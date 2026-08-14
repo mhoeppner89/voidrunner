@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v4-directional-fleet';
+const CACHE = 'voidrunner-v5-station-art';
 const directionalViews = [
   'front', 'back', 'left', 'right', 'up', 'down',
   'front-right', 'front-left', 'front-up', 'front-down',
@@ -33,7 +33,15 @@ self.addEventListener('install', (event) => {
     './vendor/three.core.min.js',
     './art/career-mining.webp',
     './art/locations/v3/azure.png',
+    './art/locations/v3/bar-azure.png',
+    './art/locations/v3/bar-helix.png',
+    './art/locations/v3/bar-rook.png',
+    './art/locations/v3/bar-vesper.png',
     './art/locations/v3/helix.png',
+    './art/locations/v3/market-azure.png',
+    './art/locations/v3/market-helix.png',
+    './art/locations/v3/market-rook.png',
+    './art/locations/v3/market-vesper.png',
     './art/locations/v3/rook.png',
     './art/locations/v3/vesper.png',
     './art/portraits/captain-dorne.webp',
