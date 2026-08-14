@@ -93,7 +93,7 @@ def start_flight(browser: Browser) -> tuple[Any, Page, list[str], list[str]]:
     page.goto(BASE_URL, wait_until="domcontentloaded")
     page.locator('[data-ui-command="new"]').click()
     page.locator("#dock-screen").wait_for(state="visible")
-    page.locator('[data-ui-command="launch"]').last.click()
+    page.locator('.concourse-pointer-ship').click()
     page.locator("#hud").wait_for(state="visible")
     page.wait_for_timeout(450)
     return context, page, errors, page_errors
@@ -255,11 +255,13 @@ def run_bounty(browser: Browser) -> dict[str, Any]:
     page.on("pageerror", lambda exc: page_errors.append(str(exc)))
     page.goto(BASE_URL, wait_until="domcontentloaded")
     page.locator('[data-ui-command="new"]').click()
-    page.locator('[data-dock-tab="missions"]').click()
+    page.locator('[data-dock-hotspot="bar"]').click()
+    page.locator('[data-bar-panel="missions"]').click()
     save = get_state(page)
     mission = next(mission for mission in save["world"]["offers"]["helix"] if mission["kind"] == "bounty")
     page.locator(f'[data-mission-id="{mission["id"]}"]').click()
-    page.locator('[data-ui-command="launch"]').last.click()
+    page.locator('[data-ui-command="dock-concourse"]').click()
+    page.locator('.concourse-pointer-ship').click()
     page.locator("#hud").wait_for(state="visible")
 
     page.evaluate(
