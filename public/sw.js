@@ -1,0 +1,84 @@
+const CACHE = 'voidrunner-v4-directional-fleet';
+const directionalViews = [
+  'front', 'back', 'left', 'right', 'up', 'down',
+  'front-right', 'front-left', 'front-up', 'front-down',
+  'back-right', 'back-left', 'back-up', 'back-down',
+  'right-up', 'right-down', 'left-up', 'left-down',
+  'front-right-up', 'front-right-down', 'front-left-up', 'front-left-down',
+  'back-right-up', 'back-right-down', 'back-left-up', 'back-left-down',
+];
+const directionalShips = ['player-courier', 'pirate-fighter', 'cargo-hauler'];
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
+    './',
+    './index.html',
+    './favicon.svg',
+    './manifest.webmanifest',
+    './src/style.css',
+    './src/main.js',
+    './src/game/audio.js',
+    './src/game/data.js',
+    './src/game/economy.js',
+    './src/game/game.js',
+    './src/game/input.js',
+    './src/game/missions.js',
+    './src/game/random.js',
+    './src/game/render.js',
+    './src/game/save.js',
+    './src/game/shipStats.js',
+    './src/game/types.js',
+    './src/game/ui.js',
+    './src/game/worldData.js',
+    './vendor/three.module.min.js',
+    './vendor/three.core.min.js',
+    './art/career-mining.webp',
+    './art/locations/v3/azure.png',
+    './art/locations/v3/helix.png',
+    './art/locations/v3/rook.png',
+    './art/locations/v3/vesper.png',
+    './art/portraits/captain-dorne.webp',
+    './art/portraits/devi-castor.webp',
+    './art/portraits/doctor-ames.webp',
+    './art/portraits/ivo-senn.webp',
+    './art/portraits/kes-ali.webp',
+    './art/portraits/linh-sorel.webp',
+    './art/portraits/mara-vek.webp',
+    './art/portraits/oskar-brill.webp',
+    './art/portraits/ren-iverson.webp',
+    './art/portraits/sana-kell.webp',
+    './art/portraits/tovik.webp',
+    './art/portraits/yara-tan.webp',
+    './art/ships/vanguard.webp',
+    './art/ships/wayfarer.webp',
+    './art/sprites/player-courier/01.png',
+    './art/sprites/player-courier/02.png',
+    './art/sprites/player-courier/03.png',
+    './art/sprites/player-courier/04.png',
+    './art/sprites/pirate-fighter/01.png',
+    './art/sprites/pirate-fighter/02.png',
+    './art/sprites/pirate-fighter/03.png',
+    './art/sprites/pirate-fighter/04.png',
+    './art/sprites/cargo-hauler/01.png',
+    './art/sprites/cargo-hauler/02.png',
+    './art/sprites/cargo-hauler/03.png',
+    './art/sprites/cargo-hauler/04.png',
+    ...directionalShips.flatMap((ship) => directionalViews.map((view) => `./art/sprites/directional/${ship}/${view}.png`)),
+    './art/title-cockpit.webp',
+    './assets/remaster/cockpit-frame.webp',
+    './assets/remaster/dock-industrial-texture.jpg',
+    './assets/remaster/dock-lower-strip.webp',
+  ])));
+  self.skipWaiting();
+});
+self.addEventListener('activate', (event) => {
+  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))));
+  self.clients.claim();
+});
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+  event.respondWith(fetch(event.request).then((response) => {
+    const copy = response.clone();
+    caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+    return response;
+  }).catch(() => caches.match(event.request)));
+});
