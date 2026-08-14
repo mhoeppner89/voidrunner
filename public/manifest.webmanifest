@@ -1,0 +1,17 @@
+{
+  "name": "Voidrunner — Frontier Adventure",
+  "short_name": "Voidrunner",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#06153a",
+  "theme_color": "#0d3d86",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
