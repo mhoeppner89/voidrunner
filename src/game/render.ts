@@ -21,44 +21,6 @@ interface TimedEffect {
   points?: THREE.Points;
 }
 
-type ShipSpriteKey = 'player-courier' | 'pirate-fighter' | 'cargo-hauler';
-type ShipSpriteDirection =
-  | 'front' | 'back' | 'left' | 'right' | 'up' | 'down'
-  | 'front-right' | 'front-left' | 'front-up' | 'front-down'
-  | 'back-right' | 'back-left' | 'back-up' | 'back-down'
-  | 'right-up' | 'right-down' | 'left-up' | 'left-down'
-  | 'front-right-up' | 'front-right-down' | 'front-left-up' | 'front-left-down'
-  | 'back-right-up' | 'back-right-down' | 'back-left-up' | 'back-left-down';
-
-const SHIP_SPRITE_DIRECTIONS: ReadonlyArray<{ name: ShipSpriteDirection; vector: THREE.Vector3 }> = [
-  { name: 'front', vector: new THREE.Vector3(0, 0, -1) },
-  { name: 'back', vector: new THREE.Vector3(0, 0, 1) },
-  { name: 'left', vector: new THREE.Vector3(-1, 0, 0) },
-  { name: 'right', vector: new THREE.Vector3(1, 0, 0) },
-  { name: 'up', vector: new THREE.Vector3(0, 1, 0) },
-  { name: 'down', vector: new THREE.Vector3(0, -1, 0) },
-  { name: 'front-right', vector: new THREE.Vector3(1, 0, -1).normalize() },
-  { name: 'front-left', vector: new THREE.Vector3(-1, 0, -1).normalize() },
-  { name: 'front-up', vector: new THREE.Vector3(0, 1, -1).normalize() },
-  { name: 'front-down', vector: new THREE.Vector3(0, -1, -1).normalize() },
-  { name: 'back-right', vector: new THREE.Vector3(1, 0, 1).normalize() },
-  { name: 'back-left', vector: new THREE.Vector3(-1, 0, 1).normalize() },
-  { name: 'back-up', vector: new THREE.Vector3(0, 1, 1).normalize() },
-  { name: 'back-down', vector: new THREE.Vector3(0, -1, 1).normalize() },
-  { name: 'right-up', vector: new THREE.Vector3(1, 1, 0).normalize() },
-  { name: 'right-down', vector: new THREE.Vector3(1, -1, 0).normalize() },
-  { name: 'left-up', vector: new THREE.Vector3(-1, 1, 0).normalize() },
-  { name: 'left-down', vector: new THREE.Vector3(-1, -1, 0).normalize() },
-  { name: 'front-right-up', vector: new THREE.Vector3(1, 1, -1).normalize() },
-  { name: 'front-right-down', vector: new THREE.Vector3(1, -1, -1).normalize() },
-  { name: 'front-left-up', vector: new THREE.Vector3(-1, 1, -1).normalize() },
-  { name: 'front-left-down', vector: new THREE.Vector3(-1, -1, -1).normalize() },
-  { name: 'back-right-up', vector: new THREE.Vector3(1, 1, 1).normalize() },
-  { name: 'back-right-down', vector: new THREE.Vector3(1, -1, 1).normalize() },
-  { name: 'back-left-up', vector: new THREE.Vector3(-1, 1, 1).normalize() },
-  { name: 'back-left-down', vector: new THREE.Vector3(-1, -1, 1).normalize() },
-];
-
 const tupleToVector = (tuple: Vec3Tuple, out = new THREE.Vector3()): THREE.Vector3 => out.set(tuple[0], tuple[1], tuple[2]);
 
 const cssHex = (value: number): string => `#${value.toString(16).padStart(6, '0')}`;
@@ -93,9 +55,6 @@ export class SpaceRenderer {
   private readonly wreckNodeMeshes = new Map<string, THREE.Object3D>();
   private readonly effects: TimedEffect[] = [];
   private readonly cockpit = new THREE.Group();
-  private readonly shipSpriteLoader = new THREE.TextureLoader();
-  private readonly directionalSpriteTextures = new Map<ShipSpriteKey, Map<ShipSpriteDirection, THREE.Texture>>();
-  private readonly directionalSpritePromises = new Map<ShipSpriteKey, Promise<Map<ShipSpriteDirection, THREE.Texture>>>();
   private readonly cockpitWarning: THREE.Mesh;
   private readonly utilityBeam: THREE.Mesh;
   private readonly utilityBeamMaterial: THREE.MeshBasicMaterial;
@@ -106,12 +65,6 @@ export class SpaceRenderer {
   private readonly pixelTextures = new Set<THREE.Texture>();
   private readonly screenTextures: THREE.CanvasTexture[] = [];
   private readonly forward = new THREE.Vector3();
-  private readonly cameraWorldPosition = new THREE.Vector3();
-  private readonly shipWorldPosition = new THREE.Vector3();
-  private readonly shipToCamera = new THREE.Vector3();
-  private readonly shipLocalView = new THREE.Vector3();
-  private readonly shipWorldQuaternion = new THREE.Quaternion();
-  private readonly sharedSpriteTextures = new Set<THREE.Texture>();
   private asteroidMesh!: THREE.InstancedMesh;
   private asteroids: AsteroidNode[];
   private graveyard: GraveyardPiece[];
@@ -930,107 +883,6 @@ export class SpaceRenderer {
     return geometry;
   }
 
-  private shipSpriteKey(entity: ShipEntity): ShipSpriteKey {
-    if (entity.hostile) return 'pirate-fighter';
-    if (entity.role === 'trader' || entity.role === 'miner') return 'cargo-hauler';
-    return 'player-courier';
-  }
-
-  private loadDirectionalSpriteSet(key: ShipSpriteKey): Promise<Map<ShipSpriteDirection, THREE.Texture>> {
-    const cached = this.directionalSpriteTextures.get(key);
-    if (cached) return Promise.resolve(cached);
-    const pending = this.directionalSpritePromises.get(key);
-    if (pending) return pending;
-
-    const promise = Promise.all(SHIP_SPRITE_DIRECTIONS.map(({ name }) => new Promise<[ShipSpriteDirection, THREE.Texture]>((resolve, reject) => {
-      this.shipSpriteLoader.load(
-        `./art/sprites/directional/${key}/${name}.png`,
-        (texture) => {
-          texture.colorSpace = THREE.SRGBColorSpace;
-          texture.magFilter = THREE.NearestFilter;
-          texture.minFilter = THREE.NearestFilter;
-          texture.generateMipmaps = false;
-          texture.wrapS = THREE.ClampToEdgeWrapping;
-          texture.wrapT = THREE.ClampToEdgeWrapping;
-          texture.anisotropy = 1;
-          this.sharedSpriteTextures.add(texture);
-          resolve([name, texture]);
-        },
-        undefined,
-        (error) => reject(error),
-      );
-    }))).then((entries) => {
-      const textures = new Map<ShipSpriteDirection, THREE.Texture>(entries);
-      this.directionalSpriteTextures.set(key, textures);
-      this.directionalSpritePromises.delete(key);
-      return textures;
-    }).catch((error) => {
-      this.directionalSpritePromises.delete(key);
-      throw error;
-    });
-    this.directionalSpritePromises.set(key, promise);
-    return promise;
-  }
-
-  private attachShipSprite(group: THREE.Group, entity: ShipEntity, legacyChildren: THREE.Object3D[]): void {
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-      alphaTest: 0.08,
-      color: 0xffffff,
-      depthWrite: false,
-      opacity: 0,
-      toneMapped: false,
-      transparent: true,
-    }));
-    const size = entity.role === 'trader' ? 14.5 : entity.role === 'miner' ? 12.5 : 11.5;
-    sprite.scale.set(size, size, 1);
-    sprite.renderOrder = 12;
-    sprite.frustumCulled = false;
-    sprite.visible = false;
-    group.add(sprite);
-    group.userData.shipSprite = sprite;
-    group.userData.spriteDirection = 'front' satisfies ShipSpriteDirection;
-
-    const key = this.shipSpriteKey(entity);
-    group.userData.spriteKey = key;
-    void this.loadDirectionalSpriteSet(key).then((textures) => {
-      group.userData.spriteTextures = textures;
-      legacyChildren.forEach((child) => { child.visible = false; });
-      const material = sprite.material as THREE.SpriteMaterial;
-      material.opacity = 1;
-      material.map = textures.get(group.userData.spriteDirection as ShipSpriteDirection) ?? textures.get('front')!;
-      material.needsUpdate = true;
-      sprite.visible = group.visible;
-    }).catch(() => {
-      // Keep the procedural mesh visible if an optional art pack is unavailable.
-      sprite.visible = false;
-    });
-  }
-
-  private selectShipSpriteDirection(group: THREE.Group): ShipSpriteDirection {
-    this.camera.getWorldPosition(this.cameraWorldPosition);
-    group.getWorldPosition(this.shipWorldPosition);
-    this.shipToCamera.subVectors(this.cameraWorldPosition, this.shipWorldPosition);
-    if (this.shipToCamera.lengthSq() < 1e-6) return (group.userData.spriteDirection as ShipSpriteDirection | undefined) ?? 'front';
-    group.getWorldQuaternion(this.shipWorldQuaternion);
-    this.shipLocalView.copy(this.shipToCamera).applyQuaternion(this.shipWorldQuaternion.invert()).normalize();
-
-    let bestDirection: ShipSpriteDirection = 'front';
-    let bestScore = -Infinity;
-    let currentScore = -Infinity;
-    const currentDirection = group.userData.spriteDirection as ShipSpriteDirection | undefined;
-    for (const candidate of SHIP_SPRITE_DIRECTIONS) {
-      const score = this.shipLocalView.dot(candidate.vector);
-      if (candidate.name === currentDirection) currentScore = score;
-      if (score > bestScore) {
-        bestScore = score;
-        bestDirection = candidate.name;
-      }
-    }
-    // A small hysteresis band prevents a ship hovering on a view boundary from flickering.
-    if (currentDirection && currentScore >= bestScore - 0.045) return currentDirection;
-    return bestDirection;
-  }
-
   private createShipMesh(entity: ShipEntity): THREE.Group {
     const group = new THREE.Group();
     const faction = factionColor(entity.faction);
@@ -1213,7 +1065,6 @@ export class SpaceRenderer {
       group.add(lamp);
     }
 
-    this.attachShipSprite(group, entity, [...group.children]);
     group.scale.setScalar(specs.scale);
     group.userData.baseScale = specs.scale;
     group.userData.engineGlow = glow;
@@ -1243,18 +1094,6 @@ export class SpaceRenderer {
       const baseScale = Number(mesh.userData.baseScale ?? 1);
       mesh.scale.setScalar(baseScale * (1 + Math.sin(performance.now() * 0.013 + entity.spawnTime) * 0.006));
       mesh.visible = entity.hull > 0;
-      const sprite = mesh.userData.shipSprite as THREE.Sprite | undefined;
-      const textures = mesh.userData.spriteTextures as Map<ShipSpriteDirection, THREE.Texture> | undefined;
-      if (sprite && textures?.size === SHIP_SPRITE_DIRECTIONS.length) {
-        const direction = this.selectShipSpriteDirection(mesh);
-        if (direction !== mesh.userData.spriteDirection) {
-          const material = sprite.material as THREE.SpriteMaterial;
-          material.map = textures.get(direction)!;
-          material.needsUpdate = true;
-          mesh.userData.spriteDirection = direction;
-        }
-        sprite.visible = mesh.visible;
-      }
       mesh.traverse((object) => {
         if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshStandardMaterial) {
           object.material.emissiveIntensity = entity.hostile ? 0.18 + damage * 0.28 : damage * 0.12;
@@ -1608,7 +1447,7 @@ export class SpaceRenderer {
       materials.forEach((material) => {
         if (!material) return;
         for (const value of Object.values(material)) {
-          if (value instanceof THREE.Texture && !this.sharedSpriteTextures.has(value)) value.dispose();
+          if (value instanceof THREE.Texture) value.dispose();
         }
         material.dispose();
       });
@@ -1622,10 +1461,6 @@ export class SpaceRenderer {
     this.disposeObject(this.scene);
     this.pixelTextures.forEach((texture) => texture.dispose());
     this.pixelTextures.clear();
-    this.sharedSpriteTextures.forEach((texture) => texture.dispose());
-    this.sharedSpriteTextures.clear();
-    this.directionalSpriteTextures.clear();
-    this.directionalSpritePromises.clear();
     this.screenTextures.length = 0;
     this.renderer.dispose();
     this.renderer.domElement.remove();

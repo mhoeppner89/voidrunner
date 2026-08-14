@@ -2185,35 +2185,11 @@ button.compact {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(76px, 1.15fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: 0.3rem;
   height: 82%;
   padding: 0.24rem 0.4rem 0.42rem;
-}
-
-.screen-target-layout {
-  grid-template-columns: minmax(0, 1fr) minmax(82px, 1.2fr);
-}
-
-.own-ship-silhouette,
-.target-ship-silhouette {
-  width: 100%;
-  height: 52%;
-  min-height: 34px;
-  background: center / contain no-repeat url("../art/sprites/player-courier/01.png");
-  image-rendering: pixelated;
-  filter: saturate(1.18) contrast(1.14) brightness(1.2) drop-shadow(0 0 5px rgba(79, 213, 239, 0.32));
-}
-
-.target-ship-silhouette {
-  background-image: url("../art/sprites/pirate-fighter/01.png");
-  filter: saturate(1.15) contrast(1.14) brightness(1.16) drop-shadow(0 0 5px rgba(255, 91, 65, 0.28));
-}
-
-.target-ship-silhouette.is-empty {
-  opacity: 0.15;
-  background-image: linear-gradient(90deg, transparent 5%, rgba(89, 187, 219, 0.6) 5% 8%, transparent 8% 92%, rgba(89, 187, 219, 0.6) 92% 95%, transparent 95%);
 }
 
 .screen-bars {
@@ -2383,11 +2359,6 @@ button.compact {
 
   .screen-bars i {
     height: 3px;
-  }
-
-  .own-ship-silhouette,
-  .target-ship-silhouette {
-    min-height: 20px;
   }
 
   .radar-screen-wrap {
