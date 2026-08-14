@@ -90,6 +90,12 @@ Original prompt: Freeze the approved Voidrunner art style and proceed with the i
 - Updated browser QA and career smoke-test helpers for ship-only launch.
 - Verification: `npm run check`, `npm run build`, `npm run build:static`, `node --test tests/logic.test.mjs`, Python syntax validation, and `git diff --check` pass. The bundled browser client and in-app browser pass reached the flight HUD with footer count 0 and zero browser errors.
 
+## GitHub Pages station-art cache refresh
+
+- Confirmed a fresh public Pages session at `https://mhoeppner89.github.io/voidrunner/` renders the revised Helix concourse, while the existing service-worker cache was still named `voidrunner-v4-directional-fleet` from the earlier flight-art pass.
+- Bumped the service-worker cache to `voidrunner-v5-station-art` and added all bar and market plates to its pre-cache so returning visitors receive the current location screens.
+- Verification: `npm run check`, `npm run build:static`, `node --test tests/logic.test.mjs`, and `git diff --check` pass. Redeploy `main` and recheck the public station flow after the Pages workflow completes.
+
 ### Next review
 
 - Review the local station flow at `http://127.0.0.1:5174/` and confirm whether the pointer positions match the intended interaction points on each location plate.
