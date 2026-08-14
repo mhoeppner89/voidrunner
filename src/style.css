@@ -4279,11 +4279,16 @@ button.primary,
 }
 
 .dock-screen[data-tab="market"] .dock-backdrop {
-  opacity: 0.86;
-  filter: saturate(1.04) contrast(1.05) brightness(0.9);
+  opacity: 0.95;
+  filter: saturate(1.1) contrast(1.04) brightness(1.04);
 }
 
-.dock-screen[data-tab="market"] .dock-backdrop::after,
+.dock-screen[data-tab="market"] .dock-backdrop::after {
+  background:
+    linear-gradient(90deg, rgba(3, 13, 42, 0.34), rgba(3, 13, 42, 0.1) 56%, rgba(3, 13, 42, 0.32)),
+    linear-gradient(0deg, rgba(3, 12, 38, 0.54), rgba(3, 12, 38, 0.08) 58%, rgba(3, 12, 38, 0.26));
+}
+
 .dock-screen[data-tab="services"] .dock-backdrop::after {
   background:
     linear-gradient(90deg, rgba(3, 13, 42, 0.76), rgba(3, 13, 42, 0.5) 56%, rgba(3, 13, 42, 0.72)),
@@ -4443,6 +4448,27 @@ button.primary,
   z-index: 3;
 }
 
+.dock-screen[data-tab="market"] .market-screen {
+  min-height: 0;
+  padding: 0.1rem 0.1rem 0.45rem;
+}
+
+.dock-screen[data-tab="market"] .market-layout {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.dock-screen[data-tab="market"] .market-table {
+  max-height: calc(100vh - 290px);
+  overflow: auto;
+}
+
+.dock-screen[data-tab="market"] .equipment-grid,
+.dock-screen[data-tab="market"] .shipyard-grid {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
 @media (max-width: 900px), (pointer: coarse) {
   .concourse-screen { min-height: 0; }
 
@@ -4467,4 +4493,426 @@ button.primary,
   .service-quick-actions { grid-template-columns: 1fr; gap: 0.2rem; }
   .service-quick-actions button { min-height: 28px; font-size: 0.42rem; }
   .market-points button { min-height: 38px; font-size: 0.48rem; }
+}
+
+/* Fit the station screens inside the actual dock row on touch devices. */
+@media (max-width: 900px), (pointer: coarse) {
+  .dock-screen[data-tab="concourse"] .concourse-screen {
+    display: grid;
+    height: auto;
+    min-height: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    align-content: start;
+    overflow: visible;
+    padding: 0.55rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-screen .landing-copy {
+    position: relative;
+    inset: auto;
+    order: 1;
+    grid-column: 1 / -1;
+    width: auto;
+    padding: 0.5rem 0.65rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-screen .landing-copy h3 {
+    margin-bottom: 0.25rem;
+    font-size: 0.95rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-screen .landing-copy p {
+    font-size: 0.58rem;
+    line-height: 1.35;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-screen .landing-signal {
+    margin-top: 0.35rem;
+    padding-top: 0.3rem;
+    font-size: 0.47rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-screen .landing-hotspots {
+    position: relative;
+    inset: auto;
+    order: 2;
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.35rem;
+    pointer-events: auto;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-screen .landing-hotspot {
+    position: relative;
+    inset: auto;
+    min-width: 0;
+    min-height: 42px;
+    padding: 0.38rem 0.42rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-screen .landing-hotspot i {
+    top: -8px;
+    left: -7px;
+    width: 18px;
+    height: 18px;
+    font-size: 0.6rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-screen .landing-hotspot b {
+    font-size: 0.5rem;
+    letter-spacing: 0.04em;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-screen .landing-hotspot small {
+    font-size: 0.43rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-screen > section {
+    position: relative;
+    inset: auto;
+    order: 3;
+    width: auto;
+    padding: 0.55rem 0.65rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-ship-art {
+    height: 58px;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-ship-card p,
+  .dock-screen[data-tab="concourse"] .concourse-info p,
+  .dock-screen[data-tab="concourse"] .concourse-services p {
+    font-size: 0.55rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-info,
+  .dock-screen[data-tab="concourse"] .concourse-services {
+    min-width: 0;
+  }
+
+  .dock-screen[data-tab="bar"] .bar-layout {
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+    max-width: none;
+  }
+
+  .dock-screen[data-tab="bar"] .bar-stage,
+  .dock-screen[data-tab="bar"] .bar-dialogue {
+    min-width: 0;
+    padding: 0.65rem;
+  }
+
+  .dock-screen[data-tab="bar"] .people-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.45rem;
+    margin-top: 0.6rem;
+  }
+
+  .dock-screen[data-tab="bar"] .person-card {
+    min-height: 0;
+  }
+
+  .dock-screen[data-tab="bar"] .person-card .avatar {
+    height: 112px;
+  }
+
+  .dock-screen[data-tab="bar"] .person-card > span {
+    padding: 0.42rem;
+  }
+
+  .dock-screen[data-tab="bar"] .person-card b {
+    font-size: 0.62rem;
+  }
+
+  .dock-screen[data-tab="bar"] .person-card small {
+    font-size: 0.5rem;
+  }
+
+  .dock-screen[data-tab="bar"] .person-card em {
+    margin-top: 0.2rem;
+    font-size: 0.44rem;
+  }
+
+  .dock-screen[data-tab="market"] .market-screen {
+    overflow: visible;
+  }
+
+  .dock-screen[data-tab="market"] .market-table {
+    max-height: none;
+    overflow-y: visible;
+  }
+}
+
+/* Short landscape phones need a compact first viewport, with the full page still scrollable. */
+@media (max-height: 520px) and (orientation: landscape) {
+  .dock-screen[data-tab="concourse"] .concourse-screen .landing-copy p,
+  .dock-screen[data-tab="concourse"] .concourse-screen .landing-signal {
+    display: none;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-screen .landing-copy {
+    padding: 0.42rem 0.55rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-screen .landing-hotspot {
+    min-height: 36px;
+    padding: 0.3rem 0.34rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-screen .landing-hotspot small {
+    display: none;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-screen > section {
+    padding: 0.45rem 0.52rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-ship-art {
+    height: 42px;
+    margin: 0.2rem 0;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-ship-card p,
+  .dock-screen[data-tab="concourse"] .concourse-info p,
+  .dock-screen[data-tab="concourse"] .concourse-services p {
+    display: none;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-ship-card h3,
+  .dock-screen[data-tab="concourse"] .concourse-info h3,
+  .dock-screen[data-tab="concourse"] .concourse-services h3 {
+    font-size: 0.65rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .snapshot-stats {
+    gap: 0.25rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .snapshot-stats div {
+    padding: 0.3rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .snapshot-stats b {
+    font-size: 0.58rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .service-quick-actions {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.2rem;
+    margin: 0.3rem 0 0;
+  }
+
+  .dock-screen[data-tab="concourse"] .service-quick-actions button {
+    min-height: 26px;
+    padding: 0.28rem 0.25rem;
+    font-size: 0.4rem;
+  }
+
+  .dock-screen[data-tab="bar"] .bar-stage h3 {
+    font-size: 0.9rem;
+  }
+
+  .dock-screen[data-tab="bar"] .bar-shortcuts {
+    margin: 0.35rem 0 0;
+  }
+
+  .dock-screen[data-tab="bar"] .people-row {
+    margin-top: 0.45rem;
+  }
+
+  .dock-screen[data-tab="bar"] .person-card .avatar {
+    height: 72px;
+  }
+
+  .dock-screen[data-tab="bar"] .person-card > span {
+    padding: 0.3rem 0.36rem;
+  }
+
+  .dock-screen[data-tab="bar"] .person-card b {
+    font-size: 0.54rem;
+  }
+
+  .dock-screen[data-tab="bar"] .person-card small {
+    font-size: 0.45rem;
+  }
+
+  .dock-screen[data-tab="bar"] .person-card em {
+    display: none;
+  }
+
+  .dock-screen[data-tab="market"] .market-points {
+    gap: 0.3rem;
+    margin-bottom: 0.45rem;
+  }
+
+  .dock-screen[data-tab="market"] .market-points button {
+    min-height: 38px;
+    padding: 0.32rem 0.28rem;
+    font-size: 0.46rem;
+  }
+
+  .dock-screen[data-tab="market"] .table-title {
+    margin-bottom: 0.4rem;
+    padding: 0.5rem 0.62rem;
+  }
+
+  .dock-screen[data-tab="market"] .market-row {
+    min-height: 46px;
+    padding: 0.3rem 0.55rem;
+  }
+}
+
+@media (max-width: 520px), (orientation: portrait) {
+  .dock-screen[data-tab="concourse"] .concourse-screen .landing-hotspots {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-screen > section {
+    grid-column: 1 / -1;
+  }
+
+  .dock-screen[data-tab="bar"] .people-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Point-and-click interaction language: labels float over the scene instead of looking like controls. */
+.landing-hotspot {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-left: 0;
+  box-shadow: none;
+  cursor: pointer;
+  text-shadow: 1px 1px #061638, 0 0 8px rgba(1, 8, 29, 0.9);
+}
+
+.landing-hotspot:hover,
+.landing-hotspot:focus-visible {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  filter: brightness(1.24);
+  outline: none;
+  transform: scale(1.03);
+}
+
+.landing-hotspot:focus-visible {
+  outline: 1px dashed var(--void-gold);
+  outline-offset: 3px;
+}
+
+.landing-hotspot i {
+  box-shadow: 0 0 0 2px rgba(4, 18, 55, 0.72), 0 0 12px rgba(255, 208, 92, 0.36);
+}
+
+.concourse-ship-card {
+  cursor: pointer;
+}
+
+.concourse-ship-card:focus-visible {
+  outline: 1px dashed var(--void-gold);
+  outline-offset: 3px;
+}
+
+.click-hint {
+  display: block;
+  color: var(--void-gold);
+  font-family: var(--pixel-font);
+  font-size: 0.48rem;
+  letter-spacing: 0.08em;
+}
+
+.person-card {
+  cursor: pointer;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.person-card > span {
+  background: transparent;
+  text-shadow: 1px 1px #061638, 0 0 8px rgba(1, 8, 29, 0.92);
+}
+
+.person-card .avatar {
+  border: 0;
+  filter: contrast(1.08) saturate(0.92) drop-shadow(0 0 12px rgba(29, 170, 224, 0.18));
+}
+
+.person-card:hover,
+.person-card:focus-visible {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: 0 0 22px rgba(91, 193, 240, 0.22);
+  outline: none;
+  transform: translateY(-2px);
+}
+
+.person-card:focus-visible {
+  outline: 1px dashed var(--void-gold);
+  outline-offset: 3px;
+}
+
+.dock-screen[data-tab="bar"] .person-card {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dock-screen[data-tab="bar"] .person-card > span {
+  background: transparent;
+}
+
+.dock-screen[data-tab="bar"] .person-card:hover,
+.dock-screen[data-tab="bar"] .person-card:focus-visible {
+  border: 0;
+  background: transparent;
+  box-shadow: 0 0 22px rgba(91, 193, 240, 0.22);
+}
+
+@media (min-width: 901px) and (pointer: fine) {
+  .dock-screen[data-tab="concourse"] .concourse-screen {
+    height: calc(100% - 4.2rem);
+    min-height: 0;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-screen > section {
+    padding: 0.62rem 0.74rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-ship-art {
+    height: 66px;
+    margin: 0.25rem 0;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-ship-card p,
+  .dock-screen[data-tab="concourse"] .concourse-info p,
+  .dock-screen[data-tab="concourse"] .concourse-services p {
+    margin-bottom: 0.38rem;
+    font-size: 0.58rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-ship-card .click-hint {
+    font-size: 0.43rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .concourse-info .ticker {
+    margin: 0.45rem 0;
+    padding: 0.45rem 0.55rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .snapshot-stats {
+    gap: 0.32rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .snapshot-stats div {
+    padding: 0.34rem;
+  }
+
+  .dock-screen[data-tab="concourse"] .snapshot-stats b {
+    font-size: 0.68rem;
+  }
 }

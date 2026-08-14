@@ -290,6 +290,14 @@ export class GameUI {
       const value = element instanceof HTMLInputElement && element.type === 'checkbox' ? element.checked : element.type === 'range' ? Number(element.value) : element.value;
       this.actions?.setSetting(setting, value);
     });
+
+    this.root.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const target = (event.target as HTMLElement).closest<HTMLElement>('[data-ui-command], [data-dock-hotspot], [data-person-id]');
+      if (!target) return;
+      event.preventDefault();
+      target.click();
+    });
   }
 
   private handleCommand(command: string, element: HTMLElement): void {
@@ -403,6 +411,11 @@ export class GameUI {
     dock.style.setProperty('--dock-secondary', location.secondary);
     dock.dataset.location = this.dockLocation;
     dock.dataset.tab = this.dockTab;
+    const illustrationScreen = this.dockTerminal === 'bar'
+      ? 'bar'
+      : this.dockTerminal === 'market'
+        ? 'market'
+        : 'concourse';
     const terminal = this.dockTerminal ? this.renderDockTab(this.dockTerminal) : '';
     const terminalTabs = [
       ['concourse', 'CONCOURSE'],
@@ -410,7 +423,7 @@ export class GameUI {
       ['market', 'MARKET'],
     ];
     dock.innerHTML = `
-      <div class="dock-backdrop">${this.locationIllustration(this.dockLocation, this.dockTerminal === 'bar' ? 'bar' : 'concourse')}</div>
+      <div class="dock-backdrop">${this.locationIllustration(this.dockLocation, illustrationScreen)}</div>
       <div class="dock-scanlines" aria-hidden="true"></div>
       <header class="dock-header">
         <div><span>${location.kind.toUpperCase()} / ${FACTION_NAMES[location.faction]}</span><h2>${escapeHtml(location.name)}</h2></div>
@@ -445,11 +458,11 @@ export class GameUI {
           <div class="landing-signal"><b>LOCAL SIGNAL</b><span>${traffic}</span></div>
         </div>
         <div class="landing-hotspots" aria-label="Location actions">
-          <button class="landing-hotspot hotspot-ship" data-ui-command="launch"><i>↗</i><b>YOUR SHIP</b><small>Click to launch</small></button>
-          <button class="landing-hotspot hotspot-services" data-dock-hotspot="services"><i>⚙</i><b>SERVICES</b><small>Repair and refuel</small></button>
-          <button class="landing-hotspot hotspot-market" data-dock-hotspot="market"><i>▣</i><b>MARKET</b><small>Trade and fit out</small></button>
-          <button class="landing-hotspot hotspot-bar" data-dock-hotspot="bar"><i>✦</i><b>BAR</b><small>Guilds and missions</small></button>
-          <button class="landing-hotspot hotspot-dock" data-ui-command="launch"><i>⌂</i><b>DOCK</b><small>Launch corridor</small></button>
+          <div class="landing-hotspot hotspot-ship" data-ui-command="launch" role="button" tabindex="0" aria-label="Launch your ship"><i>↗</i><b>YOUR SHIP</b><small>Click to launch</small></div>
+          <div class="landing-hotspot hotspot-services" data-dock-hotspot="services" role="button" tabindex="0" aria-label="Open services"><i>⚙</i><b>SERVICES</b><small>Repair and refuel</small></div>
+          <div class="landing-hotspot hotspot-market" data-dock-hotspot="market" role="button" tabindex="0" aria-label="Open market"><i>▣</i><b>MARKET</b><small>Trade and fit out</small></div>
+          <div class="landing-hotspot hotspot-bar" data-dock-hotspot="bar" role="button" tabindex="0" aria-label="Enter the bar"><i>✦</i><b>BAR</b><small>Guilds and missions</small></div>
+          <div class="landing-hotspot hotspot-dock" data-ui-command="launch" role="button" tabindex="0" aria-label="Launch corridor"><i>⌂</i><b>DOCK</b><small>Launch corridor</small></div>
         </div>
         <aside class="landing-dialogue">
           <span class="eyebrow">DOCKMASTER // OPEN CHANNEL</span>
@@ -498,18 +511,17 @@ export class GameUI {
           <p>${escapeHtml(location.description)}</p>
           <div class="landing-signal"><b>LOCAL SIGNAL</b><span>${this.dockLocation === 'rook' ? 'PATROLS HEAVY' : this.dockLocation === 'vesper' ? 'ORE CONVOYS ACTIVE' : this.dockLocation === 'azure' ? 'HARVEST LIFTS ON SCHEDULE' : 'FREEPORT VOLUME HIGH'}</span></div>
         </div>
-        <section class="concourse-ship-card">
+        <section class="concourse-ship-card" data-ui-command="launch" role="button" tabindex="0" aria-label="Launch the docked ship">
           <span class="eyebrow">DOCKED PLAYER SHIP</span>
           <div class="concourse-ship-art">${this.shipArt(this.save!.player.shipId, ship.name)}</div>
-          <h3>${escapeHtml(ship.name)}</h3><p>${escapeHtml(ship.className)} · Ready for departure</p>
-          <button class="primary" data-ui-command="launch">LAUNCH SHIP</button>
+          <h3>${escapeHtml(ship.name)}</h3><p>${escapeHtml(ship.className)} · Ready for departure</p><small class="click-hint">CLICK SHIP TO LAUNCH</small>
         </section>
         <div class="landing-hotspots" aria-label="Concourse actions">
-          <button class="landing-hotspot hotspot-ship" data-ui-command="launch"><i>↗</i><b>YOUR SHIP</b><small>Click to launch</small></button>
-          <button class="landing-hotspot hotspot-services" data-dock-hotspot="services"><i>⚙</i><b>SERVICES</b><small>Repair and refuel</small></button>
-          <button class="landing-hotspot hotspot-market" data-dock-hotspot="market"><i>▣</i><b>MARKET</b><small>Trade and fit out</small></button>
-          <button class="landing-hotspot hotspot-bar" data-dock-hotspot="bar"><i>✦</i><b>BAR</b><small>Guilds and missions</small></button>
-          <button class="landing-hotspot hotspot-dock" data-ui-command="launch"><i>⌂</i><b>DOCK</b><small>Launch corridor</small></button>
+          <div class="landing-hotspot hotspot-ship" data-ui-command="launch" role="button" tabindex="0" aria-label="Launch your ship"><i>↗</i><b>YOUR SHIP</b><small>Click to launch</small></div>
+          <div class="landing-hotspot hotspot-services" data-dock-hotspot="services" role="button" tabindex="0" aria-label="Open services"><i>⚙</i><b>SERVICES</b><small>Repair and refuel</small></div>
+          <div class="landing-hotspot hotspot-market" data-dock-hotspot="market" role="button" tabindex="0" aria-label="Open market"><i>▣</i><b>MARKET</b><small>Trade and fit out</small></div>
+          <div class="landing-hotspot hotspot-bar" data-dock-hotspot="bar" role="button" tabindex="0" aria-label="Enter the bar"><i>✦</i><b>BAR</b><small>Guilds and missions</small></div>
+          <div class="landing-hotspot hotspot-dock" data-ui-command="launch" role="button" tabindex="0" aria-label="Launch corridor"><i>⌂</i><b>DOCK</b><small>Launch corridor</small></div>
         </div>
         <section class="concourse-info">
           <span class="eyebrow">${location.kind.toUpperCase()} / LOCAL FEED</span>
@@ -552,10 +564,10 @@ export class GameUI {
           <div class="bar-shortcuts"><button data-dock-tab="bar" data-bar-panel="missions">MISSION BOARD</button><button data-dock-tab="bar" data-bar-panel="guilds">GUILDS</button></div>
           <div class="people-row">
             ${people.map((person) => `
-              <button class="person-card" data-person-id="${person.id}">
+              <article class="person-card" data-person-id="${person.id}" role="button" tabindex="0" aria-label="Talk to ${escapeHtml(person.name)}">
                 ${this.portraitImage(person.id, person.name)}
                 <span><b>${escapeHtml(person.name)}</b><small>${escapeHtml(person.role)}</small><em>${escapeHtml(person.affiliation)}</em></span>
-              </button>
+              </article>
             `).join('')}
           </div>
         </section>
@@ -725,8 +737,16 @@ export class GameUI {
 
   private locationIllustration(locationId: DockLocationId, screen = 'concourse'): string {
     const location = LOCATIONS[locationId];
-    const file = screen === 'bar' ? `bar-${locationId}` : locationId;
-    const label = screen === 'bar' ? `${location.name} bar` : location.name;
+    const file = screen === 'bar'
+      ? `bar-${locationId}`
+      : screen === 'market'
+        ? `market-${locationId}`
+        : locationId;
+    const label = screen === 'bar'
+      ? `${location.name} bar`
+      : screen === 'market'
+        ? `${location.name} market`
+        : location.name;
     return `<img src="./art/locations/v3/${file}.png" alt="Pixel-art view of ${escapeHtml(label)}" draggable="false">`;
   }
 
