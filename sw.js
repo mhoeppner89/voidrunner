@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v7-portrait-remaster';
+const CACHE = 'voidrunner-v8-spaceflight-remaster';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',
@@ -20,6 +20,7 @@ self.addEventListener('install', (event) => {
     './src/game/types.js',
     './src/game/ui.js',
     './src/game/worldData.js',
+    './src/game/voxelModels.js',
     './vendor/three.module.min.js',
     './vendor/three.core.min.js',
     './art/career-mining.webp',

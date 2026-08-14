@@ -5246,3 +5246,627 @@ button.primary,
   .scene-pointer b { font-size: 0.49rem; }
   .scene-pointer small { display: none; }
 }
+
+/* Navigation map and touch targeting */
+#space-canvas {
+  touch-action: none;
+}
+
+.cockpit-screen-radar,
+.cockpit-screen-radar .screen-heading,
+.radar-screen-wrap,
+.radar-screen-wrap #radar {
+  pointer-events: auto;
+}
+
+.cockpit-screen-radar .screen-heading {
+  pointer-events: none;
+}
+
+.radar-screen-wrap #radar {
+  cursor: pointer;
+  outline: none;
+  touch-action: manipulation;
+}
+
+.radar-screen-wrap #radar:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--void-gold), 0 0 16px rgba(255, 192, 70, 0.5);
+}
+
+.map-card {
+  width: min(1180px, 96vw);
+}
+
+.navigation-map-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.48fr) minmax(280px, 0.82fr);
+  gap: 1px;
+  background: rgba(83, 132, 145, 0.24);
+}
+
+.map-section {
+  min-width: 0;
+  background: linear-gradient(180deg, rgba(3, 19, 49, 0.98), rgba(2, 10, 28, 0.98));
+}
+
+.map-section-heading {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.62rem 0.78rem;
+  color: var(--void-cyan);
+  background: rgba(4, 27, 68, 0.9);
+  border-bottom: 1px solid rgba(91, 195, 224, 0.36);
+  font-family: var(--pixel-font);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+}
+
+.map-section-heading b {
+  overflow: hidden;
+  color: var(--void-gold);
+  font-size: 0.52rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-stage {
+  background-color: #020a1c;
+  box-shadow: inset 0 0 42px rgba(9, 103, 164, 0.13);
+}
+
+.system-map.map-stage {
+  height: min(600px, 68vh);
+  min-height: 410px;
+  background:
+    linear-gradient(rgba(55, 160, 201, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(55, 160, 201, 0.055) 1px, transparent 1px),
+    radial-gradient(circle at center, rgba(255, 190, 68, 0.12), transparent 17%),
+    radial-gradient(circle, rgba(133, 197, 213, 0.58) 0 1px, transparent 1.25px),
+    #020a1c;
+  background-size: 10% 10%, 10% 10%, auto, 53px 53px, auto;
+}
+
+.map-player-marker {
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  transform: translate(-50%, -50%);
+  place-items: center;
+  pointer-events: none;
+}
+
+.map-player-marker i {
+  width: 13px;
+  height: 13px;
+  background: var(--void-cream);
+  border: 2px solid var(--void-cyan);
+  clip-path: polygon(50% 0, 100% 100%, 50% 74%, 0 100%);
+  filter: drop-shadow(0 0 5px var(--void-cyan));
+}
+
+.map-player-marker span {
+  margin-top: 0.2rem;
+  color: var(--void-cream);
+  font-family: var(--pixel-font);
+  font-size: 0.45rem;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 5px #000;
+}
+
+.system-map .map-node {
+  z-index: 3;
+  min-width: 92px;
+  min-height: 52px;
+  padding: 0.34rem 0.45rem;
+  color: var(--void-cream);
+  background: linear-gradient(180deg, rgba(5, 32, 74, 0.94), rgba(3, 15, 41, 0.95));
+  border: 1px solid rgba(85, 183, 218, 0.48);
+  box-shadow: 0 4px 0 rgba(0, 4, 18, 0.55);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.system-map .map-node:hover,
+.system-map .map-node:focus-visible,
+.system-map .map-node.selected {
+  z-index: 5;
+  border-color: var(--void-gold);
+  box-shadow: 0 0 0 1px rgba(255, 190, 68, 0.35), 0 0 18px rgba(255, 190, 68, 0.28);
+}
+
+.system-map .map-node.selected::after {
+  position: absolute;
+  inset: -7px;
+  content: "";
+  border: 1px dashed rgba(255, 190, 68, 0.56);
+  pointer-events: none;
+}
+
+.system-map .map-node b {
+  color: var(--void-cream);
+  font-family: var(--pixel-font);
+  font-size: 0.49rem;
+  letter-spacing: 0.04em;
+}
+
+.system-map .map-node span {
+  margin-top: 0.12rem;
+  color: #83b8cb;
+  font-size: 0.45rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.local-map-section {
+  display: grid;
+  grid-template-rows: auto minmax(250px, 0.92fr) minmax(170px, 1.08fr);
+  max-height: calc(min(600px, 68vh) + 42px);
+}
+
+.tactical-map {
+  position: relative;
+  min-height: 250px;
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(73, 177, 209, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(73, 177, 209, 0.08) 1px, transparent 1px),
+    radial-gradient(circle, rgba(74, 210, 235, 0.06) 0 1px, transparent 1.1px),
+    #020a1c;
+  background-size: 12.5% 12.5%, 12.5% 12.5%, 19px 19px, auto;
+  border-bottom: 1px solid rgba(91, 195, 224, 0.28);
+}
+
+.tactical-rings,
+.tactical-rings::before,
+.tactical-rings::after {
+  position: absolute;
+  border: 1px solid rgba(83, 204, 226, 0.2);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+}
+
+.tactical-rings {
+  inset: 8%;
+}
+
+.tactical-rings::before {
+  inset: 22%;
+}
+
+.tactical-rings::after {
+  inset: 42%;
+}
+
+.tactical-player {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  width: 13px;
+  height: 13px;
+  transform: translate(-50%, -50%);
+  background: var(--void-cream);
+  clip-path: polygon(50% 0, 100% 100%, 50% 72%, 0 100%);
+  filter: drop-shadow(0 0 5px var(--void-cyan));
+  pointer-events: none;
+}
+
+.tactical-contact {
+  position: absolute;
+  z-index: 4;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.tactical-contact i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: #86c5d7;
+  border: 1px solid #d8f5fa;
+  box-shadow: 0 0 7px rgba(91, 214, 237, 0.68);
+}
+
+.tactical-contact.hostile i {
+  background: #ed5e54;
+  border-color: #ffd0c8;
+  box-shadow: 0 0 8px rgba(240, 75, 66, 0.82);
+}
+
+.tactical-contact.resource i {
+  background: #d4b766;
+  border-color: #fff0ae;
+}
+
+.tactical-contact.wreck i {
+  background: transparent;
+  border: 2px dashed #cf9f62;
+}
+
+.tactical-contact.selected::after,
+.tactical-contact:hover::after,
+.tactical-contact:focus-visible::after {
+  position: absolute;
+  inset: 3px;
+  content: "";
+  border: 1px solid var(--void-gold);
+  border-radius: 50%;
+}
+
+.contact-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: rgba(1, 9, 27, 0.96);
+  touch-action: pan-y;
+}
+
+.contact-row {
+  display: grid;
+  width: 100%;
+  min-height: 56px;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.52rem 0.7rem;
+  color: #b9dbe6;
+  background: rgba(4, 22, 53, 0.72);
+  border: 0;
+  border-bottom: 1px solid rgba(69, 148, 176, 0.22);
+  border-radius: 0;
+  box-shadow: none;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.contact-row:hover,
+.contact-row:focus-visible,
+.contact-row.selected {
+  color: var(--void-cream);
+  background: rgba(10, 47, 83, 0.9);
+  box-shadow: inset 3px 0 0 var(--void-gold);
+}
+
+.contact-row > i {
+  width: 9px;
+  height: 9px;
+  background: #82bfd1;
+  transform: rotate(45deg);
+}
+
+.contact-row.hostile > i {
+  background: #ed5e54;
+}
+
+.contact-row.resource > i {
+  background: #d4b766;
+}
+
+.contact-row.wreck > i {
+  background: transparent;
+  border: 2px dashed #cf9f62;
+}
+
+.contact-row span,
+.contact-row b,
+.contact-row small {
+  display: block;
+  min-width: 0;
+}
+
+.contact-row b {
+  overflow: hidden;
+  color: inherit;
+  font-family: var(--pixel-font);
+  font-size: 0.49rem;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact-row small {
+  overflow: hidden;
+  margin-top: 0.18rem;
+  color: #7898a5;
+  font-size: 0.52rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact-row em {
+  color: var(--void-gold);
+  font-size: 0.55rem;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.contact-empty {
+  display: grid;
+  min-height: 150px;
+  align-content: center;
+  justify-items: center;
+  gap: 0.4rem;
+  padding: 1rem;
+  color: #718d97;
+  text-align: center;
+}
+
+.contact-empty b {
+  color: #9ebec9;
+  font-family: var(--pixel-font);
+  font-size: 0.55rem;
+}
+
+.contact-empty span {
+  font-size: 0.62rem;
+}
+
+.map-card > footer {
+  flex-wrap: wrap;
+  color: #9ab7c0;
+  font-size: 0.62rem;
+  line-height: 1.45;
+}
+
+.map-card > footer span:first-child {
+  color: var(--void-gold);
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  .map-card {
+    width: 98vw;
+    max-height: 96vh;
+  }
+
+  .navigation-map-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .system-map.map-stage {
+    height: min(52vh, 470px);
+    min-height: 300px;
+  }
+
+  .local-map-section {
+    grid-template-columns: minmax(250px, 0.9fr) minmax(260px, 1.1fr);
+    grid-template-rows: auto minmax(240px, 40vh);
+    max-height: none;
+  }
+
+  .local-map-section .map-section-heading {
+    grid-column: 1 / -1;
+  }
+
+  .tactical-map {
+    min-height: 240px;
+    border-right: 1px solid rgba(91, 195, 224, 0.28);
+    border-bottom: 0;
+  }
+
+  .contact-list {
+    max-height: 40vh;
+  }
+
+  .system-map .map-node {
+    min-width: 86px;
+    min-height: 48px;
+  }
+}
+
+@media (max-width: 680px), (max-height: 520px) {
+  .map-card > header,
+  .map-card > footer {
+    padding: 0.55rem 0.65rem;
+  }
+
+  .map-card h2 {
+    font-size: 0.94rem;
+  }
+
+  .system-map.map-stage {
+    height: min(62vh, 360px);
+    min-height: 260px;
+  }
+
+  .local-map-section {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(230px, 50vh) minmax(150px, auto);
+  }
+
+  .local-map-section .map-section-heading {
+    grid-column: auto;
+  }
+
+  .tactical-map {
+    min-height: 230px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(91, 195, 224, 0.28);
+  }
+
+  .contact-list {
+    max-height: 34vh;
+  }
+
+  .system-map .map-node {
+    min-width: 72px;
+    min-height: 43px;
+    padding: 0.25rem 0.3rem;
+  }
+
+  .system-map .map-node b {
+    font-size: 0.42rem;
+  }
+
+  .system-map .map-node span {
+    font-size: 0.38rem;
+  }
+
+  .map-card > footer span:last-child {
+    display: none;
+  }
+}
+
+/* Compact tactical layout for phone-class landscape screens. Both the system
+   plot and local sensor picture remain visible without a long vertical scroll. */
+.map-player-marker span {
+  display: none;
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .modal-panel {
+    padding: max(0.25rem, var(--safe-top)) max(0.35rem, var(--safe-right)) max(0.25rem, var(--safe-bottom)) max(0.35rem, var(--safe-left));
+  }
+
+  .map-card {
+    width: min(98vw, 1120px);
+    max-height: 96vh;
+    overflow: hidden;
+  }
+
+  .map-card > header {
+    min-height: 48px;
+    padding: 0.42rem 0.62rem;
+  }
+
+  .map-card > header .eyebrow {
+    font-size: 0.48rem;
+  }
+
+  .map-card h2 {
+    margin-top: 0.08rem;
+    font-size: 0.82rem;
+  }
+
+  .map-card > header button {
+    min-height: 38px;
+    padding: 0.35rem 0.7rem;
+  }
+
+  .navigation-map-layout {
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  }
+
+  .map-section-heading {
+    min-height: 31px;
+    padding: 0.3rem 0.46rem;
+    font-size: 0.46rem;
+  }
+
+  .map-section-heading b {
+    max-width: 55%;
+    font-size: 0.42rem;
+  }
+
+  .system-map.map-stage {
+    height: 218px;
+    min-height: 218px;
+  }
+
+  .system-map .map-node {
+    min-width: 58px;
+    min-height: 35px;
+    padding: 0.18rem 0.22rem;
+  }
+
+  .system-map .map-node b {
+    font-size: 0.36rem;
+  }
+
+  .system-map .map-node span,
+  .map-player-marker span {
+    display: none;
+  }
+
+  .system-map .map-node i {
+    width: 11px;
+    height: 11px;
+    margin-bottom: 0.08rem;
+  }
+
+  .system-map .map-node.selected::after {
+    inset: -4px;
+  }
+
+  .map-star {
+    width: 24px;
+    height: 24px;
+  }
+
+  .local-map-section {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 119px 99px;
+    max-height: 249px;
+  }
+
+  .local-map-section .map-section-heading {
+    grid-column: auto;
+  }
+
+  .tactical-map {
+    min-height: 119px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(91, 195, 224, 0.28);
+  }
+
+  .tactical-contact {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+  }
+
+  .tactical-contact i {
+    width: 7px;
+    height: 7px;
+  }
+
+  .contact-list {
+    max-height: 99px;
+  }
+
+  .contact-row {
+    min-height: 42px;
+    gap: 0.42rem;
+    padding: 0.3rem 0.46rem;
+  }
+
+  .contact-row b {
+    font-size: 0.4rem;
+  }
+
+  .contact-row small {
+    margin-top: 0.08rem;
+    font-size: 0.42rem;
+  }
+
+  .contact-row em {
+    font-size: 0.44rem;
+  }
+
+  .map-card > footer {
+    min-height: 38px;
+    padding: 0.34rem 0.52rem;
+    font-size: 0.48rem;
+  }
+
+  .map-card > footer span:last-child {
+    display: none;
+  }
+}

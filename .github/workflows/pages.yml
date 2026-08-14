@@ -24,19 +24,10 @@ jobs:
         uses: actions/configure-pages@v5
         with:
           enablement: true
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Build static runtime
-        run: npm run build:static
-      - name: Upload Pages artifact
+      - name: Upload packaged v0.3.0 runtime
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: .
 
   deploy:
     environment:
