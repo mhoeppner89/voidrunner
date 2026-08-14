@@ -8,13 +8,13 @@ The project uses original models, interface art, writing, names, and synthesized
 
 Voidrunner now uses a bright cobalt/navy, cyan, gold, orange, and cream palette. Docked locations open as illustrated scenes with clickable hotspots for the bar, trade deck, mission board, and services; larger markets, missions, equipment, shipyard, and guild views remain contextual terminals. The landing flow is designed for large touch targets and a clear scene center on landscape phones.
 
-The moving world still uses the existing controlled-resolution Three.js renderer and live DOM cockpit instruments. The next art milestone is to replace remaining procedural 3D silhouettes with approved sprite sheets while keeping simulation, collision, and saves unchanged.
+The moving world still uses the existing controlled-resolution Three.js renderer and live DOM cockpit instruments. Traffic keeps readable procedural 3D silhouettes, while the illustrated cockpit frame and station plates carry the approved visual direction.
 
 The art uses original ships, characters, locations, symbols, and writing. It draws on the broad visual language of classic frontier space trading games without shipping copied Wing Commander or Privateer assets.
 
 ## Play the packaged build
 
-The `dist/` directory is already compiled and includes vendored Three.js modules, so it has no runtime network dependency.
+Build the self-contained `dist/` directory with `npm run build:static`. It includes vendored Three.js modules, so it has no runtime network dependency.
 
 ```bash
 cd void-privateer
@@ -49,7 +49,7 @@ The art pipeline separates the moving world from the interface:
 - Ship-dealer art and live traffic use chunky, utilitarian silhouettes rather than smooth generic primitives.
 - Scanlines, limited palettes, hard-edged procedural textures, and pixel-grid animation provide the nostalgic look while native-resolution text and touch targets remain sharp.
 
-Runtime art is under `public/art/` and `public/assets/remaster/`. Reproducible generators are in `scripts/generate_remaster_art.py`, `scripts/generate_cockpit_frame.py`, and `scripts/generate_dock_strip.py`; their generated source references are kept under `art-source/` and are excluded from the playable build. The style contract is documented in `review/ART_DIRECTION.md`.
+Runtime art is under `public/art/` and `public/assets/remaster/`. The committed assets are packaged by `scripts/build-static.mjs`; no separate art-generation step is required to build the current version.
 
 ## Controls
 
@@ -122,13 +122,7 @@ npm run build:static
 
 That builder transpiles the TypeScript source, fixes browser module extensions, and copies the procedural assets, service worker, manifest, and vendored Three.js runtime into `dist/`.
 
-The compiled art is committed. Regenerating the pixel-art assets requires Python and Pillow:
-
-```bash
-python3 scripts/generate_remaster_art.py
-python3 scripts/generate_cockpit_frame.py
-python3 scripts/generate_dock_strip.py
-```
+The compiled art is committed, so the current build does not require Python or an external art source archive.
 
 ## Architecture
 
@@ -164,15 +158,7 @@ xvfb-run -a python3 tests/runtime_careers.py bounty
 
 The browser tests require Python Playwright, Chromium, and an X display or Xvfb. They exercise real WebGL rendering, dock interactions, keyboard controls, touch controls, persistence, mining, salvage, and bounty completion.
 
-The source archive contains detailed evidence and review in:
-
-- `review/FEATURE_MATRIX.md`
-- `review/PRIVATEER_FEEL_AUDIT.md`
-- `review/VISUAL_REMASTER_AUDIT.md`
-- `review/ART_DIRECTION.md`
-- `review/PLAYTEST_REPORT.md`
-- `review/ARCHITECTURE.md`
-- `review/screenshots/`
+The GitHub Pages workflow rebuilds the static artifact from the committed source and runtime assets before deployment.
 
 ## Vertical-slice limits
 

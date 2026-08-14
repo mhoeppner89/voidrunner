@@ -105,3 +105,18 @@ Original prompt: Freeze the approved Voidrunner art style and proceed with the i
 ### Next review
 
 - Review the local station flow at `http://127.0.0.1:5174/` and confirm whether the pointer positions match the intended interaction points on each location plate.
+
+## Repository cleanup pass
+
+- Removed generated build output, browser review captures, temporary browser state, screenshots, TypeScript build info, Python bytecode, and macOS metadata from the working tree. The non-reproducible `art-source/` and `review/` archives were moved outside the repository for recoverability.
+- Removed retired directional flight sprites, legacy location plates, unused ship fallback images, unused animation frames, obsolete art-generation scripts, and generated Vite config copies. The current runtime keeps the approved v3 location plates, cockpit/remaster art, portraits, and the two ship-dealer frames it actually displays.
+- Updated the service-worker pre-cache and documentation to match the smaller current asset set.
+- Verification: `npm run check`, `npm run build`, `npm run build:static`, `npm run test:logic`, `git diff --check`, and the bundled browser smoke test pass. The browser also reached the cleaned Market and New Ship screens without console errors.
+
+## Portrait remaster pass
+
+- Recreated all twelve runtime portraits in one consistent high-resolution pixel-painted VGA frontier style, using the approved Captain Dorne pilot as the visual anchor while preserving each character's existing identity, role, and distinctive accessories.
+- Converted the approved renders to 1086×1448 WebP assets at quality 90 and replaced every file under `public/art/portraits/`.
+- Bumped the service-worker cache to `voidrunner-v7-portrait-remaster` so deployed clients receive the refreshed portraits instead of stale cached files.
+- Preserved the two user-deleted dock concept images and removed their stale CSS and service-worker references so builds no longer request missing artwork.
+- Verification: all twelve portrait assets are present in the static build; `npm run check`, `npm run build`, `npm run build:static`, and `npm run test:logic` pass. The browser bar dialogue loads the refreshed Mara Vek portrait at its full 1086×1448 resolution.

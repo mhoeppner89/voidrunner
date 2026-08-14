@@ -708,9 +708,7 @@ export class GameUI {
   private shipArt(shipId: ShipId, shipName: string): string {
     const source = shipId === 'wayfarer'
       ? './art/sprites/player-courier/01.png'
-      : shipId === 'vanguard'
-        ? './art/sprites/cargo-hauler/01.png'
-        : `./art/ships/${shipId}.webp`;
+      : './art/sprites/cargo-hauler/01.png';
     return `<img src="${source}" alt="Pixel ship profile of ${escapeHtml(shipName)}" draggable="false">`;
   }
 

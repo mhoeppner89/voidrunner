@@ -13,4 +13,4 @@ This directory is the compiled, self-contained browser build with the revised hi
 
 Do not open `index.html` through a `file://` URL; browser module and service-worker security rules require HTTP.
 
-The build has no runtime network dependency. After the first served load, its service worker also supports offline reload. Detailed controls and scope are in `README.md`. The source archive contains the full validation reports and screenshots under `review/`.
+The build has no runtime network dependency. After the first served load, its service worker also supports offline reload. Detailed controls and scope are in `README.md`.
