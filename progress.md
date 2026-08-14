@@ -70,3 +70,26 @@ Original prompt: Freeze the approved Voidrunner art style and proceed with the i
 - Local Vite review server is running at `http://127.0.0.1:5174/` from the current working tree.
 - The exact local URL passed the bundled browser smoke test with exit code 0; the latest boot screenshot is under `review/screenshots/local-test/client/`.
 - No cockpit file was staged, committed, or modified by this handoff.
+
+## Artwork-first station interaction pass
+
+- Removed the redundant Concourse cards: Arrival / Station, Docked Player Ship, Station / Local Feed, and Services / Near Ship.
+- Removed the duplicate Dock pointer; the docked ship is now the only launch hotspot.
+- Removed the always-visible Concourse / Bar / Market tab strip so station navigation is now driven by in-scene pointers.
+- Bar now opens on the approved bar plate with pointers for the three people, Mission Board, and Guilds. Clicking a person opens a dialogue screen; clicking that person again cycles the conversation.
+- Market now opens on the approved market plate with pointers for Commodity Market, Ship Parts, and New Ship. Each full menu opens only after its pointer is clicked and has a Market Floor return pointer.
+- Updated `tests/browser_qa.py` and `tests/runtime_careers.py` for the pointer-based station flow.
+- Verification: `npm run check` and `npm run build` pass. The bundled Playwright client passes cleanly, and the in-app browser smoke pass covered four concourse pointers, three bar people, repeated dialogue, three market pointers, commodity menu rendering, and zero browser errors.
+- A standalone multi-page Chromium capture harness still crashes at browser launch in this environment; this did not affect the bundled client or in-app browser verification.
+
+## Readable pointer and clean dock chrome pass
+
+- Reworked station pointer labels with dark backing, stronger value separation, and explicit left padding so icons no longer sit on top of the text.
+- Removed the bottom dock footer and its `LAUNCH` button; launching now happens by clicking the docked ship pointer.
+- Disabled the old transparent lower dock overlay so the location artwork reaches the bottom edge cleanly.
+- Updated browser QA and career smoke-test helpers for ship-only launch.
+- Verification: `npm run check`, `npm run build`, `npm run build:static`, `node --test tests/logic.test.mjs`, Python syntax validation, and `git diff --check` pass. The bundled browser client and in-app browser pass reached the flight HUD with footer count 0 and zero browser errors.
+
+### Next review
+
+- Review the local station flow at `http://127.0.0.1:5174/` and confirm whether the pointer positions match the intended interaction points on each location plate.

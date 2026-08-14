@@ -4386,7 +4386,6 @@ button.primary,
 .hotspot-services { left: 21%; top: 62%; }
 .hotspot-market { left: 68%; top: 36%; }
 .hotspot-bar { left: 75%; top: 62%; }
-.hotspot-dock { left: 55%; top: 70%; }
 
 .bar-shortcuts {
   display: flex;
@@ -4915,4 +4914,376 @@ button.primary,
   .dock-screen[data-tab="concourse"] .snapshot-stats b {
     font-size: 0.68rem;
   }
+}
+
+/* Artwork-first station flow: the scene is the landing screen, and menus are one click deeper. */
+.dock-screen .dock-content {
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.dock-backdrop {
+  opacity: 1 !important;
+  filter: saturate(1.08) contrast(1.04) brightness(1.08) !important;
+}
+
+.dock-backdrop::after {
+  background:
+    linear-gradient(90deg, rgba(4, 18, 55, 0.12), rgba(4, 18, 55, 0.02) 52%, rgba(4, 18, 55, 0.14)),
+    linear-gradient(0deg, rgba(3, 14, 43, 0.22), transparent 48%, rgba(3, 14, 43, 0.12));
+}
+
+.dock-screen[data-tab="bar"] .dock-backdrop::after,
+.dock-screen[data-tab="market"] .dock-backdrop::after {
+  background:
+    linear-gradient(90deg, rgba(4, 18, 55, 0.08), rgba(4, 18, 55, 0.01) 52%, rgba(4, 18, 55, 0.12)),
+    linear-gradient(0deg, rgba(3, 14, 43, 0.2), transparent 52%, rgba(3, 14, 43, 0.1));
+}
+
+.dock-pointer,
+.scene-pointer {
+  cursor: pointer;
+  user-select: none;
+}
+
+.dock-back-button {
+  min-width: 0;
+  margin-left: auto;
+  padding: 0.45rem 0.65rem;
+  color: var(--void-cyan);
+  font-family: var(--pixel-font);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-shadow: 1px 1px #061638, 0 0 8px rgba(1, 8, 29, 0.9);
+}
+
+.dock-back-button:hover,
+.dock-back-button:focus-visible {
+  color: var(--void-cream);
+  outline: 1px dashed var(--void-gold);
+  outline-offset: 3px;
+}
+
+.station-scene {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.scene-pointers {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.scene-pointer {
+  position: absolute;
+  display: grid;
+  min-width: 118px;
+  gap: 0.1rem;
+  padding: 0.3rem 0.45rem 0.3rem 0.75rem;
+  pointer-events: auto;
+  color: var(--void-cream);
+  text-align: left;
+  text-shadow: 1px 1px #061638, 0 0 8px rgba(1, 8, 29, 0.95);
+  transition: filter 120ms ease, transform 120ms ease;
+}
+
+.scene-pointer i {
+  position: absolute;
+  top: 0.1rem;
+  left: -0.18rem;
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  place-items: center;
+  color: var(--void-gold);
+  font-style: normal;
+  background: rgba(4, 23, 66, 0.88);
+  border: 1px solid var(--void-gold);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(4, 18, 55, 0.52), 0 0 14px rgba(255, 208, 92, 0.3);
+}
+
+.scene-pointer b,
+.scene-pointer small {
+  display: block;
+}
+
+.scene-pointer b {
+  color: var(--void-cream);
+  font-size: 0.62rem;
+  letter-spacing: 0.07em;
+}
+
+.scene-pointer small {
+  color: #c9e5ee;
+  font-size: 0.52rem;
+}
+
+.scene-pointer:hover,
+.scene-pointer:focus-visible {
+  filter: brightness(1.28);
+  outline: 1px dashed var(--void-gold);
+  outline-offset: 3px;
+  transform: translateY(-2px) scale(1.03);
+}
+
+.scene-pointer:focus-visible {
+  outline-color: var(--void-cream);
+}
+
+.scene-return-pointer {
+  top: 1rem;
+  left: 1rem;
+  z-index: 5;
+}
+
+/* Concourse: only the ship and four useful destinations remain clickable. */
+.concourse-pointer-ship { left: 45%; top: 57%; }
+.concourse-pointer-services { left: 20%; top: 62%; }
+.concourse-pointer-market { left: 68%; top: 36%; }
+.concourse-pointer-bar { left: 77%; top: 59%; }
+
+/* Bar: people and the two deeper menus are pointers over the approved plate. */
+.bar-pointer-missions { left: 13%; top: 23%; }
+.bar-pointer-guilds { left: 76%; top: 24%; }
+.bar-person-0 { left: 18%; top: 59%; }
+.bar-person-1 { left: 47%; top: 49%; }
+.bar-person-2 { left: 75%; top: 59%; }
+
+.bar-dialogue-card {
+  position: absolute;
+  left: 1.4rem;
+  bottom: 1.25rem;
+  z-index: 4;
+  display: grid;
+  width: min(620px, 52vw);
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: 1rem;
+  align-items: end;
+  padding: 0.8rem 1rem;
+  color: var(--void-cream);
+  background: linear-gradient(180deg, rgba(5, 25, 68, 0.91), rgba(4, 15, 44, 0.84));
+  border: 1px solid rgba(85, 194, 239, 0.7);
+  border-left: 4px solid var(--void-gold);
+  box-shadow: 0 5px 0 rgba(1, 8, 29, 0.42), inset 0 0 22px rgba(16, 123, 205, 0.12);
+}
+
+.bar-dialogue-card .avatar {
+  width: 128px;
+  height: 152px;
+  object-fit: cover;
+  image-rendering: pixelated;
+  filter: contrast(1.08) saturate(0.94) drop-shadow(0 0 12px rgba(29, 170, 224, 0.2));
+}
+
+.bar-dialogue-card h3 {
+  margin: 0.26rem 0 0.42rem;
+  color: var(--void-cream);
+  font-family: var(--pixel-font);
+  font-size: clamp(0.82rem, 1.5vw, 1.15rem);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bar-dialogue-card p {
+  margin: 0 0 0.5rem;
+  color: #d5e6ef;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.bar-dialogue-card small {
+  color: var(--void-gold);
+  font-size: 0.52rem;
+}
+
+/* Market: the plate is the floor; the three points open the full terminal one level deeper. */
+.market-pointer-commodities { left: 17%; top: 54%; }
+.market-pointer-equipment { left: 48%; top: 35%; }
+.market-pointer-shipyard { left: 75%; top: 57%; }
+
+.market-menu-screen {
+  position: relative;
+  z-index: 4;
+  height: 100%;
+  min-height: 0;
+  padding: 1rem 1.2rem 1.25rem;
+  overflow: auto;
+  background: linear-gradient(180deg, rgba(3, 16, 47, 0.28), rgba(3, 16, 47, 0.58));
+}
+
+.market-menu-screen .scene-return-pointer {
+  position: relative;
+  top: auto;
+  left: auto;
+  width: max-content;
+  margin: 0 0 0.8rem;
+}
+
+.market-menu-screen .market-points {
+  margin-top: 0;
+}
+
+/* Deeper terminals may be taller than the scene viewport; keep those menus scrollable. */
+.dock-screen:has(.mission-layout) .dock-content,
+.dock-screen:has(.guild-grid) .dock-content,
+.dock-screen:has(.service-grid) .dock-content,
+.dock-screen:has(.equipment-grid) .dock-content,
+.dock-screen:has(.shipyard-grid) .dock-content {
+  overflow: auto;
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  .scene-pointer {
+    min-width: 96px;
+    padding-left: 0.62rem;
+  }
+
+  .scene-pointer b { font-size: 0.54rem; }
+  .scene-pointer small { font-size: 0.46rem; }
+  .scene-pointer i { width: 1.16rem; height: 1.16rem; font-size: 0.72rem; }
+
+  .bar-dialogue-card {
+    left: 0.7rem;
+    right: 0.7rem;
+    bottom: 0.7rem;
+    width: auto;
+    grid-template-columns: 86px minmax(0, 1fr);
+    gap: 0.7rem;
+    padding: 0.6rem 0.7rem;
+  }
+
+  .bar-dialogue-card .avatar { width: 86px; height: 112px; }
+  .bar-dialogue-card p { font-size: 0.62rem; }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .scene-pointer {
+    min-width: 78px;
+    padding: 0.22rem 0.28rem 0.22rem 0.5rem;
+  }
+
+  .scene-pointer b { font-size: 0.46rem; }
+  .scene-pointer small { display: none; }
+  .scene-pointer i { top: 0.05rem; left: -0.12rem; width: 0.95rem; height: 0.95rem; font-size: 0.56rem; }
+  .scene-return-pointer { top: 0.65rem; left: 0.65rem; }
+
+  .bar-dialogue-card { bottom: 0.65rem; padding: 0.42rem 0.52rem; grid-template-columns: 62px minmax(0, 1fr); }
+  .bar-dialogue-card .avatar { width: 62px; height: 78px; }
+  .bar-dialogue-card h3 { font-size: 0.68rem; }
+  .bar-dialogue-card p { margin-bottom: 0.2rem; font-size: 0.54rem; }
+  .bar-dialogue-card small { font-size: 0.42rem; }
+  .market-menu-screen { padding: 0.6rem 0.7rem 0.8rem; }
+}
+
+@media (max-width: 520px), (orientation: portrait) {
+  .concourse-pointer-ship { left: 42%; top: 56%; }
+  .concourse-pointer-services { left: 12%; top: 67%; }
+  .concourse-pointer-market { left: 55%; top: 38%; }
+  .concourse-pointer-bar { left: 67%; top: 69%; }
+  .bar-pointer-missions { left: 10%; top: 24%; }
+  .bar-pointer-guilds { left: 64%; top: 24%; }
+  .bar-person-0 { left: 8%; top: 58%; }
+  .bar-person-1 { left: 39%; top: 49%; }
+  .bar-person-2 { left: 69%; top: 59%; }
+  .market-pointer-commodities { left: 8%; top: 58%; }
+  .market-pointer-equipment { left: 39%; top: 38%; }
+  .market-pointer-shipyard { left: 68%; top: 60%; }
+}
+
+/* Final station chrome cleanup: readable labels, no bottom launch strip, no baked lower overlay. */
+.dock-screen {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.dock-screen::after {
+  display: none !important;
+  content: none !important;
+}
+
+.dock-screen[data-tab="concourse"] .concourse-screen.station-scene {
+  height: 100%;
+}
+
+.scene-pointer {
+  min-width: 142px;
+  max-width: 210px;
+  padding: 0.4rem 0.65rem 0.4rem 1.9rem;
+  color: #fff2c4;
+  background: linear-gradient(180deg, rgba(4, 25, 68, 0.9), rgba(3, 14, 43, 0.84));
+  border: 1px solid rgba(104, 214, 245, 0.72);
+  border-left: 3px solid var(--void-gold);
+  box-shadow: 0 3px 0 rgba(1, 8, 29, 0.48), 0 0 14px rgba(14, 128, 214, 0.18);
+  backdrop-filter: blur(2px);
+}
+
+.scene-pointer i {
+  top: 50%;
+  left: 0.35rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  transform: translateY(-50%);
+}
+
+.scene-pointer b {
+  color: #fff2c4;
+  font-size: 0.66rem;
+  line-height: 1.2;
+  text-shadow: 1px 1px #061638, 0 0 5px rgba(1, 8, 29, 0.9);
+}
+
+.scene-pointer small {
+  color: #e2f7ff;
+  font-size: 0.54rem;
+  line-height: 1.25;
+  text-shadow: 1px 1px #061638;
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  .dock-screen[data-tab="concourse"] .concourse-screen.station-scene {
+    display: block;
+    height: 100%;
+    padding: 0;
+  }
+
+  .scene-pointer {
+    min-width: 114px;
+    max-width: 170px;
+    padding: 0.34rem 0.5rem 0.34rem 1.62rem;
+  }
+
+  .scene-pointer i {
+    left: 0.28rem;
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+
+  .scene-pointer b { font-size: 0.57rem; }
+  .scene-pointer small { font-size: 0.48rem; }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .scene-pointer {
+    min-width: 94px;
+    max-width: 142px;
+    padding: 0.25rem 0.34rem 0.25rem 1.32rem;
+  }
+
+  .scene-pointer i {
+    left: 0.2rem;
+    width: 0.92rem;
+    height: 0.92rem;
+  }
+
+  .scene-pointer b { font-size: 0.49rem; }
+  .scene-pointer small { display: none; }
 }

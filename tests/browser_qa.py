@@ -70,7 +70,9 @@ def collect_messages(page: Page, label: str) -> tuple[list[str], list[str], list
 
 
 def launch_game(page: Page) -> None:
-    page.locator('[data-ui-command="launch"]').last.click()
+    if page.locator('[data-ui-command="dock-concourse"]').count():
+        page.locator('[data-ui-command="dock-concourse"]').click()
+    page.locator('.concourse-pointer-ship').click()
     page.locator("#hud").wait_for(state="visible")
     page.wait_for_timeout(1200)
 
@@ -93,24 +95,33 @@ def run_desktop(browser: Browser) -> dict[str, Any]:
     page.locator("#dock-screen").wait_for(state="visible")
     assert state(page)["player"]["dockedAt"] == "helix"
     assert page.locator("canvas").count() >= 2, "Expected WebGL viewport and radar canvases after session start"
+    assert page.locator(".dock-footer").count() == 0
+    assert page.locator(".concourse-screen .scene-pointer").count() == 4
+    concourse_text = page.locator("#dock-screen").inner_text()
+    for stale_label in ("ARRIVAL /", "DOCKED PLAYER SHIP", "LOCAL FEED", "SERVICES / NEAR SHIP", "DOCK"):
+        assert stale_label not in concourse_text
     shot(page, "desktop-dock-concourse.png")
 
     # Bar: all three people are interactive and cycle through distinct dialogue.
-    page.locator('[data-dock-tab="bar"]').click()
-    people = page.locator(".person-card")
+    page.locator('[data-dock-hotspot="bar"]').click()
+    people = page.locator('[data-person-id]')
     assert people.count() == 3, f"Expected 3 bar contacts, found {people.count()}"
     first_person = people.first
+    first_person_id = first_person.get_attribute("data-person-id")
     first_person.click()
-    dialogue_1 = page.locator("#bar-dialogue p").inner_text()
-    first_person.click()
-    dialogue_2 = page.locator("#bar-dialogue p").inner_text()
+    dialogue_1 = page.locator(".bar-dialogue-card p").inner_text()
+    page.locator(f'[data-person-id="{first_person_id}"]').click()
+    dialogue_2 = page.locator(".bar-dialogue-card p").inner_text()
     assert dialogue_1 != dialogue_2 and "Select someone" not in dialogue_1
     shot(page, "desktop-dock-bar.png")
     print("desktop: bar", flush=True)
 
     # Market: execute a complete buy/sell round trip and verify both credit and cargo mutation.
-    page.locator('[data-dock-tab="market"]').click()
-    assert page.locator('[data-market-point]').count() == 3
+    page.locator('[data-ui-command="bar-scene"]').click()
+    page.locator('[data-ui-command="dock-concourse"]').click()
+    page.locator('[data-dock-hotspot="market"]').click()
+    assert page.locator('.market-scene [data-market-point]').count() == 3
+    page.locator('[data-market-point="commodities"]').click()
     before_buy = state(page)
     page.locator('[data-trade="buy:water:1"]').click()
     page.wait_for_timeout(150)
@@ -125,7 +136,9 @@ def run_desktop(browser: Browser) -> dict[str, Any]:
     print("desktop: market", flush=True)
 
     # Bar mission board: prefer a merchant contract and verify it becomes active.
-    page.locator('[data-dock-tab="bar"]').click()
+    page.locator('[data-ui-command="market-overview"]').click()
+    page.locator('[data-ui-command="dock-concourse"]').click()
+    page.locator('[data-dock-hotspot="bar"]').click()
     page.locator('[data-bar-panel="missions"]').click()
     before_mission = state(page)
     offers = before_mission["world"]["offers"]["helix"]
@@ -147,7 +160,8 @@ def run_desktop(browser: Browser) -> dict[str, Any]:
     print("desktop: missions", flush=True)
 
     # Guild progression starts through an explicit registration transaction.
-    page.locator('[data-dock-tab="bar"]').click()
+    page.locator('[data-ui-command="dock-concourse"]').click()
+    page.locator('[data-dock-hotspot="bar"]').click()
     page.locator('[data-bar-panel="guilds"]').click()
     credits_before_guild = state(page)["player"]["credits"]
     page.locator('[data-guild-id="merchant"]').click()
@@ -157,7 +171,8 @@ def run_desktop(browser: Browser) -> dict[str, Any]:
     assert joined_state["player"]["credits"] < credits_before_guild
     shot(page, "desktop-dock-guilds.png")
 
-    page.locator('[data-dock-tab="market"]').click()
+    page.locator('[data-ui-command="dock-concourse"]').click()
+    page.locator('[data-dock-hotspot="market"]').click()
     page.locator('[data-market-point="equipment"]').click()
     assert page.locator(".equipment-card").count() >= 8
     shot(page, "desktop-dock-equipment.png")
@@ -275,12 +290,13 @@ def run_mobile(browser: Browser) -> dict[str, Any]:
     assert webgl_available(page), "Mobile-emulated WebGL context unavailable"
     page.locator('[data-ui-command="new"]').click()
     page.locator("#dock-screen").wait_for(state="visible")
-    assert page.locator(".dock-nav").evaluate("el => el.scrollWidth >= el.clientWidth")
+    assert page.locator(".dock-footer").count() == 0
+    assert page.locator(".concourse-screen .scene-pointer").count() == 4
     shot(page, "mobile-dock-landscape.png")
     print("mobile: dock", flush=True)
 
-    page.locator('[data-dock-tab="bar"]').click()
-    assert page.locator(".person-card").count() == 3
+    page.locator('[data-dock-hotspot="bar"]').click()
+    assert page.locator('[data-person-id]').count() == 3
     shot(page, "mobile-dock-bar.png")
 
     launch_game(page)

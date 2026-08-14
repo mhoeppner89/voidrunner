@@ -103,8 +103,9 @@ export class GameUI {
   private dockLocation?: DockLocationId;
   private dockTab = 'concourse';
   private dockTerminal = 'concourse';
-  private marketPoint = 'commodities';
+  private marketPoint = '';
   private barPanel = 'people';
+  private barPersonId?: string;
   private titleVisible = true;
   private radarContext: CanvasRenderingContext2D;
   private toastId = 0;
@@ -261,7 +262,7 @@ export class GameUI {
           this.renderDock();
         }
       } else if (target.dataset.marketPoint) {
-        this.renderMarketPoint(target.dataset.marketPoint);
+        this.openMarketPoint(target.dataset.marketPoint);
       } else if (target.dataset.navId) {
         this.actions?.setNav(target.dataset.navId as LocationId);
         this.hideMap();
@@ -293,7 +294,7 @@ export class GameUI {
 
     this.root.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter' && event.key !== ' ') return;
-      const target = (event.target as HTMLElement).closest<HTMLElement>('[data-ui-command], [data-dock-hotspot], [data-person-id]');
+      const target = (event.target as HTMLElement).closest<HTMLElement>('[data-ui-command], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-person-id]');
       if (!target) return;
       event.preventDefault();
       target.click();
@@ -343,6 +344,22 @@ export class GameUI {
       case 'dock-concourse':
         this.dockTab = 'concourse';
         this.dockTerminal = 'concourse';
+        this.marketPoint = '';
+        this.barPanel = 'people';
+        this.barPersonId = undefined;
+        this.renderDock();
+        break;
+      case 'bar-scene':
+        this.dockTab = 'bar';
+        this.dockTerminal = 'bar';
+        this.barPanel = 'people';
+        this.barPersonId = undefined;
+        this.renderDock();
+        break;
+      case 'market-overview':
+        this.dockTab = 'market';
+        this.dockTerminal = 'market';
+        this.marketPoint = '';
         this.renderDock();
         break;
       default:
@@ -384,8 +401,9 @@ export class GameUI {
     this.dockLocation = locationId;
     this.dockTab = 'concourse';
     this.dockTerminal = 'concourse';
-    this.marketPoint = 'commodities';
+    this.marketPoint = '';
     this.barPanel = 'people';
+    this.barPersonId = undefined;
     this.hideTitle();
     this.hideHud();
     this.root.querySelector('#dock-screen')?.classList.remove('is-hidden');
@@ -417,64 +435,23 @@ export class GameUI {
         ? 'market'
         : 'concourse';
     const terminal = this.dockTerminal ? this.renderDockTab(this.dockTerminal) : '';
-    const terminalTabs = [
-      ['concourse', 'CONCOURSE'],
-      ['bar', 'BAR'],
-      ['market', 'MARKET'],
-    ];
     dock.innerHTML = `
       <div class="dock-backdrop">${this.locationIllustration(this.dockLocation, illustrationScreen)}</div>
       <div class="dock-scanlines" aria-hidden="true"></div>
       <header class="dock-header">
         <div><span>${location.kind.toUpperCase()} / ${FACTION_NAMES[location.faction]}</span><h2>${escapeHtml(location.name)}</h2></div>
-        ${this.dockTerminal !== 'concourse' ? '<button class="dock-back-button" data-ui-command="dock-concourse">◀ CONCOURSE</button>' : ''}
+        ${this.dockTerminal !== 'concourse' ? '<div class="dock-back-button dock-pointer" data-ui-command="dock-concourse" role="button" tabindex="0" aria-label="Return to the concourse">◀ CONCOURSE</div>' : ''}
         <div class="dock-wallet"><span>AVAILABLE CREDIT</span><strong>${formatCredits(this.save.player.credits)}</strong><small>${SHIPS[this.save.player.shipId].name} · ${cargoMass(this.save.player).toFixed(1)}/${cargoCapacity(this.save.player)} mass</small></div>
       </header>
-      <div class="dock-content">
-        <nav class="dock-nav terminal-nav" aria-label="Station screens">${terminalTabs.map(([id, label]) => `<button class="${this.dockTab === id ? 'active' : ''}" data-dock-tab="${id}">${label}</button>`).join('')}</nav>${terminal}
-      </div>
-      <footer class="dock-footer"><span>AUTOSAVE ACTIVE · LOCAL DEVICE</span><button class="launch-button" data-ui-command="launch">LAUNCH</button></footer>
+      <div class="dock-content">${terminal}</div>
     `;
     const content = dock.querySelector<HTMLElement>('.dock-content');
     if (content) content.scrollTop = 0;
-    if (this.dockTerminal === 'market') this.renderMarketPoint(this.marketPoint);
+    if (this.dockTerminal === 'market' && this.marketPoint) this.renderMarketPoint(this.marketPoint);
   }
 
   private renderLandingScene(): string {
-    if (!this.save || !this.dockLocation) return '';
-    const location = LOCATIONS[this.dockLocation];
-    const active = this.save.activeMissions.slice(0, 2);
-    const terminalTabs = [
-      ['bar', 'BAR'],
-      ['market', 'MARKET'],
-    ];
-    const traffic = this.dockLocation === 'rook' ? 'PATROLS HEAVY' : this.dockLocation === 'vesper' ? 'ORE CONVOYS ACTIVE' : this.dockLocation === 'azure' ? 'HARVEST LIFTS ON SCHEDULE' : 'FREEPORT VOLUME HIGH';
-    return `
-      <div class="landing-scene">
-        <div class="landing-copy">
-          <span class="eyebrow">ARRIVAL / ${location.kind.toUpperCase()}</span>
-          <h3>${escapeHtml(location.shortName)} CONCOURSE</h3>
-          <p>${escapeHtml(location.description)}</p>
-          <div class="landing-signal"><b>LOCAL SIGNAL</b><span>${traffic}</span></div>
-        </div>
-        <div class="landing-hotspots" aria-label="Location actions">
-          <div class="landing-hotspot hotspot-ship" data-ui-command="launch" role="button" tabindex="0" aria-label="Launch your ship"><i>↗</i><b>YOUR SHIP</b><small>Click to launch</small></div>
-          <div class="landing-hotspot hotspot-services" data-dock-hotspot="services" role="button" tabindex="0" aria-label="Open services"><i>⚙</i><b>SERVICES</b><small>Repair and refuel</small></div>
-          <div class="landing-hotspot hotspot-market" data-dock-hotspot="market" role="button" tabindex="0" aria-label="Open market"><i>▣</i><b>MARKET</b><small>Trade and fit out</small></div>
-          <div class="landing-hotspot hotspot-bar" data-dock-hotspot="bar" role="button" tabindex="0" aria-label="Enter the bar"><i>✦</i><b>BAR</b><small>Guilds and missions</small></div>
-          <div class="landing-hotspot hotspot-dock" data-ui-command="launch" role="button" tabindex="0" aria-label="Launch corridor"><i>⌂</i><b>DOCK</b><small>Launch corridor</small></div>
-        </div>
-        <aside class="landing-dialogue">
-          <span class="eyebrow">DOCKMASTER // OPEN CHANNEL</span>
-          <p>“Welcome back, pilot. The concourse is awake and the lanes are busy.”</p>
-          <div class="landing-dialogue-meta"><span>${active.length ? `${active.length} ACTIVE CONTRACT${active.length === 1 ? '' : 'S'}` : 'NO ACTIVE CONTRACTS'}</span><span>${formatCredits(this.save.player.credits)} READY</span></div>
-        </aside>
-        <nav class="dock-nav landing-actions" aria-label="Station screens">
-          <button data-dock-tab="concourse">CONCOURSE</button>
-          ${terminalTabs.map(([id, label]) => `<button data-dock-tab="${id}">${label}</button>`).join('')}
-        </nav>
-      </div>
-    `;
+    return this.renderConcourse();
   }
 
   private renderDockTab(tab: string): string {
@@ -500,47 +477,14 @@ export class GameUI {
   }
 
   private renderConcourse(): string {
-    const location = LOCATIONS[this.dockLocation!]!;
-    const active = this.save!.activeMissions.slice(0, 3);
-    const ship = SHIPS[this.save!.player.shipId];
     return `
-      <div class="concourse-screen landing-scene">
-        <div class="landing-copy">
-          <span class="eyebrow">ARRIVAL / ${location.kind.toUpperCase()}</span>
-          <h3>${escapeHtml(location.shortName)} CONCOURSE</h3>
-          <p>${escapeHtml(location.description)}</p>
-          <div class="landing-signal"><b>LOCAL SIGNAL</b><span>${this.dockLocation === 'rook' ? 'PATROLS HEAVY' : this.dockLocation === 'vesper' ? 'ORE CONVOYS ACTIVE' : this.dockLocation === 'azure' ? 'HARVEST LIFTS ON SCHEDULE' : 'FREEPORT VOLUME HIGH'}</span></div>
+      <div class="concourse-screen station-scene" aria-label="Concourse points of interest">
+        <div class="scene-pointers" aria-label="Concourse actions">
+          <div class="scene-pointer concourse-pointer-ship" data-ui-command="launch" role="button" tabindex="0" aria-label="Launch the docked ship"><i>↗</i><b>YOUR SHIP</b><small>Launch</small></div>
+          <div class="scene-pointer concourse-pointer-services" data-dock-hotspot="services" role="button" tabindex="0" aria-label="Open services"><i>⚙</i><b>SERVICES</b><small>Repair and refuel</small></div>
+          <div class="scene-pointer concourse-pointer-market" data-dock-hotspot="market" role="button" tabindex="0" aria-label="Enter the market"><i>▣</i><b>MARKET</b><small>Trade and fit out</small></div>
+          <div class="scene-pointer concourse-pointer-bar" data-dock-hotspot="bar" role="button" tabindex="0" aria-label="Enter the bar"><i>✦</i><b>BAR</b><small>Guilds and missions</small></div>
         </div>
-        <section class="concourse-ship-card" data-ui-command="launch" role="button" tabindex="0" aria-label="Launch the docked ship">
-          <span class="eyebrow">DOCKED PLAYER SHIP</span>
-          <div class="concourse-ship-art">${this.shipArt(this.save!.player.shipId, ship.name)}</div>
-          <h3>${escapeHtml(ship.name)}</h3><p>${escapeHtml(ship.className)} · Ready for departure</p><small class="click-hint">CLICK SHIP TO LAUNCH</small>
-        </section>
-        <div class="landing-hotspots" aria-label="Concourse actions">
-          <div class="landing-hotspot hotspot-ship" data-ui-command="launch" role="button" tabindex="0" aria-label="Launch your ship"><i>↗</i><b>YOUR SHIP</b><small>Click to launch</small></div>
-          <div class="landing-hotspot hotspot-services" data-dock-hotspot="services" role="button" tabindex="0" aria-label="Open services"><i>⚙</i><b>SERVICES</b><small>Repair and refuel</small></div>
-          <div class="landing-hotspot hotspot-market" data-dock-hotspot="market" role="button" tabindex="0" aria-label="Open market"><i>▣</i><b>MARKET</b><small>Trade and fit out</small></div>
-          <div class="landing-hotspot hotspot-bar" data-dock-hotspot="bar" role="button" tabindex="0" aria-label="Enter the bar"><i>✦</i><b>BAR</b><small>Guilds and missions</small></div>
-          <div class="landing-hotspot hotspot-dock" data-ui-command="launch" role="button" tabindex="0" aria-label="Launch corridor"><i>⌂</i><b>DOCK</b><small>Launch corridor</small></div>
-        </div>
-        <section class="concourse-info">
-          <span class="eyebrow">${location.kind.toUpperCase()} / LOCAL FEED</span>
-          <h3>${escapeHtml(location.shortName)} CONCOURSE</h3>
-          <p>${escapeHtml(location.description)}</p>
-          <div class="ticker"><b>TRAFFIC</b> ${this.dockLocation === 'rook' ? 'PATROLS HEAVY' : this.dockLocation === 'vesper' ? 'ORE CONVOYS ACTIVE' : this.dockLocation === 'azure' ? 'HARVEST LIFTS ON SCHEDULE' : 'FREEPORT VOLUME HIGH'}</div>
-          <div class="snapshot-stats">
-            <div><span>CREDITS</span><b>${formatCredits(this.save!.player.credits)}</b></div>
-            <div><span>CARGO</span><b>${cargoMass(this.save!.player).toFixed(1)} / ${cargoCapacity(this.save!.player)}</b></div>
-            <div><span>ACTIVE CONTRACTS</span><b>${active.length}</b></div>
-            <div><span>CONTRACTS COMPLETE</span><b>${this.save!.player.stats.contracts}</b></div>
-          </div>
-        </section>
-        <section class="concourse-services">
-          <span class="eyebrow">SERVICES / NEAR SHIP</span>
-          <h3>Keep the hull ready</h3>
-          <div class="service-quick-actions"><button data-ui-command="repair">REPAIR · ${formatCredits(repairCost(this.save!.player))}</button><button data-ui-command="refuel">REFUEL · ${formatCredits(refillCost(this.save!.player))}</button></div>
-          <p>Full repair and refuel services are available here before launch.</p>
-        </section>
       </div>
     `;
   }
@@ -548,7 +492,14 @@ export class GameUI {
   private switchToTerminal(tab: 'concourse' | 'bar' | 'market', panel: 'people' | 'missions' | 'guilds' = 'people'): void {
     this.dockTab = tab;
     this.dockTerminal = tab;
-    if (tab === 'bar') this.barPanel = panel;
+    if (tab === 'bar') {
+      this.barPanel = panel;
+      this.barPersonId = undefined;
+    } else if (tab === 'market') {
+      this.marketPoint = '';
+    } else {
+      this.marketPoint = '';
+    }
     this.renderDock();
   }
 
@@ -556,43 +507,72 @@ export class GameUI {
     const people = LOCATIONS[this.dockLocation!].people ?? [];
     if (this.barPanel === 'missions') return this.renderMissions();
     if (this.barPanel === 'guilds') return this.renderGuilds();
+    if (this.barPersonId) return this.renderBarDialogue(this.barPersonId);
     return `
-      <div class="bar-layout">
-        <section class="bar-stage">
-          <span class="eyebrow">BAR / GUILDS / OPEN CHANNELS</span>
-          <h3>Buy a drink. Find work. Make allies.</h3>
-          <div class="bar-shortcuts"><button data-dock-tab="bar" data-bar-panel="missions">MISSION BOARD</button><button data-dock-tab="bar" data-bar-panel="guilds">GUILDS</button></div>
-          <div class="people-row">
-            ${people.map((person) => `
-              <article class="person-card" data-person-id="${person.id}" role="button" tabindex="0" aria-label="Talk to ${escapeHtml(person.name)}">
-                ${this.portraitImage(person.id, person.name)}
-                <span><b>${escapeHtml(person.name)}</b><small>${escapeHtml(person.role)}</small><em>${escapeHtml(person.affiliation)}</em></span>
-              </article>
-            `).join('')}
-          </div>
-        </section>
-        <aside class="bar-dialogue" id="bar-dialogue"><span class="eyebrow">TABLE CHANNEL</span><p>Select someone to talk.</p></aside>
+      <div class="bar-scene station-scene" aria-label="Bar points of interest">
+        <div class="scene-pointers" aria-label="Bar actions">
+          <div class="scene-pointer bar-pointer-missions" data-bar-panel="missions" role="button" tabindex="0" aria-label="Open the mission board"><i>✦</i><b>MISSION BOARD</b><small>Find work</small></div>
+          <div class="scene-pointer bar-pointer-guilds" data-bar-panel="guilds" role="button" tabindex="0" aria-label="Open guilds"><i>◇</i><b>GUILDS</b><small>Find allies</small></div>
+          ${people.map((person, index) => `
+            <div class="scene-pointer bar-person-pointer bar-person-${index}" data-person-id="${person.id}" role="button" tabindex="0" aria-label="Talk to ${escapeHtml(person.name)}"><i>●</i><b>${escapeHtml(person.name)}</b><small>${escapeHtml(person.role)}</small></div>
+          `).join('')}
+        </div>
       </div>
     `;
   }
 
   private talkToPerson(personId: string): void {
     const person = LOCATIONS[this.dockLocation!].people?.find((entry) => entry.id === personId);
-    const dialogue = this.root.querySelector<HTMLElement>('#bar-dialogue');
-    if (!person || !dialogue) return;
+    if (!person) return;
     const index = this.npcLineIndex.get(personId) ?? 0;
-    const line = person.lines[index % person.lines.length]!;
     this.npcLineIndex.set(personId, index + 1);
-    dialogue.innerHTML = `<span class="eyebrow">${escapeHtml(person.name)} / ${escapeHtml(person.affiliation)}</span><p>“${escapeHtml(line)}”</p><small>Tap again for another topic.</small>`;
+    this.barPanel = 'people';
+    this.barPersonId = personId;
+    this.renderDock();
+  }
+
+  private renderBarDialogue(personId: string): string {
+    const person = LOCATIONS[this.dockLocation!].people?.find((entry) => entry.id === personId);
+    if (!person) return this.renderBar();
+    const lineIndex = Math.max(0, (this.npcLineIndex.get(personId) ?? 1) - 1);
+    const line = person.lines[lineIndex % person.lines.length]!;
+    return `
+      <div class="bar-dialogue-screen station-scene" aria-label="Conversation with ${escapeHtml(person.name)}">
+        <div class="scene-pointer scene-return-pointer" data-ui-command="bar-scene" role="button" tabindex="0" aria-label="Return to the bar"><i>◀</i><b>BAR FLOOR</b><small>Back to the room</small></div>
+        <section class="bar-dialogue-card" data-person-id="${person.id}" role="button" tabindex="0" aria-label="Continue talking to ${escapeHtml(person.name)}">
+          ${this.portraitImage(person.id, person.name)}
+          <div><span class="eyebrow">${escapeHtml(person.name)} / ${escapeHtml(person.affiliation)}</span><h3>${escapeHtml(person.role)}</h3><p>“${escapeHtml(line)}”</p><small>Click ${escapeHtml(person.name)} again for another topic.</small></div>
+        </section>
+      </div>
+    `;
   }
 
   private renderMarket(): string {
+    if (!this.marketPoint) {
+      return `
+        <div class="market-scene station-scene" aria-label="Market points of interest">
+          <div class="scene-pointers" aria-label="Market actions">
+            <div class="scene-pointer market-pointer-commodities" data-market-point="commodities" role="button" tabindex="0" aria-label="Open commodity market"><i>▦</i><b>COMMODITY MARKET</b><small>Buy and sell cargo</small></div>
+            <div class="scene-pointer market-pointer-equipment" data-market-point="equipment" role="button" tabindex="0" aria-label="Open ship parts"><i>⚙</i><b>SHIP PARTS</b><small>Fit out your ship</small></div>
+            <div class="scene-pointer market-pointer-shipyard" data-market-point="shipyard" role="button" tabindex="0" aria-label="Open the ship dealer"><i>↗</i><b>NEW SHIP</b><small>One hull for sale</small></div>
+          </div>
+        </div>
+      `;
+    }
     return `
-      <div class="market-screen">
+      <div class="market-screen market-menu-screen">
+        <div class="scene-pointer scene-return-pointer" data-ui-command="market-overview" role="button" tabindex="0" aria-label="Return to the market floor"><i>◀</i><b>MARKET FLOOR</b><small>Back to the scene</small></div>
         <nav class="market-points" aria-label="Market points"><button class="${this.marketPoint === 'commodities' ? 'active' : ''}" data-market-point="commodities">COMMODITY MARKET</button><button class="${this.marketPoint === 'equipment' ? 'active' : ''}" data-market-point="equipment">SHIP PARTS</button><button class="${this.marketPoint === 'shipyard' ? 'active' : ''}" data-market-point="shipyard">NEW SHIP</button></nav>
         <div id="market-point-content"></div>
       </div>
     `;
+  }
+
+  private openMarketPoint(point: string): void {
+    this.marketPoint = point;
+    this.dockTab = 'market';
+    this.dockTerminal = 'market';
+    this.renderDock();
   }
 
   private renderMarketPoint(point: string): void {
