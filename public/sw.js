@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v6-no-flight-ship-sprites';
+const CACHE = 'voidrunner-v7-portrait-remaster';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',
@@ -47,24 +47,10 @@ self.addEventListener('install', (event) => {
     './art/portraits/sana-kell.webp',
     './art/portraits/tovik.webp',
     './art/portraits/yara-tan.webp',
-    './art/ships/vanguard.webp',
-    './art/ships/wayfarer.webp',
     './art/sprites/player-courier/01.png',
-    './art/sprites/player-courier/02.png',
-    './art/sprites/player-courier/03.png',
-    './art/sprites/player-courier/04.png',
-    './art/sprites/pirate-fighter/01.png',
-    './art/sprites/pirate-fighter/02.png',
-    './art/sprites/pirate-fighter/03.png',
-    './art/sprites/pirate-fighter/04.png',
     './art/sprites/cargo-hauler/01.png',
-    './art/sprites/cargo-hauler/02.png',
-    './art/sprites/cargo-hauler/03.png',
-    './art/sprites/cargo-hauler/04.png',
     './art/title-cockpit.webp',
     './assets/remaster/cockpit-frame.webp',
-    './assets/remaster/dock-industrial-texture.jpg',
-    './assets/remaster/dock-lower-strip.webp',
   ])));
   self.skipWaiting();
 });

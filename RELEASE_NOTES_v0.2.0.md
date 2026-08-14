@@ -12,7 +12,7 @@ This release revises the complete visual presentation while preserving the verti
 - Amber/teal avionics hierarchy and stronger target, mining, salvage, and threat presentation improve readability without increasing persistent HUD coverage.
 - Mobile landscape layout separates radar, target data, ship status, notifications, MFDs, and touch controls while retaining the complete flight model.
 - Corrected title cropping, target/navigation overlap, duplicate canopy struts, baked concept text, station-specific cockpit labeling, and duplicate dock-background UI.
-- Source references now live under `art-source/`; the playable build includes only compact runtime assets. The v5 service-worker cache pre-caches every remaster asset and emitted module.
+- The playable build includes only the committed runtime assets, and the service worker pre-caches them for offline reload.
 
 ## Verification
 
@@ -21,5 +21,3 @@ This release revises the complete visual presentation while preserving the verti
 - Mining, salvage, and named-bounty runtime scenarios passed.
 - Standard Gamepad API QA passed for axes, fire, mode, navigation, scan, and autopilot.
 - HTTPS service-worker installation and offline reload passed with the remaster assets cached.
-
-See `review/VISUAL_REMASTER_AUDIT.md`, `review/ART_DIRECTION.md`, and `review/PLAYTEST_REPORT.md` for details.

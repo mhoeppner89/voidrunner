@@ -3346,9 +3346,7 @@ button.primary,
 }
 
 .dock-backdrop {
-  background:
-    linear-gradient(90deg, rgba(5, 9, 8, 0.28), rgba(0, 0, 0, 0.08)),
-    url("../assets/remaster/dock-industrial-texture.jpg") center / cover no-repeat;
+  background: linear-gradient(90deg, rgba(5, 9, 8, 0.28), rgba(0, 0, 0, 0.08));
 }
 
 .dock-backdrop img {
@@ -3422,9 +3420,7 @@ button.primary,
   content: "";
   pointer-events: none;
   opacity: 0.38;
-  background:
-    linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.66)),
-    url("../assets/remaster/dock-industrial-texture.jpg") center 72% / cover no-repeat;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.66));
   image-rendering: pixelated;
   filter: saturate(0.66) contrast(1.18) brightness(0.54);
 }
@@ -3616,14 +3612,6 @@ button.primary,
   background:
     linear-gradient(90deg, rgba(3, 7, 7, 0.91) 0%, rgba(3, 7, 7, 0.68) 48%, rgba(3, 7, 7, 0.82) 100%),
     linear-gradient(0deg, rgba(3, 7, 7, 0.64) 0%, rgba(3, 7, 7, 0.22) 36%, rgba(3, 7, 7, 0.58) 100%);
-}
-
-.dock-screen::after {
-  background:
-    linear-gradient(180deg, transparent 0 4%, rgba(0, 0, 0, 0.18) 72%, rgba(0, 0, 0, 0.72)),
-    url("../assets/remaster/dock-lower-strip.webp") center / cover no-repeat;
-  opacity: 0.58;
-  filter: saturate(0.84) contrast(1.2) brightness(0.72);
 }
 
 /* Remove the concept-board texture from live dock screens; it contained baked UI. */
