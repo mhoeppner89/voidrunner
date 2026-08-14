@@ -96,6 +96,12 @@ Original prompt: Freeze the approved Voidrunner art style and proceed with the i
 - Bumped the service-worker cache to `voidrunner-v5-station-art` and added all bar and market plates to its pre-cache so returning visitors receive the current location screens.
 - Verification: `npm run check`, `npm run build:static`, `node --test tests/logic.test.mjs`, and `git diff --check` pass. Redeploy `main` and recheck the public station flow after the Pages workflow completes.
 
+## Flight ship-sprite removal
+
+- Removed the directional transparent ship-sprite layer from `SpaceRenderer`; flight entities now keep their procedural 3D meshes instead of hiding them behind 2D sprite overlays.
+- Removed directional sprite loading, camera-relative sprite selection, and directional fleet pre-caching from the runtime. The remastered cockpit frame remains the active flight overlay.
+- Verification: `npm run check`, `npm run build`, `npm run build:static`, `node --test tests/logic.test.mjs`, and `git diff --check` pass. The bundled browser client still reaches the station screen cleanly; a standalone Chromium flight harness remains unavailable in this environment because the browser process crashes at launch.
+
 ### Next review
 
 - Review the local station flow at `http://127.0.0.1:5174/` and confirm whether the pointer positions match the intended interaction points on each location plate.

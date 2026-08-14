@@ -1642,7 +1642,6 @@ export class GameSession {
           screenX: projection.x,
           screenY: projection.y,
           onScreen: projection.visible && !projection.behind,
-          spriteKey: ship.hostile ? 'pirate-fighter' : ship.role === 'trader' || ship.role === 'miner' ? 'cargo-hauler' : 'player-courier',
         };
       } else if (target.kind === 'asteroid') {
         const node = this.asteroids.find((entry) => entry.id === target.id)!;

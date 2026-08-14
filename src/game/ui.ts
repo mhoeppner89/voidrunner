@@ -37,7 +37,6 @@ export interface HudTarget {
   screenX?: number;
   screenY?: number;
   onScreen?: boolean;
-  spriteKey?: 'player-courier' | 'pirate-fighter' | 'cargo-hauler';
 }
 
 export interface HudModel {
@@ -138,7 +137,7 @@ export class GameUI {
           <div class="cockpit-glass" aria-hidden="true"></div>
           <div class="cockpit-screen cockpit-screen-own" aria-label="Own ship status display">
             <div class="screen-heading"><span>OWN SHIP STATUS</span><b id="own-ship-name">WAYFARER</b></div>
-            <div class="screen-ship-layout"><div class="own-ship-silhouette" aria-hidden="true"></div><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>ARMOR</span><i><b id="screen-own-armor"></b></i><em id="screen-own-armor-value">100</em></div><div><span>HULL</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">100</em></div></div></div>
+            <div class="screen-ship-layout"><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>ARMOR</span><i><b id="screen-own-armor"></b></i><em id="screen-own-armor-value">100</em></div><div><span>HULL</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">100</em></div></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="Radar display">
             <div class="screen-heading"><span>RADAR</span><b id="screen-radar-zone">OPEN SPACE</b></div>
@@ -146,7 +145,7 @@ export class GameUI {
           </div>
           <div class="cockpit-screen cockpit-screen-target" aria-label="Target status display">
             <div class="screen-heading"><span>TARGET STATUS</span><b id="screen-target-name">NO LOCK</b></div>
-            <div class="screen-target-layout"><div class="target-ship-silhouette" aria-hidden="true"></div><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-target-shield"></b></i><em id="screen-target-shield-value">—</em></div><div><span>ARMOR</span><i><b id="screen-target-armor"></b></i><em id="screen-target-armor-value">—</em></div><div><span>HULL</span><i><b id="screen-target-hull"></b></i><em id="screen-target-hull-value">—</em></div></div></div>
+            <div class="screen-target-layout"><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-target-shield"></b></i><em id="screen-target-shield-value">—</em></div><div><span>ARMOR</span><i><b id="screen-target-armor"></b></i><em id="screen-target-armor-value">—</em></div><div><span>HULL</span><i><b id="screen-target-hull"></b></i><em id="screen-target-hull-value">—</em></div></div></div>
           </div>
           <div class="cockpit-identity" aria-hidden="true"><span>WAYFARER // HULL 07</span><b>VOIDRUNNER</b></div>
           <div class="hud-top-left">
@@ -822,7 +821,6 @@ export class GameUI {
       const element = this.root.querySelector<HTMLElement>(selector);
       if (element) element.style.width = `${Math.max(0, Math.min(100, value))}%`;
     };
-    const silhouette = this.root.querySelector<HTMLElement>('.target-ship-silhouette');
     if (!target) {
       setText('#screen-target-name', 'NO LOCK');
       setText('#screen-target-shield-value', '—');
@@ -831,8 +829,6 @@ export class GameUI {
       setBar('#screen-target-shield', 0);
       setBar('#screen-target-armor', 0);
       setBar('#screen-target-hull', 0);
-      silhouette?.style.setProperty('background-image', 'none');
-      silhouette?.classList.add('is-empty');
       return;
     }
     setText('#screen-target-name', target.name.toUpperCase());
@@ -842,9 +838,6 @@ export class GameUI {
     setBar('#screen-target-shield', percent(target.shield ?? 0, target.maxShield ?? 0));
     setBar('#screen-target-armor', percent(target.armor ?? 0, target.maxArmor ?? 0));
     setBar('#screen-target-hull', percent(target.hull ?? 0, target.maxHull ?? 0));
-    const sprite = target.spriteKey ?? (target.kind === 'ship' ? 'pirate-fighter' : undefined);
-    silhouette?.style.setProperty('background-image', sprite ? `url("./art/sprites/${sprite}/01.png")` : 'none');
-    silhouette?.classList.toggle('is-empty', !sprite);
   }
 
   private drawRadar(contacts: RadarContact[]): void {

@@ -1,13 +1,4 @@
-const CACHE = 'voidrunner-v5-station-art';
-const directionalViews = [
-  'front', 'back', 'left', 'right', 'up', 'down',
-  'front-right', 'front-left', 'front-up', 'front-down',
-  'back-right', 'back-left', 'back-up', 'back-down',
-  'right-up', 'right-down', 'left-up', 'left-down',
-  'front-right-up', 'front-right-down', 'front-left-up', 'front-left-down',
-  'back-right-up', 'back-right-down', 'back-left-up', 'back-left-down',
-];
-const directionalShips = ['player-courier', 'pirate-fighter', 'cargo-hauler'];
+const CACHE = 'voidrunner-v6-no-flight-ship-sprites';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',
@@ -70,7 +61,6 @@ self.addEventListener('install', (event) => {
     './art/sprites/cargo-hauler/02.png',
     './art/sprites/cargo-hauler/03.png',
     './art/sprites/cargo-hauler/04.png',
-    ...directionalShips.flatMap((ship) => directionalViews.map((view) => `./art/sprites/directional/${ship}/${view}.png`)),
     './art/title-cockpit.webp',
     './assets/remaster/cockpit-frame.webp',
     './assets/remaster/dock-industrial-texture.jpg',
