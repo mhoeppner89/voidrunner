@@ -1,5 +1,16 @@
 import { clamp } from './random.js';
-const HOLD_ACTIONS = new Set(['fire', 'afterburner', 'roll-left', 'roll-right']);
+
+const HOLD_ACTIONS = new Set(['fire', 'afterburner']);
+const TILT_DEADZONE = 2.5;
+const TILT_FULL_RANGE = 24;
+const wrapAngle = (value) => {
+    while (value > 180)
+        value -= 360;
+    while (value < -180)
+        value += 360;
+    return value;
+};
+
 export class InputManager {
     root;
     keys = new Set();
@@ -9,21 +20,33 @@ export class InputManager {
     joystickX = 0;
     joystickY = 0;
     throttleSet;
-    activeStickPointer;
     activeThrottlePointer;
     gamepadButtons = new Map();
     gamepadConnected = false;
+    tiltSupported = false;
+    tiltEnabled = false;
+    tiltSeen = false;
+    tiltCalibrated = false;
+    tiltBeta = 0;
+    tiltGamma = 0;
+    tiltNeutralBeta = 0;
+    tiltNeutralGamma = 0;
+    tiltSensitivity = 1;
+    tiltInvertPitch = false;
+    tiltInvertYaw = false;
     constructor(root) {
         this.root = root;
         window.addEventListener('keydown', this.onKeyDown, { passive: false });
         window.addEventListener('keyup', this.onKeyUp);
         window.addEventListener('blur', this.onBlur);
         this.bindTouchControls();
+        this.bindTilt();
     }
     dispose() {
         window.removeEventListener('keydown', this.onKeyDown);
         window.removeEventListener('keyup', this.onKeyUp);
         window.removeEventListener('blur', this.onBlur);
+        window.removeEventListener('deviceorientation', this.onDeviceOrientation);
     }
     onKeyDown = (event) => {
         const code = event.code;
@@ -43,45 +66,81 @@ export class InputManager {
         this.joystickX = 0;
         this.joystickY = 0;
     };
-    bindTouchControls() {
-        const pad = this.root.querySelector('[data-touch-stick]');
-        const knob = this.root.querySelector('[data-touch-stick-knob]');
-        if (pad && knob) {
-            const update = (event) => {
-                const rect = pad.getBoundingClientRect();
-                const cx = rect.left + rect.width / 2;
-                const cy = rect.top + rect.height / 2;
-                const max = rect.width * 0.34;
-                const dx = event.clientX - cx;
-                const dy = event.clientY - cy;
-                const length = Math.hypot(dx, dy);
-                const scale = length > max ? max / length : 1;
-                const nx = (dx * scale) / max;
-                const ny = (dy * scale) / max;
-                this.joystickX = clamp(nx, -1, 1);
-                this.joystickY = clamp(ny, -1, 1);
-                knob.style.transform = `translate(${this.joystickX * max}px, ${this.joystickY * max}px)`;
-            };
-            pad.addEventListener('pointerdown', (event) => {
-                this.activeStickPointer = event.pointerId;
-                pad.setPointerCapture(event.pointerId);
-                update(event);
-            });
-            pad.addEventListener('pointermove', (event) => {
-                if (event.pointerId === this.activeStickPointer)
-                    update(event);
-            });
-            const release = (event) => {
-                if (event.pointerId !== this.activeStickPointer)
-                    return;
-                this.activeStickPointer = undefined;
-                this.joystickX = 0;
-                this.joystickY = 0;
-                knob.style.transform = 'translate(0, 0)';
-            };
-            pad.addEventListener('pointerup', release);
-            pad.addEventListener('pointercancel', release);
+    // ---- tilt (device orientation) steering ----
+    bindTilt() {
+        this.tiltSupported = typeof DeviceOrientationEvent !== 'undefined';
+        if (this.tiltSupported)
+            window.addEventListener('deviceorientation', this.onDeviceOrientation, { passive: true });
+    }
+    onDeviceOrientation = (event) => {
+        if (event.beta == null || event.gamma == null)
+            return;
+        this.tiltSeen = true;
+        this.tiltBeta += (event.beta - this.tiltBeta) * 0.35;
+        this.tiltGamma += (event.gamma - this.tiltGamma) * 0.35;
+    };
+    async enableTilt() {
+        if (!this.tiltSupported) {
+            this.tiltEnabled = false;
+            return false;
         }
+        const request = DeviceOrientationEvent.requestPermission;
+        if (typeof request === 'function') {
+            try {
+                const state = await request.call(DeviceOrientationEvent);
+                if (state !== 'granted') {
+                    this.tiltEnabled = false;
+                    return false;
+                }
+            }
+            catch {
+                this.tiltEnabled = false;
+                return false;
+            }
+        }
+        this.tiltEnabled = true;
+        return true;
+    }
+    calibrateTilt() {
+        this.tiltNeutralBeta = this.tiltBeta;
+        this.tiltNeutralGamma = this.tiltGamma;
+        this.tiltCalibrated = true;
+        return { beta: this.tiltNeutralBeta, gamma: this.tiltNeutralGamma };
+    }
+    configureTilt(settings = {}) {
+        if (settings.tiltSensitivity !== undefined)
+            this.tiltSensitivity = Number(settings.tiltSensitivity);
+        if (settings.tiltInvertPitch !== undefined)
+            this.tiltInvertPitch = Boolean(settings.tiltInvertPitch);
+        if (settings.tiltInvertYaw !== undefined)
+            this.tiltInvertYaw = Boolean(settings.tiltInvertYaw);
+        if (settings.tiltNeutral) {
+            this.tiltNeutralBeta = Number(settings.tiltNeutral.beta ?? 0);
+            this.tiltNeutralGamma = Number(settings.tiltNeutral.gamma ?? 0);
+            this.tiltCalibrated = true;
+        }
+    }
+    tiltSteering() {
+        // Roll (gamma) steers yaw like a wheel, pitch (beta) steers the nose.
+        const curve = (value) => {
+            const magnitude = Math.abs(value);
+            if (magnitude < TILT_DEADZONE)
+                return 0;
+            const t = clamp((magnitude - TILT_DEADZONE) / TILT_FULL_RANGE, 0, 1);
+            return Math.sign(value) * t * this.tiltSensitivity;
+        };
+        let pitch = curve(wrapAngle(this.tiltBeta - this.tiltNeutralBeta));
+        let yaw = curve(wrapAngle(this.tiltGamma - this.tiltNeutralGamma));
+        if (this.tiltInvertPitch)
+            pitch = -pitch;
+        if (this.tiltInvertYaw)
+            yaw = -yaw;
+        return { pitch: clamp(pitch, -1, 1), yaw: clamp(yaw, -1, 1) };
+    }
+    get tiltActive() {
+        return this.tiltSupported && this.tiltEnabled && this.tiltSeen && this.tiltCalibrated;
+    }
+    bindTouchControls() {
         const throttle = this.root.querySelector('[data-touch-throttle]');
         const thumb = this.root.querySelector('[data-touch-throttle-thumb]');
         if (throttle && thumb) {
@@ -179,7 +238,6 @@ export class InputManager {
             afterburner: button(4),
             targetNext: this.gamepadEdge(0, button(0)),
             cycleMode: this.gamepadEdge(1, button(1)),
-            interact: this.gamepadEdge(2, button(2)),
             autopilot: this.gamepadEdge(3, button(3)),
             scan: this.gamepadEdge(12, button(12)),
             targetNearestHostile: this.gamepadEdge(13, button(13)),
@@ -194,11 +252,12 @@ export class InputManager {
         const pitchKeyboard = this.keyAxis(['KeyS', 'ArrowDown'], ['KeyW', 'ArrowUp']);
         const rollKeyboard = this.keyAxis(['KeyE'], ['KeyQ']);
         const throttleKeyboard = this.keyAxis(['KeyR', 'Equal', 'NumpadAdd'], ['KeyF', 'Minus', 'NumpadSubtract']);
+        const tilt = this.tiltActive ? this.tiltSteering() : undefined;
         const throttleSet = this.throttleSet;
         this.throttleSet = undefined;
         return {
-            pitch: clamp(this.joystickY || pitchKeyboard || gamepad.pitch || 0, -1, 1),
-            yaw: clamp(this.joystickX || yawKeyboard || gamepad.yaw || 0, -1, 1),
+            pitch: clamp(tilt ? tilt.pitch : (this.joystickY || pitchKeyboard || gamepad.pitch || 0), -1, 1),
+            yaw: clamp(tilt ? tilt.yaw : (this.joystickX || yawKeyboard || gamepad.yaw || 0), -1, 1),
             roll: clamp((this.touchHeld.has('roll-right') ? 1 : 0) - (this.touchHeld.has('roll-left') ? 1 : 0) || rollKeyboard || gamepad.roll || 0, -1, 1),
             throttleDelta: throttleKeyboard * 0.46 + (gamepad.throttleDelta ?? 0),
             throttleSet,
@@ -210,7 +269,6 @@ export class InputManager {
             cycleMode: this.consumePressed('KeyC') || this.consumeTouch('cycleMode') || Boolean(gamepad.cycleMode),
             navNext: this.consumePressed('KeyN') || this.consumeTouch('navNext') || Boolean(gamepad.navNext),
             autopilot: this.consumePressed('KeyJ') || this.consumeTouch('autopilot') || Boolean(gamepad.autopilot),
-            interact: this.consumePressed('KeyG', 'Enter') || this.consumeTouch('interact') || Boolean(gamepad.interact),
             scan: this.consumePressed('KeyV') || this.consumeTouch('scan') || Boolean(gamepad.scan),
             pause: this.consumePressed('Escape', 'KeyP') || this.consumeTouch('pause') || Boolean(gamepad.pause),
             map: this.consumePressed('KeyK') || this.consumeTouch('map') || Boolean(gamepad.map),

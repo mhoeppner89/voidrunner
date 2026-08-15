@@ -4,14 +4,14 @@ import { refreshMissionOffers } from './missions.js';
 import { clamp } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
 export const SAVE_KEY = 'void-privateer-save-v1';
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 4;
 const LEGACY_LOCATION_POSITIONS = {
-    helix: [-130, 45, 210],
-    rook: [360, 70, 260],
-    vesper: [-480, 35, -420],
-    azure: [560, -60, -300],
-    shardbelt: [40, -15, -240],
-    'mourning-line': [-330, -45, 300],
+    helix: [-14400, 1800, 12400],
+    rook: [16400, 3200, 15200],
+    vesper: [-20800, -2400, -18000],
+    azure: [23600, -3600, -14400],
+    shardbelt: [1800, -800, -19600],
+    'mourning-line': [-18000, -2000, 22000],
 };
 const defaultSettings = () => ({
     music: 0.34,
@@ -21,6 +21,11 @@ const defaultSettings = () => ({
     quality: 'auto',
     touchScale: 1,
     vibration: true,
+    steering: 'tilt',
+    tiltSensitivity: 1,
+    tiltInvertPitch: false,
+    tiltInvertYaw: false,
+    tiltNeutral: null,
 });
 export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0) => {
     const now = Date.now();
@@ -105,7 +110,7 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
 };
 const storageAvailable = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 const migrateLegacyPosition = (save, sourceVersion) => {
-    if (sourceVersion >= 2)
+    if (sourceVersion >= 4)
         return;
     const current = save.player.position;
     const ids = Object.keys(LEGACY_LOCATION_POSITIONS);
@@ -136,11 +141,20 @@ const migrateLegacyPosition = (save, sourceVersion) => {
     }
 };
 export const saveGame = (save) => {
+    // The combat simulator uses an in-memory arena save and must never touch
+    // the career autosave slot.
+    if (save?.arena)
+        return false;
     if (!storageAvailable())
         return false;
     try {
         save.updatedAt = Date.now();
-        window.localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+        // Interpolation scratch slots (prevPosition/prevRotation) are transient
+        // sim state, not career data — keep them out of the persisted save.
+        const persist = { ...save, player: { ...save.player } };
+        delete persist.player.prevPosition;
+        delete persist.player.prevRotation;
+        window.localStorage.setItem(SAVE_KEY, JSON.stringify(persist));
         return true;
     }
     catch (error) {

@@ -376,6 +376,69 @@ export const shipVariantForRole = (role) => {
             return 'kestrel';
     }
 };
+// The player's purchasable hulls map onto the shared voxel builders so the
+// cockpit schematic can draw the same silhouette the hangar renders in 3D.
+export const playerShipVariant = (shipId) => (shipId === 'vanguard' ? 'warden' : 'kestrel');
+const profileCache = new Map();
+// A top-down hull schematic for the cockpit monitors: the ship's voxel footprint
+// projected onto its XZ plane, returned as the set of filled columns plus the
+// boundary edge segments between filled and empty columns.
+export const shipTopDownProfile = (variant) => {
+    if (profileCache.has(variant))
+        return profileCache.get(variant);
+    const builder = SHIP_BUILDERS[variant] ?? SHIP_BUILDERS.kestrel;
+    const { grid } = builder();
+    const filled = new Set();
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (const key of grid.cells.keys()) {
+        const parts = key.split(',');
+        const x = Number(parts[0]);
+        const z = Number(parts[2]);
+        const column = `${x},${z}`;
+        if (filled.has(column))
+            continue;
+        filled.add(column);
+        if (x < minX)
+            minX = x;
+        if (x > maxX)
+            maxX = x;
+        if (z < minZ)
+            minZ = z;
+        if (z > maxZ)
+            maxZ = z;
+    }
+    const edges = [];
+    const isFilled = (x, z) => filled.has(`${x},${z}`);
+    for (const column of filled) {
+        const parts = column.split(',');
+        const x = Number(parts[0]);
+        const z = Number(parts[1]);
+        if (!isFilled(x + 1, z))
+            edges.push([x + 1, z, x + 1, z + 1]);
+        if (!isFilled(x - 1, z))
+            edges.push([x, z, x, z + 1]);
+        if (!isFilled(x, z + 1))
+            edges.push([x, z + 1, x + 1, z + 1]);
+        if (!isFilled(x, z - 1))
+            edges.push([x, z, x + 1, z]);
+    }
+    const profile = {
+        minX,
+        maxX,
+        minZ,
+        maxZ,
+        edges,
+        cells: Array.from(filled, (column) => {
+            const parts = column.split(',');
+            return [Number(parts[0]), Number(parts[1])];
+        }),
+    };
+    profileCache.set(variant, profile);
+    return profile;
+};
 export const paletteForFaction = (faction, hostile) => {
     if (hostile) {
         return {
@@ -443,17 +506,26 @@ export const paletteForFaction = (faction, hostile) => {
 };
 const createVoxelMeshes = (grid, unit, palette, roughness, metalness) => {
     const group = new THREE.Group();
-    const hullMaterial = new THREE.MeshStandardMaterial({
+    // Glossy painted metal: a clearcoat over a faceted hull so the low-poly ship
+    // catches the environment map and reads like a Rebel Galaxy Outlaw hull rather
+    // than flat matte voxels.
+    const hullMaterial = new THREE.MeshPhysicalMaterial({
         vertexColors: true,
         roughness,
         metalness,
         flatShading: true,
         emissive: 0x020303,
-        emissiveIntensity: 0.04,
+        emissiveIntensity: 0.05,
+        clearcoat: 1,
+        clearcoatRoughness: 0.22,
+        envMapIntensity: 1.35,
     });
     const glowMaterial = new THREE.MeshBasicMaterial({
         vertexColors: true,
         toneMapped: false,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        transparent: false,
     });
     const hullGeometry = grid.buildGeometry(unit, palette, new Set(['hull', 'dark', 'accent']));
     const glowGeometry = grid.buildGeometry(unit, palette, new Set(['canopy', 'engine', 'warning', 'window']));
@@ -461,12 +533,55 @@ const createVoxelMeshes = (grid, unit, palette, roughness, metalness) => {
     hull.name = 'voxel-hull';
     const glow = new THREE.Mesh(glowGeometry, glowMaterial);
     glow.name = 'voxel-glow';
-    group.add(hull, glow);
-    return { group, hullMaterial, glowMaterial };
+    // Fresnel rim: an inflated copy of the hull that glows at grazing angles, giving
+    // every ship a neon edge-light in its faction accent.
+    const rimMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            uColor: { value: new THREE.Color(palette.accent ?? palette.engine ?? 0x6ad9f1) },
+            uIntensity: { value: 1.05 },
+        },
+        vertexShader: `
+            varying vec3 vNormal;
+            varying vec3 vView;
+            void main() {
+                vec4 mv = modelViewMatrix * vec4(position, 1.0);
+                vNormal = normalize(normalMatrix * normal);
+                vView = normalize(-mv.xyz);
+                gl_Position = projectionMatrix * mv;
+            }`,
+        fragmentShader: `
+            uniform vec3 uColor;
+            uniform float uIntensity;
+            varying vec3 vNormal;
+            varying vec3 vView;
+            void main() {
+                float fresnel = pow(1.0 - abs(dot(normalize(vNormal), normalize(vView))), 2.2);
+                gl_FragColor = vec4(uColor * fresnel * uIntensity, fresnel);
+            }`,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        toneMapped: false,
+    });
+    const rimGeometry = hullGeometry.clone();
+    const inset = unit * 0.55;
+    const rimPos = rimGeometry.getAttribute('position');
+    const rimNorm = rimGeometry.getAttribute('normal');
+    for (let index = 0; index < rimPos.count; index += 1) {
+        rimPos.setXYZ(index, rimPos.getX(index) + rimNorm.getX(index) * inset, rimPos.getY(index) + rimNorm.getY(index) * inset, rimPos.getZ(index) + rimNorm.getZ(index) * inset);
+    }
+    rimPos.needsUpdate = true;
+    rimGeometry.computeBoundingSphere();
+    const rim = new THREE.Mesh(rimGeometry, rimMaterial);
+    rim.name = 'hull-rim';
+    rim.renderOrder = 2;
+    group.add(hull, glow, rim);
+    group.userData.rimMaterial = rimMaterial;
+    return { group, hullMaterial, glowMaterial, rimMaterial };
 };
 export const createVoxelShipModel = (variant, palette) => {
     const blueprint = SHIP_BUILDERS[variant]();
-    const { group, hullMaterial, glowMaterial } = createVoxelMeshes(blueprint.grid, blueprint.unit, palette, 0.72, 0.66);
+    const { group, hullMaterial, glowMaterial, rimMaterial } = createVoxelMeshes(blueprint.grid, blueprint.unit, palette, 0.42, 0.25);
     group.name = `voxel-ship-${variant}`;
     group.userData.baseScale = 1;
     group.userData.variant = variant;
@@ -476,6 +591,7 @@ export const createVoxelShipModel = (variant, palette) => {
         enginePorts: blueprint.enginePorts.map(([x, y, z]) => new THREE.Vector3(x * blueprint.unit, y * blueprint.unit, z * blueprint.unit)),
         hullMaterial,
         glowMaterial,
+        rimMaterial,
     };
 };
 const addHelixWindows = (grid, radius, x) => {
@@ -537,8 +653,8 @@ const buildHelixStation = () => {
     }
     const root = new THREE.Group();
     root.name = 'helix-voxel-station';
-    const staticMeshes = createVoxelMeshes(staticGrid, unit, palette, 0.78, 0.72).group;
-    const rotor = createVoxelMeshes(rotorGrid, unit, palette, 0.72, 0.74).group;
+    const staticMeshes = createVoxelMeshes(staticGrid, unit, palette, 0.72, 0.5).group;
+    const rotor = createVoxelMeshes(rotorGrid, unit, palette, 0.74, 0.5).group;
     rotor.name = 'rotor';
     rotor.userData.rotationAxis = 'x';
     root.add(staticMeshes, rotor);
@@ -593,7 +709,7 @@ const buildRookStation = () => {
         grid.fillBox(-11, -11, y, y, -13, 13, y === 0 ? 'warning' : 'window');
         grid.fillBox(11, 11, y, y, -13, 13, y === 0 ? 'warning' : 'window');
     }
-    const root = createVoxelMeshes(grid, unit, palette, 0.66, 0.79).group;
+    const root = createVoxelMeshes(grid, unit, palette, 0.79, 0.48).group;
     root.name = 'rook-voxel-station';
     return root;
 };

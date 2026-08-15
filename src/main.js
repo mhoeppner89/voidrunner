@@ -7,24 +7,26 @@ if (!host)
 const ui = new GameUI(host);
 let session;
 let cachedSave = loadGame();
-const beginSession = (mode) => {
+const beginSession = (mode, arena) => {
     session?.dispose();
-    const save = mode === 'new' ? createNewSave() : loadGame();
+    const save = mode === 'new' || mode === 'arena' ? createNewSave() : loadGame();
     if (!save) {
         ui.showToast('No autosave was found.', 'warning');
         ui.showTitle(false);
         return;
     }
+    if (mode === 'arena')
+        save.arena = arena;
     cachedSave = save;
     saveGame(save);
     session = new GameSession(save, ui, () => {
         session = undefined;
         cachedSave = loadGame();
         ui.showTitle(Boolean(cachedSave), cachedSave);
-    });
+    }, mode === 'arena' ? arena : null);
     void session.enableAudio();
 };
-const requestFullscreen = async () => {
+const enterFullscreen = async () => {
     try {
         if (!document.fullscreenElement)
             await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
@@ -35,10 +37,22 @@ const requestFullscreen = async () => {
         ui.showToast('Fullscreen or orientation lock was declined by the browser.', 'info');
     }
 };
+const toggleFullscreen = async () => {
+    if (document.fullscreenElement) {
+        try {
+            await document.exitFullscreen();
+        }
+        catch { /* ignore */ }
+        return;
+    }
+    await enterFullscreen();
+};
 const actions = {
     startNew: () => beginSession('new'),
     resume: () => beginSession('resume'),
-    requestFullscreen: () => void requestFullscreen(),
+    startArena: (environment, scenario) => beginSession('arena', { environment, scenario }),
+    requestFullscreen: () => void enterFullscreen(),
+    toggleFullscreen: () => void toggleFullscreen(),
     launch: () => {
         void session?.enableAudio();
         session?.launch();
@@ -58,6 +72,9 @@ const actions = {
     resumeFlight: () => session?.resumeFlight(),
     quitToTitle: () => session?.quitToTitle(),
     setSetting: (key, value) => session?.setSetting(key, value),
+    enableTilt: () => session?.enableTilt() ?? Promise.resolve(false),
+    calibrateTilt: () => session?.calibrateTilt(),
+    engageHyperdrive: () => session?.toggleHyperdrive(),
 };
 ui.setActions(actions);
 ui.showTitle(hasSavedGame(), cachedSave);
@@ -78,7 +95,12 @@ if ('serviceWorker' in navigator && isProductionBuild) {
 window.__VOID_PRIVATEER__ = {
     newGame: () => beginSession('new'),
     resume: () => beginSession('resume'),
+    startArena: (environment, scenario) => beginSession('arena', { environment, scenario }),
     getState: () => session?.save ?? cachedSave,
-    getRuntime: () => session?.debugSnapshot(),
+    getRuntime: () => session,
+    debugShips: () => session?.ships,
+    pickTarget: (x, y) => session?.renderer?.pickTarget(x, y),
+    projectToScreen: (position) => session?.renderer?.projectToScreen(position),
     launch: () => session?.launch(),
+    saveNow: () => session?.saveNow(),
 };

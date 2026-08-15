@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v8-spaceflight-remaster';
+const CACHE = 'voidrunner-v36-fixed-step-gfatigue';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',

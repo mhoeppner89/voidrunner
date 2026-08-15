@@ -6,8 +6,12 @@ export class AudioManager {
     musicGain;
     engineGain;
     engineOsc;
+    engineOsc2;
     engineSub;
     engineFilter;
+    engineNoise;
+    engineNoiseFilter;
+    engineNoiseGain;
     enabled = false;
     musicTimer = 0;
     noteIndex = 0;
@@ -38,21 +42,54 @@ export class AudioManager {
         this.engineGain.connect(this.engineFilter);
         this.engineFilter.connect(this.master);
         this.master.connect(this.context.destination);
+        // Engine voice: a warm, smooth rumble. Two gently detuned triangles give
+        // a soft beating "purr", a sub sine carries the weight, and a filtered
+        // noise wash supplies the air pushed out of the thrusters. The old raw
+        // sawtooth was the harsh, buzzy "angry bee" drone — it's gone.
         this.engineOsc = this.context.createOscillator();
-        this.engineOsc.type = 'sawtooth';
-        this.engineOsc.frequency.value = 42;
+        this.engineOsc.type = 'triangle';
+        this.engineOsc.frequency.value = 46;
+        this.engineOsc2 = this.context.createOscillator();
+        this.engineOsc2.type = 'triangle';
+        this.engineOsc2.frequency.value = 48;
         this.engineSub = this.context.createOscillator();
         this.engineSub.type = 'sine';
-        this.engineSub.frequency.value = 21;
+        this.engineSub.frequency.value = 23;
+        const osc2Gain = this.context.createGain();
+        osc2Gain.gain.value = 0.6;
         const subGain = this.context.createGain();
-        subGain.gain.value = 0.45;
+        subGain.gain.value = 0.5;
         this.engineOsc.connect(this.engineGain);
+        this.engineOsc2.connect(osc2Gain);
+        osc2Gain.connect(this.engineGain);
         this.engineSub.connect(subGain);
         subGain.connect(this.engineGain);
+        // Thruster wash: looping white noise through its own lowpass, gated by throttle.
+        this.engineNoise = this.context.createBufferSource();
+        this.engineNoise.buffer = this.createNoiseBuffer(2);
+        this.engineNoise.loop = true;
+        this.engineNoiseFilter = this.context.createBiquadFilter();
+        this.engineNoiseFilter.type = 'lowpass';
+        this.engineNoiseFilter.frequency.value = 380;
+        this.engineNoiseGain = this.context.createGain();
+        this.engineNoiseGain.gain.value = 0;
+        this.engineNoise.connect(this.engineNoiseFilter);
+        this.engineNoiseFilter.connect(this.engineNoiseGain);
+        this.engineNoiseGain.connect(this.master);
+        this.engineNoise.start();
         this.engineOsc.start();
+        this.engineOsc2.start();
         this.engineSub.start();
         this.enabled = true;
         await this.context.resume();
+    }
+    createNoiseBuffer(seconds) {
+        const length = Math.floor(this.context.sampleRate * seconds);
+        const buffer = this.context.createBuffer(1, length, this.context.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let index = 0; index < length; index += 1)
+            data[index] = Math.random() * 2 - 1;
+        return buffer;
     }
     setVolumes(music, effects) {
         this.musicVolume = clamp(music, 0, 1);
@@ -69,11 +106,18 @@ export class AudioManager {
         if (!this.context || !this.enabled)
             return;
         const now = this.context.currentTime;
-        const engineLevel = this.stationMode ? 0 : 0.018 + throttle * 0.055 + (afterburner ? 0.055 : 0);
-        this.engineGain?.gain.setTargetAtTime(engineLevel * this.effectsVolume, now, 0.08);
-        this.engineOsc?.frequency.setTargetAtTime(38 + throttle * 72 + (afterburner ? 42 : 0) + damage * 9, now, 0.06);
-        this.engineSub?.frequency.setTargetAtTime(19 + throttle * 30 + (afterburner ? 16 : 0), now, 0.08);
-        this.engineFilter?.frequency.setTargetAtTime(220 + throttle * 760 + (afterburner ? 900 : 0), now, 0.08);
+        const thrust = this.stationMode ? 0 : throttle;
+        const burn = this.stationMode ? 0 : (afterburner ? 1 : 0);
+        const engineLevel = this.stationMode ? 0 : 0.05 + thrust * 0.075 + burn * 0.05;
+        this.engineGain?.gain.setTargetAtTime(engineLevel * this.effectsVolume, now, 0.1);
+        const oscHz = 44 + thrust * 32 + burn * 26 + damage * 6;
+        this.engineOsc?.frequency.setTargetAtTime(oscHz, now, 0.09);
+        this.engineOsc2?.frequency.setTargetAtTime(oscHz * 1.045, now, 0.09);
+        this.engineSub?.frequency.setTargetAtTime(22 + thrust * 15 + burn * 11, now, 0.1);
+        this.engineFilter?.frequency.setTargetAtTime(300 + thrust * 380 + burn * 600, now, 0.1);
+        const washLevel = this.stationMode ? 0 : 0.014 + thrust * 0.055 + burn * 0.032;
+        this.engineNoiseGain?.gain.setTargetAtTime(washLevel * this.effectsVolume, now, 0.12);
+        this.engineNoiseFilter?.frequency.setTargetAtTime(320 + thrust * 560 + burn * 740, now, 0.1);
         this.musicTimer -= dt;
         if (this.musicTimer <= 0 && this.musicVolume > 0.01) {
             this.musicTimer = this.stationMode ? 1.8 : 2.5;

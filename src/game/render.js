@@ -3,6 +3,7 @@ import { LOCATIONS } from './data.js';
 import { createVoxelShipModel, createVoxelStationModel, paletteForFaction, shipVariantForRole } from './voxelModels.js';
 import { clamp, seededRandom } from './random.js';
 const tupleToVector = (tuple, out = new THREE.Vector3()) => out.set(tuple[0], tuple[1], tuple[2]);
+const NEG_Z = new THREE.Vector3(0, 0, -1);
 const cssHex = (value) => `#${value.toString(16).padStart(6, '0')}`;
 const factionColor = (faction) => {
     switch (faction) {
@@ -21,11 +22,12 @@ const factionColor = (faction) => {
 export class SpaceRenderer {
     container;
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(74, 1, 0.08, 60000);
+    camera = new THREE.PerspectiveCamera(74, 1, 0.08, 2000000);
     renderer;
     shell;
     dynamicRoot = new THREE.Group();
     skyRoot = new THREE.Group();
+    locationRoot = new THREE.Group();
     instanceRoots = new Map();
     locationMeshes = new Map();
     shipMeshes = new Map();
@@ -41,13 +43,19 @@ export class SpaceRenderer {
     tmpMatrix = new THREE.Matrix4();
     tmpPosition = new THREE.Vector3();
     tmpQuaternion = new THREE.Quaternion();
+    // Fixed-timestep interpolation scratch: previous-state transforms are lerped
+    // toward the current state by the per-frame alpha fraction.
+    tmpPrevPos = new THREE.Vector3();
+    tmpPrevQuat = new THREE.Quaternion();
+    tmpCurQuat = new THREE.Quaternion();
     tmpScale = new THREE.Vector3();
+    tmpEuler = new THREE.Euler();
     pixelTextures = new Set();
     screenTextures = [];
     forward = new THREE.Vector3();
     raycaster = new THREE.Raycaster();
     pointer = new THREE.Vector2();
-    asteroidMesh;
+    asteroidMeshes = [];
     asteroids;
     graveyard;
     wreckNodes;
@@ -56,12 +64,22 @@ export class SpaceRenderer {
     lastQualityScale = 1;
     qualityMode;
     contextLost = false;
+    bloomSceneTarget;
+    bloomBlurTargets = [];
+    bloomQuad;
+    bloomCamera;
+    bloomBrightMaterial;
+    bloomBlurMaterial;
+    bloomCompositeMaterial;
     fovTarget = 74;
+    skyTime = 0;
+    starShimmer;
     targetId;
     selectedAsteroidId;
     selectedWreckId;
     selectedLocationId;
     activeInstanceId;
+    stationBeacons = [];
     constructor(container, seed, asteroids, graveyard, wreckNodes, quality) {
         this.container = container;
         this.asteroids = asteroids;
@@ -78,18 +96,20 @@ export class SpaceRenderer {
         });
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderer.toneMapping = THREE.NeutralToneMapping;
-        this.renderer.toneMappingExposure = 1.24;
+        this.renderer.toneMappingExposure = 1.2;
         this.renderer.setPixelRatio(1);
         this.renderer.shadowMap.enabled = false;
-        this.renderer.setClearColor(0x061331, 1);
+        this.renderer.setClearColor(0x0d1a3c, 1);
         this.container.appendChild(this.renderer.domElement);
         this.renderer.domElement.id = 'space-canvas';
         this.renderer.domElement.classList.add('retro-pixel-canvas');
         this.renderer.domElement.style.imageRendering = 'pixelated';
         this.renderer.domElement.setAttribute('aria-label', 'Three-dimensional spaceflight view');
-        this.scene.fog = new THREE.FogExp2(0x071945, 0.00022);
+        this.scene.fog = new THREE.FogExp2(0x16223f, 0.00012);
         this.scene.add(this.skyRoot);
         this.scene.add(this.dynamicRoot);
+        this.scene.add(this.locationRoot);
+        this.locationRoot.name = 'persistent-locations';
         Object.keys(LOCATIONS).forEach((id) => {
             const root = new THREE.Group();
             root.name = `poi-instance-${id}`;
@@ -99,11 +119,12 @@ export class SpaceRenderer {
         });
         this.scene.add(this.camera);
         this.createLighting();
+        this.createEnvironmentMap();
         this.createStarfield(seed, quality);
         this.createNebulae(seed, quality);
         this.createFieldDust(seed, quality);
         this.createLocations();
-        this.asteroidMesh = this.createAsteroids();
+        this.createAsteroids();
         this.createGraveyard();
         this.createWreckNodes();
         this.createCockpit();
@@ -123,30 +144,72 @@ export class SpaceRenderer {
         this.renderer.domElement.addEventListener('webglcontextlost', this.onContextLost);
         this.renderer.domElement.addEventListener('webglcontextrestored', this.onContextRestored);
         this.resize();
+        this.createBloomPipeline();
     }
     createLighting() {
-        const ambient = new THREE.HemisphereLight(0x9dc7ec, 0x151a36, 1.82);
+        // Base fill is kept at roughly half the sector star's strength so the
+        // shadowed side of ships, stations and rocks never collapses to black.
+        const ambient = new THREE.HemisphereLight(0xc2dcf2, 0x53648e, 2.4);
         this.scene.add(ambient);
-        const sunLight = new THREE.DirectionalLight(0xffe2aa, 3.3);
+        const fillLight = new THREE.AmbientLight(0x4a5a7e, 1.0);
+        this.scene.add(fillLight);
+        const sunLight = new THREE.DirectionalLight(0xffe2aa, 3.5);
         sunLight.position.set(-0.62, 0.31, 0.72).normalize();
         this.scene.add(sunLight);
-        const rimLight = new THREE.DirectionalLight(0x5e9fd2, 0.72);
+        const rimLight = new THREE.DirectionalLight(0x5e9fd2, 0.9);
         rimLight.position.set(0.58, -0.24, -0.78).normalize();
         this.scene.add(rimLight);
-        const sun = new THREE.Mesh(new THREE.SphereGeometry(17, 20, 12), new THREE.MeshBasicMaterial({ color: 0xffd889 }));
-        sun.position.set(-1120, 360, -1740);
+        // The sun sits on the star shell, far outside the playable system.
+        const sun = new THREE.Mesh(new THREE.SphereGeometry(12000, 24, 16), new THREE.MeshBasicMaterial({ color: 0xffd889, fog: false }));
+        sun.position.set(-480000, 154000, -745000);
         this.skyRoot.add(sun);
         const corona = new THREE.Sprite(new THREE.SpriteMaterial({
             map: this.radialTexture('#fff0b2', '#ff8f36'),
             transparent: true,
-            opacity: 0.74,
+            opacity: 0.7,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             fog: false,
         }));
         corona.position.copy(sun.position);
-        corona.scale.setScalar(118);
+        corona.scale.setScalar(68000);
         this.skyRoot.add(corona);
+    }
+    createEnvironmentMap() {
+        // A painterly galactic sky used as an IBL environment so glossy, clearcoated
+        // hulls and stations reflect a colorful deep-space gradient instead of black.
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 256;
+        const context = canvas.getContext('2d');
+        const gradient = context.createLinearGradient(0, 0, 0, 256);
+        gradient.addColorStop(0, '#1b2552');
+        gradient.addColorStop(0.4, '#2c3a6e');
+        gradient.addColorStop(0.5, '#8a4a7a');
+        gradient.addColorStop(0.6, '#2c4a72');
+        gradient.addColorStop(1, '#151a3c');
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, 512, 256);
+        for (const [cx, cy, radius, fill] of [[120, 84, 110, 'rgba(255,148,64,0.7)'], [396, 164, 130, 'rgba(78,196,230,0.7)'], [250, 40, 84, 'rgba(168,110,238,0.5)'], [60, 210, 90, 'rgba(236,180,90,0.5)']]) {
+            const blob = context.createRadialGradient(cx, cy, 0, cx, cy, radius);
+            blob.addColorStop(0, fill);
+            blob.addColorStop(1, 'rgba(0,0,0,0)');
+            context.fillStyle = blob;
+            context.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+        }
+        for (let index = 0; index < 240; index += 1) {
+            const x = Math.random() * 512;
+            const y = Math.random() * 256;
+            const r = 0.4 + Math.random() * 1.6;
+            context.fillStyle = `rgba(255,255,255,${(0.25 + Math.random() * 0.75).toFixed(2)})`;
+            context.beginPath();
+            context.arc(x, y, r, 0, Math.PI * 2);
+            context.fill();
+        }
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.mapping = THREE.EquirectangularReflectionMapping;
+        texture.colorSpace = THREE.SRGBColorSpace;
+        this.scene.environment = texture;
     }
     radialTexture(inner, outer) {
         const canvas = document.createElement('canvas');
@@ -165,61 +228,258 @@ export class SpaceRenderer {
     }
     createStarfield(seed, quality) {
         const rng = seededRandom(`${seed}:stars`);
-        const count = quality === 'low' ? 1250 : 2200;
-        const positions = new Float32Array(count * 3);
-        const colors = new Float32Array(count * 3);
-        const color = new THREE.Color();
-        for (let index = 0; index < count; index += 1) {
-            const radius = 1200 + rng() * 1200;
-            const theta = rng() * Math.PI * 2;
-            const phi = Math.acos(2 * rng() - 1);
-            positions[index * 3] = Math.sin(phi) * Math.cos(theta) * radius;
-            positions[index * 3 + 1] = Math.cos(phi) * radius;
-            positions[index * 3 + 2] = Math.sin(phi) * Math.sin(theta) * radius;
-            color.setHSL(0.57 + (rng() - 0.5) * 0.2, 0.32 + rng() * 0.48, 0.74 + rng() * 0.24);
-            colors[index * 3] = color.r;
-            colors[index * 3 + 1] = color.g;
-            colors[index * 3 + 2] = color.b;
-        }
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-        const material = new THREE.PointsMaterial({ size: quality === 'low' ? 1.3 : 1.6, sizeAttenuation: false, vertexColors: true });
-        material.fog = false;
-        this.skyRoot.add(new THREE.Points(geometry, material));
+        // The shell sits far beyond the whole system so stars read as a fixed sky.
+        const SHELL_RADIUS = 900000;
+        const layer = (count, size, blending, tint) => {
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const color = new THREE.Color();
+            for (let index = 0; index < count; index += 1) {
+                const theta = rng() * Math.PI * 2;
+                const phi = Math.acos(2 * rng() - 1);
+                positions[index * 3] = Math.sin(phi) * Math.cos(theta) * SHELL_RADIUS;
+                positions[index * 3 + 1] = Math.cos(phi) * SHELL_RADIUS;
+                positions[index * 3 + 2] = Math.sin(phi) * Math.sin(theta) * SHELL_RADIUS;
+                tint(color, rng);
+                colors[index * 3] = color.r;
+                colors[index * 3 + 1] = color.g;
+                colors[index * 3 + 2] = color.b;
+            }
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            const material = new THREE.PointsMaterial({
+                size,
+                sizeAttenuation: false,
+                vertexColors: true,
+                fog: false,
+                transparent: blending === 'additive',
+                opacity: 1,
+                blending: blending === 'additive' ? THREE.AdditiveBlending : THREE.NormalBlending,
+                depthWrite: blending !== 'additive',
+            });
+            this.skyRoot.add(new THREE.Points(geometry, material));
+            return material;
+        };
+        // Dense field of mixed-temperature stars (cool blue-white with warm giants
+        // sprinkled in). Kept dim enough that the bright end doesn't glare through the
+        // bloom pass and steal attention from ships, rocks and stations.
+        layer(quality === 'low' ? 1900 : 3400, 1.5, 'normal', (color, rng) => {
+            if (rng() < 0.2) {
+                color.setHSL(0.06 + rng() * 0.06, 0.5 + rng() * 0.32, 0.5 + rng() * 0.3);
+            }
+            else {
+                color.setHSL(0.55 + (rng() - 0.5) * 0.22, 0.22 + rng() * 0.42, 0.52 + rng() * 0.3);
+            }
+        });
+        // Sparse bright layer that shimmers — the main source of "HDR glare", so its
+        // peak lightness is capped below full white.
+        this.starShimmer = layer(quality === 'low' ? 110 : 190, 2.7, 'additive', (color, rng) => {
+            color.setHSL(0.06 + rng() * 0.08, 0.3 + rng() * 0.3, 0.6 + rng() * 0.16);
+        });
     }
     createNebulae(seed, quality) {
         if (quality === 'low')
             return;
         const rng = seededRandom(`${seed}:nebula`);
-        const texture = this.nebulaTexture(seed);
+        // Nebulae hang on the same far shell as the stars, so they read as a fixed
+        // sky that barely moves as you fly — never a near-field billboard.
+        const FAR = 880000;
+        // Plane meshes facing the camera (at the sky root's origin) rather than
+        // screen-aligned sprites, so the clouds roll with the view like the stars
+        // instead of counter-rotating when the ship banks.
+        const makeCloud = (texture, dir, width, height, opacity) => {
+            const material = new THREE.MeshBasicMaterial({
+                map: texture,
+                transparent: true,
+                opacity,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+                fog: false,
+                side: THREE.DoubleSide,
+            });
+            const plane = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
+            plane.position.set(dir[0] * FAR, dir[1] * FAR, dir[2] * FAR);
+            plane.lookAt(0, 0, 0);
+            this.skyRoot.add(plane);
+        };
+        const count = quality === 'high' ? 12 : 9;
+        // Distinct color themes — mostly one hue per nebula, with a minority of
+        // two-tone clouds, so the sky reads as varied regions rather than one
+        // repeating multicolor smear.
+        const themes = [
+            [[255, 122, 66]],
+            [[90, 190, 255]],
+            [[170, 120, 255]],
+            [[255, 210, 130]],
+            [[120, 240, 220]],
+            [[255, 160, 200]],
+            [[255, 122, 66], [170, 120, 255]],
+            [[90, 190, 255], [255, 160, 200]],
+            [[120, 240, 220], [255, 210, 130]],
+        ];
+        // A golden-angle spiral scatters the nebulae evenly across the sphere so no
+        // two overlap; the random phase just rotates the whole sky per seed.
+        const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+        const phase = rng() * Math.PI * 2;
+        for (let index = 0; index < count; index += 1) {
+            const y = 1 - (index + 0.5) * (2 / count);
+            const horizontal = Math.sqrt(Math.max(0, 1 - y * y));
+            const theta = phase + index * goldenAngle;
+            const dir = [Math.cos(theta) * horizontal, y, Math.sin(theta) * horizontal];
+            makeCloud(
+                this.nebulaTexture(`${seed}:nebula:${index}`, themes[index % themes.length]),
+                dir,
+                260000 + rng() * 120000,
+                170000 + rng() * 80000,
+                0.22 + rng() * 0.1,
+            );
+        }
+        // A faint cool milky band, barely brighter than the starfield.
         for (let index = 0; index < 3; index += 1) {
-            const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending }));
-            const angle = rng() * Math.PI * 2;
-            sprite.position.set(Math.cos(angle) * 1500, (rng() - 0.5) * 650, Math.sin(angle) * 1500);
-            sprite.scale.set(900 + rng() * 500, 500 + rng() * 300, 1);
-            sprite.material.fog = false;
-            this.skyRoot.add(sprite);
+            const angle = phase + (index / 3) * Math.PI * 2;
+            const dir = [Math.cos(angle) * 0.95, 0.08 + rng() * 0.1, Math.sin(angle) * 0.95];
+            makeCloud(this.bandTexture(`${seed}:band:${index}`), dir, 680000, 160000 + rng() * 100000, 0.12);
         }
     }
-    nebulaTexture(seed) {
+    nebulaTexture(seed, theme) {
+        // A nebula is an irregular polygon with rounded corners and a soft fade: the
+        // colored interior (bright core, knots, a second hue, darker gaps) is drawn
+        // full-canvas, then a Gaussian-blurred polygon mask is applied as its alpha.
+        // The mask's blur rounds the corners and fades every edge to transparency,
+        // so the silhouette reads as a polygon — not an ellipse or a hard-edged sprite.
+        const SIZE = 512;
+        const source = document.createElement('canvas');
+        source.width = SIZE;
+        source.height = SIZE;
+        const sctx = source.getContext('2d');
+        const rng = seededRandom(`${seed}:cloud`);
+        sctx.clearRect(0, 0, SIZE, SIZE);
+        const cx = SIZE / 2;
+        const cy = SIZE / 2;
+        const rgba = (color, alpha) => `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha})`;
+        // Mild tilt + stretch so silhouettes vary across the sky.
+        const stretch = 0.85 + rng() * 0.3;
+        const tilt = rng() * Math.PI;
+        sctx.translate(cx, cy);
+        sctx.rotate(tilt);
+        sctx.scale(1, stretch);
+        sctx.translate(-cx, -cy);
+        // 5–7 vertices with a wide radius spread: clearly an irregular polygon.
+        const vertices = [];
+        const pointCount = 5 + Math.floor(rng() * 2);
+        const baseRadius = 118 + rng() * 40;
+        for (let i = 0; i < pointCount; i += 1) {
+            const angle = (i / pointCount) * Math.PI * 2 + (rng() - 0.5) * 0.35;
+            const radius = baseRadius * (0.62 + rng() * 0.55);
+            vertices.push([cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius]);
+        }
+        const maxR = Math.max(...vertices.map(([x, y]) => Math.hypot(x - cx, y - cy)));
+        const trace = (ctx) => {
+            ctx.beginPath();
+            ctx.moveTo(vertices[0][0], vertices[0][1]);
+            for (let i = 1; i < vertices.length; i += 1)
+                ctx.lineTo(vertices[i][0], vertices[i][1]);
+            ctx.closePath();
+        };
+        // Interior color, drawn full-canvas (the mask below shapes and softens it).
+        const body = sctx.createRadialGradient(cx, cy, 0, cx, cy, maxR * 1.05);
+        body.addColorStop(0, rgba(theme[0], 0.9));
+        body.addColorStop(0.5, rgba(theme[0], 0.55));
+        body.addColorStop(1, rgba(theme[0], 0.32));
+        sctx.fillStyle = body;
+        sctx.fillRect(0, 0, SIZE, SIZE);
+        const core = sctx.createRadialGradient(cx, cy, 0, cx, cy, maxR * 0.5);
+        core.addColorStop(0, rgba(theme[0], 0.35));
+        core.addColorStop(1, rgba(theme[0], 0));
+        sctx.fillStyle = core;
+        sctx.fillRect(0, 0, SIZE, SIZE);
+        const knotCount = 2;
+        for (let i = 0; i < knotCount; i += 1) {
+            const a = rng() * Math.PI * 2;
+            const d = maxR * (0.3 + rng() * 0.4);
+            const kx = cx + Math.cos(a) * d;
+            const ky = cy + Math.sin(a) * d;
+            const knot = sctx.createRadialGradient(kx, ky, 0, kx, ky, maxR * (0.28 + rng() * 0.14));
+            knot.addColorStop(0, rgba(theme[0], 0.24));
+            knot.addColorStop(1, rgba(theme[0], 0));
+            sctx.fillStyle = knot;
+            sctx.fillRect(0, 0, SIZE, SIZE);
+        }
+        if (theme.length > 1) {
+            const bx = cx + (rng() - 0.5) * maxR * 0.7;
+            const by = cy + (rng() - 0.5) * maxR * 0.7;
+            const pocket = sctx.createRadialGradient(bx, by, 0, bx, by, maxR * 0.4);
+            pocket.addColorStop(0, rgba(theme[1], 0.45));
+            pocket.addColorStop(1, rgba(theme[1], 0));
+            sctx.fillStyle = pocket;
+            sctx.fillRect(0, 0, SIZE, SIZE);
+        }
+        // Mask: the same polygon drawn solid, Gaussian-blurred so its alpha fades at
+        // every edge and its corners round off, then applied as destination-in.
+        const mask = document.createElement('canvas');
+        mask.width = SIZE;
+        mask.height = SIZE;
+        const mctx = mask.getContext('2d');
+        mctx.translate(cx, cy);
+        mctx.rotate(tilt);
+        mctx.scale(1, stretch);
+        mctx.translate(-cx, -cy);
+        trace(mctx);
+        mctx.fillStyle = '#fff';
+        mctx.fill();
+        const blurredMask = document.createElement('canvas');
+        blurredMask.width = SIZE;
+        blurredMask.height = SIZE;
+        const bctx = blurredMask.getContext('2d');
+        bctx.imageSmoothingEnabled = true;
+        bctx.imageSmoothingQuality = 'high';
+        bctx.filter = 'blur(30px)';
+        bctx.drawImage(mask, 0, 0);
+        bctx.filter = 'none';
+        sctx.globalCompositeOperation = 'destination-in';
+        sctx.drawImage(blurredMask, 0, 0);
+        sctx.globalCompositeOperation = 'source-over';
+        const texture = new THREE.CanvasTexture(source);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        return texture;
+    }
+    bandTexture(seed) {
+        // A faint, cool milky band: soft bluish-white streaks with feathered top and
+        // bottom edges, so it never shows a hard rectangle against the sky.
         const canvas = document.createElement('canvas');
         canvas.width = 512;
-        canvas.height = 512;
+        canvas.height = 256;
         const context = canvas.getContext('2d');
-        const rng = seededRandom(`${seed}:nebula-texture`);
-        context.clearRect(0, 0, 512, 512);
-        for (let i = 0; i < 42; i += 1) {
+        const rng = seededRandom(`${seed}:band`);
+        context.clearRect(0, 0, 512, 256);
+        const colors = [[150, 190, 235], [205, 214, 240], [125, 150, 200]];
+        for (let i = 0; i < 110; i += 1) {
+            const color = colors[Math.floor(rng() * colors.length)];
             const x = rng() * 512;
-            const y = rng() * 512;
-            const radius = 35 + rng() * 120;
+            const y = 36 + rng() * 184;
+            const radius = 24 + rng() * 120;
+            const height = 4 + rng() * 20;
+            const alpha = 0.05 + rng() * 0.15;
             const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
-            const hue = rng() > 0.55 ? '52, 105, 126' : '93, 57, 104';
-            gradient.addColorStop(0, `rgba(${hue}, ${0.035 + rng() * 0.08})`);
-            gradient.addColorStop(1, `rgba(${hue}, 0)`);
+            gradient.addColorStop(0, `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha})`);
+            gradient.addColorStop(1, `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0)`);
             context.fillStyle = gradient;
+            context.save();
+            context.translate(x, y);
+            context.scale(1, height / radius);
+            context.translate(-x, -y);
             context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+            context.restore();
         }
+        context.globalCompositeOperation = 'destination-in';
+        const falloff = context.createLinearGradient(0, 0, 0, 256);
+        falloff.addColorStop(0, 'rgba(255, 255, 255, 0)');
+        falloff.addColorStop(0.5, 'rgba(255, 255, 255, 1)');
+        falloff.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        context.fillStyle = falloff;
+        context.fillRect(0, 0, 512, 256);
+        context.globalCompositeOperation = 'source-over';
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         return texture;
@@ -404,46 +664,84 @@ export class SpaceRenderer {
         this.createHelixStation();
         this.createRookStation();
     }
+    createCloudTexture(seed) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 128;
+        const context = canvas.getContext('2d');
+        const rng = seededRandom(`${seed}:clouds`);
+        context.clearRect(0, 0, 256, 128);
+        for (let index = 0; index < 60; index += 1) {
+            const x = rng() * 256;
+            const y = rng() * 128;
+            const radius = 9 + rng() * 30;
+            const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
+            gradient.addColorStop(0, `rgba(255, 255, 255, ${(0.08 + rng() * 0.2).toFixed(3)})`);
+            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            context.fillStyle = gradient;
+            context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+        }
+        const texture = this.configurePixelTexture(new THREE.CanvasTexture(canvas));
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(6, 3);
+        return texture;
+    }
     createPlanet(id, color, dark, atmosphere, ringed) {
         const location = LOCATIONS[id];
         const group = new THREE.Group();
         group.position.set(...location.position);
         group.name = `planet-${id}`;
-        const surfaceTexture = this.createPixelPanelTexture(`${id}-surface`, color, atmosphere, 'planet', 128);
-        surfaceTexture.repeat.set(5, 2.4);
-        const surface = new THREE.Mesh(new THREE.SphereGeometry(location.radius, 48, 30), new THREE.MeshStandardMaterial({
+        const surfaceTexture = this.createPixelPanelTexture(`${id}-surface`, color, atmosphere, 'planet', 256);
+        surfaceTexture.repeat.set(id === 'azure' ? 14 : 12, 5.5);
+        const surface = new THREE.Mesh(new THREE.SphereGeometry(location.radius, 96, 60), new THREE.MeshStandardMaterial({
             color: 0xffffff,
             map: surfaceTexture,
-            roughness: 0.94,
-            metalness: 0.02,
+            roughness: id === 'azure' ? 0.46 : 0.94,
+            metalness: id === 'azure' ? 0.14 : 0.02,
             emissive: dark,
-            emissiveIntensity: 0.18,
+            emissiveIntensity: 0.22,
             flatShading: true,
+            fog: false,
         }));
         surface.name = 'surface';
         group.add(surface);
-        const clouds = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.012, 40, 26), new THREE.MeshBasicMaterial({
+        const clouds = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.014, 72, 44), new THREE.MeshBasicMaterial({
+            map: this.createCloudTexture(id),
             color: atmosphere,
             transparent: true,
-            opacity: id === 'azure' ? 0.14 : 0.065,
+            opacity: id === 'azure' ? 0.34 : 0.26,
             depthWrite: false,
-            wireframe: id === 'vesper',
+            fog: false,
         }));
         clouds.name = 'clouds';
         group.add(clouds);
-        const halo = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.075, 40, 24), new THREE.MeshBasicMaterial({ color: atmosphere, transparent: true, opacity: 0.1, side: THREE.BackSide, depthWrite: false }));
+        const halo = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.09, 48, 28), new THREE.MeshBasicMaterial({ color: atmosphere, transparent: true, opacity: 0.16, side: THREE.BackSide, depthWrite: false, fog: false }));
         group.add(halo);
+        const outerHalo = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.16, 40, 24), new THREE.MeshBasicMaterial({ color: atmosphere, transparent: true, opacity: 0.07, side: THREE.BackSide, depthWrite: false, fog: false }));
+        group.add(outerHalo);
         if (ringed) {
-            const ring = new THREE.Mesh(new THREE.RingGeometry(location.radius * 1.42, location.radius * 2.18, 96), new THREE.MeshBasicMaterial({ color: 0x7f9e95, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false }));
+            const ring = new THREE.Mesh(new THREE.RingGeometry(location.radius * 1.42, location.radius * 2.18, 96), new THREE.MeshBasicMaterial({ color: 0x7f9e95, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false, fog: false }));
             ring.rotation.x = Math.PI / 2.7;
             ring.rotation.z = 0.38;
             group.add(ring);
-            const outerRing = new THREE.Mesh(new THREE.RingGeometry(location.radius * 2.24, location.radius * 2.31, 96), new THREE.MeshBasicMaterial({ color: 0x93aaa3, transparent: true, opacity: 0.13, side: THREE.DoubleSide, depthWrite: false }));
+            const outerRing = new THREE.Mesh(new THREE.RingGeometry(location.radius * 2.24, location.radius * 2.31, 96), new THREE.MeshBasicMaterial({ color: 0x93aaa3, transparent: true, opacity: 0.13, side: THREE.DoubleSide, depthWrite: false, fog: false }));
             outerRing.rotation.copy(ring.rotation);
             group.add(outerRing);
+            // Render-only: the rings must not swallow taps from behind the planet.
+            ring.raycast = () => undefined;
+            outerRing.raycast = () => undefined;
         }
-        this.tagTargetable(group, 'location', id);
-        this.instanceRoots.get(id)?.add(group);
+        // Atmospheric shells are huge transparent spheres that surround the launch
+        // point (the halo/outer-halo BackSide spheres even enclose the camera right
+        // after departure). If they stay raycastable they win every tap, so the
+        // player could never select another target after leaving a planet. Only the
+        // solid surface may be picked; the shells are render-only.
+        clouds.raycast = () => undefined;
+        halo.raycast = () => undefined;
+        outerHalo.raycast = () => undefined;
+        this.tagTargetable(surface, 'location', id);
+        this.locationRoot.add(group);
         this.locationMeshes.set(id, group);
     }
     createHelixStation() {
@@ -451,8 +749,13 @@ export class SpaceRenderer {
         const group = createVoxelStationModel('helix');
         group.position.set(...location.position);
         group.rotation.set(0.18, 0.45, -0.08);
+        group.scale.setScalar(10);
+        this.makeFogExempt(group);
+        this.toneStationGlow(group);
+        this.addStationGlow(location);
+        this.addStationBeacons(group, location);
         this.tagTargetable(group, 'location', 'helix');
-        this.instanceRoots.get('helix')?.add(group);
+        this.locationRoot.add(group);
         this.locationMeshes.set('helix', group);
     }
     createRookStation() {
@@ -460,23 +763,97 @@ export class SpaceRenderer {
         const group = createVoxelStationModel('rook');
         group.position.set(...location.position);
         group.rotation.set(-0.08, -0.36, 0.12);
+        group.scale.setScalar(10);
+        this.makeFogExempt(group);
+        this.toneStationGlow(group);
+        this.addStationGlow(location);
+        this.addStationBeacons(group, location);
         this.tagTargetable(group, 'location', 'rook');
-        this.instanceRoots.get('rook')?.add(group);
+        this.locationRoot.add(group);
         this.locationMeshes.set('rook', group);
     }
+    addStationGlow(location) {
+        const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: this.radialTexture('#ffffff', location.accent),
+            transparent: true,
+            opacity: 0.07,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            fog: false,
+        }));
+        glow.position.set(...location.position);
+        glow.scale.setScalar(location.radius * 1.4);
+        this.locationRoot.add(glow);
+    }
+    addStationBeacons(group, location) {
+        // Slow-pulsing nav lights that make a station read as alive from far away.
+        const colors = [0xff6a3d, 0x8ff0ff, 0xffc04d];
+        const offsets = [[-34, 12, 10], [40, 8, -14], [4, 20, -6]];
+        offsets.forEach((offset, index) => {
+            const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+                map: this.radialTexture('#ffffff', `#${colors[index].toString(16).padStart(6, '0')}`),
+                transparent: true,
+                opacity: 0.6,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                fog: false,
+            }));
+            sprite.position.set(...offset);
+            sprite.scale.setScalar(6);
+            group.add(sprite);
+            this.stationBeacons.push({ sprite, phase: index * 2.1, color: colors[index] });
+        });
+    }
+    makeFogExempt(root) {
+        root.traverse((child) => {
+            const material = child.material;
+            if (!material)
+                return;
+            const materials = Array.isArray(material) ? material : [material];
+            materials.forEach((entry) => {
+                entry.fog = false;
+            });
+        });
+    }
+    toneStationGlow(root) {
+        // Stations are ten times the size of a fighter, so the ship-grade fresnel
+        // rim and additive window glow read as an overexposed halo. Dim both so the
+        // station keeps its neon edges without drowning the bloom pass.
+        root.traverse((child) => {
+            if (child.name === 'voxel-glow') {
+                const material = child.material;
+                if (material) {
+                    material.transparent = true;
+                    material.opacity = 0.55;
+                }
+                return;
+            }
+            const material = child.material;
+            if (material && material.type === 'ShaderMaterial' && material.uniforms && material.uniforms.uIntensity)
+                material.uniforms.uIntensity.value = 0.42;
+        });
+    }
     createAsteroids() {
-        const geometry = new THREE.IcosahedronGeometry(1, 2);
-        const positions = geometry.getAttribute('position');
-        const vertex = new THREE.Vector3();
-        for (let index = 0; index < positions.count; index += 1) {
-            vertex.fromBufferAttribute(positions, index);
-            const distortion = 0.84 + 0.19 * Math.sin(vertex.x * 8.7 + vertex.y * 11.3 + vertex.z * 14.1);
-            vertex.multiplyScalar(distortion);
-            positions.setXYZ(index, vertex.x, vertex.y, vertex.z);
+        // Several distinct distorted base rocks so the belt reads as varied terrain
+        // rather than one rescaled boulder repeated hundreds of times.
+        const variantCount = 4;
+        const geometries = [];
+        for (let variant = 0; variant < variantCount; variant += 1) {
+            const geometry = new THREE.IcosahedronGeometry(1, 2);
+            const positions = geometry.getAttribute('position');
+            const vertex = new THREE.Vector3();
+            for (let index = 0; index < positions.count; index += 1) {
+                vertex.fromBufferAttribute(positions, index);
+                const seedPhase = variant * 7.31;
+                const distortion = 0.76 + 0.28 * Math.sin(vertex.x * (6.3 + variant * 1.9) + vertex.y * (9.7 + variant * 2.3) + vertex.z * (13.1 + variant * 1.5) + seedPhase);
+                vertex.multiplyScalar(distortion);
+                positions.setXYZ(index, vertex.x, vertex.y, vertex.z);
+            }
+            positions.needsUpdate = true;
+            geometry.computeVertexNormals();
+            geometry.computeBoundingSphere();
+            geometries.push(geometry);
         }
-        positions.needsUpdate = true;
-        geometry.computeVertexNormals();
-        geometry.computeBoundingSphere();
         const rockMap = this.createPixelPanelTexture('shardbelt-rock', 0x625e54, 0xb89d67, 'rock');
         rockMap.repeat.set(3.1, 3.1);
         const material = new THREE.MeshStandardMaterial({
@@ -487,37 +864,60 @@ export class SpaceRenderer {
             flatShading: true,
             vertexColors: true,
         });
-        const mesh = new THREE.InstancedMesh(geometry, material, this.asteroids.length);
-        mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-        mesh.frustumCulled = false;
-        mesh.name = 'shardbelt-asteroids';
-        mesh.userData.targetKind = 'asteroid';
-        this.instanceRoots.get('shardbelt')?.add(mesh);
-        this.asteroidMesh = mesh;
-        this.updateAsteroidInstances();
-        return mesh;
-    }
-    updateAsteroidInstances() {
-        if (!this.asteroidMesh)
-            return;
-        const color = new THREE.Color();
+        const groups = new Map();
         this.asteroids.forEach((node, index) => {
-            this.tmpPosition.set(...node.position);
-            this.tmpQuaternion.setFromEuler(new THREE.Euler(...node.rotation));
-            this.tmpScale.set(node.radius * node.scale[0], node.radius * node.scale[1], node.radius * node.scale[2]);
-            this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
-            this.asteroidMesh.setMatrixAt(index, this.tmpMatrix);
-            if (node.id === this.selectedAsteroidId)
-                color.setHex(0xcfe884);
-            else if (node.scanned)
-                color.setHex(node.richness > 1.65 ? 0x9c8b68 : 0x696257);
-            else
-                color.setHex(0x5b5851);
-            this.asteroidMesh.setColorAt(index, color);
+            const shape = node.shape ?? 0;
+            const list = groups.get(shape) ?? [];
+            list.push({ node, index });
+            groups.set(shape, list);
         });
-        this.asteroidMesh.instanceMatrix.needsUpdate = true;
-        if (this.asteroidMesh.instanceColor)
-            this.asteroidMesh.instanceColor.needsUpdate = true;
+        this.asteroidMeshes = [];
+        groups.forEach((entries, shape) => {
+            const mesh = new THREE.InstancedMesh(geometries[shape % geometries.length], material, entries.length);
+            mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            mesh.frustumCulled = false;
+            mesh.name = 'shardbelt-asteroids';
+            mesh.userData.targetKind = 'asteroid';
+            mesh.userData.nodeIndices = entries.map((entry) => entry.index);
+            this.instanceRoots.get('shardbelt')?.add(mesh);
+            this.asteroidMeshes.push({ mesh, entries });
+        });
+        this.updateAsteroidInstances();
+        return this.asteroidMeshes[0]?.mesh;
+    }
+    updateAsteroidInstances(movingOnly = false) {
+        const color = new THREE.Color();
+        for (const { mesh, entries } of this.asteroidMeshes) {
+            let changed = false;
+            entries.forEach(({ node }, instanceIndex) => {
+                if (movingOnly && !node.moving)
+                    return;
+                changed = true;
+                this.tmpEuler.set(...node.rotation);
+                this.tmpPosition.set(...node.position);
+                this.tmpQuaternion.setFromEuler(this.tmpEuler);
+                this.tmpScale.set(node.radius * node.scale[0], node.radius * node.scale[1], node.radius * node.scale[2]);
+                this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
+                mesh.setMatrixAt(instanceIndex, this.tmpMatrix);
+                if (movingOnly) {
+                    mesh.instanceMatrix.addUpdateRange(instanceIndex * 16, 16);
+                }
+                else {
+                    if (node.id === this.selectedAsteroidId)
+                        color.setHex(0xcfe884);
+                    else if (node.scanned)
+                        color.setHex(node.richness > 1.65 ? 0x9c8b68 : 0x696257);
+                    else
+                        color.setHex(0x5b5851);
+                    mesh.setColorAt(instanceIndex, color);
+                }
+            });
+            if (changed) {
+                mesh.instanceMatrix.needsUpdate = true;
+                if (!movingOnly && mesh.instanceColor)
+                    mesh.instanceColor.needsUpdate = true;
+            }
+        }
     }
     createGraveyard() {
         const metalMap = this.createPixelPanelTexture('graveyard-metal', 0x344144, 0x7ca79f, 'metal');
@@ -536,7 +936,9 @@ export class SpaceRenderer {
             switch (kind) {
                 case 'engine': return new THREE.CylinderGeometry(0.7, 1, 1, 10, 1, true);
                 case 'panel': return new THREE.BoxGeometry(1, 0.12, 1);
+                case 'disc': return new THREE.CylinderGeometry(1, 1, 0.16, 14);
                 case 'ring': return new THREE.TorusGeometry(1, 0.18, 6, 18);
+                case 'spine': return new THREE.BoxGeometry(0.34, 0.34, 1);
                 case 'beam':
                 case 'hull':
                 default: return new THREE.BoxGeometry(1, 1, 1);
@@ -562,16 +964,24 @@ export class SpaceRenderer {
         });
         this.updateGraveyardInstances();
     }
-    updateGraveyardInstances() {
+    updateGraveyardInstances(movingOnly = false) {
         for (const batch of this.graveyardBatches) {
+            let changed = false;
             batch.pieces.forEach((piece, index) => {
+                if (movingOnly && !piece.moving)
+                    return;
+                changed = true;
                 this.tmpPosition.set(...piece.position);
-                this.tmpQuaternion.setFromEuler(new THREE.Euler(...piece.rotation));
+                this.tmpEuler.set(...piece.rotation);
+                this.tmpQuaternion.setFromEuler(this.tmpEuler);
                 this.tmpScale.set(...piece.scale);
                 this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
                 batch.mesh.setMatrixAt(index, this.tmpMatrix);
+                if (movingOnly)
+                    batch.mesh.instanceMatrix.addUpdateRange(index * 16, 16);
             });
-            batch.mesh.instanceMatrix.needsUpdate = true;
+            if (changed)
+                batch.mesh.instanceMatrix.needsUpdate = true;
         }
     }
     createWreckNodes() {
@@ -713,6 +1123,7 @@ export class SpaceRenderer {
         const baseScale = variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1;
         const engineColor = palette.engine;
         const engineFlareTexture = this.radialTexture(cssHex(engineColor), cssHex(engineColor));
+        const flares = [];
         for (const port of model.enginePorts) {
             const flare = new THREE.Sprite(new THREE.SpriteMaterial({
                 map: engineFlareTexture,
@@ -723,16 +1134,27 @@ export class SpaceRenderer {
             }));
             flare.position.copy(port).add(new THREE.Vector3(0, 0, 0.18));
             flare.scale.setScalar(variant === 'atlas-freighter' ? 2.8 : 1.42);
+            flares.push(flare);
             group.add(flare);
         }
         this.tagTargetable(group, 'ship', entity.id);
         group.scale.setScalar(baseScale);
         group.userData.baseScale = baseScale;
         group.userData.hullMaterial = model.hullMaterial;
+        group.userData.rimMaterial = model.rimMaterial;
         group.userData.variant = variant;
+        group.userData.engineFlares = flares;
+        // Cache the emissive hull materials once so the per-frame sync does not
+        // walk the whole ship graph looking for them.
+        const emissiveMaterials = [];
+        group.traverse((object) => {
+            if (object.material instanceof THREE.MeshStandardMaterial)
+                emissiveMaterials.push(object.material);
+        });
+        group.userData.emissiveMaterials = emissiveMaterials;
         return group;
     }
-    syncShips(entities) {
+    syncShips(entities, alpha = 0) {
         const live = new Set(entities.map((entity) => entity.id));
         for (const [id, mesh] of this.shipMeshes) {
             if (!live.has(id)) {
@@ -749,19 +1171,45 @@ export class SpaceRenderer {
                 this.shipMeshes.set(entity.id, mesh);
             }
             mesh.position.set(...entity.position);
+            if (entity.prevPosition && alpha > 0) {
+                this.tmpPrevPos.set(entity.prevPosition[0], entity.prevPosition[1], entity.prevPosition[2]);
+                mesh.position.lerpVectors(this.tmpPrevPos, mesh.position, alpha);
+            }
             mesh.quaternion.set(...entity.rotation);
+            if (entity.prevRotation && alpha > 0) {
+                this.tmpPrevQuat.set(...entity.prevRotation);
+                this.tmpCurQuat.copy(mesh.quaternion);
+                mesh.quaternion.copy(this.tmpPrevQuat).slerp(this.tmpCurQuat, alpha);
+            }
             const damage = 1 - entity.hull / entity.maxHull;
             const baseScale = Number(mesh.userData.baseScale ?? 1);
             mesh.scale.setScalar(baseScale * (1 + Math.sin(performance.now() * 0.013 + entity.spawnTime) * 0.006));
             mesh.visible = entity.hull > 0;
-            mesh.traverse((object) => {
-                if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshStandardMaterial) {
-                    object.material.emissiveIntensity = entity.hostile ? 0.18 + damage * 0.28 : damage * 0.12;
+            const emissiveIntensity = entity.hostile ? 0.18 + damage * 0.28 : damage * 0.12;
+            const emissiveMaterials = mesh.userData.emissiveMaterials;
+            if (emissiveMaterials) {
+                for (const material of emissiveMaterials)
+                    material.emissiveIntensity = emissiveIntensity;
+            }
+            const rimMaterial = mesh.userData.rimMaterial;
+            if (rimMaterial?.uniforms) {
+                rimMaterial.uniforms.uIntensity.value = entity.hostile ? 1.3 + damage * 0.4 : 1.05;
+            }
+            const flares = mesh.userData.engineFlares;
+            if (flares) {
+                const variant = mesh.userData.variant;
+                const boost = entity.burning ? 2.1 : entity.hostile && entity.targetId ? 1.4 : 1;
+                const pulse = 0.7 + Math.sin(performance.now() * 0.02 + entity.spawnTime) * 0.3;
+                const baseOpacity = variant === 'atlas-freighter' ? 0.42 : 0.34;
+                const baseSize = variant === 'atlas-freighter' ? 2.8 : 1.42;
+                for (const flare of flares) {
+                    flare.material.opacity = baseOpacity * pulse * boost;
+                    flare.scale.setScalar(baseSize * (0.75 + pulse * 0.45) * (boost > 1 ? 1.15 : 1));
                 }
-            });
+            }
         });
     }
-    syncProjectiles(projectiles) {
+    syncProjectiles(projectiles, alpha = 0) {
         const live = new Set(projectiles.map((entity) => entity.id));
         for (const [id, mesh] of this.projectileMeshes) {
             if (!live.has(id)) {
@@ -799,14 +1247,18 @@ export class SpaceRenderer {
                 this.projectileMeshes.set(projectile.id, mesh);
             }
             mesh.position.set(...projectile.position);
+            if (projectile.prevPosition && alpha > 0) {
+                this.tmpPrevPos.set(projectile.prevPosition[0], projectile.prevPosition[1], projectile.prevPosition[2]);
+                mesh.position.lerpVectors(this.tmpPrevPos, mesh.position, alpha);
+            }
             if (projectile.velocity[0] || projectile.velocity[1] || projectile.velocity[2]) {
                 this.forward.set(projectile.velocity[0], projectile.velocity[1], projectile.velocity[2]).normalize();
-                this.tmpQuaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), this.forward);
+                this.tmpQuaternion.setFromUnitVectors(NEG_Z, this.forward);
                 mesh.quaternion.copy(this.tmpQuaternion);
             }
         });
     }
-    syncPickups(pickups) {
+    syncPickups(pickups, alpha = 0) {
         const live = new Set(pickups.map((pickup) => pickup.id));
         for (const [id, mesh] of this.pickupMeshes) {
             if (!live.has(id)) {
@@ -830,6 +1282,10 @@ export class SpaceRenderer {
                 this.pickupMeshes.set(pickup.id, mesh);
             }
             mesh.position.set(...pickup.position);
+            if (pickup.prevPosition && alpha > 0) {
+                this.tmpPrevPos.set(pickup.prevPosition[0], pickup.prevPosition[1], pickup.prevPosition[2]);
+                mesh.position.lerpVectors(this.tmpPrevPos, mesh.position, alpha);
+            }
             mesh.rotation.x += 0.018;
             mesh.rotation.y += 0.024;
         });
@@ -865,19 +1321,22 @@ export class SpaceRenderer {
         this.raycaster.setFromCamera(this.pointer, this.camera);
         this.raycaster.params.Points.threshold = 5;
         const targets = [...this.shipMeshes.values()];
-        if (this.activeInstanceId) {
-            const locationMesh = this.locationMeshes.get(this.activeInstanceId);
-            if (locationMesh?.visible)
+        // Planets and stations are persistent landmarks: always rendered, always tappable.
+        for (const locationMesh of this.locationMeshes.values()) {
+            if (locationMesh.visible)
                 targets.push(locationMesh);
-            if (this.activeInstanceId === 'shardbelt')
-                targets.push(this.asteroidMesh);
-            if (this.activeInstanceId === 'mourning-line')
-                targets.push(...this.wreckNodeMeshes.values());
         }
+        if (this.activeInstanceId === 'shardbelt') {
+            for (const { mesh } of this.asteroidMeshes)
+                targets.push(mesh);
+        }
+        if (this.activeInstanceId === 'mourning-line')
+            targets.push(...this.wreckNodeMeshes.values());
         const hits = this.raycaster.intersectObjects(targets, true);
         for (const hit of hits) {
-            if (hit.object === this.asteroidMesh && hit.instanceId !== undefined) {
-                const node = this.asteroids[hit.instanceId];
+            const asteroidBatch = this.asteroidMeshes.find(({ mesh }) => mesh === hit.object);
+            if (asteroidBatch && hit.instanceId !== undefined) {
+                const node = this.asteroids[asteroidBatch.mesh.userData.nodeIndices[hit.instanceId]];
                 if (node?.remaining && node.remaining > 0)
                     return { kind: 'asteroid', id: node.id };
             }
@@ -905,13 +1364,34 @@ export class SpaceRenderer {
             material.transparent = true;
         }
     }
-    updateCamera(position, rotation, angularVelocity, speedRatio, afterburner, dt) {
+    setHyperdriveFx(fx, progress) {
+        if (!this.shell)
+            return;
+        const state = fx && fx !== 'none' ? fx : 'none';
+        this.shell.dataset.hyperdriveFx = state;
+        this.shell.style.setProperty('--hyperdrive-progress', clamp(progress, 0, 1).toFixed(3));
+    }
+    setGStrain(value) {
+        this.shell?.style.setProperty('--g-strain', clamp(value, 0, 1).toFixed(3));
+    }
+    updateCamera(position, prevPosition, rotation, prevRotation, angularVelocity, speedRatio, afterburner, dt, alpha = 0) {
         this.camera.position.set(...position);
+        if (prevPosition && alpha > 0) {
+            this.tmpPrevPos.set(prevPosition[0], prevPosition[1], prevPosition[2]);
+            this.camera.position.lerpVectors(this.tmpPrevPos, this.camera.position, alpha);
+        }
         this.camera.quaternion.set(...rotation);
+        if (prevRotation && alpha > 0) {
+            this.tmpPrevQuat.set(...prevRotation);
+            this.tmpCurQuat.copy(this.camera.quaternion);
+            this.camera.quaternion.copy(this.tmpPrevQuat).slerp(this.tmpCurQuat, alpha);
+        }
         this.skyRoot.position.copy(this.camera.position);
         this.fovTarget = afterburner ? 84 : 74 + speedRatio * 2.5;
+        const previousFov = this.camera.fov;
         this.camera.fov += (this.fovTarget - this.camera.fov) * (1 - Math.exp(-5 * dt));
-        this.camera.updateProjectionMatrix();
+        if (Math.abs(this.camera.fov - previousFov) > 0.001)
+            this.camera.updateProjectionMatrix();
         const shiftX = clamp(-angularVelocity[1] * 2.8, -9, 9);
         const shiftY = clamp(angularVelocity[0] * 2.0 - speedRatio * 2.2, -7, 5);
         const roll = clamp(-angularVelocity[2] * 0.34, -1.5, 1.5);
@@ -999,6 +1479,14 @@ export class SpaceRenderer {
         }
     }
     updateWorld(dt) {
+        this.skyTime += dt;
+        if (this.starShimmer)
+            this.starShimmer.opacity = 0.42 + Math.sin(this.skyTime * 2.4) * 0.14;
+        for (const beacon of this.stationBeacons) {
+            const blink = 0.35 + Math.abs(Math.sin(this.skyTime * 0.9 + beacon.phase)) * 0.65;
+            beacon.sprite.material.opacity = blink;
+            beacon.sprite.scale.setScalar(4 + blink * 4);
+        }
         this.asteroids.forEach((node) => {
             if (!node.moving)
                 return;
@@ -1019,8 +1507,7 @@ export class SpaceRenderer {
             }
         });
         if (this.activeInstanceId === 'shardbelt')
-            this.updateAsteroidInstances();
-        let graveyardMoved = false;
+            this.updateAsteroidInstances(true);
         this.graveyard.forEach((piece) => {
             if (!piece.moving)
                 return;
@@ -1030,10 +1517,9 @@ export class SpaceRenderer {
             piece.rotation[0] += piece.spin[0] * dt;
             piece.rotation[1] += piece.spin[1] * dt;
             piece.rotation[2] += piece.spin[2] * dt;
-            graveyardMoved = true;
         });
-        if (graveyardMoved && this.activeInstanceId === 'mourning-line')
-            this.updateGraveyardInstances();
+        if (this.activeInstanceId === 'mourning-line')
+            this.updateGraveyardInstances(true);
         const helixRotor = this.locationMeshes.get('helix')?.getObjectByName('rotor');
         if (helixRotor)
             helixRotor.rotation.x += dt * 0.16;
@@ -1061,10 +1547,175 @@ export class SpaceRenderer {
         });
         this.updateEffects(dt);
     }
+    createBloomPipeline() {
+        // Lightweight HDR bloom: render the scene to a float target, threshold the
+        // bright parts, blur them at half resolution, and add them back. This is the
+        // glow that makes neon rims, engine flares and specular highlights read as
+        // "lit" rather than flat — the core of the Rebel Galaxy Outlaw look.
+        const vertexShader = `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = vec4(position.xy, 0.0, 1.0);
+            }`;
+        this.bloomBrightMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                tDiffuse: { value: null },
+                uThreshold: { value: 0.48 },
+                uKnee: { value: 0.42 },
+            },
+            vertexShader,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform float uThreshold;
+                uniform float uKnee;
+                varying vec2 vUv;
+                void main() {
+                    vec3 color = texture2D(tDiffuse, vUv).rgb;
+                    float brightness = max(max(color.r, color.g), color.b);
+                    float soft = brightness - uThreshold + uKnee;
+                    soft = clamp(soft, 0.0, 2.0 * uKnee);
+                    soft = soft * soft / (4.0 * uKnee + 1e-4);
+                    float contribution = max(soft, brightness - uThreshold) / max(brightness, 1e-4);
+                    gl_FragColor = vec4(color * contribution, 1.0);
+                }`,
+            depthTest: false,
+            depthWrite: false,
+            toneMapped: false,
+        });
+        this.bloomBlurMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                tDiffuse: { value: null },
+                uDirection: { value: new THREE.Vector2(1, 0) },
+                uResolution: { value: new THREE.Vector2(1, 1) },
+            },
+            vertexShader,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform vec2 uDirection;
+                uniform vec2 uResolution;
+                varying vec2 vUv;
+                void main() {
+                    vec2 texel = uDirection / uResolution;
+                    vec4 sum = texture2D(tDiffuse, vUv) * 0.227027;
+                    sum += texture2D(tDiffuse, vUv + texel * 1.384615) * 0.316216;
+                    sum += texture2D(tDiffuse, vUv - texel * 1.384615) * 0.316216;
+                    sum += texture2D(tDiffuse, vUv + texel * 3.230769) * 0.070270;
+                    sum += texture2D(tDiffuse, vUv - texel * 3.230769) * 0.070270;
+                    gl_FragColor = sum;
+                }`,
+            depthTest: false,
+            depthWrite: false,
+            toneMapped: false,
+        });
+        this.bloomCompositeMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                tScene: { value: null },
+                tBloom: { value: null },
+                uStrength: { value: 1.0 },
+                uExposure: { value: 1.2 },
+            },
+            vertexShader,
+            fragmentShader: `
+                uniform sampler2D tScene;
+                uniform sampler2D tBloom;
+                uniform float uStrength;
+                uniform float uExposure;
+                varying vec2 vUv;
+
+                // three.js NeutralToneMapping, applied here in the final composite
+                // because the intermediate float buffers hold linear HDR values.
+                vec3 neutralToneMapping(vec3 color) {
+                    float startCompression = 0.8 - 0.04;
+                    float desaturation = 0.15;
+                    color *= uExposure;
+                    float x = min(color.r, min(color.g, color.b));
+                    float offset = x < 0.08 ? x - 6.25 * x * x : 0.01125;
+                    color.rgb += offset;
+                    float peak = max(color.r, max(color.g, color.b));
+                    if (peak < startCompression)
+                        return color;
+                    float d = 1.0 - startCompression;
+                    float newPeak = 1.0 - d * d / (peak + d - startCompression);
+                    color.rgb *= newPeak / peak;
+                    float g = 1.0 - 1.0 / (desaturation * (peak - newPeak) + 1.0);
+                    return mix(color.rgb, vec3(newPeak), g);
+                }
+                vec3 sRGBTransferOETF(vec3 color) {
+                    return mix(color * 12.92, 1.055 * pow(color, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), color));
+                }
+
+                void main() {
+                    vec3 scene = texture2D(tScene, vUv).rgb;
+                    vec3 bloom = texture2D(tBloom, vUv).rgb;
+                    vec3 color = neutralToneMapping(scene + bloom * uStrength);
+                    gl_FragColor = vec4(sRGBTransferOETF(color), 1.0);
+                }`,
+            depthTest: false,
+            depthWrite: false,
+            toneMapped: false,
+        });
+        this.bloomCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+        this.bloomQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.bloomCompositeMaterial);
+        this.bloomQuad.frustumCulled = false;
+        this.resizeBloomTargets();
+    }
+    resizeBloomTargets() {
+        const width = Math.max(2, Math.floor(this.renderer.domElement.width / 2));
+        const height = Math.max(2, Math.floor(this.renderer.domElement.height / 2));
+        const makeTarget = () => new THREE.WebGLRenderTarget(width, height, {
+            type: THREE.HalfFloatType,
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+            depthBuffer: false,
+            stencilBuffer: false,
+            colorSpace: THREE.LinearSRGBColorSpace,
+        });
+        if (this.bloomSceneTarget)
+            this.bloomSceneTarget.dispose();
+        this.bloomSceneTarget = new THREE.WebGLRenderTarget(width * 2, height * 2, {
+            type: THREE.HalfFloatType,
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+            depthBuffer: true,
+            stencilBuffer: false,
+            colorSpace: THREE.LinearSRGBColorSpace,
+        });
+        for (const target of this.bloomBlurTargets)
+            target.dispose();
+        this.bloomBlurTargets = [makeTarget(), makeTarget()];
+        this.bloomBlurMaterial.uniforms.uResolution.value.set(width, height);
+    }
     render() {
         if (this.contextLost)
             return;
+        if (!this.bloomSceneTarget)
+            this.resizeBloomTargets();
+        // Pass 1: the full scene into a float buffer.
+        this.renderer.setRenderTarget(this.bloomSceneTarget);
         this.renderer.render(this.scene, this.camera);
+        // Pass 2: bright-only downsample into the first blur target.
+        this.bloomBrightMaterial.uniforms.tDiffuse.value = this.bloomSceneTarget.texture;
+        this.bloomQuad.material = this.bloomBrightMaterial;
+        this.renderer.setRenderTarget(this.bloomBlurTargets[0]);
+        this.renderer.render(this.bloomQuad, this.bloomCamera);
+        // Pass 3: separable Gaussian blur (horizontal then vertical).
+        this.bloomBlurMaterial.uniforms.uDirection.value.set(1, 0);
+        this.bloomBlurMaterial.uniforms.tDiffuse.value = this.bloomBlurTargets[0].texture;
+        this.bloomQuad.material = this.bloomBlurMaterial;
+        this.renderer.setRenderTarget(this.bloomBlurTargets[1]);
+        this.renderer.render(this.bloomQuad, this.bloomCamera);
+        this.bloomBlurMaterial.uniforms.uDirection.value.set(0, 1);
+        this.bloomBlurMaterial.uniforms.tDiffuse.value = this.bloomBlurTargets[1].texture;
+        this.renderer.setRenderTarget(this.bloomBlurTargets[0]);
+        this.renderer.render(this.bloomQuad, this.bloomCamera);
+        // Pass 4: composite scene + bloom to the screen.
+        this.bloomCompositeMaterial.uniforms.uExposure.value = this.renderer.toneMappingExposure;
+        this.bloomCompositeMaterial.uniforms.tScene.value = this.bloomSceneTarget.texture;
+        this.bloomCompositeMaterial.uniforms.tBloom.value = this.bloomBlurTargets[0].texture;
+        this.bloomQuad.material = this.bloomCompositeMaterial;
+        this.renderer.setRenderTarget(null);
+        this.renderer.render(this.bloomQuad, this.bloomCamera);
     }
     projectToScreen(position) {
         const vector = tupleToVector(position, this.tmpPosition).project(this.camera);
@@ -1107,6 +1758,8 @@ export class SpaceRenderer {
         this.renderer.domElement.dataset.renderResolution = `${renderWidth}x${renderHeight}`;
         this.camera.aspect = aspect;
         this.camera.updateProjectionMatrix();
+        if (this.bloomSceneTarget)
+            this.resizeBloomTargets();
     };
     onContextLost = (event) => {
         event.preventDefault();

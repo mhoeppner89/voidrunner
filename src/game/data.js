@@ -235,7 +235,7 @@ const azurePeople = [
         portraitSeed: 179,
         lines: [
             'Timed contracts pay for speed and punish improvisation.',
-            'Autopilot is a tool. The second it says HOSTILES, you are the pilot again.',
+            'Hyperdrive is a tool. The second it says HOSTILES, you are the pilot again.',
             'Helix buys our protein packs by the pallet. Vesper buys them by the emergency.',
         ],
     },
@@ -258,9 +258,9 @@ export const LOCATIONS = {
         name: 'Helix Freeport',
         shortName: 'HELIX',
         kind: 'station',
-        position: [-7200, 900, 6200],
-        radius: 88,
-        dockRadius: 142,
+        position: [-144000, 18000, 124000],
+        radius: 880,
+        dockRadius: 1420,
         faction: 'free-merchants',
         accent: '#d89a43',
         secondary: '#623b24',
@@ -275,9 +275,9 @@ export const LOCATIONS = {
         name: 'Rookhaven Bastion',
         shortName: 'ROOK',
         kind: 'station',
-        position: [8200, 1600, 7600],
-        radius: 96,
-        dockRadius: 154,
+        position: [164000, 32000, 152000],
+        radius: 960,
+        dockRadius: 1540,
         faction: 'concord',
         accent: '#7fb7ca',
         secondary: '#24444f',
@@ -292,9 +292,9 @@ export const LOCATIONS = {
         name: 'Vesper Colony',
         shortName: 'VESPER',
         kind: 'planet',
-        position: [-10400, -1200, -9000],
-        radius: 305,
-        dockRadius: 410,
+        position: [-208000, -24000, -180000],
+        radius: 15250,
+        dockRadius: 15860,
         faction: 'frontier-miners',
         accent: '#d77742',
         secondary: '#4f281f',
@@ -309,9 +309,9 @@ export const LOCATIONS = {
         name: 'Azure Reach',
         shortName: 'AZURE',
         kind: 'planet',
-        position: [11800, -1800, -7200],
-        radius: 348,
-        dockRadius: 462,
+        position: [236000, -36000, -144000],
+        radius: 17400,
+        dockRadius: 18096,
         faction: 'free-merchants',
         accent: '#65c5b8',
         secondary: '#173d42',
@@ -326,8 +326,8 @@ export const LOCATIONS = {
         name: 'The Shardbelt',
         shortName: 'SHARDBELT',
         kind: 'field',
-        position: [900, -400, -9800],
-        radius: 780,
+        position: [18000, -8000, -196000],
+        radius: 2340,
         faction: 'frontier-miners',
         accent: '#b6a67a',
         secondary: '#332f29',
@@ -338,8 +338,8 @@ export const LOCATIONS = {
         name: 'Mourning Line',
         shortName: 'GRAVEYARD',
         kind: 'graveyard',
-        position: [-9000, -1000, 11000],
-        radius: 860,
+        position: [-180000, -20000, 220000],
+        radius: 2580,
         faction: 'salvage-union',
         accent: '#a2b9b0',
         secondary: '#293738',
@@ -437,9 +437,9 @@ export const SHIPS = {
         className: 'MPR-7 Utility Cutter',
         price: 0,
         description: 'A modest multipurpose ship with enough hardpoints and utility gear to attempt every frontier career.',
-        maxSpeed: 42,
-        afterburnSpeed: 72,
-        acceleration: 18,
+        maxSpeed: 50,
+        afterburnSpeed: 75,
+        acceleration: 21,
         angularAcceleration: 1.65,
         angularDamping: 2.8,
         shield: 90,
@@ -456,9 +456,9 @@ export const SHIPS = {
         className: 'VX-22 Frontier Heavy',
         price: 48500,
         description: 'A substantially more capable frontier ship: faster, tougher, better armed, and built around a serious cargo spine.',
-        maxSpeed: 55,
-        afterburnSpeed: 92,
-        acceleration: 24,
+        maxSpeed: 65,
+        afterburnSpeed: 97.5,
+        acceleration: 29,
         angularAcceleration: 1.95,
         angularDamping: 3.1,
         shield: 150,
@@ -471,8 +471,35 @@ export const SHIPS = {
     },
 };
 export const LOCATION_ORDER = ['helix', 'rook', 'azure', 'shardbelt', 'vesper', 'mourning-line'];
-export const SYSTEM_MAP_EXTENT = 12800;
-export const ROUTE_DISTANCE_SCALE = 24;
+export const SYSTEM_MAP_EXTENT = 256000;
+export const ROUTE_DISTANCE_SCALE = 480;
+export const displaySpeed = (unitsPerSecond) => unitsPerSecond * 2;
+export const hyperdriveArrivalRadius = (location) => {
+    if (location.kind === 'field' || location.kind === 'graveyard')
+        return location.radius * 0.62;
+    // Planets are huge now: exit hyperdrive at a distance proportional to the surface.
+    if (location.kind === 'planet')
+        return location.radius * 1.12;
+    return location.radius + 2000;
+};
+export const spawnClearance = (location) => {
+    // Ships must spawn well clear of the body and its landing zone.
+    if (location.kind === 'field' || location.kind === 'graveyard')
+        return location.radius + 250;
+    return (location.dockRadius ?? location.radius) + 120;
+};
+// Per-destination chance that a hyperdrive jump draws an encounter. Safe sectors
+// (the civilized core around the starting station) sit at 20%; frontier and
+// pirate-hunted destinations climb from there.
+export const SECTOR_ENCOUNTER_RATE = {
+    helix: 0.2,
+    rook: 0.2,
+    azure: 0.3,
+    vesper: 0.35,
+    shardbelt: 0.45,
+    'mourning-line': 0.5,
+};
+export const sectorEncounterChance = (id) => SECTOR_ENCOUNTER_RATE[id] ?? 0.3;
 export const locationInstanceRadius = (id) => {
     const location = LOCATIONS[id];
     if (location.kind === 'field' || location.kind === 'graveyard')
