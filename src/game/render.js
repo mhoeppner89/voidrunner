@@ -33,6 +33,9 @@ export class SpaceRenderer {
     shipMeshes = new Map();
     projectileMeshes = new Map();
     pickupMeshes = new Map();
+    shipMeshCount = 0;
+    projectileMeshCount = 0;
+    pickupMeshCount = 0;
     graveyardBatches = [];
     wreckNodeMeshes = new Map();
     effects = [];
@@ -1155,13 +1158,18 @@ export class SpaceRenderer {
         return group;
     }
     syncShips(entities, alpha = 0) {
-        const live = new Set(entities.map((entity) => entity.id));
-        for (const [id, mesh] of this.shipMeshes) {
-            if (!live.has(id)) {
-                this.dynamicRoot.remove(mesh);
-                this.disposeObject(mesh);
-                this.shipMeshes.delete(id);
+        // Reconcile mesh liveness only when the entity count changed (spawns and
+        // deaths) — steady state walks nothing and allocates nothing.
+        if (entities.length !== this.shipMeshCount) {
+            const live = new Set(entities.map((entity) => entity.id));
+            for (const [id, mesh] of this.shipMeshes) {
+                if (!live.has(id)) {
+                    this.dynamicRoot.remove(mesh);
+                    this.disposeObject(mesh);
+                    this.shipMeshes.delete(id);
+                }
             }
+            this.shipMeshCount = entities.length;
         }
         entities.forEach((entity) => {
             let mesh = this.shipMeshes.get(entity.id);
@@ -1209,17 +1217,25 @@ export class SpaceRenderer {
             }
         });
     }
-    syncProjectiles(projectiles, alpha = 0) {
-        const live = new Set(projectiles.map((entity) => entity.id));
-        for (const [id, mesh] of this.projectileMeshes) {
-            if (!live.has(id)) {
-                this.dynamicRoot.remove(mesh);
-                this.disposeObject(mesh);
-                this.projectileMeshes.delete(id);
+    syncProjectiles(projectiles, store, alpha = 0) {
+        // Meshes are keyed by flat-store slot; reconcile only when the live count
+        // changes so steady state allocates nothing per frame.
+        if (projectiles.length !== this.projectileMeshCount) {
+            const live = new Set(projectiles.map((entity) => entity.slot));
+            for (const [slot, mesh] of this.projectileMeshes) {
+                if (!live.has(slot)) {
+                    this.dynamicRoot.remove(mesh);
+                    this.disposeObject(mesh);
+                    this.projectileMeshes.delete(slot);
+                }
             }
+            this.projectileMeshCount = projectiles.length;
         }
+        const pos = store.pos;
+        const vel = store.vel;
+        const prevPos = store.prevPos;
         projectiles.forEach((projectile) => {
-            let mesh = this.projectileMeshes.get(projectile.id);
+            let mesh = this.projectileMeshes.get(projectile.slot);
             if (!mesh) {
                 if (projectile.kind === 'laser') {
                     mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.8, 3, 6), new THREE.MeshBasicMaterial({
@@ -1244,31 +1260,37 @@ export class SpaceRenderer {
                     mesh = group;
                 }
                 this.dynamicRoot.add(mesh);
-                this.projectileMeshes.set(projectile.id, mesh);
+                this.projectileMeshes.set(projectile.slot, mesh);
             }
-            mesh.position.set(...projectile.position);
-            if (projectile.prevPosition && alpha > 0) {
-                this.tmpPrevPos.set(projectile.prevPosition[0], projectile.prevPosition[1], projectile.prevPosition[2]);
+            const i = projectile.slot * 3;
+            mesh.position.set(pos[i], pos[i + 1], pos[i + 2]);
+            if (alpha > 0) {
+                this.tmpPrevPos.set(prevPos[i], prevPos[i + 1], prevPos[i + 2]);
                 mesh.position.lerpVectors(this.tmpPrevPos, mesh.position, alpha);
             }
-            if (projectile.velocity[0] || projectile.velocity[1] || projectile.velocity[2]) {
-                this.forward.set(projectile.velocity[0], projectile.velocity[1], projectile.velocity[2]).normalize();
+            if (vel[i] || vel[i + 1] || vel[i + 2]) {
+                this.forward.set(vel[i], vel[i + 1], vel[i + 2]).normalize();
                 this.tmpQuaternion.setFromUnitVectors(NEG_Z, this.forward);
                 mesh.quaternion.copy(this.tmpQuaternion);
             }
         });
     }
-    syncPickups(pickups, alpha = 0) {
-        const live = new Set(pickups.map((pickup) => pickup.id));
-        for (const [id, mesh] of this.pickupMeshes) {
-            if (!live.has(id)) {
-                this.dynamicRoot.remove(mesh);
-                this.disposeObject(mesh);
-                this.pickupMeshes.delete(id);
+    syncPickups(pickups, store, alpha = 0) {
+        if (pickups.length !== this.pickupMeshCount) {
+            const live = new Set(pickups.map((pickup) => pickup.slot));
+            for (const [slot, mesh] of this.pickupMeshes) {
+                if (!live.has(slot)) {
+                    this.dynamicRoot.remove(mesh);
+                    this.disposeObject(mesh);
+                    this.pickupMeshes.delete(slot);
+                }
             }
+            this.pickupMeshCount = pickups.length;
         }
+        const pos = store.pos;
+        const prevPos = store.prevPos;
         pickups.forEach((pickup) => {
-            let mesh = this.pickupMeshes.get(pickup.id);
+            let mesh = this.pickupMeshes.get(pickup.slot);
             if (!mesh) {
                 const color = pickup.source === 'mining' ? 0xd7c07a : pickup.rarity === 'rare' ? 0xe3a9ff : 0x80d1bf;
                 const group = new THREE.Group();
@@ -1279,11 +1301,12 @@ export class SpaceRenderer {
                 group.add(glow);
                 mesh = group;
                 this.dynamicRoot.add(mesh);
-                this.pickupMeshes.set(pickup.id, mesh);
+                this.pickupMeshes.set(pickup.slot, mesh);
             }
-            mesh.position.set(...pickup.position);
-            if (pickup.prevPosition && alpha > 0) {
-                this.tmpPrevPos.set(pickup.prevPosition[0], pickup.prevPosition[1], pickup.prevPosition[2]);
+            const i = pickup.slot * 3;
+            mesh.position.set(pos[i], pos[i + 1], pos[i + 2]);
+            if (alpha > 0) {
+                this.tmpPrevPos.set(prevPos[i], prevPos[i + 1], prevPos[i + 2]);
                 mesh.position.lerpVectors(this.tmpPrevPos, mesh.position, alpha);
             }
             mesh.rotation.x += 0.018;

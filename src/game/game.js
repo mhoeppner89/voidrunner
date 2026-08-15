@@ -5,6 +5,7 @@ import { buyCommodity, cargoCapacity, cargoFree, cargoMass, sellCommodity, tickE
 import { InputManager } from './input.js';
 import { acceptMission, awardCareerProgress, completeBountyMission, completeMissionsAtDock, failExpiredMissions, joinGuild, refreshMissionOffers, } from './missions.js';
 import { clamp, damp, formatCredits, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
+import { EntityStore } from './entityStore.js';
 import { SpaceRenderer } from './render.js';
 import { saveGame } from './save.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
@@ -66,6 +67,21 @@ const vec = (value, out = new THREE.Vector3()) => out.set(value[0], value[1], va
 const tuple = (value) => [value.x, value.y, value.z];
 const quat = (value, out = new THREE.Quaternion()) => out.set(value[0], value[1], value[2], value[3]);
 const quatTuple = (value) => [value.x, value.y, value.z, value.w];
+// In-place variants: entities keep their transform arrays for the whole
+// lifetime now, so writes mutate instead of replacing (zero allocation).
+const tupleInto = (dst, value) => {
+    dst[0] = value.x;
+    dst[1] = value.y;
+    dst[2] = value.z;
+    return dst;
+};
+const quatTupleInto = (dst, value) => {
+    dst[0] = value.x;
+    dst[1] = value.y;
+    dst[2] = value.z;
+    dst[3] = value.w;
+    return dst;
+};
 // Allocation-free segment/sphere intersection: scalar math only, no Vector3
 // temporaries, because this runs over hundreds of field obstacles per frame.
 const segmentSphereHit = (start, end, center, radius) => {
@@ -105,6 +121,11 @@ export class GameSession {
     ships = [];
     projectiles = [];
     pickups = [];
+    // Flat component stores: projectile/pickup transforms live in Float32Array
+    // channels keyed by slot; the renderer reads the same channels (no sync
+    // arrays, no per-step tuple() allocations, no shared scratch objects).
+    projStore = new EntityStore(256);
+    pickupStore = new EntityStore(64);
     extractionCarry = new Map();
     tmpA = new THREE.Vector3();
     tmpB = new THREE.Vector3();
@@ -129,6 +150,13 @@ export class GameSession {
     // updatePlayer aliases this.tmpA, so writing the normal into tmpA used to
     // overwrite the ship's position with a unit vector (teleport to open space).
     tmpCollide = new THREE.Vector3();
+    // Projectile/pickup step scratches (store reads/writes). Owned by
+    // updateProjectiles/updatePickups so they never alias live sim state.
+    tmpP0 = new THREE.Vector3();
+    tmpP1 = new THREE.Vector3();
+    tmpP2 = new THREE.Vector3();
+    tmpP3 = new THREE.Vector3();
+    tmpP4 = new THREE.Vector3();
     frameId = 0;
     lastFrame = performance.now();
     simAccumulator = 0;
@@ -358,8 +386,8 @@ export class GameSession {
             autopilot: this.autopilot,
             afterburning: this.afterburning,
             ships: this.ships.map((ship) => ({ ...ship, position: [...ship.position], velocity: [...ship.velocity], rotation: [...ship.rotation] })),
-            projectiles: this.projectiles.map((projectile) => ({ ...projectile, position: [...projectile.position], velocity: [...projectile.velocity] })),
-            pickups: this.pickups.map((pickup) => ({ ...pickup, position: [...pickup.position], velocity: [...pickup.velocity] })),
+            projectiles: this.projectiles.map((projectile) => ({ ...projectile, position: [...this.projStore.pos.subarray(projectile.slot * 3, projectile.slot * 3 + 3)], velocity: [...this.projStore.vel.subarray(projectile.slot * 3, projectile.slot * 3 + 3)] })),
+            pickups: this.pickups.map((pickup) => ({ ...pickup, position: [...this.pickupStore.pos.subarray(pickup.slot * 3, pickup.slot * 3 + 3)], velocity: [...this.pickupStore.vel.subarray(pickup.slot * 3, pickup.slot * 3 + 3)] })),
             activeInstance: this.activeInstanceId,
         };
     }
@@ -446,14 +474,10 @@ export class GameSession {
             ship.prevPosition.set(ship.position);
             ship.prevRotation.set(ship.rotation);
         }
-        for (const projectile of this.projectiles) {
-            projectile.prevPosition = projectile.prevPosition ?? new Float64Array(3);
-            projectile.prevPosition.set(projectile.position);
-        }
-        for (const pickup of this.pickups) {
-            pickup.prevPosition = pickup.prevPosition ?? new Float64Array(3);
-            pickup.prevPosition.set(pickup.position);
-        }
+        for (const projectile of this.projectiles)
+            this.projStore.snapshot(projectile.slot);
+        for (const pickup of this.pickups)
+            this.pickupStore.snapshot(pickup.slot);
     }
     updateSimulation(dt, actions) {
         this.snapshotInterpolationState();
@@ -742,12 +766,15 @@ export class GameSession {
         const down = UP.clone().applyQuaternion(orientation).multiplyScalar(-0.24);
         for (const side of [-0.58, 0.58]) {
             const muzzle = position.clone().addScaledVector(right, side).add(down).addScaledVector(direction, 1.8);
+            const slot = this.projStore.alloc();
+            this.projStore.setPos(slot, muzzle.x, muzzle.y, muzzle.z);
+            const shotVel = this.tmpP0.copy(direction).multiplyScalar(205).add(vec(this.save.player.velocity));
+            this.projStore.setVel(slot, shotVel.x, shotVel.y, shotVel.z);
             this.projectiles.push({
                 id: `p-${++this.projectileCounter}`,
                 kind: 'laser',
                 ownerId: 'player',
-                position: tuple(muzzle),
-                velocity: tuple(direction.clone().multiplyScalar(205).add(vec(this.save.player.velocity))),
+                slot,
                 damage: stats.gunDamage,
                 life: 1.35,
                 targetId: target?.kind === 'ship' ? target.id : undefined,
@@ -779,12 +806,15 @@ export class GameSession {
         const position = vec(this.save.player.position);
         const orientation = quat(this.save.player.rotation);
         const direction = FORWARD.clone().applyQuaternion(orientation).normalize();
+        const slot = this.projStore.alloc();
+        this.projStore.setPos(slot, position.x + direction.x * 2.2, position.y + direction.y * 2.2, position.z + direction.z * 2.2);
+        const missileVel = this.tmpP0.copy(direction).multiplyScalar(72).add(vec(this.save.player.velocity));
+        this.projStore.setVel(slot, missileVel.x, missileVel.y, missileVel.z);
         this.projectiles.push({
             id: `p-${++this.projectileCounter}`,
             kind: 'missile',
             ownerId: 'player',
-            position: tuple(position.clone().addScaledVector(direction, 2.2)),
-            velocity: tuple(direction.multiplyScalar(72).add(vec(this.save.player.velocity))),
+            slot,
             damage: 42,
             life: 8,
             targetId: ship.id,
@@ -935,11 +965,14 @@ export class GameSession {
         const rng = seededRandom(`${this.save.world.seed}:pickup:${++this.pickupCounter}:${this.save.world.time}`);
         const drift = new THREE.Vector3(rng() - 0.5, rng() - 0.5, rng() - 0.5).normalize().multiplyScalar(randomBetween(rng, 0.8, 2.4));
         const offset = drift.clone().normalize().multiplyScalar(2.2 + rng() * 2.5);
+        const slot = this.pickupStore.alloc();
+        const originPos = this.tmpP0.copy(vec(origin)).add(offset);
+        this.pickupStore.setPos(slot, originPos.x, originPos.y, originPos.z);
+        this.pickupStore.setVel(slot, drift.x, drift.y, drift.z);
         this.pickups.push({
             id: `pickup-${this.pickupCounter}`,
             commodity,
-            position: tuple(vec(origin).add(offset)),
-            velocity: tuple(drift),
+            slot,
             amount: 1,
             source,
             rarity,
@@ -947,22 +980,23 @@ export class GameSession {
         });
     }
     updatePickups(dt) {
-        const player = vec(this.save.player.position);
+        const player = vec(this.save.player.position, this.tmpP3);
+        const salvageRange = getEffectiveShipStats(this.save.player).salvageRange * 1.5;
         for (const pickup of this.pickups) {
             pickup.life -= dt;
-            const position = vec(pickup.position);
-            const velocity = vec(pickup.velocity);
+            const position = this.pickupStore.getPos(pickup.slot, this.tmpP0);
+            const velocity = this.pickupStore.getVel(pickup.slot, this.tmpP1);
             const distance = position.distanceTo(player);
             const modeMatches = (this.save.player.mode === 'mining' && pickup.source === 'mining') ||
                 (this.save.player.mode === 'salvage' && (pickup.source === 'salvage' || pickup.source === 'combat'));
-            if ((this.utilityActive && modeMatches && distance < getEffectiveShipStats(this.save.player).salvageRange * 1.5) || distance < 7) {
-                const pull = player.clone().sub(position).normalize().multiplyScalar((28 / Math.max(2, distance)) * dt);
+            if ((this.utilityActive && modeMatches && distance < salvageRange) || distance < 7) {
+                const pull = this.tmpP2.copy(player).sub(position).normalize().multiplyScalar((28 / Math.max(2, distance)) * dt);
                 velocity.add(pull);
             }
             velocity.multiplyScalar(Math.exp(-0.18 * dt));
             position.addScaledVector(velocity, dt);
-            pickup.position = tuple(position);
-            pickup.velocity = tuple(velocity);
+            this.pickupStore.setPosV(pickup.slot, position);
+            this.pickupStore.setVelV(pickup.slot, velocity);
             if (distance < 3.2)
                 this.collectPickup(pickup);
         }
@@ -1521,9 +1555,9 @@ export class GameSession {
         const nextSpeed = damp(currentSpeed, desiredSpeed, evasive || fleeing || ship.burning ? 1.6 : 1.25, dt);
         velocity.copy(forward).multiplyScalar(nextSpeed);
         position.addScaledVector(velocity, dt);
-        ship.position = tuple(position);
-        ship.velocity = tuple(velocity);
-        ship.rotation = quatTuple(orientation);
+        tupleInto(ship.position, position);
+        tupleInto(ship.velocity, velocity);
+        quatTupleInto(ship.rotation, orientation);
         const facing = forward.dot(lead);
         if (!fleeing && distance < ATTACK_FIRE_RANGE && facing > 0.85 && ship.fireCooldown <= 0 && !this.lineBlocked(position, predicted, ship.id)) {
             this.fireNpcGun(ship, lead);
@@ -1562,18 +1596,21 @@ export class GameSession {
         orientation.slerp(this.tmpQ2, 1 - Math.exp(-ship.turnRate * (1 - ship.gFatigue * 0.5) * 0.62 * dt));
         velocity.lerp(desired.multiplyScalar(ship.speed * (ship.role === 'trader' ? 0.72 : 0.5)), 1 - Math.exp(-0.55 * dt));
         position.addScaledVector(velocity, dt);
-        ship.position = tuple(position);
-        ship.velocity = tuple(velocity);
-        ship.rotation = quatTuple(orientation);
+        tupleInto(ship.position, position);
+        tupleInto(ship.velocity, velocity);
+        quatTupleInto(ship.rotation, orientation);
     }
     fireNpcGun(ship, direction) {
         const position = vec(ship.position).addScaledVector(direction, 2.4);
+        const slot = this.projStore.alloc();
+        this.projStore.setPos(slot, position.x, position.y, position.z);
+        const shotVel = this.tmpP0.copy(direction).multiplyScalar(150).add(vec(ship.velocity));
+        this.projStore.setVel(slot, shotVel.x, shotVel.y, shotVel.z);
         this.projectiles.push({
             id: `p-${++this.projectileCounter}`,
             kind: 'laser',
             ownerId: ship.id,
-            position: tuple(position),
-            velocity: tuple(direction.clone().multiplyScalar(150).add(vec(ship.velocity))),
+            slot,
             damage: ship.gunDamage,
             life: 1.55,
             targetId: ship.targetId,
@@ -1582,29 +1619,30 @@ export class GameSession {
         ship.fireCooldown = ship.role === 'bounty' ? 0.28 : ship.role === 'pirate' ? 0.38 : 0.46;
     }
     updateProjectiles(dt) {
+        const playerPos = vec(this.save.player.position, this.tmpP3);
         for (const projectile of this.projectiles) {
             if (projectile.life <= 0)
                 continue;
             projectile.life -= dt;
-            const start = vec(projectile.position);
-            const velocity = vec(projectile.velocity);
+            const start = this.projStore.getPos(projectile.slot, this.tmpP0);
+            const velocity = this.projStore.getVel(projectile.slot, this.tmpP1);
             if (projectile.kind === 'missile' && projectile.targetId) {
                 let targetPosition;
                 if (projectile.targetId === 'player') {
-                    targetPosition = vec(this.save.player.position);
+                    targetPosition = this.tmpP4.copy(playerPos);
                 }
                 else {
                     const targetShip = this.ships.find((entry) => entry.id === projectile.targetId && entry.hull > 0);
                     if (targetShip)
-                        targetPosition = vec(targetShip.position);
+                        targetPosition = vec(targetShip.position, this.tmpP4);
                 }
                 if (targetPosition) {
                     const desired = targetPosition.sub(start).normalize().multiplyScalar(92);
                     velocity.lerp(desired, 1 - Math.exp(-2.8 * dt));
-                    projectile.velocity = tuple(velocity);
+                    this.projStore.setVel(projectile.slot, velocity);
                 }
             }
-            const end = start.clone().addScaledVector(velocity, dt);
+            const end = this.tmpP2.copy(start).addScaledVector(velocity, dt);
             let bestT = 2;
             let hitKind;
             let hitShip;
@@ -1614,7 +1652,7 @@ export class GameSession {
                 hitKind = 'obstacle';
             }
             if (projectile.ownerId !== 'player') {
-                const playerT = segmentSphereHit(start, end, vec(this.save.player.position), PLAYER_RADIUS + (projectile.kind === 'missile' ? 0.8 : 0.25));
+                const playerT = segmentSphereHit(start, end, playerPos, PLAYER_RADIUS + (projectile.kind === 'missile' ? 0.8 : 0.25));
                 if (playerT !== undefined && playerT < bestT) {
                     bestT = playerT;
                     hitKind = 'player';
@@ -1626,7 +1664,7 @@ export class GameSession {
                 if (projectile.ownerId !== 'player' && !this.projectileCanHitShip(projectile, ship))
                     continue;
                 const radius = ship.role === 'trader' ? 3.8 : 2.4;
-                const hit = segmentSphereHit(start, end, vec(ship.position), radius + (projectile.kind === 'missile' ? 0.8 : 0));
+                const hit = segmentSphereHit(start, end, vec(ship.position, this.tmpP4), radius + (projectile.kind === 'missile' ? 0.8 : 0));
                 if (hit !== undefined && hit < bestT) {
                     bestT = hit;
                     hitKind = 'ship';
@@ -1634,7 +1672,7 @@ export class GameSession {
                 }
             }
             if (hitKind) {
-                const hitPosition = start.clone().lerp(end, bestT);
+                const hitPosition = this.tmpP4.copy(start).lerp(end, bestT);
                 projectile.life = 0;
                 this.renderer.spawnImpact(tuple(hitPosition), projectile.kind === 'missile' ? 0xff7a42 : 0xffcb62);
                 if (hitKind === 'player')
@@ -1649,7 +1687,7 @@ export class GameSession {
                     this.audio.play('impact', 0.35);
             }
             else {
-                projectile.position = tuple(end);
+                this.projStore.setPosV(projectile.slot, end);
             }
         }
     }
@@ -2014,12 +2052,16 @@ export class GameSession {
     }
     cleanupEntities() {
         for (let index = this.projectiles.length - 1; index >= 0; index -= 1) {
-            if (this.projectiles[index].life <= 0)
+            if (this.projectiles[index].life <= 0) {
+                this.projStore.free(this.projectiles[index].slot);
                 this.projectiles.splice(index, 1);
+            }
         }
         for (let index = this.pickups.length - 1; index >= 0; index -= 1) {
-            if (this.pickups[index].life <= 0)
+            if (this.pickups[index].life <= 0) {
+                this.pickupStore.free(this.pickups[index].slot);
                 this.pickups.splice(index, 1);
+            }
         }
         for (let index = this.ships.length - 1; index >= 0; index -= 1) {
             if (this.ships[index].hull < 0 || (this.ships[index].hull === 0 && this.ships[index].lifetime > 1.3))
@@ -2709,9 +2751,9 @@ export class GameSession {
         this.renderer.setGStrain(this.gFatigue);
         this.renderer.updateCamera(this.save.player.position, this.save.player.prevPosition, this.save.player.rotation, this.save.player.prevRotation, this.save.player.angularVelocity, clamp(speed / Math.max(1, stats.afterburnSpeed), 0, 2), this.afterburning || (this.autopilot && speed > stats.afterburnSpeed), dt, alpha);
         this.renderer.setDamageWarning(1 - this.save.player.hull / stats.hull);
-        this.renderer.syncShips(this.ships.filter((entry) => entry.hull >= 0), alpha);
-        this.renderer.syncProjectiles(this.projectiles, alpha);
-        this.renderer.syncPickups(this.pickups.filter((entry) => entry.life > 0), alpha);
+        this.renderer.syncShips(this.ships, alpha);
+        this.renderer.syncProjectiles(this.projectiles, this.projStore, alpha);
+        this.renderer.syncPickups(this.pickups, this.pickupStore, alpha);
         this.renderer.render();
         if (!this.save.player.dockedAt && now - this.lastHudUpdate > 42) {
             this.lastHudUpdate = now;
@@ -2954,7 +2996,7 @@ export class GameSession {
         }
         for (const pickup of this.pickups)
             if (pickup.life > 0)
-                add(pickup.position, 'pickup', false);
+                add(this.pickupStore.pos.subarray(pickup.slot * 3, pickup.slot * 3 + 3), 'pickup', false);
         return contacts;
     }
     zoneLabel(zone) {

@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v37-gfatigue-caps-spiral';
+const CACHE = 'voidrunner-v38-entity-store';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',
@@ -10,6 +10,7 @@ self.addEventListener('install', (event) => {
     './src/game/audio.js',
     './src/game/data.js',
     './src/game/economy.js',
+    './src/game/entityStore.js',
     './src/game/game.js',
     './src/game/input.js',
     './src/game/missions.js',
