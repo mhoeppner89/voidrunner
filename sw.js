@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v38-entity-store';
+const CACHE = 'voidrunner-v39-theme-consolidation';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',

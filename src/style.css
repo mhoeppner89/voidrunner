@@ -1,19 +1,33 @@
 :root {
   color-scheme: dark;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Base palette (touch UI + generic UI). */
   --ink: #e6e0d0;
-  --muted: #91968f;
-  --dim: #5d6664;
-  --panel: rgba(8, 13, 14, 0.82);
-  --panel-solid: #0a1011;
   --line: rgba(139, 160, 151, 0.32);
   --amber: #d7a253;
-  --amber-soft: #8f6a37;
   --teal: #73c6b4;
   --danger: #f05c43;
   --success: #9acb88;
-  --blue: #77bcd2;
   --touch-scale: 1;
+  /* Voidrunner style lock (bright VGA frontier) + retro cockpit chrome — one
+     theme block, effective values only. The --void-* and --retro-* families
+     were previously re-declared in their own :root blocks halfway down the
+     file (which silently shadowed the top ones); all tokens now live here. */
+  --void-navy: #06153a;
+  --void-cobalt: #0d3d86;
+  --void-cyan: #69e4f2;
+  --void-gold: #ffd05c;
+  --void-cream: #fff3cf;
+  --void-muted: #a8c7dc;
+  --void-shadow: 0 8px 0 rgba(1, 7, 24, 0.68), 0 0 0 1px rgba(2, 12, 39, 0.96), 0 16px 34px rgba(1, 7, 25, 0.42);
+  --retro-black: #06102d;
+  --retro-amber: #ffb83d;
+  --retro-amber-hi: #ffe89a;
+  --retro-green: #75e7c8;
+  --retro-red: #ff5e57;
+  --pixel-font: "Lucida Console", "Courier New", ui-monospace, monospace;
+  --display-font: Impact, "Arial Narrow", Haettenschweiler, sans-serif;
+  --panel-shadow: var(--void-shadow);
   --safe-top: max(10px, env(safe-area-inset-top));
   --safe-right: max(10px, env(safe-area-inset-right));
   --safe-bottom: max(10px, env(safe-area-inset-bottom));
@@ -434,9 +448,9 @@ button.compact {
   position: relative;
   width: clamp(135px, 17vw, 215px);
   aspect-ratio: 1;
-  background: radial-gradient(circle, rgba(7, 27, 24, 0.76), rgba(3, 8, 8, 0.9));
-  border: 1px solid rgba(94, 174, 155, 0.48);
-  border-radius: 50%;
+  background: radial-gradient(circle, rgba(12, 44, 38, 0.83), rgba(2, 8, 7, 0.96));
+  border: 2px solid #566158;
+  border-radius: 0;
   box-shadow: inset 0 0 18px rgba(41, 120, 103, 0.16), 0 0 0 6px rgba(12, 17, 16, 0.72);
 }
 
@@ -649,23 +663,26 @@ button.compact {
   font-size: 0.56rem;
 }
 
-/* Contextual pads: FIRE becomes MINE/SALVAGE, MISSILE becomes SCAN. */
+/* Contextual pads: FIRE becomes MINE/SALVAGE, MISSILE becomes SCAN. The
+   .is-mining/.is-salvage/.is-scan classes win by specificity (0,2,0 vs 0,1,0)
+   over every plain .touch-fire/.touch-missile rule, so no !important is
+   needed — the old !important arms race with the remaster layer is gone. */
 .touch-fire.is-mining {
-  color: #1c1202 !important;
-  background: radial-gradient(circle at 38% 32%, rgba(238, 197, 92, 0.98), rgba(150, 105, 26, 0.98)) !important;
-  border: 2px solid #ffd97a !important;
+  color: #1c1202;
+  background: radial-gradient(circle at 38% 32%, rgba(238, 197, 92, 0.98), rgba(150, 105, 26, 0.98));
+  border: 2px solid #ffd97a;
 }
 
 .touch-fire.is-salvage {
-  color: #02211c !important;
-  background: radial-gradient(circle at 38% 32%, rgba(122, 226, 203, 0.98), rgba(26, 122, 103, 0.98)) !important;
-  border: 2px solid #90f0dc !important;
+  color: #02211c;
+  background: radial-gradient(circle at 38% 32%, rgba(122, 226, 203, 0.98), rgba(26, 122, 103, 0.98));
+  border: 2px solid #90f0dc;
 }
 
 .touch-missile.is-scan {
-  color: #ecffe9 !important;
-  background: radial-gradient(circle at 38% 32%, rgba(124, 202, 152, 0.95), rgba(24, 84, 62, 0.96)) !important;
-  border: 2px solid rgba(160, 240, 188, 0.7) !important;
+  color: #ecffe9;
+  background: radial-gradient(circle at 38% 32%, rgba(124, 202, 152, 0.95), rgba(24, 84, 62, 0.96));
+  border: 2px solid rgba(160, 240, 188, 0.7);
 }
 
 .touch-boost:active,
@@ -2520,29 +2537,9 @@ button.compact {
 /* ========================================================================== */
 /* RETRO REMASTER VISUAL LAYER                                                */
 /* ========================================================================== */
-:root {
-  --retro-black: #020504;
-  --retro-panel: rgba(4, 11, 10, 0.94);
-  --retro-panel-soft: rgba(8, 15, 14, 0.86);
-  --retro-edge: #3f4b45;
-  --retro-edge-hi: #8b7b58;
-  --retro-amber: #e1a63f;
-  --retro-amber-hi: #ffe18a;
-  --retro-green: #69d4bd;
-  --retro-red: #dc553d;
-  --retro-blue: #71b9cc;
-  --pixel-font: "Lucida Console", "Courier New", ui-monospace, monospace;
-  --display-font: Impact, "Arial Narrow", Haettenschweiler, sans-serif;
-  --panel-shadow: 0 0 0 1px #050706, 0 0 0 2px rgba(139, 123, 88, 0.48), 0 12px 30px rgba(0, 0, 0, 0.7), inset 0 0 20px rgba(0, 0, 0, 0.7);
-}
-
-html,
-body,
-#app,
-#game-shell {
-  background: var(--retro-black);
-}
-
+/* Theme tokens live in the single :root block at the top of the file; this
+   section only carries the remaster's component overrides. The page/body
+   background is set by the style-lock section below (var(--void-navy)). */
 body {
   font-family: var(--pixel-font);
   image-rendering: pixelated;
@@ -2553,7 +2550,7 @@ body {
 #space-canvas {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  filter: saturate(0.82) contrast(1.12) brightness(0.94);
+  filter: saturate(1.12) contrast(1.04) brightness(1.13);
 }
 
 .global-crt-overlay {
@@ -2561,11 +2558,11 @@ body {
   inset: 0;
   z-index: 110;
   pointer-events: none;
-  opacity: 0.32;
+  opacity: 0.14;
   background:
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.018) 0 1px, rgba(0, 0, 0, 0.04) 1px 3px),
-    linear-gradient(90deg, rgba(255, 35, 10, 0.018), transparent 15%, transparent 84%, rgba(30, 180, 255, 0.018)),
-    radial-gradient(ellipse at center, transparent 52%, rgba(0, 0, 0, 0.34) 100%);
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.026) 0 1px, rgba(5, 29, 76, 0.035) 1px 3px),
+    linear-gradient(90deg, rgba(0, 70, 220, 0.06), transparent 18%, transparent 82%, rgba(0, 198, 255, 0.07)),
+    radial-gradient(ellipse at center, transparent 62%, rgba(2, 10, 36, 0.24) 100%);
   mix-blend-mode: screen;
 }
 
@@ -2826,12 +2823,6 @@ button.primary,
 .target-bracket i {
   border-color: #eec751;
   border-width: 3px;
-}
-
-.radar-shell {
-  border: 2px solid #566158;
-  border-radius: 0;
-  background: radial-gradient(circle, rgba(12, 44, 38, 0.83), rgba(2, 8, 7, 0.96));
 }
 
 #radar {
@@ -3229,8 +3220,8 @@ button.primary,
 
 .touch-fire {
   color: #160703;
-  border-color: #ff9b78 !important;
-  background: linear-gradient(180deg, #df6748, #8e2d20) !important;
+  border-color: #ff9b78;
+  background: linear-gradient(180deg, #df6748, #8e2d20);
 }
 
 @media (max-width: 900px), (pointer: coarse) {
@@ -3946,49 +3937,14 @@ button.primary,
 /* ========================================================================== */
 /* VOIDRUNNER STYLE LOCK — BRIGHT VGA FRONTIER ADVENTURE                      */
 /* ========================================================================== */
-:root {
-  --void-navy: #06153a;
-  --void-cobalt: #0d3d86;
-  --void-blue: #1c8fe5;
-  --void-cyan: #69e4f2;
-  --void-gold: #ffd05c;
-  --void-orange: #ff9850;
-  --void-cream: #fff3cf;
-  --void-muted: #a8c7dc;
-  --void-panel: rgba(5, 21, 58, 0.88);
-  --void-panel-soft: rgba(7, 35, 78, 0.72);
-  --void-line: rgba(77, 187, 240, 0.72);
-  --void-shadow: 0 8px 0 rgba(1, 7, 24, 0.68), 0 0 0 1px rgba(2, 12, 39, 0.96), 0 16px 34px rgba(1, 7, 25, 0.42);
-  --retro-black: #06102d;
-  --retro-panel: rgba(5, 21, 58, 0.92);
-  --retro-panel-soft: rgba(7, 35, 78, 0.78);
-  --retro-edge: #236bb0;
-  --retro-edge-hi: #62dff2;
-  --retro-amber: #ffb83d;
-  --retro-amber-hi: #ffe89a;
-  --retro-green: #75e7c8;
-  --retro-red: #ff5e57;
-  --retro-blue: #78cfff;
-  --panel-shadow: var(--void-shadow);
-}
-
+/* All theme tokens (--void-*, --retro-*, fonts, shadows) live in the single
+   :root block at the top of the file. This section carries the style lock's
+   component overrides only. */
 html,
 body,
 #app,
 #game-shell {
   background: var(--void-navy);
-}
-
-#space-canvas {
-  filter: saturate(1.12) contrast(1.04) brightness(1.13);
-}
-
-.global-crt-overlay {
-  opacity: 0.14;
-  background:
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.026) 0 1px, rgba(5, 29, 76, 0.035) 1px 3px),
-    linear-gradient(90deg, rgba(0, 70, 220, 0.06), transparent 18%, transparent 82%, rgba(0, 198, 255, 0.07)),
-    radial-gradient(ellipse at center, transparent 62%, rgba(2, 10, 36, 0.24) 100%);
 }
 
 button {
