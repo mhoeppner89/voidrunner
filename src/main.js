@@ -89,7 +89,21 @@ document.addEventListener('visibilitychange', () => {
 const isProductionBuild = import.meta.env?.PROD ?? location.protocol !== 'file:';
 if ('serviceWorker' in navigator && isProductionBuild) {
     window.addEventListener('load', () => {
-        void navigator.serviceWorker.register('./sw.js').catch(() => undefined);
+        // If a returning player is controlled by a stale service worker from a
+        // previous deploy, a fresh push installs the new one (skipWaiting +
+        // clients.claim) but nothing reloads the page — so the old build keeps
+        // running until the player manually refreshes. Reload once when the new
+        // service worker takes control so deployed updates actually show up.
+        const alreadyControlled = Boolean(navigator.serviceWorker.controller);
+        void navigator.serviceWorker.register('./sw.js').then(() => {
+            if (!alreadyControlled) return;
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (refreshing) return;
+                refreshing = true;
+                window.location.reload();
+            });
+        }).catch(() => undefined);
     });
 }
 window.__VOID_PRIVATEER__ = {

@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v36-fixed-step-gfatigue';
+const CACHE = 'voidrunner-v37-gfatigue-caps-spiral';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',

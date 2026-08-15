@@ -579,7 +579,7 @@ export class GameSession {
             const spinRate = angularVelocity.length();
             const gTarget = clamp(spinRate / 0.8, 0, 1);
             this.gFatigue += (gTarget - this.gFatigue) * (1 - Math.exp(-(gTarget > this.gFatigue ? 1.4 : 0.55) * dt));
-            const gFactor = 1 - this.gFatigue * 0.42;
+            const gFactor = 1 - this.gFatigue * 0.4;
             angularVelocity.x += actions.pitch * stats.angularAcceleration * gFactor * burnBoost * dt;
             angularVelocity.y += -actions.yaw * stats.angularAcceleration * gFactor * burnBoost * dt;
             angularVelocity.z += -actions.roll * stats.angularAcceleration * gFactor * burnBoost * dt;
@@ -589,7 +589,10 @@ export class GameSession {
             orientation.multiply(deltaRotation).normalize();
         }
         const forward = FORWARD.clone().applyQuaternion(orientation).normalize();
-        this.afterburning = !this.autopilot && actions.afterburner && this.save.player.throttle > 0.55 && this.save.player.fuel > 0.5;
+        // Afterburner speed boost only once the ship is moving at a good clip
+        // (>= 90% of max speed); below that it still doubles turn authority so
+        // the button is never dead — it just can't add speed you haven't built.
+        this.afterburning = !this.autopilot && actions.afterburner && this.save.player.throttle > 0.55 && this.save.player.fuel > 0.5 && velocity.length() >= 0.9 * stats.maxSpeed;
         let targetSpeed = this.save.player.throttle * stats.maxSpeed;
         if (this.afterburning)
             targetSpeed = this.save.player.throttle * stats.afterburnSpeed;
@@ -1378,6 +1381,29 @@ export class GameSession {
             const jinkRemaining = Math.max(0, (ship.jinkUntil ?? 0) - this.save.world.time);
             jink = (ship.jinkSign ?? 1) * (ship.jinkStrength ?? 0.45) * clamp(jinkRemaining / 0.55, 0, 1);
         }
+        // Spiral evasion: under fire, the pilot sometimes commits to a corkscrew
+        // (rotating perpendicular bias + matching roll) so the dodge works in
+        // three dimensions. Gate rolls ~45% every few seconds while threatened
+        // and then rests on a cooldown, so it reads as a natural combat reflex
+        // rather than a permanent spin.
+        let spiraling = false;
+        if ((evasive || damaged) && !ship.fleeing && !ship.covering) {
+            if (!(ship.spiralT > 0) && this.save.world.time >= (ship.spiralCooldownUntil ?? 0)) {
+                if (Math.random() < 0.45) {
+                    ship.spiralT = 0.9 + Math.random() * 0.9;
+                    ship.spiralSign = Math.random() < 0.5 ? 1 : -1;
+                    ship.spiralPhase = 0;
+                    ship.spiralCooldownUntil = this.save.world.time + 5 + Math.random() * 5;
+                }
+                else {
+                    ship.spiralCooldownUntil = this.save.world.time + 2 + Math.random() * 3;
+                }
+            }
+            if (ship.spiralT > 0) {
+                ship.spiralT = Math.max(0, ship.spiralT - dt);
+                spiraling = true;
+            }
+        }
         const desired = this.tmpI;
         if (ship.covering && ship.coverPoint) {
             const cover = this.tmpJ.set(ship.coverPoint[0], ship.coverPoint[1], ship.coverPoint[2]);
@@ -1420,6 +1446,17 @@ export class GameSession {
             desired.subVectors(aimPoint, position).normalize();
         }
         desired.addScaledVector(lateral, jink);
+        if (spiraling) {
+            ship.spiralPhase = (ship.spiralPhase ?? 0) + dt * 6;
+            const s = Math.sin(ship.spiralPhase) * 0.55;
+            const c = Math.cos(ship.spiralPhase) * 0.45;
+            const upV = this.tmpL.crossVectors(lateral, direct);
+            if (upV.lengthSq() < 1e-6)
+                upV.set(0, 1, 0);
+            else
+                upV.normalize();
+            desired.addScaledVector(lateral, s * (ship.spiralSign ?? 1)).addScaledVector(upV, c * (ship.spiralSign ?? 1));
+        }
         desired.add(this.getAvoidanceVector(position, desired, 40, currentSpeed));
         const shipAvoidance = this.getShipAvoidance(position, velocity, ship.id);
         if (shipAvoidance)
@@ -1449,8 +1486,16 @@ export class GameSession {
         // bleed turn authority instead of allowing instant 180° pivots.
         const strainTarget = clamp(orientation.angleTo(this.tmpQ2) / 2, 0, 1);
         ship.gFatigue += (strainTarget - ship.gFatigue) * (1 - Math.exp(-(strainTarget > ship.gFatigue ? 1.4 : 0.6) * dt));
-        orientation.slerp(this.tmpQ2, 1 - Math.exp(-ship.turnRate * (1 - ship.gFatigue * 0.3) * dt));
+        orientation.slerp(this.tmpQ2, 1 - Math.exp(-ship.turnRate * (1 - ship.gFatigue * 0.5) * dt));
         orientation.normalize();
+        if (spiraling) {
+            // Bank into the corkscrew around the flight axis; guns stay forward,
+            // so the pilot keeps firing while dodging in three dimensions.
+            // (tmpQ2 is free here: the slerp above consumed its target.)
+            const fwd = this.tmpC.copy(FORWARD).applyQuaternion(orientation);
+            this.tmpQ2.setFromAxisAngle(fwd, Math.sin(ship.spiralPhase) * 0.9 * (ship.spiralSign ?? 1));
+            orientation.multiply(this.tmpQ2).normalize();
+        }
         // Fly where the nose points at a controlled speed. A scalar throttle damp
         // (rather than a vector lerp) means the nose can sweep a 180° yo-yo turn
         // without the velocity vector collapsing toward zero mid-turn.
@@ -1514,7 +1559,7 @@ export class GameSession {
         this.tmpQ2.setFromUnitVectors(FORWARD, desired);
         const strainTarget = clamp(orientation.angleTo(this.tmpQ2) / 2, 0, 1);
         ship.gFatigue += (strainTarget - ship.gFatigue) * (1 - Math.exp(-(strainTarget > ship.gFatigue ? 1.4 : 0.6) * dt));
-        orientation.slerp(this.tmpQ2, 1 - Math.exp(-ship.turnRate * (1 - ship.gFatigue * 0.3) * 0.62 * dt));
+        orientation.slerp(this.tmpQ2, 1 - Math.exp(-ship.turnRate * (1 - ship.gFatigue * 0.5) * 0.62 * dt));
         velocity.lerp(desired.multiplyScalar(ship.speed * (ship.role === 'trader' ? 0.72 : 0.5)), 1 - Math.exp(-0.55 * dt));
         position.addScaledVector(velocity, dt);
         ship.position = tuple(position);
@@ -2806,7 +2851,7 @@ export class GameSession {
             hyperdrive: this.hyperdriveFxState(),
             loadPercent: Math.round((cargoMass(this.save.player) / Math.max(1, cargoCapacity(this.save.player))) * 100),
             // Handling folds in both the cargo-load penalty and pilot G-fatigue.
-            handlingPercent: Math.round(this.flightLoadScale() * (1 - this.gFatigue * 0.42) * 100),
+            handlingPercent: Math.round(this.flightLoadScale() * (1 - this.gFatigue * 0.4) * 100),
             zone: this.zoneLabel(this.getWorldZone(player)),
             target: hudTarget,
             prompt: dockPrompt,
