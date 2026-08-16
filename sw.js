@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v46-target-distance';
+const CACHE = 'voidrunner-v47-monitor-readouts';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',
