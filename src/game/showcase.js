@@ -488,26 +488,139 @@ export class ShowcaseRenderer {
         const baseC = new THREE.Color(color);
         const accentC = new THREE.Color(atmosphere);
         const phaseOffset = (seededRandom(`${id}:surface`)() * Math.PI * 2);
+        const rng = seededRandom(`${id}:surface:gen`);
+
+        // === Azure: oceanic agricultural world per data.js ===
+        // Build continents (organic teal-green blobs), polar ice caps, and
+        // weather bands at mid latitudes. Each feature is layered into the
+        //        base cyan so the planet reads as a real water-and-land body,
+        //        not a flat-painted disc.
+        if (id === 'azure') {
+            // Base ocean — vertical gradient: deeper at the equator, lighter at the poles.
+            for (let y = 0; y < 512; y += 1) {
+                const lat = (y / 512) * 2 - 1;
+                const depth = 1 - Math.abs(lat); // 1 at equator, 0 at poles
+                const bandShift = Math.sin(lat * 18 + phaseOffset) * 0.08;
+                const noise = (rng() - 0.5) * 0.05;
+                const row = baseC.clone()
+                    .lerp(accentC, 0.18 + depth * 0.35 + bandShift + noise);
+                ctx.fillStyle = '#' + row.getHexString();
+                ctx.fillRect(0, y, 512, 1);
+            }
+
+            // Polar ice caps — bright white at the top and bottom strips.
+            const polarHeight = 38 + Math.floor(rng() * 14); // 38-52 px tall
+            const iceColor = new THREE.Color(0xeaf6f0);
+            ctx.fillStyle = '#' + iceColor.getHexString();
+            ctx.fillRect(0, 0, 512, polarHeight);
+            ctx.fillRect(0, 512 - polarHeight, 512, polarHeight);
+            // Melted ice edge — gradient down from white into the base color.
+            for (let dy = 0; dy < 16; dy += 1) {
+                const alpha = 1 - dy / 16;
+                ctx.fillStyle = `rgba(234, 246, 240, ${alpha.toFixed(3)})`;
+                ctx.fillRect(0, polarHeight - dy, 512, 1);
+                ctx.fillRect(0, 512 - polarHeight + dy, 512, 1);
+            }
+
+            // Continents — 5–7 irregular teal-green blobs across the temperate band
+            //            (avoid the polar caps at y in [0, polarHeight+8] and
+            //            [512 - polarHeight - 8, 512]).
+            const continents = 5 + Math.floor(rng() * 3);
+            const landColor = new THREE.Color(0x6fa086).lerp(accentC, 0.18);
+            for (let i = 0; i < continents; i += 1) {
+                const cx = 30 + rng() * 452;
+                const cy = polarHeight + 24 + rng() * (512 - 2 * polarHeight - 48);
+                const baseR = 28 + rng() * 36;
+                // Build the island by stamping overlapping discs of varying radius.
+                const stamps = 14 + Math.floor(rng() * 10);
+                for (let s = 0; s < stamps; s += 1) {
+                    const ox = (rng() - 0.5) * baseR * 1.4;
+                    const oy = (rng() - 0.5) * baseR * 0.7;
+                    const sr = baseR * (0.55 + rng() * 0.7);
+                    const sx = Math.round(cx + ox);
+                    const sy = Math.round(cy + oy);
+                    const tint = landColor.clone().lerp(baseC, (rng() - 0.5) * 0.18);
+                    ctx.fillStyle = '#' + tint.getHexString();
+                    for (let dy = -sr; dy <= sr; dy += 1) {
+                        for (let dx = -sr; dx <= sr; dx += 1) {
+                            if (dx * dx + dy * dy < sr * sr)
+                                ctx.fillRect(sx + dx, sy + dy, 1, 1);
+                        }
+                    }
+                }
+            }
+
+            // Latitude bands — soft cyan/white current rings at ±25°.
+            const ringColor = accentC.clone().lerp(new THREE.Color(0xffffff), 0.25);
+            for (const ringY of [180, 332]) {
+                ctx.fillStyle = 'rgba(' + ringColor.r + ',' + ringColor.g + ',' + ringColor.b + ',0.16)';
+                for (let dx = 0; dx < 512; dx += 1) {
+                    const wave = Math.sin(dx * 0.05 + phaseOffset) * 6;
+                    ctx.fillRect(dx, ringY + Math.round(wave), 1, 4);
+                }
+            }
+
+            // Storm swirls — 4 small rotating cloud bands at the mid latitudes.
+            const storms = 4;
+            for (let i = 0; i < storms; i += 1) {
+                const sx = 60 + rng() * 392;
+                const sy = polarHeight + 60 + rng() * (512 - 2 * polarHeight - 120);
+                const r = 18 + rng() * 14;
+                ctx.save();
+                ctx.translate(sx, sy);
+                ctx.rotate(rng() * Math.PI * 2);
+                const c = new THREE.Color(0xffffff);
+                for (let arm = 0; arm < 3; arm += 1) {
+                    ctx.fillStyle = `rgba(${c.r*255}, ${c.g*255}, ${c.b*255}, 0.32)`;
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, r, r * 0.35, (arm * Math.PI) / 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+            return canvas;
+        }
+
+        // === Vesper and other worlds: keep the existing banded look ===
+        //                  (with extra mining-pit dark spots for Vesper).
         for (let y = 0; y < 512; y += 1) {
             const lat = (y / 512) * 2 - 1;
             const band = Math.sin(lat * 10 + phaseOffset) * 0.5 + 0.5;
-            const noise = (seededRandom(`${id}:surface:${y}`)() - 0.5) * 0.18;
+            const noise = (rng() - 0.5) * 0.18;
             const row = baseC.clone().lerp(accentC, 0.16 + band * 0.55 + noise);
             ctx.fillStyle = '#' + row.getHexString();
             ctx.fillRect(0, y, 512, 1);
         }
-        // Storm spots
-        const stormCount = 2 + Math.floor(seededRandom(`${id}:storm`)() * 2);
+        // Storm spots (for Vesper: dust storms; for others: cloud bands)
+        const stormCount = 2 + Math.floor(rng() * 2);
         for (let i = 0; i < stormCount; i += 1) {
-            const sx = 100 + seededRandom(`${id}:storm:${i}`)() * 312;
-            const sy = 80 + seededRandom(`${id}:storm:${i}:y`)() * 360;
-            const r = 22 + seededRandom(`${id}:storm:${i}:r`)() * 18;
+            const sx = 100 + rng() * 312;
+            const sy = 80 + rng() * 360;
+            const r = 22 + rng() * 18;
             for (let dy = -r; dy <= r; dy += 1) {
                 for (let dx = -r; dx <= r; dx += 1) {
                     if (dx * dx + dy * dy < r * r) {
                         const shade = baseC.clone().lerp(accentC, 0.35 + (1 - Math.hypot(dx, dy) / r) * 0.4);
                         ctx.fillStyle = '#' + shade.getHexString();
                         ctx.fillRect(sx + dx, sy + dy, 1, 1);
+                    }
+                }
+            }
+        }
+        if (id === 'vesper') {
+            // Mining-pit scars: round dark patches in the temperate band.
+            const pitColor = new THREE.Color(color).multiplyScalar(0.36);
+            const pits = 7 + Math.floor(rng() * 5);
+            for (let i = 0; i < pits; i += 1) {
+                const sx = 60 + rng() * 392;
+                const sy = 140 + rng() * 232;
+                const r = 8 + rng() * 10;
+                for (let dy = -r; dy <= r; dy += 1) {
+                    for (let dx = -r; dx <= r; dx += 1) {
+                        if (dx * dx + dy * dy < r * r) {
+                            ctx.fillStyle = '#' + pitColor.getHexString();
+                            ctx.fillRect(sx + dx, sy + dy, 1, 1);
+                        }
                     }
                 }
             }
