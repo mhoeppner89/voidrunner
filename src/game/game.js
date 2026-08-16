@@ -892,14 +892,22 @@ export class GameSession {
         }
     }
     extractAsteroid(node, dt, rate) {
+        if (cargoFree(this.save.player) < COMMODITIES.ore.mass + 0.001) {
+            if (this.hintCooldown <= 0) {
+                this.hintCooldown = 1.4;
+                this.ui.showToast('Cargo hold full. Extraction suspended.', 'warning');
+            }
+            return;
+        }
         const current = this.extractionCarry.get(node.id) ?? 0;
         let next = current + dt * 0.58 * rate * node.richness;
         while (next >= 1 && node.remaining > 0) {
             next -= 1;
             node.remaining = Math.max(0, node.remaining - 1);
             this.save.world.depletedAsteroids[node.id] = node.remaining;
-            this.spawnPickup('ore', node.position, 'mining', node.richness > 1.75 ? 'uncommon' : 'common');
-            this.ui.showToast('Ore fragment separated. Tractor field active.', 'success', 2400);
+            // Ore is tractored straight into the hold — no pickup to chase.
+            this.collectExtraction('ore', 'mining', 1, node.richness > 1.75 ? 'uncommon' : 'common');
+            this.ui.showToast('Ore recovered to the hold.', 'success', 2400);
             if (node.remaining <= 0) {
                 this.ui.showToast('Deposit exhausted.', 'info');
                 this.save.player.currentTargetId = undefined;
@@ -909,14 +917,22 @@ export class GameSession {
         this.extractionCarry.set(node.id, next);
     }
     extractWreck(node, dt, rate) {
+        if (cargoFree(this.save.player) < COMMODITIES[node.salvage].mass + 0.001) {
+            if (this.hintCooldown <= 0) {
+                this.hintCooldown = 1.4;
+                this.ui.showToast('Cargo hold full. Extraction suspended.', 'warning');
+            }
+            return;
+        }
         const current = this.extractionCarry.get(node.id) ?? 0;
         let next = current + dt * 0.48 * rate * (node.rarity === 'rare' ? 0.78 : 1);
         while (next >= 1 && node.remaining > 0) {
             next -= 1;
             node.remaining = Math.max(0, node.remaining - 1);
             this.save.world.depletedWrecks[node.id] = node.remaining;
-            this.spawnPickup(node.salvage, node.position, 'salvage', node.rarity);
-            this.ui.showToast(`${COMMODITIES[node.salvage].name} recovered from the wreck.`, 'success', 2600);
+            // Recovered components go straight to the hold — no pickup to chase.
+            this.collectExtraction(node.salvage, 'salvage', 1, node.rarity);
+            this.ui.showToast(`${COMMODITIES[node.salvage].name} recovered to the hold.`, 'success', 2600);
             if (node.remaining <= 0) {
                 if (node.rarity === 'rare')
                     this.recoverRareEquipment(node);
@@ -926,6 +942,21 @@ export class GameSession {
             }
         }
         this.extractionCarry.set(node.id, next);
+    }
+    collectExtraction(commodity, source, amount, rarity) {
+        this.save.player.cargo[commodity] = (this.save.player.cargo[commodity] ?? 0) + amount;
+        if (source === 'mining') {
+            this.save.player.stats.mined += amount;
+            const rankMessage = awardCareerProgress(this.save, 'mining', 1, 'frontier-miners');
+            if (rankMessage)
+                this.ui.showToast(rankMessage, 'success', 5000);
+        }
+        else {
+            this.save.player.stats.salvaged += amount;
+            const rankMessage = awardCareerProgress(this.save, 'salvage', rarity === 'rare' ? 3 : 1, 'salvage-union');
+            if (rankMessage)
+                this.ui.showToast(rankMessage, 'success', 5000);
+        }
     }
     recoverRareEquipment(node) {
         const rng = seededRandom(`${this.save.world.seed}:rare-equipment:${node.id}`);
@@ -2937,7 +2968,7 @@ export class GameSession {
                     scanned: this.save.player.discovered.includes(location.id),
                     ...screen,
                 };
-                scanText = `${location.shortName.toUpperCase()} · ${Math.round(distance)} units`;
+                // POIs carry no readout card — the target monitor shows name and distance.
             }
         }
         const dock = this.dockCandidate();

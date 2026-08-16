@@ -89,12 +89,6 @@ export class GameUI {
           </div>
           <button type="button" id="hyperdrive-card" class="cockpit-identity" data-touch-action="autopilot" aria-label="Hyperdrive: engage jump to nav point"><b>HYPERDRIVE</b><em id="hyperdrive-card-status" class="is-hidden"></em></button>
 
-          <div class="hud-top-right target-panel is-hidden" id="target-panel" aria-hidden="true">
-            <span class="eyebrow">TARGET</span>
-            <strong id="hud-target-name">NO LOCK</strong>
-            <span id="hud-target-subtitle">T selects contact</span>
-            <div class="micro-bars" id="target-bars"></div>
-          </div>
           <div id="target-bracket" class="target-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
           <div id="target-edge-pointer" class="target-edge-pointer is-hidden" aria-hidden="true"><i></i><span></span></div>
           <div class="reticle" aria-hidden="true"><span></span><span></span><span></span><span></span><b></b></div>
@@ -823,34 +817,22 @@ export class GameUI {
     updateTarget(target) {
         const bracket = this.el('#target-bracket');
         const edgePointer = this.el('#target-edge-pointer');
-        const targetPanel = this.el('#target-panel');
+        // The target monitor carries the lock (name, bars, distance) — the old
+        // top-right target panel was redundant with it and is gone.
         if (!target) {
-            this.el('#hud-target-name').textContent = 'NO LOCK';
-            this.el('#hud-target-subtitle').textContent = 'T selects contact';
             this.el('#screen-target-distance').textContent = '—';
-            this.el('#target-bars').innerHTML = '';
             this.setTargetScreenValue(undefined);
             this.updateWeaponButtons(undefined);
             bracket?.classList.add('is-hidden');
             bracket?.classList.remove('is-hostile');
             edgePointer?.classList.add('is-hidden');
             edgePointer?.classList.remove('is-hostile');
-            targetPanel?.classList.remove('is-hostile');
             return;
         }
         const hostile = target.kind === 'ship' && target.hostile;
         bracket?.classList.toggle('is-hostile', hostile);
         edgePointer?.classList.toggle('is-hostile', hostile);
-        targetPanel?.classList.toggle('is-hostile', hostile);
-        this.el('#hud-target-name').textContent = target.name;
         this.el('#screen-target-distance').textContent = `${Math.round(target.distance).toLocaleString('en-US')} km`;
-        this.el('#hud-target-subtitle').textContent = `${target.subtitle} · ${Math.round(target.distance)} km${target.scanned === false ? ' · UNSCANNED' : ''}`;
-        const bars = this.el('#target-bars');
-        bars.innerHTML = [
-            target.maxShield ? `<i><b style="width:${percent(target.shield ?? 0, target.maxShield)}%"></b></i>` : '',
-            target.maxArmor ? `<i><b style="width:${percent(target.armor ?? 0, target.maxArmor)}%"></b></i>` : '',
-            target.maxHull ? `<i><b style="width:${percent(target.hull ?? 0, target.maxHull)}%"></b></i>` : '',
-        ].join('');
         this.setTargetScreenValue(target);
         this.updateWeaponButtons(target.kind);
         if (bracket && target.onScreen && target.screenX !== undefined && target.screenY !== undefined) {
