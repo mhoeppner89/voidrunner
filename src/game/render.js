@@ -377,9 +377,9 @@ export class SpaceRenderer {
             makeCloud(
                 this.nebulaTexture(`${seed}:nebula:${index}`, themes[index % themes.length]),
                 dir,
-                260000 + rng() * 120000,
-                170000 + rng() * 80000,
-                0.22 + rng() * 0.1,
+                280000 + rng() * 140000,
+                180000 + rng() * 100000,
+                0.34 + rng() * 0.12,
             );
         }
         // A faint cool milky band, barely brighter than the starfield.
@@ -600,12 +600,45 @@ export class SpaceRenderer {
             }
         }
         else if (kind === 'planet') {
-            context.globalAlpha = 0.52;
-            for (let y = 4; y < size; y += 7) {
-                context.fillStyle = rng() > 0.5 ? cssHex(accent) : 'rgba(255,255,255,.08)';
-                context.fillRect(0, y, size, rng() > 0.8 ? 2 : 1);
+            // Jupiter-style horizontal banding driven by sample-rows plus
+            // latitude-driven brightness curves, so each band reads as its own
+            // weather system even when the planet rotates.
+            const accentC = new THREE.Color(accent);
+            const baseC = baseColor;
+            const phaseOffset = rng() * Math.PI * 2;
+            for (let y = 0; y < size; y += 1) {
+                const lat = (y / size) * 2 - 1;
+                const band = Math.sin(lat * 10 + phaseOffset) * 0.5 + 0.5;
+                const noise = (rng() - 0.5) * 0.16;
+                const row = baseC.clone().lerp(accentC, 0.18 + band * 0.55 + noise);
+                if (Math.abs(lat) < 0.18)
+                    row.offsetHSL(0, -0.05, -0.06);
+                context.fillStyle = cssHex(row.getHex());
+                context.fillRect(0, y, size, 1);
             }
-            context.globalAlpha = 1;
+            // 2-3 storm-eye spots (Galilean-style) at varying latitudes.
+            const stormCount = 2 + Math.floor(rng() * 2);
+            for (let i = 0; i < stormCount; i += 1) {
+                const sy = Math.floor((0.15 + rng() * 0.7) * size);
+                const sx = Math.floor(rng() * size);
+                const r = 4 + Math.floor(rng() * 6);
+                for (let dy = -r; dy <= r; dy += 1) {
+                    for (let dx = -r; dx <= r; dx += 1) {
+                        if (dx * dx + dy * dy > r * r)
+                            continue;
+                        const px = ((sx + dx) % size + size) % size;
+                        const py = sy + dy;
+                        if (py < 0 || py >= size)
+                            continue;
+                        context.fillStyle = `rgba(${Math.round(accentC.r * 255)},${Math.round(accentC.g * 255)},${Math.round(accentC.b * 255)},0.45)`;
+                        context.fillRect(px, py, 1, 1);
+                    }
+                }
+            }
+            // Polar cap on whichever pole this render tipped.
+            const cap = rng() > 0.5 ? 0 : size - 6;
+            context.fillStyle = 'rgba(255,255,255,0.35)';
+            context.fillRect(0, cap, size, 6);
         }
         return this.configurePixelTexture(new THREE.CanvasTexture(canvas));
     }
@@ -729,20 +762,43 @@ export class SpaceRenderer {
         const context = canvas.getContext('2d');
         const rng = seededRandom(`${seed}:clouds`);
         context.clearRect(0, 0, 256, 128);
-        for (let index = 0; index < 60; index += 1) {
+        // Latitude-driven storm ribbons: 3 wide bands at varying latitudes
+        // look like real atmospheric circulation, not random blotches.
+        const bands = [
+            { y: 36, h: 18, count: 22 },
+            { y: 64, h: 22, count: 28 },
+            { y: 96, h: 16, count: 20 },
+        ];
+        for (const band of bands) {
+            for (let i = 0; i < band.count; i += 1) {
+                const cx = rng() * 256;
+                const cy = band.y + (rng() - 0.5) * band.h;
+                const rx = 18 + rng() * 32;
+                const ry = 4 + rng() * 6;
+                const alpha = 0.18 + rng() * 0.34;
+                const gradient = context.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rx, ry));
+                gradient.addColorStop(0, `rgba(255, 255, 255, ${alpha.toFixed(3)})`);
+                gradient.addColorStop(0.55, `rgba(255, 255, 255, ${(alpha * 0.4).toFixed(3)})`);
+                gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                context.fillStyle = gradient;
+                context.fillRect(cx - rx, cy - ry, rx * 2, ry * 2);
+            }
+        }
+        // Plus stray wisps between bands.
+        for (let i = 0; i < 18; i += 1) {
             const x = rng() * 256;
             const y = rng() * 128;
-            const radius = 9 + rng() * 30;
-            const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
-            gradient.addColorStop(0, `rgba(255, 255, 255, ${(0.08 + rng() * 0.2).toFixed(3)})`);
+            const r = 7 + rng() * 14;
+            const gradient = context.createRadialGradient(x, y, 0, x, y, r);
+            gradient.addColorStop(0, `rgba(255, 255, 255, ${(0.06 + rng() * 0.12).toFixed(3)})`);
             gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
             context.fillStyle = gradient;
-            context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+            context.fillRect(x - r, y - r, r * 2, r * 2);
         }
         const texture = this.configurePixelTexture(new THREE.CanvasTexture(canvas));
         texture.wrapS = THREE.RepeatWrapping;
         texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(6, 3);
+        texture.repeat.set(4, 2);
         return texture;
     }
     createPlanet(id, color, dark, atmosphere, ringed) {
@@ -750,42 +806,50 @@ export class SpaceRenderer {
         const group = new THREE.Group();
         group.position.set(...location.position);
         group.name = `planet-${id}`;
-        const surfaceTexture = this.createPixelPanelTexture(`${id}-surface`, color, atmosphere, 'planet', 256);
-        surfaceTexture.repeat.set(id === 'azure' ? 14 : 12, 5.5);
-        const surface = new THREE.Mesh(new THREE.SphereGeometry(location.radius, 96, 60), new THREE.MeshStandardMaterial({
+        const surfaceTexture = this.createPixelPanelTexture(`${id}-surface`, color, atmosphere, 'planet', 512);
+        surfaceTexture.repeat.set(id === 'azure' ? 9 : 7, 4.5);
+        const surface = new THREE.Mesh(new THREE.SphereGeometry(location.radius, 128, 80), new THREE.MeshStandardMaterial({
             color: 0xffffff,
             map: surfaceTexture,
             roughness: id === 'azure' ? 0.46 : 0.94,
             metalness: id === 'azure' ? 0.14 : 0.02,
             emissive: dark,
-            emissiveIntensity: 0.22,
+            emissiveIntensity: 0.28,
             flatShading: true,
             fog: false,
         }));
         surface.name = 'surface';
         group.add(surface);
-        const clouds = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.014, 72, 44), new THREE.MeshBasicMaterial({
+        const clouds = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.014, 96, 56), new THREE.MeshBasicMaterial({
             map: this.createCloudTexture(id),
             color: atmosphere,
             transparent: true,
-            opacity: id === 'azure' ? 0.34 : 0.26,
+            opacity: id === 'azure' ? 0.46 : 0.38,
             depthWrite: false,
             fog: false,
         }));
         clouds.name = 'clouds';
         group.add(clouds);
-        const halo = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.09, 48, 28), new THREE.MeshBasicMaterial({ color: atmosphere, transparent: true, opacity: 0.16, side: THREE.BackSide, depthWrite: false, fog: false }));
+        // Three-tier atmosphere: tight Fresnel-style rim glow, broad hot halo,
+        // and a far scatter shell that fades into the sky.
+        const halo = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.05, 64, 36), new THREE.MeshBasicMaterial({ color: atmosphere, transparent: true, opacity: 0.34, side: THREE.BackSide, depthWrite: false, fog: false }));
         group.add(halo);
-        const outerHalo = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.16, 40, 24), new THREE.MeshBasicMaterial({ color: atmosphere, transparent: true, opacity: 0.07, side: THREE.BackSide, depthWrite: false, fog: false }));
-        group.add(outerHalo);
+        const wideHalo = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.13, 56, 32), new THREE.MeshBasicMaterial({ color: atmosphere, transparent: true, opacity: 0.16, side: THREE.BackSide, depthWrite: false, fog: false }));
+        group.add(wideHalo);
+        const scatterShell = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.32, 40, 24), new THREE.MeshBasicMaterial({ color: atmosphere, transparent: true, opacity: 0.06, side: THREE.BackSide, depthWrite: false, fog: false }));
+        group.add(scatterShell);
         if (ringed) {
-            const ring = new THREE.Mesh(new THREE.RingGeometry(location.radius * 1.42, location.radius * 2.18, 96), new THREE.MeshBasicMaterial({ color: 0x7f9e95, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false, fog: false }));
-            ring.rotation.x = Math.PI / 2.7;
+            const ring = new THREE.Mesh(new THREE.RingGeometry(location.radius * 1.42, location.radius * 2.55, 128), new THREE.MeshBasicMaterial({ color: 0xa3c4bd, transparent: true, opacity: 0.36, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+            ring.rotation.x = Math.PI / 2.6;
             ring.rotation.z = 0.38;
             group.add(ring);
-            const outerRing = new THREE.Mesh(new THREE.RingGeometry(location.radius * 2.24, location.radius * 2.31, 96), new THREE.MeshBasicMaterial({ color: 0x93aaa3, transparent: true, opacity: 0.13, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+            const outerRing = new THREE.Mesh(new THREE.RingGeometry(location.radius * 2.6, location.radius * 2.74, 128), new THREE.MeshBasicMaterial({ color: 0xb6cdc8, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false, fog: false }));
             outerRing.rotation.copy(ring.rotation);
             group.add(outerRing);
+            // Inner C-ring for a layered Saturn feel.
+            const innerRing = new THREE.Mesh(new THREE.RingGeometry(location.radius * 1.32, location.radius * 1.42, 96), new THREE.MeshBasicMaterial({ color: 0x88aaa6, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+            innerRing.rotation.copy(ring.rotation);
+            group.add(innerRing);
             // Render-only: the rings must not swallow taps from behind the planet.
             ring.raycast = () => undefined;
             outerRing.raycast = () => undefined;
@@ -797,7 +861,8 @@ export class SpaceRenderer {
         // solid surface may be picked; the shells are render-only.
         clouds.raycast = () => undefined;
         halo.raycast = () => undefined;
-        outerHalo.raycast = () => undefined;
+        wideHalo.raycast = () => undefined;
+        scatterShell.raycast = () => undefined;
         this.tagTargetable(surface, 'location', id);
         this.locationRoot.add(group);
         this.locationMeshes.set(id, group);
@@ -1256,7 +1321,7 @@ export class SpaceRenderer {
             }
             const rimMaterial = mesh.userData.rimMaterial;
             if (rimMaterial?.uniforms) {
-                rimMaterial.uniforms.uIntensity.value = entity.hostile ? 1.3 + damage * 0.4 : 1.05;
+                rimMaterial.uniforms.uIntensity.value = entity.hostile ? 1.35 + damage * 0.4 : 1.2;
             }
             const flares = mesh.userData.engineFlares;
             if (flares) {
