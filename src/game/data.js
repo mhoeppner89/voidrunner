@@ -397,7 +397,7 @@ export const EQUIPMENT = {
         category: 'radar',
         price: 5400,
         description: 'Improves target acquisition, scan range, and threat classification.',
-        stat: '+60% target and scan range',
+        stat: '+50% target and scan range',
     },
     'cargo-pods': {
         id: 'cargo-pods',

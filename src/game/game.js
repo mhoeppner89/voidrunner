@@ -826,7 +826,7 @@ export class GameSession {
         const stats = getEffectiveShipStats(this.save.player);
         const playerPosition = vec(this.save.player.position);
         const mode = this.save.player.mode;
-        const range = mode === 'mining' ? (this.save.player.equipment.includes('mining-mk2') ? 62 : 48) : stats.salvageRange;
+        const range = mode === 'mining' ? stats.miningRange : stats.salvageRange;
         if (!firing || !target || (mode === 'mining' && target.kind !== 'asteroid') || (mode === 'salvage' && target.kind !== 'wreck')) {
             this.renderer.setUtilityBeam(false, mode, this.save.player.position);
             return;
