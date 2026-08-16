@@ -634,14 +634,14 @@ export class SpaceRenderer {
             // Pull palette geography from the seed so every planet gets a
             // unique mix of warm/cool regions instead of a flat single-hue disc.
             const hueShift = (rng() - 0.5) * 0.04 + (baseColor.r > baseColor.b ? 0.02 : -0.02);
-            const continentCount = 4 + Math.floor(rng() * 4);
+            const continentCount = 8 + Math.floor(rng() * 6);
             const continents = [];
             for (let i = 0; i < continentCount; i += 1) {
                 continents.push({
                     cx: rng() * size,
-                    cy: 0.18 + rng() * 0.7 * size,
-                    rx: 28 + rng() * 56,
-                    ry: 14 + rng() * 28,
+                    cy: 0.14 + rng() * 0.78 * size,
+                    rx: 38 + rng() * 78,
+                    ry: 18 + rng() * 38,
                     rot: rng() * Math.PI * 2,
                     warmth: 0.32 + rng() * 0.34,
                 });
@@ -657,24 +657,51 @@ export class SpaceRenderer {
                     row.offsetHSL(0, -0.05, -0.06);
                 context.fillStyle = cssHex(row.getHex());
                 context.fillRect(0, y, size, 1);
-                // Landmass / ocean basin: an elongated ellipse per continent
-                // adds warm patchiness for Vesper (rust deserts vs cool dust
-                // plains) and warm-ochre continents on Azure's teal seas.
-                for (const c of continents) {
-                    const cosR = Math.cos(c.rot);
-                    const sinR = Math.sin(c.rot);
-                    const dx = y - c.cy;
-                    const u = (Math.sin(((y * 1.7 + c.cy * 0.4) % size) / size * Math.PI * 2) + 1) * size * 0.5;
-                    const ox = (((u + c.cx) % size) + size) % size - c.cx;
-                    const lx = ox * cosR - dx * sinR;
-                    const ly = ox * sinR + dx * cosR;
-                    const d = (lx * lx) / (c.rx * c.rx) + (ly * ly) / (c.ry * c.ry);
-                    if (d <= 1) {
-                        const landShade = baseC.clone().offsetHSL(hueShift + (baseColor.r > baseColor.b ? 0.03 : -0.04 - band * 0.03), 0.06, 0.18 + (1 - d) * 0.14);
-                        context.fillStyle = cssHex(landShade.getHex());
-                        context.fillRect(0, y, size, 1);
+                // Landmass / ocean basin: for each row, only paint the columns
+                // that fall inside at least one continent's rotated ellipse. The
+                // continent "drift" is a sin-driven horizontal offset so the
+                // continent has curvy coastlines.
+                // Build a per-row mask once per row, then paint only those columns.
+                const continentHue = baseColor.b > baseColor.r ? 0.10 : 0.04;
+                let lastColor = '';
+                let runStart = -1;
+                const flush = (endX) => {
+                    if (runStart < 0 || endX <= runStart)
+                        return;
+                    context.fillRect(runStart, y, endX - runStart, 1);
+                    runStart = -1;
+                };
+                for (let x = 0; x < size; x += 1) {
+                    let bestD = Infinity;
+                    for (const c of continents) {
+                        const cosR = Math.cos(c.rot);
+                        const sinR = Math.sin(c.rot);
+                        const u = (Math.sin(((y * 1.7 + c.cy * 0.4) + (x * 0.04)) / size * Math.PI * 2) + 1) * size * 0.5;
+                        const ox = (((u + c.cx) % size) + size) % size - c.cx;
+                        const dx_ = y - c.cy;
+                        const lx = (x - ox) * cosR - dx_ * sinR;
+                        const ly = (x - ox) * sinR + dx_ * cosR;
+                        const d = (lx * lx) / (c.rx * c.rx) + (ly * ly) / (c.ry * c.ry);
+                        if (d < bestD)
+                            bestD = d;
+                    }
+                    if (bestD <= 1) {
+                        const warmth = 1 - Math.min(1, bestD);
+                        const landShade = baseC.clone().offsetHSL(hueShift + continentHue + band * 0.02, 0.10, 0.22 + warmth * 0.18);
+                        const color = cssHex(landShade.getHex());
+                        if (color !== lastColor) {
+                            flush(x);
+                            context.fillStyle = color;
+                            lastColor = color;
+                            runStart = x;
+                        }
+                    }
+                    else {
+                        flush(x);
+                        lastColor = '';
                     }
                 }
+                flush(size);
             }
             // 3-5 storm-eye spots (Galilean-style) at varying latitudes.
             const stormCount = 3 + Math.floor(rng() * 3);
