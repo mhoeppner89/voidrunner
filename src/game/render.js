@@ -99,7 +99,7 @@ export class SpaceRenderer {
         });
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderer.toneMapping = THREE.NeutralToneMapping;
-        this.renderer.toneMappingExposure = 1.2;
+        this.renderer.toneMappingExposure = 1.4;
         this.renderer.setPixelRatio(1);
         this.renderer.shadowMap.enabled = false;
         this.renderer.setClearColor(0x0d1a3c, 1);
@@ -108,7 +108,7 @@ export class SpaceRenderer {
         this.renderer.domElement.classList.add('retro-pixel-canvas');
         this.renderer.domElement.style.imageRendering = 'pixelated';
         this.renderer.domElement.setAttribute('aria-label', 'Three-dimensional spaceflight view');
-        this.scene.fog = new THREE.FogExp2(0x16223f, 0.00012);
+        this.scene.fog = new THREE.FogExp2(0x2a1e44, 0.00010);
         this.scene.add(this.skyRoot);
         this.scene.add(this.dynamicRoot);
         this.scene.add(this.locationRoot);
@@ -150,50 +150,94 @@ export class SpaceRenderer {
         this.createBloomPipeline();
     }
     createLighting() {
-        // Base fill is kept at roughly half the sector star's strength so the
-        // shadowed side of ships, stations and rocks never collapses to black.
-        const ambient = new THREE.HemisphereLight(0xc2dcf2, 0x53648e, 2.4);
+        // Lighting now mimics Rebel Galaxy Outlaw's two-tone dusk: a warm sodium-
+        // orange sun whose key light pushes hulls toward gold, paired with a cool
+        // cyan counter-rim that catches the shadow side. Fill is held at half the
+        // sun's strength so the unlit side never collapses to black.
+        const ambient = new THREE.HemisphereLight(0xffc99e, 0x2c2f5a, 2.6);
         this.scene.add(ambient);
-        const fillLight = new THREE.AmbientLight(0x4a5a7e, 1.0);
+        const fillLight = new THREE.AmbientLight(0x6e6ba8, 1.05);
         this.scene.add(fillLight);
-        const sunLight = new THREE.DirectionalLight(0xffe2aa, 3.5);
-        sunLight.position.set(-0.62, 0.31, 0.72).normalize();
+        const sunDir = new THREE.Vector3(-0.62, 0.31, 0.72).normalize();
+        const sunLight = new THREE.DirectionalLight(0xffb46a, 4.4);
+        sunLight.position.copy(sunDir).multiplyScalar(1);
         this.scene.add(sunLight);
-        const rimLight = new THREE.DirectionalLight(0x5e9fd2, 0.9);
+        const rimLight = new THREE.DirectionalLight(0x66b9ff, 1.4);
         rimLight.position.set(0.58, -0.24, -0.78).normalize();
         this.scene.add(rimLight);
-        // The sun sits on the star shell, far outside the playable system.
-        const sun = new THREE.Mesh(new THREE.SphereGeometry(12000, 24, 16), new THREE.MeshBasicMaterial({ color: 0xffd889, fog: false }));
-        sun.position.set(-480000, 154000, -745000);
+        // The sun sits on the star shell, far outside the playable system. The
+        // body is a slightly oversized golden disc with two coronae stacked
+        // around it (tight inner halo + broad out-of-system bloom) plus a thin
+        // anamorphic streak so it reads as a *star* and not just a sphere.
+        const sunPos = new THREE.Vector3(-480000, 154000, -745000);
+        const sun = new THREE.Mesh(new THREE.SphereGeometry(22000, 32, 20), new THREE.MeshBasicMaterial({ color: 0xffe1a0, fog: false }));
+        sun.position.copy(sunPos);
         this.skyRoot.add(sun);
-        const corona = new THREE.Sprite(new THREE.SpriteMaterial({
-            map: this.radialTexture('#fff0b2', '#ff8f36'),
+        const innerCorona = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: this.radialTexture('#fff5cf', '#ffaf3d'),
             transparent: true,
-            opacity: 0.7,
+            opacity: 0.95,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             fog: false,
         }));
-        corona.position.copy(sun.position);
-        corona.scale.setScalar(68000);
-        this.skyRoot.add(corona);
+        innerCorona.position.copy(sunPos);
+        innerCorona.scale.setScalar(96000);
+        this.skyRoot.add(innerCorona);
+        const outerCorona = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: this.radialTexture('#ffd57a', '#ff6b2a'),
+            transparent: true,
+            opacity: 0.78,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            fog: false,
+        }));
+        outerCorona.position.copy(sunPos);
+        outerCorona.scale.setScalar(220000);
+        this.skyRoot.add(outerCorona);
+        const farHalo = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: this.radialTexture('#ffe9a8', '#e07a3a'),
+            transparent: true,
+            opacity: 0.42,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            fog: false,
+        }));
+        farHalo.position.copy(sunPos);
+        farHalo.scale.setScalar(540000);
+        this.skyRoot.add(farHalo);
+        // Persist the sun direction in render-space so other systems (rim shader,
+        // engine flare bias, sub-light point glows) can use it without re-reading
+        // the directional light.
+        this.sunDirection = sunDir.clone();
     }
     createEnvironmentMap() {
-        // A painterly galactic sky used as an IBL environment so glossy, clearcoated
-        // hulls and stations reflect a colorful deep-space gradient instead of black.
+        // Painterly galactic sky used as an IBL environment so glossy, clearcoated
+        // hulls and stations reflect a colorful deep-space gradient instead of
+        // black. The horizon band is hot orange/peach to match the new sun key
+        // light; the polar caps fade to cobalt for high-glance reflections on
+        // belly-mounted hull parts.
         const canvas = document.createElement('canvas');
         canvas.width = 512;
         canvas.height = 256;
         const context = canvas.getContext('2d');
         const gradient = context.createLinearGradient(0, 0, 0, 256);
-        gradient.addColorStop(0, '#1b2552');
-        gradient.addColorStop(0.4, '#2c3a6e');
-        gradient.addColorStop(0.5, '#8a4a7a');
-        gradient.addColorStop(0.6, '#2c4a72');
-        gradient.addColorStop(1, '#151a3c');
+        gradient.addColorStop(0, '#101a40');
+        gradient.addColorStop(0.28, '#3a2664');
+        gradient.addColorStop(0.45, '#b86b4b');
+        gradient.addColorStop(0.52, '#f5aa52');
+        gradient.addColorStop(0.6, '#a6486c');
+        gradient.addColorStop(0.78, '#2c2d5a');
+        gradient.addColorStop(1, '#0a1132');
         context.fillStyle = gradient;
         context.fillRect(0, 0, 512, 256);
-        for (const [cx, cy, radius, fill] of [[120, 84, 110, 'rgba(255,148,64,0.7)'], [396, 164, 130, 'rgba(78,196,230,0.7)'], [250, 40, 84, 'rgba(168,110,238,0.5)'], [60, 210, 90, 'rgba(236,180,90,0.5)']]) {
+        for (const [cx, cy, radius, fill] of [
+            [120, 132, 160, 'rgba(255,168,80,0.78)'],
+            [396, 132, 150, 'rgba(255,140,90,0.62)'],
+            [250, 50, 100, 'rgba(196,108,238,0.46)'],
+            [70, 210, 90, 'rgba(110,196,238,0.5)'],
+            [430, 220, 70, 'rgba(120,236,196,0.36)'],
+        ]) {
             const blob = context.createRadialGradient(cx, cy, 0, cx, cy, radius);
             blob.addColorStop(0, fill);
             blob.addColorStop(1, 'rgba(0,0,0,0)');
@@ -204,7 +248,7 @@ export class SpaceRenderer {
             const x = Math.random() * 512;
             const y = Math.random() * 256;
             const r = 0.4 + Math.random() * 1.6;
-            context.fillStyle = `rgba(255,255,255,${(0.25 + Math.random() * 0.75).toFixed(2)})`;
+            context.fillStyle = `rgba(255,230,180,${(0.25 + Math.random() * 0.75).toFixed(2)})`;
             context.beginPath();
             context.arc(x, y, r, 0, Math.PI * 2);
             context.fill();
@@ -1592,8 +1636,8 @@ export class SpaceRenderer {
         this.bloomBrightMaterial = new THREE.ShaderMaterial({
             uniforms: {
                 tDiffuse: { value: null },
-                uThreshold: { value: 0.48 },
-                uKnee: { value: 0.42 },
+                uThreshold: { value: 0.4 },
+                uKnee: { value: 0.5 },
             },
             vertexShader,
             fragmentShader: `

@@ -16,3 +16,5 @@ progress.md
 RELEASE_NOTES_v0.3.0.md
 README.md
 PLAYABLE_README.md
+*.webp
+.workbench/
