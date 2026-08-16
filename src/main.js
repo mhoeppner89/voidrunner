@@ -1,6 +1,7 @@
 import { GameSession } from './game/game.js';
 import { createNewSave, hasSavedGame, loadGame, saveGame } from './game/save.js';
 import { GameUI } from './game/ui.js';
+import { ShowcaseRenderer } from './game/showcase.js';
 const host = document.querySelector('#app');
 if (!host)
     throw new Error('Missing #app host element.');
@@ -143,6 +144,18 @@ document.addEventListener('visibilitychange', () => {
         saveGame(session.save);
 });
 const isProductionBuild = import.meta.env?.PROD ?? location.protocol !== 'file:';
+// Workbench-only path: when the page is loaded with `?test=showcase` the
+// harness bypasses the title UI and loads a clean showroom scene so each
+// ship / planet / station can be captured on a turntable without any
+// contamination from the player's actual location, asteroids, or HUD.
+const startupParams = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+let showcaseInstance = null;
+if (startupParams?.get('test') === 'showcase') {
+    const host = document.querySelector('#app');
+    if (host) host.innerHTML = '<div id="showcase-host" style="position:fixed;inset:0;background:#0c1531;"></div>';
+    showcaseInstance = new ShowcaseRenderer(document.querySelector('#showcase-host'));
+}
+
 if ('serviceWorker' in navigator && isProductionBuild) {
     window.addEventListener('load', () => {
         // If a returning player is controlled by a stale service worker from a
@@ -162,6 +175,8 @@ if ('serviceWorker' in navigator && isProductionBuild) {
         }).catch(() => undefined);
     });
 }
+// Determine the loaded surface so the harness can always speak to *something*,
+// even on the title screen.
 window.__VOID_PRIVATEER__ = {
     newGame: () => beginSession('new'),
     resume: () => beginSession('resume'),
@@ -177,4 +192,15 @@ window.__VOID_PRIVATEER__ = {
     saveNow: () => session?.saveNow(),
     setChaseCamera: (active, offset) => session?.renderer?.setChaseCamera?.(active, offset),
     renderChaseFrame: () => session?.renderer?.renderChaseFrame?.(),
+    ...(startupParams?.get('test') === 'showcase' && showcaseInstance
+        ? {
+            showcase: {
+                listPoses: () => Object.keys(showcaseInstance.poseItems).concat(['lineup']),
+                renderPose: (name, opts) => showcaseInstance.render(name, opts),
+                snapshotPose: (name, opts) => showcaseInstance.snapshot(name, opts),
+                renderer: showcaseInstance,
+            },
+            isShowcase: true,
+        }
+        : {}),
 };
