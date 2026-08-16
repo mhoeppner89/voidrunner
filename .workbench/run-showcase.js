@@ -60,24 +60,41 @@ function startServer() {
     });
 }
 
-const POSES = [
-    // Six ship variants.
-    { name: 'ship-kestrel',         out: '10-ship-kestrel.png',          yaw: -0.55, pitch: 0.10 },
-    { name: 'ship-talon',           out: '11-ship-talon.png',            yaw: -0.65, pitch: 0.10 },
-    { name: 'ship-warden',          out: '12-ship-warden.png',           yaw: -0.50, pitch: 0.10 },
-    { name: 'ship-prospector',      out: '13-ship-prospector.png',       yaw: -0.55, pitch: 0.12 },
-    { name: 'ship-lancer',          out: '14-ship-lancer.png',           yaw: -0.55, pitch: 0.10 },
-    { name: 'ship-atlas-freighter', out: '15-ship-atlas.png',            yaw: -0.55, pitch: 0.10 },
-    // Both stations.
-    { name: 'station-helix',        out: '30-station-helix.png',         distance: 230, yaw: -0.55, pitch: 0.20 },
-    { name: 'station-rook',         out: '31-station-rook.png',          distance: 220, yaw: -0.55, pitch: 0.10 },
-    // Both planets.
-    { name: 'planet-vesper',        out: '40-planet-vesper.png',         distance: 480, yaw: -0.5, pitch: 0.05 },
-    { name: 'planet-azure',         out: '41-planet-azure.png',          distance: 540, yaw: -0.7, pitch: 0.05 },
-    // Asteroid + debris field clusters (using the existing in-game data).
-    { out: '50-asteroid-cluster.png', asteroids: true, seed: 'cluster-asteroids' },
-    { out: '51-debris-cluster.png',  graveyard: true, seed: 'cluster-graveyard' },
+// Multi-angle capture: every ship / station / planet gets 4 angles so
+// each composite compares like-for-like against RGO references from
+// multiple sides. Ships at ~1000u, stations at ~3000u, planets at ~11000u.
+// Clusters keep their auto-frame and only get one shot per cluster.
+const ANGLES = [
+    { suffix: 'a-front',  yaw: 0.00,             pitch: 0.05 },
+    { suffix: 'b-3qtr',   yaw: -0.55,            pitch: 0.10 },
+    { suffix: 'c-side',   yaw: -1.55,            pitch: 0.08 },
+    { suffix: 'd-rear',   yaw: Math.PI - 0.45,   pitch: 0.12 },
 ];
+
+const POSES = [];
+function pushMulti(prefix, name, baseDistance) {
+    for (const a of ANGLES) {
+        POSES.push({
+            name,
+            out: `${prefix}-${a.suffix}.png`,
+            distance: baseDistance,
+            yaw: a.yaw, pitch: a.pitch,
+        });
+    }
+}
+
+pushMulti('10-ship-kestrel',         'ship-kestrel',         1000);
+pushMulti('11-ship-talon',           'ship-talon',           1000);
+pushMulti('12-ship-warden',          'ship-warden',          1000);
+pushMulti('13-ship-prospector',      'ship-prospector',      1000);
+pushMulti('14-ship-lancer',          'ship-lancer',          1000);
+pushMulti('15-ship-atlas',           'ship-atlas-freighter', 1200);
+pushMulti('30-station-helix',        'station-helix',        3000);
+pushMulti('31-station-rook',         'station-rook',         3000);
+pushMulti('40-planet-vesper',        'planet-vesper',       11000);
+pushMulti('41-planet-azure',         'planet-azure',        11000);
+POSES.push({ out: '50-asteroid-cluster.png', asteroids: true, seed: 'cluster-asteroids' });
+POSES.push({ out: '51-debris-cluster.png',   graveyard: true, seed: 'cluster-graveyard' });
 
 async function main() {
     const port = await startServer();
@@ -120,7 +137,10 @@ async function main() {
             }
             await new Promise((r) => setTimeout(r, 800));
             const out = path.join(SCREEN_DIR, pose.out);
-            await page.screenshot({ path: out });
+            // Screenshot only the showcase canvas so background overlays
+            // (HUD, title-cockpit.webp, etc.) don't smudge the captured pose.
+            const handle = await page.$('#showcase-canvas');
+            await handle.screenshot({ path: out, type: 'png' });
             console.log(`wrote ${out}`);
         } catch (e) {
             console.log(`[err]`, pose.out, e.message);

@@ -263,34 +263,46 @@ export class ShowcaseRenderer {
     }
 
     _buildSky() {
-        // Procedural cosmic gradient that is *bright enough* on the warm
-        // horizon side to act as a real IBL reflection source for the
-        // clearcoat hulls, while keeping the nadir/pole dark enough that a
-        // single subject reads as the focal element.
+        // Deep-space gradient: midnight navy at the nadir, deep blue at the
+        // equator, near-black at the pole. **No orange / sunset**. This is
+        // what the in-game starfield reads as when the chase camera is
+        // pointed away from the Helix's hab-band horizon — pure cosmic
+        // darkness with a faint cool gleam at the antisolar equator.
         const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 256;
+        canvas.width = 1024;
+        canvas.height = 512;
         const ctx = canvas.getContext('2d');
-        const gradient = ctx.createLinearGradient(0, 0, 0, 256);
-        gradient.addColorStop(0.0, '#101830');
-        gradient.addColorStop(0.30, '#1c2848');
-        gradient.addColorStop(0.45, '#4a3478');
-        gradient.addColorStop(0.50, '#a76a48');
-        gradient.addColorStop(0.55, '#d8915a');
-        gradient.addColorStop(0.60, '#aa6648');
-        gradient.addColorStop(0.70, '#3a2a55');
-        gradient.addColorStop(0.85, '#101830');
-        gradient.addColorStop(1.0, '#070b18');
+        const gradient = ctx.createLinearGradient(0, 0, 0, 512);
+        gradient.addColorStop(0.0, '#02030a');
+        gradient.addColorStop(0.30, '#020614');
+        gradient.addColorStop(0.50, '#040a20');
+        gradient.addColorStop(0.62, '#06122e');
+        gradient.addColorStop(0.75, '#030a1c');
+        gradient.addColorStop(1.0, '#01020a');
         ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 512, 256);
+        ctx.fillRect(0, 0, 1024, 512);
         const sky = new THREE.Mesh(
-            new THREE.SphereGeometry(640000, 64, 32),
+            new THREE.SphereGeometry(640000, 96, 48),
             new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.BackSide, fog: false, depthWrite: false }),
         );
         sky.name = 'sky';
         this.scene.add(sky);
         sky.material.map.colorSpace = THREE.SRGBColorSpace;
-        const envTexture = new THREE.CanvasTexture(canvas);
+
+        // Cool, neutral IBL so clearcoat hulls pick up a faint steel/blue
+        // sheen instead of the warm peach/orange wash we used before. The
+        // envmap is a *separate* canvas with a dim neutral gradient — the
+        // visible sky never gets the orange tint.
+        const envCanvas = document.createElement('canvas');
+        envCanvas.width = 256; envCanvas.height = 128;
+        const envCtx = envCanvas.getContext('2d');
+        const envGrad = envCtx.createLinearGradient(0, 0, 0, 128);
+        envGrad.addColorStop(0.0, '#0b0e18');
+        envGrad.addColorStop(0.5, '#1a2236');
+        envGrad.addColorStop(1.0, '#070a12');
+        envCtx.fillStyle = envGrad;
+        envCtx.fillRect(0, 0, 256, 128);
+        const envTexture = new THREE.CanvasTexture(envCanvas);
         envTexture.mapping = THREE.EquirectangularReflectionMapping;
         envTexture.colorSpace = THREE.SRGBColorSpace;
         this.scene.environment = envTexture;
@@ -327,7 +339,9 @@ export class ShowcaseRenderer {
             const x = Math.sin(phi) * Math.cos(theta) * r;
             const y = Math.cos(phi) * r * 0.4;
             const z = Math.sin(phi) * Math.sin(theta) * r;
-            const color = ['#b54a4f', '#d18a4c', '#3c7fa3', '#7d4ca3', '#a35eb6', '#c46a3a'][i % 6];
+            // Cool-only nebula palette: deep blue, teal, indigo, magenta.
+            // No warm reds or oranges here — the user wants space, not sunset.
+            const color = ['#284a78', '#3a6da0', '#1f5a7c', '#3b4a8c', '#2c3270', '#1d3a6a'][i % 6];
             const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
                 map: radialTexture(color, '#0a0a30'),
                 transparent: true,
@@ -432,17 +446,22 @@ export class ShowcaseRenderer {
             }
             return group;
         };
-        const vesper = makePlanet('vesper', 0xa85f36, 0x281611, 0xd78a54, false, 0.04);
-        vesper.position.set(380, -40, -260);
+        // Bumped scale 5× over the original showcase so a 10–12ku camera
+        // distance reads as a true close-up of the planet's surface limb
+        // (the original 0.04 made the planet a small dot at 25ku).
+        const vesper = makePlanet('vesper', 0xa85f36, 0x281611, 0xd78a54, false, 0.22);
+        vesper.position.set(9000, 2000, -8000);
         vesper.rotation.y = 0.4;
         planets.add(vesper);
-        this.poseItems['planet-vesper'] = { object3d: vesper, framing: { distance: 80, height: 6 } };
 
-        const azure = makePlanet('azure', 0x2b8889, 0x0d2f3a, 0x83e0c7, true, 0.045);
-        azure.position.set(-360, 50, 300);
+        const azure = makePlanet('azure', 0x2b8889, 0x0d2f3a, 0x83e0c7, true, 0.22);
+        azure.position.set(-9000, -1000, 9000);
         azure.rotation.y = -0.7;
         planets.add(azure);
-        this.poseItems['planet-azure'] = { object3d: azure, framing: { distance: 90, height: 7 } };
+
+        // Both planets use the *user-specified* distances (10–12ku) at scale 0.22.
+        this.poseItems['planet-vesper'] = { object3d: vesper, framing: { distance: 11000, height: 0 } };
+        this.poseItems['planet-azure']  = { object3d: azure,  framing: { distance: 12000, height: 0 } };
 
         this.scene.add(planets);
     }
