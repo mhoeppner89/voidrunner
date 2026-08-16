@@ -1291,13 +1291,12 @@ export class SpaceRenderer {
         for (const [x, y] of [[-1.46, -0.47], [-0.82, -0.69], [0.82, -0.69], [1.46, -0.47], [-0.72, -0.93], [0.72, -0.93]]) {
             addMesh(boltGeometry, edgeMaterial, [x, y, -1.965], [0, 0, 0], 1004);
         }
-        // Subtle grime layer — speck density stays the same but the alpha is
-        // dropped (0.34 → 0.16) so the dirt reads as faint canopy wear, not
-        // foreground noise.
+        // Grime layer — speck density unchanged but alpha at 0.10 so the
+        // dirt reads as the faintest canopy specks; barely-there but visible.
         addMesh(new THREE.PlaneGeometry(3.72, 2.38), new THREE.MeshBasicMaterial({
             map: this.createGrimeTexture('wayfarer-canopy'),
             transparent: true,
-            opacity: 0.16,
+            opacity: 0.10,
             depthTest: false,
             depthWrite: false,
             blending: THREE.NormalBlending,

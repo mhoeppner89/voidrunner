@@ -683,8 +683,9 @@ button.compact {
   color: #c6e5ba;
 }
 
-/* Title. Background is deep-space navy — no warm rust tint was added
-   here in any recent iteration; the in-game sky stays cool. */
+/* Title. Background is the original cockpit sprite + warm-leaning sky
+   gradient that established the title-screen look before the recent
+   overhauls. The .webp is in the service-worker cache list. */
 .title-screen {
   position: absolute;
   inset: 0;
@@ -693,8 +694,11 @@ button.compact {
   place-items: center;
   overflow: hidden;
   background:
-    radial-gradient(ellipse at 50% 56%, rgba(20, 32, 60, 0.42), transparent 60%),
-    linear-gradient(180deg, #040814 0%, #06091a 50%, #020308 100%);
+    linear-gradient(90deg, rgba(0, 0, 0, 0.92) 0 7%, rgba(0, 0, 0, 0.52) 35%, rgba(0, 0, 0, 0.14) 68%, rgba(0, 0, 0, 0.42)),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.86), transparent 55%),
+    url("../art/title-cockpit.webp") center / cover no-repeat;
+  image-rendering: pixelated;
+  filter: contrast(1.05) saturate(1.12) brightness(1.05);
 }
 
 .title-stars {
@@ -3566,15 +3570,16 @@ button.primary,
   pointer-events: none;
 }
 
+/* Cockpit frame painted beams removed per direction — the .cockpit-art
+   element stays in the DOM for parity with existing selectors but no longer
+   draws the cockpit-frame.webp. The Three.js canopy geometry (rails,
+   console, screens) stays visible via .cockpit-glass + .cockpit-vignette. */
 .cockpit-art {
   inset: -1.2%;
   z-index: 1;
-  background: url("../assets/remaster/cockpit-frame.webp") center / 100% 100% no-repeat;
-  image-rendering: pixelated;
+  background: none;
   transform: translate3d(var(--cockpit-shift-x), var(--cockpit-shift-y), 0) rotate(var(--cockpit-roll));
   transform-origin: 50% 72%;
-  filter: contrast(1.06) saturate(0.96) brightness(0.96) drop-shadow(0 -6px 18px rgba(0, 0, 0, 0.55));
-  opacity: 0.92;
   will-change: transform;
 }
 
