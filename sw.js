@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v47-monitor-readouts';
+const CACHE = 'voidrunner-v48-pilot-personalities';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',

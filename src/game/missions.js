@@ -1,11 +1,17 @@
 import { COMMODITIES, DOCK_LOCATION_IDS, GUILD_RANK_NAMES, LOCATIONS, commodityIds, routeDistanceBetween } from './data.js';
 import { cargoFree } from './economy.js';
 import { clamp, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
+import { rollPilot, TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 const GUILD_NAMES_FALLBACK = (guild) => guild === 'merchant' ? 'Merchant Guild' : guild === 'bounty' ? 'Bounty Registry' : guild === 'mining' ? 'Prospectors Guild' : 'Salvage Union';
 const merchantIssuers = ['Kestrel Freight', 'Orison Combine', 'Free Haulers Desk', 'Sable Route Logistics', 'Guild Dispatch'];
 const bountyIssuers = ['Concord Warrant Desk', 'Frontier Security Office', 'Bounty Hunters Registry', 'Civil Claims Bureau'];
-const cargoLabels = ['sealed diplomatic case', 'reactor-control package', 'medical coldbox', 'priority machine tooling', 'survey archive'];
+// Special labeled cargo only comes from transport contracts; the game's AI
+// reads this list to call out valuable sealed load (see game.js cargoFlavor).
+export const VALUABLE_CARGO_LABELS = ['sealed diplomatic case', 'reactor-control package', 'medical coldbox', 'priority machine tooling', 'survey archive'];
 const missionCycle = (worldTime) => Math.floor(worldTime / 150);
+// Bonus bounty-guild reputation for taking down a named ace warrant: the
+// registry pays extra for the hardest names on the board.
+const ACE_WARRANT_REP = 10;
 const chooseDestination = (rng, origin) => {
     const candidates = DOCK_LOCATION_IDS.filter((id) => id !== origin);
     return pick(rng, candidates);
@@ -40,6 +46,27 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             const targetName = proceduralCallsign(rng);
             const reward = bountyReward(danger, rank, targetZone);
             const deposit = Math.round(reward * 0.05);
+            // Warrants pin a pilot profile at offer time: high-reward targets are
+            // named aces, and the profile travels with the mission so the same
+            // callsign flies the same way on every encounter (and after reloads).
+            // Registry standing draws hotter prey: each bounty rank drops the
+            // danger bar for a veteran/ace pin (a Marshal's board is thick with
+            // named aces), and even below the bar there's a slim rank-scaled
+            // chance the registry certifies a veteran name. The top tier stays
+            // probabilistic so even the highest rank keeps some steady hands.
+            const rankEdge = rank * 0.4;
+            const aceChance = 0.8 + rank * 0.05;
+            const pinnedTier = danger + rankEdge >= 2 ? (rng() < aceChance ? 'ace' : 'veteran')
+                : danger + rankEdge >= 1.3 ? 'veteran'
+                : rng() < 0.05 + rank * 0.08 ? 'veteran'
+                : undefined;
+            const pilot = rollPilot(rng, clamp(0.35 + (danger + rankEdge) * 0.3, 0.2, 1), 'red-talons', pinnedTier ? { tier: pinnedTier } : undefined);
+            // The profile rides in the briefing so players can read a warrant's
+            // habits before they accept: the callsign, its tier, and its
+            // temperament are stable for the whole contract.
+            const pilotProfile = pilot
+                ? ` Pilot profile: ${TIER_LABELS[pilot.tier]} ${TEMPERAMENT_LABELS[pilot.temperament]}${pinnedTier === 'ace' ? ' — expect relentless pursuit.' : ''}.`
+                : '';
             offers.push({
                 id,
                 kind: 'bounty',
@@ -50,12 +77,14 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
                 targetName,
                 reward,
                 deposit,
+                danger,
+                pilot,
                 deadline: save.world.time + randomInt(rng, 300, 620),
                 status: 'offered',
                 guild: 'bounty',
                 guildRep: 7 + Math.floor(danger * 3),
                 faction: locationId === 'rook' ? 'concord' : LOCATIONS[locationId].faction,
-                briefing: `${targetName} has been positively identified near ${LOCATIONS[targetZone].name}. Locate the ship, confirm identity, and destroy it. Expect armed resistance${danger > 2 ? ' and possible escorts' : ''}.`,
+                briefing: `${targetName} has been positively identified near ${LOCATIONS[targetZone].name}. Locate the ship, confirm identity, and destroy it. Expect armed resistance${danger > 2 ? ' and possible escorts' : ''}.${pilotProfile}`,
             });
             continue;
         }
@@ -73,7 +102,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             : kind === 'procurement'
                 ? `Procure ${quantity} ${COMMODITIES[commodity].name}`
                 : `Timed transport to ${LOCATIONS[destination].shortName}`;
-        const cargoLabel = pick(rng, cargoLabels);
+        const cargoLabel = pick(rng, VALUABLE_CARGO_LABELS);
         offers.push({
             id,
             kind,
@@ -192,11 +221,38 @@ export const completeBountyMission = (save, missionId) => {
     const mission = save.activeMissions.find((entry) => entry.id === missionId && entry.kind === 'bounty');
     if (!mission)
         return { ok: false, message: 'No matching active warrant.' };
-    save.world.bountyKills.push(mission.targetName ?? mission.id);
-    const message = awardMission(save, mission);
+    const callsign = mission.targetName ?? mission.id;
+    save.world.bountyKills.push(callsign);
+    // Registry: remember every cleared callsign with the pinned profile, so the
+    // bounty board shows which named pilots the player has taken down. Legacy
+    // warrants (no pinned pilot) still register under the callsign.
+    const entry = save.world.registry[callsign] ?? {
+        tier: mission.pilot?.tier,
+        temperament: mission.pilot?.temperament,
+        danger: mission.danger,
+        count: 0,
+    };
+    if (mission.pilot?.tier)
+        entry.tier = mission.pilot.tier;
+    if (mission.pilot?.temperament)
+        entry.temperament = mission.pilot.temperament;
+    entry.danger = mission.danger ?? entry.danger;
+    entry.count = (entry.count ?? 0) + 1;
+    entry.clearedAt = save.world.time;
+    save.world.registry[callsign] = entry;
+    const aceKill = mission.pilot?.tier === 'ace';
+    // Bonus rep lands before the award's rank check, so a rank-up earned from
+    // an ace kill is reported in the same completion toast.
+    if (aceKill)
+        save.player.guildRep.bounty += ACE_WARRANT_REP;
     save.player.guildRep.bounty += 2;
+    const message = awardMission(save, mission);
     save.player.reputation['red-talons'] = clamp(save.player.reputation['red-talons'] - 4, -100, 100);
-    return { ok: true, message, mission };
+    return {
+        ok: true,
+        message: aceKill ? `${message} Ace warrant confirmed — ${ACE_WARRANT_REP} registry rep.` : message,
+        mission,
+    };
 };
 export const failExpiredMissions = (save) => {
     const messages = [];

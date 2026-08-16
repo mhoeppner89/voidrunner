@@ -81,7 +81,7 @@ const toggleFullscreen = async () => {
 const actions = {
     startNew: () => beginSession('new'),
     resume: () => beginSession('resume'),
-    startArena: (environment, scenario) => beginSession('arena', { environment, scenario }),
+    startArena: (environment, scenario, difficulty) => beginSession('arena', { environment, scenario, difficulty }),
     requestFullscreen: () => void enterFullscreen(),
     toggleFullscreen: () => void toggleFullscreen(),
     launch: () => {
@@ -165,7 +165,7 @@ if ('serviceWorker' in navigator && isProductionBuild) {
 window.__VOID_PRIVATEER__ = {
     newGame: () => beginSession('new'),
     resume: () => beginSession('resume'),
-    startArena: (environment, scenario) => beginSession('arena', { environment, scenario }),
+    startArena: (environment, scenario, difficulty) => beginSession('arena', { environment, scenario, difficulty }),
     getState: () => session?.save ?? cachedSave,
     getRuntime: () => session,
     debugShips: () => session?.ships,
@@ -173,4 +173,7 @@ window.__VOID_PRIVATEER__ = {
     projectToScreen: (position) => session?.renderer?.projectToScreen(position),
     launch: () => session?.launch(),
     saveNow: () => session?.saveNow(),
+    // Mock story-mission line: pins the comms bar in amber, mutes all chatter
+    // until dismissed (tap the CONTINUE bar) or the duration elapses.
+    playStoryLine: (name, text) => session?.playStoryLine(name, text),
 };
