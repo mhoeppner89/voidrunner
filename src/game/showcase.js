@@ -459,9 +459,9 @@ export class ShowcaseRenderer {
         azure.rotation.y = -0.7;
         planets.add(azure);
 
-        // Both planets use the *user-specified* distances (10–12ku) at scale 0.22.
-        this.poseItems['planet-vesper'] = { object3d: vesper, framing: { distance: 11000, height: 0 } };
-        this.poseItems['planet-azure']  = { object3d: azure,  framing: { distance: 12000, height: 0 } };
+        // Per spec: Vesper 12500u, Azure 15000u camera distance at 0.22 scale.
+        this.poseItems['planet-vesper'] = { object3d: vesper, framing: { distance: 12500, height: 0 } };
+        this.poseItems['planet-azure']  = { object3d: azure,  framing: { distance: 15000, height: 0 } };
 
         this.scene.add(planets);
     }
@@ -599,57 +599,84 @@ export class ShowcaseRenderer {
             this.scene.add(this._clusterRoot);
         }
         while (this._clusterRoot.children.length) this._clusterRoot.remove(this._clusterRoot.children[0]);
-        const rng = seededRandom(`${seed}:asteroid-cluster`);
-        // Use the same shape distortion the in-game renderer applies.
+        // The player's actual Shardbelt field — same data SpaceRenderer
+        // applies when you fly to the asteroid arena. 36 rock-crown ring
+        // asteroids + ~80 scattered tunnel & strip rocks.
+        const nodes = generateAsteroidField(seed, {});
+        const center = LOCATIONS.shardbelt.position;
+        // Build the same shape pool SpaceRenderer uses so the field reads
+        // identical to in-game.
+        const rng = seededRandom(`${seed}:shapes`);
         const variantCount = 4;
         const geometries = [];
         for (let variant = 0; variant < variantCount; variant += 1) {
-            const geometry = new THREE.IcosahedronGeometry(1, 2);
-            const positions = geometry.getAttribute('position');
-            const v = new THREE.Vector3();
+            const geo = new THREE.IcosahedronGeometry(1, 2);
+            const positions = geo.getAttribute('position');
+            const v3 = new THREE.Vector3();
             const phase = variant * 7.31;
-            for (let j = 0; j < positions.count; j += 1) {
-                v.fromBufferAttribute(positions, j);
-                const distortion = 0.72 + 0.32 * Math.sin(v.x * 6.3 + v.y * 9.7 + v.z * 13.1 + phase);
-                v.multiplyScalar(distortion);
-                positions.setXYZ(j, v.x, v.y, v.z);
+            for (let k = 0; k < positions.count; k += 1) {
+                v3.fromBufferAttribute(positions, k);
+                const distortion = 0.72 + 0.32 * Math.sin(v3.x * 6.3 + v3.y * 9.7 + v3.z * 13.1 + phase);
+                v3.multiplyScalar(distortion);
+                positions.setXYZ(k, v3.x, v3.y, v3.z);
             }
             positions.needsUpdate = true;
-            geometry.computeVertexNormals();
-            geometries.push(geometry);
+            geo.computeVertexNormals();
+            geometries.push(geo);
         }
         const ironMap = createPixelPanelTexture('cluster-iron', 0x54585d, 0xb8a98a, 'rock');
         const ironMaterial = new THREE.MeshStandardMaterial({ color: 0xb0b8c0, map: ironMap, roughness: 0.78, metalness: 0.32, flatShading: true });
         const iceMap = createPixelPanelTexture('cluster-ice', 0xc7d6e2, 0x8eb6cc, 'rock');
         const iceMaterial = new THREE.MeshStandardMaterial({ color: 0xd6e6f0, map: iceMap, roughness: 0.42, metalness: 0.08, flatShading: true, emissive: 0x0a1822, emissiveIntensity: 0.18 });
-        const darkMap = createPixelPanelTexture('cluster-dark', 0x232027, 0xa4553a, 'rock');
-        const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x6a5a5e, map: darkMap, roughness: 0.88, metalness: 0.12, flatShading: true });
-        const materials = [ironMaterial, iceMaterial, darkMaterial];
-        // Generate ~24 asteroids in a cluster around origin.
-        const count = 24;
-        for (let i = 0; i < count; i += 1) {
-            const kind = i % 3;
-            const shape = i % variantCount;
-            const radius = 3 + (i === 0 ? 14 : (i === 1 ? 11 : rng() * 9 + 2));
-            const theta = (i / count) * Math.PI * 2 + rng() * 0.4;
-            const radial = 18 + (i === 0 ? 8 : (i === 1 ? 4 : rng() * 28));
-            const position = new THREE.Vector3(Math.cos(theta) * radial, (rng() - 0.5) * 12, Math.sin(theta) * radial);
-            const rock = new THREE.Mesh(geometries[shape], materials[kind]);
-            rock.position.copy(position);
-            rock.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
-            rock.scale.setScalar(radius);
-            this._clusterRoot.add(rock);
-        }
-        // Add one large "rock crown" centerpiece.
-        const crownMat = darkMaterial;
-        const crown = new THREE.Mesh(geometries[0], crownMat);
-        crown.position.set(0, 0, 0);
-        crown.scale.setScalar(20);
-        crown.rotation.set(0.4, 0.6, 0.2);
-        this._clusterRoot.add(crown);
-        this.poseItems['cluster'] = { object3d: this._clusterRoot, framing: { distance: 180, height: 20 } };
+        // FNV-1a hash same as the SpaceRenderer's kindFor(id):
+        const fnv1a = (str) => {
+            let hash = 2166136261;
+            for (let i = 0; i < str.length; i += 1) {
+                hash ^= str.charCodeAt(i);
+                hash = (hash * 16777619) >>> 0;
+            }
+            return hash;
+        };
+        const kindFor = (id) => (fnv1a(id) & 0xff) < 160 ? 'iron' : 'ice';
+        const groups = new Map();
+        const tmpPosition = new THREE.Vector3();
+        const tmpEuler = new THREE.Euler();
+        const tmpQuaternion = new THREE.Quaternion();
+        const tmpScale = new THREE.Vector3();
+        const tmpMatrix = new THREE.Matrix4();
+        nodes.forEach((node) => {
+            const shape = (node.shape ?? 0) % variantCount;
+            const kind = kindFor(node.id);
+            const key = `${shape}:${kind}`;
+            const list = groups.get(key) ?? [];
+            list.push(node);
+            groups.set(key, list);
+        });
+        const materialByKind = { iron: ironMaterial, ice: iceMaterial };
+        groups.forEach((list, key) => {
+            const [shapeStr, kind] = key.split(':');
+            const shape = Number(shapeStr);
+            const material = materialByKind[kind] ?? ironMaterial;
+            const mesh = new THREE.InstancedMesh(geometries[shape % variantCount], material, list.length);
+            mesh.frustumCulled = false;
+            list.forEach((node, instanceIndex) => {
+                tmpPosition.set(node.position[0] - center[0], node.position[1] - center[1], node.position[2] - center[2]);
+                tmpEuler.set(...node.rotation);
+                tmpQuaternion.setFromEuler(tmpEuler);
+                const r = node.radius ?? 1;
+                tmpScale.set(r * node.scale[0], r * node.scale[1], r * node.scale[2]);
+                tmpMatrix.compose(tmpPosition, tmpQuaternion, tmpScale);
+                mesh.setMatrixAt(instanceIndex, tmpMatrix);
+            });
+            mesh.instanceMatrix.needsUpdate = true;
+            this._clusterRoot.add(mesh);
+        });
+        // Ring rocks live at ~372u radius, scattered up to ~2445u — pull
+        // camera back to 4500u so the field reads with depth.
+        this.poseItems['cluster'] = { object3d: this._clusterRoot, framing: { distance: 4500, height: 0 } };
         return this._clusterRoot;
     }
+
     spawnDebrisCluster(seed) {
         if (!this._clusterRoot) {
             this._clusterRoot = new THREE.Group();
@@ -657,40 +684,70 @@ export class ShowcaseRenderer {
             this.scene.add(this._clusterRoot);
         }
         while (this._clusterRoot.children.length) this._clusterRoot.remove(this._clusterRoot.children[0]);
-        // Use the same metal/rust patterns the SpaceRenderer applies for the
-        // graveyard, so the debris reads as burned-out capital-ship wreckage.
+        // Use the actual in-game Mourning Line plan: 11 ribs × 12 segments
+        // beam cage, 5 carrier hulls (keels + engine + slabs), 260 scattered
+        // junk pieces. Same data the player flies through.
+        const pieces = generateGraveyardPieces(seed);
+        const center = LOCATIONS['mourning-line'].position;
         const metalMap = createPixelPanelTexture('cluster-graveyard-metal', 0x344144, 0x7ca79f, 'metal');
         metalMap.repeat.set(3.5, 2.2);
         const rustMap = createPixelPanelTexture('cluster-graveyard-rust', 0x48362f, 0xb7683e, 'rust');
         rustMap.repeat.set(4.2, 2.6);
-        const metalMat = new THREE.MeshStandardMaterial({ color: 0xb0c1c8, map: metalMap, roughness: 0.7, metalness: 0.3, flatShading: true });
-        const rustMat = new THREE.MeshStandardMaterial({ color: 0xb86a3a, map: rustMap, roughness: 0.85, metalness: 0.18, flatShading: true });
-        // ~12 boxes/cylinders/discs of varied size arranged as a wreck path.
-        const layout = [
-            { kind: 'beam-panel', x: -36, y: -4, z: 14, sx: 22, sy: 3, sz: 4, mat: 'rust' },
-            { kind: 'cylinder',   x:  18, y:  0, z: -8, sx: 6, sy: 6, sz: 6, mat: 'metal' },
-            { kind: 'box',        x:  32, y: -6, z: 20, sx: 14, sy: 5, sz: 18, mat: 'rust' },
-            { kind: 'cylinder',   x: -16, y:  6, z: 28, sx: 4, sy: 4, sz: 4, mat: 'metal' },
-            { kind: 'box',        x:  -4, y:  8, z: -16, sx: 18, sy: 4, sz: 6, mat: 'metal' },
-            { kind: 'box',        x:  42, y:  4, z: -22, sx: 9, sy: 4, sz: 14, mat: 'rust' },
-            { kind: 'cylinder',   x: -34, y:  2, z: -12, sx: 5, sy: 5, sz: 5, mat: 'rust' },
-            { kind: 'box',        x:  20, y: -2, z: 36, sx: 6, sy: 6, sz: 6, mat: 'metal' },
-            { kind: 'beam-panel', x:   0, y:  4, z:  0, sx: 28, sy: 2, sz: 3, mat: 'metal' },
-            { kind: 'cylinder',   x: -22, y:  9, z:  -3, sx: 3, sy: 3, sz: 3, mat: 'metal' },
-        ];
-        for (const piece of layout) {
-            const geo = (() => {
-                if (piece.kind === 'cylinder') return new THREE.CylinderGeometry(piece.sx, piece.sx, piece.sy, 14, 1, true);
-                if (piece.kind === 'beam-panel') return new THREE.BoxGeometry(piece.sx, piece.sy, piece.sz);
-                return new THREE.BoxGeometry(piece.sx, piece.sy, piece.sz);
-            })();
-            const mat = piece.mat === 'rust' ? rustMat : metalMat;
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.position.set(piece.x, piece.y, piece.z);
-            mesh.rotation.set(piece.kind === 'cylinder' ? 0.6 : 0.1, piece.kind === 'cylinder' ? 0.3 : -0.15, piece.kind === 'cylinder' ? 0.1 : 0.05);
-            this._clusterRoot.add(mesh);
+        // Mirror SpaceRenderer's geometry pool so junk shapes match in-game.
+        const geometryFor = (kind) => {
+            switch (kind) {
+                case 'engine': return new THREE.CylinderGeometry(0.7, 1, 1, 10, 1, true);
+                case 'panel':  return new THREE.BoxGeometry(1, 0.12, 1);
+                case 'disc':   return new THREE.CylinderGeometry(1, 1, 0.16, 14);
+                case 'ring':   return new THREE.TorusGeometry(1, 0.18, 6, 18);
+                case 'spine':  return new THREE.BoxGeometry(0.34, 0.34, 1);
+                case 'beam':
+                case 'hull':
+                default:       return new THREE.BoxGeometry(1, 1, 1);
+            }
+        };
+        const grouped = new Map();
+        for (const piece of pieces) {
+            const finish = piece.kind === 'panel' || piece.id.includes('carrier') ? 'rust' : 'metal';
+            const key = `${piece.kind}:${finish}`;
+            const list = grouped.get(key) ?? [];
+            list.push(piece);
+            grouped.set(key, list);
         }
-        this.poseItems['cluster'] = { object3d: this._clusterRoot, framing: { distance: 280, height: 10 } };
+        const tmpPosition = new THREE.Vector3();
+        const tmpEuler = new THREE.Euler();
+        const tmpQuaternion = new THREE.Quaternion();
+        const tmpScale = new THREE.Vector3();
+        const tmpMatrix = new THREE.Matrix4();
+        grouped.forEach((list, key) => {
+            const [kindRaw, finish] = key.split(':');
+            const kind = kindRaw;
+            const material = new THREE.MeshStandardMaterial({
+                color: finish === 'rust' ? 0xb09383 : 0xa3aab0,
+                map: finish === 'rust' ? rustMap : metalMap,
+                roughness: finish === 'rust' ? 0.92 : 0.76,
+                metalness: finish === 'rust' ? 0.48 : 0.74,
+                emissive: finish === 'rust' ? 0x4a2a18 : 0x2a3340,
+                emissiveIntensity: finish === 'rust' ? 0.32 : 0.28,
+                flatShading: true,
+            });
+            const mesh = new THREE.InstancedMesh(geometryFor(kind), material, list.length);
+            mesh.frustumCulled = false;
+            list.forEach((piece, instanceIndex) => {
+                tmpPosition.set(piece.position[0] - center[0], piece.position[1] - center[1], piece.position[2] - center[2]);
+                tmpEuler.set(...piece.rotation);
+                tmpQuaternion.setFromEuler(tmpEuler);
+                tmpScale.set(piece.scale[0], piece.scale[1], piece.scale[2]);
+                tmpMatrix.compose(tmpPosition, tmpQuaternion, tmpScale);
+                mesh.setMatrixAt(instanceIndex, tmpMatrix);
+            });
+            mesh.instanceMatrix.needsUpdate = true;
+            this._clusterRoot.add(mesh);
+        });
+        // Mourning Line spans ~1500u along z (11 ribs × 147u) with carrier
+        // hulks extending ~250u off-axis. Camera at 3500u lets the rib cage
+        // dominate the frame.
+        this.poseItems['cluster'] = { object3d: this._clusterRoot, framing: { distance: 3500, height: 0 } };
         return this._clusterRoot;
     }
 

@@ -64,17 +64,42 @@ function startServer() {
 // each composite compares like-for-like against RGO references from
 // multiple sides. Ships at ~1000u, stations at ~3000u, planets at ~11000u.
 // Clusters keep their auto-frame and only get one shot per cluster.
-const ANGLES = [
-    { suffix: 'a-front',  yaw: 0.00,             pitch: 0.05 },
-    { suffix: 'b-3qtr',   yaw: -0.55,            pitch: 0.10 },
-    { suffix: 'c-side',   yaw: -1.55,            pitch: 0.08 },
-    { suffix: 'd-rear',   yaw: Math.PI - 0.45,   pitch: 0.12 },
-];
+// Per-model angles: front, top-down (catches belly/top), bottom-up, rear.
+const TOP_DOWN_PITCH = 0.95;
+const BOTTOM_UP_PITCH = -0.95;
+const ANGLES = {
+    ship: [
+        { suffix: 'a-front',  yaw: 0.00,                 pitch: 0.18 },
+        { suffix: 'b-top',    yaw: -0.45,                pitch: TOP_DOWN_PITCH },
+        { suffix: 'c-bottom', yaw: -0.45,                pitch: BOTTOM_UP_PITCH },
+        { suffix: 'd-rear',   yaw: Math.PI - 0.30,       pitch: -0.18 },
+    ],
+    station: [
+        { suffix: 'a-front',  yaw: 0.00,                 pitch: 0.10 },
+        { suffix: 'b-3qtr',   yaw: -0.55,                pitch: 0.20 },
+        { suffix: 'c-side',   yaw: -Math.PI / 2 - 0.10,  pitch: 0.05 },
+        { suffix: 'd-rear',   yaw: Math.PI - 0.40,       pitch: 0.0 },
+    ],
+    planet: [
+        { suffix: 'a-front',  yaw: 0.00,                 pitch: 0.10 },
+        { suffix: 'b-3qtr',   yaw: -0.55,                pitch: 0.20 },
+        { suffix: 'c-side',   yaw: -Math.PI / 2,         pitch: 0.05 },
+        { suffix: 'd-rear',   yaw: Math.PI - 0.30,       pitch: -0.05 },
+    ],
+    cluster: [
+        { suffix: 'a-overview', yaw: 0.20,              pitch: 0.30 },
+        { suffix: 'b-3qtr',     yaw: -0.55,             pitch: 0.20 },
+        { suffix: 'c-low',      yaw: -0.95,             pitch: -0.45 },
+        { suffix: 'd-overhead', yaw: -0.30,             pitch: Math.PI / 2 - 0.5 },
+    ],
+};
+function angleSet(name) { return ANGLES[name] ?? ANGLES.ship; }
 
 const POSES = [];
-function pushMulti(prefix, name, baseDistance) {
-    for (const a of ANGLES) {
+function pushMulti(kind, prefix, name, baseDistance) {
+    for (const a of angleSet(kind)) {
         POSES.push({
+            kind,
             name,
             out: `${prefix}-${a.suffix}.png`,
             distance: baseDistance,
@@ -83,18 +108,22 @@ function pushMulti(prefix, name, baseDistance) {
     }
 }
 
-pushMulti('10-ship-kestrel',         'ship-kestrel',         1000);
-pushMulti('11-ship-talon',           'ship-talon',           1000);
-pushMulti('12-ship-warden',          'ship-warden',          1000);
-pushMulti('13-ship-prospector',      'ship-prospector',      1000);
-pushMulti('14-ship-lancer',          'ship-lancer',          1000);
-pushMulti('15-ship-atlas',           'ship-atlas-freighter', 1200);
-pushMulti('30-station-helix',        'station-helix',        3000);
-pushMulti('31-station-rook',         'station-rook',         3000);
-pushMulti('40-planet-vesper',        'planet-vesper',       11000);
-pushMulti('41-planet-azure',         'planet-azure',        11000);
-POSES.push({ out: '50-asteroid-cluster.png', asteroids: true, seed: 'cluster-asteroids' });
-POSES.push({ out: '51-debris-cluster.png',   graveyard: true, seed: 'cluster-graveyard' });
+// Ships at 1000u (Atlas 1200u) — see the top and bottom.
+pushMulti('ship', '10-ship-kestrel',         'ship-kestrel',         1000);
+pushMulti('ship', '11-ship-talon',           'ship-talon',           1000);
+pushMulti('ship', '12-ship-warden',          'ship-warden',          1000);
+pushMulti('ship', '13-ship-prospector',      'ship-prospector',      1000);
+pushMulti('ship', '14-ship-lancer',          'ship-lancer',          1000);
+pushMulti('ship', '15-ship-atlas',           'ship-atlas-freighter', 1200);
+// Stations at 3000u.
+pushMulti('station', '30-station-helix',     'station-helix',        3000);
+pushMulti('station', '31-station-rook',      'station-rook',         3000);
+// Planets at 12500u (Vesper) / 15000u (Azure).
+pushMulti('planet',  '40-planet-vesper',     'planet-vesper',       12500);
+pushMulti('planet',  '41-planet-azure',      'planet-azure',        15000);
+// Clusters: shardbelt asteroids + mourning-line debris, 4 angles each.
+pushMulti('cluster', '50-asteroid-cluster',  'cluster',              4500);
+pushMulti('cluster', '51-debris-cluster',    'cluster',              3500);
 
 async function main() {
     const port = await startServer();
@@ -122,14 +151,15 @@ async function main() {
 
     for (const pose of POSES) {
         try {
-            if (pose.asteroids || pose.graveyard) {
+            if (pose.kind === 'cluster') {
+                const isAsteroid = pose.out.startsWith('50-');
                 await page.evaluate(async (cfg) => {
                     const sc = window.__VOID_PRIVATEER__.showcase.renderer;
-                    // Drop the current cluster viewport to use a procedural cluster.
-                    if (cfg.asteroids) sc.spawnAsteroidCluster(cfg.seed);
-                    if (cfg.graveyard) sc.spawnDebrisCluster(cfg.seed);
-                    sc.render('cluster', { yaw: -0.55, pitch: 0.10, distance: cfg.asteroids ? 180 : 280 });
-                }, pose);
+                    if (cfg.isAsteroid) sc.spawnAsteroidCluster(cfg.seed);
+                    else sc.spawnDebrisCluster(cfg.seed);
+                    sc.render('cluster', { yaw: cfg.yaw, pitch: cfg.pitch, distance: cfg.distance });
+                }, { isAsteroid, seed: 'cluster-' + (isAsteroid ? 'asteroids' : 'graveyard'),
+                     yaw: pose.yaw, pitch: pose.pitch, distance: pose.distance });
             } else {
                 await page.evaluate((name, opts) => {
                     window.__VOID_PRIVATEER__.showcase.renderPose(name, opts);
