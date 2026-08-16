@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { LOCATIONS } from './data.js';
 import { createVoxelShipModel, createVoxelStationModel, paletteForFaction, shipVariantForRole } from './voxelModels.js';
+import { createHeroShipModel, createHeroStationModel } from './heroes.js';
 import { clamp, seededRandom } from './random.js';
 const tupleToVector = (tuple, out = new THREE.Vector3()) => out.set(tuple[0], tuple[1], tuple[2]);
 const NEG_Z = new THREE.Vector3(0, 0, -1);
@@ -889,10 +890,10 @@ export class SpaceRenderer {
     }
     createHelixStation() {
         const location = LOCATIONS.helix;
-        const group = createVoxelStationModel('helix');
+        const group = createHeroStationModel('helix');
         group.position.set(...location.position);
         group.rotation.set(0.18, 0.45, -0.08);
-        group.scale.setScalar(10);
+        group.scale.setScalar(3.2);
         this.makeFogExempt(group);
         this.toneStationGlow(group);
         this.addStationGlow(location);
@@ -903,10 +904,10 @@ export class SpaceRenderer {
     }
     createRookStation() {
         const location = LOCATIONS.rook;
-        const group = createVoxelStationModel('rook');
+        const group = createHeroStationModel('rook');
         group.position.set(...location.position);
         group.rotation.set(-0.08, -0.36, 0.12);
-        group.scale.setScalar(10);
+        group.scale.setScalar(3.0);
         this.makeFogExempt(group);
         this.toneStationGlow(group);
         this.addStationGlow(location);
@@ -1364,7 +1365,7 @@ export class SpaceRenderer {
     createShipMesh(entity) {
         const variant = shipVariantForRole(entity.role);
         const palette = paletteForFaction(entity.faction, entity.hostile);
-        const model = createVoxelShipModel(variant, palette);
+        const model = createHeroShipModel(variant, palette);
         const group = model.group;
         const baseScale = variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1;
         const engineColor = palette.engine;

@@ -10,6 +10,7 @@
 
 import * as THREE from 'three';
 import { createVoxelShipModel, createVoxelStationModel } from './voxelModels.js';
+import { createHeroShipModel, createHeroStationModel } from './heroes.js';
 import { LOCATIONS } from './data.js';
 
 const SHIP_VARIANTS = ['kestrel', 'talon', 'warden', 'prospector', 'lancer', 'atlas-freighter'];
@@ -103,6 +104,49 @@ export class ShowcaseRenderer {
         this.camera.updateProjectionMatrix();
     };
 
+    /**
+     * Hide everything *except* the named subject and the warm sky/starfield.
+     * Each per-model shot then reads as just that hero with a clean backdrop
+     * rather than a busy field of decoys.
+     */
+    _isolateShot(name, isolated) {
+        // Per-model shots hide every ship except the named one and pull every
+        // auxiliary set piece (planets, stations, asteroids) off-stage. The
+        // "lineup" pose keeps all six ships visible.
+        const lineupOnly = name === 'lineup';
+        if (this._allShips) {
+            for (const [key, item] of this._allShips) {
+                if (lineupOnly) {
+                    item.object3d.position.y = 0;
+                    item.object3d.visible = true;
+                } else if (isolated) {
+                    if (key === name) {
+                        item.object3d.position.y = 0;
+                        item.object3d.visible = true;
+                    } else {
+                        item.object3d.position.y = -30000;
+                        item.object3d.visible = false;
+                    }
+                }
+            }
+        }
+        const planets = this.scene.getObjectByName('planets-root');
+        const stations = this.scene.getObjectByName('stations-root');
+        const asteroids = this.scene.getObjectByName('asteroid-samples');
+        const stationSubjects = ['station-helix', 'station-rook'];
+        if (planets) planets.visible = lineupOnly;
+        if (stations) {
+            stations.visible = lineupOnly || stationSubjects.includes(name);
+            for (const child of stations.children) {
+                const isSubject = (name === 'station-helix' && child === this.poseItems['station-helix'].object3d)
+                    || (name === 'station-rook' && child === this.poseItems['station-rook'].object3d);
+                if (!lineupOnly && !isSubject) child.visible = false;
+                else child.visible = true;
+            }
+        }
+        if (asteroids) asteroids.visible = lineupOnly;
+    }
+
     _buildLights() {
         // Two-tone key + cool counter, matching the in-game look — but stronger
         // so per-model showcases aren't lost in shadow.
@@ -180,21 +224,24 @@ export class ShowcaseRenderer {
     }
 
     _buildSky() {
-        // Procedural envmap (matches the in-game sky gradient) so any reflective
-        // clearcoat hull picks up warm gold on sun-facing edges.
+        // Procedural cosmic gradient — deep navy at the poles with a thin warm
+        // horizon band. The horizon stays warm so the rim shader and clearcoat
+        // hulls pick up gold, but the field around the equator is dark enough
+        // that a single model reads as the focal element rather than a
+        // bright sky background.
         const canvas = document.createElement('canvas');
         canvas.width = 512;
         canvas.height = 256;
         const ctx = canvas.getContext('2d');
         const gradient = ctx.createLinearGradient(0, 0, 0, 256);
-        gradient.addColorStop(0.0, '#0c1f48');
-        gradient.addColorStop(0.18, '#1a2c66');
-        gradient.addColorStop(0.34, '#5a3a8a');
-        gradient.addColorStop(0.5, '#c87a4f');
-        gradient.addColorStop(0.62, '#f3a363');
-        gradient.addColorStop(0.72, '#d77a4c');
-        gradient.addColorStop(0.86, '#3d2a55');
-        gradient.addColorStop(1.0, '#0a143a');
+        gradient.addColorStop(0.0, '#040814');
+        gradient.addColorStop(0.25, '#0a1430');
+        gradient.addColorStop(0.45, '#1c264e');
+        gradient.addColorStop(0.52, '#3a2c5e');   // thin warm horizon
+        gradient.addColorStop(0.55, '#5a3666');
+        gradient.addColorStop(0.62, '#392253');
+        gradient.addColorStop(0.75, '#13193a');
+        gradient.addColorStop(1.0, '#03060f');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, 512, 256);
         const sky = new THREE.Mesh(
@@ -203,9 +250,8 @@ export class ShowcaseRenderer {
         );
         sky.name = 'sky';
         this.scene.add(sky);
-        // Replicate the showcase envmap so the ship clearcoat picks up the same
-        // tones as in-game.
         sky.material.map.colorSpace = THREE.SRGBColorSpace;
+        // Cube the same gradient for the envmap.
         const envTexture = new THREE.CanvasTexture(canvas);
         envTexture.mapping = THREE.EquirectangularReflectionMapping;
         envTexture.colorSpace = THREE.SRGBColorSpace;
@@ -259,28 +305,28 @@ export class ShowcaseRenderer {
     }
 
     _spawnShips() {
-        // Six ships laid out left-to-right in a turntable row.
-        const rs = new THREE.Group();
-        rs.name = 'ships-root';
+        // Six ships at fixed world positions. They live in the scene directly
+        // (not a parent group) so per-pose visibility toggling works without
+        // hiding the focal subject along with the rest.
         const spacing = 80;
         const lineupX = -((SHIP_VARIANTS.length - 1) / 2) * spacing;
         SHIP_VARIANTS.forEach((variant, idx) => {
             const palette = { ...SHIP_PALETTES[variant] };
-            const build = createVoxelShipModel(variant, palette);
+            const build = createHeroShipModel(variant, palette);
             const group = build.group;
             group.position.set(lineupX + idx * spacing, 0, 0);
-            const scale = variant === 'atlas-freighter' ? 1.4 : variant === 'prospector' ? 1.8 : 1.9;
+            const scale = variant === 'atlas-freighter' ? 14 : variant === 'prospector' ? 18 : 22;
             group.scale.setScalar(scale);
             group.rotation.y = idx * 0.6;
-            rs.add(group);
+            this.scene.add(group);
             this.poseItems[`ship-${variant}`] = {
                 object3d: group,
-                framing: { distance: variant === 'atlas-freighter' ? 60 : 38, height: 6 },
+                framing: { distance: variant === 'atlas-freighter' ? 230 : 130, height: 4 },
             };
         });
-        this.scene.add(rs);
-        this._lineupRoot = rs;
-        // Slow auto-rotate the line-up so any "show me all of them" shot moves.
+        // Track all ship groups so we can reposition them for the lineup pose
+        // and hide the non-focal ones for per-model shots.
+        this._allShips = Object.entries(this.poseItems).filter(([k]) => k.startsWith('ship-'));
         this._lineupSpin = true;
     }
 
@@ -419,28 +465,24 @@ export class ShowcaseRenderer {
     _spawnStations() {
         const root = new THREE.Group();
         root.name = 'stations-root';
-        const helix = createVoxelStationModel('helix');
-        helix.scale.setScalar(8);
+        const helix = createHeroStationModel('helix');
+        helix.scale.setScalar(1.0);
         helix.position.set(-180, -10, -180);
         helix.rotation.set(0.18, 0.45, -0.08);
         root.add(helix);
         this.poseItems['station-helix'] = {
             object3d: helix,
-            framing: { distance: 260, height: 60 },
-            animation: (obj, t) => {
-                const rotor = obj.getObjectByName('rotor');
-                if (rotor) rotor.rotation.x = t * 0.42;
-            },
+            framing: { distance: 220, height: 60 },
         };
 
-        const rook = createVoxelStationModel('rook');
-        rook.scale.setScalar(9);
+        const rook = createHeroStationModel('rook');
+        rook.scale.setScalar(1.0);
         rook.position.set(180, -8, 180);
         rook.rotation.set(0.0, 0.6, 0.06);
         root.add(rook);
         this.poseItems['station-rook'] = {
             object3d: rook,
-            framing: { distance: 280, height: 30 },
+            framing: { distance: 200, height: 30 },
         };
 
         this.scene.add(root);
@@ -495,7 +537,12 @@ export class ShowcaseRenderer {
      * to a point *between* the camera and the model so the rim shader lights
      * the ship from front-upper-right.
      */
-    poseCamera(name, { yaw = -0.6, pitch = 0.05, distance, lookAt, fov } = {}) {
+    poseCamera(name, { yaw = -0.6, pitch = 0.05, distance, lookAt, fov, hideOthers = true } = {}) {
+        // Default: any per-model pose hides the other vehicles and locks the
+        // camera onto a single subject so the shot is *just* that model. The
+        // "lineup" pose keeps all six ships visible.
+        this._isolateShot(name, hideOthers && name !== 'lineup');
+
         const sunYawDelta = -0.55;
         const sunPitch = 0.42;
         if (name === 'lineup') {
@@ -528,12 +575,7 @@ export class ShowcaseRenderer {
         this.camera.updateProjectionMatrix();
         const lookAtPoint = lookAt ? new THREE.Vector3(...lookAt) : new THREE.Vector3(target.x, height, target.z);
         this.camera.lookAt(lookAtPoint);
-        // Sun stays attached to the camera so its visible size is constant,
-        // but for *per-model* shots we hide the visible sun entirely — its
-        // warm sky anchor comes from the envmap, and the model itself needs
-        // to be the centre of attention.
-        this._attachSunToCamera(sunPitch, yaw + sunYawDelta, 18000);
-        this.sunGroup.visible = false;
+        // (per-model isolation is handled by _isolateShot before this call)
         // The directional light's *target* stays at the model so the rim
         // shader, base lighting, and shadows all key from in front of the
         // model toward the camera. The light's *position* sits off to the
@@ -547,20 +589,18 @@ export class ShowcaseRenderer {
      */
     tickAnimations(time = (performance.now() - this.startTime) / 1000) {
         if (this._lineupSpin) {
-            this._lineupRoot.rotation.y = Math.sin(time * 0.18) * 0.18;
-            for (const child of this._lineupRoot.children) {
-                child.rotation.y = (child.rotation.y ?? 0); // keep per-ship fixed
+            for (const [, item] of this._allShips) {
+                item.object3d.rotation.y = Math.sin(time * 0.18 + item.object3d.position.x * 0.01) * 0.06;
             }
         }
         for (const [name, item] of Object.entries(this.poseItems)) {
             if (item.animation) item.animation(item.object3d, time);
-            // Engine plume pulse for ships — keep glow readable.
             if (name.startsWith('ship-')) this._pulseShip(item.object3d, time);
         }
     }
 
     _pulseShip(group, time) {
-        const rims = group.getObjectsByProperty('name', 'hull-rim');
+        const rims = group.getObjectsByProperty('name', 'hero-rim');
         for (const rim of rims) {
             const mat = rim.material;
             if (mat?.uniforms?.uIntensity) mat.uniforms.uIntensity.value = 0.6 + Math.sin(time * 1.3 + group.position.x) * 0.08;
