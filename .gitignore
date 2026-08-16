@@ -5,6 +5,14 @@ review/
 *.tsbuildinfo
 *.DS_Store
 voidrunner-*.png
-.freebuff/desktop-v2.db
-.freebuff/desktop-v2.db-shm
-.freebuff/desktop-v2.db-wal
+
+# Dev tooling — not part of the shipped game.
+.freebuff/
+screenshots/
+
+# Docs kept out of the repo; only the game + hosting live here.
+AGENTS.md
+progress.md
+RELEASE_NOTES_v0.3.0.md
+README.md
+PLAYABLE_README.md
