@@ -65,7 +65,7 @@ export class ShowcaseRenderer {
         this.renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, depth: true, stencil: false });
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderer.toneMapping = THREE.NeutralToneMapping;
-        this.renderer.toneMappingExposure = 1.18;
+        this.renderer.toneMappingExposure = 1.0;
         this.renderer.setPixelRatio(1);
         this.renderer.setClearColor(0x0c1531, 1);
         console.log('three.js revision', this.renderer.capabilities?.isWebGL2 ? 'webgl2' : 'webgl1');
@@ -148,41 +148,27 @@ export class ShowcaseRenderer {
     }
 
     _buildLights() {
-        // Two-tone key + cool counter, matching the in-game look — but stronger
-        // so per-model showcases aren't lost in shadow.
-        const ambient = new THREE.HemisphereLight(0xffd2a8, 0x4a3a78, 2.6);
+        // Strong warm key from camera-relative front-quarter so every model
+        // gets a hot rim and a lit silhouette side; a cool fill catches the
+        // shadow side without crushing it. The directional light is moved per
+        // pose so the rim always hits the visible face of the model.
+        const ambient = new THREE.HemisphereLight(0xffe5b7, 0x4a4a78, 3.4);
         this.scene.add(ambient);
-        const fill = new THREE.AmbientLight(0x9aa6cf, 1.3);
+        const fill = new THREE.AmbientLight(0xb0bcde, 1.5);
         this.scene.add(fill);
-        // Sun position is *recomputed per pose* so the model is always lit
-        // front-quarter rather than silhouetted. Default position is reused
-        // here so the scene has a sun before any pose is set.
-        this.sun = new THREE.DirectionalLight(0xffc890, 2.5);
+        this.sun = new THREE.DirectionalLight(0xffc890, 3.2);
         this.sun.position.set(8000, 5200, 8000);
         this.scene.add(this.sun);
-        this.counterSun = new THREE.DirectionalLight(0x4d6fa0, 1.1);
+        this.counterSun = new THREE.DirectionalLight(0x6c8cc4, 1.4);
         this.counterSun.position.set(-6000, -2000, -4000);
         this.scene.add(this.counterSun);
-        // Visible sun group whose position we move in tandem with the sun
-        // light. The corona sprites need to stay way out in the skybox.
+        // Light from below so the belly of every ship reads too.
+        const uplift = new THREE.DirectionalLight(0x9b8c70, 0.6);
+        uplift.position.set(0, -8000, 3000);
+        this.scene.add(uplift);
+        // (Visible sun suppressed in per-model poses; lineup keeps it.)
         this.sunGroup = new THREE.Group();
         this.sunGroup.name = 'sun-group';
-        const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(1200, 32, 20), new THREE.MeshBasicMaterial({ color: 0xffe1a0, fog: false }));
-        this.sunGroup.add(sunMesh);
-        for (const [map, scale, opacity] of [
-            [radialTexture('#fff5cf', '#ffaf3d'), 2800, 0.55],
-            [radialTexture('#ffd57a', '#ff6b2a'), 7200, 0.32],
-            [radialTexture('#ffe9a8', '#e07a3a'), 14000, 0.14],
-        ]) {
-            const corona = new THREE.Sprite(new THREE.SpriteMaterial({
-                map, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
-            }));
-            corona.scale.setScalar(scale);
-            this.sunGroup.add(corona);
-        }
-        this.scene.add(this.sunGroup);
-        this._sunPositionDefault = this.sun.position.clone();
-        this._sunGroupPositionDefault = new THREE.Vector3();
     }
 
     /** Move the sun light + sun-disc to a 3D point, plus its visual group.
@@ -224,24 +210,24 @@ export class ShowcaseRenderer {
     }
 
     _buildSky() {
-        // Procedural cosmic gradient — deep navy at the poles with a thin warm
-        // horizon band. The horizon stays warm so the rim shader and clearcoat
-        // hulls pick up gold, but the field around the equator is dark enough
-        // that a single model reads as the focal element rather than a
-        // bright sky background.
+        // Procedural cosmic gradient that is *bright enough* on the warm
+        // horizon side to act as a real IBL reflection source for the
+        // clearcoat hulls, while keeping the nadir/pole dark enough that a
+        // single subject reads as the focal element.
         const canvas = document.createElement('canvas');
         canvas.width = 512;
         canvas.height = 256;
         const ctx = canvas.getContext('2d');
         const gradient = ctx.createLinearGradient(0, 0, 0, 256);
-        gradient.addColorStop(0.0, '#040814');
-        gradient.addColorStop(0.25, '#0a1430');
-        gradient.addColorStop(0.45, '#1c264e');
-        gradient.addColorStop(0.52, '#3a2c5e');   // thin warm horizon
-        gradient.addColorStop(0.55, '#5a3666');
-        gradient.addColorStop(0.62, '#392253');
-        gradient.addColorStop(0.75, '#13193a');
-        gradient.addColorStop(1.0, '#03060f');
+        gradient.addColorStop(0.0, '#101830');
+        gradient.addColorStop(0.30, '#1c2848');
+        gradient.addColorStop(0.45, '#4a3478');
+        gradient.addColorStop(0.50, '#a76a48');
+        gradient.addColorStop(0.55, '#d8915a');
+        gradient.addColorStop(0.60, '#aa6648');
+        gradient.addColorStop(0.70, '#3a2a55');
+        gradient.addColorStop(0.85, '#101830');
+        gradient.addColorStop(1.0, '#070b18');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, 512, 256);
         const sky = new THREE.Mesh(
@@ -251,7 +237,6 @@ export class ShowcaseRenderer {
         sky.name = 'sky';
         this.scene.add(sky);
         sky.material.map.colorSpace = THREE.SRGBColorSpace;
-        // Cube the same gradient for the envmap.
         const envTexture = new THREE.CanvasTexture(canvas);
         envTexture.mapping = THREE.EquirectangularReflectionMapping;
         envTexture.colorSpace = THREE.SRGBColorSpace;
@@ -315,13 +300,13 @@ export class ShowcaseRenderer {
             const build = createHeroShipModel(variant, palette);
             const group = build.group;
             group.position.set(lineupX + idx * spacing, 0, 0);
-            const scale = variant === 'atlas-freighter' ? 14 : variant === 'prospector' ? 18 : 22;
+            const scale = variant === 'atlas-freighter' ? 6 : variant === 'prospector' ? 7 : 9;
             group.scale.setScalar(scale);
             group.rotation.y = idx * 0.6;
             this.scene.add(group);
             this.poseItems[`ship-${variant}`] = {
                 object3d: group,
-                framing: { distance: variant === 'atlas-freighter' ? 230 : 130, height: 4 },
+                framing: { distance: variant === 'atlas-freighter' ? 95 : 60, height: 1 },
             };
         });
         // Track all ship groups so we can reposition them for the lineup pose
