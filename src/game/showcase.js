@@ -186,7 +186,20 @@ export class ShowcaseRenderer {
         const asteroids = this.scene.getObjectByName('asteroid-samples');
         const stationSubjects = ['station-helix', 'station-rook'];
         const planetSubjects = ['planet-vesper', 'planet-azure'];
-        if (planets) planets.visible = lineupOnly || planetSubjects.includes(name);
+        if (planets) {
+            planets.visible = lineupOnly || planetSubjects.includes(name);
+            // Drop the *other* planet's children off-stage when one planet
+            // is the named subject, so a Vesper close-up never shows Azure
+            // and vice versa.
+            if (!lineupOnly && planetSubjects.includes(name)) {
+                for (const child of planets.children) {
+                    const isSubject =
+                        (name === 'planet-vesper' && child === this.poseItems['planet-vesper'].object3d)
+                        || (name === 'planet-azure'  && child === this.poseItems['planet-azure'].object3d);
+                    child.visible = isSubject;
+                }
+            }
+        }
         if (stations) {
             stations.visible = lineupOnly || stationSubjects.includes(name);
             for (const child of stations.children) {
@@ -449,13 +462,15 @@ export class ShowcaseRenderer {
         // Bumped scale 5× over the original showcase so a 10–12ku camera
         // distance reads as a true close-up of the planet's surface limb
         // (the original 0.04 made the planet a small dot at 25ku).
+        // Spread the planets far apart — Vesper at +z, Azure at -z — so the
+        // close-up camera for one never accidentally frames the other.
         const vesper = makePlanet('vesper', 0xa85f36, 0x281611, 0xd78a54, false, 0.22);
-        vesper.position.set(9000, 2000, -8000);
+        vesper.position.set(0, 0, 25000);
         vesper.rotation.y = 0.4;
         planets.add(vesper);
 
         const azure = makePlanet('azure', 0x2b8889, 0x0d2f3a, 0x83e0c7, true, 0.22);
-        azure.position.set(-9000, -1000, 9000);
+        azure.position.set(0, 0, -25000);
         azure.rotation.y = -0.7;
         planets.add(azure);
 
