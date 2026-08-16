@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v44-tilt-orientation';
+const CACHE = 'voidrunner-v45-revalidate';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',
@@ -21,6 +21,7 @@ self.addEventListener('install', (event) => {
     './src/game/types.js',
     './src/game/ui.js',
     './src/game/worldData.js',
+    './src/game/quests.js',
     './src/game/voxelModels.js',
     './vendor/three.module.min.js',
     './vendor/three.core.min.js',
@@ -62,7 +63,13 @@ self.addEventListener('activate', (event) => {
 });
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  event.respondWith(fetch(event.request).then((response) => {
+  // Network-first, but never trust the HTTP cache: GitHub Pages serves every
+  // asset with `max-age=600`, so after a deploy a plain fetch() can keep
+  // returning the stale-but-fresh pre-deploy bytes (and the new cache then
+  // stores them). `cache: 'no-cache'` forces a conditional revalidation
+  // (If-None-Match) on every request, so the moment a new build is live the
+  // next load revalidates and picks it up.
+  event.respondWith(fetch(event.request, { cache: 'no-cache' }).then((response) => {
     const copy = response.clone();
     caches.open(CACHE).then((cache) => cache.put(event.request, copy));
     return response;
