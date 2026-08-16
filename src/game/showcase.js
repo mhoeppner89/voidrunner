@@ -105,7 +105,7 @@ const createPixelPanelTexture = (seed, base, accent, kind = 'metal', size = 64) 
 export class ShowcaseRenderer {
     constructor(container) {
         this.container = container;
-        this.renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, depth: true, stencil: false });
+        this.renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, depth: true, stencil: false, preserveDrawingBuffer: true });
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderer.toneMapping = THREE.NeutralToneMapping;
         this.renderer.toneMappingExposure = 1.0;
@@ -432,17 +432,17 @@ export class ShowcaseRenderer {
             }
             return group;
         };
-        const vesper = makePlanet('vesper', 0xa85f36, 0x281611, 0xd78a54, false, 0.55);
+        const vesper = makePlanet('vesper', 0xa85f36, 0x281611, 0xd78a54, false, 0.04);
         vesper.position.set(380, -40, -260);
         vesper.rotation.y = 0.4;
         planets.add(vesper);
-        this.poseItems['planet-vesper'] = { object3d: vesper, framing: { distance: 360, height: 30 } };
+        this.poseItems['planet-vesper'] = { object3d: vesper, framing: { distance: 80, height: 6 } };
 
-        const azure = makePlanet('azure', 0x2b8889, 0x0d2f3a, 0x83e0c7, true, 0.6);
+        const azure = makePlanet('azure', 0x2b8889, 0x0d2f3a, 0x83e0c7, true, 0.045);
         azure.position.set(-360, 50, 300);
         azure.rotation.y = -0.7;
         planets.add(azure);
-        this.poseItems['planet-azure'] = { object3d: azure, framing: { distance: 460, height: 50 } };
+        this.poseItems['planet-azure'] = { object3d: azure, framing: { distance: 90, height: 7 } };
 
         this.scene.add(planets);
     }
