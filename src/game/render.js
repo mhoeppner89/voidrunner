@@ -1685,6 +1685,94 @@ export class SpaceRenderer {
         this.renderer.render(this.scene, this.camera);
         return true;
     }
+    /**
+     * Place the camera at a fixed offset from a target object3D, aim at the
+     * target's world center, hide the cockpit chrome, and render one frame.
+     * Used by the workbench catalog harness to frame single models against
+     * the real in-game sky/lighting/fog without any studio colour grading.
+     */
+    cinematicFrame(target3D, { yaw = -0.6, pitch = 0.05, distance, heightOffset = 0, fov, autoFrame = false, frameRadius = null } = {}) {
+        const targetWorld = new THREE.Vector3();
+        target3D.getWorldPosition(targetWorld);
+        // Apply FOV first so autoFrame math sees the desired FOV.
+        if (fov) {
+            this.camera.fov = fov;
+            this.camera.updateProjectionMatrix();
+        }
+        let dist = distance;
+        if (autoFrame) {
+            const box = new THREE.Box3().setFromObject(target3D);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            // Stations and planets add huge halo sprites and atmosphere shells
+            // that bloat the bounding box. If the caller knows the model radius,
+            // prefer that as the framing target.
+            const longest = frameRadius ?? Math.max(size.x, size.y, size.z);
+            // Multiply by 0.55 instead of 1.4 so the model fills the frame more
+            // aggressively — the previous calc put stations 4 km and planets
+            // 100+ km away.
+            dist = (longest * 0.55) / Math.tan(this.camera.fov * Math.PI / 360);
+        }
+        const cosPitch = Math.cos(pitch);
+        const offset = new THREE.Vector3(
+            Math.sin(yaw) * dist * cosPitch,
+            heightOffset + Math.sin(pitch) * dist,
+            Math.cos(yaw) * dist * cosPitch,
+        );
+        this.camera.position.copy(targetWorld).add(offset);
+        this.camera.lookAt(targetWorld.x, targetWorld.y + heightOffset, targetWorld.z);
+        // Hide the cockpit chrome so the model alone reads.
+        if (this.cockpit) this.cockpit.visible = false;
+        this.chaseCameraActive = false; // subsequent render calls follow the cinematic camera.
+        // Park the sky-root at the camera so the gradient sphere stays anchored
+        // (matches the chase-cam pattern).
+        this.skyRoot.position.copy(this.camera.position);
+        this.renderer.render(this.scene, this.camera);
+        return { distance: dist, target: [targetWorld.x, targetWorld.y, targetWorld.z] };
+    }
+    setCockpitVisible(visible) {
+        if (this.cockpit) this.cockpit.visible = !!visible;
+    }
+    /**
+     * Frame the entire asteroid / wreck cluster around its bounding box.
+     * Walks every instance matrix across all asteroidMeshes and wreckMeshes
+     * and pulls the camera back so the cluster fills ~60% of the FOV.
+     */
+    clusterFrame({ fov = 50, yaw = -0.55, pitch = 0.10 } = {}) {
+        const box = new THREE.Box3();
+        const m = new THREE.Matrix4();
+        const v = new THREE.Vector3();
+        const collectInstanced = (mesh) => {
+            if (!mesh || !mesh.isInstancedMesh) return;
+            for (let i = 0; i < mesh.count; i += 1) {
+                mesh.getMatrixAt(i, m);
+                v.setFromMatrixPosition(m);
+                box.expandByPoint(v);
+            }
+        };
+        for (const { mesh } of (this.asteroidMeshes ?? [])) collectInstanced(mesh);
+        for (const { mesh } of (this.wreckMeshes ?? [])) collectInstanced(mesh);
+        if (box.isEmpty()) return { ok: false };
+        const size = new THREE.Vector3(); box.getSize(size);
+        const longest = Math.max(size.x, size.y, size.z);
+        const dist = (longest * 1.18) / Math.tan(fov * Math.PI / 360);
+        const center = box.getCenter(new THREE.Vector3());
+        const cosPitch = Math.cos(pitch);
+        this.camera.position.copy(center).add(new THREE.Vector3(
+            Math.sin(yaw) * dist * cosPitch,
+            heightOffset(pitch) + Math.sin(pitch) * dist,
+            Math.cos(yaw) * dist * cosPitch,
+        ));
+        this.camera.fov = fov;
+        this.camera.updateProjectionMatrix();
+        this.camera.lookAt(center);
+        this.skyRoot.position.copy(this.camera.position);
+        if (this.cockpit) this.cockpit.visible = false;
+        this.chaseCameraActive = false;
+        this.renderer.render(this.scene, this.camera);
+        return { ok: true, distance: dist, center: center.toArray() };
+        function heightOffset(p) { return p === 0 ? 0 : 0; }
+    }
     setDamageWarning(level) {
         const normalized = clamp(level, 0, 1);
         this.shell?.style.setProperty('--damage-warning', normalized.toFixed(3));

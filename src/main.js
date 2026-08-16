@@ -192,6 +192,39 @@ window.__VOID_PRIVATEER__ = {
     saveNow: () => session?.saveNow(),
     setChaseCamera: (active, offset) => session?.renderer?.setChaseCamera?.(active, offset),
     renderChaseFrame: () => session?.renderer?.renderChaseFrame?.(),
+    cinematicFrame: (targetId, opts) => {
+        const r = session?.renderer;
+        if (!r) return null;
+        const target = (() => {
+            if (!targetId) return null;
+            if (targetId.type === 'ship') {
+                const map = r.shipMeshes;
+                return map?.get(targetId.entityId) ?? r.shipMeshes?.get(targetId.entityId);
+            }
+            if (targetId.type === 'location') return r.locationMeshes?.get(targetId.locationId);
+            if (targetId.type === 'instanceRoot') return r.instanceRoots?.get(targetId.locationId);
+            if (targetId.type === 'asteroid') {
+                // Find the instanced mesh that contains this asteroid node index.
+                const nodeIndex = targetId.nodeIndex;
+                for (const { mesh, entries } of r.asteroidMeshes) {
+                    if (entries[nodeIndex]) return mesh;
+                }
+                return null;
+            }
+            return null;
+        })();
+        if (!target) return { error: `no target for ${JSON.stringify(targetId)}` };
+        return r.cinematicFrame(target, opts);
+    },
+    setCockpitVisible: (visible) => session?.renderer?.setCockpitVisible?.(visible),
+    clusterFrame: (opts) => session?.renderer?.clusterFrame?.(opts),
+    spawnShipAt: (role, x, y, z) => session?.spawnShip?.(role, [x, y, z]),
+    getAsteroidCenter: () => session?.renderer?.asteroidMeshes?.[0]?.mesh?.position?.toArray?.() ?? null,
+    getAsteroidMeshes: () => {
+        const r = session?.renderer;
+        if (!r) return null;
+        return { meshes: r.asteroidMeshes?.map(({ mesh }) => mesh.position.toArray()) };
+    },
     ...(startupParams?.get('test') === 'showcase' && showcaseInstance
         ? {
             showcase: {
