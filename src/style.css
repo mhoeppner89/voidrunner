@@ -3257,11 +3257,103 @@ button.primary,
   .ship-silhouette { height: 118px; }
 }
 
-@media (max-width: 720px) and (orientation: landscape) {
-  .title-card { width: 58vw; max-height: calc(100vh - 1.4rem); overflow: auto; }
-  .title-card h1 { font-size: clamp(2rem, 8vw, 3.8rem); }
-  .title-card > p { margin: 0.6rem 0; font-size: 0.62rem; }
-  .title-controls { display: none; }
+/* Landscape phones: the viewport is wide but short, so the title card switches
+   from a tall scrollable stack to a two-column layout — title left, actions
+   right — sized by the short axis (vh). Height-based so it also catches modern
+   phones that are >720px wide in landscape (e.g. iPhone 12 at 844px). */
+@media (orientation: landscape) and (max-height: 520px) {
+  .title-screen {
+    padding: max(0.4rem, var(--safe-top)) max(0.7rem, var(--safe-right)) max(0.4rem, var(--safe-bottom)) max(0.7rem, var(--safe-left));
+  }
+
+  .title-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto auto;
+    grid-template-areas:
+      "kicker actions"
+      "title actions"
+      "tagline actions"
+      "version tilt"
+      "controls controls";
+    align-content: start;
+    align-items: start;
+    column-gap: clamp(1rem, 4vw, 2.2rem);
+    row-gap: 0.3rem;
+    width: min(1100px, 96vw);
+    max-height: calc(100vh - 1.1rem);
+    padding: clamp(0.5rem, 2vh, 1rem) clamp(0.8rem, 3vw, 1.5rem);
+    overflow: auto;
+  }
+
+  .title-kicker {
+    grid-area: kicker;
+    font-size: clamp(0.5rem, 1.7vh, 0.68rem);
+  }
+
+  .title-card h1 {
+    grid-area: title;
+    margin: 0.1rem 0 0.25rem;
+    font-size: clamp(1.9rem, 8.5vh, 3.4rem);
+  }
+
+  .title-version {
+    position: static;
+    grid-area: version;
+    justify-self: start;
+    margin-top: 0.1rem;
+  }
+
+  .title-card > p {
+    grid-area: tagline;
+    margin: 0;
+    font-size: clamp(0.55rem, 1.7vh, 0.72rem);
+    line-height: 1.4;
+  }
+
+  .title-actions {
+    grid-area: actions;
+    align-self: center;
+    gap: 0.4rem;
+    margin: 0;
+  }
+
+  .title-actions button {
+    min-width: 118px;
+    min-height: clamp(34px, 10vh, 44px);
+    padding: 0.45rem 0.6rem;
+    font-size: clamp(0.54rem, 1.9vh, 0.7rem);
+  }
+
+  .title-tilt {
+    grid-area: tilt;
+    justify-content: center;
+    gap: 0.4rem;
+    margin: 0.15rem 0 0;
+  }
+
+  .title-tilt button {
+    min-height: 30px;
+    padding: 0.32rem 0.65rem;
+    font-size: clamp(0.5rem, 1.6vh, 0.62rem);
+  }
+
+  .title-controls {
+    grid-area: controls;
+    justify-content: center;
+    gap: 0.2rem 1.2rem;
+    margin: 0.45rem 0 0;
+    font-size: clamp(0.48rem, 1.6vh, 0.6rem);
+  }
+
+  .title-controls span {
+    white-space: nowrap;
+  }
+
+  .copyright-note {
+    display: none;
+  }
+
   .dock-header h2 { font-size: clamp(1.25rem, 4vw, 2rem); }
   .dock-wallet small { display: none; }
 }

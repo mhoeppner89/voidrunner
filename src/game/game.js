@@ -198,7 +198,7 @@ export class GameSession {
     activeInstanceId;
     targetPointer;
     arena = null;
-    constructor(save, ui, onQuit, arena = null) {
+    constructor(save, ui, onQuit, arena = null, tiltGranted = false) {
         this.arena = arena;
         this.ui = ui;
         this.onQuit = onQuit;
@@ -213,11 +213,25 @@ export class GameSession {
         this.renderer.canvas.addEventListener('pointercancel', this.onSpacePointerCancel);
         this.input = new InputManager(ui.root);
         this.input.configureTilt(save.settings);
-        // Tilt steering auto-enables only for returning players who already have a
-        // saved neutral (so the ship starts level). First-time players fall back to
-        // the stick until they tap ENABLE TILT STEER, which also calibrates neutral.
-        if (save.settings.steering !== 'stick' && save.settings.tiltNeutral) {
-            void this.input.enableTilt().then((active) => this.ui.setTouchSteering(active && this.input.tiltActive ? 'tilt' : 'stick'));
+        // Tilt steering auto-enables for players who asked for it — returning
+        // players with a saved neutral, or anyone who granted gyroscope permission
+        // from the title screen this session. New players fall back to the stick
+        // until they tap ENABLE TILT STEER (which also calibrates neutral).
+        if (save.settings.steering !== 'stick' && (save.settings.tiltNeutral || tiltGranted)) {
+            void this.input.enableTilt(tiltGranted).then((active) => {
+                if (active) {
+                    if (!save.settings.tiltNeutral) {
+                        this.input.calibrateTilt();
+                        save.settings.tiltNeutral = { beta: this.input.tiltNeutralBeta, gamma: this.input.tiltNeutralGamma };
+                    }
+                    save.settings.steering = 'tilt';
+                    saveGame(save);
+                    this.ui.setTouchSteering('tilt');
+                }
+                else {
+                    this.ui.setTouchSteering('stick');
+                }
+            });
         }
         else {
             this.ui.setTouchSteering('stick');

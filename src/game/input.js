@@ -96,13 +96,16 @@ export class InputManager {
         this.tiltBeta += (beta - this.tiltBeta) * 0.35;
         this.tiltGamma += (gamma - this.tiltGamma) * 0.35;
     };
-    async enableTilt() {
+    // alreadyGranted: the player granted gyroscope permission from the title
+    // screen this session, so skip the (user-gesture-gated) re-request — the
+    // permission call would otherwise fail outside a tap, e.g. at session start.
+    async enableTilt(alreadyGranted = false) {
         if (!this.tiltSupported) {
             this.tiltEnabled = false;
             return false;
         }
         const request = DeviceOrientationEvent.requestPermission;
-        if (typeof request === 'function') {
+        if (typeof request === 'function' && !alreadyGranted) {
             try {
                 const state = await request.call(DeviceOrientationEvent);
                 if (state !== 'granted') {

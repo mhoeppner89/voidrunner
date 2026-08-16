@@ -7,6 +7,37 @@ if (!host)
 const ui = new GameUI(host);
 let session;
 let cachedSave = loadGame();
+// Tilt state shared with the title screen, where no session (and no
+// InputManager) exists yet. The gyro listener keeps live readings so
+// ENABLE TILT STEER and SET NEUTRAL work before a career starts.
+let tiltGranted = false;
+let tiltBeta = 0;
+let tiltGamma = 0;
+if (typeof DeviceOrientationEvent !== 'undefined') {
+    window.addEventListener('deviceorientation', (event) => {
+        if (event.beta == null || event.gamma == null)
+            return;
+        // Same screen-frame rotation the InputManager applies (see input.js).
+        const radians = ((screen?.orientation?.angle ?? window.orientation ?? 0) * Math.PI) / 180;
+        const cos = Math.cos(radians);
+        const sin = Math.sin(radians);
+        tiltBeta = event.beta * cos + event.gamma * sin;
+        tiltGamma = -event.beta * sin + event.gamma * cos;
+    }, { passive: true });
+}
+const requestTiltPermission = async () => {
+    if (typeof DeviceOrientationEvent === 'undefined')
+        return false;
+    const request = DeviceOrientationEvent.requestPermission;
+    if (typeof request !== 'function')
+        return true;
+    try {
+        return (await request.call(DeviceOrientationEvent)) === 'granted';
+    }
+    catch {
+        return false;
+    }
+};
 const beginSession = (mode, arena) => {
     session?.dispose();
     const save = mode === 'new' || mode === 'arena' ? createNewSave() : loadGame();
@@ -23,7 +54,7 @@ const beginSession = (mode, arena) => {
         session = undefined;
         cachedSave = loadGame();
         ui.showTitle(Boolean(cachedSave), cachedSave);
-    }, mode === 'arena' ? arena : null);
+    }, mode === 'arena' ? arena : null, tiltGranted);
     void session.enableAudio();
 };
 const enterFullscreen = async () => {
@@ -73,8 +104,33 @@ const actions = {
     resumeFlight: () => session?.resumeFlight(),
     quitToTitle: () => session?.quitToTitle(),
     setSetting: (key, value) => session?.setSetting(key, value),
-    enableTilt: () => session?.enableTilt() ?? Promise.resolve(false),
-    calibrateTilt: () => session?.calibrateTilt(),
+    enableTilt: async () => {
+        // In a session the InputManager owns tilt; on the title screen there is
+        // no session yet, so request permission here and let the next session
+        // inherit it (the constructor auto-enables when tiltGranted is set).
+        if (session)
+            return session.enableTilt();
+        const granted = await requestTiltPermission();
+        if (!granted)
+            return false;
+        tiltGranted = true;
+        const save = cachedSave ?? loadGame();
+        if (save) {
+            save.settings.steering = 'tilt';
+            saveGame(save);
+        }
+        return true;
+    },
+    calibrateTilt: () => {
+        if (session)
+            return session.calibrateTilt();
+        const save = cachedSave ?? loadGame();
+        if (save) {
+            save.settings.tiltNeutral = { beta: tiltBeta, gamma: tiltGamma };
+            saveGame(save);
+        }
+        return true;
+    },
 };
 ui.setActions(actions);
 ui.showTitle(hasSavedGame(), cachedSave);
