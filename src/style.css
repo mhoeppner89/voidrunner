@@ -572,10 +572,20 @@ button.compact {
 .touch-fire,
 .touch-missile {
   border-radius: 50%;
-  font-weight: 700;
-  letter-spacing: 0.06em;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
   opacity: 0.94;
+}
+
+/* In-flight controls are pure symbols (no text on the cockpit glass): every
+   button hosts one or more 24x24 viewBox glyphs, colored via currentColor so
+   the contextual pads (MINE/SALVAGE/SCAN) inherit their accent automatically. */
+.touch-boost svg,
+.touch-fire svg,
+.touch-missile svg {
+  display: block;
+  width: 58%;
+  height: 58%;
+  margin: auto;
 }
 
 .touch-throttle {
@@ -616,12 +626,20 @@ button.compact {
   box-shadow: 0 0 8px rgba(226, 177, 77, 0.35);
 }
 
-.touch-throttle span {
+.touch-throttle-label {
   position: absolute;
-  right: -2px;
-  bottom: -19px;
+  bottom: -21px;
+  left: 50%;
+  width: 22px;
+  height: 22px;
   color: #a88a52;
-  font-size: 0.52rem;
+  transform: translateX(-50%);
+}
+
+.touch-throttle-label svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .touch-boost {
@@ -630,7 +648,6 @@ button.compact {
   color: #ffe9bd;
   background: radial-gradient(circle at 38% 32%, rgba(196, 138, 62, 0.95), rgba(74, 45, 16, 0.96));
   border: 2px solid rgba(238, 184, 96, 0.7);
-  font-size: 0.56rem;
 }
 
 .touch-fire {
@@ -639,7 +656,6 @@ button.compact {
   color: #1a0703;
   background: radial-gradient(circle at 38% 32%, rgba(240, 126, 84, 0.98), rgba(158, 46, 30, 0.98));
   border: 2px solid #ff9b78;
-  font-size: 0.78rem;
 }
 
 .touch-missile {
@@ -648,7 +664,6 @@ button.compact {
   color: #cff6ff;
   background: radial-gradient(circle at 38% 32%, rgba(84, 164, 196, 0.95), rgba(18, 56, 78, 0.96));
   border: 2px solid rgba(140, 219, 240, 0.7);
-  font-size: 0.56rem;
 }
 
 /* Contextual pads: FIRE becomes MINE/SALVAGE, MISSILE becomes SCAN. The
@@ -1840,12 +1855,6 @@ button.compact {
     width: 112px;
   }
 
-  .screen-flight {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.06rem 0.3rem;
-    font-size: clamp(0.2rem, 0.36vw, 0.32rem);
-  }
-
   .hud-bottom-center {
     bottom: 32%;
   }
@@ -2005,7 +2014,6 @@ button.compact {
   .touch-fire {
     width: 82px;
     height: 82px;
-    font-size: 0.66rem;
   }
 
   .touch-boost,
@@ -2145,7 +2153,7 @@ button.compact {
   padding: 0.32rem 0.48rem 0;
   color: var(--void-cyan);
   border-bottom: 1px solid rgba(48, 161, 195, 0.48);
-  font-size: clamp(0.37rem, 0.62vw, 0.62rem);
+  font-size: clamp(0.42rem, 0.72vw, 0.72rem);
   letter-spacing: 0.08em;
   white-space: nowrap;
 }
@@ -2176,6 +2184,12 @@ button.compact {
   gap: 0.22rem;
   height: 82%;
   padding: 0.2rem 0.4rem 0.42rem;
+}
+
+/* Own-ship monitor stacks the flight strip on top (SPD/FUEL above the hull),
+   with the outline filling the middle and the status bars at the bottom. */
+.screen-ship-layout {
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 /* Top-down schematic drawn live so the own and target monitors always show
@@ -2216,7 +2230,7 @@ button.compact {
   align-items: center;
   gap: 0.18rem;
   min-width: 0;
-  font-size: clamp(0.29rem, 0.48vw, 0.48rem);
+  font-size: clamp(0.33rem, 0.56vw, 0.56rem);
 }
 
 .screen-bars span,
@@ -2233,7 +2247,7 @@ button.compact {
 }
 
 .screen-bars em {
-  width: 1.5rem;
+  width: 1.8rem;
   color: var(--void-cream);
   text-align: right;
 }
@@ -2275,17 +2289,19 @@ button.compact {
   background-image: repeating-linear-gradient(90deg, transparent 0 3px, rgba(2, 8, 24, 0.82) 3px 4px);
 }
 
-/* Flight telemetry strip inside the own-ship monitor: the old floating
-   bottom-left/right HUD cards are scrapped, so SPD/THR/FUEL/MSL and
-   HOLD/LOAD/HND/CR now live on the cockpit glass with the bars. */
+/* Flight telemetry strip at the top of the own-ship monitor: the old floating
+   bottom-left/right HUD cards are scrapped, and the strip is kept to the two
+   pilot-critical readouts (SPD/FUEL) above the hull — missiles render as a
+   rack under the hull outline, and throttle/cargo/load/handling/credits live
+   on the docked screens, not the cockpit glass. */
 .screen-flight {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.1rem 0.3rem;
   min-width: 0;
-  padding-top: 0.14rem;
-  border-top: 1px solid rgba(48, 161, 195, 0.4);
-  font-size: clamp(0.24rem, 0.42vw, 0.42rem);
+  padding-bottom: 0.14rem;
+  border-bottom: 1px solid rgba(48, 161, 195, 0.4);
+  font-size: clamp(0.32rem, 0.58vw, 0.58rem);
   letter-spacing: 0.02em;
 }
 
@@ -2416,7 +2432,6 @@ button.compact {
 
   .screen-heading {
     padding: 0.14rem 0.24rem 0;
-    font-size: clamp(0.27rem, 0.8vw, 0.48rem);
   }
 
   .screen-heading b {
@@ -2440,9 +2455,6 @@ button.compact {
     display: none;
   }
 
-  .screen-bars > div {
-    font-size: clamp(0.22rem, 0.58vw, 0.36rem);
-  }
 
   .screen-bars i {
     height: 3px;

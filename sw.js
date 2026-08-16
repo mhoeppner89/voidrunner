@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v41-afterburn-boost';
+const CACHE = 'voidrunner-v42-nebula-band-fade';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',

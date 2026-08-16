@@ -2879,6 +2879,7 @@ export class GameSession {
             hull: this.save.player.hull,
             maxHull: stats.hull,
             missiles: this.save.player.missiles,
+            maxMissiles: stats.missileCapacity,
             cargo: cargoMass(this.save.player),
             cargoCapacity: cargoCapacity(this.save.player),
             credits: this.save.player.credits,

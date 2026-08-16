@@ -482,6 +482,17 @@ export class SpaceRenderer {
         falloff.addColorStop(1, 'rgba(255, 255, 255, 0)');
         context.fillStyle = falloff;
         context.fillRect(0, 0, 512, 256);
+        // Same falloff along the horizontal axis: the streaks run edge to edge, so
+        // without this the band's left/right borders keep ~8% alpha and show as
+        // hard rectangular edges against the sky (top/bottom were already feathered
+        // by the vertical pass above). Destination-in multiplies, so the two passes
+        // feather all four sides.
+        const falloffX = context.createLinearGradient(0, 0, 512, 0);
+        falloffX.addColorStop(0, 'rgba(255, 255, 255, 0)');
+        falloffX.addColorStop(0.5, 'rgba(255, 255, 255, 1)');
+        falloffX.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        context.fillStyle = falloffX;
+        context.fillRect(0, 0, 512, 256);
         context.globalCompositeOperation = 'source-over';
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;

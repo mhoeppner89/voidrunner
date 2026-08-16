@@ -76,7 +76,7 @@ export class GameUI {
           </div>
           <div class="cockpit-screen cockpit-screen-own" aria-label="Own ship status display">
             <div class="screen-heading"><span>OWN SHIP STATUS</span><b id="own-ship-name">WAYFARER</b></div>
-            <div class="screen-ship-layout"><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>ARMOR</span><i><b id="screen-own-armor"></b></i><em id="screen-own-armor-value">100</em></div><div><span>HULL</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">100</em></div></div><div class="screen-flight"><div><span>SPD</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>THR</span><b id="screen-own-throttle">0</b><small>%</small></div><div><span>FUEL</span><b id="screen-own-fuel">100</b><small>%</small></div><div><span>MSL</span><b id="screen-own-missiles">4</b></div><div><span>HOLD</span><b id="screen-own-cargo">0/32</b></div><div><span>LOAD</span><b id="screen-own-load">0</b><small>%</small></div><div><span>HND</span><b id="screen-own-handling">100</b><small>%</small></div><div><span>CR</span><b id="screen-own-credits">3,200</b></div></div></div>
+            <div class="screen-ship-layout"><div class="screen-flight"><div><span>SPD</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>FUEL</span><b id="screen-own-fuel">100</b><small>%</small></div></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>ARMOR</span><i><b id="screen-own-armor"></b></i><em id="screen-own-armor-value">100</em></div><div><span>HULL</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">100</em></div></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="Radar display; tap to open navigation map">
             <div class="screen-heading"><span>RADAR · TAP MAP</span><b id="screen-radar-zone">OPEN SPACE</b></div>
@@ -107,13 +107,13 @@ export class GameUI {
               <div class="touch-throttle" data-touch-throttle>
                 <div class="touch-throttle-fill"></div>
                 <div class="touch-throttle-thumb" data-touch-throttle-thumb></div>
-                <span>THR</span>
+                <span class="touch-throttle-label" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 2.5v19"/><path d="M5.5 8.5H12"/><circle cx="16.8" cy="8.5" r="2.4"/></svg></span>
               </div>
-              <button class="touch-boost" data-touch-action="afterburner" aria-label="Afterburner — hold">AFTERBURN</button>
+              <button class="touch-boost" data-touch-action="afterburner" aria-label="Afterburner — hold"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" fill-rule="evenodd"><path d="M12 2.2C7.9 7.5 5.4 10.3 5.4 14a6.6 6.6 0 0 0 13.2 0c0-3.7-2.5-6.5-6.6-11.8Zm0 7c-2 2.6-2.8 3.8-2.8 5.3a2.8 2.8 0 0 0 5.6 0c0-1.5-.8-2.7-2.8-5.3Z"/></svg></button>
             </div>
             <div class="touch-right">
-              <button id="touch-fire" class="touch-fire" data-touch-action="fire" aria-label="Fire — hold">FIRE</button>
-              <button id="touch-missile" class="touch-missile" data-touch-action="missile" aria-label="Missile">MISSILE</button>
+              <button id="touch-fire" class="touch-fire" data-touch-action="fire" aria-label="Fire — hold"><svg data-icon="fire" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.6"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg></button>
+              <button id="touch-missile" class="touch-missile" data-touch-action="missile" aria-label="Missile"><svg data-icon="missile" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.4 9.3 8.8h5.4Z"/><path d="M9.3 8.8h5.4v6.4H9.3Z"/><path d="M9.3 15.2 6.8 21M14.7 15.2l2.5 5.8"/></svg><svg data-icon="scan" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" class="is-hidden"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5.5 5.5"/></svg></button>
             </div>
           </div>
           <div class="hud-corner-buttons">
@@ -779,13 +779,7 @@ export class GameUI {
         setText('#hud-mode', model.mode.toUpperCase());
         setText('#screen-own-speed', Math.round(model.speed).toString());
         setText('#screen-own-max-speed', `/${Math.round(model.maxSpeed)}`);
-        setText('#screen-own-throttle', Math.round(model.throttle * 100).toString());
         setText('#screen-own-fuel', Math.round((model.fuel / model.maxFuel) * 100).toString());
-        setText('#screen-own-missiles', model.missiles.toString());
-        setText('#screen-own-cargo', `${model.cargo.toFixed(0)}/${model.cargoCapacity}`);
-        setText('#screen-own-load', (model.loadPercent ?? 0).toString());
-        setText('#screen-own-handling', (model.handlingPercent ?? 100).toString());
-        setText('#screen-own-credits', Math.floor(model.credits).toLocaleString('en-US'));
         setText('#own-ship-name', model.shipName.toUpperCase());
         setText('#screen-radar-zone', model.zone.toUpperCase());
         setText('#screen-own-shield-value', Math.ceil(model.shield).toString());
@@ -806,7 +800,7 @@ export class GameUI {
         }
         this.updateTarget(model.target);
         this.drawRadar(model.contacts);
-        this.drawHullOutline(this.ownHullCanvas, model.playerVariant ?? 'kestrel', 0, 'rgba(111, 216, 236, 0.9)', false);
+        this.drawHullOutline(this.ownHullCanvas, model.playerVariant ?? 'kestrel', 0, 'rgba(111, 216, 236, 0.9)', false, model.missiles, model.maxMissiles);
         const throttleThumb = this.el('[data-touch-throttle-thumb]');
         const throttleFill = this.el('.touch-throttle-fill');
         if (throttleThumb)
@@ -874,11 +868,17 @@ export class GameUI {
         const mining = kind === 'asteroid';
         const salvage = kind === 'wreck';
         const utility = mining || salvage;
-        fire.textContent = mining ? 'MINE' : salvage ? 'SALVAGE' : 'FIRE';
-        missile.textContent = utility ? 'SCAN' : 'MISSILE';
         fire.classList.toggle('is-mining', mining);
         fire.classList.toggle('is-salvage', salvage);
         missile.classList.toggle('is-scan', utility);
+        // The pads swap between pre-rendered symbols (FIRE→MINE/SALVAGE,
+        // MISSILE→SCAN) — no text on the cockpit glass.
+        const showIcon = (button, name) => {
+            for (const icon of button.querySelectorAll('svg'))
+                icon.classList.toggle('is-hidden', icon.dataset.icon !== name);
+        };
+        showIcon(fire, mining ? 'mine' : salvage ? 'salvage' : 'fire');
+        showIcon(missile, utility ? 'scan' : 'missile');
         fire.setAttribute('aria-label', mining ? 'Mine — hold' : salvage ? 'Salvage — hold' : 'Fire — hold');
         missile.setAttribute('aria-label', utility ? 'Scan target' : 'Missile');
     }
@@ -1031,7 +1031,7 @@ export class GameUI {
             }
         }
     }
-    drawHullOutline(canvas, variant, heading = 0, accent = 'rgba(111, 216, 236, 0.9)', hostile = false) {
+    drawHullOutline(canvas, variant, heading = 0, accent = 'rgba(111, 216, 236, 0.9)', hostile = false, missiles = 0, missileCapacity = 0) {
         if (!canvas)
             return;
         const ctx = canvas.getContext('2d');
@@ -1083,6 +1083,40 @@ export class GameUI {
         ctx.closePath();
         ctx.fill();
         ctx.restore();
+        // Missile rack: one diamond per ordnance slot, drawn in a row under the
+        // hull like a weapons rack — filled (gold) for rounds on board, a dim
+        // empty slot for spent ones. Replaces the old MSL text cell.
+        if (missileCapacity > 0) {
+            // Sized off the canvas, not the hull-cell scale: narrow long hulls
+            // (29x44 cells) would shrink pips to sub-pixel dots.
+            const pip = Math.max(4, Math.min(width, height) * 0.06);
+            const gap = pip * 1.7;
+            const total = missileCapacity * pip + (missileCapacity - 1) * gap;
+            const rackY = Math.min(cy + (gridH / 2) * scale + pip * 1.5, height - pip * 0.9);
+            const x0 = cx - total / 2 + pip / 2;
+            ctx.lineWidth = Math.max(1, ratio * 0.8);
+            for (let i = 0; i < missileCapacity; i += 1) {
+                const x = x0 + i * (pip + gap);
+                const y = rackY;
+                ctx.beginPath();
+                ctx.moveTo(x, y - pip / 2);
+                ctx.lineTo(x + pip / 2, y);
+                ctx.lineTo(x, y + pip / 2);
+                ctx.lineTo(x - pip / 2, y);
+                ctx.closePath();
+                if (i < missiles) {
+                    ctx.fillStyle = 'rgba(255, 192, 70, 0.92)';
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(255, 210, 110, 0.9)';
+                }
+                else {
+                    ctx.fillStyle = 'rgba(2, 8, 24, 0.9)';
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(125, 150, 170, 0.45)';
+                }
+                ctx.stroke();
+            }
+        }
     }
     drawRadar(contacts) {
         const canvas = this.radarContext.canvas;
