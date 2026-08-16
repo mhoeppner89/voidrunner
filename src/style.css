@@ -2685,11 +2685,13 @@ button.primary,
   inset: 0;
   content: "";
   background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.92) 0 7%, rgba(0, 0, 0, 0.52) 35%, rgba(0, 0, 0, 0.14) 68%, rgba(0, 0, 0, 0.42)),
-    linear-gradient(0deg, rgba(0, 0, 0, 0.86), transparent 55%),
-    url("../art/title-cockpit.webp") center / cover no-repeat;
+    radial-gradient(ellipse at 78% 92%, rgba(255, 224, 162, 0.94) 0 6%, rgba(255, 152, 64, 0.7) 12%, rgba(178, 60, 50, 0.45) 28%, rgba(40, 24, 60, 0.18) 50%, transparent 70%),
+    radial-gradient(ellipse at 78% 100%, rgba(255, 196, 96, 0.55) 0 9%, transparent 22%),
+    radial-gradient(circle at 50% 0%, rgba(8, 22, 70, 0.85), rgba(18, 30, 70, 0.6)),
+    linear-gradient(180deg, #0c1840 0 22%, #1c2058 24% 42%, #5e2a5e 44%, #b04e44 64%, #d9894b 80%, #f5d493 100%);
+  background-blend-mode: normal, normal, normal, normal;
   image-rendering: pixelated;
-  filter: contrast(1.08) saturate(0.85);
+  filter: contrast(1.06) saturate(1.18) brightness(1.18);
 }
 
 .title-screen::after {
@@ -3571,8 +3573,8 @@ button.primary,
   image-rendering: pixelated;
   transform: translate3d(var(--cockpit-shift-x), var(--cockpit-shift-y), 0) rotate(var(--cockpit-roll)) scale(var(--cockpit-zoom));
   transform-origin: 50% 72%;
-  filter: contrast(1.14) saturate(0.88) brightness(0.84) drop-shadow(0 -8px 24px rgba(0, 0, 0, 0.72));
-  opacity: 0.98;
+  filter: contrast(1.06) saturate(0.96) brightness(0.96) drop-shadow(0 -6px 18px rgba(0, 0, 0, 0.55));
+  opacity: 0.92;
   will-change: transform;
 }
 
@@ -3581,8 +3583,8 @@ button.primary,
   z-index: 2;
   background:
     linear-gradient(116deg, transparent 0 32%, rgba(126, 208, 191, 0.025) 39%, transparent 46%),
-    linear-gradient(76deg, transparent 0 60%, rgba(255, 211, 126, 0.018) 66%, transparent 73%),
-    radial-gradient(ellipse at 50% 46%, transparent 0 52%, rgba(0, 0, 0, 0.28) 83%, rgba(0, 0, 0, 0.58) 100%),
+    linear-gradient(76deg, transparent 0 60%, rgba(255, 211, 126, 0.022) 66%, transparent 73%),
+    radial-gradient(ellipse at 50% 46%, transparent 0 56%, rgba(0, 0, 0, 0.18) 84%, rgba(0, 0, 0, 0.46) 100%),
     rgba(152, 21, 9, calc(var(--damage-warning) * 0.13));
   box-shadow: inset 0 0 calc(26px + var(--damage-warning) * 48px) rgba(235, 58, 27, calc(var(--damage-warning) * 0.48));
   mix-blend-mode: screen;
@@ -4132,10 +4134,12 @@ button.primary,
 
 .title-screen::before {
   background:
-    linear-gradient(90deg, rgba(2, 15, 52, 0.78) 0 7%, rgba(2, 15, 52, 0.32) 36%, rgba(2, 15, 52, 0.06) 70%, rgba(2, 15, 52, 0.24)),
-    linear-gradient(0deg, rgba(2, 12, 42, 0.7), transparent 58%),
-    url("../art/title-cockpit.webp") center / cover no-repeat;
-  filter: contrast(1.03) saturate(1.16) brightness(1.16);
+    radial-gradient(ellipse at 78% 92%, rgba(255, 224, 162, 0.94) 0 6%, rgba(255, 152, 64, 0.7) 12%, rgba(178, 60, 50, 0.45) 28%, rgba(40, 24, 60, 0.18) 50%, transparent 70%),
+    radial-gradient(ellipse at 78% 100%, rgba(255, 196, 96, 0.55) 0 9%, transparent 22%),
+    radial-gradient(circle at 50% 0%, rgba(8, 22, 70, 0.85), rgba(18, 30, 70, 0.6)),
+    linear-gradient(180deg, #0c1840 0 22%, #1c2058 24% 42%, #5e2a5e 44%, #b04e44 64%, #d9894b 80%, #f5d493 100%);
+  background-blend-mode: normal, normal, normal, normal;
+  filter: contrast(1.04) saturate(1.16) brightness(1.16);
 }
 
 .title-screen::after {
