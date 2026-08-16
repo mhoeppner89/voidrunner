@@ -2919,7 +2919,6 @@ export class GameSession {
         const nav = LOCATIONS[this.save.player.navTargetId];
         const target = this.getTargetRef();
         let hudTarget;
-        let scanText;
         if (target) {
             const projection = this.renderer.projectToScreen(target.position);
             const edge = this.targetEdge(projection);
@@ -2949,13 +2948,11 @@ export class GameSession {
             }
             else if (target.kind === 'asteroid') {
                 const node = this.asteroids.find((entry) => entry.id === target.id);
-                hudTarget = { kind: 'asteroid', name: target.name, subtitle: node.scanned ? `${node.richness > 1.8 ? 'RICH' : node.richness > 1.2 ? 'VIABLE' : 'LEAN'} ORE` : 'MINERAL SIGNATURE', distance, scanned: node.scanned, ...screen };
-                scanText = node.scanned ? `ORE ${node.richness.toFixed(2)} · ${Math.ceil(node.remaining)} units` : 'V / SCAN to analyze deposit';
+                hudTarget = { kind: 'asteroid', name: target.name, subtitle: node.scanned ? `${node.richness > 1.8 ? 'RICH' : node.richness > 1.2 ? 'VIABLE' : 'LEAN'} ORE` : 'MINERAL SIGNATURE', distance, scanned: node.scanned, readout: node.scanned ? `ORE ${node.richness.toFixed(2)} · ${Math.ceil(node.remaining)} units` : 'V / SCAN to analyze deposit', ...screen };
             }
             else if (target.kind === 'wreck') {
                 const node = this.wreckNodes.find((entry) => entry.id === target.id);
-                hudTarget = { kind: 'wreck', name: node.name, subtitle: node.scanned ? `${node.rarity.toUpperCase()} ${COMMODITIES[node.salvage].name}` : 'UNRESOLVED WRECK', distance, scanned: node.scanned, ...screen };
-                scanText = node.scanned ? `HAZARD ${Math.round(node.hazard * 100)} · ${Math.ceil(node.remaining)} recoveries` : 'V / SCAN to identify salvage';
+                hudTarget = { kind: 'wreck', name: node.name, subtitle: node.scanned ? `${node.rarity.toUpperCase()} ${COMMODITIES[node.salvage].name}` : 'UNRESOLVED WRECK', distance, scanned: node.scanned, readout: node.scanned ? `HAZARD ${Math.round(node.hazard * 100)} · ${Math.ceil(node.remaining)} recoveries` : 'V / SCAN to identify salvage', ...screen };
             }
             else {
                 const location = LOCATIONS[target.id];
@@ -3007,7 +3004,6 @@ export class GameSession {
             zone: this.zoneLabel(this.getWorldZone(player)),
             target: hudTarget,
             prompt: dockPrompt,
-            scanText,
             contacts: this.radarContacts(),
         };
     }

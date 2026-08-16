@@ -85,6 +85,7 @@ export class GameUI {
           <div class="cockpit-screen cockpit-screen-target" data-touch-action="targetNext" aria-label="Target status display; tap to cycle targets">
             <div class="screen-heading"><span>TARGET STATUS</span><b id="screen-target-name">NO LOCK</b></div>
             <div id="screen-target-distance" class="screen-target-distance">—</div>
+            <div id="screen-target-readout" class="screen-target-readout">—</div>
             <div class="screen-target-layout"><canvas class="hull-outline" id="target-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-target-shield"></b></i><em id="screen-target-shield-value">—</em></div><div><span>ARMOR</span><i><b id="screen-target-armor"></b></i><em id="screen-target-armor-value">—</em></div><div><span>HULL</span><i><b id="screen-target-hull"></b></i><em id="screen-target-hull-value">—</em></div></div></div>
           </div>
           <button type="button" id="hyperdrive-card" class="cockpit-identity" data-touch-action="autopilot" aria-label="Hyperdrive: engage jump to nav point"><b>HYPERDRIVE</b><em id="hyperdrive-card-status" class="is-hidden"></em></button>
@@ -94,7 +95,6 @@ export class GameUI {
           <div class="reticle" aria-hidden="true"><span></span><span></span><span></span><span></span><b></b></div>
           <div class="hud-bottom-center">
             <div id="context-prompt" class="context-prompt is-hidden"></div>
-            <div id="scan-readout" class="scan-readout is-hidden"></div>
           </div>
           <div class="touch-controls" aria-label="Touch flight controls">
             <div class="touch-left">
@@ -799,11 +799,6 @@ export class GameUI {
             prompt.textContent = model.prompt ?? '';
             prompt.classList.toggle('is-hidden', !model.prompt);
         }
-        const scan = this.el('#scan-readout');
-        if (scan) {
-            scan.textContent = model.scanText ?? '';
-            scan.classList.toggle('is-hidden', !model.scanText);
-        }
         this.updateTarget(model.target);
         this.drawRadar(model.contacts);
         this.drawHullOutline(this.ownHullCanvas, model.playerVariant ?? 'kestrel', 0, 'rgba(111, 216, 236, 0.9)', false, model.missiles, model.maxMissiles);
@@ -821,6 +816,7 @@ export class GameUI {
         // top-right target panel was redundant with it and is gone.
         if (!target) {
             this.el('#screen-target-distance').textContent = '—';
+            this.el('#screen-target-readout').textContent = '—';
             this.setTargetScreenValue(undefined);
             this.updateWeaponButtons(undefined);
             bracket?.classList.add('is-hidden');
@@ -833,6 +829,7 @@ export class GameUI {
         bracket?.classList.toggle('is-hostile', hostile);
         edgePointer?.classList.toggle('is-hostile', hostile);
         this.el('#screen-target-distance').textContent = `${Math.round(target.distance).toLocaleString('en-US')} km`;
+        this.el('#screen-target-readout').textContent = target.readout ?? '—';
         this.setTargetScreenValue(target);
         this.updateWeaponButtons(target.kind);
         if (bracket && target.onScreen && target.screenX !== undefined && target.screenY !== undefined) {
