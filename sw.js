@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v42-nebula-band-fade';
+const CACHE = 'voidrunner-v44-tilt-orientation';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',

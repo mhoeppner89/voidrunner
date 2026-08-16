@@ -2,7 +2,7 @@ import { clamp } from './random.js';
 
 const HOLD_ACTIONS = new Set(['fire', 'afterburner']);
 const TILT_DEADZONE = 2.5;
-const TILT_FULL_RANGE = 24;
+const TILT_FULL_RANGE = 15;
 const wrapAngle = (value) => {
     while (value > 180)
         value -= 360;
@@ -31,7 +31,7 @@ export class InputManager {
     tiltGamma = 0;
     tiltNeutralBeta = 0;
     tiltNeutralGamma = 0;
-    tiltSensitivity = 1;
+    tiltSensitivity = 1.35;
     tiltInvertPitch = false;
     tiltInvertYaw = false;
     constructor(root) {
@@ -72,12 +72,29 @@ export class InputManager {
         if (this.tiltSupported)
             window.addEventListener('deviceorientation', this.onDeviceOrientation, { passive: true });
     }
+    // Current screen orientation in degrees (0 = portrait, ±90 = landscape).
+    // The deviceorientation event always reports tilt in the DEVICE frame
+    // (portrait axes), so the screen frame — the frame the player actually
+    // steers in — is a rotation of (beta, gamma) by this angle.
+    screenOrientationAngle() {
+        return screen?.orientation?.angle ?? window.orientation ?? 0;
+    }
     onDeviceOrientation = (event) => {
         if (event.beta == null || event.gamma == null)
             return;
         this.tiltSeen = true;
-        this.tiltBeta += (event.beta - this.tiltBeta) * 0.35;
-        this.tiltGamma += (event.gamma - this.tiltGamma) * 0.35;
+        // Rotate the device-frame tilt into the screen frame so steering feels
+        // identical in portrait, landscape-primary and landscape-secondary.
+        // Without this, holding the phone sideways (the game locks landscape)
+        // swaps the pitch/yaw axes: rolling steers the nose and tilting the
+        // phone forward steers the wheel.
+        const radians = (this.screenOrientationAngle() * Math.PI) / 180;
+        const cos = Math.cos(radians);
+        const sin = Math.sin(radians);
+        const beta = event.beta * cos + event.gamma * sin;
+        const gamma = -event.beta * sin + event.gamma * cos;
+        this.tiltBeta += (beta - this.tiltBeta) * 0.35;
+        this.tiltGamma += (gamma - this.tiltGamma) * 0.35;
     };
     async enableTilt() {
         if (!this.tiltSupported) {
@@ -122,6 +139,8 @@ export class InputManager {
     }
     tiltSteering() {
         // Roll (gamma) steers yaw like a wheel, pitch (beta) steers the nose.
+        // Beta/gamma are already screen-frame (see onDeviceOrientation), so the
+        // wheel and nose stay on the physical axes the player perceives.
         const curve = (value) => {
             const magnitude = Math.abs(value);
             if (magnitude < TILT_DEADZONE)

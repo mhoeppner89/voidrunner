@@ -74,7 +74,6 @@ const actions = {
     setSetting: (key, value) => session?.setSetting(key, value),
     enableTilt: () => session?.enableTilt() ?? Promise.resolve(false),
     calibrateTilt: () => session?.calibrateTilt(),
-    engageHyperdrive: () => session?.toggleHyperdrive(),
 };
 ui.setActions(actions);
 ui.showTitle(hasSavedGame(), cachedSave);

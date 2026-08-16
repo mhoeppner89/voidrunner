@@ -5,7 +5,7 @@ import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from
 import { shipTopDownProfile } from './voxelModels.js';
 const escapeHtml = (value) => value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const percent = (value, max) => (max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100)));
-const GAME_VERSION = '0.3.32';
+const GAME_VERSION = '0.3.33';
 export class GameUI {
     root;
     viewport;
@@ -82,12 +82,11 @@ export class GameUI {
             <div class="screen-heading"><span>RADAR · TAP MAP</span><b id="screen-radar-zone">OPEN SPACE</b></div>
             <div class="radar-screen-wrap"><canvas id="radar" width="220" height="220" role="button" tabindex="0" aria-label="Open navigation map"></canvas></div>
           </div>
-          <div class="cockpit-screen cockpit-screen-target" aria-label="Target status display">
+          <div class="cockpit-screen cockpit-screen-target" data-touch-action="targetNext" aria-label="Target status display; tap to cycle targets">
             <div class="screen-heading"><span>TARGET STATUS</span><b id="screen-target-name">NO LOCK</b></div>
             <div class="screen-target-layout"><canvas class="hull-outline" id="target-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-target-shield"></b></i><em id="screen-target-shield-value">—</em></div><div><span>ARMOR</span><i><b id="screen-target-armor"></b></i><em id="screen-target-armor-value">—</em></div><div><span>HULL</span><i><b id="screen-target-hull"></b></i><em id="screen-target-hull-value">—</em></div></div></div>
-            <div id="target-screen-hint" class="target-screen-hint is-hidden" aria-hidden="true"></div>
           </div>
-          <div class="cockpit-identity" aria-hidden="true"><span>WAYFARER // HULL 07</span><b>VOIDRUNNER</b></div>
+          <button type="button" id="hyperdrive-card" class="cockpit-identity" data-touch-action="autopilot" aria-label="Hyperdrive: engage jump to nav point"><span>VOIDRUNNER</span><b>HYPERDRIVE</b><em id="hyperdrive-card-status" class="is-hidden"></em></button>
 
           <div class="hud-top-right target-panel is-hidden" id="target-panel" aria-hidden="true">
             <span class="eyebrow">TARGET</span>
@@ -281,15 +280,6 @@ export class GameUI {
                 return;
             event.preventDefault();
             this.actions?.openMap();
-        });
-        // Tapping the target monitor engages hyperdrive when a location is locked.
-        const targetScreen = this.root.querySelector('.cockpit-screen-target');
-        targetScreen?.addEventListener('pointerup', (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            const id = this.save?.player.currentTargetId;
-            if (id && Object.prototype.hasOwnProperty.call(LOCATIONS, id))
-                this.actions?.engageHyperdrive();
         });
         this.root.addEventListener('input', (event) => {
             const element = event.target;
@@ -759,21 +749,24 @@ export class GameUI {
             if (element)
                 element.style.width = `${Math.max(0, Math.min(100, value))}%`;
         };
-        const targetHint = this.el('#target-screen-hint');
-        if (targetHint) {
+        // The VOIDRUNNER identity card doubles as the hyperdrive control: it
+        // glows when a jump is clear, and carries the charge/cruise/interrupt
+        // status while the drive is live.
+        const card = this.el('#hyperdrive-card');
+        const cardStatus = this.el('#hyperdrive-card-status');
+        if (card && cardStatus) {
             const state = model.hyperdrive?.fx ?? 'none';
             const progress = Math.max(0, Math.min(1, model.hyperdrive?.progress ?? 0));
-            let hint = '';
-            if (model.target?.kind === 'location' && state === 'none')
-                hint = 'ACTIVATE HYPERDRIVE';
-            else if (state === 'spooling')
-                hint = `CHARGING ${Math.round(progress * 100)}%`;
+            let status = '';
+            if (state === 'spooling')
+                status = `CHARGING ${Math.round(progress * 100)}%`;
             else if (state === 'active')
-                hint = 'HYPERDRIVE';
+                status = 'ENGAGED';
             else if (state === 'interrupt')
-                hint = 'INTERRUPTED';
-            targetHint.textContent = hint;
-            targetHint.classList.toggle('is-hidden', !hint);
+                status = 'INTERRUPTED';
+            cardStatus.textContent = status;
+            cardStatus.classList.toggle('is-hidden', !status);
+            card.dataset.hyperdriveReady = model.hyperdriveReady ? 'true' : 'false';
         }
         setText('#hud-zone', model.zone.toUpperCase());
         setText('#hud-mode', model.mode.toUpperCase());
@@ -1083,28 +1076,34 @@ export class GameUI {
         ctx.closePath();
         ctx.fill();
         ctx.restore();
-        // Missile rack: one diamond per ordnance slot, drawn in a row under the
-        // hull like a weapons rack — filled (gold) for rounds on board, a dim
-        // empty slot for spent ones. Replaces the old MSL text cell.
+        // Missile rack: one missile dart per ordnance slot, flanking the hull
+        // like hardpoints — two up the port side, two up the starboard, nose
+        // toward the bow (the hull points up). Filled gold for rounds on
+        // board, a dim empty outline for spent slots. Replaces the old MSL
+        // text cell (and the earlier diamond pips).
         if (missileCapacity > 0) {
             // Sized off the canvas, not the hull-cell scale: narrow long hulls
-            // (29x44 cells) would shrink pips to sub-pixel dots.
-            const pip = Math.max(4, Math.min(width, height) * 0.06);
-            const gap = pip * 1.7;
-            const total = missileCapacity * pip + (missileCapacity - 1) * gap;
-            const rackY = Math.min(cy + (gridH / 2) * scale + pip * 1.5, height - pip * 0.9);
-            const x0 = cx - total / 2 + pip / 2;
-            ctx.lineWidth = Math.max(1, ratio * 0.8);
-            for (let i = 0; i < missileCapacity; i += 1) {
-                const x = x0 + i * (pip + gap);
-                const y = rackY;
+            // (29x44 cells) would shrink the darts to sub-pixel dots.
+            const ms = Math.max(4, Math.min(width, height) * 0.055);
+            const halfW = ms * 0.55;
+            const finW = ms * 0.35;
+            const tip = -ms * 1.2;
+            const noseBase = -ms * 0.45;
+            const bodyBottom = ms * 0.55;
+            const finY = ms * 1.15;
+            const drawMissile = (x, y, aboard) => {
                 ctx.beginPath();
-                ctx.moveTo(x, y - pip / 2);
-                ctx.lineTo(x + pip / 2, y);
-                ctx.lineTo(x, y + pip / 2);
-                ctx.lineTo(x - pip / 2, y);
+                ctx.moveTo(x, y + tip);
+                ctx.lineTo(x + halfW, y + noseBase);
+                ctx.lineTo(x + halfW, y + bodyBottom);
+                ctx.lineTo(x + halfW + finW, y + finY);
+                ctx.lineTo(x + halfW * 0.45, y + bodyBottom);
+                ctx.lineTo(x - halfW * 0.45, y + bodyBottom);
+                ctx.lineTo(x - halfW - finW, y + finY);
+                ctx.lineTo(x - halfW, y + bodyBottom);
+                ctx.lineTo(x - halfW, y + noseBase);
                 ctx.closePath();
-                if (i < missiles) {
+                if (aboard) {
                     ctx.fillStyle = 'rgba(255, 192, 70, 0.92)';
                     ctx.fill();
                     ctx.strokeStyle = 'rgba(255, 210, 110, 0.9)';
@@ -1115,6 +1114,18 @@ export class GameUI {
                     ctx.strokeStyle = 'rgba(125, 150, 170, 0.45)';
                 }
                 ctx.stroke();
+            };
+            const hullHalf = (gridW / 2) * scale;
+            const sideOffset = Math.min(Math.max(hullHalf + ms * 0.9 + 3, ms * 1.4), width / 2 - halfW - finW - 2);
+            const leftCount = Math.ceil(missileCapacity / 2);
+            const step = ms * 2.35 + ms * 0.8;
+            const stackTop = (count) => cy - (count * step - ms * 0.8) / 2;
+            ctx.lineWidth = Math.max(1, ratio * 0.9);
+            for (let i = 0; i < missileCapacity; i += 1) {
+                const left = i < leftCount;
+                const index = left ? i : i - leftCount;
+                const count = left ? leftCount : missileCapacity - leftCount;
+                drawMissile(left ? cx - sideOffset : cx + sideOffset, stackTop(count) + index * step + ms * 1.175, i < missiles);
             }
         }
     }

@@ -694,34 +694,6 @@ button.compact {
   filter: brightness(1.18);
 }
 
-/* Tapping the target monitor engages hyperdrive when a location is locked. */
-.target-screen-hint {
-  margin: 4px 6px 0;
-  padding: 3px 6px;
-  color: #d9fffa;
-  background: rgba(12, 46, 43, 0.92);
-  border: 1px solid rgba(105, 224, 210, 0.72);
-  box-shadow: 0 0 8px rgba(105, 224, 210, 0.28);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: 0.6rem;
-  letter-spacing: 0.08em;
-  text-align: center;
-  text-shadow: 0 0 6px rgba(120, 240, 230, 0.5);
-  animation: hint-pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes hint-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
-}
-
-.cockpit-screen-target:has(.target-screen-hint:not(.is-hidden)) {
-  cursor: pointer;
-  pointer-events: auto;
-  outline: 1px solid rgba(105, 224, 210, 0.55);
-  outline-offset: -3px;
-}
-
 /* Global status messages */
 .toast-stack {
   position: absolute;
@@ -2140,6 +2112,15 @@ button.compact {
   top: 61.4%;
   width: 19.6%;
   height: 25.2%;
+  /* Tapping the target monitor cycles to the next target (hierarchy:
+     closest opponent → mission goal → other contacts/POIs). */
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.cockpit-screen-target:active {
+  outline: 1px solid rgba(105, 224, 210, 0.55);
+  outline-offset: -3px;
 }
 
 .screen-heading {
@@ -3498,11 +3479,74 @@ button.primary,
   font-size: 0.43rem;
   letter-spacing: 0.13em;
   text-align: center;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .cockpit-identity b {
   color: #b68a3d;
-  font-size: 0.52rem;
+  font-size: 0.56rem;
+}
+
+/* The card is a <button>, and the global `button:hover:not(:disabled)` rule
+   (specificity 0,2,1) would light it up gold on hover — that's the jump
+   button's job, not a hover effect. All card-state rules below use the
+   #hyperdrive-card id so they outrank the global button styles. Hover and
+   focus keep the plaque's idle look (focus still gets a quiet outline); the
+   only light on this card is the ready glow. */
+#hyperdrive-card:hover,
+#hyperdrive-card:focus-visible {
+  border-color: #6d6045;
+  border-top-color: #a47b34;
+  color: #7f8d82;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.86), inset 0 0 9px #000;
+  filter: none;
+}
+
+#hyperdrive-card:hover b,
+#hyperdrive-card:focus-visible b {
+  color: #b68a3d;
+}
+
+#hyperdrive-card:focus-visible {
+  outline: 1px dashed rgba(255, 208, 92, 0.5);
+  outline-offset: 2px;
+}
+
+/* Press feedback only (momentary), after the hover rule so it wins. */
+#hyperdrive-card:active {
+  filter: brightness(1.25);
+}
+
+/* Ready glow: the card lights up when a jump is clear to engage. */
+#hyperdrive-card[data-hyperdrive-ready="true"] {
+  border-color: #c8a24a;
+  border-top-color: #f1c978;
+  color: #d9c9a0;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.86), 0 0 14px rgba(241, 201, 120, 0.55), inset 0 0 9px #000;
+}
+
+#hyperdrive-card[data-hyperdrive-ready="true"] b {
+  color: #f1c978;
+  text-shadow: 0 0 8px rgba(241, 201, 120, 0.7);
+}
+
+.cockpit-identity em {
+  display: block;
+  min-height: 1em;
+  font-style: normal;
+  color: #9fd8cf;
+  font-size: 0.42rem;
+  letter-spacing: 0.12em;
+}
+
+#game-shell[data-hyperdrive-fx="active"] .cockpit-identity em {
+  color: #f1c978;
+}
+
+#game-shell[data-hyperdrive-fx="interrupt"] .cockpit-identity em {
+  color: #ff6b55;
 }
 
 .hud-top-left,
@@ -3582,7 +3626,9 @@ button.primary,
   }
 
   .cockpit-identity {
-    display: none;
+    min-width: 148px;
+    padding: 0.22rem 0.6rem 0.18rem;
+    font-size: 0.4rem;
   }
 }
 

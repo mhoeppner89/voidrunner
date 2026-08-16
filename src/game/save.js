@@ -4,7 +4,7 @@ import { refreshMissionOffers } from './missions.js';
 import { clamp } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
 export const SAVE_KEY = 'void-privateer-save-v1';
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 const LEGACY_LOCATION_POSITIONS = {
     helix: [-14400, 1800, 12400],
     rook: [16400, 3200, 15200],
@@ -22,7 +22,7 @@ const defaultSettings = () => ({
     touchScale: 1,
     vibration: true,
     steering: 'tilt',
-    tiltSensitivity: 1,
+    tiltSensitivity: 1.35,
     tiltInvertPitch: false,
     tiltInvertYaw: false,
     tiltNeutral: null,
@@ -103,6 +103,9 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             seed,
         },
         activeMissions: [],
+        // Reserved quest-state records (see quests.js): the main story arc's
+        // flags and choices live here, plain JSON, versioned with the save.
+        quests: [],
         settings: defaultSettings(),
     };
     refreshMissionOffers(save, true);
@@ -195,6 +198,7 @@ const hydrateSave = (candidate) => {
             scannedNodes: candidate.world?.scannedNodes ?? [],
         },
         activeMissions: candidate.activeMissions ?? [],
+        quests: candidate.quests ?? [],
     };
     // Optional fields are omitted by JSON.stringify. Preserve an undocked flight
     // state instead of inheriting the fallback save's starting dock.

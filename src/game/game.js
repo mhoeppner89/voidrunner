@@ -1073,11 +1073,23 @@ export class GameSession {
         const candidates = this.targetCandidates();
         if (!candidates.length) {
             this.clearTarget();
-            this.ui.showToast(`No ${this.save.player.mode} targets in sensor range.`, 'info');
+            this.ui.showToast('No targets in sensor range.', 'info');
             return;
         }
         const currentIndex = candidates.findIndex((entry) => entry.id === this.save.player.currentTargetId);
         const next = candidates[(currentIndex + 1) % candidates.length];
+        // Mode follows the selected target so the touch pads and radar filters match.
+        if (next.kind === 'ship')
+            this.save.player.mode = 'combat';
+        else if (next.kind === 'asteroid')
+            this.save.player.mode = 'mining';
+        else if (next.kind === 'wreck')
+            this.save.player.mode = 'salvage';
+        // Selecting a POI as a target also sets it as the hyperdrive nav point.
+        if (next.kind === 'location') {
+            this.save.player.navTargetId = next.id;
+            this.autopilot = false;
+        }
         this.applyTarget(next);
     }
     targetNearestHostile() {
@@ -1098,32 +1110,57 @@ export class GameSession {
         const orientation = quat(this.save.player.rotation);
         const forward = FORWARD.clone().applyQuaternion(orientation);
         const stats = getEffectiveShipStats(this.save.player);
+        const inRange = (position) => player.distanceTo(vec(position)) < stats.scanRange * 2.2;
+        const byDistance = (a, b) => player.distanceToSquared(vec(a.position)) - player.distanceToSquared(vec(b.position));
+        // Tier 1 — opponents: hostile ships in sensor range, closest first.
+        const opponents = this.ships
+            .filter((entry) => entry.hostile && entry.hull > 0 && inRange(entry.position))
+            .sort(byDistance)
+            .map((entry) => ({ kind: 'ship', id: entry.id, position: entry.position, name: entry.name }));
+        // Tier 2 — mission goals: the thing each active contract points at (the
+        // warrant target ship, or the destination POI to fly to).
+        const goals = [];
+        for (const mission of this.save.activeMissions) {
+            if (mission.kind === 'bounty') {
+                const target = this.ships.find((entry) => entry.missionId === mission.id && entry.hull > 0);
+                if (target)
+                    goals.push({ kind: 'ship', id: target.id, position: target.position, name: target.name });
+            }
+            else if (mission.destination && Object.prototype.hasOwnProperty.call(LOCATIONS, mission.destination)) {
+                const location = LOCATIONS[mission.destination];
+                goals.push({ kind: 'location', id: mission.destination, position: location.position, name: location.name });
+            }
+        }
+        // Tier 3 — everything else: traffic, deposits, wrecks, and POIs, scored
+        // by how close they sit to the nose.
         const score = (position) => {
             const direction = vec(position).sub(player);
             const distance = direction.length();
             const angle = forward.angleTo(direction.normalize());
             return angle * 110 + distance * 0.12;
         };
-        if (this.save.player.mode === 'combat') {
-            return this.ships
-                .filter((entry) => entry.hull > 0 && player.distanceTo(vec(entry.position)) < stats.scanRange * 2.2)
-                .map((entry) => ({ kind: 'ship', id: entry.id, position: entry.position, name: entry.name }))
-                .sort((a, b) => score(a.position) - score(b.position));
+        const others = [];
+        for (const entry of this.ships)
+            if (!entry.hostile && entry.hull > 0 && inRange(entry.position))
+                others.push({ kind: 'ship', id: entry.id, position: entry.position, name: entry.name });
+        if (this.activeInstanceId === 'shardbelt') {
+            for (const node of this.asteroids)
+                if (node.remaining > 0 && player.distanceTo(vec(node.position)) < stats.scanRange)
+                    others.push({ kind: 'asteroid', id: node.id, position: node.position, name: node.tunnelPart ? 'Rock Crown Deposit' : 'Asteroid Deposit' });
         }
-        if (this.save.player.mode === 'mining') {
-            if (this.activeInstanceId !== 'shardbelt')
-                return [];
-            return this.asteroids
-                .filter((entry) => entry.remaining > 0 && player.distanceTo(vec(entry.position)) < stats.scanRange)
-                .map((entry) => ({ kind: 'asteroid', id: entry.id, position: entry.position, name: entry.tunnelPart ? 'Rock Crown Deposit' : 'Asteroid Deposit' }))
-                .sort((a, b) => score(a.position) - score(b.position));
+        if (this.activeInstanceId === 'mourning-line') {
+            for (const node of this.wreckNodes)
+                if (node.remaining > 0 && player.distanceTo(vec(node.position)) < stats.scanRange)
+                    others.push({ kind: 'wreck', id: node.id, position: node.position, name: node.name });
         }
-        if (this.activeInstanceId !== 'mourning-line')
-            return [];
-        return this.wreckNodes
-            .filter((entry) => entry.remaining > 0 && player.distanceTo(vec(entry.position)) < stats.scanRange)
-            .map((entry) => ({ kind: 'wreck', id: entry.id, position: entry.position, name: entry.name }))
-            .sort((a, b) => score(a.position) - score(b.position));
+        for (const id of NAV_LOCATION_IDS) {
+            if (goals.some((goal) => goal.id === id))
+                continue;
+            const location = LOCATIONS[id];
+            others.push({ kind: 'location', id, position: location.position, name: location.name });
+        }
+        others.sort((a, b) => score(a.position) - score(b.position));
+        return [...opponents, ...goals, ...others];
     }
     selectTarget(kind, id) {
         let target;
@@ -1213,30 +1250,15 @@ export class GameSession {
             this.ui.showToast('Hyperdrive disengaged.', 'info');
             return;
         }
+        const block = this.hyperdriveBlockReason();
+        if (block) {
+            this.ui.showToast(block.message, block.kind, block.duration);
+            if (block.kind !== 'info')
+                this.audio.play('warning');
+            return;
+        }
         const player = vec(this.save.player.position);
-        if (this.hostilesNear(player, HYPERDRIVE_THREAT_RADIUS)) {
-            this.ui.showToast('Hyperdrive unavailable while an enemy is close.', 'danger');
-            this.audio.play('warning');
-            return;
-        }
         const nav = LOCATIONS[this.save.player.navTargetId];
-        const arrivalRadius = hyperdriveArrivalRadius(nav);
-        if (player.distanceTo(vec(nav.position)) < arrivalRadius + 12) {
-            this.ui.showToast('Already inside the selected nav drop zone.', 'info');
-            return;
-        }
-        const toNav = vec(nav.position).sub(player);
-        const forward = FORWARD.clone().applyQuaternion(quat(this.save.player.rotation)).normalize();
-        if (forward.dot(toNav.clone().normalize()) < HYPERDRIVE_ALIGNMENT) {
-            this.ui.showToast('Hyperdrive requires a clear vector: align your ship with the nav point.', 'warning', 3800);
-            this.audio.play('warning');
-            return;
-        }
-        if (this.lineBlocked(player, vec(nav.position))) {
-            this.ui.showToast('Hyperdrive path obstructed.', 'danger');
-            this.audio.play('warning');
-            return;
-        }
         this.autopilot = true;
         this.hyperdriveFx = 'spooling';
         this.hyperdriveSpoolStartedAt = this.save.world.time;
@@ -1250,6 +1272,25 @@ export class GameSession {
         }
         this.ui.showToast(`Hyperdrive vector set: ${nav.name}.`, 'success');
         this.audio.play('ui');
+    }
+    // Why a jump cannot start right now (null = clear). Shared by the toggle
+    // (toast hints on press) and the HUD model (identity-card ready glow), so
+    // the button light and the press feedback can never drift apart.
+    hyperdriveBlockReason() {
+        const player = vec(this.save.player.position);
+        if (this.hostilesNear(player, HYPERDRIVE_THREAT_RADIUS))
+            return { message: 'Hyperdrive unavailable while an enemy is close.', kind: 'danger' };
+        const nav = LOCATIONS[this.save.player.navTargetId];
+        const arrivalRadius = hyperdriveArrivalRadius(nav);
+        if (player.distanceTo(vec(nav.position)) < arrivalRadius + 12)
+            return { message: 'Already inside the selected nav drop zone.', kind: 'info' };
+        const toNav = vec(nav.position).sub(player);
+        const forward = FORWARD.clone().applyQuaternion(quat(this.save.player.rotation)).normalize();
+        if (forward.dot(toNav.clone().normalize()) < HYPERDRIVE_ALIGNMENT)
+            return { message: 'Hyperdrive requires a clear vector: align your ship with the nav point.', kind: 'warning', duration: 3800 };
+        if (this.lineBlocked(player, vec(nav.position)))
+            return { message: 'Hyperdrive path obstructed.', kind: 'danger' };
+        return null;
     }
     hyperdriveFxState() {
         const now = this.save.world.time;
@@ -2890,6 +2931,7 @@ export class GameSession {
             navDistance: player.distanceTo(vec(nav.position)),
             autopilot: this.autopilot,
             hyperdrive: this.hyperdriveFxState(),
+            hyperdriveReady: !this.autopilot && !this.hyperdriveBlockReason(),
             loadPercent: Math.round((cargoMass(this.save.player) / Math.max(1, cargoCapacity(this.save.player))) * 100),
             // Handling reflects the cargo-load penalty on turn/acceleration.
             handlingPercent: Math.round(this.flightLoadScale() * 100),
