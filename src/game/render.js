@@ -1291,11 +1291,13 @@ export class SpaceRenderer {
         for (const [x, y] of [[-1.46, -0.47], [-0.82, -0.69], [0.82, -0.69], [1.46, -0.47], [-0.72, -0.93], [0.72, -0.93]]) {
             addMesh(boltGeometry, edgeMaterial, [x, y, -1.965], [0, 0, 0], 1004);
         }
-        // A restrained grime layer gives the canopy a tactile, aged surface without hiding targets.
+        // Subtle grime layer — speck density stays the same but the alpha is
+        // dropped (0.34 → 0.16) so the dirt reads as faint canopy wear, not
+        // foreground noise.
         addMesh(new THREE.PlaneGeometry(3.72, 2.38), new THREE.MeshBasicMaterial({
             map: this.createGrimeTexture('wayfarer-canopy'),
             transparent: true,
-            opacity: 0.34,
+            opacity: 0.16,
             depthTest: false,
             depthWrite: false,
             blending: THREE.NormalBlending,
@@ -1830,18 +1832,20 @@ export class SpaceRenderer {
             this.camera.quaternion.copy(this.tmpPrevQuat).slerp(this.tmpCurQuat, alpha);
         }
         this.skyRoot.position.copy(this.camera.position);
-        this.fovTarget = afterburner ? 84 : 74 + speedRatio * 2.5;
+        // Tighter FOV swing so the cockpit frame doesn't punch in. Painted
+        // beams stay locked to the inner struts because we no longer apply
+        // --cockpit-zoom to the frame art.
+        this.fovTarget = afterburner ? 80 : 70 + speedRatio * 2.0;
         const previousFov = this.camera.fov;
         this.camera.fov += (this.fovTarget - this.camera.fov) * (1 - Math.exp(-5 * dt));
         if (Math.abs(this.camera.fov - previousFov) > 0.001)
             this.camera.updateProjectionMatrix();
-        const shiftX = clamp(-angularVelocity[1] * 2.8, -9, 9);
-        const shiftY = clamp(angularVelocity[0] * 2.0 - speedRatio * 2.2, -7, 5);
-        const roll = clamp(-angularVelocity[2] * 0.34, -1.5, 1.5);
+        const shiftX = clamp(-angularVelocity[1] * 2.4, -7, 7);
+        const shiftY = clamp(angularVelocity[0] * 1.8 - speedRatio * 1.4, -5, 4);
+        const roll = clamp(-angularVelocity[2] * 0.30, -1.2, 1.2);
         this.shell?.style.setProperty('--cockpit-shift-x', `${shiftX.toFixed(2)}px`);
         this.shell?.style.setProperty('--cockpit-shift-y', `${shiftY.toFixed(2)}px`);
         this.shell?.style.setProperty('--cockpit-roll', `${roll.toFixed(2)}deg`);
-        this.shell?.style.setProperty('--cockpit-zoom', afterburner ? '1.035' : '1.018');
     }
     setUtilityBeam(active, mode, start, end) {
         if (!active || !end) {

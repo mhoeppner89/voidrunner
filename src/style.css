@@ -683,7 +683,8 @@ button.compact {
   color: #c6e5ba;
 }
 
-/* Title */
+/* Title. Background is deep-space navy — no warm rust tint was added
+   here in any recent iteration; the in-game sky stays cool. */
 .title-screen {
   position: absolute;
   inset: 0;
@@ -692,9 +693,8 @@ button.compact {
   place-items: center;
   overflow: hidden;
   background:
-    radial-gradient(circle at 70% 38%, rgba(117, 65, 39, 0.22), transparent 32%),
-    radial-gradient(circle at 30% 45%, rgba(37, 86, 89, 0.17), transparent 37%),
-    linear-gradient(135deg, #050809, #080b0c 52%, #020304);
+    radial-gradient(ellipse at 50% 56%, rgba(20, 32, 60, 0.42), transparent 60%),
+    linear-gradient(180deg, #040814 0%, #06091a 50%, #020308 100%);
 }
 
 .title-stars {
@@ -3571,11 +3571,19 @@ button.primary,
   z-index: 1;
   background: url("../assets/remaster/cockpit-frame.webp") center / 100% 100% no-repeat;
   image-rendering: pixelated;
-  transform: translate3d(var(--cockpit-shift-x), var(--cockpit-shift-y), 0) rotate(var(--cockpit-roll)) scale(var(--cockpit-zoom));
+  transform: translate3d(var(--cockpit-shift-x), var(--cockpit-shift-y), 0) rotate(var(--cockpit-roll));
   transform-origin: 50% 72%;
   filter: contrast(1.06) saturate(0.96) brightness(0.96) drop-shadow(0 -6px 18px rgba(0, 0, 0, 0.55));
   opacity: 0.92;
   will-change: transform;
+}
+
+/* Pinn the cockpit glass vignette to the same translation+rotation as the
+   cockpit frame so painted beams and the vignette never disagree during
+   afterburner or nebula fly-throughs. */
+.cockpit-vignette {
+  transform: translate3d(var(--cockpit-shift-x), var(--cockpit-shift-y), 0) rotate(var(--cockpit-roll));
+  transform-origin: 50% 72%;
 }
 
 .cockpit-glass {
