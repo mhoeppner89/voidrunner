@@ -324,15 +324,19 @@ export class SpaceRenderer {
             this.skyRoot.add(new THREE.Points(geometry, material));
             return material;
         };
-        // Dense field of mixed-temperature stars (cool blue-white with warm giants
-        // sprinkled in). Kept dim enough that the bright end doesn't glare through the
-        // bloom pass and steal attention from ships, rocks and stations.
+        // Dense field of mixed-temperature stars. Rebalanced toward warm
+        // giants (40% warm, 50% cool-bluish, 10% distant red) so the sky keeps
+        // its sunset lean when the camera looks upward in chase views.
         layer(quality === 'low' ? 1900 : 3400, 1.5, 'normal', (color, rng) => {
-            if (rng() < 0.2) {
-                color.setHSL(0.06 + rng() * 0.06, 0.5 + rng() * 0.32, 0.5 + rng() * 0.3);
+            const r = rng();
+            if (r < 0.4) {
+                color.setHSL(0.05 + rng() * 0.1, 0.55 + rng() * 0.32, 0.55 + rng() * 0.28);
+            }
+            else if (r < 0.9) {
+                color.setHSL(0.55 + (rng() - 0.5) * 0.18, 0.22 + rng() * 0.32, 0.5 + rng() * 0.28);
             }
             else {
-                color.setHSL(0.55 + (rng() - 0.5) * 0.22, 0.22 + rng() * 0.42, 0.52 + rng() * 0.3);
+                color.setHSL(0.97 + rng() * 0.06, 0.45 + rng() * 0.3, 0.45 + rng() * 0.25);
             }
         });
         // Sparse bright layer that shimmers — the main source of "HDR glare", so its
