@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v39-theme-consolidation';
+const CACHE = 'voidrunner-v41-afterburn-boost';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',

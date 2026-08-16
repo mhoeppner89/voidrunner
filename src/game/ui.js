@@ -5,7 +5,7 @@ import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from
 import { shipTopDownProfile } from './voxelModels.js';
 const escapeHtml = (value) => value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const percent = (value, max) => (max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100)));
-const GAME_VERSION = '0.3.30';
+const GAME_VERSION = '0.3.32';
 export class GameUI {
     root;
     viewport;

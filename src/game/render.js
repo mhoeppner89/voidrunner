@@ -1394,9 +1394,6 @@ export class SpaceRenderer {
         this.shell.dataset.hyperdriveFx = state;
         this.shell.style.setProperty('--hyperdrive-progress', clamp(progress, 0, 1).toFixed(3));
     }
-    setGStrain(value) {
-        this.shell?.style.setProperty('--g-strain', clamp(value, 0, 1).toFixed(3));
-    }
     updateCamera(position, prevPosition, rotation, prevRotation, angularVelocity, speedRatio, afterburner, dt, alpha = 0) {
         this.camera.position.set(...position);
         if (prevPosition && alpha > 0) {

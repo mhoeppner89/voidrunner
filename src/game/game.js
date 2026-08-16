@@ -160,7 +160,6 @@ export class GameSession {
     frameId = 0;
     lastFrame = performance.now();
     simAccumulator = 0;
-    gFatigue = 0;
     active = true;
     autopilot = false;
     afterburning = false;
@@ -310,7 +309,6 @@ export class GameSession {
         this.hyperdriveFx = 'none';
         this.hyperdriveEncounterAt = null;
         this.deathTimer = 0;
-        this.gFatigue = 0;
         this.renderer.setCockpitVisible(true);
         this.audio.setStationMode(false);
         this.ui.hideDock();
@@ -571,6 +569,13 @@ export class GameSession {
             this.hyperdriveFxUntil = this.save.world.time + HYPERDRIVE_FX_DURATION;
             this.ui.showToast('Hyperdrive disengaged by manual input.', 'warning');
         }
+        // Afterburner: the burn is live whenever the button is held with fuel
+        // (never in autopilot), at ANY throttle and ANY speed — turn authority
+        // doubles and the burn visuals (FOV, cockpit zoom, engine audio) play
+        // the whole time. Only the speed ceiling is gated: it rises to
+        // afterburnSpeed once the ship is moving at >= 90% of max speed, so
+        // below that the burn holds the current speed instead of adding to it.
+        this.afterburning = !this.autopilot && actions.afterburner && this.save.player.fuel > 0.5;
         if (this.autopilot) {
             if (this.hyperdriveEncounterAt !== null && this.save.world.time >= this.hyperdriveEncounterAt) {
                 this.hyperdriveEncounterAt = null;
@@ -595,30 +600,21 @@ export class GameSession {
         else {
             // Afterburn doubles turn authority so a boost is also a fight move,
             // not just a straight-line speedup.
-            const burnBoost = (actions.afterburner && this.save.player.throttle > 0.55 && this.save.player.fuel > 0.5) ? 2 : 1;
-            // G-fatigue: sustained hard turns bleed turn authority (pilot strain),
-            // and recover in straight flight. Strain tracks the actual rotation
-            // rate, so wrenching a full-rate turn wears the pilot out but a
-            // gentle cruise does not.
-            const spinRate = angularVelocity.length();
-            const gTarget = clamp(spinRate / 0.8, 0, 1);
-            this.gFatigue += (gTarget - this.gFatigue) * (1 - Math.exp(-(gTarget > this.gFatigue ? 1.4 : 0.55) * dt));
-            const gFactor = 1 - this.gFatigue * 0.4;
-            angularVelocity.x += actions.pitch * stats.angularAcceleration * gFactor * burnBoost * dt;
-            angularVelocity.y += -actions.yaw * stats.angularAcceleration * gFactor * burnBoost * dt;
-            angularVelocity.z += -actions.roll * stats.angularAcceleration * gFactor * burnBoost * dt;
+            const burnBoost = this.afterburning ? 2 : 1;
+            angularVelocity.x += actions.pitch * stats.angularAcceleration * burnBoost * dt;
+            angularVelocity.y += -actions.yaw * stats.angularAcceleration * burnBoost * dt;
+            angularVelocity.z += -actions.roll * stats.angularAcceleration * burnBoost * dt;
             const dampingRate = stats.angularDamping * (this.save.settings.flightAssist ? 1 : 0.38);
             angularVelocity.multiplyScalar(Math.exp(-dampingRate * dt));
             const deltaRotation = this.tmpQ2.setFromEuler(new THREE.Euler(angularVelocity.x * dt, angularVelocity.y * dt, angularVelocity.z * dt, 'XYZ'));
             orientation.multiply(deltaRotation).normalize();
         }
         const forward = FORWARD.clone().applyQuaternion(orientation).normalize();
-        // Afterburner speed boost only once the ship is moving at a good clip
-        // (>= 90% of max speed); below that it still doubles turn authority so
-        // the button is never dead — it just can't add speed you haven't built.
-        this.afterburning = !this.autopilot && actions.afterburner && this.save.player.throttle > 0.55 && this.save.player.fuel > 0.5 && velocity.length() >= 0.9 * stats.maxSpeed;
         let targetSpeed = this.save.player.throttle * stats.maxSpeed;
-        if (this.afterburning)
+        // Speed gate: below 90% of max speed the burn holds the current cruise
+        // ceiling (turn move); past it the ceiling rises to afterburnSpeed and
+        // the damped acceleration below ramps the boost in smoothly.
+        if (this.afterburning && velocity.length() >= 0.9 * stats.maxSpeed)
             targetSpeed = this.save.player.throttle * stats.afterburnSpeed;
         if (this.autopilot) {
             // Charge-up hold: the ship stays put (steering only) while the drive spools,
@@ -1419,7 +1415,9 @@ export class GameSession {
         // (rotating perpendicular bias + matching roll) so the dodge works in
         // three dimensions. Gate rolls ~45% every few seconds while threatened
         // and then rests on a cooldown, so it reads as a natural combat reflex
-        // rather than a permanent spin.
+        // rather than a permanent spin. The bias rotates slowly enough that the
+        // nose can track it, and the roll is folded into the slerp target below
+        // so the maneuver is one coordinated barrel roll, not a wobble.
         let spiraling = false;
         if ((evasive || damaged) && !ship.fleeing && !ship.covering) {
             if (!(ship.spiralT > 0) && this.save.world.time >= (ship.spiralCooldownUntil ?? 0)) {
@@ -1481,7 +1479,7 @@ export class GameSession {
         }
         desired.addScaledVector(lateral, jink);
         if (spiraling) {
-            ship.spiralPhase = (ship.spiralPhase ?? 0) + dt * 6;
+            ship.spiralPhase = (ship.spiralPhase ?? 0) + dt * 3.2;
             const s = Math.sin(ship.spiralPhase) * 0.55;
             const c = Math.cos(ship.spiralPhase) * 0.45;
             const upV = this.tmpL.crossVectors(lateral, direct);
@@ -1514,22 +1512,28 @@ export class GameSession {
         const rightBanked = right.multiplyScalar(cosB).addScaledVector(this.tmpL, sinB);
         this.tmpL.crossVectors(desired, up);
         const upBanked = up.multiplyScalar(cosB).addScaledVector(this.tmpL, sinB);
-        this.tmpD.copy(desired).negate();
-        this.tmpQ2.setFromRotationMatrix(this.tmpM4.makeBasis(rightBanked, upBanked, this.tmpD));
-        // G-fatigue: the pilot strains on big nose swings, so sustained reversals
-        // bleed turn authority instead of allowing instant 180° pivots.
-        const strainTarget = clamp(orientation.angleTo(this.tmpQ2) / 2, 0, 1);
-        ship.gFatigue += (strainTarget - ship.gFatigue) * (1 - Math.exp(-(strainTarget > ship.gFatigue ? 1.4 : 0.6) * dt));
-        orientation.slerp(this.tmpQ2, 1 - Math.exp(-ship.turnRate * (1 - ship.gFatigue * 0.5) * dt));
-        orientation.normalize();
+        // Coordinated corkscrew roll: while spiraling, the target attitude rolls
+        // around the flight axis at the same rate (and in the same sense) the nose
+        // bias circles, so the dodge reads as a smooth barrel roll instead of a
+        // wobble. The roll lives inside the slerp target, so the turn slerp below
+        // carries it rather than fighting a per-frame post-roll. Guns stay forward.
         if (spiraling) {
-            // Bank into the corkscrew around the flight axis; guns stay forward,
-            // so the pilot keeps firing while dodging in three dimensions.
-            // (tmpQ2 is free here: the slerp above consumed its target.)
-            const fwd = this.tmpC.copy(FORWARD).applyQuaternion(orientation);
-            this.tmpQ2.setFromAxisAngle(fwd, Math.sin(ship.spiralPhase) * 0.9 * (ship.spiralSign ?? 1));
-            orientation.multiply(this.tmpQ2).normalize();
+            const rollAngle = (ship.spiralPhase ?? 0) * (ship.spiralSign ?? 1);
+            const cosR = Math.cos(rollAngle);
+            const sinR = Math.sin(rollAngle);
+            // Stage the rotated right in tmpF (predicted is dead past the aim
+            // point): the banked right/up must both be read pre-rotation.
+            this.tmpF.copy(rightBanked).multiplyScalar(cosR).addScaledVector(upBanked, sinR);
+            upBanked.multiplyScalar(cosR).addScaledVector(rightBanked, -sinR);
+            this.tmpD.copy(desired).negate();
+            this.tmpQ2.setFromRotationMatrix(this.tmpM4.makeBasis(this.tmpF, upBanked, this.tmpD));
         }
+        else {
+            this.tmpD.copy(desired).negate();
+            this.tmpQ2.setFromRotationMatrix(this.tmpM4.makeBasis(rightBanked, upBanked, this.tmpD));
+        }
+        orientation.slerp(this.tmpQ2, 1 - Math.exp(-ship.turnRate * dt));
+        orientation.normalize();
         // Fly where the nose points at a controlled speed. A scalar throttle damp
         // (rather than a vector lerp) means the nose can sweep a 180° yo-yo turn
         // without the velocity vector collapsing toward zero mid-turn.
@@ -1591,9 +1595,7 @@ export class GameSession {
             desired.add(shipAvoidance);
         desired.normalize();
         this.tmpQ2.setFromUnitVectors(FORWARD, desired);
-        const strainTarget = clamp(orientation.angleTo(this.tmpQ2) / 2, 0, 1);
-        ship.gFatigue += (strainTarget - ship.gFatigue) * (1 - Math.exp(-(strainTarget > ship.gFatigue ? 1.4 : 0.6) * dt));
-        orientation.slerp(this.tmpQ2, 1 - Math.exp(-ship.turnRate * (1 - ship.gFatigue * 0.5) * 0.62 * dt));
+        orientation.slerp(this.tmpQ2, 1 - Math.exp(-ship.turnRate * 0.62 * dt));
         velocity.lerp(desired.multiplyScalar(ship.speed * (ship.role === 'trader' ? 0.72 : 0.5)), 1 - Math.exp(-0.55 * dt));
         position.addScaledVector(velocity, dt);
         tupleInto(ship.position, position);
@@ -1639,7 +1641,7 @@ export class GameSession {
                 if (targetPosition) {
                     const desired = targetPosition.sub(start).normalize().multiplyScalar(92);
                     velocity.lerp(desired, 1 - Math.exp(-2.8 * dt));
-                    this.projStore.setVel(projectile.slot, velocity);
+                    this.projStore.setVelV(projectile.slot, velocity);
                 }
             }
             const end = this.tmpP2.copy(start).addScaledVector(velocity, dt);
@@ -1839,7 +1841,6 @@ export class GameSession {
         this.save.player.fuel = stats.fuel * 0.35;
         this.save.player.missiles = 0;
         this.save.player.dockedAt = dock;
-        this.gFatigue = 0;
         this.renderer.setCockpitVisible(false);
         this.audio.setStationMode(true);
         this.ui.hideHud();
@@ -2001,8 +2002,6 @@ export class GameSession {
             afterburnSpeed: role === 'bounty' ? 64 : role === 'pirate' || role === 'escort' ? 57 : 0,
             turnRate: role === 'bounty' ? 1.55 : role === 'pirate' || role === 'escort' ? 1.35 : role === 'patrol' ? 1.1 : 0.72,
             gunDamage: role === 'bounty' ? 10 : role === 'pirate' ? 7.5 : role === 'escort' ? 6.5 : role === 'patrol' ? 7 : 4,
-            // Pilot G-fatigue (0..1): sustained hard turns bleed turn authority.
-            gFatigue: 0,
             hostile,
             bountyValue: role === 'bounty' ? 900 : role === 'pirate' || role === 'escort' ? randomInt(rng, 170, 420) : 0,
             aiState: hostile ? 'attack' : role === 'miner' ? 'mine' : role === 'patrol' ? 'patrol' : 'travel',
@@ -2748,7 +2747,6 @@ export class GameSession {
         // completed step (prev*) and the current state. Zero when docked/paused.
         const alpha = clamp(this.simAccumulator / SIM_STEP, 0, 1);
         this.renderer.setHyperdriveFx(fxState.fx, fxState.progress);
-        this.renderer.setGStrain(this.gFatigue);
         this.renderer.updateCamera(this.save.player.position, this.save.player.prevPosition, this.save.player.rotation, this.save.player.prevRotation, this.save.player.angularVelocity, clamp(speed / Math.max(1, stats.afterburnSpeed), 0, 2), this.afterburning || (this.autopilot && speed > stats.afterburnSpeed), dt, alpha);
         this.renderer.setDamageWarning(1 - this.save.player.hull / stats.hull);
         this.renderer.syncShips(this.ships, alpha);
@@ -2869,7 +2867,7 @@ export class GameSession {
             : undefined;
         return {
             speed: this.autopilot ? speed / (HYPERDRIVE_CRUISE_SPEED / HYPERDRIVE_DISPLAY_SPEED) : displaySpeed(speed),
-            maxSpeed: this.autopilot ? HYPERDRIVE_DISPLAY_SPEED : displaySpeed(this.afterburning ? stats.afterburnSpeed : stats.maxSpeed),
+            maxSpeed: this.autopilot ? HYPERDRIVE_DISPLAY_SPEED : displaySpeed(this.afterburning && speed >= 0.9 * stats.maxSpeed ? stats.afterburnSpeed : stats.maxSpeed),
             throttle: this.save.player.throttle,
             afterburner: this.afterburning,
             fuel: this.save.player.fuel,
@@ -2892,8 +2890,8 @@ export class GameSession {
             autopilot: this.autopilot,
             hyperdrive: this.hyperdriveFxState(),
             loadPercent: Math.round((cargoMass(this.save.player) / Math.max(1, cargoCapacity(this.save.player))) * 100),
-            // Handling folds in both the cargo-load penalty and pilot G-fatigue.
-            handlingPercent: Math.round(this.flightLoadScale() * (1 - this.gFatigue * 0.4) * 100),
+            // Handling reflects the cargo-load penalty on turn/acceleration.
+            handlingPercent: Math.round(this.flightLoadScale() * 100),
             zone: this.zoneLabel(this.getWorldZone(player)),
             target: hudTarget,
             prompt: dockPrompt,
