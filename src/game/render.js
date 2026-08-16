@@ -1774,14 +1774,22 @@ export class SpaceRenderer {
             this.camera.quaternion.copy(this.tmpPrevQuat).slerp(this.tmpCurQuat, alpha);
         }
         this.skyRoot.position.copy(this.camera.position);
-        // Tighter FOV swing so the cockpit frame doesn't punch in. Painted
-        // beams stay locked to the inner struts because we no longer apply
-        // --cockpit-zoom to the frame art.
+        // Tighter FOV swing so the cockpit frame doesn't punch in.
         this.fovTarget = afterburner ? 80 : 70 + speedRatio * 2.0;
         const previousFov = this.camera.fov;
         this.camera.fov += (this.fovTarget - this.camera.fov) * (1 - Math.exp(-5 * dt));
         if (Math.abs(this.camera.fov - previousFov) > 0.001)
             this.camera.updateProjectionMatrix();
+        // Counter-scale the cockpit group (which now only contains the grime
+        // plane) so it keeps its apparent on-screen size when the FOV widens
+        // (e.g. afterburner 70° → 80°). Without this, the grime shrinks
+        // during afterburner and reads as "moving away".
+        if (this.cockpit) {
+            const baseHalfFovTan = Math.tan(70 * 0.5 * Math.PI / 180);
+            const currentHalfFovTan = Math.tan(this.camera.fov * 0.5 * Math.PI / 180);
+            const fovCompScale = baseHalfFovTan / currentHalfFovTan;
+            this.cockpit.scale.setScalar(fovCompScale);
+        }
         const shiftX = clamp(-angularVelocity[1] * 2.4, -7, 7);
         const shiftY = clamp(angularVelocity[0] * 1.8 - speedRatio * 1.4, -5, 4);
         const roll = clamp(-angularVelocity[2] * 0.30, -1.2, 1.2);
