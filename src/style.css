@@ -160,10 +160,11 @@ button.compact {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.5), transparent 9%, transparent 91%, rgba(0, 0, 0, 0.5)),
-    linear-gradient(0deg, rgba(0, 0, 0, 0.5), transparent 19%, transparent 91%, rgba(0, 0, 0, 0.24)),
-    radial-gradient(circle at center, transparent 48%, rgba(0, 0, 0, 0.42) 100%);
+    linear-gradient(90deg, rgba(0, 0, 0, 0.32), transparent 9%, transparent 91%, rgba(0, 0, 0, 0.32)),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.32), transparent 19%, transparent 91%, rgba(0, 0, 0, 0.16)),
+    radial-gradient(circle at center, transparent 48%, rgba(0, 0, 0, 0.28) 100%);
   mix-blend-mode: multiply;
+  opacity: 0.85;
 }
 
 .hud-top-left,
@@ -694,11 +695,11 @@ button.compact {
   place-items: center;
   overflow: hidden;
   background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.92) 0 7%, rgba(0, 0, 0, 0.52) 35%, rgba(0, 0, 0, 0.14) 68%, rgba(0, 0, 0, 0.42)),
-    linear-gradient(0deg, rgba(0, 0, 0, 0.86), transparent 55%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0 7%, rgba(0, 0, 0, 0.30) 35%, rgba(0, 0, 0, 0.08) 68%, rgba(0, 0, 0, 0.26)),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.55), transparent 55%),
     url("../art/title-cockpit.webp") center / cover no-repeat;
   image-rendering: pixelated;
-  filter: contrast(1.05) saturate(1.12) brightness(1.05);
+  filter: contrast(1.12) saturate(1.32) brightness(1.55);
 }
 
 .title-stars {
@@ -2684,11 +2685,11 @@ button.primary,
   justify-content: flex-start;
   padding: clamp(1.1rem, 4vw, 4rem);
   background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.92) 0 7%, rgba(0, 0, 0, 0.52) 35%, rgba(0, 0, 0, 0.14) 68%, rgba(0, 0, 0, 0.42)),
-    linear-gradient(0deg, rgba(0, 0, 0, 0.86), transparent 55%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0 7%, rgba(0, 0, 0, 0.30) 35%, rgba(0, 0, 0, 0.08) 68%, rgba(0, 0, 0, 0.26)),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.55), transparent 55%),
     url("../art/title-cockpit.webp") center / cover no-repeat;
   image-rendering: pixelated;
-  filter: contrast(1.05) saturate(1.12) brightness(1.05);
+  filter: contrast(1.12) saturate(1.32) brightness(1.55);
 }
 
 /* Stripped: the warm sunset gradient previously painted over the entire
@@ -3585,8 +3586,8 @@ button.primary,
   image-rendering: pixelated;
   transform: translate3d(var(--cockpit-shift-x), var(--cockpit-shift-y), 0) rotate(var(--cockpit-roll));
   transform-origin: 50% 72%;
-  filter: contrast(1.06) saturate(0.96) brightness(0.96) drop-shadow(0 -6px 18px rgba(0, 0, 0, 0.55));
-  opacity: 0.92;
+  filter: contrast(1.06) saturate(1.00) brightness(1.04) drop-shadow(0 -6px 18px rgba(0, 0, 0, 0.55));
+  opacity: 1 !important;
   will-change: transform;
 }
 
@@ -4152,8 +4153,8 @@ button.primary,
 .title-screen {
   background-color: transparent;
   background-image:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.92) 0 7%, rgba(0, 0, 0, 0.52) 35%, rgba(0, 0, 0, 0.14) 68%, rgba(0, 0, 0, 0.42)),
-    linear-gradient(0deg, rgba(0, 0, 0, 0.86), transparent 55%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0 7%, rgba(0, 0, 0, 0.30) 35%, rgba(0, 0, 0, 0.08) 68%, rgba(0, 0, 0, 0.26)),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.55), transparent 55%),
     url("../art/title-cockpit.webp") center / cover no-repeat;
 }
 

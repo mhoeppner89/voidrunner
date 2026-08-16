@@ -631,39 +631,119 @@ export class SpaceRenderer {
             const accentC = new THREE.Color(accent);
             const baseC = baseColor;
             const phaseOffset = rng() * Math.PI * 2;
+            // Pull palette geography from the seed so every planet gets a
+            // unique mix of warm/cool regions instead of a flat single-hue disc.
+            const hueShift = (rng() - 0.5) * 0.04 + (baseColor.r > baseColor.b ? 0.02 : -0.02);
+            const continentCount = 4 + Math.floor(rng() * 4);
+            const continents = [];
+            for (let i = 0; i < continentCount; i += 1) {
+                continents.push({
+                    cx: rng() * size,
+                    cy: 0.18 + rng() * 0.7 * size,
+                    rx: 28 + rng() * 56,
+                    ry: 14 + rng() * 28,
+                    rot: rng() * Math.PI * 2,
+                    warmth: 0.32 + rng() * 0.34,
+                });
+            }
             for (let y = 0; y < size; y += 1) {
                 const lat = (y / size) * 2 - 1;
                 const band = Math.sin(lat * 10 + phaseOffset) * 0.5 + 0.5;
-                const noise = (rng() - 0.5) * 0.16;
+                const swirl = Math.sin(lat * 28 + phaseOffset * 1.7 + y * 0.13) * 0.5 + 0.5;
+                const noise = (rng() - 0.5) * 0.22;
                 const row = baseC.clone().lerp(accentC, 0.18 + band * 0.55 + noise);
+                row.offsetHSL(hueShift * (swirl - 0.5), 0, (swirl - 0.5) * 0.06);
                 if (Math.abs(lat) < 0.18)
                     row.offsetHSL(0, -0.05, -0.06);
                 context.fillStyle = cssHex(row.getHex());
                 context.fillRect(0, y, size, 1);
+                // Landmass / ocean basin: an elongated ellipse per continent
+                // adds warm patchiness for Vesper (rust deserts vs cool dust
+                // plains) and warm-ochre continents on Azure's teal seas.
+                for (const c of continents) {
+                    const cosR = Math.cos(c.rot);
+                    const sinR = Math.sin(c.rot);
+                    const dx = y - c.cy;
+                    const u = (Math.sin(((y * 1.7 + c.cy * 0.4) % size) / size * Math.PI * 2) + 1) * size * 0.5;
+                    const ox = (((u + c.cx) % size) + size) % size - c.cx;
+                    const lx = ox * cosR - dx * sinR;
+                    const ly = ox * sinR + dx * cosR;
+                    const d = (lx * lx) / (c.rx * c.rx) + (ly * ly) / (c.ry * c.ry);
+                    if (d <= 1) {
+                        const landShade = baseC.clone().offsetHSL(hueShift + (baseColor.r > baseColor.b ? 0.03 : -0.04 - band * 0.03), 0.06, 0.18 + (1 - d) * 0.14);
+                        context.fillStyle = cssHex(landShade.getHex());
+                        context.fillRect(0, y, size, 1);
+                    }
+                }
             }
-            // 2-3 storm-eye spots (Galilean-style) at varying latitudes.
-            const stormCount = 2 + Math.floor(rng() * 2);
+            // 3-5 storm-eye spots (Galilean-style) at varying latitudes.
+            const stormCount = 3 + Math.floor(rng() * 3);
             for (let i = 0; i < stormCount; i += 1) {
                 const sy = Math.floor((0.15 + rng() * 0.7) * size);
                 const sx = Math.floor(rng() * size);
-                const r = 4 + Math.floor(rng() * 6);
+                const r = 5 + Math.floor(rng() * 8);
+                const rotate = rng() * Math.PI * 2;
+                // Vortex: hotter core, dark outer ring, hot wisps trailing.
                 for (let dy = -r; dy <= r; dy += 1) {
                     for (let dx = -r; dx <= r; dx += 1) {
-                        if (dx * dx + dy * dy > r * r)
+                        const d2 = dx * dx + dy * dy;
+                        if (d2 > r * r)
                             continue;
                         const px = ((sx + dx) % size + size) % size;
                         const py = sy + dy;
                         if (py < 0 || py >= size)
                             continue;
-                        context.fillStyle = `rgba(${Math.round(accentC.r * 255)},${Math.round(accentC.g * 255)},${Math.round(accentC.b * 255)},0.45)`;
-                        context.fillRect(px, py, 1, 1);
+                        const t = Math.sqrt(d2) / r;
+                        let alpha = 0;
+                        let rC = accentC.r, gC = accentC.g, bC = accentC.b;
+                        if (t < 0.32) {
+                            // Hot eye
+                            alpha = 0.62 * (1 - t / 0.32);
+                            rC = 1; gC = 0.95; bC = 0.86;
+                        }
+                        else if (t < 0.62) {
+                            // Mid eye wall
+                            alpha = 0.42;
+                        }
+                        else if (t < 0.95) {
+                            // Trailing wisps (rotated)
+                            const wa = Math.atan2(dy, dx) - rotate;
+                            if (Math.abs(((wa + Math.PI) % (Math.PI * 0.42)) - Math.PI * 0.21) < 0.18) {
+                                alpha = 0.34 * (1 - (t - 0.62) / 0.33);
+                            }
+                        }
+                        if (alpha > 0.05) {
+                            context.fillStyle = `rgba(${Math.round(rC * 255)},${Math.round(gC * 255)},${Math.round(bC * 255)},${alpha})`;
+                            context.fillRect(px, py, 1, 1);
+                        }
                     }
                 }
             }
-            // Polar cap on whichever pole this render tipped.
-            const cap = rng() > 0.5 ? 0 : size - 6;
-            context.fillStyle = 'rgba(255,255,255,0.35)';
-            context.fillRect(0, cap, size, 6);
+            // Twin polar caps: dim white caps ringed by cooler bands.
+            for (const poleY of [0, size]) {
+                const grad = context.createLinearGradient(0, poleY === 0 ? 0 : size - 28, 0, poleY === 0 ? 28 : size);
+                grad.addColorStop(0, 'rgba(232, 240, 246, 0.86)');
+                grad.addColorStop(0.55, 'rgba(186, 210, 230, 0.42)');
+                grad.addColorStop(1, 'rgba(120, 156, 188, 0)');
+                context.fillStyle = grad;
+                context.fillRect(0, poleY === 0 ? 0 : size - 28, size, 28);
+            }
+            // Sparse cloud plumes: long thin warm streaks across the bandline.
+            const plumes = 6 + Math.floor(rng() * 6);
+            for (let i = 0; i < plumes; i += 1) {
+                const py = Math.floor((0.12 + rng() * 0.76) * size);
+                const start = Math.floor(rng() * size);
+                const width = 22 + Math.floor(rng() * 40);
+                const alpha = 0.18 + rng() * 0.18;
+                for (let d = 0; d < width; d += 1) {
+                    const px = ((start + d) % size + size) % size;
+                    const pxRow = py + Math.round(Math.sin(d * 0.32) * 2);
+                    if (pxRow < 0 || pxRow >= size)
+                        continue;
+                    context.fillStyle = `rgba(214, 230, 240, ${alpha * (1 - d / width)})`;
+                    context.fillRect(px, pxRow, 1, 2);
+                }
+            }
         }
         return this.configurePixelTexture(new THREE.CanvasTexture(canvas));
     }
@@ -831,25 +911,25 @@ export class SpaceRenderer {
         const group = new THREE.Group();
         group.position.set(...location.position);
         group.name = `planet-${id}`;
-        const surfaceTexture = this.createPixelPanelTexture(`${id}-surface`, color, atmosphere, 'planet', 512);
-        surfaceTexture.repeat.set(id === 'azure' ? 9 : 7, 4.5);
-        const surface = new THREE.Mesh(new THREE.SphereGeometry(location.radius, 128, 80), new THREE.MeshStandardMaterial({
+        const surfaceTexture = this.createPixelPanelTexture(`${id}-surface`, color, atmosphere, 'planet', 1024);
+        surfaceTexture.repeat.set(id === 'azure' ? 14 : 11, 7);
+        const surface = new THREE.Mesh(new THREE.SphereGeometry(location.radius, 192, 128), new THREE.MeshStandardMaterial({
             color: 0xffffff,
             map: surfaceTexture,
-            roughness: id === 'azure' ? 0.46 : 0.94,
-            metalness: id === 'azure' ? 0.14 : 0.02,
+            roughness: id === 'azure' ? 0.62 : 0.94,
+            metalness: id === 'azure' ? 0.10 : 0.02,
             emissive: dark,
-            emissiveIntensity: 0.28,
-            flatShading: true,
+            emissiveIntensity: id === 'azure' ? 0.42 : 0.32,
+            flatShading: false,
             fog: false,
         }));
         surface.name = 'surface';
         group.add(surface);
-        const clouds = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.014, 96, 56), new THREE.MeshBasicMaterial({
+        const clouds = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.018, 128, 80), new THREE.MeshBasicMaterial({
             map: this.createCloudTexture(id),
             color: atmosphere,
             transparent: true,
-            opacity: id === 'azure' ? 0.46 : 0.38,
+            opacity: id === 'azure' ? 0.28 : 0.40,
             depthWrite: false,
             fog: false,
         }));
