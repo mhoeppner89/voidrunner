@@ -1225,82 +1225,25 @@ export class SpaceRenderer {
         });
     }
     createCockpit() {
-        const frameMap = this.createPixelPanelTexture('cockpit-frame', 0x171a18, 0x8f7544, 'metal', 64);
-        frameMap.repeat.set(5, 2);
-        const consoleMap = this.createPixelPanelTexture('cockpit-console', 0x242821, 0xd29a3f, 'rust', 64);
-        consoleMap.repeat.set(4, 2);
-        const frameMaterial = new THREE.MeshBasicMaterial({ color: 0x77776a, map: frameMap, depthTest: false, depthWrite: false });
-        const darkMaterial = new THREE.MeshBasicMaterial({ color: 0x343a35, map: consoleMap, depthTest: false, depthWrite: false });
-        const edgeMaterial = new THREE.MeshBasicMaterial({ color: 0x756e58, depthTest: false, depthWrite: false });
-        const blackMaterial = new THREE.MeshBasicMaterial({ color: 0x050807, depthTest: false, depthWrite: false });
-        const amberMaterial = new THREE.MeshBasicMaterial({ color: 0xe1a343, depthTest: false, depthWrite: false, toneMapped: false });
-        const tealMaterial = new THREE.MeshBasicMaterial({ color: 0x55cdb8, depthTest: false, depthWrite: false, toneMapped: false });
-        const warningMaterial = new THREE.MeshBasicMaterial({ color: 0x6f211a, depthTest: false, depthWrite: false, toneMapped: false });
-        const leftScreenMaterial = new THREE.MeshBasicMaterial({ map: this.createInstrumentTexture('cockpit-left', 0x57d6bc), color: 0xb2ffe9, depthTest: false, depthWrite: false });
-        const rightScreenMaterial = new THREE.MeshBasicMaterial({ map: this.createInstrumentTexture('cockpit-right', 0x58c8d6), color: 0xb9f6ff, depthTest: false, depthWrite: false });
-        const addMesh = (geometry, material, position, rotation = [0, 0, 0], order = 999, name) => {
-            const mesh = new THREE.Mesh(geometry, material);
-            mesh.position.set(...position);
-            mesh.rotation.set(...rotation);
-            mesh.renderOrder = order;
-            mesh.frustumCulled = false;
-            if (name)
-                mesh.name = name;
-            this.cockpit.add(mesh);
-            return mesh;
-        };
-        addMesh(new THREE.BoxGeometry(3.15, 0.5, 0.72), darkMaterial, [0, -0.98, -1.54], [-0.12, 0, 0]);
-        addMesh(new THREE.BoxGeometry(1.25, 0.26, 0.42), frameMaterial, [0, -0.73, -1.76], [-0.07, 0, 0], 1000);
-        addMesh(new THREE.BoxGeometry(3.28, 0.055, 0.07), edgeMaterial, [0, -0.69, -1.92], [0, 0, 0], 1002);
-        addMesh(new THREE.BoxGeometry(0.62, 0.22, 0.36), blackMaterial, [0, -0.84, -1.91], [-0.03, 0, 0], 1001);
-        const leftConsole = addMesh(new THREE.BoxGeometry(1.06, 0.82, 1.28), darkMaterial, [-1.38, -0.69, -1.29], [-0.09, -0.27, -0.07]);
-        const rightConsole = addMesh(new THREE.BoxGeometry(1.06, 0.82, 1.28), darkMaterial, [1.38, -0.69, -1.29], [-0.09, 0.27, 0.07]);
-        leftConsole.scale.z = rightConsole.scale.z = 1.04;
-        addMesh(new THREE.BoxGeometry(0.74, 0.46, 0.07), frameMaterial, [-1.09, -0.56, -1.77], [-0.05, 0.18, -0.02], 1000);
-        addMesh(new THREE.PlaneGeometry(0.62, 0.34), leftScreenMaterial, [-1.085, -0.555, -1.815], [-0.05, 0.18, -0.02], 1001);
-        addMesh(new THREE.BoxGeometry(0.74, 0.46, 0.07), frameMaterial, [1.09, -0.56, -1.77], [-0.05, -0.18, 0.02], 1000);
-        addMesh(new THREE.PlaneGeometry(0.62, 0.34), rightScreenMaterial, [1.085, -0.555, -1.815], [-0.05, -0.18, 0.02], 1001);
-        // Dense rows of instrument lamps and physical switches.
-        for (let row = 0; row < 2; row += 1) {
-            for (let column = 0; column < 7; column += 1) {
-                const x = -0.62 + column * 0.205;
-                const material = column === 6 && row === 0 ? warningMaterial : (column + row) % 3 === 0 ? tealMaterial : amberMaterial;
-                const lamp = addMesh(new THREE.BoxGeometry(0.11, 0.042, 0.024), material, [x, -0.708 - row * 0.075, -1.955], [0, 0, 0], 1003);
-                if (column === 6 && row === 0)
-                    lamp.name = 'warning-light';
-            }
-        }
-        for (const side of [-1, 1]) {
-            for (let column = 0; column < 3; column += 1) {
-                addMesh(new THREE.BoxGeometry(0.085, 0.045, 0.024), column === 1 ? tealMaterial : amberMaterial, [side * (0.91 + column * 0.12), -0.85, -1.84], [0, side * -0.12, 0], 1003);
-            }
-        }
-        // Heavy canopy rails, layered to create the enclosed Privateer-style cockpit silhouette.
-        addMesh(new THREE.BoxGeometry(0.105, 2.55, 0.13), frameMaterial, [-1.08, 0.34, -1.56], [0, 0, -0.305], 998);
-        addMesh(new THREE.BoxGeometry(0.105, 2.55, 0.13), frameMaterial, [1.08, 0.34, -1.56], [0, 0, 0.305], 998);
-        addMesh(new THREE.BoxGeometry(0.052, 2.42, 0.15), edgeMaterial, [-1.01, 0.35, -1.64], [0, 0, -0.305], 999);
-        addMesh(new THREE.BoxGeometry(0.052, 2.42, 0.15), edgeMaterial, [1.01, 0.35, -1.64], [0, 0, 0.305], 999);
-        addMesh(new THREE.BoxGeometry(1.72, 0.12, 0.14), frameMaterial, [0, 1.13, -1.59], [0, 0, 0], 998);
-        addMesh(new THREE.BoxGeometry(1.58, 0.045, 0.15), edgeMaterial, [0, 1.07, -1.66], [0, 0, 0], 999);
-        addMesh(new THREE.BoxGeometry(0.5, 0.18, 0.2), darkMaterial, [0, 1.0, -1.69], [0, 0, 0], 999);
-        // Console seams, vents, and fasteners.
-        for (const x of [-1.42, -1.16, -0.9, 0.9, 1.16, 1.42]) {
-            addMesh(new THREE.BoxGeometry(0.14, 0.025, 0.025), blackMaterial, [x, -0.91, -1.78], [0, 0, 0], 1002);
-        }
-        const boltGeometry = new THREE.CircleGeometry(0.025, 6);
-        for (const [x, y] of [[-1.46, -0.47], [-0.82, -0.69], [0.82, -0.69], [1.46, -0.47], [-0.72, -0.93], [0.72, -0.93]]) {
-            addMesh(boltGeometry, edgeMaterial, [x, y, -1.965], [0, 0, 0], 1004);
-        }
-        // Grime layer — speck density unchanged but alpha at 0.10 so the
-        // dirt reads as the faintest canopy specks; barely-there but visible.
-        addMesh(new THREE.PlaneGeometry(3.72, 2.38), new THREE.MeshBasicMaterial({
+        // Scrapped: every 3D cockpit mesh (frame rails, console boxes,
+        // screen planes, instrument lamps, fasteners, canopy rails, vents,
+        // bolts) is gone. The cockpit HUD is now delivered entirely by the
+        // cockpit-frame.webp CSS overlay. The only thing we keep here is the
+        // grime plane so the canopy still carries faint dirt specks.
+        const grimeMaterial = new THREE.MeshBasicMaterial({
             map: this.createGrimeTexture('wayfarer-canopy'),
             transparent: true,
             opacity: 0.10,
             depthTest: false,
             depthWrite: false,
             blending: THREE.NormalBlending,
-        }), [0, 0.08, -1.98], [0, 0, 0], 1005);
+        });
+        const grime = new THREE.Mesh(new THREE.PlaneGeometry(3.72, 2.38), grimeMaterial);
+        grime.position.set(0, 0.08, -1.98);
+        grime.renderOrder = 1005;
+        grime.frustumCulled = false;
+        grime.name = 'cockpit-grime';
+        this.cockpit.add(grime);
         this.cockpit.traverse((object) => {
             object.frustumCulled = false;
             if (object instanceof THREE.Mesh) {
@@ -1314,7 +1257,7 @@ export class SpaceRenderer {
         this.camera.add(this.cockpit);
         this.cockpit.visible = false;
     }
-    createPrismGeometry(points, thickness) {
+        createPrismGeometry(points, thickness) {
         const vertices = [];
         const half = thickness * 0.5;
         for (const [x, z] of points)
