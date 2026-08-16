@@ -1787,6 +1787,83 @@ button.compact {
   grid-column: 1 / -1;
 }
 
+/* Ship-status menu (tap the OWN SHIP STATUS monitor): active contracts,
+   cargo hold, and account — the radar → nav-map twin. */
+.ship-menu-grid section {
+  min-width: 0;
+}
+
+.ship-menu-missions {
+  grid-column: 1 / -1;
+}
+
+.ship-mission-card {
+  margin-bottom: 0.7rem;
+  padding: 0.7rem;
+}
+
+.ship-mission-card h4 {
+  margin: 0.45rem 0;
+  font-size: 0.74rem;
+}
+
+.ship-mission-card dl {
+  margin: 0.45rem 0 0;
+}
+
+.ship-menu-empty {
+  margin: 0;
+  color: #7c8a84;
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.cargo-row,
+.ship-account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.42rem 0;
+  border-bottom: 1px solid rgba(119, 139, 130, 0.14);
+  color: #9ea6a2;
+  font-size: 0.68rem;
+}
+
+.cargo-row span,
+.ship-account-row span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.cargo-row b {
+  overflow: hidden;
+  color: #d7d0bd;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cargo-row small {
+  color: #6f7d77;
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+}
+
+.cargo-row em,
+.ship-account-row b {
+  color: #dfb75d;
+  font-size: 0.72rem;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.ship-account-row {
+  min-height: 44px;
+}
+
 .controls-reference p {
   color: #89938e;
   font-family: "Courier New", ui-monospace, monospace;
@@ -2098,6 +2175,15 @@ button.compact {
   top: 61.4%;
   width: 17.1%;
   height: 25.2%;
+  /* Tapping the own-ship monitor opens the paused ship menu (contracts,
+     cargo, account) — the radar → nav-map twin. */
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.cockpit-screen-own:active {
+  outline: 1px solid rgba(105, 224, 210, 0.55);
+  outline-offset: -3px;
 }
 
 .cockpit-screen-radar {
@@ -3467,8 +3553,8 @@ button.primary,
   bottom: max(11px, calc(var(--safe-bottom) + 2px));
   z-index: 4;
   display: grid;
-  min-width: 170px;
-  padding: 0.26rem 0.8rem 0.22rem;
+  min-width: 236px;
+  padding: 0.3rem 0.9rem 0.24rem;
   transform: translateX(-50%);
   border: 1px solid #6d6045;
   border-top: 2px solid #a47b34;
@@ -3484,9 +3570,12 @@ button.primary,
   touch-action: manipulation;
 }
 
+/* The card carries only HYPERDRIVE now (the callsign plaque is gone), so the
+   word can be read at a glance: nearly double the old plaque font. */
 .cockpit-identity b {
   color: #b68a3d;
-  font-size: 0.56rem;
+  font-size: 1.05rem;
+  letter-spacing: 0.1em;
 }
 
 /* The card is a <button>, and the global `button:hover:not(:disabled)` rule
@@ -3626,9 +3715,13 @@ button.primary,
   }
 
   .cockpit-identity {
-    min-width: 148px;
-    padding: 0.22rem 0.6rem 0.18rem;
+    min-width: 208px;
+    padding: 0.24rem 0.6rem 0.2rem;
     font-size: 0.4rem;
+  }
+
+  .cockpit-identity b {
+    font-size: 0.95rem;
   }
 }
 

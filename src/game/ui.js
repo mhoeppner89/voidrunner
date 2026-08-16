@@ -74,7 +74,7 @@ export class GameUI {
             <i class="hyperdrive-fx-streaks"></i>
             <i class="hyperdrive-fx-flash"></i>
           </div>
-          <div class="cockpit-screen cockpit-screen-own" aria-label="Own ship status display">
+          <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="Own ship status display; tap to open ship menu">
             <div class="screen-heading"><span>OWN SHIP STATUS</span><b id="own-ship-name">WAYFARER</b></div>
             <div class="screen-ship-layout"><div class="screen-flight"><div><span>SPD</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>FUEL</span><b id="screen-own-fuel">100</b><small>%</small></div></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>ARMOR</span><i><b id="screen-own-armor"></b></i><em id="screen-own-armor-value">100</em></div><div><span>HULL</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">100</em></div></div></div>
           </div>
@@ -86,7 +86,7 @@ export class GameUI {
             <div class="screen-heading"><span>TARGET STATUS</span><b id="screen-target-name">NO LOCK</b></div>
             <div class="screen-target-layout"><canvas class="hull-outline" id="target-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-target-shield"></b></i><em id="screen-target-shield-value">—</em></div><div><span>ARMOR</span><i><b id="screen-target-armor"></b></i><em id="screen-target-armor-value">—</em></div><div><span>HULL</span><i><b id="screen-target-hull"></b></i><em id="screen-target-hull-value">—</em></div></div></div>
           </div>
-          <button type="button" id="hyperdrive-card" class="cockpit-identity" data-touch-action="autopilot" aria-label="Hyperdrive: engage jump to nav point"><span>VOIDRUNNER</span><b>HYPERDRIVE</b><em id="hyperdrive-card-status" class="is-hidden"></em></button>
+          <button type="button" id="hyperdrive-card" class="cockpit-identity" data-touch-action="autopilot" aria-label="Hyperdrive: engage jump to nav point"><b>HYPERDRIVE</b><em id="hyperdrive-card-status" class="is-hidden"></em></button>
 
           <div class="hud-top-right target-panel is-hidden" id="target-panel" aria-hidden="true">
             <span class="eyebrow">TARGET</span>
@@ -149,6 +149,7 @@ export class GameUI {
 
         <section id="dock-screen" class="dock-screen is-hidden" aria-label="Docked location"></section>
         <section id="map-panel" class="modal-panel is-hidden" aria-label="Navigation map"></section>
+        <section id="ship-panel" class="modal-panel is-hidden" aria-label="Ship status"></section>
         <section id="pause-panel" class="modal-panel is-hidden" aria-label="Pause and settings"></section>
         <section id="arena-panel" class="modal-panel is-hidden" aria-label="Combat simulator"></section>
         <div id="toast-stack" class="toast-stack global-toasts" aria-live="polite"></div>
@@ -281,6 +282,20 @@ export class GameUI {
             event.preventDefault();
             this.actions?.openMap();
         });
+        // Tapping the OWN SHIP STATUS monitor opens the paused ship menu
+        // (active contracts, cargo hold, account) — the radar's nav-map twin.
+        const ownScreen = this.root.querySelector('.cockpit-screen-own');
+        ownScreen?.addEventListener('pointerup', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.actions?.openShipMenu();
+        });
+        ownScreen?.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ')
+                return;
+            event.preventDefault();
+            this.actions?.openShipMenu();
+        });
         this.root.addEventListener('input', (event) => {
             const element = event.target;
             const setting = element.dataset.setting;
@@ -346,6 +361,9 @@ export class GameUI {
                 break;
             case 'close-map':
                 this.hideMap();
+                break;
+            case 'close-ship':
+                this.hideShipMenu();
                 break;
             case 'save':
                 this.actions?.saveNow();
@@ -1249,11 +1267,70 @@ export class GameUI {
         <footer><span>${model.autopilotAvailable ? 'HYPERDRIVE READY — select a point, close the map, then engage.' : `HYPERDRIVE LOCKED — ${escapeHtml(model.threatLabel ?? 'hostile proximity')}.`}</span><span>Tap any system point or local contact to select it.</span></footer>
       </div>`;
         this.hidePause();
+        this.hideShipMenu();
         panel.classList.remove('is-hidden');
         this.updateOrientationNotice();
     }
     hideMap() {
         this.root.querySelector('#map-panel')?.classList.add('is-hidden');
+        this.updateOrientationNotice();
+    }
+    showShipMenu() {
+        if (!this.save)
+            return;
+        const panel = this.root.querySelector('#ship-panel');
+        const player = this.save.player;
+        const ship = SHIPS[player.shipId];
+        const mass = cargoMass(player);
+        const capacity = cargoCapacity(player);
+        const loadPercent = capacity > 0 ? Math.min(100, Math.round((mass / capacity) * 100)) : 0;
+        const cargoEntries = Object.entries(player.cargo)
+            .filter(([, qty]) => qty > 0)
+            .map(([id, qty]) => {
+                const commodity = COMMODITIES[id];
+                return { name: commodity?.name ?? id, qty, mass: (commodity?.mass ?? 0) * qty };
+            });
+        const sealed = (player.sealedCargo ?? []).map((entry) => ({ name: entry.label, qty: entry.units, mass: entry.mass }));
+        const allCargo = [...cargoEntries, ...sealed];
+        const cargoRows = allCargo.length
+            ? allCargo.map((entry) => `<div class="cargo-row"><span><b>${escapeHtml(entry.name)}</b><small>${entry.qty} UNITS</small></span><em>${entry.mass.toFixed(1)} MASS</em></div>`).join('')
+            : '<p class="ship-menu-empty">Hold empty. The market is one jump away.</p>';
+        const missions = this.save.activeMissions;
+        const missionRows = missions.length
+            ? missions.map((mission) => {
+                const destinationId = mission.kind === 'bounty' ? mission.targetZone : mission.destination;
+                const destination = destinationId && Object.prototype.hasOwnProperty.call(LOCATIONS, destinationId) ? LOCATIONS[destinationId] : undefined;
+                const where = mission.kind === 'bounty'
+                    ? (destination ? `HUNT NEAR ${destination.name.toUpperCase()}` : 'HUNT TARGET UNKNOWN')
+                    : (destination ? `FLY TO ${destination.name.toUpperCase()}` : '—');
+                return `<article class="mission-card ${mission.kind} ship-mission-card">
+                <header><span>${this.missionBadge(mission)}</span><b>${formatCredits(mission.reward)}</b></header>
+                <h4>${escapeHtml(mission.title)}</h4>
+                <dl><div><dt>VECTOR</dt><dd>${escapeHtml(where)}</dd></div><div><dt>DEADLINE</dt><dd>${formatDuration(Math.max(0, mission.deadline - this.save.world.time))}</dd></div></dl>
+              </article>`;
+            }).join('')
+            : '<p class="ship-menu-empty">No active contracts. The bar posts new work at every station.</p>';
+        panel.innerHTML = `
+      <div class="modal-card ship-card">
+        <header><div><span class="eyebrow">SHIP STATUS / PAUSED</span><h2>${escapeHtml(ship?.name ?? 'VOIDRUNNER')}</h2></div><button data-ui-command="close-ship">CLOSE</button></header>
+        <div class="pause-grid ship-menu-grid">
+          <section class="ship-menu-missions"><h3>ACTIVE CONTRACTS · ${missions.length}/6</h3>${missionRows}</section>
+          <section class="ship-menu-cargo"><h3>CARGO HOLD · ${mass.toFixed(1)}/${capacity} MASS (${loadPercent}%)</h3>${cargoRows}</section>
+          <section class="ship-menu-account"><h3>ACCOUNT</h3>
+            <div class="ship-account-row"><span>AVAILABLE CREDIT</span><b>${formatCredits(player.credits)}</b></div>
+            <div class="ship-account-row"><span>CARGO LOAD</span><b>${loadPercent}%</b></div>
+            <div class="ship-account-row"><span>HULL</span><b>${Math.ceil(player.hull)}/${Math.ceil(getEffectiveShipStats(player).hull)}</b></div>
+          </section>
+        </div>
+        <footer><span>Contracts point you to a vector — open the nav map and set it.</span><button data-ui-command="map">NAV MAP</button></footer>
+      </div>`;
+        this.hidePause();
+        this.hideMap();
+        panel.classList.remove('is-hidden');
+        this.updateOrientationNotice();
+    }
+    hideShipMenu() {
+        this.root.querySelector('#ship-panel')?.classList.add('is-hidden');
         this.updateOrientationNotice();
     }
     showPause() {
@@ -1272,6 +1349,7 @@ export class GameUI {
         </div>
         <footer><button data-ui-command="map">NAV MAP</button><button data-ui-command="save">SAVE NOW</button><button data-ui-command="quit-title">QUIT TO TITLE</button></footer>
       </div>`;
+        this.hideShipMenu();
         panel.classList.remove('is-hidden');
         this.updateOrientationNotice();
     }
@@ -1322,7 +1400,7 @@ export class GameUI {
         button.classList.toggle('is-fullscreen', full);
     };
     get isModalOpen() {
-        return !this.root.querySelector('#map-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#pause-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#arena-panel')?.classList.contains('is-hidden');
+        return !this.root.querySelector('#map-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#ship-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#pause-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#arena-panel')?.classList.contains('is-hidden');
     }
     get isTitleVisible() {
         return this.titleVisible;

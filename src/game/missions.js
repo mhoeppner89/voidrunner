@@ -31,7 +31,11 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
         const id = `${locationId}-${cycle}-${index}-${Math.floor(rng() * 99999)}`;
         if (isBounty) {
             const rank = save.player.guildRank.bounty;
-            const targetZone = pick(rng, ['shardbelt', 'mourning-line', 'vesper', 'azure']);
+            // Warrants always send you to a different dockable POI: a target in
+            // your current system (or in a non-dock field) reads as "hunt near
+            // the station you're standing at" and the encounter can never
+            // trigger, because the spawn check sits inside the approach path.
+            const targetZone = pick(rng, DOCK_LOCATION_IDS.filter((id) => id !== locationId));
             const danger = dangerBase + randomBetween(rng, 0.35, 1.4) + rank * 0.25;
             const targetName = proceduralCallsign(rng);
             const reward = bountyReward(danger, rank, targetZone);

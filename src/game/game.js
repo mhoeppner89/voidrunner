@@ -423,6 +423,7 @@ export class GameSession {
                 if (actions.pause) {
                     this.ui.hidePause();
                     this.ui.hideMap();
+                    this.ui.hideShipMenu();
                 }
             }
             else if (actions.pause) {
@@ -1125,6 +1126,12 @@ export class GameSession {
                 const target = this.ships.find((entry) => entry.missionId === mission.id && entry.hull > 0);
                 if (target)
                     goals.push({ kind: 'ship', id: target.id, position: target.position, name: target.name });
+                // Before the warrant ship is spawned, the goal is the POI to
+                // fly to — so target cycling still points you somewhere.
+                else if (mission.targetZone && Object.prototype.hasOwnProperty.call(LOCATIONS, mission.targetZone)) {
+                    const location = LOCATIONS[mission.targetZone];
+                    goals.push({ kind: 'location', id: mission.targetZone, position: location.position, name: location.name });
+                }
             }
             else if (mission.destination && Object.prototype.hasOwnProperty.call(LOCATIONS, mission.destination)) {
                 const location = LOCATIONS[mission.destination];
@@ -1897,7 +1904,11 @@ export class GameSession {
             if (this.ships.some((entry) => entry.missionId === mission.id && entry.hull > 0))
                 continue;
             const zone = LOCATIONS[mission.targetZone];
-            if (player.distanceTo(vec(zone.position)) > zone.radius + 190)
+            // Trigger on the dock approach, not the body radius: for planets the
+            // radius ring sits INSIDE the auto-dock zone, so a pilot flying in to
+            // dock never crossed it and the warrant target never spawned.
+            const approachRadius = zone.dockRadius ?? zone.radius;
+            if (player.distanceTo(vec(zone.position)) > approachRadius + 190)
                 continue;
             const rng = seededRandom(`${this.save.world.seed}:bounty:${mission.id}:${Math.floor(this.save.world.time / 60)}`);
             const offset = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.45, rng() - 0.5).normalize().multiplyScalar(randomBetween(rng, 85, 145));
@@ -2716,6 +2727,12 @@ export class GameSession {
     resumeFlight() {
         this.ui.hidePause();
         this.ui.hideMap();
+        this.ui.hideShipMenu();
+    }
+    openShipMenu() {
+        if (this.save.player.dockedAt)
+            return;
+        this.ui.showShipMenu();
     }
     quitToTitle() {
         saveGame(this.save);
