@@ -955,6 +955,7 @@ export class GameSession {
             const escort = this.spawnShip('escort', tuple(player.clone().add(new THREE.Vector3(-75, -15, -95))));
             escort.targetId = 'player';
         }
+        this.threatAcquireTarget();
         this.ui.showToast('Salvage claim challenged: hostile drives inbound.', 'danger', 5200);
         this.audio.play('warning');
     }
@@ -1105,6 +1106,23 @@ export class GameSession {
         }
         this.save.player.mode = 'combat';
         this.applyTarget({ kind: 'ship', id: nearest.id, position: nearest.position, name: nearest.name });
+    }
+    // When a fresh hostile spawns in while the pilot already has a lock, restart
+    // target selection at the top of the hierarchy: the closest hostile takes
+    // the reticle (tier 1 beats mission goals and other contacts). No-op with
+    // no current lock or no hostile in sensor range.
+    threatAcquireTarget() {
+        if (!this.save.player.currentTargetId)
+            return;
+        const player = vec(this.save.player.position);
+        const sensor = getEffectiveShipStats(this.save.player).scanRange * 2.2;
+        const nearest = this.ships
+            .filter((entry) => entry.hostile && entry.hull > 0 && player.distanceTo(vec(entry.position)) < sensor)
+            .sort((a, b) => player.distanceToSquared(vec(a.position)) - player.distanceToSquared(vec(b.position)))[0];
+        if (!nearest || nearest.id === this.save.player.currentTargetId)
+            return;
+        this.save.player.mode = 'combat';
+        this.applyTarget({ kind: 'ship', id: nearest.id, position: nearest.position, name: nearest.name }, `HOSTILE LOCK: ${nearest.name}`);
     }
     targetCandidates() {
         const player = vec(this.save.player.position);
@@ -1334,6 +1352,7 @@ export class GameSession {
             const pirate = this.spawnShip(index === 0 ? 'pirate' : 'escort', tuple(player.clone().add(offset)));
             pirate.targetId = 'player';
         }
+        this.threatAcquireTarget();
         this.audio.play('warning');
     }
     snapToCombatSpeed() {
@@ -1920,6 +1939,7 @@ export class GameSession {
                 const escort = this.spawnShip('escort', tuple(vec(target.position).add(new THREE.Vector3(12, 7, -14))));
                 escort.targetId = 'player';
             }
+            this.threatAcquireTarget();
             this.ui.showToast(`Warrant target detected: ${mission.targetName}`, 'danger', 5600);
             this.audio.play('warning');
         }
@@ -1983,6 +2003,7 @@ export class GameSession {
             this.ui.showToast('Pirate intercept. Weapons free.', 'danger', 4800);
             this.audio.play('warning');
         }
+        this.threatAcquireTarget();
         this.nextEncounterAt = this.save.world.time + randomBetween(rng, 24, 44);
     }
     encounterPosition(rng, distance) {
