@@ -154,12 +154,15 @@ export class SpaceRenderer {
         // orange sun whose key light pushes hulls toward gold, paired with a cool
         // cyan counter-rim that catches the shadow side. Fill is held at half the
         // sun's strength so the unlit side never collapses to black.
-        const ambient = new THREE.HemisphereLight(0xffc99e, 0x2c2f5a, 2.6);
+        const ambient = new THREE.HemisphereLight(0xffd2a8, 0x32284c, 2.4);
         this.scene.add(ambient);
-        const fillLight = new THREE.AmbientLight(0x6e6ba8, 1.05);
+        const fillLight = new THREE.AmbientLight(0x7a6caa, 1.0);
         this.scene.add(fillLight);
-        const sunDir = new THREE.Vector3(-0.62, 0.31, 0.72).normalize();
-        const sunLight = new THREE.DirectionalLight(0xffb46a, 4.4);
+        // Sun is positioned *forward* (slightly above horizon, in -y so the
+        // player tends to look at it) so chase-camera frames include the
+        // sun-lit silhouette against the warm sky.
+        const sunDir = new THREE.Vector3(-0.45, 0.18, 1.0).normalize();
+        const sunLight = new THREE.DirectionalLight(0xffa566, 5.0);
         sunLight.position.copy(sunDir).multiplyScalar(1);
         this.scene.add(sunLight);
         const rimLight = new THREE.DirectionalLight(0x66b9ff, 1.4);
@@ -169,7 +172,7 @@ export class SpaceRenderer {
         // body is a slightly oversized golden disc with two coronae stacked
         // around it (tight inner halo + broad out-of-system bloom) plus a thin
         // anamorphic streak so it reads as a *star* and not just a sphere.
-        const sunPos = new THREE.Vector3(-480000, 154000, -745000);
+        const sunPos = new THREE.Vector3(-360000, 144000, 800000);
         const sun = new THREE.Mesh(new THREE.SphereGeometry(22000, 32, 20), new THREE.MeshBasicMaterial({ color: 0xffe1a0, fog: false }));
         sun.position.copy(sunPos);
         this.skyRoot.add(sun);
@@ -214,29 +217,30 @@ export class SpaceRenderer {
     createEnvironmentMap() {
         // Painterly galactic sky used as an IBL environment so glossy, clearcoated
         // hulls and stations reflect a colorful deep-space gradient instead of
-        // black. The horizon band is hot orange/peach to match the new sun key
-        // light; the polar caps fade to cobalt for high-glance reflections on
-        // belly-mounted hull parts.
+        // black. The horizon band stays hot orange/peach so any high-altitude
+        // glossy part catches the warm sun reflection. Polar caps fade to deep
+        // cobalt (still cool blue, but darker than before).
         const canvas = document.createElement('canvas');
         canvas.width = 512;
         canvas.height = 256;
         const context = canvas.getContext('2d');
         const gradient = context.createLinearGradient(0, 0, 0, 256);
-        gradient.addColorStop(0, '#101a40');
-        gradient.addColorStop(0.28, '#3a2664');
-        gradient.addColorStop(0.45, '#b86b4b');
-        gradient.addColorStop(0.52, '#f5aa52');
-        gradient.addColorStop(0.6, '#a6486c');
-        gradient.addColorStop(0.78, '#2c2d5a');
+        gradient.addColorStop(0, '#0a122c');
+        gradient.addColorStop(0.18, '#54264c');
+        gradient.addColorStop(0.34, '#a35a3c');
+        gradient.addColorStop(0.46, '#ee9e50');
+        gradient.addColorStop(0.52, '#ffd070');
+        gradient.addColorStop(0.58, '#e07250');
+        gradient.addColorStop(0.72, '#56284e');
         gradient.addColorStop(1, '#0a1132');
         context.fillStyle = gradient;
         context.fillRect(0, 0, 512, 256);
         for (const [cx, cy, radius, fill] of [
-            [120, 132, 160, 'rgba(255,168,80,0.78)'],
-            [396, 132, 150, 'rgba(255,140,90,0.62)'],
-            [250, 50, 100, 'rgba(196,108,238,0.46)'],
-            [70, 210, 90, 'rgba(110,196,238,0.5)'],
-            [430, 220, 70, 'rgba(120,236,196,0.36)'],
+            [120, 132, 170, 'rgba(255,170,80,0.85)'],
+            [396, 132, 160, 'rgba(255,140,90,0.7)'],
+            [250, 50, 110, 'rgba(196,108,238,0.42)'],
+            [70, 210, 100, 'rgba(140,158,196,0.36)'],
+            [430, 220, 80, 'rgba(120,236,196,0.28)'],
         ]) {
             const blob = context.createRadialGradient(cx, cy, 0, cx, cy, radius);
             blob.addColorStop(0, fill);
@@ -1534,26 +1538,39 @@ export class SpaceRenderer {
     // the cockpit and frame the whole ship against the sky. The harness uses
     // this for the "chase" labels so we actually see the new hull silhouettes
     // we redrew this iteration.
-    setChaseCamera(active, offset = [0, 1.6, -7]) {
+    setChaseCamera(active, offset = [0, 2.4, -10], focus = 14) {
         this.chaseCameraActive = !!active;
         if (active) {
             this.cockpit.visible = false;
             this.chaseOffset = offset;
+            this.chaseFocus = focus;
+            // Wider FOV for chase views so the ship reads as smaller and the
+            // sky/sun/planet behind it dominate the frame.
+            this.camera.fov = 68;
+            this.camera.updateProjectionMatrix();
+        }
+        else {
+            this.camera.fov = 74;
+            this.camera.updateProjectionMatrix();
         }
     }
-    // Move the camera to a chase position behind the player for one render
-    // pass. The renderer keeps no internal state about which view it was
-    // showing, so the harness must call this *every* frame it wants chase.
     renderChaseFrame() {
         if (!this.chaseCameraActive || !this.chasePlayerPosition)
             return false;
-        const off = new THREE.Vector3(...(this.chaseOffset ?? [0, 1.6, -7]));
+        const off = new THREE.Vector3(...(this.chaseOffset ?? [0, 2.4, -10]));
+        const focus = this.chaseFocus ?? 14;
         const fwd = (this.chaseForward ?? new THREE.Vector3(0, 0, -1)).clone();
         const up = new THREE.Vector3(0, 1, 0);
-        const camPos = new THREE.Vector3(...this.chasePlayerPosition).addScaledVector(fwd, off.z).addScaledVector(up, off.y);
-        const target = new THREE.Vector3(...this.chasePlayerPosition).addScaledVector(fwd, 4);
+        // Bias the chase camera a bit so the ship sits in the lower-third
+        // frame; sky reads above.
+        const camPos = new THREE.Vector3(...this.chasePlayerPosition)
+            .addScaledVector(fwd, off.z)
+            .addScaledVector(up, off.y);
+        const lookTarget = new THREE.Vector3(...this.chasePlayerPosition)
+            .addScaledVector(fwd, focus)
+            .addScaledVector(up, 0.8);
         this.camera.position.copy(camPos);
-        this.camera.lookAt(target);
+        this.camera.lookAt(lookTarget);
         this.skyRoot.position.copy(camPos);
         this.renderer.render(this.scene, this.camera);
         return true;
