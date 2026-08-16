@@ -9,9 +9,9 @@
 // SpaceRenderer so we can iterate the two paths independently.
 
 import * as THREE from 'three';
-import { createVoxelShipModel, createVoxelStationModel } from './voxelModels.js';
-import { createHeroShipModel, createHeroStationModel } from './heroes.js';
+import { createVoxelShipModel, createVoxelStationModel, paletteForFaction } from './voxelModels.js';
 import { LOCATIONS } from './data.js';
+import { generateAsteroidField, generateGraveyardPieces } from './worldData.js';
 
 const SHIP_VARIANTS = ['kestrel', 'talon', 'warden', 'prospector', 'lancer', 'atlas-freighter'];
 const SHIP_PALETTES = {
@@ -57,6 +57,49 @@ const radialTexture = (innerHex, outerHex, stops = 8) => {
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
+};
+// Mirror of SpaceRenderer.createPixelPanelTexture — same algorithm so the
+// cluster pieces look like the in-game rocks/debris.
+const createPixelPanelTexture = (seed, base, accent, kind = 'metal', size = 64) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    const context = canvas.getContext('2d');
+    const rng = seededRandom(`pixel-texture:${seed}:${kind}`);
+    const baseColor = new THREE.Color(base);
+    const accentColor = new THREE.Color(accent);
+    context.fillStyle = `#${baseColor.getHexString()}`;
+    context.fillRect(0, 0, size, size);
+    const block = kind === 'planet' ? 2 : kind === 'rock' ? 4 : 8;
+    for (let y = 0; y < size; y += block) {
+        for (let x = 0; x < size; x += block) {
+            const noise = (rng() - 0.5) * (kind === 'rock' ? 0.46 : kind === 'planet' ? 0.28 : 0.18);
+            const shade = baseColor.clone().offsetHSL((rng() - 0.5) * 0.018, (rng() - 0.5) * 0.08, noise);
+            if (kind === 'rust' && rng() > 0.72) shade.lerp(new THREE.Color(0x6f3522), 0.55 + rng() * 0.3);
+            if (kind === 'rock' && rng() > 0.83) shade.lerp(accentColor, 0.18 + rng() * 0.22);
+            context.fillStyle = `#${shade.getHexString()}`;
+            context.fillRect(x, y, block, block);
+        }
+    }
+    if (kind === 'metal' || kind === 'rust') {
+        context.strokeStyle = `rgba(${Math.round(accentColor.r * 255)}, ${Math.round(accentColor.g * 255)}, ${Math.round(accentColor.b * 255)}, .38)`;
+        context.lineWidth = 1;
+        for (let x = 0; x < size; x += 16) context.strokeRect(x + 0.5, 0.5, 15, size - 1);
+        for (let y = 0; y < size; y += 16) context.strokeRect(0.5, y + 0.5, size - 1, 15);
+        context.fillStyle = 'rgba(3, 5, 5, .6)';
+        for (let i = 0; i < size / 8; i += 1) {
+            const x = Math.floor(rng() * (size - 6));
+            const y = Math.floor(rng() * (size - 2));
+            context.fillRect(x, y, 4 + Math.floor(rng() * 8), 1);
+        }
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.NearestMipmapNearestFilter;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.generateMipmaps = true;
+    return texture;
 };
 
 export class ShowcaseRenderer {
@@ -112,21 +155,29 @@ export class ShowcaseRenderer {
     _isolateShot(name, isolated) {
         // Per-model shots hide every ship except the named one and pull every
         // auxiliary set piece (planets, stations, asteroids) off-stage. The
-        // "lineup" pose keeps all six ships visible.
+        // "lineup" pose keeps all six ships visible. Cluster poses keep the
+        // cluster root visible and hide everything else.
         const lineupOnly = name === 'lineup';
+        const clusterMode = name === 'cluster';
+        const shipSubject = (
+            name.startsWith('ship-')
+            || name === 'lineup'
+            || name === 'cluster'
+        );
         if (this._allShips) {
             for (const [key, item] of this._allShips) {
                 if (lineupOnly) {
                     item.object3d.position.y = 0;
                     item.object3d.visible = true;
+                } else if (key === name) {
+                    item.object3d.position.y = 0;
+                    item.object3d.visible = true;
                 } else if (isolated) {
-                    if (key === name) {
-                        item.object3d.position.y = 0;
-                        item.object3d.visible = true;
-                    } else {
-                        item.object3d.position.y = -30000;
-                        item.object3d.visible = false;
-                    }
+                    item.object3d.position.y = -30000;
+                    item.object3d.visible = false;
+                } else {
+                    item.object3d.position.y = 0;
+                    item.object3d.visible = true;
                 }
             }
         }
@@ -134,7 +185,8 @@ export class ShowcaseRenderer {
         const stations = this.scene.getObjectByName('stations-root');
         const asteroids = this.scene.getObjectByName('asteroid-samples');
         const stationSubjects = ['station-helix', 'station-rook'];
-        if (planets) planets.visible = lineupOnly;
+        const planetSubjects = ['planet-vesper', 'planet-azure'];
+        if (planets) planets.visible = lineupOnly || planetSubjects.includes(name);
         if (stations) {
             stations.visible = lineupOnly || stationSubjects.includes(name);
             for (const child of stations.children) {
@@ -145,6 +197,7 @@ export class ShowcaseRenderer {
             }
         }
         if (asteroids) asteroids.visible = lineupOnly;
+        if (this._clusterRoot) this._clusterRoot.visible = clusterMode;
     }
 
     _buildLights() {
@@ -297,16 +350,18 @@ export class ShowcaseRenderer {
         const lineupX = -((SHIP_VARIANTS.length - 1) / 2) * spacing;
         SHIP_VARIANTS.forEach((variant, idx) => {
             const palette = { ...SHIP_PALETTES[variant] };
-            const build = createHeroShipModel(variant, palette);
+            const build = createVoxelShipModel(variant, palette);
             const group = build.group;
             group.position.set(lineupX + idx * spacing, 0, 0);
-            const scale = variant === 'atlas-freighter' ? 6 : variant === 'prospector' ? 7 : 9;
+            // Voxel ship models are small (a few units) — scale them up so a
+            // single ship fills the showcase frame.
+            const scale = variant === 'atlas-freighter' ? 22 : variant === 'prospector' ? 28 : 32;
             group.scale.setScalar(scale);
             group.rotation.y = idx * 0.6;
             this.scene.add(group);
             this.poseItems[`ship-${variant}`] = {
                 object3d: group,
-                framing: { distance: variant === 'atlas-freighter' ? 95 : 60, height: 1 },
+                framing: { distance: variant === 'atlas-freighter' ? 95 : 75, height: 4 },
             };
         });
         // Track all ship groups so we can reposition them for the lineup pose
@@ -450,24 +505,24 @@ export class ShowcaseRenderer {
     _spawnStations() {
         const root = new THREE.Group();
         root.name = 'stations-root';
-        const helix = createHeroStationModel('helix');
-        helix.scale.setScalar(1.0);
+        const helix = createVoxelStationModel('helix');
+        helix.scale.setScalar(8);
         helix.position.set(-180, -10, -180);
         helix.rotation.set(0.18, 0.45, -0.08);
         root.add(helix);
         this.poseItems['station-helix'] = {
             object3d: helix,
-            framing: { distance: 220, height: 60 },
+            framing: { distance: 230, height: 8 },
         };
 
-        const rook = createHeroStationModel('rook');
-        rook.scale.setScalar(1.0);
+        const rook = createVoxelStationModel('rook');
+        rook.scale.setScalar(9);
         rook.position.set(180, -8, 180);
         rook.rotation.set(0.0, 0.6, 0.06);
         root.add(rook);
         this.poseItems['station-rook'] = {
             object3d: rook,
-            framing: { distance: 200, height: 30 },
+            framing: { distance: 220, height: 6 },
         };
 
         this.scene.add(root);
@@ -510,6 +565,114 @@ export class ShowcaseRenderer {
         }
         root.name = 'asteroid-samples';
         this.scene.add(root);
+    }
+
+    /**
+     * Reusable scene root for the cluster poses. Spawn is idempotent: keep the
+     * latest cluster under this group and swap meshes when a different cluster
+     * type is requested.
+     */
+    _clusterRoot = null;
+    spawnAsteroidCluster(seed) {
+        if (!this._clusterRoot) {
+            this._clusterRoot = new THREE.Group();
+            this._clusterRoot.name = 'cluster-root';
+            this.scene.add(this._clusterRoot);
+        }
+        while (this._clusterRoot.children.length) this._clusterRoot.remove(this._clusterRoot.children[0]);
+        const rng = seededRandom(`${seed}:asteroid-cluster`);
+        // Use the same shape distortion the in-game renderer applies.
+        const variantCount = 4;
+        const geometries = [];
+        for (let variant = 0; variant < variantCount; variant += 1) {
+            const geometry = new THREE.IcosahedronGeometry(1, 2);
+            const positions = geometry.getAttribute('position');
+            const v = new THREE.Vector3();
+            const phase = variant * 7.31;
+            for (let j = 0; j < positions.count; j += 1) {
+                v.fromBufferAttribute(positions, j);
+                const distortion = 0.72 + 0.32 * Math.sin(v.x * 6.3 + v.y * 9.7 + v.z * 13.1 + phase);
+                v.multiplyScalar(distortion);
+                positions.setXYZ(j, v.x, v.y, v.z);
+            }
+            positions.needsUpdate = true;
+            geometry.computeVertexNormals();
+            geometries.push(geometry);
+        }
+        const ironMap = createPixelPanelTexture('cluster-iron', 0x54585d, 0xb8a98a, 'rock');
+        const ironMaterial = new THREE.MeshStandardMaterial({ color: 0xb0b8c0, map: ironMap, roughness: 0.78, metalness: 0.32, flatShading: true });
+        const iceMap = createPixelPanelTexture('cluster-ice', 0xc7d6e2, 0x8eb6cc, 'rock');
+        const iceMaterial = new THREE.MeshStandardMaterial({ color: 0xd6e6f0, map: iceMap, roughness: 0.42, metalness: 0.08, flatShading: true, emissive: 0x0a1822, emissiveIntensity: 0.18 });
+        const darkMap = createPixelPanelTexture('cluster-dark', 0x232027, 0xa4553a, 'rock');
+        const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x6a5a5e, map: darkMap, roughness: 0.88, metalness: 0.12, flatShading: true });
+        const materials = [ironMaterial, iceMaterial, darkMaterial];
+        // Generate ~24 asteroids in a cluster around origin.
+        const count = 24;
+        for (let i = 0; i < count; i += 1) {
+            const kind = i % 3;
+            const shape = i % variantCount;
+            const radius = 3 + (i === 0 ? 14 : (i === 1 ? 11 : rng() * 9 + 2));
+            const theta = (i / count) * Math.PI * 2 + rng() * 0.4;
+            const radial = 18 + (i === 0 ? 8 : (i === 1 ? 4 : rng() * 28));
+            const position = new THREE.Vector3(Math.cos(theta) * radial, (rng() - 0.5) * 12, Math.sin(theta) * radial);
+            const rock = new THREE.Mesh(geometries[shape], materials[kind]);
+            rock.position.copy(position);
+            rock.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
+            rock.scale.setScalar(radius);
+            this._clusterRoot.add(rock);
+        }
+        // Add one large "rock crown" centerpiece.
+        const crownMat = darkMaterial;
+        const crown = new THREE.Mesh(geometries[0], crownMat);
+        crown.position.set(0, 0, 0);
+        crown.scale.setScalar(20);
+        crown.rotation.set(0.4, 0.6, 0.2);
+        this._clusterRoot.add(crown);
+        this.poseItems['cluster'] = { object3d: this._clusterRoot, framing: { distance: 180, height: 20 } };
+        return this._clusterRoot;
+    }
+    spawnDebrisCluster(seed) {
+        if (!this._clusterRoot) {
+            this._clusterRoot = new THREE.Group();
+            this._clusterRoot.name = 'cluster-root';
+            this.scene.add(this._clusterRoot);
+        }
+        while (this._clusterRoot.children.length) this._clusterRoot.remove(this._clusterRoot.children[0]);
+        // Use the same metal/rust patterns the SpaceRenderer applies for the
+        // graveyard, so the debris reads as burned-out capital-ship wreckage.
+        const metalMap = createPixelPanelTexture('cluster-graveyard-metal', 0x344144, 0x7ca79f, 'metal');
+        metalMap.repeat.set(3.5, 2.2);
+        const rustMap = createPixelPanelTexture('cluster-graveyard-rust', 0x48362f, 0xb7683e, 'rust');
+        rustMap.repeat.set(4.2, 2.6);
+        const metalMat = new THREE.MeshStandardMaterial({ color: 0xb0c1c8, map: metalMap, roughness: 0.7, metalness: 0.3, flatShading: true });
+        const rustMat = new THREE.MeshStandardMaterial({ color: 0xb86a3a, map: rustMap, roughness: 0.85, metalness: 0.18, flatShading: true });
+        // ~12 boxes/cylinders/discs of varied size arranged as a wreck path.
+        const layout = [
+            { kind: 'beam-panel', x: -36, y: -4, z: 14, sx: 22, sy: 3, sz: 4, mat: 'rust' },
+            { kind: 'cylinder',   x:  18, y:  0, z: -8, sx: 6, sy: 6, sz: 6, mat: 'metal' },
+            { kind: 'box',        x:  32, y: -6, z: 20, sx: 14, sy: 5, sz: 18, mat: 'rust' },
+            { kind: 'cylinder',   x: -16, y:  6, z: 28, sx: 4, sy: 4, sz: 4, mat: 'metal' },
+            { kind: 'box',        x:  -4, y:  8, z: -16, sx: 18, sy: 4, sz: 6, mat: 'metal' },
+            { kind: 'box',        x:  42, y:  4, z: -22, sx: 9, sy: 4, sz: 14, mat: 'rust' },
+            { kind: 'cylinder',   x: -34, y:  2, z: -12, sx: 5, sy: 5, sz: 5, mat: 'rust' },
+            { kind: 'box',        x:  20, y: -2, z: 36, sx: 6, sy: 6, sz: 6, mat: 'metal' },
+            { kind: 'beam-panel', x:   0, y:  4, z:  0, sx: 28, sy: 2, sz: 3, mat: 'metal' },
+            { kind: 'cylinder',   x: -22, y:  9, z:  -3, sx: 3, sy: 3, sz: 3, mat: 'metal' },
+        ];
+        for (const piece of layout) {
+            const geo = (() => {
+                if (piece.kind === 'cylinder') return new THREE.CylinderGeometry(piece.sx, piece.sx, piece.sy, 14, 1, true);
+                if (piece.kind === 'beam-panel') return new THREE.BoxGeometry(piece.sx, piece.sy, piece.sz);
+                return new THREE.BoxGeometry(piece.sx, piece.sy, piece.sz);
+            })();
+            const mat = piece.mat === 'rust' ? rustMat : metalMat;
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(piece.x, piece.y, piece.z);
+            mesh.rotation.set(piece.kind === 'cylinder' ? 0.6 : 0.1, piece.kind === 'cylinder' ? 0.3 : -0.15, piece.kind === 'cylinder' ? 0.1 : 0.05);
+            this._clusterRoot.add(mesh);
+        }
+        this.poseItems['cluster'] = { object3d: this._clusterRoot, framing: { distance: 280, height: 10 } };
+        return this._clusterRoot;
     }
 
     /**
@@ -585,7 +748,7 @@ export class ShowcaseRenderer {
     }
 
     _pulseShip(group, time) {
-        const rims = group.getObjectsByProperty('name', 'hero-rim');
+        const rims = group.getObjectsByProperty('name', 'hull-rim');
         for (const rim of rims) {
             const mat = rim.material;
             if (mat?.uniforms?.uIntensity) mat.uniforms.uIntensity.value = 0.6 + Math.sin(time * 1.3 + group.position.x) * 0.08;
