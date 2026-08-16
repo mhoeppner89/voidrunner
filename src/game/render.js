@@ -96,6 +96,11 @@ export class SpaceRenderer {
             powerPreference: 'high-performance',
             depth: true,
             stencil: false,
+            // The workbench catalog harness drives the renderer with a programmatic
+            // camera and screenshots the canvas right after. Without
+            // preserveDrawingBuffer the back-buffer is cleared on present, so the
+            // screenshot is either the previous frame or empty.
+            preserveDrawingBuffer: true,
         });
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderer.toneMapping = THREE.NeutralToneMapping;
@@ -1706,12 +1711,15 @@ export class SpaceRenderer {
             box.getSize(size);
             // Stations and planets add huge halo sprites and atmosphere shells
             // that bloat the bounding box. If the caller knows the model radius,
-            // prefer that as the framing target.
+            // prefer that as the framing target — and stand OFF the body so we
+            // don't end up inside the atmosphere shell.
             const longest = frameRadius ?? Math.max(size.x, size.y, size.z);
-            // Multiply by 0.55 instead of 1.4 so the model fills the frame more
-            // aggressively — the previous calc put stations 4 km and planets
-            // 100+ km away.
-            dist = (longest * 0.55) / Math.tan(this.camera.fov * Math.PI / 360);
+            // `autoFrame` puts the camera at the rim of the framed object so
+            // it fills the FOV. distance = longest is the natural choice — the
+            // tangent of half-FOV * distance = (longest/2), which lets the full
+            // diameter fit on screen. Without this, ships end up tiny and big
+            // stations end up clipping the camera into the geometry.
+            dist = (longest * 0.5) / Math.tan(this.camera.fov * Math.PI / 360);
         }
         const cosPitch = Math.cos(pitch);
         const offset = new THREE.Vector3(
@@ -1724,11 +1732,21 @@ export class SpaceRenderer {
         // Hide the cockpit chrome so the model alone reads.
         if (this.cockpit) this.cockpit.visible = false;
         this.chaseCameraActive = false; // subsequent render calls follow the cinematic camera.
+        // Freeze the camera transform so the in-game frame loop's updateCamera
+        // call doesn't overwrite our framing before the screenshot lands.
+        this.cinematicLock = true;
         // Park the sky-root at the camera so the gradient sphere stays anchored
         // (matches the chase-cam pattern).
         this.skyRoot.position.copy(this.camera.position);
         this.renderer.render(this.scene, this.camera);
         return { distance: dist, target: [targetWorld.x, targetWorld.y, targetWorld.z] };
+    }
+    setCinematicLock(locked) {
+        this.cinematicLock = !!locked;
+        if (!locked) {
+            // re-arm the cockpit so the next regular tick re-positions the camera
+            this.chaseCameraActive = false;
+        }
     }
     setCockpitVisible(visible) {
         if (this.cockpit) this.cockpit.visible = !!visible;
@@ -1790,6 +1808,10 @@ export class SpaceRenderer {
         this.shell.style.setProperty('--hyperdrive-progress', clamp(progress, 0, 1).toFixed(3));
     }
     updateCamera(position, prevPosition, rotation, prevRotation, angularVelocity, speedRatio, afterburner, dt, alpha = 0) {
+        // When the workbench harness has parked the camera at a static framing,
+        // leave the transform alone so the in-game frame loop doesn't overwrite
+        // the cinematic frame on the next tick.
+        if (this.cinematicLock) return;
         // Cache the player position/forward so chase-camera helpers (used by
         // the screenshot harness) can place a third-person rig without
         // re-reading game state every frame.

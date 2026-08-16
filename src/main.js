@@ -217,6 +217,7 @@ window.__VOID_PRIVATEER__ = {
         return r.cinematicFrame(target, opts);
     },
     setCockpitVisible: (visible) => session?.renderer?.setCockpitVisible?.(visible),
+    setCinematicLock: (locked) => session?.renderer?.setCinematicLock?.(locked),
     clusterFrame: (opts) => session?.renderer?.clusterFrame?.(opts),
     spawnShipAt: (role, x, y, z) => session?.spawnShip?.(role, [x, y, z]),
     getAsteroidCenter: () => session?.renderer?.asteroidMeshes?.[0]?.mesh?.position?.toArray?.() ?? null,
