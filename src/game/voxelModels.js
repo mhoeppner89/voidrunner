@@ -767,47 +767,83 @@ const buildHelixStation = () => {
     };
     const unit = 1.28;
     const staticGrid = new VoxelGrid();
-    staticGrid.fillCylinderX(-35, 34, 4.5, 'hull');
-    for (const x of [-28, -14, 0, 14, 28])
-        staticGrid.fillCylinderX(x - 1, x + 1, 7, 'dark');
-    staticGrid.fillCylinderX(-43, -31, 5.5, 'dark', -9, 0);
-    staticGrid.fillCylinderX(-43, -31, 5.5, 'hull', 0, 0);
-    staticGrid.fillCylinderX(-43, -31, 5.5, 'dark', 9, 0);
-    staticGrid.fillBox(-48, -44, -15, 15, -7, 7, 'dark');
-    staticGrid.fillBox(-49, -49, -13, 13, -5, 5, 'warning');
-    staticGrid.fillCylinderX(30, 47, 10, 'dark');
-    staticGrid.fillRingX(46, 48, 8, 1.5, 'hull');
-    addHelixWindows(staticGrid, 8, 48);
-    staticGrid.fillBox(49, 49, -6, 6, -6, 6, 'dark');
+    // Long central spindle with multiple greebled segments.
+    staticGrid.fillCylinderX(-46, 50, 5.5, 'hull');
+    // Mid-body ribbed rings (the silhouette must read as a tower of discs).
+    for (const x of [-30, -16, 0, 16, 30])
+        staticGrid.fillCylinderX(x - 1, x + 1, 8, 'dark');
+    // Front "Command bulb" — wide front cap with running lights.
+    staticGrid.fillCylinderX(-58, -42, 6.5, 'dark', -10, 0);
+    staticGrid.fillCylinderX(-58, -42, 6.5, 'hull', 0, 0);
+    staticGrid.fillCylinderX(-58, -42, 6.5, 'dark', 10, 0);
+    for (let y = -8; y <= 8; y += 4)
+        staticGrid.set(-58, y, 0, 'window');
+    staticGrid.fillBox(-60, -56, -16, 16, -7, 7, 'dark');
+    staticGrid.fillBox(-61, -61, -14, 14, -4, 4, 'warning');
+    staticGrid.fillBox(-62, -62, -10, 10, -2, 2, 'accent');
+    // Aft engine block with three concentric thrust bells.
+    staticGrid.fillCylinderX(38, 56, 11, 'dark');
+    staticGrid.fillRingX(56, 58, 9, 1.5, 'hull');
+    staticGrid.fillRingX(60, 62, 7, 1.5, 'hull');
+    addHelixWindows(staticGrid, 9, 56);
+    staticGrid.fillBox(63, 63, -7, 7, -7, 7, 'dark');
+    staticGrid.fillBox(64, 64, -5, 5, -5, 5, 'engine');
+    // Two side-mounted docking booms (the big visual tells: "this is a
+    // station you can dock with").
     for (const side of [-1, 1]) {
-        staticGrid.fillBox(-10, 20, side * 10 - 1, side * 10 + 1, -2, 2, 'dark');
-        staticGrid.fillBox(12, 20, side * 13 - 1, side * 13 + 1, -7, 7, 'hull');
-        staticGrid.fillBox(20, 20, side * 13, side * 13, -5, 5, 'window');
+        staticGrid.fillBox(-12, 22, side * 11 - 1, side * 11 + 1, -2, 2, 'dark');
+        // Boom arms.
+        staticGrid.fillBox(15, 30, side * 14 - 1, side * 14 + 1, -8, 8, 'hull');
+        staticGrid.fillBox(28, 28, side * 14, side * 14, -6, 6, 'window');
+        staticGrid.set(30, side * 14, 0, side > 0 ? 'warning' : 'accent');
     }
-    for (let index = 0; index < 8; index += 1) {
-        const z = -24 + index * 7;
-        staticGrid.fillBox(-22, -14, -3, 3, z, z + 2, index % 2 ? 'hull' : 'dark');
-        staticGrid.fillBox(-18, -18, 4, 4, z, z + 2, index % 3 === 0 ? 'warning' : 'window');
+    // Vertical "fenestration strips" along the spine — ribbed tower of windows
+    // for an airport-control-tower read.
+    for (let index = 0; index < 11; index += 1) {
+        const z = -32 + index * 6;
+        staticGrid.fillBox(-22, -16, -3, 3, z, z + 2, index % 2 ? 'hull' : 'dark');
+        staticGrid.fillBox(-19, -19, 4, 4, z, z + 2, index % 3 === 0 ? 'warning' : 'window');
     }
-    staticGrid.line([-5, 7, -4], [-5, 25, -10], 1, 'dark');
-    staticGrid.line([5, 7, 4], [5, 25, 10], 1, 'dark');
-    staticGrid.set(-5, 26, -10, 'warning');
-    staticGrid.set(5, 26, 10, 'window');
+    // Long navigation antenna + base.
+    staticGrid.line([-5, 7, -4], [-5, 28, -10], 1, 'dark');
+    staticGrid.line([5, 7, 4], [5, 28, 10], 1, 'dark');
+    staticGrid.set(-5, 29, -10, 'warning');
+    staticGrid.set(5, 29, 10, 'window');
+    staticGrid.set(0, 32, 0, 'accent');
+    // Cross-beam solar arrays (additive wing-shaped panels either side).
+    for (const z of [-22, 0, 22]) {
+        for (const side of [-1, 1]) {
+            staticGrid.fillBox(side * 35 - 2, side * 35 + 2, z - 8, z + 8, -1, 1, 'hull');
+            staticGrid.fillBox(side * 35, side * 35, z - 7, z + 7, -1, 1, 'window');
+            staticGrid.line([side * 36, 0, z - 8], [side * 36, 0, z + 8], 0, 'dark');
+        }
+    }
+    staticGrid.line([-22 + 30, 7, -4], [-22 + 30, 7, -4], 0, 'dark');
+    void staticGrid.set(0, 0, 0, 'hull');
     const rotorGrid = new VoxelGrid();
-    rotorGrid.fillRingX(-2, 2, 22, 2.5, 'hull');
-    rotorGrid.fillRingX(-1, 1, 15, 1.2, 'dark');
-    for (let index = 0; index < 12; index += 1) {
-        const angle = (index / 12) * Math.PI * 2;
-        const y = Math.round(Math.cos(angle) * 22);
-        const z = Math.round(Math.sin(angle) * 22);
-        rotorGrid.line([0, 0, 0], [0, Math.round(Math.cos(angle) * 18), Math.round(Math.sin(angle) * 18)], 0, 'dark');
+    // Bigger rotating habitat ring with more spoke lights.
+    rotorGrid.fillRingX(-2, 2, 30, 3, 'hull');
+    rotorGrid.fillRingX(-2, 2, 24, 1.5, 'dark');
+    rotorGrid.fillRingX(-1, 1, 18, 1.2, 'dark');
+    for (let index = 0; index < 16; index += 1) {
+        const angle = (index / 16) * Math.PI * 2;
+        const y = Math.round(Math.cos(angle) * 30);
+        const z = Math.round(Math.sin(angle) * 30);
+        // Spoke from the axis out to the ring.
+        rotorGrid.line([0, 0, 0], [0, y, z], 1, 'dark');
+        // Habitation pod hanging off the ring.
         rotorGrid.fillBox(-4, 4, y - 3, y + 3, z - 3, z + 3, index % 2 ? 'dark' : 'hull');
-        rotorGrid.fillBox(4, 4, y - 1, y + 1, z - 1, z + 1, index % 3 === 0 ? 'warning' : 'window');
+        rotorGrid.fillBox(0, 0, y - 1, y + 1, z - 1, z + 1, index % 3 === 0 ? 'warning' : 'window');
+        // A single nav light on each pod so the ring reads as alive at distance.
+        if (index === 0 || index === 8)
+            rotorGrid.set(0, y + 4, z, 'accent');
+        if (index === 4 || index === 12)
+            rotorGrid.set(0, y + 4, z, 'warning');
     }
     const root = new THREE.Group();
     root.name = 'helix-voxel-station';
-    const staticMeshes = createVoxelMeshes(staticGrid, unit, palette, 0.72, 0.5).group;
-    const rotor = createVoxelMeshes(rotorGrid, unit, palette, 0.74, 0.5).group;
+    const staticMeshes = createVoxelMeshes(staticGrid, unit, palette, 0.7, 0.5).group;
+    const rotor = createVoxelMeshes(rotorGrid, unit, palette, 0.72, 0.5).group;
     rotor.name = 'rotor';
     rotor.userData.rotationAxis = 'x';
     root.add(staticMeshes, rotor);
@@ -825,42 +861,59 @@ const buildRookStation = () => {
     };
     const unit = 1.34;
     const grid = new VoxelGrid();
-    grid.fillBox(-10, 10, -9, 9, -18, 18, 'hull');
-    grid.fillBox(-8, 8, 10, 14, -22, 22, 'dark');
-    grid.fillBox(-8, 8, -14, -10, -22, 22, 'dark');
-    grid.fillBox(-14, 14, -6, 6, -23, -18, 'dark');
-    grid.fillBox(-14, 14, -6, 6, 18, 23, 'dark');
-    grid.fillBox(-6, 6, -6, 6, 23, 34, 'dark');
-    grid.fillRingX(-1, 1, 6, 1.5, 'hull');
-    for (let index = 0; index < 12; index += 1) {
-        const angle = (index / 12) * Math.PI * 2;
-        grid.set(Math.round(Math.cos(angle) * 7), Math.round(Math.sin(angle) * 7), 35, index % 4 === 0 ? 'warning' : 'window');
+    // Beefier central core.
+    grid.fillBox(-12, 12, -11, 11, -22, 22, 'hull');
+    grid.fillBox(-10, 10, 12, 16, -28, 28, 'dark');
+    grid.fillBox(-10, 10, -16, -12, -28, 28, 'dark');
+    grid.fillBox(-16, 16, -7, 7, -27, -22, 'dark');
+    grid.fillBox(-16, 16, -7, 7, 22, 27, 'dark');
+    grid.fillBox(-7, 7, -7, 7, 27, 40, 'dark');
+    grid.fillRingX(-1, 1, 7, 1.5, 'hull');
+    // Halo of dock lights ringing the core.
+    for (let index = 0; index < 18; index += 1) {
+        const angle = (index / 18) * Math.PI * 2;
+        grid.set(Math.round(Math.cos(angle) * 9), Math.round(Math.sin(angle) * 9), 41, index % 4 === 0 ? 'warning' : 'window');
     }
+    // Window strips ringing the core shell.
+    for (let z = -25; z <= 28; z += 4) {
+        grid.fillBox(-12, -10, z, z, 0, 0, index => z % 8 === 0 ? 'warning' : 'window');
+    }
+    void (() => { let i = 0; for (let z = -25; z <= 28; z += 4) { grid.set(-12, 0, z, i++ % 3 === 0 ? 'warning' : 'window'); grid.set(12, 0, z, i % 3 === 0 ? 'warning' : 'window'); } })();
+    // Reinforce the four arms — and add more interior detail.
     const armDirections = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     armDirections.forEach(([dx, dy], armIndex) => {
-        for (let step = 11; step <= 32; step += 1) {
+        for (let step = 13; step <= 38; step += 1) {
             const x = dx * step;
             const y = dy * step;
-            grid.fillBox(x - (dy !== 0 ? 3 : 1), x + (dy !== 0 ? 3 : 1), y - (dx !== 0 ? 3 : 1), y + (dx !== 0 ? 3 : 1), -5, 9, 'dark');
+            const thickness = 4;
+            grid.fillBox(x - (dy !== 0 ? thickness : 2), x + (dy !== 0 ? thickness : 2), y - (dx !== 0 ? thickness : 2), y + (dx !== 0 ? thickness : 2), -6, 10, 'dark');
+            // Window strips on the arms.
+            if (step % 3 === 0) {
+                grid.set(x, y, 9, 'window');
+                grid.set(x, y, -6, 'warning');
+            }
         }
-        const px = dx * 34;
-        const py = dy * 34;
-        grid.fillBox(px - 6, px + 6, py - 6, py + 6, -10, 13, 'hull');
-        grid.fillBox(px - 4, px + 4, py - 4, py + 4, 14, 20, 'dark');
-        grid.fillBox(px - 2, px + 2, py - 2, py + 2, 20, 27, 'dark');
-        const barrelStart = [px, py, 27];
-        const barrelEnd = [px + dx * 4, py + dy * 4, 35];
+        const px = dx * 40;
+        const py = dy * 40;
+        grid.fillBox(px - 7, px + 7, py - 7, py + 7, -12, 14, 'hull');
+        grid.fillBox(px - 5, px + 5, py - 5, py + 5, 15, 22, 'dark');
+        grid.fillBox(px - 3, px + 3, py - 3, py + 3, 22, 30, 'dark');
+        const barrelStart = [px, py, 30];
+        const barrelEnd = [px + dx * 5, py + dy * 5, 38];
         grid.line(barrelStart, barrelEnd, 1, 'dark');
         grid.set(barrelEnd[0], barrelEnd[1], barrelEnd[2], armIndex === 2 ? 'warning' : 'accent');
-        grid.fillBox(px - 3, px + 3, py - 3, py + 3, -12, -11, armIndex % 2 ? 'warning' : 'window');
+        grid.fillBox(px - 4, px + 4, py - 4, py + 4, -13, -12, armIndex % 2 ? 'warning' : 'window');
+        // Beacon light on top of each arm.
+        grid.set(px, py, 23, 'accent');
     });
-    for (const x of [-8, 0, 8]) {
-        grid.line([x, 14, -9], [x, 28 + Math.abs(x) * 0.3, -14 + x * 0.4], 0, 'dark');
-        grid.set(x, Math.round(29 + Math.abs(x) * 0.3), Math.round(-14 + x * 0.4), x === 0 ? 'warning' : 'window');
+    // Long dorsal antenna trio.
+    for (const x of [-9, 0, 9]) {
+        grid.line([x, 16, -12], [x, 30 + Math.abs(x) * 0.3, -16 + x * 0.4], 0, 'dark');
+        grid.set(x, Math.round(31 + Math.abs(x) * 0.3), Math.round(-16 + x * 0.4), x === 0 ? 'warning' : 'window');
     }
-    for (const y of [-7, 0, 7]) {
-        grid.fillBox(-11, -11, y, y, -13, 13, y === 0 ? 'warning' : 'window');
-        grid.fillBox(11, 11, y, y, -13, 13, y === 0 ? 'warning' : 'window');
+    for (const y of [-8, 0, 8]) {
+        grid.fillBox(-13, -13, y, y, -16, 16, y === 0 ? 'warning' : 'window');
+        grid.fillBox(13, 13, y, y, -16, 16, y === 0 ? 'warning' : 'window');
     }
     const root = createVoxelMeshes(grid, unit, palette, 0.79, 0.48).group;
     root.name = 'rook-voxel-station';

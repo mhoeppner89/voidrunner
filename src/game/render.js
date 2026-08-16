@@ -259,14 +259,26 @@ export class SpaceRenderer {
         this.scene.environment = texture;
     }
     radialTexture(inner, outer) {
+        // Accept either a CSS string (already prefixed with #) or a numeric hex —
+        // caller code can be sloppy, and a bad color once crashed the whole
+        // render. Always end up with a valid `#rrggbb` plus an alpha tail.
+        const normalize = (value) => {
+            if (typeof value === 'number')
+                return cssHex(value);
+            if (!value)
+                return '#000000';
+            return value.startsWith('#') ? value : `#${value}`;
+        };
+        const innerCss = normalize(inner);
+        const outerCss = normalize(outer);
         const canvas = document.createElement('canvas');
         canvas.width = 256;
         canvas.height = 256;
         const context = canvas.getContext('2d');
         const gradient = context.createRadialGradient(128, 128, 0, 128, 128, 128);
-        gradient.addColorStop(0, inner);
-        gradient.addColorStop(0.22, inner);
-        gradient.addColorStop(1, `${outer}00`);
+        gradient.addColorStop(0, innerCss);
+        gradient.addColorStop(0.22, innerCss);
+        gradient.addColorStop(1, `${outerCss}00`);
         context.fillStyle = gradient;
         context.fillRect(0, 0, 256, 256);
         const texture = new THREE.CanvasTexture(canvas);
@@ -899,30 +911,50 @@ export class SpaceRenderer {
         const glow = new THREE.Sprite(new THREE.SpriteMaterial({
             map: this.radialTexture('#ffffff', location.accent),
             transparent: true,
-            opacity: 0.07,
+            opacity: 0.18,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             fog: false,
         }));
         glow.position.set(...location.position);
-        glow.scale.setScalar(location.radius * 1.4);
+        glow.scale.setScalar(location.radius * 1.8);
         this.locationRoot.add(glow);
+        // Far-field scatter halo so the station reads as a *bright* point of
+        // light from across the system.
+        const scatter = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: this.radialTexture(location.accent, location.accent),
+            transparent: true,
+            opacity: 0.08,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            fog: false,
+        }));
+        scatter.position.set(...location.position);
+        scatter.scale.setScalar(location.radius * 4.5);
+        this.locationRoot.add(scatter);
     }
     addStationBeacons(group, location) {
-        // Slow-pulsing nav lights that make a station read as alive from far away.
-        const colors = [0xff6a3d, 0x8ff0ff, 0xffc04d];
-        const offsets = [[-34, 12, 10], [40, 8, -14], [4, 20, -6]];
+        // Bright pulsing nav lights that make a station read as alive from far
+        // away. Six beacons per station, varied colors so the silhouette has
+        // its own color signature. All `colors` are stored already-`#`-prefixed
+        // CSS strings so the radialTexture template doesn't double up the hash.
+        const accent = location.accent?.startsWith('#') ? location.accent : cssHex(location.accent);
+        const colors = ['#ff6a3d', '#8ff0ff', '#ffc04d', accent, '#66f0c8', '#ff9466'];
+        const offsets = [
+            [-34, 12, 10], [40, 8, -14], [4, 22, -6], [-22, -16, 22], [28, 18, 12], [0, -24, -8],
+        ];
         offsets.forEach((offset, index) => {
             const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-                map: this.radialTexture('#ffffff', `#${colors[index].toString(16).padStart(6, '0')}`),
+                map: this.radialTexture('#ffffff', colors[index]),
                 transparent: true,
-                opacity: 0.6,
+                opacity: 0.95,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
                 fog: false,
+                toneMapped: false,
             }));
             sprite.position.set(...offset);
-            sprite.scale.setScalar(6);
+            sprite.scale.setScalar(8);
             group.add(sprite);
             this.stationBeacons.push({ sprite, phase: index * 2.1, color: colors[index] });
         });
@@ -1498,6 +1530,34 @@ export class SpaceRenderer {
         // The remastered cockpit is a responsive DOM art layer; the legacy geometry would double the canopy struts.
         this.cockpit.visible = false;
     }
+    // True third-person chase camera so screenshots and replays can step out of
+    // the cockpit and frame the whole ship against the sky. The harness uses
+    // this for the "chase" labels so we actually see the new hull silhouettes
+    // we redrew this iteration.
+    setChaseCamera(active, offset = [0, 1.6, -7]) {
+        this.chaseCameraActive = !!active;
+        if (active) {
+            this.cockpit.visible = false;
+            this.chaseOffset = offset;
+        }
+    }
+    // Move the camera to a chase position behind the player for one render
+    // pass. The renderer keeps no internal state about which view it was
+    // showing, so the harness must call this *every* frame it wants chase.
+    renderChaseFrame() {
+        if (!this.chaseCameraActive || !this.chasePlayerPosition)
+            return false;
+        const off = new THREE.Vector3(...(this.chaseOffset ?? [0, 1.6, -7]));
+        const fwd = (this.chaseForward ?? new THREE.Vector3(0, 0, -1)).clone();
+        const up = new THREE.Vector3(0, 1, 0);
+        const camPos = new THREE.Vector3(...this.chasePlayerPosition).addScaledVector(fwd, off.z).addScaledVector(up, off.y);
+        const target = new THREE.Vector3(...this.chasePlayerPosition).addScaledVector(fwd, 4);
+        this.camera.position.copy(camPos);
+        this.camera.lookAt(target);
+        this.skyRoot.position.copy(camPos);
+        this.renderer.render(this.scene, this.camera);
+        return true;
+    }
     setDamageWarning(level) {
         const normalized = clamp(level, 0, 1);
         this.shell?.style.setProperty('--damage-warning', normalized.toFixed(3));
@@ -1515,6 +1575,12 @@ export class SpaceRenderer {
         this.shell.style.setProperty('--hyperdrive-progress', clamp(progress, 0, 1).toFixed(3));
     }
     updateCamera(position, prevPosition, rotation, prevRotation, angularVelocity, speedRatio, afterburner, dt, alpha = 0) {
+        // Cache the player position/forward so chase-camera helpers (used by
+        // the screenshot harness) can place a third-person rig without
+        // re-reading game state every frame.
+        this.chasePlayerPosition = position;
+        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion().set(...rotation));
+        this.chaseForward = fwd;
         this.camera.position.set(...position);
         if (prevPosition && alpha > 0) {
             this.tmpPrevPos.set(prevPosition[0], prevPosition[1], prevPosition[2]);

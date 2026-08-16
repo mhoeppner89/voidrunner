@@ -175,4 +175,6 @@ window.__VOID_PRIVATEER__ = {
     projectToScreen: (position) => session?.renderer?.projectToScreen(position),
     launch: () => session?.launch(),
     saveNow: () => session?.saveNow(),
+    setChaseCamera: (active, offset) => session?.renderer?.setChaseCamera?.(active, offset),
+    renderChaseFrame: () => session?.renderer?.renderChaseFrame?.(),
 };
