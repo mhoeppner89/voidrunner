@@ -99,7 +99,7 @@ export class SpaceRenderer {
         });
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderer.toneMapping = THREE.NeutralToneMapping;
-        this.renderer.toneMappingExposure = 1.4;
+        this.renderer.toneMappingExposure = 1.18;
         this.renderer.setPixelRatio(1);
         this.renderer.shadowMap.enabled = false;
         this.renderer.setClearColor(0x0d1a3c, 1);
@@ -179,35 +179,35 @@ export class SpaceRenderer {
         const innerCorona = new THREE.Sprite(new THREE.SpriteMaterial({
             map: this.radialTexture('#fff5cf', '#ffaf3d'),
             transparent: true,
-            opacity: 0.95,
+            opacity: 0.55,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             fog: false,
         }));
         innerCorona.position.copy(sunPos);
-        innerCorona.scale.setScalar(96000);
+        innerCorona.scale.setScalar(48000);
         this.skyRoot.add(innerCorona);
         const outerCorona = new THREE.Sprite(new THREE.SpriteMaterial({
             map: this.radialTexture('#ffd57a', '#ff6b2a'),
             transparent: true,
-            opacity: 0.78,
+            opacity: 0.32,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             fog: false,
         }));
         outerCorona.position.copy(sunPos);
-        outerCorona.scale.setScalar(220000);
+        outerCorona.scale.setScalar(110000);
         this.skyRoot.add(outerCorona);
         const farHalo = new THREE.Sprite(new THREE.SpriteMaterial({
             map: this.radialTexture('#ffe9a8', '#e07a3a'),
             transparent: true,
-            opacity: 0.42,
+            opacity: 0.14,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             fog: false,
         }));
         farHalo.position.copy(sunPos);
-        farHalo.scale.setScalar(540000);
+        farHalo.scale.setScalar(220000);
         this.skyRoot.add(farHalo);
         // Persist the sun direction in render-space so other systems (rim shader,
         // engine flare bias, sub-light point glows) can use it without re-reading
@@ -399,7 +399,7 @@ export class SpaceRenderer {
                 dir,
                 280000 + rng() * 140000,
                 180000 + rng() * 100000,
-                0.34 + rng() * 0.12,
+                0.24 + rng() * 0.1,
             );
         }
         // A faint cool milky band, barely brighter than the starfield.
@@ -919,26 +919,24 @@ export class SpaceRenderer {
         const glow = new THREE.Sprite(new THREE.SpriteMaterial({
             map: this.radialTexture('#ffffff', location.accent),
             transparent: true,
-            opacity: 0.18,
+            opacity: 0.12,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             fog: false,
         }));
         glow.position.set(...location.position);
-        glow.scale.setScalar(location.radius * 1.8);
+        glow.scale.setScalar(location.radius * 1.5);
         this.locationRoot.add(glow);
-        // Far-field scatter halo so the station reads as a *bright* point of
-        // light from across the system.
         const scatter = new THREE.Sprite(new THREE.SpriteMaterial({
             map: this.radialTexture(location.accent, location.accent),
             transparent: true,
-            opacity: 0.08,
+            opacity: 0.05,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             fog: false,
         }));
         scatter.position.set(...location.position);
-        scatter.scale.setScalar(location.radius * 4.5);
+        scatter.scale.setScalar(location.radius * 3.2);
         this.locationRoot.add(scatter);
     }
     addStationBeacons(group, location) {
@@ -955,14 +953,14 @@ export class SpaceRenderer {
             const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
                 map: this.radialTexture('#ffffff', colors[index]),
                 transparent: true,
-                opacity: 0.95,
+                opacity: 0.7,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
                 fog: false,
                 toneMapped: false,
             }));
             sprite.position.set(...offset);
-            sprite.scale.setScalar(8);
+            sprite.scale.setScalar(6);
             group.add(sprite);
             this.stationBeacons.push({ sprite, phase: index * 2.1, color: colors[index] });
         });
@@ -1008,7 +1006,7 @@ export class SpaceRenderer {
             for (let index = 0; index < positions.count; index += 1) {
                 vertex.fromBufferAttribute(positions, index);
                 const seedPhase = variant * 7.31;
-                const distortion = 0.76 + 0.28 * Math.sin(vertex.x * (6.3 + variant * 1.9) + vertex.y * (9.7 + variant * 2.3) + vertex.z * (13.1 + variant * 1.5) + seedPhase);
+                const distortion = 0.72 + 0.32 * Math.sin(vertex.x * (6.3 + variant * 1.9) + vertex.y * (9.7 + variant * 2.3) + vertex.z * (13.1 + variant * 1.5) + seedPhase);
                 vertex.multiplyScalar(distortion);
                 positions.setXYZ(index, vertex.x, vertex.y, vertex.z);
             }
@@ -1017,40 +1015,95 @@ export class SpaceRenderer {
             geometry.computeBoundingSphere();
             geometries.push(geometry);
         }
-        const rockMap = this.createPixelPanelTexture('shardbelt-rock', 0x625e54, 0xb89d67, 'rock');
-        rockMap.repeat.set(3.1, 3.1);
-        const material = new THREE.MeshStandardMaterial({
-            color: 0xffffff,
-            map: rockMap,
-            roughness: 1,
-            metalness: 0.06,
+        // Three asteroid material kinds: iron (mid-grade metallic sand),
+        // ice (pale frozen, drifts mostly), and dark (carbonaceous, monoliths/rock-crown).
+        // Each gets its own pixel texture and slightly different roughness so a
+        // belt cluster reads as varied terrain instead of one repeated rock.
+        const ironMap = this.createPixelPanelTexture('shardbelt-iron', 0x54585d, 0xb8a98a, 'rock');
+        ironMap.repeat.set(3.4, 3.4);
+        const ironMaterial = new THREE.MeshStandardMaterial({
+            color: 0xb0b8c0,
+            map: ironMap,
+            roughness: 0.78,
+            metalness: 0.32,
             flatShading: true,
             vertexColors: true,
         });
+        const iceMap = this.createPixelPanelTexture('shardbelt-ice', 0xc7d6e2, 0x8eb6cc, 'rock');
+        iceMap.repeat.set(3.4, 3.4);
+        const iceMaterial = new THREE.MeshStandardMaterial({
+            color: 0xd6e6f0,
+            map: iceMap,
+            roughness: 0.42,
+            metalness: 0.08,
+            flatShading: true,
+            vertexColors: true,
+            emissive: 0x0a1822,
+            emissiveIntensity: 0.18,
+        });
+        const darkMap = this.createPixelPanelTexture('shardbelt-dark', 0x232027, 0xa4553a, 'rock');
+        darkMap.repeat.set(3.4, 3.4);
+        const darkMaterial = new THREE.MeshStandardMaterial({
+            color: 0x6a5a5e,
+            map: darkMap,
+            roughness: 0.88,
+            metalness: 0.12,
+            flatShading: true,
+            vertexColors: true,
+        });
+        const kindPalettes = {
+            iron: { base: 0x9aa4b0, accent: 0xd0a060, scan: 0xc4ad7a, rich: 0xe7c478 },
+            ice:  { base: 0xb8cee0, accent: 0xe6f4ff, scan: 0xa8c4dc, rich: 0xd8ecff },
+            dark: { base: 0x5a4a52, accent: 0xb0483a, scan: 0x806868, rich: 0xc25c4a },
+        };
+        const kindFor = (id) => {
+            if (id.startsWith('rock-crown-')) return 'dark';
+            if (id.startsWith('asteroid-monolith-')) return 'dark';
+            // Hash the id so each drift and static cluster gets a stable kind
+            // but the belt still reads as a mix of iron and ice.
+            let hash = 2166136261;
+            for (let i = 0; i < id.length; i += 1) {
+                hash ^= id.charCodeAt(i);
+                hash = (hash * 16777619) >>> 0;
+            }
+            return (hash & 0xff) < 160 ? 'iron' : 'ice';
+        };
         const groups = new Map();
         this.asteroids.forEach((node, index) => {
             const shape = node.shape ?? 0;
-            const list = groups.get(shape) ?? [];
-            list.push({ node, index });
-            groups.set(shape, list);
+            const kind = kindFor(node.id);
+            const key = `${shape}:${kind}`;
+            const list = groups.get(key) ?? [];
+            list.push({ node, index, kind });
+            groups.set(key, list);
         });
+        const materialByKind = { iron: ironMaterial, ice: iceMaterial, dark: darkMaterial };
         this.asteroidMeshes = [];
-        groups.forEach((entries, shape) => {
+        groups.forEach((entries, key) => {
+            const [shapeStr, kind] = key.split(':');
+            const shape = Number(shapeStr);
+            const material = materialByKind[kind];
             const mesh = new THREE.InstancedMesh(geometries[shape % geometries.length], material, entries.length);
             mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
             mesh.frustumCulled = false;
-            mesh.name = 'shardbelt-asteroids';
+            mesh.name = `shardbelt-asteroids-${kind}`;
             mesh.userData.targetKind = 'asteroid';
+            mesh.userData.asteroidKind = kind;
             mesh.userData.nodeIndices = entries.map((entry) => entry.index);
             this.instanceRoots.get('shardbelt')?.add(mesh);
-            this.asteroidMeshes.push({ mesh, entries });
+            this.asteroidMeshes.push({ mesh, entries, kind });
         });
+        // Stash the palette cache for updateAsteroidInstances so the per-instance
+        // tint logic stays in one place.
+        this._asteroidPalettes = kindPalettes;
         this.updateAsteroidInstances();
         return this.asteroidMeshes[0]?.mesh;
     }
     updateAsteroidInstances(movingOnly = false) {
         const color = new THREE.Color();
-        for (const { mesh, entries } of this.asteroidMeshes) {
+        const palettes = this._asteroidPalettes;
+        for (const { mesh, entries, kind } of this.asteroidMeshes) {
+            const palette = palettes[kind] ?? palettes.iron;
             let changed = false;
             entries.forEach(({ node }, instanceIndex) => {
                 if (movingOnly && !node.moving)
@@ -1069,9 +1122,9 @@ export class SpaceRenderer {
                     if (node.id === this.selectedAsteroidId)
                         color.setHex(0xcfe884);
                     else if (node.scanned)
-                        color.setHex(node.richness > 1.65 ? 0x9c8b68 : 0x696257);
+                        color.setHex(node.richness > 1.65 ? palette.rich : palette.scan);
                     else
-                        color.setHex(0x5b5851);
+                        color.setHex(palette.base);
                     mesh.setColorAt(instanceIndex, color);
                 }
             });
@@ -1278,6 +1331,36 @@ export class SpaceRenderer {
         geometry.computeVertexNormals();
         return geometry;
     }
+    engineFlameTexture() {
+        // A side-on radial gradient: hot white/yellow core fading to orange
+        // then red then transparent. Mapped on a stretched plane behind each
+        // engine port so ships get proper exhaust trails in chase views.
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 32;
+        const context = canvas.getContext('2d');
+        const gradient = context.createLinearGradient(0, 0, 256, 0);
+        gradient.addColorStop(0, 'rgba(255, 240, 200, 0)');
+        gradient.addColorStop(0.18, 'rgba(255, 200, 110, 0.5)');
+        gradient.addColorStop(0.36, 'rgba(255, 150, 70, 0.85)');
+        gradient.addColorStop(0.5, 'rgba(255, 100, 50, 0.65)');
+        gradient.addColorStop(0.78, 'rgba(200, 60, 40, 0.3)');
+        gradient.addColorStop(1, 'rgba(80, 20, 0, 0)');
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, 256, 32);
+        // Vertical fade so the trail isn't a flat ribbon.
+        const vFade = context.createLinearGradient(0, 0, 0, 32);
+        vFade.addColorStop(0, 'rgba(0,0,0,1)');
+        vFade.addColorStop(0.5, 'rgba(0,0,0,0)');
+        vFade.addColorStop(1, 'rgba(0,0,0,1)');
+        context.globalCompositeOperation = 'destination-out';
+        context.fillStyle = vFade;
+        context.fillRect(0, 0, 256, 32);
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        this.pixelTextures.add(texture);
+        return texture;
+    }
     createShipMesh(entity) {
         const variant = shipVariantForRole(entity.role);
         const palette = paletteForFaction(entity.faction, entity.hostile);
@@ -1286,7 +1369,10 @@ export class SpaceRenderer {
         const baseScale = variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1;
         const engineColor = palette.engine;
         const engineFlareTexture = this.radialTexture(cssHex(engineColor), cssHex(engineColor));
+        const flameTex = this.engineFlameTexture();
         const flares = [];
+        // Per-port near-field flare (small bright sprite at the engine).
+        const trail = [];
         for (const port of model.enginePorts) {
             const flare = new THREE.Sprite(new THREE.SpriteMaterial({
                 map: engineFlareTexture,
@@ -1299,6 +1385,25 @@ export class SpaceRenderer {
             flare.scale.setScalar(variant === 'atlas-freighter' ? 2.8 : 1.42);
             flares.push(flare);
             group.add(flare);
+            // Long exhaust trail: a thin plane stretched along the ship's
+            // forward axis (z+ on the ship = behind the engine).
+            const trailMat = new THREE.MeshBasicMaterial({
+                map: flameTex,
+                color: engineColor,
+                transparent: true,
+                opacity: 0.78,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                side: THREE.DoubleSide,
+                toneMapped: false,
+            });
+            const trailLen = variant === 'atlas-freighter' ? 9 : variant === 'kestrel' ? 6 : 7;
+            const trailMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.45, trailLen), trailMat);
+            trailMesh.position.copy(port).add(new THREE.Vector3(0, 0, trailLen * 0.45));
+            trailMesh.rotation.x = Math.PI / 2;
+            trailMesh.userData.isTrail = true;
+            trail.push(trailMesh);
+            group.add(trailMesh);
         }
         this.tagTargetable(group, 'ship', entity.id);
         group.scale.setScalar(baseScale);
@@ -1307,6 +1412,7 @@ export class SpaceRenderer {
         group.userData.rimMaterial = model.rimMaterial;
         group.userData.variant = variant;
         group.userData.engineFlares = flares;
+        group.userData.engineTrails = trail;
         // Cache the emissive hull materials once so the per-frame sync does not
         // walk the whole ship graph looking for them.
         const emissiveMaterials = [];
@@ -1361,7 +1467,7 @@ export class SpaceRenderer {
             }
             const rimMaterial = mesh.userData.rimMaterial;
             if (rimMaterial?.uniforms) {
-                rimMaterial.uniforms.uIntensity.value = entity.hostile ? 1.35 + damage * 0.4 : 1.2;
+                rimMaterial.uniforms.uIntensity.value = entity.hostile ? 0.7 + damage * 0.2 : 0.62;
             }
             const flares = mesh.userData.engineFlares;
             if (flares) {
@@ -1788,8 +1894,8 @@ export class SpaceRenderer {
         this.bloomBrightMaterial = new THREE.ShaderMaterial({
             uniforms: {
                 tDiffuse: { value: null },
-                uThreshold: { value: 0.4 },
-                uKnee: { value: 0.5 },
+                uThreshold: { value: 0.78 },
+                uKnee: { value: 0.28 },
             },
             vertexShader,
             fragmentShader: `
@@ -1839,7 +1945,7 @@ export class SpaceRenderer {
             uniforms: {
                 tScene: { value: null },
                 tBloom: { value: null },
-                uStrength: { value: 1.0 },
+                uStrength: { value: 0.6 },
                 uExposure: { value: 1.2 },
             },
             vertexShader,

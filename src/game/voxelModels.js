@@ -637,12 +637,104 @@ export const paletteForFaction = (faction, hostile) => {
             };
     }
 };
-const createVoxelMeshes = (grid, unit, palette, roughness, metalness) => {
+const createStationPaintTexture = (palette, seed) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 256;
+    const context = canvas.getContext('2d');
+    const base = new THREE.Color(palette.hull);
+    const dark = new THREE.Color(palette.dark);
+    const accent = new THREE.Color(palette.accent ?? palette.engine ?? 0xffffff);
+    const baseHex = `#${base.getHexString()}`;
+    const darkHex = `#${dark.getHexString()}`;
+    const accentRgb = `${Math.round(accent.r * 255)}, ${Math.round(accent.g * 255)}, ${Math.round(accent.b * 255)}`;
+    context.fillStyle = baseHex;
+    context.fillRect(0, 0, 256, 256);
+    // Pixelated noise so the painted hull reads as greebled sheet metal
+    // rather than a plastic monotone.
+    const rng = mulberry32(`${seed}:paint`);
+    for (let y = 0; y < 256; y += 4) {
+        for (let x = 0; x < 256; x += 4) {
+            const variance = (rng() - 0.5) * 0.22;
+            const row = base.clone().offsetHSL((rng() - 0.5) * 0.012, 0, variance);
+            context.fillStyle = `#${row.getHexString()}`;
+            context.fillRect(x, y, 4, 4);
+        }
+    }
+    // Panel grid: every 64u a darker seam, every 32u a rivet row.
+    context.strokeStyle = `rgba(${accentRgb}, 0.12)`;
+    context.lineWidth = 2;
+    for (let x = 0; x < 256; x += 64) {
+        context.beginPath(); context.moveTo(x + 0.5, 0); context.lineTo(x + 0.5, 256); context.stroke();
+    }
+    for (let y = 0; y < 256; y += 64) {
+        context.beginPath(); context.moveTo(0, y + 0.5); context.lineTo(256, y + 0.5); context.stroke();
+    }
+    context.strokeStyle = `rgba(0,0,0,0.6)`;
+    context.lineWidth = 1;
+    for (let x = 32; x < 256; x += 32) {
+        context.beginPath(); context.moveTo(x + 0.5, 0); context.lineTo(x + 0.5, 256); context.stroke();
+    }
+    for (let y = 32; y < 256; y += 32) {
+        context.beginPath(); context.moveTo(0, y + 0.5); context.lineTo(256, y + 0.5); context.stroke();
+    }
+    // Subtle rivets at panel intersections.
+    context.fillStyle = darkHex;
+    for (let y = 64; y < 256; y += 64) {
+        for (let x = 64; x < 256; x += 64) {
+            context.fillRect(x - 2, y - 2, 4, 4);
+        }
+    }
+    // A handful of dark "weathering" streaks so the paint isn't sterile.
+    context.fillStyle = `rgba(0,0,0,0.18)`;
+    for (let i = 0; i < 12; i += 1) {
+        const x = Math.floor(rng() * 240);
+        const y = Math.floor(rng() * 240);
+        context.fillRect(x, y, 6 + Math.floor(rng() * 14), 1);
+    }
+    // Bright accent chevrons at random — same accent color as the windows
+    // so the hulls feel like they belong to the same colour family.
+    context.fillStyle = `rgba(${accentRgb}, 0.9)`;
+    for (let i = 0; i < 4; i += 1) {
+        const x = Math.floor(rng() * 200);
+        const y = Math.floor(rng() * 220);
+        context.fillRect(x, y, 12, 2);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.NearestMipmapNearestFilter;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(3.5, 3.5);
+    texture.generateMipmaps = true;
+    texture.needsUpdate = true;
+    return texture;
+};
+// Tiny mulberry32 keyed by string so the station paint variations stay
+// deterministic for a given seed.
+const mulberry32 = (seedString) => {
+    let h = 1779033703 ^ seedString.length;
+    for (let i = 0; i < seedString.length; i += 1) {
+        h = Math.imul(h ^ seedString.charCodeAt(i), 3432918353);
+        h = (h << 13) | (h >>> 19);
+    }
+    let a = h >>> 0;
+    return () => {
+        a = (a + 0x6d2b79f5) >>> 0;
+        let t = a;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+};
+const createVoxelMeshes = (grid, unit, palette, roughness, metalness, hullMap = null) => {
     const group = new THREE.Group();
     // Glossy painted metal: a clearcoat over a faceted hull so the low-poly ship
     // catches the environment map and reads like a Rebel Galaxy Outlaw hull rather
-    // than flat matte voxels.
+    // than flat matte voxels. Stations may pass a hullMap so the paint panel
+    // texture gets multiplied with the per-vertex faction color.
     const hullMaterial = new THREE.MeshPhysicalMaterial({
+        map: hullMap,
         vertexColors: true,
         roughness,
         metalness,
@@ -678,7 +770,7 @@ const createVoxelMeshes = (grid, unit, palette, roughness, metalness) => {
             uColor: { value: new THREE.Color(palette.accent ?? palette.engine ?? 0x6ad9f1) },
             uSun: { value: sunColor },
             uShadow: { value: shadowColor },
-            uIntensity: { value: 1.35 },
+            uIntensity: { value: 0.95 },
         },
         vertexShader: `
             varying vec3 vNormal;
@@ -840,10 +932,11 @@ const buildHelixStation = () => {
         if (index === 4 || index === 12)
             rotorGrid.set(0, y + 4, z, 'warning');
     }
+    const paintTexture = createStationPaintTexture(palette, 'helix-station');
     const root = new THREE.Group();
     root.name = 'helix-voxel-station';
-    const staticMeshes = createVoxelMeshes(staticGrid, unit, palette, 0.7, 0.5).group;
-    const rotor = createVoxelMeshes(rotorGrid, unit, palette, 0.72, 0.5).group;
+    const staticMeshes = createVoxelMeshes(staticGrid, unit, palette, 0.62, 0.55, paintTexture).group;
+    const rotor = createVoxelMeshes(rotorGrid, unit, palette, 0.68, 0.5, paintTexture).group;
     rotor.name = 'rotor';
     rotor.userData.rotationAxis = 'x';
     root.add(staticMeshes, rotor);
@@ -915,7 +1008,7 @@ const buildRookStation = () => {
         grid.fillBox(-13, -13, y, y, -16, 16, y === 0 ? 'warning' : 'window');
         grid.fillBox(13, 13, y, y, -16, 16, y === 0 ? 'warning' : 'window');
     }
-    const root = createVoxelMeshes(grid, unit, palette, 0.79, 0.48).group;
+    const root = createVoxelMeshes(grid, unit, palette, 0.74, 0.5, createStationPaintTexture(palette, 'rook-station')).group;
     root.name = 'rook-voxel-station';
     return root;
 };
