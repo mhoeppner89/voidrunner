@@ -5,7 +5,7 @@ import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from
 import { shipTopDownProfile } from './voxelModels.js';
 const escapeHtml = (value) => value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const percent = (value, max) => (max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100)));
-const GAME_VERSION = '0.3.33';
+const GAME_VERSION = '0.3.34';
 export class GameUI {
     root;
     viewport;
@@ -84,6 +84,7 @@ export class GameUI {
           </div>
           <div class="cockpit-screen cockpit-screen-target" data-touch-action="targetNext" aria-label="Target status display; tap to cycle targets">
             <div class="screen-heading"><span>TARGET STATUS</span><b id="screen-target-name">NO LOCK</b></div>
+            <div id="screen-target-distance" class="screen-target-distance">—</div>
             <div class="screen-target-layout"><canvas class="hull-outline" id="target-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-target-shield"></b></i><em id="screen-target-shield-value">—</em></div><div><span>ARMOR</span><i><b id="screen-target-armor"></b></i><em id="screen-target-armor-value">—</em></div><div><span>HULL</span><i><b id="screen-target-hull"></b></i><em id="screen-target-hull-value">—</em></div></div></div>
           </div>
           <button type="button" id="hyperdrive-card" class="cockpit-identity" data-touch-action="autopilot" aria-label="Hyperdrive: engage jump to nav point"><b>HYPERDRIVE</b><em id="hyperdrive-card-status" class="is-hidden"></em></button>
@@ -826,6 +827,7 @@ export class GameUI {
         if (!target) {
             this.el('#hud-target-name').textContent = 'NO LOCK';
             this.el('#hud-target-subtitle').textContent = 'T selects contact';
+            this.el('#screen-target-distance').textContent = '—';
             this.el('#target-bars').innerHTML = '';
             this.setTargetScreenValue(undefined);
             this.updateWeaponButtons(undefined);
@@ -841,6 +843,7 @@ export class GameUI {
         edgePointer?.classList.toggle('is-hostile', hostile);
         targetPanel?.classList.toggle('is-hostile', hostile);
         this.el('#hud-target-name').textContent = target.name;
+        this.el('#screen-target-distance').textContent = `${Math.round(target.distance).toLocaleString('en-US')} km`;
         this.el('#hud-target-subtitle').textContent = `${target.subtitle} · ${Math.round(target.distance)} km${target.scanned === false ? ' · UNSCANNED' : ''}`;
         const bars = this.el('#target-bars');
         bars.innerHTML = [

@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v45-revalidate';
+const CACHE = 'voidrunner-v46-target-distance';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',

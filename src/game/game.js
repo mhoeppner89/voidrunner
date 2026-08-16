@@ -1035,9 +1035,8 @@ export class GameSession {
             return;
         }
         if (target.kind === 'location') {
-            const location = LOCATIONS[target.id];
-            const distance = vec(this.save.player.position).distanceTo(vec(location.position));
-            this.ui.showToast(`NAV database: ${location.name} · ${location.kind.toUpperCase()} · ${Math.round(distance)} units.`, 'info', 4200);
+            // Distance for a locked POI now lives on the target monitor heading;
+            // the old NAV-database pop-up card is gone.
             this.scanCooldown = 0.35;
             this.audio.play('scan');
             return;
@@ -1122,7 +1121,7 @@ export class GameSession {
         if (!nearest || nearest.id === this.save.player.currentTargetId)
             return;
         this.save.player.mode = 'combat';
-        this.applyTarget({ kind: 'ship', id: nearest.id, position: nearest.position, name: nearest.name }, `HOSTILE LOCK: ${nearest.name}`);
+        this.applyTarget({ kind: 'ship', id: nearest.id, position: nearest.position, name: nearest.name });
     }
     targetCandidates() {
         const player = vec(this.save.player.position);
@@ -1223,7 +1222,7 @@ export class GameSession {
             this.ui.showToast('Target is no longer available.', 'warning');
             return;
         }
-        this.applyTarget(target, kind === 'location' ? `TARGET / NAV: ${target.name}` : undefined);
+        this.applyTarget(target);
         // Selecting a deposit resolves it automatically now that the SCAN button is
         // gone from the touch cockpit (it was the only gate before extraction).
         if ((kind === 'asteroid' || kind === 'wreck') && target.kind === kind && this.scanCooldown <= 0) {
@@ -1232,10 +1231,11 @@ export class GameSession {
                 this.scanTarget();
         }
     }
-    applyTarget(target, message) {
+    applyTarget(target) {
         this.save.player.currentTargetId = target.id;
         this.renderer.setTarget(target.kind === 'ship' ? target.id : undefined, target.kind === 'asteroid' ? target.id : undefined, target.kind === 'wreck' ? target.id : undefined, target.kind === 'location' ? target.id : undefined);
-        this.ui.showToast(message ?? `Target: ${target.name}`, 'info', 1800);
+        // No selection pop-up: the target monitor already shows the lock, and
+        // the distance readout lives in its heading (below the label row).
         this.audio.play('ui');
     }
     clearTarget() {
