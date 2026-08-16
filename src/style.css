@@ -2437,10 +2437,10 @@ button.compact {
 }
 
 /* The live instrument windows are now the authoritative status/radar layer. */
-.hud > .cockpit-vignette {
-  background:
-    linear-gradient(90deg, rgba(1, 8, 26, 0.22), transparent 13%, transparent 87%, rgba(1, 8, 26, 0.22)),
-    radial-gradient(ellipse at center, transparent 52%, rgba(1, 7, 25, 0.34) 100%);
+.hud > /* Stripped: previously painted orange/blue tinted edges that bled
+   through the cockpit sprite. The frame image alone carries the look. */
+.cockpit-vignette {
+  background: transparent;
 }
 
 .hud > .cockpit-mfd {
@@ -2691,18 +2691,15 @@ button.primary,
   filter: contrast(1.05) saturate(1.12) brightness(1.05);
 }
 
+/* Stripped: the warm sunset gradient previously painted over the entire
+   title sprite. With it gone, the .title-screen background-image (the
+   cockpit cockpit.webp) is fully visible. */
 .title-screen::before {
   position: absolute;
   inset: 0;
   content: "";
-  background:
-    radial-gradient(ellipse at 78% 92%, rgba(255, 224, 162, 0.94) 0 6%, rgba(255, 152, 64, 0.7) 12%, rgba(178, 60, 50, 0.45) 28%, rgba(40, 24, 60, 0.18) 50%, transparent 70%),
-    radial-gradient(ellipse at 78% 100%, rgba(255, 196, 96, 0.55) 0 9%, transparent 22%),
-    radial-gradient(circle at 50% 0%, rgba(8, 22, 70, 0.85), rgba(18, 30, 70, 0.6)),
-    linear-gradient(180deg, #0c1840 0 22%, #1c2058 24% 42%, #5e2a5e 44%, #b04e44 64%, #d9894b 80%, #f5d493 100%);
-  background-blend-mode: normal, normal, normal, normal;
-  image-rendering: pixelated;
-  filter: contrast(1.06) saturate(1.18) brightness(1.18);
+  background: none;
+  z-index: -1;
 }
 
 .title-screen::after {
@@ -3577,16 +3574,19 @@ button.primary,
   pointer-events: none;
 }
 
-/* Cockpit frame painted beams removed per direction — the .cockpit-art
-   element stays in the DOM for parity with existing selectors but no longer
-   draws the cockpit-frame.webp. The Three.js canopy geometry (rails,
-   console, screens) stays visible via .cockpit-glass + .cockpit-vignette. */
+/* In-flight cockpit painted sprite — cockpit-frame.webp is the original
+   art. The .cockpit-art HUD overlay shows the cockpit canopy/console.
+   Locked to the camera via translate3d+rotate so it tracks with the
+   cockpit transform during banking and afterburner. */
 .cockpit-art {
   inset: -1.2%;
   z-index: 1;
-  background: none;
+  background: url("../assets/remaster/cockpit-frame.webp") center / 100% 100% no-repeat;
+  image-rendering: pixelated;
   transform: translate3d(var(--cockpit-shift-x), var(--cockpit-shift-y), 0) rotate(var(--cockpit-roll));
   transform-origin: 50% 72%;
+  filter: contrast(1.06) saturate(0.96) brightness(0.96) drop-shadow(0 -6px 18px rgba(0, 0, 0, 0.55));
+  opacity: 0.92;
   will-change: transform;
 }
 
@@ -4157,14 +4157,9 @@ button.primary,
     url("../art/title-cockpit.webp") center / cover no-repeat;
 }
 
+/* Phototropic override: also no overlay, sprite stays exposed. */
 .title-screen::before {
-  background:
-    radial-gradient(ellipse at 78% 92%, rgba(255, 224, 162, 0.94) 0 6%, rgba(255, 152, 64, 0.7) 12%, rgba(178, 60, 50, 0.45) 28%, rgba(40, 24, 60, 0.18) 50%, transparent 70%),
-    radial-gradient(ellipse at 78% 100%, rgba(255, 196, 96, 0.55) 0 9%, transparent 22%),
-    radial-gradient(circle at 50% 0%, rgba(8, 22, 70, 0.85), rgba(18, 30, 70, 0.6)),
-    linear-gradient(180deg, #0c1840 0 22%, #1c2058 24% 42%, #5e2a5e 44%, #b04e44 64%, #d9894b 80%, #f5d493 100%);
-  background-blend-mode: normal, normal, normal, normal;
-  filter: contrast(1.04) saturate(1.16) brightness(1.16);
+  background: none;
 }
 
 .title-screen::after {
