@@ -2675,13 +2675,20 @@ button.primary,
   text-shadow: 1px 1px #000, 0 0 6px rgba(105, 212, 189, 0.22);
 }
 
-/* Title screen: approved cockpit concept used as a backplate, with live DOM UI. */
+/* Title screen backplate: art/title-cockpit.webp sprite + dark vignette,
+   same layering as the top-level .title-screen so the .webp is visible on
+   both mobile and desktop. */
 .title-screen {
   display: flex;
   align-items: flex-end;
   justify-content: flex-start;
   padding: clamp(1.1rem, 4vw, 4rem);
-  background: #010302;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.92) 0 7%, rgba(0, 0, 0, 0.52) 35%, rgba(0, 0, 0, 0.14) 68%, rgba(0, 0, 0, 0.42)),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.86), transparent 55%),
+    url("../art/title-cockpit.webp") center / cover no-repeat;
+  image-rendering: pixelated;
+  filter: contrast(1.05) saturate(1.12) brightness(1.05);
 }
 
 .title-screen::before {
@@ -4141,8 +4148,13 @@ button.primary,
   background: linear-gradient(180deg, #ffe08a 0 12%, #f5aa3e 12% 78%, #bf682e 78%), #e69b37;
 }
 
+/* Inherit the sprite background in landscape/portrait phones too. */
 .title-screen {
-  background: #07183f;
+  background-color: transparent;
+  background-image:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.92) 0 7%, rgba(0, 0, 0, 0.52) 35%, rgba(0, 0, 0, 0.14) 68%, rgba(0, 0, 0, 0.42)),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.86), transparent 55%),
+    url("../art/title-cockpit.webp") center / cover no-repeat;
 }
 
 .title-screen::before {
