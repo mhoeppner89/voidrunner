@@ -1782,12 +1782,15 @@ export class SpaceRenderer {
             this.camera.updateProjectionMatrix();
         // Counter-scale the cockpit group (which now only contains the grime
         // plane) so it keeps its apparent on-screen size when the FOV widens
-        // (e.g. afterburner 70° → 80°). Without this, the grime shrinks
-        // during afterburner and reads as "moving away".
+        // (e.g. afterburner 70° → 80°). Without this, the grime shrinks in
+        // screen-percentage during afterburner and reads as "moving away".
+        //   - cruise FOV 70°: scale = 1.000
+        //   - mid FOV    74°: scale = 1.083
+        //   - afterburn  80°: scale = 1.198  (compensates wider frustum)
         if (this.cockpit) {
             const baseHalfFovTan = Math.tan(70 * 0.5 * Math.PI / 180);
             const currentHalfFovTan = Math.tan(this.camera.fov * 0.5 * Math.PI / 180);
-            const fovCompScale = baseHalfFovTan / currentHalfFovTan;
+            const fovCompScale = currentHalfFovTan / baseHalfFovTan;
             this.cockpit.scale.setScalar(fovCompScale);
         }
         const shiftX = clamp(-angularVelocity[1] * 2.4, -7, 7);
