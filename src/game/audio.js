@@ -242,4 +242,41 @@ export class AudioManager {
         oscillator.start(now);
         oscillator.stop(now + duration + 0.02);
     }
+    // Comms chirp: a muted two-tone radio squelch announcing incoming chatter.
+    // The tone pair is temperament-tuned so the player can hear who is talking
+    // before reading the toast — timid descends (plaintive), aggressive ascends
+    // (assertive), flamboyant runs bright and quick. Deliberately quieter than
+    // regular effects: chatter should sit under the mix, not compete with lasers.
+    playComms(temperament = 'steady') {
+        if (!this.context || !this.effectsGain || !this.enabled || this.effectsVolume <= 0.001)
+            return;
+        const pairs = {
+            timid: [1480, 1180],
+            aggressive: [1120, 1560],
+            flamboyant: [1560, 1980],
+            steady: [1320, 1420],
+        };
+        const [first, second] = pairs[temperament] ?? pairs.steady;
+        const now = this.context.currentTime;
+        const blip = (frequency, at) => {
+            const oscillator = this.context.createOscillator();
+            const filter = this.context.createBiquadFilter();
+            const gain = this.context.createGain();
+            oscillator.type = 'sine';
+            oscillator.frequency.value = frequency;
+            filter.type = 'bandpass';
+            filter.frequency.value = frequency;
+            filter.Q.value = 5;
+            gain.gain.setValueAtTime(0.0001, at);
+            gain.gain.exponentialRampToValueAtTime(0.05, at + 0.008);
+            gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.075);
+            oscillator.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.effectsGain);
+            oscillator.start(at);
+            oscillator.stop(at + 0.1);
+        };
+        blip(first, now);
+        blip(second, now + 0.11);
+    }
 }

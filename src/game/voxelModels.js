@@ -201,7 +201,6 @@ const addStripe = (grid, y, z0, z1, material) => {
 // readable from a distance. `width` is the run along z, `wing` is the
 // outward offset on the +x / -x side.
 const addFin = (grid, side, anchorX, tipX, y, z0, z1, material = 'dark') => {
-    const dx = Math.sign(tipX - anchorX);
     for (let z = z0; z <= z1; z += 1) {
         const t = (z - z0) / Math.max(1, z1 - z0);
         const x = Math.round(anchorX + (tipX - anchorX) * t);
@@ -212,7 +211,6 @@ const addFin = (grid, side, anchorX, tipX, y, z0, z1, material = 'dark') => {
         else {
             grid.fillBox(x * side, x * side, y - thickness, y + thickness, z, z, material);
         }
-        void dx;
     }
 };
 // Wing-tip nav lights: a single red/green emissive voxel at every wingtip —
@@ -910,8 +908,6 @@ const buildHelixStation = () => {
             staticGrid.line([side * 36, 0, z - 8], [side * 36, 0, z + 8], 0, 'dark');
         }
     }
-    staticGrid.line([-22 + 30, 7, -4], [-22 + 30, 7, -4], 0, 'dark');
-    void staticGrid.set(0, 0, 0, 'hull');
     const rotorGrid = new VoxelGrid();
     // Bigger rotating habitat ring with more spoke lights.
     rotorGrid.fillRingX(-2, 2, 30, 3, 'hull');

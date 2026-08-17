@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v47-monitor-readouts';
+const CACHE = 'voidrunner-v48-pilot-personalities';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',
@@ -14,6 +14,7 @@ self.addEventListener('install', (event) => {
     './src/game/game.js',
     './src/game/input.js',
     './src/game/missions.js',
+    './src/game/pilots.js',
     './src/game/random.js',
     './src/game/render.js',
     './src/game/save.js',

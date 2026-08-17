@@ -2,10 +2,22 @@ import { COMMODITIES, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, L
 import { cargoCapacity, cargoMass } from './economy.js';
 import { formatCredits, formatDuration } from './random.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
+import { TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 import { shipTopDownProfile } from './voxelModels.js';
 const escapeHtml = (value) => value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const percent = (value, max) => (max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100)));
-const GAME_VERSION = '0.3.35';
+// Talker identity for the comms surfaces: the color follows the speaker's
+// relation to the player — hostiles red, allies blue, neutral white — so the
+// strip reads at a glance without a per-ship legend. The text shows the
+// callsign itself: the quoted combat handle when there is one, the plain name
+// otherwise.
+const RELATION_COLORS = { hostile: '#ff6b5e', ally: '#6fb5ff', neutral: '#e9e6dc' };
+export const relationColor = (relation) => RELATION_COLORS[relation] ?? RELATION_COLORS.neutral;
+export const callsignHandle = (callsign) => {
+    const quoted = callsign.match(/“[^”]+”/);
+    return quoted ? quoted[0].slice(1, -1) : callsign;
+};
+const GAME_VERSION = '0.4.0';
 export class GameUI {
     root;
     viewport;
@@ -20,6 +32,7 @@ export class GameUI {
     titleVisible = true;
     arenaEnv = 'open';
     arenaScenario = '1v1';
+    arenaDifficulty = 'veteran';
     radarContext;
     // DOM cache: the cockpit HUD is built once and never re-rendered, so the
     // per-frame updateHud path reads nodes from this map instead of re-querying
@@ -96,6 +109,7 @@ export class GameUI {
           <div class="hud-bottom-center">
             <div id="context-prompt" class="context-prompt is-hidden"></div>
           </div>
+          <button type="button" id="comms-bar" class="comms-bar" data-ui-command="open-chat" role="button" tabindex="0" aria-label="Open comms log"></button>
           <div class="touch-controls" aria-label="Touch flight controls">
             <div class="touch-left">
               <div class="touch-throttle" data-touch-throttle>
@@ -147,6 +161,7 @@ export class GameUI {
         <section id="ship-panel" class="modal-panel is-hidden" aria-label="Ship status"></section>
         <section id="pause-panel" class="modal-panel is-hidden" aria-label="Pause and settings"></section>
         <section id="arena-panel" class="modal-panel is-hidden" aria-label="Combat simulator"></section>
+        <section id="chat-panel" class="modal-panel is-hidden" aria-label="Comms log"></section>
         <div id="toast-stack" class="toast-stack global-toasts" aria-live="polite"></div>
         <div id="rotate-notice" class="rotate-notice is-hidden"><strong>ROTATE DEVICE</strong><span>Landscape gives the cockpit room to breathe.</span></div>
       </main>
@@ -190,7 +205,7 @@ export class GameUI {
                 this.mapPointer = undefined;
         });
         this.root.addEventListener('click', (event) => {
-            const target = event.target.closest('[data-ui-command], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-nav-id], [data-trade], [data-mission-id], [data-equipment-id], [data-ship-id], [data-switch-ship], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario]');
+            const target = event.target.closest('[data-ui-command], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-nav-id], [data-trade], [data-mission-id], [data-equipment-id], [data-ship-id], [data-switch-ship], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty]');
             if (!target)
                 return;
             if (target.dataset.uiCommand)
@@ -202,6 +217,10 @@ export class GameUI {
             else if (target.dataset.arenaScenario) {
                 this.arenaScenario = target.dataset.arenaScenario;
                 this.root.querySelectorAll('[data-arena-scenario]').forEach((button) => button.classList.toggle('selected', button === target));
+            }
+            else if (target.dataset.arenaDifficulty) {
+                this.arenaDifficulty = target.dataset.arenaDifficulty;
+                this.root.querySelectorAll('[data-arena-difficulty]').forEach((button) => button.classList.toggle('selected', button === target));
             }
             else if (target.dataset.mapTargetKind && target.dataset.mapTargetId) {
                 const key = mapTargetKey(target);
@@ -329,7 +348,7 @@ export class GameUI {
                 break;
             case 'launch-arena':
                 this.hideArena();
-                this.actions?.startArena(this.arenaEnv, this.arenaScenario);
+                this.actions?.startArena(this.arenaEnv, this.arenaScenario, this.arenaDifficulty);
                 break;
             case 'launch':
                 this.actions?.launch();
@@ -356,6 +375,15 @@ export class GameUI {
                 break;
             case 'close-map':
                 this.hideMap();
+                break;
+            case 'open-chat':
+                this.openChatLog();
+                break;
+            case 'dismiss-story':
+                this.dismissStory();
+                break;
+            case 'close-chat':
+                this.closeChatLog();
                 break;
             case 'close-ship':
                 this.hideShipMenu();
@@ -722,8 +750,25 @@ export class GameUI {
             <div class="guild-meter"><i><b style="width:${rank >= 3 ? 100 : Math.min(100, (rep / nextThreshold) * 100)}%"></b></i><em>${rep} REP</em></div>
             <p>${id === 'merchant' ? 'Better route intelligence, cargo contracts, and external hold equipment.' : id === 'bounty' ? 'Higher-value warrants, combat equipment, and recognized kill authentication.' : id === 'mining' ? 'Survey claims, rich deposit data, and advanced extraction lances.' : 'Protected recovery claims, rare wreck data, and long-range tractor systems.'}</p>
             <button data-guild-id="${id}" ${joined ? 'disabled' : ''}>${joined ? 'MEMBERSHIP ACTIVE' : 'REGISTER'}</button>
+            ${id === 'bounty' ? this.renderBountyRegistry() : ''}
           </article>`;
         }).join('')}
+      </div>
+    `;
+    }
+    renderBountyRegistry() {
+        // The cleared-warrant registry: every callsign the player has taken down,
+        // newest first, with the pinned profile so the board remembers what each
+        // name meant to fight. Ace warrants paid bonus rep when they fell.
+        const entries = Object.entries(this.save.world.registry ?? {})
+            .sort((a, b) => (b[1].clearedAt ?? 0) - (a[1].clearedAt ?? 0))
+            .slice(0, 6);
+        return `
+      <div class="registry-list">
+        <span class="eyebrow">CONFIRMED CALLSIGNS</span>
+        ${entries.length ? entries.map(([callsign, entry]) => `
+          <div class="registry-row"><b>${escapeHtml(callsign)}</b><small>${entry.tier ? `${TIER_LABELS[entry.tier] ?? entry.tier} ${TEMPERAMENT_LABELS[entry.temperament] ?? entry.temperament}` : 'Unnamed target'}${entry.count > 1 ? ` ×${entry.count}` : ''}</small></div>`).join('')
+        : '<p class="registry-empty">No confirmed kills. The board remembers the names you clear.</p>'}
       </div>
     `;
     }
@@ -820,14 +865,17 @@ export class GameUI {
             this.setTargetScreenValue(undefined);
             this.updateWeaponButtons(undefined);
             bracket?.classList.add('is-hidden');
-            bracket?.classList.remove('is-hostile');
+            bracket?.classList.remove('is-hostile', 'is-surrendered');
             edgePointer?.classList.add('is-hidden');
-            edgePointer?.classList.remove('is-hostile');
+            edgePointer?.classList.remove('is-hostile', 'is-surrendered');
             return;
         }
         const hostile = target.kind === 'ship' && target.hostile;
+        const surrendered = target.kind === 'ship' && target.surrendered;
         bracket?.classList.toggle('is-hostile', hostile);
+        bracket?.classList.toggle('is-surrendered', surrendered && !hostile);
         edgePointer?.classList.toggle('is-hostile', hostile);
+        edgePointer?.classList.toggle('is-surrendered', surrendered && !hostile);
         this.el('#screen-target-distance').textContent = `${Math.round(target.distance).toLocaleString('en-US')} km`;
         this.el('#screen-target-readout').textContent = target.readout ?? '—';
         this.setTargetScreenValue(target);
@@ -1210,6 +1258,95 @@ export class GameUI {
             window.setTimeout(() => toast.remove(), 320);
         }, duration);
     }
+    // Pilot chatter: a top-center comms bar showing the latest transmission
+    // as just "callsign: message", colored by the speaker's relation (hostiles
+    // red, allies blue, neutral white). No badges, no timestamps, no log tag —
+    // the transmission is the whole bar. Last speaker wins; the full
+    // transcript lives in the chat log, which opens when the bar is tapped.
+    commsLog = [];
+    commsBarTimer;
+    storyDismissed = false;
+    // story marks story-mission transmissions on the log entries; rendering
+    // them distinctly (pinned bar, log tag) is later work — the flag is the
+    // seam so the log already knows which lines are story.
+    showPilotLine(callsign, line, relation = 'neutral', duration = 6000, story = false) {
+        // Append to the comms log (capped) so the chat panel can review the
+        // whole conversation — nobody misses a line that faded off the bar.
+        this.commsLog.push({ callsign, line, relation, story });
+        if (this.commsLog.length > 40)
+            this.commsLog.shift();
+        const bar = this.el('#comms-bar');
+        if (!bar)
+            return;
+        const color = relationColor(relation);
+        const text = document.createElement('span');
+        text.className = 'talker-text';
+        text.textContent = `${callsignHandle(callsign)}: ${line}`;
+        bar.textContent = '';
+        bar.style.color = color;
+        bar.style.borderColor = color;
+        bar.classList.add('active');
+        bar.append(text);
+        window.clearTimeout(this.commsBarTimer);
+        this.commsBarTimer = window.setTimeout(() => {
+            bar.classList.remove('active');
+            bar.textContent = '';
+        }, duration);
+    }
+    // Story-mission display: a pinned amber transmission on the comms bar.
+    // Unlike normal chatter it doesn't fade — it stays until dismissed (tap
+    // the CONTINUE bar, or the game times it out) — and it's flagged story in
+    // the log. The game holds the chatter mute (storyLineUntil) while it's up.
+    showStoryLine(name, text, relation = 'neutral') {
+        this.commsLog.push({ callsign: name, line: text, relation, story: true });
+        const bar = this.el('#comms-bar');
+        if (!bar)
+            return;
+        bar.textContent = '';
+        bar.style.color = '#e8c87a';
+        bar.style.borderColor = 'rgba(232, 200, 122, 0.6)';
+        bar.classList.add('active', 'story');
+        bar.setAttribute('data-ui-command', 'dismiss-story');
+        const textNode = document.createElement('span');
+        textNode.className = 'talker-text';
+        textNode.textContent = `${name}: ${text}`;
+        bar.append(textNode);
+        window.clearTimeout(this.commsBarTimer);
+        this.storyDismissed = false;
+    }
+    dismissStory() {
+        const bar = this.el('#comms-bar');
+        if (bar) {
+            bar.classList.remove('active', 'story');
+            bar.setAttribute('data-ui-command', 'open-chat');
+            bar.textContent = '';
+        }
+        window.clearTimeout(this.commsBarTimer);
+        this.storyDismissed = true;
+    }
+    openChatLog() {
+        const panel = this.root.querySelector('#chat-panel');
+        if (!panel)
+            return;
+        const rows = [...this.commsLog].reverse().map((entry) => {
+            const color = relationColor(entry.relation);
+            return `<div class="comms-row" style="border-left-color:${color};"><b style="color:${color};">${escapeHtml(callsignHandle(entry.callsign))}</b><p>${escapeHtml(entry.line)}</p></div>`;
+        }).join('');
+        panel.innerHTML = `
+      <div class="modal-card comms-card">
+        <header><div><span class="eyebrow">COMMS LOG / PAUSED</span><h2>Incoming transmissions</h2></div><button data-ui-command="close-chat">CLOSE</button></header>
+        <div class="comms-log-list">${rows.length ? rows : '<p class="comms-log-empty">No transmissions received.</p>'}</div>
+        <footer><span>${this.commsLog.length} transmission${this.commsLog.length === 1 ? '' : 's'} recorded</span></footer>
+      </div>`;
+        this.hidePause();
+        this.hideShipMenu();
+        panel.classList.remove('is-hidden');
+        this.updateOrientationNotice();
+    }
+    closeChatLog() {
+        this.root.querySelector('#chat-panel')?.classList.add('is-hidden');
+        this.updateOrientationNotice();
+    }
     showMap(model) {
         if (!this.save)
             return;
@@ -1343,6 +1480,7 @@ export class GameUI {
         const panel = this.root.querySelector('#arena-panel');
         const envOptions = [['open', 'OPEN SPACE'], ['asteroid-field', 'ASTEROID FIELD'], ['debris-field', 'DEBRIS FIELD']];
         const scenarioOptions = [['1v1', '1V1'], ['1v2', '1V2'], ['1v3', '1V3'], ['2v3', '2V3']];
+        const difficultyOptions = [['novice', 'ROOKIE'], ['veteran', 'VETERAN'], ['ace', 'ACE']];
         const option = (key, value, label, selected) => `<button data-arena-${key}="${value}" class="${selected ? 'selected' : ''}">${label}</button>`;
         panel.innerHTML = `
       <div class="modal-card arena-card">
@@ -1355,6 +1493,10 @@ export class GameUI {
           <section>
             <h3>SCENARIO</h3>
             <div class="arena-options">${scenarioOptions.map(([value, label]) => option('scenario', value, label, this.arenaScenario === value)).join('')}</div>
+          </section>
+          <section>
+            <h3>PILOTS</h3>
+            <div class="arena-options">${difficultyOptions.map(([value, label]) => option('difficulty', value, label, this.arenaDifficulty === value)).join('')}</div>
           </section>
         </div>
         <footer><span>Test AI, cover, and handling with zero career consequences.</span><button class="primary" data-ui-command="launch-arena">LAUNCH</button></footer>
@@ -1382,7 +1524,7 @@ export class GameUI {
         button.classList.toggle('is-fullscreen', full);
     };
     get isModalOpen() {
-        return !this.root.querySelector('#map-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#ship-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#pause-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#arena-panel')?.classList.contains('is-hidden');
+        return !this.root.querySelector('#map-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#ship-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#pause-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#arena-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#chat-panel')?.classList.contains('is-hidden');
     }
     get isTitleVisible() {
         return this.titleVisible;

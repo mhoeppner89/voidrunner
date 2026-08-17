@@ -375,6 +375,20 @@ button.compact {
   color: #ff6a55;
 }
 
+/* Surrendered targets: orange, no longer a threat (see surrenderShip). */
+.target-bracket.is-surrendered i,
+.target-edge-pointer.is-surrendered i::before {
+  border-color: #ffa040;
+}
+
+.target-bracket.is-surrendered i {
+  filter: drop-shadow(0 0 4px rgba(255, 160, 64, 0.85));
+}
+
+.target-edge-pointer.is-surrendered span {
+  color: #ffab55;
+}
+
 .radar-shell {
   position: relative;
   width: clamp(135px, 17vw, 215px);
@@ -1535,6 +1549,34 @@ button.compact {
   font-style: normal;
 }
 
+.registry-list {
+  margin-top: 0.9rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid rgba(169, 78, 62, 0.35);
+}
+
+.registry-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.22rem 0;
+  color: #e5dcc7;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.66rem;
+}
+
+.registry-row small {
+  color: #b5aa8e;
+  font-size: 0.56rem;
+}
+
+.registry-empty {
+  margin: 0.35rem 0 0;
+  color: #8a938e;
+  font-size: 0.68rem;
+}
+
 /* Modal navigation and pause */
 .modal-panel {
   position: absolute;
@@ -2183,6 +2225,130 @@ button.compact {
   padding: 0.2rem 0.4rem 0.42rem;
 }
 
+/* Pilot chatter: a top-center comms bar that shows the latest transmission
+   as just "callsign: message", colored by the speaker's relation (hostiles
+   red, allies blue, neutral white), and opens the full chat log when tapped
+   — so several hostiles talking never buries the toast stack (which stays
+   for real alerts) and no line is missed. Last speaker wins on the bar. */
+.comms-bar {
+  position: absolute;
+  top: calc(var(--safe-top) + 6px);
+  left: 50%;
+  z-index: 6;
+  display: flex;
+  width: min(620px, 68vw);
+  min-height: 2rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.28rem 0.5rem;
+  transform: translateX(-50%);
+  color: var(--void-cyan);
+  background: rgba(2, 8, 10, 0.9);
+  border: 1px solid rgba(48, 161, 195, 0.5);
+  border-bottom-width: 2px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: clamp(0.72rem, 1.15vw, 0.98rem);
+  letter-spacing: 0.03em;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Inert while invisible: the bar is a full-width strip across the top of
+     the screen, so leaving it clickable at opacity 0 steals taps/clicks meant
+     for the space view (target picking) behind it. Only the active bar is
+     interactive. */
+  pointer-events: none;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+
+.comms-bar.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Story-mission transmissions: pinned amber (no fade until dismissed), a
+   pulsing glow, and a CONTINUE affordance so it reads as dismissible. The
+   color is set inline from showStoryLine; this class adds the motion. */
+.comms-bar.story {
+  animation: story-glow 2.2s ease-in-out infinite;
+}
+
+.comms-bar.story::after {
+  content: "CONTINUE ▸";
+  margin-left: 0.55rem;
+  padding-left: 0.55rem;
+  border-left: 1px solid currentColor;
+  opacity: 0.85;
+  font-size: 0.72em;
+  letter-spacing: 0.08em;
+}
+
+@keyframes story-glow {
+  0%,
+  100% {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 10px rgba(232, 200, 122, 0.18);
+  }
+  50% {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 24px rgba(232, 200, 122, 0.42);
+  }
+}
+
+/* The comms log panel: a full transcript of the fight so far, newest first,
+   each row just the callsign (relation-colored) and the message. */
+.comms-card {
+  width: min(560px, 92vw);
+}
+
+.comms-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+  max-height: 60vh;
+  padding: 0.6rem 1rem;
+}
+
+.comms-log-empty {
+  margin: 1.5rem 0;
+  color: #8a938e;
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+.comms-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  background: rgba(6, 12, 12, 0.72);
+  border: 1px solid rgba(118, 158, 147, 0.28);
+  border-left: 3px solid var(--teal);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.88rem;
+}
+
+.comms-row > b {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.comms-row p {
+  margin: 0;
+  color: #c9d2cd;
+  line-height: 1.4;
+}
+
+.talker-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* Selected-target range lives on the monitor itself now (the per-selection
    pop-up cards are gone): a readable band under the heading for every lock,
    sized for phone landscapes too. */
@@ -2736,20 +2902,6 @@ button.primary,
   box-shadow: var(--panel-shadow), inset 0 0 42px rgba(128, 79, 24, 0.09);
 }
 
-.title-card::before,
-.title-card::after {
-  position: absolute;
-  content: "";
-  width: 12px;
-  height: 12px;
-  background: #1b1d19;
-  border: 1px solid #8b7650;
-  box-shadow: inset 0 0 0 2px #060807;
-}
-
-.title-card::before { top: 7px; right: 26px; }
-.title-card::after { bottom: 7px; left: 12px; }
-
 .title-kicker {
   color: var(--retro-green);
   font-family: var(--pixel-font);
@@ -3182,20 +3334,12 @@ button.primary,
   box-shadow: 0 -4px 0 rgba(0, 0, 0, 0.58);
 }
 
-/* Navigation and pause terminals. */
+/* Navigation, comms and pause terminals: a light veil over the frozen flight
+   view — the sim pauses while a terminal is open, but the cockpit stays on
+   screen (no sprite swap), so opening a panel never breaks immersion. */
 .modal-panel {
-  background: rgba(0, 3, 3, 0.84);
-}
-
-.modal-panel::before {
-  position: absolute;
-  inset: 0;
-  content: "";
-  background:
-    linear-gradient(90deg, rgba(0,0,0,.9), rgba(0,0,0,.32), rgba(0,0,0,.88)),
-    url("../art/career-mining.webp") center / cover no-repeat;
-  image-rendering: pixelated;
-  filter: saturate(0.68) contrast(1.12);
+  background: rgba(1, 4, 5, 0.52);
+  backdrop-filter: blur(2px) brightness(0.78);
 }
 
 .modal-card {
@@ -3584,7 +3728,7 @@ button.primary,
   z-index: 1;
   background: url("../assets/remaster/cockpit-frame.webp") center / 100% 100% no-repeat;
   image-rendering: pixelated;
-  transform: translate3d(var(--cockpit-shift-x), var(--cockpit-shift-y), 0) rotate(var(--cockpit-roll));
+  transform: translate3d(var(--cockpit-shift-x), var(--cockpit-shift-y), 0) rotate(var(--cockpit-roll)) scale(var(--cockpit-zoom));
   transform-origin: 50% 72%;
   filter: contrast(1.06) saturate(1.00) brightness(1.04) drop-shadow(0 -6px 18px rgba(0, 0, 0, 0.55));
   opacity: 1 !important;
@@ -3595,7 +3739,7 @@ button.primary,
    cockpit frame so painted beams and the vignette never disagree during
    afterburner or nebula fly-throughs. */
 .cockpit-vignette {
-  transform: translate3d(var(--cockpit-shift-x), var(--cockpit-shift-y), 0) rotate(var(--cockpit-roll));
+  transform: translate3d(var(--cockpit-shift-x), var(--cockpit-shift-y), 0) rotate(var(--cockpit-roll)) scale(var(--cockpit-zoom));
   transform-origin: 50% 72%;
 }
 
@@ -6252,7 +6396,7 @@ button.primary,
 
 .arena-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 1.1rem;
   padding: 1.1rem 1.2rem;
 }

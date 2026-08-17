@@ -1,19 +1,23 @@
 import * as THREE from 'three';
 import { AudioManager } from './audio.js';
-import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, LOCATIONS, NAV_LOCATION_IDS, SHIPS, displaySpeed, equipmentIds, hyperdriveArrivalRadius, locationInstanceRadius, sectorEncounterChance, spawnClearance } from './data.js';
-import { buyCommodity, cargoCapacity, cargoFree, cargoMass, sellCommodity, tickEconomy } from './economy.js';
+import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, GUILD_RANK_NAMES, LOCATIONS, NAV_LOCATION_IDS, SHIPS, displaySpeed, equipmentIds, hyperdriveArrivalRadius, locationInstanceRadius, sectorEncounterChance, spawnClearance } from './data.js';
+import { buyCommodity, cargoCapacity, cargoFree, cargoMass, refreshAllPrices, sellCommodity, tickEconomy } from './economy.js';
 import { InputManager } from './input.js';
-import { acceptMission, awardCareerProgress, completeBountyMission, completeMissionsAtDock, failExpiredMissions, joinGuild, refreshMissionOffers, } from './missions.js';
+import { acceptMission, awardCareerProgress, completeBountyMission, completeMissionsAtDock, failExpiredMissions, joinGuild, refreshMissionOffers, VALUABLE_CARGO_LABELS, } from './missions.js';
 import { clamp, damp, formatCredits, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
 import { EntityStore } from './entityStore.js';
 import { SpaceRenderer } from './render.js';
 import { saveGame } from './save.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
 import { generateAsteroidField, generateGraveyardPieces, generateWreckNodes } from './worldData.js';
+import { PILOT_LINES, pilotMod, rollPilot, TEMPERAMENT_LABELS, TIER_LABELS } from './pilots.js';
 import { playerShipVariant, shipVariantForRole } from './voxelModels.js';
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const UP = new THREE.Vector3(0, 1, 0);
 const RIGHT = new THREE.Vector3(1, 0, 0);
+// Situation lines that land at most once per ship (first contact, the player's
+// rank, and the valuable-load callouts) — remembered in pilotLineHistory.said.
+const PILOT_ONESHOT_KEYS = new Set(['contact', 'rank', 'case', 'cargo']);
 const PLAYER_RADIUS = 1.25;
 const HYPERDRIVE_THREAT_RADIUS = 360;
 const HYPERDRIVE_CRUISE_SPEED = 50000;
@@ -41,6 +45,49 @@ const MAX_SIM_STEPS = 6;
 // Strafing-run dogfight pacing (WW2 fighter / Privateer jousting): close in, fire,
 // blow past, then extend before turning back. No point-blank hugging, no endless circles.
 const ATTACK_PASS_RANGE = 55;
+// Beyond this range a timid pilot only calls for help when a hit actually
+// bites hull — long-range potshots that just graze shields aren't worth a
+// MAYDAY. Sits just past the player's max bolt range (~277), so the rule only
+// bites when the fight is genuinely long.
+const DISTRESS_CLOSE_RANGE = 300;
+// How close the player must get before a pilot mutters a proximity line — an
+// edge-triggered reaction to being noticed, separate from the timed chatter.
+const PROXIMITY_RANGE = 350;
+// One voice at a time: the minimum gap between pilot lines, so a furball of
+// hostiles can't drown the comms bar — each line is fully visible before the
+// next lands. Story lines bypass the gate (they mute everything else).
+const CHATTER_GAP = 9;
+// How often the first scan of a recognized pilot offers a favor (a valuable
+// wreck tip or a market contact) instead of just a deferential scan.
+const PILOT_FAVOR_CHANCE = 0.35;
+// How much more likely a wary pilot (one who escaped after surrendering) is
+// to give up on any hull hit than their temperament would normally allow.
+const WARY_FLEE_MULTIPLIER = 1.5;
+// Marker shown in the scan toast and target monitor for a ship whose pilot
+// remembers the player from a previous surrender (spared or escaped).
+const SPARED_MARK = '✦';
+// Which surrender action a beaten pilot picks, weighted by temperament: run,
+// jettison cargo or pay and run, or power down (optionally after dumping the
+// hold). Timid pilots give up everything; aggressive pilots mostly run and
+// almost never power down.
+const SURRENDER_WEIGHTS = {
+    timid: { flee: 1, eject: 3, pay: 3, down: 2, downEject: 4, downPay: 4 },
+    steady: { flee: 3, eject: 2, pay: 2, down: 2, downEject: 1, downPay: 1 },
+    aggressive: { flee: 6, eject: 2, pay: 1, down: 1, downEject: 0, downPay: 0 },
+    flamboyant: { flee: 2, eject: 4, pay: 3, down: 1, downEject: 2, downPay: 1 },
+};
+// What a surrendering pilot jettisons, by role: the hold matches what the
+// ship would actually be hauling — trade goods from a freighter, ore from a
+// miner, looted tech (and the occasional smuggled arms, already a wreck-
+// salvage type) from pirates and bounty targets.
+const SURRENDER_EJECT_POOLS = {
+    trader: ['water', 'food', 'medicine', 'electronics', 'machinery', 'luxuries'],
+    miner: ['ore', 'machinery', 'scrap'],
+    patrol: ['food', 'water', 'medicine'],
+    pirate: ['electronics', 'machinery', 'scrap', 'luxuries'],
+    bounty: ['electronics', 'machinery', 'luxuries', 'arms'],
+    escort: ['electronics', 'machinery', 'scrap', 'luxuries'],
+};
 const ATTACK_RESET_RANGE = 175;
 const ATTACK_SEPARATION = 22;
 const ATTACK_FIRE_RANGE = 140;
@@ -121,6 +168,18 @@ export class GameSession {
     ships = [];
     projectiles = [];
     pickups = [];
+    // Per-ship chat memory: the last pool key and line index used, so chatter
+    // rotates through the pools instead of repeating the same line back to
+    // back, and the one-shot first-contact line only lands once per ship.
+    pilotLineHistory = new Map();
+    // Story-mission seam: while a story line is up (storyLineUntil in the
+    // future), every chatter emitter returns before rolling, so no combat
+    // lines, mutters, taunts, or distress calls land and the seeded roll
+    // streams stay untouched — chatter resumes where it left off.
+    storyLineUntil;
+    // Global one-voice gate: the world time at which the next pilot line may
+    // land (see chatterOpen/sayPilotLine).
+    nextChatterAt;
     // Flat component stores: projectile/pickup transforms live in Float32Array
     // channels keyed by slot; the renderer reads the same channels (no sync
     // arrays, no per-step tuple() allocations, no shared scratch objects).
@@ -260,6 +319,10 @@ export class GameSession {
         const player = this.save.player;
         const stats = getEffectiveShipStats(player);
         player.dockedAt = undefined;
+        // The arena undocks the player (a fresh save starts docked), so the
+        // engine must come back on — otherwise the silo's stationMode leaves
+        // the arena flight silent until the first restart.
+        this.audio.setStationMode(false);
         player.position = tuple(center);
         player.rotation = [0, 0, 0, 1];
         player.velocity = [0, 0, 0];
@@ -273,6 +336,10 @@ export class GameSession {
         player.navTargetId = environment === 'asteroid-field' ? 'shardbelt' : environment === 'debris-field' ? 'mourning-line' : 'helix';
         const hostileCount = scenario === '1v2' ? 2 : scenario === '1v3' || scenario === '2v3' ? 3 : 1;
         const withWingman = scenario === '2v3';
+        // The difficulty selector pins the hostile pilot tier (temperament still
+        // rolls per faction); ROOKIE / VETERAN / ACE map straight onto the pilot
+        // tiers, so the arena is a clean skill ladder.
+        const hostilePilot = { tier: config.difficulty ?? 'veteran' };
         let wingman;
         if (withWingman) {
             // 2v3 is two concurrent dogfights: a wingman pockets one hostile off
@@ -283,7 +350,7 @@ export class GameSession {
             const wingmanPos = center.clone().addScaledVector(wingDir, 170);
             const attackerPos = center.clone().addScaledVector(wingDir, 360);
             wingman = this.spawnShip('patrol', tuple(wingmanPos));
-            const wingAttacker = this.spawnShip('escort', tuple(attackerPos));
+            const wingAttacker = this.spawnShip('escort', tuple(attackerPos), undefined, undefined, hostilePilot);
             wingAttacker.targetId = wingman.id;
             const faceToward = (ship, toward) => {
                 const dir = toward.clone().sub(vec(ship.position)).normalize();
@@ -296,7 +363,7 @@ export class GameSession {
             // Two hostiles press the player from opposite flanks.
             const flanks = [new THREE.Vector3(1, 0, 0.25), new THREE.Vector3(-0.9, 0, -0.3)];
             flanks.forEach((dir, index) => {
-                const hostile = this.spawnShip(index === 0 ? 'pirate' : 'escort', tuple(center.clone().addScaledVector(dir.normalize(), 220 + index * 40)));
+                const hostile = this.spawnShip(index === 0 ? 'pirate' : 'escort', tuple(center.clone().addScaledVector(dir.normalize(), 220 + index * 40)), undefined, undefined, hostilePilot);
                 hostile.targetId = 'player';
             });
         }
@@ -304,13 +371,14 @@ export class GameSession {
             for (let index = 0; index < hostileCount; index += 1) {
                 const angle = (index / Math.max(1, hostileCount)) * Math.PI * 2 + 0.6;
                 const offset = new THREE.Vector3(Math.cos(angle), index % 2 ? 0.5 : -0.35, Math.sin(angle)).normalize().multiplyScalar(220 + index * 40);
-                const hostile = this.spawnShip(index === 0 ? 'pirate' : 'escort', tuple(center.clone().add(offset)));
+                const hostile = this.spawnShip(index === 0 ? 'pirate' : 'escort', tuple(center.clone().add(offset)), undefined, undefined, hostilePilot);
                 hostile.targetId = 'player';
             }
         }
         if (announce) {
             const envLabel = environment === 'asteroid-field' ? 'ASTEROID FIELD' : environment === 'debris-field' ? 'DEBRIS FIELD' : 'OPEN SPACE';
-            this.ui.showToast(`COMBAT SIMULATOR · ${scenario.toUpperCase()} · ${envLabel}`, 'info', 5200);
+            const difficultyLabel = TIER_LABELS[config.difficulty ?? 'veteran'] ?? 'Veteran';
+            this.ui.showToast(`COMBAT SIMULATOR · ${scenario.toUpperCase()} · ${envLabel} · ${difficultyLabel.toUpperCase()} PILOTS`, 'info', 5200);
             this.ui.showToast('Hostiles inbound. Weapons free.', 'danger', 3600);
         }
     }
@@ -428,6 +496,10 @@ export class GameSession {
         // Hard cap so a stall/tab-switch can't queue an unbounded catch-up burst.
         if (this.simAccumulator > SIM_STEP * MAX_SIM_STEPS)
             this.simAccumulator = SIM_STEP * MAX_SIM_STEPS;
+        // End a story line's mute when the player dismissed the bar or the
+        // duration elapsed; runs before the sim so chatter can resume the
+        // same frame the story clears.
+        this.refreshStoryLine();
         const actions = this.input.getActions();
         const flying = !this.save.player.dockedAt;
         if (flying) {
@@ -438,6 +510,7 @@ export class GameSession {
                     this.ui.hidePause();
                     this.ui.hideMap();
                     this.ui.hideShipMenu();
+                    this.ui.hideChatLog?.();
                 }
             }
             else if (actions.pause) {
@@ -1004,7 +1077,7 @@ export class GameSession {
         this.ui.showToast('Salvage claim challenged: hostile drives inbound.', 'danger', 5200);
         this.audio.play('warning');
     }
-    spawnPickup(commodity, origin, source, rarity) {
+    spawnPickup(commodity, origin, source, rarity, amount = 1) {
         const rng = seededRandom(`${this.save.world.seed}:pickup:${++this.pickupCounter}:${this.save.world.time}`);
         const drift = new THREE.Vector3(rng() - 0.5, rng() - 0.5, rng() - 0.5).normalize().multiplyScalar(randomBetween(rng, 0.8, 2.4));
         const offset = drift.clone().normalize().multiplyScalar(2.2 + rng() * 2.5);
@@ -1016,7 +1089,7 @@ export class GameSession {
             id: `pickup-${this.pickupCounter}`,
             commodity,
             slot,
-            amount: 1,
+            amount,
             source,
             rarity,
             life: 140,
@@ -1047,6 +1120,14 @@ export class GameSession {
     collectPickup(pickup) {
         if (pickup.life <= 0)
             return;
+        if (pickup.commodity === 'credits') {
+            // A surrendered pilot's transfer: credits, straight to the wallet —
+            // no cargo space involved.
+            this.save.player.credits += pickup.amount;
+            pickup.life = 0;
+            this.ui.showToast(`${formatCredits(pickup.amount)} recovered.`, 'success', 2400);
+            return;
+        }
         const required = COMMODITIES[pickup.commodity].mass * pickup.amount;
         if (cargoFree(this.save.player) + 0.001 < required) {
             if (this.hintCooldown <= 0) {
@@ -1109,7 +1190,36 @@ export class GameSession {
         }
         else {
             const ship = this.ships.find((entry) => entry.id === target.id);
-            this.ui.showToast(`Scan: ${ship.name} · ${ship.role.toUpperCase()} · ${ship.hostile ? 'HOSTILE' : 'NO ACTIVE WARRANT'}.`, ship.hostile ? 'danger' : 'info', 4200);
+            if (ship.surrendered) {
+                // A surrendered pilot is captured on scan: this pays the bounty
+                // and completes the warrant (claimSurrendered toasts) instead of
+                // the generic scan toast. A beaten civilian has no bounty and
+                // just reads as surrendered.
+                if (!this.claimSurrendered(ship))
+                    this.ui.showToast(`Scan: ${ship.name} · SURRENDERED · no bounty.`, 'info', 4200);
+            }
+            else if (this.deferentialPilot(ship)) {
+                // A pilot the player spared may pay the debt: the first scan
+                // rolls a favor (wreck tip or market contact, see givePilotFavor)
+                // instead of the generic scan toast; later scans read as
+                // previously spared and never re-roll. Wary pilots (escaped
+                // once) get no favor — they never felt spared.
+                const favor = !ship.favorGiven && this.givePilotFavor(ship);
+                ship.favorGiven = true;
+                if (!favor)
+                    this.ui.showToast(`Scan: ${SPARED_MARK} ${ship.name} · PREVIOUSLY SPARED.`, 'info', 4200);
+            }
+            else {
+                // The pilot profile rides along with the scan so a name, its tier,
+                // and its temperament are all readable before the fight starts.
+                // Recognizing ships carry the marker too — a wary pilot who
+                // escaped still remembers the player, and the HOSTILE tag
+                // explains the disposition.
+                const pilot = ship.pilot;
+                const profile = pilot ? ` · ${TIER_LABELS[pilot.tier] ?? pilot.tier} ${TEMPERAMENT_LABELS[pilot.temperament] ?? pilot.temperament}` : '';
+                const mark = ship.recognizesPlayer ? `${SPARED_MARK} ` : '';
+                this.ui.showToast(`Scan: ${mark}${ship.name} · ${ship.role.toUpperCase()} · ${ship.hostile ? 'HOSTILE' : 'NO ACTIVE WARRANT'}${profile}.`, ship.hostile ? 'danger' : 'info', 4200);
+            }
         }
         this.scanCooldown = 0.55;
         this.audio.play('scan');
@@ -1417,15 +1527,321 @@ export class GameSession {
             ship.shieldDelay -= dt;
             if (ship.shieldDelay <= 0)
                 ship.shield = Math.min(ship.maxShield, ship.shield + dt * 3.8);
-            const target = this.resolveShipTarget(ship);
-            if (target)
-                this.updateAttackAI(ship, target.position, target.velocity, dt);
-            else
-                this.updateTravelAI(ship, dt);
-            const position = vec(ship.position);
-            if (position.distanceTo(playerPosition) > 950 && ship.lifetime > 40 && !ship.missionId)
-                ship.hull = -1;
+        const target = this.resolveShipTarget(ship);
+        const deferring = this.deferentialPilot(ship);
+        // A deferential pilot never re-engages: even if an encounter spawner
+        // forced a target, clear it and drift off — no combat AI, no "engaged"
+        // chatter. Wary pilots (escaped once) stay hostile and fight normally.
+        if (target && !deferring)
+            this.updateAttackAI(ship, target.position, target.velocity, dt);
+        else {
+            if (deferring)
+                ship.targetId = undefined;
+            this.updateTravelAI(ship, dt);
         }
+        const position = vec(ship.position);
+        // Priority order for the one-voice slot: the one-shot recognition
+        // line lands first (a wary re-encounter shouldn't lose it to generic
+        // combat chatter), then the proximity mutter, then the timed lines.
+        this.maybeRecognitionLine(ship, position, playerPosition);
+        this.maybeProximityLine(ship, position, playerPosition);
+        this.maybePilotLine(ship, position, playerPosition);
+        if (position.distanceTo(playerPosition) > 950 && ship.lifetime > 40 && !ship.missionId)
+            ship.hull = -1;
+        }
+    }
+    // The comms surfaces color each line by the speaker's relation to the
+    // player: hostiles red, allies blue, neutral white. Hostile is the flag
+    // itself; an unhostile patrol with a non-player target is actively
+    // fighting on our side (wingman, friendly patrol) and reads as an ally.
+    shipRelation(ship) {
+        return ship.hostile ? 'hostile' : ship.role === 'patrol' && ship.targetId && ship.targetId !== 'player' ? 'ally' : 'neutral';
+    }
+    // A pilot who recognizes the player and was captured (not escaped) defers:
+    // non-hostile, never re-engages, offers favors. Escaped pilots come back
+    // wary instead — hostile and jumpy — so most gates key on this predicate.
+    deferentialPilot(ship) {
+        return ship.recognizesPlayer && !ship.waryOfPlayer;
+    }
+    // One voice at a time: a pilot line may only land when no story mute is
+    // up and the previous line has had its full read time (CHATTER_GAP).
+    // Every chatter emitter gates on this, so a 3v1 streams one readable
+    // line at a time instead of a wall of overlapping callsigns.
+    chatterOpen() {
+        return !this.storyLineActive() && this.save.world.time >= (this.nextChatterAt ?? 0);
+    }
+    // The single path every pilot line lands through: stamps the global gap,
+    // then shows the line with the speaker's relation color and chirp.
+    sayPilotLine(ship, line, relation = this.shipRelation(ship)) {
+        this.nextChatterAt = this.save.world.time + CHATTER_GAP;
+        this.ui.showPilotLine?.(ship.name, line, relation);
+        this.audio?.playComms?.(ship.pilot.temperament);
+    }
+    playerLosing() {
+        const stats = getEffectiveShipStats(this.save.player);
+        return stats.hull > 0 && this.save.player.hull / stats.hull < 0.35;
+    }
+    // Whether the player's bounty rank is high enough to earn a name-drop, and
+    // the actual title for the line.
+    rankAware() {
+        return (this.save.player.guildRank?.bounty ?? 0) >= 2;
+    }
+    rankTitle() {
+        return GUILD_RANK_NAMES.bounty[this.save.player.guildRank?.bounty ?? 0];
+    }
+    // Valuable sealed load worth a callout: 'case' for the diplomatic case,
+    // 'cargo' for other labeled contract goods, undefined for an empty or
+    // mundane hold.
+    cargoFlavor() {
+        const labels = (this.save.player.sealedCargo ?? []).map((entry) => entry.label);
+        if (labels.includes('sealed diplomatic case'))
+            return 'case';
+        return labels.some((label) => VALUABLE_CARGO_LABELS.includes(label)) ? 'cargo' : undefined;
+    }
+    // Pick a line from a pool with the ship's seeded RNG, stepping around the
+    // previously used line so chatter rotates instead of repeating, and
+    // remembering which one-shot situation lines have been said.
+    pickPilotLine(ship, key, lines) {
+        let index = Math.floor(ship.aiRng() * lines.length);
+        const last = this.pilotLineHistory.get(ship.id);
+        if (lines.length > 1 && last?.key === key && last.index === index)
+            index = (index + 1) % lines.length;
+        const said = new Set(last?.said ?? []);
+        if (PILOT_ONESHOT_KEYS.has(key))
+            said.add(key);
+        this.pilotLineHistory.set(ship.id, { key, index, said });
+        return lines[index];
+    }
+    storyLineActive() {
+        return this.save.world.time < (this.storyLineUntil ?? 0);
+    }
+    // Story-mission entry point: pin a story transmission on the comms bar
+    // and mute all chatter until the player dismisses it (or the duration
+    // elapses). The mock story content proves the seam end-to-end; real
+    // story missions call this with their own lines.
+    playStoryLine(name, text, relation = 'neutral', duration = 12000) {
+        this.storyLineUntil = this.save.world.time + duration;
+        this.ui.showStoryLine?.(name, text, relation);
+    }
+    // Called every frame: lift the story mute when the player dismissed the
+    // bar or the duration elapsed, and unpin the bar.
+    refreshStoryLine() {
+        if (this.ui.storyDismissed || (this.storyLineUntil !== undefined && this.save.world.time >= this.storyLineUntil)) {
+            this.storyLineUntil = undefined;
+            this.ui.dismissStory?.();
+            this.ui.storyDismissed = false;
+        }
+    }
+    // Combat comms: temperament-driven chatter while engaged with the player.
+    // Timid pilots cry for help when hurt or fleeing, aggressive pilots
+    // threaten, flamboyant pilots showboat; steady pilots stay silent
+    // professionals. Lines roll on a per-ship seeded timer, so the chatter is
+    // deterministic like every other pilot roll.
+    maybePilotLine(ship, position, playerPosition) {
+        if (!this.chatterOpen())
+            return;
+        const pilot = ship.pilot;
+        const pool = pilot ? PILOT_LINES[pilot.temperament] : undefined;
+        if (!pool || !ship.hostile || playerPosition.distanceTo(position) > 550)
+            return;
+        const engaged = ship.targetId === 'player' || ship.fleeing;
+        if (!engaged)
+            return;
+        const hullRatio = ship.maxHull > 0 ? ship.hull / ship.maxHull : 1;
+        const said = this.pilotLineHistory.get(ship.id)?.said ?? new Set();
+        const cargo = this.cargoFlavor();
+        // Situation-aware pick: the pool follows the fight state, evaluated so
+        // the most urgent read wins. Timid pilots only speak when things go
+        // wrong (hurt, fleeing, or a nervous first line); the others talk
+        // through the whole fight — first contact once, then one-shot lines
+        // naming the player's bounty rank (when high) or valuable sealed
+        // cargo, then threats/taunts, gloating when the player is falling
+        // apart, desperate when their own hull is low.
+        let key;
+        if (pilot.temperament === 'timid') {
+            if (ship.fleeing || hullRatio < 0.45)
+                key = 'distress';
+            else if (hullRatio < 0.7)
+                key = 'pressed';
+            else if (!said.has('contact') && pool.contact?.length)
+                key = 'contact';
+            else if (!said.has('rank') && this.rankAware() && pool.rank?.length)
+                key = 'rank';
+            else if (!said.has(cargo) && cargo && pool[cargo]?.length)
+                key = cargo;
+        }
+        else if (hullRatio < 0.2 && pool.pressed?.length)
+            key = 'pressed';
+        else if (this.playerLosing() && pool.gloat?.length)
+            key = 'gloat';
+        else if (!said.has('contact') && pool.contact?.length)
+            key = 'contact';
+        else if (!said.has('rank') && this.rankAware() && pool.rank?.length)
+            key = 'rank';
+        else if (!said.has(cargo) && cargo && pool[cargo]?.length)
+            key = cargo;
+        else if (pool.threat?.length)
+            key = 'threat';
+        else if (pool.taunt?.length)
+            key = 'taunt';
+        const lines = key ? pool[key] : undefined;
+        if (!lines?.length || this.save.world.time < (ship.nextLineAt ?? 0))
+            return;
+        ship.nextLineAt = this.save.world.time + 12 + ship.aiRng() * 12;
+        const line = this.pickPilotLine(ship, key, lines);
+        // Chatter goes to the top-center comms bar, not the toast stack —
+        // several hostiles talking should never bury real alerts.
+        this.sayPilotLine(ship, key === 'rank' ? line.replace('{rank}', this.rankTitle()) : line);
+    }
+    // Proximity mutter: a pilot says one thing when the player closes inside
+    // PROXIMITY_RANGE — a reaction to being noticed, on top of the timed
+    // combat chatter. Edge-triggered (fires when the player crosses into
+    // range, not every frame) with a long cooldown, and rolled on its own
+    // seeded stream so it never perturbs the combat rolls. Allies don't
+    // mutter at you; steady pilots stay silent as always.
+    maybeProximityLine(ship, position, playerPosition) {
+        if (this.storyLineActive())
+            return;
+        // A surrendered pilot pleads once more when the player closes in — a
+        // single follow-up to the surrender line, then silence. No proximity
+        // mutter: a beaten ship has nothing to say but "please". Fires as
+        // soon as the player is within range (no edge tracking), so the plea
+        // lands even if the player was already beside the ship when it gave up.
+        if (ship.surrendered) {
+            if (!ship.saidSurrenderPlead && playerPosition.distanceTo(position) <= PROXIMITY_RANGE && this.chatterOpen()) {
+                ship.saidSurrenderPlead = true;
+                const pool = ship.pilot ? PILOT_LINES[ship.pilot.temperament]?.plead : undefined;
+                if (pool?.length) {
+                    const line = pool[Math.floor(ship.proxRng() * pool.length)];
+                    this.sayPilotLine(ship, line);
+                }
+            }
+            return;
+        }
+        if (!this.chatterOpen())
+            return;
+        // The edge is only tracked after a short spawn grace, so a ship that
+        // spawns inside range still gets its mutter a beat later instead of
+        // the flag eating the approach edge before it may speak.
+        const tracking = this.save.world.time >= ship.spawnTime + 2;
+        const within = tracking && playerPosition.distanceTo(position) <= PROXIMITY_RANGE;
+        const pool = ship.pilot ? PILOT_LINES[ship.pilot.temperament] : undefined;
+        if (within && !ship.nearPlayer && !this.deferentialPilot(ship) && pool?.proximity?.length && this.shipRelation(ship) !== 'ally'
+            && this.save.world.time >= (ship.nextProximityAt ?? 0)) {
+            ship.nextProximityAt = this.save.world.time + 25 + ship.proxRng() * 20;
+            const line = pool.proximity[Math.floor(ship.proxRng() * pool.proximity.length)];
+            this.sayPilotLine(ship, line);
+        }
+        ship.nearPlayer = within;
+    }
+    // A pilot the player has beaten before recognizes them on a later
+    // encounter: one line when the player gets close, then silence. A captured
+    // pilot defers (deference pool, never re-engages); one who escaped comes
+    // back wary (wary pool, hostile and fighty). Fires once per ship, rolled
+    // on the seeded aiRng like the rest of the chatter.
+    maybeRecognitionLine(ship, position, playerPosition) {
+        if (!this.chatterOpen() || ship.saidRecognition || !ship.recognizesPlayer)
+            return;
+        if (playerPosition.distanceTo(position) > PROXIMITY_RANGE)
+            return;
+        ship.saidRecognition = true;
+        const pool = ship.pilot ? PILOT_LINES[ship.pilot.temperament]?.[this.deferentialPilot(ship) ? 'deference' : 'wary'] : undefined;
+        if (!pool?.length)
+            return;
+        const line = pool[Math.floor(ship.aiRng() * pool.length)];
+        this.sayPilotLine(ship, line);
+    }
+    // A pilot the player spared occasionally pays the debt when scanned: a tip
+    // about a valuable wreck (flagged on the scanner, if any remain) or a
+    // market contact (supply/demand nudged so the station actually honors the
+    // tip). One roll per ship, on its own seeded stream — deterministic and
+    // never touching the combat rolls.
+    givePilotFavor(ship) {
+        const rng = seededRandom(`${this.save.world.seed}:favor:${ship.id}`);
+        if (rng() >= PILOT_FAVOR_CHANCE)
+            return false;
+        // Half the time the favor is a wreck tip; with no wrecks left it falls
+        // back to a market contact so the favor always lands.
+        const wreckTip = rng() < 0.5 && this.giveWreckTip(rng);
+        return wreckTip || this.giveMarketTip(rng);
+    }
+    // Flag the best unscanned wreck on the scanner: the player learns exactly
+    // which wreck off Mourning Line is worth the trip (the map reads the
+    // scanned flag live, and the 3D marker pops on the next target sync).
+    giveWreckTip(rng) {
+        const unseen = (node) => node.remaining > 0 && !node.scanned;
+        const rare = this.wreckNodes.filter((node) => unseen(node) && node.rarity === 'rare');
+        const pool = rare.length ? rare : this.wreckNodes.filter((node) => unseen(node) && node.rarity === 'uncommon');
+        if (!pool.length)
+            return false;
+        const node = pool[Math.floor(rng() * pool.length)];
+        node.scanned = true;
+        if (!this.save.world.scannedNodes.includes(node.id))
+            this.save.world.scannedNodes.push(node.id);
+        this.ui.showToast(`Tip: ${node.name} off Mourning Line is carrying ${COMMODITIES[node.salvage].name}. Flagged on your scanner.`, 'success', 6500);
+        return true;
+    }
+    // A trade contact: nudge one station's supply/demand so the tip is real
+    // (they pay more for something, or have something below market). The price
+    // drifts back toward the location's baseline over the next few cycles.
+    giveMarketTip(rng) {
+        const favorites = ['medicine', 'electronics', 'machinery', 'luxuries', 'arms'];
+        const locationId = DOCK_LOCATION_IDS[Math.floor(rng() * DOCK_LOCATION_IDS.length)];
+        const commodityId = favorites[Math.floor(rng() * favorites.length)];
+        const sellTip = rng() < 0.5;
+        const item = this.save.world.market[locationId][commodityId];
+        if (sellTip)
+            item.demand += 15;
+        else
+            item.supply += 15;
+        refreshAllPrices(this.save.world.market, this.save.world.seed, this.save.world.economyClock);
+        this.ui.showToast(sellTip
+            ? `Tip: my contact at ${LOCATIONS[locationId].name} pays top credit for ${COMMODITIES[commodityId].name}.`
+            : `Tip: my contact at ${LOCATIONS[locationId].name} has ${COMMODITIES[commodityId].name} below market.`, 'success', 6500);
+        return true;
+    }
+    // Taunt on a landed hit: ace-tier and flamboyant pilots like to talk while
+    // they're winning, so a successful shot at the player feels personal. The
+    // chance and cooldown roll on the ship's seeded aiRng (deterministic like
+    // every other pilot roll) and the chirp announces the transmission. A
+    // temperament with its own taunts (flamboyant) uses those; silent
+    // temperaments borrow the ace pool when the tier earns the right to brag.
+    maybeHitTaunt(attackerId) {
+        if (!this.chatterOpen() || attackerId === 'player' || this.deathTimer > 0)
+            return;
+        const ship = this.ships.find((entry) => entry.id === attackerId && entry.hull > 0);
+        const pilot = ship?.pilot;
+        if (!pilot || (pilot.tier !== 'ace' && !pilot.flamboyance && pilot.temperament !== 'aggressive'))
+            return;
+        if (this.save.world.time < (ship.nextHitTauntAt ?? 0))
+            return;
+        // Who talks and how often: aces and flamboyants brag on nearly a third
+        // of their volleys; aggressive pilots threaten with a smaller chance so
+        // their lines land as exclamation points, not static.
+        const chance = pilot.tier === 'ace' || pilot.flamboyance ? 0.35 : pilot.temperament === 'aggressive' ? 0.18 : 0;
+        if (chance === 0 || ship.aiRng() >= chance)
+            return;
+        ship.nextHitTauntAt = this.save.world.time + 6 + ship.aiRng() * 8;
+        // Talk is backed by action: an aggressive pilot who lands a hit presses
+        // the next pass — tighter standoff and a shorter extend while the press
+        // window lasts (see updateAttackAI), so the threat is followed by a
+        // real closing run, not just words.
+        if (pilot.temperament === 'aggressive')
+            ship.pressingUntil = this.save.world.time + 5;
+        // The line follows the moment: when the player is falling apart a
+        // landed hit earns a gloat; otherwise temperament flavor first
+        // (flamboyant taunts, aggressive threats), with silent temperaments
+        // borrowing the ace pool when the tier earns the right to brag.
+        const ownPool = PILOT_LINES[pilot.temperament];
+        const gloatPool = this.playerLosing() ? (ownPool?.gloat ?? PILOT_LINES.ace.gloat) : undefined;
+        const lines = gloatPool?.length ? gloatPool
+            : ownPool?.taunt ?? ((pilot.tier === 'ace' || pilot.temperament === 'aggressive') ? (ownPool?.threat ?? PILOT_LINES.ace.taunt) : undefined);
+        if (!lines?.length)
+            return;
+        const line = this.pickPilotLine(ship, 'hittaunt', lines);
+        // Chatter goes to the comms bar like the timer lines — a landed shot is
+        // just a sharper moment to speak up.
+        this.sayPilotLine(ship, line);
     }
     resolveShipTarget(ship) {
         const playerPosition = vec(this.save.player.position);
@@ -1435,7 +1851,7 @@ export class GameSession {
             const dz = p[2] - from[2];
             return dx * dx + dy * dy + dz * dz;
         };
-        if ((ship.role === 'pirate' || ship.role === 'bounty' || ship.role === 'escort' || ship.hostile) && !ship.targetId) {
+        if (!ship.surrendered && !this.deferentialPilot(ship) && (ship.role === 'pirate' || ship.role === 'bounty' || ship.role === 'escort' || ship.hostile) && !ship.targetId) {
             const victim = this.ships
                 .filter((entry) => !entry.hostile && entry.hull > 0 && (entry.role === 'trader' || entry.role === 'miner'))
                 .sort((a, b) => distSqTo(ship.position, a.position) - distSqTo(ship.position, b.position))[0];
@@ -1470,21 +1886,69 @@ export class GameSession {
         else
             direct.copy(FORWARD).applyQuaternion(orientation).normalize();
         // Deflection shooting: aim where the target will be when the bolt arrives.
-        const timeToTarget = Math.max(0.2, distance / 150);
-        const predicted = this.tmpF.copy(targetPosition);
+        // Aim quality scales the lead factor: aces read the target's vector and
+        // land on the future position, novices undershoot it (their bolts fall
+        // behind a crossing target even before the jitter in fireNpcGun).
+        const aim = ship.pilot?.aim ?? 0.72;
+        // Exact intercept time for a constant-velocity target, solved in the
+        // ship's frame: the bolt leaves at 150 relative to the ship, so the bolt
+        // meets the target when |r + wt| = 150t (r = target offset, w = target
+        // velocity minus the ship's own). The old distance/150 ignored the
+        // shooter's motion, so chases and head-on passes whiffed by a wide
+        // margin. Aim quality scales how much of that lead the pilot actually
+        // applies: novices undershoot the future position, aces land on it.
+        const leadFactor = 0.6 + aim * 0.4;
+        const r = this.tmpI.copy(targetPosition).sub(position);
+        const w = this.tmpJ.set(0, 0, 0);
         if (targetVelocity)
-            predicted.addScaledVector(targetVelocity, timeToTarget * 0.85);
-        const lead = this.tmpG.subVectors(predicted, position).normalize();
+            w.copy(targetVelocity);
+        w.sub(velocity);
+        const rr = r.lengthSq();
+        const rw = r.dot(w);
+        const a = w.lengthSq() - 150 * 150;
+        let intercept = Infinity;
+        if (a !== 0) {
+            const disc = rw * rw - a * rr;
+            if (disc >= 0) {
+                const s = Math.sqrt(disc);
+                const candidates = [(-rw - s) / a, (-rw + s) / a].filter((t) => t > 0);
+                if (candidates.length)
+                    intercept = Math.min(...candidates);
+            }
+        }
+        // No geometric solution (target outruns the bolt): fall back to the
+        // closing speed along the sightline so the pilot still aims plausibly.
+        if (!isFinite(intercept)) {
+            const closing = 150 + velocity.dot(direct) - (targetVelocity ? targetVelocity.dot(direct) : 0);
+            intercept = Math.max(0.2, distance / Math.max(60, closing));
+        }
+        const leadTime = Math.max(0.2, intercept * leadFactor);
+        // Aim where the bolt actually goes: it leaves at 150 PLUS the ship's
+        // own velocity, so the lead direction must compensate for the shooter's
+        // motion — normalize(r + w·t) — not just point at the future position.
+        // Pointing at the raw future spot lets lateral velocity drift every bolt
+        // wide by v·t, which the intercept time alone cannot correct (the
+        // direction is what carries the shooter's drift). Lead factor scales
+        // both: aces compensate fully, novices undershoot the correction.
+        const predicted = this.tmpF.copy(r).addScaledVector(w, leadTime);
+        const lead = this.tmpG.copy(predicted).normalize();
         // Strafing-run state machine (Privateer jousting): approach on a firing line,
         // then blow past at full speed and extend before turning back for the next pass.
         // The pilot never decelerates into a point-blank hug and never circles flat.
         const passRange = ship.passRange ?? ATTACK_PASS_RANGE;
         const resetRange = ship.resetRange ?? ATTACK_RESET_RANGE;
+        // Aggressive pilots back their threats with action: while the press
+        // window from a landed-hit threat lasts, the next pass commits deeper
+        // (tighter standoff, 0.65x pass range) and the extend is abbreviated
+        // (0.6x reset range), so the ship turns back and closes again sooner.
+        const pressing = ship.pilot?.temperament === 'aggressive' && this.save.world.time < (ship.pressingUntil ?? 0);
+        const effectivePassRange = pressing ? passRange * 0.65 : passRange;
+        const effectiveResetRange = pressing ? resetRange * 0.6 : resetRange;
         if (!ship.attackPhase)
             ship.attackPhase = 'approach';
-        if (ship.attackPhase === 'approach' && distance < passRange)
+        if (ship.attackPhase === 'approach' && distance < effectivePassRange)
             ship.attackPhase = 'extend';
-        else if (ship.attackPhase === 'extend' && distance > resetRange)
+        else if (ship.attackPhase === 'extend' && distance > effectiveResetRange)
             ship.attackPhase = 'approach';
         if (distance < ATTACK_SEPARATION)
             ship.attackPhase = 'extend';
@@ -1495,12 +1959,30 @@ export class GameSession {
         lateral.normalize();
         const hullRatio = ship.maxHull > 0 ? ship.hull / ship.maxHull : 1;
         const shieldFraction = ship.maxShield > 0 ? ship.shield / ship.maxShield : 1;
-        const evasive = this.save.world.time < (ship.evasiveUntil ?? 0);
-        const damaged = hullRatio < 0.45;
+        // Reflex gates reaction: after taking fire the pilot waits out their
+        // latency window (novices flinch late, aces react almost instantly),
+        // then stays evasive for a reflex-scaled duration.
+        const evasive = this.save.world.time >= (ship.evasiveLatencyUntil ?? 0) && this.save.world.time < (ship.evasiveUntil ?? 0);
+        // damageThresholdMul: timid flinches at higher hull damage, aggressive
+        // shrugs it off (this also raises/lowers the cover duck point).
+        const damaged = hullRatio < pilotMod(ship, 0.45, 'damageThresholdMul');
+        // Post-damage evasion comes in bursts: ~1.5-2.5s of hard jinking and
+        // spiraling, then a few seconds flying straight to re-engage. A pilot
+        // that dodges forever never shoots back, and a crippled ship becomes
+        // unfinishable — fights stall with everyone at partial hull. Under
+        // active fire (evasive) the pilot stays in the burst the whole time;
+        // the cycle only paces the damaged-state dodges.
+        const damagedCycle = damaged && !evasive && !ship.fleeing && !ship.covering;
+        if (damagedCycle && this.save.world.time >= (ship.evadeCycleUntil ?? 0)) {
+            const resting = ship.evadePhase === 'rest';
+            ship.evadePhase = resting ? 'burst' : 'rest';
+            ship.evadeCycleUntil = this.save.world.time + (resting ? randomBetween(ship.aiRng, 1.2, 2) : randomBetween(ship.aiRng, 4, 6));
+        }
+        const evading = evasive || (damagedCycle && ship.evadePhase === 'burst');
         const currentSpeed = velocity.length();
         // Cover & recharge: a damaged ship with drained shields ducks behind a big
         // rock or wreck to let shields regenerate, then breaks out for another run.
-        const wantsCover = !ship.fleeing && damaged && shieldFraction < COVER_RECHARGE_SHIELD && distance > 140;
+        const wantsCover = !ship.fleeing && damaged && shieldFraction < pilotMod(ship, COVER_RECHARGE_SHIELD, 'coverShieldMul') && distance > 140;
         if (wantsCover && !ship.covering) {
             const cover = this.findCoverPoint(position, targetPosition);
             if (cover) {
@@ -1509,19 +1991,29 @@ export class GameSession {
                 ship.coverHoldSince = 0;
             }
         }
-        else if (ship.covering && (!wantsCover || (ship.coverHoldSince && this.save.world.time - ship.coverHoldSince > COVER_HOLD_MAX)))
+        else if (ship.covering && (!wantsCover || (ship.coverHoldSince && this.save.world.time - ship.coverHoldSince > pilotMod(ship, COVER_HOLD_MAX, 'coverHoldMul'))))
             ship.covering = false, ship.coverPoint = undefined, ship.coverHoldSince = 0;
         // While hurt or under fire, commit to brief lateral jinks that spoil the
-        // player's lead without collapsing into a wild spiral.
+        // player's lead without collapsing into a wild spiral. Flamboyant pilots
+        // also jink while healthy (showboating). The strength is capped so a
+        // dodge bends the heading without steering the ship sideways harder
+        // than it flies forward. All rolls use the ship's seeded aiRng so
+        // headless probes are deterministic.
         let jink = 0;
-        if ((evasive || damaged) && !ship.fleeing && !ship.covering) {
+        const showboating = !evasive && !damaged && (ship.pilot?.flamboyance ?? 0) > 0 && !ship.fleeing && !ship.covering;
+        if ((evading || showboating) && !ship.fleeing && !ship.covering) {
             if (this.save.world.time > (ship.jinkUntil ?? 0)) {
-                ship.jinkUntil = this.save.world.time + 0.55 + Math.random() * 0.55;
-                ship.jinkSign = Math.random() < 0.5 ? 1 : -1;
-                ship.jinkStrength = 0.3 + Math.random() * 0.35;
+                const reflex = ship.pilot?.reflex ?? 0.78;
+                const evasion = ship.pilot?.evasion ?? 0.82;
+                const jinkMul = pilotMod(ship, 1, 'jinkMul');
+                ship.jinkDuration = (0.55 + ship.aiRng() * 0.55) * (0.65 + reflex * 0.7) * jinkMul;
+                ship.jinkUntil = this.save.world.time + ship.jinkDuration;
+                ship.jinkSign = ship.aiRng() < 0.5 ? 1 : -1;
+                ship.jinkStrength = Math.min(0.6, (0.3 + ship.aiRng() * 0.35) * (0.6 + evasion * 0.7) * jinkMul);
             }
             const jinkRemaining = Math.max(0, (ship.jinkUntil ?? 0) - this.save.world.time);
-            jink = (ship.jinkSign ?? 1) * (ship.jinkStrength ?? 0.45) * clamp(jinkRemaining / 0.55, 0, 1);
+            const jinkDuration = ship.jinkDuration ?? 0.55;
+            jink = (ship.jinkSign ?? 1) * (ship.jinkStrength ?? 0.45) * clamp(jinkRemaining / jinkDuration, 0, 1);
         }
         // Spiral evasion: under fire, the pilot sometimes commits to a corkscrew
         // (rotating perpendicular bias + matching roll) so the dodge works in
@@ -1531,16 +2023,24 @@ export class GameSession {
         // nose can track it, and the roll is folded into the slerp target below
         // so the maneuver is one coordinated barrel roll, not a wobble.
         let spiraling = false;
-        if ((evasive || damaged) && !ship.fleeing && !ship.covering) {
+        // Corkscrew gate: base 0.45, pushed by temperament (flamboyant showboats
+        // at ~0.83, timid prefers cover at ~0.29). Reflex scales the cooldowns so
+        // slow pilots commit less often; evasion scales duration. Healthy
+        // flamboyant pilots roll a reduced showboating gate. Gated on the same
+        // burst as jinks, so the corkscrew never outlasts the dodge window.
+        if ((evading || showboating) && !ship.fleeing && !ship.covering) {
             if (!(ship.spiralT > 0) && this.save.world.time >= (ship.spiralCooldownUntil ?? 0)) {
-                if (Math.random() < 0.45) {
-                    ship.spiralT = 0.9 + Math.random() * 0.9;
-                    ship.spiralSign = Math.random() < 0.5 ? 1 : -1;
+                const gate = pilotMod(ship, 0.45, 'spiralMul') * (showboating ? 0.45 : 1);
+                const reflex = ship.pilot?.reflex ?? 0.78;
+                const evasion = ship.pilot?.evasion ?? 0.82;
+                if (ship.aiRng() < gate) {
+                    ship.spiralT = (0.9 + ship.aiRng() * 0.9) * (0.7 + evasion * 0.5) * (ship.pilot?.flamboyance ? 1.4 : 1);
+                    ship.spiralSign = ship.aiRng() < 0.5 ? 1 : -1;
                     ship.spiralPhase = 0;
-                    ship.spiralCooldownUntil = this.save.world.time + 5 + Math.random() * 5;
+                    ship.spiralCooldownUntil = this.save.world.time + (5 + ship.aiRng() * 5) * (1.6 - reflex * 0.7);
                 }
                 else {
-                    ship.spiralCooldownUntil = this.save.world.time + 2 + Math.random() * 3;
+                    ship.spiralCooldownUntil = this.save.world.time + (2 + ship.aiRng() * 3) * (1.6 - reflex * 0.7);
                 }
             }
             if (ship.spiralT > 0) {
@@ -1657,7 +2157,10 @@ export class GameSession {
         // their tail — a chase, an extension, or a rout — so they can outrun a
         // non-burning player and force a real pursuit instead of a free kill.
         const targetBehind = direct.dot(forward) < -0.25;
-        ship.burning = Boolean(ship.afterburnSpeed) && !holdingCover && !ship.covering && (fleeing || targetBehind);
+        // Aggressive pilots (afterburnMul > 1.2) burn afterburn in pursuit too,
+        // not just when running or being chased.
+        const burnInPursuit = (ship.pilot?.afterburnMul ?? 1) > 1.2 && ship.attackPhase === 'approach';
+        ship.burning = Boolean(ship.afterburnSpeed) && !holdingCover && !ship.covering && (fleeing || targetBehind || burnInPursuit);
         const cruise = ship.burning ? ship.afterburnSpeed : ship.speed;
         // Brake only when a collision is truly imminent (rock dead ahead and close);
         // steering avoidance handles the rest so ships keep their combat speed.
@@ -1675,7 +2178,13 @@ export class GameSession {
         tupleInto(ship.velocity, velocity);
         quatTupleInto(ship.rotation, orientation);
         const facing = forward.dot(lead);
-        if (!fleeing && distance < ATTACK_FIRE_RANGE && facing > 0.85 && ship.fireCooldown <= 0 && !this.lineBlocked(position, predicted, ship.id)) {
+        // Fire discipline: aces snap shots off as soon as the nose is on the
+        // deflection point; novices need a tighter alignment (and still spray,
+        // see fireNpcGun). Fire range is temperament-driven: timid only commits
+        // at short range, aggressive hoses from way out.
+        const fireGate = 0.85 + (1 - aim) * 0.1;
+        const fireRange = pilotMod(ship, ATTACK_FIRE_RANGE, 'fireRangeMul');
+        if (!fleeing && distance < fireRange && facing > fireGate && ship.fireCooldown <= 0 && !this.lineBlocked(position, predicted, ship.id)) {
             this.fireNpcGun(ship, lead);
         }
     }
@@ -1683,6 +2192,15 @@ export class GameSession {
         ship.burning = false;
         const position = this.tmpA.set(ship.position[0], ship.position[1], ship.position[2]);
         const velocity = this.tmpB.set(ship.velocity[0], ship.velocity[1], ship.velocity[2]);
+        if (ship.poweredDown) {
+            // Surrendered and dark: bleed off velocity and drift. The ship no
+            // longer navigates, attacks, or evades.
+            velocity.multiplyScalar(Math.max(0, 1 - dt * 0.6));
+            position.addScaledVector(velocity, dt);
+            tupleInto(ship.position, position);
+            tupleInto(ship.velocity, velocity);
+            return;
+        }
         const orientation = this.tmpQ.set(ship.rotation[0], ship.rotation[1], ship.rotation[2], ship.rotation[3]);
         let destination = ship.destination ? this.tmpD.set(ship.destination[0], ship.destination[1], ship.destination[2]) : undefined;
         if (!destination || position.distanceTo(destination) < 30) {
@@ -1715,10 +2233,24 @@ export class GameSession {
         quatTupleInto(ship.rotation, orientation);
     }
     fireNpcGun(ship, direction) {
-        const position = vec(ship.position).addScaledVector(direction, 2.4);
+        // Aim quality: the AI's nose already aims at the deflection point, so the
+        // only thing keeping novices honest is angular jitter on the shot
+        // direction — aces shoot where they aim. Jitter is seeded per ship.
+        const aim = ship.pilot?.aim ?? 0.72;
+        let aimDir = direction;
+        if (aim < 0.99) {
+            const spread = (1 - aim) * 0.09;
+            const axis = this.tmpP3.crossVectors(direction, UP);
+            if (axis.lengthSq() < 1e-6)
+                axis.set(1, 0, 0);
+            else
+                axis.normalize();
+            aimDir = this.tmpP4.copy(direction).applyAxisAngle(axis, (ship.aiRng() - 0.5) * 2 * spread).normalize();
+        }
+        const position = vec(ship.position).addScaledVector(aimDir, 2.4);
         const slot = this.projStore.alloc();
         this.projStore.setPos(slot, position.x, position.y, position.z);
-        const shotVel = this.tmpP0.copy(direction).multiplyScalar(150).add(vec(ship.velocity));
+        const shotVel = this.tmpP0.copy(aimDir).multiplyScalar(150).add(vec(ship.velocity));
         this.projStore.setVel(slot, shotVel.x, shotVel.y, shotVel.z);
         this.projectiles.push({
             id: `p-${++this.projectileCounter}`,
@@ -1730,7 +2262,8 @@ export class GameSession {
             targetId: ship.targetId,
             faction: ship.faction,
         });
-        ship.fireCooldown = ship.role === 'bounty' ? 0.28 : ship.role === 'pirate' ? 0.38 : 0.46;
+        // Fire rate scales with aim: aces keep the trigger down, novices wait.
+        ship.fireCooldown = (ship.role === 'bounty' ? 0.28 : ship.role === 'pirate' ? 0.38 : 0.46) * (1 + (1 - aim) * 0.7);
     }
     updateProjectiles(dt) {
         const playerPos = vec(this.save.player.position, this.tmpP3);
@@ -1789,8 +2322,12 @@ export class GameSession {
                 const hitPosition = this.tmpP4.copy(start).lerp(end, bestT);
                 projectile.life = 0;
                 this.renderer.spawnImpact(tuple(hitPosition), projectile.kind === 'missile' ? 0xff7a42 : 0xffcb62);
-                if (hitKind === 'player')
+                if (hitKind === 'player') {
                     this.damagePlayer(projectile.damage, projectile.kind === 'missile' ? 'missile strike' : 'weapons fire');
+                    // A landed shot is a moment worth talking about: ace and
+                    // flamboyant pilots get a seeded chance to rub it in.
+                    this.maybeHitTaunt(projectile.ownerId);
+                }
                 else if (hitKind === 'ship' && hitShip)
                     this.damageShip(hitShip, projectile.damage, projectile.ownerId, tuple(hitPosition));
                 if (projectile.kind === 'missile') {
@@ -1828,24 +2365,160 @@ export class GameSession {
         }
         if (remaining > 0)
             ship.hull -= remaining;
+        const hullDamaged = remaining > 0;
         ship.shieldDelay = 4.5;
-        if (attackerId === 'player' && ship.hull > 0) {
-            // Under fire: the pilot breaks hard and jinks for a couple of seconds.
-            ship.evasiveUntil = this.save.world.time + 2.5;
-            // Crippled hulls sometimes cut and run instead of pressing the fight.
+        if (attackerId === 'player' && ship.hull > 0 && !ship.poweredDown) {
+            // Under fire: the pilot commits to evasion after their reaction
+            // latency (reflex — novices flinch late, aces react fast) and stays
+            // evasive for a reflex-scaled duration.
+            const reflex = ship.pilot?.reflex ?? 0.78;
+            ship.evasiveUntil = this.save.world.time + 2.5 * (0.6 + reflex * 0.5);
+            ship.evasiveLatencyUntil = this.save.world.time + (1.2 - reflex) * 1.1;
+            // Hull damage opens the surrender gate: instead of just running,
+            // the pilot picks a surrender action (run, dump cargo or pay and
+            // run, or power down). The gate is open from the first hull hit —
+            // every hull hit rolls a personality-driven chance that climbs as
+            // the hull degrades, so a timid pilot may give up at the first
+            // scratch while an aggressive one fights on. fleeMul drives both
+            // the starting odds and how fast they rise; a wary pilot who
+            // escaped before gives up even sooner.
             const hullRatio = ship.maxHull > 0 ? ship.hull / ship.maxHull : 1;
-            if (hullRatio < 0.22 && !ship.fleeing && Math.random() < 0.45)
-                ship.fleeing = true;
+            const stubborn = pilotMod(ship, 1, 'fleeMul');
+            const chance = (0.04 + (1 - hullRatio) * 0.32) * stubborn * (ship.waryOfPlayer ? WARY_FLEE_MULTIPLIER : 1);
+            if (hullDamaged && !ship.fleeing && !ship.surrendered && ship.aiRng() < chance)
+                this.surrenderShip(ship);
+            // Timid pilots call for help when the player lands a hit: a seeded
+            // chance with its own cooldown, routed through the comms bar like
+            // the rest of the chatter. At close range any hit is worth
+            // crying about; out past DISTRESS_CLOSE_RANGE a hit has to actually
+            // bite hull (the ship closed in, shields are down, the fight is
+            // real) before it earns a MAYDAY — long-range potshots that only
+            // graze shields stay quiet.
+            const dx = ship.position[0] - this.save.player.position[0];
+            const dy = ship.position[1] - this.save.player.position[1];
+            const dz = ship.position[2] - this.save.player.position[2];
+            const closeRange = dx * dx + dy * dy + dz * dz <= DISTRESS_CLOSE_RANGE * DISTRESS_CLOSE_RANGE;
+            if (this.chatterOpen() && ship.pilot?.temperament === 'timid' && (hullDamaged || closeRange) && this.save.world.time >= (ship.nextDistressAt ?? 0) && ship.aiRng() < 0.3) {
+                const distressPool = PILOT_LINES.timid.distress;
+                if (distressPool?.length) {
+                    ship.nextDistressAt = this.save.world.time + 6 + ship.aiRng() * 8;
+                    const line = distressPool[Math.floor(ship.aiRng() * distressPool.length)];
+                    this.sayPilotLine(ship, line);
+                }
+            }
         }
-        if (attackerId === 'player' && !ship.hostile) {
-            ship.hostile = true;
-            ship.targetId = 'player';
-            this.save.player.reputation[ship.faction] = clamp(this.save.player.reputation[ship.faction] - (ship.role === 'patrol' ? 16 : 9), -100, 100);
-            this.ui.showToast(`Unauthorized attack: ${FACTION_LABEL(ship.faction)} reputation damaged.`, 'danger', 4500);
-            this.alertPatrols(ship.position);
+        // Accidental fire doesn't end a career: player hits on a non-hostile
+        // ship accumulate (playerDamageTaken), and only crossing a real damage
+        // threshold counts as a deliberate unauthorized attack — one stray
+        // bolt earns a throttled warning, sustained fire escalates to the
+        // hostile tag, rep loss, and a patrol alert. A surrendered ship never
+        // re-enters the fight (finishing it still pays the bounty via the
+        // faction check in destroyShip), and a recognizing pilot defending
+        // itself is self-defense, so neither is penalized here.
+        if (attackerId === 'player' && !ship.hostile && !ship.surrendered && !ship.recognizesPlayer) {
+            ship.playerDamageTaken = (ship.playerDamageTaken ?? 0) + (amount - remaining);
+            const threshold = Math.max(25, (ship.maxShield + ship.maxArmor + ship.maxHull) * 0.15);
+            if (ship.playerDamageTaken < threshold) {
+                if (this.save.world.time >= (ship.fireWarningAt ?? 0)) {
+                    ship.fireWarningAt = this.save.world.time + 6;
+                    this.ui.showToast(`Watch your fire — ${ship.role === 'patrol' ? 'patrol vessel' : 'civilian vessel'} hit!`, 'warning', 3600);
+                }
+            }
+            else {
+                ship.hostile = true;
+                ship.targetId = 'player';
+                this.save.player.reputation[ship.faction] = clamp(this.save.player.reputation[ship.faction] - (ship.role === 'patrol' ? 16 : 9), -100, 100);
+                this.ui.showToast(`Unauthorized attack: ${FACTION_LABEL(ship.faction)} reputation damaged.`, 'danger', 4500);
+                this.alertPatrols(ship.position);
+            }
         }
         if (ship.hull <= 0)
             this.destroyShip(ship, attackerId, position);
+    }
+    // A beaten pilot gives up rather than fighting on. Every outcome ends the
+    // fight: the ship stops counting as hostile (hyperdrive/landing unlock)
+    // and turns orange on the HUD, with a fitting line per action. The action
+    // follows the temperament weights, and cargo/credit dumps spawn pickups.
+    surrenderShip(ship) {
+        ship.surrendered = true;
+        ship.hostile = false;
+        ship.fleeing = false;
+        ship.targetId = undefined;
+        const weights = SURRENDER_WEIGHTS[ship.pilot?.temperament] ?? SURRENDER_WEIGHTS.steady;
+        const entries = Object.entries(weights);
+        const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
+        let roll = ship.aiRng() * total;
+        let action = entries[0][0];
+        for (const [candidate, weight] of entries) {
+            roll -= weight;
+            if (roll < 0) {
+                action = candidate;
+                break;
+            }
+        }
+        if (action === 'eject' || action === 'downEject')
+            this.ejectCargo(ship);
+        if (action === 'pay' || action === 'downPay')
+            this.transferCredits(ship);
+        if (action.startsWith('down'))
+            ship.poweredDown = true;
+        else
+            ship.fleeing = true;
+        // The pilot remembers the encounter: record the callsign and whether
+        // they were captured in place (powered down) or got away (fled), so a
+        // later spawn of the same name defers or comes back wary (see spawnShip
+        // recognition).
+        const surrenderedTo = this.save.world.surrenderedTo ?? (this.save.world.surrenderedTo = {});
+        surrenderedTo[ship.name] = action.startsWith('down') ? 'captured' : 'fled';
+        const pool = PILOT_LINES[ship.pilot?.temperament]?.surrender?.[action];
+        if (pool?.length && this.chatterOpen()) {
+            const line = pool[Math.floor(ship.aiRng() * pool.length)];
+            this.sayPilotLine(ship, line);
+        }
+    }
+    // Jettison the hold: a couple of salvage-grade pickups as the pilot runs,
+    // drawn from the role's cargo pool (see SURRENDER_EJECT_POOLS) so the loot
+    // reads like what the ship was actually carrying.
+    ejectCargo(ship) {
+        const rng = seededRandom(`${this.save.world.seed}:surrender-eject:${ship.id}`);
+        const pool = SURRENDER_EJECT_POOLS[ship.role] ?? ['electronics', 'scrap'];
+        const drops = 1 + Math.floor(rng() * 2);
+        for (let index = 0; index < drops; index += 1)
+            this.spawnPickup(pool[Math.floor(rng() * pool.length)], ship.position, 'combat', rng() > 0.9 ? 'uncommon' : 'common');
+    }
+    // Hand over the wallet: a credit pickup worth a slice of the bounty value.
+    transferCredits(ship) {
+        const amount = ship.bountyValue > 0 ? Math.round(ship.bountyValue * 0.6) : 60;
+        this.spawnPickup('credits', ship.position, 'combat', 'common', amount);
+    }
+    // A surrendered pilot is captured, not exploded: claiming the ship (scan
+    // it, or dock while it's still around) pays the defense bounty, completes
+    // any active warrant into the registry, and counts the kill — the surrender
+    // already ended the fight, so no explosion and no civilian-loss penalty.
+    // Only ships worth a bounty are claimable; a civilian the player beat down
+    // has no payoff and stays unclaimed.
+    claimSurrendered(ship) {
+        if (!ship.surrendered || ship.claimed || ship.hull <= 0 || !(ship.bountyValue > 0 || ship.missionId))
+            return false;
+        ship.claimed = true;
+        this.save.player.stats.kills += 1;
+        if (ship.bountyValue > 0) {
+            const payment = ship.bountyValue;
+            this.save.player.credits += payment;
+            this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + 1, -100, 100);
+            this.ui.showToast(`Surrendered pilot captured. ${formatCredits(payment)} bounty credited.`, 'success', 4200);
+        }
+        if (ship.missionId) {
+            const result = completeBountyMission(this.save, ship.missionId);
+            if (result.ok)
+                this.ui.showToast(result.message, 'success', 6500);
+        }
+        if (this.save.player.currentTargetId === ship.id)
+            this.save.player.currentTargetId = undefined;
+        // The captured ship leaves the scene like a destroyed one (cleanupEntities
+        // removes hull 0 ships shortly after) but without the explosion.
+        ship.hull = 0;
+        return true;
     }
     destroyShip(ship, attackerId, position) {
         ship.hull = 0;
@@ -1978,7 +2651,13 @@ export class GameSession {
             const offset = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.45, rng() - 0.5).normalize().multiplyScalar(randomBetween(rng, 85, 145));
             const spawnPosition = player.clone().add(offset);
             this.clearSpawnPosition(spawnPosition, zone);
-            const target = this.spawnShip('bounty', tuple(spawnPosition), mission.id, mission.targetName);
+            // Warrants pin a pilot profile at offer time, so a named ace keeps
+            // the same skill and temperament across every spawn of that warrant
+            // (and across reloads): the player learns the name, not the roll.
+            // Legacy saves without a pinned profile fall back to a name-seeded
+            // roll so the callsign is still stable.
+            const pinnedPilot = mission.pilot ?? (mission.targetName ? rollPilot(seededRandom(`${mission.targetName}:pilot`), this.spawnThreat(spawnPosition, mission.id), 'red-talons') : undefined);
+            const target = this.spawnShip('bounty', tuple(spawnPosition), mission.id, mission.targetName, pinnedPilot);
             target.targetId = 'player';
             if (this.save.player.guildRank.bounty >= 1 || mission.reward > 6500) {
                 const escort = this.spawnShip('escort', tuple(vec(target.position).add(new THREE.Vector3(12, 7, -14))));
@@ -2092,19 +2771,59 @@ export class GameSession {
         const miner = this.spawnShip('miner', around(LOCATIONS.shardbelt));
         miner.destination = LOCATIONS.shardbelt.position;
     }
-    spawnShip(role, position, missionId, nameOverride) {
+    // How dangerous the surrounding fight is, 0..1. Feeds the pilot tier roll:
+    // contract danger dominates (a fat warrant draws an ace), then the zone.
+    spawnThreat(position, missionId) {
+        if (missionId) {
+            const mission = this.save.activeMissions.find((entry) => entry.id === missionId);
+            if (mission?.kind === 'bounty') {
+                const danger = mission.danger ?? 1.5;
+                return clamp(0.35 + danger * 0.3, 0.2, 1);
+            }
+        }
+        const zone = this.getWorldZone(position);
+        if (zone === 'asteroid-field' || zone === 'graveyard')
+            return 0.6;
+        if (zone === 'near-location')
+            return 0.35;
+        return 0.45;
+    }
+    spawnShip(role, position, missionId, nameOverride, pilotOverride) {
         const index = ++this.entityCounter;
         const rng = seededRandom(`${this.save.world.seed}:ship:${index}:${Math.floor(this.save.world.time)}`);
         const faction = role === 'pirate' || role === 'bounty' || role === 'escort' ? 'red-talons' : role === 'patrol' ? 'concord' : role === 'miner' ? 'frontier-miners' : 'free-merchants';
         const hostile = faction === 'red-talons';
+        // Every ship rolls a pilot at spawn (seeded, deterministic). The profile
+        // is transient per-ship state — no save-schema change.
+        const pilot = rollPilot(rng, this.spawnThreat(position, missionId), faction, pilotOverride);
+        // Per-ship RNG for in-flight rolls (jinks, spirals, flee checks, shot
+        // jitter): seeded like everything else so headless probes are exact.
+        const aiRng = seededRandom(`${this.save.world.seed}:ai:${index}:${Math.floor(this.save.world.time)}`);
+        // A separate seeded stream for the proximity mutter, so the ambient
+        // line never perturbs the combat roll stream (headless probes stay
+        // exact on the calibrated scenarios).
+        const proxRng = seededRandom(`${this.save.world.seed}:prox:${index}:${Math.floor(this.save.world.time)}`);
         const maxShield = role === 'bounty' ? 105 : role === 'trader' ? 82 : role === 'patrol' ? 75 : role === 'miner' ? 50 : 58;
         const maxArmor = role === 'bounty' ? 105 : role === 'trader' ? 110 : role === 'patrol' ? 72 : role === 'miner' ? 76 : 62;
         const maxHull = role === 'bounty' ? 120 : role === 'trader' ? 145 : role === 'patrol' ? 90 : role === 'miner' ? 95 : 75;
         const direction = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.4, rng() - 0.5).normalize();
         const rotation = new THREE.Quaternion().setFromUnitVectors(FORWARD, direction);
+        const shipName = nameOverride ?? (hostile ? proceduralCallsign(rng) : `${role === 'trader' ? 'MV' : role === 'patrol' ? 'CPV' : role === 'miner' ? 'Prospector' : 'Escort'} ${randomInt(rng, 12, 997)}`);
+        // A pilot who surrendered to the player before remembers: when the same
+        // callsign spawns again (outside an active warrant), it defers instead
+        // of re-engaging — non-hostile, no combat target, and a one-shot line
+        // when the player gets close (see maybeRecognitionLine). The memory
+        // lives in the save (world.surrenderedTo) so it survives instance
+        // resets and reloads.
+        const prior = (this.save.world.surrenderedTo ?? {})[shipName];
+        const recognizesPlayer = hostile && !missionId && prior !== undefined;
+        // A pilot who fled after surrendering came back wary, not deferential:
+        // hostile again, but they cut and run earlier than usual (see damageShip).
+        const waryOfPlayer = recognizesPlayer && prior === 'fled';
+        const isHostile = hostile && !(recognizesPlayer && !waryOfPlayer);
         const ship = {
             id: `ship-${index}`,
-            name: nameOverride ?? (hostile ? proceduralCallsign(rng) : `${role === 'trader' ? 'MV' : role === 'patrol' ? 'CPV' : role === 'miner' ? 'Prospector' : 'Escort'} ${randomInt(rng, 12, 997)}`),
+            name: shipName,
             role,
             faction,
             position: [...position],
@@ -2120,9 +2839,9 @@ export class GameSession {
             afterburnSpeed: role === 'bounty' ? 64 : role === 'pirate' || role === 'escort' ? 57 : 0,
             turnRate: role === 'bounty' ? 1.55 : role === 'pirate' || role === 'escort' ? 1.35 : role === 'patrol' ? 1.1 : 0.72,
             gunDamage: role === 'bounty' ? 10 : role === 'pirate' ? 7.5 : role === 'escort' ? 6.5 : role === 'patrol' ? 7 : 4,
-            hostile,
+            hostile: isHostile,
             bountyValue: role === 'bounty' ? 900 : role === 'pirate' || role === 'escort' ? randomInt(rng, 170, 420) : 0,
-            aiState: hostile ? 'attack' : role === 'miner' ? 'mine' : role === 'patrol' ? 'patrol' : 'travel',
+            aiState: isHostile ? 'attack' : role === 'miner' ? 'mine' : role === 'patrol' ? 'patrol' : 'travel',
             fireCooldown: randomBetween(rng, 0.2, 0.8),
             missileCooldown: randomBetween(rng, 1, 3),
             shieldDelay: 0,
@@ -2138,9 +2857,30 @@ export class GameSession {
             lifetime: 0,
             missionId,
             attackPhase: 'approach',
-            passRange: 48 + rng() * 20,
-            resetRange: 170 + rng() * 50,
+            // Pass/reset range come from the pilot's temperament (timid keeps
+            // distance, aggressive presses in) on top of the per-ship variance.
+            passRange: (48 + rng() * 20) * pilot.passRangeMul,
+            resetRange: (170 + rng() * 50) * pilot.resetRangeMul,
             passPhase: rng() * Math.PI * 2,
+            pilot,
+            aiRng,
+            proxRng,
+            recognizesPlayer,
+            waryOfPlayer,
+            surrendered: false,
+            claimed: false,
+            poweredDown: false,
+            saidRecognition: false,
+            // Whether the pilot has already rolled (and possibly given) the
+            // first-scan favor — one roll per ship, so re-scanning can't farm it.
+            favorGiven: false,
+            // Player-inflicted damage on a non-hostile ship, for the
+            // accidental-fire escalation in damageShip.
+            playerDamageTaken: 0,
+            // Comms cadence: the first line lands a few seconds into a fight,
+            // then every ~12-24s while engaged. The initial delay comes off the
+            // spawn rng so it never perturbs the in-flight aiRng roll stream.
+            nextLineAt: this.save.world.time + 2 + rng() * 5,
         };
         this.ships.push(ship);
         return ship;
@@ -2575,6 +3315,14 @@ export class GameSession {
         return distance <= (LOCATIONS[locationId].dockRadius ?? 55) ? locationId : undefined;
     }
     dockAt(locationId) {
+        // Captured on departure: any surrendered bounty pilot still around is
+        // claimed when the player docks, so a surrender never denies the payoff
+        // (ships despawn past ~950u, so everything still listed is nearby or
+        // an active warrant target).
+        for (const ship of this.ships) {
+            if (ship.surrendered && !ship.claimed && ship.hull > 0 && (ship.bountyValue > 0 || ship.missionId))
+                this.claimSurrendered(ship);
+        }
         this.autopilot = false;
         this.afterburning = false;
         this.save.player.dockedAt = locationId;
@@ -2794,6 +3542,7 @@ export class GameSession {
         this.ui.hidePause();
         this.ui.hideMap();
         this.ui.hideShipMenu();
+        this.ui.hideChatLog?.();
     }
     openShipMenu() {
         if (this.save.player.dockedAt)
@@ -2947,9 +3696,15 @@ export class GameSession {
                     kind: 'ship',
                     name: ship.name,
                     hostile: ship.hostile,
+                    surrendered: ship.surrendered,
                     variant: shipVariantForRole(ship.role),
                     heading,
-                    subtitle: `${ship.role.toUpperCase()} · ${ship.hostile ? 'HOSTILE' : FACTION_LABEL(ship.faction)}`,
+                    subtitle: `${ship.role.toUpperCase()} · ${ship.surrendered ? 'SURRENDERED' : ship.hostile ? 'HOSTILE' : FACTION_LABEL(ship.faction)}`,
+                    // The monitor's readout line carries the pilot profile so a
+                    // locked target's habits are visible at a glance — prefixed
+                    // with the recognition marker when the pilot remembers the
+                    // player (spared or escaped).
+                    readout: ship.pilot ? `${ship.recognizesPlayer ? `${SPARED_MARK} ` : ''}${TIER_LABELS[ship.pilot.tier] ?? ship.pilot.tier} · ${TEMPERAMENT_LABELS[ship.pilot.temperament] ?? ship.pilot.temperament}` : undefined,
                     distance,
                     shield: ship.shield,
                     maxShield: ship.maxShield,

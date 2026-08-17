@@ -5,6 +5,12 @@ import { clamp, seededRandom } from './random.js';
 const tupleToVector = (tuple, out = new THREE.Vector3()) => out.set(tuple[0], tuple[1], tuple[2]);
 const NEG_Z = new THREE.Vector3(0, 0, -1);
 const cssHex = (value) => `#${value.toString(16).padStart(6, '0')}`;
+// Cockpit sprite scale: idle is held slightly zoomed-in so the frame still
+// fills the view when it relaxes to COCKPIT_ZOOM_BURN under afterburner.
+const COCKPIT_ZOOM_IDLE = 1.018;
+// Half the previous pull-back (was 0.97): the frame relaxes to 0.994 under
+// burn, and the grime follows at half that rate via the 0.5 factor below.
+const COCKPIT_ZOOM_BURN = 0.994;
 const factionColor = (faction) => {
     switch (faction) {
         case 'concord':
@@ -82,7 +88,6 @@ export class SpaceRenderer {
     selectedWreckId;
     selectedLocationId;
     activeInstanceId;
-    stationBeacons = [];
     constructor(container, seed, asteroids, graveyard, wreckNodes, quality) {
         this.container = container;
         this.asteroids = asteroids;
@@ -96,11 +101,6 @@ export class SpaceRenderer {
             powerPreference: 'high-performance',
             depth: true,
             stencil: false,
-            // The workbench catalog harness drives the renderer with a programmatic
-            // camera and screenshots the canvas right after. Without
-            // preserveDrawingBuffer the back-buffer is cleared on present, so the
-            // screenshot is either the previous frame or empty.
-            preserveDrawingBuffer: true,
         });
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderer.toneMapping = THREE.NeutralToneMapping;
@@ -148,6 +148,7 @@ export class SpaceRenderer {
         this.utilityBeam.visible = false;
         this.scene.add(this.utilityBeam);
         this.cockpitWarning = this.cockpit.getObjectByName('warning-light');
+        this.cockpitZoom = COCKPIT_ZOOM_IDLE;
         window.addEventListener('resize', this.resize);
         this.renderer.domElement.addEventListener('webglcontextlost', this.onContextLost);
         this.renderer.domElement.addEventListener('webglcontextrestored', this.onContextRestored);
@@ -268,26 +269,14 @@ export class SpaceRenderer {
         this.scene.environment = texture;
     }
     radialTexture(inner, outer) {
-        // Accept either a CSS string (already prefixed with #) or a numeric hex —
-        // caller code can be sloppy, and a bad color once crashed the whole
-        // render. Always end up with a valid `#rrggbb` plus an alpha tail.
-        const normalize = (value) => {
-            if (typeof value === 'number')
-                return cssHex(value);
-            if (!value)
-                return '#000000';
-            return value.startsWith('#') ? value : `#${value}`;
-        };
-        const innerCss = normalize(inner);
-        const outerCss = normalize(outer);
         const canvas = document.createElement('canvas');
         canvas.width = 256;
         canvas.height = 256;
         const context = canvas.getContext('2d');
         const gradient = context.createRadialGradient(128, 128, 0, 128, 128, 128);
-        gradient.addColorStop(0, innerCss);
-        gradient.addColorStop(0.22, innerCss);
-        gradient.addColorStop(1, `${outerCss}00`);
+        gradient.addColorStop(0, inner);
+        gradient.addColorStop(0.22, inner);
+        gradient.addColorStop(1, `${outer}00`);
         context.fillStyle = gradient;
         context.fillRect(0, 0, 256, 256);
         const texture = new THREE.CanvasTexture(canvas);
@@ -1007,8 +996,6 @@ export class SpaceRenderer {
         group.scale.setScalar(10);
         this.makeFogExempt(group);
         this.toneStationGlow(group);
-        this.addStationGlow(location);
-        this.addStationBeacons(group, location);
         this.tagTargetable(group, 'location', 'helix');
         this.locationRoot.add(group);
         this.locationMeshes.set('helix', group);
@@ -1021,61 +1008,9 @@ export class SpaceRenderer {
         group.scale.setScalar(10);
         this.makeFogExempt(group);
         this.toneStationGlow(group);
-        this.addStationGlow(location);
-        this.addStationBeacons(group, location);
         this.tagTargetable(group, 'location', 'rook');
         this.locationRoot.add(group);
         this.locationMeshes.set('rook', group);
-    }
-    addStationGlow(location) {
-        const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-            map: this.radialTexture('#ffffff', location.accent),
-            transparent: true,
-            opacity: 0.12,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-            fog: false,
-        }));
-        glow.position.set(...location.position);
-        glow.scale.setScalar(location.radius * 1.5);
-        this.locationRoot.add(glow);
-        const scatter = new THREE.Sprite(new THREE.SpriteMaterial({
-            map: this.radialTexture(location.accent, location.accent),
-            transparent: true,
-            opacity: 0.05,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-            fog: false,
-        }));
-        scatter.position.set(...location.position);
-        scatter.scale.setScalar(location.radius * 3.2);
-        this.locationRoot.add(scatter);
-    }
-    addStationBeacons(group, location) {
-        // Bright pulsing nav lights that make a station read as alive from far
-        // away. Six beacons per station, varied colors so the silhouette has
-        // its own color signature. All `colors` are stored already-`#`-prefixed
-        // CSS strings so the radialTexture template doesn't double up the hash.
-        const accent = location.accent?.startsWith('#') ? location.accent : cssHex(location.accent);
-        const colors = ['#ff6a3d', '#8ff0ff', '#ffc04d', accent, '#66f0c8', '#ff9466'];
-        const offsets = [
-            [-34, 12, 10], [40, 8, -14], [4, 22, -6], [-22, -16, 22], [28, 18, 12], [0, -24, -8],
-        ];
-        offsets.forEach((offset, index) => {
-            const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-                map: this.radialTexture('#ffffff', colors[index]),
-                transparent: true,
-                opacity: 0.7,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-                fog: false,
-                toneMapped: false,
-            }));
-            sprite.position.set(...offset);
-            sprite.scale.setScalar(6);
-            group.add(sprite);
-            this.stationBeacons.push({ sprite, phase: index * 2.1, color: colors[index] });
-        });
     }
     makeFogExempt(root) {
         root.traverse((child) => {
@@ -1364,7 +1299,7 @@ export class SpaceRenderer {
         this.camera.add(this.cockpit);
         this.cockpit.visible = false;
     }
-        createPrismGeometry(points, thickness) {
+    createPrismGeometry(points, thickness) {
         const vertices = [];
         const half = thickness * 0.5;
         for (const [x, z] of points)
@@ -1696,151 +1631,8 @@ export class SpaceRenderer {
         }
         return undefined;
     }
-    setCockpitVisible(_visible) {
-        // The remastered cockpit is a responsive DOM art layer; the legacy geometry would double the canopy struts.
-        this.cockpit.visible = false;
-    }
-    // True third-person chase camera so screenshots and replays can step out of
-    // the cockpit and frame the whole ship against the sky. The harness uses
-    // this for the "chase" labels so we actually see the new hull silhouettes
-    // we redrew this iteration.
-    setChaseCamera(active, offset = [0, 2.4, -10], focus = 14) {
-        this.chaseCameraActive = !!active;
-        if (active) {
-            this.cockpit.visible = false;
-            this.chaseOffset = offset;
-            this.chaseFocus = focus;
-            // Wider FOV for chase views so the ship reads as smaller and the
-            // sky/sun/planet behind it dominate the frame.
-            this.camera.fov = 68;
-            this.camera.updateProjectionMatrix();
-        }
-        else {
-            this.camera.fov = 74;
-            this.camera.updateProjectionMatrix();
-        }
-    }
-    renderChaseFrame() {
-        if (!this.chaseCameraActive || !this.chasePlayerPosition)
-            return false;
-        const off = new THREE.Vector3(...(this.chaseOffset ?? [0, 2.4, -10]));
-        const focus = this.chaseFocus ?? 14;
-        const fwd = (this.chaseForward ?? new THREE.Vector3(0, 0, -1)).clone();
-        const up = new THREE.Vector3(0, 1, 0);
-        // Bias the chase camera a bit so the ship sits in the lower-third
-        // frame; sky reads above.
-        const camPos = new THREE.Vector3(...this.chasePlayerPosition)
-            .addScaledVector(fwd, off.z)
-            .addScaledVector(up, off.y);
-        const lookTarget = new THREE.Vector3(...this.chasePlayerPosition)
-            .addScaledVector(fwd, focus)
-            .addScaledVector(up, 0.8);
-        this.camera.position.copy(camPos);
-        this.camera.lookAt(lookTarget);
-        this.skyRoot.position.copy(camPos);
-        this.renderer.render(this.scene, this.camera);
-        return true;
-    }
-    /**
-     * Place the camera at a fixed offset from a target object3D, aim at the
-     * target's world center, hide the cockpit chrome, and render one frame.
-     * Used by the workbench catalog harness to frame single models against
-     * the real in-game sky/lighting/fog without any studio colour grading.
-     */
-    cinematicFrame(target3D, { yaw = -0.6, pitch = 0.05, distance, heightOffset = 0, fov, autoFrame = false, frameRadius = null } = {}) {
-        const targetWorld = new THREE.Vector3();
-        target3D.getWorldPosition(targetWorld);
-        // Apply FOV first so autoFrame math sees the desired FOV.
-        if (fov) {
-            this.camera.fov = fov;
-            this.camera.updateProjectionMatrix();
-        }
-        let dist = distance;
-        if (autoFrame) {
-            const box = new THREE.Box3().setFromObject(target3D);
-            const size = new THREE.Vector3();
-            box.getSize(size);
-            // Stations and planets add huge halo sprites and atmosphere shells
-            // that bloat the bounding box. If the caller knows the model radius,
-            // prefer that as the framing target — and stand OFF the body so we
-            // don't end up inside the atmosphere shell.
-            const longest = frameRadius ?? Math.max(size.x, size.y, size.z);
-            // `autoFrame` puts the camera at the rim of the framed object so
-            // it fills the FOV. distance = longest is the natural choice — the
-            // tangent of half-FOV * distance = (longest/2), which lets the full
-            // diameter fit on screen. Without this, ships end up tiny and big
-            // stations end up clipping the camera into the geometry.
-            dist = (longest * 0.5) / Math.tan(this.camera.fov * Math.PI / 360);
-        }
-        const cosPitch = Math.cos(pitch);
-        const offset = new THREE.Vector3(
-            Math.sin(yaw) * dist * cosPitch,
-            heightOffset + Math.sin(pitch) * dist,
-            Math.cos(yaw) * dist * cosPitch,
-        );
-        this.camera.position.copy(targetWorld).add(offset);
-        this.camera.lookAt(targetWorld.x, targetWorld.y + heightOffset, targetWorld.z);
-        // Hide the cockpit chrome so the model alone reads.
-        if (this.cockpit) this.cockpit.visible = false;
-        this.chaseCameraActive = false; // subsequent render calls follow the cinematic camera.
-        // Freeze the camera transform so the in-game frame loop's updateCamera
-        // call doesn't overwrite our framing before the screenshot lands.
-        this.cinematicLock = true;
-        // Park the sky-root at the camera so the gradient sphere stays anchored
-        // (matches the chase-cam pattern).
-        this.skyRoot.position.copy(this.camera.position);
-        this.renderer.render(this.scene, this.camera);
-        return { distance: dist, target: [targetWorld.x, targetWorld.y, targetWorld.z] };
-    }
-    setCinematicLock(locked) {
-        this.cinematicLock = !!locked;
-        if (!locked) {
-            // re-arm the cockpit so the next regular tick re-positions the camera
-            this.chaseCameraActive = false;
-        }
-    }
     setCockpitVisible(visible) {
         if (this.cockpit) this.cockpit.visible = !!visible;
-    }
-    /**
-     * Frame the entire asteroid / wreck cluster around its bounding box.
-     * Walks every instance matrix across all asteroidMeshes and wreckMeshes
-     * and pulls the camera back so the cluster fills ~60% of the FOV.
-     */
-    clusterFrame({ fov = 50, yaw = -0.55, pitch = 0.10 } = {}) {
-        const box = new THREE.Box3();
-        const m = new THREE.Matrix4();
-        const v = new THREE.Vector3();
-        const collectInstanced = (mesh) => {
-            if (!mesh || !mesh.isInstancedMesh) return;
-            for (let i = 0; i < mesh.count; i += 1) {
-                mesh.getMatrixAt(i, m);
-                v.setFromMatrixPosition(m);
-                box.expandByPoint(v);
-            }
-        };
-        for (const { mesh } of (this.asteroidMeshes ?? [])) collectInstanced(mesh);
-        for (const { mesh } of (this.wreckMeshes ?? [])) collectInstanced(mesh);
-        if (box.isEmpty()) return { ok: false };
-        const size = new THREE.Vector3(); box.getSize(size);
-        const longest = Math.max(size.x, size.y, size.z);
-        const dist = (longest * 1.18) / Math.tan(fov * Math.PI / 360);
-        const center = box.getCenter(new THREE.Vector3());
-        const cosPitch = Math.cos(pitch);
-        this.camera.position.copy(center).add(new THREE.Vector3(
-            Math.sin(yaw) * dist * cosPitch,
-            heightOffset(pitch) + Math.sin(pitch) * dist,
-            Math.cos(yaw) * dist * cosPitch,
-        ));
-        this.camera.fov = fov;
-        this.camera.updateProjectionMatrix();
-        this.camera.lookAt(center);
-        this.skyRoot.position.copy(this.camera.position);
-        if (this.cockpit) this.cockpit.visible = false;
-        this.chaseCameraActive = false;
-        this.renderer.render(this.scene, this.camera);
-        return { ok: true, distance: dist, center: center.toArray() };
-        function heightOffset(p) { return p === 0 ? 0 : 0; }
     }
     setDamageWarning(level) {
         const normalized = clamp(level, 0, 1);
@@ -1859,16 +1651,6 @@ export class SpaceRenderer {
         this.shell.style.setProperty('--hyperdrive-progress', clamp(progress, 0, 1).toFixed(3));
     }
     updateCamera(position, prevPosition, rotation, prevRotation, angularVelocity, speedRatio, afterburner, dt, alpha = 0) {
-        // When the workbench harness has parked the camera at a static framing,
-        // leave the transform alone so the in-game frame loop doesn't overwrite
-        // the cinematic frame on the next tick.
-        if (this.cinematicLock) return;
-        // Cache the player position/forward so chase-camera helpers (used by
-        // the screenshot harness) can place a third-person rig without
-        // re-reading game state every frame.
-        this.chasePlayerPosition = position;
-        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion().set(...rotation));
-        this.chaseForward = fwd;
         this.camera.position.set(...position);
         if (prevPosition && alpha > 0) {
             this.tmpPrevPos.set(prevPosition[0], prevPosition[1], prevPosition[2]);
@@ -1887,10 +1669,18 @@ export class SpaceRenderer {
         this.camera.fov += (this.fovTarget - this.camera.fov) * (1 - Math.exp(-5 * dt));
         if (Math.abs(this.camera.fov - previousFov) > 0.001)
             this.camera.updateProjectionMatrix();
+        // The cockpit sprite pulls back a touch under afterburner. Drives
+        // --cockpit-zoom, consumed as a scale by the frame/vignette overlays.
+        const cockpitZoomTarget = afterburner ? COCKPIT_ZOOM_BURN : COCKPIT_ZOOM_IDLE;
+        this.cockpitZoom += (cockpitZoomTarget - this.cockpitZoom) * (1 - Math.exp(-8 * dt));
+        this.shell?.style.setProperty('--cockpit-zoom', this.cockpitZoom.toFixed(4));
         // Counter-scale the cockpit group (which now only contains the grime
         // plane) so it keeps its apparent on-screen size when the FOV widens
         // (e.g. afterburner 70° → 80°). Without this, the grime shrinks in
         // screen-percentage during afterburner and reads as "moving away".
+        // The grime then also zooms out with the sprite under burn, but only
+        // ~50% as far, so the dirt reads as sitting closer to the glass than
+        // the frame itself.
         //   - cruise FOV 70°: scale = 1.000
         //   - mid FOV    74°: scale = 1.083
         //   - afterburn  80°: scale = 1.198  (compensates wider frustum)
@@ -1898,7 +1688,8 @@ export class SpaceRenderer {
             const baseHalfFovTan = Math.tan(70 * 0.5 * Math.PI / 180);
             const currentHalfFovTan = Math.tan(this.camera.fov * 0.5 * Math.PI / 180);
             const fovCompScale = currentHalfFovTan / baseHalfFovTan;
-            this.cockpit.scale.setScalar(fovCompScale);
+            const grimeBurnScale = 1 + (this.cockpitZoom / COCKPIT_ZOOM_IDLE - 1) * 0.5;
+            this.cockpit.scale.setScalar(fovCompScale * grimeBurnScale);
         }
         const shiftX = clamp(-angularVelocity[1] * 2.4, -7, 7);
         const shiftY = clamp(angularVelocity[0] * 1.8 - speedRatio * 1.4, -5, 4);
@@ -1989,11 +1780,6 @@ export class SpaceRenderer {
         this.skyTime += dt;
         if (this.starShimmer)
             this.starShimmer.opacity = 0.42 + Math.sin(this.skyTime * 2.4) * 0.14;
-        for (const beacon of this.stationBeacons) {
-            const blink = 0.35 + Math.abs(Math.sin(this.skyTime * 0.9 + beacon.phase)) * 0.65;
-            beacon.sprite.material.opacity = blink;
-            beacon.sprite.scale.setScalar(4 + blink * 4);
-        }
         this.asteroids.forEach((node) => {
             if (!node.moving)
                 return;

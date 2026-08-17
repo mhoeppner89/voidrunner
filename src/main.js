@@ -1,7 +1,6 @@
 import { GameSession } from './game/game.js';
 import { createNewSave, hasSavedGame, loadGame, saveGame } from './game/save.js';
 import { GameUI } from './game/ui.js';
-import { ShowcaseRenderer } from './game/showcase.js';
 const host = document.querySelector('#app');
 if (!host)
     throw new Error('Missing #app host element.');
@@ -82,7 +81,7 @@ const toggleFullscreen = async () => {
 const actions = {
     startNew: () => beginSession('new'),
     resume: () => beginSession('resume'),
-    startArena: (environment, scenario) => beginSession('arena', { environment, scenario }),
+    startArena: (environment, scenario, difficulty) => beginSession('arena', { environment, scenario, difficulty }),
     requestFullscreen: () => void enterFullscreen(),
     toggleFullscreen: () => void toggleFullscreen(),
     launch: () => {
@@ -144,18 +143,6 @@ document.addEventListener('visibilitychange', () => {
         saveGame(session.save);
 });
 const isProductionBuild = import.meta.env?.PROD ?? location.protocol !== 'file:';
-// Workbench-only path: when the page is loaded with `?test=showcase` the
-// harness bypasses the title UI and loads a clean showroom scene so each
-// ship / planet / station can be captured on a turntable without any
-// contamination from the player's actual location, asteroids, or HUD.
-const startupParams = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
-let showcaseInstance = null;
-if (startupParams?.get('test') === 'showcase') {
-    const host = document.querySelector('#app');
-    if (host) host.innerHTML = '<div id="showcase-host" style="position:fixed;inset:0;background:#0c1531;"></div>';
-    showcaseInstance = new ShowcaseRenderer(document.querySelector('#showcase-host'));
-}
-
 if ('serviceWorker' in navigator && isProductionBuild) {
     window.addEventListener('load', () => {
         // If a returning player is controlled by a stale service worker from a
@@ -175,66 +162,18 @@ if ('serviceWorker' in navigator && isProductionBuild) {
         }).catch(() => undefined);
     });
 }
-// Determine the loaded surface so the harness can always speak to *something*,
-// even on the title screen.
 window.__VOID_PRIVATEER__ = {
     newGame: () => beginSession('new'),
     resume: () => beginSession('resume'),
-    startArena: (environment, scenario) => beginSession('arena', { environment, scenario }),
+    startArena: (environment, scenario, difficulty) => beginSession('arena', { environment, scenario, difficulty }),
     getState: () => session?.save ?? cachedSave,
     getRuntime: () => session,
-    getLocations: () => session?.renderer?.locationMeshes ?? null,
-    getLocation: (id) => session?.renderer?.locationMeshes?.get(id) ?? null,
     debugShips: () => session?.ships,
     pickTarget: (x, y) => session?.renderer?.pickTarget(x, y),
     projectToScreen: (position) => session?.renderer?.projectToScreen(position),
     launch: () => session?.launch(),
     saveNow: () => session?.saveNow(),
-    setChaseCamera: (active, offset) => session?.renderer?.setChaseCamera?.(active, offset),
-    renderChaseFrame: () => session?.renderer?.renderChaseFrame?.(),
-    cinematicFrame: (targetId, opts) => {
-        const r = session?.renderer;
-        if (!r) return null;
-        const target = (() => {
-            if (!targetId) return null;
-            if (targetId.type === 'ship') {
-                const map = r.shipMeshes;
-                return map?.get(targetId.entityId) ?? r.shipMeshes?.get(targetId.entityId);
-            }
-            if (targetId.type === 'location') return r.locationMeshes?.get(targetId.locationId);
-            if (targetId.type === 'instanceRoot') return r.instanceRoots?.get(targetId.locationId);
-            if (targetId.type === 'asteroid') {
-                // Find the instanced mesh that contains this asteroid node index.
-                const nodeIndex = targetId.nodeIndex;
-                for (const { mesh, entries } of r.asteroidMeshes) {
-                    if (entries[nodeIndex]) return mesh;
-                }
-                return null;
-            }
-            return null;
-        })();
-        if (!target) return { error: `no target for ${JSON.stringify(targetId)}` };
-        return r.cinematicFrame(target, opts);
-    },
-    setCockpitVisible: (visible) => session?.renderer?.setCockpitVisible?.(visible),
-    setCinematicLock: (locked) => session?.renderer?.setCinematicLock?.(locked),
-    clusterFrame: (opts) => session?.renderer?.clusterFrame?.(opts),
-    spawnShipAt: (role, x, y, z) => session?.spawnShip?.(role, [x, y, z]),
-    getAsteroidCenter: () => session?.renderer?.asteroidMeshes?.[0]?.mesh?.position?.toArray?.() ?? null,
-    getAsteroidMeshes: () => {
-        const r = session?.renderer;
-        if (!r) return null;
-        return { meshes: r.asteroidMeshes?.map(({ mesh }) => mesh.position.toArray()) };
-    },
-    ...(startupParams?.get('test') === 'showcase' && showcaseInstance
-        ? {
-            showcase: {
-                listPoses: () => Object.keys(showcaseInstance.poseItems).concat(['lineup']),
-                renderPose: (name, opts) => showcaseInstance.render(name, opts),
-                snapshotPose: (name, opts) => showcaseInstance.snapshot(name, opts),
-                renderer: showcaseInstance,
-            },
-            isShowcase: true,
-        }
-        : {}),
+    // Mock story-mission line: pins the comms bar in amber, mutes all chatter
+    // until dismissed (tap the CONTINUE bar) or the duration elapses.
+    playStoryLine: (name, text) => session?.playStoryLine(name, text),
 };
