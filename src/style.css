@@ -3282,6 +3282,15 @@ button.primary,
   text-shadow: 2px 2px #120e08;
 }
 
+.ship-card p.ship-personality {
+  margin: -0.45rem 0 0.55rem;
+  color: var(--dock-accent);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
 .ticker {
   border: 1px solid #515a50;
   border-left: 4px solid var(--dock-accent);

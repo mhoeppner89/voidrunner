@@ -17,7 +17,7 @@ export const callsignHandle = (callsign) => {
     const quoted = callsign.match(/“[^”]+”/);
     return quoted ? quoted[0].slice(1, -1) : callsign;
 };
-const GAME_VERSION = '0.4.3';
+const GAME_VERSION = '0.4.4';
 export class GameUI {
     root;
     viewport;
@@ -721,21 +721,26 @@ export class GameUI {
     `;
     }
     renderShipyard() {
-        const saleId = LOCATIONS[this.dockLocation].shipForSale ?? 'wayfarer';
+        const stockIds = LOCATIONS[this.dockLocation].shipsForSale ?? [];
+        if (!stockIds.length)
+            return '<div class="shipyard-grid"><p class="market-empty">No hulls for sale at this port.</p></div>';
+        return `<div class="shipyard-grid">${stockIds.map((shipId) => this.renderShipCard(shipId)).join('')}</div>`;
+    }
+    renderShipCard(saleId) {
         const ship = SHIPS[saleId];
         const owned = this.save.player.ownedShips.includes(saleId);
         const active = this.save.player.shipId === saleId;
         return `
-      <div class="shipyard-grid">
-        <article class="ship-card ${active ? 'active' : ''}">
-          <div class="ship-silhouette ${saleId}">${this.shipArt(saleId, ship.name)}</div>
-          <header><span>${escapeHtml(ship.className)}</span><b>${saleId === 'wayfarer' ? 'STARTER HULL' : formatCredits(ship.price)}</b></header>
-          <h3>${escapeHtml(ship.name)}</h3><p>${escapeHtml(ship.description)}</p>
-          <dl><div><dt>SPEED</dt><dd>${displaySpeed(ship.maxSpeed)}</dd></div><div><dt>SHIELD</dt><dd>${ship.shield}</dd></div><div><dt>ARMOR</dt><dd>${ship.armor}</dd></div><div><dt>CARGO</dt><dd>${ship.cargo}</dd></div><div><dt>MISSILES</dt><dd>${ship.missileCapacity}</dd></div><div><dt>GUN</dt><dd>${ship.gunDamage}</dd></div><div><dt>TURN</dt><dd>${ship.angularAcceleration.toFixed(2)}</dd></div><div><dt>ACCL</dt><dd>${ship.acceleration}</dd></div></dl>
-          <p class="ship-handling-note">Handling falls up to 24% as the cargo hold fills — watch LOAD and HND on your flight readout.</p>
-          ${active ? '<button disabled>ACTIVE SHIP</button>' : owned ? `<button data-switch-ship="${saleId}">SWITCH TO SHIP</button>` : `<button class="primary" data-ship-id="${saleId}">PURCHASE HULL</button>`}
-        </article>
-      </div>
+      <article class="ship-card ${active ? 'active' : ''}">
+        <div class="ship-silhouette ${saleId}">${this.shipArt(saleId, ship.name)}</div>
+        <header><span>${escapeHtml(ship.className)}</span><b>${saleId === 'wayfarer' ? 'STARTER HULL' : formatCredits(ship.price)}</b></header>
+        <h3>${escapeHtml(ship.name)}</h3>
+        <p class="ship-personality">${escapeHtml(ship.personality ?? '')}</p>
+        <p>${escapeHtml(ship.description)}</p>
+        <dl><div><dt>SPEED</dt><dd>${displaySpeed(ship.maxSpeed)}</dd></div><div><dt>SHIELD</dt><dd>${ship.shield}</dd></div><div><dt>ARMOR</dt><dd>${ship.armor}</dd></div><div><dt>CARGO</dt><dd>${ship.cargo}</dd></div><div><dt>MISSILES</dt><dd>${ship.missileCapacity}</dd></div><div><dt>GUN</dt><dd>${ship.gunDamage}</dd></div><div><dt>TURN</dt><dd>${ship.angularAcceleration.toFixed(2)}</dd></div><div><dt>ACCL</dt><dd>${ship.acceleration}</dd></div></dl>
+        <p class="ship-handling-note">Handling falls up to 24% as the cargo hold fills — watch LOAD and HND on your flight readout.</p>
+        ${active ? '<button disabled>ACTIVE SHIP</button>' : owned ? `<button data-switch-ship="${saleId}">SWITCH TO SHIP</button>` : `<button class="primary" data-ship-id="${saleId}">PURCHASE HULL</button>`}
+      </article>
     `;
     }
     renderGuilds() {

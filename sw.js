@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v51-auto-scan';
+const CACHE = 'voidrunner-v52-shipyard-hulls';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',

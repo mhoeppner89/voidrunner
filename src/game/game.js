@@ -3659,7 +3659,7 @@ export class GameSession {
     }
     buyShip(shipId) {
         const dock = this.save.player.dockedAt;
-        if (!dock || LOCATIONS[dock].shipForSale !== shipId) {
+        if (!dock || !(LOCATIONS[dock].shipsForSale ?? []).includes(shipId)) {
             this.ui.showToast('That hull is not for sale at this location.', 'warning');
             return;
         }

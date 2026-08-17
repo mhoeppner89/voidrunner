@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SHIPS } from './data.js';
 const keyOf = (x, y, z) => `${x},${y},${z}`;
 const FACE_DEFS = [
     {
@@ -509,7 +510,7 @@ export const shipVariantForRole = (role) => {
 };
 // The player's purchasable hulls map onto the shared voxel builders so the
 // cockpit schematic can draw the same silhouette the hangar renders in 3D.
-export const playerShipVariant = (shipId) => (shipId === 'vanguard' ? 'warden' : 'kestrel');
+export const playerShipVariant = (shipId) => SHIPS[shipId]?.variant ?? 'kestrel';
 const profileCache = new Map();
 // A top-down hull schematic for the cockpit monitors: the ship's voxel footprint
 // projected onto its XZ plane, returned as the set of filled columns plus the
