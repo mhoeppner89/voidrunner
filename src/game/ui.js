@@ -17,7 +17,7 @@ export const callsignHandle = (callsign) => {
     const quoted = callsign.match(/“[^”]+”/);
     return quoted ? quoted[0].slice(1, -1) : callsign;
 };
-const GAME_VERSION = '0.4.0';
+const GAME_VERSION = '0.4.1';
 export class GameUI {
     root;
     viewport;

@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v48-pilot-personalities';
+const CACHE = 'voidrunner-v49-radar-ai';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',

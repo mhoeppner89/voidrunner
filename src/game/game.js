@@ -1296,7 +1296,9 @@ export class GameSession {
         for (const mission of this.save.activeMissions) {
             if (mission.kind === 'bounty') {
                 const target = this.ships.find((entry) => entry.missionId === mission.id && entry.hull > 0);
-                if (target)
+                // Warrant ships are still ships: they follow the radar-range
+                // target rule. Only POIs stay selectable at any distance.
+                if (target && inRange(target.position))
                     goals.push({ kind: 'ship', id: target.id, position: target.position, name: target.name });
                 // Before the warrant ship is spawned, the goal is the POI to
                 // fly to — so target cycling still points you somewhere.
@@ -2086,8 +2088,13 @@ export class GameSession {
             if (ship.passBiasSign === undefined)
                 ship.passBiasSign = 1;
             const standoff = Math.max(ATTACK_PASS_STANDOFF_FLOOR, Math.min(ATTACK_PASS_STANDOFF, distance * 0.5));
-            const aimPoint = this.tmpL.copy(predicted).addScaledVector(lateral, ship.passBiasSign * standoff);
-            desired.subVectors(aimPoint, position).normalize();
+            // `predicted` is the lead vector relative to the ship (target offset +
+            // target-relative velocity lead), so the near-miss aim direction is
+            // already a direction from the ship — subtracting the ship's world
+            // position here aimed the ship at a point far from the arena (in a
+            // field arena that point is the system origin, so hostiles broke off
+            // toward (0,0,0) and read as fleeing on spawn).
+            desired.copy(predicted).addScaledVector(lateral, ship.passBiasSign * standoff).normalize();
         }
         desired.addScaledVector(lateral, jink);
         if (spiraling) {
@@ -2648,7 +2655,7 @@ export class GameSession {
             if (player.distanceTo(vec(zone.position)) > approachRadius + 190)
                 continue;
             const rng = seededRandom(`${this.save.world.seed}:bounty:${mission.id}:${Math.floor(this.save.world.time / 60)}`);
-            const offset = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.45, rng() - 0.5).normalize().multiplyScalar(randomBetween(rng, 85, 145));
+            const offset = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.45, rng() - 0.5).normalize().multiplyScalar(randomBetween(rng, 128, 218));
             const spawnPosition = player.clone().add(offset);
             this.clearSpawnPosition(spawnPosition, zone);
             // Warrants pin a pilot profile at offer time, so a named ace keeps
@@ -2698,14 +2705,14 @@ export class GameSession {
         }
         const bucket = rng();
         if ((zone === 'asteroid-field' && bucket < 0.42) || (zone === 'graveyard' && bucket < 0.28) || (zone === 'open' && bucket < 0.22)) {
-            const miner = this.spawnShip('miner', this.encounterPosition(rng, 120));
+            const miner = this.spawnShip('miner', this.encounterPosition(rng, 180));
             miner.destination = tuple(vec(LOCATIONS.shardbelt.position).add(new THREE.Vector3(randomBetween(rng, -70, 70), randomBetween(rng, -35, 35), randomBetween(rng, -70, 70))));
             this.ui.showToast(zone === 'graveyard' ? 'Independent recovery crew on sensors.' : 'Miner traffic crossing the lane.', 'info');
         }
         else if (bucket < (zone === 'graveyard' ? 0.72 : zone === 'asteroid-field' ? 0.68 : 0.5)) {
-            const trader = this.spawnShip('trader', this.encounterPosition(rng, 150));
+            const trader = this.spawnShip('trader', this.encounterPosition(rng, 225));
             if (rng() < 0.55) {
-                const pirate = this.spawnShip('pirate', this.encounterPosition(rng, 125));
+                const pirate = this.spawnShip('pirate', this.encounterPosition(rng, 188));
                 pirate.targetId = trader.id;
                 this.ui.showToast('Distress traffic: pirates attacking a civilian vessel.', 'danger', 5200);
                 this.audio.play('warning');
@@ -2715,13 +2722,13 @@ export class GameSession {
             }
         }
         else if (bucket < 0.78) {
-            this.spawnShip('patrol', this.encounterPosition(rng, 145));
+            this.spawnShip('patrol', this.encounterPosition(rng, 218));
             this.ui.showToast('Concord patrol sweep detected.', 'info');
         }
         else {
             const count = randomInt(rng, 1, zone === 'graveyard' ? 3 : 2);
             for (let i = 0; i < count; i += 1) {
-                const pirate = this.spawnShip(i === 0 ? 'pirate' : 'escort', this.encounterPosition(rng, 105 + i * 18));
+                const pirate = this.spawnShip(i === 0 ? 'pirate' : 'escort', this.encounterPosition(rng, 158 + i * 27));
                 pirate.targetId = 'player';
             }
             this.ui.showToast('Pirate intercept. Weapons free.', 'danger', 4800);
