@@ -160,10 +160,11 @@ button.compact {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.5), transparent 9%, transparent 91%, rgba(0, 0, 0, 0.5)),
-    linear-gradient(0deg, rgba(0, 0, 0, 0.5), transparent 19%, transparent 91%, rgba(0, 0, 0, 0.24)),
-    radial-gradient(circle at center, transparent 48%, rgba(0, 0, 0, 0.42) 100%);
+    linear-gradient(90deg, rgba(0, 0, 0, 0.32), transparent 9%, transparent 91%, rgba(0, 0, 0, 0.32)),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.32), transparent 19%, transparent 91%, rgba(0, 0, 0, 0.16)),
+    radial-gradient(circle at center, transparent 48%, rgba(0, 0, 0, 0.28) 100%);
   mix-blend-mode: multiply;
+  opacity: 0.85;
 }
 
 .hud-top-left,
@@ -697,7 +698,9 @@ button.compact {
   color: #c6e5ba;
 }
 
-/* Title */
+/* Title. Background is the original cockpit sprite + warm-leaning sky
+   gradient that established the title-screen look before the recent
+   overhauls. The .webp is in the service-worker cache list. */
 .title-screen {
   position: absolute;
   inset: 0;
@@ -706,9 +709,11 @@ button.compact {
   place-items: center;
   overflow: hidden;
   background:
-    radial-gradient(circle at 70% 38%, rgba(117, 65, 39, 0.22), transparent 32%),
-    radial-gradient(circle at 30% 45%, rgba(37, 86, 89, 0.17), transparent 37%),
-    linear-gradient(135deg, #050809, #080b0c 52%, #020304);
+    linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0 7%, rgba(0, 0, 0, 0.30) 35%, rgba(0, 0, 0, 0.08) 68%, rgba(0, 0, 0, 0.26)),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.55), transparent 55%),
+    url("../art/title-cockpit.webp") center / cover no-repeat;
+  image-rendering: pixelated;
+  filter: contrast(1.12) saturate(1.32) brightness(1.55);
 }
 
 .title-stars {
@@ -2249,7 +2254,11 @@ button.compact {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  pointer-events: auto;
+  /* Inert while invisible: the bar is a full-width strip across the top of
+     the screen, so leaving it clickable at opacity 0 steals taps/clicks meant
+     for the space view (target picking) behind it. Only the active bar is
+     interactive. */
+  pointer-events: none;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.28s ease;
@@ -2257,6 +2266,7 @@ button.compact {
 
 .comms-bar.active {
   opacity: 1;
+  pointer-events: auto;
 }
 
 /* Story-mission transmissions: pinned amber (no fade until dismissed), a
@@ -2594,10 +2604,10 @@ button.compact {
 }
 
 /* The live instrument windows are now the authoritative status/radar layer. */
-.hud > .cockpit-vignette {
-  background:
-    linear-gradient(90deg, rgba(1, 8, 26, 0.22), transparent 13%, transparent 87%, rgba(1, 8, 26, 0.22)),
-    radial-gradient(ellipse at center, transparent 52%, rgba(1, 7, 25, 0.34) 100%);
+.hud > /* Stripped: previously painted orange/blue tinted edges that bled
+   through the cockpit sprite. The frame image alone carries the look. */
+.cockpit-vignette {
+  background: transparent;
 }
 
 .hud > .cockpit-mfd {
@@ -2832,25 +2842,31 @@ button.primary,
   text-shadow: 1px 1px #000, 0 0 6px rgba(105, 212, 189, 0.22);
 }
 
-/* Title screen: approved cockpit concept used as a backplate, with live DOM UI. */
+/* Title screen backplate: art/title-cockpit.webp sprite + dark vignette,
+   same layering as the top-level .title-screen so the .webp is visible on
+   both mobile and desktop. */
 .title-screen {
   display: flex;
   align-items: flex-end;
   justify-content: flex-start;
   padding: clamp(1.1rem, 4vw, 4rem);
-  background: #010302;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0 7%, rgba(0, 0, 0, 0.30) 35%, rgba(0, 0, 0, 0.08) 68%, rgba(0, 0, 0, 0.26)),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.55), transparent 55%),
+    url("../art/title-cockpit.webp") center / cover no-repeat;
+  image-rendering: pixelated;
+  filter: contrast(1.12) saturate(1.32) brightness(1.55);
 }
 
+/* Stripped: the warm sunset gradient previously painted over the entire
+   title sprite. With it gone, the .title-screen background-image (the
+   cockpit cockpit.webp) is fully visible. */
 .title-screen::before {
   position: absolute;
   inset: 0;
   content: "";
-  background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.92) 0 7%, rgba(0, 0, 0, 0.52) 35%, rgba(0, 0, 0, 0.14) 68%, rgba(0, 0, 0, 0.42)),
-    linear-gradient(0deg, rgba(0, 0, 0, 0.86), transparent 55%),
-    url("../art/title-cockpit.webp") center / cover no-repeat;
-  image-rendering: pixelated;
-  filter: contrast(1.08) saturate(0.85);
+  background: none;
+  z-index: -1;
 }
 
 .title-screen::after {
@@ -2885,20 +2901,6 @@ button.primary,
   clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
   box-shadow: var(--panel-shadow), inset 0 0 42px rgba(128, 79, 24, 0.09);
 }
-
-.title-card::before,
-.title-card::after {
-  position: absolute;
-  content: "";
-  width: 12px;
-  height: 12px;
-  background: #1b1d19;
-  border: 1px solid #8b7650;
-  box-shadow: inset 0 0 0 2px #060807;
-}
-
-.title-card::before { top: 7px; right: 26px; }
-.title-card::after { bottom: 7px; left: 12px; }
 
 .title-kicker {
   color: var(--retro-green);
@@ -3717,6 +3719,10 @@ button.primary,
   pointer-events: none;
 }
 
+/* In-flight cockpit painted sprite — cockpit-frame.webp is the original
+   art. The .cockpit-art HUD overlay shows the cockpit canopy/console.
+   Locked to the camera via translate3d+rotate so it tracks with the
+   cockpit transform during banking and afterburner. */
 .cockpit-art {
   inset: -1.2%;
   z-index: 1;
@@ -3724,9 +3730,17 @@ button.primary,
   image-rendering: pixelated;
   transform: translate3d(var(--cockpit-shift-x), var(--cockpit-shift-y), 0) rotate(var(--cockpit-roll)) scale(var(--cockpit-zoom));
   transform-origin: 50% 72%;
-  filter: contrast(1.14) saturate(0.88) brightness(0.84) drop-shadow(0 -8px 24px rgba(0, 0, 0, 0.72));
-  opacity: 0.98;
+  filter: contrast(1.06) saturate(1.00) brightness(1.04) drop-shadow(0 -6px 18px rgba(0, 0, 0, 0.55));
+  opacity: 1 !important;
   will-change: transform;
+}
+
+/* Pinn the cockpit glass vignette to the same translation+rotation as the
+   cockpit frame so painted beams and the vignette never disagree during
+   afterburner or nebula fly-throughs. */
+.cockpit-vignette {
+  transform: translate3d(var(--cockpit-shift-x), var(--cockpit-shift-y), 0) rotate(var(--cockpit-roll)) scale(var(--cockpit-zoom));
+  transform-origin: 50% 72%;
 }
 
 .cockpit-glass {
@@ -3734,8 +3748,8 @@ button.primary,
   z-index: 2;
   background:
     linear-gradient(116deg, transparent 0 32%, rgba(126, 208, 191, 0.025) 39%, transparent 46%),
-    linear-gradient(76deg, transparent 0 60%, rgba(255, 211, 126, 0.018) 66%, transparent 73%),
-    radial-gradient(ellipse at 50% 46%, transparent 0 52%, rgba(0, 0, 0, 0.28) 83%, rgba(0, 0, 0, 0.58) 100%),
+    linear-gradient(76deg, transparent 0 60%, rgba(255, 211, 126, 0.022) 66%, transparent 73%),
+    radial-gradient(ellipse at 50% 46%, transparent 0 56%, rgba(0, 0, 0, 0.18) 84%, rgba(0, 0, 0, 0.46) 100%),
     rgba(152, 21, 9, calc(var(--damage-warning) * 0.13));
   box-shadow: inset 0 0 calc(26px + var(--damage-warning) * 48px) rgba(235, 58, 27, calc(var(--damage-warning) * 0.48));
   mix-blend-mode: screen;
@@ -4279,16 +4293,18 @@ button.primary,
   background: linear-gradient(180deg, #ffe08a 0 12%, #f5aa3e 12% 78%, #bf682e 78%), #e69b37;
 }
 
+/* Inherit the sprite background in landscape/portrait phones too. */
 .title-screen {
-  background: #07183f;
+  background-color: transparent;
+  background-image:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0 7%, rgba(0, 0, 0, 0.30) 35%, rgba(0, 0, 0, 0.08) 68%, rgba(0, 0, 0, 0.26)),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.55), transparent 55%),
+    url("../art/title-cockpit.webp") center / cover no-repeat;
 }
 
+/* Phototropic override: also no overlay, sprite stays exposed. */
 .title-screen::before {
-  background:
-    linear-gradient(90deg, rgba(2, 15, 52, 0.78) 0 7%, rgba(2, 15, 52, 0.32) 36%, rgba(2, 15, 52, 0.06) 70%, rgba(2, 15, 52, 0.24)),
-    linear-gradient(0deg, rgba(2, 12, 42, 0.7), transparent 58%),
-    url("../art/title-cockpit.webp") center / cover no-repeat;
-  filter: contrast(1.03) saturate(1.16) brightness(1.16);
+  background: none;
 }
 
 .title-screen::after {

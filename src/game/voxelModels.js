@@ -191,165 +191,296 @@ const markCanopy = (grid, x0, x1, z0, z1, y) => {
         grid.fillBox(x0 + inset, x1 - inset, y, y, z, z, 'canopy');
     }
 };
+// Helpers for the RGO-style redesign pass.
+// `addStripe` paints a thin emissive stripe along a span of z cells — useful
+// for engine manifolds and hull trim. seed pushes a hue via accent/warning.
+const addStripe = (grid, y, z0, z1, material) => {
+    grid.fillBox(-1, 1, y, y, z0, z1, material);
+};
+// Antennas / stabilizer fins: thin greebling that makes the silhouette
+// readable from a distance. `width` is the run along z, `wing` is the
+// outward offset on the +x / -x side.
+const addFin = (grid, side, anchorX, tipX, y, z0, z1, material = 'dark') => {
+    for (let z = z0; z <= z1; z += 1) {
+        const t = (z - z0) / Math.max(1, z1 - z0);
+        const x = Math.round(anchorX + (tipX - anchorX) * t);
+        const thickness = Math.max(0, Math.round((1 - t) * 1.5));
+        if (thickness === 0) {
+            grid.set(x * side, y, z, material);
+        }
+        else {
+            grid.fillBox(x * side, x * side, y - thickness, y + thickness, z, z, material);
+        }
+    }
+};
+// Wing-tip nav lights: a single red/green emissive voxel at every wingtip —
+// RGO ships always have these and they're the cheapest "this is a real ship"
+// cue you can add.
+const addNavLights = (grid, lights) => {
+    for (const [x, y, z, kind] of lights) {
+        if (kind === 'red') grid.set(x, y, z, 'warning');
+        else if (kind === 'green') grid.set(x, y, z, 'accent');
+        else grid.set(x, y, z, 'window');
+    }
+};
+// Long engine plume cap: a trailing emissive beacon inside a darker skirt,
+// for "this fighter just lit its afterburner" look.
+const addEnginePlume = (grid, x, y, nose, tail, material = 'engine') => {
+    grid.fillBox(x, x, y - 1, y + 1, nose, tail, 'dark');
+    grid.fillBox(x, x, y, y, nose + 1, tail - 1, material);
+};
 const buildKestrel = () => {
     const grid = new VoxelGrid();
-    fillTaperedBody(grid, -23, 17, (t) => ({
-        width: t < 0.2 ? 1 + t * 8 : t < 0.72 ? 3.2 : 2.6 - (t - 0.72) * 2.6,
-        height: t < 0.24 ? 0.7 + t * 4 : 1.7,
+    // Sharper, longer nose + broader swept wings — a more chiseled
+    // RGO-style silhouette than the older stubby-arrow version.
+    fillTaperedBody(grid, -28, 18, (t) => ({
+        width: t < 0.18 ? 0.5 + t * 9 : t < 0.74 ? 3.4 : 2.7 - (t - 0.74) * 2.8,
+        height: t < 0.22 ? 0.6 + t * 4 : 1.7,
     }), 'hull');
-    grid.fillBox(-2, 2, -2, 2, -5, 15, 'dark');
-    for (let z = -6; z <= 9; z += 1) {
-        const span = Math.round(5 + (z + 6) * 0.62);
-        const inner = Math.max(3, Math.round(4 - (z + 6) * 0.05));
-        grid.fillBox(-span, -inner, 0, 0, z, z, 'hull');
-        grid.fillBox(inner, span, 0, 0, z, z, 'hull');
-        grid.set(-span, 0, z, 'accent');
-        grid.set(span, 0, z, 'accent');
+    // Long belly spine (gives the ship a snaky read from the side).
+    grid.fillBox(-2, 2, -2, 0, -4, 17, 'dark');
+    addStripe(grid, 1, -4, 17, 'accent');
+    // Swept wings — wider on the aft half where the engines flare.
+    for (let z = -4; z <= 11; z += 1) {
+        const span = Math.round(4 + (z + 4) * 0.72);
+        const inner = Math.max(3, Math.round(4 - (z + 4) * 0.06));
+        grid.fillBox(-span, -inner, 0, 1, z, z, 'hull');
+        grid.fillBox(inner, span, 0, 1, z, z, 'hull');
+        // Per-wing-tip nav light, alternating red/green for the silhouette read.
+        if (z % 4 === 0) {
+            grid.set(-span, 1, z, z % 8 === 0 ? 'warning' : 'accent');
+            grid.set(span, 1, z, z % 8 === 0 ? 'accent' : 'warning');
+        }
     }
-    grid.fillBox(-4, -2, -1, 1, 11, 20, 'dark');
-    grid.fillBox(2, 4, -1, 1, 11, 20, 'dark');
-    grid.fillBox(-3, -2, -1, 1, 20, 20, 'engine');
-    grid.fillBox(2, 3, -1, 1, 20, 20, 'engine');
-    grid.fillBox(-9, -8, -1, 0, -12, -4, 'dark');
-    grid.fillBox(8, 9, -1, 0, -12, -4, 'dark');
-    markCanopy(grid, -1, 1, -12, -5, 2);
-    grid.fillBox(0, 0, 2, 2, -3, 8, 'accent');
-    return { grid, unit: 0.23, enginePorts: [[-2.5, 0, 20.7], [2.5, 0, 20.7]] };
+    // Wingtip extensions (small fins that bow outward past the wing).
+    addFin(grid, -1, 4, 12, 0, 4, 12, 'hull');
+    addFin(grid, 1, 4, 12, 0, 4, 12, 'hull');
+    // Twin engine cluster (was buried deep before; now reads as a thruster
+    // block with a glowing cap).
+    grid.fillBox(-3, -1, -1, 1, 12, 19, 'dark');
+    grid.fillBox(1, 3, -1, 1, 12, 19, 'dark');
+    addEnginePlume(grid, -2, 0, 19, 23, 'engine');
+    addEnginePlume(grid, 2, 0, 19, 23, 'engine');
+    // Forward-swept antennas on the spine.
+    grid.line([0, 2, -8], [0, 4, -16], 0, 'dark');
+    grid.line([0, 2, -8], [1, 5, -18], 0, 'dark');
+    // Cockpit with a tinted upper canopy.
+    markCanopy(grid, -1, 1, -14, -7, 2);
+    addStripe(grid, 3, -14, -7, 'warning');
+    // Belly warning stripe.
+    addStripe(grid, -2, -2, 16, 'window');
+    return {
+        grid,
+        unit: 0.235,
+        enginePorts: [[-2, 0, 23.7], [2, 0, 23.7]],
+    };
 };
 const buildTalon = () => {
     const grid = new VoxelGrid();
-    fillTaperedBody(grid, -18, 16, (t) => ({
-        width: t < 0.25 ? 1.2 + t * 9 : t < 0.7 ? 3.7 : 3.7 - (t - 0.7) * 5,
-        height: t < 0.28 ? 0.8 + t * 4 : 1.7,
+    // Bigger, more aggressive wing plan; pirate alloy has darker shards
+    // embedded in the hull seams.
+    fillTaperedBody(grid, -22, 19, (t) => ({
+        width: t < 0.22 ? 1 + t * 9 : t < 0.72 ? 4.0 : 3.8 - (t - 0.72) * 6,
+        height: t < 0.28 ? 0.7 + t * 4 : 1.7,
     }), 'hull');
-    grid.fillBox(-2, 2, -2, 1, -3, 15, 'dark');
-    for (let z = -12; z <= 10; z += 1) {
-        const centerBias = 1 - Math.abs(z + 1) / 13;
-        const span = Math.max(5, Math.round(9 + centerBias * 8));
-        const inner = z < -5 ? 2 : 3;
-        grid.fillBox(-span, -inner, 0, 0, z, z, z < -8 ? 'dark' : 'hull');
-        grid.fillBox(inner, span, 0, 0, z, z, z < -8 ? 'dark' : 'hull');
+    // Asymmetric damage: left wing has a notched-out chunk from the front.
+    grid.fillBox(-3, -3, 0, 1, -12, -7, 'dark');
+    // Belly spike for the RGO asymmetric silhouette.
+    grid.fillBox(-2, 2, -3, -3, -8, 12, 'dark');
+    addStripe(grid, -4, -6, 12, 'warning');
+    // Razor wings with negative sweep at the tips (folds inward).
+    for (let z = -10; z <= 12; z += 1) {
+        const centerBias = 1 - Math.abs(z + 1) / 14;
+        const span = Math.max(5, Math.round(10 + centerBias * 10));
+        const inner = z < -3 ? 2 : 3;
+        grid.fillBox(-span, -inner, 0, 1, z, z, z < -6 ? 'dark' : 'hull');
+        grid.fillBox(inner, span, 0, 1, z, z, z < -6 ? 'dark' : 'hull');
         if (z % 3 === 0) {
-            grid.set(-span, 0, z, 'accent');
-            grid.set(span, 0, z, 'accent');
+            grid.set(-span, 1, z, 'accent');
+            grid.set(span, 1, z, 'accent');
         }
     }
-    grid.line([-17, 0, -8], [-13, 2, -15], 0, 'accent');
-    grid.line([17, 0, -8], [13, 2, -15], 0, 'accent');
-    grid.fillBox(-7, -4, -1, 1, 10, 19, 'dark');
-    grid.fillBox(4, 7, -1, 1, 10, 19, 'dark');
-    grid.fillBox(-6, -5, -1, 1, 19, 19, 'engine');
-    grid.fillBox(5, 6, -1, 1, 19, 19, 'engine');
-    markCanopy(grid, -2, 2, -10, -3, 2);
-    grid.fillBox(-1, 1, 2, 2, -1, 7, 'warning');
-    return { grid, unit: 0.235, enginePorts: [[-5.5, 0, 19.7], [5.5, 0, 19.7]] };
-};
-const buildWarden = () => {
-    const grid = new VoxelGrid();
-    fillTaperedBody(grid, -17, 18, (t) => ({
-        width: t < 0.18 ? 1.5 + t * 17 : t < 0.78 ? 4.7 : 4.7 - (t - 0.78) * 6,
-        height: t < 0.2 ? 1 + t * 7 : 2.5,
-    }), 'hull');
-    grid.fillBox(-4, 4, -3, 2, -2, 16, 'dark');
-    grid.fillBox(-12, -4, -1, 1, -3, 11, 'hull');
-    grid.fillBox(4, 12, -1, 1, -3, 11, 'hull');
-    grid.fillBox(-11, -8, -2, 2, 5, 14, 'dark');
-    grid.fillBox(8, 11, -2, 2, 5, 14, 'dark');
-    grid.fillBox(-6, -4, 2, 7, 10, 18, 'dark');
-    grid.fillBox(4, 6, 2, 7, 10, 18, 'dark');
-    for (const x of [-8, -3, 3, 8]) {
-        grid.fillBox(x - 1, x + 1, -2, 1, 14, 21, 'dark');
-        grid.fillBox(x, x, -1, 1, 21, 21, 'engine');
-    }
-    markCanopy(grid, -2, 2, -10, -3, 3);
-    grid.fillBox(-12, -12, 1, 1, -1, 8, 'accent');
-    grid.fillBox(12, 12, 1, 1, -1, 8, 'accent');
-    grid.fillBox(-1, 1, 3, 3, 1, 7, 'window');
+    // Wingtip dagger-fin extensions.
+    addFin(grid, -1, 10, 16, 0, -2, 14, 'dark');
+    addFin(grid, 1, 10, 16, 0, -2, 14, 'dark');
+    // Twin engine cluster with longer plumes (hostile ships run hotter).
+    grid.fillBox(-7, -4, -1, 1, 13, 19, 'dark');
+    grid.fillBox(4, 7, -1, 1, 13, 19, 'dark');
+    addEnginePlume(grid, -5.5, 0, 19, 24, 'engine');
+    addEnginePlume(grid, 5.5, 0, 19, 24, 'engine');
+    // Side-mounted gun pods.
+    grid.fillBox(-9, -8, 0, 0, 4, 10, 'dark');
+    grid.fillBox(8, 9, 0, 0, 4, 10, 'dark');
+    grid.fillBox(-9, -9, 0, 0, 6, 8, 'warning');
+    grid.fillBox(9, 9, 0, 0, 6, 8, 'warning');
+    // Forward antenna pair.
+    grid.line([-2, 2, -8], [-3, 5, -16], 0, 'dark');
+    grid.line([2, 2, -8], [3, 5, -16], 0, 'dark');
+    markCanopy(grid, -2, 2, -11, -3, 2);
+    addStripe(grid, 3, -11, -3, 'warning');
     return {
         grid,
         unit: 0.24,
-        enginePorts: [[-8, 0, 21.7], [-3, 0, 21.7], [3, 0, 21.7], [8, 0, 21.7]],
+        enginePorts: [[-5.5, 0, 24.7], [5.5, 0, 24.7]],
+    };
+};
+const buildWarden = () => {
+    const grid = new VoxelGrid();
+    fillTaperedBody(grid, -22, 21, (t) => ({
+        width: t < 0.16 ? 1.4 + t * 22 : t < 0.78 ? 5.2 : 4.8 - (t - 0.78) * 7,
+        height: t < 0.2 ? 1 + t * 8 : 2.7,
+    }), 'hull');
+    // Belly spine + carbon streaks.
+    grid.fillBox(-4, 4, -3, 1, -2, 19, 'dark');
+    addStripe(grid, 2, -2, 19, 'accent');
+    // Wider sweep wings with strong nav lights.
+    grid.fillBox(-13, -4, -1, 1, -3, 13, 'hull');
+    grid.fillBox(4, 13, -1, 1, -3, 13, 'hull');
+    addNavLights(grid, [[-13, 1, 4, 'green'], [13, 1, 4, 'red'], [-13, 1, 10, 'green'], [13, 1, 10, 'red']]);
+    // Aft flank thrusters that come out of the wing shoulders.
+    grid.fillBox(-12, -9, -2, 2, 6, 15, 'dark');
+    grid.fillBox(9, 12, -2, 2, 6, 15, 'dark');
+    grid.fillBox(-6, -4, 2, 7, 11, 19, 'dark');
+    grid.fillBox(4, 6, 2, 7, 11, 19, 'dark');
+    // Four-engine cluster with extra-long plumes (Concord patrol has the
+    // largest engine bay of any escort).
+    for (const [x, y, z0, z1] of [[-8, 0, 14, 21], [-3, 0, 14, 21], [3, 0, 14, 21], [8, 0, 21, 25]]) {
+        addEnginePlume(grid, x, y, z0, z1, 'engine');
+    }
+    // Tail fins flanking the engine block.
+    addFin(grid, -1, 4, 10, 1, 14, 20, 'dark');
+    addFin(grid, 1, 4, 10, 1, 14, 20, 'dark');
+    // Top antenna array + radar dish.
+    markCanopy(grid, -2, 2, -10, -3, 3);
+    grid.line([0, 3, -8], [0, 6, -14], 0, 'dark');
+    grid.set(0, 6, -14, 'window');
+    grid.fillBox(-1, 1, 3, 3, 1, 7, 'window');
+    return {
+        grid,
+        unit: 0.245,
+        enginePorts: [[-8, 0, 25.7], [-3, 0, 25.7], [3, 0, 25.7], [8, 0, 25.7]],
     };
 };
 const buildProspector = () => {
     const grid = new VoxelGrid();
-    fillTaperedBody(grid, -16, 16, (t) => ({
-        width: t < 0.22 ? 1.3 + t * 12 : t < 0.75 ? 4.2 : 4.2 - (t - 0.75) * 5,
-        height: t < 0.22 ? 0.8 + t * 5 : 2.2,
+    fillTaperedBody(grid, -19, 18, (t) => ({
+        width: t < 0.22 ? 1.2 + t * 14 : t < 0.74 ? 4.5 : 4.4 - (t - 0.74) * 6,
+        height: t < 0.22 ? 0.8 + t * 6 : 2.4,
     }), 'hull');
-    grid.fillBox(-3, 3, -3, 2, -2, 15, 'dark');
-    for (const side of [-1, 1]) {
+    grid.fillBox(-3, 3, -3, 2, -2, 17, 'dark');
+    // Twin retractable mining arms (asymmetric: one tucked, one extended).
+    for (const [side, extended] of [[-1, false], [1, true]]) {
         const x0 = side < 0 ? -11 : 7;
         const x1 = side < 0 ? -7 : 11;
-        grid.fillBox(x0, x1, -3, 3, -3, 16, 'hull');
+        grid.fillBox(x0, x1, -3, 3, -3, 17, 'hull');
         grid.fillBox(x0, x1, -1, 1, 2, 7, 'accent');
-        grid.line([side * 5, -1, -12], [side * 7, -1, -25], 1, 'dark');
-        grid.line([side * 7, -1, -25], [side * 7, -1, -29], 0, 'warning');
+        // Drill head always visible at the end of each arm.
+        grid.fillBox(side * 12 - 1, side * 12 + 1, -2, 2, extended ? 2 : -2, 8, 'dark');
+        grid.fillBox(side * 12, side * 12, -1, 1, extended ? -3 : 0, extended ? 0 : 4, 'warning');
+        // Tether cable running belly->drill.
+        grid.line([side * 5, -1, -12], [side * 7, -1, extended ? -25 : -22], 1, 'dark');
+        grid.line([side * 7, -1, extended ? -25 : -22], [side * 7, -1, extended ? -30 : -27], 0, 'warning');
+        // Engine cluster placed aft of the drill arm position.
         grid.fillBox(side * 9 - 1, side * 9 + 1, -2, 2, 13, 21, 'dark');
-        grid.fillBox(side * 9, side * 9, -1, 1, 21, 21, 'engine');
+        addEnginePlume(grid, side * 9, 0, 21, 25, 'engine');
     }
+    // Forward surveyor antenna.
+    grid.line([0, 3, -10], [0, 6, -16], 0, 'dark');
+    grid.set(0, 6, -16, 'accent');
     markCanopy(grid, -2, 2, -11, -4, 3);
     grid.fillBox(-1, 1, 2, 2, 0, 8, 'window');
-    return { grid, unit: 0.235, enginePorts: [[-9, 0, 21.7], [9, 0, 21.7]] };
+    return {
+        grid,
+        unit: 0.24,
+        enginePorts: [[-9, 0, 25.7], [9, 0, 25.7]],
+    };
 };
 const buildLancer = () => {
     const grid = new VoxelGrid();
-    fillTaperedBody(grid, -26, 17, (t) => ({
-        width: t < 0.3 ? 0.7 + t * 7 : t < 0.72 ? 2.8 : 2.8 - (t - 0.72) * 2.7,
-        height: t < 0.3 ? 0.6 + t * 3.5 : 1.5,
+    // Razor-thin interceptor: longer nose + tail-stinger for the bounty hunter.
+    fillTaperedBody(grid, -30, 19, (t) => ({
+        width: t < 0.3 ? 0.5 + t * 8 : t < 0.7 ? 3.2 : 3.0 - (t - 0.7) * 4.2,
+        height: t < 0.3 ? 0.5 + t * 4 : 1.5,
     }), 'hull');
-    grid.fillBox(-2, 2, -2, 1, -6, 16, 'dark');
-    for (let z = -12; z <= 11; z += 1) {
-        const t = (z + 12) / 23;
-        const span = Math.round(4 + t * 12);
-        grid.fillBox(-span, -2, 0, 0, z, z, 'hull');
-        grid.fillBox(2, span, 0, 0, z, z, 'hull');
+    grid.fillBox(-2, 2, -2, 1, -6, 18, 'dark');
+    // Razor delta wings — narrower but longer, with negative sweeps.
+    for (let z = -10; z <= 13; z += 1) {
+        const t = (z + 10) / 23;
+        const span = Math.round(3 + t * 14);
+        grid.fillBox(-span, -2, 0, 1, z, z, 'hull');
+        grid.fillBox(2, span, 0, 1, z, z, 'hull');
         if (z % 4 === 0) {
-            grid.set(-span, 0, z, 'accent');
-            grid.set(span, 0, z, 'accent');
+            grid.set(-span, 1, z, 'warning');
+            grid.set(span, 1, z, 'warning');
         }
     }
+    // Twin forward-swept canards.
     for (const side of [-1, 1]) {
-        grid.fillBox(side * 7 - 1, side * 7 + 1, -1, 0, -22, -7, 'dark');
-        grid.fillBox(side * 12 - 1, side * 12 + 1, -1, 0, -18, -4, 'dark');
+        grid.fillBox(side * 7 - 1, side * 7 + 1, -1, 0, -24, -10, 'dark');
+        grid.fillBox(side * 12 - 1, side * 12 + 1, -1, 0, -19, -6, 'dark');
+        grid.set(side * 12, 0, -19, 'accent');
     }
+    // Three-engine cluster (the ripcord thrust to outrun police).
     for (const x of [-4, 0, 4]) {
-        grid.fillBox(x - 1, x + 1, -1, 1, 12, 21, 'dark');
-        grid.fillBox(x, x, -1, 1, 21, 21, 'engine');
+        grid.fillBox(x - 1, x + 1, -1, 1, 13, 22, 'dark');
+        addEnginePlume(grid, x, 0, 22, 27, 'engine');
     }
-    markCanopy(grid, -1, 1, -14, -7, 2);
-    grid.fillBox(-1, 1, 2, 2, -4, 5, 'accent');
-    return { grid, unit: 0.225, enginePorts: [[-4, 0, 21.7], [0, 0, 21.7], [4, 0, 21.7]] };
+    // Dorsal spine antenna.
+    markCanopy(grid, -1, 1, -16, -9, 2);
+    addStripe(grid, 3, -16, -9, 'warning');
+    grid.line([0, 4, -6], [0, 7, -10], 0, 'dark');
+    return {
+        grid,
+        unit: 0.23,
+        enginePorts: [[-4, 0, 27.7], [0, 0, 27.7], [4, 0, 27.7]],
+    };
 };
 const buildAtlasFreighter = () => {
     const grid = new VoxelGrid();
-    grid.fillBox(-3, 3, -3, 3, -34, 34, 'dark');
-    fillTaperedBody(grid, -38, -18, (t) => ({ width: 1 + t * 6, height: 1 + t * 3 }), 'hull');
-    grid.fillBox(-6, 6, -4, 4, -23, -10, 'hull');
-    grid.fillBox(-4, 4, 4, 8, -28, -15, 'dark');
-    markCanopy(grid, -3, 3, -28, -19, 9);
-    const cargoZ = [-8, 8, 24];
+    // Long central spine.
+    grid.fillBox(-3, 3, -3, 3, -38, 38, 'dark');
+    fillTaperedBody(grid, -42, -22, (t) => ({ width: 1 + t * 7, height: 1 + t * 3 }), 'hull');
+    grid.fillBox(-6, 6, -4, 4, -27, -12, 'hull');
+    grid.fillBox(-4, 4, 4, 8, -32, -19, 'dark');
+    markCanopy(grid, -3, 3, -32, -23, 9);
+    addStripe(grid, 10, -32, -23, 'warning');
+    // Four cargo pods (two per side) instead of three — bigger silhouette
+    // for the long-haul hauler.
+    const cargoZ = [-12, -2, 10, 22];
     for (const z of cargoZ) {
         for (const side of [-1, 1]) {
-            const cx = side * 13;
-            grid.fillBox(cx - 6, cx + 6, -6, 6, z - 7, z + 7, 'hull');
-            grid.fillBox(cx - 6, cx + 6, -1, 1, z - 7, z + 7, 'accent');
-            grid.fillBox(cx - 2, cx + 2, -7, -7, z - 5, z + 5, 'dark');
+            const cx = side * 14;
+            const podHeight = Math.abs(z) > 10 ? 6 : 5;
+            grid.fillBox(cx - 7, cx + 7, -podHeight, podHeight, z - 6, z + 6, 'hull');
+            // Window strips on the pod so it reads as occupied.
+            grid.fillBox(cx - 6, cx + 6, -1, 1, z - 5, z + 5, 'window');
+            grid.fillBox(cx - 2, cx + 2, -podHeight - 1, -podHeight - 1, z - 4, z + 4, 'dark');
+            // Connector strut from spine to pod.
             grid.line([side * 4, 0, z], [side * 7, 0, z], 1, 'dark');
+            grid.set(side * 7, 0, z, 'accent');
         }
     }
-    grid.fillBox(-11, 11, -4, 4, 29, 38, 'dark');
-    for (const x of [-9, -3, 3, 9]) {
-        grid.fillBox(x - 2, x + 2, -3, 3, 32, 42, 'dark');
-        grid.fillBox(x - 1, x + 1, -2, 2, 42, 42, 'engine');
+    // Industrial radiator vents under the belly between cargo pods.
+    for (const z of [-7, 5, 17]) {
+        grid.fillBox(-2, 2, -5, -5, z - 1, z + 1, 'warning');
     }
-    grid.fillBox(-1, 1, 5, 5, -11, 28, 'window');
-    grid.fillBox(-16, -16, 7, 7, -4, 25, 'warning');
-    grid.fillBox(16, 16, 7, 7, -4, 25, 'warning');
+    // Aft engine housing — wider than before.
+    grid.fillBox(-12, 12, -5, 5, 33, 42, 'dark');
+    addStripe(grid, 6, 33, 42, 'window');
+    for (const x of [-9, -3, 3, 9]) {
+        grid.fillBox(x - 2, x + 2, -3, 3, 36, 46, 'dark');
+        addEnginePlume(grid, x, 0, 46, 52, 'engine');
+    }
+    // Dorsal antenna + long-running lights.
+    addStripe(grid, 5, -32, 30, 'window');
+    grid.line([0, 9, -28], [0, 14, -38], 0, 'dark');
+    grid.set(0, 14, -38, 'warning');
+    // Wing-tip nav lights.
+    addNavLights(grid, [[-16, 7, -4, 'green'], [16, 7, -4, 'red'], [-16, 7, 24, 'green'], [16, 7, 24, 'red'], [-16, 7, 12, 'green'], [16, 7, 12, 'red']]);
     return {
         grid,
-        unit: 0.34,
-        enginePorts: [[-9, 0, 42.8], [-3, 0, 42.8], [3, 0, 42.8], [9, 0, 42.8]],
+        unit: 0.35,
+        enginePorts: [[-9, 0, 52.8], [-3, 0, 52.8], [3, 0, 52.8], [9, 0, 52.8]],
     };
 };
 const SHIP_BUILDERS = {
@@ -504,12 +635,104 @@ export const paletteForFaction = (faction, hostile) => {
             };
     }
 };
-const createVoxelMeshes = (grid, unit, palette, roughness, metalness) => {
+const createStationPaintTexture = (palette, seed) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 256;
+    const context = canvas.getContext('2d');
+    const base = new THREE.Color(palette.hull);
+    const dark = new THREE.Color(palette.dark);
+    const accent = new THREE.Color(palette.accent ?? palette.engine ?? 0xffffff);
+    const baseHex = `#${base.getHexString()}`;
+    const darkHex = `#${dark.getHexString()}`;
+    const accentRgb = `${Math.round(accent.r * 255)}, ${Math.round(accent.g * 255)}, ${Math.round(accent.b * 255)}`;
+    context.fillStyle = baseHex;
+    context.fillRect(0, 0, 256, 256);
+    // Pixelated noise so the painted hull reads as greebled sheet metal
+    // rather than a plastic monotone.
+    const rng = mulberry32(`${seed}:paint`);
+    for (let y = 0; y < 256; y += 4) {
+        for (let x = 0; x < 256; x += 4) {
+            const variance = (rng() - 0.5) * 0.22;
+            const row = base.clone().offsetHSL((rng() - 0.5) * 0.012, 0, variance);
+            context.fillStyle = `#${row.getHexString()}`;
+            context.fillRect(x, y, 4, 4);
+        }
+    }
+    // Panel grid: every 64u a darker seam, every 32u a rivet row.
+    context.strokeStyle = `rgba(${accentRgb}, 0.12)`;
+    context.lineWidth = 2;
+    for (let x = 0; x < 256; x += 64) {
+        context.beginPath(); context.moveTo(x + 0.5, 0); context.lineTo(x + 0.5, 256); context.stroke();
+    }
+    for (let y = 0; y < 256; y += 64) {
+        context.beginPath(); context.moveTo(0, y + 0.5); context.lineTo(256, y + 0.5); context.stroke();
+    }
+    context.strokeStyle = `rgba(0,0,0,0.6)`;
+    context.lineWidth = 1;
+    for (let x = 32; x < 256; x += 32) {
+        context.beginPath(); context.moveTo(x + 0.5, 0); context.lineTo(x + 0.5, 256); context.stroke();
+    }
+    for (let y = 32; y < 256; y += 32) {
+        context.beginPath(); context.moveTo(0, y + 0.5); context.lineTo(256, y + 0.5); context.stroke();
+    }
+    // Subtle rivets at panel intersections.
+    context.fillStyle = darkHex;
+    for (let y = 64; y < 256; y += 64) {
+        for (let x = 64; x < 256; x += 64) {
+            context.fillRect(x - 2, y - 2, 4, 4);
+        }
+    }
+    // A handful of dark "weathering" streaks so the paint isn't sterile.
+    context.fillStyle = `rgba(0,0,0,0.18)`;
+    for (let i = 0; i < 12; i += 1) {
+        const x = Math.floor(rng() * 240);
+        const y = Math.floor(rng() * 240);
+        context.fillRect(x, y, 6 + Math.floor(rng() * 14), 1);
+    }
+    // Bright accent chevrons at random — same accent color as the windows
+    // so the hulls feel like they belong to the same colour family.
+    context.fillStyle = `rgba(${accentRgb}, 0.9)`;
+    for (let i = 0; i < 4; i += 1) {
+        const x = Math.floor(rng() * 200);
+        const y = Math.floor(rng() * 220);
+        context.fillRect(x, y, 12, 2);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.NearestMipmapNearestFilter;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(3.5, 3.5);
+    texture.generateMipmaps = true;
+    texture.needsUpdate = true;
+    return texture;
+};
+// Tiny mulberry32 keyed by string so the station paint variations stay
+// deterministic for a given seed.
+const mulberry32 = (seedString) => {
+    let h = 1779033703 ^ seedString.length;
+    for (let i = 0; i < seedString.length; i += 1) {
+        h = Math.imul(h ^ seedString.charCodeAt(i), 3432918353);
+        h = (h << 13) | (h >>> 19);
+    }
+    let a = h >>> 0;
+    return () => {
+        a = (a + 0x6d2b79f5) >>> 0;
+        let t = a;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+};
+const createVoxelMeshes = (grid, unit, palette, roughness, metalness, hullMap = null) => {
     const group = new THREE.Group();
     // Glossy painted metal: a clearcoat over a faceted hull so the low-poly ship
     // catches the environment map and reads like a Rebel Galaxy Outlaw hull rather
-    // than flat matte voxels.
+    // than flat matte voxels. Stations may pass a hullMap so the paint panel
+    // texture gets multiplied with the per-vertex faction color.
     const hullMaterial = new THREE.MeshPhysicalMaterial({
+        map: hullMap,
         vertexColors: true,
         roughness,
         metalness,
@@ -518,7 +741,7 @@ const createVoxelMeshes = (grid, unit, palette, roughness, metalness) => {
         emissiveIntensity: 0.05,
         clearcoat: 1,
         clearcoatRoughness: 0.22,
-        envMapIntensity: 1.35,
+        envMapIntensity: 1.85,
     });
     const glowMaterial = new THREE.MeshBasicMaterial({
         vertexColors: true,
@@ -533,30 +756,50 @@ const createVoxelMeshes = (grid, unit, palette, roughness, metalness) => {
     hull.name = 'voxel-hull';
     const glow = new THREE.Mesh(glowGeometry, glowMaterial);
     glow.name = 'voxel-glow';
-    // Fresnel rim: an inflated copy of the hull that glows at grazing angles, giving
-    // every ship a neon edge-light in its faction accent.
+    // Fresnel rim: an inflated copy of the hull that glows at grazing angles.
+    // Two-tone: sun-facing edges pick up a sodium-orange tint, shadow-facing
+    // edges pick up cool cobalt, and the mid-band carries the faction accent.
+    // This is the *distinct* Rebel Galaxy Outlaw silhouette cue — a single
+    // neon accent alone reads flat.
+    const sunColor = new THREE.Color(0xffb070);
+    const shadowColor = new THREE.Color(0x4d6fa0);
     const rimMaterial = new THREE.ShaderMaterial({
         uniforms: {
             uColor: { value: new THREE.Color(palette.accent ?? palette.engine ?? 0x6ad9f1) },
-            uIntensity: { value: 1.05 },
+            uSun: { value: sunColor },
+            uShadow: { value: shadowColor },
+            uIntensity: { value: 0.95 },
         },
         vertexShader: `
             varying vec3 vNormal;
             varying vec3 vView;
+            varying vec3 vWorldNormal;
             void main() {
-                vec4 mv = modelViewMatrix * vec4(position, 1.0);
-                vNormal = normalize(normalMatrix * normal);
-                vView = normalize(-mv.xyz);
+                vec4 worldPos = modelMatrix * vec4(position, 1.0);
+                vec4 mv = viewMatrix * worldPos;
+                vNormal = normalize(mat3(modelMatrix) * normal);
+                vWorldNormal = normalize(mat3(modelMatrix) * normal);
+                vView = normalize(cameraPosition - worldPos.xyz);
                 gl_Position = projectionMatrix * mv;
             }`,
         fragmentShader: `
             uniform vec3 uColor;
+            uniform vec3 uSun;
+            uniform vec3 uShadow;
             uniform float uIntensity;
             varying vec3 vNormal;
             varying vec3 vView;
+            varying vec3 vWorldNormal;
             void main() {
-                float fresnel = pow(1.0 - abs(dot(normalize(vNormal), normalize(vView))), 2.2);
-                gl_FragColor = vec4(uColor * fresnel * uIntensity, fresnel);
+                vec3 n = normalize(vWorldNormal);
+                vec3 v = normalize(vView);
+                float facing = clamp(dot(n, v), 0.0, 1.0);
+                float fresnel = pow(1.0 - facing, 2.4);
+                // Faction tint when looking at the ship dead-on, sun where the
+                // sun would hit the curve, cool on the back side.
+                vec3 col = mix(uShadow, uColor, smoothstep(0.05, 0.55, facing));
+                col = mix(col, uSun, smoothstep(0.45, 0.95, facing) * 0.85);
+                gl_FragColor = vec4(col * fresnel * uIntensity, fresnel);
             }`,
         transparent: true,
         blending: THREE.AdditiveBlending,
@@ -614,47 +857,82 @@ const buildHelixStation = () => {
     };
     const unit = 1.28;
     const staticGrid = new VoxelGrid();
-    staticGrid.fillCylinderX(-35, 34, 4.5, 'hull');
-    for (const x of [-28, -14, 0, 14, 28])
-        staticGrid.fillCylinderX(x - 1, x + 1, 7, 'dark');
-    staticGrid.fillCylinderX(-43, -31, 5.5, 'dark', -9, 0);
-    staticGrid.fillCylinderX(-43, -31, 5.5, 'hull', 0, 0);
-    staticGrid.fillCylinderX(-43, -31, 5.5, 'dark', 9, 0);
-    staticGrid.fillBox(-48, -44, -15, 15, -7, 7, 'dark');
-    staticGrid.fillBox(-49, -49, -13, 13, -5, 5, 'warning');
-    staticGrid.fillCylinderX(30, 47, 10, 'dark');
-    staticGrid.fillRingX(46, 48, 8, 1.5, 'hull');
-    addHelixWindows(staticGrid, 8, 48);
-    staticGrid.fillBox(49, 49, -6, 6, -6, 6, 'dark');
+    // Long central spindle with multiple greebled segments.
+    staticGrid.fillCylinderX(-46, 50, 5.5, 'hull');
+    // Mid-body ribbed rings (the silhouette must read as a tower of discs).
+    for (const x of [-30, -16, 0, 16, 30])
+        staticGrid.fillCylinderX(x - 1, x + 1, 8, 'dark');
+    // Front "Command bulb" — wide front cap with running lights.
+    staticGrid.fillCylinderX(-58, -42, 6.5, 'dark', -10, 0);
+    staticGrid.fillCylinderX(-58, -42, 6.5, 'hull', 0, 0);
+    staticGrid.fillCylinderX(-58, -42, 6.5, 'dark', 10, 0);
+    for (let y = -8; y <= 8; y += 4)
+        staticGrid.set(-58, y, 0, 'window');
+    staticGrid.fillBox(-60, -56, -16, 16, -7, 7, 'dark');
+    staticGrid.fillBox(-61, -61, -14, 14, -4, 4, 'warning');
+    staticGrid.fillBox(-62, -62, -10, 10, -2, 2, 'accent');
+    // Aft engine block with three concentric thrust bells.
+    staticGrid.fillCylinderX(38, 56, 11, 'dark');
+    staticGrid.fillRingX(56, 58, 9, 1.5, 'hull');
+    staticGrid.fillRingX(60, 62, 7, 1.5, 'hull');
+    addHelixWindows(staticGrid, 9, 56);
+    staticGrid.fillBox(63, 63, -7, 7, -7, 7, 'dark');
+    staticGrid.fillBox(64, 64, -5, 5, -5, 5, 'engine');
+    // Two side-mounted docking booms (the big visual tells: "this is a
+    // station you can dock with").
     for (const side of [-1, 1]) {
-        staticGrid.fillBox(-10, 20, side * 10 - 1, side * 10 + 1, -2, 2, 'dark');
-        staticGrid.fillBox(12, 20, side * 13 - 1, side * 13 + 1, -7, 7, 'hull');
-        staticGrid.fillBox(20, 20, side * 13, side * 13, -5, 5, 'window');
+        staticGrid.fillBox(-12, 22, side * 11 - 1, side * 11 + 1, -2, 2, 'dark');
+        // Boom arms.
+        staticGrid.fillBox(15, 30, side * 14 - 1, side * 14 + 1, -8, 8, 'hull');
+        staticGrid.fillBox(28, 28, side * 14, side * 14, -6, 6, 'window');
+        staticGrid.set(30, side * 14, 0, side > 0 ? 'warning' : 'accent');
     }
-    for (let index = 0; index < 8; index += 1) {
-        const z = -24 + index * 7;
-        staticGrid.fillBox(-22, -14, -3, 3, z, z + 2, index % 2 ? 'hull' : 'dark');
-        staticGrid.fillBox(-18, -18, 4, 4, z, z + 2, index % 3 === 0 ? 'warning' : 'window');
+    // Vertical "fenestration strips" along the spine — ribbed tower of windows
+    // for an airport-control-tower read.
+    for (let index = 0; index < 11; index += 1) {
+        const z = -32 + index * 6;
+        staticGrid.fillBox(-22, -16, -3, 3, z, z + 2, index % 2 ? 'hull' : 'dark');
+        staticGrid.fillBox(-19, -19, 4, 4, z, z + 2, index % 3 === 0 ? 'warning' : 'window');
     }
-    staticGrid.line([-5, 7, -4], [-5, 25, -10], 1, 'dark');
-    staticGrid.line([5, 7, 4], [5, 25, 10], 1, 'dark');
-    staticGrid.set(-5, 26, -10, 'warning');
-    staticGrid.set(5, 26, 10, 'window');
+    // Long navigation antenna + base.
+    staticGrid.line([-5, 7, -4], [-5, 28, -10], 1, 'dark');
+    staticGrid.line([5, 7, 4], [5, 28, 10], 1, 'dark');
+    staticGrid.set(-5, 29, -10, 'warning');
+    staticGrid.set(5, 29, 10, 'window');
+    staticGrid.set(0, 32, 0, 'accent');
+    // Cross-beam solar arrays (additive wing-shaped panels either side).
+    for (const z of [-22, 0, 22]) {
+        for (const side of [-1, 1]) {
+            staticGrid.fillBox(side * 35 - 2, side * 35 + 2, z - 8, z + 8, -1, 1, 'hull');
+            staticGrid.fillBox(side * 35, side * 35, z - 7, z + 7, -1, 1, 'window');
+            staticGrid.line([side * 36, 0, z - 8], [side * 36, 0, z + 8], 0, 'dark');
+        }
+    }
     const rotorGrid = new VoxelGrid();
-    rotorGrid.fillRingX(-2, 2, 22, 2.5, 'hull');
-    rotorGrid.fillRingX(-1, 1, 15, 1.2, 'dark');
-    for (let index = 0; index < 12; index += 1) {
-        const angle = (index / 12) * Math.PI * 2;
-        const y = Math.round(Math.cos(angle) * 22);
-        const z = Math.round(Math.sin(angle) * 22);
-        rotorGrid.line([0, 0, 0], [0, Math.round(Math.cos(angle) * 18), Math.round(Math.sin(angle) * 18)], 0, 'dark');
+    // Bigger rotating habitat ring with more spoke lights.
+    rotorGrid.fillRingX(-2, 2, 30, 3, 'hull');
+    rotorGrid.fillRingX(-2, 2, 24, 1.5, 'dark');
+    rotorGrid.fillRingX(-1, 1, 18, 1.2, 'dark');
+    for (let index = 0; index < 16; index += 1) {
+        const angle = (index / 16) * Math.PI * 2;
+        const y = Math.round(Math.cos(angle) * 30);
+        const z = Math.round(Math.sin(angle) * 30);
+        // Spoke from the axis out to the ring.
+        rotorGrid.line([0, 0, 0], [0, y, z], 1, 'dark');
+        // Habitation pod hanging off the ring.
         rotorGrid.fillBox(-4, 4, y - 3, y + 3, z - 3, z + 3, index % 2 ? 'dark' : 'hull');
-        rotorGrid.fillBox(4, 4, y - 1, y + 1, z - 1, z + 1, index % 3 === 0 ? 'warning' : 'window');
+        rotorGrid.fillBox(0, 0, y - 1, y + 1, z - 1, z + 1, index % 3 === 0 ? 'warning' : 'window');
+        // A single nav light on each pod so the ring reads as alive at distance.
+        if (index === 0 || index === 8)
+            rotorGrid.set(0, y + 4, z, 'accent');
+        if (index === 4 || index === 12)
+            rotorGrid.set(0, y + 4, z, 'warning');
     }
+    const paintTexture = createStationPaintTexture(palette, 'helix-station');
     const root = new THREE.Group();
     root.name = 'helix-voxel-station';
-    const staticMeshes = createVoxelMeshes(staticGrid, unit, palette, 0.72, 0.5).group;
-    const rotor = createVoxelMeshes(rotorGrid, unit, palette, 0.74, 0.5).group;
+    const staticMeshes = createVoxelMeshes(staticGrid, unit, palette, 0.62, 0.55, paintTexture).group;
+    const rotor = createVoxelMeshes(rotorGrid, unit, palette, 0.68, 0.5, paintTexture).group;
     rotor.name = 'rotor';
     rotor.userData.rotationAxis = 'x';
     root.add(staticMeshes, rotor);
@@ -672,44 +950,61 @@ const buildRookStation = () => {
     };
     const unit = 1.34;
     const grid = new VoxelGrid();
-    grid.fillBox(-10, 10, -9, 9, -18, 18, 'hull');
-    grid.fillBox(-8, 8, 10, 14, -22, 22, 'dark');
-    grid.fillBox(-8, 8, -14, -10, -22, 22, 'dark');
-    grid.fillBox(-14, 14, -6, 6, -23, -18, 'dark');
-    grid.fillBox(-14, 14, -6, 6, 18, 23, 'dark');
-    grid.fillBox(-6, 6, -6, 6, 23, 34, 'dark');
-    grid.fillRingX(-1, 1, 6, 1.5, 'hull');
-    for (let index = 0; index < 12; index += 1) {
-        const angle = (index / 12) * Math.PI * 2;
-        grid.set(Math.round(Math.cos(angle) * 7), Math.round(Math.sin(angle) * 7), 35, index % 4 === 0 ? 'warning' : 'window');
+    // Beefier central core.
+    grid.fillBox(-12, 12, -11, 11, -22, 22, 'hull');
+    grid.fillBox(-10, 10, 12, 16, -28, 28, 'dark');
+    grid.fillBox(-10, 10, -16, -12, -28, 28, 'dark');
+    grid.fillBox(-16, 16, -7, 7, -27, -22, 'dark');
+    grid.fillBox(-16, 16, -7, 7, 22, 27, 'dark');
+    grid.fillBox(-7, 7, -7, 7, 27, 40, 'dark');
+    grid.fillRingX(-1, 1, 7, 1.5, 'hull');
+    // Halo of dock lights ringing the core.
+    for (let index = 0; index < 18; index += 1) {
+        const angle = (index / 18) * Math.PI * 2;
+        grid.set(Math.round(Math.cos(angle) * 9), Math.round(Math.sin(angle) * 9), 41, index % 4 === 0 ? 'warning' : 'window');
     }
+    // Window strips ringing the core shell.
+    for (let z = -25; z <= 28; z += 4) {
+        grid.fillBox(-12, -10, z, z, 0, 0, index => z % 8 === 0 ? 'warning' : 'window');
+    }
+    void (() => { let i = 0; for (let z = -25; z <= 28; z += 4) { grid.set(-12, 0, z, i++ % 3 === 0 ? 'warning' : 'window'); grid.set(12, 0, z, i % 3 === 0 ? 'warning' : 'window'); } })();
+    // Reinforce the four arms — and add more interior detail.
     const armDirections = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     armDirections.forEach(([dx, dy], armIndex) => {
-        for (let step = 11; step <= 32; step += 1) {
+        for (let step = 13; step <= 38; step += 1) {
             const x = dx * step;
             const y = dy * step;
-            grid.fillBox(x - (dy !== 0 ? 3 : 1), x + (dy !== 0 ? 3 : 1), y - (dx !== 0 ? 3 : 1), y + (dx !== 0 ? 3 : 1), -5, 9, 'dark');
+            const thickness = 4;
+            grid.fillBox(x - (dy !== 0 ? thickness : 2), x + (dy !== 0 ? thickness : 2), y - (dx !== 0 ? thickness : 2), y + (dx !== 0 ? thickness : 2), -6, 10, 'dark');
+            // Window strips on the arms.
+            if (step % 3 === 0) {
+                grid.set(x, y, 9, 'window');
+                grid.set(x, y, -6, 'warning');
+            }
         }
-        const px = dx * 34;
-        const py = dy * 34;
-        grid.fillBox(px - 6, px + 6, py - 6, py + 6, -10, 13, 'hull');
-        grid.fillBox(px - 4, px + 4, py - 4, py + 4, 14, 20, 'dark');
-        grid.fillBox(px - 2, px + 2, py - 2, py + 2, 20, 27, 'dark');
-        const barrelStart = [px, py, 27];
-        const barrelEnd = [px + dx * 4, py + dy * 4, 35];
+        const px = dx * 40;
+        const py = dy * 40;
+        grid.fillBox(px - 7, px + 7, py - 7, py + 7, -12, 14, 'hull');
+        grid.fillBox(px - 5, px + 5, py - 5, py + 5, 15, 22, 'dark');
+        grid.fillBox(px - 3, px + 3, py - 3, py + 3, 22, 30, 'dark');
+        const barrelStart = [px, py, 30];
+        const barrelEnd = [px + dx * 5, py + dy * 5, 38];
         grid.line(barrelStart, barrelEnd, 1, 'dark');
         grid.set(barrelEnd[0], barrelEnd[1], barrelEnd[2], armIndex === 2 ? 'warning' : 'accent');
-        grid.fillBox(px - 3, px + 3, py - 3, py + 3, -12, -11, armIndex % 2 ? 'warning' : 'window');
+        grid.fillBox(px - 4, px + 4, py - 4, py + 4, -13, -12, armIndex % 2 ? 'warning' : 'window');
+        // Beacon light on top of each arm.
+        grid.set(px, py, 23, 'accent');
     });
-    for (const x of [-8, 0, 8]) {
-        grid.line([x, 14, -9], [x, 28 + Math.abs(x) * 0.3, -14 + x * 0.4], 0, 'dark');
-        grid.set(x, Math.round(29 + Math.abs(x) * 0.3), Math.round(-14 + x * 0.4), x === 0 ? 'warning' : 'window');
+    // Long dorsal antenna trio.
+    for (const x of [-9, 0, 9]) {
+        grid.line([x, 16, -12], [x, 30 + Math.abs(x) * 0.3, -16 + x * 0.4], 0, 'dark');
+        grid.set(x, Math.round(31 + Math.abs(x) * 0.3), Math.round(-16 + x * 0.4), x === 0 ? 'warning' : 'window');
     }
-    for (const y of [-7, 0, 7]) {
-        grid.fillBox(-11, -11, y, y, -13, 13, y === 0 ? 'warning' : 'window');
-        grid.fillBox(11, 11, y, y, -13, 13, y === 0 ? 'warning' : 'window');
+    for (const y of [-8, 0, 8]) {
+        grid.fillBox(-13, -13, y, y, -16, 16, y === 0 ? 'warning' : 'window');
+        grid.fillBox(13, 13, y, y, -16, 16, y === 0 ? 'warning' : 'window');
     }
-    const root = createVoxelMeshes(grid, unit, palette, 0.79, 0.48).group;
+    const root = createVoxelMeshes(grid, unit, palette, 0.74, 0.5, createStationPaintTexture(palette, 'rook-station')).group;
     root.name = 'rook-voxel-station';
     return root;
 };

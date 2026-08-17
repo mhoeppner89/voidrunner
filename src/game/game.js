@@ -319,6 +319,10 @@ export class GameSession {
         const player = this.save.player;
         const stats = getEffectiveShipStats(player);
         player.dockedAt = undefined;
+        // The arena undocks the player (a fresh save starts docked), so the
+        // engine must come back on — otherwise the silo's stationMode leaves
+        // the arena flight silent until the first restart.
+        this.audio.setStationMode(false);
         player.position = tuple(center);
         player.rotation = [0, 0, 0, 1];
         player.velocity = [0, 0, 0];
