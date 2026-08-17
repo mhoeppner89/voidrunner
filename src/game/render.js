@@ -1285,7 +1285,9 @@ export class SpaceRenderer {
             marker.position.set(...node.position);
             marker.scale.setScalar(node.radius * 1.6);
             marker.rotation.set((hash % 5) * 0.7, (hash % 7) * 0.9, (hash % 3) * 0.5);
-            marker.visible = node.scanned || node.id === this.selectedWreckId;
+            // Salvage chunks render as part of the graveyard like the big
+            // structural debris — they must never pop in only once targeted.
+            marker.visible = true;
             this.tagTargetable(marker, 'wreck', node.id);
             root?.add(marker);
             this.wreckNodeMeshes.set(node.id, marker);
@@ -1601,12 +1603,12 @@ export class SpaceRenderer {
         this.selectedWreckId = wreckId;
         this.selectedLocationId = locationId;
         this.updateAsteroidInstances();
-        this.wreckNodeMeshes.forEach((mesh, id) => {
-            const node = this.wreckNodes.find((entry) => entry.id === id);
-            mesh.visible = Boolean(node?.scanned || id === wreckId);
-            const selected = id === wreckId;
-            mesh.material.emissive.setHex(selected ? 0xcfe884 : 0x000000);
-            mesh.material.emissiveIntensity = selected ? 0.6 : 0;
+        this.wreckNodeMeshes.forEach((mesh) => {
+            mesh.visible = true;
+            // Selection is signalled by the HUD bracket and target monitor, not
+            // a green glow on the chunk itself.
+            mesh.material.emissive.setHex(0x000000);
+            mesh.material.emissiveIntensity = 0;
         });
     }
     setActiveInstance(id) {

@@ -22,7 +22,7 @@ const PLAYER_RADIUS = 1.25;
 // The widest rendered field obstacle (a scaled monolith ≈ 130u × 1.6) exceeds
 // the old 140u collision margin, so grid queries must pad by this much to catch
 // the surface of the biggest rocks before the ship is inside them.
-const MAX_FIELD_OBSTACLE_RADIUS = 224;
+const MAX_FIELD_OBSTACLE_RADIUS = 320;
 const HYPERDRIVE_THREAT_RADIUS = 360;
 const HYPERDRIVE_CRUISE_SPEED = 50000;
 const HYPERDRIVE_DISPLAY_SPEED = 1000;
@@ -197,6 +197,7 @@ export class GameSession {
     tmpC = new THREE.Vector3();
     tmpQ = new THREE.Quaternion();
     tmpQ2 = new THREE.Quaternion();
+    tmpEuler = new THREE.Euler();
     // Scratch vectors/matrices reused across the per-ship AI so the flight loop
     // allocates almost nothing on the hot path (GC pauses were janking combat).
     tmpD = new THREE.Vector3();
@@ -817,13 +818,95 @@ export class GameSession {
             }
             this.autopilot = false;
         };
+        // Debris is an oriented box, not a sphere: a flat panel must block its
+        // whole face without ballooning into an invisible sphere around its
+        // thin axis. Transform the player into the box's local frame, push out
+        // along the nearest face, then rotate the normal back to world space.
+        const collideBox = (obstacle, label) => {
+            const box = obstacle.box;
+            this.tmpQ.set(box.qx, box.qy, box.qz, box.qw);
+            this.tmpQ2.copy(this.tmpQ).invert();
+            this.tmpF.set(position.x - obstacle.x, position.y - obstacle.y, position.z - obstacle.z).applyQuaternion(this.tmpQ2);
+            const hx = box.hx;
+            const hy = box.hy;
+            const hz = box.hz;
+            const ex = hx + PLAYER_RADIUS;
+            const ey = hy + PLAYER_RADIUS;
+            const ez = hz + PLAYER_RADIUS;
+            if (this.tmpF.x < -ex || this.tmpF.x > ex || this.tmpF.y < -ey || this.tmpF.y > ey || this.tmpF.z < -ez || this.tmpF.z > ez)
+                return;
+            const cx = clamp(this.tmpF.x, -hx, hx);
+            const cy = clamp(this.tmpF.y, -hy, hy);
+            const cz = clamp(this.tmpF.z, -hz, hz);
+            let dx = this.tmpF.x - cx;
+            let dy = this.tmpF.y - cy;
+            let dz = this.tmpF.z - cz;
+            const distSq = dx * dx + dy * dy + dz * dz;
+            let nx;
+            let ny;
+            let nz;
+            let push;
+            if (distSq > 1e-9) {
+                const dist = Math.sqrt(distSq);
+                if (dist >= PLAYER_RADIUS)
+                    return;
+                nx = dx / dist;
+                ny = dy / dist;
+                nz = dz / dist;
+                push = PLAYER_RADIUS - dist + 0.08;
+            }
+            else {
+                // The centre is inside the box (a fast jump tunnelled in):
+                // exit through the nearest face.
+                const px = hx - Math.abs(this.tmpF.x);
+                const py = hy - Math.abs(this.tmpF.y);
+                const pz = hz - Math.abs(this.tmpF.z);
+                if (px <= py && px <= pz) {
+                    nx = this.tmpF.x < 0 ? -1 : 1;
+                    ny = 0;
+                    nz = 0;
+                    push = px + PLAYER_RADIUS + 0.08;
+                }
+                else if (py <= pz) {
+                    nx = 0;
+                    ny = this.tmpF.y < 0 ? -1 : 1;
+                    nz = 0;
+                    push = py + PLAYER_RADIUS + 0.08;
+                }
+                else {
+                    nx = 0;
+                    ny = 0;
+                    nz = this.tmpF.z < 0 ? -1 : 1;
+                    push = pz + PLAYER_RADIUS + 0.08;
+                }
+            }
+            this.tmpG.set(nx, ny, nz).applyQuaternion(this.tmpQ);
+            position.x += this.tmpG.x * push;
+            position.y += this.tmpG.y * push;
+            position.z += this.tmpG.z * push;
+            const impactSpeed = Math.max(0, -(velocity.x * this.tmpG.x + velocity.y * this.tmpG.y + velocity.z * this.tmpG.z)) + velocity.length() * 0.16;
+            velocity.reflect(this.tmpG).multiplyScalar(0.32);
+            if (impactSpeed > 4) {
+                this.damagePlayer((impactSpeed - 3) * 1.65, label);
+                if (this.collisionMessageCooldown <= 0) {
+                    this.collisionMessageCooldown = 1.4;
+                    this.ui.showToast(`Collision: ${label}`, 'danger');
+                }
+            }
+            this.autopilot = false;
+        };
         const dock = this.activeDockObstacle();
         if (dock)
             collide(dock.x, dock.y, dock.z, dock.collisionRadius, LOCATIONS[dock.id].name);
         else {
             const margin = MAX_FIELD_OBSTACLE_RADIUS;
             const label = this.activeInstanceId === 'shardbelt' ? 'asteroid' : 'wreckage';
-            this.forEachObstacleInBox(position.x - margin, position.y - margin, position.z - margin, position.x + margin, position.y + margin, position.z + margin, (obstacle) => collide(obstacle.x, obstacle.y, obstacle.z, obstacle.collisionRadius, label));
+            this.forEachObstacleInBox(position.x - margin, position.y - margin, position.z - margin, position.x + margin, position.y + margin, position.z + margin, (obstacle) => {
+                if (obstacle.box)
+                    collideBox(obstacle, label);
+                else
+                    collide(obstacle.x, obstacle.y, obstacle.z, obstacle.collisionRadius, label);
+            });
         }
     }
     updatePlayerWeapons(dt, actions) {
@@ -3032,8 +3115,25 @@ export class GameSession {
                 // wrongly block a clearly-clear mining beam.
                 return { id: node.id, x: node.position[0], y: node.position[1], z: node.position[2], radius, losRadius: node.radius * 0.9, collisionRadius: radius };
             });
-        if (this.activeInstanceId === 'mourning-line')
-            return this.graveyard.map((piece) => ({ id: piece.id, x: piece.position[0], y: piece.position[1], z: piece.position[2], radius: piece.collisionRadius, losRadius: piece.collisionRadius, collisionRadius: piece.collisionRadius }));
+        if (this.activeInstanceId === 'mourning-line') {
+            return this.graveyard.map((piece) => {
+                const [hx, hy, hz] = piece.halfExtents;
+                const q = this.tmpQ.setFromEuler(this.tmpEuler.set(piece.rotation[0], piece.rotation[1], piece.rotation[2], 'XYZ'));
+                // radius is the bounding sphere used for the spatial grid and
+                // avoidance; hard collision uses the oriented box so a flat
+                // panel blocks its face without an inflated sphere around it.
+                return {
+                    id: piece.id,
+                    x: piece.position[0],
+                    y: piece.position[1],
+                    z: piece.position[2],
+                    radius: Math.hypot(hx, hy, hz),
+                    losRadius: piece.collisionRadius,
+                    collisionRadius: Math.hypot(hx, hy, hz),
+                    box: { hx, hy, hz, qx: q.x, qy: q.y, qz: q.z, qw: q.w },
+                };
+            });
+        }
         return [];
     }
     locationCollisionRadius(location) {

@@ -13,6 +13,19 @@ const sphericalOffset = (rng, radius, inner = 0) => {
     ];
 };
 const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+// Base half-extents of each graveyard debris geometry, before the per-piece
+// scale. These must mirror createGraveyard's geometryFor so the collision box
+// is exactly the shape the player sees (the 0.06-thick panels especially — a
+// sphere can never approximate a flat slab).
+export const GRAVEYARD_GEOMETRY_HALF_EXTENTS = {
+    engine: [1, 0.5, 1],
+    panel: [0.5, 0.06, 0.5],
+    disc: [1, 0.08, 1],
+    ring: [1.18, 0.18, 1.18],
+    spine: [0.17, 0.17, 0.5],
+    beam: [0.5, 0.5, 0.5],
+    hull: [0.5, 0.5, 0.5],
+};
 export const generateAsteroidField = (seed, depleted, scanned = []) => {
     const rng = seededRandom(`${seed}:asteroid-field`);
     const center = LOCATIONS.shardbelt.position;
@@ -222,9 +235,13 @@ export const generateGraveyardPieces = (seed) => {
     // Collision spheres may be tuned smaller than a long piece's visual extent
     // (the carrier keels keep the passage open), but they must never exceed the
     // visual bounding radius — an oversized sphere is an invisible wall that
-    // traps the ship.
+    // traps the ship. The sphere survives only as the LOS blocking radius; hard
+    // collision uses halfExtents as an oriented box so a flat panel blocks its
+    // whole face without ballooning into an invisible sphere.
     for (const piece of pieces) {
-        const bounding = Math.hypot(piece.scale[0] / 2, piece.scale[1] / 2, piece.scale[2] / 2);
+        const base = GRAVEYARD_GEOMETRY_HALF_EXTENTS[piece.kind] ?? [0.5, 0.5, 0.5];
+        piece.halfExtents = [base[0] * piece.scale[0], base[1] * piece.scale[1], base[2] * piece.scale[2]];
+        const bounding = Math.hypot(piece.halfExtents[0], piece.halfExtents[1], piece.halfExtents[2]);
         piece.collisionRadius = Math.min(piece.collisionRadius, bounding);
     }
     return pieces;
