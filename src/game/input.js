@@ -19,6 +19,7 @@ export class InputManager {
     touchEdges = new Set();
     joystickX = 0;
     joystickY = 0;
+    joystickKnob;
     throttleSet;
     activeThrottlePointer;
     gamepadButtons = new Map();
@@ -65,6 +66,10 @@ export class InputManager {
         this.touchHeld.clear();
         this.joystickX = 0;
         this.joystickY = 0;
+        if (this.joystickKnob) {
+            this.joystickKnob.style.left = '50%';
+            this.joystickKnob.style.top = '50%';
+        }
     };
     // ---- tilt (device orientation) steering ----
     bindTilt() {
@@ -218,6 +223,47 @@ export class InputManager {
                     release(event);
             });
         });
+        const stick = this.root.querySelector('[data-touch-stick]');
+        const knob = this.root.querySelector('[data-touch-stick-knob]');
+        if (stick && knob) {
+            this.joystickKnob = knob;
+            let stickPointer;
+            const centerStick = () => {
+                stickPointer = undefined;
+                this.joystickX = 0;
+                this.joystickY = 0;
+                knob.style.left = '50%';
+                knob.style.top = '50%';
+            };
+            const moveStick = (event) => {
+                const rect = stick.getBoundingClientRect();
+                const scale = stick.offsetWidth > 0 ? rect.width / stick.offsetWidth : 1;
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+                const halfTravel = Math.max(1, (stick.offsetWidth - knob.offsetWidth) / 2);
+                const dx = clamp((event.clientX - cx) / scale, -halfTravel, halfTravel);
+                const dy = clamp((event.clientY - cy) / scale, -halfTravel, halfTravel);
+                this.joystickX = dx / halfTravel;
+                this.joystickY = dy / halfTravel;
+                knob.style.left = `calc(50% + ${dx}px)`;
+                knob.style.top = `calc(50% + ${dy}px)`;
+            };
+            stick.addEventListener('pointerdown', (event) => {
+                stickPointer = event.pointerId;
+                stick.setPointerCapture(event.pointerId);
+                moveStick(event);
+            });
+            stick.addEventListener('pointermove', (event) => {
+                if (event.pointerId === stickPointer)
+                    moveStick(event);
+            });
+            const releaseStick = (event) => {
+                if (event.pointerId === stickPointer)
+                    centerStick();
+            };
+            stick.addEventListener('pointerup', releaseStick);
+            stick.addEventListener('pointercancel', releaseStick);
+        }
     }
     keyAxis(positive, negative) {
         const pos = positive.some((code) => this.keys.has(code)) ? 1 : 0;

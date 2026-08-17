@@ -9,7 +9,7 @@ import { EntityStore } from './entityStore.js';
 import { SpaceRenderer } from './render.js';
 import { saveGame } from './save.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
-import { generateAsteroidField, generateGraveyardPieces, generateWreckNodes } from './worldData.js';
+import { asteroidCollisionRadius, generateAsteroidField, generateGraveyardPieces, generateWreckNodes } from './worldData.js';
 import { PILOT_LINES, pilotMod, rollPilot, TEMPERAMENT_LABELS, TIER_LABELS } from './pilots.js';
 import { playerShipVariant, shipVariantForRole } from './voxelModels.js';
 const FORWARD = new THREE.Vector3(0, 0, -1);
@@ -19,6 +19,10 @@ const RIGHT = new THREE.Vector3(1, 0, 0);
 // rank, and the valuable-load callouts) — remembered in pilotLineHistory.said.
 const PILOT_ONESHOT_KEYS = new Set(['contact', 'rank', 'case', 'cargo']);
 const PLAYER_RADIUS = 1.25;
+// The widest rendered field obstacle (a scaled monolith ≈ 130u × 1.6) exceeds
+// the old 140u collision margin, so grid queries must pad by this much to catch
+// the surface of the biggest rocks before the ship is inside them.
+const MAX_FIELD_OBSTACLE_RADIUS = 224;
 const HYPERDRIVE_THREAT_RADIUS = 360;
 const HYPERDRIVE_CRUISE_SPEED = 50000;
 const HYPERDRIVE_DISPLAY_SPEED = 1000;
@@ -30,10 +34,12 @@ const AUTO_DOCK_SPEED = 8;
 const DOCK_SAFE_RADIUS = 320;
 const COMBAT_CALM_SECONDS = 40;
 const HYPERDRIVE_ALIGNMENT = 0.88;
-const MAP_CONTACT_RANGE = 360;
-const MAP_RESOURCE_CONTACT_RANGE = 150;
+// Nav-map contact radii track the doubled base sensor range (radarRange 800/1200),
+// so the map and radar show the same volume target selection can reach.
+const MAP_CONTACT_RANGE = 720;
+const MAP_RESOURCE_CONTACT_RANGE = 300;
 const MAP_RESOURCE_CONTACT_LIMIT = 48;
-const MAP_WRECK_CONTACT_RANGE = 300;
+const MAP_WRECK_CONTACT_RANGE = 600;
 const MAP_WRECK_CONTACT_LIMIT = 48;
 const TARGET_TAP_DRIFT = 14;
 // Fixed-timestep simulation: the sim advances in exact 1/60s steps regardless of
@@ -237,6 +243,9 @@ export class GameSession {
     hyperdriveFx = 'none';
     hyperdriveSpoolStartedAt = 0;
     hyperdriveFxUntil = 0;
+    // Throttle the ship was holding when the current jump started; restored on
+    // every hyperdrive exit so a jump never silently changes the cruise speed.
+    hyperdriveReturnThrottle = 0.35;
     lastCombatAt = -Infinity;
     entityCounter = 0;
     projectileCounter = 0;
@@ -655,6 +664,7 @@ export class GameSession {
             this.hyperdriveEncounterAt = null;
             this.hyperdriveFx = 'drop';
             this.hyperdriveFxUntil = this.save.world.time + HYPERDRIVE_FX_DURATION;
+            this.save.player.throttle = clamp(this.hyperdriveReturnThrottle, 0, 1);
             this.ui.showToast('Hyperdrive disengaged by manual input.', 'warning');
         }
         // Afterburner: the burn is live whenever the button is held with fuel
@@ -675,6 +685,7 @@ export class GameSession {
                 this.hyperdriveFx = 'interrupt';
                 this.hyperdriveFxUntil = this.save.world.time + HYPERDRIVE_INTERRUPT_DURATION;
                 this.snapToCombatSpeed();
+                this.save.player.throttle = clamp(this.hyperdriveReturnThrottle, 0, 1);
                 // Re-sync the local velocity: it was captured before the break, so
                 // otherwise the stale cruise vector would overwrite the combat-speed snap.
                 velocity.copy(vec(this.save.player.velocity));
@@ -760,7 +771,7 @@ export class GameSession {
             this.hyperdriveEncounterAt = null;
             this.hyperdriveFx = 'drop';
             this.hyperdriveFxUntil = this.save.world.time + HYPERDRIVE_FX_DURATION;
-            this.save.player.throttle = 0.25;
+            this.save.player.throttle = clamp(this.hyperdriveReturnThrottle, 0, 1);
             this.save.player.velocity = tuple(FORWARD.clone().applyQuaternion(orientation).multiplyScalar(10));
             this.ui.showToast(`Hyperdrive arrival: ${nav.name}.`, 'success');
             this.audio.play('success');
@@ -814,7 +825,7 @@ export class GameSession {
         if (dock)
             collide(dock.x, dock.y, dock.z, dock.collisionRadius, LOCATIONS[dock.id].name);
         else {
-            const margin = 140;
+            const margin = MAX_FIELD_OBSTACLE_RADIUS;
             const label = this.activeInstanceId === 'shardbelt' ? 'asteroid' : 'wreckage';
             this.forEachObstacleInBox(position.x - margin, position.y - margin, position.z - margin, position.x + margin, position.y + margin, position.z + margin, (obstacle) => collide(obstacle.x, obstacle.y, obstacle.z, obstacle.collisionRadius, label));
         }
@@ -918,7 +929,7 @@ export class GameSession {
             this.renderer.setUtilityBeam(false, mode, this.save.player.position);
             return;
         }
-        const distance = playerPosition.distanceTo(vec(target.position));
+        const distance = this.surfaceDistance(playerPosition, target);
         if (distance > range) {
             this.renderer.setUtilityBeam(false, mode, this.save.player.position);
             if (this.hintCooldown <= 0) {
@@ -1168,7 +1179,7 @@ export class GameSession {
             return;
         }
         const stats = getEffectiveShipStats(this.save.player);
-        const distance = vec(this.save.player.position).distanceTo(vec(target.position));
+        const distance = this.surfaceDistance(vec(this.save.player.position), target);
         if (distance > stats.scanRange) {
             this.ui.showToast(`Target outside scan range (${Math.round(distance)} / ${stats.scanRange}).`, 'warning');
             return;
@@ -1232,7 +1243,12 @@ export class GameSession {
             this.ui.showToast('No targets in sensor range.', 'info');
             return;
         }
-        const currentIndex = candidates.findIndex((entry) => entry.id === this.save.player.currentTargetId);
+        let currentIndex = candidates.findIndex((entry) => entry.id === this.save.player.currentTargetId);
+        // A ship that just surrendered drops out of the hostile tier, so the next
+        // press restarts selection at the top of the hierarchy (closest remaining
+        // threat) instead of stepping into the non-hostile contact list.
+        if (this.ships.some((entry) => entry.id === this.save.player.currentTargetId && entry.surrendered))
+            currentIndex = -1;
         const next = candidates[(currentIndex + 1) % candidates.length];
         // Mode follows the selected target so the touch pads and radar filters match.
         if (next.kind === 'ship')
@@ -1250,7 +1266,7 @@ export class GameSession {
     }
     targetNearestHostile() {
         const player = vec(this.save.player.position);
-        const sensorRange = getEffectiveShipStats(this.save.player).scanRange * 2.4;
+        const sensorRange = getEffectiveShipStats(this.save.player).radarRange * 2.4;
         const nearest = this.ships
             .filter((entry) => entry.hostile && entry.hull > 0 && player.distanceTo(vec(entry.position)) <= sensorRange)
             .sort((a, b) => player.distanceToSquared(vec(a.position)) - player.distanceToSquared(vec(b.position)))[0];
@@ -1269,7 +1285,7 @@ export class GameSession {
         if (!this.save.player.currentTargetId)
             return;
         const player = vec(this.save.player.position);
-        const sensor = getEffectiveShipStats(this.save.player).scanRange * 2.2;
+        const sensor = getEffectiveShipStats(this.save.player).radarRange * 2.2;
         const nearest = this.ships
             .filter((entry) => entry.hostile && entry.hull > 0 && player.distanceTo(vec(entry.position)) < sensor)
             .sort((a, b) => player.distanceToSquared(vec(a.position)) - player.distanceToSquared(vec(b.position)))[0];
@@ -1283,7 +1299,7 @@ export class GameSession {
         const orientation = quat(this.save.player.rotation);
         const forward = FORWARD.clone().applyQuaternion(orientation);
         const stats = getEffectiveShipStats(this.save.player);
-        const inRange = (position) => player.distanceTo(vec(position)) < stats.scanRange * 2.2;
+        const inRange = (position) => player.distanceTo(vec(position)) < stats.radarRange * 2.2;
         const byDistance = (a, b) => player.distanceToSquared(vec(a.position)) - player.distanceToSquared(vec(b.position));
         // Tier 1 — opponents: hostile ships in sensor range, closest first.
         const opponents = this.ships
@@ -1326,12 +1342,12 @@ export class GameSession {
                 others.push({ kind: 'ship', id: entry.id, position: entry.position, name: entry.name });
         if (this.activeInstanceId === 'shardbelt') {
             for (const node of this.asteroids)
-                if (node.remaining > 0 && player.distanceTo(vec(node.position)) < stats.scanRange)
+                if (node.remaining > 0 && player.distanceTo(vec(node.position)) - asteroidCollisionRadius(node) < stats.radarRange)
                     others.push({ kind: 'asteroid', id: node.id, position: node.position, name: node.tunnelPart ? 'Rock Crown Deposit' : 'Asteroid Deposit' });
         }
         if (this.activeInstanceId === 'mourning-line') {
             for (const node of this.wreckNodes)
-                if (node.remaining > 0 && player.distanceTo(vec(node.position)) < stats.scanRange)
+                if (node.remaining > 0 && player.distanceTo(vec(node.position)) - node.radius < stats.radarRange)
                     others.push({ kind: 'wreck', id: node.id, position: node.position, name: node.name });
         }
         for (const id of NAV_LOCATION_IDS) {
@@ -1384,7 +1400,8 @@ export class GameSession {
         // gone from the touch cockpit (it was the only gate before extraction).
         if ((kind === 'asteroid' || kind === 'wreck') && target.kind === kind && this.scanCooldown <= 0) {
             const node = (kind === 'asteroid' ? this.asteroids : this.wreckNodes).find((entry) => entry.id === target.id);
-            if (node && !node.scanned && vec(this.save.player.position).distanceTo(vec(node.position)) <= getEffectiveShipStats(this.save.player).scanRange)
+            const edge = node ? (kind === 'asteroid' ? asteroidCollisionRadius(node) : node.radius) : 0;
+            if (node && !node.scanned && vec(this.save.player.position).distanceTo(vec(node.position)) - edge <= getEffectiveShipStats(this.save.player).scanRange)
                 this.scanTarget();
         }
     }
@@ -1429,6 +1446,7 @@ export class GameSession {
             this.hyperdriveFx = 'drop';
             this.hyperdriveFxUntil = this.save.world.time + HYPERDRIVE_FX_DURATION;
             this.snapToCombatSpeed();
+            this.save.player.throttle = clamp(this.hyperdriveReturnThrottle, 0, 1);
             this.ui.showToast('Hyperdrive disengaged.', 'info');
             return;
         }
@@ -1441,6 +1459,7 @@ export class GameSession {
         }
         const player = vec(this.save.player.position);
         const nav = LOCATIONS[this.save.player.navTargetId];
+        this.hyperdriveReturnThrottle = this.save.player.throttle;
         this.autopilot = true;
         this.hyperdriveFx = 'spooling';
         this.hyperdriveSpoolStartedAt = this.save.world.time;
@@ -2984,15 +3003,50 @@ export class GameSession {
             z: location.position[2],
             radius: location.radius,
             losRadius: location.kind === 'planet' ? location.radius + 60 : location.radius * 0.73,
-            collisionRadius: location.kind === 'planet' ? location.radius + 55 : location.radius * 0.72,
+            collisionRadius: this.locationCollisionRadius(location),
         };
     }
     activeFieldObstacles() {
         if (this.activeInstanceId === 'shardbelt')
-            return this.asteroids.map((node) => ({ id: node.id, x: node.position[0], y: node.position[1], z: node.position[2], radius: node.radius, losRadius: node.radius * 0.9, collisionRadius: node.radius * 0.88 }));
+            return this.asteroids.map((node) => {
+                const radius = asteroidCollisionRadius(node);
+                // Hard collision and avoidance use the visual bounding sphere, but
+                // ray/LOS blocking uses the nominal radius: the bounding sphere is
+                // inflated across the narrow axes of an elongated rock, which would
+                // wrongly block a clearly-clear mining beam.
+                return { id: node.id, x: node.position[0], y: node.position[1], z: node.position[2], radius, losRadius: node.radius * 0.9, collisionRadius: radius };
+            });
         if (this.activeInstanceId === 'mourning-line')
             return this.graveyard.map((piece) => ({ id: piece.id, x: piece.position[0], y: piece.position[1], z: piece.position[2], radius: piece.collisionRadius, losRadius: piece.collisionRadius, collisionRadius: piece.collisionRadius }));
         return [];
+    }
+    locationCollisionRadius(location) {
+        return location.kind === 'planet' ? location.radius + 55 : location.radius * 0.72;
+    }
+    // Distance reads for large bodies are measured to the collidable surface,
+    // not the center: scanning, mining, salvage, and landing all care how far
+    // the hull is from the rock/body, not from an abstract center point.
+    targetSurfaceRadius(target) {
+        if (!target)
+            return 0;
+        if (target.kind === 'asteroid') {
+            const node = this.asteroids.find((entry) => entry.id === target.id);
+            return node ? asteroidCollisionRadius(node) : 0;
+        }
+        if (target.kind === 'wreck') {
+            const node = this.wreckNodes.find((entry) => entry.id === target.id);
+            return node ? node.radius : 0;
+        }
+        if (target.kind === 'location') {
+            const location = LOCATIONS[target.id];
+            return location ? this.locationCollisionRadius(location) : 0;
+        }
+        return 0;
+    }
+    surfaceDistance(position, target) {
+        if (!target)
+            return 0;
+        return Math.max(0, position.distanceTo(vec(target.position)) - this.targetSurfaceRadius(target));
     }
     ensureObstacleGrid() {
         // Drifting rocks and wreckage move slowly, so the grid is rebuilt at most
@@ -3221,7 +3275,7 @@ export class GameSession {
         if (dock)
             accumulate(dock);
         else {
-            const margin = range + lookahead + 140;
+            const margin = range + lookahead + MAX_FIELD_OBSTACLE_RADIUS;
             this.forEachObstacleInBox(px - margin, py - margin, pz - margin, px + margin, py + margin, pz + margin, accumulate);
         }
         return this.tmpAvoidance.set(ax, ay, az);
@@ -3271,7 +3325,10 @@ export class GameSession {
             const oy = obstacle.y - py;
             const oz = obstacle.z - pz;
             const distSq = ox * ox + oy * oy + oz * oz;
-            if (distSq >= maxRange * maxRange || distSq < 0.0001)
+            // The rock's own radius is part of its reach: a big monolith's surface
+            // enters the braking window while its center is still far outside it.
+            const reach = maxRange + obstacle.radius;
+            if (distSq >= reach * reach || distSq < 0.0001)
                 return;
             const dist = Math.sqrt(distSq);
             const inv = 1 / dist;
@@ -3286,7 +3343,7 @@ export class GameSession {
         if (dock)
             accumulate(dock);
         else
-            this.forEachObstacleInBox(px - maxRange, py - maxRange, pz - maxRange, px + maxRange, py + maxRange, pz + maxRange, accumulate);
+            this.forEachObstacleInBox(px - (maxRange + MAX_FIELD_OBSTACLE_RADIUS), py - (maxRange + MAX_FIELD_OBSTACLE_RADIUS), pz - (maxRange + MAX_FIELD_OBSTACLE_RADIUS), px + (maxRange + MAX_FIELD_OBSTACLE_RADIUS), py + (maxRange + MAX_FIELD_OBSTACLE_RADIUS), pz + (maxRange + MAX_FIELD_OBSTACLE_RADIUS), accumulate);
         return closest;
     }
     lineBlocked(start, end, ignoreId) {
@@ -3692,7 +3749,7 @@ export class GameSession {
         if (target) {
             const projection = this.renderer.projectToScreen(target.position);
             const edge = this.targetEdge(projection);
-            const distance = player.distanceTo(vec(target.position));
+            const distance = this.surfaceDistance(player, target);
             const screen = { screenX: projection.x, screenY: projection.y, onScreen: projection.visible && !projection.behind, edge };
             if (target.kind === 'ship') {
                 const ship = this.ships.find((entry) => entry.id === target.id);
@@ -3850,7 +3907,7 @@ export class GameSession {
         const contacts = [];
         const player = vec(this.save.player.position);
         const inverse = quat(this.save.player.rotation).invert();
-        const range = this.save.player.equipment.includes('radar-mk2') ? 280 : 190;
+        const range = this.save.player.equipment.includes('radar-mk2') ? 560 : 380;
         const add = (position, type, selected, surfaceOffset = 0) => {
             const relative = vec(position).sub(player).applyQuaternion(inverse);
             const distance = Math.hypot(relative.x, relative.z) - surfaceOffset;

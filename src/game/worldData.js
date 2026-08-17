@@ -114,6 +114,11 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
     }
     return nodes;
 };
+// The rendered rock is a distorted icosahedron scaled by node.scale on each
+// axis, so the widest axis — not the nominal node.radius — is what a ship
+// actually touches. This is the single source of truth for both hard collision
+// and "distance to the surface" reads (scanning, mining, landing).
+export const asteroidCollisionRadius = (node) => node.radius * Math.max(node.scale[0], node.scale[1], node.scale[2]);
 export const generateGraveyardPieces = (seed) => {
     const rng = seededRandom(`${seed}:graveyard-pieces`);
     const center = LOCATIONS['mourning-line'].position;
@@ -213,6 +218,14 @@ export const generateGraveyardPieces = (seed) => {
                 ? [randomBetween(rng, -0.12, 0.12), randomBetween(rng, -0.12, 0.12), randomBetween(rng, -0.12, 0.12)]
                 : [0, 0, 0],
         });
+    }
+    // Collision spheres may be tuned smaller than a long piece's visual extent
+    // (the carrier keels keep the passage open), but they must never exceed the
+    // visual bounding radius — an oversized sphere is an invisible wall that
+    // traps the ship.
+    for (const piece of pieces) {
+        const bounding = Math.hypot(piece.scale[0] / 2, piece.scale[1] / 2, piece.scale[2] / 2);
+        piece.collisionRadius = Math.min(piece.collisionRadius, bounding);
     }
     return pieces;
 };

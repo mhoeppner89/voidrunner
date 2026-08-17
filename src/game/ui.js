@@ -17,7 +17,7 @@ export const callsignHandle = (callsign) => {
     const quoted = callsign.match(/“[^”]+”/);
     return quoted ? quoted[0].slice(1, -1) : callsign;
 };
-const GAME_VERSION = '0.4.1';
+const GAME_VERSION = '0.4.2';
 export class GameUI {
     root;
     viewport;
@@ -117,9 +117,11 @@ export class GameUI {
                 <div class="touch-throttle-thumb" data-touch-throttle-thumb></div>
                 <span class="touch-throttle-label" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 2.5v19"/><path d="M5.5 8.5H12"/><circle cx="16.8" cy="8.5" r="2.4"/></svg></span>
               </div>
-              <button class="touch-boost" data-touch-action="afterburner" aria-label="Afterburner — hold"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" fill-rule="evenodd"><path d="M12 2.2C7.9 7.5 5.4 10.3 5.4 14a6.6 6.6 0 0 0 13.2 0c0-3.7-2.5-6.5-6.6-11.8Zm0 7c-2 2.6-2.8 3.8-2.8 5.3a2.8 2.8 0 0 0 5.6 0c0-1.5-.8-2.7-2.8-5.3Z"/></svg></button>
+              <div class="touch-stick" data-touch-stick aria-label="Steering stick"><div class="touch-stick-rings" aria-hidden="true"></div><div class="touch-stick-knob" data-touch-stick-knob></div></div>
+              <button class="touch-boost touch-boost-left" data-touch-action="afterburner" aria-label="Afterburner — hold"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" fill-rule="evenodd"><path d="M12 2.2C7.9 7.5 5.4 10.3 5.4 14a6.6 6.6 0 0 0 13.2 0c0-3.7-2.5-6.5-6.6-11.8Zm0 7c-2 2.6-2.8 3.8-2.8 5.3a2.8 2.8 0 0 0 5.6 0c0-1.5-.8-2.7-2.8-5.3Z"/></svg></button>
             </div>
             <div class="touch-right">
+              <button class="touch-boost touch-boost-right" data-touch-action="afterburner" aria-label="Afterburner — hold"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" fill-rule="evenodd"><path d="M12 2.2C7.9 7.5 5.4 10.3 5.4 14a6.6 6.6 0 0 0 13.2 0c0-3.7-2.5-6.5-6.6-11.8Zm0 7c-2 2.6-2.8 3.8-2.8 5.3a2.8 2.8 0 0 0 5.6 0c0-1.5-.8-2.7-2.8-5.3Z"/></svg></button>
               <button id="touch-fire" class="touch-fire" data-touch-action="fire" aria-label="Fire — hold"><svg data-icon="fire" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.6"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg></button>
               <button id="touch-missile" class="touch-missile" data-touch-action="missile" aria-label="Missile"><svg data-icon="missile" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.4 9.3 8.8h5.4Z"/><path d="M9.3 8.8h5.4v6.4H9.3Z"/><path d="M9.3 15.2 6.8 21M14.7 15.2l2.5 5.8"/></svg><svg data-icon="scan" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" class="is-hidden"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5.5 5.5"/></svg></button>
             </div>
@@ -1291,6 +1293,8 @@ export class GameUI {
         this.commsBarTimer = window.setTimeout(() => {
             bar.classList.remove('active');
             bar.textContent = '';
+            bar.style.color = '';
+            bar.style.borderColor = '';
         }, duration);
     }
     // Story-mission display: a pinned amber transmission on the comms bar.
@@ -1320,6 +1324,8 @@ export class GameUI {
             bar.classList.remove('active', 'story');
             bar.setAttribute('data-ui-command', 'open-chat');
             bar.textContent = '';
+            bar.style.color = '';
+            bar.style.borderColor = '';
         }
         window.clearTimeout(this.commsBarTimer);
         this.storyDismissed = true;
@@ -1328,15 +1334,25 @@ export class GameUI {
         const panel = this.root.querySelector('#chat-panel');
         if (!panel)
             return;
-        const rows = [...this.commsLog].reverse().map((entry) => {
+        // Screen-aware transcript: show only as many of the newest lines as the
+        // viewport can hold comfortably (~52px of height per line), so a short
+        // landscape phone isn't handed a wall of cramped rows. The list still
+        // scrolls for the rest when a line wraps.
+        const heightBudget = Math.floor((window.innerHeight || 800) / 52);
+        const maxRows = Math.min(this.commsLog.length, Math.max(5, heightBudget));
+        const visible = this.commsLog.slice(-maxRows);
+        const rows = [...visible].reverse().map((entry) => {
             const color = relationColor(entry.relation);
             return `<div class="comms-row" style="border-left-color:${color};"><b style="color:${color};">${escapeHtml(callsignHandle(entry.callsign))}</b><p>${escapeHtml(entry.line)}</p></div>`;
         }).join('');
+        const countLabel = visible.length < this.commsLog.length
+            ? `Showing ${visible.length} of ${this.commsLog.length} transmissions`
+            : `${this.commsLog.length} transmission${this.commsLog.length === 1 ? '' : 's'} recorded`;
         panel.innerHTML = `
       <div class="modal-card comms-card">
         <header><div><span class="eyebrow">COMMS LOG / PAUSED</span><h2>Incoming transmissions</h2></div><button data-ui-command="close-chat">CLOSE</button></header>
         <div class="comms-log-list">${rows.length ? rows : '<p class="comms-log-empty">No transmissions received.</p>'}</div>
-        <footer><span>${this.commsLog.length} transmission${this.commsLog.length === 1 ? '' : 's'} recorded</span></footer>
+        <footer><span>${countLabel}</span></footer>
       </div>`;
         this.hidePause();
         this.hideShipMenu();

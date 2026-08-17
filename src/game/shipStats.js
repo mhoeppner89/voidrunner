@@ -12,8 +12,11 @@ export const getEffectiveShipStats = (player) => {
         armor: base.armor + (has('armor-mk2') ? 40 : 0),
         cargo: base.cargo + (has('cargo-pods') ? 18 : 0),
         gunDamage: base.gunDamage * (has('pulse-mk2') ? 1.35 : 1),
-        scanRange: has('radar-mk2') ? 1200 : 800,
-        miningRange: has('mining-mk2') ? 200 : 150,
+        // Radar (sensor) range decides what appears as a selectable target; the
+        // active SCAN range is separate and shorter — identify, not just see.
+        radarRange: has('radar-mk2') ? 1200 : 800,
+        scanRange: has('radar-mk2') ? 450 : 300,
+        miningRange: 100,
         miningRate: has('mining-mk2') ? 1.7 : 1,
         salvageRate: has('salvage-mk2') ? 1.7 : 1,
         salvageRange: has('salvage-mk2') ? 68 : 44,

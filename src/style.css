@@ -593,12 +593,63 @@ button.compact {
   height: 100%;
 }
 
+/* Steering stick: the virtual joystick for stick steering. Hidden while tilt
+   steering is active; in stick mode it takes the bottom-left corner and the
+   throttle rides above it. */
+.touch-stick {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: none;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: pointer;
+}
+
+.steering-stick .touch-stick {
+  display: block;
+}
+
+.touch-stick-rings {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(105, 212, 189, 0.42);
+  border-radius: 50%;
+}
+
+.touch-stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(128, 142, 136, 0.92);
+  border: 2px solid #9bb3ab;
+  box-shadow: 0 0 12px rgba(105, 212, 189, 0.3);
+  transform: translate(-50%, -50%);
+}
+
 .touch-boost {
   width: 64px;
   height: 64px;
   color: #ffe9bd;
   background: radial-gradient(circle at 38% 32%, rgba(196, 138, 62, 0.95), rgba(74, 45, 16, 0.96));
   border: 2px solid rgba(238, 184, 96, 0.7);
+}
+
+/* The boost pad exists in both columns: under the throttle in tilt mode and
+   above FIRE in stick mode, so the swap needs no cross-column repositioning. */
+.touch-boost-right {
+  display: none;
+}
+
+.steering-stick .touch-boost-right {
+  display: block;
+}
+
+.steering-stick .touch-boost-left {
+  display: none;
 }
 
 .touch-fire {
@@ -2233,7 +2284,9 @@ button.compact {
 .comms-bar {
   position: absolute;
   top: calc(var(--safe-top) + 6px);
-  left: 50%;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
   z-index: 6;
   display: flex;
   width: min(620px, 68vw);
@@ -2241,32 +2294,53 @@ button.compact {
   align-items: center;
   justify-content: center;
   padding: 0.28rem 0.5rem;
-  transform: translateX(-50%);
+  color: var(--void-cyan);
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom-width: 2px;
+  box-shadow: none;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: clamp(0.72rem, 1.15vw, 0.98rem);
+  letter-spacing: 0.03em;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  /* Always tappable: the top edge must open the log even when no live
+     transmission is on the bar. Idle shows only a faint COMMS LOG hint;
+     an active transmission takes over the strip. */
+  pointer-events: auto;
+  cursor: pointer;
+  transition: background-color 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease, color 0.28s ease;
+}
+
+/* Idle hint: visible only while no transmission is on the bar, so the top
+   edge always advertises the log without competing with live chatter. */
+.comms-bar::before {
+  content: "COMMS LOG";
+  font-size: 0.66em;
+  letter-spacing: 0.14em;
+  color: rgba(122, 200, 220, 0.5);
+}
+
+.comms-bar.active {
   color: var(--void-cyan);
   background: rgba(2, 8, 10, 0.9);
   border: 1px solid rgba(48, 161, 195, 0.5);
   border-bottom-width: 2px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: clamp(0.72rem, 1.15vw, 0.98rem);
-  letter-spacing: 0.03em;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  /* Inert while invisible: the bar is a full-width strip across the top of
-     the screen, so leaving it clickable at opacity 0 steals taps/clicks meant
-     for the space view (target picking) behind it. Only the active bar is
-     interactive. */
-  pointer-events: none;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.28s ease;
 }
 
-.comms-bar.active {
-  opacity: 1;
-  pointer-events: auto;
+.comms-bar.active::before {
+  content: none;
+}
+
+/* The comms bar is a quiet persistent affordance, not a lit button: keep its
+   border and tint steady on hover/focus instead of flashing the global amber
+   button highlight. Inline relation colors on an active message still win. */
+#comms-bar:hover,
+#comms-bar:focus-visible {
+  border-color: transparent;
+  filter: none;
 }
 
 /* Story-mission transmissions: pinned amber (no fade until dismissed), a
@@ -2300,6 +2374,9 @@ button.compact {
    each row just the callsign (relation-colored) and the message. */
 .comms-card {
   width: min(560px, 92vw);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .comms-log-list {
@@ -2307,8 +2384,10 @@ button.compact {
   flex-direction: column;
   gap: 0.5rem;
   overflow-y: auto;
-  max-height: 60vh;
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 0.6rem 1rem;
+  touch-action: pan-y;
 }
 
 .comms-log-empty {
@@ -2344,9 +2423,8 @@ button.compact {
 
 .talker-text {
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* Selected-target range lives on the monitor itself now (the per-selection

@@ -1248,18 +1248,39 @@ export class SpaceRenderer {
         }
     }
     createWreckNodes() {
-        const geometry = new THREE.OctahedronGeometry(1, 0);
+        // Salvage nodes are solid chunks of the wreck, not wireframe markers: a
+        // handful of irregular geometries and a rarity tint read as debris worth
+        // extracting rather than "yellow lines forming a shape".
         const root = this.instanceRoots.get('mourning-line');
+        const scrapMap = this.createPixelPanelTexture('wreck-node-scrap', 0x394244, 0x7f8f8c, 'metal');
+        const rustMap = this.createPixelPanelTexture('wreck-node-rust', 0x46352c, 0xa8643e, 'rust');
+        const geometries = [
+            new THREE.IcosahedronGeometry(1, 1),
+            new THREE.DodecahedronGeometry(1, 0),
+            new THREE.BoxGeometry(1.2, 0.7, 1.6),
+            new THREE.CylinderGeometry(0.55, 0.8, 1.5, 8),
+        ];
+        const rarityColor = { rare: 0xc9a24a, uncommon: 0x69a89e, common: 0x778285 };
         this.wreckNodes.forEach((node) => {
-            const material = new THREE.MeshBasicMaterial({
-                color: node.rarity === 'rare' ? 0xd9b86f : node.rarity === 'uncommon' ? 0x79b9ae : 0x647279,
-                transparent: true,
-                opacity: 0.28,
-                wireframe: true,
+            let hash = 2166136261;
+            for (let index = 0; index < node.id.length; index += 1) {
+                hash ^= node.id.charCodeAt(index);
+                hash = (hash * 16777619) >>> 0;
+            }
+            const geometry = geometries[hash % geometries.length];
+            const material = new THREE.MeshStandardMaterial({
+                color: rarityColor[node.rarity],
+                map: node.rarity === 'rare' ? rustMap : scrapMap,
+                roughness: 0.84,
+                metalness: node.rarity === 'rare' ? 0.42 : 0.6,
+                flatShading: true,
+                emissive: 0x000000,
+                emissiveIntensity: 0,
             });
             const marker = new THREE.Mesh(geometry, material);
             marker.position.set(...node.position);
             marker.scale.setScalar(node.radius * 1.6);
+            marker.rotation.set((hash % 5) * 0.7, (hash % 7) * 0.9, (hash % 3) * 0.5);
             marker.visible = node.scanned || node.id === this.selectedWreckId;
             this.tagTargetable(marker, 'wreck', node.id);
             root?.add(marker);
@@ -1275,7 +1296,7 @@ export class SpaceRenderer {
         const grimeMaterial = new THREE.MeshBasicMaterial({
             map: this.createGrimeTexture('wayfarer-canopy'),
             transparent: true,
-            opacity: 0.10,
+            opacity: 0.06,
             depthTest: false,
             depthWrite: false,
             blending: THREE.NormalBlending,
@@ -1579,9 +1600,9 @@ export class SpaceRenderer {
         this.wreckNodeMeshes.forEach((mesh, id) => {
             const node = this.wreckNodes.find((entry) => entry.id === id);
             mesh.visible = Boolean(node?.scanned || id === wreckId);
-            const material = mesh.material;
-            if (material instanceof THREE.MeshBasicMaterial)
-                material.opacity = id === wreckId ? 0.8 : 0.28;
+            const selected = id === wreckId;
+            mesh.material.emissive.setHex(selected ? 0xcfe884 : 0x000000);
+            mesh.material.emissiveIntensity = selected ? 0.6 : 0;
         });
     }
     setActiveInstance(id) {
@@ -1674,22 +1695,21 @@ export class SpaceRenderer {
         const cockpitZoomTarget = afterburner ? COCKPIT_ZOOM_BURN : COCKPIT_ZOOM_IDLE;
         this.cockpitZoom += (cockpitZoomTarget - this.cockpitZoom) * (1 - Math.exp(-8 * dt));
         this.shell?.style.setProperty('--cockpit-zoom', this.cockpitZoom.toFixed(4));
-        // Counter-scale the cockpit group (which now only contains the grime
-        // plane) so it keeps its apparent on-screen size when the FOV widens
-        // (e.g. afterburner 70° → 80°). Without this, the grime shrinks in
-        // screen-percentage during afterburner and reads as "moving away".
-        // The grime then also zooms out with the sprite under burn, but only
-        // ~50% as far, so the dirt reads as sitting closer to the glass than
-        // the frame itself.
-        //   - cruise FOV 70°: scale = 1.000
-        //   - mid FOV    74°: scale = 1.083
-        //   - afterburn  80°: scale = 1.198  (compensates wider frustum)
+        // The grime plane is a camera-space overlay, so widening the FOV
+        // recedes it exactly as far as the starfield — the dirt reads as part
+        // of the sky instead of sitting on the glass. Counter three quarters
+        // of that FOV swing so the grime recedes only ~25% as far as the
+        // stars: it hugs the canopy while the sky pulls back. Scale x/y only —
+        // a uniform scale about the camera origin cancels out and does nothing.
+        //   - cruise FOV 70°: grime scale = 1.000
+        //   - mid FOV    74°: grime scale = 1.057
+        //   - afterburn  80°: grime scale = 1.149  (quarter the starfield recede)
         if (this.cockpit) {
             const baseHalfFovTan = Math.tan(70 * 0.5 * Math.PI / 180);
             const currentHalfFovTan = Math.tan(this.camera.fov * 0.5 * Math.PI / 180);
             const fovCompScale = currentHalfFovTan / baseHalfFovTan;
-            const grimeBurnScale = 1 + (this.cockpitZoom / COCKPIT_ZOOM_IDLE - 1) * 0.5;
-            this.cockpit.scale.setScalar(fovCompScale * grimeBurnScale);
+            const grimeScale = 0.25 + 0.75 * fovCompScale;
+            this.cockpit.scale.set(grimeScale, grimeScale, 1);
         }
         const shiftX = clamp(-angularVelocity[1] * 2.4, -7, 7);
         const shiftY = clamp(angularVelocity[0] * 1.8 - speedRatio * 1.4, -5, 4);
