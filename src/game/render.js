@@ -1183,9 +1183,9 @@ export class SpaceRenderer {
         }
     }
     createGraveyard() {
-        const metalMap = this.createPixelPanelTexture('graveyard-metal', 0x344144, 0x7ca79f, 'metal');
+        const metalMap = this.createPixelPanelTexture('graveyard-metal', 0x4a565a, 0x93b2ad, 'metal');
         metalMap.repeat.set(3.5, 2.2);
-        const rustMap = this.createPixelPanelTexture('graveyard-rust', 0x48362f, 0xb7683e, 'rust');
+        const rustMap = this.createPixelPanelTexture('graveyard-rust', 0x5a4436, 0xc27a48, 'rust');
         rustMap.repeat.set(4.2, 2.6);
         const grouped = new Map();
         for (const piece of this.graveyard) {
@@ -1212,7 +1212,7 @@ export class SpaceRenderer {
             const [kindRaw, finish] = key.split(':');
             const kind = kindRaw;
             const material = new THREE.MeshStandardMaterial({
-                color: finish === 'rust' ? 0x8f7768 : 0x879394,
+                color: finish === 'rust' ? 0xbc9f88 : 0xaeb6ba,
                 map: finish === 'rust' ? rustMap : metalMap,
                 roughness: finish === 'rust' ? 0.92 : 0.76,
                 metalness: finish === 'rust' ? 0.48 : 0.74,
@@ -1252,15 +1252,19 @@ export class SpaceRenderer {
         // handful of irregular geometries and a rarity tint read as debris worth
         // extracting rather than "yellow lines forming a shape".
         const root = this.instanceRoots.get('mourning-line');
-        const scrapMap = this.createPixelPanelTexture('wreck-node-scrap', 0x394244, 0x7f8f8c, 'metal');
-        const rustMap = this.createPixelPanelTexture('wreck-node-rust', 0x46352c, 0xa8643e, 'rust');
+        // Brighter base + stronger accent so the panel/dirt detail actually
+        // reads on a small chunk instead of collapsing into a flat dark blob.
+        // The material color stays a light rarity tint (it multiplies the map),
+        // which keeps the detail visible rather than crushing it into shadow.
+        const scrapMap = this.createPixelPanelTexture('wreck-node-scrap', 0x5c6a70, 0xa8b4ba, 'metal');
+        const rustMap = this.createPixelPanelTexture('wreck-node-rust', 0x5c4638, 0xc48152, 'rust');
         const geometries = [
             new THREE.IcosahedronGeometry(1, 1),
             new THREE.DodecahedronGeometry(1, 0),
             new THREE.BoxGeometry(1.2, 0.7, 1.6),
             new THREE.CylinderGeometry(0.55, 0.8, 1.5, 8),
         ];
-        const rarityColor = { rare: 0xc9a24a, uncommon: 0x69a89e, common: 0x778285 };
+        const rarityColor = { rare: 0xffe2a8, uncommon: 0xcfe0f2, common: 0xd4dce0 };
         this.wreckNodes.forEach((node) => {
             let hash = 2166136261;
             for (let index = 0; index < node.id.length; index += 1) {

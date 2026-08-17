@@ -595,6 +595,7 @@ export class GameSession {
             return;
         }
         this.updatePlayer(dt, actions);
+        this.autoScanDeposit();
         this.autoDockCheck();
         this.updateActiveInstance();
         this.updateBountySpawns();
@@ -637,13 +638,8 @@ export class GameSession {
             this.scanTarget();
         if (actions.autopilot)
             this.toggleHyperdrive();
-        if (actions.missile) {
-            const missileTarget = this.getTargetRef(false);
-            if (missileTarget && (missileTarget.kind === 'asteroid' || missileTarget.kind === 'wreck'))
-                this.scanTarget();
-            else
-                this.fireMissile();
-        }
+        if (actions.missile)
+            this.fireMissile();
     }
     updatePlayer(dt, actions) {
         const stats = getEffectiveShipStats(this.save.player);
@@ -986,7 +982,7 @@ export class GameSession {
         this.renderer.setUtilityBeam(false, this.save.player.mode, this.save.player.position);
         if (this.hintCooldown <= 0) {
             this.hintCooldown = 1.2;
-            this.ui.showToast('SCAN REQUIRED before extraction.', 'warning');
+            this.ui.showToast('Scanner still cycling — hold steady.', 'warning');
         }
     }
     extractAsteroid(node, dt, rate) {
@@ -1163,6 +1159,22 @@ export class GameSession {
         }
         this.ui.showToast(`Tractor captured ${COMMODITIES[pickup.commodity].name}.`, 'success', 2200);
     }
+    // The cockpit has no manual SCAN control anymore: a selected asteroid or
+    // wreck is resolved automatically the moment the ship closes to scan range.
+    // Out-of-range status is rendered on the target monitor by buildHudModel.
+    autoScanDeposit() {
+        if (this.scanCooldown > 0)
+            return;
+        const target = this.getTargetRef();
+        if (!target || (target.kind !== 'asteroid' && target.kind !== 'wreck'))
+            return;
+        const nodes = target.kind === 'asteroid' ? this.asteroids : this.wreckNodes;
+        const node = nodes.find((entry) => entry.id === target.id);
+        if (!node || node.scanned)
+            return;
+        if (this.surfaceDistance(vec(this.save.player.position), target) <= getEffectiveShipStats(this.save.player).scanRange)
+            this.scanTarget();
+    }
     scanTarget() {
         if (this.scanCooldown > 0)
             return;
@@ -1180,7 +1192,13 @@ export class GameSession {
         }
         const stats = getEffectiveShipStats(this.save.player);
         const distance = this.surfaceDistance(vec(this.save.player.position), target);
-        if (distance > stats.scanRange) {
+        if (target.kind === 'asteroid' || target.kind === 'wreck') {
+            // Deposits scan automatically once selected and in range; the
+            // out-of-range status lives on the target monitor, not a toast.
+            if (distance > stats.scanRange)
+                return;
+        }
+        else if (distance > stats.scanRange) {
             this.ui.showToast(`Target outside scan range (${Math.round(distance)} / ${stats.scanRange}).`, 'warning');
             return;
         }
@@ -1396,14 +1414,8 @@ export class GameSession {
             return;
         }
         this.applyTarget(target);
-        // Selecting a deposit resolves it automatically now that the SCAN button is
-        // gone from the touch cockpit (it was the only gate before extraction).
-        if ((kind === 'asteroid' || kind === 'wreck') && target.kind === kind && this.scanCooldown <= 0) {
-            const node = (kind === 'asteroid' ? this.asteroids : this.wreckNodes).find((entry) => entry.id === target.id);
-            const edge = node ? (kind === 'asteroid' ? asteroidCollisionRadius(node) : node.radius) : 0;
-            if (node && !node.scanned && vec(this.save.player.position).distanceTo(vec(node.position)) - edge <= getEffectiveShipStats(this.save.player).scanRange)
-                this.scanTarget();
-        }
+        // Deposits resolve automatically on the next sim step via autoScanDeposit,
+        // so selection needs no manual scan gate here.
     }
     applyTarget(target) {
         this.save.player.currentTargetId = target.id;
@@ -2951,13 +2963,17 @@ export class GameSession {
                 this.ships.splice(index, 1);
         }
     }
-    getWorldZone(position = vec(this.save.player.position)) {
-        if (this.activeInstanceId === 'shardbelt' && position.distanceTo(vec(LOCATIONS.shardbelt.position)) < LOCATIONS.shardbelt.radius)
+    getWorldZone(position = this.save.player.position) {
+        // Accept both tuple arrays (ship spawns pass encounterPosition tuples)
+        // and THREE.Vector3 (player paths) so spawnThreat never crashes on a
+        // bare array when a jump/encounter spawns inside a field.
+        const p = Array.isArray(position) ? vec(position) : position;
+        if (this.activeInstanceId === 'shardbelt' && p.distanceTo(vec(LOCATIONS.shardbelt.position)) < LOCATIONS.shardbelt.radius)
             return 'asteroid-field';
-        if (this.activeInstanceId === 'mourning-line' && position.distanceTo(vec(LOCATIONS['mourning-line'].position)) < LOCATIONS['mourning-line'].radius)
+        if (this.activeInstanceId === 'mourning-line' && p.distanceTo(vec(LOCATIONS['mourning-line'].position)) < LOCATIONS['mourning-line'].radius)
             return 'graveyard';
         const dockLocation = DOCK_LOCATION_IDS.find((id) => id === this.activeInstanceId);
-        if (dockLocation && position.distanceTo(vec(LOCATIONS[dockLocation].position)) < (LOCATIONS[dockLocation].dockRadius ?? 60) + 50)
+        if (dockLocation && p.distanceTo(vec(LOCATIONS[dockLocation].position)) < (LOCATIONS[dockLocation].dockRadius ?? 60) + 50)
             return 'near-location';
         return 'open';
     }
@@ -3651,10 +3667,20 @@ export class GameSession {
             void this.input.enableTilt().then((active) => {
                 if (active)
                     this.input.calibrateTilt();
-                this.ui.setTouchSteering(this.input.tiltActive ? 'tilt' : 'stick');
+                // If permission was refused (or there is no gyro), fall back to
+                // the stick and keep the persisted setting honest instead of
+                // leaving the pause menu showing a tilt mode that never engaged.
+                const mode = this.input.tiltActive ? 'tilt' : 'stick';
+                this.save.settings.steering = mode;
+                this.ui.setTouchSteering(mode);
+                saveGame(this.save);
             });
         }
         else {
+            // Actually switch off tilt input, not just the touch layout — the
+            // joystick was appearing while tilt still steered the ship.
+            this.input.disableTilt();
+            this.save.settings.steering = 'stick';
             this.ui.setTouchSteering('stick');
         }
     }
@@ -3781,11 +3807,21 @@ export class GameSession {
             }
             else if (target.kind === 'asteroid') {
                 const node = this.asteroids.find((entry) => entry.id === target.id);
-                hudTarget = { kind: 'asteroid', name: target.name, subtitle: node.scanned ? `${node.richness > 1.8 ? 'RICH' : node.richness > 1.2 ? 'VIABLE' : 'LEAN'} ORE` : 'MINERAL SIGNATURE', distance, scanned: node.scanned, readout: node.scanned ? `ORE ${node.richness.toFixed(2)} · ${Math.ceil(node.remaining)} units` : 'V / SCAN to analyze deposit', ...screen };
+                const scanStatus = node.scanned
+                    ? `ORE ${node.richness.toFixed(2)} · ${Math.ceil(node.remaining)} units`
+                    : distance > stats.scanRange
+                        ? `OUT OF SCAN RANGE · ${Math.round(distance)}/${stats.scanRange} km`
+                        : 'SCANNING…';
+                hudTarget = { kind: 'asteroid', name: target.name, subtitle: node.scanned ? `${node.richness > 1.8 ? 'RICH' : node.richness > 1.2 ? 'VIABLE' : 'LEAN'} ORE` : 'MINERAL SIGNATURE', distance, scanned: node.scanned, readout: scanStatus, ...screen };
             }
             else if (target.kind === 'wreck') {
                 const node = this.wreckNodes.find((entry) => entry.id === target.id);
-                hudTarget = { kind: 'wreck', name: node.name, subtitle: node.scanned ? `${node.rarity.toUpperCase()} ${COMMODITIES[node.salvage].name}` : 'UNRESOLVED WRECK', distance, scanned: node.scanned, readout: node.scanned ? `HAZARD ${Math.round(node.hazard * 100)} · ${Math.ceil(node.remaining)} recoveries` : 'V / SCAN to identify salvage', ...screen };
+                const scanStatus = node.scanned
+                    ? `HAZARD ${Math.round(node.hazard * 100)} · ${Math.ceil(node.remaining)} recoveries`
+                    : distance > stats.scanRange
+                        ? `OUT OF SCAN RANGE · ${Math.round(distance)}/${stats.scanRange} km`
+                        : 'SCANNING…';
+                hudTarget = { kind: 'wreck', name: node.name, subtitle: node.scanned ? `${node.rarity.toUpperCase()} ${COMMODITIES[node.salvage].name}` : 'UNRESOLVED WRECK', distance, scanned: node.scanned, readout: scanStatus, ...screen };
             }
             else {
                 const location = LOCATIONS[target.id];

@@ -126,6 +126,11 @@ export class InputManager {
         this.tiltEnabled = true;
         return true;
     }
+    disableTilt() {
+        // Stops tilt from driving the ship without losing the stored neutral
+        // and calibration, so re-enabling later is instant (no re-setup).
+        this.tiltEnabled = false;
+    }
     calibrateTilt() {
         this.tiltNeutralBeta = this.tiltBeta;
         this.tiltNeutralGamma = this.tiltGamma;
@@ -156,8 +161,11 @@ export class InputManager {
             const t = clamp((magnitude - TILT_DEADZONE) / TILT_FULL_RANGE, 0, 1);
             return Math.sign(value) * t * this.tiltSensitivity;
         };
-        let pitch = curve(wrapAngle(this.tiltBeta - this.tiltNeutralBeta));
-        let yaw = curve(wrapAngle(this.tiltGamma - this.tiltNeutralGamma));
+        // Inverted by default: the base mapping negates the raw device tilt,
+        // and the invert checkboxes flip it back the other way when the player
+        // opts out of the inverted default.
+        let pitch = -curve(wrapAngle(this.tiltBeta - this.tiltNeutralBeta));
+        let yaw = -curve(wrapAngle(this.tiltGamma - this.tiltNeutralGamma));
         if (this.tiltInvertPitch)
             pitch = -pitch;
         if (this.tiltInvertYaw)

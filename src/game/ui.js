@@ -17,7 +17,7 @@ export const callsignHandle = (callsign) => {
     const quoted = callsign.match(/“[^”]+”/);
     return quoted ? quoted[0].slice(1, -1) : callsign;
 };
-const GAME_VERSION = '0.4.2';
+const GAME_VERSION = '0.4.3';
 export class GameUI {
     root;
     viewport;
@@ -123,7 +123,7 @@ export class GameUI {
             <div class="touch-right">
               <button class="touch-boost touch-boost-right" data-touch-action="afterburner" aria-label="Afterburner — hold"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" fill-rule="evenodd"><path d="M12 2.2C7.9 7.5 5.4 10.3 5.4 14a6.6 6.6 0 0 0 13.2 0c0-3.7-2.5-6.5-6.6-11.8Zm0 7c-2 2.6-2.8 3.8-2.8 5.3a2.8 2.8 0 0 0 5.6 0c0-1.5-.8-2.7-2.8-5.3Z"/></svg></button>
               <button id="touch-fire" class="touch-fire" data-touch-action="fire" aria-label="Fire — hold"><svg data-icon="fire" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.6"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg></button>
-              <button id="touch-missile" class="touch-missile" data-touch-action="missile" aria-label="Missile"><svg data-icon="missile" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.4 9.3 8.8h5.4Z"/><path d="M9.3 8.8h5.4v6.4H9.3Z"/><path d="M9.3 15.2 6.8 21M14.7 15.2l2.5 5.8"/></svg><svg data-icon="scan" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" class="is-hidden"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5.5 5.5"/></svg></button>
+              <button id="touch-missile" class="touch-missile" data-touch-action="missile" aria-label="Missile"><svg data-icon="missile" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.4 9.3 8.8h5.4Z"/><path d="M9.3 8.8h5.4v6.4H9.3Z"/><path d="M9.3 15.2 6.8 21M14.7 15.2l2.5 5.8"/></svg></button>
             </div>
           </div>
           <div class="hud-corner-buttons">
@@ -913,17 +913,17 @@ export class GameUI {
         const utility = mining || salvage;
         fire.classList.toggle('is-mining', mining);
         fire.classList.toggle('is-salvage', salvage);
-        missile.classList.toggle('is-scan', utility);
-        // The pads swap between pre-rendered symbols (FIRE→MINE/SALVAGE,
-        // MISSILE→SCAN) — no text on the cockpit glass.
+        // No manual SCAN pad: deposits resolve automatically on approach, so the
+        // missile pad only ever fires missiles and is inert against rocks/wrecks.
+        missile.disabled = utility;
         const showIcon = (button, name) => {
             for (const icon of button.querySelectorAll('svg'))
                 icon.classList.toggle('is-hidden', icon.dataset.icon !== name);
         };
         showIcon(fire, mining ? 'mine' : salvage ? 'salvage' : 'fire');
-        showIcon(missile, utility ? 'scan' : 'missile');
+        showIcon(missile, 'missile');
         fire.setAttribute('aria-label', mining ? 'Mine — hold' : salvage ? 'Salvage — hold' : 'Fire — hold');
-        missile.setAttribute('aria-label', utility ? 'Scan target' : 'Missile');
+        missile.setAttribute('aria-label', utility ? 'Missile unavailable — auto-scan active' : 'Missile');
     }
     setTargetScreenValue(target) {
         const setText = (selector, value) => {
