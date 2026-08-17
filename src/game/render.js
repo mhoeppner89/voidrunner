@@ -2108,6 +2108,13 @@ export class SpaceRenderer {
     getCameraForward(out = new THREE.Vector3()) {
         return out.set(0, 0, -1).applyQuaternion(this.camera.quaternion).normalize();
     }
+    // The in-game Quality dropdown changes the render tier too (640/720/1280
+    // base), not just the scale — otherwise Low/High mid-session do nothing
+    // beyond the governor's scale tweak.
+    setQualityMode(mode) {
+        this.qualityMode = mode;
+        this.resize();
+    }
     setQualityScale(scale) {
         const next = clamp(scale, 0.55, 1.35);
         if (Math.abs(next - this.lastQualityScale) < 0.05)

@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v53-cargo-shipyard';
+const CACHE = 'voidrunner-v54-bughunt-fixes';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',

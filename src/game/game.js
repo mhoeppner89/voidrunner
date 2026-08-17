@@ -3763,6 +3763,9 @@ export class GameSession {
         }
         else if (key === 'quality' && (value === 'auto' || value === 'low' || value === 'high')) {
             this.save.settings.quality = value;
+            // Apply the tier (640/720/1280 base) as well as the scale; 'auto'
+            // restores the full resolution and lets the governor manage it.
+            this.renderer.setQualityMode(value);
             this.qualityScale = value === 'low' ? 0.72 : 1;
             this.renderer.setQualityScale(this.qualityScale);
         }

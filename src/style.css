@@ -5764,7 +5764,8 @@ button.primary,
 .dock-screen:has(.service-grid) .dock-content,
 .dock-screen:has(.equipment-grid) .dock-content,
 .dock-screen:has(.shipyard-grid) .dock-content,
-.dock-screen:has(.shipyard-detail) .dock-content {
+.dock-screen:has(.shipyard-detail) .dock-content,
+.dock-screen:has(.market-table) .dock-content {
   overflow: auto;
 }
 
