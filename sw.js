@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v52-shipyard-hulls';
+const CACHE = 'voidrunner-v53-cargo-shipyard';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',

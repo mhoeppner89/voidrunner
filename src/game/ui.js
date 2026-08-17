@@ -4,6 +4,7 @@ import { formatCredits, formatDuration } from './random.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
 import { TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 import { shipTopDownProfile } from './voxelModels.js';
+import { ShipPreview } from './shipPreview.js';
 const escapeHtml = (value) => value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const percent = (value, max) => (max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100)));
 // Talker identity for the comms surfaces: the color follows the speaker's
@@ -17,7 +18,7 @@ export const callsignHandle = (callsign) => {
     const quoted = callsign.match(/“[^”]+”/);
     return quoted ? quoted[0].slice(1, -1) : callsign;
 };
-const GAME_VERSION = '0.4.4';
+const GAME_VERSION = '0.4.5';
 export class GameUI {
     root;
     viewport;
@@ -27,6 +28,7 @@ export class GameUI {
     dockTab = 'concourse';
     dockTerminal = 'concourse';
     marketPoint = '';
+    shipDetailId;
     barPanel = 'people';
     barPersonId;
     titleVisible = true;
@@ -38,6 +40,7 @@ export class GameUI {
     // per-frame updateHud path reads nodes from this map instead of re-querying
     // the document dozens of times per frame.
     elementCache = new Map();
+    shipPreviews = [];
     toastId = 0;
     mapPointer;
     lastMapPointerSelection;
@@ -89,7 +92,7 @@ export class GameUI {
           </div>
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="Own ship status display; tap to open ship menu">
             <div class="screen-heading"><span>OWN SHIP STATUS</span><b id="own-ship-name">WAYFARER</b></div>
-            <div class="screen-ship-layout"><div class="screen-flight"><div><span>SPD</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>FUEL</span><b id="screen-own-fuel">100</b><small>%</small></div></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>ARMOR</span><i><b id="screen-own-armor"></b></i><em id="screen-own-armor-value">100</em></div><div><span>HULL</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">100</em></div></div></div>
+            <div class="screen-ship-layout"><div class="screen-flight"><div><span>SPD</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>FUEL</span><b id="screen-own-fuel">100</b><small>%</small></div><div><span>HOLD</span><b id="screen-own-cargo">0.0</b><small id="screen-own-cargo-cap">/32</small></div></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>ARMOR</span><i><b id="screen-own-armor"></b></i><em id="screen-own-armor-value">100</em></div><div><span>HULL</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">100</em></div></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="Radar display; tap to open navigation map">
             <div class="screen-heading"><span>RADAR · TAP MAP</span><b id="screen-radar-zone">OPEN SPACE</b></div>
@@ -155,7 +158,7 @@ export class GameUI {
               <button data-ui-command="calibrate-tilt">SET NEUTRAL</button>
             </div>
           </div>
-          <div class="copyright-note">ORIGINAL RETRO-FUTURE ART · LOCAL AUTOSAVE · TOUCH / PAD / KEYBOARD</div>
+          <div class="copyright-note">LOCAL AUTOSAVE · TOUCH / PAD / KEYBOARD</div>
         </section>
 
         <section id="dock-screen" class="dock-screen is-hidden" aria-label="Docked location"></section>
@@ -207,7 +210,7 @@ export class GameUI {
                 this.mapPointer = undefined;
         });
         this.root.addEventListener('click', (event) => {
-            const target = event.target.closest('[data-ui-command], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-nav-id], [data-trade], [data-mission-id], [data-equipment-id], [data-ship-id], [data-switch-ship], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty]');
+            const target = event.target.closest('[data-ui-command], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-nav-id], [data-trade], [data-mission-id], [data-equipment-id], [data-ship-id], [data-switch-ship], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty]');
             if (!target)
                 return;
             if (target.dataset.uiCommand)
@@ -279,6 +282,14 @@ export class GameUI {
             else if (target.dataset.switchShip) {
                 this.actions?.switchShip(target.dataset.switchShip);
             }
+            else if (target.dataset.shipDetail) {
+                this.shipDetailId = target.dataset.shipDetail;
+                this.renderMarketPoint('shipyard');
+            }
+            else if (target.dataset.shipDetailBack) {
+                this.shipDetailId = undefined;
+                this.renderMarketPoint('shipyard');
+            }
             else if (target.dataset.guildId) {
                 this.actions?.joinGuild(target.dataset.guildId);
             }
@@ -323,7 +334,7 @@ export class GameUI {
         this.root.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter' && event.key !== ' ')
                 return;
-            const target = event.target.closest('[data-ui-command], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-person-id]');
+            const target = event.target.closest('[data-ui-command], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-person-id], [data-ship-detail], [data-ship-detail-back]');
             if (!target)
                 return;
             event.preventDefault();
@@ -474,12 +485,14 @@ export class GameUI {
             this.renderDock();
     }
     hideDock() {
+        this.disposeShipPreviews();
         this.root.querySelector('#dock-screen')?.classList.add('is-hidden');
         this.dockLocation = undefined;
     }
     renderDock() {
         if (!this.save || !this.dockLocation)
             return;
+        this.disposeShipPreviews();
         const dock = this.root.querySelector('#dock-screen');
         const location = LOCATIONS[this.dockLocation];
         dock.style.setProperty('--dock-accent', location.accent);
@@ -602,7 +615,7 @@ export class GameUI {
         <div class="scene-pointer scene-return-pointer" data-ui-command="bar-scene" role="button" tabindex="0" aria-label="Return to the bar"><i>◀</i><b>BAR FLOOR</b><small>Back to the room</small></div>
         <section class="bar-dialogue-card" data-person-id="${person.id}" role="button" tabindex="0" aria-label="Continue talking to ${escapeHtml(person.name)}">
           ${this.portraitImage(person.id, person.name)}
-          <div><span class="eyebrow">${escapeHtml(person.name)} / ${escapeHtml(person.affiliation)}</span><h3>${escapeHtml(person.role)}</h3><p>“${escapeHtml(line)}”</p><small>Click ${escapeHtml(person.name)} again for another topic.</small></div>
+          <div><span class="eyebrow">${escapeHtml(person.name)} / ${escapeHtml(person.affiliation)}</span><h3>${escapeHtml(person.role)}</h3><p>“${escapeHtml(line)}”</p></div>
         </section>
       </div>
     `;
@@ -614,7 +627,7 @@ export class GameUI {
           <div class="scene-pointers" aria-label="Market actions">
             <div class="scene-pointer market-pointer-commodities" data-market-point="commodities" role="button" tabindex="0" aria-label="Open commodity market"><i>▦</i><b>COMMODITY MARKET</b><small>Buy and sell cargo</small></div>
             <div class="scene-pointer market-pointer-equipment" data-market-point="equipment" role="button" tabindex="0" aria-label="Open ship parts"><i>⚙</i><b>SHIP PARTS</b><small>Fit out your ship</small></div>
-            <div class="scene-pointer market-pointer-shipyard" data-market-point="shipyard" role="button" tabindex="0" aria-label="Open the ship dealer"><i>↗</i><b>NEW SHIP</b><small>One hull for sale</small></div>
+            <div class="scene-pointer market-pointer-shipyard" data-market-point="shipyard" role="button" tabindex="0" aria-label="Open the ship dealer"><i>↗</i><b>NEW SHIP</b><small>Hulls for sale</small></div>
           </div>
         </div>
       `;
@@ -639,11 +652,16 @@ export class GameUI {
         if (!content || !marketScreen || !this.save || !this.dockLocation)
             return;
         this.marketPoint = point;
+        if (point !== 'shipyard')
+            this.shipDetailId = undefined;
+        this.disposeShipPreviews();
         marketScreen.querySelectorAll('[data-market-point]').forEach((button) => button.classList.toggle('active', button.dataset.marketPoint === point));
         if (point === 'equipment')
             content.innerHTML = this.renderEquipment();
-        else if (point === 'shipyard')
+        else if (point === 'shipyard') {
             content.innerHTML = this.renderShipyard();
+            this.mountShipPreviews();
+        }
         else {
             const market = this.save.world.market[this.dockLocation];
             content.innerHTML = `
@@ -722,26 +740,72 @@ export class GameUI {
     }
     renderShipyard() {
         const stockIds = LOCATIONS[this.dockLocation].shipsForSale ?? [];
+        if (this.shipDetailId && stockIds.includes(this.shipDetailId))
+            return this.renderShipDetail(this.shipDetailId);
+        this.shipDetailId = undefined;
         if (!stockIds.length)
             return '<div class="shipyard-grid"><p class="market-empty">No hulls for sale at this port.</p></div>';
-        return `<div class="shipyard-grid">${stockIds.map((shipId) => this.renderShipCard(shipId)).join('')}</div>`;
+        return `<div class="shipyard-grid">${stockIds.map((shipId) => this.renderShipOverview(shipId)).join('')}</div>`;
     }
-    renderShipCard(saleId) {
+    renderShipOverview(saleId) {
         const ship = SHIPS[saleId];
         const owned = this.save.player.ownedShips.includes(saleId);
         const active = this.save.player.shipId === saleId;
         return `
-      <article class="ship-card ${active ? 'active' : ''}">
-        <div class="ship-silhouette ${saleId}">${this.shipArt(saleId, ship.name)}</div>
+      <article class="ship-card ship-overview ${active ? 'active' : ''}" data-ship-detail="${saleId}" role="button" tabindex="0" aria-label="View ${escapeHtml(ship.name)} details">
+        <div class="ship-silhouette ${saleId}" data-variant="${ship.variant}"></div>
+        <header><span>${escapeHtml(ship.className)}</span><b>${saleId === 'wayfarer' ? 'STARTER HULL' : formatCredits(ship.price)}</b></header>
+        <h3>${escapeHtml(ship.name)}</h3>
+        <p class="ship-personality">${escapeHtml(ship.personality ?? '')}</p>
+        <div class="ship-overview-meta"><span>${active ? 'ACTIVE SHIP' : owned ? 'IN YOUR FLEET' : 'FOR SALE'}</span><b>DETAILS ▸</b></div>
+      </article>
+    `;
+    }
+    renderShipDetail(saleId) {
+        return `
+      <div class="shipyard-detail">
+        <button class="ship-detail-back" data-ship-detail-back="1">◀ ALL HULLS</button>
+        ${this.renderShipCard(saleId)}
+      </div>
+    `;
+    }
+    renderShipCard(saleId) {
+        const ship = SHIPS[saleId];
+        const current = SHIPS[this.save.player.shipId] ?? SHIPS.wayfarer;
+        const owned = this.save.player.ownedShips.includes(saleId);
+        const active = this.save.player.shipId === saleId;
+        const speedDelta = displaySpeed(ship.maxSpeed) - displaySpeed(current.maxSpeed);
+        const turnDelta = ship.angularAcceleration - current.angularAcceleration;
+        return `
+      <article class="ship-card ship-detail ${active ? 'active' : ''}">
+        <div class="ship-silhouette ship-silhouette-large ${saleId}" data-variant="${ship.variant}" aria-label="Rotating 3D preview of the ${escapeHtml(ship.name)}"></div>
         <header><span>${escapeHtml(ship.className)}</span><b>${saleId === 'wayfarer' ? 'STARTER HULL' : formatCredits(ship.price)}</b></header>
         <h3>${escapeHtml(ship.name)}</h3>
         <p class="ship-personality">${escapeHtml(ship.personality ?? '')}</p>
         <p>${escapeHtml(ship.description)}</p>
-        <dl><div><dt>SPEED</dt><dd>${displaySpeed(ship.maxSpeed)}</dd></div><div><dt>SHIELD</dt><dd>${ship.shield}</dd></div><div><dt>ARMOR</dt><dd>${ship.armor}</dd></div><div><dt>CARGO</dt><dd>${ship.cargo}</dd></div><div><dt>MISSILES</dt><dd>${ship.missileCapacity}</dd></div><div><dt>GUN</dt><dd>${ship.gunDamage}</dd></div><div><dt>TURN</dt><dd>${ship.angularAcceleration.toFixed(2)}</dd></div><div><dt>ACCL</dt><dd>${ship.acceleration}</dd></div></dl>
-        <p class="ship-handling-note">Handling falls up to 24% as the cargo hold fills — watch LOAD and HND on your flight readout.</p>
+        <dl><div><dt>SPEED</dt><dd>${displaySpeed(ship.maxSpeed)} ${this.statDelta(speedDelta)}</dd></div><div><dt>SHIELD</dt><dd>${ship.shield} ${this.statDelta(ship.shield - current.shield)}</dd></div><div><dt>ARMOR</dt><dd>${ship.armor} ${this.statDelta(ship.armor - current.armor)}</dd></div><div><dt>CARGO</dt><dd>${ship.cargo} ${this.statDelta(ship.cargo - current.cargo)}</dd></div><div><dt>MISSILES</dt><dd>${ship.missileCapacity} ${this.statDelta(ship.missileCapacity - current.missileCapacity)}</dd></div><div><dt>GUN</dt><dd>${ship.gunDamage} ${this.statDelta(ship.gunDamage - current.gunDamage)}</dd></div><div><dt>TURN</dt><dd>${ship.angularAcceleration.toFixed(2)} ${this.statDelta(turnDelta, 2)}</dd></div><div><dt>ACCL</dt><dd>${ship.acceleration} ${this.statDelta(ship.acceleration - current.acceleration)}</dd></div></dl>
+        <p class="ship-handling-note">Handling falls up to 24% as the cargo hold fills.</p>
         ${active ? '<button disabled>ACTIVE SHIP</button>' : owned ? `<button data-switch-ship="${saleId}">SWITCH TO SHIP</button>` : `<button class="primary" data-ship-id="${saleId}">PURCHASE HULL</button>`}
       </article>
     `;
+    }
+    statDelta(delta, digits = 0) {
+        const rounded = Number(delta.toFixed(digits));
+        const cls = rounded > 0 ? 'up' : rounded < 0 ? 'down' : 'even';
+        const label = rounded > 0 ? `+${rounded}` : rounded < 0 ? `−${Math.abs(rounded)}` : '0';
+        return `<b class="stat-delta ${cls}">${label}</b>`;
+    }
+    mountShipPreviews() {
+        this.root.querySelectorAll('.ship-silhouette[data-variant]').forEach((container) => {
+            if (container.querySelector('.ship-preview-canvas'))
+                return;
+            const variant = container.dataset.variant;
+            this.shipPreviews.push(new ShipPreview(container, variant));
+        });
+    }
+    disposeShipPreviews() {
+        this.shipPreviews.forEach((preview) => preview.dispose());
+        this.shipPreviews.length = 0;
     }
     renderGuilds() {
         return `
@@ -782,12 +846,7 @@ export class GameUI {
     portraitImage(personId, personName) {
         return `<img class="avatar" src="./art/portraits/${escapeHtml(personId)}.webp" alt="Pixel portrait of ${escapeHtml(personName)}" draggable="false">`;
     }
-    shipArt(shipId, shipName) {
-        const source = shipId === 'wayfarer'
-            ? './art/sprites/player-courier/01.png'
-            : './art/sprites/cargo-hauler/01.png';
-        return `<img src="${source}" alt="Pixel ship profile of ${escapeHtml(shipName)}" draggable="false">`;
-    }
+
     locationIllustration(locationId, screen = 'concourse') {
         const location = LOCATIONS[locationId];
         const file = screen === 'bar'
@@ -838,6 +897,23 @@ export class GameUI {
         setText('#screen-own-speed', Math.round(model.speed).toString());
         setText('#screen-own-max-speed', `/${Math.round(model.maxSpeed)}`);
         setText('#screen-own-fuel', Math.round((model.fuel / model.maxFuel) * 100).toString());
+        const cargoValue = this.el('#screen-own-cargo');
+        const cargoCap = this.el('#screen-own-cargo-cap');
+        if (cargoValue && cargoCap) {
+            if (model.ownMonitorStatus) {
+                // A transient HOLD message (e.g. CARGO FULL on a pickup attempt)
+                // flashes in place of the mass readout for the status duration.
+                cargoValue.textContent = model.ownMonitorStatus;
+                cargoValue.classList.add('is-alert');
+                cargoCap.textContent = '';
+            }
+            else {
+                cargoValue.textContent = (model.cargo ?? 0).toFixed(1);
+                cargoValue.classList.toggle('is-full', (model.loadPercent ?? 0) >= 100);
+                cargoValue.classList.remove('is-alert');
+                cargoCap.textContent = `/${model.cargoCapacity ?? 0}`;
+            }
+        }
         setText('#own-ship-name', model.shipName.toUpperCase());
         setText('#screen-radar-zone', model.zone.toUpperCase());
         setText('#screen-own-shield-value', Math.ceil(model.shield).toString());
@@ -852,6 +928,12 @@ export class GameUI {
             prompt.classList.toggle('is-hidden', !model.prompt);
         }
         this.updateTarget(model.target);
+        const targetReadout = this.el('#screen-target-readout');
+        if (targetReadout) {
+            targetReadout.classList.toggle('is-alert', Boolean(model.monitorStatus));
+            if (model.monitorStatus)
+                targetReadout.textContent = model.monitorStatus;
+        }
         this.drawRadar(model.contacts);
         this.drawHullOutline(this.ownHullCanvas, model.playerVariant ?? 'kestrel', 0, 'rgba(111, 216, 236, 0.9)', false, model.missiles, model.maxMissiles);
         const throttleThumb = this.el('[data-touch-throttle-thumb]');
@@ -1404,7 +1486,7 @@ export class GameUI {
             </div>
           </section>
         </div>
-        <footer><span>${model.autopilotAvailable ? 'HYPERDRIVE READY — select a point, close the map, then engage.' : `HYPERDRIVE LOCKED — ${escapeHtml(model.threatLabel ?? 'hostile proximity')}.`}</span><span>Tap any system point or local contact to select it.</span></footer>
+        <footer><span>${model.autopilotAvailable ? 'HYPERDRIVE READY — plot a jump vector.' : `HYPERDRIVE LOCKED — ${escapeHtml(model.threatLabel ?? 'hostile proximity')}.`}</span></footer>
       </div>`;
         this.hidePause();
         this.hideShipMenu();
@@ -1462,7 +1544,7 @@ export class GameUI {
             <div class="ship-account-row"><span>HULL</span><b>${Math.ceil(player.hull)}/${Math.ceil(getEffectiveShipStats(player).hull)}</b></div>
           </section>
         </div>
-        <footer><span>Contracts point you to a vector — open the nav map and set it.</span><button data-ui-command="map">NAV MAP</button></footer>
+        <footer><span>Contracts carry a destination vector.</span><button data-ui-command="map">NAV MAP</button></footer>
       </div>`;
         this.hidePause();
         this.hideMap();
@@ -1520,7 +1602,7 @@ export class GameUI {
             <div class="arena-options">${difficultyOptions.map(([value, label]) => option('difficulty', value, label, this.arenaDifficulty === value)).join('')}</div>
           </section>
         </div>
-        <footer><span>Test AI, cover, and handling with zero career consequences.</span><button class="primary" data-ui-command="launch-arena">LAUNCH</button></footer>
+        <footer><span>Simulated sortie — nothing here follows you back out.</span><button class="primary" data-ui-command="launch-arena">LAUNCH</button></footer>
       </div>`;
         panel.classList.remove('is-hidden');
         this.updateOrientationNotice();

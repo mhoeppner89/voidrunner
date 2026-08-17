@@ -1512,7 +1512,7 @@ button.compact {
 }
 
 .shipyard-grid {
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   max-width: 980px;
 }
 
@@ -1526,10 +1526,38 @@ button.compact {
 
 .ship-silhouette {
   position: relative;
-  height: 110px;
-  margin-bottom: 0.8rem;
+  height: 160px;
+  max-width: 360px;
+  margin: 0 auto 0.8rem;
   overflow: hidden;
   background: radial-gradient(ellipse, color-mix(in srgb, var(--dock-accent), transparent 78%), transparent 65%), rgba(3, 6, 6, 0.55);
+}
+
+.ship-silhouette .ship-preview-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.ship-card dd .stat-delta {
+  margin-left: 0.3rem;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.52rem;
+  font-weight: 700;
+}
+
+.stat-delta.up {
+  color: #8fd6a8;
+}
+
+.stat-delta.down {
+  color: #e28874;
+}
+
+.stat-delta.even {
+  color: #5f6a65;
 }
 
 .ship-silhouette i {
@@ -2464,6 +2492,11 @@ button.compact {
   white-space: nowrap;
 }
 
+.screen-target-readout.is-alert {
+  color: #e28874;
+  text-shadow: 0 0 6px rgba(226, 136, 116, 0.5);
+}
+
 .cockpit-screen-target .screen-target-layout {
   height: 60%;
 }
@@ -2578,7 +2611,7 @@ button.compact {
    on the docked screens, not the cockpit glass. */
 .screen-flight {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.1rem 0.3rem;
   min-width: 0;
   padding-bottom: 0.14rem;
@@ -2611,6 +2644,12 @@ button.compact {
   color: #7c8985;
   font-size: 0.85em;
   white-space: nowrap;
+}
+
+.screen-flight b.is-full,
+.screen-flight b.is-alert {
+  color: #e28874;
+  text-shadow: 0 0 6px rgba(226, 136, 116, 0.5);
 }
 
 .cockpit-screen {
@@ -3246,28 +3285,6 @@ button.primary,
   box-shadow: var(--panel-shadow);
 }
 
-.location-brief::after,
-.career-snapshot::after,
-.active-contracts::after,
-.bar-stage::after,
-.bar-dialogue::after,
-.service-card::after,
-.equipment-card::after,
-.ship-card::after,
-.guild-card::after,
-.active-list::after,
-.mission-card::after {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 7px;
-  height: 7px;
-  content: "";
-  border: 1px solid #7d765d;
-  background: #151814;
-  box-shadow: inset 0 0 0 2px #030504;
-}
-
 .location-brief h3,
 .career-snapshot h3,
 .bar-stage h3,
@@ -3412,6 +3429,66 @@ button.primary,
 
 .ship-card.active .ship-silhouette {
   box-shadow: inset 0 0 35px #000, 0 0 14px color-mix(in srgb, var(--dock-accent), transparent 70%);
+}
+
+/* Shipyard overview cards are compact tap targets; the detail view expands on
+   tap with the full stat sheet and buy/switch action. */
+.ship-overview {
+  cursor: pointer;
+  min-height: 0;
+}
+
+.ship-overview:hover,
+.ship-overview:focus-visible {
+  border-color: var(--dock-accent);
+  outline: none;
+}
+
+.ship-overview .ship-silhouette {
+  height: 96px;
+}
+
+.ship-overview h3 {
+  font-size: 0.95rem;
+}
+
+.ship-overview .ship-personality {
+  margin-bottom: 0.4rem;
+}
+
+.ship-overview-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  color: #77827e;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ship-overview-meta b {
+  color: var(--dock-accent);
+}
+
+.ship-overview.active .ship-overview-meta span {
+  color: #8fd6a8;
+}
+
+.shipyard-detail {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.ship-detail-back {
+  margin-bottom: 0.7rem;
+}
+
+.ship-silhouette-large {
+  height: 220px;
+  max-width: none;
 }
 
 .dock-footer {
@@ -5003,8 +5080,9 @@ button.primary,
 }
 
 .dock-screen[data-tab="market"] .market-table {
-  max-height: calc(100vh - 290px);
-  overflow: auto;
+  /* The menu-screen below is the single scroll container; a nested scrolling
+     table traps touch gestures on phones and freezes the list. */
+  overflow: visible;
 }
 
 .dock-screen[data-tab="market"] .equipment-grid,
@@ -5662,7 +5740,9 @@ button.primary,
   height: 100%;
   min-height: 0;
   padding: 1rem 1.2rem 1.25rem;
-  overflow: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   background: linear-gradient(180deg, rgba(3, 16, 47, 0.28), rgba(3, 16, 47, 0.58));
 }
 
@@ -5683,7 +5763,8 @@ button.primary,
 .dock-screen:has(.guild-grid) .dock-content,
 .dock-screen:has(.service-grid) .dock-content,
 .dock-screen:has(.equipment-grid) .dock-content,
-.dock-screen:has(.shipyard-grid) .dock-content {
+.dock-screen:has(.shipyard-grid) .dock-content,
+.dock-screen:has(.shipyard-detail) .dock-content {
   overflow: auto;
 }
 

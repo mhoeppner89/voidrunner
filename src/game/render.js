@@ -8,6 +8,15 @@ const cssHex = (value) => `#${value.toString(16).padStart(6, '0')}`;
 // Cockpit sprite scale: idle is held slightly zoomed-in so the frame still
 // fills the view when it relaxes to COCKPIT_ZOOM_BURN under afterburner.
 const COCKPIT_ZOOM_IDLE = 1.018;
+// Debris visibility cutoff: graveyard pieces and salvage chunks farther than
+// this from the camera are hidden (instances zero-scaled, wreck markers not
+// drawn). The field spans ~±2445 units around mourning-line, so most of that
+// shell is off-screen or a few pixels when flying inside it — culling saves a
+// lot of mobile fill. The targeted wreck always stays visible, and the cutoff
+// sits far beyond the drivable passage (~735 units of ribbing).
+const DEBRIS_CULL_RANGE = 1600;
+const DEBRIS_CULL_RANGE_SQ = DEBRIS_CULL_RANGE * DEBRIS_CULL_RANGE;
+const HIDDEN_SCALE = [0.0001, 0.0001, 0.0001];
 // Half the previous pull-back (was 0.97): the frame relaxes to 0.994 under
 // burn, and the grime follows at half that rate via the 0.5 factor below.
 const COCKPIT_ZOOM_BURN = 0.994;
@@ -92,6 +101,10 @@ export class SpaceRenderer {
         this.container = container;
         this.asteroids = asteroids;
         this.qualityMode = quality;
+        // Touch-primary devices get the phone render tier regardless of CSS
+        // width — landscape phones are 900+ CSS px wide, and the old <900
+        // check silently gave them the desktop 960p tier.
+        this.touchDevice = typeof matchMedia === 'function' ? matchMedia('(pointer: coarse)').matches : 'ontouchstart' in window;
         this.shell = this.container.closest('#game-shell');
         this.graveyard = graveyard;
         this.wreckNodes = wreckNodes;
@@ -1228,20 +1241,29 @@ export class SpaceRenderer {
         this.updateGraveyardInstances();
     }
     updateGraveyardInstances(movingOnly = false) {
+        const cam = this.camera.position;
         for (const batch of this.graveyardBatches) {
             let changed = false;
             batch.pieces.forEach((piece, index) => {
-                if (movingOnly && !piece.moving)
+                const dx = piece.position[0] - cam.x;
+                const dy = piece.position[1] - cam.y;
+                const dz = piece.position[2] - cam.z;
+                const culled = dx * dx + dy * dy + dz * dz > DEBRIS_CULL_RANGE_SQ;
+                const stateChanged = piece._culled !== culled;
+                // Full pass rewrites only pieces whose cull state flipped;
+                // the moving pass additionally rewrites visible drifting pieces.
+                // Culled pieces keep their hidden matrix until they drift back
+                // into range (the flip then rebuilds it from live state).
+                if (!stateChanged && (movingOnly ? !piece.moving || culled : true))
                     return;
+                piece._culled = culled;
                 changed = true;
                 this.tmpPosition.set(...piece.position);
                 this.tmpEuler.set(...piece.rotation);
                 this.tmpQuaternion.setFromEuler(this.tmpEuler);
-                this.tmpScale.set(...piece.scale);
+                this.tmpScale.set(...(culled ? HIDDEN_SCALE : piece.scale));
                 this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
                 batch.mesh.setMatrixAt(index, this.tmpMatrix);
-                if (movingOnly)
-                    batch.mesh.instanceMatrix.addUpdateRange(index * 16, 16);
             });
             if (changed)
                 batch.mesh.instanceMatrix.needsUpdate = true;
@@ -1264,7 +1286,39 @@ export class SpaceRenderer {
             new THREE.BoxGeometry(1.2, 0.7, 1.6),
             new THREE.CylinderGeometry(0.55, 0.8, 1.5, 8),
         ];
-        const rarityColor = { rare: 0xffe2a8, uncommon: 0xcfe0f2, common: 0xd4dce0 };
+        // One material per rarity instead of one per chunk: 64 nodes used to
+        // carry 64 separate material objects (64 state changes per frame on
+        // mobile). All materials share the emissive=0 selection rule, so
+        // sharing is safe.
+        const rarityMaterials = {
+            rare: new THREE.MeshStandardMaterial({
+                color: 0xffe2a8,
+                map: rustMap,
+                roughness: 0.84,
+                metalness: 0.42,
+                flatShading: true,
+                emissive: 0x000000,
+                emissiveIntensity: 0,
+            }),
+            uncommon: new THREE.MeshStandardMaterial({
+                color: 0xcfe0f2,
+                map: scrapMap,
+                roughness: 0.84,
+                metalness: 0.6,
+                flatShading: true,
+                emissive: 0x000000,
+                emissiveIntensity: 0,
+            }),
+            common: new THREE.MeshStandardMaterial({
+                color: 0xd4dce0,
+                map: scrapMap,
+                roughness: 0.84,
+                metalness: 0.6,
+                flatShading: true,
+                emissive: 0x000000,
+                emissiveIntensity: 0,
+            }),
+        };
         this.wreckNodes.forEach((node) => {
             let hash = 2166136261;
             for (let index = 0; index < node.id.length; index += 1) {
@@ -1272,16 +1326,7 @@ export class SpaceRenderer {
                 hash = (hash * 16777619) >>> 0;
             }
             const geometry = geometries[hash % geometries.length];
-            const material = new THREE.MeshStandardMaterial({
-                color: rarityColor[node.rarity],
-                map: node.rarity === 'rare' ? rustMap : scrapMap,
-                roughness: 0.84,
-                metalness: node.rarity === 'rare' ? 0.42 : 0.6,
-                flatShading: true,
-                emissive: 0x000000,
-                emissiveIntensity: 0,
-            });
-            const marker = new THREE.Mesh(geometry, material);
+            const marker = new THREE.Mesh(geometry, rarityMaterials[node.rarity] ?? rarityMaterials.common);
             marker.position.set(...node.position);
             marker.scale.setScalar(node.radius * 1.6);
             marker.rotation.set((hash % 5) * 0.7, (hash % 7) * 0.9, (hash % 3) * 0.5);
@@ -1860,7 +1905,21 @@ export class SpaceRenderer {
             if (clouds)
                 clouds.rotation.y += dt * 0.016;
         }
+        const cam = this.camera.position;
         this.wreckNodeMeshes.forEach((mesh) => {
+            // Cull salvage chunks by distance like the structural debris. The
+            // targeted chunk always stays visible, and culled chunks stop
+            // tumbling (their transform is frozen until they come back).
+            const dx = mesh.position.x - cam.x;
+            const dy = mesh.position.y - cam.y;
+            const dz = mesh.position.z - cam.z;
+            const culled = dx * dx + dy * dy + dz * dz > DEBRIS_CULL_RANGE_SQ && mesh.userData.targetId !== this.selectedWreckId;
+            if (culled !== mesh._culled) {
+                mesh._culled = culled;
+                mesh.visible = !culled;
+            }
+            if (culled)
+                return;
             mesh.rotation.x += dt * 0.22;
             mesh.rotation.y -= dt * 0.17;
         });
@@ -2065,7 +2124,7 @@ export class SpaceRenderer {
             ? 640
             : this.qualityMode === 'high'
                 ? 1280
-                : this.viewportWidth < 900
+                : this.touchDevice || this.viewportWidth < 900
                     ? 720
                     : 960;
         const renderWidth = Math.max(288, Math.round(Math.min(this.viewportWidth, baseWidth) * this.lastQualityScale));

@@ -450,6 +450,7 @@ const surrenderToRecognition = (seed) => {
     const targetId = again.targetId;
     runFrames(session, again, 60);
     session.save.player.currentTargetId = again.id;
+    again.scanned = true; // profile is revealed by a scan, not shown pre-scan
     const model = session.buildHudModel();
     const readout = model.target?.readout ?? '';
     return {
@@ -522,6 +523,7 @@ const waryRun = (seed) => {
         return mean(points);
     };
     session.save.player.currentTargetId = again.id;
+    again.scanned = true; // profile is revealed by a scan, not shown pre-scan
     const model = session.buildHudModel();
     const readout = model.target?.readout ?? '';
     const normalPoint = measurePoint(false);
@@ -603,6 +605,7 @@ const favorRun = (seed, withWrecks) => {
     session.scanTarget();
     return {
         favorGiven: again.favorGiven,
+        scanned: again.scanned,
         toasts,
         marketChanged,
         scannedWrecks,
@@ -613,10 +616,9 @@ const marketFavor = favorRun('favor-9', false);
 const wreckFavor = favorRun('favor-5', true);
 console.log(`  no-wrecks seed: ${marketFavor.toasts.join(' / ')}`);
 console.log(`  with-wrecks seed: ${wreckFavor.toasts.join(' / ')}`);
-assert(marketFavor.favorGiven && marketFavor.toasts.length === 2, `the first scan decides a favor, later scans never re-roll (${marketFavor.toasts.join(' / ')})`);
+assert(marketFavor.favorGiven && marketFavor.scanned && marketFavor.toasts.length === 1, `the first scan decides a favor and later scans never re-roll (${marketFavor.toasts.join(' / ')})`);
 assert(marketFavor.toasts[0].startsWith('Tip: my contact') && marketFavor.marketChanged, `a market favor actually moves the station market (${marketFavor.toasts[0]})`);
-assert(marketFavor.toasts[1].includes('✦') && marketFavor.toasts[1].includes('PREVIOUSLY SPARED'), `the scan toast marks a previously spared pilot (${marketFavor.toasts[1]})`);
-assert(wreckFavor.favorGiven && wreckFavor.toasts.length === 2, `the with-wrecks seed also decides exactly once (${wreckFavor.toasts.join(' / ')})`);
+assert(wreckFavor.favorGiven && wreckFavor.scanned && wreckFavor.toasts.length === 1, `the with-wrecks seed also decides exactly once (${wreckFavor.toasts.join(' / ')})`);
 assert(wreckFavor.toasts[0].startsWith('Tip: ') && wreckFavor.scannedWrecks[0] === 'salvage-node-tip' && wreckFavor.savedScanned.length === 1, `a wreck favor flags the rare wreck and persists it to the save (${wreckFavor.toasts[0]})`);
 assert(JSON.stringify(marketFavor) === JSON.stringify(favorRun('favor-9', false)), 'favor rolls are seed-deterministic');
 
@@ -734,9 +736,9 @@ const profileRun = (seed) => {
     return { toasts, readout: model.target?.readout };
 };
 const profile = profileRun('profile-1');
-console.log(`  scan: ${profile.toasts[0]} · monitor readout: ${profile.readout}`);
-assert(profile.toasts.length >= 1 && profile.toasts[0].includes('Ace') && profile.toasts[0].includes('Flamboyant'), `scan toast names tier and temperament (${profile.toasts[0]})`);
-assert(profile.readout === 'Ace · Flamboyant', `target monitor readout shows the pilot profile (${profile.readout})`);
+console.log(`  scan toasts: ${profile.toasts.length} · monitor readout: ${profile.readout}`);
+assert(profile.toasts.length === 0, `the scan no longer toasts — the profile lands on the monitor (${profile.toasts.join(' / ')})`);
+assert(profile.readout === 'Ace · Flamboyant', `target monitor readout shows the pilot profile after scan (${profile.readout})`);
 
 // ---------------------------------------------------------------------------
 console.log('comms: temperament-driven combat lines');

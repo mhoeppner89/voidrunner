@@ -634,6 +634,18 @@ export const paletteForFaction = (faction, hostile) => {
                 warning: 0xf0b24d,
                 window: 0xffb359,
             };
+        // The player's showroom paint: a neutral slate-and-amber livery that
+        // reads as "your ship" without borrowing any faction's colors.
+        case 'player':
+            return {
+                hull: 0x8a97a0,
+                dark: 0x2a3238,
+                accent: 0xe0a63f,
+                canopy: 0x8ee0ef,
+                engine: 0x7fd4ea,
+                warning: 0xe7794a,
+                window: 0xb4e6ee,
+            };
     }
 };
 const createStationPaintTexture = (palette, seed) => {

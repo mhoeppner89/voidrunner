@@ -230,6 +230,11 @@ export class GameSession {
     autopilot = false;
     afterburning = false;
     utilityActive = false;
+    utilityReadout = '';
+    monitorStatus = '';
+    monitorStatusUntil = 0;
+    ownMonitorStatus = '';
+    ownMonitorStatusUntil = 0;
     utilitySoundCooldown = 0;
     gunCooldown = 0;
     missileCooldown = 0;
@@ -298,11 +303,24 @@ export class GameSession {
                     this.ui.setTouchSteering('tilt');
                 }
                 else {
+                    // Permission refused (or revoked since the last session):
+                    // correct the persisted setting too, so the pause menu's
+                    // steering select doesn't claim Tilt while the stick is
+                    // actually driving the ship.
+                    save.settings.steering = 'stick';
+                    saveGame(save);
                     this.ui.setTouchSteering('stick');
                 }
             });
         }
         else {
+            // No saved neutral and no fresh grant: tilt can't engage, so run
+            // the stick and keep the persisted setting honest — otherwise the
+            // pause menu shows Tilt selected while the stick steers.
+            if (save.settings.steering !== 'stick') {
+                save.settings.steering = 'stick';
+                saveGame(save);
+            }
             this.ui.setTouchSteering('stick');
         }
         this.audio.setVolumes(save.settings.music, save.settings.effects);
@@ -911,6 +929,7 @@ export class GameSession {
     }
     updatePlayerWeapons(dt, actions) {
         this.utilityActive = false;
+        this.utilityReadout = '';
         if (this.save.player.mode === 'combat') {
             this.renderer.setUtilityBeam(false, 'combat', this.save.player.position);
             if (actions.fire && this.gunCooldown <= 0)
@@ -958,20 +977,34 @@ export class GameSession {
         this.gunCooldown = 0.17;
         this.audio.play('laser', 0.72);
     }
+    // Transient target-monitor status: missile and target-cycle errors land on
+    // the TARGET monitor's readout line instead of the toast stack.
+    setMonitorStatus(message, duration = 2800) {
+        // Duration is in milliseconds; save.world.time runs in seconds.
+        this.monitorStatus = message;
+        this.monitorStatusUntil = this.save.world.time + duration / 1000;
+    }
+    // Transient own-ship monitor status: the HOLD cell flashes the message
+    // (e.g. CARGO FULL) instead of the toast stack for floating-pickup errors.
+    setOwnMonitorStatus(message, duration = 2400) {
+        // Duration is in milliseconds; save.world.time runs in seconds.
+        this.ownMonitorStatus = message;
+        this.ownMonitorStatusUntil = this.save.world.time + duration / 1000;
+    }
     fireMissile() {
         if (this.save.player.mode !== 'combat') {
-            this.ui.showToast('Missile circuit available only in COMBAT mode.', 'warning');
+            this.setMonitorStatus('MISSILES: COMBAT MODE ONLY');
             return;
         }
         if (this.missileCooldown > 0)
             return;
         if (this.save.player.missiles <= 0) {
-            this.ui.showToast('Missile rack empty.', 'warning');
+            this.setMonitorStatus('MISSILE RACK EMPTY');
             return;
         }
         const target = this.getTargetRef();
         if (!target || target.kind !== 'ship') {
-            this.ui.showToast('No ship target locked.', 'warning');
+            this.setMonitorStatus('NO SHIP TARGET LOCKED');
             return;
         }
         const ship = this.ships.find((entry) => entry.id === target.id);
@@ -1011,18 +1044,12 @@ export class GameSession {
         const distance = this.surfaceDistance(playerPosition, target);
         if (distance > range) {
             this.renderer.setUtilityBeam(false, mode, this.save.player.position);
-            if (this.hintCooldown <= 0) {
-                this.hintCooldown = 1.2;
-                this.ui.showToast(`Utility target out of range (${Math.round(distance)} / ${Math.round(range)}).`, 'warning');
-            }
+            this.utilityReadout = `OUT OF RANGE · ${Math.round(distance)}/${Math.round(range)} km`;
             return;
         }
         if (this.lineBlocked(playerPosition, vec(target.position), target.id)) {
             this.renderer.setUtilityBeam(false, mode, this.save.player.position);
-            if (this.hintCooldown <= 0) {
-                this.hintCooldown = 1.2;
-                this.ui.showToast('Utility beam obstructed.', 'warning');
-            }
+            this.utilityReadout = 'BEAM OBSTRUCTED';
             return;
         }
         if (mode === 'mining') {
@@ -1062,18 +1089,13 @@ export class GameSession {
         }
     }
     requireScanHint() {
+        // An unscanned deposit already reads SCANNING… / OUT OF SCAN RANGE on
+        // the target monitor, so there is nothing extra to pop up here.
         this.renderer.setUtilityBeam(false, this.save.player.mode, this.save.player.position);
-        if (this.hintCooldown <= 0) {
-            this.hintCooldown = 1.2;
-            this.ui.showToast('Scanner still cycling — hold steady.', 'warning');
-        }
     }
     extractAsteroid(node, dt, rate) {
         if (cargoFree(this.save.player) < COMMODITIES.ore.mass + 0.001) {
-            if (this.hintCooldown <= 0) {
-                this.hintCooldown = 1.4;
-                this.ui.showToast('Cargo hold full. Extraction suspended.', 'warning');
-            }
+            this.utilityReadout = 'CARGO FULL';
             return;
         }
         const current = this.extractionCarry.get(node.id) ?? 0;
@@ -1082,9 +1104,9 @@ export class GameSession {
             next -= 1;
             node.remaining = Math.max(0, node.remaining - 1);
             this.save.world.depletedAsteroids[node.id] = node.remaining;
-            // Ore is tractored straight into the hold — no pickup to chase.
+            // Ore is tractored straight into the hold — no pickup to chase. The
+            // monitor's remaining-units count ticks down, so no per-unit toast.
             this.collectExtraction('ore', 'mining', 1, node.richness > 1.75 ? 'uncommon' : 'common');
-            this.ui.showToast('Ore recovered to the hold.', 'success', 2400);
             if (node.remaining <= 0) {
                 this.ui.showToast('Deposit exhausted.', 'info');
                 this.save.player.currentTargetId = undefined;
@@ -1095,10 +1117,7 @@ export class GameSession {
     }
     extractWreck(node, dt, rate) {
         if (cargoFree(this.save.player) < COMMODITIES[node.salvage].mass + 0.001) {
-            if (this.hintCooldown <= 0) {
-                this.hintCooldown = 1.4;
-                this.ui.showToast('Cargo hold full. Extraction suspended.', 'warning');
-            }
+            this.utilityReadout = 'CARGO FULL';
             return;
         }
         const current = this.extractionCarry.get(node.id) ?? 0;
@@ -1108,8 +1127,8 @@ export class GameSession {
             node.remaining = Math.max(0, node.remaining - 1);
             this.save.world.depletedWrecks[node.id] = node.remaining;
             // Recovered components go straight to the hold — no pickup to chase.
+            // The monitor's remaining-recoveries count ticks down, so no per-unit toast.
             this.collectExtraction(node.salvage, 'salvage', 1, node.rarity);
-            this.ui.showToast(`${COMMODITIES[node.salvage].name} recovered to the hold.`, 'success', 2600);
             if (node.remaining <= 0) {
                 if (node.rarity === 'rare')
                     this.recoverRareEquipment(node);
@@ -1220,10 +1239,9 @@ export class GameSession {
         }
         const required = COMMODITIES[pickup.commodity].mass * pickup.amount;
         if (cargoFree(this.save.player) + 0.001 < required) {
-            if (this.hintCooldown <= 0) {
-                this.hintCooldown = 1.4;
-                this.ui.showToast('Cargo hold full. Recovery remains outside.', 'warning');
-            }
+            // The HOLD cell on the own-ship monitor flashes CARGO FULL (it's
+            // already red while full), so the pickup hint needs no toast.
+            this.setOwnMonitorStatus('CARGO FULL');
             return;
         }
         this.save.player.cargo[pickup.commodity] = (this.save.player.cargo[pickup.commodity] ?? 0) + pickup.amount;
@@ -1302,35 +1320,24 @@ export class GameSession {
         }
         else {
             const ship = this.ships.find((entry) => entry.id === target.id);
+            // The scan result lands on the target monitor's readout line rather
+            // than a toast: it flips from UNRESOLVED CONTACT to the pilot
+            // profile (tier · temperament, with the ✦ marker when the pilot
+            // recognizes the player) once ship.scanned is set.
+            ship.scanned = true;
             if (ship.surrendered) {
-                // A surrendered pilot is captured on scan: this pays the bounty
-                // and completes the warrant (claimSurrendered toasts) instead of
-                // the generic scan toast. A beaten civilian has no bounty and
-                // just reads as surrendered.
-                if (!this.claimSurrendered(ship))
-                    this.ui.showToast(`Scan: ${ship.name} · SURRENDERED · no bounty.`, 'info', 4200);
+                // Capturing a surrendered pilot pays the bounty and completes the
+                // warrant (claimSurrendered announces those); a beaten civilian
+                // simply reads as surrendered on the monitor.
+                this.claimSurrendered(ship);
             }
             else if (this.deferentialPilot(ship)) {
-                // A pilot the player spared may pay the debt: the first scan
-                // rolls a favor (wreck tip or market contact, see givePilotFavor)
-                // instead of the generic scan toast; later scans read as
-                // previously spared and never re-roll. Wary pilots (escaped
-                // once) get no favor — they never felt spared.
-                const favor = !ship.favorGiven && this.givePilotFavor(ship);
+                // First scan of a spared pilot may pay a favor (wreck tip or
+                // market contact); re-scans never re-roll. The ✦ marker already
+                // in the readout signals they remember the player.
+                if (!ship.favorGiven)
+                    this.givePilotFavor(ship);
                 ship.favorGiven = true;
-                if (!favor)
-                    this.ui.showToast(`Scan: ${SPARED_MARK} ${ship.name} · PREVIOUSLY SPARED.`, 'info', 4200);
-            }
-            else {
-                // The pilot profile rides along with the scan so a name, its tier,
-                // and its temperament are all readable before the fight starts.
-                // Recognizing ships carry the marker too — a wary pilot who
-                // escaped still remembers the player, and the HOSTILE tag
-                // explains the disposition.
-                const pilot = ship.pilot;
-                const profile = pilot ? ` · ${TIER_LABELS[pilot.tier] ?? pilot.tier} ${TEMPERAMENT_LABELS[pilot.temperament] ?? pilot.temperament}` : '';
-                const mark = ship.recognizesPlayer ? `${SPARED_MARK} ` : '';
-                this.ui.showToast(`Scan: ${mark}${ship.name} · ${ship.role.toUpperCase()} · ${ship.hostile ? 'HOSTILE' : 'NO ACTIVE WARRANT'}${profile}.`, ship.hostile ? 'danger' : 'info', 4200);
             }
         }
         this.scanCooldown = 0.55;
@@ -1341,7 +1348,7 @@ export class GameSession {
         const candidates = this.targetCandidates();
         if (!candidates.length) {
             this.clearTarget();
-            this.ui.showToast('No targets in sensor range.', 'info');
+            this.setMonitorStatus('NO TARGETS IN SENSOR RANGE');
             return;
         }
         let currentIndex = candidates.findIndex((entry) => entry.id === this.save.player.currentTargetId);
@@ -1372,7 +1379,7 @@ export class GameSession {
             .filter((entry) => entry.hostile && entry.hull > 0 && player.distanceTo(vec(entry.position)) <= sensorRange)
             .sort((a, b) => player.distanceToSquared(vec(a.position)) - player.distanceToSquared(vec(b.position)))[0];
         if (!nearest) {
-            this.ui.showToast('No hostile contact in sensor range.', 'info');
+            this.setMonitorStatus('NO HOSTILE IN SENSOR RANGE');
             return;
         }
         this.save.player.mode = 'combat';
@@ -1493,7 +1500,7 @@ export class GameSession {
             }
         }
         if (!target) {
-            this.ui.showToast('Target is no longer available.', 'warning');
+            this.setMonitorStatus('TARGET NO LONGER AVAILABLE');
             return;
         }
         this.applyTarget(target);
@@ -2988,6 +2995,7 @@ export class GameSession {
             proxRng,
             recognizesPlayer,
             waryOfPlayer,
+            scanned: false,
             surrendered: false,
             claimed: false,
             poweredDown: false,
@@ -3765,8 +3773,13 @@ export class GameSession {
     syncTiltSteering(useTilt) {
         if (useTilt) {
             void this.input.enableTilt().then((active) => {
-                if (active)
+                if (active) {
                     this.input.calibrateTilt();
+                    // Persist the neutral alongside the mode (mirroring
+                    // enableTilt) so a reload keeps tilt instead of falling
+                    // back to the stick with no saved neutral.
+                    this.save.settings.tiltNeutral = { beta: this.input.tiltNeutralBeta, gamma: this.input.tiltNeutralGamma };
+                }
                 // If permission was refused (or there is no gyro), fall back to
                 // the stick and keep the persisted setting honest instead of
                 // leaving the pause menu showing a tilt mode that never engaged.
@@ -3821,12 +3834,16 @@ export class GameSession {
             this.ui.updateHud(this.buildHudModel());
         }
         if (this.save.settings.quality === 'auto') {
+            // Respond fast and deep: a dense debris field can halve a phone's
+            // frame rate in a single step, and the old 2.5s / -0.08 reaction
+            // left a long slideshow before resolution dropped. 1.2s windows,
+            // larger steps, and a 0.5 floor catch the slowdown quickly.
             this.fpsAccumulator += dt;
             this.fpsFrames += 1;
-            if (this.fpsAccumulator > 2.5) {
+            if (this.fpsAccumulator > 1.2) {
                 const fps = this.fpsFrames / this.fpsAccumulator;
-                if (fps < 39)
-                    this.qualityScale = Math.max(0.62, this.qualityScale - 0.08);
+                if (fps < 45)
+                    this.qualityScale = Math.max(0.5, this.qualityScale - 0.15);
                 else if (fps > 56)
                     this.qualityScale = Math.min(1, this.qualityScale + 0.04);
                 this.renderer.setQualityScale(this.qualityScale);
@@ -3894,7 +3911,9 @@ export class GameSession {
                     // locked target's habits are visible at a glance — prefixed
                     // with the recognition marker when the pilot remembers the
                     // player (spared or escaped).
-                    readout: ship.pilot ? `${ship.recognizesPlayer ? `${SPARED_MARK} ` : ''}${TIER_LABELS[ship.pilot.tier] ?? ship.pilot.tier} · ${TEMPERAMENT_LABELS[ship.pilot.temperament] ?? ship.pilot.temperament}` : undefined,
+                    readout: ship.scanned
+                        ? (ship.pilot ? `${ship.recognizesPlayer ? `${SPARED_MARK} ` : ''}${TIER_LABELS[ship.pilot.tier] ?? ship.pilot.tier} · ${TEMPERAMENT_LABELS[ship.pilot.temperament] ?? ship.pilot.temperament}` : undefined)
+                        : 'UNRESOLVED CONTACT',
                     distance,
                     shield: ship.shield,
                     maxShield: ship.maxShield,
@@ -3912,7 +3931,7 @@ export class GameSession {
                     : distance > stats.scanRange
                         ? `OUT OF SCAN RANGE · ${Math.round(distance)}/${stats.scanRange} km`
                         : 'SCANNING…';
-                hudTarget = { kind: 'asteroid', name: target.name, subtitle: node.scanned ? `${node.richness > 1.8 ? 'RICH' : node.richness > 1.2 ? 'VIABLE' : 'LEAN'} ORE` : 'MINERAL SIGNATURE', distance, scanned: node.scanned, readout: scanStatus, ...screen };
+                hudTarget = { kind: 'asteroid', name: target.name, subtitle: node.scanned ? `${node.richness > 1.8 ? 'RICH' : node.richness > 1.2 ? 'VIABLE' : 'LEAN'} ORE` : 'MINERAL SIGNATURE', distance, scanned: node.scanned, readout: this.utilityReadout || scanStatus, ...screen };
             }
             else if (target.kind === 'wreck') {
                 const node = this.wreckNodes.find((entry) => entry.id === target.id);
@@ -3921,7 +3940,7 @@ export class GameSession {
                     : distance > stats.scanRange
                         ? `OUT OF SCAN RANGE · ${Math.round(distance)}/${stats.scanRange} km`
                         : 'SCANNING…';
-                hudTarget = { kind: 'wreck', name: node.name, subtitle: node.scanned ? `${node.rarity.toUpperCase()} ${COMMODITIES[node.salvage].name}` : 'UNRESOLVED WRECK', distance, scanned: node.scanned, readout: scanStatus, ...screen };
+                hudTarget = { kind: 'wreck', name: node.name, subtitle: node.scanned ? `${node.rarity.toUpperCase()} ${COMMODITIES[node.salvage].name}` : 'UNRESOLVED WRECK', distance, scanned: node.scanned, readout: this.utilityReadout || scanStatus, ...screen };
             }
             else {
                 const location = LOCATIONS[target.id];
@@ -3973,6 +3992,8 @@ export class GameSession {
             zone: this.zoneLabel(this.getWorldZone(player)),
             target: hudTarget,
             prompt: dockPrompt,
+            monitorStatus: this.save.world.time < this.monitorStatusUntil ? this.monitorStatus : undefined,
+            ownMonitorStatus: this.save.world.time < this.ownMonitorStatusUntil ? this.ownMonitorStatus : undefined,
             contacts: this.radarContacts(),
         };
     }
