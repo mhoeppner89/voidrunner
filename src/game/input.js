@@ -1,6 +1,6 @@
 import { clamp } from './random.js';
 
-const HOLD_ACTIONS = new Set(['fire', 'afterburner']);
+const HOLD_ACTIONS = new Set(['fire', 'afterburner', 'utility']);
 const TILT_DEADZONE = 2.5;
 const TILT_FULL_RANGE = 15;
 const wrapAngle = (value) => {
@@ -9,6 +9,19 @@ const wrapAngle = (value) => {
     while (value < -180)
         value += 360;
     return value;
+};
+const normalizeScreenAngle = (value) => {
+    const angle = Number(value);
+    return Number.isFinite(angle) ? wrapAngle(angle) : 0;
+};
+const rotateTiltFrame = (beta, gamma, deltaAngle) => {
+    const radians = (deltaAngle * Math.PI) / 180;
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
+    return {
+        beta: beta * cos + gamma * sin,
+        gamma: -beta * sin + gamma * cos,
+    };
 };
 
 export class InputManager {
@@ -30,8 +43,10 @@ export class InputManager {
     tiltCalibrated = false;
     tiltBeta = 0;
     tiltGamma = 0;
+    tiltFrameAngle = 0;
     tiltNeutralBeta = 0;
     tiltNeutralGamma = 0;
+    tiltNeutralAngle = 0;
     tiltSensitivity = 1.35;
     tiltInvertPitch = false;
     tiltInvertYaw = false;
@@ -82,10 +97,26 @@ export class InputManager {
     // (portrait axes), so the screen frame — the frame the player actually
     // steers in — is a rotation of (beta, gamma) by this angle.
     screenOrientationAngle() {
-        return screen?.orientation?.angle ?? window.orientation ?? 0;
+        return normalizeScreenAngle(globalThis.screen?.orientation?.angle ?? globalThis.window?.orientation ?? 0);
+    }
+    rebaseTiltFrame(angle) {
+        const nextAngle = normalizeScreenAngle(angle);
+        const delta = wrapAngle(nextAngle - this.tiltFrameAngle);
+        if (Math.abs(delta) > 0.001) {
+            const current = rotateTiltFrame(this.tiltBeta, this.tiltGamma, delta);
+            this.tiltBeta = current.beta;
+            this.tiltGamma = current.gamma;
+            const neutral = rotateTiltFrame(this.tiltNeutralBeta, this.tiltNeutralGamma, delta);
+            this.tiltNeutralBeta = neutral.beta;
+            this.tiltNeutralGamma = neutral.gamma;
+        }
+        this.tiltFrameAngle = nextAngle;
+        this.tiltNeutralAngle = nextAngle;
     }
     onDeviceOrientation = (event) => {
-        if (event.beta == null || event.gamma == null)
+        const rawBeta = Number(event.beta);
+        const rawGamma = Number(event.gamma);
+        if (!Number.isFinite(rawBeta) || !Number.isFinite(rawGamma))
             return;
         this.tiltSeen = true;
         // Rotate the device-frame tilt into the screen frame so steering feels
@@ -93,11 +124,13 @@ export class InputManager {
         // Without this, holding the phone sideways (the game locks landscape)
         // swaps the pitch/yaw axes: rolling steers the nose and tilting the
         // phone forward steers the wheel.
-        const radians = (this.screenOrientationAngle() * Math.PI) / 180;
+        const angle = this.screenOrientationAngle();
+        this.rebaseTiltFrame(angle);
+        const radians = (angle * Math.PI) / 180;
         const cos = Math.cos(radians);
         const sin = Math.sin(radians);
-        const beta = event.beta * cos + event.gamma * sin;
-        const gamma = -event.beta * sin + event.gamma * cos;
+        const beta = rawBeta * cos + rawGamma * sin;
+        const gamma = -rawBeta * sin + rawGamma * cos;
         this.tiltBeta += (beta - this.tiltBeta) * 0.35;
         this.tiltGamma += (gamma - this.tiltGamma) * 0.35;
     };
@@ -132,10 +165,12 @@ export class InputManager {
         this.tiltEnabled = false;
     }
     calibrateTilt() {
+        this.rebaseTiltFrame(this.screenOrientationAngle());
         this.tiltNeutralBeta = this.tiltBeta;
         this.tiltNeutralGamma = this.tiltGamma;
+        this.tiltNeutralAngle = this.tiltFrameAngle;
         this.tiltCalibrated = true;
-        return { beta: this.tiltNeutralBeta, gamma: this.tiltNeutralGamma };
+        return { beta: this.tiltNeutralBeta, gamma: this.tiltNeutralGamma, angle: this.tiltNeutralAngle };
     }
     configureTilt(settings = {}) {
         if (settings.tiltSensitivity !== undefined)
@@ -144,10 +179,19 @@ export class InputManager {
             this.tiltInvertPitch = Boolean(settings.tiltInvertPitch);
         if (settings.tiltInvertYaw !== undefined)
             this.tiltInvertYaw = Boolean(settings.tiltInvertYaw);
+        this.tiltFrameAngle = this.screenOrientationAngle();
         if (settings.tiltNeutral) {
-            this.tiltNeutralBeta = Number(settings.tiltNeutral.beta ?? 0);
-            this.tiltNeutralGamma = Number(settings.tiltNeutral.gamma ?? 0);
-            this.tiltCalibrated = true;
+            const beta = Number(settings.tiltNeutral.beta ?? 0);
+            const gamma = Number(settings.tiltNeutral.gamma ?? 0);
+            if (Number.isFinite(beta) && Number.isFinite(gamma)) {
+                this.tiltNeutralBeta = beta;
+                this.tiltNeutralGamma = gamma;
+                const savedAngle = Number(settings.tiltNeutral.angle);
+                this.tiltNeutralAngle = Number.isFinite(savedAngle) ? normalizeScreenAngle(savedAngle) : this.tiltFrameAngle;
+                this.tiltFrameAngle = this.tiltNeutralAngle;
+                this.tiltCalibrated = true;
+                this.rebaseTiltFrame(this.screenOrientationAngle());
+            }
         }
     }
     tiltSteering() {
@@ -161,11 +205,12 @@ export class InputManager {
             const t = clamp((magnitude - TILT_DEADZONE) / TILT_FULL_RANGE, 0, 1);
             return Math.sign(value) * t * this.tiltSensitivity;
         };
-        // Inverted by default: the base mapping negates the raw device tilt,
-        // and the invert checkboxes flip it back the other way when the player
-        // opts out of the inverted default.
-        let pitch = -curve(wrapAngle(this.tiltBeta - this.tiltNeutralBeta));
-        let yaw = -curve(wrapAngle(this.tiltGamma - this.tiltNeutralGamma));
+        const betaDelta = wrapAngle(this.tiltBeta - this.tiltNeutralBeta);
+        const gammaDelta = wrapAngle(this.tiltGamma - this.tiltNeutralGamma);
+        if (!Number.isFinite(betaDelta) || !Number.isFinite(gammaDelta))
+            return undefined;
+        let pitch = curve(betaDelta);
+        let yaw = curve(gammaDelta);
         if (this.tiltInvertPitch)
             pitch = -pitch;
         if (this.tiltInvertYaw)
@@ -202,11 +247,12 @@ export class InputManager {
             throttle.addEventListener('pointercancel', release);
         }
         this.root.querySelectorAll('[data-touch-action]').forEach((button) => {
-            const action = button.dataset.touchAction;
-            if (!action)
-                return;
             const press = (event) => {
                 event.preventDefault();
+                const action = button.dataset.touchAction;
+                if (!action)
+                    return;
+                button._activeTouchAction = action;
                 button.setPointerCapture(event.pointerId);
                 button.classList.add('is-active');
                 if (HOLD_ACTIONS.has(action)) {
@@ -220,8 +266,11 @@ export class InputManager {
             };
             const release = (event) => {
                 event.preventDefault();
+                const action = button._activeTouchAction ?? button.dataset.touchAction;
                 button.classList.remove('is-active');
-                this.touchHeld.delete(action);
+                if (action)
+                    this.touchHeld.delete(action);
+                delete button._activeTouchAction;
             };
             button.addEventListener('pointerdown', press);
             button.addEventListener('pointerup', release);
@@ -312,10 +361,11 @@ export class InputManager {
             fire: button(7),
             missile: this.gamepadEdge(5, button(5)),
             afterburner: button(4),
+            utility: button(5),
             targetNext: this.gamepadEdge(0, button(0)),
             cycleMode: this.gamepadEdge(1, button(1)),
             autopilot: this.gamepadEdge(3, button(3)),
-            scan: this.gamepadEdge(12, button(12)),
+            capture: this.gamepadEdge(12, button(12)),
             targetNearestHostile: this.gamepadEdge(13, button(13)),
             navNext: this.gamepadEdge(15, button(15)),
             pause: this.gamepadEdge(9, button(9)),
@@ -329,23 +379,26 @@ export class InputManager {
         const rollKeyboard = this.keyAxis(['KeyE'], ['KeyQ']);
         const throttleKeyboard = this.keyAxis(['KeyR', 'Equal', 'NumpadAdd'], ['KeyF', 'Minus', 'NumpadSubtract']);
         const tilt = this.tiltActive ? this.tiltSteering() : undefined;
+        const tiltValid = Boolean(tilt && Number.isFinite(tilt.pitch) && Number.isFinite(tilt.yaw));
         const throttleSet = this.throttleSet;
         this.throttleSet = undefined;
         return {
-            pitch: clamp(tilt ? tilt.pitch : (this.joystickY || pitchKeyboard || gamepad.pitch || 0), -1, 1),
-            yaw: clamp(tilt ? tilt.yaw : (this.joystickX || yawKeyboard || gamepad.yaw || 0), -1, 1),
+            pitch: clamp(tiltValid ? tilt.pitch : (this.joystickY || pitchKeyboard || gamepad.pitch || 0), -1, 1),
+            yaw: clamp(tiltValid ? tilt.yaw : (this.joystickX || yawKeyboard || gamepad.yaw || 0), -1, 1),
             roll: clamp((this.touchHeld.has('roll-right') ? 1 : 0) - (this.touchHeld.has('roll-left') ? 1 : 0) || rollKeyboard || gamepad.roll || 0, -1, 1),
             throttleDelta: throttleKeyboard * 0.46 + (gamepad.throttleDelta ?? 0),
             throttleSet,
             fire: this.keys.has('Space') || this.touchHeld.has('fire') || Boolean(gamepad.fire),
             missile: this.consumePressed('KeyM') || this.consumeTouch('missile') || Boolean(gamepad.missile),
+            scan: this.consumeTouch('scan'),
+            utility: this.keys.has('KeyM') || this.touchHeld.has('utility') || Boolean(gamepad.utility),
             afterburner: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchHeld.has('afterburner') || Boolean(gamepad.afterburner),
             targetNext: this.consumePressed('KeyT', 'Tab') || this.consumeTouch('targetNext') || Boolean(gamepad.targetNext),
             targetNearestHostile: this.consumePressed('KeyH') || this.consumeTouch('targetNearestHostile') || Boolean(gamepad.targetNearestHostile),
             cycleMode: this.consumePressed('KeyC') || this.consumeTouch('cycleMode') || Boolean(gamepad.cycleMode),
             navNext: this.consumePressed('KeyN') || this.consumeTouch('navNext') || Boolean(gamepad.navNext),
             autopilot: this.consumePressed('KeyJ') || this.consumeTouch('autopilot') || Boolean(gamepad.autopilot),
-            scan: this.consumePressed('KeyV') || this.consumeTouch('scan') || Boolean(gamepad.scan),
+            capture: this.consumeTouch('capture') || Boolean(gamepad.capture),
             pause: this.consumePressed('Escape', 'KeyP') || this.consumeTouch('pause') || Boolean(gamepad.pause),
             map: this.consumePressed('KeyK') || this.consumeTouch('map') || Boolean(gamepad.map),
         };

@@ -1,4 +1,4 @@
-import { COMMODITIES, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, LOCATIONS, SHIPS, SYSTEM_MAP_EXTENT, commodityIds, displaySpeed, equipmentIds } from './data.js';
+import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, LOCATIONS, SHIPS, SUN_POSITION, commodityIds, displaySpeed, equipmentIds } from './data.js';
 import { cargoCapacity, cargoMass } from './economy.js';
 import { formatCredits, formatDuration } from './random.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
@@ -7,6 +7,34 @@ import { shipTopDownProfile } from './voxelModels.js';
 import { ShipPreview } from './shipPreview.js';
 const escapeHtml = (value) => value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const percent = (value, max) => (max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100)));
+// The rendered star sits far outside the playable system. Use its real
+// position for radial distance, then use the canonical system X/Z plane for
+// the POI angles. Using the far-shell sun for both would collapse every
+// destination into one narrow sunward wedge instead of centering the system
+// map around the star.
+const SYSTEM_MAP_RADIAL_MIN = 16;
+const SYSTEM_MAP_RADIAL_MAX = 42;
+// Helix and Mourning Line are intentionally only 20,000 units apart, which
+// is less than one map-card width at this system scale. Give the graveyard a
+// schematic bearing offset so both POIs remain readable; its radial distance
+// (and therefore its closer-to-the-sun relationship) is unchanged.
+const SYSTEM_MAP_ANGLE_OFFSETS = Object.freeze({ 'mourning-line': 1.0 });
+const systemMapDistance = (position) => Math.hypot(position[0] - SUN_POSITION[0], position[1] - SUN_POSITION[1], position[2] - SUN_POSITION[2]);
+const SYSTEM_MAP_DISTANCE_RANGE = (() => {
+    const distances = Object.values(LOCATIONS).map((location) => systemMapDistance(location.position));
+    const min = Math.min(...distances);
+    const max = Math.max(...distances);
+    return { min, span: Math.max(1, max - min) };
+})();
+const systemMapPoint = (position, locationId) => {
+    const distance = systemMapDistance(position);
+    const radial = Math.max(SYSTEM_MAP_RADIAL_MIN, Math.min(SYSTEM_MAP_RADIAL_MAX, SYSTEM_MAP_RADIAL_MIN + ((distance - SYSTEM_MAP_DISTANCE_RANGE.min) / SYSTEM_MAP_DISTANCE_RANGE.span) * (SYSTEM_MAP_RADIAL_MAX - SYSTEM_MAP_RADIAL_MIN)));
+    const angle = Math.atan2(position[2], position[0]) + (SYSTEM_MAP_ANGLE_OFFSETS[locationId] ?? 0);
+    return {
+        left: 50 + Math.cos(angle) * radial,
+        top: 50 + Math.sin(angle) * radial,
+    };
+};
 // Talker identity for the comms surfaces: the color follows the speaker's
 // relation to the player — hostiles red, allies blue, neutral white — so the
 // strip reads at a glance without a per-ship legend. The text shows the
@@ -18,7 +46,127 @@ export const callsignHandle = (callsign) => {
     const quoted = callsign.match(/“[^”]+”/);
     return quoted ? quoted[0].slice(1, -1) : callsign;
 };
-const GAME_VERSION = '0.4.5a';
+const GAME_VERSION = '0.4.7';
+// Local art review flags. `dev-dock` opens any concourse directly and
+// `dev-ship` selects the initial hull, so visual checks do not require a
+// flight, a jump, or a saved-game detour. (Guarded for headless imports.)
+const QUERY_PARAMS = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
+const VESPER_HOVER_PREVIEW = QUERY_PARAMS.get('vesper-hover') === '1';
+const VESPER_HOVER_SHIP_ID = VESPER_HOVER_PREVIEW ? QUERY_PARAMS.get('vesper-ship') : undefined;
+const DEV_PREVIEW_LOCATION_PARAM = QUERY_PARAMS.get('dev-dock');
+const DEV_PREVIEW_LOCATION = DOCK_LOCATION_IDS.includes(DEV_PREVIEW_LOCATION_PARAM) ? DEV_PREVIEW_LOCATION_PARAM : undefined;
+const DEV_PREVIEW_SHIP_ID = QUERY_PARAMS.get('dev-ship');
+const PREVIEW_LOCATION = DEV_PREVIEW_LOCATION ?? (VESPER_HOVER_PREVIEW ? 'vesper' : undefined);
+const PREVIEW_MODE = Boolean(PREVIEW_LOCATION);
+const VESPER_ART_WIDTH = 1672;
+const VESPER_ART_HEIGHT = 941;
+// These are background-space anchors, not viewport percentages. Each profile
+// compensates for the sprite's actual visible silhouette and visual angle so
+// transparent canvas padding does not decide how high the ship appears to
+// hover above a concourse pad.
+const VESPER_SHIP_PROFILES = Object.freeze({
+    wayfarer: Object.freeze({
+        name: 'Wayfarer',
+        art: './assets/remaster/ship-isometric-wayfarer-vesper-lit-v3.png',
+        anchorX: 848,
+        anchorY: 498,
+        width: 245,
+        angle: -1,
+        bob: 8,
+        shadowX: 790,
+        shadowY: 625,
+        shadowWidth: 301,
+    }),
+    talon: Object.freeze({
+        name: 'Talon',
+        art: './assets/remaster/ship-isometric-talon-vesper-lit-v1.png',
+        anchorX: 848,
+        anchorY: 492,
+        width: 228.2,
+        angle: 4,
+        bob: 8,
+        shadowX: 790,
+        shadowY: 625,
+        shadowWidth: 287,
+    }),
+    vanguard: Object.freeze({
+        name: 'Vanguard',
+        art: './assets/remaster/ship-isometric-vanguard-vesper-lit-v1.png',
+        anchorX: 848,
+        anchorY: 497,
+        width: 225.4,
+        angle: 7,
+        bob: 7,
+        shadowX: 790,
+        shadowY: 625,
+        shadowWidth: 294,
+    }),
+    prospector: Object.freeze({
+        name: 'Prospector',
+        art: './assets/remaster/ship-isometric-prospector-vesper-lit-v1.png',
+        anchorX: 848,
+        anchorY: 512,
+        width: 222.6,
+        angle: -3,
+        bob: 5,
+        shadowX: 790,
+        shadowY: 633,
+        shadowWidth: 301,
+    }),
+    lancer: Object.freeze({
+        name: 'Lancer',
+        art: './assets/remaster/ship-isometric-lancer-vesper-lit-v1.png',
+        anchorX: 848,
+        anchorY: 497,
+        width: 228.2,
+        angle: 13,
+        bob: 8,
+        shadowX: 790,
+        shadowY: 625,
+        shadowWidth: 297.5,
+    }),
+    atlas: Object.freeze({
+        name: 'Atlas Hauler',
+        art: './assets/remaster/ship-isometric-atlas-vesper-lit-v1.png',
+        anchorX: 848,
+        anchorY: 505,
+        width: 420,
+        angle: -1,
+        bob: 4,
+        shadowX: 790,
+        shadowY: 640,
+        shadowWidth: 520,
+    }),
+});
+const DEFAULT_VESPER_SHIP_PROFILE = VESPER_SHIP_PROFILES.wayfarer;
+const VESPER_LAUNCH_DURATION = 960;
+const VESPER_POINTER_ANCHORS = Object.freeze({
+    services: Object.freeze({ x: 496, y: 617 }),
+    market: Object.freeze({ x: 450, y: 405 }),
+    bar: Object.freeze({ x: 1154, y: 473 }),
+});
+// Source-image anchors for the local all-location preview tool. They are
+// deliberately background-space coordinates, so cover-cropping the same
+// 1672×941 plate at another viewport keeps the hull on its landing area.
+const CONCOURSE_PREVIEW_ANCHORS = Object.freeze({
+    vesper: Object.freeze({ shipX: 848, shipY: 498, shadowX: 790, shadowY: 625, services: VESPER_POINTER_ANCHORS.services, market: VESPER_POINTER_ANCHORS.market, bar: VESPER_POINTER_ANCHORS.bar }),
+    helix: Object.freeze({ shipX: 1280, shipY: 520, smallShipY: 560, shadowX: 1280, shadowY: 680, services: { x: 1010, y: 520 }, market: { x: 320, y: 500 }, bar: { x: 280, y: 320 } }),
+    rook: Object.freeze({ shipX: 836, shipY: 560, smallShipY: 568, shadowX: 836, shadowY: 690, services: { x: 1240, y: 470 }, market: { x: 380, y: 470 }, bar: { x: 340, y: 280 } }),
+    azure: Object.freeze({ shipX: 680, shipY: 430, shadowX: 500, shadowY: 580, smallShipX: 540, smallShipY: 500, smallShadowX: 450, smallShadowY: 590, atlasShipX: 650, atlasShadowX: 470, services: { x: 1190, y: 650 }, market: { x: 1290, y: 350 }, bar: { x: 250, y: 320 } }),
+});
+const INITIAL_PREVIEW_SHIP_ID = VESPER_SHIP_PROFILES[DEV_PREVIEW_SHIP_ID]
+    ? DEV_PREVIEW_SHIP_ID
+    : VESPER_SHIP_PROFILES[VESPER_HOVER_SHIP_ID]
+        ? VESPER_HOVER_SHIP_ID
+        : undefined;
+const COCKPIT_ART_BY_SHIP = Object.freeze({
+    wayfarer: './assets/remaster/cockpit-frame.webp',
+    vanguard: './assets/remaster/cockpit-vanguard.webp',
+    talon: './assets/remaster/cockpit-talon.webp',
+    prospector: './assets/remaster/cockpit-prospector.webp',
+    lancer: './assets/remaster/cockpit-lancer.webp',
+    atlas: './assets/remaster/cockpit-atlas.webp',
+});
 export class GameUI {
     root;
     viewport;
@@ -46,6 +194,10 @@ export class GameUI {
     lastMapPointerSelection;
     lastHud;
     npcLineIndex = new Map();
+    cockpitShipId = 'wayfarer';
+    vesperPreviewShipId = INITIAL_PREVIEW_SHIP_ID;
+    vesperLaunchTransition = false;
+    vesperLaunchTimer;
     constructor(host) {
         host.innerHTML = this.shellMarkup();
         this.root = host.querySelector('#game-shell');
@@ -59,7 +211,10 @@ export class GameUI {
         this.syncFullscreenButton();
         document.addEventListener('fullscreenchange', this.syncFullscreenButton);
         this.updateOrientationNotice();
-        window.addEventListener('resize', this.updateOrientationNotice);
+        window.addEventListener('resize', () => {
+            this.updateOrientationNotice();
+            this.syncConcourseOverlay();
+        });
     }
     setActions(actions) {
         this.actions = actions;
@@ -74,6 +229,52 @@ export class GameUI {
     }
     attachSave(save) {
         this.save = save;
+        this.setCockpitShip(save?.player?.shipId);
+    }
+    setCockpitShip(shipId = 'wayfarer') {
+        const nextId = COCKPIT_ART_BY_SHIP[shipId] ? shipId : 'wayfarer';
+        if (this.cockpitShipId === nextId && this.root.dataset.cockpitShip === nextId)
+            return;
+        this.cockpitShipId = nextId;
+        this.root.dataset.cockpitShip = nextId;
+        const art = this.el('.cockpit-art');
+        if (art)
+            art.style.backgroundImage = `url("${COCKPIT_ART_BY_SHIP[nextId]}")`;
+    }
+    getVesperShipId(shipId = this.save?.player?.shipId) {
+        if (PREVIEW_MODE && VESPER_SHIP_PROFILES[this.vesperPreviewShipId])
+            return this.vesperPreviewShipId;
+        return VESPER_SHIP_PROFILES[shipId] ? shipId : 'wayfarer';
+    }
+    getVesperShipProfile(shipId = this.save?.player?.shipId) {
+        return VESPER_SHIP_PROFILES[this.getVesperShipId(shipId)] ?? DEFAULT_VESPER_SHIP_PROFILE;
+    }
+    selectVesperPreviewShip(shipId) {
+        if (!PREVIEW_MODE || !VESPER_SHIP_PROFILES[shipId] || this.vesperLaunchTransition)
+            return;
+        this.vesperPreviewShipId = shipId;
+        const profile = this.getVesperShipProfile();
+        const layer = this.root.querySelector('.concourse-hover-preview');
+        const image = layer?.querySelector('.concourse-hover-ship');
+        if (!layer || !image)
+            return;
+        const launchLabel = `Launch the docked ${profile.name}`;
+        image.src = profile.art;
+        image.alt = launchLabel;
+        image.setAttribute('aria-label', launchLabel);
+        this.syncConcourseOverlay();
+        const toolbar = this.root.querySelector('.vesper-preview-toolbar');
+        const heading = toolbar?.querySelector('.vesper-preview-heading b');
+        if (heading)
+            heading.textContent = profile.name;
+        this.root.querySelectorAll('[data-vesper-preview-ship]').forEach((button) => {
+            const selected = button.dataset.vesperPreviewShip === shipId;
+            button.classList.toggle('is-selected', selected);
+            button.setAttribute('aria-pressed', String(selected));
+        });
+        const takeoff = toolbar?.querySelector('[data-vesper-preview-launch]');
+        if (takeoff)
+            takeoff.innerHTML = `TAKE OFF <span>${escapeHtml(profile.name)}</span>`;
     }
     shellMarkup() {
         return `
@@ -126,7 +327,7 @@ export class GameUI {
             <div class="touch-right">
               <button class="touch-boost touch-boost-right" data-touch-action="afterburner" aria-label="Afterburner — hold"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" fill-rule="evenodd"><path d="M12 2.2C7.9 7.5 5.4 10.3 5.4 14a6.6 6.6 0 0 0 13.2 0c0-3.7-2.5-6.5-6.6-11.8Zm0 7c-2 2.6-2.8 3.8-2.8 5.3a2.8 2.8 0 0 0 5.6 0c0-1.5-.8-2.7-2.8-5.3Z"/></svg></button>
               <button id="touch-fire" class="touch-fire" data-touch-action="fire" aria-label="Fire — hold"><svg data-icon="fire" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.6"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg></button>
-              <button id="touch-missile" class="touch-missile" data-touch-action="missile" aria-label="Missile"><svg data-icon="missile" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.4 9.3 8.8h5.4Z"/><path d="M9.3 8.8h5.4v6.4H9.3Z"/><path d="M9.3 15.2 6.8 21M14.7 15.2l2.5 5.8"/></svg></button>
+              <button id="touch-missile" class="touch-missile" data-touch-action="missile" aria-label="Missile"><svg data-icon="missile" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.4 9.3 8.8h5.4Z"/><path d="M9.3 8.8h5.4v6.4H9.3Z"/><path d="M9.3 15.2 6.8 21M14.7 15.2l2.5 5.8"/></svg><svg data-icon="scan" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="is-hidden"><circle cx="12" cy="12" r="6.2"/><path d="M12 5.8V12l4.2 2.4"/><path d="M4.8 4.8 3.4 3.4M19.2 4.8l1.4-1.4M4.8 19.2l-1.4 1.4M19.2 19.2l1.4 1.4"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg><svg data-icon="capture" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M8 3.6h8l1.8 3H6.2Z"/><path d="M9.2 6.6v2.1M14.8 6.6v2.1"/><path d="M7 11.5h10M8.1 14.5h7.8M9.3 17.5h5.4M10.6 20.5h2.8"/></svg></button>
             </div>
           </div>
           <div class="hud-corner-buttons">
@@ -150,7 +351,7 @@ export class GameUI {
               <button data-ui-command="fullscreen">FULLSCREEN</button>
             </div>
             <div class="title-controls">
-              <span>TOUCH: tilt to steer · THRUST · AFTERBURN · FIRE · MISSILE</span>
+              <span>TOUCH: tilt to steer · THRUST · AFTERBURN · FIRE · SECONDARY TOOL</span>
               <span>KEYBOARD: WASD · Q/E · R/F · Space · T · J</span>
             </div>
             <div class="title-tilt">
@@ -210,6 +411,16 @@ export class GameUI {
                 this.mapPointer = undefined;
         });
         this.root.addEventListener('click', (event) => {
+            const previewShip = event.target.closest('[data-vesper-preview-ship]');
+            if (previewShip) {
+                this.selectVesperPreviewShip(previewShip.dataset.vesperPreviewShip);
+                return;
+            }
+            const previewLaunch = event.target.closest('[data-vesper-preview-launch]');
+            if (previewLaunch) {
+                this.startVesperLaunchTransition();
+                return;
+            }
             const target = event.target.closest('[data-ui-command], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-nav-id], [data-trade], [data-mission-id], [data-equipment-id], [data-ship-id], [data-switch-ship], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty]');
             if (!target)
                 return;
@@ -364,7 +575,10 @@ export class GameUI {
                 this.actions?.startArena(this.arenaEnv, this.arenaScenario, this.arenaDifficulty);
                 break;
             case 'launch':
-                this.actions?.launch();
+                if ((this.dockLocation === 'vesper' || DEV_PREVIEW_LOCATION === this.dockLocation) && this.dockTerminal === 'concourse' && element?.classList.contains('concourse-hover-ship'))
+                    this.startVesperLaunchTransition();
+                else
+                    this.actions?.launch();
                 break;
             case 'pause':
                 this.showPause();
@@ -466,6 +680,7 @@ export class GameUI {
         this.root.querySelector('#hud')?.classList.add('is-hidden');
     }
     showDock(save, locationId) {
+        this.cancelVesperLaunchTransition();
         this.save = save;
         this.dockLocation = locationId;
         this.dockTab = 'concourse';
@@ -485,9 +700,58 @@ export class GameUI {
             this.renderDock();
     }
     hideDock() {
+        this.cancelVesperLaunchTransition();
         this.disposeShipPreviews();
         this.root.querySelector('#dock-screen')?.classList.add('is-hidden');
         this.dockLocation = undefined;
+    }
+    cancelVesperLaunchTransition() {
+        this.vesperLaunchTransition = false;
+        if (this.vesperLaunchTimer !== undefined) {
+            window.clearTimeout(this.vesperLaunchTimer);
+            this.vesperLaunchTimer = undefined;
+        }
+    }
+    startVesperLaunchTransition() {
+        if (this.vesperLaunchTransition)
+            return;
+        const dock = this.root.querySelector('#dock-screen');
+        const scene = dock?.querySelector('.station-scene');
+        const ship = dock?.querySelector('.concourse-hover-ship');
+        const flight = dock?.querySelector('.concourse-hover-ship-flight');
+        if (!scene || !ship || !flight) {
+            this.actions?.launch();
+            return;
+        }
+        if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+            this.actions?.launch();
+            return;
+        }
+        this.vesperLaunchTransition = true;
+        scene.classList.add('is-launching');
+        ship.closest('.concourse-hover-preview')?.classList.add('is-departing');
+        scene.querySelector('.scene-pointers')?.setAttribute('aria-hidden', 'true');
+        ship.setAttribute('aria-disabled', 'true');
+        ship.removeAttribute('tabindex');
+        let finished = false;
+        const finish = () => {
+            if (finished)
+                return;
+            finished = true;
+            flight.removeEventListener('animationend', onAnimationEnd);
+            this.vesperLaunchTransition = false;
+            if (this.vesperLaunchTimer !== undefined) {
+                window.clearTimeout(this.vesperLaunchTimer);
+                this.vesperLaunchTimer = undefined;
+            }
+            this.actions?.launch();
+        };
+        const onAnimationEnd = (event) => {
+            if (event.animationName === 'vesper-launch-ship' || event.animationName === 'rook-launch-ship')
+                finish();
+        };
+        flight.addEventListener('animationend', onAnimationEnd);
+        this.vesperLaunchTimer = window.setTimeout(finish, VESPER_LAUNCH_DURATION + 120);
     }
     renderDock() {
         if (!this.save || !this.dockLocation)
@@ -495,10 +759,16 @@ export class GameUI {
         this.disposeShipPreviews();
         const dock = this.root.querySelector('#dock-screen');
         const location = LOCATIONS[this.dockLocation];
+        // Refreshes of the same dock screen (e.g. a market trade) must keep the
+        // scroll position; only actual navigation resets it to the top.
+        const prevTab = dock.dataset.tab;
+        const prevTerminal = dock.dataset.terminal;
+        const prevScroll = dock.querySelector('.dock-content')?.scrollTop ?? 0;
         dock.style.setProperty('--dock-accent', location.accent);
         dock.style.setProperty('--dock-secondary', location.secondary);
         dock.dataset.location = this.dockLocation;
         dock.dataset.tab = this.dockTab;
+        dock.dataset.terminal = this.dockTerminal;
         const illustrationScreen = this.dockTerminal === 'bar'
             ? 'bar'
             : this.dockTerminal === 'market'
@@ -516,10 +786,67 @@ export class GameUI {
       <div class="dock-content">${terminal}</div>
     `;
         const content = dock.querySelector('.dock-content');
+        const preserveScroll = prevTab === this.dockTab && prevTerminal === this.dockTerminal;
         if (content)
-            content.scrollTop = 0;
-        if (this.dockTerminal === 'market' && this.marketPoint)
+            content.scrollTop = preserveScroll ? prevScroll : 0;
+        const illustration = dock.querySelector('.dock-backdrop img');
+        illustration?.addEventListener('load', () => this.syncConcourseOverlay(), { once: true });
+        this.syncConcourseOverlay();
+        requestAnimationFrame(() => this.syncConcourseOverlay());
+        if (this.dockTerminal === 'market' && this.marketPoint) {
             this.renderMarketPoint(this.marketPoint);
+            if (content && preserveScroll)
+                content.scrollTop = prevScroll;
+        }
+    }
+    syncConcourseOverlay() {
+        const dock = this.root.querySelector('#dock-screen');
+        const layer = dock?.querySelector('.concourse-hover-preview');
+        const scene = dock?.querySelector('.station-scene');
+        const illustration = dock?.querySelector('.dock-backdrop img');
+        if (!layer || !scene || !illustration)
+            return;
+        const imageRect = illustration.getBoundingClientRect();
+        const sceneRect = scene.getBoundingClientRect();
+        const naturalWidth = illustration.naturalWidth || VESPER_ART_WIDTH;
+        const naturalHeight = illustration.naturalHeight || VESPER_ART_HEIGHT;
+        const scale = Math.max(imageRect.width / naturalWidth, imageRect.height / naturalHeight);
+        const renderedWidth = naturalWidth * scale;
+        const renderedHeight = naturalHeight * scale;
+        const contentLeft = imageRect.left + (imageRect.width - renderedWidth) / 2;
+        const contentTop = imageRect.top + (imageRect.height - renderedHeight) / 2;
+        const anchorX = (sourceX) => `${(contentLeft + sourceX * scale - sceneRect.left).toFixed(2)}px`;
+        const anchorY = (sourceY) => `${(contentTop + sourceY * scale - sceneRect.top).toFixed(2)}px`;
+        const profile = this.getVesperShipProfile();
+        const anchors = CONCOURSE_PREVIEW_ANCHORS[this.dockLocation] ?? CONCOURSE_PREVIEW_ANCHORS.vesper;
+        const isAtlas = profile === VESPER_SHIP_PROFILES.atlas;
+        const shipBaseX = isAtlas ? (anchors.atlasShipX ?? anchors.shipX) : (anchors.smallShipX ?? anchors.shipX);
+        const shipBaseY = isAtlas ? (anchors.atlasShipY ?? anchors.shipY) : (anchors.smallShipY ?? anchors.shipY);
+        const shadowBaseX = isAtlas ? (anchors.atlasShadowX ?? anchors.shadowX) : (anchors.smallShadowX ?? anchors.shadowX);
+        const shadowBaseY = isAtlas ? (anchors.atlasShadowY ?? anchors.shadowY) : (anchors.smallShadowY ?? anchors.shadowY);
+        const shipAnchorX = shipBaseX + (profile.anchorX - DEFAULT_VESPER_SHIP_PROFILE.anchorX);
+        const shipAnchorY = shipBaseY + (profile.anchorY - DEFAULT_VESPER_SHIP_PROFILE.anchorY);
+        const shadowAnchorX = shadowBaseX + (profile.shadowX - DEFAULT_VESPER_SHIP_PROFILE.shadowX);
+        const shadowAnchorY = shadowBaseY + (profile.shadowY - DEFAULT_VESPER_SHIP_PROFILE.shadowY);
+        const concourseShipScale = this.dockLocation === 'rook' ? 0.86 : 1;
+        const concourseShadowScale = this.dockLocation === 'rook' ? 0.9 : 1;
+        layer.style.setProperty('--vesper-ship-left', anchorX(shipAnchorX));
+        layer.style.setProperty('--vesper-ship-top', anchorY(shipAnchorY));
+        const shipMaskArt = profile.art.startsWith('./') ? `/${profile.art.slice(2)}` : profile.art;
+        layer.style.setProperty('--vesper-ship-mask', `url("${shipMaskArt}")`);
+        layer.style.setProperty('--vesper-ship-width', `${(profile.width * scale * concourseShipScale).toFixed(2)}px`);
+        layer.style.setProperty('--vesper-ship-angle', `${profile.angle}deg`);
+        layer.style.setProperty('--vesper-ship-bob', `${(profile.bob * scale * concourseShipScale).toFixed(2)}px`);
+        layer.style.setProperty('--vesper-shadow-left', anchorX(shadowAnchorX));
+        layer.style.setProperty('--vesper-shadow-top', anchorY(shadowAnchorY));
+        layer.style.setProperty('--vesper-shadow-width', `${(profile.shadowWidth * scale * concourseShadowScale).toFixed(2)}px`);
+        layer.style.setProperty('--vesper-shadow-height', `${(58 * scale * concourseShadowScale).toFixed(2)}px`);
+        scene.style.setProperty('--concourse-services-left', anchorX(anchors.services.x));
+        scene.style.setProperty('--concourse-services-top', anchorY(anchors.services.y));
+        scene.style.setProperty('--concourse-market-left', anchorX(anchors.market.x));
+        scene.style.setProperty('--concourse-market-top', anchorY(anchors.market.y));
+        scene.style.setProperty('--concourse-bar-left', anchorX(anchors.bar.x));
+        scene.style.setProperty('--concourse-bar-top', anchorY(anchors.bar.y));
     }
     renderLandingScene() {
         return this.renderConcourse();
@@ -548,10 +875,30 @@ export class GameUI {
         }
     }
     renderConcourse() {
+        const showShipPreview = this.dockLocation === 'vesper' || DEV_PREVIEW_LOCATION === this.dockLocation;
+        const livePreview = PREVIEW_MODE && PREVIEW_LOCATION === this.dockLocation;
+        const profile = this.getVesperShipProfile();
+        const selectedShipId = this.getVesperShipId();
+        const launchLabel = `Launch the docked ${profile.name}`;
+        const previewToolbar = livePreview ? `
+        <div class="vesper-preview-toolbar" aria-label="Live concourse ship preview">
+          <div class="vesper-preview-heading"><span>LIVE CONCOURSE PREVIEW</span><b>${escapeHtml(profile.name)}</b></div>
+          <div class="vesper-preview-ship-list" role="group" aria-label="Select a Vesper ship">
+            ${Object.entries(VESPER_SHIP_PROFILES).map(([id, candidate]) => `<button type="button" class="${id === selectedShipId ? 'is-selected' : ''}" data-vesper-preview-ship="${id}" aria-pressed="${id === selectedShipId}">${escapeHtml(candidate.name.replace(/ Hauler$/, ''))}</button>`).join('')}
+          </div>
+          <button type="button" class="vesper-preview-takeoff" data-vesper-preview-launch>TAKE OFF <span>${escapeHtml(profile.name)}</span></button>
+        </div>` : '';
         return `
       <div class="concourse-screen station-scene" aria-label="Concourse points of interest">
+        ${previewToolbar}
+        ${showShipPreview ? `<div class="concourse-hover-preview" aria-label="Your docked ship">
+          <div class="concourse-hover-shadow" aria-hidden="true"></div>
+          <div class="concourse-hover-ship-flight">
+            <img class="concourse-hover-ship" src="${profile.art}" alt="${escapeHtml(launchLabel)}" data-ui-command="launch" role="button" tabindex="0" aria-label="${escapeHtml(launchLabel)}" draggable="false">
+          </div>
+        </div>` : ''}
         <div class="scene-pointers" aria-label="Concourse actions">
-          <div class="scene-pointer concourse-pointer-ship" data-ui-command="launch" role="button" tabindex="0" aria-label="Launch the docked ship"><i>↗</i><b>YOUR SHIP</b><small>Launch</small></div>
+          ${showShipPreview ? '' : '<div class="scene-pointer concourse-pointer-ship" data-ui-command="launch" role="button" tabindex="0" aria-label="Launch the docked ship"><i>↗</i><b>YOUR SHIP</b><small>Launch</small></div>'}
           <div class="scene-pointer concourse-pointer-services" data-dock-hotspot="services" role="button" tabindex="0" aria-label="Open services"><i>⚙</i><b>SERVICES</b><small>Repair and refuel</small></div>
           <div class="scene-pointer concourse-pointer-market" data-dock-hotspot="market" role="button" tabindex="0" aria-label="Enter the market"><i>▣</i><b>MARKET</b><small>Trade and fit out</small></div>
           <div class="scene-pointer concourse-pointer-bar" data-dock-hotspot="bar" role="button" tabindex="0" aria-label="Enter the bar"><i>✦</i><b>BAR</b><small>Guilds and missions</small></div>
@@ -854,15 +1201,44 @@ export class GameUI {
             : screen === 'market'
                 ? `market-${locationId}`
                 : locationId;
+        const illustrationFile = locationId === 'vesper' && screen === 'bar'
+            ? 'bar-vesper-hd-v1'
+            : locationId === 'vesper' && screen === 'market'
+                ? 'market-vesper-hd-v1'
+                : locationId === 'azure' && screen === 'concourse'
+                    ? 'azure-hd-v1'
+                : locationId === 'azure' && screen === 'bar'
+                    ? 'bar-azure-hd-v1'
+                : locationId === 'azure' && screen === 'market'
+                    ? 'market-azure-hd-v1'
+                : locationId === 'helix' && screen === 'concourse'
+                    ? 'helix-hd-v1'
+                : locationId === 'helix' && screen === 'bar'
+                    ? 'bar-helix-hd-v1'
+                : locationId === 'helix' && screen === 'market'
+                    ? 'market-helix-hd-v1'
+                : locationId === 'rook' && screen === 'concourse'
+                    ? 'rook-hd-v1'
+                : locationId === 'rook' && screen === 'bar'
+                    ? 'bar-rook-hd-v1'
+                : locationId === 'rook' && screen === 'market'
+                    ? 'market-rook-hd-v1'
+                : VESPER_HOVER_PREVIEW && locationId === 'vesper' && screen === 'concourse'
+                    ? 'vesper-preview'
+                    : file;
         const label = screen === 'bar'
             ? `${location.name} bar`
             : screen === 'market'
                 ? `${location.name} market`
                 : location.name;
-        return `<img src="./art/locations/v3/${file}.png" alt="Pixel-art view of ${escapeHtml(label)}" draggable="false">`;
+        const artDescription = illustrationFile.endsWith('-hd-v1') || illustrationFile === 'vesper-preview'
+            ? 'HD view'
+            : 'Pixel-art view';
+        return `<img src="./art/locations/v3/${illustrationFile}.png" alt="${artDescription} of ${escapeHtml(label)}" draggable="false">`;
     }
     updateHud(model) {
         this.lastHud = model;
+        this.setCockpitShip(model.shipId);
         const setText = (selector, value) => {
             const element = this.el(selector);
             if (element)
@@ -927,7 +1303,7 @@ export class GameUI {
             prompt.textContent = model.prompt ?? '';
             prompt.classList.toggle('is-hidden', !model.prompt);
         }
-        this.updateTarget(model.target);
+        this.updateTarget(model.target, model.mode);
         const targetReadout = this.el('#screen-target-readout');
         if (targetReadout) {
             targetReadout.classList.toggle('is-alert', Boolean(model.monitorStatus));
@@ -943,7 +1319,7 @@ export class GameUI {
         if (throttleFill)
             throttleFill.style.height = `${model.throttle * 100}%`;
     }
-    updateTarget(target) {
+    updateTarget(target, mode = this.lastHud?.mode ?? 'combat') {
         const bracket = this.el('#target-bracket');
         const edgePointer = this.el('#target-edge-pointer');
         // The target monitor carries the lock (name, bars, distance) — the old
@@ -952,7 +1328,7 @@ export class GameUI {
             this.el('#screen-target-distance').textContent = '—';
             this.el('#screen-target-readout').textContent = '—';
             this.setTargetScreenValue(undefined);
-            this.updateWeaponButtons(undefined);
+            this.updateWeaponButtons(undefined, mode);
             bracket?.classList.add('is-hidden');
             bracket?.classList.remove('is-hostile', 'is-surrendered');
             edgePointer?.classList.add('is-hidden');
@@ -968,7 +1344,7 @@ export class GameUI {
         this.el('#screen-target-distance').textContent = `${Math.round(target.distance).toLocaleString('en-US')} km`;
         this.el('#screen-target-readout').textContent = target.readout ?? '—';
         this.setTargetScreenValue(target);
-        this.updateWeaponButtons(target.kind);
+        this.updateWeaponButtons(target, mode);
         if (bracket && target.onScreen && target.screenX !== undefined && target.screenY !== undefined) {
             bracket.style.transform = `translate(${target.screenX}px, ${target.screenY}px)`;
             bracket.classList.remove('is-hidden');
@@ -990,27 +1366,48 @@ export class GameUI {
             edgePointer?.classList.add('is-hidden');
         }
     }
-    updateWeaponButtons(kind) {
+    updateWeaponButtons(target, mode = this.lastHud?.mode ?? 'combat') {
         const fire = this.el('#touch-fire');
         const missile = this.el('#touch-missile');
         if (!fire || !missile)
             return;
-        const mining = kind === 'asteroid';
-        const salvage = kind === 'wreck';
+        // Keep the old kind-string shorthand working for debug probes and
+        // lightweight callers; normal HUD updates pass the full target model.
+        const kindString = typeof target === 'string';
+        const kind = kindString ? target : target?.kind;
+        const contextualMode = kindString
+            ? kind === 'asteroid' ? 'mining' : kind === 'wreck' ? 'salvage' : mode
+            : mode;
+        const mining = kind === 'asteroid' && contextualMode === 'mining';
+        const salvage = kind === 'wreck' && contextualMode === 'salvage';
         const utility = mining || salvage;
+        const surrendered = kind === 'ship' && Boolean(target.surrendered) && !target.captured;
+        const capture = surrendered && Boolean(target.captureAvailable);
         fire.classList.toggle('is-mining', mining);
         fire.classList.toggle('is-salvage', salvage);
-        // No manual SCAN pad: deposits resolve automatically on approach, so the
-        // missile pad only ever fires missiles and is inert against rocks/wrecks.
-        missile.disabled = utility;
+        fire.classList.toggle('is-surrendered', surrendered);
+        missile.classList.toggle('is-scan', utility);
+        missile.classList.toggle('is-capture', surrendered);
+        fire.dataset.touchAction = utility ? 'utility' : 'fire';
+        missile.dataset.touchAction = utility ? 'scan' : surrendered ? 'capture' : 'missile';
+        // FIRE becomes the held mining/salvage beam for resource contacts. The
+        // smaller pad scans deposits with a tap, or handles missiles/capture
+        // against ordinary and surrendered ships.
+        missile.disabled = surrendered && !capture;
         const showIcon = (button, name) => {
             for (const icon of button.querySelectorAll('svg'))
                 icon.classList.toggle('is-hidden', icon.dataset.icon !== name);
         };
         showIcon(fire, mining ? 'mine' : salvage ? 'salvage' : 'fire');
-        showIcon(missile, 'missile');
+        showIcon(missile, utility ? 'scan' : capture || surrendered ? 'capture' : 'missile');
         fire.setAttribute('aria-label', mining ? 'Mine — hold' : salvage ? 'Salvage — hold' : 'Fire — hold');
-        missile.setAttribute('aria-label', utility ? 'Missile unavailable — auto-scan active' : 'Missile');
+        missile.setAttribute('aria-label', utility
+            ? 'Scan — tap'
+                : capture
+                    ? 'Capture surrendered pilot'
+                    : surrendered
+                    ? target.captureClaimable === false ? 'Capture unavailable — no claim' : 'Capture unavailable — approach target'
+                    : 'Missile');
     }
     setTargetScreenValue(target) {
         const setText = (selector, value) => {
@@ -1454,8 +1851,7 @@ export class GameUI {
         if (!this.save)
             return;
         const panel = this.root.querySelector('#map-panel');
-        const playerLeft = 50 + (model.playerPosition[0] / SYSTEM_MAP_EXTENT) * 42;
-        const playerTop = 50 + (model.playerPosition[2] / SYSTEM_MAP_EXTENT) * 42;
+        const playerPoint = systemMapPoint(model.playerPosition);
         const contactTone = (contact) => contact.hostile ? 'hostile' : contact.kind === 'asteroid' ? 'resource' : contact.kind === 'wreck' ? 'wreck' : 'ship';
         panel.innerHTML = `
       <div class="modal-card map-card">
@@ -1464,14 +1860,13 @@ export class GameUI {
           <section class="map-section system-map-section">
             <div class="map-section-heading"><span>SYSTEM POINTS</span><b>${escapeHtml(LOCATIONS[model.navTargetId].shortName)} VECTOR</b></div>
             <div class="system-map map-stage">
-              <div class="map-orbit orbit-a"></div><div class="map-orbit orbit-b"></div><div class="map-star"></div>
-              <div class="map-player-marker" style="left:${playerLeft.toFixed(2)}%;top:${playerTop.toFixed(2)}%" aria-label="Current position"><i></i><span>YOU</span></div>
+              <div class="map-orbit orbit-a"></div><div class="map-orbit orbit-b"></div><div class="map-star" aria-label="Helios star"></div>
+              <div class="map-player-marker" style="left:${playerPoint.left.toFixed(2)}%;top:${playerPoint.top.toFixed(2)}%" aria-label="Current position"><i></i><span>YOU</span></div>
               ${Object.keys(LOCATIONS).map((id) => {
             const location = LOCATIONS[id];
-            const left = 50 + (location.position[0] / SYSTEM_MAP_EXTENT) * 42;
-            const top = 50 + (location.position[2] / SYSTEM_MAP_EXTENT) * 42;
+            const point = systemMapPoint(location.position, id);
             const selected = model.navTargetId === id || model.currentTargetId === id;
-            return `<button class="map-node kind-${location.kind} ${selected ? 'selected' : ''}" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}%" data-map-target-kind="location" data-map-target-id="${id}"><i></i><b>${escapeHtml(location.shortName)}</b><span>${this.save.player.discovered.includes(id) ? escapeHtml(location.kind) : 'UNSURVEYED'}</span></button>`;
+            return `<button class="map-node kind-${location.kind} ${selected ? 'selected' : ''}" style="left:${point.left.toFixed(2)}%;top:${point.top.toFixed(2)}%" data-map-target-kind="location" data-map-target-id="${id}"><i></i><b>${escapeHtml(location.shortName)}</b><span>${this.save.player.discovered.includes(id) ? escapeHtml(location.kind) : 'UNSURVEYED'}</span></button>`;
         }).join('')}
             </div>
           </section>
@@ -1567,7 +1962,7 @@ export class GameUI {
           <section><h3>FLIGHT</h3><label><span>Flight assist</span><input type="checkbox" data-setting="flightAssist" ${settings.flightAssist ? 'checked' : ''}></label><label><span>Aim assistance</span><input type="checkbox" data-setting="aimAssist" ${settings.aimAssist ? 'checked' : ''}></label><label><span>Quality</span><select data-setting="quality"><option value="auto" ${settings.quality === 'auto' ? 'selected' : ''}>Auto</option><option value="low" ${settings.quality === 'low' ? 'selected' : ''}>Low</option><option value="high" ${settings.quality === 'high' ? 'selected' : ''}>High</option></select></label><label><span>Touch scale</span><input type="range" min="0.8" max="1.3" step="0.05" value="${settings.touchScale}" data-setting="touchScale"></label></section>
           <section><h3>TILT STEER</h3><label><span>Steering</span><select data-setting="steering"><option value="tilt" ${settings.steering !== 'stick' ? 'selected' : ''}>Tilt</option><option value="stick" ${settings.steering === 'stick' ? 'selected' : ''}>Stick</option></select></label><label><span>Sensitivity</span><input type="range" min="0.4" max="1.8" step="0.05" value="${settings.tiltSensitivity}" data-setting="tiltSensitivity"></label><label><span>Invert pitch</span><input type="checkbox" data-setting="tiltInvertPitch" ${settings.tiltInvertPitch ? 'checked' : ''}></label><label><span>Invert yaw</span><input type="checkbox" data-setting="tiltInvertYaw" ${settings.tiltInvertYaw ? 'checked' : ''}></label><div class="tilt-actions"><button data-ui-command="enable-tilt">ENABLE</button><button data-ui-command="calibrate-tilt">SET NEUTRAL</button></div></section>
           <section><h3>AUDIO</h3><label><span>Music</span><input type="range" min="0" max="1" step="0.05" value="${settings.music}" data-setting="music"></label><label><span>Effects</span><input type="range" min="0" max="1" step="0.05" value="${settings.effects}" data-setting="effects"></label><label><span>Haptics</span><input type="checkbox" data-setting="vibration" ${settings.vibration ? 'checked' : ''}></label></section>
-          <section class="controls-reference"><h3>KEYBOARD / CONTROLLER</h3><p>W/S pitch · A/D yaw · Q/E roll · R/F throttle · Shift afterburn · Space fire · M missile · T target · C mode · V scan · N nav · J hyperdrive · K map</p><p>Gamepad: left stick steer · right stick roll/throttle · RT fire · RB missile · LB afterburn · face buttons target/mode/hyperdrive · D-pad scan/hostile/nav.</p></section>
+          <section class="controls-reference"><h3>KEYBOARD / CONTROLLER</h3><p>W/S pitch · A/D yaw · Q/E roll · R/F throttle · Shift afterburn · Space fire · hold M secondary tool / tap missile or capture · T target · C mode · N nav · J hyperdrive · K map</p><p>Gamepad: left stick steer · right stick roll/throttle · RT fire · hold RB secondary tool / tap missile or capture · LB afterburn · face buttons target/mode/hyperdrive · D-pad capture/hostile/nav.</p></section>
         </div>
         <footer><button data-ui-command="map">NAV MAP</button><button data-ui-command="save">SAVE NOW</button><button data-ui-command="quit-title">QUIT TO TITLE</button></footer>
       </div>`;

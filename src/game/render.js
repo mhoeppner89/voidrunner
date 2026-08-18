@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { LOCATIONS } from './data.js';
+import { LOCATIONS, SUN_POSITION } from './data.js';
 import { createVoxelShipModel, createVoxelStationModel, paletteForFaction, shipVariantForRole } from './voxelModels.js';
 import { clamp, seededRandom } from './random.js';
+import { GRAVEYARD_GEOMETRY_PROFILES, wreckNodeCollisionRadius } from './worldData.js';
 const tupleToVector = (tuple, out = new THREE.Vector3()) => out.set(tuple[0], tuple[1], tuple[2]);
 const NEG_Z = new THREE.Vector3(0, 0, -1);
 const cssHex = (value) => `#${value.toString(16).padStart(6, '0')}`;
@@ -10,11 +11,10 @@ const cssHex = (value) => `#${value.toString(16).padStart(6, '0')}`;
 const COCKPIT_ZOOM_IDLE = 1.018;
 // Debris visibility cutoff: graveyard pieces and salvage chunks farther than
 // this from the camera are hidden (instances zero-scaled, wreck markers not
-// drawn). The field spans ~±2445 units around mourning-line, so most of that
-// shell is off-screen or a few pixels when flying inside it — culling saves a
-// lot of mobile fill. The targeted wreck always stays visible, and the cutoff
-// sits far beyond the drivable passage (~735 units of ribbing).
-const DEBRIS_CULL_RANGE = 1600;
+// drawn). Keep the complete graveyard visible from Helix's 20,000-unit
+// sunward viewing distance, with room for its outer wake. The batches stay
+// instanced; this increases visible coverage without multiplying draw calls.
+const DEBRIS_CULL_RANGE = 25000;
 const DEBRIS_CULL_RANGE_SQ = DEBRIS_CULL_RANGE * DEBRIS_CULL_RANGE;
 const HIDDEN_SCALE = [0.0001, 0.0001, 0.0001];
 // Half the previous pull-back (was 0.97): the frame relaxes to 0.994 under
@@ -52,6 +52,7 @@ export class SpaceRenderer {
     projectileMeshCount = 0;
     pickupMeshCount = 0;
     graveyardBatches = [];
+    wreckBatches = [];
     wreckNodeMeshes = new Map();
     effects = [];
     cockpit = new THREE.Group();
@@ -126,7 +127,9 @@ export class SpaceRenderer {
         this.renderer.domElement.classList.add('retro-pixel-canvas');
         this.renderer.domElement.style.imageRendering = 'pixelated';
         this.renderer.domElement.setAttribute('aria-label', 'Three-dimensional spaceflight view');
-        this.scene.fog = new THREE.FogExp2(0x2a1e44, 0.00010);
+        // Keep the far wake readable while letting the closer wreck layers
+        // separate from one another through a gentle distance falloff.
+        this.scene.fog = new THREE.FogExp2(0x2a1e44, 0.000115);
         this.scene.add(this.skyRoot);
         this.scene.add(this.dynamicRoot);
         this.scene.add(this.locationRoot);
@@ -191,7 +194,7 @@ export class SpaceRenderer {
         // body is a slightly oversized golden disc with two coronae stacked
         // around it (tight inner halo + broad out-of-system bloom) plus a thin
         // anamorphic streak so it reads as a *star* and not just a sphere.
-        const sunPos = new THREE.Vector3(-360000, 144000, 800000);
+        const sunPos = new THREE.Vector3(...SUN_POSITION);
         const sun = new THREE.Mesh(new THREE.SphereGeometry(22000, 32, 20), new THREE.MeshBasicMaterial({ color: 0xffe1a0, fog: false }));
         sun.position.copy(sunPos);
         this.skyRoot.add(sun);
@@ -1200,23 +1203,86 @@ export class SpaceRenderer {
         metalMap.repeat.set(3.5, 2.2);
         const rustMap = this.createPixelPanelTexture('graveyard-rust', 0x5a4436, 0xc27a48, 'rust');
         rustMap.repeat.set(4.2, 2.6);
+        // Route frames are painted structural salvage, not emissive markers.
+        // A shared map keeps the extra visual vocabulary cheap on mobile.
+        const routeMap = this.createPixelPanelTexture('graveyard-route-paint', 0x625b50, 0xd1b06b, 'route');
+        routeMap.repeat.set(5.2, 1.5);
+        const distantMap = this.createPixelPanelTexture('graveyard-distant-metal', 0x333c4a, 0x697681, 'metal');
+        distantMap.repeat.set(2.8, 1.8);
         const grouped = new Map();
         for (const piece of this.graveyard) {
-            const finish = piece.kind === 'panel' || piece.id.includes('carrier') ? 'rust' : 'metal';
+            const finish = piece.finish ?? (piece.kind === 'panel' || piece.id.includes('carrier') ? 'rust' : 'metal');
             const key = `${piece.kind}:${finish}`;
             const list = grouped.get(key) ?? [];
             list.push(piece);
             grouped.set(key, list);
         }
+        const extrudedProfileGeometry = (profile) => {
+            const shape = new THREE.Shape();
+            profile.outline.forEach(([x, z], index) => {
+                if (index === 0)
+                    shape.moveTo(x, z);
+                else
+                    shape.lineTo(x, z);
+            });
+            shape.closePath();
+            const geometry = new THREE.ExtrudeGeometry(shape, {
+                depth: profile.depth,
+                steps: 1,
+                bevelEnabled: true,
+                bevelThickness: profile.bevelThickness,
+                bevelSize: profile.bevelSize,
+                bevelSegments: 1,
+                curveSegments: 1,
+            });
+            // The outline is authored in local X/Z; rotate the extrusion's
+            // local depth into Y so ship silhouettes have a thin vertical hull
+            // and the existing oriented-box collision frame remains correct.
+            geometry.rotateX(Math.PI / 2);
+            geometry.center();
+            return geometry;
+        };
         const geometryFor = (kind) => {
             switch (kind) {
-                case 'engine': return new THREE.CylinderGeometry(0.7, 1, 1, 10, 1, true);
-                case 'panel': return new THREE.BoxGeometry(1, 0.12, 1);
+                case 'engine': {
+                    const profile = GRAVEYARD_GEOMETRY_PROFILES.engine;
+                    const rimDepth = Math.min(profile.rimDepth, profile.halfHeight * 0.3);
+                    const innerTop = Math.max(0.05, profile.radiusTop - profile.wallThickness);
+                    const innerBottom = Math.max(0.05, profile.radiusBottom - profile.wallThickness);
+                    // LatheGeometry revolves this local-radius/local-Y
+                    // section around Y. The final point closes the section so
+                    // both open ends get a visible metal rim; the bore itself
+                    // remains open for the player's fly-through.
+                    const shellProfile = [
+                        new THREE.Vector2(profile.radiusBottom, -profile.halfHeight),
+                        new THREE.Vector2(profile.radiusBottom, -profile.halfHeight + rimDepth),
+                        new THREE.Vector2(profile.radiusTop, profile.halfHeight - rimDepth),
+                        new THREE.Vector2(profile.radiusTop, profile.halfHeight),
+                        new THREE.Vector2(innerTop, profile.halfHeight),
+                        new THREE.Vector2(innerTop, profile.halfHeight - rimDepth),
+                        new THREE.Vector2(innerBottom, -profile.halfHeight + rimDepth),
+                        new THREE.Vector2(innerBottom, -profile.halfHeight),
+                        new THREE.Vector2(profile.radiusBottom, -profile.halfHeight),
+                    ];
+                    return new THREE.LatheGeometry(shellProfile, 12);
+                }
+                case 'carrierHull':
+                case 'battleshipHull':
+                case 'frigateHull':
+                case 'bridge':
+                    return extrudedProfileGeometry(GRAVEYARD_GEOMETRY_PROFILES[kind]);
+                case 'panel': {
+                    return extrudedProfileGeometry(GRAVEYARD_GEOMETRY_PROFILES.panel);
+                }
                 case 'disc': return new THREE.CylinderGeometry(1, 1, 0.16, 14);
-                case 'ring': return new THREE.TorusGeometry(1, 0.18, 6, 18);
+                case 'turret': return new THREE.CylinderGeometry(0.72, 1, 0.34, 8);
+                case 'ring': {
+                    const profile = GRAVEYARD_GEOMETRY_PROFILES.ring;
+                    return new THREE.TorusGeometry(profile.majorRadius, profile.tubeRadius, 6, 18);
+                }
                 case 'spine': return new THREE.BoxGeometry(0.34, 0.34, 1);
-                case 'beam':
-                case 'hull':
+                case 'hull': return new THREE.DodecahedronGeometry(0.68, 0);
+                case 'beam': return new THREE.OctahedronGeometry(0.68, 0);
                 default: return new THREE.BoxGeometry(1, 1, 1);
             }
         };
@@ -1224,12 +1290,34 @@ export class SpaceRenderer {
         grouped.forEach((pieces, key) => {
             const [kindRaw, finish] = key.split(':');
             const kind = kindRaw;
+            const finishStyle = (() => {
+                switch (finish) {
+                    case 'rust':
+                        return { color: 0xbc9f88, map: rustMap, roughness: 0.92, metalness: 0.48 };
+                    case 'route-gold':
+                        return { color: 0xf0bd68, map: routeMap, roughness: 0.82, metalness: 0.5 };
+                    case 'route-ice':
+                        return { color: 0xaed6d8, map: routeMap, roughness: 0.8, metalness: 0.58 };
+                    case 'route-copper':
+                        return { color: 0xe19a66, map: routeMap, roughness: 0.84, metalness: 0.46 };
+                    case 'route-teal':
+                        return { color: 0x86c6bb, map: routeMap, roughness: 0.8, metalness: 0.54 };
+                    case 'route-ash':
+                        return { color: 0xb6afb1, map: routeMap, roughness: 0.9, metalness: 0.42 };
+                    case 'distant':
+                        return { color: 0x727785, map: distantMap, roughness: 0.96, metalness: 0.3 };
+                    default:
+                        return { color: 0xaeb6ba, map: metalMap, roughness: 0.76, metalness: 0.74 };
+                }
+            })();
             const material = new THREE.MeshStandardMaterial({
-                color: finish === 'rust' ? 0xbc9f88 : 0xaeb6ba,
-                map: finish === 'rust' ? rustMap : metalMap,
-                roughness: finish === 'rust' ? 0.92 : 0.76,
-                metalness: finish === 'rust' ? 0.48 : 0.74,
+                ...finishStyle,
                 flatShading: true,
+                // Every graveyard piece can be viewed from behind while the
+                // player flies through the cloud. This matters for thin slabs,
+                // open-ended engines, and the other low-poly wreck shapes: a
+                // reverse face must keep its texture instead of disappearing.
+                side: THREE.DoubleSide,
             });
             const mesh = new THREE.InstancedMesh(geometryFor(kind), material, pieces.length);
             mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -1299,6 +1387,7 @@ export class SpaceRenderer {
                 flatShading: true,
                 emissive: 0x000000,
                 emissiveIntensity: 0,
+                side: THREE.DoubleSide,
             }),
             uncommon: new THREE.MeshStandardMaterial({
                 color: 0xcfe0f2,
@@ -1308,6 +1397,7 @@ export class SpaceRenderer {
                 flatShading: true,
                 emissive: 0x000000,
                 emissiveIntensity: 0,
+                side: THREE.DoubleSide,
             }),
             common: new THREE.MeshStandardMaterial({
                 color: 0xd4dce0,
@@ -1317,26 +1407,77 @@ export class SpaceRenderer {
                 flatShading: true,
                 emissive: 0x000000,
                 emissiveIntensity: 0,
+                side: THREE.DoubleSide,
             }),
         };
-        this.wreckNodes.forEach((node) => {
+        const groups = new Map();
+        this.wreckNodes.forEach((node, nodeIndex) => {
             let hash = 2166136261;
             for (let index = 0; index < node.id.length; index += 1) {
                 hash ^= node.id.charCodeAt(index);
                 hash = (hash * 16777619) >>> 0;
             }
-            const geometry = geometries[hash % geometries.length];
-            const marker = new THREE.Mesh(geometry, rarityMaterials[node.rarity] ?? rarityMaterials.common);
-            marker.position.set(...node.position);
-            marker.scale.setScalar(node.radius * 1.6);
-            marker.rotation.set((hash % 5) * 0.7, (hash % 7) * 0.9, (hash % 3) * 0.5);
-            // Salvage chunks render as part of the graveyard like the big
-            // structural debris — they must never pop in only once targeted.
-            marker.visible = true;
-            this.tagTargetable(marker, 'wreck', node.id);
-            root?.add(marker);
-            this.wreckNodeMeshes.set(node.id, marker);
+            const geometryIndex = hash % geometries.length;
+            const rarity = node.rarity ?? 'common';
+            const key = `${geometryIndex}:${rarity}`;
+            const entries = groups.get(key) ?? [];
+            entries.push({
+                node,
+                nodeIndex,
+                rotation: [(hash % 5) * 0.7, (hash % 7) * 0.9, (hash % 3) * 0.5],
+            });
+            groups.set(key, entries);
         });
+        // Wreck chunks share four geometries and three rarity materials. Keeping
+        // them as one instanced batch per combination removes dozens of draw calls
+        // from the debris scene without changing their shapes or scan targets.
+        groups.forEach((entries, key) => {
+            const [geometryIndex, rarity] = key.split(':');
+            const mesh = new THREE.InstancedMesh(geometries[Number(geometryIndex)], rarityMaterials[rarity] ?? rarityMaterials.common, entries.length);
+            mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            mesh.frustumCulled = false;
+            mesh.name = `wreck-nodes-${key}`;
+            mesh.userData.targetKind = 'wreck';
+            mesh.userData.nodeIndices = entries.map((entry) => entry.nodeIndex);
+            root?.add(mesh);
+            this.wreckBatches.push({ mesh, entries });
+            entries.forEach((entry) => this.wreckNodeMeshes.set(entry.node.id, mesh));
+        });
+        this.updateWreckNodeInstances();
+    }
+    updateWreckNodeInstances(dt = 0) {
+        const cam = this.camera.position;
+        for (const batch of this.wreckBatches) {
+            let changed = false;
+            batch.entries.forEach((entry, index) => {
+                const node = entry.node;
+                const dx = node.position[0] - cam.x;
+                const dy = node.position[1] - cam.y;
+                const dz = node.position[2] - cam.z;
+                const culled = dx * dx + dy * dy + dz * dz > DEBRIS_CULL_RANGE_SQ && node.id !== this.selectedWreckId;
+                const depleted = node.remaining <= 0;
+                const hidden = culled || depleted;
+                const stateChanged = entry.hidden !== hidden;
+                if (entry.initialized && !stateChanged && (hidden || dt <= 0))
+                    return;
+                if (!hidden && dt > 0) {
+                    entry.rotation[0] += dt * 0.22;
+                    entry.rotation[1] -= dt * 0.17;
+                }
+                entry.culled = culled;
+                entry.hidden = hidden;
+                entry.initialized = true;
+                changed = true;
+                this.tmpPosition.set(...node.position);
+                this.tmpEuler.set(...entry.rotation);
+                this.tmpQuaternion.setFromEuler(this.tmpEuler);
+                this.tmpScale.setScalar(hidden ? HIDDEN_SCALE[0] : wreckNodeCollisionRadius(node));
+                this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
+                batch.mesh.setMatrixAt(index, this.tmpMatrix);
+            });
+            if (changed)
+                batch.mesh.instanceMatrix.needsUpdate = true;
+        }
     }
     createCockpit() {
         // Scrapped: every 3D cockpit mesh (frame rails, console boxes,
@@ -1648,19 +1789,31 @@ export class SpaceRenderer {
         this.selectedWreckId = wreckId;
         this.selectedLocationId = locationId;
         this.updateAsteroidInstances();
-        this.wreckNodeMeshes.forEach((mesh) => {
-            mesh.visible = true;
-            // Selection is signalled by the HUD bracket and target monitor, not
-            // a green glow on the chunk itself.
-            mesh.material.emissive.setHex(0x000000);
-            mesh.material.emissiveIntensity = 0;
-        });
+        if (this.activeInstanceId === 'mourning-line')
+            this.updateWreckNodeInstances();
     }
     setActiveInstance(id) {
         this.activeInstanceId = id;
         this.instanceRoots.forEach((root, rootId) => {
             root.visible = rootId === id;
         });
+        this.updateDistantInstanceVisibility();
+        if (id === 'mourning-line')
+            this.updateWreckNodeInstances();
+    }
+    updateDistantInstanceVisibility() {
+        const graveyardRoot = this.instanceRoots.get('mourning-line');
+        if (!graveyardRoot)
+            return;
+        if (this.activeInstanceId === 'mourning-line') {
+            graveyardRoot.visible = true;
+            return;
+        }
+        const center = LOCATIONS['mourning-line'].position;
+        const dx = this.camera.position.x - center[0];
+        const dy = this.camera.position.y - center[1];
+        const dz = this.camera.position.z - center[2];
+        graveyardRoot.visible = dx * dx + dy * dy + dz * dz <= DEBRIS_CULL_RANGE_SQ;
     }
     get canvas() {
         return this.renderer.domElement;
@@ -1683,7 +1836,7 @@ export class SpaceRenderer {
                 targets.push(mesh);
         }
         if (this.activeInstanceId === 'mourning-line')
-            targets.push(...this.wreckNodeMeshes.values());
+            targets.push(...this.wreckBatches.map(({ mesh }) => mesh));
         const hits = this.raycaster.intersectObjects(targets, true);
         for (const hit of hits) {
             const asteroidBatch = this.asteroidMeshes.find(({ mesh }) => mesh === hit.object);
@@ -1691,6 +1844,12 @@ export class SpaceRenderer {
                 const node = this.asteroids[asteroidBatch.mesh.userData.nodeIndices[hit.instanceId]];
                 if (node?.remaining && node.remaining > 0)
                     return { kind: 'asteroid', id: node.id };
+            }
+            const wreckBatch = this.wreckBatches.find(({ mesh }) => mesh === hit.object);
+            if (wreckBatch && hit.instanceId !== undefined) {
+                const node = this.wreckNodes[wreckBatch.mesh.userData.nodeIndices[hit.instanceId]];
+                if (node?.remaining && node.remaining > 0)
+                    return { kind: 'wreck', id: node.id };
             }
             let object = hit.object;
             while (object) {
@@ -1734,6 +1893,7 @@ export class SpaceRenderer {
             this.tmpCurQuat.copy(this.camera.quaternion);
             this.camera.quaternion.copy(this.tmpPrevQuat).slerp(this.tmpCurQuat, alpha);
         }
+        this.updateDistantInstanceVisibility();
         this.skyRoot.position.copy(this.camera.position);
         // Tighter FOV swing so the cockpit frame doesn't punch in.
         this.fovTarget = afterburner ? 80 : 70 + speedRatio * 2.0;
@@ -1882,7 +2042,7 @@ export class SpaceRenderer {
             piece.rotation[1] += piece.spin[1] * dt;
             piece.rotation[2] += piece.spin[2] * dt;
         });
-        if (this.activeInstanceId === 'mourning-line')
+        if (this.instanceRoots.get('mourning-line')?.visible)
             this.updateGraveyardInstances(true);
         const helixRotor = this.locationMeshes.get('helix')?.getObjectByName('rotor');
         if (helixRotor)
@@ -1905,24 +2065,8 @@ export class SpaceRenderer {
             if (clouds)
                 clouds.rotation.y += dt * 0.016;
         }
-        const cam = this.camera.position;
-        this.wreckNodeMeshes.forEach((mesh) => {
-            // Cull salvage chunks by distance like the structural debris. The
-            // targeted chunk always stays visible, and culled chunks stop
-            // tumbling (their transform is frozen until they come back).
-            const dx = mesh.position.x - cam.x;
-            const dy = mesh.position.y - cam.y;
-            const dz = mesh.position.z - cam.z;
-            const culled = dx * dx + dy * dy + dz * dz > DEBRIS_CULL_RANGE_SQ && mesh.userData.targetId !== this.selectedWreckId;
-            if (culled !== mesh._culled) {
-                mesh._culled = culled;
-                mesh.visible = !culled;
-            }
-            if (culled)
-                return;
-            mesh.rotation.x += dt * 0.22;
-            mesh.rotation.y -= dt * 0.17;
-        });
+        if (this.instanceRoots.get('mourning-line')?.visible)
+            this.updateWreckNodeInstances(dt);
         this.updateEffects(dt);
     }
     createBloomPipeline() {

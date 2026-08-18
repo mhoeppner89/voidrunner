@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v54-bughunt-fixes';
+const CACHE = 'voidrunner-v97-location-art-debris-release';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',
@@ -28,16 +28,27 @@ self.addEventListener('install', (event) => {
     './vendor/three.core.min.js',
     './art/career-mining.webp',
     './art/locations/v3/azure.png',
+    './art/locations/v3/azure-hd-v1.png',
     './art/locations/v3/bar-azure.png',
+    './art/locations/v3/bar-azure-hd-v1.png',
     './art/locations/v3/bar-helix.png',
+    './art/locations/v3/bar-helix-hd-v1.png',
     './art/locations/v3/bar-rook.png',
+    './art/locations/v3/bar-rook-hd-v1.png',
     './art/locations/v3/bar-vesper.png',
+    './art/locations/v3/bar-vesper-hd-v1.png',
     './art/locations/v3/helix.png',
+    './art/locations/v3/helix-hd-v1.png',
     './art/locations/v3/market-azure.png',
+    './art/locations/v3/market-azure-hd-v1.png',
     './art/locations/v3/market-helix.png',
+    './art/locations/v3/market-helix-hd-v1.png',
     './art/locations/v3/market-rook.png',
+    './art/locations/v3/market-rook-hd-v1.png',
     './art/locations/v3/market-vesper.png',
+    './art/locations/v3/market-vesper-hd-v1.png',
     './art/locations/v3/rook.png',
+    './art/locations/v3/rook-hd-v1.png',
     './art/locations/v3/vesper.png',
     './art/portraits/captain-dorne.webp',
     './art/portraits/devi-castor.webp',
@@ -55,6 +66,19 @@ self.addEventListener('install', (event) => {
     './art/sprites/cargo-hauler/01.png',
     './art/title-cockpit.webp',
     './assets/remaster/cockpit-frame.webp',
+    './assets/remaster/cockpit-vanguard.webp',
+    './assets/remaster/cockpit-talon.webp',
+    './assets/remaster/cockpit-prospector.webp',
+    './assets/remaster/cockpit-lancer.webp',
+    './assets/remaster/cockpit-atlas.webp',
+    './assets/remaster/ship-isometric-wayfarer-vesper-lit.png',
+    './assets/remaster/ship-isometric-wayfarer-vesper-lit-v2.png',
+    './assets/remaster/ship-isometric-wayfarer-vesper-lit-v3.png',
+    './assets/remaster/ship-isometric-talon-vesper-lit-v1.png',
+    './assets/remaster/ship-isometric-vanguard-vesper-lit-v1.png',
+    './assets/remaster/ship-isometric-prospector-vesper-lit-v1.png',
+    './assets/remaster/ship-isometric-atlas-vesper-lit-v1.png',
+    './assets/remaster/ship-isometric-lancer-vesper-lit-v1.png',
   ])));
   self.skipWaiting();
 });
