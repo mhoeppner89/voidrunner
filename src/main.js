@@ -1,5 +1,6 @@
 import { GameSession } from './game/game.js';
 import { createNewSave, hasSavedGame, loadGame, saveGame } from './game/save.js';
+import { DOCK_LOCATION_IDS, SHIPS } from './game/data.js';
 import { GameUI } from './game/ui.js';
 const host = document.querySelector('#app');
 if (!host)
@@ -7,18 +8,36 @@ if (!host)
 const ui = new GameUI(host);
 let session;
 let cachedSave = loadGame();
+const vesperHoverPreview = new URLSearchParams(location.search).get('vesper-hover') === '1';
+const devPreviewParams = new URLSearchParams(location.search);
+const devPreviewLocationParam = devPreviewParams.get('dev-dock');
+const devPreviewLocation = DOCK_LOCATION_IDS.includes(devPreviewLocationParam) ? devPreviewLocationParam : undefined;
+const devPreviewShipParam = devPreviewParams.get('dev-ship');
+const devPreviewShip = SHIPS[devPreviewShipParam] ? devPreviewShipParam : undefined;
 // Tilt state shared with the title screen, where no session (and no
 // InputManager) exists yet. The gyro listener keeps live readings so
 // ENABLE TILT STEER and SET NEUTRAL work before a career starts.
 let tiltGranted = false;
 let tiltBeta = 0;
 let tiltGamma = 0;
+let tiltAngle = 0;
+const normalizeTiltAngle = (value) => {
+    let angle = Number(value);
+    if (!Number.isFinite(angle))
+        angle = 0;
+    while (angle > 180)
+        angle -= 360;
+    while (angle < -180)
+        angle += 360;
+    return angle;
+};
 if (typeof DeviceOrientationEvent !== 'undefined') {
     window.addEventListener('deviceorientation', (event) => {
         if (event.beta == null || event.gamma == null)
             return;
         // Same screen-frame rotation the InputManager applies (see input.js).
-        const radians = ((screen?.orientation?.angle ?? window.orientation ?? 0) * Math.PI) / 180;
+        tiltAngle = normalizeTiltAngle(globalThis.screen?.orientation?.angle ?? globalThis.window?.orientation ?? 0);
+        const radians = (tiltAngle * Math.PI) / 180;
         const cos = Math.cos(radians);
         const sin = Math.sin(radians);
         tiltBeta = event.beta * cos + event.gamma * sin;
@@ -45,6 +64,24 @@ const beginSession = (mode, arena) => {
         ui.showToast('No autosave was found.', 'warning');
         ui.showTitle(false);
         return;
+    }
+    if (vesperHoverPreview && mode !== 'arena') {
+        // Keep the visual preview reachable from either title-screen button
+        // without changing the normal career flow when the flag is absent.
+        save.player.dockedAt = 'vesper';
+        save.player.lastDockedAt = 'vesper';
+        save.player.velocity = [0, 0, 0];
+        save.player.throttle = 0;
+    }
+    if (devPreviewLocation && mode !== 'arena') {
+        // Dev-only direct station preview. It is query-gated and never runs
+        // in the normal career flow, but uses the same saved-game dock path.
+        save.player.dockedAt = devPreviewLocation;
+        save.player.lastDockedAt = devPreviewLocation;
+        save.player.velocity = [0, 0, 0];
+        save.player.throttle = 0;
+        if (devPreviewShip)
+            save.player.shipId = devPreviewShip;
     }
     if (mode === 'arena')
         save.arena = arena;
@@ -126,7 +163,7 @@ const actions = {
             return session.calibrateTilt();
         const save = cachedSave ?? loadGame();
         if (save) {
-            save.settings.tiltNeutral = { beta: tiltBeta, gamma: tiltGamma };
+            save.settings.tiltNeutral = { beta: tiltBeta, gamma: tiltGamma, angle: tiltAngle };
             saveGame(save);
         }
         return true;

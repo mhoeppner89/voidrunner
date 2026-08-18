@@ -17,4 +17,15 @@ RELEASE_NOTES_v0.3.0.md
 README.md
 PLAYABLE_README.md
 *.webp
+!assets/remaster/cockpit-vanguard.webp
+!assets/remaster/cockpit-talon.webp
+!assets/remaster/cockpit-prospector.webp
+!assets/remaster/cockpit-lancer.webp
+!assets/remaster/cockpit-atlas.webp
+!assets/remaster/ship-isometric-wayfarer.webp
+!assets/remaster/ship-isometric-vanguard.webp
+!assets/remaster/ship-isometric-talon.webp
+!assets/remaster/ship-isometric-prospector.webp
+!assets/remaster/ship-isometric-lancer.webp
+!assets/remaster/ship-isometric-atlas.webp
 .workbench/

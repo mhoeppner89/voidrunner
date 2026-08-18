@@ -9,20 +9,63 @@ import { EntityStore } from './entityStore.js';
 import { SpaceRenderer } from './render.js';
 import { saveGame } from './save.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
-import { asteroidCollisionRadius, generateAsteroidField, generateGraveyardPieces, generateWreckNodes } from './worldData.js';
+import { asteroidCollisionRadius, generateAsteroidField, generateGraveyardPieces, generateWreckNodes, graveyardZoneAt, graveyardZoneLabel, GRAVEYARD_GEOMETRY_PROFILES, wreckNodeCollisionRadius } from './worldData.js';
 import { PILOT_LINES, pilotMod, rollPilot, TEMPERAMENT_LABELS, TIER_LABELS } from './pilots.js';
 import { playerShipVariant, shipVariantForRole } from './voxelModels.js';
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const UP = new THREE.Vector3(0, 1, 0);
 const RIGHT = new THREE.Vector3(1, 0, 0);
+// Keep the AI update callable with lightweight debug/test ship objects that do
+// not carry the seeded runtime RNG used by spawned ships.
+const FALLBACK_AI_RNG = () => 0.5;
 // Situation lines that land at most once per ship (first contact, the player's
 // rank, and the valuable-load callouts) — remembered in pilotLineHistory.said.
 const PILOT_ONESHOT_KEYS = new Set(['contact', 'rank', 'case', 'cargo']);
 const PLAYER_RADIUS = 1.25;
+// Combat-sim field starts sit inside the cloud, but keep a generous bubble
+// around the player so the first frame is a calm staging view rather than an
+// immediate collision check. The candidate offsets make this robust to a
+// depleted or drifting piece changing the exact centre pocket later.
+const ARENA_FIELD_SAFE_CLEARANCE = 320;
+const ARENA_FIELD_START_OFFSETS = [
+    [0, 0, 0],
+    [0, 160, 0],
+    [0, -160, 0],
+    [180, 0, 0],
+    [-180, 0, 0],
+    [0, 0, 180],
+    [0, 0, -180],
+    [120, 120, 120],
+    [-120, 120, -120],
+    [120, -120, -120],
+    [-120, -120, 120],
+];
 // The widest rendered field obstacle (a scaled monolith ≈ 130u × 1.6) exceeds
 // the old 140u collision margin, so grid queries must pad by this much to catch
 // the surface of the biggest rocks before the ship is inside them.
 const MAX_FIELD_OBSTACLE_RADIUS = 320;
+const ENTRY_CLEARANCE = 4;
+const ENTRY_SEARCH_RADII = [64, 128, 256, 512, 1024];
+const ENTRY_SEARCH_DIRECTIONS = [
+    [1, 0, 0],
+    [-1, 0, 0],
+    [0, 1, 0],
+    [0, -1, 0],
+    [0, 0, 1],
+    [0, 0, -1],
+    [1, 1, 0],
+    [-1, 1, 0],
+    [1, -1, 0],
+    [-1, -1, 0],
+    [1, 0, 1],
+    [-1, 0, 1],
+    [1, 0, -1],
+    [-1, 0, -1],
+    [0, 1, 1],
+    [0, -1, 1],
+    [0, 1, -1],
+    [0, -1, -1],
+];
 const HYPERDRIVE_THREAT_RADIUS = 360;
 const HYPERDRIVE_CRUISE_SPEED = 50000;
 const HYPERDRIVE_DISPLAY_SPEED = 1000;
@@ -69,9 +112,19 @@ const PILOT_FAVOR_CHANCE = 0.35;
 // How much more likely a wary pilot (one who escaped after surrendering) is
 // to give up on any hull hit than their temperament would normally allow.
 const WARY_FLEE_MULTIPLIER = 1.5;
-// Marker shown in the scan toast and target monitor for a ship whose pilot
-// remembers the player from a previous surrender (spared or escaped).
+// Marker shown in the target monitor for a ship whose pilot remembers the
+// player from a previous surrender (spared or escaped).
 const SPARED_MARK = '✦';
+const SCAN_COMMODITY_LABELS = {
+    electronics: 'ELECTRONICS',
+    machinery: 'MACHINERY',
+    medicine: 'MEDIGEL',
+    scrap: 'SCRAP',
+    arms: 'ARMAMENTS',
+    water: 'WATER',
+    food: 'PROTEIN',
+    luxuries: 'LUXURIES',
+};
 // Which surrender action a beaten pilot picks, weighted by temperament: run,
 // jettison cargo or pay and run, or power down (optionally after dumping the
 // hold). Timid pilots give up everything; aggressive pilots mostly run and
@@ -161,6 +214,154 @@ const segmentSphereHit = (start, end, center, radius) => {
         return t2;
     return undefined;
 };
+// Allocation-free segment/OBB intersection for laser and hyperdrive line of
+// sight. Graveyard pieces are rotated boxes; a bounding sphere can miss a flat
+// face at its corners or make the beam pass through visible debris.
+const segmentBoxHit = (start, end, obstacle, padding = 1.5) => {
+    const box = obstacle.box;
+    const qx = box.qx;
+    const qy = box.qy;
+    const qz = box.qz;
+    const qw = box.qw;
+    const m00 = 1 - 2 * (qy * qy + qz * qz);
+    const m01 = 2 * (qx * qy - qz * qw);
+    const m02 = 2 * (qx * qz + qy * qw);
+    const m10 = 2 * (qx * qy + qz * qw);
+    const m11 = 1 - 2 * (qx * qx + qz * qz);
+    const m12 = 2 * (qy * qz - qx * qw);
+    const m20 = 2 * (qx * qz - qy * qw);
+    const m21 = 2 * (qy * qz + qx * qw);
+    const m22 = 1 - 2 * (qx * qx + qy * qy);
+    const startX = start.x - obstacle.x;
+    const startY = start.y - obstacle.y;
+    const startZ = start.z - obstacle.z;
+    const endX = end.x - obstacle.x;
+    const endY = end.y - obstacle.y;
+    const endZ = end.z - obstacle.z;
+    const sx = m00 * startX + m10 * startY + m20 * startZ;
+    const sy = m01 * startX + m11 * startY + m21 * startZ;
+    const sz = m02 * startX + m12 * startY + m22 * startZ;
+    const ex = m00 * endX + m10 * endY + m20 * endZ;
+    const ey = m01 * endX + m11 * endY + m21 * endZ;
+    const ez = m02 * endX + m12 * endY + m22 * endZ;
+    const dx = ex - sx;
+    const dy = ey - sy;
+    const dz = ez - sz;
+    const hx = box.hx + padding;
+    const hy = box.hy + padding;
+    const hz = box.hz + padding;
+    // A projectile that starts inside a piece is already past that blocker;
+    // ignore the exit face so a muzzle touching debris does not self-hit.
+    if (Math.abs(sx) <= hx && Math.abs(sy) <= hy && Math.abs(sz) <= hz)
+        return undefined;
+    let near = 0;
+    let far = 1;
+    if (Math.abs(dx) < 1e-8) {
+        if (sx < -hx || sx > hx)
+            return undefined;
+    }
+    else {
+        let t1 = (-hx - sx) / dx;
+        let t2 = (hx - sx) / dx;
+        if (t1 > t2) {
+            const swap = t1;
+            t1 = t2;
+            t2 = swap;
+        }
+        near = Math.max(near, t1);
+        far = Math.min(far, t2);
+        if (near > far)
+            return undefined;
+    }
+    if (Math.abs(dy) < 1e-8) {
+        if (sy < -hy || sy > hy)
+            return undefined;
+    }
+    else {
+        let t1 = (-hy - sy) / dy;
+        let t2 = (hy - sy) / dy;
+        if (t1 > t2) {
+            const swap = t1;
+            t1 = t2;
+            t2 = swap;
+        }
+        near = Math.max(near, t1);
+        far = Math.min(far, t2);
+        if (near > far)
+            return undefined;
+    }
+    if (Math.abs(dz) < 1e-8) {
+        if (sz < -hz || sz > hz)
+            return undefined;
+    }
+    else {
+        let t1 = (-hz - sz) / dz;
+        let t2 = (hz - sz) / dz;
+        if (t1 > t2) {
+            const swap = t1;
+            t1 = t2;
+            t2 = swap;
+        }
+        near = Math.max(near, t1);
+        far = Math.min(far, t2);
+        if (near > far)
+            return undefined;
+    }
+    return near >= 0 && near <= 1 ? near : undefined;
+};
+const segmentRadialBandAt = (s0, s1, d0, d1, t, innerSq, outerSq) => {
+    const first = s0 + d0 * t;
+    const second = s1 + d1 * t;
+    const radiusSq = first * first + second * second;
+    return radiusSq >= innerSq && radiusSq <= outerSq;
+};
+const segmentRadialBandRoot = (s0, s1, d0, d1, coefficientA, coefficientB, coefficientC, targetSq, t0, t1, innerSq, outerSq) => {
+    if (Math.abs(coefficientA) < 1e-10)
+        return undefined;
+    const discriminant = coefficientB * coefficientB - 4 * coefficientA * (coefficientC - targetSq);
+    if (discriminant < 0)
+        return undefined;
+    const root = Math.sqrt(discriminant);
+    const first = (-coefficientB - root) / (2 * coefficientA);
+    const second = (-coefficientB + root) / (2 * coefficientA);
+    if (first >= t0 && first <= t1 && segmentRadialBandAt(s0, s1, d0, d1, first, innerSq, outerSq))
+        return first;
+    if (second >= t0 && second <= t1 && segmentRadialBandAt(s0, s1, d0, d1, second, innerSq, outerSq))
+        return second;
+    return undefined;
+};
+const segmentEngineShellAt = (sx, sy, sz, dx, dy, dz, t, radiusCenter, radiusSlope, halfHeight, padding) => {
+    const y = sy + dy * t;
+    if (y < -halfHeight - padding || y > halfHeight + padding)
+        return false;
+    const surfaceY = clamp(y, -halfHeight, halfHeight);
+    const radius = radiusCenter + radiusSlope * surfaceY;
+    return Math.abs(Math.hypot(sx + dx * t, sz + dz * t) - radius) <= padding;
+};
+const segmentEngineShellRoot = (sx, sy, sz, dx, dy, dz, radiusCenter, radiusSlope, halfHeight, padding, offset, t0, t1) => {
+    const radiusAtStart = radiusCenter + radiusSlope * sy + offset;
+    const radiusDelta = radiusSlope * dy;
+    const coefficientA = dx * dx + dz * dz - radiusDelta * radiusDelta;
+    const coefficientB = 2 * (sx * dx + sz * dz - radiusAtStart * radiusDelta);
+    const coefficientC = sx * sx + sz * sz - radiusAtStart * radiusAtStart;
+    if (Math.abs(coefficientA) < 1e-10) {
+        if (Math.abs(coefficientB) < 1e-10)
+            return undefined;
+        const root = -coefficientC / coefficientB;
+        return root >= t0 && root <= t1 && segmentEngineShellAt(sx, sy, sz, dx, dy, dz, root, radiusCenter, radiusSlope, halfHeight, padding) ? root : undefined;
+    }
+    const discriminant = coefficientB * coefficientB - 4 * coefficientA * coefficientC;
+    if (discriminant < 0)
+        return undefined;
+    const root = Math.sqrt(discriminant);
+    const first = (-coefficientB - root) / (2 * coefficientA);
+    const second = (-coefficientB + root) / (2 * coefficientA);
+    if (first >= t0 && first <= t1 && segmentEngineShellAt(sx, sy, sz, dx, dy, dz, first, radiusCenter, radiusSlope, halfHeight, padding))
+        return first;
+    if (second >= t0 && second <= t1 && segmentEngineShellAt(sx, sy, sz, dx, dy, dz, second, radiusCenter, radiusSlope, halfHeight, padding))
+        return second;
+    return undefined;
+};
 export class GameSession {
     ui;
     onQuit;
@@ -197,6 +398,9 @@ export class GameSession {
     tmpC = new THREE.Vector3();
     tmpQ = new THREE.Quaternion();
     tmpQ2 = new THREE.Quaternion();
+    // Player orientation must not share the collision quaternion scratch:
+    // resolvePlayerCollisions loads each debris box rotation into tmpQ.
+    tmpPlayerOrientation = new THREE.Quaternion();
     tmpEuler = new THREE.Euler();
     // Scratch vectors/matrices reused across the per-ship AI so the flight loop
     // allocates almost nothing on the hot path (GC pauses were janking combat).
@@ -216,6 +420,17 @@ export class GameSession {
     // updatePlayer aliases this.tmpA, so writing the normal into tmpA used to
     // overwrite the ship's position with a unit vector (teleport to open space).
     tmpCollide = new THREE.Vector3();
+    // Entry-clearance scratches. These are separate from the live flight and
+    // collision vectors because hyperdrive arrival can run inside updatePlayer.
+    tmpEntryAnchor = new THREE.Vector3();
+    tmpEntryCandidate = new THREE.Vector3();
+    tmpEntryDirection = new THREE.Vector3();
+    tmpEntryPreferredDirection = new THREE.Vector3();
+    tmpEntryNormal = new THREE.Vector3();
+    tmpEntryLocal = new THREE.Vector3();
+    tmpEntryLocalDirection = new THREE.Vector3();
+    tmpEntryQuaternion = new THREE.Quaternion();
+    tmpEntryInverseQuaternion = new THREE.Quaternion();
     // Projectile/pickup step scratches (store reads/writes). Owned by
     // updateProjectiles/updatePickups so they never alias live sim state.
     tmpP0 = new THREE.Vector3();
@@ -264,9 +479,11 @@ export class GameSession {
     salvageAmbushTriggered = new Set();
     fpsAccumulator = 0;
     obstacleGrid = null;
+    obstacleSegmentGrid = null;
     obstacleGridInstance = undefined;
     obstacleGridBuiltAt = -Infinity;
     obstacleCellSize = 256;
+    obstacleQueryStamp = 0;
     fpsFrames = 0;
     qualityScale = 1;
     activeInstanceId;
@@ -295,8 +512,7 @@ export class GameSession {
             void this.input.enableTilt(tiltGranted).then((active) => {
                 if (active) {
                     if (!save.settings.tiltNeutral) {
-                        this.input.calibrateTilt();
-                        save.settings.tiltNeutral = { beta: this.input.tiltNeutralBeta, gamma: this.input.tiltNeutralGamma };
+                        save.settings.tiltNeutral = this.input.calibrateTilt();
                     }
                     save.settings.steering = 'tilt';
                     saveGame(save);
@@ -343,7 +559,18 @@ export class GameSession {
             'asteroid-field': vec(LOCATIONS.shardbelt.position),
             'debris-field': vec(LOCATIONS['mourning-line'].position),
         };
-        const center = centers[environment] ?? centers.open;
+        const instanceId = environment === 'asteroid-field' ? 'shardbelt' : environment === 'debris-field' ? 'mourning-line' : undefined;
+        const center = centers[environment]?.clone() ?? centers.open.clone();
+        // Field combat sims begin in a protected pocket inside the cloud so
+        // the player sees the relict scene immediately. Hyperdrive arrivals
+        // still use the outer edge path below; this exception is only for the
+        // deliberate arena staging start.
+        if (instanceId) {
+            if (environment === 'debris-field')
+                this.setFieldArenaPosition(center, instanceId);
+            else
+                this.setFieldEntryPosition(center, instanceId, FORWARD);
+        }
         const player = this.save.player;
         const stats = getEffectiveShipStats(player);
         player.dockedAt = undefined;
@@ -352,7 +579,15 @@ export class GameSession {
         // the arena flight silent until the first restart.
         this.audio.setStationMode(false);
         player.position = tuple(center);
-        player.rotation = [0, 0, 0, 1];
+        // The interior debris arena faces the normal -Z scene direction. The
+        // edge-start asteroid arena still turns inward from its boundary.
+        if (instanceId && environment !== 'debris-field') {
+            const inward = this.tmpEntryDirection.copy(FORWARD).multiplyScalar(-1);
+            player.rotation = quatTuple(this.tmpQ.setFromUnitVectors(FORWARD, inward));
+        }
+        else {
+            player.rotation = [0, 0, 0, 1];
+        }
         player.velocity = [0, 0, 0];
         player.angularVelocity = [0, 0, 0];
         player.throttle = 0.35;
@@ -362,6 +597,7 @@ export class GameSession {
         player.hull = stats.hull;
         player.missiles = stats.missileCapacity;
         player.navTargetId = environment === 'asteroid-field' ? 'shardbelt' : environment === 'debris-field' ? 'mourning-line' : 'helix';
+        this.resetPlayerInterpolation(true);
         const hostileCount = scenario === '1v2' ? 2 : scenario === '1v3' || scenario === '2v3' ? 3 : 1;
         const withWingman = scenario === '2v3';
         // The difficulty selector pins the hostile pilot tier (temperament still
@@ -550,7 +786,7 @@ export class GameSession {
                 this.openMap();
             }
             else {
-                // Edge actions (target cycle, hyperdrive toggle, missile, scan…) run
+                // Edge actions (target cycle, hyperdrive toggle, missile, capture…) run
                 // exactly once per frame — never per sim step: a multi-step frame
                 // would otherwise double-toggle the hyperdrive or double-cycle
                 // targets, and a zero-step frame (120Hz displays) would drop the
@@ -593,6 +829,17 @@ export class GameSession {
         for (const pickup of this.pickups)
             this.pickupStore.snapshot(pickup.slot);
     }
+    resetPlayerInterpolation(resetClock = false) {
+        const player = this.save.player;
+        player.prevPosition = player.prevPosition ?? new Float64Array(3);
+        player.prevRotation = player.prevRotation ?? new Float64Array(4);
+        player.prevPosition.set(player.position);
+        player.prevRotation.set(player.rotation);
+        if (resetClock) {
+            this.simAccumulator = 0;
+            this.lastFrame = performance.now();
+        }
+    }
     updateSimulation(dt, actions) {
         this.snapshotInterpolationState();
         this.renderer.updateWorld(dt);
@@ -614,7 +861,7 @@ export class GameSession {
             return;
         }
         this.updatePlayer(dt, actions);
-        this.autoScanDeposit();
+        this.autoScanTarget();
         this.autoDockCheck();
         this.updateActiveInstance();
         this.updateBountySpawns();
@@ -653,12 +900,20 @@ export class GameSession {
             this.targetNearestHostile();
         else if (actions.targetNext)
             this.cycleTarget();
+        if (actions.capture)
+            this.captureTarget();
         if (actions.scan)
             this.scanTarget();
         if (actions.autopilot)
             this.toggleHyperdrive();
-        if (actions.missile)
-            this.fireMissile();
+        if (actions.missile) {
+            const target = this.getTargetRef(false);
+            const ship = target?.kind === 'ship' ? this.ships.find((entry) => entry.id === target.id) : undefined;
+            if (ship?.surrendered && !ship.claimed && !ship.captured && (ship.bountyValue > 0 || ship.missionId))
+                this.captureTarget();
+            else if (!((this.save.player.mode === 'mining' && target?.kind === 'asteroid') || (this.save.player.mode === 'salvage' && target?.kind === 'wreck')))
+                this.fireMissile();
+        }
     }
     updatePlayer(dt, actions) {
         const stats = getEffectiveShipStats(this.save.player);
@@ -668,7 +923,7 @@ export class GameSession {
         stats.angularAcceleration *= loadScale;
         const position = vec(this.save.player.position, this.tmpA);
         const velocity = vec(this.save.player.velocity, this.tmpB);
-        const orientation = quat(this.save.player.rotation, this.tmpQ);
+        const orientation = quat(this.save.player.rotation, this.tmpPlayerOrientation);
         const angularVelocity = vec(this.save.player.angularVelocity, this.tmpC);
         if (actions.throttleSet !== undefined)
             this.save.player.throttle = actions.throttleSet;
@@ -760,6 +1015,7 @@ export class GameSession {
             targetSpeed = Math.min(targetSpeed, 8);
             this.afterburning = false;
         }
+        let hyperdriveDropped = false;
         if (this.autopilot && this.hyperdriveFx !== 'spooling') {
             // Predictive drop: settle exactly on the arrival sphere this frame instead of
             // overshooting it by up to a full frame step at 50000 u/s cruise.
@@ -768,26 +1024,44 @@ export class GameSession {
             const approach = position.distanceTo(vec(nav.position));
             if (approach - arrivalRadius <= velocity.length() * dt) {
                 const outward = position.clone().sub(vec(nav.position)).normalize();
-                position.copy(vec(nav.position)).addScaledVector(outward, arrivalRadius + 8);
+                if (nav.kind === 'field' || nav.kind === 'graveyard')
+                    this.setFieldEntryPosition(position, nav.id, outward);
+                else {
+                    position.copy(vec(nav.position)).addScaledVector(outward, arrivalRadius + 8);
+                    // Arrival is a spawn event too. Check the destination
+                    // instance, not just the source instance currently used by
+                    // the obstacle grid.
+                    this.ensurePlayerEntryClearance(position, nav.id, outward);
+                }
                 velocity.set(0, 0, 0);
+                hyperdriveDropped = true;
             }
         }
         position.addScaledVector(velocity, dt);
         this.resolvePlayerCollisions(position, velocity);
         this.save.player.position = tuple(position);
         this.save.player.velocity = tuple(velocity);
-        this.save.player.rotation = quatTuple(orientation);
+        quatTupleInto(this.save.player.rotation, orientation);
         this.save.player.angularVelocity = tuple(angularVelocity);
         const nav = LOCATIONS[this.save.player.navTargetId];
         const navDistance = position.distanceTo(vec(nav.position));
         const arrivalRadius = hyperdriveArrivalRadius(nav);
-        if (this.autopilot && navDistance <= arrivalRadius + 10) {
+        if (this.autopilot && (hyperdriveDropped || navDistance <= arrivalRadius + 10)) {
+            if (!hyperdriveDropped) {
+                const outward = position.clone().sub(vec(nav.position)).normalize();
+                if (nav.kind === 'field' || nav.kind === 'graveyard')
+                    this.setFieldEntryPosition(position, nav.id, outward);
+                else
+                    this.ensurePlayerEntryClearance(position, nav.id, outward);
+                this.save.player.position = tuple(position);
+            }
             this.autopilot = false;
             this.hyperdriveEncounterAt = null;
             this.hyperdriveFx = 'drop';
             this.hyperdriveFxUntil = this.save.world.time + HYPERDRIVE_FX_DURATION;
             this.save.player.throttle = clamp(this.hyperdriveReturnThrottle, 0, 1);
             this.save.player.velocity = tuple(FORWARD.clone().applyQuaternion(orientation).multiplyScalar(10));
+            this.resetPlayerInterpolation();
             this.ui.showToast(`Hyperdrive arrival: ${nav.name}.`, 'success');
             this.audio.play('success');
         }
@@ -809,6 +1083,21 @@ export class GameSession {
         angularVelocity.multiplyScalar(Math.exp(-4.8 * dt));
     }
     resolvePlayerCollisions(position, velocity) {
+        const resolveContact = (normal, push, label) => {
+            position.x += normal.x * push;
+            position.y += normal.y * push;
+            position.z += normal.z * push;
+            const impactSpeed = Math.max(0, -(velocity.x * normal.x + velocity.y * normal.y + velocity.z * normal.z)) + velocity.length() * 0.16;
+            velocity.reflect(normal).multiplyScalar(0.32);
+            if (impactSpeed > 4) {
+                this.damagePlayer((impactSpeed - 3) * 1.65, label);
+                if (this.collisionMessageCooldown <= 0) {
+                    this.collisionMessageCooldown = 1.4;
+                    this.ui.showToast(`Collision: ${label}`, 'danger');
+                }
+            }
+            this.autopilot = false;
+        };
         const collide = (x, y, z, radius, label) => {
             const ox = position.x - x;
             const oy = position.y - y;
@@ -824,17 +1113,8 @@ export class GameSession {
             position.x = x + nx * (minimum + 0.08);
             position.y = y + ny * (minimum + 0.08);
             position.z = z + nz * (minimum + 0.08);
-            const impactSpeed = Math.max(0, -(velocity.x * nx + velocity.y * ny + velocity.z * nz)) + velocity.length() * 0.16;
             this.tmpCollide.set(nx, ny, nz);
-            velocity.reflect(this.tmpCollide).multiplyScalar(0.32);
-            if (impactSpeed > 4) {
-                this.damagePlayer((impactSpeed - 3) * 1.65, label);
-                if (this.collisionMessageCooldown <= 0) {
-                    this.collisionMessageCooldown = 1.4;
-                    this.ui.showToast(`Collision: ${label}`, 'danger');
-                }
-            }
-            this.autopilot = false;
+            resolveContact(this.tmpCollide, 0, label);
         };
         // Debris is an oriented box, not a sphere: a flat panel must block its
         // whole face without ballooning into an invisible sphere around its
@@ -899,19 +1179,106 @@ export class GameSession {
                 }
             }
             this.tmpG.set(nx, ny, nz).applyQuaternion(this.tmpQ);
-            position.x += this.tmpG.x * push;
-            position.y += this.tmpG.y * push;
-            position.z += this.tmpG.z * push;
-            const impactSpeed = Math.max(0, -(velocity.x * this.tmpG.x + velocity.y * this.tmpG.y + velocity.z * this.tmpG.z)) + velocity.length() * 0.16;
-            velocity.reflect(this.tmpG).multiplyScalar(0.32);
-            if (impactSpeed > 4) {
-                this.damagePlayer((impactSpeed - 3) * 1.65, label);
-                if (this.collisionMessageCooldown <= 0) {
-                    this.collisionMessageCooldown = 1.4;
-                    this.ui.showToast(`Collision: ${label}`, 'danger');
-                }
+            resolveContact(this.tmpG, push, label);
+        };
+        // Rings are toruses, not solid boxes. THREE.TorusGeometry lies in the
+        // local XY plane, so the opening runs along local Z. Measure the
+        // player's centre in that scaled local frame and expand only the tube
+        // by the ship radius. A large opening therefore remains flyable; a
+        // small opening naturally closes when the ship cannot fit through it.
+        const collideRing = (obstacle, label) => {
+            const box = obstacle.box;
+            const scaleX = Math.max(0.001, obstacle.scale[0]);
+            const scaleY = Math.max(0.001, obstacle.scale[1]);
+            const scaleZ = Math.max(0.001, obstacle.scale[2]);
+            const minScale = Math.min(scaleX, scaleY, scaleZ);
+            this.tmpQ.set(box.qx, box.qy, box.qz, box.qw);
+            this.tmpQ2.copy(this.tmpQ).invert();
+            this.tmpF.set(position.x - obstacle.x, position.y - obstacle.y, position.z - obstacle.z).applyQuaternion(this.tmpQ2);
+            const localX = this.tmpF.x / scaleX;
+            const localY = this.tmpF.y / scaleY;
+            const localZ = this.tmpF.z / scaleZ;
+            const radial = Math.hypot(localX, localY);
+            const radialDirectionX = radial > 1e-6 ? localX / radial : 1;
+            const radialDirectionY = radial > 1e-6 ? localY / radial : 0;
+            const deltaRadial = radial - GRAVEYARD_GEOMETRY_PROFILES.ring.majorRadius;
+            const distanceToTube = Math.hypot(deltaRadial, localZ);
+            const playerRadius = PLAYER_RADIUS / minScale;
+            const expandedTube = GRAVEYARD_GEOMETRY_PROFILES.ring.tubeRadius + playerRadius;
+            if (distanceToTube >= expandedTube)
+                return;
+            let normalRadial;
+            let normalZ;
+            if (distanceToTube > 1e-6) {
+                normalRadial = deltaRadial / distanceToTube;
+                normalZ = localZ / distanceToTube;
             }
-            this.autopilot = false;
+            else {
+                normalRadial = 1;
+                normalZ = 0;
+            }
+            const pushLocal = expandedTube - distanceToTube + 0.08 / minScale;
+            this.tmpG.set(normalRadial * radialDirectionX * pushLocal * scaleX, normalRadial * radialDirectionY * pushLocal * scaleY, normalZ * pushLocal * scaleZ).applyQuaternion(this.tmpQ);
+            const push = this.tmpG.length();
+            if (push < 1e-6)
+                return;
+            this.tmpG.multiplyScalar(1 / push);
+            resolveContact(this.tmpG, push, label);
+        };
+        // Engines use a hollow tapered shell. Only the wall and its end rims
+        // collide; the two circular ends stay open, so a ship can pass down
+        // the bore when its radius fits the visible opening.
+        const collideEngine = (obstacle, label) => {
+            const box = obstacle.box;
+            const scaleX = Math.max(0.001, obstacle.scale[0]);
+            const scaleY = Math.max(0.001, obstacle.scale[1]);
+            const scaleZ = Math.max(0.001, obstacle.scale[2]);
+            const radialScale = Math.min(scaleX, scaleZ);
+            this.tmpQ.set(box.qx, box.qy, box.qz, box.qw);
+            this.tmpQ2.copy(this.tmpQ).invert();
+            this.tmpF.set(position.x - obstacle.x, position.y - obstacle.y, position.z - obstacle.z).applyQuaternion(this.tmpQ2);
+            const localX = this.tmpF.x / scaleX;
+            const localY = this.tmpF.y / scaleY;
+            const localZ = this.tmpF.z / scaleZ;
+            const playerRadius = PLAYER_RADIUS / radialScale;
+            const yAllowance = PLAYER_RADIUS / scaleY;
+            const profile = GRAVEYARD_GEOMETRY_PROFILES.engine;
+            if (localY < -profile.halfHeight - yAllowance || localY > profile.halfHeight + yAllowance)
+                return;
+            const surfaceY = clamp(localY, -profile.halfHeight, profile.halfHeight);
+            const yFraction = (surfaceY + profile.halfHeight) / (profile.halfHeight * 2);
+            const wallRadius = profile.radiusBottom + (profile.radiusTop - profile.radiusBottom) * yFraction;
+            const innerRadius = Math.max(0.05, wallRadius - profile.wallThickness);
+            const radial = Math.hypot(localX, localZ);
+            const radialDirectionX = radial > 1e-6 ? localX / radial : 1;
+            const radialDirectionZ = radial > 1e-6 ? localZ / radial : 0;
+            let distanceToWall;
+            let normalSign;
+            if (radial < innerRadius) {
+                distanceToWall = innerRadius - radial;
+                if (distanceToWall >= playerRadius)
+                    return;
+                normalSign = -1;
+            }
+            else if (radial > wallRadius) {
+                distanceToWall = radial - wallRadius;
+                if (distanceToWall >= playerRadius)
+                    return;
+                normalSign = 1;
+            }
+            else {
+                const innerDistance = radial - innerRadius;
+                const outerDistance = wallRadius - radial;
+                distanceToWall = Math.min(innerDistance, outerDistance);
+                normalSign = innerDistance <= outerDistance ? -1 : 1;
+            }
+            const pushLocal = playerRadius - distanceToWall + 0.08 / radialScale;
+            this.tmpG.set(normalSign * radialDirectionX * pushLocal * scaleX, 0, normalSign * radialDirectionZ * pushLocal * scaleZ).applyQuaternion(this.tmpQ);
+            const push = this.tmpG.length();
+            if (push < 1e-6)
+                return;
+            this.tmpG.multiplyScalar(1 / push);
+            resolveContact(this.tmpG, push, label);
         };
         const dock = this.activeDockObstacle();
         if (dock)
@@ -920,7 +1287,11 @@ export class GameSession {
             const margin = MAX_FIELD_OBSTACLE_RADIUS;
             const label = this.activeInstanceId === 'shardbelt' ? 'asteroid' : 'wreckage';
             this.forEachObstacleInBox(position.x - margin, position.y - margin, position.z - margin, position.x + margin, position.y + margin, position.z + margin, (obstacle) => {
-                if (obstacle.box)
+                if (obstacle.shape === 'ring')
+                    collideRing(obstacle, label);
+                else if (obstacle.shape === 'engine')
+                    collideEngine(obstacle, label);
+                else if (obstacle.box)
                     collideBox(obstacle, label);
                 else
                     collide(obstacle.x, obstacle.y, obstacle.z, obstacle.collisionRadius, label);
@@ -930,13 +1301,13 @@ export class GameSession {
     updatePlayerWeapons(dt, actions) {
         this.utilityActive = false;
         this.utilityReadout = '';
+        if (actions.fire && this.gunCooldown <= 0)
+            this.firePlayerGuns();
         if (this.save.player.mode === 'combat') {
             this.renderer.setUtilityBeam(false, 'combat', this.save.player.position);
-            if (actions.fire && this.gunCooldown <= 0)
-                this.firePlayerGuns();
             return;
         }
-        this.updateUtilityTool(dt, actions.fire);
+        this.updateUtilityTool(dt, actions.utility);
     }
     firePlayerGuns() {
         const stats = getEffectiveShipStats(this.save.player);
@@ -1031,13 +1402,13 @@ export class GameSession {
         this.missileCooldown = 1.1;
         this.audio.play('missile');
     }
-    updateUtilityTool(dt, firing) {
+    updateUtilityTool(dt, active) {
         const target = this.getTargetRef();
         const stats = getEffectiveShipStats(this.save.player);
         const playerPosition = vec(this.save.player.position);
         const mode = this.save.player.mode;
         const range = mode === 'mining' ? stats.miningRange : stats.salvageRange;
-        if (!firing || !target || (mode === 'mining' && target.kind !== 'asteroid') || (mode === 'salvage' && target.kind !== 'wreck')) {
+        if (!active || !target || (mode === 'mining' && target.kind !== 'asteroid') || (mode === 'salvage' && target.kind !== 'wreck')) {
             this.renderer.setUtilityBeam(false, mode, this.save.player.position);
             return;
         }
@@ -1109,7 +1480,8 @@ export class GameSession {
             this.collectExtraction('ore', 'mining', 1, node.richness > 1.75 ? 'uncommon' : 'common');
             if (node.remaining <= 0) {
                 this.ui.showToast('Deposit exhausted.', 'info');
-                this.save.player.currentTargetId = undefined;
+                this.clearTarget();
+                this.obstacleGridBuiltAt = -Infinity;
                 break;
             }
         }
@@ -1133,7 +1505,8 @@ export class GameSession {
                 if (node.rarity === 'rare')
                     this.recoverRareEquipment(node);
                 this.ui.showToast('Wreck section stripped.', 'info');
-                this.save.player.currentTargetId = undefined;
+                this.clearTarget();
+                this.obstacleGridBuiltAt = -Infinity;
                 break;
             }
         }
@@ -1260,20 +1633,22 @@ export class GameSession {
         }
         this.ui.showToast(`Tractor captured ${COMMODITIES[pickup.commodity].name}.`, 'success', 2200);
     }
-    // The cockpit has no manual SCAN control anymore: a selected asteroid or
-    // wreck is resolved automatically the moment the ship closes to scan range.
-    // Out-of-range status is rendered on the target monitor by buildHudModel.
-    autoScanDeposit() {
+    // The cockpit has no manual SCAN control anymore: a selected ship, asteroid,
+    // or wreck is resolved automatically the moment the ship closes to scan
+    // range. Out-of-range status is rendered on the target monitor.
+    autoScanTarget() {
         if (this.scanCooldown > 0)
             return;
         const target = this.getTargetRef();
-        if (!target || (target.kind !== 'asteroid' && target.kind !== 'wreck'))
+        if (!target || (target.kind !== 'ship' && target.kind !== 'asteroid' && target.kind !== 'wreck'))
             return;
-        const nodes = target.kind === 'asteroid' ? this.asteroids : this.wreckNodes;
-        const node = nodes.find((entry) => entry.id === target.id);
-        if (!node || node.scanned)
+        const entity = target.kind === 'ship'
+            ? this.ships.find((entry) => entry.id === target.id)
+            : (target.kind === 'asteroid' ? this.asteroids : this.wreckNodes).find((entry) => entry.id === target.id);
+        if (!entity || entity.scanned)
             return;
-        if (this.surfaceDistance(vec(this.save.player.position), target) <= getEffectiveShipStats(this.save.player).scanRange)
+        const stats = getEffectiveShipStats(this.save.player);
+        if (this.surfaceDistance(vec(this.save.player.position), target) <= stats.scanRange)
             this.scanTarget();
     }
     scanTarget() {
@@ -1294,8 +1669,8 @@ export class GameSession {
         const stats = getEffectiveShipStats(this.save.player);
         const distance = this.surfaceDistance(vec(this.save.player.position), target);
         if (target.kind === 'asteroid' || target.kind === 'wreck') {
-            // Deposits scan automatically once selected and in range; the
-            // out-of-range status lives on the target monitor, not a toast.
+            // Locked contacts scan automatically in range; the out-of-range
+            // status lives on the target monitor, not a toast for resources.
             if (distance > stats.scanRange)
                 return;
         }
@@ -1308,30 +1683,21 @@ export class GameSession {
             node.scanned = true;
             if (!this.save.world.scannedNodes.includes(node.id))
                 this.save.world.scannedNodes.push(node.id);
-            const grade = node.richness > 1.8 ? 'RICH' : node.richness > 1.2 ? 'VIABLE' : 'LEAN';
-            this.ui.showToast(`Scan: ${grade} metallic deposit · ${Math.ceil(node.remaining)} recoverable units.`, 'success', 4600);
         }
         else if (target.kind === 'wreck') {
             const node = this.wreckNodes.find((entry) => entry.id === target.id);
             node.scanned = true;
             if (!this.save.world.scannedNodes.includes(node.id))
                 this.save.world.scannedNodes.push(node.id);
-            this.ui.showToast(`Scan: ${node.rarity.toUpperCase()} ${COMMODITIES[node.salvage].name} · hazard ${Math.round(node.hazard * 100)}.`, 'success', 4800);
         }
         else {
             const ship = this.ships.find((entry) => entry.id === target.id);
             // The scan result lands on the target monitor's readout line rather
-            // than a toast: it flips from UNRESOLVED CONTACT to the pilot
-            // profile (tier · temperament, with the ✦ marker when the pilot
-            // recognizes the player) once ship.scanned is set.
+            // than a toast: ordinary contacts flip from UNRESOLVED CONTACT to
+            // the pilot profile once ship.scanned is set. Surrendered pilots
+            // keep the claim decision separate instead.
             ship.scanned = true;
-            if (ship.surrendered) {
-                // Capturing a surrendered pilot pays the bounty and completes the
-                // warrant (claimSurrendered announces those); a beaten civilian
-                // simply reads as surrendered on the monitor.
-                this.claimSurrendered(ship);
-            }
-            else if (this.deferentialPilot(ship)) {
+            if (!ship.surrendered && this.deferentialPilot(ship)) {
                 // First scan of a spared pilot may pay a favor (wreck tip or
                 // market contact); re-scans never re-roll. The ✦ marker already
                 // in the readout signals they remember the player.
@@ -1343,6 +1709,31 @@ export class GameSession {
         this.scanCooldown = 0.55;
         this.audio.play('scan');
         this.renderer.setTarget(target.kind === 'ship' ? target.id : undefined, target.kind === 'asteroid' ? target.id : undefined, target.kind === 'wreck' ? target.id : undefined);
+    }
+    captureTarget() {
+        const target = this.getTargetRef();
+        if (!target || target.kind !== 'ship') {
+            this.setMonitorStatus('NO SURRENDERED SHIP LOCKED');
+            return;
+        }
+        const ship = this.ships.find((entry) => entry.id === target.id);
+        if (!ship || ship.hull <= 0)
+            return;
+        if (!ship.surrendered || ship.captured) {
+            this.setMonitorStatus('PILOT HAS NOT SURRENDERED');
+            return;
+        }
+        const stats = getEffectiveShipStats(this.save.player);
+        const distance = this.surfaceDistance(vec(this.save.player.position), target);
+        if (distance > stats.scanRange) {
+            this.setMonitorStatus(`OUT OF CAPTURE RANGE · ${Math.round(distance)}/${stats.scanRange} km`);
+            return;
+        }
+        if (!(ship.bountyValue > 0 || ship.missionId)) {
+            this.setMonitorStatus('NO CAPTURE CLAIM AVAILABLE');
+            return;
+        }
+        this.claimSurrendered(ship);
     }
     cycleTarget() {
         const candidates = this.targetCandidates();
@@ -1419,7 +1810,7 @@ export class GameSession {
         const goals = [];
         for (const mission of this.save.activeMissions) {
             if (mission.kind === 'bounty') {
-                const target = this.ships.find((entry) => entry.missionId === mission.id && entry.hull > 0);
+                const target = this.ships.find((entry) => entry.missionId === mission.id && !entry.claimed && !entry.captured && entry.hull > 0);
                 // Warrant ships are still ships: they follow the radar-range
                 // target rule. Only POIs stay selectable at any distance.
                 if (target && inRange(target.position))
@@ -1446,7 +1837,7 @@ export class GameSession {
         };
         const others = [];
         for (const entry of this.ships)
-            if (!entry.hostile && entry.hull > 0 && inRange(entry.position))
+            if (!entry.hostile && !entry.claimed && !entry.captured && entry.hull > 0 && inRange(entry.position))
                 others.push({ kind: 'ship', id: entry.id, position: entry.position, name: entry.name });
         if (this.activeInstanceId === 'shardbelt') {
             for (const node of this.asteroids)
@@ -1479,7 +1870,7 @@ export class GameSession {
             target = { kind, id: locationId, position: location.position, name: location.name };
         }
         else if (kind === 'ship') {
-            const ship = this.ships.find((entry) => entry.id === id && entry.hull > 0);
+            const ship = this.ships.find((entry) => entry.id === id && !entry.claimed && !entry.captured && entry.hull > 0);
             if (ship) {
                 this.save.player.mode = 'combat';
                 target = { kind, id, position: ship.position, name: ship.name };
@@ -1504,8 +1895,8 @@ export class GameSession {
             return;
         }
         this.applyTarget(target);
-        // Deposits resolve automatically on the next sim step via autoScanDeposit,
-        // so selection needs no manual scan gate here.
+        // Locked contacts resolve automatically on the next sim step via
+        // autoScanTarget, so selection needs no manual scan gate here.
     }
     applyTarget(target) {
         this.save.player.currentTargetId = target.id;
@@ -1527,7 +1918,7 @@ export class GameSession {
             const location = LOCATIONS[locationId];
             return { kind: 'location', id: locationId, position: location.position, name: location.name };
         }
-        const ship = this.ships.find((entry) => entry.id === id && entry.hull > 0);
+        const ship = this.ships.find((entry) => entry.id === id && !entry.claimed && !entry.captured && entry.hull > 0);
         if (ship)
             return { kind: 'ship', id, position: ship.position, name: ship.name };
         const asteroid = this.asteroids.find((entry) => entry.id === id && entry.remaining > 0);
@@ -1669,7 +2060,7 @@ export class GameSession {
         this.maybeRecognitionLine(ship, position, playerPosition);
         this.maybeProximityLine(ship, position, playerPosition);
         this.maybePilotLine(ship, position, playerPosition);
-        if (position.distanceTo(playerPosition) > 950 && ship.lifetime > 40 && !ship.missionId)
+        if (position.distanceTo(playerPosition) > 950 && ship.lifetime > 40 && !ship.missionId && !ship.captured)
             ship.hull = -1;
         }
     }
@@ -1830,6 +2221,8 @@ export class GameSession {
         // mutter: a beaten ship has nothing to say but "please". Fires as
         // soon as the player is within range (no edge tracking), so the plea
         // lands even if the player was already beside the ship when it gave up.
+        if (ship.captured)
+            return;
         if (ship.surrendered) {
             if (!ship.saidSurrenderPlead && playerPosition.distanceTo(position) <= PROXIMITY_RANGE && this.chatterOpen()) {
                 ship.saidSurrenderPlead = true;
@@ -1998,6 +2391,7 @@ export class GameSession {
         return { position: vec(target.position), velocity: vec(target.velocity) };
     }
     updateAttackAI(ship, targetPosition, targetVelocity, dt) {
+        const aiRng = typeof ship.aiRng === 'function' ? ship.aiRng : FALLBACK_AI_RNG;
         const position = this.tmpA.set(ship.position[0], ship.position[1], ship.position[2]);
         const velocity = this.tmpB.set(ship.velocity[0], ship.velocity[1], ship.velocity[2]);
         const orientation = this.tmpQ.set(ship.rotation[0], ship.rotation[1], ship.rotation[2], ship.rotation[3]);
@@ -2099,7 +2493,7 @@ export class GameSession {
         if (damagedCycle && this.save.world.time >= (ship.evadeCycleUntil ?? 0)) {
             const resting = ship.evadePhase === 'rest';
             ship.evadePhase = resting ? 'burst' : 'rest';
-            ship.evadeCycleUntil = this.save.world.time + (resting ? randomBetween(ship.aiRng, 1.2, 2) : randomBetween(ship.aiRng, 4, 6));
+            ship.evadeCycleUntil = this.save.world.time + (resting ? randomBetween(aiRng, 1.2, 2) : randomBetween(aiRng, 4, 6));
         }
         const evading = evasive || (damagedCycle && ship.evadePhase === 'burst');
         const currentSpeed = velocity.length();
@@ -2129,10 +2523,10 @@ export class GameSession {
                 const reflex = ship.pilot?.reflex ?? 0.78;
                 const evasion = ship.pilot?.evasion ?? 0.82;
                 const jinkMul = pilotMod(ship, 1, 'jinkMul');
-                ship.jinkDuration = (0.55 + ship.aiRng() * 0.55) * (0.65 + reflex * 0.7) * jinkMul;
+                ship.jinkDuration = (0.55 + aiRng() * 0.55) * (0.65 + reflex * 0.7) * jinkMul;
                 ship.jinkUntil = this.save.world.time + ship.jinkDuration;
-                ship.jinkSign = ship.aiRng() < 0.5 ? 1 : -1;
-                ship.jinkStrength = Math.min(0.6, (0.3 + ship.aiRng() * 0.35) * (0.6 + evasion * 0.7) * jinkMul);
+                ship.jinkSign = aiRng() < 0.5 ? 1 : -1;
+                ship.jinkStrength = Math.min(0.6, (0.3 + aiRng() * 0.35) * (0.6 + evasion * 0.7) * jinkMul);
             }
             const jinkRemaining = Math.max(0, (ship.jinkUntil ?? 0) - this.save.world.time);
             const jinkDuration = ship.jinkDuration ?? 0.55;
@@ -2156,14 +2550,14 @@ export class GameSession {
                 const gate = pilotMod(ship, 0.45, 'spiralMul') * (showboating ? 0.45 : 1);
                 const reflex = ship.pilot?.reflex ?? 0.78;
                 const evasion = ship.pilot?.evasion ?? 0.82;
-                if (ship.aiRng() < gate) {
-                    ship.spiralT = (0.9 + ship.aiRng() * 0.9) * (0.7 + evasion * 0.5) * (ship.pilot?.flamboyance ? 1.4 : 1);
-                    ship.spiralSign = ship.aiRng() < 0.5 ? 1 : -1;
+                if (aiRng() < gate) {
+                    ship.spiralT = (0.9 + aiRng() * 0.9) * (0.7 + evasion * 0.5) * (ship.pilot?.flamboyance ? 1.4 : 1);
+                    ship.spiralSign = aiRng() < 0.5 ? 1 : -1;
                     ship.spiralPhase = 0;
-                    ship.spiralCooldownUntil = this.save.world.time + (5 + ship.aiRng() * 5) * (1.6 - reflex * 0.7);
+                    ship.spiralCooldownUntil = this.save.world.time + (5 + aiRng() * 5) * (1.6 - reflex * 0.7);
                 }
                 else {
-                    ship.spiralCooldownUntil = this.save.world.time + (2 + ship.aiRng() * 3) * (1.6 - reflex * 0.7);
+                    ship.spiralCooldownUntil = this.save.world.time + (2 + aiRng() * 3) * (1.6 - reflex * 0.7);
                 }
             }
             if (ship.spiralT > 0) {
@@ -2320,6 +2714,15 @@ export class GameSession {
         ship.burning = false;
         const position = this.tmpA.set(ship.position[0], ship.position[1], ship.position[2]);
         const velocity = this.tmpB.set(ship.velocity[0], ship.velocity[1], ship.velocity[2]);
+        if (ship.captured) {
+            // A captured hull is inert but remains in the scene. Preserve its
+            // current momentum so the recovered ship keeps drifting instead of
+            // disappearing or snapping onto a civilian route.
+            position.addScaledVector(velocity, dt);
+            tupleInto(ship.position, position);
+            tupleInto(ship.velocity, velocity);
+            return;
+        }
         if (ship.poweredDown) {
             // Surrendered and dark: bleed off velocity and drift. The ship no
             // longer navigates, attacks, or evades.
@@ -2480,6 +2883,8 @@ export class GameSession {
         return false;
     }
     damageShip(ship, amount, attackerId, position) {
+        if (ship.captured)
+            return;
         let remaining = amount;
         if (ship.shield > 0) {
             const absorbed = Math.min(ship.shield, remaining);
@@ -2619,16 +3024,30 @@ export class GameSession {
         const amount = ship.bountyValue > 0 ? Math.round(ship.bountyValue * 0.6) : 60;
         this.spawnPickup('credits', ship.position, 'combat', 'common', amount);
     }
-    // A surrendered pilot is captured, not exploded: claiming the ship (scan
-    // it, or dock while it's still around) pays the defense bounty, completes
-    // any active warrant into the registry, and counts the kill — the surrender
-    // already ended the fight, so no explosion and no civilian-loss penalty.
+    // A surrendered pilot is captured, not exploded: claiming the ship pays the
+    // defense bounty, completes any active warrant into the registry, and counts
+    // the capture — the surrender already ended the fight, so no explosion and
+    // no civilian-loss penalty. The hull stays alive and drifts as a quiet scene
+    // object after the transfer.
     // Only ships worth a bounty are claimable; a civilian the player beat down
     // has no payoff and stays unclaimed.
     claimSurrendered(ship) {
         if (!ship.surrendered || ship.claimed || ship.hull <= 0 || !(ship.bountyValue > 0 || ship.missionId))
             return false;
         ship.claimed = true;
+        ship.captured = true;
+        ship.hostile = false;
+        ship.fleeing = false;
+        ship.poweredDown = false;
+        ship.targetId = undefined;
+        ship.burning = false;
+        ship.destination = undefined;
+        // A powered-down surrender may have nearly zero momentum. Give the
+        // recovered hull a small, forward drift so it visibly remains in space.
+        if (Math.hypot(ship.velocity[0], ship.velocity[1], ship.velocity[2]) < 0.75) {
+            const drift = FORWARD.clone().applyQuaternion(quat(ship.rotation)).multiplyScalar(2.4);
+            ship.velocity = tuple(drift);
+        }
         this.save.player.stats.kills += 1;
         if (ship.bountyValue > 0) {
             const payment = ship.bountyValue;
@@ -2641,11 +3060,10 @@ export class GameSession {
             if (result.ok)
                 this.ui.showToast(result.message, 'success', 6500);
         }
+        const surrenderedTo = this.save.world.surrenderedTo ?? (this.save.world.surrenderedTo = {});
+        surrenderedTo[ship.name] = 'captured';
         if (this.save.player.currentTargetId === ship.id)
-            this.save.player.currentTargetId = undefined;
-        // The captured ship leaves the scene like a destroyed one (cleanupEntities
-        // removes hull 0 ships shortly after) but without the explosion.
-        ship.hull = 0;
+            this.clearTarget();
         return true;
     }
     destroyShip(ship, attackerId, position) {
@@ -2998,6 +3416,7 @@ export class GameSession {
             scanned: false,
             surrendered: false,
             claimed: false,
+            captured: false,
             poweredDown: false,
             saidRecognition: false,
             // Whether the pilot has already rolled (and possibly given) the
@@ -3113,8 +3532,8 @@ export class GameSession {
             collisionRadius: this.locationCollisionRadius(location),
         };
     }
-    activeFieldObstacles() {
-        if (this.activeInstanceId === 'shardbelt')
+    activeFieldObstacles(instanceId = this.activeInstanceId) {
+        if (instanceId === 'shardbelt')
             return this.asteroids.map((node) => {
                 const radius = asteroidCollisionRadius(node);
                 // Hard collision and avoidance use the visual bounding sphere, but
@@ -3123,8 +3542,8 @@ export class GameSession {
                 // wrongly block a clearly-clear mining beam.
                 return { id: node.id, x: node.position[0], y: node.position[1], z: node.position[2], radius, losRadius: node.radius * 0.9, collisionRadius: radius };
             });
-        if (this.activeInstanceId === 'mourning-line') {
-            return this.graveyard.map((piece) => {
+        if (instanceId === 'mourning-line') {
+            const obstacles = this.graveyard.filter((piece) => piece.collidable !== false).map((piece) => {
                 const [hx, hy, hz] = piece.halfExtents;
                 const q = this.tmpQ.setFromEuler(this.tmpEuler.set(piece.rotation[0], piece.rotation[1], piece.rotation[2], 'XYZ'));
                 // radius is the bounding sphere used for the spatial grid and
@@ -3138,11 +3557,207 @@ export class GameSession {
                     radius: Math.hypot(hx, hy, hz),
                     losRadius: piece.collisionRadius,
                     collisionRadius: Math.hypot(hx, hy, hz),
+                    shape: piece.kind === 'ring' || piece.kind === 'engine' ? piece.kind : undefined,
+                    scale: piece.scale,
                     box: { hx, hy, hz, qx: q.x, qy: q.y, qz: q.z, qw: q.w },
                 };
             });
+            for (const node of this.wreckNodes) {
+                if (node.remaining <= 0)
+                    continue;
+                const radius = wreckNodeCollisionRadius(node);
+                obstacles.push({
+                    id: node.id,
+                    x: node.position[0],
+                    y: node.position[1],
+                    z: node.position[2],
+                    radius,
+                    losRadius: radius,
+                    collisionRadius: radius,
+                });
+            }
+            return obstacles;
         }
         return [];
+    }
+    entryPositionClear(position, obstacles, clearance = PLAYER_RADIUS + ENTRY_CLEARANCE) {
+        const clearanceSq = clearance * clearance;
+        for (const obstacle of obstacles) {
+            if (obstacle.box) {
+                const box = obstacle.box;
+                this.tmpEntryQuaternion.set(box.qx, box.qy, box.qz, box.qw);
+                this.tmpEntryInverseQuaternion.copy(this.tmpEntryQuaternion).invert();
+                this.tmpEntryLocal.set(position.x - obstacle.x, position.y - obstacle.y, position.z - obstacle.z).applyQuaternion(this.tmpEntryInverseQuaternion);
+                const closestX = clamp(this.tmpEntryLocal.x, -box.hx, box.hx);
+                const closestY = clamp(this.tmpEntryLocal.y, -box.hy, box.hy);
+                const closestZ = clamp(this.tmpEntryLocal.z, -box.hz, box.hz);
+                const dx = this.tmpEntryLocal.x - closestX;
+                const dy = this.tmpEntryLocal.y - closestY;
+                const dz = this.tmpEntryLocal.z - closestZ;
+                if (dx * dx + dy * dy + dz * dz < clearanceSq)
+                    return false;
+            }
+            else {
+                const dx = position.x - obstacle.x;
+                const dy = position.y - obstacle.y;
+                const dz = position.z - obstacle.z;
+                const minimum = obstacle.collisionRadius + clearance;
+                if (dx * dx + dy * dy + dz * dz < minimum * minimum)
+                    return false;
+            }
+        }
+        return true;
+    }
+    pushEntryPosition(position, obstacle, preferredDirection) {
+        if (obstacle.box) {
+            const box = obstacle.box;
+            this.tmpEntryQuaternion.set(box.qx, box.qy, box.qz, box.qw);
+            this.tmpEntryInverseQuaternion.copy(this.tmpEntryQuaternion).invert();
+            this.tmpEntryLocal.set(position.x - obstacle.x, position.y - obstacle.y, position.z - obstacle.z).applyQuaternion(this.tmpEntryInverseQuaternion);
+            const hx = box.hx + PLAYER_RADIUS + ENTRY_CLEARANCE;
+            const hy = box.hy + PLAYER_RADIUS + ENTRY_CLEARANCE;
+            const hz = box.hz + PLAYER_RADIUS + ENTRY_CLEARANCE;
+            if (Math.abs(this.tmpEntryLocal.x) > hx || Math.abs(this.tmpEntryLocal.y) > hy || Math.abs(this.tmpEntryLocal.z) > hz)
+                return false;
+            const penetrationX = hx - Math.abs(this.tmpEntryLocal.x);
+            const penetrationY = hy - Math.abs(this.tmpEntryLocal.y);
+            const penetrationZ = hz - Math.abs(this.tmpEntryLocal.z);
+            this.tmpEntryLocalDirection.copy(preferredDirection).applyQuaternion(this.tmpEntryInverseQuaternion);
+            if (penetrationX <= penetrationY && penetrationX <= penetrationZ)
+                this.tmpEntryLocal.x = (Math.abs(this.tmpEntryLocal.x) > 0.001 ? Math.sign(this.tmpEntryLocal.x) : (this.tmpEntryLocalDirection.x < 0 ? -1 : 1)) * (hx + 0.08);
+            else if (penetrationY <= penetrationZ)
+                this.tmpEntryLocal.y = (Math.abs(this.tmpEntryLocal.y) > 0.001 ? Math.sign(this.tmpEntryLocal.y) : (this.tmpEntryLocalDirection.y < 0 ? -1 : 1)) * (hy + 0.08);
+            else
+                this.tmpEntryLocal.z = (Math.abs(this.tmpEntryLocal.z) > 0.001 ? Math.sign(this.tmpEntryLocal.z) : (this.tmpEntryLocalDirection.z < 0 ? -1 : 1)) * (hz + 0.08);
+            this.tmpEntryLocal.applyQuaternion(this.tmpEntryQuaternion);
+            position.set(obstacle.x, obstacle.y, obstacle.z).add(this.tmpEntryLocal);
+            return true;
+        }
+        const dx = position.x - obstacle.x;
+        const dy = position.y - obstacle.y;
+        const dz = position.z - obstacle.z;
+        const minimum = obstacle.collisionRadius + PLAYER_RADIUS + ENTRY_CLEARANCE;
+        const distanceSq = dx * dx + dy * dy + dz * dz;
+        if (distanceSq >= minimum * minimum)
+            return false;
+        if (distanceSq > 1e-8)
+            this.tmpEntryNormal.set(dx, dy, dz).multiplyScalar(1 / Math.sqrt(distanceSq));
+        else
+            this.tmpEntryNormal.copy(preferredDirection);
+        if (this.tmpEntryNormal.lengthSq() < 1e-8)
+            this.tmpEntryNormal.set(0, 0, -1);
+        position.set(obstacle.x, obstacle.y, obstacle.z).addScaledVector(this.tmpEntryNormal, minimum + 0.08);
+        return true;
+    }
+    setFieldEntryPosition(position, instanceId, preferredDirection = FORWARD) {
+        const location = LOCATIONS[instanceId];
+        if (!location)
+            return false;
+        const direction = this.tmpEntryPreferredDirection.copy(preferredDirection ?? FORWARD);
+        if (direction.lengthSq() < 1e-8)
+            direction.copy(FORWARD);
+        direction.normalize();
+        const obstacles = this.activeFieldObstacles(instanceId);
+        let entryRadius = hyperdriveArrivalRadius(location);
+        // The configured field radius is the normal cloud edge. Include the
+        // live outermost object as well because drift and collectible chunks
+        // can extend beyond that seed radius during a long session.
+        for (const obstacle of obstacles) {
+            const dx = obstacle.x - location.position[0];
+            const dy = obstacle.y - location.position[1];
+            const dz = obstacle.z - location.position[2];
+            entryRadius = Math.max(entryRadius, Math.hypot(dx, dy, dz) + obstacle.radius + PLAYER_RADIUS + ENTRY_CLEARANCE + 0.08);
+        }
+        position.set(location.position[0], location.position[1], location.position[2]).addScaledVector(direction, entryRadius);
+        // Keep the exact oriented-box/sphere check as the final authority in
+        // case a field generator ever produces geometry outside its bounds.
+        this.ensurePlayerEntryClearance(position, instanceId, direction);
+        return true;
+    }
+    setFieldArenaPosition(position, instanceId) {
+        const location = LOCATIONS[instanceId];
+        if (!location)
+            return false;
+        const obstacles = this.activeFieldObstacles(instanceId);
+        this.tmpEntryAnchor.set(location.position[0], location.position[1], location.position[2]);
+        for (const [x, y, z] of ARENA_FIELD_START_OFFSETS) {
+            this.tmpEntryCandidate.set(this.tmpEntryAnchor.x + x, this.tmpEntryAnchor.y + y, this.tmpEntryAnchor.z + z);
+            if (this.entryPositionClear(this.tmpEntryCandidate, obstacles, ARENA_FIELD_SAFE_CLEARANCE)) {
+                position.copy(this.tmpEntryCandidate);
+                return true;
+            }
+        }
+        // If a future seed closes every interior candidate, preserve the
+        // centre-first intent while still guaranteeing a collision-free start.
+        position.copy(this.tmpEntryAnchor);
+        this.ensurePlayerEntryClearance(position, instanceId, FORWARD);
+        return false;
+    }
+    ensurePlayerEntryClearance(position, instanceId, preferredDirection = FORWARD) {
+        if (!instanceId)
+            return false;
+        const obstacles = this.activeFieldObstacles(instanceId);
+        if (obstacles.length === 0)
+            return false;
+        this.tmpEntryAnchor.copy(position);
+        this.tmpEntryPreferredDirection.copy(preferredDirection ?? FORWARD);
+        if (this.tmpEntryPreferredDirection.lengthSq() < 1e-8)
+            this.tmpEntryPreferredDirection.copy(FORWARD);
+        this.tmpEntryPreferredDirection.normalize();
+        let moved = false;
+        // Resolve several times because pushing away from one large piece can
+        // put the player into a neighbouring piece in a dense field.
+        for (let pass = 0; pass < 8; pass += 1) {
+            let passMoved = false;
+            for (const obstacle of obstacles) {
+                if (this.pushEntryPosition(position, obstacle, this.tmpEntryPreferredDirection)) {
+                    passMoved = true;
+                    moved = true;
+                }
+            }
+            if (!passMoved || this.entryPositionClear(position, obstacles))
+                break;
+        }
+        if (this.entryPositionClear(position, obstacles))
+            return moved;
+        // If local resolution is trapped between overlapping pieces, search a
+        // deterministic ring around the original entry point before resorting
+        // to the field boundary. This keeps normal arrivals close to the nav
+        // drop sphere while still guaranteeing a clean control hand-off.
+        for (const radius of ENTRY_SEARCH_RADII) {
+            this.tmpEntryCandidate.copy(this.tmpEntryAnchor).addScaledVector(this.tmpEntryPreferredDirection, radius);
+            if (this.entryPositionClear(this.tmpEntryCandidate, obstacles)) {
+                position.copy(this.tmpEntryCandidate);
+                return true;
+            }
+            for (const rawDirection of ENTRY_SEARCH_DIRECTIONS) {
+                this.tmpEntryCandidate.set(this.tmpEntryAnchor.x, this.tmpEntryAnchor.y, this.tmpEntryAnchor.z);
+                this.tmpEntryDirection.set(rawDirection[0], rawDirection[1], rawDirection[2]).normalize();
+                this.tmpEntryCandidate.addScaledVector(this.tmpEntryDirection, radius);
+                if (this.entryPositionClear(this.tmpEntryCandidate, obstacles)) {
+                    position.copy(this.tmpEntryCandidate);
+                    return true;
+                }
+            }
+        }
+        // The generated field geometry is finite, so a point beyond the furthest
+        // obstacle's bounding sphere is a mathematical guarantee, even after
+        // long-running drift has moved pieces away from their seed positions.
+        const location = LOCATIONS[instanceId];
+        if (location) {
+            const center = location.position;
+            let safeRadius = location.radius + PLAYER_RADIUS + ENTRY_CLEARANCE;
+            for (const obstacle of obstacles) {
+                const dx = obstacle.x - center[0];
+                const dy = obstacle.y - center[1];
+                const dz = obstacle.z - center[2];
+                safeRadius = Math.max(safeRadius, Math.hypot(dx, dy, dz) + obstacle.radius + PLAYER_RADIUS + ENTRY_CLEARANCE + 0.08);
+            }
+            this.tmpEntryCandidate.set(center[0], center[1], center[2]).addScaledVector(this.tmpEntryPreferredDirection, safeRadius);
+            position.copy(this.tmpEntryCandidate);
+            return true;
+        }
+        return moved;
     }
     locationCollisionRadius(location) {
         return location.kind === 'planet' ? location.radius + 55 : location.radius * 0.72;
@@ -3159,7 +3774,7 @@ export class GameSession {
         }
         if (target.kind === 'wreck') {
             const node = this.wreckNodes.find((entry) => entry.id === target.id);
-            return node ? node.radius : 0;
+            return node ? wreckNodeCollisionRadius(node) : 0;
         }
         if (target.kind === 'location') {
             const location = LOCATIONS[target.id];
@@ -3178,24 +3793,53 @@ export class GameSession {
         if (this.obstacleGrid && this.obstacleGridInstance === this.activeInstanceId && this.save.world.time - this.obstacleGridBuiltAt < 0.5)
             return;
         const grid = new Map();
+        const segmentGrid = new Map();
         const size = this.obstacleCellSize;
         for (const obstacle of this.activeFieldObstacles()) {
-            const key = this.cellKey(Math.floor(obstacle.x / size), Math.floor(obstacle.y / size), Math.floor(obstacle.z / size));
-            let bucket = grid.get(key);
-            if (!bucket) {
-                bucket = [];
-                grid.set(key, bucket);
+            // Keep the center-cell index for physical collision and steering
+            // queries. Their box padding already accounts for obstacle radius,
+            // and retaining this index keeps manual controls on the old exact
+            // candidate set.
+            const centerKey = this.cellKey(Math.floor(obstacle.x / size), Math.floor(obstacle.y / size), Math.floor(obstacle.z / size));
+            let centerBucket = grid.get(centerKey);
+            if (!centerBucket) {
+                centerBucket = [];
+                grid.set(centerKey, centerBucket);
             }
-            bucket.push(obstacle);
+            centerBucket.push(obstacle);
+            // Index an obstacle in every cell its bounding sphere touches. The
+            // old query checked all 26 neighboring cells for every DDA step;
+            // that was cheap in open space but became a repeated Map lookup
+            // storm along weapon lines through the dense wreck field.
+            const cx0 = Math.floor((obstacle.x - obstacle.radius) / size);
+            const cy0 = Math.floor((obstacle.y - obstacle.radius) / size);
+            const cz0 = Math.floor((obstacle.z - obstacle.radius) / size);
+            const cx1 = Math.floor((obstacle.x + obstacle.radius) / size);
+            const cy1 = Math.floor((obstacle.y + obstacle.radius) / size);
+            const cz1 = Math.floor((obstacle.z + obstacle.radius) / size);
+            for (let cx = cx0; cx <= cx1; cx += 1) {
+                for (let cy = cy0; cy <= cy1; cy += 1) {
+                    for (let cz = cz0; cz <= cz1; cz += 1) {
+                        const key = this.cellKey(cx, cy, cz);
+                        let bucket = segmentGrid.get(key);
+                        if (!bucket) {
+                            bucket = [];
+                            segmentGrid.set(key, bucket);
+                        }
+                        bucket.push(obstacle);
+                    }
+                }
+            }
         }
         this.obstacleGrid = grid;
+        this.obstacleSegmentGrid = segmentGrid;
         this.obstacleGridInstance = this.activeInstanceId;
         this.obstacleGridBuiltAt = this.save.world.time;
     }
     cellKey(cx, cy, cz) {
         // Numeric key instead of a "x,y,z" string: the obstacle grid is queried
-        // tens of thousands of times a second (every DDA cell checks its 26
-        // neighbours), and the string version was the top GC/CPU cost in flight.
+        // tens of thousands of times a second, and the string version was the
+        // top GC/CPU cost in flight.
         // Cell coords stay within ±4096 (the playable system spans ~±1M units at
         // a 256-unit cell size), so 13 bits per axis pack losslessly into a double.
         return (cx + 4096) * 16777216 + (cy + 4096) * 4096 + (cz + 4096);
@@ -3204,6 +3848,7 @@ export class GameSession {
         this.ensureObstacleGrid();
         if (this.obstacleGrid.size === 0)
             return;
+        const stamp = ++this.obstacleQueryStamp;
         const size = this.obstacleCellSize;
         const cx0 = Math.floor(minX / size);
         const cy0 = Math.floor(minY / size);
@@ -3217,8 +3862,12 @@ export class GameSession {
                     const bucket = this.obstacleGrid.get(this.cellKey(cx, cy, cz));
                     if (!bucket)
                         continue;
-                    for (const obstacle of bucket)
+                    for (const obstacle of bucket) {
+                        if (obstacle._queryStamp === stamp)
+                            continue;
+                        obstacle._queryStamp = stamp;
                         callback(obstacle);
+                    }
                 }
             }
         }
@@ -3227,12 +3876,13 @@ export class GameSession {
         // Walk the grid along the segment instead of iterating its whole bounding
         // box. A hyperdrive vector can span a whole sector (~100k units), so the
         // box version touches tens of millions of cells and freezes the frame;
-        // this DDA visits only the cells the ray actually crosses. Each visited
-        // cell also checks its 26 neighbours so obstacles whose centre sits in an
-        // adjacent cell but whose radius overlaps the ray are still caught.
+        // this DDA visits only the cells the ray actually crosses. Obstacles are
+        // pre-indexed into every cell their bounding sphere touches, so no
+        // neighboring-cell fan-out is needed here.
         this.ensureObstacleGrid();
-        if (this.obstacleGrid.size === 0)
+        if (this.obstacleSegmentGrid.size === 0)
             return;
+        const stamp = ++this.obstacleQueryStamp;
         const size = this.obstacleCellSize;
         let cx = Math.floor(start.x / size);
         let cy = Math.floor(start.y / size);
@@ -3253,15 +3903,14 @@ export class GameSession {
         let tMaxY = dy !== 0 ? ((stepY > 0 ? (cy + 1) * size : cy * size) - start.y) / dy : Infinity;
         let tMaxZ = dz !== 0 ? ((stepZ > 0 ? (cz + 1) * size : cz * size) - start.z) / dz : Infinity;
         const visit = (x, y, z) => {
-            for (let ox = x - 1; ox <= x + 1; ox += 1) {
-                for (let oy = y - 1; oy <= y + 1; oy += 1) {
-                    for (let oz = z - 1; oz <= z + 1; oz += 1) {
-                        const bucket = this.obstacleGrid.get(this.cellKey(ox, oy, oz));
-                        if (bucket)
-                            for (const obstacle of bucket)
-                                callback(obstacle);
-                    }
-                }
+            const bucket = this.obstacleSegmentGrid.get(this.cellKey(x, y, z));
+            if (!bucket)
+                return;
+            for (const obstacle of bucket) {
+                if (obstacle._queryStamp === stamp)
+                    continue;
+                obstacle._queryStamp = stamp;
+                callback(obstacle);
             }
         };
         visit(cx, cy, cz);
@@ -3470,6 +4119,134 @@ export class GameSession {
             this.forEachObstacleInBox(px - (maxRange + MAX_FIELD_OBSTACLE_RADIUS), py - (maxRange + MAX_FIELD_OBSTACLE_RADIUS), pz - (maxRange + MAX_FIELD_OBSTACLE_RADIUS), px + (maxRange + MAX_FIELD_OBSTACLE_RADIUS), py + (maxRange + MAX_FIELD_OBSTACLE_RADIUS), pz + (maxRange + MAX_FIELD_OBSTACLE_RADIUS), accumulate);
         return closest;
     }
+    setSegmentShapeEndpoints(start, end, obstacle) {
+        const box = obstacle.box;
+        const scaleX = Math.max(0.001, obstacle.scale[0]);
+        const scaleY = Math.max(0.001, obstacle.scale[1]);
+        const scaleZ = Math.max(0.001, obstacle.scale[2]);
+        const qx = box.qx;
+        const qy = box.qy;
+        const qz = box.qz;
+        const qw = box.qw;
+        const m00 = 1 - 2 * (qy * qy + qz * qz);
+        const m01 = 2 * (qx * qy - qz * qw);
+        const m02 = 2 * (qx * qz + qy * qw);
+        const m10 = 2 * (qx * qy + qz * qw);
+        const m11 = 1 - 2 * (qx * qx + qz * qz);
+        const m12 = 2 * (qy * qz - qx * qw);
+        const m20 = 2 * (qx * qz - qy * qw);
+        const m21 = 2 * (qy * qz + qx * qw);
+        const m22 = 1 - 2 * (qx * qx + qy * qy);
+        const startX = start.x - obstacle.x;
+        const startY = start.y - obstacle.y;
+        const startZ = start.z - obstacle.z;
+        const endX = end.x - obstacle.x;
+        const endY = end.y - obstacle.y;
+        const endZ = end.z - obstacle.z;
+        this.tmpF.set((m00 * startX + m10 * startY + m20 * startZ) / scaleX, (m01 * startX + m11 * startY + m21 * startZ) / scaleY, (m02 * startX + m12 * startY + m22 * startZ) / scaleZ);
+        this.tmpG.set((m00 * endX + m10 * endY + m20 * endZ) / scaleX, (m01 * endX + m11 * endY + m21 * endZ) / scaleY, (m02 * endX + m12 * endY + m22 * endZ) / scaleZ);
+    }
+    segmentRingHit(start, end, obstacle, padding = 1.5) {
+        this.setSegmentShapeEndpoints(start, end, obstacle);
+        const sx = this.tmpF.x;
+        const sy = this.tmpF.y;
+        const sz = this.tmpF.z;
+        const dx = this.tmpG.x - sx;
+        const dy = this.tmpG.y - sy;
+        const dz = this.tmpG.z - sz;
+        const scale = Math.min(obstacle.scale[0], obstacle.scale[1], obstacle.scale[2]);
+        const localPadding = padding / Math.max(0.001, scale);
+        let t0 = 0;
+        let t1 = 1;
+        const profile = GRAVEYARD_GEOMETRY_PROFILES.ring;
+        const axialLimit = profile.tubeRadius + localPadding;
+        if (Math.abs(dz) < 1e-10) {
+            if (sz < -axialLimit || sz > axialLimit)
+                return undefined;
+        }
+        else {
+            let near = (-axialLimit - sz) / dz;
+            let far = (axialLimit - sz) / dz;
+            if (near > far) {
+                const swap = near;
+                near = far;
+                far = swap;
+            }
+            t0 = Math.max(t0, near);
+            t1 = Math.min(t1, far);
+            if (t0 > t1)
+                return undefined;
+        }
+        const inner = Math.max(0, profile.majorRadius - profile.tubeRadius - localPadding);
+        const outer = profile.majorRadius + profile.tubeRadius + localPadding;
+        const innerSq = inner * inner;
+        const outerSq = outer * outer;
+        const atStart = segmentRadialBandAt(sx, sy, dx, dy, t0, innerSq, outerSq);
+        if (t0 <= 1e-6 && atStart)
+            return undefined;
+        if (atStart)
+            return t0;
+        if (segmentRadialBandAt(sx, sy, dx, dy, t1, innerSq, outerSq))
+            return t1;
+        const coefficientA = dx * dx + dy * dy;
+        const coefficientB = 2 * (sx * dx + sy * dy);
+        const coefficientC = sx * sx + sy * sy;
+        const innerHit = segmentRadialBandRoot(sx, sy, dx, dy, coefficientA, coefficientB, coefficientC, innerSq, t0, t1, innerSq, outerSq);
+        const outerHit = segmentRadialBandRoot(sx, sy, dx, dy, coefficientA, coefficientB, coefficientC, outerSq, t0, t1, innerSq, outerSq);
+        if (innerHit === undefined)
+            return outerHit;
+        if (outerHit === undefined)
+            return innerHit;
+        return Math.min(innerHit, outerHit);
+    }
+    segmentEngineHit(start, end, obstacle, padding = 1.5) {
+        this.setSegmentShapeEndpoints(start, end, obstacle);
+        const sx = this.tmpF.x;
+        const sy = this.tmpF.y;
+        const sz = this.tmpF.z;
+        const dx = this.tmpG.x - sx;
+        const dy = this.tmpG.y - sy;
+        const dz = this.tmpG.z - sz;
+        const scale = Math.min(obstacle.scale[0], obstacle.scale[1], obstacle.scale[2]);
+        const localPadding = padding / Math.max(0.001, scale);
+        const profile = GRAVEYARD_GEOMETRY_PROFILES.engine;
+        let t0 = 0;
+        let t1 = 1;
+        const yLimit = profile.halfHeight + localPadding;
+        if (Math.abs(dy) < 1e-10) {
+            if (sy < -yLimit || sy > yLimit)
+                return undefined;
+        }
+        else {
+            let near = (-yLimit - sy) / dy;
+            let far = (yLimit - sy) / dy;
+            if (near > far) {
+                const swap = near;
+                near = far;
+                far = swap;
+            }
+            t0 = Math.max(t0, near);
+            t1 = Math.min(t1, far);
+            if (t0 > t1)
+                return undefined;
+        }
+        const radiusCenter = (profile.radiusBottom + profile.radiusTop) * 0.5;
+        const radiusSlope = (profile.radiusTop - profile.radiusBottom) / (profile.halfHeight * 2);
+        const atStart = segmentEngineShellAt(sx, sy, sz, dx, dy, dz, t0, radiusCenter, radiusSlope, profile.halfHeight, localPadding);
+        if (t0 <= 1e-6 && atStart)
+            return undefined;
+        if (atStart)
+            return t0;
+        if (segmentEngineShellAt(sx, sy, sz, dx, dy, dz, t1, radiusCenter, radiusSlope, profile.halfHeight, localPadding))
+            return t1;
+        const innerHit = segmentEngineShellRoot(sx, sy, sz, dx, dy, dz, radiusCenter, radiusSlope, profile.halfHeight, localPadding, -localPadding, t0, t1);
+        const outerHit = segmentEngineShellRoot(sx, sy, sz, dx, dy, dz, radiusCenter, radiusSlope, profile.halfHeight, localPadding, localPadding, t0, t1);
+        if (innerHit === undefined)
+            return outerHit;
+        if (outerHit === undefined)
+            return innerHit;
+        return Math.min(innerHit, outerHit);
+    }
     lineBlocked(start, end, ignoreId) {
         return this.firstObstacleHit(start, end, ignoreId) !== undefined;
     }
@@ -3478,6 +4255,24 @@ export class GameSession {
         const test = (obstacle) => {
             if (obstacle.id === ignoreId)
                 return;
+            if (obstacle.shape === 'ring') {
+                const hit = this.segmentRingHit(start, end, obstacle);
+                if (hit !== undefined && (best === undefined || hit < best))
+                    best = hit;
+                return;
+            }
+            if (obstacle.shape === 'engine') {
+                const hit = this.segmentEngineHit(start, end, obstacle);
+                if (hit !== undefined && (best === undefined || hit < best))
+                    best = hit;
+                return;
+            }
+            if (obstacle.box) {
+                const hit = segmentBoxHit(start, end, obstacle);
+                if (hit !== undefined && (best === undefined || hit < best))
+                    best = hit;
+                return;
+            }
             const sx = start.x - obstacle.x;
             const sy = start.y - obstacle.y;
             const sz = start.z - obstacle.z;
@@ -3503,14 +4298,6 @@ export class GameSession {
         return distance <= (LOCATIONS[locationId].dockRadius ?? 55) ? locationId : undefined;
     }
     dockAt(locationId) {
-        // Captured on departure: any surrendered bounty pilot still around is
-        // claimed when the player docks, so a surrender never denies the payoff
-        // (ships despawn past ~950u, so everything still listed is nearby or
-        // an active warrant target).
-        for (const ship of this.ships) {
-            if (ship.surrendered && !ship.claimed && ship.hull > 0 && (ship.bountyValue > 0 || ship.missionId))
-                this.claimSurrendered(ship);
-        }
         this.autopilot = false;
         this.afterburning = false;
         this.save.player.dockedAt = locationId;
@@ -3574,6 +4361,7 @@ export class GameSession {
             this.clearTarget();
         if (this.save.player.navTargetId === locationId)
             this.save.player.navTargetId = 'shardbelt';
+        this.resetPlayerInterpolation(true);
         this.renderer.setCockpitVisible(true);
         this.audio.setStationMode(false);
         this.ui.hideDock();
@@ -3699,6 +4487,7 @@ export class GameSession {
             this.ui.showToast('Cargo mass exceeds this hull capacity.', 'warning');
             return;
         }
+        this.ui.setCockpitShip(shipId);
         const stats = getEffectiveShipStats(this.save.player);
         this.save.player.shield = stats.shield;
         this.save.player.armor = stats.armor;
@@ -3777,11 +4566,11 @@ export class GameSession {
         if (useTilt) {
             void this.input.enableTilt().then((active) => {
                 if (active) {
-                    this.input.calibrateTilt();
+                    const neutral = this.input.calibrateTilt();
                     // Persist the neutral alongside the mode (mirroring
                     // enableTilt) so a reload keeps tilt instead of falling
                     // back to the stick with no saved neutral.
-                    this.save.settings.tiltNeutral = { beta: this.input.tiltNeutralBeta, gamma: this.input.tiltNeutralGamma };
+                    this.save.settings.tiltNeutral = neutral;
                 }
                 // If permission was refused (or there is no gyro), fall back to
                 // the stick and keep the persisted setting honest instead of
@@ -3802,11 +4591,10 @@ export class GameSession {
     }
     enableTilt() {
         return this.input.enableTilt().then((active) => {
-            if (active)
-                this.input.calibrateTilt();
+            const neutral = active ? this.input.calibrateTilt() : undefined;
             this.save.settings.steering = this.input.tiltActive ? 'tilt' : 'stick';
             if (active)
-                this.save.settings.tiltNeutral = { beta: this.input.tiltNeutralBeta, gamma: this.input.tiltNeutralGamma };
+                this.save.settings.tiltNeutral = neutral;
             this.ui.setTouchSteering(this.input.tiltActive ? 'tilt' : 'stick');
             saveGame(this.save);
             return this.input.tiltActive;
@@ -3902,11 +4690,23 @@ export class GameSession {
                 const targetForward = FORWARD.clone().applyQuaternion(quat(ship.rotation));
                 const targetLocal = targetForward.clone().applyQuaternion(quat(this.save.player.rotation).invert());
                 const heading = Math.atan2(targetLocal.x, -targetLocal.z);
+                const claimable = ship.surrendered && !ship.claimed && !ship.captured && ship.hull > 0 && (ship.bountyValue > 0 || ship.missionId);
+                const captureAvailable = claimable && distance <= stats.scanRange;
+                const surrenderReadout = ship.captured
+                    ? 'CAPTURED · HULL DRIFTING'
+                    : claimable
+                        ? captureAvailable
+                            ? 'SURRENDERED · CLAIM READY'
+                            : 'SURRENDERED · APPROACH TO CLAIM'
+                        : 'SURRENDERED · NO CLAIM';
                 hudTarget = {
                     kind: 'ship',
                     name: ship.name,
                     hostile: ship.hostile,
                     surrendered: ship.surrendered,
+                    captured: ship.captured,
+                    captureClaimable: Boolean(claimable),
+                    captureAvailable,
                     variant: shipVariantForRole(ship.role),
                     heading,
                     subtitle: `${ship.role.toUpperCase()} · ${ship.surrendered ? 'SURRENDERED' : ship.hostile ? 'HOSTILE' : FACTION_LABEL(ship.faction)}`,
@@ -3914,9 +4714,13 @@ export class GameSession {
                     // locked target's habits are visible at a glance — prefixed
                     // with the recognition marker when the pilot remembers the
                     // player (spared or escaped).
-                    readout: ship.scanned
+                    readout: ship.captured || ship.surrendered
+                        ? surrenderReadout
+                        : ship.scanned
                         ? (ship.pilot ? `${ship.recognizesPlayer ? `${SPARED_MARK} ` : ''}${TIER_LABELS[ship.pilot.tier] ?? ship.pilot.tier} · ${TEMPERAMENT_LABELS[ship.pilot.temperament] ?? ship.pilot.temperament}` : undefined)
-                        : 'UNRESOLVED CONTACT',
+                        : distance > stats.scanRange
+                            ? `OUT OF SCAN RANGE · ${Math.round(distance)}/${stats.scanRange} km`
+                            : 'SCANNING…',
                     distance,
                     shield: ship.shield,
                     maxShield: ship.maxShield,
@@ -3929,8 +4733,9 @@ export class GameSession {
             }
             else if (target.kind === 'asteroid') {
                 const node = this.asteroids.find((entry) => entry.id === target.id);
+                const grade = node.richness > 1.8 ? 'RICH' : node.richness > 1.2 ? 'VIABLE' : 'LEAN';
                 const scanStatus = node.scanned
-                    ? `ORE ${node.richness.toFixed(2)} · ${Math.ceil(node.remaining)} units`
+                    ? `${grade} ORE · ${Math.ceil(node.remaining)} LEFT`
                     : distance > stats.scanRange
                         ? `OUT OF SCAN RANGE · ${Math.round(distance)}/${stats.scanRange} km`
                         : 'SCANNING…';
@@ -3938,8 +4743,9 @@ export class GameSession {
             }
             else if (target.kind === 'wreck') {
                 const node = this.wreckNodes.find((entry) => entry.id === target.id);
+                const commodity = SCAN_COMMODITY_LABELS[node.salvage] ?? COMMODITIES[node.salvage].name.toUpperCase();
                 const scanStatus = node.scanned
-                    ? `HAZARD ${Math.round(node.hazard * 100)} · ${Math.ceil(node.remaining)} recoveries`
+                    ? `${node.rarity.toUpperCase()} ${commodity} · HAZ ${Math.round(node.hazard * 100)} · ${Math.ceil(node.remaining)} LEFT`
                     : distance > stats.scanRange
                         ? `OUT OF SCAN RANGE · ${Math.round(distance)}/${stats.scanRange} km`
                         : 'SCANNING…';
@@ -3983,6 +4789,7 @@ export class GameSession {
             credits: this.save.player.credits,
             mode: this.save.player.mode,
             shipName: SHIPS[this.save.player.shipId].name,
+            shipId: this.save.player.shipId,
             playerVariant: playerShipVariant(this.save.player.shipId),
             navName: nav.shortName,
             navDistance: player.distanceTo(vec(nav.position)),
@@ -4102,7 +4909,7 @@ export class GameSession {
         if (zone === 'asteroid-field')
             return 'SHARDBELT / COLLISION HAZARD';
         if (zone === 'graveyard')
-            return 'MOURNING LINE / RADIATION';
+            return `MOURNING LINE / ${graveyardZoneLabel(graveyardZoneAt(this.save.player.position))}`;
         if (zone === 'near-location')
             return 'CONTROLLED APPROACH';
         return 'OPEN SPACE';

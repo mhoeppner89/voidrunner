@@ -338,7 +338,9 @@ export const LOCATIONS = {
         name: 'Mourning Line',
         shortName: 'GRAVEYARD',
         kind: 'graveyard',
-        position: [-180000, -20000, 220000],
+        // Keep the wreck fleet in Helix's far viewing distance, on the
+        // sunward side: roughly 20,000 world units from the station.
+        position: [-149994, 21496, 142758],
         radius: 2580,
         faction: 'salvage-union',
         accent: '#a2b9b0',
@@ -346,6 +348,10 @@ export const LOCATIONS = {
         description: 'A battlefield graveyard of shattered hulls, unstable reactors, and salvage claims with flexible ownership.',
     },
 };
+// The visible star is placed on the far star shell rather than at world
+// origin. Navigation-map projections use the same anchor so sunward routes
+// are not judged against the wrong point.
+export const SUN_POSITION = [-360000, 144000, 800000];
 export const DOCK_LOCATION_IDS = ['helix', 'rook', 'vesper', 'azure'];
 export const NAV_LOCATION_IDS = ['helix', 'rook', 'vesper', 'azure', 'shardbelt', 'mourning-line'];
 export const EQUIPMENT = {
@@ -566,9 +572,12 @@ export const LOCATION_ORDER = ['helix', 'rook', 'azure', 'shardbelt', 'vesper', 
 export const SYSTEM_MAP_EXTENT = 256000;
 export const ROUTE_DISTANCE_SCALE = 480;
 export const displaySpeed = (unitsPerSecond) => unitsPerSecond * 2;
+const FIELD_ENTRY_MARGIN = 250;
 export const hyperdriveArrivalRadius = (location) => {
     if (location.kind === 'field' || location.kind === 'graveyard')
-        return location.radius * 0.62;
+        // Field destinations are navigationally centred on the cloud, but the
+        // player should regain control just beyond its visible/collidable edge.
+        return location.radius + FIELD_ENTRY_MARGIN;
     // Planets are huge now: exit hyperdrive at a distance proportional to the surface.
     if (location.kind === 'planet')
         return location.radius * 1.12;
@@ -577,7 +586,7 @@ export const hyperdriveArrivalRadius = (location) => {
 export const spawnClearance = (location) => {
     // Ships must spawn well clear of the body and its landing zone.
     if (location.kind === 'field' || location.kind === 'graveyard')
-        return location.radius + 250;
+        return location.radius + FIELD_ENTRY_MARGIN;
     return (location.dockRadius ?? location.radius) + 120;
 };
 // Per-destination chance that a hyperdrive jump draws an encounter. Safe sectors
