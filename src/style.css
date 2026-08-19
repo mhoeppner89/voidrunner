@@ -3370,12 +3370,12 @@ button.primary,
   border-top: 4px solid var(--dock-accent);
   background:
     linear-gradient(180deg, rgba(6, 14, 12, 0.98), rgba(2, 7, 6, 0.96)),
-    url("../art/locations/v3/helix.png") 72% 56% / 190% auto no-repeat;
+    url("../art/locations/v3/helix-hd-v1.png") 72% 56% / 190% auto no-repeat;
 }
 
-.dock-screen[data-location="rook"] .bar-dialogue { background-image: linear-gradient(180deg, rgba(6,14,16,.9), rgba(2,7,8,.86)), url("../art/locations/v3/rook.png"); }
+.dock-screen[data-location="rook"] .bar-dialogue { background-image: linear-gradient(180deg, rgba(6,14,16,.9), rgba(2,7,8,.86)), url("../art/locations/v3/rook-hd-v1.png"); }
 .dock-screen[data-location="vesper"] .bar-dialogue { background-image: linear-gradient(180deg, rgba(15,9,7,.88), rgba(6,4,3,.82)), url("../art/locations/v3/vesper.png"); }
-.dock-screen[data-location="azure"] .bar-dialogue { background-image: linear-gradient(180deg, rgba(5,15,14,.88), rgba(2,7,7,.82)), url("../art/locations/v3/azure.png"); }
+.dock-screen[data-location="azure"] .bar-dialogue { background-image: linear-gradient(180deg, rgba(5,15,14,.88), rgba(2,7,7,.82)), url("../art/locations/v3/azure-hd-v1.png"); }
 
 .market-table,
 .market-row,
@@ -6654,9 +6654,9 @@ button.primary,
   .arena-grid { grid-template-columns: 1fr; }
 }
 
-/* Vesper concourse ship overlay. GameUI calculates these anchors from the
-   rendered background image, keeping the sprite over the same pad location as
-   the viewport changes. */
+/* Concourse ship overlay. GameUI calculates these anchors from the rendered
+   background image, keeping the sprite over the same pad location as the
+   viewport changes at every dock. */
 .dock-screen[data-tab="concourse"] .concourse-hover-preview {
   position: absolute;
   inset: 0;

@@ -72,6 +72,9 @@ const HYPERDRIVE_DISPLAY_SPEED = 1000;
 const HYPERDRIVE_SPOOL_SECONDS = 2;
 const HYPERDRIVE_FX_DURATION = 0.9;
 const HYPERDRIVE_INTERRUPT_DURATION = 1.1;
+// Give the player a short calm window after an intercept is resolved so a long
+// route cannot immediately roll into another hyperdrive ambush.
+const HYPERDRIVE_ENCOUNTER_COOLDOWN = 45;
 const ENCOUNTER_LOCK_RADIUS = 8000;
 const AUTO_DOCK_SPEED = 8;
 const DOCK_SAFE_RADIUS = 320;
@@ -461,6 +464,8 @@ export class GameSession {
     jumpCounter = 0;
     interceptCounter = 0;
     hyperdriveEncounterAt = null;
+    hyperdriveEncounterCooldownUntil = 0;
+    hyperdriveInterceptIds = new Set();
     hyperdriveFx = 'none';
     hyperdriveSpoolStartedAt = 0;
     hyperdriveFxUntil = 0;
@@ -654,6 +659,8 @@ export class GameSession {
         this.afterburning = false;
         this.hyperdriveFx = 'none';
         this.hyperdriveEncounterAt = null;
+        this.hyperdriveEncounterCooldownUntil = 0;
+        this.hyperdriveInterceptIds.clear();
         this.deathTimer = 0;
         this.renderer.setCockpitVisible(true);
         this.audio.setStationMode(false);
@@ -1971,6 +1978,9 @@ export class GameSession {
     // (toast hints on press) and the HUD model (identity-card ready glow), so
     // the button light and the press feedback can never drift apart.
     hyperdriveBlockReason() {
+        const cooldown = this.hyperdriveCooldownRemaining();
+        if (cooldown > 0)
+            return { message: `Hyperdrive cooling down after intercept: ${Math.ceil(cooldown)}s remaining.`, kind: 'warning', duration: 3200 };
         const player = vec(this.save.player.position);
         if (this.hostilesNear(player, HYPERDRIVE_THREAT_RADIUS))
             return { message: 'Hyperdrive unavailable while an enemy is close.', kind: 'danger' };
@@ -2020,9 +2030,18 @@ export class GameSession {
             const offset = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.5, rng() - 0.5).normalize().multiplyScalar(140 + rng() * 160);
             const pirate = this.spawnShip(index === 0 ? 'pirate' : 'escort', tuple(player.clone().add(offset)));
             pirate.targetId = 'player';
+            this.hyperdriveInterceptIds.add(pirate.id);
         }
         this.threatAcquireTarget();
         this.audio.play('warning');
+    }
+    resolveHyperdriveIntercept(ship) {
+        if (!this.hyperdriveInterceptIds.delete(ship.id) || this.hyperdriveInterceptIds.size > 0)
+            return;
+        this.hyperdriveEncounterCooldownUntil = this.save.world.time + HYPERDRIVE_ENCOUNTER_COOLDOWN;
+    }
+    hyperdriveCooldownRemaining() {
+        return Math.max(0, this.hyperdriveEncounterCooldownUntil - this.save.world.time);
     }
     snapToCombatSpeed() {
         const velocity = vec(this.save.player.velocity);
@@ -2977,6 +2996,7 @@ export class GameSession {
         ship.hostile = false;
         ship.fleeing = false;
         ship.targetId = undefined;
+        this.resolveHyperdriveIntercept(ship);
         const weights = SURRENDER_WEIGHTS[ship.pilot?.temperament] ?? SURRENDER_WEIGHTS.steady;
         const entries = Object.entries(weights);
         const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
@@ -3068,6 +3088,7 @@ export class GameSession {
     }
     destroyShip(ship, attackerId, position) {
         ship.hull = 0;
+        this.resolveHyperdriveIntercept(ship);
         this.renderer.spawnExplosion(ship.position, ship.hostile, ship.role === 'trader' ? 1.5 : 1);
         this.audio.play('explosion', 1.1);
         if (ship.hostile && attackerId === 'player') {
@@ -4795,6 +4816,7 @@ export class GameSession {
             navDistance: player.distanceTo(vec(nav.position)),
             autopilot: this.autopilot,
             hyperdrive: this.hyperdriveFxState(),
+            hyperdriveCooldown: this.hyperdriveCooldownRemaining(),
             hyperdriveReady: !this.autopilot && !this.hyperdriveBlockReason(),
             loadPercent: Math.round((cargoMass(this.save.player) / Math.max(1, cargoCapacity(this.save.player))) * 100),
             // Handling reflects the cargo-load penalty on turn/acceleration.
@@ -4861,13 +4883,18 @@ export class GameSession {
         }
         contacts.sort((a, b) => Number(b.hostile) - Number(a.hostile) || prioritize(a, b));
         const nearestThreat = contacts.find((contact) => contact.hostile && contact.distance <= HYPERDRIVE_THREAT_RADIUS);
+        const hyperdriveCooldown = this.hyperdriveCooldownRemaining();
         return {
             playerPosition: [...this.save.player.position],
             navTargetId: this.save.player.navTargetId,
             currentTargetId: this.save.player.currentTargetId,
             contacts,
-            autopilotAvailable: !nearestThreat,
-            threatLabel: nearestThreat ? `${nearestThreat.name} at ${Math.round(nearestThreat.distance)} units` : undefined,
+            autopilotAvailable: !nearestThreat && hyperdriveCooldown <= 0,
+            threatLabel: nearestThreat
+                ? `${nearestThreat.name} at ${Math.round(nearestThreat.distance)} units`
+                : hyperdriveCooldown > 0
+                    ? `intercept cooldown (${Math.ceil(hyperdriveCooldown)}s)`
+                    : undefined,
         };
     }
     radarContacts() {
