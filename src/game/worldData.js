@@ -14,6 +14,15 @@ const sphericalOffset = (rng, radius, inner = 0) => {
 };
 const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const clamp01 = (value) => Math.max(0, Math.min(1, value));
+// Depletion overlays a worked-out amount but must NOT re-order the rng stream:
+// a field's layout (positions and per-node rolls) has to stay byte-identical
+// whether or not a rock/wreck has been tapped. Always roll, then override with
+// the depleted figure when present. This keeps mining-claim positions stable
+// across saves and after any rock has been mined.
+const depletedOrRoll = (rng, depleted, id, low, high) => {
+    const roll = randomBetween(rng, low, high);
+    return Math.max(0, depleted[id] ?? roll);
+};
 // Base half-extents of each graveyard debris geometry, before the per-piece
 // scale. These must mirror createGraveyard's geometryFor so the collision box
 // is exactly the shape the player sees (the 0.06-thick panels especially — a
@@ -155,7 +164,7 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
         const radial = ringRadius + randomBetween(rng, -30, 36);
         const local = [Math.cos(angle) * radial, Math.sin(angle) * radial * 0.78, randomBetween(rng, -78, 78)];
         const id = `rock-crown-${index}`;
-        const remaining = Math.max(0, depleted[id] ?? randomBetween(rng, 3.4, 7.8));
+        const remaining = depletedOrRoll(rng, depleted, id, 3.4, 7.8);
         nodes.push({
             id,
             position: add(center, local),
@@ -176,7 +185,7 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
     for (let index = 0; index < 18; index += 1) {
         const offset = sphericalOffset(rng, 1860, 900);
         const id = `asteroid-monolith-${index}`;
-        const remaining = Math.max(0, depleted[id] ?? randomBetween(rng, 4, 8));
+        const remaining = depletedOrRoll(rng, depleted, id, 4, 8);
         nodes.push({
             id,
             position: add(center, offset),
@@ -199,7 +208,7 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
         if (Math.hypot(offset[0], offset[1]) < 246 && Math.abs(offset[2]) < 990)
             offset = [offset[0] + 405, offset[1], offset[2]];
         const id = `asteroid-static-${index}`;
-        const remaining = Math.max(0, depleted[id] ?? randomBetween(rng, 1.2, 5.4));
+        const remaining = depletedOrRoll(rng, depleted, id, 1.2, 5.4);
         nodes.push({
             id,
             position: add(center, offset),
@@ -221,7 +230,7 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
         const speed = randomBetween(rng, 0.25, 1.75);
         const theta = rng() * Math.PI * 2;
         const id = `asteroid-drift-${index}`;
-        const remaining = Math.max(0, depleted[id] ?? randomBetween(rng, 0.4, 1.8));
+        const remaining = depletedOrRoll(rng, depleted, id, 0.4, 1.8);
         nodes.push({
             id,
             position: add(center, offset),
@@ -603,7 +612,7 @@ export const generateWreckNodes = (seed, depleted, scanned = []) => {
                 position: add(center, local),
                 radius: randomBetween(rng, 4, 12),
                 salvage,
-                remaining: Math.max(0, depleted[id] ?? randomBetween(rng, 0.9, 4.2)),
+                remaining: depletedOrRoll(rng, depleted, id, 0.9, 4.2),
                 scanned: scanned.includes(id),
                 zone: site.zone,
                 route: site.route,

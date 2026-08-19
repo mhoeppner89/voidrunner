@@ -120,10 +120,14 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
                     quantity,
                     claimNodeId: claim.id,
                     claimName,
+                    claimPosition: [...claim.position],
                     mined: 0,
                     reward: miningReward(quantity, save.player.guildRank.mining),
                     deposit: 0,
-                    deadline: Infinity,
+                    // null = no deadline. Never Infinity: JSON.stringify turns
+                    // Infinity into null on autosave, which used to read as
+                    // "already expired" and fail the contract on the next load.
+                    deadline: null,
                     status: 'offered',
                     guild: 'mining',
                     guildRep: 6 + Math.floor(quantity / 3) + (save.player.guildRank.mining >= 1 ? 1 : 0),
@@ -310,7 +314,9 @@ export const completeBountyMission = (save, missionId) => {
 export const failExpiredMissions = (save) => {
     const messages = [];
     for (const mission of [...save.activeMissions]) {
-        if (save.world.time <= mission.deadline)
+        // A null deadline is a no-deadline contract (mining claims): it never
+        // expires. Legacy saves may also carry null from an Infinity round-trip.
+        if (mission.deadline == null || save.world.time <= mission.deadline)
             continue;
         mission.status = 'failed';
         save.world.failedMissionIds.push(mission.id);

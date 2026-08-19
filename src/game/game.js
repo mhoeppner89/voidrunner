@@ -22,10 +22,14 @@ const FALLBACK_AI_RNG = () => 0.5;
 // rank, and the valuable-load callouts) — remembered in pilotLineHistory.said.
 const PILOT_ONESHOT_KEYS = new Set(['contact', 'rank', 'case', 'cargo']);
 const PLAYER_RADIUS = 1.25;
-// NPCs use a slightly roomier single-radius hull than the player: enough for a
-// freighter's bulk without per-hull collision math, and it keeps the field pass
-// cheap. Debris boxes still resolve against their exact oriented surface.
+// Fallback NPC collision radius for hulls without an explicit entry in
+// HULL_FLIGHT_STATS. Debris boxes still resolve against their exact oriented
+// surface, but the ship-side envelope is now per-hull so a freighter bumps at
+// its corners and an interceptor slips through gaps the barge cannot.
 const NPC_SHIP_RADIUS = 1.8;
+// A ship below this hull ratio is "badly damaged" and, after clipping a rock,
+// re-rolls toward clear open space instead of straight back into the field.
+const NPC_BADLY_DAMAGED_HULL_RATIO = 0.6;
 // Combat-sim field starts sit inside the cloud, but keep a generous bubble
 // around the player so the first frame is a calm staging view rather than an
 // immediate collision check. The candidate offsets make this robust to a
@@ -94,6 +98,16 @@ const SALVAGE_AMBUSH_ESCORT_MAX_WORTH = 1400;
 const GOLD_POCKET_CHANCE = 0.08;
 const GOLD_POCKET_MIN = 1;
 const GOLD_POCKET_MAX = 3;
+// A staked claim occasionally draws a rival prospector who contests the rock
+// mid-cut. Seeded per claim node, so the same seam disputes the same way every
+// career, and it fires at most once per claim.
+const CLAIM_DISPUTE_CHANCE = 0.35;
+const CLAIM_DISPUTE_LINES = [
+    'That seam is under my crew\'s claim. Cut it any deeper and you will answer for it.',
+    'You are on registered ground, spacer. My board holds the papers on this rock.',
+    'Walk away from that cut and this stays civil.',
+    'That is my ore you are beaming. Step off or get spaced.',
+];
 // Selling gold marks the player (see economy.js GOLD_HEAT_SECONDS). While the
 // heat is fresh, the Shardbelt's ambient encounter windows shift so pirate
 // intercepts roughly double — but from a low base, because mining is meant to
@@ -105,17 +119,18 @@ const GOLD_HEAT_TRADER_CUTOFF = 0.58;
 const GOLD_HEAT_PATROL_CUTOFF = 0.80;
 const ASTEROID_PATROL_CUTOFF = 0.90;
 // Most pirate encounters open with a standoff ("mugging") instead of gunfire:
-// the lead hails and demands a share of the most valuable cargo — or a credit
-// toll if the hold is empty — with a short window to comply. Compliance means
-// the group takes its cut and breaks off; firing or letting the clock expire
-// commits them to the fight. Gold-heat intercepts reuse the same machinery
-// with a syndicate-tipped demand for every gram of gold aboard.
+// the lead hails and demands a share of the most valuable cargo — or, when the
+// hold is empty, a toll priced off the ship and its outfit (never the pilot's
+// wallet) — with a short window to comply. Compliance means the group takes its
+// cut and breaks off; firing or letting the clock expire commits them to the
+// fight. Gold-heat intercepts reuse the same machinery with a syndicate-tipped
+// demand for every gram of gold aboard.
 const MUG_CHANCE = 0.7;
 const MUG_STANDOFF_SECONDS = 9;
 const MUG_CARGO_SHARE = 0.5;
 const MUG_TOLL_MIN = 120;
 const MUG_TOLL_MAX = 600;
-const MUG_TOLL_SHARE = 0.12;
+const MUG_TOLL_SHARE = 0.06;
 // How big a cut a mugger wants, by temperament: timid pirates settle for a
 // light toll, aggressive ones try to take the hold's cream. Steady sits on
 // the MUG_CARGO_SHARE baseline.
@@ -172,6 +187,9 @@ const HYPERDRIVE_ALIGNMENT = 0.88;
 const MAP_CONTACT_RANGE = 720;
 const MAP_RESOURCE_CONTACT_RANGE = 300;
 const MAP_RESOURCE_CONTACT_LIMIT = 48;
+// Staked claims surface on the nav map at an extended "from orbit" range so the
+// pilot can find their rock without scanning half the field first.
+const MAP_CLAIM_CONTACT_RANGE = 1000;
 const MAP_WRECK_CONTACT_RANGE = 600;
 const MAP_WRECK_CONTACT_LIMIT = 48;
 const TARGET_TAP_DRIFT = 14;
@@ -244,12 +262,12 @@ const MINER_GOLD_DROP_CHANCE = 0.12;
 // not just what it looks like. Light interceptors turn on a dime; freighters
 // wallow through their turns.
 const HULL_FLIGHT_STATS = {
-    kestrel: { speed: 40, afterburnSpeed: 60, turnRate: 1.5 }, // escort — light interceptor
-    talon: { speed: 38, afterburnSpeed: 57, turnRate: 1.35 }, // pirate — baseline fighter
-    lancer: { speed: 43, afterburnSpeed: 64, turnRate: 1.25 }, // bounty — gunship: fast, slower to turn
-    warden: { speed: 36, afterburnSpeed: 0, turnRate: 1.1 }, // patrol — medium
-    prospector: { speed: 24, afterburnSpeed: 0, turnRate: 0.9 }, // miner — agile industrial
-    'atlas-freighter': { speed: 27, afterburnSpeed: 0, turnRate: 0.55 }, // trader — ponderous
+    kestrel: { speed: 40, afterburnSpeed: 60, turnRate: 1.5, collisionRadius: 1.3 }, // escort — light interceptor
+    talon: { speed: 38, afterburnSpeed: 57, turnRate: 1.35, collisionRadius: 1.5 }, // pirate — baseline fighter
+    lancer: { speed: 43, afterburnSpeed: 64, turnRate: 1.25, collisionRadius: 2.0 }, // bounty — gunship: fast, slower to turn
+    warden: { speed: 36, afterburnSpeed: 0, turnRate: 1.1, collisionRadius: 1.9 }, // patrol — medium
+    prospector: { speed: 24, afterburnSpeed: 0, turnRate: 0.9, collisionRadius: 2.2 }, // miner — agile industrial
+    'atlas-freighter': { speed: 27, afterburnSpeed: 0, turnRate: 0.55, collisionRadius: 2.9 }, // trader — ponderous
 };
 const ATTACK_RESET_RANGE = 175;
 const ATTACK_SEPARATION = 22;
@@ -587,6 +605,9 @@ export class GameSession {
     lastHudUpdate = 0;
     deathTimer = 0;
     salvageAmbushTriggered = new Set();
+    claimDisputesTriggered = new Set();
+    npcCollisionCooldown = 0;
+    targetClipUntil = 0;
     fpsAccumulator = 0;
     obstacleGrid = null;
     obstacleSegmentGrid = null;
@@ -962,6 +983,7 @@ export class GameSession {
         this.missileCooldown -= dt;
         this.playerShieldDelay -= dt;
         this.collisionMessageCooldown -= dt;
+        this.npcCollisionCooldown -= dt;
         this.hintCooldown -= dt;
         this.scanCooldown -= dt;
         this.utilitySoundCooldown -= dt;
@@ -1119,16 +1141,12 @@ export class GameSession {
             lateral.multiplyScalar(Math.exp(-(this.save.settings.flightAssist ? 1.45 : 0.16) * dt));
             velocity.copy(forward).multiplyScalar(nextForwardSpeed).add(lateral);
         }
+        // Fuel is afterburner propellant and nothing else: normal flight and
+        // the hyperdrive cruise never touch it. Running dry only kills the burn.
         if (this.afterburning)
             this.save.player.fuel = Math.max(0, this.save.player.fuel - dt * 1.025);
-        else if (this.autopilot && targetSpeed > stats.afterburnSpeed)
-            this.save.player.fuel = Math.max(0, this.save.player.fuel - dt * 0.34);
-        else
-            this.save.player.fuel = Math.max(0, this.save.player.fuel - dt * (0.008 + this.save.player.throttle * 0.018));
-        if (this.save.player.fuel <= 0) {
-            targetSpeed = Math.min(targetSpeed, 8);
+        if (this.save.player.fuel <= 0)
             this.afterburning = false;
-        }
         let hyperdriveDropped = false;
         if (this.autopilot && this.hyperdriveFx !== 'spooling') {
             // Predictive drop: settle exactly on the arrival sphere this frame instead of
@@ -1663,6 +1681,20 @@ export class GameSession {
     activeMiningClaim(nodeId) {
         return this.save.activeMissions.find((mission) => mission.kind === 'mining' && mission.claimNodeId === nodeId);
     }
+    activeMiningClaims() {
+        return this.save.activeMissions.filter((mission) => mission.kind === 'mining' && mission.claimNodeId);
+    }
+    claimNodePosition(nodeId) {
+        const live = this.asteroids.find((node) => node.id === nodeId);
+        if (live)
+            return live.position;
+        const mission = this.activeMiningClaim(nodeId);
+        if (mission?.claimPosition)
+            return mission.claimPosition;
+        // Legacy claim without a stored position: derive it from the seeded field.
+        const node = generateAsteroidField(this.save.world.seed, this.save.world.depletedAsteroids, this.save.world.scannedNodes).find((entry) => entry.id === nodeId);
+        return node?.position;
+    }
     recordClaimMining(nodeId, amount) {
         // Ore cut from a staked rock advances that contract's manifest. This is
         // the only way a claim completes — bought ore never moves the needle.
@@ -1677,6 +1709,36 @@ export class GameSession {
         }
         if (fulfilled)
             this.ui.pushEvent(`Claim met: ${fulfilled.claimName ?? fulfilled.claimNodeId} is dry. Return the ore to ${LOCATIONS[fulfilled.destination].name}.`, 'success', 6200);
+        if (this.activeMiningClaim(nodeId))
+            this.triggerClaimDispute(nodeId);
+    }
+    triggerClaimDispute(nodeId) {
+        // A staked rock occasionally draws a rival prospector who contests the
+        // seam mid-cut. Seeded per node and gated to fire once per claim, so the
+        // same rock disputes the same way every career.
+        if (this.claimDisputesTriggered.has(nodeId))
+            return;
+        const rng = seededRandom(`${this.save.world.seed}:claim-dispute:${nodeId}`);
+        if (rng() > CLAIM_DISPUTE_CHANCE)
+            return;
+        this.claimDisputesTriggered.add(nodeId);
+        const mission = this.activeMiningClaim(nodeId);
+        const node = this.asteroids.find((entry) => entry.id === nodeId);
+        const spawnPosition = node ? this.claimDisputePosition(node, rng) : this.encounterPosition(rng, 150);
+        const rival = this.spawnShip('miner', spawnPosition);
+        rival.hostile = true;
+        rival.targetId = 'player';
+        rival.bountyValue = 0;
+        this.sayPilotLine(rival, CLAIM_DISPUTE_LINES[Math.floor(rng() * CLAIM_DISPUTE_LINES.length)]);
+        this.ui.pushEvent(`Claim dispute: a rival prospector contests ${mission?.claimName ?? 'your staked rock'}.`, 'warning', 5600);
+        this.audio.play('warning');
+        this.threatAcquireTarget();
+    }
+    claimDisputePosition(node, rng) {
+        // Spawn the rival just outside the rock's collision envelope so they
+        // arrive beside the seam instead of materializing inside it.
+        const direction = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.4, rng() - 0.5).normalize();
+        return tuple(vec(node.position).addScaledVector(direction, asteroidCollisionRadius(node) + 90));
     }
     recoverWreckEquipment(node) {
         const rng = seededRandom(`${this.save.world.seed}:wreck-equipment:${node.id}`);
@@ -2071,6 +2133,18 @@ export class GameSession {
                 this.save.player.mode = 'mining';
                 target = { kind, id, position: node.position, name: node.tunnelPart ? 'Rock Crown Deposit' : 'Asteroid Deposit' };
             }
+            else {
+                // Out of sensor range or not in the field yet: the claim lives in
+                // the Shardbelt, so lock a jump vector to the field. Once there,
+                // the claim marker re-resolves to the actual rock.
+                const claim = this.activeMiningClaim(id);
+                if (claim) {
+                    this.save.player.navTargetId = 'shardbelt';
+                    this.autopilot = false;
+                    this.ui.pushSensor(`NAV set: The Shardbelt — ${claim.claimName ?? 'claim'} vector locked.`, 'info');
+                    target = { kind: 'location', id: 'shardbelt', position: LOCATIONS.shardbelt.position, name: LOCATIONS.shardbelt.name };
+                }
+            }
         }
         else {
             const node = this.wreckNodes.find((entry) => entry.id === id && entry.remaining > 0);
@@ -2094,6 +2168,8 @@ export class GameSession {
         // over the new target for its full display window.
         this.monitorStatus = '';
         this.monitorStatusUntil = 0;
+        // A fresh lock also clears a lingering clip-flash from the previous hull.
+        this.targetClipUntil = 0;
         this.renderer.setTarget(target.kind === 'ship' ? target.id : undefined, target.kind === 'asteroid' ? target.id : undefined, target.kind === 'wreck' ? target.id : undefined, target.kind === 'location' ? target.id : undefined);
         // No selection pop-up: the target monitor already shows the lock, and
         // the distance readout lives in its heading (below the label row).
@@ -2215,12 +2291,25 @@ export class GameSession {
         const player = vec(this.save.player.position);
         const rng = seededRandom(`${this.save.world.seed}:intercept:${++this.interceptCounter}`);
         const count = rng() < 0.35 ? 2 : 1;
+        const escorts = [];
+        let lead;
         for (let index = 0; index < count; index += 1) {
             const offset = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.5, rng() - 0.5).normalize().multiplyScalar(140 + rng() * 160);
             const pirate = this.spawnShip(index === 0 ? 'pirate' : 'escort', tuple(player.clone().add(offset)));
             pirate.targetId = 'player';
             this.hyperdriveInterceptIds.add(pirate.id);
+            if (index === 0)
+                lead = pirate;
+            else
+                escorts.push(pirate);
         }
+        // A jump ambush opens with the same standoff as ambient pirate traffic:
+        // the crew wants cargo (or a hull-and-outfit toll), not necessarily a
+        // wreck. The killer minority still jumps straight to weapons-free.
+        if (lead && rng() < MUG_CHANCE)
+            this.openMug(lead, escorts);
+        else
+            this.ui.pushSensor('Pirate intercept. Weapons free.', 'danger', 4800);
         this.threatAcquireTarget();
         this.audio.play('warning');
     }
@@ -2958,17 +3047,26 @@ export class GameSession {
         const orientation = this.tmpQ.set(ship.rotation[0], ship.rotation[1], ship.rotation[2], ship.rotation[3]);
         let destination = ship.destination ? this.tmpD.set(ship.destination[0], ship.destination[1], ship.destination[2]) : undefined;
         if (!destination || position.distanceTo(destination) < 30) {
-            const rng = seededRandom(`${this.save.world.seed}:route:${ship.id}:${Math.floor(ship.lifetime / 20)}`);
-            if (ship.role === 'miner') {
-                destination = this.tmpD.set(LOCATIONS.shardbelt.position[0] + randomBetween(rng, -110, 110), LOCATIONS.shardbelt.position[1] + randomBetween(rng, -55, 55), LOCATIONS.shardbelt.position[2] + randomBetween(rng, -110, 110));
-            }
-            else if (ship.role === 'patrol') {
-                const angle = rng() * Math.PI * 2;
-                destination = this.tmpD.set(LOCATIONS.rook.position[0] + Math.cos(angle) * 95, LOCATIONS.rook.position[1] + randomBetween(rng, -35, 35), LOCATIONS.rook.position[2] + Math.sin(angle) * 95);
+            if (ship.seekClearSpace) {
+                // A badly damaged ship limps toward open space before choosing
+                // its next route instead of re-rolling straight into clutter.
+                const clear = this.findClearSpace(ship);
+                destination = this.tmpD.set(clear[0], clear[1], clear[2]);
+                ship.seekClearSpace = false;
             }
             else {
-                const dock = pick(rng, DOCK_LOCATION_IDS);
-                destination = this.tmpD.set(LOCATIONS[dock].position[0] + randomBetween(rng, -30, 30), LOCATIONS[dock].position[1] + randomBetween(rng, -20, 20), LOCATIONS[dock].position[2] + randomBetween(rng, -30, 30));
+                const rng = seededRandom(`${this.save.world.seed}:route:${ship.id}:${Math.floor(ship.lifetime / 20)}`);
+                if (ship.role === 'miner') {
+                    destination = this.tmpD.set(LOCATIONS.shardbelt.position[0] + randomBetween(rng, -110, 110), LOCATIONS.shardbelt.position[1] + randomBetween(rng, -55, 55), LOCATIONS.shardbelt.position[2] + randomBetween(rng, -110, 110));
+                }
+                else if (ship.role === 'patrol') {
+                    const angle = rng() * Math.PI * 2;
+                    destination = this.tmpD.set(LOCATIONS.rook.position[0] + Math.cos(angle) * 95, LOCATIONS.rook.position[1] + randomBetween(rng, -35, 35), LOCATIONS.rook.position[2] + Math.sin(angle) * 95);
+                }
+                else {
+                    const dock = pick(rng, DOCK_LOCATION_IDS);
+                    destination = this.tmpD.set(LOCATIONS[dock].position[0] + randomBetween(rng, -30, 30), LOCATIONS[dock].position[1] + randomBetween(rng, -20, 20), LOCATIONS[dock].position[2] + randomBetween(rng, -30, 30));
+                }
             }
             ship.destination = tuple(destination);
         }
@@ -2999,6 +3097,7 @@ export class GameSession {
         // coarse but safe proxy for NPC steering.
         if (ship.captured || ship.poweredDown)
             return;
+        const shipRadius = HULL_FLIGHT_STATS[shipVariantForRole(ship.role)]?.collisionRadius ?? NPC_SHIP_RADIUS;
         const position = this.tmpA.set(ship.position[0], ship.position[1], ship.position[2]);
         const velocity = this.tmpB.set(ship.velocity[0], ship.velocity[1], ship.velocity[2]);
         const speed = velocity.length();
@@ -3022,7 +3121,7 @@ export class GameSession {
             const ox = position.x - x;
             const oy = position.y - y;
             const oz = position.z - z;
-            const minimum = radius + NPC_SHIP_RADIUS;
+            const minimum = radius + shipRadius;
             const distSq = ox * ox + oy * oy + oz * oz;
             if (distSq >= minimum * minimum || distSq < 0.0001)
                 return;
@@ -3044,9 +3143,9 @@ export class GameSession {
             const hx = box.hx;
             const hy = box.hy;
             const hz = box.hz;
-            const ex = hx + NPC_SHIP_RADIUS;
-            const ey = hy + NPC_SHIP_RADIUS;
-            const ez = hz + NPC_SHIP_RADIUS;
+            const ex = hx + shipRadius;
+            const ey = hy + shipRadius;
+            const ez = hz + shipRadius;
             if (this.tmpF.x < -ex || this.tmpF.x > ex || this.tmpF.y < -ey || this.tmpF.y > ey || this.tmpF.z < -ez || this.tmpF.z > ez)
                 return;
             const cx = clamp(this.tmpF.x, -hx, hx);
@@ -3062,12 +3161,12 @@ export class GameSession {
             let push;
             if (distSq > 1e-9) {
                 const dist = Math.sqrt(distSq);
-                if (dist >= NPC_SHIP_RADIUS)
+                if (dist >= shipRadius)
                     return;
                 nx = dx / dist;
                 ny = dy / dist;
                 nz = dz / dist;
-                push = NPC_SHIP_RADIUS - dist + 0.08;
+                push = shipRadius - dist + 0.08;
             }
             else {
                 const px = hx - Math.abs(this.tmpF.x);
@@ -3077,25 +3176,25 @@ export class GameSession {
                     nx = this.tmpF.x < 0 ? -1 : 1;
                     ny = 0;
                     nz = 0;
-                    push = px + NPC_SHIP_RADIUS + 0.08;
+                    push = px + shipRadius + 0.08;
                 }
                 else if (py <= pz) {
                     nx = 0;
                     ny = this.tmpF.y < 0 ? -1 : 1;
                     nz = 0;
-                    push = py + NPC_SHIP_RADIUS + 0.08;
+                    push = py + shipRadius + 0.08;
                 }
                 else {
                     nx = 0;
                     ny = 0;
                     nz = this.tmpF.z < 0 ? -1 : 1;
-                    push = pz + NPC_SHIP_RADIUS + 0.08;
+                    push = pz + shipRadius + 0.08;
                 }
             }
             this.tmpG.set(nx, ny, nz).applyQuaternion(this.tmpQ);
             resolveContact(this.tmpG, push);
         };
-        const margin = MAX_FIELD_OBSTACLE_RADIUS + NPC_SHIP_RADIUS;
+        const margin = MAX_FIELD_OBSTACLE_RADIUS + shipRadius;
         this.forEachObstacleInBox(position.x - margin, position.y - margin, position.z - margin, position.x + margin, position.y + margin, position.z + margin, (obstacle) => {
             if (obstacle.box)
                 collideBox(obstacle);
@@ -3106,8 +3205,45 @@ export class GameSession {
         tupleInto(ship.velocity, velocity);
         if (impactDamage > 0)
             this.damageShip(ship, impactDamage, 'environment', tuple(position));
-        if (clipped && impactDamage > 0.5)
+        if (clipped && impactDamage > 0.5) {
             ship.destination = undefined;
+            // A badly damaged ship flees toward open space instead of re-rolling
+            // straight back into the clutter it just bounced off.
+            ship.seekClearSpace = ship.maxHull > 0 && ship.hull / ship.maxHull < NPC_BADLY_DAMAGED_HULL_RATIO;
+            // If the player is watching this hull on the target monitor, flash
+            // its outline so the field damage is visible, not just audible.
+            if (this.save.player.currentTargetId === ship.id)
+                this.targetClipUntil = this.save.world.time + 1.4;
+            if (this.npcCollisionCooldown <= 0) {
+                this.npcCollisionCooldown = 2.5;
+                this.ui.pushEvent(`${ship.name} clipped ${this.activeInstanceId === 'mourning-line' ? 'wreckage' : 'a rock'}.`, 'warning', 3600);
+            }
+        }
+    }
+    findClearSpace(ship) {
+        // Search a fan of nearby points for the first pocket clear of field
+        // obstacles, so a badly damaged ship can limp out of the clutter before
+        // committing to its next route. Deterministic per ship/lifetime window.
+        const obstacles = this.activeFieldObstacles();
+        const origin = vec(ship.position, this.tmpP2);
+        const shipRadius = HULL_FLIGHT_STATS[shipVariantForRole(ship.role)]?.collisionRadius ?? NPC_SHIP_RADIUS;
+        const clearance = shipRadius + 24;
+        const rng = seededRandom(`${this.save.world.seed}:clearpath:${ship.id}:${Math.floor(ship.lifetime / 20)}`);
+        const base = rng() * Math.PI * 2;
+        if (!obstacles.length)
+            return tuple(this.tmpP3.set(origin.x + Math.cos(base) * 320, origin.y + 160, origin.z + Math.sin(base) * 320));
+        for (let ring = 0; ring < 4; ring += 1) {
+            const distance = 160 + ring * 110;
+            const rise = (ring % 2 === 0 ? 1 : -1) * (24 + ring * 40);
+            for (let k = 0; k < 8; k += 1) {
+                const angle = base + (k / 8) * Math.PI * 2;
+                this.tmpP3.set(origin.x + Math.cos(angle) * distance, origin.y + rise, origin.z + Math.sin(angle) * distance);
+                if (this.entryPositionClear(this.tmpP3, obstacles, clearance))
+                    return tuple(this.tmpP3);
+            }
+        }
+        // No pocket in range: climb above the field clutter.
+        return tuple(this.tmpP3.set(origin.x, origin.y + 260, origin.z));
     }
     fireNpcGun(ship, direction) {
         // Aim quality: the AI's nose already aims at the deflection point, so the
@@ -3409,9 +3545,10 @@ export class GameSession {
         return MUG_TEMPERAMENT_SHARE[temperament] ?? MUG_CARGO_SHARE;
     }
     // What a mugger demands: the most valuable line in the hold (a temperament
-    // share of it), or a credit toll when the hold is empty. Undefined when
-    // there is nothing worth taking — the pirates break off instead of fighting
-    // an empty ship.
+    // share of it), or — with an empty hold — a toll priced off the hull and its
+    // outfit rather than the pilot's wallet. A well-appointed ship draws a toll
+    // even when the pilot is flying broke. Undefined when there is nothing worth
+    // taking — the pirates break off instead of fighting a bare, empty ship.
     mugDemand(share = MUG_CARGO_SHARE) {
         const cargo = this.save.player.cargo ?? {};
         let best;
@@ -3426,10 +3563,22 @@ export class GameSession {
             const quantity = Math.max(1, Math.ceil(best.qty * share));
             return { kind: 'cargo', commodity: best.commodity, quantity };
         }
-        const credits = this.save.player.credits ?? 0;
-        if (credits >= MUG_TOLL_MIN)
-            return { kind: 'credits', amount: Math.min(MUG_TOLL_MAX, Math.max(MUG_TOLL_MIN, Math.round(credits * MUG_TOLL_SHARE))) };
+        // No cargo: price the ship and its installed modules. Player credits
+        // are deliberately ignored — the mugger wants what the hull is worth,
+        // not what happens to be in the pilot's account.
+        const assets = this.shipAssetValue();
+        if (assets > 0)
+            return { kind: 'credits', amount: clamp(Math.round(assets * MUG_TOLL_SHARE), MUG_TOLL_MIN, MUG_TOLL_MAX) };
         return undefined;
+    }
+    // The market value of the hull plus every module bolted to it — the only
+    // wealth a mugger can actually see from outside.
+    shipAssetValue() {
+        const ship = SHIPS[this.save.player.shipId];
+        let value = ship?.price ?? 0;
+        for (const id of (this.save.player.equipment ?? []))
+            value += EQUIPMENT[id]?.price ?? 0;
+        return value;
     }
     // Claim-jumpers demand the salvage the pilot has already pulled from the
     // wreck — never what is still aboard. Nothing extracted yet means there is
@@ -3474,6 +3623,7 @@ export class GameSession {
                 ship.standingDown = true;
                 ship.hostile = false;
                 ship.targetId = undefined;
+                this.resolveHyperdriveIntercept(ship);
             }
             const rng = seededRandom(`${this.save.world.seed}:mug-empty:${lead.id}:${Math.floor(this.save.world.time)}`);
             this.sayPilotLine(lead, MUG_EMPTY_LINES[Math.floor(rng() * MUG_EMPTY_LINES.length)]);
@@ -3496,6 +3646,9 @@ export class GameSession {
             ship.standingDown = true;
             ship.hostile = false;
             ship.targetId = undefined;
+            // A peaceful stand-down resolves a hyperdrive intercept too, so the
+            // post-intercept calm window still triggers after a paid-off mug.
+            this.resolveHyperdriveIntercept(ship);
         }
     }
     // A show of force: when the player lands a hit on a demanding pirate, the
@@ -4072,7 +4225,7 @@ export class GameSession {
         const capacity = cargoCapacity(player);
         if (capacity <= 0)
             return 1;
-        return 1 - 0.24 * clamp(cargoMass(player) / capacity, 0, 1);
+        return 1 - 0.10 * clamp(cargoMass(player) / capacity, 0, 1);
     }
     combatCalmFactor() {
         // Ramp from 0 right after a fight back to 1 over COMBAT_CALM_SECONDS.
@@ -5300,6 +5453,7 @@ export class GameSession {
                             ? `OUT OF RANGE · ${Math.round(distance)}/${stats.scanRange} km`
                             : 'SCANNING…',
                     distance,
+                    clipFlash: this.save.world.time < this.targetClipUntil,
                     shield: ship.shield,
                     maxShield: ship.maxShield,
                     armor: ship.armor,
@@ -5409,10 +5563,10 @@ export class GameSession {
         const shipRange = upgradedRadar ? MAP_CONTACT_RANGE * 1.45 : MAP_CONTACT_RANGE;
         const resourceRange = upgradedRadar ? MAP_RESOURCE_CONTACT_RANGE * 1.4 : MAP_RESOURCE_CONTACT_RANGE;
         const wreckRange = upgradedRadar ? MAP_WRECK_CONTACT_RANGE * 1.35 : MAP_WRECK_CONTACT_RANGE;
-        const buildContact = (kind, id, name, subtitle, position, range, hostile = false, scanned = false) => {
+        const buildContact = (kind, id, name, subtitle, position, range, hostile = false, scanned = false, force = false) => {
             const relative = vec(position).sub(player);
             const distance = relative.length();
-            if (distance > range)
+            if (!force && distance > range)
                 return undefined;
             relative.applyQuaternion(inverse);
             return {
@@ -5439,8 +5593,9 @@ export class GameSession {
                 contacts.push(contact);
         }
         if (this.activeInstanceId === 'shardbelt') {
+            const claimNodes = new Set(this.activeMiningClaims().map((mission) => mission.claimNodeId));
             const resources = this.asteroids
-                .filter((node) => node.remaining > 0)
+                .filter((node) => node.remaining > 0 && !claimNodes.has(node.id))
                 .map((node) => buildContact('asteroid', node.id, node.tunnelPart ? 'Rock Crown Deposit' : 'Asteroid Deposit', node.scanned ? 'ORE' : 'UNSCANNED MINERAL', node.position, resourceRange, false, node.scanned))
                 .filter((contact) => Boolean(contact))
                 .sort(prioritize)
@@ -5455,6 +5610,19 @@ export class GameSession {
                 .sort(prioritize)
                 .slice(0, MAP_WRECK_CONTACT_LIMIT);
             contacts.push(...wrecks);
+        }
+        // Staked claims always surface — even far beyond sensor range — so the
+        // pilot can see where the rock is and lock a hyperdrive jump to it.
+        for (const mission of this.activeMiningClaims()) {
+            const position = this.claimNodePosition(mission.claimNodeId);
+            if (!position)
+                continue;
+            const liveScanned = this.activeInstanceId === 'shardbelt' ? Boolean(this.asteroids.find((node) => node.id === mission.claimNodeId)?.scanned) : false;
+            const contact = buildContact('asteroid', mission.claimNodeId, `Claim: ${mission.claimName ?? mission.claimNodeId}`, `MINING CLAIM · ${mission.mined ?? 0}/${mission.quantity} MINED`, position, MAP_CLAIM_CONTACT_RANGE, false, liveScanned, true);
+            if (contact) {
+                contact.claim = true;
+                contacts.push(contact);
+            }
         }
         contacts.sort((a, b) => Number(b.hostile) - Number(a.hostile) || prioritize(a, b));
         const nearestThreat = contacts.find((contact) => contact.hostile && contact.distance <= HYPERDRIVE_THREAT_RADIUS);
@@ -5480,7 +5648,10 @@ export class GameSession {
             if (distance > range * 1.45)
                 return;
             const scale = Math.max(range, distance);
-            contacts.push({ x: clamp(relative.x / scale, -1, 1), y: clamp(relative.z / scale, -1, 1), type, selected, altitude: relative.y });
+            // Altitude is normalised to the same full-ring scale as the in-plane
+            // position, so the out-of-plane tick can grow with how far above or
+            // below the contact sits instead of being a fixed stub.
+            contacts.push({ x: clamp(relative.x / scale, -1, 1), y: clamp(relative.z / scale, -1, 1), type, selected, altitude: relative.y / range });
         };
         for (const ship of this.ships) {
             if (ship.hull <= 0)

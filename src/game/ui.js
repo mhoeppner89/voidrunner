@@ -46,7 +46,21 @@ export const callsignHandle = (callsign) => {
     const quoted = callsign.match(/“[^”]+”/);
     return quoted ? quoted[0].slice(1, -1) : callsign;
 };
-const GAME_VERSION = '0.4.7i';
+// Radar altitude tick geometry. The caller picks the direction sign (-1 = up
+// the screen, +1 = down), and the tick grows toward ~80% of the ring for a
+// full-range climb while being normalised to the room left before the rim so a
+// contact near the edge never spills off the readable disc. Returns undefined
+// when there is no room for a legible tick.
+export const radarAltitudeTick = ({ x, y, radius, ratio = 1, direction, magnitude, size = 3.2 }) => {
+    const gap = (size + 1.5) * ratio;
+    const startY = y + direction * gap;
+    const half = Math.sqrt(Math.max(0, radius * radius - x * x));
+    const room = direction < 0 ? startY + half : half - startY;
+    const desired = Math.max(3, magnitude * radius * 0.8) * ratio;
+    const length = Math.max(0, Math.min(desired, room - 2 * ratio));
+    return length >= 1.5 * ratio ? { startY, length } : undefined;
+};
+const GAME_VERSION = '0.4.7t';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -1077,7 +1091,7 @@ export class GameUI {
         return `
       <div class="service-grid">
         <article class="service-card"><span class="eyebrow">HULL / ARMOR</span><h3>Repair bay</h3><div class="service-bars"><label>HULL <i><b style="width:${percent(this.save.player.hull, stats.hull)}%"></b></i><em>${Math.ceil(this.save.player.hull)}/${stats.hull}</em></label><label>ARMOR <i><b style="width:${percent(this.save.player.armor, stats.armor)}%"></b></i><em>${Math.ceil(this.save.player.armor)}/${stats.armor}</em></label></div><p>Replace ablative plate, patch pressure structure, and clear combat faults.</p><button class="primary" data-ui-command="repair" ${repairs <= 0 ? 'disabled' : ''}>REPAIR · ${formatCredits(repairs)}</button></article>
-        <article class="service-card"><span class="eyebrow">CONSUMABLES</span><h3>Fuel and ordnance</h3><div class="service-bars"><label>FUEL <i><b style="width:${percent(this.save.player.fuel, stats.fuel)}%"></b></i><em>${Math.ceil(this.save.player.fuel)}/${stats.fuel}</em></label><label>MISSILES <i><b style="width:${percent(this.save.player.missiles, stats.missileCapacity)}%"></b></i><em>${this.save.player.missiles}/${stats.missileCapacity}</em></label></div><p>Refill reactor mass, afterburn propellant, and standard seeker missiles.</p><button class="primary" data-ui-command="refuel" ${refill <= 0 ? 'disabled' : ''}>REFILL · ${formatCredits(refill)}</button></article>
+        <article class="service-card"><span class="eyebrow">CONSUMABLES</span><h3>Fuel and ordnance</h3><div class="service-bars"><label>FUEL <i><b style="width:${percent(this.save.player.fuel, stats.fuel)}%"></b></i><em>${Math.ceil(this.save.player.fuel)}/${stats.fuel}</em></label><label>MISSILES <i><b style="width:${percent(this.save.player.missiles, stats.missileCapacity)}%"></b></i><em>${this.save.player.missiles}/${stats.missileCapacity}</em></label></div><p>Refill afterburner propellant and standard seeker missiles.</p><button class="primary" data-ui-command="refuel" ${refill <= 0 ? 'disabled' : ''}>REFILL · ${formatCredits(refill)}</button></article>
         <article class="service-card danger-service"><span class="eyebrow">INSURANCE NOTE</span><h3>Emergency recovery</h3><p>A destroyed ship is towed to the last safe dock. The service retains cargo, mission bonds, and a percentage of liquid credit.</p><b>FLY WITH A RESERVE.</b></article>
       </div>
     `;
@@ -1374,6 +1388,7 @@ export class GameUI {
             this.el('#screen-target-readout').textContent = '—';
             this.setTargetScreenValue(undefined);
             this.updateWeaponButtons(undefined, mode);
+            this.targetLayout?.classList.remove('is-clip-flash');
             bracket?.classList.add('is-hidden');
             bracket?.classList.remove('is-hostile', 'is-surrendered');
             edgePointer?.classList.add('is-hidden');
@@ -1390,6 +1405,8 @@ export class GameUI {
         this.el('#screen-target-readout').textContent = target.readout ?? '—';
         this.setTargetScreenValue(target);
         this.updateWeaponButtons(target, mode);
+        // A clipped NPC flashes its outline on the target monitor for a beat.
+        this.targetLayout?.classList.toggle('is-clip-flash', Boolean(target.clipFlash));
         if (bracket && target.onScreen && target.screenX !== undefined && target.screenY !== undefined) {
             bracket.style.transform = `translate(${target.screenX}px, ${target.screenY}px)`;
             bracket.classList.remove('is-hidden');
@@ -1765,10 +1782,19 @@ export class GameUI {
                 ctx.strokeRect(x - size * 2, y - size * 2, size * 4, size * 4);
             }
             ctx.globalAlpha = 0.35;
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x, y + Math.sign(contact.altitude || 1) * 7 * ratio);
-            ctx.stroke();
+            const altitudeRatio = Math.max(-1, Math.min(1, contact.altitude || 0));
+            const altitudeMagnitude = Math.abs(altitudeRatio);
+            if (altitudeMagnitude > 0.02) {
+                // Cockpit intuition: above the plane points up, below points down.
+                const direction = altitudeRatio > 0 ? -1 : 1;
+                const tick = radarAltitudeTick({ x, y, radius, ratio, direction, magnitude: altitudeMagnitude, size });
+                if (tick) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, tick.startY);
+                    ctx.lineTo(x, tick.startY + direction * tick.length);
+                    ctx.stroke();
+                }
+            }
             ctx.globalAlpha = 1;
         }
         ctx.restore();
@@ -1929,7 +1955,7 @@ export class GameUI {
             return;
         const panel = this.root.querySelector('#map-panel');
         const playerPoint = systemMapPoint(model.playerPosition);
-        const contactTone = (contact) => contact.hostile ? 'hostile' : contact.kind === 'asteroid' ? 'resource' : contact.kind === 'wreck' ? 'wreck' : 'ship';
+        const contactTone = (contact) => contact.claim ? 'claim' : contact.hostile ? 'hostile' : contact.kind === 'asteroid' ? 'resource' : contact.kind === 'wreck' ? 'wreck' : 'ship';
         panel.innerHTML = `
       <div class="modal-card map-card">
         <header><div><span class="eyebrow">NAVIGATION COMPUTER / PAUSED</span><h2>Helios Verge System</h2></div><button data-ui-command="close-map">CLOSE</button></header>

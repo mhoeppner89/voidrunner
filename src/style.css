@@ -2671,6 +2671,21 @@ button.compact {
   display: none;
 }
 
+/* A clipped NPC briefly flashes its outline on the target monitor, so field
+   damage the pilot is watching is visible — not just a ticker line. */
+.screen-target-layout.is-clip-flash .hull-outline {
+  animation: clip-flash 0.55s ease-in-out 2;
+}
+
+@keyframes clip-flash {
+  0%, 100% {
+    filter: drop-shadow(0 0 4px rgba(96, 226, 244, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px rgba(255, 122, 88, 0.95)) brightness(1.75);
+  }
+}
+
 .screen-bars {
   display: grid;
   gap: 0.18rem;
@@ -6403,6 +6418,34 @@ button.primary,
   border: 2px dashed #cf9f62;
 }
 
+.tactical-contact.claim i {
+  width: 11px;
+  height: 11px;
+  background: #ffd24a;
+  border-color: #fff3c4;
+  box-shadow: 0 0 12px rgba(255, 199, 66, 0.92);
+}
+
+.tactical-contact.claim::before {
+  position: absolute;
+  inset: 2px;
+  content: "";
+  border: 1px dashed rgba(255, 210, 74, 0.8);
+  border-radius: 50%;
+  animation: claim-ping 2.4s ease-out infinite;
+}
+
+@keyframes claim-ping {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.85;
+  }
+  70%, 100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
 .tactical-contact.selected::after,
 .tactical-contact:hover::after,
 .tactical-contact:focus-visible::after {
@@ -6466,6 +6509,11 @@ button.primary,
 .contact-row.wreck > i {
   background: transparent;
   border: 2px dashed #cf9f62;
+}
+
+.contact-row.claim > i {
+  background: #ffd24a;
+  box-shadow: 0 0 6px rgba(255, 199, 66, 0.7);
 }
 
 .contact-row span,
