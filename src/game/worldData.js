@@ -166,7 +166,6 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
             rotationSpeed: [0, 0, 0],
             moving: false,
             resource: 'ore',
-            richness: randomBetween(rng, 1.5, 2.7),
             remaining,
             scanned: scanned.includes(id),
             tunnelPart: true,
@@ -188,7 +187,6 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
             rotationSpeed: [0, 0, 0],
             moving: false,
             resource: 'ore',
-            richness: randomBetween(rng, 1.1, 2.2),
             remaining,
             scanned: scanned.includes(id),
             tunnelPart: false,
@@ -212,7 +210,6 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
             rotationSpeed: [0, 0, 0],
             moving: false,
             resource: 'ore',
-            richness: randomBetween(rng, 0.75, 2.4),
             remaining,
             scanned: scanned.includes(id),
             tunnelPart: false,
@@ -235,7 +232,6 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
             rotationSpeed: [randomBetween(rng, -0.25, 0.25), randomBetween(rng, -0.25, 0.25), randomBetween(rng, -0.25, 0.25)],
             moving: true,
             resource: 'ore',
-            richness: randomBetween(rng, 0.45, 1.35),
             remaining,
             scanned: scanned.includes(id),
             tunnelPart: false,
@@ -253,6 +249,25 @@ export const asteroidCollisionRadius = (node) => node.radius * Math.max(node.sca
 // spherical player/beam collision envelope. Keeping this in worldData avoids the
 // renderer and simulation drifting apart as the chunk size is tuned.
 export const wreckNodeCollisionRadius = (node) => node.radius * 1.6;
+// A mining claim needs a specific, still-rich rock: contracts stake one of the
+// monoliths (a big, landmark body) with enough ore left to be worth a trip.
+// Replaying the field generation keeps the claim's ore exactly in sync with
+// what the player finds on arrival, depletion included.
+export const miningClaimCandidates = (seed, depleted, scanned = []) => {
+    const field = generateAsteroidField(seed, depleted, scanned);
+    const monoliths = field.filter((node) => node.id.startsWith('asteroid-monolith-') && node.remaining >= 4);
+    // If every monolith is worked out, fall back to any solid static body with
+    // a worthwhile seam (skip the tiny drifting fragments and the rock crown,
+    // which is a landmark rather than a stakable claim).
+    if (monoliths.length)
+        return monoliths;
+    return field.filter((node) => node.id.startsWith('asteroid-static-') && node.remaining >= 4);
+};
+export const miningClaimName = (nodeId) => {
+    const parts = nodeId.split('-');
+    const number = Number(parts[parts.length - 1]) + 1;
+    return parts[1] === 'monolith' ? `Monolith ${number}` : `Rock ${number}`;
+};
 export const generateGraveyardPieces = (seed) => {
     const rng = seededRandom(`${seed}:graveyard-pieces`);
     const center = LOCATIONS['mourning-line'].position;
@@ -580,9 +595,7 @@ export const generateWreckNodes = (seed, depleted, scanned = []) => {
                 site.center[1] + randomBetween(rng, -site.spread[1], site.spread[1]),
                 site.center[2] + randomBetween(rng, -site.spread[2], site.spread[2]),
             ];
-            const rarityRoll = rng();
-            const rarity = rarityRoll > 0.9 ? 'rare' : rarityRoll > 0.62 ? 'uncommon' : 'common';
-            const salvage = rarity === 'rare' ? pick(rng, ['electronics', 'arms']) : pick(rng, salvageTypes);
+            const salvage = pick(rng, salvageTypes);
             const id = `salvage-node-${index}`;
             nodes.push({
                 id,
@@ -590,10 +603,8 @@ export const generateWreckNodes = (seed, depleted, scanned = []) => {
                 position: add(center, local),
                 radius: randomBetween(rng, 4, 12),
                 salvage,
-                rarity,
-                remaining: Math.max(0, depleted[id] ?? (rarity === 'rare' ? randomBetween(rng, 2.2, 4.2) : randomBetween(rng, 0.9, 2.8))),
+                remaining: Math.max(0, depleted[id] ?? randomBetween(rng, 0.9, 4.2)),
                 scanned: scanned.includes(id),
-                hazard: rarity === 'rare' ? randomBetween(rng, 0.7, 1.5) : randomBetween(rng, 0.1, 0.9),
                 zone: site.zone,
                 route: site.route,
             });

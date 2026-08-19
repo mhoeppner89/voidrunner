@@ -1,10 +1,12 @@
 import { COMMODITIES, DOCK_LOCATION_IDS, GUILD_RANK_NAMES, LOCATIONS, commodityIds, routeDistanceBetween } from './data.js';
+import { miningClaimCandidates, miningClaimName } from './worldData.js';
 import { cargoFree } from './economy.js';
 import { clamp, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
 import { rollPilot, TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 const GUILD_NAMES_FALLBACK = (guild) => guild === 'merchant' ? 'Merchant Guild' : guild === 'bounty' ? 'Bounty Registry' : guild === 'mining' ? 'Prospectors Guild' : 'Salvage Union';
 const merchantIssuers = ['Kestrel Freight', 'Orison Combine', 'Free Haulers Desk', 'Sable Route Logistics', 'Guild Dispatch'];
 const bountyIssuers = ['Concord Warrant Desk', 'Frontier Security Office', 'Bounty Hunters Registry', 'Civil Claims Bureau'];
+const miningIssuers = ['Frontier Miners Cooperative', 'Prospectors Guild', 'Coreward Refinery Trust', 'Vesper Smelting Desk'];
 // Special labeled cargo only comes from transport contracts; the game's AI
 // reads this list to call out valuable sealed load (see game.js cargoFlavor).
 export const VALUABLE_CARGO_LABELS = ['sealed diplomatic case', 'reactor-control package', 'medical coldbox', 'priority machine tooling', 'survey archive'];
@@ -20,8 +22,13 @@ const chooseCommodity = (rng, kind) => {
     if (kind === 'procurement') {
         return pick(rng, ['medicine', 'electronics', 'machinery', 'food', 'water', 'ore', 'scrap']);
     }
-    return pick(rng, commodityIds.filter((id) => id !== 'arms'));
+    // Gold stays a mined jackpot — it never shows up as generic delivery cargo.
+    return pick(rng, commodityIds.filter((id) => id !== 'arms' && id !== 'gold'));
 };
+// A claim contract pays like a delivery run plus the ore's value: mining is a
+// safe-but-slower loop, so it has to land in the same cr/minute band as trading
+// and bounty work or nobody leaves the board for it.
+const miningReward = (quantity, rank) => Math.round(quantity * COMMODITIES.ore.basePrice * 2.6 + 2200 + rank * 380);
 const contractReward = (distance, quantity, danger, rank) => Math.round(750 + distance * 3.3 + quantity * 90 + danger * 340 + rank * 520);
 const bountyReward = (danger, rank, zone) => {
     const zoneFactor = zone === 'mourning-line' ? 1.25 : zone === 'shardbelt' ? 1.1 : 1;
@@ -32,6 +39,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
     const rng = seededRandom(`${save.world.seed}:missions:${cycle}:${locationId}`);
     const offers = [];
     const dangerBase = clamp(save.world.danger, 0.2, 3.5);
+    const claimedNodeIds = new Set();
     for (let index = 0; index < count; index += 1) {
         const isBounty = index >= Math.ceil(count * 0.62);
         const id = `${locationId}-${cycle}-${index}-${Math.floor(rng() * 99999)}`;
@@ -87,6 +95,44 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
                 briefing: `${targetName} has been positively identified near ${LOCATIONS[targetZone].name}. Locate the ship, confirm identity, and destroy it. Expect armed resistance${danger > 2 ? ' and possible escorts' : ''}.${pilotProfile}`,
             });
             continue;
+        }
+        // Ore-hungry stations (they import ore at a premium, so buying it
+        // locally is the expensive route) post mining contracts: the board
+        // stakes a specific Shardbelt claim, the pilot cuts it out, and the ore
+        // is delivered back. No clock — and only rock actually cut from the
+        // claim counts, so bought ore can't pad the manifest.
+        if ((LOCATIONS[locationId].economy?.ore ?? 1) > 1 && index < 2) {
+            const candidates = miningClaimCandidates(save.world.seed, save.world.depletedAsteroids, save.world.scannedNodes)
+                .filter((node) => !claimedNodeIds.has(node.id));
+            const claim = pick(rng, candidates);
+            if (claim) {
+                claimedNodeIds.add(claim.id);
+                const quantity = Math.round(claim.remaining);
+                const claimName = miningClaimName(claim.id);
+                offers.push({
+                    id,
+                    kind: 'mining',
+                    title: `Mine the ${claimName} claim`,
+                    issuer: pick(rng, miningIssuers),
+                    origin: locationId,
+                    destination: locationId,
+                    commodity: 'ore',
+                    quantity,
+                    claimNodeId: claim.id,
+                    claimName,
+                    mined: 0,
+                    reward: miningReward(quantity, save.player.guildRank.mining),
+                    deposit: 0,
+                    deadline: Infinity,
+                    status: 'offered',
+                    guild: 'mining',
+                    guildRep: 6 + Math.floor(quantity / 3) + (save.player.guildRank.mining >= 1 ? 1 : 0),
+                    faction: 'frontier-miners',
+                    briefing: `${LOCATIONS[locationId].name} holds the papers on the ${claimName} in the Shardbelt. Cut the whole seam — ${quantity} units — and deliver it back. No deadline: the claim is yours until it runs dry. Bought ore won't clear the manifest.`,
+                });
+                continue;
+            }
+            // No stakable claim left: fall through to a merchant contract.
         }
         const kind = pick(rng, ['delivery', 'procurement', 'transport']);
         const destination = chooseDestination(rng, locationId);
@@ -209,10 +255,17 @@ export const completeMissionsAtDock = (save, locationId) => {
             save.player.sealedCargo.splice(cargoIndex, 1);
             messages.push(awardMission(save, mission));
         }
-        else if (mission.kind === 'procurement' && mission.commodity && mission.quantity) {
-            if (consumeProcurementCargo(save.player, mission.commodity, mission.quantity)) {
+        else if (mission.kind === 'mining' && mission.commodity && mission.quantity) {
+            // Claim contracts only clear on rock the pilot actually cut: bought
+            // ore can pad a hold but never satisfies the manifest. Legacy mining
+            // contracts (no claim) keep the old any-ore rule.
+            const minedEnough = mission.claimNodeId ? (mission.mined ?? 0) >= mission.quantity : true;
+            if (minedEnough && consumeProcurementCargo(save.player, mission.commodity, mission.quantity))
                 messages.push(awardMission(save, mission));
-            }
+        }
+        else if (mission.kind === 'procurement' && mission.commodity && mission.quantity) {
+            if (consumeProcurementCargo(save.player, mission.commodity, mission.quantity))
+                messages.push(awardMission(save, mission));
         }
     }
     return messages;

@@ -130,6 +130,8 @@ const actions = {
     openShipMenu: () => session?.openShipMenu(),
     selectTarget: (kind, id) => session?.selectTarget(kind, id),
     trade: (kind, commodityId, quantity) => session?.trade(kind, commodityId, quantity),
+    jettison: (commodityId) => session?.jettisonCargo(commodityId),
+    payOffMug: () => session?.payOffMug(),
     acceptMission: (missionId) => session?.acceptMission(missionId),
     repair: () => session?.repair(),
     refuel: () => session?.refuel(),
@@ -169,6 +171,7 @@ const actions = {
         return true;
     },
 };
+ui.mugDemand = () => session?.activeMugDemand();
 ui.setActions(actions);
 ui.showTitle(hasSavedGame(), cachedSave);
 window.addEventListener('pagehide', () => {
@@ -181,22 +184,12 @@ document.addEventListener('visibilitychange', () => {
 });
 const isProductionBuild = import.meta.env?.PROD ?? location.protocol !== 'file:';
 if ('serviceWorker' in navigator && isProductionBuild) {
+    // Register the worker for offline/asset caching. A new deploy's worker
+    // takes over on the NEXT full page load (skipWaiting + clients.claim),
+    // never by force-reloading the running page — that surprise reload was
+    // dumping players straight back to the title screen mid-interaction.
     window.addEventListener('load', () => {
-        // If a returning player is controlled by a stale service worker from a
-        // previous deploy, a fresh push installs the new one (skipWaiting +
-        // clients.claim) but nothing reloads the page — so the old build keeps
-        // running until the player manually refreshes. Reload once when the new
-        // service worker takes control so deployed updates actually show up.
-        const alreadyControlled = Boolean(navigator.serviceWorker.controller);
-        void navigator.serviceWorker.register('./sw.js').then(() => {
-            if (!alreadyControlled) return;
-            let refreshing = false;
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-                if (refreshing) return;
-                refreshing = true;
-                window.location.reload();
-            });
-        }).catch(() => undefined);
+        void navigator.serviceWorker.register('./sw.js').catch(() => undefined);
     });
 }
 window.__VOID_PRIVATEER__ = {

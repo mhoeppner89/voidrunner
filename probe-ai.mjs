@@ -579,8 +579,8 @@ const favorRun = (seed, withWrecks) => {
     const session = makeSession(seed);
     if (withWrecks) {
         session.wreckNodes = [
-            { id: 'salvage-node-tip', name: 'Carrier lifeboat rack A-12', position: [12000, 2000, 15000], radius: 6, salvage: 'electronics', rarity: 'rare', remaining: 3, scanned: false, hazard: 0.9 },
-            { id: 'salvage-node-plain', name: 'Courier bow B-4', position: [11000, 1500, 14000], radius: 5, salvage: 'scrap', rarity: 'common', remaining: 2, scanned: false, hazard: 0.2 },
+            { id: 'salvage-node-tip', name: 'Carrier lifeboat rack A-12', position: [12000, 2000, 15000], radius: 6, salvage: 'electronics', remaining: 3, scanned: false },
+            { id: 'salvage-node-plain', name: 'Courier bow B-4', position: [11000, 1500, 14000], radius: 5, salvage: 'scrap', remaining: 2, scanned: false },
         ];
     }
     const toasts = [];
@@ -619,7 +619,7 @@ const wreckFavor = favorRun('favor-5', true);
 console.log(`  no-wrecks seed: ${marketFavor.toasts.join(' / ')}`);
 console.log(`  with-wrecks seed: ${wreckFavor.toasts.join(' / ')}`);
 assert(marketFavor.favorGiven && marketFavor.scanned && marketFavor.toasts.length === 1, `the first scan decides a favor and later scans never re-roll (${marketFavor.toasts.join(' / ')})`);
-assert(marketFavor.toasts[0].startsWith('Tip: my contact') && marketFavor.marketChanged, `a market favor actually moves the station market (${marketFavor.toasts[0]})`);
+assert(marketFavor.toasts[0].startsWith('Tip: ') && marketFavor.marketChanged, `a market favor actually moves the station market (${marketFavor.toasts[0]})`);
 assert(wreckFavor.favorGiven && wreckFavor.scanned && wreckFavor.toasts.length === 1, `the with-wrecks seed also decides exactly once (${wreckFavor.toasts.join(' / ')})`);
 assert(wreckFavor.toasts[0].startsWith('Tip: ') && wreckFavor.scannedWrecks[0] === 'salvage-node-tip' && wreckFavor.savedScanned.length === 1, `a wreck favor flags the rare wreck and persists it to the save (${wreckFavor.toasts[0]})`);
 assert(JSON.stringify(marketFavor) === JSON.stringify(favorRun('favor-9', false)), 'favor rolls are seed-deterministic');

@@ -46,7 +46,7 @@ export const callsignHandle = (callsign) => {
     const quoted = callsign.match(/“[^”]+”/);
     return quoted ? quoted[0].slice(1, -1) : callsign;
 };
-const GAME_VERSION = '0.4.7b';
+const GAME_VERSION = '0.4.7i';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -299,6 +299,7 @@ export class GameUI {
           </div>
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="Own ship status display; tap to open ship menu">
             <div class="screen-heading"><span>OWN SHIP STATUS</span><b id="own-ship-name">WAYFARER</b></div>
+            <div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>STANDOFF</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
             <div class="screen-ship-layout"><div class="screen-flight"><div><span>SPD</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>FUEL</span><b id="screen-own-fuel">100</b><small>%</small></div><div><span>HOLD</span><b id="screen-own-cargo">0.0</b><small id="screen-own-cargo-cap">/32</small></div></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>ARMOR</span><i><b id="screen-own-armor"></b></i><em id="screen-own-armor-value">100</em></div><div><span>HULL</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">100</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="Radar display; tap to open navigation map">
@@ -425,7 +426,7 @@ export class GameUI {
                 this.startVesperLaunchTransition();
                 return;
             }
-            const target = event.target.closest('[data-ui-command], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-nav-id], [data-trade], [data-mission-id], [data-equipment-id], [data-ship-id], [data-switch-ship], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty]');
+            const target = event.target.closest('[data-ui-command], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-nav-id], [data-trade], [data-jettison], [data-mission-id], [data-equipment-id], [data-ship-id], [data-switch-ship], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty], [data-pay-mug]');
             if (!target)
                 return;
             if (target.dataset.uiCommand)
@@ -484,6 +485,14 @@ export class GameUI {
             else if (target.dataset.trade) {
                 const [kind, commodityId, quantity] = target.dataset.trade.split(':');
                 this.actions?.trade(kind, commodityId, Number(quantity));
+            }
+            else if (target.dataset.jettison) {
+                this.actions?.jettison(target.dataset.jettison);
+                this.showShipMenu();
+            }
+            else if (target.dataset.payMug) {
+                this.actions?.payOffMug();
+                this.showShipMenu();
             }
             else if (target.dataset.missionId) {
                 this.actions?.acceptMission(target.dataset.missionId);
@@ -1037,6 +1046,9 @@ export class GameUI {
     missionBadge(mission) {
         return mission.kind === 'bounty' ? 'WARRANT' : mission.kind === 'transport' ? 'TIMED' : mission.kind.toUpperCase();
     }
+    deadlineLabel(mission) {
+        return Number.isFinite(mission.deadline) ? formatDuration(mission.deadline - this.save.world.time) : 'NO DEADLINE';
+    }
     renderMissions() {
         const offers = this.save.world.offers[this.dockLocation] ?? [];
         const active = this.save.activeMissions;
@@ -1049,12 +1061,12 @@ export class GameUI {
               <header><span>${this.missionBadge(mission)}</span><b>${formatCredits(mission.reward)}</b></header>
               <h4>${escapeHtml(mission.title)}</h4>
               <p>${escapeHtml(mission.briefing)}</p>
-              <dl><div><dt>ISSUER</dt><dd>${escapeHtml(mission.issuer)}</dd></div><div><dt>DEADLINE</dt><dd>${formatDuration(mission.deadline - this.save.world.time)}</dd></div><div><dt>BOND</dt><dd>${formatCredits(mission.deposit)}</dd></div><div><dt>GUILD REP</dt><dd>+${mission.guildRep}</dd></div></dl>
+              <dl><div><dt>ISSUER</dt><dd>${escapeHtml(mission.issuer)}</dd></div><div><dt>DEADLINE</dt><dd>${this.deadlineLabel(mission)}</dd></div><div><dt>BOND</dt><dd>${formatCredits(mission.deposit)}</dd></div><div><dt>GUILD REP</dt><dd>+${mission.guildRep}</dd></div></dl>
               <button class="primary compact" data-mission-id="${mission.id}">ACCEPT CONTRACT</button>
             </article>`).join('') : '<p>No fresh contracts. Launch, trade, or return after the board cycles.</p>'}
           </div>
         </section>
-        <aside class="active-list"><span class="eyebrow">ACTIVE</span>${active.length ? active.map((mission) => `<article><b>${escapeHtml(mission.title)}</b><small>${formatDuration(mission.deadline - this.save.world.time)} · ${formatCredits(mission.reward)}</small></article>`).join('') : '<p>None.</p>'}</aside>
+        <aside class="active-list"><span class="eyebrow">ACTIVE</span>${active.length ? active.map((mission) => `<article><b>${escapeHtml(mission.title)}</b><small>${this.deadlineLabel(mission)} · ${formatCredits(mission.reward)}</small></article>`).join('') : '<p>None.</p>'}</aside>
       </div>
     `;
     }
@@ -1310,6 +1322,18 @@ export class GameUI {
             }
         }
         setText('#own-ship-name', model.shipName.toUpperCase());
+        const standoff = this.el('#screen-standoff');
+        if (standoff) {
+            standoff.classList.toggle('is-visible', Boolean(model.standoff));
+            if (model.standoff) {
+                const demand = this.el('#screen-standoff-demand');
+                const timer = this.el('#screen-standoff-timer');
+                if (demand)
+                    demand.textContent = model.standoff.kind === 'credits' ? `PAY ${model.standoff.label}` : `DROP ${model.standoff.label}`;
+                if (timer)
+                    timer.textContent = String(model.standoff.seconds);
+            }
+        }
         const zoneLabel = this.el('#screen-radar-zone');
         if (zoneLabel) {
             // The dock hint rides the radar's zone line (no floating prompt):
@@ -1828,6 +1852,12 @@ export class GameUI {
             bar.style.borderColor = '';
         }, duration);
     }
+    // A group transmission (a mugging crew that folds together): the bar shows
+    // all of their callsigns, comma-joined, ahead of the line.
+    showGroupLine(callsigns, line, relation = 'neutral', duration = 6000) {
+        const names = callsigns.map((callsign) => callsignHandle(callsign)).join(', ');
+        this.showPilotLine(names, line, relation, duration);
+    }
     // Story-mission display: a pinned amber transmission on the comms bar.
     // Unlike normal chatter it doesn't fade — it stays until dismissed (tap
     // the CONTINUE bar, or the game times it out) — and it's flagged story in
@@ -1948,16 +1978,17 @@ export class GameUI {
         const mass = cargoMass(player);
         const capacity = cargoCapacity(player);
         const loadPercent = capacity > 0 ? Math.min(100, Math.round((mass / capacity) * 100)) : 0;
+        const mug = this.mugDemand?.();
         const cargoEntries = Object.entries(player.cargo)
             .filter(([, qty]) => qty > 0)
             .map(([id, qty]) => {
                 const commodity = COMMODITIES[id];
-                return { name: commodity?.name ?? id, qty, mass: (commodity?.mass ?? 0) * qty };
+                return { id, name: commodity?.name ?? id, qty, mass: (commodity?.mass ?? 0) * qty };
             });
         const sealed = (player.sealedCargo ?? []).map((entry) => ({ name: entry.label, qty: entry.units, mass: entry.mass }));
         const allCargo = [...cargoEntries, ...sealed];
         const cargoRows = allCargo.length
-            ? allCargo.map((entry) => `<div class="cargo-row"><span><b>${escapeHtml(entry.name)}</b><small>${entry.qty} UNITS</small></span><em>${entry.mass.toFixed(1)} MASS</em></div>`).join('')
+            ? allCargo.map((entry) => `<div class="cargo-row"><span><b>${escapeHtml(entry.name)}</b><small>${entry.qty} UNITS</small></span>${entry.id === 'gold' || (mug?.kind === 'cargo' && mug.commodity === entry.id) ? `<button data-jettison="${entry.id}">JETTISON</button>` : ''}<em>${entry.mass.toFixed(1)} MASS</em></div>`).join('')
             : '<p class="ship-menu-empty">Hold empty. The market is one jump away.</p>';
         const missions = this.save.activeMissions;
         const missionRows = missions.length
@@ -1966,11 +1997,18 @@ export class GameUI {
                 const destination = destinationId && Object.prototype.hasOwnProperty.call(LOCATIONS, destinationId) ? LOCATIONS[destinationId] : undefined;
                 const where = mission.kind === 'bounty'
                     ? (destination ? `HUNT NEAR ${destination.name.toUpperCase()}` : 'HUNT TARGET UNKNOWN')
-                    : (destination ? `FLY TO ${destination.name.toUpperCase()}` : '—');
+                    : mission.kind === 'mining'
+                        ? ((mission.mined ?? 0) >= mission.quantity
+                            ? `RETURN TO ${(LOCATIONS[mission.destination]?.name ?? 'DOCK').toUpperCase()}`
+                            : `MINE ${(mission.claimName ?? 'SHARDBELT CLAIM').toUpperCase()}`)
+                        : (destination ? `FLY TO ${destination.name.toUpperCase()}` : '—');
+                const progress = mission.kind === 'mining' && mission.claimNodeId
+                    ? `<div><dt>PROGRESS</dt><dd>${mission.mined ?? 0}/${mission.quantity} MINED</dd></div>`
+                    : '';
                 return `<article class="mission-card ${mission.kind} ship-mission-card">
                 <header><span>${this.missionBadge(mission)}</span><b>${formatCredits(mission.reward)}</b></header>
                 <h4>${escapeHtml(mission.title)}</h4>
-                <dl><div><dt>VECTOR</dt><dd>${escapeHtml(where)}</dd></div><div><dt>DEADLINE</dt><dd>${formatDuration(Math.max(0, mission.deadline - this.save.world.time))}</dd></div></dl>
+                <dl><div><dt>VECTOR</dt><dd>${escapeHtml(where)}</dd></div>${progress}<div><dt>DEADLINE</dt><dd>${this.deadlineLabel(mission)}</dd></div></dl>
               </article>`;
             }).join('')
             : '<p class="ship-menu-empty">No active contracts. The bar posts new work at every station.</p>';
@@ -1985,6 +2023,7 @@ export class GameUI {
           <section class="ship-menu-cargo"><h3>CARGO HOLD · ${mass.toFixed(1)}/${capacity} MASS (${loadPercent}%)</h3>${cargoRows}</section>
           <section class="ship-menu-account"><h3>ACCOUNT</h3>
             <div class="ship-account-row"><span>AVAILABLE CREDIT</span><b>${formatCredits(player.credits)}</b></div>
+            ${mug?.kind === 'credits' ? `<div class="ship-account-row"><span>STANDOFF TOLL</span><button data-pay-mug="1">PAY ${formatCredits(mug.amount)}</button></div>` : ''}
             <div class="ship-account-row"><span>CARGO LOAD</span><b>${loadPercent}%</b></div>
             <div class="ship-account-row"><span>HULL</span><b>${Math.ceil(player.hull)}/${Math.ceil(getEffectiveShipStats(player).hull)}</b></div>
           </section>

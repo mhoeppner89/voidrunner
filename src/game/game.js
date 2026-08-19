@@ -22,6 +22,10 @@ const FALLBACK_AI_RNG = () => 0.5;
 // rank, and the valuable-load callouts) — remembered in pilotLineHistory.said.
 const PILOT_ONESHOT_KEYS = new Set(['contact', 'rank', 'case', 'cargo']);
 const PLAYER_RADIUS = 1.25;
+// NPCs use a slightly roomier single-radius hull than the player: enough for a
+// freighter's bulk without per-hull collision math, and it keeps the field pass
+// cheap. Debris boxes still resolve against their exact oriented surface.
+const NPC_SHIP_RADIUS = 1.8;
 // Combat-sim field starts sit inside the cloud, but keep a generous bubble
 // around the player so the first frame is a calm staging view rather than an
 // immediate collision check. The candidate offsets make this robust to a
@@ -75,6 +79,89 @@ const HYPERDRIVE_INTERRUPT_DURATION = 1.1;
 // Give the player a short calm window after an intercept is resolved so a long
 // route cannot immediately roll into another hyperdrive ambush.
 const HYPERDRIVE_ENCOUNTER_COOLDOWN = 45;
+// Salvage ambushes chase the hold's value: below SALVAGE_AMBUSH_FLOOR_WORTH
+// claim-jumpers won't bother, and the odds scale linearly up to
+// SALVAGE_AMBUSH_MAX_CHANCE at SALVAGE_AMBUSH_MAX_WORTH. The richest holds
+// draw a second pirate, whose odds ramp across the escort worth band.
+const SALVAGE_AMBUSH_FLOOR_WORTH = 200;
+const SALVAGE_AMBUSH_MAX_WORTH = 1700;
+const SALVAGE_AMBUSH_MAX_CHANCE = 0.5;
+const SALVAGE_AMBUSH_ESCORT_MIN_WORTH = 500;
+const SALVAGE_AMBUSH_ESCORT_MAX_WORTH = 1400;
+// Mining jackpot: a fully depleted asteroid occasionally reveals a gold
+// pocket (the mining mirror of the salvage equipment drop). Seeded per node,
+// so the same rock strikes the same pocket every career.
+const GOLD_POCKET_CHANCE = 0.08;
+const GOLD_POCKET_MIN = 1;
+const GOLD_POCKET_MAX = 3;
+// Selling gold marks the player (see economy.js GOLD_HEAT_SECONDS). While the
+// heat is fresh, the Shardbelt's ambient encounter windows shift so pirate
+// intercepts roughly double — but from a low base, because mining is meant to
+// be mostly safe: base windows are miner 0.42, trader 0.68, patrol 0.90
+// (pirate 10%), and gold heat moves them to miner 0.36, trader 0.58, patrol
+// 0.80 (pirate 20%).
+const GOLD_HEAT_MINER_CUTOFF = 0.36;
+const GOLD_HEAT_TRADER_CUTOFF = 0.58;
+const GOLD_HEAT_PATROL_CUTOFF = 0.80;
+const ASTEROID_PATROL_CUTOFF = 0.90;
+// Most pirate encounters open with a standoff ("mugging") instead of gunfire:
+// the lead hails and demands a share of the most valuable cargo — or a credit
+// toll if the hold is empty — with a short window to comply. Compliance means
+// the group takes its cut and breaks off; firing or letting the clock expire
+// commits them to the fight. Gold-heat intercepts reuse the same machinery
+// with a syndicate-tipped demand for every gram of gold aboard.
+const MUG_CHANCE = 0.7;
+const MUG_STANDOFF_SECONDS = 9;
+const MUG_CARGO_SHARE = 0.5;
+const MUG_TOLL_MIN = 120;
+const MUG_TOLL_MAX = 600;
+const MUG_TOLL_SHARE = 0.12;
+// How big a cut a mugger wants, by temperament: timid pirates settle for a
+// light toll, aggressive ones try to take the hold's cream. Steady sits on
+// the MUG_CARGO_SHARE baseline.
+const MUG_TEMPERAMENT_SHARE = {
+    timid: 0.35,
+    steady: 0.5,
+    aggressive: 0.7,
+    flamboyant: 0.55,
+};
+const MUG_DEMAND_LINES = [
+    'Drop {demand} and keep the hull. {seconds} seconds.',
+    'Nice hold you have there. Hand over {demand} and we fly on. {seconds} seconds.',
+    'Toll time, spacer. {demand}, or we take it off the wreck. {seconds} seconds.',
+    'We are not asking twice. {demand}. {seconds} seconds.',
+];
+const MUG_EMPTY_LINES = [
+    'Nothing worth the fuel. Clear off, spacer.',
+    'An empty hold. Not worth the ammo — fly on.',
+    'You are not worth our time. Go.',
+];
+// Claim-jumpers want the wreck, not a kill: they demand the salvage itself.
+const SALVAGE_DEMAND_LINES = [
+    'That wreck is claimed. Drop {demand} and clear off. {seconds} seconds.',
+    'Walk away from our salvage. {demand}, now. {seconds} seconds.',
+    'You are cutting our wreck. Hand over {demand}. {seconds} seconds.',
+];
+// A show of force can end a standoff before it becomes a fight: a hit on a
+// demanding pirate may scare the group off, with timid leads folding easiest
+// and aggressive ones fighting to the last.
+const MUG_SCARE_OFF = {
+    timid: 0.5,
+    steady: 0.18,
+    aggressive: 0.02,
+    flamboyant: 0.12,
+};
+const MUG_SCARE_LINES = [
+    'Forget it — this one fights. We will find easier prey.',
+    'Not worth the hull damage. Break off!',
+    'They shoot back! Disengage, disengage!',
+];
+const GOLD_DEMAND_LINES = [
+    'Jettison the gold and we all fly home. {seconds} seconds.',
+    'We know what you sold. Drop the gold, keep the ship. {seconds} seconds.',
+    'The syndicate wants its cut. Eject the gold or we take it off the wreck. {seconds} seconds.',
+    'Nice haul, miner. Leave the gold drifting and nothing gets scuffed. {seconds} seconds.',
+];
 const ENCOUNTER_LOCK_RADIUS = 8000;
 const AUTO_DOCK_SPEED = 8;
 const DOCK_SAFE_RADIUS = 320;
@@ -149,6 +236,20 @@ const SURRENDER_EJECT_POOLS = {
     pirate: ['electronics', 'machinery', 'scrap', 'luxuries'],
     bounty: ['electronics', 'machinery', 'luxuries', 'arms'],
     escort: ['electronics', 'machinery', 'scrap', 'luxuries'],
+};
+// Miners occasionally strike gold in the field, so a surrendered or destroyed
+// miner rarely carries a nugget alongside its ore and scrap.
+const MINER_GOLD_DROP_CHANCE = 0.12;
+// Hull-appropriate flight tuning: the voxel model decides how a ship flies,
+// not just what it looks like. Light interceptors turn on a dime; freighters
+// wallow through their turns.
+const HULL_FLIGHT_STATS = {
+    kestrel: { speed: 40, afterburnSpeed: 60, turnRate: 1.5 }, // escort — light interceptor
+    talon: { speed: 38, afterburnSpeed: 57, turnRate: 1.35 }, // pirate — baseline fighter
+    lancer: { speed: 43, afterburnSpeed: 64, turnRate: 1.25 }, // bounty — gunship: fast, slower to turn
+    warden: { speed: 36, afterburnSpeed: 0, turnRate: 1.1 }, // patrol — medium
+    prospector: { speed: 24, afterburnSpeed: 0, turnRate: 0.9 }, // miner — agile industrial
+    'atlas-freighter': { speed: 27, afterburnSpeed: 0, turnRate: 0.55 }, // trader — ponderous
 };
 const ATTACK_RESET_RANGE = 175;
 const ATTACK_SEPARATION = 22;
@@ -915,6 +1016,8 @@ export class GameSession {
             this.captureTarget();
         if (actions.scan)
             this.scanTarget();
+        if (actions.jettison)
+            this.jettisonCargo(this.activeMugCargoCommodity() ?? 'gold');
         if (actions.autopilot)
             this.toggleHyperdrive();
         if (actions.missile) {
@@ -1467,8 +1570,6 @@ export class GameSession {
             this.utilityActive = true;
             this.renderer.setUtilityBeam(true, mode, this.save.player.position, node.position);
             this.extractWreck(node, dt, stats.salvageRate);
-            if (node.hazard > 0.45)
-                this.damagePlayer(node.hazard * dt * 1.25, 'radiation exposure', false);
             if (this.utilitySoundCooldown <= 0) {
                 this.utilitySoundCooldown = 0.18;
                 this.audio.play('salvage', 0.32);
@@ -1477,7 +1578,7 @@ export class GameSession {
         }
     }
     requireScanHint() {
-        // An unscanned deposit already reads SCANNING… / OUT OF SCAN RANGE on
+        // An unscanned deposit already reads SCANNING… / OUT OF RANGE on
         // the target monitor, so there is nothing extra to pop up here.
         this.renderer.setUtilityBeam(false, this.save.player.mode, this.save.player.position);
     }
@@ -1487,15 +1588,17 @@ export class GameSession {
             return;
         }
         const current = this.extractionCarry.get(node.id) ?? 0;
-        let next = current + dt * 0.58 * rate * node.richness;
+        let next = current + dt * 0.58 * rate;
         while (next >= 1 && node.remaining > 0) {
             next -= 1;
             node.remaining = Math.max(0, node.remaining - 1);
             this.save.world.depletedAsteroids[node.id] = node.remaining;
             // Ore is tractored straight into the hold — no pickup to chase. The
             // monitor's remaining-units count ticks down, so no per-unit toast.
-            this.collectExtraction('ore', 'mining', 1, node.richness > 1.75 ? 'uncommon' : 'common');
+            this.collectExtraction('ore', 'mining', 1);
+            this.recordClaimMining(node.id, 1);
             if (node.remaining <= 0) {
+                this.strikeGoldPocket(node);
                 this.setMonitorStatus('DEPOSIT EXHAUSTED');
                 this.clearTarget();
                 this.obstacleGridBuiltAt = -Infinity;
@@ -1510,17 +1613,17 @@ export class GameSession {
             return;
         }
         const current = this.extractionCarry.get(node.id) ?? 0;
-        let next = current + dt * 0.48 * rate * (node.rarity === 'rare' ? 0.78 : 1);
+        let next = current + dt * 0.48 * rate;
         while (next >= 1 && node.remaining > 0) {
             next -= 1;
             node.remaining = Math.max(0, node.remaining - 1);
             this.save.world.depletedWrecks[node.id] = node.remaining;
             // Recovered components go straight to the hold — no pickup to chase.
             // The monitor's remaining-recoveries count ticks down, so no per-unit toast.
-            this.collectExtraction(node.salvage, 'salvage', 1, node.rarity);
+            this.collectExtraction(node.salvage, 'salvage', 1);
             if (node.remaining <= 0) {
-                if (node.rarity === 'rare')
-                    this.recoverRareEquipment(node);
+                if (node.salvage === 'electronics' || node.salvage === 'arms')
+                    this.recoverWreckEquipment(node);
                 this.setMonitorStatus('WRECK STRIPPED');
                 this.clearTarget();
                 this.obstacleGridBuiltAt = -Infinity;
@@ -1529,7 +1632,20 @@ export class GameSession {
         }
         this.extractionCarry.set(node.id, next);
     }
-    collectExtraction(commodity, source, amount, rarity) {
+    strikeGoldPocket(node) {
+        const rng = seededRandom(`${this.save.world.seed}:gold-pocket:${node.id}`);
+        if (rng() >= GOLD_POCKET_CHANCE)
+            return;
+        const amount = randomInt(rng, GOLD_POCKET_MIN, GOLD_POCKET_MAX);
+        const space = Math.floor(cargoFree(this.save.player) / COMMODITIES.gold.mass);
+        const grant = Math.min(amount, space);
+        if (grant <= 0)
+            return;
+        this.save.player.cargo.gold = (this.save.player.cargo.gold ?? 0) + grant;
+        this.ui.pushEvent(`Gold pocket struck: +${grant} GOLD.`, 'success', 5600);
+        this.audio.play('success', 1.35);
+    }
+    collectExtraction(commodity, source, amount) {
         this.save.player.cargo[commodity] = (this.save.player.cargo[commodity] ?? 0) + amount;
         if (source === 'mining') {
             this.save.player.stats.mined += amount;
@@ -1539,14 +1655,34 @@ export class GameSession {
         }
         else {
             this.save.player.stats.salvaged += amount;
-            const rankMessage = awardCareerProgress(this.save, 'salvage', rarity === 'rare' ? 3 : 1, 'salvage-union');
+            const rankMessage = awardCareerProgress(this.save, 'salvage', 1, 'salvage-union');
             if (rankMessage)
                 this.ui.pushEvent(rankMessage, 'success', 5000);
         }
     }
-    recoverRareEquipment(node) {
-        const rng = seededRandom(`${this.save.world.seed}:rare-equipment:${node.id}`);
-        if (rng() > 0.38)
+    activeMiningClaim(nodeId) {
+        return this.save.activeMissions.find((mission) => mission.kind === 'mining' && mission.claimNodeId === nodeId);
+    }
+    recordClaimMining(nodeId, amount) {
+        // Ore cut from a staked rock advances that contract's manifest. This is
+        // the only way a claim completes — bought ore never moves the needle.
+        let fulfilled;
+        for (const mission of this.save.activeMissions) {
+            if (mission.kind !== 'mining' || mission.claimNodeId !== nodeId)
+                continue;
+            const before = mission.mined ?? 0;
+            mission.mined = Math.min(mission.quantity, before + amount);
+            if (before < mission.quantity && mission.mined >= mission.quantity)
+                fulfilled = mission;
+        }
+        if (fulfilled)
+            this.ui.pushEvent(`Claim met: ${fulfilled.claimName ?? fulfilled.claimNodeId} is dry. Return the ore to ${LOCATIONS[fulfilled.destination].name}.`, 'success', 6200);
+    }
+    recoverWreckEquipment(node) {
+        const rng = seededRandom(`${this.save.world.seed}:wreck-equipment:${node.id}`);
+        // Tech wrecks can surface an intact module, but the roll stays low so
+        // the event is genuinely rare (only ~half of wrecks are tech).
+        if (rng() > 0.08)
             return;
         const candidates = equipmentIds.filter((id) => !this.save.player.equipment.includes(id));
         if (!candidates.length)
@@ -1555,28 +1691,54 @@ export class GameSession {
         this.save.player.equipment.push(equipmentId);
         const stats = getEffectiveShipStats(this.save.player);
         this.save.player.shield = Math.min(stats.shield, this.save.player.shield + 12);
-        this.ui.pushEvent(`Rare recovery: ${EQUIPMENT[equipmentId].name} installed.`, 'success', 6200);
+        this.ui.pushEvent(`Intact module recovered: ${EQUIPMENT[equipmentId].name} installed.`, 'success', 6200);
         this.audio.play('success', 1.35);
     }
     triggerSalvageAmbush(node) {
         if (this.salvageAmbushTriggered.has(node.id))
             return;
         const rng = seededRandom(`${this.save.world.seed}:salvage-ambush:${node.id}`);
-        if (rng() > 0.34 + node.hazard * 0.18)
+        // Claim-jumpers chase value, not wrecks: the hold's remaining worth
+        // (commodity price × recoveries left) sets the odds. Cheap scrap draws
+        // no one; the richest arms wreck tops out at 50%.
+        const worth = COMMODITIES[node.salvage].basePrice * node.remaining;
+        const span = SALVAGE_AMBUSH_MAX_WORTH - SALVAGE_AMBUSH_FLOOR_WORTH;
+        const ambushChance = clamp(((worth - SALVAGE_AMBUSH_FLOOR_WORTH) / span) * SALVAGE_AMBUSH_MAX_CHANCE, 0, SALVAGE_AMBUSH_MAX_CHANCE);
+        if (rng() > ambushChance)
             return;
         this.salvageAmbushTriggered.add(node.id);
         const player = vec(this.save.player.position);
-        const pirate = this.spawnShip('pirate', tuple(player.clone().add(new THREE.Vector3(90, 20, -75))));
-        pirate.targetId = 'player';
-        if (node.rarity === 'rare') {
+        const lead = this.spawnShip('pirate', tuple(player.clone().add(new THREE.Vector3(90, 20, -75))));
+        lead.targetId = 'player';
+        const escorts = [];
+        // The richest holds rate a two-ship team: the second pirate's odds
+        // ramp across the escort worth band instead of cutting in at a hard
+        // threshold.
+        const escortSpan = SALVAGE_AMBUSH_ESCORT_MAX_WORTH - SALVAGE_AMBUSH_ESCORT_MIN_WORTH;
+        const escortChance = clamp((worth - SALVAGE_AMBUSH_ESCORT_MIN_WORTH) / escortSpan, 0, 1);
+        if (rng() < escortChance) {
             const escort = this.spawnShip('escort', tuple(player.clone().add(new THREE.Vector3(-75, -15, -95))));
             escort.targetId = 'player';
+            escorts.push(escort);
+        }
+        // Claim-jumpers want the salvage, not a fight: if the pilot has already
+        // pulled cargo from the wreck they open with a demand for it; otherwise
+        // there is nothing to shake down and they attack immediately.
+        const demand = this.salvageMugDemand(node, lead);
+        if (demand) {
+            this.beginMug(lead, escorts, demand, {
+                lines: SALVAGE_DEMAND_LINES,
+                sensor: 'Claim-jumpers inbound — they are hailing you.',
+                event: 'Standoff: drop the salvage or fight.',
+            });
+        }
+        else {
+            this.ui.pushEvent('Salvage claim challenged: hostile drives inbound.', 'danger', 5200);
         }
         this.threatAcquireTarget();
-        this.ui.pushEvent('Salvage claim challenged: hostile drives inbound.', 'danger', 5200);
         this.audio.play('warning');
     }
-    spawnPickup(commodity, origin, source, rarity, amount = 1) {
+    spawnPickup(commodity, origin, source, amount = 1) {
         const rng = seededRandom(`${this.save.world.seed}:pickup:${++this.pickupCounter}:${this.save.world.time}`);
         const drift = new THREE.Vector3(rng() - 0.5, rng() - 0.5, rng() - 0.5).normalize().multiplyScalar(randomBetween(rng, 0.8, 2.4));
         const offset = drift.clone().normalize().multiplyScalar(2.2 + rng() * 2.5);
@@ -1590,7 +1752,6 @@ export class GameSession {
             slot,
             amount,
             source,
-            rarity,
             life: 140,
         });
     }
@@ -1644,7 +1805,7 @@ export class GameSession {
         }
         else {
             this.save.player.stats.salvaged += pickup.amount;
-            const rankMessage = awardCareerProgress(this.save, 'salvage', pickup.rarity === 'rare' ? 3 : 1, 'salvage-union');
+            const rankMessage = awardCareerProgress(this.save, 'salvage', 1, 'salvage-union');
             if (rankMessage)
                 this.ui.pushEvent(rankMessage, 'success', 5000);
         }
@@ -1692,7 +1853,7 @@ export class GameSession {
                 return;
         }
         else if (distance > stats.scanRange) {
-            this.setMonitorStatus(`OUT OF SCAN RANGE · ${Math.round(distance)}/${stats.scanRange} km`);
+            this.setMonitorStatus(`OUT OF RANGE · ${Math.round(distance)}/${stats.scanRange} km`);
             return;
         }
         if (target.kind === 'asteroid') {
@@ -1743,7 +1904,7 @@ export class GameSession {
         const stats = getEffectiveShipStats(this.save.player);
         const distance = this.surfaceDistance(vec(this.save.player.position), target);
         if (distance > stats.scanRange) {
-            this.setMonitorStatus(`OUT OF CAPTURE RANGE · ${Math.round(distance)}/${stats.scanRange} km`);
+            this.setMonitorStatus(`OUT OF RANGE · ${Math.round(distance)}/${stats.scanRange} km`);
             return;
         }
         if (!(ship.bountyValue > 0 || ship.missionId)) {
@@ -1812,8 +1973,6 @@ export class GameSession {
     }
     targetCandidates() {
         const player = vec(this.save.player.position);
-        const orientation = quat(this.save.player.rotation);
-        const forward = FORWARD.clone().applyQuaternion(orientation);
         const stats = getEffectiveShipStats(this.save.player);
         const inRange = (position) => player.distanceTo(vec(position)) < stats.radarRange * 2.2;
         const byDistance = (a, b) => player.distanceToSquared(vec(a.position)) - player.distanceToSquared(vec(b.position));
@@ -1839,19 +1998,32 @@ export class GameSession {
                     goals.push({ kind: 'location', id: mission.targetZone, position: location.position, name: location.name });
                 }
             }
+            else if (mission.kind === 'mining') {
+                // A claim contract points at the rock until it's dry, then at the
+                // return dock. Before the pilot reaches the Shardbelt the goal is
+                // the field itself, so target cycling still gives a fly-to point.
+                const doneMining = (mission.mined ?? 0) >= mission.quantity;
+                if (doneMining || !mission.claimNodeId) {
+                    const destination = LOCATIONS[mission.destination];
+                    goals.push({ kind: 'location', id: mission.destination, position: destination.position, name: destination.name });
+                }
+                else if (this.activeInstanceId === 'shardbelt') {
+                    const claim = this.asteroids.find((node) => node.id === mission.claimNodeId && node.remaining > 0);
+                    if (claim)
+                        goals.push({ kind: 'asteroid', id: claim.id, position: claim.position, name: `Claim: ${mission.claimName ?? claim.id}`, scanned: claim.scanned });
+                }
+                else {
+                    goals.push({ kind: 'location', id: 'shardbelt', position: LOCATIONS.shardbelt.position, name: LOCATIONS.shardbelt.name });
+                }
+            }
             else if (mission.destination && Object.prototype.hasOwnProperty.call(LOCATIONS, mission.destination)) {
                 const location = LOCATIONS[mission.destination];
                 goals.push({ kind: 'location', id: mission.destination, position: location.position, name: location.name });
             }
         }
-        // Tier 3 — everything else: traffic, deposits, wrecks, and POIs, scored
-        // by how close they sit to the nose.
-        const score = (position) => {
-            const direction = vec(position).sub(player);
-            const distance = direction.length();
-            const angle = forward.angleTo(direction.normalize());
-            return angle * 110 + distance * 0.12;
-        };
+        // Tier 3 — everything else: traffic, deposits, wrecks, and POIs.
+        // Scanned deposits/wrecks cycle before unscanned ones (a scan already
+        // invested makes them the priority), then nearest first.
         const others = [];
         for (const entry of this.ships)
             if (!entry.hostile && !entry.claimed && !entry.captured && entry.hull > 0 && inRange(entry.position))
@@ -1859,12 +2031,12 @@ export class GameSession {
         if (this.activeInstanceId === 'shardbelt') {
             for (const node of this.asteroids)
                 if (node.remaining > 0 && player.distanceTo(vec(node.position)) - asteroidCollisionRadius(node) < stats.radarRange)
-                    others.push({ kind: 'asteroid', id: node.id, position: node.position, name: node.tunnelPart ? 'Rock Crown Deposit' : 'Asteroid Deposit' });
+                    others.push({ kind: 'asteroid', id: node.id, position: node.position, name: node.tunnelPart ? 'Rock Crown Deposit' : 'Asteroid Deposit', scanned: node.scanned });
         }
         if (this.activeInstanceId === 'mourning-line') {
             for (const node of this.wreckNodes)
                 if (node.remaining > 0 && player.distanceTo(vec(node.position)) - node.radius < stats.radarRange)
-                    others.push({ kind: 'wreck', id: node.id, position: node.position, name: node.name });
+                    others.push({ kind: 'wreck', id: node.id, position: node.position, name: node.name, scanned: node.scanned });
         }
         for (const id of NAV_LOCATION_IDS) {
             if (goals.some((goal) => goal.id === id))
@@ -1872,7 +2044,7 @@ export class GameSession {
             const location = LOCATIONS[id];
             others.push({ kind: 'location', id, position: location.position, name: location.name });
         }
-        others.sort((a, b) => score(a.position) - score(b.position));
+        others.sort((a, b) => Number(Boolean(b.scanned)) - Number(Boolean(a.scanned)) || byDistance(a, b));
         return [...opponents, ...goals, ...others];
     }
     selectTarget(kind, id) {
@@ -1917,6 +2089,11 @@ export class GameSession {
     }
     applyTarget(target) {
         this.save.player.currentTargetId = target.id;
+        // A fresh lock supersedes the previous target's transient readout
+        // (DEPOSIT EXHAUSTED / WRECK STRIPPED) instead of letting it linger
+        // over the new target for its full display window.
+        this.monitorStatus = '';
+        this.monitorStatusUntil = 0;
         this.renderer.setTarget(target.kind === 'ship' ? target.id : undefined, target.kind === 'asteroid' ? target.id : undefined, target.kind === 'wreck' ? target.id : undefined, target.kind === 'location' ? target.id : undefined);
         // No selection pop-up: the target monitor already shows the lock, and
         // the distance readout lives in its heading (below the label row).
@@ -2072,6 +2249,10 @@ export class GameSession {
             ship.shieldDelay -= dt;
             if (ship.shieldDelay <= 0)
                 ship.shield = Math.min(ship.maxShield, ship.shield + dt * 3.8);
+            // The standoff clock runs down: once it expires the hunters open
+            // fire (or they already did if the pilot shot first).
+            if (ship.holdFire && this.save.world.time >= (ship.demandUntil ?? 0))
+                this.endMugStandoff(ship);
         const target = this.resolveShipTarget(ship);
         const deferring = this.deferentialPilot(ship);
         // A deferential pilot never re-engages: even if an encounter spawner
@@ -2084,6 +2265,7 @@ export class GameSession {
                 ship.targetId = undefined;
             this.updateTravelAI(ship, dt);
         }
+        this.resolveNpcCollisions(ship);
         const position = vec(ship.position);
         // Priority order for the one-voice slot: the one-shot recognition
         // line lands first (a wary re-encounter shouldn't lose it to generic
@@ -2121,6 +2303,13 @@ export class GameSession {
         this.nextChatterAt = this.save.world.time + CHATTER_GAP;
         this.ui.showPilotLine?.(ship.name, line, relation);
         this.audio?.playComms?.(ship.pilot.temperament);
+    }
+    // A line from a whole group (a scared-off mug): the comms bar shows every
+    // callsign at once so the player sees who folded.
+    sayGroupLine(ships, line) {
+        this.nextChatterAt = this.save.world.time + CHATTER_GAP;
+        this.ui.showGroupLine?.(ships.map((ship) => ship.name), line, this.shipRelation(ships[0]));
+        this.audio?.playComms?.(ships[0].pilot.temperament);
     }
     playerLosing() {
         const stats = getEffectiveShipStats(this.save.player);
@@ -2309,23 +2498,25 @@ export class GameSession {
             return false;
         // Half the time the favor is a wreck tip; with no wrecks left it falls
         // back to a market contact so the favor always lands.
-        const wreckTip = rng() < 0.5 && this.giveWreckTip(rng);
+        const wreckTip = rng() < 0.5 && this.giveWreckTip();
         return wreckTip || this.giveMarketTip(rng);
     }
     // Flag the best unscanned wreck on the scanner: the player learns exactly
     // which wreck off Mourning Line is worth the trip (the map reads the
     // scanned flag live, and the 3D marker pops on the next target sync).
-    giveWreckTip(rng) {
-        const unseen = (node) => node.remaining > 0 && !node.scanned;
-        const rare = this.wreckNodes.filter((node) => unseen(node) && node.rarity === 'rare');
-        const pool = rare.length ? rare : this.wreckNodes.filter((node) => unseen(node) && node.rarity === 'uncommon');
-        if (!pool.length)
+    giveWreckTip() {
+        const unseen = this.wreckNodes.filter((node) => node.remaining > 0 && !node.scanned);
+        if (!unseen.length)
             return false;
-        const node = pool[Math.floor(rng() * pool.length)];
+        // Flag the highest-value wreck left: the tip should point at the trip
+        // that's actually worth making.
+        const worth = (node) => COMMODITIES[node.salvage].basePrice * node.remaining;
+        const node = unseen.reduce((best, candidate) => (worth(candidate) > worth(best) ? candidate : best));
         node.scanned = true;
         if (!this.save.world.scannedNodes.includes(node.id))
             this.save.world.scannedNodes.push(node.id);
-        this.ui.pushSensor(`Tip: ${node.name} carrying ${COMMODITIES[node.salvage].name}. Flagged on your scanner.`, 'success', 6500);
+        const tipCommodity = SCAN_COMMODITY_LABELS[node.salvage] ?? COMMODITIES[node.salvage].name.toUpperCase();
+        this.ui.pushSensor(`Tip: ${node.name} carries ${tipCommodity}. Flagged on scanner.`, 'success', 6500);
         return true;
     }
     // A trade contact: nudge one station's supply/demand so the tip is real
@@ -2342,9 +2533,10 @@ export class GameSession {
         else
             item.supply += 15;
         refreshAllPrices(this.save.world.market, this.save.world.seed, this.save.world.economyClock);
+        const tipCommodity = SCAN_COMMODITY_LABELS[commodityId] ?? COMMODITIES[commodityId].name.toUpperCase();
         this.ui.pushSensor(sellTip
-            ? `Tip: my contact at ${LOCATIONS[locationId].name} pays top credit for ${COMMODITIES[commodityId].name}.`
-            : `Tip: my contact at ${LOCATIONS[locationId].name} has ${COMMODITIES[commodityId].name} below market.`, 'success', 6500);
+            ? `Tip: ${LOCATIONS[locationId].shortName} pays top credit for ${tipCommodity}.`
+            : `Tip: ${LOCATIONS[locationId].shortName} sells ${tipCommodity} below market.`, 'success', 6500);
         return true;
     }
     // Taunt on a landed hit: ace-tier and flamboyant pilots like to talk while
@@ -2398,7 +2590,7 @@ export class GameSession {
             const dz = p[2] - from[2];
             return dx * dx + dy * dy + dz * dz;
         };
-        if (!ship.surrendered && !this.deferentialPilot(ship) && (ship.role === 'pirate' || ship.role === 'bounty' || ship.role === 'escort' || ship.hostile) && !ship.targetId) {
+        if (!ship.surrendered && !ship.standingDown && !this.deferentialPilot(ship) && (ship.role === 'pirate' || ship.role === 'bounty' || ship.role === 'escort' || ship.hostile) && !ship.targetId) {
             const victim = this.ships
                 .filter((entry) => !entry.hostile && entry.hull > 0 && (entry.role === 'trader' || entry.role === 'miner'))
                 .sort((a, b) => distSqTo(ship.position, a.position) - distSqTo(ship.position, b.position))[0];
@@ -2737,7 +2929,7 @@ export class GameSession {
         // at short range, aggressive hoses from way out.
         const fireGate = 0.85 + (1 - aim) * 0.1;
         const fireRange = pilotMod(ship, ATTACK_FIRE_RANGE, 'fireRangeMul');
-        if (!fleeing && distance < fireRange && facing > fireGate && ship.fireCooldown <= 0 && !this.lineBlocked(position, predicted, ship.id)) {
+        if (!fleeing && !ship.holdFire && distance < fireRange && facing > fireGate && ship.fireCooldown <= 0 && !this.lineBlocked(position, predicted, ship.id)) {
             this.fireNpcGun(ship, lead);
         }
     }
@@ -2781,18 +2973,141 @@ export class GameSession {
             ship.destination = tuple(destination);
         }
         const desired = this.tmpI.subVectors(destination, position).normalize();
-        desired.add(this.getAvoidanceVector(position, desired, 28));
+        desired.add(this.getAvoidanceVector(position, desired, 28, velocity.length()));
         const shipAvoidance = this.getShipAvoidance(position, velocity, ship.id);
         if (shipAvoidance)
             desired.add(shipAvoidance);
         desired.normalize();
         this.tmpQ2.setFromUnitVectors(FORWARD, desired);
         orientation.slerp(this.tmpQ2, 1 - Math.exp(-ship.turnRate * 0.62 * dt));
-        velocity.lerp(desired.multiplyScalar(ship.speed * (ship.role === 'trader' ? 0.72 : 0.5)), 1 - Math.exp(-0.55 * dt));
+        orientation.normalize();
+        // Fly where the nose points (matching combat AI), so a course change is
+        // a real banked turn rather than a sideways slide onto the new heading.
+        const forward = this.tmpC.copy(FORWARD).applyQuaternion(orientation).normalize();
+        const travelSpeed = ship.speed * (ship.role === 'trader' ? 0.72 : 0.5);
+        velocity.lerp(forward.multiplyScalar(travelSpeed), 1 - Math.exp(-0.55 * dt));
         position.addScaledVector(velocity, dt);
         tupleInto(ship.position, position);
         tupleInto(ship.velocity, velocity);
         quatTupleInto(ship.rotation, orientation);
+    }
+    resolveNpcCollisions(ship) {
+        // NPC hard-collision pass: mirror the player's field collision so ships
+        // push out of rocks and wreckage instead of ghosting through them. Debris
+        // panels resolve against their exact oriented surface; everything else
+        // (asteroids, wreck nodes, rings/engines) uses its bounding sphere — a
+        // coarse but safe proxy for NPC steering.
+        if (ship.captured || ship.poweredDown)
+            return;
+        const position = this.tmpA.set(ship.position[0], ship.position[1], ship.position[2]);
+        const velocity = this.tmpB.set(ship.velocity[0], ship.velocity[1], ship.velocity[2]);
+        const speed = velocity.length();
+        let impactDamage = 0;
+        let clipped = false;
+        const resolveContact = (normal, push) => {
+            clipped = true;
+            position.x += normal.x * push;
+            position.y += normal.y * push;
+            position.z += normal.z * push;
+            // Cancel the inward velocity and add a little outward rebound, so the
+            // ship cannot tunnel into or grind along the obstacle's surface.
+            const inward = -(velocity.x * normal.x + velocity.y * normal.y + velocity.z * normal.z);
+            if (inward > 0)
+                velocity.addScaledVector(normal, inward * 1.5);
+            const impactSpeed = inward + speed * 0.16;
+            if (impactSpeed > 4)
+                impactDamage = Math.max(impactDamage, (impactSpeed - 3) * 1.35);
+        };
+        const collideSphere = (x, y, z, radius) => {
+            const ox = position.x - x;
+            const oy = position.y - y;
+            const oz = position.z - z;
+            const minimum = radius + NPC_SHIP_RADIUS;
+            const distSq = ox * ox + oy * oy + oz * oz;
+            if (distSq >= minimum * minimum || distSq < 0.0001)
+                return;
+            const dist = Math.sqrt(distSq);
+            const nx = ox / dist;
+            const ny = oy / dist;
+            const nz = oz / dist;
+            position.x = x + nx * minimum;
+            position.y = y + ny * minimum;
+            position.z = z + nz * minimum;
+            this.tmpCollide.set(nx, ny, nz);
+            resolveContact(this.tmpCollide, 0);
+        };
+        const collideBox = (obstacle) => {
+            const box = obstacle.box;
+            this.tmpQ.set(box.qx, box.qy, box.qz, box.qw);
+            this.tmpQ2.copy(this.tmpQ).invert();
+            this.tmpF.set(position.x - obstacle.x, position.y - obstacle.y, position.z - obstacle.z).applyQuaternion(this.tmpQ2);
+            const hx = box.hx;
+            const hy = box.hy;
+            const hz = box.hz;
+            const ex = hx + NPC_SHIP_RADIUS;
+            const ey = hy + NPC_SHIP_RADIUS;
+            const ez = hz + NPC_SHIP_RADIUS;
+            if (this.tmpF.x < -ex || this.tmpF.x > ex || this.tmpF.y < -ey || this.tmpF.y > ey || this.tmpF.z < -ez || this.tmpF.z > ez)
+                return;
+            const cx = clamp(this.tmpF.x, -hx, hx);
+            const cy = clamp(this.tmpF.y, -hy, hy);
+            const cz = clamp(this.tmpF.z, -hz, hz);
+            let dx = this.tmpF.x - cx;
+            let dy = this.tmpF.y - cy;
+            let dz = this.tmpF.z - cz;
+            const distSq = dx * dx + dy * dy + dz * dz;
+            let nx;
+            let ny;
+            let nz;
+            let push;
+            if (distSq > 1e-9) {
+                const dist = Math.sqrt(distSq);
+                if (dist >= NPC_SHIP_RADIUS)
+                    return;
+                nx = dx / dist;
+                ny = dy / dist;
+                nz = dz / dist;
+                push = NPC_SHIP_RADIUS - dist + 0.08;
+            }
+            else {
+                const px = hx - Math.abs(this.tmpF.x);
+                const py = hy - Math.abs(this.tmpF.y);
+                const pz = hz - Math.abs(this.tmpF.z);
+                if (px <= py && px <= pz) {
+                    nx = this.tmpF.x < 0 ? -1 : 1;
+                    ny = 0;
+                    nz = 0;
+                    push = px + NPC_SHIP_RADIUS + 0.08;
+                }
+                else if (py <= pz) {
+                    nx = 0;
+                    ny = this.tmpF.y < 0 ? -1 : 1;
+                    nz = 0;
+                    push = py + NPC_SHIP_RADIUS + 0.08;
+                }
+                else {
+                    nx = 0;
+                    ny = 0;
+                    nz = this.tmpF.z < 0 ? -1 : 1;
+                    push = pz + NPC_SHIP_RADIUS + 0.08;
+                }
+            }
+            this.tmpG.set(nx, ny, nz).applyQuaternion(this.tmpQ);
+            resolveContact(this.tmpG, push);
+        };
+        const margin = MAX_FIELD_OBSTACLE_RADIUS + NPC_SHIP_RADIUS;
+        this.forEachObstacleInBox(position.x - margin, position.y - margin, position.z - margin, position.x + margin, position.y + margin, position.z + margin, (obstacle) => {
+            if (obstacle.box)
+                collideBox(obstacle);
+            else
+                collideSphere(obstacle.x, obstacle.y, obstacle.z, obstacle.collisionRadius);
+        });
+        tupleInto(ship.position, position);
+        tupleInto(ship.velocity, velocity);
+        if (impactDamage > 0)
+            this.damageShip(ship, impactDamage, 'environment', tuple(position));
+        if (clipped && impactDamage > 0.5)
+            ship.destination = undefined;
     }
     fireNpcGun(ship, direction) {
         // Aim quality: the AI's nose already aims at the deflection point, so the
@@ -2932,42 +3247,48 @@ export class GameSession {
         const hullDamaged = remaining > 0;
         ship.shieldDelay = 4.5;
         if (attackerId === 'player' && ship.hull > 0 && !ship.poweredDown) {
-            // Under fire: the pilot commits to evasion after their reaction
-            // latency (reflex — novices flinch late, aces react fast) and stays
-            // evasive for a reflex-scaled duration.
-            const reflex = ship.pilot?.reflex ?? 0.78;
-            ship.evasiveUntil = this.save.world.time + 2.5 * (0.6 + reflex * 0.5);
-            ship.evasiveLatencyUntil = this.save.world.time + (1.2 - reflex) * 1.1;
-            // Hull damage opens the surrender gate: instead of just running,
-            // the pilot picks a surrender action (run, dump cargo or pay and
-            // run, or power down). The gate is open from the first hull hit —
-            // every hull hit rolls a personality-driven chance that climbs as
-            // the hull degrades, so a timid pilot may give up at the first
-            // scratch while an aggressive one fights on. fleeMul drives both
-            // the starting odds and how fast they rise; a wary pilot who
-            // escaped before gives up even sooner.
-            const hullRatio = ship.maxHull > 0 ? ship.hull / ship.maxHull : 1;
-            const stubborn = pilotMod(ship, 1, 'fleeMul');
-            const chance = (0.04 + (1 - hullRatio) * 0.32) * stubborn * (ship.waryOfPlayer ? WARY_FLEE_MULTIPLIER : 1);
-            if (hullDamaged && !ship.fleeing && !ship.surrendered && ship.aiRng() < chance)
-                this.surrenderShip(ship);
-            // Timid pilots call for help when the player lands a hit: a seeded
-            // chance with its own cooldown, routed through the comms bar like
-            // the rest of the chatter. At close range any hit is worth
-            // crying about; out past DISTRESS_CLOSE_RANGE a hit has to actually
-            // bite hull (the ship closed in, shields are down, the fight is
-            // real) before it earns a MAYDAY — long-range potshots that only
-            // graze shields stay quiet.
-            const dx = ship.position[0] - this.save.player.position[0];
-            const dy = ship.position[1] - this.save.player.position[1];
-            const dz = ship.position[2] - this.save.player.position[2];
-            const closeRange = dx * dx + dy * dy + dz * dz <= DISTRESS_CLOSE_RANGE * DISTRESS_CLOSE_RANGE;
-            if (this.chatterOpen() && ship.pilot?.temperament === 'timid' && (hullDamaged || closeRange) && this.save.world.time >= (ship.nextDistressAt ?? 0) && ship.aiRng() < 0.3) {
-                const distressPool = PILOT_LINES.timid.distress;
-                if (distressPool?.length) {
-                    ship.nextDistressAt = this.save.world.time + 6 + ship.aiRng() * 8;
-                    const line = distressPool[Math.floor(ship.aiRng() * distressPool.length)];
-                    this.sayPilotLine(ship, line);
+            // Firing on a demanding pirate ends the standoff one way or
+            // another: a scared group breaks off, the rest commit to the fight.
+            const brokeOff = ship.mug ? this.tryScareOffMug(ship) : false;
+            if (!brokeOff) {
+                this.endMugStandoff(ship);
+                // Under fire: the pilot commits to evasion after their reaction
+                // latency (reflex — novices flinch late, aces react fast) and stays
+                // evasive for a reflex-scaled duration.
+                const reflex = ship.pilot?.reflex ?? 0.78;
+                ship.evasiveUntil = this.save.world.time + 2.5 * (0.6 + reflex * 0.5);
+                ship.evasiveLatencyUntil = this.save.world.time + (1.2 - reflex) * 1.1;
+                // Hull damage opens the surrender gate: instead of just running,
+                // the pilot picks a surrender action (run, dump cargo or pay and
+                // run, or power down). The gate is open from the first hull hit —
+                // every hull hit rolls a personality-driven chance that climbs as
+                // the hull degrades, so a timid pilot may give up at the first
+                // scratch while an aggressive one fights on. fleeMul drives both
+                // the starting odds and how fast they rise; a wary pilot who
+                // escaped before gives up even sooner.
+                const hullRatio = ship.maxHull > 0 ? ship.hull / ship.maxHull : 1;
+                const stubborn = pilotMod(ship, 1, 'fleeMul');
+                const chance = (0.04 + (1 - hullRatio) * 0.32) * stubborn * (ship.waryOfPlayer ? WARY_FLEE_MULTIPLIER : 1);
+                if (hullDamaged && !ship.fleeing && !ship.surrendered && ship.aiRng() < chance)
+                    this.surrenderShip(ship);
+                // Timid pilots call for help when the player lands a hit: a seeded
+                // chance with its own cooldown, routed through the comms bar like
+                // the rest of the chatter. At close range any hit is worth
+                // crying about; out past DISTRESS_CLOSE_RANGE a hit has to actually
+                // bite hull (the ship closed in, shields are down, the fight is
+                // real) before it earns a MAYDAY — long-range potshots that only
+                // graze shields stay quiet.
+                const dx = ship.position[0] - this.save.player.position[0];
+                const dy = ship.position[1] - this.save.player.position[1];
+                const dz = ship.position[2] - this.save.player.position[2];
+                const closeRange = dx * dx + dy * dy + dz * dz <= DISTRESS_CLOSE_RANGE * DISTRESS_CLOSE_RANGE;
+                if (this.chatterOpen() && ship.pilot?.temperament === 'timid' && (hullDamaged || closeRange) && this.save.world.time >= (ship.nextDistressAt ?? 0) && ship.aiRng() < 0.3) {
+                    const distressPool = PILOT_LINES.timid.distress;
+                    if (distressPool?.length) {
+                        ship.nextDistressAt = this.save.world.time + 6 + ship.aiRng() * 8;
+                        const line = distressPool[Math.floor(ship.aiRng() * distressPool.length)];
+                        this.sayPilotLine(ship, line);
+                    }
                 }
             }
         }
@@ -2979,7 +3300,10 @@ export class GameSession {
         // re-enters the fight (finishing it still pays the bounty via the
         // faction check in destroyShip), and a recognizing pilot defending
         // itself is self-defense, so neither is penalized here.
-        if (attackerId === 'player' && !ship.hostile && !ship.surrendered && !ship.recognizesPlayer) {
+        // A ship that just stood down after a mug (complied or scared off) is
+        // not a fresh civilian target: the hit that resolved the standoff is
+        // self-defense, not an unauthorized attack.
+        if (attackerId === 'player' && !ship.hostile && !ship.surrendered && !ship.recognizesPlayer && !ship.standingDown) {
             ship.playerDamageTaken = (ship.playerDamageTaken ?? 0) + (amount - remaining);
             const threshold = Math.max(25, (ship.maxShield + ship.maxArmor + ship.maxHull) * 0.15);
             if (ship.playerDamageTaken < threshold) {
@@ -3049,12 +3373,201 @@ export class GameSession {
         const pool = SURRENDER_EJECT_POOLS[ship.role] ?? ['electronics', 'scrap'];
         const drops = 1 + Math.floor(rng() * 2);
         for (let index = 0; index < drops; index += 1)
-            this.spawnPickup(pool[Math.floor(rng() * pool.length)], ship.position, 'combat', rng() > 0.9 ? 'uncommon' : 'common');
+            this.spawnPickup(pool[Math.floor(rng() * pool.length)], ship.position, 'combat');
+        if (ship.role === 'miner' && rng() < MINER_GOLD_DROP_CHANCE)
+            this.spawnPickup('gold', ship.position, 'combat');
     }
     // Hand over the wallet: a credit pickup worth a slice of the bounty value.
     transferCredits(ship) {
         const amount = ship.bountyValue > 0 ? Math.round(ship.bountyValue * 0.6) : 60;
-        this.spawnPickup('credits', ship.position, 'combat', 'common', amount);
+        this.spawnPickup('credits', ship.position, 'combat', amount);
+    }
+    // The live standoff, or undefined when no pirate is holding fire on the
+    // player: the demand plus the seconds left on the window.
+    activeMug() {
+        const mugger = this.ships.find((ship) => ship.mug && ship.holdFire);
+        if (!mugger)
+            return undefined;
+        return {
+            demand: mugger.mug.demand,
+            secondsLeft: Math.max(0, Math.ceil((mugger.demandUntil ?? 0) - this.save.world.time)),
+        };
+    }
+    // The demand an active standoff is making, or undefined when no pirate is
+    // holding fire on the player. The ship menu and keyboard use this to show
+    // the compliance affordance (jettison this cargo, or pay the toll).
+    activeMugDemand() {
+        return this.activeMug()?.demand;
+    }
+    activeMugCargoCommodity() {
+        const demand = this.activeMugDemand();
+        return demand?.kind === 'cargo' ? demand.commodity : undefined;
+    }
+    // The cut a mugger wants, by temperament: aggressive pilots demand the
+    // hold's cream, timid ones settle for a light toll.
+    mugShare(temperament) {
+        return MUG_TEMPERAMENT_SHARE[temperament] ?? MUG_CARGO_SHARE;
+    }
+    // What a mugger demands: the most valuable line in the hold (a temperament
+    // share of it), or a credit toll when the hold is empty. Undefined when
+    // there is nothing worth taking — the pirates break off instead of fighting
+    // an empty ship.
+    mugDemand(share = MUG_CARGO_SHARE) {
+        const cargo = this.save.player.cargo ?? {};
+        let best;
+        for (const [id, qty] of Object.entries(cargo)) {
+            if (qty <= 0)
+                continue;
+            const value = (COMMODITIES[id]?.basePrice ?? 0) * qty;
+            if (!best || value > best.value)
+                best = { commodity: id, qty, value };
+        }
+        if (best) {
+            const quantity = Math.max(1, Math.ceil(best.qty * share));
+            return { kind: 'cargo', commodity: best.commodity, quantity };
+        }
+        const credits = this.save.player.credits ?? 0;
+        if (credits >= MUG_TOLL_MIN)
+            return { kind: 'credits', amount: Math.min(MUG_TOLL_MAX, Math.max(MUG_TOLL_MIN, Math.round(credits * MUG_TOLL_SHARE))) };
+        return undefined;
+    }
+    // Claim-jumpers demand the salvage the pilot has already pulled from the
+    // wreck — never what is still aboard. Nothing extracted yet means there is
+    // nothing to shake down, so the ambush falls back to a plain attack.
+    salvageMugDemand(node, lead) {
+        const share = this.mugShare(lead.pilot?.temperament);
+        const held = this.save.player.cargo[node.salvage] ?? 0;
+        if (held <= 0)
+            return undefined;
+        return { kind: 'cargo', commodity: node.salvage, quantity: Math.max(1, Math.ceil(held * share)) };
+    }
+    // Open a standoff: the lead hails a demand and the whole group holds fire
+    // for the window. `demand` may be forced (gold-heat) or built from the hold.
+    beginMug(lead, escorts, demand, options = {}) {
+        const seconds = options.seconds ?? MUG_STANDOFF_SECONDS;
+        const lines = options.lines ?? MUG_DEMAND_LINES;
+        const rng = seededRandom(`${this.save.world.seed}:mug:${lead.id}:${Math.floor(this.save.world.time)}`);
+        const mug = { demand };
+        for (const ship of [lead, ...escorts]) {
+            ship.mug = mug;
+            ship.holdFire = true;
+            ship.demandUntil = this.save.world.time + seconds;
+        }
+        const label = demand.kind === 'cargo'
+            ? `${demand.quantity} ${COMMODITIES[demand.commodity].name}`
+            : formatCredits(demand.amount);
+        const line = lines[Math.floor(rng() * lines.length)]
+            .replace(/\{demand\}/g, label)
+            .replace(/\{seconds\}/g, String(seconds));
+        this.sayPilotLine(lead, line);
+        if (options.sensor)
+            this.ui.pushSensor(options.sensor, 'danger', 5200);
+        if (options.event)
+            this.ui.pushEvent(options.event, 'warning', 6000);
+    }
+    // Ambient intercepts default to mugging: demand whatever the hold will
+    // bear, or break off when the pilot is flying empty and broke.
+    openMug(lead, escorts) {
+        const demand = this.mugDemand(this.mugShare(lead.pilot?.temperament));
+        if (!demand) {
+            for (const ship of [lead, ...escorts]) {
+                ship.standingDown = true;
+                ship.hostile = false;
+                ship.targetId = undefined;
+            }
+            const rng = seededRandom(`${this.save.world.seed}:mug-empty:${lead.id}:${Math.floor(this.save.world.time)}`);
+            this.sayPilotLine(lead, MUG_EMPTY_LINES[Math.floor(rng() * MUG_EMPTY_LINES.length)]);
+            this.ui.pushSensor('Pirates closing — then breaking off: nothing worth the risk.', 'info', 4800);
+            return;
+        }
+        this.beginMug(lead, escorts, demand, {
+            sensor: 'Pirates inbound — they are hailing you.',
+            event: 'Standoff: comply before they fire.',
+        });
+    }
+    // Compliance: the group takes its cut and leaves the field.
+    standDownMug(mugShip) {
+        const mug = mugShip.mug;
+        for (const ship of this.ships) {
+            if (!ship.mug || ship.mug !== mug)
+                continue;
+            ship.mug = undefined;
+            ship.holdFire = false;
+            ship.standingDown = true;
+            ship.hostile = false;
+            ship.targetId = undefined;
+        }
+    }
+    // A show of force: when the player lands a hit on a demanding pirate, the
+    // group may lose its nerve and break off instead of committing to the
+    // fight. Timid leads scare easily; aggressive ones rarely flinch.
+    tryScareOffMug(ship) {
+        const mug = ship.mug;
+        if (!mug)
+            return false;
+        const group = this.ships.filter((entry) => entry.mug === mug);
+        const lead = group[0] ?? ship;
+        const chance = MUG_SCARE_OFF[lead.pilot?.temperament] ?? 0.15;
+        if (ship.aiRng() >= chance)
+            return false;
+        this.standDownMug(lead);
+        const line = MUG_SCARE_LINES[Math.floor(ship.aiRng() * MUG_SCARE_LINES.length)];
+        // The whole crew folds together, so the comms bar names every ship
+        // that is breaking off — not just the lead.
+        this.sayGroupLine(group, line);
+        this.ui.pushEvent('The pirates break off — they want an easier mark.', 'info', 4800);
+        return true;
+    }
+    // The window closed (or the pilot shot first): the whole group commits.
+    endMugStandoff(ship) {
+        const mug = ship.mug;
+        if (!mug) {
+            ship.holdFire = false;
+            return;
+        }
+        for (const entry of this.ships) {
+            if (entry.mug === mug) {
+                entry.mug = undefined;
+                entry.holdFire = false;
+            }
+        }
+    }
+    // Pay off a credit toll during a standoff: cheaper than a hull repair.
+    payOffMug() {
+        const mugger = this.ships.find((ship) => ship.mug && ship.holdFire && ship.mug.demand?.kind === 'credits');
+        if (!mugger)
+            return false;
+        const amount = mugger.mug.demand.amount;
+        if ((this.save.player.credits ?? 0) < amount)
+            return false;
+        this.save.player.credits -= amount;
+        this.standDownMug(mugger);
+        this.ui.pushEvent(`Toll paid (${formatCredits(amount)}) — the pirates break off.`, 'info', 5200);
+        this.audio.play('ui', 0.6);
+        return true;
+    }
+    // The mugging out: hand over cargo to a demanding pirate group. If an
+    // active standoff wants this commodity, the group takes the demanded share
+    // and breaks off; otherwise the cargo becomes drifting pickups the pilot
+    // can scoop back up.
+    jettisonCargo(commodityId = 'gold') {
+        const owned = this.save.player.cargo[commodityId] ?? 0;
+        if (owned <= 0)
+            return false;
+        const mugger = this.ships.find((ship) => ship.mug && ship.holdFire && ship.mug.demand?.kind === 'cargo' && ship.mug.demand.commodity === commodityId);
+        if (mugger) {
+            const take = Math.min(owned, mugger.mug.demand.quantity);
+            this.save.player.cargo[commodityId] = owned - take;
+            this.standDownMug(mugger);
+            this.ui.pushEvent(`${COMMODITIES[commodityId].name} jettisoned (${take} units) — the pirates take it and break off.`, 'info', 5200);
+            this.audio.play('ui', 0.6);
+            return true;
+        }
+        this.save.player.cargo[commodityId] = 0;
+        this.spawnPickup(commodityId, this.save.player.position, 'combat', owned);
+        this.ui.pushEvent(`${COMMODITIES[commodityId].name} jettisoned (${owned} units).`, 'info', 5200);
+        this.audio.play('ui', 0.6);
+        return false;
     }
     // A surrendered pilot is captured, not exploded: claiming the ship pays the
     // defense bounty, completes any active warrant into the registry, and counts
@@ -3127,7 +3640,9 @@ export class GameSession {
         }
         const rng = seededRandom(`${this.save.world.seed}:combat-drop:${ship.id}`);
         if (rng() < 0.64)
-            this.spawnPickup(rng() > 0.8 ? 'electronics' : 'scrap', position, 'combat', rng() > 0.88 ? 'uncommon' : 'common');
+            this.spawnPickup(rng() > 0.8 ? 'electronics' : 'scrap', position, 'combat');
+        if (ship.role === 'miner' && rng() < MINER_GOLD_DROP_CHANCE)
+            this.spawnPickup('gold', position, 'combat');
         if (this.save.player.currentTargetId === ship.id)
             this.save.player.currentTargetId = undefined;
     }
@@ -3276,12 +3791,20 @@ export class GameSession {
             return;
         }
         const bucket = rng();
-        if ((zone === 'asteroid-field' && bucket < 0.42) || (zone === 'graveyard' && bucket < 0.28) || (zone === 'open' && bucket < 0.22)) {
+        // Selling gold is loud: while the sale is fresh (world.goldHeatUntil),
+        // the syndicate has the miner's scent and pirates converge on the
+        // Shardbelt lanes — the intercept window roughly doubles and the miner,
+        // trader, and patrol windows shrink to make room.
+        const goldHeat = zone === 'asteroid-field' && this.save.world.goldHeatUntil > this.save.world.time;
+        const minerCutoff = zone === 'asteroid-field' ? (goldHeat ? GOLD_HEAT_MINER_CUTOFF : 0.42) : zone === 'graveyard' ? 0.28 : 0.22;
+        const traderCutoff = zone === 'graveyard' ? 0.72 : zone === 'asteroid-field' ? (goldHeat ? GOLD_HEAT_TRADER_CUTOFF : 0.68) : 0.5;
+        const patrolCutoff = zone === 'asteroid-field' ? (goldHeat ? GOLD_HEAT_PATROL_CUTOFF : ASTEROID_PATROL_CUTOFF) : 0.78;
+        if (bucket < minerCutoff) {
             const miner = this.spawnShip('miner', this.encounterPosition(rng, 180));
             miner.destination = tuple(vec(LOCATIONS.shardbelt.position).add(new THREE.Vector3(randomBetween(rng, -70, 70), randomBetween(rng, -35, 35), randomBetween(rng, -70, 70))));
             this.ui.pushSensor(zone === 'graveyard' ? 'Independent recovery crew on sensors.' : 'Miner traffic crossing the lane.', 'info');
         }
-        else if (bucket < (zone === 'graveyard' ? 0.72 : zone === 'asteroid-field' ? 0.68 : 0.5)) {
+        else if (bucket < traderCutoff) {
             const trader = this.spawnShip('trader', this.encounterPosition(rng, 225));
             if (rng() < 0.55) {
                 const pirate = this.spawnShip('pirate', this.encounterPosition(rng, 188));
@@ -3293,17 +3816,37 @@ export class GameSession {
                 this.ui.pushSensor('Civilian trader entering local space.', 'info');
             }
         }
-        else if (bucket < 0.78) {
+        else if (bucket < patrolCutoff) {
             this.spawnShip('patrol', this.encounterPosition(rng, 218));
             this.ui.pushSensor('Concord patrol sweep detected.', 'info');
         }
         else {
             const count = randomInt(rng, 1, zone === 'graveyard' ? 3 : 2);
+            const escorts = [];
+            let lead;
             for (let i = 0; i < count; i += 1) {
                 const pirate = this.spawnShip(i === 0 ? 'pirate' : 'escort', this.encounterPosition(rng, 158 + i * 27));
                 pirate.targetId = 'player';
+                if (i === 0)
+                    lead = pirate;
+                else
+                    escorts.push(pirate);
             }
-            this.ui.pushSensor('Pirate intercept. Weapons free.', 'danger', 4800);
+            if (goldHeat && lead) {
+                // Gold-heat keeps its syndicate flavor: a demand for every gram
+                // of gold aboard, with the board-tip lines and messages.
+                this.beginMug(lead, escorts, { kind: 'cargo', commodity: 'gold', quantity: Math.max(1, this.save.player.cargo.gold ?? 0) }, {
+                    lines: GOLD_DEMAND_LINES,
+                    sensor: 'Gold-hunters inbound — they are hailing you.',
+                    event: 'Standoff: jettison gold from the hold before they fire.',
+                });
+            }
+            else if (lead && rng() < MUG_CHANCE) {
+                this.openMug(lead, escorts);
+            }
+            else {
+                this.ui.pushSensor('Pirate intercept. Weapons free.', 'danger', 4800);
+            }
             this.audio.play('warning');
         }
         this.threatAcquireTarget();
@@ -3400,6 +3943,7 @@ export class GameSession {
         // hostile again, but they cut and run earlier than usual (see damageShip).
         const waryOfPlayer = recognizesPlayer && prior === 'fled';
         const isHostile = hostile && !(recognizesPlayer && !waryOfPlayer);
+        const hullFlight = HULL_FLIGHT_STATS[shipVariantForRole(role)] ?? HULL_FLIGHT_STATS.talon;
         const ship = {
             id: `ship-${index}`,
             name: shipName,
@@ -3414,9 +3958,9 @@ export class GameSession {
             maxArmor,
             hull: maxHull,
             maxHull,
-            speed: role === 'bounty' ? 43 : role === 'pirate' || role === 'escort' ? 38 : role === 'patrol' ? 36 : role === 'trader' ? 27 : 24,
-            afterburnSpeed: role === 'bounty' ? 64 : role === 'pirate' || role === 'escort' ? 57 : 0,
-            turnRate: role === 'bounty' ? 1.55 : role === 'pirate' || role === 'escort' ? 1.35 : role === 'patrol' ? 1.1 : 0.72,
+            speed: hullFlight.speed,
+            afterburnSpeed: hullFlight.afterburnSpeed,
+            turnRate: hullFlight.turnRate,
             gunDamage: role === 'bounty' ? 10 : role === 'pirate' ? 7.5 : role === 'escort' ? 6.5 : role === 'patrol' ? 7 : 4,
             hostile: isHostile,
             bountyValue: role === 'bounty' ? 900 : role === 'pirate' || role === 'escort' ? randomInt(rng, 170, 420) : 0,
@@ -4414,7 +4958,8 @@ export class GameSession {
         if (!dock)
             return;
         const result = kind === 'buy' ? buyCommodity(this.save, dock, commodityId, quantity) : sellCommodity(this.save, dock, commodityId, quantity);
-        this.ui.showToast(result.message + (result.ok ? ` ${formatCredits(result.total)}.` : ''), result.ok ? 'success' : 'warning');
+        const goldHeatNote = result.ok && commodityId === 'gold' ? ' The board marks the sale — expect company on the Shardbelt lanes.' : '';
+        this.ui.showToast(result.message + (result.ok ? ` ${formatCredits(result.total)}.${goldHeatNote}` : ''), result.ok ? 'success' : 'warning');
         this.audio.play(result.ok ? 'ui' : 'warning', 0.55);
         this.ui.refreshDock(this.save);
         saveGame(this.save);
@@ -4752,7 +5297,7 @@ export class GameSession {
                         : ship.scanned
                         ? (ship.pilot ? `${ship.recognizesPlayer ? `${SPARED_MARK} ` : ''}${TIER_LABELS[ship.pilot.tier] ?? ship.pilot.tier} · ${TEMPERAMENT_LABELS[ship.pilot.temperament] ?? ship.pilot.temperament}` : undefined)
                         : distance > stats.scanRange
-                            ? `OUT OF SCAN RANGE · ${Math.round(distance)}/${stats.scanRange} km`
+                            ? `OUT OF RANGE · ${Math.round(distance)}/${stats.scanRange} km`
                             : 'SCANNING…',
                     distance,
                     shield: ship.shield,
@@ -4766,23 +5311,26 @@ export class GameSession {
             }
             else if (target.kind === 'asteroid') {
                 const node = this.asteroids.find((entry) => entry.id === target.id);
-                const grade = node.richness > 1.8 ? 'RICH' : node.richness > 1.2 ? 'VIABLE' : 'LEAN';
+                const claim = this.activeMiningClaim(node.id);
                 const scanStatus = node.scanned
-                    ? `${grade} ORE · ${Math.ceil(node.remaining)} LEFT`
+                    ? claim
+                        ? `CLAIM · ${claim.mined ?? 0}/${claim.quantity} MINED`
+                        : `ORE · ${Math.ceil(node.remaining)} LEFT`
                     : distance > stats.scanRange
-                        ? `OUT OF SCAN RANGE · ${Math.round(distance)}/${stats.scanRange} km`
+                        ? `OUT OF RANGE · ${Math.round(distance)}/${stats.scanRange} km`
                         : 'SCANNING…';
-                hudTarget = { kind: 'asteroid', name: target.name, subtitle: node.scanned ? `${node.richness > 1.8 ? 'RICH' : node.richness > 1.2 ? 'VIABLE' : 'LEAN'} ORE` : 'MINERAL SIGNATURE', distance, scanned: node.scanned, readout: this.utilityReadout || scanStatus, ...screen };
+                hudTarget = { kind: 'asteroid', name: target.name, subtitle: node.scanned ? (claim ? 'MINING CLAIM' : 'ORE') : 'MINERAL SIGNATURE', distance, scanned: node.scanned, readout: this.utilityReadout || scanStatus, ...screen };
             }
             else if (target.kind === 'wreck') {
                 const node = this.wreckNodes.find((entry) => entry.id === target.id);
                 const commodity = SCAN_COMMODITY_LABELS[node.salvage] ?? COMMODITIES[node.salvage].name.toUpperCase();
+                // Scanned wrecks report only commodity + recoveries left.
                 const scanStatus = node.scanned
-                    ? `${node.rarity.toUpperCase()} ${commodity} · HAZ ${Math.round(node.hazard * 100)} · ${Math.ceil(node.remaining)} LEFT`
+                    ? `${commodity} · ${Math.ceil(node.remaining)} LEFT`
                     : distance > stats.scanRange
-                        ? `OUT OF SCAN RANGE · ${Math.round(distance)}/${stats.scanRange} km`
+                        ? `OUT OF RANGE · ${Math.round(distance)}/${stats.scanRange} km`
                         : 'SCANNING…';
-                hudTarget = { kind: 'wreck', name: node.name, subtitle: node.scanned ? `${node.rarity.toUpperCase()} ${COMMODITIES[node.salvage].name}` : 'UNRESOLVED WRECK', distance, scanned: node.scanned, readout: this.utilityReadout || scanStatus, ...screen };
+                hudTarget = { kind: 'wreck', name: node.name, subtitle: node.scanned ? commodity : 'UNRESOLVED WRECK', distance, scanned: node.scanned, readout: this.utilityReadout || scanStatus, ...screen };
             }
             else {
                 const location = LOCATIONS[target.id];
@@ -4802,6 +5350,14 @@ export class GameSession {
         const dockPrompt = dock && vec(this.save.player.velocity).length() > AUTO_DOCK_SPEED
             ? `REDUCE SPEED — ${LOCATIONS[dock].kind === 'planet' ? 'LAND' : 'DOCK'} ${LOCATIONS[dock].shortName}`
             : undefined;
+        const mug = this.activeMug();
+        const standoff = mug ? {
+            kind: mug.demand.kind,
+            label: mug.demand.kind === 'cargo'
+                ? `${mug.demand.quantity} × ${SCAN_COMMODITY_LABELS[mug.demand.commodity] ?? COMMODITIES[mug.demand.commodity].name.toUpperCase()}`
+                : formatCredits(mug.demand.amount),
+            seconds: mug.secondsLeft,
+        } : undefined;
         return {
             speed: this.autopilot ? speed / (HYPERDRIVE_CRUISE_SPEED / HYPERDRIVE_DISPLAY_SPEED) : displaySpeed(speed),
             maxSpeed: this.autopilot ? HYPERDRIVE_DISPLAY_SPEED : displaySpeed(this.afterburning && speed >= 0.9 * stats.maxSpeed ? stats.afterburnSpeed : stats.maxSpeed),
@@ -4841,6 +5397,7 @@ export class GameSession {
             dockPrompt,
             monitorStatus: this.save.world.time < this.monitorStatusUntil ? this.monitorStatus : undefined,
             ownMonitorStatus: this.save.world.time < this.ownMonitorStatusUntil ? this.ownMonitorStatus : undefined,
+            standoff,
             contacts: this.radarContacts(),
         };
     }
@@ -4852,7 +5409,7 @@ export class GameSession {
         const shipRange = upgradedRadar ? MAP_CONTACT_RANGE * 1.45 : MAP_CONTACT_RANGE;
         const resourceRange = upgradedRadar ? MAP_RESOURCE_CONTACT_RANGE * 1.4 : MAP_RESOURCE_CONTACT_RANGE;
         const wreckRange = upgradedRadar ? MAP_WRECK_CONTACT_RANGE * 1.35 : MAP_WRECK_CONTACT_RANGE;
-        const buildContact = (kind, id, name, subtitle, position, range, hostile = false) => {
+        const buildContact = (kind, id, name, subtitle, position, range, hostile = false, scanned = false) => {
             const relative = vec(position).sub(player);
             const distance = relative.length();
             if (distance > range)
@@ -4867,10 +5424,13 @@ export class GameSession {
                 x: clamp(relative.x / range, -1, 1),
                 y: clamp(relative.z / range, -1, 1),
                 hostile,
+                scanned,
                 selected: id === this.save.player.currentTargetId,
             };
         };
-        const prioritize = (a, b) => Number(b.selected) - Number(a.selected) || a.distance - b.distance;
+        // Selected lock first, then scanned deposits/wrecks above unscanned,
+        // then nearest first.
+        const prioritize = (a, b) => Number(b.selected) - Number(a.selected) || Number(Boolean(b.scanned)) - Number(Boolean(a.scanned)) || a.distance - b.distance;
         for (const ship of this.ships) {
             if (ship.hull <= 0)
                 continue;
@@ -4881,7 +5441,7 @@ export class GameSession {
         if (this.activeInstanceId === 'shardbelt') {
             const resources = this.asteroids
                 .filter((node) => node.remaining > 0)
-                .map((node) => buildContact('asteroid', node.id, node.tunnelPart ? 'Rock Crown Deposit' : 'Asteroid Deposit', node.scanned ? `ORE ${node.richness.toFixed(2)}` : 'UNSCANNED MINERAL', node.position, resourceRange))
+                .map((node) => buildContact('asteroid', node.id, node.tunnelPart ? 'Rock Crown Deposit' : 'Asteroid Deposit', node.scanned ? 'ORE' : 'UNSCANNED MINERAL', node.position, resourceRange, false, node.scanned))
                 .filter((contact) => Boolean(contact))
                 .sort(prioritize)
                 .slice(0, upgradedRadar ? MAP_RESOURCE_CONTACT_LIMIT + 16 : MAP_RESOURCE_CONTACT_LIMIT);
@@ -4890,7 +5450,7 @@ export class GameSession {
         if (this.activeInstanceId === 'mourning-line') {
             const wrecks = this.wreckNodes
                 .filter((node) => node.remaining > 0)
-                .map((node) => buildContact('wreck', node.id, node.name, node.scanned ? `${node.rarity.toUpperCase()} ${COMMODITIES[node.salvage].name}` : 'UNSCANNED WRECK', node.position, wreckRange))
+                .map((node) => buildContact('wreck', node.id, node.name, node.scanned ? (SCAN_COMMODITY_LABELS[node.salvage] ?? COMMODITIES[node.salvage].name.toUpperCase()) : 'UNSCANNED WRECK', node.position, wreckRange, false, node.scanned))
                 .filter((contact) => Boolean(contact))
                 .sort(prioritize)
                 .slice(0, MAP_WRECK_CONTACT_LIMIT);

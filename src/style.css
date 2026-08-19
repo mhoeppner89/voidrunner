@@ -1379,6 +1379,10 @@ button.compact {
   border-top-color: #5c9f9b;
 }
 
+.mission-card.mining {
+  border-top-color: #c69a3f;
+}
+
 .mission-card header,
 .equipment-card header,
 .ship-card header {
@@ -1971,6 +1975,28 @@ button.compact {
   white-space: nowrap;
 }
 
+.cargo-row button,
+.ship-account-row button {
+  flex: none;
+  padding: 0.26rem 0.5rem;
+  border: 1px solid rgba(223, 183, 93, 0.5);
+  border-radius: 3px;
+  background: rgba(177, 79, 62, 0.16);
+  color: #e0a06a;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.54rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.cargo-row button:hover,
+.cargo-row button:focus-visible,
+.ship-account-row button:hover,
+.ship-account-row button:focus-visible {
+  background: rgba(177, 79, 62, 0.34);
+  color: #ffd9b0;
+}
+
 .ship-account-row {
   min-height: 44px;
 }
@@ -2320,7 +2346,7 @@ button.compact {
   padding: 0.32rem 0.48rem 0;
   color: var(--void-cyan);
   border-bottom: 1px solid rgba(48, 161, 195, 0.48);
-  font-size: clamp(0.42rem, 0.72vw, 0.72rem);
+  font-size: clamp(0.5rem, 0.82vw, 0.78rem);
   letter-spacing: 0.08em;
   white-space: nowrap;
 }
@@ -2338,6 +2364,54 @@ button.compact {
   letter-spacing: 0.04em;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Standoff readout on the own-ship monitor: the mugger's demand plus the
+   countdown, hidden until a pirate is holding fire on the player. It overlays
+   the top of the hull schematic so the 18%/82% heading/layout split is
+   untouched. */
+.screen-standoff {
+  display: none;
+  position: absolute;
+  z-index: 2;
+  top: 18%;
+  left: 0;
+  right: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.18rem 0.48rem;
+  border-top: 1px solid rgba(223, 183, 93, 0.35);
+  border-bottom: 1px solid rgba(223, 183, 93, 0.35);
+  background: rgba(10, 14, 16, 0.82);
+  color: #e0a06a;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: clamp(0.5rem, 0.86vw, 0.72rem);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.screen-standoff.is-visible {
+  display: flex;
+}
+
+.screen-standoff span {
+  color: #ffd9b0;
+  letter-spacing: 0.1em;
+}
+
+.screen-standoff b {
+  overflow: hidden;
+  color: #d7d0bd;
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
+.screen-standoff em {
+  color: #ffd9b0;
+  font-style: normal;
+  font-weight: 700;
 }
 
 /* Dock hint rides the radar zone line: an amber blink while the ship needs
@@ -2534,11 +2608,14 @@ button.compact {
   font-size: clamp(0.58rem, 1.05vw, 0.9rem);
   letter-spacing: 0.05em;
   text-shadow: 0 0 6px rgba(255, 208, 92, 0.35);
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Deposit / wreck scan readout (RICH ORE · 120 LEFT, RARE ELECTRONICS · HAZ 50 · 4 LEFT)
-   lives on the monitor too — the floating scan-readout card is gone. */
+/* Deposit / wreck scan readout (ORE · 120 LEFT, ELECTRONICS · 4 LEFT)
+   lives on the monitor too — the floating scan-readout card is gone. Long
+   statuses truncate with an ellipsis instead of clipping mid-word. */
 .screen-target-readout {
   position: relative;
   z-index: 1;
@@ -2549,9 +2626,11 @@ button.compact {
   padding: 0 0.4rem;
   color: #8fd1c1;
   border-bottom: 1px solid rgba(48, 161, 195, 0.3);
-  font-size: clamp(0.5rem, 0.9vw, 0.78rem);
+  font-size: clamp(0.56rem, 1vw, 0.84rem);
   letter-spacing: 0.05em;
   text-shadow: 0 0 6px rgba(105, 205, 182, 0.3);
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -2798,7 +2877,7 @@ button.compact {
   color: #8fd1c1;
   border-top: 1px solid rgba(48, 161, 195, 0.3);
   font-family: "Courier New", ui-monospace, monospace;
-  font-size: clamp(0.42rem, 0.8vw, 0.66rem);
+  font-size: clamp(0.52rem, 0.95vw, 0.78rem);
   letter-spacing: 0.04em;
   line-height: 1.1;
   overflow: hidden;

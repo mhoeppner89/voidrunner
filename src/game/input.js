@@ -401,6 +401,7 @@ export class InputManager {
             navNext: this.consumePressed('KeyN') || this.consumeTouch('navNext') || Boolean(gamepad.navNext),
             autopilot: this.consumePressed('KeyJ') || this.consumeTouch('autopilot') || Boolean(gamepad.autopilot),
             capture: this.consumeTouch('capture') || Boolean(gamepad.capture),
+            jettison: this.consumePressed('KeyG'),
             pause: this.consumePressed('Escape', 'KeyP') || this.consumeTouch('pause') || Boolean(gamepad.pause),
             map: this.consumePressed('KeyK') || this.consumeTouch('map') || Boolean(gamepad.map),
         };

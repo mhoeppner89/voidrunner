@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v99-0-4-7b-art-cache';
+const CACHE = 'voidrunner-v99-0-4-7i-art-cache';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',

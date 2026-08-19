@@ -1,6 +1,9 @@
 import { COMMODITIES, DOCK_LOCATION_IDS, LOCATIONS, commodityIds } from './data.js';
 import { clamp, randomBetween, seededRandom } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
+// Selling gold is loud: word reaches the syndicate and pirates watch the
+// Shardbelt lanes for this long after the sale (see updateDynamicEncounters).
+const GOLD_HEAT_SECONDS = 360;
 export const createInitialMarket = (seed) => {
     const market = {};
     for (const locationId of DOCK_LOCATION_IDS) {
@@ -101,5 +104,10 @@ export const sellCommodity = (save, locationId, commodityId, requestedQuantity =
     item.demand = clamp(item.demand - Math.ceil(quantity * 0.35), 0, 99);
     item.lastPrice = marketPrice(locationId, commodityId, item, save.world.seed, save.world.economyClock);
     save.player.stats.trades += quantity;
+    if (commodityId === 'gold') {
+        // The exchange tips the syndicate: pirates converge on the Shardbelt to
+        // hunt the lucky miner while the sale is still fresh.
+        save.world.goldHeatUntil = save.world.time + GOLD_HEAT_SECONDS;
+    }
     return { ok: true, message: `Sold ${quantity} ${COMMODITIES[commodityId].name}.`, quantity, total };
 };

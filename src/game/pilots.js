@@ -99,7 +99,9 @@ export const TEMPERAMENT_WEIGHTS = {
     'free-merchants': { timid: 0.35, steady: 0.3, aggressive: 0.15, flamboyant: 0.2 },
     'frontier-miners': { timid: 0.25, steady: 0.45, aggressive: 0.15, flamboyant: 0.15 },
     concord: { timid: 0.12, steady: 0.58, aggressive: 0.12, flamboyant: 0.18 },
-    'red-talons': { timid: 0.08, steady: 0.22, aggressive: 0.52, flamboyant: 0.18 },
+    // Pirates mostly want to mug and be on their way, so the bloodthirsty
+    // aggressive temperament is the minority — steady is the common pirate.
+    'red-talons': { timid: 0.16, steady: 0.4, aggressive: 0.24, flamboyant: 0.2 },
 };
 const TIER_IDS = ['novice', 'veteran', 'ace'];
 const TEMPERAMENT_IDS = ['timid', 'steady', 'aggressive', 'flamboyant'];

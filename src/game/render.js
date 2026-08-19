@@ -1115,9 +1115,9 @@ export class SpaceRenderer {
             vertexColors: true,
         });
         const kindPalettes = {
-            iron: { base: 0x9aa4b0, accent: 0xd0a060, scan: 0xc4ad7a, rich: 0xe7c478 },
-            ice:  { base: 0xb8cee0, accent: 0xe6f4ff, scan: 0xa8c4dc, rich: 0xd8ecff },
-            dark: { base: 0x5a4a52, accent: 0xb0483a, scan: 0x806868, rich: 0xc25c4a },
+            iron: { base: 0x9aa4b0, accent: 0xd0a060, scan: 0xc4ad7a },
+            ice:  { base: 0xb8cee0, accent: 0xe6f4ff, scan: 0xa8c4dc },
+            dark: { base: 0x5a4a52, accent: 0xb0483a, scan: 0x806868 },
         };
         const kindFor = (id) => {
             if (id.startsWith('rock-crown-')) return 'dark';
@@ -1185,7 +1185,7 @@ export class SpaceRenderer {
                     if (node.id === this.selectedAsteroidId)
                         color.setHex(0xcfe884);
                     else if (node.scanned)
-                        color.setHex(node.richness > 1.65 ? palette.rich : palette.scan);
+                        color.setHex(palette.scan);
                     else
                         color.setHex(palette.base);
                     mesh.setColorAt(instanceIndex, color);
@@ -1359,12 +1359,12 @@ export class SpaceRenderer {
     }
     createWreckNodes() {
         // Salvage nodes are solid chunks of the wreck, not wireframe markers: a
-        // handful of irregular geometries and a rarity tint read as debris worth
+        // handful of irregular geometries and a value tint read as debris worth
         // extracting rather than "yellow lines forming a shape".
         const root = this.instanceRoots.get('mourning-line');
         // Brighter base + stronger accent so the panel/dirt detail actually
         // reads on a small chunk instead of collapsing into a flat dark blob.
-        // The material color stays a light rarity tint (it multiplies the map),
+        // The material color stays a light value tint (it multiplies the map),
         // which keeps the detail visible rather than crushing it into shadow.
         const scrapMap = this.createPixelPanelTexture('wreck-node-scrap', 0x5c6a70, 0xa8b4ba, 'metal');
         const rustMap = this.createPixelPanelTexture('wreck-node-rust', 0x5c4638, 0xc48152, 'rust');
@@ -1374,42 +1374,31 @@ export class SpaceRenderer {
             new THREE.BoxGeometry(1.2, 0.7, 1.6),
             new THREE.CylinderGeometry(0.55, 0.8, 1.5, 8),
         ];
-        // One material per rarity instead of one per chunk: 64 nodes used to
-        // carry 64 separate material objects (64 state changes per frame on
-        // mobile). All materials share the emissive=0 selection rule, so
-        // sharing is safe.
-        const rarityMaterials = {
-            rare: new THREE.MeshStandardMaterial({
-                color: 0xffe2a8,
-                map: rustMap,
-                roughness: 0.84,
-                metalness: 0.42,
-                flatShading: true,
-                emissive: 0x000000,
-                emissiveIntensity: 0,
-                side: THREE.DoubleSide,
-            }),
-            uncommon: new THREE.MeshStandardMaterial({
-                color: 0xcfe0f2,
-                map: scrapMap,
-                roughness: 0.84,
-                metalness: 0.6,
-                flatShading: true,
-                emissive: 0x000000,
-                emissiveIntensity: 0,
-                side: THREE.DoubleSide,
-            }),
-            common: new THREE.MeshStandardMaterial({
-                color: 0xd4dce0,
-                map: scrapMap,
-                roughness: 0.84,
-                metalness: 0.6,
-                flatShading: true,
-                emissive: 0x000000,
-                emissiveIntensity: 0,
-                side: THREE.DoubleSide,
-            }),
-        };
+        // Two value-tinted materials instead of one per chunk: tech wrecks
+        // (arms/electronics) get the warm rust look, bulk wrecks (scrap/
+        // machinery) the cool scrap grey. Sharing materials keeps 64 nodes
+        // from becoming 64 state changes per frame.
+        const techMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffe2a8,
+            map: rustMap,
+            roughness: 0.84,
+            metalness: 0.42,
+            flatShading: true,
+            emissive: 0x000000,
+            emissiveIntensity: 0,
+            side: THREE.DoubleSide,
+        });
+        const bulkMaterial = new THREE.MeshStandardMaterial({
+            color: 0xd4dce0,
+            map: scrapMap,
+            roughness: 0.84,
+            metalness: 0.6,
+            flatShading: true,
+            emissive: 0x000000,
+            emissiveIntensity: 0,
+            side: THREE.DoubleSide,
+        });
+        const materialFor = (node) => (node.salvage === 'arms' || node.salvage === 'electronics' ? techMaterial : bulkMaterial);
         const groups = new Map();
         this.wreckNodes.forEach((node, nodeIndex) => {
             let hash = 2166136261;
@@ -1418,8 +1407,8 @@ export class SpaceRenderer {
                 hash = (hash * 16777619) >>> 0;
             }
             const geometryIndex = hash % geometries.length;
-            const rarity = node.rarity ?? 'common';
-            const key = `${geometryIndex}:${rarity}`;
+            const tier = materialFor(node) === techMaterial ? 'tech' : 'bulk';
+            const key = `${geometryIndex}:${tier}`;
             const entries = groups.get(key) ?? [];
             entries.push({
                 node,
@@ -1428,12 +1417,12 @@ export class SpaceRenderer {
             });
             groups.set(key, entries);
         });
-        // Wreck chunks share four geometries and three rarity materials. Keeping
-        // them as one instanced batch per combination removes dozens of draw calls
-        // from the debris scene without changing their shapes or scan targets.
+        // Wreck chunks share four geometries and two value-tinted materials.
+        // Keeping them as one instanced batch per combination removes dozens of
+        // draw calls without changing their shapes or scan targets.
         groups.forEach((entries, key) => {
-            const [geometryIndex, rarity] = key.split(':');
-            const mesh = new THREE.InstancedMesh(geometries[Number(geometryIndex)], rarityMaterials[rarity] ?? rarityMaterials.common, entries.length);
+            const [geometryIndex, tier] = key.split(':');
+            const mesh = new THREE.InstancedMesh(geometries[Number(geometryIndex)], tier === 'tech' ? techMaterial : bulkMaterial, entries.length);
             mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
             mesh.frustumCulled = false;
             mesh.name = `wreck-nodes-${key}`;
@@ -1762,7 +1751,7 @@ export class SpaceRenderer {
         pickups.forEach((pickup) => {
             let mesh = this.pickupMeshes.get(pickup.slot);
             if (!mesh) {
-                const color = pickup.source === 'mining' ? 0xd7c07a : pickup.rarity === 'rare' ? 0xe3a9ff : 0x80d1bf;
+                const color = pickup.source === 'mining' ? 0xd7c07a : 0x80d1bf;
                 const group = new THREE.Group();
                 const body = new THREE.Mesh(pickup.source === 'mining' ? new THREE.DodecahedronGeometry(0.62, 0) : new THREE.BoxGeometry(0.9, 0.52, 0.72), new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.45, emissive: color, emissiveIntensity: 0.16 }));
                 group.add(body);

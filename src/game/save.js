@@ -1,4 +1,4 @@
-import { createInitialMarket } from './economy.js';
+import { createInitialMarket, refreshAllPrices } from './economy.js';
 import { LOCATIONS } from './data.js';
 import { refreshMissionOffers } from './missions.js';
 import { clamp } from './random.js';
@@ -86,6 +86,7 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             time: 0,
             economyClock: 0,
             encounterClock: 0,
+            goldHeatUntil: 0,
             market: createInitialMarket(seed),
             offers: {
                 helix: [],
@@ -174,6 +175,20 @@ export const saveGame = (save) => {
         return false;
     }
 };
+// Existing saves carry a market snapshot from the version they were written
+// under. When a new commodity ships (e.g. gold), that snapshot lacks its entry
+// and the market UI/economy tick would crash on `undefined`. Merge the saved
+// prices with any freshly added commodity so old careers keep working.
+const mergeMarket = (candidateMarket, fallbackMarket) => {
+    const merged = {};
+    for (const locationId of Object.keys(fallbackMarket)) {
+        merged[locationId] = {};
+        for (const commodityId of Object.keys(fallbackMarket[locationId])) {
+            merged[locationId][commodityId] = candidateMarket?.[locationId]?.[commodityId] ?? fallbackMarket[locationId][commodityId];
+        }
+    }
+    return merged;
+};
 const hydrateSave = (candidate) => {
     const sourceVersion = Number(candidate.version ?? 1);
     const fallback = createNewSave(candidate.world?.seed);
@@ -197,7 +212,7 @@ const hydrateSave = (candidate) => {
         world: {
             ...fallback.world,
             ...(candidate.world ?? {}),
-            market: candidate.world?.market ?? fallback.world.market,
+            market: mergeMarket(candidate.world?.market, fallback.world.market),
             offers: { ...fallback.world.offers, ...(candidate.world?.offers ?? {}) },
             depletedAsteroids: candidate.world?.depletedAsteroids ?? {},
             depletedWrecks: candidate.world?.depletedWrecks ?? {},
@@ -228,6 +243,10 @@ const hydrateSave = (candidate) => {
     save.player.armor = clamp(save.player.armor, 0, stats.armor);
     save.player.hull = clamp(save.player.hull, 1, stats.hull);
     save.player.missiles = clamp(save.player.missiles, 0, stats.missileCapacity);
+    // Re-derive market prices from the current base prices on load, so a
+    // balance pass (e.g. ore/salvage revaluation) lands immediately instead of
+    // waiting for the next 45s economy tick.
+    refreshAllPrices(save.world.market, save.world.seed, save.world.economyClock);
     refreshMissionOffers(save);
     return save;
 };
