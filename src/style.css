@@ -1893,6 +1893,42 @@ button.compact {
   line-height: 1.5;
 }
 
+/* Flight recorder history: a full-width column under the other ship-menu
+   sections, newest entry first, tone-colored like the monitor ticker. */
+.ship-menu-events {
+  grid-column: 1 / -1;
+}
+
+.event-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.36rem 0;
+  border-bottom: 1px solid rgba(119, 139, 130, 0.14);
+  color: #9fd8cf;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.66rem;
+  line-height: 1.4;
+}
+
+.event-row::before {
+  content: "▸";
+  flex: none;
+  font-size: 0.6rem;
+}
+
+.event-row[data-tone='warning'] {
+  color: #f0d08a;
+}
+
+.event-row[data-tone='danger'] {
+  color: #ff9c8b;
+}
+
+.event-row[data-tone='success'] {
+  color: #c6e5ba;
+}
+
 .cargo-row,
 .ship-account-row {
   display: flex;
@@ -2304,6 +2340,20 @@ button.compact {
   white-space: nowrap;
 }
 
+/* Dock hint rides the radar zone line: an amber blink while the ship needs
+   to slow to land/dock, so the old floating bottom-center prompt is gone. */
+.screen-heading b.is-dock-prompt {
+  color: #ffc66b;
+  text-shadow: 0 0 6px rgba(255, 198, 107, 0.6);
+  animation: dock-prompt-blink 1s steps(2, start) infinite;
+}
+
+@keyframes dock-prompt-blink {
+  50% {
+    opacity: 0.55;
+  }
+}
+
 .screen-ship-layout,
 .screen-target-layout {
   position: relative;
@@ -2515,9 +2565,10 @@ button.compact {
 }
 
 /* Own-ship monitor stacks the flight strip on top (SPD/FUEL above the hull),
-   with the outline filling the middle and the status bars at the bottom. */
+   with the outline filling the middle, the status bars below it, and the
+   flight-recorder ticker as a thin bottom row. */
 .screen-ship-layout {
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
 }
 
 /* Top-down schematic drawn live so the own and target monitors always show
@@ -2704,7 +2755,8 @@ button.compact {
 
 .radar-screen-wrap {
   position: absolute;
-  inset: 18% 7% 5%;
+  /* Bottom inset leaves room for the sensor-log ticker line. */
+  inset: 18% 7% 17%;
   z-index: 1;
 }
 
@@ -2731,6 +2783,59 @@ button.compact {
   width: 100%;
   height: 100%;
   image-rendering: pixelated;
+}
+
+/* Monitor tickers: thin single-line event feeds that replace the in-flight
+   toast stack. Idle (no active entry) fades the line out; a live entry colors
+   it by tone so danger/warning/success read like the old toast palette. */
+.screen-ticker {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  min-height: 10px;
+  padding: 0.08rem 0.4rem 0.1rem;
+  color: #8fd1c1;
+  border-top: 1px solid rgba(48, 161, 195, 0.3);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: clamp(0.42rem, 0.8vw, 0.66rem);
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.screen-ticker.is-visible {
+  opacity: 1;
+}
+
+.screen-ticker[data-tone='warning'] {
+  color: #f0d08a;
+  text-shadow: 0 0 6px rgba(240, 208, 138, 0.4);
+}
+
+.screen-ticker[data-tone='danger'] {
+  color: #ff9c8b;
+  text-shadow: 0 0 6px rgba(255, 156, 139, 0.5);
+}
+
+.screen-ticker[data-tone='success'] {
+  color: #c6e5ba;
+  text-shadow: 0 0 6px rgba(198, 229, 186, 0.35);
+}
+
+/* The radar's sensor log sits along the monitor's bottom edge, under the
+   sweep. */
+.screen-sensor-log {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 3%;
+  border-top: none;
+  border-bottom: 1px solid rgba(48, 161, 195, 0.3);
 }
 
 /* The live instrument windows are now the authoritative status/radar layer. */
@@ -2793,7 +2898,8 @@ button.compact {
   }
 
   .radar-screen-wrap {
-    inset: 21% 5% 3%;
+    /* Keep the bottom clear for the sensor-log ticker line. */
+    inset: 21% 5% 17%;
   }
 }
 
@@ -4012,10 +4118,13 @@ button.primary,
 .cockpit-identity em {
   display: block;
   min-height: 1em;
+  overflow: hidden;
   font-style: normal;
   color: #9fd8cf;
   font-size: 0.42rem;
   letter-spacing: 0.12em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #game-shell[data-hyperdrive-fx="active"] .cockpit-identity em {
@@ -6709,19 +6818,9 @@ button.primary,
   box-shadow: 0 0 20px var(--helix-shadow-glow);
 }
 
-.dock-screen[data-location="helix"][data-tab="concourse"] .concourse-hover-ship-flight::after,
-.dock-screen[data-location="rook"][data-tab="concourse"] .concourse-hover-ship-flight::after {
-  position: absolute;
-  inset: 0;
-  background: rgba(55, 139, 211, 0.2);
-  content: "";
-  pointer-events: none;
-  mix-blend-mode: color;
-  opacity: 0.8;
-  -webkit-mask: var(--vesper-ship-mask) center / 100% 100% no-repeat;
-  mask: var(--vesper-ship-mask) center / 100% 100% no-repeat;
-}
-
+/* Helix/Rook cool hangar light comes from the blue drop-shadows now — the
+   masked ::after wash is gone (it loaded the same PNG twice). A full
+   hue-rotate read too blue, so the grade stays in the shadows. */
 .dock-screen[data-location="helix"][data-tab="concourse"] .concourse-hover-ship,
 .dock-screen[data-location="rook"][data-tab="concourse"] .concourse-hover-ship {
   filter: brightness(0.8) saturate(0.82) contrast(1.12)

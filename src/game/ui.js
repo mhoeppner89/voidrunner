@@ -46,7 +46,7 @@ export const callsignHandle = (callsign) => {
     const quoted = callsign.match(/“[^”]+”/);
     return quoted ? quoted[0].slice(1, -1) : callsign;
 };
-const GAME_VERSION = '0.4.7a';
+const GAME_VERSION = '0.4.7b';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -190,6 +190,12 @@ export class GameUI {
     elementCache = new Map();
     shipPreviews = [];
     toastId = 0;
+    // Monitor surfaces replace the in-flight toast stack: recentEvents feeds
+    // the own-ship flight-recorder ticker + the ship-menu history, sensorLog
+    // feeds the radar's local-space line. Both ring-buffer so a busy fight
+    // never grows the DOM, and entries carry their own expiry for the ticker.
+    recentEvents = [];
+    sensorLog = [];
     mapPointer;
     lastMapPointerSelection;
     lastHud;
@@ -293,11 +299,12 @@ export class GameUI {
           </div>
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="Own ship status display; tap to open ship menu">
             <div class="screen-heading"><span>OWN SHIP STATUS</span><b id="own-ship-name">WAYFARER</b></div>
-            <div class="screen-ship-layout"><div class="screen-flight"><div><span>SPD</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>FUEL</span><b id="screen-own-fuel">100</b><small>%</small></div><div><span>HOLD</span><b id="screen-own-cargo">0.0</b><small id="screen-own-cargo-cap">/32</small></div></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>ARMOR</span><i><b id="screen-own-armor"></b></i><em id="screen-own-armor-value">100</em></div><div><span>HULL</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">100</em></div></div></div>
+            <div class="screen-ship-layout"><div class="screen-flight"><div><span>SPD</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>FUEL</span><b id="screen-own-fuel">100</b><small>%</small></div><div><span>HOLD</span><b id="screen-own-cargo">0.0</b><small id="screen-own-cargo-cap">/32</small></div></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>ARMOR</span><i><b id="screen-own-armor"></b></i><em id="screen-own-armor-value">100</em></div><div><span>HULL</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">100</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="Radar display; tap to open navigation map">
             <div class="screen-heading"><span>RADAR · TAP MAP</span><b id="screen-radar-zone">OPEN SPACE</b></div>
             <div class="radar-screen-wrap"><canvas id="radar" width="220" height="220" role="button" tabindex="0" aria-label="Open navigation map"></canvas></div>
+            <div class="screen-ticker screen-sensor-log" id="screen-sensor-log" data-tone="info"></div>
           </div>
           <div class="cockpit-screen cockpit-screen-target" data-touch-action="targetNext" aria-label="Target status display; tap to cycle targets">
             <div class="screen-heading"><span>TARGET STATUS</span><b id="screen-target-name">NO LOCK</b></div>
@@ -310,9 +317,6 @@ export class GameUI {
           <div id="target-bracket" class="target-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
           <div id="target-edge-pointer" class="target-edge-pointer is-hidden" aria-hidden="true"><i></i><span></span></div>
           <div class="reticle" aria-hidden="true"><span></span><span></span><span></span><span></span><b></b></div>
-          <div class="hud-bottom-center">
-            <div id="context-prompt" class="context-prompt is-hidden"></div>
-          </div>
           <button type="button" id="comms-bar" class="comms-bar" data-ui-command="open-chat" role="button" tabindex="0" aria-label="Open comms log"></button>
           <div class="touch-controls" aria-label="Touch flight controls">
             <div class="touch-left">
@@ -832,8 +836,6 @@ export class GameUI {
         const concourseShadowScale = this.dockLocation === 'rook' ? 0.9 : 1;
         layer.style.setProperty('--vesper-ship-left', anchorX(shipAnchorX));
         layer.style.setProperty('--vesper-ship-top', anchorY(shipAnchorY));
-        const shipMaskArt = profile.art.startsWith('./') ? `/${profile.art.slice(2)}` : profile.art;
-        layer.style.setProperty('--vesper-ship-mask', `url("${shipMaskArt}")`);
         layer.style.setProperty('--vesper-ship-width', `${(profile.width * scale * concourseShipScale).toFixed(2)}px`);
         layer.style.setProperty('--vesper-ship-angle', `${profile.angle}deg`);
         layer.style.setProperty('--vesper-ship-bob', `${(profile.bob * scale * concourseShipScale).toFixed(2)}px`);
@@ -1264,12 +1266,27 @@ export class GameUI {
                 status = 'ENGAGED';
             else if (state === 'interrupt')
                 status = 'INTERRUPTED';
-            else if (model.hyperdriveCooldown > 0)
-                status = `COOLDOWN ${Math.ceil(model.hyperdriveCooldown)}s`;
+            else if (model.hyperdriveStatus)
+                status = model.hyperdriveStatus;
+            // No COOLDOWN state: the post-intercept calm window only suppresses
+            // new ambushes, never the drive, so the card has nothing to count.
             cardStatus.textContent = status;
             cardStatus.classList.toggle('is-hidden', !status);
             card.dataset.hyperdriveReady = model.hyperdriveReady ? 'true' : 'false';
         }
+        // Monitor tickers: the own-ship flight recorder and the radar sensor
+        // log replace the in-flight toast stack. Each shows the newest entry
+        // whose display window is still open, colored by its tone.
+        const renderTicker = (selector, entry) => {
+            const ticker = this.el(selector);
+            if (!ticker)
+                return;
+            ticker.textContent = entry?.message ?? '';
+            ticker.dataset.tone = entry?.tone ?? 'info';
+            ticker.classList.toggle('is-visible', Boolean(entry));
+        };
+        renderTicker('#screen-event-ticker', this.currentEntry(this.recentEvents));
+        renderTicker('#screen-sensor-log', this.currentEntry(this.sensorLog));
         setText('#hud-zone', model.zone.toUpperCase());
         setText('#hud-mode', model.mode.toUpperCase());
         setText('#screen-own-speed', Math.round(model.speed).toString());
@@ -1293,18 +1310,20 @@ export class GameUI {
             }
         }
         setText('#own-ship-name', model.shipName.toUpperCase());
-        setText('#screen-radar-zone', model.zone.toUpperCase());
+        const zoneLabel = this.el('#screen-radar-zone');
+        if (zoneLabel) {
+            // The dock hint rides the radar's zone line (no floating prompt):
+            // while the ship needs to slow to land/dock it replaces the zone
+            // with an amber flash, then hands the line back to the zone name.
+            zoneLabel.textContent = (model.dockPrompt ?? model.zone).toUpperCase();
+            zoneLabel.classList.toggle('is-dock-prompt', Boolean(model.dockPrompt));
+        }
         setText('#screen-own-shield-value', Math.ceil(model.shield).toString());
         setText('#screen-own-armor-value', Math.ceil(model.armor).toString());
         setText('#screen-own-hull-value', Math.ceil(model.hull).toString());
         setBar('#screen-own-shield', percent(model.shield, model.maxShield));
         setBar('#screen-own-armor', percent(model.armor, model.maxArmor));
         setBar('#screen-own-hull', percent(model.hull, model.maxHull));
-        const prompt = this.el('#context-prompt');
-        if (prompt) {
-            prompt.textContent = model.prompt ?? '';
-            prompt.classList.toggle('is-hidden', !model.prompt);
-        }
         this.updateTarget(model.target, model.mode);
         const targetReadout = this.el('#screen-target-readout');
         if (targetReadout) {
@@ -1746,6 +1765,32 @@ export class GameUI {
             window.setTimeout(() => toast.remove(), 320);
         }, duration);
     }
+    // Own-ship flight recorder: combat/career events land on the own monitor's
+    // ticker and persist in the ship menu's RECENT EVENTS (like the comms log).
+    pushEvent(message, tone = 'info', duration = 5600) {
+        const now = this.save?.world.time ?? 0;
+        this.recentEvents.push({ message, tone, at: now, until: now + duration / 1000 });
+        if (this.recentEvents.length > 24)
+            this.recentEvents.shift();
+    }
+    // Radar sensor log: local-space traffic/encounter chatter lives on the nav
+    // monitor's ticker rather than the toast stack.
+    pushSensor(message, tone = 'info', duration = 5600) {
+        const now = this.save?.world.time ?? 0;
+        this.sensorLog.push({ message, tone, at: now, until: now + duration / 1000 });
+        if (this.sensorLog.length > 12)
+            this.sensorLog.shift();
+    }
+    // The newest entry whose display window is still open; undefined when the
+    // line has expired (the ticker then fades back to its idle state).
+    currentEntry(log) {
+        const now = this.save?.world.time ?? 0;
+        for (let index = log.length - 1; index >= 0; index -= 1) {
+            if (log[index].until > now)
+                return log[index];
+        }
+        return undefined;
+    }
     // Pilot chatter: a top-center comms bar showing the latest transmission
     // as just "callsign: message", colored by the speaker's relation (hostiles
     // red, allies blue, neutral white). No badges, no timestamps, no log tag —
@@ -1929,6 +1974,9 @@ export class GameUI {
               </article>`;
             }).join('')
             : '<p class="ship-menu-empty">No active contracts. The bar posts new work at every station.</p>';
+        const eventRows = this.recentEvents.length
+            ? [...this.recentEvents].reverse().map((entry) => `<div class="event-row" data-tone="${escapeHtml(entry.tone)}"><span>${escapeHtml(entry.message)}</span></div>`).join('')
+            : '<p class="ship-menu-empty">No flight events recorded. The recorder logs combat, salvage, and pickups.</p>';
         panel.innerHTML = `
       <div class="modal-card ship-card">
         <header><div><span class="eyebrow">SHIP STATUS / PAUSED</span><h2>${escapeHtml(ship?.name ?? 'VOIDRUNNER')}</h2></div><button data-ui-command="close-ship">CLOSE</button></header>
@@ -1940,6 +1988,7 @@ export class GameUI {
             <div class="ship-account-row"><span>CARGO LOAD</span><b>${loadPercent}%</b></div>
             <div class="ship-account-row"><span>HULL</span><b>${Math.ceil(player.hull)}/${Math.ceil(getEffectiveShipStats(player).hull)}</b></div>
           </section>
+          <section class="ship-menu-events"><h3>RECENT EVENTS · ${this.recentEvents.length}</h3>${eventRows}</section>
         </div>
         <footer><span>Contracts carry a destination vector.</span><button data-ui-command="map">NAV MAP</button></footer>
       </div>`;

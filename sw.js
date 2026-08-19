@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v98-0-4-7a-tilt-intercept-fix';
+const CACHE = 'voidrunner-v99-0-4-7b-art-cache';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',
@@ -86,14 +86,35 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))));
   self.clients.claim();
 });
+// Immutable, content-addressed art (sprites, location plates, portraits, the
+// cockpit frame, fonts): the URL only changes when a new image is published,
+// so it never needs a blocking revalidation. Serve the cached copy immediately
+// and refresh it in the background (stale-while-revalidate) so returning to a
+// station never re-downloads the plates — the old network-first path forced a
+// revalidation round trip on every image, every time.
+const IMMUTABLE_ART = /\.(?:png|jpe?g|webp|gif|svg|avif|ico|woff2?|ttf|otf)$/i;
+const isArtAsset = (request) => IMMUTABLE_ART.test(new URL(request.url).pathname);
+const staleWhileRevalidate = async (request) => {
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match(request);
+  const network = fetch(request, { cache: 'no-cache' }).then((response) => {
+    if (response && response.ok)
+      cache.put(request, response.clone());
+    return response;
+  }).catch(() => undefined);
+  return cached ?? (await network);
+};
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  // Network-first, but never trust the HTTP cache: GitHub Pages serves every
-  // asset with `max-age=600`, so after a deploy a plain fetch() can keep
-  // returning the stale-but-fresh pre-deploy bytes (and the new cache then
-  // stores them). `cache: 'no-cache'` forces a conditional revalidation
-  // (If-None-Match) on every request, so the moment a new build is live the
-  // next load revalidates and picks it up.
+  if (isArtAsset(event.request)) {
+    event.respondWith(staleWhileRevalidate(event.request));
+    return;
+  }
+  // App shell (HTML/JS/CSS) stays network-first, but never trusts the HTTP
+  // cache: GitHub Pages serves every asset with `max-age=600`, so after a
+  // deploy a plain fetch() can keep returning the stale-but-fresh pre-deploy
+  // bytes. `cache: 'no-cache'` forces conditional revalidation on every
+  // request, so the moment a new build is live the next load picks it up.
   event.respondWith(fetch(event.request, { cache: 'no-cache' }).then((response) => {
     const copy = response.clone();
     caches.open(CACHE).then((cache) => cache.put(event.request, copy));

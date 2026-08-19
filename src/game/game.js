@@ -453,6 +453,10 @@ export class GameSession {
     monitorStatusUntil = 0;
     ownMonitorStatus = '';
     ownMonitorStatusUntil = 0;
+    // Transient identity-card line: hyperdrive vector/arrival/break messages
+    // land on the drive card's status line instead of the toast stack.
+    hyperdriveStatus = '';
+    hyperdriveStatusUntil = 0;
     utilitySoundCooldown = 0;
     gunCooldown = 0;
     missileCooldown = 0;
@@ -647,8 +651,8 @@ export class GameSession {
         if (announce) {
             const envLabel = environment === 'asteroid-field' ? 'ASTEROID FIELD' : environment === 'debris-field' ? 'DEBRIS FIELD' : 'OPEN SPACE';
             const difficultyLabel = TIER_LABELS[config.difficulty ?? 'veteran'] ?? 'Veteran';
-            this.ui.showToast(`COMBAT SIMULATOR · ${scenario.toUpperCase()} · ${envLabel} · ${difficultyLabel.toUpperCase()} PILOTS`, 'info', 5200);
-            this.ui.showToast('Hostiles inbound. Weapons free.', 'danger', 3600);
+            this.ui.pushEvent(`COMBAT SIMULATOR · ${scenario.toUpperCase()} · ${envLabel} · ${difficultyLabel.toUpperCase()} PILOTS`, 'info', 5200);
+            this.ui.pushEvent('Hostiles inbound. Weapons free.', 'danger', 3600);
         }
     }
     restartArena() {
@@ -667,7 +671,7 @@ export class GameSession {
         this.ui.hideDock();
         this.ui.showHud();
         this.setupArena(this.arena, false);
-        this.ui.showToast('Ship destroyed — arena reset.', 'warning', 3600);
+        this.ui.pushEvent('Ship destroyed — arena reset.', 'warning', 3600);
     }
     onSpacePointerDown = (event) => {
         if (event.button !== 0 || this.save.player.dockedAt || this.ui.isModalOpen)
@@ -882,7 +886,7 @@ export class GameSession {
         this.cleanupEntities();
         if (this.save.world.time - this.lastMissionCheck > 0.8) {
             this.lastMissionCheck = this.save.world.time;
-            failExpiredMissions(this.save).forEach((message) => this.ui.showToast(message, 'danger', 4800));
+            failExpiredMissions(this.save).forEach((message) => this.ui.pushEvent(message, 'danger', 4800));
         }
         if (this.save.world.time - this.lastAutosaveAt > 12) {
             this.lastAutosaveAt = this.save.world.time;
@@ -896,7 +900,7 @@ export class GameSession {
             this.save.player.mode = order[(index + 1) % order.length];
             this.save.player.currentTargetId = undefined;
             this.renderer.setTarget();
-            this.ui.showToast(`${this.save.player.mode.toUpperCase()} systems selected.`, 'info');
+            this.ui.pushEvent(`${this.save.player.mode.toUpperCase()} systems selected.`, 'info');
             this.audio.play('ui');
         }
         if (actions.navNext) {
@@ -942,7 +946,7 @@ export class GameSession {
             this.hyperdriveFx = 'drop';
             this.hyperdriveFxUntil = this.save.world.time + HYPERDRIVE_FX_DURATION;
             this.save.player.throttle = clamp(this.hyperdriveReturnThrottle, 0, 1);
-            this.ui.showToast('Hyperdrive disengaged by manual input.', 'warning');
+            this.setHyperdriveStatus('DISENGAGED · MANUAL INPUT');
         }
         // Afterburner: the burn is live whenever the button is held with fuel
         // (never in autopilot), at ANY throttle and ANY speed — turn authority
@@ -966,7 +970,7 @@ export class GameSession {
                 // Re-sync the local velocity: it was captured before the break, so
                 // otherwise the stale cruise vector would overwrite the combat-speed snap.
                 velocity.copy(vec(this.save.player.velocity));
-                this.ui.showToast('HYPERDRIVE BREAK: hostile intercept.', 'danger', 4200);
+                this.setHyperdriveStatus('HYPERDRIVE BREAK · INTERCEPT', 4200);
                 this.audio.play('warning');
             }
             else {
@@ -1069,7 +1073,7 @@ export class GameSession {
             this.save.player.throttle = clamp(this.hyperdriveReturnThrottle, 0, 1);
             this.save.player.velocity = tuple(FORWARD.clone().applyQuaternion(orientation).multiplyScalar(10));
             this.resetPlayerInterpolation();
-            this.ui.showToast(`Hyperdrive arrival: ${nav.name}.`, 'success');
+            this.setHyperdriveStatus(`ARRIVAL · ${nav.name}`, 3400);
             this.audio.play('success');
         }
     }
@@ -1100,7 +1104,7 @@ export class GameSession {
                 this.damagePlayer((impactSpeed - 3) * 1.65, label);
                 if (this.collisionMessageCooldown <= 0) {
                     this.collisionMessageCooldown = 1.4;
-                    this.ui.showToast(`Collision: ${label}`, 'danger');
+                    this.ui.pushEvent(`Collision: ${label}`, 'danger');
                 }
             }
             this.autopilot = false;
@@ -1369,6 +1373,12 @@ export class GameSession {
         this.ownMonitorStatus = message;
         this.ownMonitorStatusUntil = this.save.world.time + duration / 1000;
     }
+    // Transient hyperdrive-card status: vector set / arrival / break messages
+    // render on the identity card's status line while the drive is idle.
+    setHyperdriveStatus(message, duration = 3000) {
+        this.hyperdriveStatus = message;
+        this.hyperdriveStatusUntil = this.save.world.time + duration / 1000;
+    }
     fireMissile() {
         if (this.save.player.mode !== 'combat') {
             this.setMonitorStatus('MISSILES: COMBAT MODE ONLY');
@@ -1486,7 +1496,7 @@ export class GameSession {
             // monitor's remaining-units count ticks down, so no per-unit toast.
             this.collectExtraction('ore', 'mining', 1, node.richness > 1.75 ? 'uncommon' : 'common');
             if (node.remaining <= 0) {
-                this.ui.showToast('Deposit exhausted.', 'info');
+                this.setMonitorStatus('DEPOSIT EXHAUSTED');
                 this.clearTarget();
                 this.obstacleGridBuiltAt = -Infinity;
                 break;
@@ -1511,7 +1521,7 @@ export class GameSession {
             if (node.remaining <= 0) {
                 if (node.rarity === 'rare')
                     this.recoverRareEquipment(node);
-                this.ui.showToast('Wreck section stripped.', 'info');
+                this.setMonitorStatus('WRECK STRIPPED');
                 this.clearTarget();
                 this.obstacleGridBuiltAt = -Infinity;
                 break;
@@ -1525,13 +1535,13 @@ export class GameSession {
             this.save.player.stats.mined += amount;
             const rankMessage = awardCareerProgress(this.save, 'mining', 1, 'frontier-miners');
             if (rankMessage)
-                this.ui.showToast(rankMessage, 'success', 5000);
+                this.ui.pushEvent(rankMessage, 'success', 5000);
         }
         else {
             this.save.player.stats.salvaged += amount;
             const rankMessage = awardCareerProgress(this.save, 'salvage', rarity === 'rare' ? 3 : 1, 'salvage-union');
             if (rankMessage)
-                this.ui.showToast(rankMessage, 'success', 5000);
+                this.ui.pushEvent(rankMessage, 'success', 5000);
         }
     }
     recoverRareEquipment(node) {
@@ -1545,7 +1555,7 @@ export class GameSession {
         this.save.player.equipment.push(equipmentId);
         const stats = getEffectiveShipStats(this.save.player);
         this.save.player.shield = Math.min(stats.shield, this.save.player.shield + 12);
-        this.ui.showToast(`Rare recovery: ${EQUIPMENT[equipmentId].name} installed.`, 'success', 6200);
+        this.ui.pushEvent(`Rare recovery: ${EQUIPMENT[equipmentId].name} installed.`, 'success', 6200);
         this.audio.play('success', 1.35);
     }
     triggerSalvageAmbush(node) {
@@ -1563,7 +1573,7 @@ export class GameSession {
             escort.targetId = 'player';
         }
         this.threatAcquireTarget();
-        this.ui.showToast('Salvage claim challenged: hostile drives inbound.', 'danger', 5200);
+        this.ui.pushEvent('Salvage claim challenged: hostile drives inbound.', 'danger', 5200);
         this.audio.play('warning');
     }
     spawnPickup(commodity, origin, source, rarity, amount = 1) {
@@ -1614,7 +1624,7 @@ export class GameSession {
             // no cargo space involved.
             this.save.player.credits += pickup.amount;
             pickup.life = 0;
-            this.ui.showToast(`${formatCredits(pickup.amount)} recovered.`, 'success', 2400);
+            this.setOwnMonitorStatus(`+${formatCredits(pickup.amount)}`);
             return;
         }
         const required = COMMODITIES[pickup.commodity].mass * pickup.amount;
@@ -1630,15 +1640,15 @@ export class GameSession {
             this.save.player.stats.mined += pickup.amount;
             const rankMessage = awardCareerProgress(this.save, 'mining', 1, 'frontier-miners');
             if (rankMessage)
-                this.ui.showToast(rankMessage, 'success', 5000);
+                this.ui.pushEvent(rankMessage, 'success', 5000);
         }
         else {
             this.save.player.stats.salvaged += pickup.amount;
             const rankMessage = awardCareerProgress(this.save, 'salvage', pickup.rarity === 'rare' ? 3 : 1, 'salvage-union');
             if (rankMessage)
-                this.ui.showToast(rankMessage, 'success', 5000);
+                this.ui.pushEvent(rankMessage, 'success', 5000);
         }
-        this.ui.showToast(`Tractor captured ${COMMODITIES[pickup.commodity].name}.`, 'success', 2200);
+        this.setOwnMonitorStatus(`+${COMMODITIES[pickup.commodity].name.toUpperCase()}`, 2200);
     }
     // The cockpit has no manual SCAN control anymore: a selected ship, asteroid,
     // or wreck is resolved automatically the moment the ship closes to scan
@@ -1663,7 +1673,7 @@ export class GameSession {
             return;
         const target = this.getTargetRef();
         if (!target) {
-            this.ui.showToast('No target selected for scan.', 'warning');
+            this.setMonitorStatus('NO SCAN TARGET');
             return;
         }
         if (target.kind === 'location') {
@@ -1682,7 +1692,7 @@ export class GameSession {
                 return;
         }
         else if (distance > stats.scanRange) {
-            this.ui.showToast(`Target outside scan range (${Math.round(distance)} / ${stats.scanRange}).`, 'warning');
+            this.setMonitorStatus(`OUT OF SCAN RANGE · ${Math.round(distance)}/${stats.scanRange} km`);
             return;
         }
         if (target.kind === 'asteroid') {
@@ -1947,12 +1957,12 @@ export class GameSession {
             this.hyperdriveFxUntil = this.save.world.time + HYPERDRIVE_FX_DURATION;
             this.snapToCombatSpeed();
             this.save.player.throttle = clamp(this.hyperdriveReturnThrottle, 0, 1);
-            this.ui.showToast('Hyperdrive disengaged.', 'info');
+            this.setHyperdriveStatus('DISENGAGED');
             return;
         }
         const block = this.hyperdriveBlockReason();
         if (block) {
-            this.ui.showToast(block.message, block.kind, block.duration);
+            this.setHyperdriveStatus(block.message, block.duration ?? 3000);
             if (block.kind !== 'info')
                 this.audio.play('warning');
             return;
@@ -1967,20 +1977,22 @@ export class GameSession {
         // danger. An encounter already in progress nearby keeps the jump clean.
         const hostileInSector = this.ships.some((ship) => ship.hostile && ship.hull > 0 && player.distanceTo(vec(ship.position)) < ENCOUNTER_LOCK_RADIUS);
         const rng = seededRandom(`${this.save.world.seed}:jump:${++this.jumpCounter}:${Math.floor(this.save.world.time)}`);
-        if (!hostileInSector && rng() < sectorEncounterChance(nav.id) * this.combatEncounterScale()) {
+        // The calm window after a resolved intercept suppresses new ambushes
+        // without touching the drive: jump away freely, just no immediate re-hit.
+        if (!hostileInSector && this.hyperdriveCooldownRemaining() <= 0 && rng() < sectorEncounterChance(nav.id) * this.combatEncounterScale()) {
             const travelSeconds = HYPERDRIVE_SPOOL_SECONDS + player.distanceTo(vec(nav.position)) / HYPERDRIVE_CRUISE_SPEED;
             this.hyperdriveEncounterAt = this.save.world.time + travelSeconds * randomBetween(rng, 0.4, 0.75);
         }
-        this.ui.showToast(`Hyperdrive vector set: ${nav.name}.`, 'success');
+        this.setHyperdriveStatus(`VECTOR SET · ${nav.name}`, 3200);
         this.audio.play('ui');
     }
     // Why a jump cannot start right now (null = clear). Shared by the toggle
     // (toast hints on press) and the HUD model (identity-card ready glow), so
     // the button light and the press feedback can never drift apart.
+    // The drive itself is never gated by the post-intercept calm window: the
+    // 45s encounter cooldown only suppresses NEW ambushes (see toggleHyperdrive),
+    // so a resolved fight never strands the player from jumping away.
     hyperdriveBlockReason() {
-        const cooldown = this.hyperdriveCooldownRemaining();
-        if (cooldown > 0)
-            return { message: `Hyperdrive cooling down after intercept: ${Math.ceil(cooldown)}s remaining.`, kind: 'warning', duration: 3200 };
         const player = vec(this.save.player.position);
         if (this.hostilesNear(player, HYPERDRIVE_THREAT_RADIUS))
             return { message: 'Hyperdrive unavailable while an enemy is close.', kind: 'danger' };
@@ -2313,7 +2325,7 @@ export class GameSession {
         node.scanned = true;
         if (!this.save.world.scannedNodes.includes(node.id))
             this.save.world.scannedNodes.push(node.id);
-        this.ui.showToast(`Tip: ${node.name} off Mourning Line is carrying ${COMMODITIES[node.salvage].name}. Flagged on your scanner.`, 'success', 6500);
+        this.ui.pushSensor(`Tip: ${node.name} carrying ${COMMODITIES[node.salvage].name}. Flagged on your scanner.`, 'success', 6500);
         return true;
     }
     // A trade contact: nudge one station's supply/demand so the tip is real
@@ -2330,7 +2342,7 @@ export class GameSession {
         else
             item.supply += 15;
         refreshAllPrices(this.save.world.market, this.save.world.seed, this.save.world.economyClock);
-        this.ui.showToast(sellTip
+        this.ui.pushSensor(sellTip
             ? `Tip: my contact at ${LOCATIONS[locationId].name} pays top credit for ${COMMODITIES[commodityId].name}.`
             : `Tip: my contact at ${LOCATIONS[locationId].name} has ${COMMODITIES[commodityId].name} below market.`, 'success', 6500);
         return true;
@@ -2973,14 +2985,14 @@ export class GameSession {
             if (ship.playerDamageTaken < threshold) {
                 if (this.save.world.time >= (ship.fireWarningAt ?? 0)) {
                     ship.fireWarningAt = this.save.world.time + 6;
-                    this.ui.showToast(`Watch your fire — ${ship.role === 'patrol' ? 'patrol vessel' : 'civilian vessel'} hit!`, 'warning', 3600);
+                    this.ui.pushEvent(`Watch your fire — ${ship.role === 'patrol' ? 'patrol vessel' : 'civilian vessel'} hit!`, 'warning', 3600);
                 }
             }
             else {
                 ship.hostile = true;
                 ship.targetId = 'player';
                 this.save.player.reputation[ship.faction] = clamp(this.save.player.reputation[ship.faction] - (ship.role === 'patrol' ? 16 : 9), -100, 100);
-                this.ui.showToast(`Unauthorized attack: ${FACTION_LABEL(ship.faction)} reputation damaged.`, 'danger', 4500);
+                this.ui.pushEvent(`Unauthorized attack: ${FACTION_LABEL(ship.faction)} reputation damaged.`, 'danger', 4500);
                 this.alertPatrols(ship.position);
             }
         }
@@ -3073,12 +3085,12 @@ export class GameSession {
             const payment = ship.bountyValue;
             this.save.player.credits += payment;
             this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + 1, -100, 100);
-            this.ui.showToast(`Surrendered pilot captured. ${formatCredits(payment)} bounty credited.`, 'success', 4200);
+            this.ui.pushEvent(`Surrendered pilot captured. ${formatCredits(payment)} bounty credited.`, 'success', 4200);
         }
         if (ship.missionId) {
             const result = completeBountyMission(this.save, ship.missionId);
             if (result.ok)
-                this.ui.showToast(result.message, 'success', 6500);
+                this.ui.pushEvent(result.message, 'success', 6500);
         }
         const surrenderedTo = this.save.world.surrenderedTo ?? (this.save.world.surrenderedTo = {});
         surrenderedTo[ship.name] = 'captured';
@@ -3101,16 +3113,16 @@ export class GameSession {
                 const payment = ship.bountyValue;
                 this.save.player.credits += payment;
                 this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + 1, -100, 100);
-                this.ui.showToast(`Hostile destroyed. ${formatCredits(payment)} defense bounty credited.`, 'success', 4200);
+                this.ui.pushEvent(`Hostile destroyed. ${formatCredits(payment)} defense bounty credited.`, 'success', 4200);
             }
             else {
                 this.save.player.reputation[ship.faction] = clamp(this.save.player.reputation[ship.faction] - 18, -100, 100);
-                this.ui.showToast('Civilian loss recorded. Faction standing severely reduced.', 'danger', 5200);
+                this.ui.pushEvent('Civilian loss recorded. Faction standing severely reduced.', 'danger', 5200);
             }
             if (ship.missionId) {
                 const result = completeBountyMission(this.save, ship.missionId);
                 if (result.ok)
-                    this.ui.showToast(result.message, 'success', 6500);
+                    this.ui.pushEvent(result.message, 'success', 6500);
             }
         }
         const rng = seededRandom(`${this.save.world.seed}:combat-drop:${ship.id}`);
@@ -3147,7 +3159,7 @@ export class GameSession {
             this.save.player.hull = 0;
             this.deathTimer = 2.1;
             this.renderer.spawnExplosion(this.save.player.position, false, 1.55);
-            this.ui.showToast(`SHIP LOST: ${source}. Emergency beacon transmitting.`, 'danger', 6500);
+            this.ui.pushEvent(`SHIP LOST: ${source}. Emergency beacon transmitting.`, 'danger', 6500);
             this.audio.play('explosion', 1.6);
         }
     }
@@ -3231,7 +3243,7 @@ export class GameSession {
                 escort.targetId = 'player';
             }
             this.threatAcquireTarget();
-            this.ui.showToast(`Warrant target detected: ${mission.targetName}`, 'danger', 5600);
+            this.ui.pushEvent(`Warrant target detected: ${mission.targetName}`, 'danger', 5600);
             this.audio.play('warning');
         }
     }
@@ -3267,23 +3279,23 @@ export class GameSession {
         if ((zone === 'asteroid-field' && bucket < 0.42) || (zone === 'graveyard' && bucket < 0.28) || (zone === 'open' && bucket < 0.22)) {
             const miner = this.spawnShip('miner', this.encounterPosition(rng, 180));
             miner.destination = tuple(vec(LOCATIONS.shardbelt.position).add(new THREE.Vector3(randomBetween(rng, -70, 70), randomBetween(rng, -35, 35), randomBetween(rng, -70, 70))));
-            this.ui.showToast(zone === 'graveyard' ? 'Independent recovery crew on sensors.' : 'Miner traffic crossing the lane.', 'info');
+            this.ui.pushSensor(zone === 'graveyard' ? 'Independent recovery crew on sensors.' : 'Miner traffic crossing the lane.', 'info');
         }
         else if (bucket < (zone === 'graveyard' ? 0.72 : zone === 'asteroid-field' ? 0.68 : 0.5)) {
             const trader = this.spawnShip('trader', this.encounterPosition(rng, 225));
             if (rng() < 0.55) {
                 const pirate = this.spawnShip('pirate', this.encounterPosition(rng, 188));
                 pirate.targetId = trader.id;
-                this.ui.showToast('Distress traffic: pirates attacking a civilian vessel.', 'danger', 5200);
+                this.ui.pushSensor('Distress traffic: pirates attacking a civilian vessel.', 'danger', 5200);
                 this.audio.play('warning');
             }
             else {
-                this.ui.showToast('Civilian trader entering local space.', 'info');
+                this.ui.pushSensor('Civilian trader entering local space.', 'info');
             }
         }
         else if (bucket < 0.78) {
             this.spawnShip('patrol', this.encounterPosition(rng, 218));
-            this.ui.showToast('Concord patrol sweep detected.', 'info');
+            this.ui.pushSensor('Concord patrol sweep detected.', 'info');
         }
         else {
             const count = randomInt(rng, 1, zone === 'graveyard' ? 3 : 2);
@@ -3291,7 +3303,7 @@ export class GameSession {
                 const pirate = this.spawnShip(i === 0 ? 'pirate' : 'escort', this.encounterPosition(rng, 158 + i * 27));
                 pirate.targetId = 'player';
             }
-            this.ui.showToast('Pirate intercept. Weapons free.', 'danger', 4800);
+            this.ui.pushSensor('Pirate intercept. Weapons free.', 'danger', 4800);
             this.audio.play('warning');
         }
         this.threatAcquireTarget();
@@ -3471,7 +3483,7 @@ export class GameSession {
             const discoveryRadius = location.radius + (location.kind === 'planet' ? 160 : 120);
             if (player.distanceTo(vec(location.position)) <= discoveryRadius && !this.save.player.discovered.includes(id)) {
                 this.save.player.discovered.push(id);
-                this.ui.showToast(`NAV DISCOVERY: ${location.name}`, 'success', 4600);
+                this.ui.pushSensor(`NAV DISCOVERY: ${location.name}`, 'success', 4600);
                 this.audio.play('success');
             }
         }
@@ -4387,14 +4399,14 @@ export class GameSession {
         this.audio.setStationMode(false);
         this.ui.hideDock();
         this.ui.showHud();
-        this.ui.showToast(`Cleared for departure from ${location.name}.`, 'success');
+        this.ui.pushEvent(`Cleared for departure from ${location.name}.`, 'success');
         this.updateActiveInstance(true);
         saveGame(this.save);
     }
     setNav(locationId) {
         this.save.player.navTargetId = locationId;
         this.autopilot = false;
-        this.ui.showToast(`NAV set: ${LOCATIONS[locationId].name}.`, 'info');
+        this.ui.pushSensor(`NAV set: ${LOCATIONS[locationId].name}.`, 'info');
         this.audio.play('ui');
     }
     trade(kind, commodityId, quantity) {
@@ -4816,14 +4828,17 @@ export class GameSession {
             navDistance: player.distanceTo(vec(nav.position)),
             autopilot: this.autopilot,
             hyperdrive: this.hyperdriveFxState(),
-            hyperdriveCooldown: this.hyperdriveCooldownRemaining(),
+            hyperdriveStatus: this.save.world.time < this.hyperdriveStatusUntil ? this.hyperdriveStatus : undefined,
+            // No hyperdriveCooldown field: the post-intercept calm window only
+            // suppresses new ambushes (see toggleHyperdrive) and never blocks the
+            // drive, so the card has nothing to count down.
             hyperdriveReady: !this.autopilot && !this.hyperdriveBlockReason(),
             loadPercent: Math.round((cargoMass(this.save.player) / Math.max(1, cargoCapacity(this.save.player))) * 100),
             // Handling reflects the cargo-load penalty on turn/acceleration.
             handlingPercent: Math.round(this.flightLoadScale() * 100),
             zone: this.zoneLabel(this.getWorldZone(player)),
             target: hudTarget,
-            prompt: dockPrompt,
+            dockPrompt,
             monitorStatus: this.save.world.time < this.monitorStatusUntil ? this.monitorStatus : undefined,
             ownMonitorStatus: this.save.world.time < this.ownMonitorStatusUntil ? this.ownMonitorStatus : undefined,
             contacts: this.radarContacts(),
@@ -4883,18 +4898,15 @@ export class GameSession {
         }
         contacts.sort((a, b) => Number(b.hostile) - Number(a.hostile) || prioritize(a, b));
         const nearestThreat = contacts.find((contact) => contact.hostile && contact.distance <= HYPERDRIVE_THREAT_RADIUS);
-        const hyperdriveCooldown = this.hyperdriveCooldownRemaining();
         return {
             playerPosition: [...this.save.player.position],
             navTargetId: this.save.player.navTargetId,
             currentTargetId: this.save.player.currentTargetId,
             contacts,
-            autopilotAvailable: !nearestThreat && hyperdriveCooldown <= 0,
+            autopilotAvailable: !nearestThreat,
             threatLabel: nearestThreat
                 ? `${nearestThreat.name} at ${Math.round(nearestThreat.distance)} units`
-                : hyperdriveCooldown > 0
-                    ? `intercept cooldown (${Math.ceil(hyperdriveCooldown)}s)`
-                    : undefined,
+                : undefined,
         };
     }
     radarContacts() {

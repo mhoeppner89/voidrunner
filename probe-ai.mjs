@@ -57,6 +57,8 @@ const makeSession = (seed) => {
     session.projectileCounter = 0;
     session.pickupCounter = 0;
     session.entityCounter = 0;
+    session.hyperdriveInterceptIds = new Set();
+    session.hyperdriveEncounterCooldownUntil = 0;
     session.activeInstanceId = undefined;
     session.asteroids = [];
     session.graveyard = [];
@@ -80,7 +82,7 @@ const makeSession = (seed) => {
         projectToScreen: () => ({ x: 0, y: 0, visible: true, behind: false }),
     };
     session.audio = { play: () => undefined, playComms: () => undefined };
-    session.ui = { showToast: () => undefined, showPilotLine: () => undefined };
+    session.ui = { pushEvent: () => undefined, pushSensor: () => undefined, showToast: () => undefined, showPilotLine: () => undefined };
     return session;
 };
 const STEP = 1 / 60;
@@ -245,7 +247,7 @@ console.log('surrender outcomes: run, dump cargo, pay, or power down — and the
 const surrenderOutcome = (seed, pilot) => {
     const session = makeSession(seed);
     const messages = [];
-    session.ui = { showToast: () => undefined, showPilotLine: (callsign, line) => messages.push(`${callsign}: “${line}”`) };
+    session.ui = { pushEvent: () => undefined, pushSensor: () => undefined, showToast: () => undefined, showPilotLine: (callsign, line) => messages.push(`${callsign}: “${line}”`) };
     const ship = session.spawnShip('pirate', [0, 0, -200], undefined, undefined, pilot);
     ship.shield = 0;
     ship.armor = 0;
@@ -299,7 +301,7 @@ console.log('plead: a surrendered pilot begs once when you close in, then goes q
 const pleadRun = (seed, temperament) => {
     const session = makeSession(seed);
     const lines = [];
-    session.ui = { showToast: () => undefined, showPilotLine: (callsign, line) => lines.push(line) };
+    session.ui = { pushEvent: () => undefined, pushSensor: () => undefined, showToast: () => undefined, showPilotLine: (callsign, line) => lines.push(line) };
     session.audio = { play: () => undefined, playComms: () => undefined };
     const ship = session.spawnShip('pirate', [0, 0, -200], undefined, undefined, { tier: 'veteran', temperament });
     ship.shield = 0;
@@ -343,7 +345,7 @@ console.log('claim: capturing a surrendered pilot pays the bounty and registers 
 const claimRun = (seed, withMission) => {
     const session = makeSession(seed);
     const messages = [];
-    session.ui = { showToast: (message) => messages.push(message), showPilotLine: () => undefined };
+    session.ui = { pushEvent: (message) => messages.push(message), pushSensor: () => undefined, showToast: (message) => messages.push(message), showPilotLine: () => undefined };
     const ship = session.spawnShip('pirate', [0, 0, -200], undefined, undefined, { tier: 'veteran', temperament: 'aggressive' });
     if (withMission) {
         const mission = { id: `${seed}-claim`, kind: 'bounty', title: 'Warrant: Claim Target', targetName: ship.name, reward: 5000, deposit: 250, danger: 2.5, guild: 'bounty', guildRep: 14, faction: 'concord', pilot: { tier: 'veteran', temperament: 'aggressive' }, status: 'active', deadline: session.save.world.time + 500 };
@@ -373,7 +375,7 @@ const plainClaim = claimRun('claim-1', false);
 const missionClaim = claimRun('claim-2', true);
 console.log(`  plain: paid ${plainClaim.paid} on a ${plainClaim.bounty} bounty, kills ${plainClaim.kills} · mission: paid ${missionClaim.paid}, registry ${JSON.stringify(missionClaim.registry)}`);
 assert(plainClaim.claimed && plainClaim.paid === plainClaim.bounty && plainClaim.kills === 1 && plainClaim.concord > 0, 'claiming a surrendered pirate pays the defense bounty and counts the kill');
-assert(plainClaim.hull === 0 && plainClaim.again === false, 'a claimed ship is gone and cannot be claimed twice');
+assert(plainClaim.again === false && plainClaim.hull > 0, 'a claimed ship cannot be claimed twice and stays as a drifting hull');
 assert(missionClaim.claimed && missionClaim.paid >= 5000 && missionClaim.registry?.count === 1, 'claiming a warrant target completes the mission into the registry');
 assert(missionClaim.messages.some((message) => message.includes('complete')), 'warrant completion toast fires on claim');
 const traderClaim = (seed) => {
@@ -429,7 +431,7 @@ console.log('recognition: a pilot you spared defers instead of re-engaging');
 const surrenderToRecognition = (seed) => {
     const session = makeSession(seed);
     const messages = [];
-    session.ui = { showToast: () => undefined, showPilotLine: (callsign, line) => messages.push(line) };
+    session.ui = { pushEvent: () => undefined, pushSensor: () => undefined, showToast: () => undefined, showPilotLine: (callsign, line) => messages.push(line) };
     session.audio = { play: () => undefined, playComms: () => undefined };
     const first = session.spawnShip('pirate', [0, 0, -200], undefined, undefined, { tier: 'veteran', temperament: 'aggressive' });
     first.shield = 0;
@@ -485,7 +487,7 @@ console.log('wary: a pilot who escaped after surrendering comes back hostile and
 const waryRun = (seed) => {
     const session = makeSession(seed);
     const lines = [];
-    session.ui = { showToast: () => undefined, showPilotLine: (callsign, line) => lines.push(line) };
+    session.ui = { pushEvent: () => undefined, pushSensor: () => undefined, showToast: () => undefined, showPilotLine: (callsign, line) => lines.push(line) };
     session.audio = { play: () => undefined, playComms: () => undefined };
     const first = session.spawnShip('pirate', [0, 0, -200], undefined, undefined, { tier: 'veteran', temperament: 'aggressive' });
     first.shield = 0;
@@ -546,7 +548,7 @@ console.log('unauthorized fire: one stray bolt is a warning, sustained fire is a
 const fireRun = (seed, hits, damage) => {
     const session = makeSession(seed);
     const toasts = [];
-    session.ui = { showToast: (message) => toasts.push(message) };
+    session.ui = { pushEvent: (message) => toasts.push(message), pushSensor: () => undefined, showToast: (message) => toasts.push(message) };
     session.audio = { play: () => undefined, playComms: () => undefined };
     const trader = session.spawnShip('trader', [0, 0, -200], undefined, undefined, { tier: 'veteran', temperament: 'steady' });
     const repBefore = session.save.player.reputation['free-merchants'];
@@ -582,7 +584,7 @@ const favorRun = (seed, withWrecks) => {
         ];
     }
     const toasts = [];
-    session.ui = { showToast: (message) => toasts.push(message), showPilotLine: () => undefined };
+    session.ui = { pushEvent: () => undefined, pushSensor: (message) => toasts.push(message), showToast: (message) => toasts.push(message), showPilotLine: () => undefined };
     session.audio = { play: () => undefined, playComms: () => undefined };
     const first = session.spawnShip('pirate', [0, 0, -200], undefined, undefined, { tier: 'veteran', temperament: 'flamboyant' });
     first.shield = 0;
@@ -728,7 +730,7 @@ console.log('pilot profile: scan toast and target monitor');
 const profileRun = (seed) => {
     const session = makeSession(seed);
     const toasts = [];
-    session.ui = { showToast: (message) => toasts.push(message) };
+    session.ui = { pushEvent: (message) => toasts.push(message), pushSensor: () => undefined, showToast: (message) => toasts.push(message) };
     const ship = session.spawnShip('pirate', [0, 0, -100], undefined, undefined, { tier: 'ace', temperament: 'flamboyant' });
     session.save.player.currentTargetId = ship.id;
     session.scanTarget();
@@ -748,7 +750,7 @@ const commsRun = (seed, pilot, setup) => {
     const chirps = [];
     const relations = [];
     const durations = [];
-    session.ui = { showPilotLine: (callsign, line, relation, duration = 6000) => { messages.push(`${callsign}: “${line}”`); relations.push(relation); durations.push(duration); } };
+    session.ui = { pushEvent: () => undefined, pushSensor: () => undefined, showPilotLine: (callsign, line, relation, duration = 6000) => { messages.push(`${callsign}: “${line}”`); relations.push(relation); durations.push(duration); } };
     session.audio = { playComms: (temperament) => chirps.push(temperament) };
     const ship = session.spawnShip('pirate', [0, 0, -120], undefined, undefined, pilot);
     ship.targetId = 'player';
@@ -791,7 +793,7 @@ const losingRun = (seed, pilot) => {
     const session = makeSession(seed);
     const messages = [];
     const chirps = [];
-    session.ui = { showPilotLine: (callsign, line) => messages.push(`${callsign}: “${line}”`) };
+    session.ui = { pushEvent: () => undefined, pushSensor: () => undefined, showPilotLine: (callsign, line) => messages.push(`${callsign}: “${line}”`) };
     session.audio = { playComms: (temperament) => chirps.push(temperament) };
     const ship = session.spawnShip('pirate', [0, 0, -120], undefined, undefined, pilot);
     ship.targetId = 'player';
@@ -814,7 +816,7 @@ console.log('context lines: rank and valuable load change what hostiles say');
 const contextRun = (seed, pilot, setup) => {
     const session = makeSession(seed);
     const messages = [];
-    session.ui = { showPilotLine: (callsign, line) => messages.push(`${callsign}: “${line}”`) };
+    session.ui = { pushEvent: () => undefined, pushSensor: () => undefined, showPilotLine: (callsign, line) => messages.push(`${callsign}: “${line}”`) };
     session.audio = { playComms: () => undefined };
     const ship = session.spawnShip('pirate', [0, 0, -120], undefined, undefined, pilot);
     ship.targetId = 'player';
@@ -852,7 +854,7 @@ console.log('proximity: a mutter when the player closes to short range');
 const proximityRun = (seed, distance) => {
     const session = makeSession(seed);
     const lines = [];
-    session.ui = { showPilotLine: (callsign, line) => lines.push(line) };
+    session.ui = { pushEvent: () => undefined, pushSensor: () => undefined, showPilotLine: (callsign, line) => lines.push(line) };
     session.audio = { playComms: () => undefined };
     const ship = session.spawnShip('pirate', [0, 0, -distance], undefined, undefined, { tier: 'veteran', temperament: 'flamboyant' });
     ship.targetId = 'player';
@@ -872,7 +874,7 @@ assert(nearRun.mutters.length === 1, `closing to short range draws exactly one p
 const gateRun = (seed, distance) => {
     const session = makeSession(seed);
     const lines = [];
-    session.ui = { showPilotLine: (callsign, line) => lines.push(line) };
+    session.ui = { pushEvent: () => undefined, pushSensor: () => undefined, showPilotLine: (callsign, line) => lines.push(line) };
     session.audio = { playComms: () => undefined };
     session.spawnShip('pirate', [0, 0, -distance], undefined, undefined, { tier: 'veteran', temperament: 'flamboyant' });
     session.save.world.time = 10; // past the spawn grace, no prior proximity
@@ -897,7 +899,7 @@ const storySeamRun = () => {
     const session = makeSession('story-1');
     const messages = [];
     const chirps = [];
-    session.ui = { showPilotLine: (callsign, line) => messages.push(`${callsign}: “${line}”`) };
+    session.ui = { pushEvent: () => undefined, pushSensor: () => undefined, showPilotLine: (callsign, line) => messages.push(`${callsign}: “${line}”`) };
     session.audio = { play: () => undefined, playComms: (temperament) => chirps.push(temperament) };
     const ship = session.spawnShip('pirate', [0, 0, -120], undefined, undefined, { tier: 'veteran', temperament: 'flamboyant' });
     ship.targetId = 'player';
@@ -934,6 +936,8 @@ const storyLineRun = () => {
     const chirps = [];
     const shown = [];
     session.ui = {
+        pushEvent: () => undefined,
+        pushSensor: () => undefined,
         showPilotLine: (callsign, line) => lines.push(line),
         showStoryLine: (name, text) => shown.push(`${name}: ${text}`),
         dismissStory: () => undefined,
@@ -964,7 +968,7 @@ assert(storyLine.activeAfterDismiss === false, 'dismissing the story clears the 
 assert(storyLine.afterStory > storyLine.duringStory, 'chatter resumes after dismissal');
 const timeoutClears = (() => {
     const session = makeSession('story-3');
-    session.ui = { showPilotLine: () => undefined, showStoryLine: () => undefined, dismissStory: () => undefined };
+    session.ui = { pushEvent: () => undefined, pushSensor: () => undefined, showPilotLine: () => undefined, showStoryLine: () => undefined, dismissStory: () => undefined };
     session.audio = { play: () => undefined, playComms: () => undefined };
     session.playStoryLine('X', 'Y', 'neutral', 10);
     session.save.world.time += 11;
@@ -997,7 +1001,7 @@ const hitTauntRun = (seed, pilot) => {
     const messages = [];
     const chirps = [];
     let attempts = 0;
-    session.ui = { showPilotLine: (callsign, line) => messages.push(`${callsign}: “${line}”`) };
+    session.ui = { pushEvent: () => undefined, pushSensor: () => undefined, showPilotLine: (callsign, line) => messages.push(`${callsign}: “${line}”`) };
     session.audio = { play: () => undefined, playComms: (temperament) => chirps.push(temperament) };
     const originalHitTaunt = session.maybeHitTaunt.bind(session);
     session.maybeHitTaunt = (attackerId) => { attempts += 1; originalHitTaunt(attackerId); };
@@ -1036,7 +1040,7 @@ const tauntRateRun = (seed, pilot) => {
     const session = makeSession(seed);
     let attempts = 0;
     const messages = [];
-    session.ui = { showPilotLine: (callsign, line) => messages.push(`${callsign}: “${line}”`) };
+    session.ui = { pushEvent: () => undefined, pushSensor: () => undefined, showPilotLine: (callsign, line) => messages.push(`${callsign}: “${line}”`) };
     session.audio = { play: () => undefined, playComms: () => undefined };
     const originalHitTaunt = session.maybeHitTaunt.bind(session);
     session.maybeHitTaunt = (attackerId) => {
@@ -1125,7 +1129,7 @@ const distressRun = (seed, setup) => {
     const session = makeSession(seed);
     const messages = [];
     const chirps = [];
-    session.ui = { showToast: () => undefined, showPilotLine: (callsign, line) => messages.push(`${callsign}: “${line}”`) };
+    session.ui = { pushEvent: () => undefined, pushSensor: () => undefined, showToast: () => undefined, showPilotLine: (callsign, line) => messages.push(`${callsign}: “${line}”`) };
     session.audio = { play: () => undefined, playComms: (t) => chirps.push(t) };
     const ship = session.spawnShip('pirate', setup.position, undefined, undefined, { tier: 'veteran', temperament: setup.temperament ?? 'timid' });
     ship.shield = setup.shield ?? 5000;
