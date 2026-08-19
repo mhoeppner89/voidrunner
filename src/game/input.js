@@ -209,8 +209,10 @@ export class InputManager {
         const gammaDelta = wrapAngle(this.tiltGamma - this.tiltNeutralGamma);
         if (!Number.isFinite(betaDelta) || !Number.isFinite(gammaDelta))
             return undefined;
-        let pitch = curve(betaDelta);
-        let yaw = curve(gammaDelta);
+        // Keep the 0.4.5a default mapping: raw device tilt is inverted, while
+        // the settings checkboxes remain opt-in overrides of that base mapping.
+        let pitch = -curve(betaDelta);
+        let yaw = -curve(gammaDelta);
         if (this.tiltInvertPitch)
             pitch = -pitch;
         if (this.tiltInvertYaw)

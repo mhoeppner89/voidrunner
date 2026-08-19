@@ -46,7 +46,7 @@ export const callsignHandle = (callsign) => {
     const quoted = callsign.match(/“[^”]+”/);
     return quoted ? quoted[0].slice(1, -1) : callsign;
 };
-const GAME_VERSION = '0.4.7';
+const GAME_VERSION = '0.4.7a';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -575,7 +575,7 @@ export class GameUI {
                 this.actions?.startArena(this.arenaEnv, this.arenaScenario, this.arenaDifficulty);
                 break;
             case 'launch':
-                if ((this.dockLocation === 'vesper' || DEV_PREVIEW_LOCATION === this.dockLocation) && this.dockTerminal === 'concourse' && element?.classList.contains('concourse-hover-ship'))
+                if (DOCK_LOCATION_IDS.includes(this.dockLocation) && this.dockTerminal === 'concourse' && element?.classList.contains('concourse-hover-ship'))
                     this.startVesperLaunchTransition();
                 else
                     this.actions?.launch();
@@ -875,7 +875,7 @@ export class GameUI {
         }
     }
     renderConcourse() {
-        const showShipPreview = this.dockLocation === 'vesper' || DEV_PREVIEW_LOCATION === this.dockLocation;
+        const showShipPreview = DOCK_LOCATION_IDS.includes(this.dockLocation);
         const livePreview = PREVIEW_MODE && PREVIEW_LOCATION === this.dockLocation;
         const profile = this.getVesperShipProfile();
         const selectedShipId = this.getVesperShipId();
@@ -1264,6 +1264,8 @@ export class GameUI {
                 status = 'ENGAGED';
             else if (state === 'interrupt')
                 status = 'INTERRUPTED';
+            else if (model.hyperdriveCooldown > 0)
+                status = `COOLDOWN ${Math.ceil(model.hyperdriveCooldown)}s`;
             cardStatus.textContent = status;
             cardStatus.classList.toggle('is-hidden', !status);
             card.dataset.hyperdriveReady = model.hyperdriveReady ? 'true' : 'false';

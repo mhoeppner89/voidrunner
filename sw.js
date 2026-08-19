@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v97-location-art-debris-release';
+const CACHE = 'voidrunner-v98-0-4-7a-tilt-intercept-fix';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',
