@@ -13,9 +13,13 @@ const LEGACY_LOCATION_POSITIONS = {
     shardbelt: [1800, -800, -19600],
     'mourning-line': [-18000, -2000, 22000],
 };
-const defaultSettings = () => ({
-    music: 0.34,
-    effects: 0.68,
+// Sound starts OFF: a fresh career is silent until the pilot opens the
+// options menu and raises Music / Effects (the AUDIO section in the pause and
+// options panels). The sliders are the single on/off, so "default off" never
+// needs a second master switch.
+export const defaultSettings = () => ({
+    music: 0,
+    effects: 0,
     flightAssist: true,
     aimAssist: true,
     quality: 'auto',
@@ -41,6 +45,10 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             throttle: 0,
             credits: 3200,
             fuel: 100,
+            // Transponder state: ON squawks a full sensor signature (visible at
+            // standard radar range), OFF hides the ship from sensors beyond the
+            // dark-detection line — at the cost of being an unlicensed squawk.
+            transponder: true,
             shield: 90,
             armor: 85,
             hull: 100,
@@ -66,12 +74,14 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
                 bounty: 0,
                 mining: 0,
                 salvage: 0,
+                syndicate: 0,
             },
             guildRank: {
                 merchant: 0,
                 bounty: 0,
                 mining: 0,
                 salvage: 0,
+                syndicate: 0,
             },
             discovered: ['helix'],
             stats: {
@@ -162,6 +172,14 @@ export const saveGame = (save) => {
         return false;
     try {
         save.updatedAt = Date.now();
+        // Never persist a corrupted state: if the player's position or velocity
+        // has gone non-finite (a crash glitch), keep the last good autosave
+        // instead of overwriting the career with garbage.
+        const state = save.player;
+        if ([state.position, state.velocity, state.angularVelocity].some((arr) => !Array.isArray(arr) || arr.some((v) => !Number.isFinite(v)))) {
+            console.warn('Refusing to persist non-finite player state.');
+            return false;
+        }
         // Interpolation scratch slots (prevPosition/prevRotation) are transient
         // sim state, not career data — keep them out of the persisted save.
         const persist = { ...save, player: { ...save.player } };
@@ -195,7 +213,19 @@ const hydrateSave = (candidate) => {
     const save = {
         ...fallback,
         ...candidate,
-        settings: { ...fallback.settings, ...(candidate.settings ?? {}) },
+        settings: (() => {
+            const merged = { ...fallback.settings, ...(candidate.settings ?? {}) };
+            // Sound-default-off migration: a save that still carries the legacy
+            // factory volumes (never adjusted) opens silent too, so the change
+            // applies to existing careers, not just fresh ones. A player who
+            // deliberately set those exact levels is indistinguishable from
+            // untouched, and the options menu restores them in one drag.
+            if (merged.music === 0.34 && merged.effects === 0.68) {
+                merged.music = 0;
+                merged.effects = 0;
+            }
+            return merged;
+        })(),
         player: {
             ...fallback.player,
             ...(candidate.player ?? {}),
@@ -235,6 +265,18 @@ const hydrateSave = (candidate) => {
         save.player.dockedAt = undefined;
     if (candidate.player && !Object.prototype.hasOwnProperty.call(candidate.player, 'currentTargetId'))
         save.player.currentTargetId = undefined;
+    // A save written by a crashed session may hold a non-finite position
+    // (JSON round-trips NaN as null). Snap it back to the last dock so the
+    // pilot always recovers instead of spawning into corrupted coordinates.
+    const savedPosition = save.player.position;
+    if (!Array.isArray(savedPosition) || savedPosition.some((v) => !Number.isFinite(v))) {
+        const anchorId = save.player.dockedAt ?? save.player.lastDockedAt ?? 'helix';
+        const anchor = LOCATIONS[anchorId] ?? LOCATIONS.helix;
+        save.player.position = [...anchor.position];
+        save.player.velocity = [0, 0, 0];
+        save.player.angularVelocity = [0, 0, 0];
+        save.player.throttle = 0;
+    }
     migrateLegacyPosition(save, sourceVersion);
     save.version = SAVE_VERSION;
     const stats = getEffectiveShipStats(save.player);

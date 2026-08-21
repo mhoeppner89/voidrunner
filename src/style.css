@@ -479,9 +479,67 @@ button.compact {
   font-size: 1.02rem;
 }
 
-.fullscreen-button.is-fullscreen {
+.fullscreen-button.is-fullscreen,
+.title-fullscreen-button.is-fullscreen,
+.fullscreen-switch.is-fullscreen {
   color: #f1c978;
   border-color: rgba(238, 184, 96, 0.6);
+}
+
+/* Title-screen fullscreen: a small icon switch floating in the card's top-
+   right corner, below the build tag and clear of the start-option buttons —
+   ⛶ to enter fullscreen, ⤡ to leave, glowing gold when active. */
+.title-fullscreen-button {
+  position: absolute;
+  top: 2.1rem;
+  right: 1.15rem;
+  display: flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: #8fd1c1;
+  background: rgba(7, 10, 10, 0.6);
+  border: 1px solid rgba(169, 152, 112, 0.38);
+  border-radius: 999px;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.title-fullscreen-button:hover,
+.title-fullscreen-button:focus-visible {
+  border-color: rgba(143, 209, 193, 0.75);
+  color: #c9eee3;
+}
+
+.title-fullscreen-button.is-fullscreen {
+  color: #f1c978;
+  background: rgba(224, 166, 63, 0.2);
+  border-color: rgba(238, 184, 96, 0.6);
+}
+
+/* Options/pause DISPLAY row: a pill switch toggling fullscreen, matching the
+   settings grid's row height. Icon swaps between ⛶ and ⤡ with the state. */
+.fullscreen-switch {
+  display: flex;
+  width: 52px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: #8fd1c1;
+  background: #101716;
+  border: 1px solid #46524f;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fullscreen-switch.is-fullscreen {
+  background: rgba(224, 166, 63, 0.22);
 }
 
 /* Touch cockpit controls */
@@ -673,6 +731,26 @@ button.compact {
   color: #cff6ff;
   background: radial-gradient(circle at 38% 32%, rgba(84, 164, 196, 0.95), rgba(18, 56, 78, 0.96));
   border: 2px solid rgba(140, 219, 240, 0.7);
+}
+
+/* The transponder pad: a compact square that mirrors the radar chip. Lit =
+   cyan squawk, dark = amber squawk-off, so mobile pilots see the state on
+   the same pad they toggle it with. */
+.touch-transponder {
+  width: 44px;
+  height: 44px;
+  color: #cff6ff;
+  background: radial-gradient(circle at 38% 32%, rgba(84, 164, 196, 0.95), rgba(18, 56, 78, 0.96));
+  border: 2px solid rgba(140, 219, 240, 0.7);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+
+.touch-transponder.is-dark {
+  color: #ffcf7d;
+  background: radial-gradient(circle at 38% 32%, rgba(196, 138, 62, 0.95), rgba(74, 45, 16, 0.96));
+  border-color: rgba(238, 184, 96, 0.75);
 }
 
 /* Contextual pads: FIRE becomes MINE/SALVAGE, while the smaller pad becomes
@@ -944,6 +1022,12 @@ button.compact {
   padding: var(--safe-top) max(1.2rem, var(--safe-right)) 0.8rem max(1.2rem, var(--safe-left));
   background: linear-gradient(90deg, rgba(7, 10, 10, 0.96), rgba(13, 15, 14, 0.72));
   border-bottom: 1px solid color-mix(in srgb, var(--dock-accent), transparent 58%);
+}
+
+/* The location title absorbs the free space so the credit wallet and the
+   options gear sit flush together at the right edge. */
+.dock-header > div:first-child {
+  flex: 1;
 }
 
 .dock-header span,
@@ -2008,28 +2092,99 @@ button.compact {
   line-height: 1.5;
 }
 
+/* Forced landscape prompt: a full-screen blocking overlay whenever the
+   viewport is taller than it is wide (phone, pad, or a portrait window on
+   desktop). z-index sits above every modal, panel and toast, so the only way
+   past it is to flip the device or widen the window. */
 .rotate-notice {
   position: absolute;
   inset: 0;
   z-index: 120;
-  display: grid;
-  place-content: center;
-  gap: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.05rem;
   padding: 2rem;
   color: #d8c48f;
-  background: rgba(3, 6, 6, 0.96);
+  background:
+    radial-gradient(ellipse at 50% 36%, rgba(40, 78, 100, 0.6), rgba(3, 6, 6, 0.98) 70%),
+    #030606;
   font-family: "Courier New", ui-monospace, monospace;
   text-align: center;
 }
 
 .rotate-notice strong {
-  font-size: 1.2rem;
-  letter-spacing: 0.16em;
+  font-size: clamp(1.1rem, 3.2vw, 1.6rem);
+  letter-spacing: 0.22em;
 }
 
 .rotate-notice span {
+  max-width: 34ch;
   color: #84908b;
+  font-size: clamp(0.68rem, 1.8vw, 0.84rem);
+  line-height: 1.55;
+}
+
+.rotate-notice button {
+  margin-top: 0.4rem;
+  padding: 0.62rem 1.6rem;
+  font-family: inherit;
   font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  color: #ffe3a1;
+  background: linear-gradient(180deg, rgba(96, 74, 34, 0.85), rgba(38, 27, 10, 0.92));
+  border: 1px solid rgba(224, 166, 63, 0.65);
+  cursor: pointer;
+}
+
+.rotate-notice button:hover,
+.rotate-notice button:focus-visible {
+  border-color: #e0a63f;
+  color: #fff0c8;
+}
+
+/* The flip prompt's phone glyph: a rounded handset that rocks from portrait
+   to landscape and back, so the instruction reads without words. */
+.rotate-phone {
+  position: relative;
+  width: clamp(52px, 12vw, 84px);
+  aspect-ratio: 0.55;
+  border: 3px solid #d8c48f;
+  border-radius: 22% / 14%;
+  box-shadow: 0 0 22px rgba(224, 166, 63, 0.25), inset 0 0 12px rgba(224, 166, 63, 0.18);
+  animation: rotate-phone-rock 1.9s ease-in-out infinite;
+}
+
+.rotate-phone::before {
+  content: "";
+  position: absolute;
+  inset: 12% 8%;
+  border: 2px solid rgba(105, 224, 210, 0.75);
+  border-radius: 8% / 12%;
+}
+
+.rotate-phone::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 4%;
+  width: 26%;
+  height: 6%;
+  transform: translateX(-50%);
+  background: #d8c48f;
+  border-radius: 999px;
+}
+
+@keyframes rotate-phone-rock {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  45%,
+  55% {
+    transform: rotate(-90deg);
+  }
 }
 
 @media (pointer: coarse), (max-width: 900px) {
@@ -2366,6 +2521,28 @@ button.compact {
   white-space: nowrap;
 }
 
+/* Transponder chip on the radar heading: a small status badge that mirrors the
+   ship's live sensor signature. Lit (cyan) = visible at full range; dark
+   (amber) = hidden beyond the dark-detection line. */
+.radar-transponder {
+  align-self: center;
+  padding: 0.08rem 0.3rem;
+  border: 1px solid rgba(105, 224, 210, 0.4);
+  border-radius: 2px;
+  color: var(--void-cyan);
+  font-size: 0.62em;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 6px rgba(105, 224, 210, 0.55);
+  box-shadow: inset 0 0 6px rgba(105, 224, 210, 0.18);
+}
+
+.radar-transponder.is-dark {
+  border-color: rgba(224, 186, 104, 0.55);
+  color: var(--void-gold);
+  text-shadow: 0 0 6px rgba(224, 186, 104, 0.6);
+  box-shadow: inset 0 0 6px rgba(224, 186, 104, 0.22);
+}
+
 /* Standoff readout on the own-ship monitor: the mugger's demand plus the
    countdown, hidden until a pirate is holding fire on the player. It overlays
    the top of the hull schematic so the 18%/82% heading/layout split is
@@ -2414,9 +2591,10 @@ button.compact {
   font-weight: 700;
 }
 
-/* Dock hint rides the radar zone line: an amber blink while the ship needs
-   to slow to land/dock, so the old floating bottom-center prompt is gone. */
-.screen-heading b.is-dock-prompt {
+/* The slow-down call for an approach rides the target monitor's readout: an
+   amber blink while the ship needs to slow to land/dock, so the radar zone
+   line keeps showing the zone name. */
+.screen-target-readout.is-dock-prompt {
   color: #ffc66b;
   text-shadow: 0 0 6px rgba(255, 198, 107, 0.6);
   animation: dock-prompt-blink 1s steps(2, start) infinite;
@@ -2523,6 +2701,157 @@ button.compact {
   opacity: 0.85;
   font-size: 0.72em;
   letter-spacing: 0.08em;
+}
+
+/* The patrol-reply chip: a small courtesy button that appears below the
+   comms bar while a cordon pilot is still waiting for the player's reply
+   (see patrolReply in game.js). It ticks down, then hides with the window. */
+.patrol-reply-chip {
+  position: absolute;
+  top: calc(var(--safe-top) + 2.9rem);
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  z-index: 7;
+  width: min(220px, 40vw);
+  padding: 0.22rem 0.6rem;
+  color: #6fb5ff;
+  background: rgba(2, 8, 10, 0.88);
+  border: 1px solid rgba(111, 181, 255, 0.55);
+  border-radius: 999px;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.patrol-reply-chip em {
+  font-style: normal;
+  opacity: 0.75;
+  margin-left: 0.4rem;
+  font-size: 0.85em;
+}
+
+.patrol-reply-chip:hover,
+.patrol-reply-chip:focus-visible {
+  background: rgba(10, 22, 34, 0.95);
+  border-color: #6fb5ff;
+}
+
+.patrol-reply-chip.is-hidden {
+  display: none;
+}
+
+/* The syndicate berth payment card: the starting modal on the concourse for an
+   unlicensed (dark) arrival. The pilot either pays the fee or launches back
+   into space — there is no third way out, so it covers the whole dock screen
+   and carries no close affordance. Amber reads as the unlicensed lane. */
+.syndicate-card {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 1.2rem;
+  background: rgba(2, 6, 6, 0.78);
+  backdrop-filter: blur(2px);
+}
+
+.syndicate-card-panel {
+  width: min(420px, 92vw);
+  padding: 1.1rem 1.25rem 1.25rem;
+  color: #e8d9b0;
+  background: linear-gradient(180deg, rgba(24, 13, 3, 0.97), rgba(10, 6, 2, 0.98));
+  border: 1px solid rgba(255, 183, 84, 0.55);
+  box-shadow: 0 0 0 6px rgba(0, 0, 0, 0.35), 0 10px 40px rgba(0, 0, 0, 0.6);
+  font-family: "Courier New", ui-monospace, monospace;
+}
+
+.syndicate-card-eyebrow {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: #ffb754;
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+}
+
+.syndicate-card-panel h3 {
+  margin: 0 0 0.45rem;
+  color: #ffe2a8;
+  font-size: 1.15rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.syndicate-card-panel p {
+  margin: 0 0 0.9rem;
+  color: #b9a87f;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.syndicate-card-fee {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 0.2rem 0.8rem;
+  margin-bottom: 1rem;
+  padding: 0.6rem 0.75rem;
+  background: rgba(255, 183, 84, 0.08);
+  border: 1px solid rgba(255, 183, 84, 0.25);
+}
+
+.syndicate-card-fee span {
+  color: #8f8060;
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+}
+
+.syndicate-card-fee b {
+  color: #ffcf7d;
+  font-size: 1.05rem;
+}
+
+.syndicate-card-fee small {
+  grid-column: 1 / -1;
+  color: #8f8060;
+  font-size: 0.66rem;
+}
+
+.syndicate-card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.syndicate-card-actions button {
+  padding: 0.55rem 0.6rem;
+  color: #0b0601;
+  background: #ffb754;
+  border: 1px solid #ffcf7d;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+
+.syndicate-card-actions button[data-ui-command="launch"] {
+  color: #ffcf7d;
+  background: transparent;
+  border-color: rgba(255, 183, 84, 0.45);
+}
+
+.syndicate-card-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.syndicate-card-actions button:focus-visible {
+  outline: 2px solid #ffe2a8;
+  outline-offset: 2px;
 }
 
 @keyframes story-glow {
@@ -2637,6 +2966,14 @@ button.compact {
 .screen-target-readout.is-alert {
   color: #e28874;
   text-shadow: 0 0 6px rgba(226, 136, 116, 0.5);
+}
+
+/* A locked ship the sensors can no longer resolve: the readout flashes the
+   CONTACT LOST state in warning amber instead of pretending the picture is
+   fresh. */
+.screen-target-readout.is-lost {
+  color: #e0ba68;
+  text-shadow: 0 0 7px rgba(224, 186, 104, 0.55);
 }
 
 .cockpit-screen-target .screen-target-layout {
@@ -2854,23 +3191,9 @@ button.compact {
   z-index: 1;
 }
 
-.radar-screen-wrap::before,
-.radar-screen-wrap::after {
-  position: absolute;
-  content: "";
-  pointer-events: none;
-  border: 1px solid rgba(74, 206, 225, 0.3);
-  border-radius: 50%;
-}
-
-.radar-screen-wrap::before {
-  inset: 7%;
-}
-
-.radar-screen-wrap::after {
-  inset: 25%;
-}
-
+/* The radar canvas draws its own calibrated range rings (dark-detection,
+   scan range, full horizon) plus the crosshair — no extra CSS bezels, so the
+   disc stays readable. */
 .radar-screen-wrap #radar {
   position: absolute;
   inset: 0;
@@ -3030,6 +3353,12 @@ button.compact {
 
   .dock-wallet {
     display: none;
+  }
+
+  /* With the wallet hidden, the gear no longer has the credit box to stretch
+     to — keep a real tap target instead of collapsing to its icon. */
+  .dock-options-button {
+    min-height: 44px;
   }
 
   .concourse-grid,
@@ -4773,6 +5102,36 @@ button.primary,
   padding: clamp(0.55rem, 1.4vw, 1rem) max(0.7rem, var(--safe-right)) clamp(0.7rem, 1.4vw, 1rem) max(0.7rem, var(--safe-left));
 }
 
+/* The syndicate berth's receipt: a saved notice under the header for the whole
+   visit, so a dark arrival reads as paid-for and the ledger stays visible. */
+.dock-notice {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.42rem max(1.2rem, var(--safe-right)) 0.42rem max(1.2rem, var(--safe-left));
+  color: #ffb980;
+  background: linear-gradient(90deg, rgba(52, 24, 10, 0.9), rgba(26, 14, 7, 0.72));
+  border-bottom: 1px solid rgba(255, 170, 92, 0.5);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+}
+
+.dock-notice b {
+  color: #ffd59a;
+  font-family: var(--pixel-font);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+.den-footnote {
+  margin: 0.7rem 0 0;
+  color: #c9e5ee;
+  font-size: 0.6rem;
+  line-height: 1.55;
+}
+
 .landing-scene {
   position: relative;
   min-height: 490px;
@@ -5810,6 +6169,43 @@ button.primary,
   outline-offset: 3px;
 }
 
+/* The credit wallet and the options gear are one unit: the wrapper stretches
+   the gear to the wallet's exact height at every breakpoint, so both scale
+   together as the wallet's padding and text reflow on smaller screens. */
+.dock-wallet-unit {
+  display: flex;
+  align-items: stretch;
+  align-self: center;
+}
+
+/* Options gear: a box flush right of the credit wallet, same height and
+   chrome so the header reads as one unit (the wallet's border-right is the
+   divider between them). Icon only, no label; width and icon scale with the
+   viewport like the wallet does (the 42px floor keeps the tap target). */
+.dock-options-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  width: clamp(42px, 6.5vw, 62px);
+  min-width: 42px;
+  padding: 0;
+  color: var(--dock-accent);
+  font-family: var(--pixel-font);
+  font-size: clamp(0.85rem, 3vw, 1.05rem);
+  line-height: 1;
+  background: rgba(7, 10, 10, 0.74);
+  border-right: 3px solid var(--dock-accent);
+  text-shadow: 1px 1px #061638, 0 0 8px rgba(1, 8, 29, 0.9);
+}
+
+.dock-options-button:hover,
+.dock-options-button:focus-visible {
+  color: var(--void-cream);
+  outline: 1px dashed var(--void-gold);
+  outline-offset: -3px;
+}
+
 .station-scene {
   position: relative;
   width: 100%;
@@ -5906,6 +6302,11 @@ button.primary,
   top: var(--concourse-bar-top, var(--vesper-bar-top, 45%));
 }
 
+/* The smuggler's den has no storefront: the pointer sits low under the pad,
+   the way a back door should read. */
+.concourse-pointer-den { left: 55%; top: 72%; }
+.dock-screen[data-location="azure"][data-tab="concourse"] .concourse-pointer-den { left: 47%; top: 72%; }
+
 /* Azure's landmarks are arranged differently from Vesper's: living quarters
    sit left, the industrial market occupies the right skyline, and the repair
    bay hugs the lower-right edge of the landing pad. */
@@ -5972,6 +6373,7 @@ button.primary,
 .market-pointer-commodities { left: 17%; top: 54%; }
 .market-pointer-equipment { left: 48%; top: 35%; }
 .market-pointer-shipyard { left: 75%; top: 57%; }
+.market-pointer-den { left: 48%; top: 57%; }
 
 .market-menu-screen {
   position: relative;
@@ -6413,9 +6815,94 @@ button.primary,
   border-color: #fff0ae;
 }
 
+/* A distress beacon: an attacked ship pinging its position beyond the normal
+   sensor horizon — a pulsing orange diamond with a faint ring. */
+.tactical-contact.distress i {
+  background: #ff9442;
+  border-color: #ffd2a6;
+  box-shadow: 0 0 9px rgba(255, 148, 66, 0.9);
+  animation: tactical-distress-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes tactical-distress-pulse {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) rotate(45deg) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-50%, -50%) rotate(45deg) scale(1.35);
+    opacity: 0.55;
+  }
+}
+
 .tactical-contact.wreck i {
   background: transparent;
   border: 2px dashed #cf9f62;
+}
+
+/* An active search sweep on the chart: a dashed ring at the searching ship's
+   last-known-position anchor — blue for a Concord patrol, red for a hostile —
+   always visible (clamped to the frame) so a hunt beyond the sensor horizon
+   still reads on the map. */
+.tactical-search-ring {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border: 1.5px dashed rgba(108, 200, 228, 0.85);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 3;
+  animation: tactical-search-pulse 1.6s ease-in-out infinite;
+}
+.tactical-search-ring.red {
+  border-color: rgba(255, 90, 67, 0.85);
+}
+
+@keyframes tactical-search-pulse {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* A lost contact on the chart: a cross at the last-known position (the radar
+   draws the same marker), fading out as the trace ages — never a live lock. */
+.tactical-contact.ghost i {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  transform: translate(-50%, -50%);
+}
+
+.tactical-contact.ghost i::before,
+.tactical-contact.ghost i::after {
+  position: absolute;
+  content: "";
+  background: rgba(134, 197, 215, 0.75);
+}
+
+.tactical-contact.ghost i::before {
+  top: 50%;
+  left: 2px;
+  right: 2px;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+.tactical-contact.ghost i::after {
+  left: 50%;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  transform: translateX(-50%);
+}
+
+.tactical-contact.ghost.hostile i::before,
+.tactical-contact.ghost.hostile i::after {
+  background: rgba(237, 94, 84, 0.8);
 }
 
 .tactical-contact.claim i {

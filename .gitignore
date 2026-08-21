@@ -10,6 +10,10 @@ voidrunner-*.png
 .freebuff/
 screenshots/
 
+# Source ship models (full-res GLBs + reference art). Dev-only: the game
+# loads optimized copies generated from these, never the folder itself.
+glb_models/
+
 # Docs kept out of the repo; only the game + hosting live here.
 AGENTS.md
 progress.md

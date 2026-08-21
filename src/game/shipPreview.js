@@ -1,13 +1,27 @@
 import * as THREE from 'three';
 import { createVoxelShipModel, paletteForFaction } from './voxelModels.js';
+import { loadGlb } from './glbLoader.js';
+import { GLB_SHIP_CONFIG } from './render.js';
+
+// Showroom presence: how much of its card each hull should fill. The fit-to-
+// frame camera would otherwise render every hull at the same on-screen scale,
+// hiding the size gap between classes. The atlas is a bulk freighter — nearly
+// twice the fitted bulk of the fighters — so its preview zooms in to read as
+// the titan it is. Tuned against the reference renders; kept away from the
+// clipping edge of the rotating hull.
+const PREVIEW_FRAME_ZOOM = {
+    'atlas-freighter': 0.74,
+};
 
 // A lightweight turntable renderer for the shipyard cards. Each card gets its
 // own WebGL context (a dock sells at most two hulls at once), so the models can
 // spin independently and are disposed cleanly when the market re-renders or the
-// player launches.
+// player launches. The voxel hull renders immediately, then the real GLB model
+// (the same hull the flight scene flies) swaps in when its fetch resolves.
 export class ShipPreview {
     constructor(container, variant) {
         this.container = container;
+        this.variant = variant;
         this.disposed = false;
         this.renderer = new THREE.WebGLRenderer({
             antialias: false,
@@ -34,14 +48,32 @@ export class ShipPreview {
         this.createLighting();
         this.scene.environment = this.createEnvironment();
 
-        // The showroom paint is shared across every hull so the comparison stays
-        // about shape and stats, not livery.
-        const model = createVoxelShipModel(variant, paletteForFaction('player'));
+        // The voxel hull is an instant placeholder: it keeps the card from
+        // flashing empty while the GLB fetch is in flight, exactly like the
+        // flight scene's voxel-until-GLB path.
+        const placeholder = createVoxelShipModel(variant, paletteForFaction('player'));
         this.pivot = new THREE.Group();
-        this.model = model.group;
+        this.model = placeholder.group;
         this.pivot.add(this.model);
         this.scene.add(this.pivot);
         this.frameModel();
+
+        // Swap in the real hull once it loads; it carries the same baked yaw +
+        // scale the flight scene uses, so the showroom matches the ship you fly.
+        loadPreviewGlb(variant).then((glb) => {
+            if (this.disposed) {
+                if (glb)
+                    disposeObject(glb);
+                return;
+            }
+            if (!glb)
+                return; // load failed; keep the voxel placeholder
+            this.pivot.remove(this.model);
+            disposeObject(this.model);
+            this.model = glb;
+            this.pivot.add(glb);
+            this.frameModel();
+        });
 
         this.resizeObserver = new ResizeObserver(() => this.resize());
         this.resizeObserver.observe(container);
@@ -94,7 +126,8 @@ export class ShipPreview {
         const tanHalf = Math.tan(fovHalf);
         const aspect = this.container.clientWidth / Math.max(1, this.container.clientHeight);
         const fit = Math.min(tanHalf, tanHalf * aspect);
-        const distance = (radius / Math.max(fit, 0.0001)) * 1.06;
+        const zoom = PREVIEW_FRAME_ZOOM[this.variant] ?? 1;
+        const distance = (radius / Math.max(fit, 0.0001)) * 1.06 * zoom;
         const azimuth = Math.PI / 3;
         const elevation = Math.PI / 6;
         this.camera.position.set(
@@ -126,23 +159,46 @@ export class ShipPreview {
         this.disposed = true;
         cancelAnimationFrame(this.rafId);
         this.resizeObserver.disconnect();
-        this.pivot.traverse((object) => {
-            if (!(object instanceof THREE.Mesh))
-                return;
-            object.geometry?.dispose?.();
-            const materials = Array.isArray(object.material) ? object.material : [object.material];
-            materials.forEach((material) => {
-                if (!material)
-                    return;
-                for (const value of Object.values(material)) {
-                    if (value instanceof THREE.Texture)
-                        value.dispose();
-                }
-                material.dispose();
-            });
-        });
+        disposeObject(this.pivot);
         this.scene.environment?.dispose?.();
         this.renderer.dispose();
         this.renderer.domElement.remove();
     }
 }
+// Load one GLB hull for the showroom, baking in the same per-variant yaw and
+// world scale the flight scene applies. Each preview owns its copy, so cards
+// can be disposed independently (variants never repeat in a dock's stock).
+const loadPreviewGlb = (variant) => {
+    const config = GLB_SHIP_CONFIG[variant];
+    if (!config)
+        return Promise.resolve(null);
+    return loadGlb(`assets/models/ships/${config.file}`)
+        .then((model) => {
+            model.rotation.y = config.yaw;
+            model.scale.setScalar(config.scale);
+            return model;
+        })
+        .catch((error) => {
+            console.warn(`GLB hull ${variant} (${config.file}) failed to load for the shipyard preview; using voxels.`, error);
+            return null;
+        });
+};
+// Release the GPU resources (geometry, materials, textures) of one model
+// subtree. Used both when a placeholder is swapped out and on final dispose.
+const disposeObject = (root) => {
+    root.traverse((object) => {
+        if (!(object instanceof THREE.Mesh))
+            return;
+        object.geometry?.dispose?.();
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        materials.forEach((material) => {
+            if (!material)
+                return;
+            for (const value of Object.values(material)) {
+                if (value instanceof THREE.Texture)
+                    value.dispose();
+            }
+            material.dispose();
+        });
+    });
+};

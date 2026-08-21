@@ -10,12 +10,14 @@ export const GUILD_NAMES = {
     bounty: 'Bounty Hunters Registry',
     mining: 'Prospectors Guild',
     salvage: 'Salvage Union',
+    syndicate: 'Red Talon Syndicate',
 };
 export const GUILD_RANK_NAMES = {
     merchant: ['Independent', 'Factor', 'Broker', 'Master Trader'],
     bounty: ['Unlicensed', 'Deputy', 'Hunter', 'Warrant Marshal'],
     mining: ['Roughneck', 'Prospector', 'Surveyor', 'Deep-Core Chief'],
     salvage: ['Picker', 'Rigger', 'Recovery Chief', 'Relic Broker'],
+    syndicate: ['Unmarked', 'Fence', 'Fixer', 'Kingpin'],
 };
 export const COMMODITIES = {
     water: {
@@ -277,7 +279,7 @@ export const LOCATIONS = {
         accent: '#d89a43',
         secondary: '#623b24',
         description: 'A rotating freeport built around a refinery spindle. Busy, loud, and commercially neutral.',
-        shipsForSale: ['wayfarer', 'talon', 'atlas'],
+        shipsForSale: ['talon', 'atlas'],
         economy: { food: 1.08, water: 1.05, medicine: 1.12, electronics: 0.92, machinery: 0.96, ore: 0.9, scrap: 0.92, luxuries: 1.15, arms: 1.08 },
         marketBias: { electronics: 18, machinery: 12, ore: 20, scrap: 18, food: -10, medicine: -8 },
         people: helixPeople,
@@ -328,7 +330,7 @@ export const LOCATIONS = {
         accent: '#65c5b8',
         secondary: '#173d42',
         description: 'An oceanic agricultural world exporting food, biochemicals, and high-value cultured goods.',
-        shipsForSale: ['wayfarer', 'talon'],
+        shipsForSale: ['talon'],
         economy: { food: 0.55, water: 0.62, medicine: 0.82, electronics: 1.28, machinery: 1.34, ore: 1.22, scrap: 1.12, luxuries: 0.72, arms: 1.35 },
         marketBias: { food: 48, water: 38, medicine: 20, machinery: -25, electronics: -18 },
         people: azurePeople,
@@ -415,7 +417,7 @@ export const EQUIPMENT = {
         category: 'radar',
         price: 5400,
         description: 'Improves target acquisition, scan range, and threat classification.',
-        stat: '+50% target and scan range',
+        stat: '+25% target range · +50% scan range',
     },
     'cargo-pods': {
         id: 'cargo-pods',

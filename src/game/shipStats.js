@@ -15,7 +15,7 @@ export const getEffectiveShipStats = (player) => {
         // Radar (sensor) range decides what appears as a selectable target. A
         // locked ship, asteroid, or wreck resolves automatically within the
         // active scan range.
-        radarRange: has('radar-mk2') ? 1200 : 800,
+        radarRange: has('radar-mk2') ? 1250 : 1000,
         scanRange: has('radar-mk2') ? 750 : 500,
         miningRange: 100,
         miningRate: has('mining-mk2') ? 1.7 : 1,

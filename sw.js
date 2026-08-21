@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v99-0-4-7t-art-cache';
+const CACHE = 'voidrunner-v101-0-4-9-glb-cache';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',
@@ -24,6 +24,13 @@ self.addEventListener('install', (event) => {
     './src/game/worldData.js',
     './src/game/quests.js',
     './src/game/voxelModels.js',
+    './src/game/glbLoader.js',
+    './assets/models/ships/atlas.glb',
+    './assets/models/ships/lancer.glb',
+    './assets/models/ships/prospector.glb',
+    './assets/models/ships/talon.glb',
+    './assets/models/ships/vanguard.glb',
+    './assets/models/ships/wayfarer.glb',
     './vendor/three.module.min.js',
     './vendor/three.core.min.js',
     './art/career-mining.webp',

@@ -4,6 +4,21 @@ import { getEffectiveShipStats } from './shipStats.js';
 // Selling gold is loud: word reaches the syndicate and pirates watch the
 // Shardbelt lanes for this long after the sale (see updateDynamicEncounters).
 const GOLD_HEAT_SECONDS = 360;
+// Once a dock's underworld ledger crosses this total, the local fixer opens
+// the smuggler's den to the pilot who paid for it (see game.js
+// paySyndicateBerth / denUnlockedAt).
+export const SYNDICATE_DEN_FAVOR = 600;
+// The den pays over the counter for restricted goods: untraceable arms move at
+// this premium above the station's licensed market price. Legal goods do not
+// trade below the radar — the den only moves what the manifest can't show.
+const BLACK_MARKET_PREMIUM = 1.25;
+export const denPrice = (locationId, commodityId, item, seed, economyClock) => {
+    const commodity = COMMODITIES[commodityId];
+    if (commodity.legal)
+        return undefined;
+    const base = marketPrice(locationId, commodityId, item, seed, economyClock);
+    return Math.max(3, Math.round(base * BLACK_MARKET_PREMIUM));
+};
 export const createInitialMarket = (seed) => {
     const market = {};
     for (const locationId of DOCK_LOCATION_IDS) {
@@ -68,10 +83,10 @@ export const cargoMass = (player) => {
 };
 export const cargoCapacity = (player) => getEffectiveShipStats(player).cargo;
 export const cargoFree = (player) => Math.max(0, cargoCapacity(player) - cargoMass(player));
-export const buyCommodity = (save, locationId, commodityId, requestedQuantity = 1) => {
+export const buyCommodity = (save, locationId, commodityId, requestedQuantity = 1, priceOverride) => {
     const item = save.world.market[locationId][commodityId];
     const commodity = COMMODITIES[commodityId];
-    const price = item.lastPrice;
+    const price = priceOverride ?? item.lastPrice;
     const affordable = Math.floor(save.player.credits / price);
     const byCapacity = Math.floor(cargoFree(save.player) / commodity.mass);
     const quantity = Math.max(0, Math.min(requestedQuantity, item.supply, affordable, byCapacity));
@@ -91,13 +106,33 @@ export const buyCommodity = (save, locationId, commodityId, requestedQuantity = 
     save.player.stats.trades += quantity;
     return { ok: true, message: `Loaded ${quantity} ${commodity.name}.`, quantity, total };
 };
-export const sellCommodity = (save, locationId, commodityId, requestedQuantity = 1) => {
+// A delivered NPC cargo softens the destination market: the inbound stock
+// lands on the exchange (supply up, local demand partly met), which eases
+// lastPrice exactly like a player sale would. Deterministic — pure supply/
+// demand math, no rng. Traders call this when their trade task reaches a port
+// (see shipAI.legTick); smugglers deliberately bypass the licensed market.
+export const deliverCargo = (market, locationId, cargo, seed, economyClock) => {
+    const prices = market?.[locationId];
+    if (!prices)
+        return;
+    for (const [commodityId, qty] of Object.entries(cargo ?? {})) {
+        if (qty <= 0)
+            continue;
+        const item = prices[commodityId];
+        if (!item)
+            continue;
+        item.supply = clamp(item.supply + Math.ceil(qty * 0.8), 0, 99);
+        item.demand = clamp(item.demand - Math.ceil(qty * 0.3), 0, 99);
+        item.lastPrice = marketPrice(locationId, commodityId, item, seed, economyClock);
+    }
+};
+export const sellCommodity = (save, locationId, commodityId, requestedQuantity = 1, priceOverride) => {
     const owned = save.player.cargo[commodityId] ?? 0;
     const quantity = Math.max(0, Math.min(requestedQuantity, owned));
     if (quantity <= 0)
         return { ok: false, message: 'No matching cargo in the hold.', quantity: 0, total: 0 };
     const item = save.world.market[locationId][commodityId];
-    const total = item.lastPrice * quantity;
+    const total = (priceOverride ?? item.lastPrice) * quantity;
     save.player.credits += total;
     save.player.cargo[commodityId] = owned - quantity;
     item.supply = clamp(item.supply + quantity, 0, 99);

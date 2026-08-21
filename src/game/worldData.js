@@ -1,5 +1,74 @@
+import * as THREE from 'three';
 import { LOCATIONS } from './data.js';
 import { pick, randomBetween, randomInt, seededRandom } from './random.js';
+// The asteroid surface is a detail-2 icosahedron whose vertices are pushed
+// radially by a per-variant distortion function, then scaled per axis by the
+// rock's radius × node.scale. That deformed mesh is the ONLY source of truth
+// for both the rendered rock (render.js builds its instanced geometry from it)
+// and the sim's hard collision (game.js tests the ship against these same
+// triangles) — so a bump always lands on the exact visible surface.
+let asteroidBaseMeshes = null;
+const buildAsteroidBaseMeshes = () => {
+    const meshes = [];
+    for (let variant = 0; variant < 4; variant += 1) {
+        const geometry = new THREE.IcosahedronGeometry(1, 2);
+        const positions = geometry.getAttribute('position');
+        const vertex = new THREE.Vector3();
+        for (let index = 0; index < positions.count; index += 1) {
+            vertex.fromBufferAttribute(positions, index);
+            const seedPhase = variant * 7.31;
+            const distortion = 0.72 + 0.32 * Math.sin(vertex.x * (6.3 + variant * 1.9) + vertex.y * (9.7 + variant * 2.3) + vertex.z * (13.1 + variant * 1.5) + seedPhase);
+            vertex.multiplyScalar(distortion);
+            positions.setXYZ(index, vertex.x, vertex.y, vertex.z);
+        }
+        positions.needsUpdate = true;
+        geometry.computeVertexNormals();
+        geometry.computeBoundingSphere();
+        const index = geometry.getIndex();
+        let indices;
+        if (index) {
+            indices = new Uint16Array(index.array);
+        }
+        else {
+            // Non-indexed geometry stores vertices per-triangle in order.
+            indices = new Uint16Array(positions.count);
+            for (let i = 0; i < positions.count; i += 1)
+                indices[i] = i;
+        }
+        meshes.push({
+            geometry,
+            positions: new Float32Array(positions.array),
+            indices,
+        });
+    }
+    asteroidBaseMeshes = meshes;
+    return meshes;
+};
+export const getAsteroidBaseMeshes = () => asteroidBaseMeshes ?? buildAsteroidBaseMeshes();
+// Per-rock collision triangles: the base mesh scaled to the rock's radius ×
+// per-axis scale, cached on the node (field layout and scale are stable for a
+// session; the rotation is applied by the collider at query time, so drifting
+// rocks stay correct through grid rebuilds).
+export const asteroidCollisionMesh = (node) => {
+    if (!node._collisionMesh) {
+        // A node without a shape (hand-built fixtures, legacy saves) falls
+        // back to variant 0 so collision never dereferences an empty slot.
+        const bases = getAsteroidBaseMeshes();
+        const base = bases[Number.isFinite(node.shape) ? node.shape % bases.length : 0];
+        const sx = node.radius * node.scale[0];
+        const sy = node.radius * node.scale[1];
+        const sz = node.radius * node.scale[2];
+        const src = base.positions;
+        const verts = new Float32Array(src.length);
+        for (let i = 0; i < src.length; i += 3) {
+            verts[i] = src[i] * sx;
+            verts[i + 1] = src[i + 1] * sy;
+            verts[i + 2] = src[i + 2] * sz;
+        }
+        node._collisionMesh = { verts, indices: base.indices };
+    }
+    return node._collisionMesh;
+};
 const sphericalOffset = (rng, radius, inner = 0) => {
     const u = rng();
     const v = rng();

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { SHIPS } from './data.js';
+import { GLB_TOP_DOWN_PROFILES } from './shipProfiles.js';
 const keyOf = (x, y, z) => `${x},${y},${z}`;
 const FACE_DEFS = [
     {
@@ -518,6 +519,22 @@ const profileCache = new Map();
 export const shipTopDownProfile = (variant) => {
     if (profileCache.has(variant))
         return profileCache.get(variant);
+    // Prefer the silhouette baked from the GLB hull (the model the game
+    // actually flies); fall back to the voxel footprint for anything without
+    // a GLB.
+    const glb = GLB_TOP_DOWN_PROFILES[variant];
+    if (glb) {
+        const glbProfile = {
+            minX: 0,
+            maxX: glb.cols - 1,
+            minZ: 0,
+            maxZ: glb.rows - 1,
+            edges: glb.edges,
+            cells: glb.cells,
+        };
+        profileCache.set(variant, glbProfile);
+        return glbProfile;
+    }
     const builder = SHIP_BUILDERS[variant] ?? SHIP_BUILDERS.kestrel;
     const { grid } = builder();
     const filled = new Set();

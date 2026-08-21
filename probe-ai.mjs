@@ -20,6 +20,7 @@ const { EntityStore } = await import('./src/game/entityStore.js');
 const { createNewSave } = await import('./src/game/save.js');
 const { PILOT_LINES, pilotMod, rollPilot } = await import('./src/game/pilots.js');
 const { seededRandom } = await import('./src/game/random.js');
+const { COMMODITIES } = await import('./src/game/data.js');
 const { completeBountyMission, generateMissionOffers } = await import('./src/game/missions.js');
 const { relationColor, callsignHandle } = await import('./src/game/ui.js');
 
@@ -740,7 +741,7 @@ const profileRun = (seed) => {
 const profile = profileRun('profile-1');
 console.log(`  scan toasts: ${profile.toasts.length} · monitor readout: ${profile.readout}`);
 assert(profile.toasts.length === 0, `the scan no longer toasts — the profile lands on the monitor (${profile.toasts.join(' / ')})`);
-assert(profile.readout === 'Ace · Flamboyant', `target monitor readout shows the pilot profile after scan (${profile.readout})`);
+assert(profile.readout === 'HUNTING · Ace · Flamboyant', `target monitor readout leads with the ship's task after scan (${profile.readout})`);
 
 // ---------------------------------------------------------------------------
 console.log('comms: temperament-driven combat lines');
@@ -1360,6 +1361,254 @@ const rolled = makeSession('drift-3').spawnShip('pirate', [0, 0, -120]);
 const rolledAgain = makeSession('drift-3').spawnShip('pirate', [0, 0, -120]);
 assert(['novice', 'veteran', 'ace'].includes(rolled.pilot.tier) && ['timid', 'steady', 'aggressive', 'flamboyant'].includes(rolled.pilot.temperament), `plain spawn rolls a valid pilot (${rolled.pilot.tier}/${rolled.pilot.temperament})`);
 assert(rolled.pilot.tier === rolledAgain.pilot.tier && rolled.pilot.temperament === rolledAgain.pilot.temperament, 'plain spawn pilot roll is seed-stable');
+
+// ---------------------------------------------------------------------------
+console.log('search AI: only ships that already saw you sweep the last-known spot');
+// The search AI: a ship that already had the player resolved and then lost the
+// signal opens a search at the last-known position — a patrol that watched a
+// dark contact vanish (blue ring) or a hostile actually targeting the player
+// that lost the resolve (red ring). The searcher flies to the anchor, then
+// randomly fans out across the 100-km sweep radius for a timed window before
+// giving up for a cooldown. Finding the player again closes the search with a
+// hail (patrol) or an engagement (hostile). The escape paths — speed bleed,
+// occlusion, dropping the beam — are each scripted and asserted against the
+// seeded sim.
+const searchSession = (seed) => {
+    const session = makeSession(seed);
+    const sensors = [];
+    const events = [];
+    const lines = [];
+    session.ui = {
+        pushEvent: (message) => events.push(message),
+        pushSensor: (message) => sensors.push(message),
+        showToast: () => undefined,
+        showPilotLine: (callsign, line) => lines.push(`${callsign}: ${line}`),
+    };
+    session.audio = { play: (effect) => { if (effect === 'warning') session.warnings += 1; }, playComms: () => undefined };
+    session.warnings = 0;
+    session.save.player.transponder = false; // running dark
+    session.save.player.velocity = [0, 0, 0];
+    return { session, sensors, events, lines };
+};
+const SEARCH_STEP = 1 / 60;
+const searchFrames = (run, frames, perFrame) => {
+    const { session } = run;
+    for (let index = 0; index < frames; index += 1) {
+        session.save.world.time += SEARCH_STEP;
+        session.updateShips(SEARCH_STEP);
+        perFrame?.(index);
+    }
+    return run.patrol;
+};
+const rings = (run) => run.session.buildHudModel().searchRings ?? [];
+
+// A — caught dark: resolving the pilot warns, dings Concord once, and hails —
+// but never sweeps. The ring only appears once the patrol loses the contact.
+const caughtRun = searchSession('search-caught-1');
+const caughtPatrol = caughtRun.session.spawnShip('patrol', [0, 0, -150]);
+const caught = { ...caughtRun, patrol: caughtPatrol };
+searchFrames(caught, 6);
+console.log(`  caught: ${caught.sensors[0] ?? 'no sensor line'} · concord ${caughtRun.session.save.player.reputation.concord} · ${caught.lines[0] ?? 'no comms line'}`);
+assert(caughtPatrol.search === undefined, 'resolving a dark contact catches — it does not open a search');
+assert(caught.sensors.some((line) => line.includes('flagged your dark transponder')), 'the caught-dark warning lands on the sensor log');
+assert(caughtRun.session.save.player.reputation.concord === -2, 'being caught running dark dings Concord standing by 2');
+assert(caughtRun.session.warnings === 1, 'the catch plays the warning tone');
+assert(caught.lines.length === 1, 'the patrol calls out the catch on comms');
+assert(rings(caught).length === 0, 'a catch draws no sweep ring — nothing is being searched');
+searchFrames(caught, 30); // hold the resolve: still watched, never swept or re-dinged
+assert(caughtPatrol.search === undefined && caughtRun.session.save.player.reputation.concord === -2, 'a held contact is watched, never swept or re-dinged');
+// The pilot breaks the resolve (speed bleed): the patrol that already saw them
+// sweeps the last-known spot — a blue ring anchored where the signal dropped.
+let sprinted = 0;
+for (; sprinted < 400; sprinted += 1) {
+    caughtRun.session.save.player.position[2] += 1; // 60 km/s sprint
+    searchFrames(caught, 1);
+    if (caughtPatrol.search)
+        break;
+}
+const caughtRing = rings(caught)[0];
+assert(caughtPatrol.search?.phase === 'approach', 'losing the resolved dark contact opens an approach search');
+assert(sprinted < 400, `the sprint breaks the resolve within the window (${sprinted} frames)`);
+assert(caughtRing && caughtRing.color === 'blue', 'the patrol sweep is a blue ring');
+assert(Math.abs(caughtRing.x) < 0.05 && Math.abs(caughtRing.y) < 0.05, 'the ring starts at the radar center — the anchor is where the signal dropped');
+assert(Math.abs(caughtRing.fraction - 0.1) < 0.02, 'the ring radius is the 100-km sweep radius');
+searchFrames(caught, 1500, () => { caughtRun.session.save.player.position[2] += 1; }); // keep sprinting: the approach pass is slower than a lit hull
+assert(caughtPatrol.search === undefined, 'the speed-bleed search gives up after the timed fan-out');
+assert(caughtRun.session.save.world.time < caughtPatrol.searchCooldownUntil, 'every outcome sets the give-up cooldown before a re-trigger');
+assert(caught.sensors.some((line) => line.includes('no contact at last-known position')), 'the give-up logs the inconclusive sweep');
+assert(caughtRun.session.save.player.reputation.concord === -2, 'escaping never adds a second Concord ding');
+assert(rings(caught).length === 0, 'the sweep ring leaves the radar once the search closes');
+
+// B — occlusion: a rock cuts the resolve without the pilot moving — the search
+// opens at the last-known spot (radar center). The pilot then slips away
+// behind the rock; the patrol sweeps the frozen anchor and gives up.
+const occludeRun = searchSession('search-occlude-1');
+const occludePatrol = occludeRun.session.spawnShip('patrol', [0, 0, -150]);
+const occlude = { ...occludeRun, patrol: occludePatrol };
+searchFrames(occlude, 6); // caught at 150 km
+assert(occludePatrol.search === undefined && occludeRun.session.save.player.reputation.concord === -2, 'the visible dark contact is caught, not searched');
+// A rock cuts the line of sight while the pilot stays put. The resolve does
+// not snap: the patrol tracks the pilot through the rock for the occlusion
+// grace (breaking visual contact is a maneuver, not a one-frame flicker), and
+// only when the grace runs out does it sweep the last-known spot.
+occludeRun.session.activeInstanceId = 'shardbelt';
+occludeRun.session.asteroids.push({ id: 'rock', position: [0, 0, -60], radius: 25, scale: [1, 1, 1], remaining: 1, shape: 1 });
+occludeRun.session.obstacleGrid = null;
+occludeRun.session.obstacleSegmentGrid = null;
+occludeRun.session.obstacleGridBuiltAt = -Infinity;
+searchFrames(occlude, 2);
+assert(occludePatrol.search === undefined && occludePatrol.resolvedPlayerLast, 'occlusion holds the resolve for the tracking grace — no instant search');
+// The grace (2.5 s) runs out with the rock still in the way: the search opens
+// at the last-known spot (radar center).
+searchFrames(occlude, 160);
+assert(occludePatrol.search?.phase === 'approach', 'the tracked contact opens the search at the last-known position once the grace expires');
+const occludeRing = rings(occlude)[0];
+assert(occludeRing && occludeRing.color === 'blue' && Math.abs(occludeRing.x) < 0.05 && Math.abs(occludeRing.y) < 0.05, 'the ring is blue and starts at the radar center');
+// The pilot slips away behind the rock; the anchor stays frozen at the
+// last-known spot, so the patrol sweeps empty space and gives up.
+occludeRun.session.save.player.position = [0, 0, 300];
+searchFrames(occlude, 1900); // the rock's avoidance makes the approach wander, then the sweep runs its window
+console.log(`  occlude: concord ${occludeRun.session.save.player.reputation.concord} · ${occlude.sensors.at(-1) ?? 'no sensor line'}`);
+assert(occludePatrol.search === undefined, 'the occluded search gives up after the timed fan-out');
+assert(occludeRun.session.save.player.reputation.concord === -2, 'one catch, one Concord ding');
+assert(occlude.sensors.some((line) => line.includes('no contact at last-known position')), 'the inconclusive sweep is logged');
+assert(!occlude.sensors.some((line) => line.includes('contact confirmed')), 'the pilot who slipped away is never logged as a firm contact');
+
+// C — dropping the beam: a broadcasting pilot is resolved at full sensor
+// range; the moment the broadcast drops the patrol investigates the last-known
+// position — no warning, no rep ding. The drop alone is not the escape: a
+// pilot who stays at the last-known position gets hailed as a firm contact,
+// while one who sprints away shakes the investigation to an inconclusive
+// give-up.
+const vanishEscape = (seed, sprint) => {
+    const run = searchSession(seed);
+    const patrol = run.session.spawnShip('patrol', [0, 0, 0]);
+    const holder = { ...run, patrol };
+    run.session.utilityActive = true; // the extraction beam broadcasts the work
+    run.session.save.player.position = [0, 0, 500]; // resolved at 500 km, lit
+    searchFrames(holder, 10);
+    const resolvedBeforeDrop = patrol.resolvedPlayerLast;
+    const noSearchBeforeDrop = patrol.search === undefined;
+    run.session.utilityActive = false; // drop the beam: dark at 500 km
+    searchFrames(holder, 2);
+    const opened = patrol.search?.phase === 'approach';
+    const dropRing = rings(holder)[0];
+    searchFrames(holder, sprint ? 2600 : 1600, sprint ? () => { run.session.save.player.position[2] += 1; } : undefined); // 60 km/s while the patrol investigates
+    return {
+        resolvedBeforeDrop,
+        noSearchBeforeDrop,
+        opened,
+        ringColor: dropRing?.color,
+        ringCentered: dropRing ? Math.abs(dropRing.x) < 0.05 && Math.abs(dropRing.y) < 0.05 : false,
+        dinged: run.session.save.player.reputation.concord,
+        warned: run.session.warnings,
+        closed: patrol.search === undefined,
+        logged: run.sensors.some((line) => line.includes('contact confirmed')),
+        gaveUp: run.sensors.some((line) => line.includes('no contact at last-known position')),
+        sensors: run.sensors.slice(),
+    };
+};
+const vanishSprint = vanishEscape('search-vanish-1', true);
+const vanishSprintRepeat = vanishEscape('search-vanish-1', true);
+const vanishStay = vanishEscape('search-vanish-2', false);
+console.log(`  vanish: sprint gave up ${vanishSprint.gaveUp} / logged ${vanishSprint.logged} · stay logged ${vanishStay.logged}`);
+assert(vanishSprint.resolvedBeforeDrop && vanishSprint.noSearchBeforeDrop, 'a lit pilot is normal traffic — resolved but never searched');
+assert(vanishSprint.opened, 'the vanished signal opens an investigation at the last-known position');
+assert(vanishSprint.dinged === 0 && vanishSprint.warned === 0, 'a vanish is an investigation, not a catch — no warning or ding');
+assert(vanishSprint.ringColor === 'blue' && vanishSprint.ringCentered, 'the investigation ring is blue and starts at the radar center');
+assert(vanishSprint.closed && vanishSprint.gaveUp, 'sprinting after the drop shakes the investigation to an inconclusive give-up');
+assert(vanishSprint.logged === false, 'the sprinting pilot is never logged as a firm contact');
+assert(vanishStay.closed && vanishStay.logged && !vanishStay.gaveUp, 'staying at the last-known position gets the pilot hailed as a firm contact');
+assert(JSON.stringify(vanishSprint) === JSON.stringify(vanishSprintRepeat), 'the beam-drop escape is seed-deterministic');
+
+// D — a hostile actually targeting the player: the pirate loses the resolve
+// and sweeps the last-known spot with a red ring; a pilot who stays in the
+// path gets found (the attack AI re-engages), one who flees shakes the hunt to
+// an inconclusive give-up.
+const hostileHunt = (seed, flee) => {
+    const run = searchSession(seed);
+    const pirate = run.session.spawnShip('pirate', [0, 0, -150]);
+    const holder = { ...run, pirate };
+    pirate.targetId = 'player'; // actually targeting the player
+    searchFrames(holder, 10); // resolved at 150 km inside the dark line
+    const resolvedBefore = pirate.resolvedPlayerLast;
+    const noSearchBefore = pirate.search === undefined;
+    // The player breaks the resolve (teleports out of the dark-detection line).
+    run.session.save.player.position = flee ? [0, 0, 600] : [0, 0, 160];
+    searchFrames(holder, 2);
+    const opened = pirate.search?.phase === 'approach';
+    const huntRing = rings(holder)[0];
+    searchFrames(holder, flee ? 1500 : 900);
+    return {
+        resolvedBefore,
+        noSearchBefore,
+        opened,
+        ringColor: huntRing?.color,
+        closed: pirate.search === undefined,
+        gaveUp: run.sensors.some((line) => line.includes('lost the signal')),
+        reEngaged: pirate.attackPhase !== undefined,
+        targetId: pirate.targetId,
+        cooldown: pirate.searchCooldownUntil > run.session.save.world.time,
+        sensors: run.sensors.slice(),
+    };
+};
+const huntFlee = hostileHunt('search-hostile-1', true);
+const huntFleeRepeat = hostileHunt('search-hostile-1', true);
+const huntFound = hostileHunt('search-hostile-2', false);
+console.log(`  hostile: flee gave up ${huntFlee.gaveUp} · found re-engaged ${huntFound.reEngaged}`);
+assert(huntFlee.resolvedBefore && huntFlee.noSearchBefore, 'a hostile targeting the player is resolved and hunting, not searching');
+assert(huntFlee.opened, 'losing the resolve opens the hostile search at the last-known position');
+assert(huntFlee.ringColor === 'red', 'the hostile sweep is a red ring');
+assert(huntFlee.closed && huntFlee.gaveUp, 'the fleeing pilot shakes the hostile hunt to a give-up');
+assert(huntFlee.cooldown, 'the hostile give-up sets the cooldown before a re-trigger');
+assert(huntFound.closed && huntFound.reEngaged && huntFound.targetId === 'player', 'a hostile that finds the player again re-engages the fight');
+assert(JSON.stringify(huntFlee) === JSON.stringify(huntFleeRepeat), 'the hostile hunt is seed-deterministic');
+
+// ---------------------------------------------------------------------------
+console.log('syndicate berth: a dark arrival lands, then pays or launches out');
+// A dark ship now auto-lands like anyone else — the fee is collected on the
+// concourse, not at the door. The landing records a pending berth fee (flat
+// handling plus the cargo cut); PAY deducts it into the dock's underworld
+// ledger and stamps the visit receipt; without the credits the only way out
+// is launching back into space, which clears the pending fee uncollected.
+const berthRun = (seed, credits, cargo) => {
+    const session = makeSession(seed);
+    const toasts = [];
+    session.ui = { pushEvent: () => undefined, pushSensor: () => undefined, showToast: (message) => toasts.push(message), showPilotLine: () => undefined, showDock: () => undefined };
+    session.audio = { play: () => undefined, playComms: () => undefined };
+    session.save.player.transponder = false;
+    session.save.player.credits = credits;
+    session.save.player.cargo = cargo;
+    session.save.player.dockedAt = 'helix';
+    session.beginDarkArrival('helix');
+    const pending = { ...session.save.world.syndicatePending };
+    const paid = session.paySyndicateBerth();
+    return {
+        fee: pending.fee,
+        location: pending.locationId,
+        paid,
+        credits: session.save.player.credits,
+        pendingLeft: session.save.world.syndicatePending ?? undefined,
+        ledger: session.save.world.underworld?.helix ?? 0,
+        receipt: session.save.world.syndicateArrival,
+        toasts: toasts.slice(),
+    };
+};
+const emptyBerth = berthRun('berth-empty', 2000, {});
+const loadedBerth = berthRun('berth-loaded', 5000, { water: 10 });
+const brokeBerth = berthRun('berth-broke', 100, {});
+console.log(`  empty hold: fee ${emptyBerth.fee} · paid ${emptyBerth.paid} · credits ${emptyBerth.credits} · ledger ${emptyBerth.ledger}`);
+console.log(`  water ×10: fee ${loadedBerth.fee} · paid ${loadedBerth.paid} · ledger ${loadedBerth.ledger} · receipt ${JSON.stringify(loadedBerth.receipt)}`);
+console.log(`  broke: fee ${brokeBerth.fee} · paid ${brokeBerth.paid} · credits ${brokeBerth.credits} · ${brokeBerth.toasts[0] ?? 'no toast'}`);
+assert(emptyBerth.location === 'helix' && emptyBerth.fee === 150, 'an empty dark hold owes exactly the flat berth fee');
+assert(loadedBerth.fee === 150 + Math.round(0.12 * 10 * COMMODITIES.water.basePrice), `the berth fee adds the cargo cut (${loadedBerth.fee})`);
+assert(loadedBerth.paid && loadedBerth.credits === 5000 - loadedBerth.fee, 'PAY deducts exactly the pending fee');
+assert(loadedBerth.ledger === loadedBerth.fee && loadedBerth.receipt?.fee === loadedBerth.fee, 'PAY banks the fee into the dock ledger and stamps the visit receipt');
+assert(loadedBerth.pendingLeft === undefined, 'PAY clears the pending card so the concourse opens normally');
+assert(brokeBerth.paid === false && brokeBerth.credits === 100 && brokeBerth.pendingLeft?.fee === 150, 'without the credits the payment is refused and the card stays');
+assert(brokeBerth.toasts.some((message) => message.includes('not enough credits')), 'the refusal explains why on the card');
+const berthRepeat = berthRun('berth-empty', 2000, {});
+assert(JSON.stringify(emptyBerth) === JSON.stringify(berthRepeat), 'the berth flow is seed-deterministic');
 
 // ---------------------------------------------------------------------------
 console.log(`\n${passed} assertions passed${process.exitCode ? ' (with failures)' : ''}.`);

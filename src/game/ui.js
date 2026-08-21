@@ -1,9 +1,10 @@
 import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, LOCATIONS, SHIPS, SUN_POSITION, commodityIds, displaySpeed, equipmentIds } from './data.js';
-import { cargoCapacity, cargoMass } from './economy.js';
+import { cargoCapacity, cargoMass, denPrice, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { formatCredits, formatDuration } from './random.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
 import { TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 import { shipTopDownProfile } from './voxelModels.js';
+import { defaultSettings } from './save.js';
 import { ShipPreview } from './shipPreview.js';
 const escapeHtml = (value) => value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const percent = (value, max) => (max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100)));
@@ -56,11 +57,13 @@ export const radarAltitudeTick = ({ x, y, radius, ratio = 1, direction, magnitud
     const startY = y + direction * gap;
     const half = Math.sqrt(Math.max(0, radius * radius - x * x));
     const room = direction < 0 ? startY + half : half - startY;
-    const desired = Math.max(3, magnitude * radius * 0.8) * ratio;
+    // Ticks stay short: a full-range climb reads as a stub, not a spike —
+    // capped at half the ring so above/below never dominates the blip.
+    const desired = Math.max(3, magnitude * radius * 0.4) * ratio;
     const length = Math.max(0, Math.min(desired, room - 2 * ratio));
     return length >= 1.5 * ratio ? { startY, length } : undefined;
 };
-const GAME_VERSION = '0.4.7t';
+const GAME_VERSION = '0.4.9';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -230,6 +233,13 @@ export class GameUI {
         this.bindStaticEvents();
         this.syncFullscreenButton();
         document.addEventListener('fullscreenchange', this.syncFullscreenButton);
+        // React instantly to a physical rotation (phones/tablets) so the forced
+        // landscape overlay clears the moment the device is flipped.
+        if (typeof matchMedia === 'function') {
+            const portraitQuery = matchMedia('(orientation: portrait)');
+            this.portraitQuery = portraitQuery;
+            portraitQuery.addEventListener?.('change', this.updateOrientationNotice);
+        }
         this.updateOrientationNotice();
         window.addEventListener('resize', () => {
             this.updateOrientationNotice();
@@ -317,7 +327,7 @@ export class GameUI {
             <div class="screen-ship-layout"><div class="screen-flight"><div><span>SPD</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>FUEL</span><b id="screen-own-fuel">100</b><small>%</small></div><div><span>HOLD</span><b id="screen-own-cargo">0.0</b><small id="screen-own-cargo-cap">/32</small></div></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>ARMOR</span><i><b id="screen-own-armor"></b></i><em id="screen-own-armor-value">100</em></div><div><span>HULL</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">100</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="Radar display; tap to open navigation map">
-            <div class="screen-heading"><span>RADAR · TAP MAP</span><b id="screen-radar-zone">OPEN SPACE</b></div>
+            <div class="screen-heading"><span>RADAR · TAP MAP</span><b id="screen-radar-zone">OPEN SPACE</b><b id="screen-radar-transponder" class="radar-transponder" title="Transponder — press B">TP ON</b></div>
             <div class="radar-screen-wrap"><canvas id="radar" width="220" height="220" role="button" tabindex="0" aria-label="Open navigation map"></canvas></div>
             <div class="screen-ticker screen-sensor-log" id="screen-sensor-log" data-tone="info"></div>
           </div>
@@ -333,6 +343,7 @@ export class GameUI {
           <div id="target-edge-pointer" class="target-edge-pointer is-hidden" aria-hidden="true"><i></i><span></span></div>
           <div class="reticle" aria-hidden="true"><span></span><span></span><span></span><span></span><b></b></div>
           <button type="button" id="comms-bar" class="comms-bar" data-ui-command="open-chat" role="button" tabindex="0" aria-label="Open comms log"></button>
+          <button type="button" id="patrol-reply-chip" class="patrol-reply-chip is-hidden" data-ui-command="patrol-reply" role="button" tabindex="0" aria-label="Reply to the patrol greeting">REPLY <em id="patrol-reply-timer"></em></button>
           <div class="touch-controls" aria-label="Touch flight controls">
             <div class="touch-left">
               <div class="touch-throttle" data-touch-throttle>
@@ -347,6 +358,7 @@ export class GameUI {
               <button class="touch-boost touch-boost-right" data-touch-action="afterburner" aria-label="Afterburner — hold"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" fill-rule="evenodd"><path d="M12 2.2C7.9 7.5 5.4 10.3 5.4 14a6.6 6.6 0 0 0 13.2 0c0-3.7-2.5-6.5-6.6-11.8Zm0 7c-2 2.6-2.8 3.8-2.8 5.3a2.8 2.8 0 0 0 5.6 0c0-1.5-.8-2.7-2.8-5.3Z"/></svg></button>
               <button id="touch-fire" class="touch-fire" data-touch-action="fire" aria-label="Fire — hold"><svg data-icon="fire" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.6"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg></button>
               <button id="touch-missile" class="touch-missile" data-touch-action="missile" aria-label="Missile"><svg data-icon="missile" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.4 9.3 8.8h5.4Z"/><path d="M9.3 8.8h5.4v6.4H9.3Z"/><path d="M9.3 15.2 6.8 21M14.7 15.2l2.5 5.8"/></svg><svg data-icon="scan" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="is-hidden"><circle cx="12" cy="12" r="6.2"/><path d="M12 5.8V12l4.2 2.4"/><path d="M4.8 4.8 3.4 3.4M19.2 4.8l1.4-1.4M4.8 19.2l-1.4 1.4M19.2 19.2l1.4 1.4"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg><svg data-icon="capture" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M8 3.6h8l1.8 3H6.2Z"/><path d="M9.2 6.6v2.1M14.8 6.6v2.1"/><path d="M7 11.5h10M8.1 14.5h7.8M9.3 17.5h5.4M10.6 20.5h2.8"/></svg></button>
+              <button id="touch-transponder" class="touch-transponder" data-touch-action="transponder" aria-label="Transponder — toggle">TP</button>
             </div>
           </div>
           <div class="hud-corner-buttons">
@@ -359,6 +371,7 @@ export class GameUI {
           <div class="title-stars"></div>
           <div class="title-cockpit-frame" aria-hidden="true"></div>
           <div class="title-card">
+            <button class="title-fullscreen-button" data-ui-command="toggle-fullscreen" aria-label="Toggle fullscreen">⛶</button>
             <span class="title-kicker">FRONTIER COMMERCE / WARRANTS / RECOVERY</span>
             <span class="title-version">BUILD ${GAME_VERSION}</span>
             <h1>VOID<br><b>RUNNER</b></h1>
@@ -367,7 +380,7 @@ export class GameUI {
               <button class="primary" data-ui-command="resume">RESUME FLIGHT</button>
               <button data-ui-command="new">NEW CAREER</button>
               <button data-ui-command="arena">COMBAT SIM</button>
-              <button data-ui-command="fullscreen">FULLSCREEN</button>
+              <button data-ui-command="options">OPTIONS</button>
             </div>
             <div class="title-controls">
               <span>TOUCH: tilt to steer · THRUST · AFTERBURN · FIRE · SECONDARY TOOL</span>
@@ -388,7 +401,12 @@ export class GameUI {
         <section id="arena-panel" class="modal-panel is-hidden" aria-label="Combat simulator"></section>
         <section id="chat-panel" class="modal-panel is-hidden" aria-label="Comms log"></section>
         <div id="toast-stack" class="toast-stack global-toasts" aria-live="polite"></div>
-        <div id="rotate-notice" class="rotate-notice is-hidden"><strong>ROTATE DEVICE</strong><span>Landscape gives the cockpit room to breathe.</span></div>
+        <div id="rotate-notice" class="rotate-notice is-hidden" role="alertdialog" aria-label="Rotate your screen to landscape">
+          <div class="rotate-phone" aria-hidden="true"></div>
+          <strong>FLIP TO LANDSCAPE</strong>
+          <span>Voidrunner is built for horizontal play.<br>Rotate your device — or widen the window — to continue.</span>
+          <button type="button" data-ui-command="fullscreen">GO FULLSCREEN</button>
+        </div>
       </main>
     `;
     }
@@ -610,6 +628,12 @@ export class GameUI {
             case 'pause':
                 this.showPause();
                 break;
+            case 'options':
+                this.showOptions();
+                break;
+            case 'close-options':
+                this.hideOptions();
+                break;
             case 'toggle-fullscreen':
                 this.actions?.toggleFullscreen();
                 break;
@@ -632,6 +656,12 @@ export class GameUI {
                 break;
             case 'open-chat':
                 this.openChatLog();
+                break;
+            case 'patrol-reply':
+                this.actions?.patrolReply?.();
+                break;
+            case 'syndicate-pay':
+                this.actions?.paySyndicateBerth?.();
                 break;
             case 'dismiss-story':
                 this.dismissStory();
@@ -804,13 +834,14 @@ export class GameUI {
         const terminal = this.dockTerminal ? this.renderDockTab(this.dockTerminal) : '';
         dock.innerHTML = `
       <div class="dock-backdrop">${this.locationIllustration(this.dockLocation, illustrationScreen)}</div>
-      <div class="dock-scanlines" aria-hidden="true"></div>
-      <header class="dock-header">
+      <div class="dock-scanlines" aria-hidden="true"></div>        <header class="dock-header">
         <div><span>${location.kind.toUpperCase()} / ${FACTION_NAMES[location.faction]}</span><h2>${escapeHtml(location.name)}</h2></div>
         ${this.dockTerminal !== 'concourse' ? '<div class="dock-back-button dock-pointer" data-ui-command="dock-concourse" role="button" tabindex="0" aria-label="Return to the concourse">◀ CONCOURSE</div>' : ''}
-        <div class="dock-wallet"><span>AVAILABLE CREDIT</span><strong>${formatCredits(this.save.player.credits)}</strong><small>${SHIPS[this.save.player.shipId].name} · ${cargoMass(this.save.player).toFixed(1)}/${cargoCapacity(this.save.player)} mass</small></div>
+        <div class="dock-wallet-unit"><div class="dock-wallet"><span>AVAILABLE CREDIT</span><strong>${formatCredits(this.save.player.credits)}</strong><small>${SHIPS[this.save.player.shipId].name} · ${cargoMass(this.save.player).toFixed(1)}/${cargoCapacity(this.save.player)} mass</small></div><button class="dock-options-button dock-pointer" data-ui-command="options" role="button" tabindex="0" aria-label="Options">⚙</button></div>
       </header>
+      ${this.renderDockNotice()}
       <div class="dock-content">${terminal}</div>
+      ${this.renderSyndicateCard()}
     `;
         const content = dock.querySelector('.dock-content');
         const preserveScroll = prevTab === this.dockTab && prevTerminal === this.dockTerminal;
@@ -825,6 +856,51 @@ export class GameUI {
             if (content && preserveScroll)
                 content.scrollTop = prevScroll;
         }
+    }
+    // The syndicate berth's receipt: while the current visit arrived below the
+    // radar, the dock screen keeps a saved notice showing what the berth cost
+    // and what this dock's ledger remembers — plus how close the ledger is to
+    // opening the smuggler's den.
+    renderDockNotice() {
+        const arrival = this.save?.world?.syndicateArrival;
+        if (!arrival || arrival.locationId !== this.dockLocation)
+            return '';
+        const paidHere = this.save.world.underworld?.[this.dockLocation] ?? 0;
+        const denReady = paidHere >= SYNDICATE_DEN_FAVOR;
+        return `
+      <div class="dock-notice syndicate-notice">
+        <b>SYNDICATE BERTH · ${formatCredits(arrival.fee)} PAID</b>
+        <span>This dock did not report your arrival. Ledger: ${formatCredits(paidHere)} paid to date${denReady ? ' — the smuggler\'s den is open to you.' : ` — ${formatCredits(SYNDICATE_DEN_FAVOR - paidHere)} more buys the den.`}</span>
+      </div>`;
+    }
+    // The local syndicate's ledger at this dock has crossed the favor line:
+    // the fixer opens the smuggler's den (black-market prices for restricted
+    // goods) to the pilot who paid for it.
+    denUnlockedAt(locationId) {
+        return (this.save?.world?.underworld?.[locationId] ?? 0) >= SYNDICATE_DEN_FAVOR;
+    }
+    // The starting payment card for an unlicensed arrival: the dark pilot lands
+    // like anyone else, and the concourse opens on the syndicate's demand — pay
+    // the berth fee or launch back into space. Modal on purpose: there is no
+    // third way out, so the fee can't be sidestepped by wandering the concourse.
+    renderSyndicateCard() {
+        const pending = this.save?.world?.syndicatePending;
+        if (!pending || pending.locationId !== this.dockLocation)
+            return '';
+        const affordable = this.save.player.credits >= pending.fee;
+        return `
+      <div class="syndicate-card" role="dialog" aria-modal="true" aria-label="Syndicate berth payment">
+        <div class="syndicate-card-panel">
+          <span class="syndicate-card-eyebrow">UNLICENSED ARRIVAL · THIS DOCK DID NOT REPORT YOU</span>
+          <h3>Syndicate berth</h3>
+          <p>The station took your landing, but the ledger has no manifest for you. Pay the berth fee — or launch back into space.</p>
+          <div class="syndicate-card-fee"><span>BERTH FEE</span><b>${formatCredits(pending.fee)}</b><small>${affordable ? 'Covers this arrival · ledger credit toward the den' : `You have ${formatCredits(this.save.player.credits)} — not enough. Launch to leave.`}</small></div>
+          <div class="syndicate-card-actions">
+            <button type="button" data-ui-command="syndicate-pay" ${affordable ? '' : 'disabled'} aria-label="Pay the syndicate berth fee">PAY ${formatCredits(pending.fee)}</button>
+            <button type="button" data-ui-command="launch" aria-label="Launch back into space without paying">LAUNCH BACK</button>
+          </div>
+        </div>
+      </div>`;
     }
     syncConcourseOverlay() {
         const dock = this.root.querySelector('#dock-screen');
@@ -927,6 +1003,7 @@ export class GameUI {
           <div class="scene-pointer concourse-pointer-services" data-dock-hotspot="services" role="button" tabindex="0" aria-label="Open services"><i>⚙</i><b>SERVICES</b><small>Repair and refuel</small></div>
           <div class="scene-pointer concourse-pointer-market" data-dock-hotspot="market" role="button" tabindex="0" aria-label="Enter the market"><i>▣</i><b>MARKET</b><small>Trade and fit out</small></div>
           <div class="scene-pointer concourse-pointer-bar" data-dock-hotspot="bar" role="button" tabindex="0" aria-label="Enter the bar"><i>✦</i><b>BAR</b><small>Guilds and missions</small></div>
+          ${this.denUnlockedAt(this.dockLocation) ? '<div class="scene-pointer concourse-pointer-den" data-market-point="den" role="button" tabindex="0" aria-label="Enter the smuggler\'s den"><i>☣</i><b>SMUGGLER\'S DEN</b><small>Black-market prices</small></div>' : ''}
         </div>
       </div>
     `;
@@ -1000,6 +1077,7 @@ export class GameUI {
             <div class="scene-pointer market-pointer-commodities" data-market-point="commodities" role="button" tabindex="0" aria-label="Open commodity market"><i>▦</i><b>COMMODITY MARKET</b><small>Buy and sell cargo</small></div>
             <div class="scene-pointer market-pointer-equipment" data-market-point="equipment" role="button" tabindex="0" aria-label="Open ship parts"><i>⚙</i><b>SHIP PARTS</b><small>Fit out your ship</small></div>
             <div class="scene-pointer market-pointer-shipyard" data-market-point="shipyard" role="button" tabindex="0" aria-label="Open the ship dealer"><i>↗</i><b>NEW SHIP</b><small>Hulls for sale</small></div>
+            ${this.denUnlockedAt(this.dockLocation) ? '<div class="scene-pointer market-pointer-den" data-market-point="den" role="button" tabindex="0" aria-label="Enter the smuggler\'s den"><i>☣</i><b>SMUGGLER\'S DEN</b><small>Black-market prices</small></div>' : ''}
           </div>
         </div>
       `;
@@ -1007,7 +1085,7 @@ export class GameUI {
         return `
       <div class="market-screen market-menu-screen">
         <div class="scene-pointer scene-return-pointer" data-ui-command="market-overview" role="button" tabindex="0" aria-label="Return to the market floor"><i>◀</i><b>MARKET FLOOR</b><small>Back to the scene</small></div>
-        <nav class="market-points" aria-label="Market points"><button class="${this.marketPoint === 'commodities' ? 'active' : ''}" data-market-point="commodities">COMMODITY MARKET</button><button class="${this.marketPoint === 'equipment' ? 'active' : ''}" data-market-point="equipment">SHIP PARTS</button><button class="${this.marketPoint === 'shipyard' ? 'active' : ''}" data-market-point="shipyard">NEW SHIP</button></nav>
+        <nav class="market-points" aria-label="Market points"><button class="${this.marketPoint === 'commodities' ? 'active' : ''}" data-market-point="commodities">COMMODITY MARKET</button><button class="${this.marketPoint === 'equipment' ? 'active' : ''}" data-market-point="equipment">SHIP PARTS</button><button class="${this.marketPoint === 'shipyard' ? 'active' : ''}" data-market-point="shipyard">NEW SHIP</button>${this.denUnlockedAt(this.dockLocation) ? `<button class="${this.marketPoint === 'den' ? 'active' : ''}" data-market-point="den">SMUGGLER\'S DEN</button>` : ''}</nav>
         <div id="market-point-content"></div>
       </div>
     `;
@@ -1034,6 +1112,32 @@ export class GameUI {
             content.innerHTML = this.renderShipyard();
             this.mountShipPreviews();
         }
+        else if (point === 'den') {
+            const market = this.save.world.market[this.dockLocation];
+            const rows = commodityIds.filter((id) => !COMMODITIES[id].legal).map((id) => {
+                const item = market[id];
+                const commodity = COMMODITIES[id];
+                const owned = this.save.player.cargo[id] ?? 0;
+                const price = denPrice(this.dockLocation, id, item, this.save.world.seed, this.save.world.economyClock) ?? 0;
+                return `<div class="market-row restricted">
+              <span><b>${escapeHtml(commodity.name)}</b><small>${escapeHtml(commodity.description)}</small></span>
+              <span><b>${formatCredits(price)}</b><small>DEN PRICE</small></span>
+              <span><b>${item.supply} / ${item.demand}</b><small>UNDER THE COUNTER</small></span>
+              <span><b>${owned}</b><small>UNITS</small></span>
+              <span class="market-actions"><button data-trade="den-buy:${id}:1">BUY 1</button><button data-trade="den-buy:${id}:5">BUY 5</button><button data-trade="den-sell:${id}:1" ${owned <= 0 ? 'disabled' : ''}>SELL 1</button><button data-trade="den-sell:${id}:999" ${owned <= 0 ? 'disabled' : ''}>SELL ALL</button></span>
+            </div>`;
+            }).join('');
+            const paidHere = this.save.world.underworld?.[this.dockLocation] ?? 0;
+            content.innerHTML = `
+        <div class="market-layout">
+          <div class="table-title"><div><span class="eyebrow">UNLICENSED EXCHANGE</span><h3>Smuggler's den</h3></div><div><span>YOUR LEDGER HERE</span><b>${formatCredits(paidHere)} cr</b></div></div>
+          <div class="market-table">
+          <div class="market-row market-head"><span>COMMODITY</span><span>PRICE</span><span>SUP / DEM</span><span>HOLD</span><span>ACTIONS</span></div>
+          ${rows}
+          </div>
+          <p class="den-footnote">The den only moves restricted goods. Untraceable arms fetch ${Math.round((denPrice(this.dockLocation, 'arms', market.arms, this.save.world.seed, this.save.world.economyClock) / Math.max(1, market.arms.lastPrice)) * 100)}% of the counter price — and no manifest entry ever gets written.</p>
+        </div>`;
+        }
         else {
             const market = this.save.world.market[this.dockLocation];
             content.innerHTML = `
@@ -1058,7 +1162,7 @@ export class GameUI {
         }
     }
     missionBadge(mission) {
-        return mission.kind === 'bounty' ? 'WARRANT' : mission.kind === 'transport' ? 'TIMED' : mission.kind.toUpperCase();
+        return mission.kind === 'bounty' ? 'WARRANT' : mission.kind === 'transport' ? 'TIMED' : mission.kind === 'smuggle' ? 'DARK RUN' : mission.kind.toUpperCase();
     }
     deadlineLabel(mission) {
         return Number.isFinite(mission.deadline) ? formatDuration(mission.deadline - this.save.world.time) : 'NO DEADLINE';
@@ -1129,7 +1233,7 @@ export class GameUI {
         return `
       <article class="ship-card ship-overview ${active ? 'active' : ''}" data-ship-detail="${saleId}" role="button" tabindex="0" aria-label="View ${escapeHtml(ship.name)} details">
         <div class="ship-silhouette ${saleId}" data-variant="${ship.variant}"></div>
-        <header><span>${escapeHtml(ship.className)}</span><b>${saleId === 'wayfarer' ? 'STARTER HULL' : formatCredits(ship.price)}</b></header>
+        <header><span>${escapeHtml(ship.className)}</span><b>${formatCredits(ship.price)}</b></header>
         <h3>${escapeHtml(ship.name)}</h3>
         <p class="ship-personality">${escapeHtml(ship.personality ?? '')}</p>
         <div class="ship-overview-meta"><span>${active ? 'ACTIVE SHIP' : owned ? 'IN YOUR FLEET' : 'FOR SALE'}</span><b>DETAILS ▸</b></div>
@@ -1154,7 +1258,7 @@ export class GameUI {
         return `
       <article class="ship-card ship-detail ${active ? 'active' : ''}">
         <div class="ship-silhouette ship-silhouette-large ${saleId}" data-variant="${ship.variant}" aria-label="Rotating 3D preview of the ${escapeHtml(ship.name)}"></div>
-        <header><span>${escapeHtml(ship.className)}</span><b>${saleId === 'wayfarer' ? 'STARTER HULL' : formatCredits(ship.price)}</b></header>
+        <header><span>${escapeHtml(ship.className)}</span><b>${formatCredits(ship.price)}</b></header>
         <h3>${escapeHtml(ship.name)}</h3>
         <p class="ship-personality">${escapeHtml(ship.personality ?? '')}</p>
         <p>${escapeHtml(ship.description)}</p>
@@ -1194,7 +1298,7 @@ export class GameUI {
             <span class="eyebrow">${escapeHtml(GUILD_NAMES[id])}</span>
             <h3>${GUILD_RANK_NAMES[id][rank]}</h3>
             <div class="guild-meter"><i><b style="width:${rank >= 3 ? 100 : Math.min(100, (rep / nextThreshold) * 100)}%"></b></i><em>${rep} REP</em></div>
-            <p>${id === 'merchant' ? 'Better route intelligence, cargo contracts, and external hold equipment.' : id === 'bounty' ? 'Higher-value warrants, combat equipment, and recognized kill authentication.' : id === 'mining' ? 'Survey claims, rich deposit data, and advanced extraction lances.' : 'Protected recovery claims, rare wreck data, and long-range tractor systems.'}</p>
+            <p>${id === 'merchant' ? 'Better route intelligence, cargo contracts, and external hold equipment.' : id === 'bounty' ? 'Higher-value warrants, combat equipment, and recognized kill authentication.' : id === 'mining' ? 'Survey claims, rich deposit data, and advanced extraction lances.' : id === 'syndicate' ? 'Dark-goods contracts, untraceable den prices, and the local fixer\'s favor.' : 'Protected recovery claims, rare wreck data, and long-range tractor systems.'}</p>
             <button data-guild-id="${id}" ${joined ? 'disabled' : ''}>${joined ? 'MEMBERSHIP ACTIVE' : 'REGISTER'}</button>
             ${id === 'bounty' ? this.renderBountyRegistry() : ''}
           </article>`;
@@ -1313,6 +1417,17 @@ export class GameUI {
         };
         renderTicker('#screen-event-ticker', this.currentEntry(this.recentEvents));
         renderTicker('#screen-sensor-log', this.currentEntry(this.sensorLog));
+        // The patrol reply chip: visible while a cordon pilot is still waiting
+        // for the courtesy, with the window ticking down.
+        const patrolReply = this.el('#patrol-reply-chip');
+        if (patrolReply) {
+            patrolReply.classList.toggle('is-hidden', !model.patrolReply);
+            if (model.patrolReply) {
+                const timer = this.el('#patrol-reply-timer');
+                if (timer)
+                    timer.textContent = String(model.patrolReply.seconds);
+            }
+        }
         setText('#hud-zone', model.zone.toUpperCase());
         setText('#hud-mode', model.mode.toUpperCase());
         setText('#screen-own-speed', Math.round(model.speed).toString());
@@ -1348,14 +1463,20 @@ export class GameUI {
                     timer.textContent = String(model.standoff.seconds);
             }
         }
-        const zoneLabel = this.el('#screen-radar-zone');
-        if (zoneLabel) {
-            // The dock hint rides the radar's zone line (no floating prompt):
-            // while the ship needs to slow to land/dock it replaces the zone
-            // with an amber flash, then hands the line back to the zone name.
-            zoneLabel.textContent = (model.dockPrompt ?? model.zone).toUpperCase();
-            zoneLabel.classList.toggle('is-dock-prompt', Boolean(model.dockPrompt));
+        this.drawRadar(model.contacts, model.radarRings, model.searchRings);
+        const transponderChip = this.el('#screen-radar-transponder');
+        if (transponderChip) {
+            // The chip mirrors the live sensor signature: transponder ON, or a
+            // dark ship lit up by its own extraction beam.
+            transponderChip.textContent = model.broadcasting ? 'TP ON' : 'TP OFF';
+            transponderChip.classList.toggle('is-dark', !model.broadcasting);
+            transponderChip.title = model.broadcasting
+                ? 'Visible to sensors at full range' + (model.transponder ? ' · press B to go dark' : ' · the extraction beam is broadcasting') 
+                : 'Dark to sensors beyond 200 km · press B to transmit';
         }
+        const zoneLabel = this.el('#screen-radar-zone');
+        if (zoneLabel)
+            zoneLabel.textContent = model.zone.toUpperCase();
         setText('#screen-own-shield-value', Math.ceil(model.shield).toString());
         setText('#screen-own-armor-value', Math.ceil(model.armor).toString());
         setText('#screen-own-hull-value', Math.ceil(model.hull).toString());
@@ -1365,11 +1486,16 @@ export class GameUI {
         this.updateTarget(model.target, model.mode);
         const targetReadout = this.el('#screen-target-readout');
         if (targetReadout) {
+            // Transient monitor alerts win, then the slow-down call for an
+            // approach — the landing/docking prompt lives on the target
+            // monitor's readout, not the radar zone line.
             targetReadout.classList.toggle('is-alert', Boolean(model.monitorStatus));
+            targetReadout.classList.toggle('is-dock-prompt', Boolean(model.dockPrompt && !model.monitorStatus));
             if (model.monitorStatus)
                 targetReadout.textContent = model.monitorStatus;
+            else if (model.dockPrompt)
+                targetReadout.textContent = model.dockPrompt;
         }
-        this.drawRadar(model.contacts);
         this.drawHullOutline(this.ownHullCanvas, model.playerVariant ?? 'kestrel', 0, 'rgba(111, 216, 236, 0.9)', false, model.missiles, model.maxMissiles);
         const throttleThumb = this.el('[data-touch-throttle-thumb]');
         const throttleFill = this.el('.touch-throttle-fill');
@@ -1377,6 +1503,11 @@ export class GameUI {
             throttleThumb.style.bottom = `${model.throttle * 100}%`;
         if (throttleFill)
             throttleFill.style.height = `${model.throttle * 100}%`;
+        // The touch transponder pad mirrors the radar chip: amber when dark so
+        // mobile pilots see the squawk state on the pad they toggle it with.
+        const touchTransponder = this.el('#touch-transponder');
+        if (touchTransponder)
+            touchTransponder.classList.toggle('is-dark', model.transponder === false);
     }
     updateTarget(target, mode = this.lastHud?.mode ?? 'combat') {
         const bracket = this.el('#target-bracket');
@@ -1725,7 +1856,7 @@ export class GameUI {
             }
         }
     }
-    drawRadar(contacts) {
+    drawRadar(contacts, rings, searchRings = []) {
         const canvas = this.radarContext.canvas;
         const rect = canvas.getBoundingClientRect();
         const ratio = Math.min(2, window.devicePixelRatio || 1);
@@ -1742,13 +1873,23 @@ export class GameUI {
         ctx.clearRect(0, 0, width, height);
         ctx.save();
         ctx.translate(cx, cy);
-        ctx.strokeStyle = 'rgba(115, 203, 185, .35)';
         ctx.lineWidth = Math.max(1, ratio);
-        for (const ring of [0.33, 0.66, 1]) {
+        // Calibrated range rings as fractions of the outer ring (radarRange):
+        // the mid ring marks scan range and the warm inner ring marks the
+        // dark-detection line — the "invisible past here" threshold.
+        const ringFractions = rings && rings.length === 3 ? rings : [0.2, 0.5, 1];
+        for (let index = 0; index < ringFractions.length; index += 1) {
+            // When the pilot broadcasts, the dark-visibility ring merges with
+            // the horizon (full signature) — skip it so only the scan ring and
+            // the outer ring (plus the cross-hair) remain.
+            if (ringFractions[index] >= 0.98)
+                continue;
+            ctx.strokeStyle = index === 0 ? 'rgba(224, 186, 104, .3)' : 'rgba(115, 203, 185, .35)';
             ctx.beginPath();
-            ctx.arc(0, 0, radius * ring, 0, Math.PI * 2);
+            ctx.arc(0, 0, radius * ringFractions[index], 0, Math.PI * 2);
             ctx.stroke();
         }
+        ctx.strokeStyle = 'rgba(115, 203, 185, .35)';
         ctx.beginPath();
         ctx.moveTo(-radius, 0);
         ctx.lineTo(radius, 0);
@@ -1762,12 +1903,98 @@ export class GameUI {
         ctx.lineTo(5 * ratio, 5 * ratio);
         ctx.closePath();
         ctx.fill();
+        const now = performance.now();
+        // Active searches: a dashed ring at the last-known-position anchor,
+        // scaled to the sweep radius — blue for a Concord patrol, red for a
+        // hostile — so a hunt near the pilot shows on the disc, not just as a
+        // sensor-log note. The ring pulses slowly so it reads as a live sweep,
+        // and a small cross marks the anchor. Drawn before the contact blips so
+        // they stay on top.
+        const sweepPulse = 0.65 + 0.35 * Math.sin(now / 260);
+        for (const ring of searchRings) {
+            const x = ring.x * radius;
+            const y = ring.y * radius;
+            const r = Math.max(3 * ratio, ring.fraction * radius);
+            const stroke = ring.color === 'red' ? 'rgba(255, 90, 67, 0.9)' : 'rgba(108, 200, 228, 0.9)';
+            ctx.globalAlpha = sweepPulse;
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = Math.max(1.6, 1.8 * ratio);
+            ctx.setLineDash([7 * ratio, 5 * ratio]);
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.strokeStyle = ring.color === 'red' ? 'rgba(255, 90, 67, 0.65)' : 'rgba(108, 200, 228, 0.65)';
+            ctx.lineWidth = Math.max(1, ratio);
+            const cross = Math.max(3 * ratio, r * 0.12);
+            ctx.beginPath();
+            ctx.moveTo(x - cross, y);
+            ctx.lineTo(x + cross, y);
+            ctx.moveTo(x, y - cross);
+            ctx.lineTo(x, y + cross);
+            ctx.stroke();
+            // A search clamped in from past the horizon carries its distance,
+            // tucked just inside the ring toward the disc center.
+            if (ring.beyond) {
+                ctx.fillStyle = ring.color === 'red' ? '#ff9a7a' : '#a8e2f2';
+                ctx.font = `${Math.max(8, Math.floor(8.5 * ratio))}px ui-monospace, monospace`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`${ring.distance}`, x * 0.8, y * 0.8);
+            }
+            ctx.globalAlpha = 1;
+        }
         for (const contact of contacts) {
             const x = contact.x * radius;
             const y = contact.y * radius;
             const size = (contact.selected ? 5.5 : 3.2) * ratio;
-            ctx.fillStyle = contact.type === 'hostile' ? '#ff5a43' : contact.type === 'friendly' ? '#6cc8e4' : contact.type === 'location' ? '#e6b95f' : contact.type === 'resource' ? '#b8c97b' : contact.type === 'wreck' ? '#87b5aa' : contact.type === 'pickup' ? '#f2df91' : '#c9cbc6';
-            ctx.strokeStyle = ctx.fillStyle;
+            const color = contact.type === 'hostile' ? '#ff5a43' : contact.type === 'friendly' ? '#6cc8e4' : contact.type === 'location' ? '#e6b95f' : contact.type === 'resource' ? '#b8c97b' : contact.type === 'wreck' ? '#87b5aa' : contact.type === 'pickup' ? '#f2df91' : contact.type === 'distress' ? '#ff9442' : '#c9cbc6';
+            // A distress beacon from beyond the horizon (see radarContacts): a
+            // pulsing diamond at the disc rim aimed at the source, with a
+            // distance readout tucked just inside it.
+            if (contact.distress) {
+                const pulse = 0.7 + 0.3 * Math.sin(now / 150);
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(Math.PI / 4);
+                ctx.globalAlpha = pulse;
+                ctx.fillStyle = color;
+                const s = size * 1.6;
+                ctx.fillRect(-s, -s, s * 2, s * 2);
+                ctx.restore();
+                ctx.globalAlpha = 1;
+                ctx.strokeStyle = 'rgba(255, 148, 66, 0.75)';
+                ctx.lineWidth = Math.max(1, ratio);
+                ctx.beginPath();
+                ctx.arc(x, y, size * 2.5, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = '#ffab6b';
+                ctx.font = `${Math.max(8, Math.floor(8.5 * ratio))}px ui-monospace, monospace`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`${contact.distance}`, x * 0.82, y * 0.82);
+                continue;
+            }
+            // A lost contact: the last-known position of a signal the dish just
+            // stopped resolving — a cross, not a dashed circle. Solid for the
+            // hold window, then fading out over the fade window (the alpha is
+            // precomputed in game.js radarContacts).
+            if (contact.ghost) {
+                ctx.strokeStyle = color;
+                ctx.lineWidth = Math.max(1.4, 1.7 * ratio);
+                ctx.globalAlpha = contact.lostAlpha ?? 0.9;
+                const cross = size * 2.2;
+                ctx.beginPath();
+                ctx.moveTo(x - cross, y);
+                ctx.lineTo(x + cross, y);
+                ctx.moveTo(x, y - cross);
+                ctx.lineTo(x, y + cross);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+                continue;
+            }
+            ctx.fillStyle = color;
+            ctx.strokeStyle = color;
             ctx.globalAlpha = contact.altitude > 0 ? 1 : 0.62;
             if (contact.type === 'location') {
                 ctx.strokeRect(x - size, y - size, size * 2, size * 2);
@@ -1974,10 +2201,10 @@ export class GameUI {
             </div>
           </section>
           <section class="map-section local-map-section">
-            <div class="map-section-heading"><span>LOCAL CONTACTS</span><b>${model.contacts.length} TRACKED</b></div>
-            <div class="tactical-map map-stage">
+            <div class="map-section-heading"><span>LOCAL CONTACTS</span><b>${model.contacts.length} TRACKED</b></div>              <div class="tactical-map map-stage">
               <div class="tactical-rings"></div><div class="tactical-player"></div>
-              ${model.contacts.map((contact) => `<button class="tactical-contact ${contactTone(contact)} ${contact.selected ? 'selected' : ''}" style="left:${(50 + contact.x * 42).toFixed(2)}%;top:${(50 + contact.y * 42).toFixed(2)}%" data-map-target-kind="${contact.kind}" data-map-target-id="${escapeHtml(contact.id)}" aria-label="${escapeHtml(contact.name)}"><i></i></button>`).join('')}
+              ${(model.searchRings ?? []).map((ring) => `<span class="tactical-search-ring ${ring.color}" style="left:${(50 + ring.x * 42).toFixed(2)}%;top:${(50 + ring.y * 42).toFixed(2)}%;width:${Math.max(6, ring.fraction * 84).toFixed(1)}%;height:${Math.max(6, ring.fraction * 84).toFixed(1)}%"></span>`).join('')}
+              ${model.contacts.map((contact) => `<button class="tactical-contact ${contactTone(contact)} ${contact.ghost ? 'ghost' : ''} ${contact.distress ? 'distress' : ''} ${contact.selected ? 'selected' : ''}" style="left:${(50 + contact.x * 42).toFixed(2)}%;top:${(50 + contact.y * 42).toFixed(2)}%;opacity:${contact.ghost ? (contact.lostAlpha ?? 0.9) : 1}" data-map-target-kind="${contact.kind}" data-map-target-id="${escapeHtml(contact.id)}" aria-label="${escapeHtml(contact.name)}"><i></i></button>`).join('')}
             </div>
             <div class="contact-list">
               ${model.contacts.length ? model.contacts.map((contact) => `<button class="contact-row ${contactTone(contact)} ${contact.selected ? 'selected' : ''}" data-map-target-kind="${contact.kind}" data-map-target-id="${escapeHtml(contact.id)}"><i></i><span><b>${escapeHtml(contact.name)}</b><small>${escapeHtml(contact.subtitle)}</small></span><em>${Math.round(contact.distance)}u</em></button>`).join('') : '<div class="contact-empty"><b>NO LOCAL CONTACTS</b><span>Only contacts inside sensor range appear here.</span></div>'}
@@ -2066,6 +2293,19 @@ export class GameUI {
         this.root.querySelector('#ship-panel')?.classList.add('is-hidden');
         this.updateOrientationNotice();
     }
+    // The settings sections (FLIGHT / TILT STEER / AUDIO / controls) shared by
+    // the in-flight pause panel and the options panel on the title and dock
+    // screens — one source of truth for the toggles and sliders.
+    settingsSections(settings) {
+        return `
+        <div class="pause-grid">
+          <section><h3>FLIGHT</h3><label><span>Flight assist</span><input type="checkbox" data-setting="flightAssist" ${settings.flightAssist ? 'checked' : ''}></label><label><span>Aim assistance</span><input type="checkbox" data-setting="aimAssist" ${settings.aimAssist ? 'checked' : ''}></label><label><span>Quality</span><select data-setting="quality"><option value="auto" ${settings.quality === 'auto' ? 'selected' : ''}>Auto</option><option value="low" ${settings.quality === 'low' ? 'selected' : ''}>Low</option><option value="high" ${settings.quality === 'high' ? 'selected' : ''}>High</option></select></label><label><span>Touch scale</span><input type="range" min="0.8" max="1.3" step="0.05" value="${settings.touchScale}" data-setting="touchScale"></label></section>
+          <section><h3>TILT STEER</h3><label><span>Steering</span><select data-setting="steering"><option value="tilt" ${settings.steering !== 'stick' ? 'selected' : ''}>Tilt</option><option value="stick" ${settings.steering === 'stick' ? 'selected' : ''}>Stick</option></select></label><label><span>Sensitivity</span><input type="range" min="0.4" max="1.8" step="0.05" value="${settings.tiltSensitivity}" data-setting="tiltSensitivity"></label><label><span>Invert pitch</span><input type="checkbox" data-setting="tiltInvertPitch" ${settings.tiltInvertPitch ? 'checked' : ''}></label><label><span>Invert yaw</span><input type="checkbox" data-setting="tiltInvertYaw" ${settings.tiltInvertYaw ? 'checked' : ''}></label><div class="tilt-actions"><button data-ui-command="enable-tilt">ENABLE</button><button data-ui-command="calibrate-tilt">SET NEUTRAL</button></div></section>
+          <section><h3>AUDIO</h3><label><span>Music</span><input type="range" min="0" max="1" step="0.05" value="${settings.music}" data-setting="music"></label><label><span>Effects</span><input type="range" min="0" max="1" step="0.05" value="${settings.effects}" data-setting="effects"></label><label><span>Haptics</span><input type="checkbox" data-setting="vibration" ${settings.vibration ? 'checked' : ''}></label></section>
+          <section><h3>DISPLAY</h3><label><span>Fullscreen</span><button type="button" class="fullscreen-switch" data-ui-command="toggle-fullscreen" role="switch" aria-label="Toggle fullscreen" aria-checked="false">⛶</button></label></section>
+          <section class="controls-reference"><h3>KEYBOARD / CONTROLLER</h3><p>W/S pitch · A/D yaw · Q/E roll · R/F throttle · Shift afterburn · Space fire · hold M secondary tool / tap missile or capture · T target · C mode · N nav · J hyperdrive · K map · B transponder</p><p>Gamepad: left stick steer · right stick roll/throttle · RT fire · hold RB secondary tool / tap missile or capture · LB afterburn · face buttons target/mode/hyperdrive · left stick click transponder · D-pad capture/hostile/nav.</p></section>
+        </div>`;
+    }
     showPause() {
         if (!this.save)
             return;
@@ -2074,16 +2314,33 @@ export class GameUI {
         panel.innerHTML = `
       <div class="modal-card pause-card">
         <header><div><span class="eyebrow">SHIP COMPUTER</span><h2>Paused</h2></div><button data-ui-command="resume-flight">RESUME</button></header>
-        <div class="pause-grid">
-          <section><h3>FLIGHT</h3><label><span>Flight assist</span><input type="checkbox" data-setting="flightAssist" ${settings.flightAssist ? 'checked' : ''}></label><label><span>Aim assistance</span><input type="checkbox" data-setting="aimAssist" ${settings.aimAssist ? 'checked' : ''}></label><label><span>Quality</span><select data-setting="quality"><option value="auto" ${settings.quality === 'auto' ? 'selected' : ''}>Auto</option><option value="low" ${settings.quality === 'low' ? 'selected' : ''}>Low</option><option value="high" ${settings.quality === 'high' ? 'selected' : ''}>High</option></select></label><label><span>Touch scale</span><input type="range" min="0.8" max="1.3" step="0.05" value="${settings.touchScale}" data-setting="touchScale"></label></section>
-          <section><h3>TILT STEER</h3><label><span>Steering</span><select data-setting="steering"><option value="tilt" ${settings.steering !== 'stick' ? 'selected' : ''}>Tilt</option><option value="stick" ${settings.steering === 'stick' ? 'selected' : ''}>Stick</option></select></label><label><span>Sensitivity</span><input type="range" min="0.4" max="1.8" step="0.05" value="${settings.tiltSensitivity}" data-setting="tiltSensitivity"></label><label><span>Invert pitch</span><input type="checkbox" data-setting="tiltInvertPitch" ${settings.tiltInvertPitch ? 'checked' : ''}></label><label><span>Invert yaw</span><input type="checkbox" data-setting="tiltInvertYaw" ${settings.tiltInvertYaw ? 'checked' : ''}></label><div class="tilt-actions"><button data-ui-command="enable-tilt">ENABLE</button><button data-ui-command="calibrate-tilt">SET NEUTRAL</button></div></section>
-          <section><h3>AUDIO</h3><label><span>Music</span><input type="range" min="0" max="1" step="0.05" value="${settings.music}" data-setting="music"></label><label><span>Effects</span><input type="range" min="0" max="1" step="0.05" value="${settings.effects}" data-setting="effects"></label><label><span>Haptics</span><input type="checkbox" data-setting="vibration" ${settings.vibration ? 'checked' : ''}></label></section>
-          <section class="controls-reference"><h3>KEYBOARD / CONTROLLER</h3><p>W/S pitch · A/D yaw · Q/E roll · R/F throttle · Shift afterburn · Space fire · hold M secondary tool / tap missile or capture · T target · C mode · N nav · J hyperdrive · K map</p><p>Gamepad: left stick steer · right stick roll/throttle · RT fire · hold RB secondary tool / tap missile or capture · LB afterburn · face buttons target/mode/hyperdrive · D-pad capture/hostile/nav.</p></section>
-        </div>
+        ${this.settingsSections(settings)}
         <footer><button data-ui-command="map">NAV MAP</button><button data-ui-command="save">SAVE NOW</button><button data-ui-command="quit-title">QUIT TO TITLE</button></footer>
       </div>`;
         this.hideShipMenu();
         panel.classList.remove('is-hidden');
+        this.syncFullscreenButton();
+        this.updateOrientationNotice();
+    }
+    // Options panel on the title and dock screens: the same settings grid as
+    // the pause panel (sound lives here — a fresh career starts silent, and
+    // Music / Effects are the on-switch), without the in-flight footer. Works
+    // before a career exists: settings fall back to the factory defaults and
+    // changes persist via the no-session setSetting path.
+    showOptions() {
+        const panel = this.root.querySelector('#pause-panel');
+        const settings = this.save?.settings ?? defaultSettings();
+        panel.innerHTML = `
+      <div class="modal-card pause-card">
+        <header><div><span class="eyebrow">SHIP COMPUTER</span><h2>Options</h2></div><button data-ui-command="close-options">CLOSE</button></header>
+        ${this.settingsSections(settings)}
+      </div>`;
+        panel.classList.remove('is-hidden');
+        this.syncFullscreenButton();
+        this.updateOrientationNotice();
+    }
+    hideOptions() {
+        this.root.querySelector('#pause-panel')?.classList.add('is-hidden');
         this.updateOrientationNotice();
     }
     hidePause() {
@@ -2129,13 +2386,22 @@ export class GameUI {
         this.root.classList.toggle('steering-tilt', mode === 'tilt');
         this.root.classList.toggle('steering-stick', mode !== 'tilt');
     }
+    // Every fullscreen control — the HUD corner button, the title-screen
+    // switch, and the options/pause switch — mirrors the live fullscreen state
+    // (icon flips between enter ⛶ and exit ⤡, active state glows gold).
     syncFullscreenButton = () => {
-        const button = this.root.querySelector('.fullscreen-button');
-        if (!button)
-            return;
-        const full = Boolean(document.fullscreenElement);
-        button.textContent = full ? '⤡' : '⛶';
-        button.classList.toggle('is-fullscreen', full);
+        // Standard plus the webkit-prefixed element (older Safari/Edge), so the
+        // switch mirrors fullscreen state on every engine.
+        const full = Boolean(document.fullscreenElement ?? document.webkitFullscreenElement);
+        const icon = full ? '⤡' : '⛶';
+        this.root.querySelectorAll('.fullscreen-button, .title-fullscreen-button, .fullscreen-switch').forEach((button) => {
+            button.textContent = icon;
+            button.classList.toggle('is-fullscreen', full);
+            if (button.getAttribute('role') === 'switch')
+                button.setAttribute('aria-checked', String(full));
+            else
+                button.setAttribute('aria-pressed', String(full));
+        });
     };
     get isModalOpen() {
         return !this.root.querySelector('#map-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#ship-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#pause-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#arena-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#chat-panel')?.classList.contains('is-hidden');
@@ -2143,11 +2409,16 @@ export class GameUI {
     get isTitleVisible() {
         return this.titleVisible;
     }
+    // Forced landscape prompt: whenever the viewport is taller than it is wide
+    // (phone, pad, or a portrait window on desktop) the overlay blocks play —
+    // on the title screen, in the dock, and in flight — until the device is
+    // flipped or the window widened. No dismiss: the game is built for
+    // horizontal play.
     updateOrientationNotice = () => {
         const notice = this.root.querySelector('#rotate-notice');
         if (!notice)
             return;
-        const portrait = window.innerHeight > window.innerWidth && window.innerWidth < 900;
-        notice.classList.toggle('is-hidden', !portrait || this.titleVisible || this.isModalOpen);
+        const portrait = window.innerHeight > window.innerWidth;
+        notice.classList.toggle('is-hidden', !portrait);
     };
 }

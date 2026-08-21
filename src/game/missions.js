@@ -1,12 +1,15 @@
 import { COMMODITIES, DOCK_LOCATION_IDS, GUILD_RANK_NAMES, LOCATIONS, commodityIds, routeDistanceBetween } from './data.js';
 import { miningClaimCandidates, miningClaimName } from './worldData.js';
-import { cargoFree } from './economy.js';
+import { cargoFree, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { clamp, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
 import { rollPilot, TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
-const GUILD_NAMES_FALLBACK = (guild) => guild === 'merchant' ? 'Merchant Guild' : guild === 'bounty' ? 'Bounty Registry' : guild === 'mining' ? 'Prospectors Guild' : 'Salvage Union';
+const GUILD_NAMES_FALLBACK = (guild) => guild === 'merchant' ? 'Merchant Guild' : guild === 'bounty' ? 'Bounty Registry' : guild === 'mining' ? 'Prospectors Guild' : guild === 'syndicate' ? 'Red Talon Syndicate' : 'Salvage Union';
 const merchantIssuers = ['Kestrel Freight', 'Orison Combine', 'Free Haulers Desk', 'Sable Route Logistics', 'Guild Dispatch'];
 const bountyIssuers = ['Concord Warrant Desk', 'Frontier Security Office', 'Bounty Hunters Registry', 'Civil Claims Bureau'];
 const miningIssuers = ['Frontier Miners Cooperative', 'Prospectors Guild', 'Coreward Refinery Trust', 'Vesper Smelting Desk'];
+const syndicateIssuers = ['The Fixer', 'Den Concierge', 'Syndicate Broker'];
+// Dark-goods runs only move what the manifest cannot show.
+const SMUGGLE_COMMODITIES = ['arms', 'luxuries', 'electronics', 'medicine'];
 // Special labeled cargo only comes from transport contracts; the game's AI
 // reads this list to call out valuable sealed load (see game.js cargoFlavor).
 export const VALUABLE_CARGO_LABELS = ['sealed diplomatic case', 'reactor-control package', 'medical coldbox', 'priority machine tooling', 'survey archive'];
@@ -18,10 +21,7 @@ const chooseDestination = (rng, origin) => {
     const candidates = DOCK_LOCATION_IDS.filter((id) => id !== origin);
     return pick(rng, candidates);
 };
-const chooseCommodity = (rng, kind) => {
-    if (kind === 'procurement') {
-        return pick(rng, ['medicine', 'electronics', 'machinery', 'food', 'water', 'ore', 'scrap']);
-    }
+const chooseCommodity = (rng) => {
     // Gold stays a mined jackpot — it never shows up as generic delivery cargo.
     return pick(rng, commodityIds.filter((id) => id !== 'arms' && id !== 'gold'));
 };
@@ -101,6 +101,38 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
         // stakes a specific Shardbelt claim, the pilot cuts it out, and the ore
         // is delivered back. No clock — and only rock actually cut from the
         // claim counts, so bought ore can't pad the manifest.
+        // The smuggler's den opens once the berth ledger crosses the favor
+        // line: paid dark-arrival fees buy access to restricted-cargo runs.
+        // One or two appear on the board whenever the den is open.
+        const denOpen = (save.world.underworld?.[locationId] ?? 0) >= SYNDICATE_DEN_FAVOR;
+        if (denOpen && (index === 2 || index === 4)) {
+            const commodity = pick(rng, SMUGGLE_COMMODITIES);
+            const destination = pick(rng, DOCK_LOCATION_IDS.filter((id) => id !== locationId && id !== 'rook'));
+            const distance = routeDistanceBetween(locationId, destination);
+            const quantity = randomInt(rng, 3, 8);
+            const rank = save.player.guildRank.syndicate ?? 0;
+            const danger = dangerBase + randomBetween(rng, 0.3, 1.1);
+            const reward = Math.round(contractReward(distance, quantity, danger, rank) * 1.3);
+            offers.push({
+                id,
+                kind: 'smuggle',
+                title: `Dark run: ${quantity} ${COMMODITIES[commodity].name}`,
+                issuer: pick(rng, syndicateIssuers),
+                origin: locationId,
+                destination,
+                commodity,
+                quantity,
+                reward,
+                deposit: Math.round(reward * 0.06),
+                deadline: save.world.time + randomInt(rng, 240, 460),
+                status: 'offered',
+                guild: 'syndicate',
+                guildRep: 8 + Math.floor(distance / 160) + Math.floor(quantity / 2),
+                faction: 'red-talons',
+                briefing: `${quantity} units of ${COMMODITIES[commodity].name} that the manifest cannot show. Collect the sealed crate, run dark, and deliver to ${LOCATIONS[destination].name}. A patrol that resolves you seizes the crate and fines you — stay off the cordon.`,
+            });
+            continue;
+        }
         if ((LOCATIONS[locationId].economy?.ore ?? 1) > 1 && index < 2) {
             const candidates = miningClaimCandidates(save.world.seed, save.world.depletedAsteroids, save.world.scannedNodes)
                 .filter((node) => !claimedNodeIds.has(node.id));
@@ -138,20 +170,22 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             }
             // No stakable claim left: fall through to a merchant contract.
         }
-        const kind = pick(rng, ['delivery', 'procurement', 'transport']);
+        // Merchant contracts always hand the cargo over at acceptance (sealed
+        // goods) — the old "procure on the open market" run just re-bought
+        // market cargo for a delivery fee, so it is gone. Getting cargo from a
+        // specific rock is what the mining claims are for.
+        const kind = pick(rng, ['delivery', 'transport']);
         const destination = chooseDestination(rng, locationId);
         const distance = routeDistanceBetween(locationId, destination);
         const rank = save.player.guildRank.merchant;
         const danger = dangerBase + randomBetween(rng, 0.05, 0.8);
         const quantity = kind === 'transport' ? randomInt(rng, 2, 5) : randomInt(rng, 3, Math.min(10, 6 + rank * 2));
-        const commodity = kind === 'transport' ? undefined : chooseCommodity(rng, kind);
+        const commodity = kind === 'transport' ? undefined : chooseCommodity(rng);
         const reward = contractReward(distance, quantity, danger, rank) * (kind === 'transport' ? 1.15 : 1);
-        const deposit = kind === 'delivery' ? Math.round(reward * 0.08) : kind === 'transport' ? Math.round(reward * 0.12) : 0;
+        const deposit = kind === 'delivery' ? Math.round(reward * 0.08) : Math.round(reward * 0.12);
         const title = kind === 'delivery'
             ? `Deliver ${quantity} ${COMMODITIES[commodity].name}`
-            : kind === 'procurement'
-                ? `Procure ${quantity} ${COMMODITIES[commodity].name}`
-                : `Timed transport to ${LOCATIONS[destination].shortName}`;
+            : `Timed transport to ${LOCATIONS[destination].shortName}`;
         const cargoLabel = pick(rng, VALUABLE_CARGO_LABELS);
         offers.push({
             id,
@@ -171,9 +205,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             faction: LOCATIONS[destination].faction,
             briefing: kind === 'delivery'
                 ? `${quantity} units of ${COMMODITIES[commodity].name} are sealed and waiting. Deliver them intact to ${LOCATIONS[destination].name}. Cargo mass is reserved on acceptance.`
-                : kind === 'procurement'
-                    ? `${LOCATIONS[destination].name} requires ${quantity} units of ${COMMODITIES[commodity].name}. Source them on the open market and deliver before the contract expires.`
-                    : `Carry a ${cargoLabel} to ${LOCATIONS[destination].name}. The case occupies ${(quantity * 1.2).toFixed(1)} cargo mass and the client values punctuality above discretion.`,
+                : `Carry a ${cargoLabel} to ${LOCATIONS[destination].name}. The case occupies ${(quantity * 1.2).toFixed(1)} cargo mass and the client values punctuality above discretion.`,
         });
     }
     return offers;
@@ -196,18 +228,22 @@ export const acceptMission = (save, locationId, missionId) => {
         return { ok: false, message: 'Mission computer has reached its active-contract limit.' };
     if (save.player.credits < offered.deposit)
         return { ok: false, message: `A ${offered.deposit} credit bond is required.` };
-    if (offered.kind === 'delivery' || offered.kind === 'transport') {
+    if (offered.kind === 'delivery' || offered.kind === 'transport' || offered.kind === 'smuggle') {
         const units = offered.quantity ?? 0;
-        const massPerUnit = offered.kind === 'delivery' ? COMMODITIES[offered.commodity].mass : 1.2;
+        const massPerUnit = offered.kind === 'transport' ? 1.2 : COMMODITIES[offered.commodity].mass;
         const requiredMass = units * massPerUnit;
         if (cargoFree(save.player) + 0.001 < requiredMass) {
             return { ok: false, message: `Free ${requiredMass.toFixed(1)} cargo mass before accepting this contract.` };
         }
+        const smuggled = offered.kind === 'smuggle';
         save.player.sealedCargo.push({
             missionId: offered.id,
-            label: offered.kind === 'delivery' ? COMMODITIES[offered.commodity].name : 'Priority sealed package',
+            label: smuggled
+                ? `${COMMODITIES[offered.commodity].name} (syndicate)`
+                : offered.kind === 'delivery' ? COMMODITIES[offered.commodity].name : 'Priority sealed package',
             units,
             mass: massPerUnit,
+            ...(smuggled ? { smuggled: true } : {}),
         });
     }
     save.player.credits -= offered.deposit;
@@ -238,7 +274,7 @@ const updateGuildRank = (player, guild) => {
 const awardMission = (save, mission) => {
     mission.status = 'completed';
     save.player.credits += mission.reward + mission.deposit;
-    save.player.guildRep[mission.guild] += mission.guildRep;
+    save.player.guildRep[mission.guild] = (save.player.guildRep[mission.guild] ?? 0) + mission.guildRep;
     save.player.reputation[mission.faction] = clamp(save.player.reputation[mission.faction] + Math.max(1, Math.floor(mission.guildRep / 3)), -100, 100);
     save.player.stats.contracts += 1;
     save.world.completedMissionIds.push(mission.id);
@@ -267,7 +303,17 @@ export const completeMissionsAtDock = (save, locationId) => {
             if (minedEnough && consumeProcurementCargo(save.player, mission.commodity, mission.quantity))
                 messages.push(awardMission(save, mission));
         }
+        else if (mission.kind === 'smuggle') {
+            // The dark run clears on arrival: the crate is handed to the den.
+            const cargoIndex = save.player.sealedCargo.findIndex((cargo) => cargo.missionId === mission.id);
+            if (cargoIndex < 0)
+                continue;
+            save.player.sealedCargo.splice(cargoIndex, 1);
+            messages.push(awardMission(save, mission));
+        }
         else if (mission.kind === 'procurement' && mission.commodity && mission.quantity) {
+            // Legacy contracts from before market-procure runs were removed:
+            // old saves can still finish what they started.
             if (consumeProcurementCargo(save.player, mission.commodity, mission.quantity))
                 messages.push(awardMission(save, mission));
         }

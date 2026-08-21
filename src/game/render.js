@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { LOCATIONS, SUN_POSITION } from './data.js';
 import { createVoxelShipModel, createVoxelStationModel, paletteForFaction, shipVariantForRole } from './voxelModels.js';
 import { clamp, seededRandom } from './random.js';
-import { GRAVEYARD_GEOMETRY_PROFILES, wreckNodeCollisionRadius } from './worldData.js';
+import { GRAVEYARD_GEOMETRY_PROFILES, getAsteroidBaseMeshes, wreckNodeCollisionRadius } from './worldData.js';
+import { loadGlb } from './glbLoader.js';
 const tupleToVector = (tuple, out = new THREE.Vector3()) => out.set(tuple[0], tuple[1], tuple[2]);
 const NEG_Z = new THREE.Vector3(0, 0, -1);
 const cssHex = (value) => `#${value.toString(16).padStart(6, '0')}`;
@@ -34,6 +35,37 @@ const factionColor = (faction) => {
             return 0xcf4d3c;
     }
 };
+// GLB hulls (assets/models/ships/, converted from glb_models/ by
+// .workbench/convert-glb.mjs). One config per voxel variant: the file to
+// load, the yaw that points the model's nose at -Z (the game's forward), the
+// scale that matches the voxel ship's length, engine ports in model-local
+// units (the models are ~±1 per axis), and the model-local rear axis for the
+// exhaust trails. Yaw/port values are tuned against the reference renders.
+// Exported so the shipyard's buy-ship preview (shipPreview.js) loads the same
+// hulls with the same orientation and world scale.
+export const GLB_SHIP_CONFIG = {
+    kestrel: { file: 'wayfarer.glb', yaw: Math.PI / 2, scale: 6.1, rearAxis: [-1, 0, 0], enginePorts: [[-0.85, 0, -0.06], [-0.85, 0, 0.06]] },
+    warden: { file: 'vanguard.glb', yaw: Math.PI / 2, scale: 5.9, rearAxis: [-1, 0, 0], enginePorts: [[-0.85, 0, -0.3], [-0.85, 0, 0.3]] },
+    talon: { file: 'talon.glb', yaw: Math.PI / 2, scale: 5.65, rearAxis: [-1, 0, 0], enginePorts: [[-0.85, 0, -0.12], [-0.85, 0, 0.12]] },
+    prospector: { file: 'prospector.glb', yaw: Math.PI / 2, scale: 6.7, rearAxis: [-1, 0, 0], enginePorts: [[-0.9, 0, -0.3], [-0.9, 0, 0.3]] },
+    lancer: { file: 'lancer.glb', yaw: Math.PI / 2, scale: 6.65, rearAxis: [-1, 0, 0], enginePorts: [[-0.85, 0, -0.22], [-0.85, 0, 0], [-0.85, 0, 0.22]] },
+    'atlas-freighter': { file: 'atlas.glb', yaw: Math.PI / 2, scale: 13.4, rearAxis: [-1, 0, 0], enginePorts: [[-0.9, 0, -0.25], [-0.9, 0, 0.25]] },
+};
+// Per-variant engine glow tuning, applied on top of the shared defaults. The
+// talon's twin ports sit close together, so its two additive flares overlap
+// into one bright blob that reads hotter than any other ship.
+const ENGINE_GLOW_TUNING = {
+    talon: { flareScale: 0.8, flareOpacity: 0.7, trailOpacity: 0.65 },
+};
+// The near-field engine glow (the small additive sprite at each engine — NOT
+// the exhaust plume) is deliberately faint: a running-light read at a
+// distance, not a beacon. Hostile and burning states barely raise it.
+const ENGINE_FLARE_OPACITY = 0.13;
+const ENGINE_FLARE_OPACITY_ATLAS = 0.17;
+const ENGINE_FLARE_SIZE = 0.9;
+const ENGINE_FLARE_SIZE_ATLAS = 1.6;
+const ENGINE_FLARE_HOSTILE_BOOST = 1.12;
+const ENGINE_FLARE_BURNING_BOOST = 1.45;
 export class SpaceRenderer {
     container;
     scene = new THREE.Scene();
@@ -49,6 +81,10 @@ export class SpaceRenderer {
     projectileMeshes = new Map();
     pickupMeshes = new Map();
     shipMeshCount = 0;
+    // GLB ship hulls: per-variant cached model (or null when the load failed),
+    // plus the in-flight promises so concurrent spawns share one fetch.
+    glbShipModels = new Map();
+    glbShipLoading = new Map();
     projectileMeshCount = 0;
     pickupMeshCount = 0;
     graveyardBatches = [];
@@ -81,6 +117,11 @@ export class SpaceRenderer {
     viewportWidth = 1;
     viewportHeight = 1;
     lastQualityScale = 1;
+    // Hysteresis for the auto tier's bloom gate: once the governor drops the
+    // scale low enough to cut bloom, it stays off until the device clearly
+    // recovers — otherwise a machine hovering around the threshold would pop
+    // the glow on and off every second.
+    bloomOff = false;
     qualityMode;
     contextLost = false;
     bloomSceneTarget;
@@ -170,6 +211,9 @@ export class SpaceRenderer {
         this.renderer.domElement.addEventListener('webglcontextrestored', this.onContextRestored);
         this.resize();
         this.createBloomPipeline();
+        // Fire the GLB hull fetches up front so the first ship you see is
+        // already the real model, not a voxel placeholder.
+        this.preloadGlbShips();
     }
     createLighting() {
         // Lighting now mimics Rebel Galaxy Outlaw's two-tone dusk: a warm sodium-
@@ -1060,24 +1104,10 @@ export class SpaceRenderer {
     createAsteroids() {
         // Several distinct distorted base rocks so the belt reads as varied terrain
         // rather than one rescaled boulder repeated hundreds of times.
-        const variantCount = 4;
-        const geometries = [];
-        for (let variant = 0; variant < variantCount; variant += 1) {
-            const geometry = new THREE.IcosahedronGeometry(1, 2);
-            const positions = geometry.getAttribute('position');
-            const vertex = new THREE.Vector3();
-            for (let index = 0; index < positions.count; index += 1) {
-                vertex.fromBufferAttribute(positions, index);
-                const seedPhase = variant * 7.31;
-                const distortion = 0.72 + 0.32 * Math.sin(vertex.x * (6.3 + variant * 1.9) + vertex.y * (9.7 + variant * 2.3) + vertex.z * (13.1 + variant * 1.5) + seedPhase);
-                vertex.multiplyScalar(distortion);
-                positions.setXYZ(index, vertex.x, vertex.y, vertex.z);
-            }
-            positions.needsUpdate = true;
-            geometry.computeVertexNormals();
-            geometry.computeBoundingSphere();
-            geometries.push(geometry);
-        }
+        // The deformed-icosahedron base meshes are shared with the sim's hard
+        // collision (worldData.getAsteroidBaseMeshes) so a bump lands exactly on
+        // the rendered surface.
+        const geometries = getAsteroidBaseMeshes().map((mesh) => mesh.geometry);
         // Three asteroid material kinds: iron (mid-grade metallic sand),
         // ice (pale frozen, drifts mostly), and dark (carbonaceous, monoliths/rock-crown).
         // Each gets its own pixel texture and slightly different roughness so a
@@ -1570,12 +1600,12 @@ export class SpaceRenderer {
             const flare = new THREE.Sprite(new THREE.SpriteMaterial({
                 map: engineFlareTexture,
                 transparent: true,
-                opacity: variant === 'atlas-freighter' ? 0.42 : 0.34,
+                opacity: variant === 'atlas-freighter' ? ENGINE_FLARE_OPACITY_ATLAS : ENGINE_FLARE_OPACITY,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
             }));
             flare.position.copy(port).add(new THREE.Vector3(0, 0, 0.18));
-            flare.scale.setScalar(variant === 'atlas-freighter' ? 2.8 : 1.42);
+            flare.scale.setScalar(variant === 'atlas-freighter' ? ENGINE_FLARE_SIZE_ATLAS : ENGINE_FLARE_SIZE);
             flares.push(flare);
             group.add(flare);
             // Long exhaust trail: a thin plane stretched along the ship's
@@ -1584,7 +1614,7 @@ export class SpaceRenderer {
                 map: flameTex,
                 color: engineColor,
                 transparent: true,
-                opacity: 0.78,
+                opacity: 0.78 * (ENGINE_GLOW_TUNING[variant]?.trailOpacity ?? 1),
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
                 side: THREE.DoubleSide,
@@ -1616,6 +1646,134 @@ export class SpaceRenderer {
         group.userData.emissiveMaterials = emissiveMaterials;
         return group;
     }
+    // --- GLB hulls ----------------------------------------------------------
+    // Start the per-variant fetches; ships spawn with the voxel placeholder
+    // until a variant's model resolves (see swapShipMesh).
+    preloadGlbShips() {
+        for (const variant of Object.keys(GLB_SHIP_CONFIG))
+            this.ensureGlbShipModel(variant);
+    }
+    ensureGlbShipModel(variant) {
+        if (this.glbShipModels.has(variant) || this.glbShipLoading.has(variant))
+            return;
+        const config = GLB_SHIP_CONFIG[variant];
+        if (!config)
+            return;
+        const promise = loadGlb(`assets/models/ships/${config.file}`)
+            .then((model) => {
+                const ready = this.prepareGlbShip(model, config);
+                this.glbShipModels.set(variant, ready);
+                return ready;
+            })
+            .catch((error) => {
+                console.warn(`GLB hull ${variant} (${config.file}) failed to load; using voxels.`, error);
+                this.glbShipModels.set(variant, null);
+                return null;
+            });
+        this.glbShipLoading.set(variant, promise);
+    }
+    // Bake the per-variant yaw + scale into the shared model so every clone
+    // inherits the same flight orientation and world size.
+    prepareGlbShip(model, config) {
+        model.rotation.y = config.yaw;
+        model.scale.setScalar(config.scale);
+        return model;
+    }
+    // A GLB ship with per-ship material tints (faction livery), engine flares
+    // and exhaust trails, and the same userData the voxel path feeds the
+    // per-frame sync. The model clone (carrying the baked yaw + scale) hangs
+    // inside a wrapper the sync transforms freely: syncShips overwrites the
+    // mesh's quaternion and scale every frame, which would wipe the yaw and
+    // world size if they lived on the same object. Geometry and textures stay
+    // shared with the cached model.
+    createGlbShipMesh(entity, model, config) {
+        const wrapper = new THREE.Group();
+        const group = model.clone(true);
+        wrapper.add(group);
+        const variant = shipVariantForRole(entity.role);
+        const palette = paletteForFaction(entity.faction, entity.hostile);
+        const tint = new THREE.Color(palette.hull);
+        const emissiveMaterials = [];
+        group.traverse((child) => {
+            if (child.material instanceof THREE.MeshStandardMaterial) {
+                const material = child.material.clone();
+                material.color.copy(tint).lerp(new THREE.Color(0xffffff), 0.45);
+                child.material = material;
+                emissiveMaterials.push(material);
+            }
+        });
+        const baseScale = variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1;
+        const engineColor = palette.engine;
+        const engineFlareTexture = this.radialTexture(cssHex(engineColor), cssHex(engineColor));
+        const flameTex = this.engineFlameTexture();
+        const flares = [];
+        const trail = [];
+        const rear = new THREE.Vector3(config.rearAxis[0], config.rearAxis[1], config.rearAxis[2]);
+        const up = new THREE.Vector3(0, 1, 0);
+        const trailLen = variant === 'atlas-freighter' ? 9 : variant === 'kestrel' ? 6 : 7;
+        for (const port of config.enginePorts) {
+            const flare = new THREE.Sprite(new THREE.SpriteMaterial({
+                map: engineFlareTexture,
+                transparent: true,
+                opacity: variant === 'atlas-freighter' ? ENGINE_FLARE_OPACITY_ATLAS : ENGINE_FLARE_OPACITY,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+            }));
+            flare.position.set(port[0], port[1], port[2]);
+            flare.scale.setScalar((variant === 'atlas-freighter' ? ENGINE_FLARE_SIZE_ATLAS : ENGINE_FLARE_SIZE) / config.scale);
+            flares.push(flare);
+            group.add(flare);
+            // Long exhaust trail: a thin plane stretched along the model's rear
+            // axis. Geometry sizes are divided by config.scale because the
+            // group carries the world scale (children of it are in model
+            // units).
+            const trailMat = new THREE.MeshBasicMaterial({
+                map: flameTex,
+                color: engineColor,
+                transparent: true,
+                opacity: 0.78 * (ENGINE_GLOW_TUNING[variant]?.trailOpacity ?? 1),
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                side: THREE.DoubleSide,
+                toneMapped: false,
+            });
+            const trailMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.45 / config.scale, trailLen / config.scale), trailMat);
+            trailMesh.quaternion.setFromUnitVectors(up, rear);
+            trailMesh.position.set(port[0], port[1], port[2]).addScaledVector(rear, (trailLen * 0.45) / config.scale);
+            trailMesh.userData.isTrail = true;
+            trail.push(trailMesh);
+            group.add(trailMesh);
+        }
+        this.tagTargetable(wrapper, 'ship', entity.id);
+        wrapper.userData.baseScale = baseScale;
+        wrapper.userData.variant = variant;
+        wrapper.userData.engineFlares = flares;
+        wrapper.userData.engineTrails = trail;
+        wrapper.userData.emissiveMaterials = emissiveMaterials;
+        wrapper.userData.glb = true;
+        return wrapper;
+    }
+    // Replace a voxel placeholder with the real hull once its GLB resolves.
+    swapShipMesh(entity, voxelMesh, model, variant) {
+        const glbMesh = this.createGlbShipMesh(entity, model, GLB_SHIP_CONFIG[variant]);
+        glbMesh.position.copy(voxelMesh.position);
+        glbMesh.quaternion.copy(voxelMesh.quaternion);
+        this.dynamicRoot.remove(voxelMesh);
+        this.disposeObject(voxelMesh);
+        this.dynamicRoot.add(glbMesh);
+        this.shipMeshes.set(entity.id, glbMesh);
+    }
+    // GLB ship clones share geometry and textures with the cached model, so
+    // disposal only releases the per-ship material clones (and flare/trail
+    // materials). The shared resources die with the renderer.
+    disposeGlbShip(mesh) {
+        mesh.traverse((child) => {
+            if (!(child instanceof THREE.Mesh || child instanceof THREE.Sprite))
+                return;
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            materials.forEach((material) => material?.dispose?.());
+        });
+    }
     syncShips(entities, alpha = 0) {
         // Reconcile mesh liveness only when the entity count changed (spawns and
         // deaths) — steady state walks nothing and allocates nothing.
@@ -1624,7 +1782,10 @@ export class SpaceRenderer {
             for (const [id, mesh] of this.shipMeshes) {
                 if (!live.has(id)) {
                     this.dynamicRoot.remove(mesh);
-                    this.disposeObject(mesh);
+                    if (mesh.userData.glb)
+                        this.disposeGlbShip(mesh);
+                    else
+                        this.disposeObject(mesh);
                     this.shipMeshes.delete(id);
                 }
             }
@@ -1633,7 +1794,22 @@ export class SpaceRenderer {
         entities.forEach((entity) => {
             let mesh = this.shipMeshes.get(entity.id);
             if (!mesh) {
-                mesh = this.createShipMesh(entity);
+                const variant = shipVariantForRole(entity.role);
+                const ready = this.glbShipModels.get(variant);
+                if (ready) {
+                    mesh = this.createGlbShipMesh(entity, ready, GLB_SHIP_CONFIG[variant]);
+                }
+                else {
+                    mesh = this.createShipMesh(entity); // voxel placeholder
+                    const loading = this.glbShipLoading.get(variant);
+                    if (loading) {
+                        const voxelMesh = mesh;
+                        loading.then((loaded) => {
+                            if (loaded && this.shipMeshes.get(entity.id) === voxelMesh)
+                                this.swapShipMesh(entity, voxelMesh, loaded, variant);
+                        });
+                    }
+                }
                 this.dynamicRoot.add(mesh);
                 this.shipMeshes.set(entity.id, mesh);
             }
@@ -1665,13 +1841,13 @@ export class SpaceRenderer {
             const flares = mesh.userData.engineFlares;
             if (flares) {
                 const variant = mesh.userData.variant;
-                const boost = entity.burning ? 2.1 : entity.hostile && entity.targetId ? 1.4 : 1;
-                const pulse = 0.7 + Math.sin(performance.now() * 0.02 + entity.spawnTime) * 0.3;
-                const baseOpacity = variant === 'atlas-freighter' ? 0.42 : 0.34;
-                const baseSize = variant === 'atlas-freighter' ? 2.8 : 1.42;
+                const glow = ENGINE_GLOW_TUNING[variant];
+                const boost = entity.burning ? ENGINE_FLARE_BURNING_BOOST : entity.hostile && entity.targetId ? ENGINE_FLARE_HOSTILE_BOOST : 1;
+                const baseOpacity = (variant === 'atlas-freighter' ? ENGINE_FLARE_OPACITY_ATLAS : ENGINE_FLARE_OPACITY) * (glow?.flareOpacity ?? 1);
+                const baseSize = (variant === 'atlas-freighter' ? ENGINE_FLARE_SIZE_ATLAS : ENGINE_FLARE_SIZE) * (glow?.flareScale ?? 1);
                 for (const flare of flares) {
-                    flare.material.opacity = baseOpacity * pulse * boost;
-                    flare.scale.setScalar(baseSize * (0.75 + pulse * 0.45) * (boost > 1 ? 1.15 : 1));
+                    flare.material.opacity = baseOpacity * boost;
+                    flare.scale.setScalar(baseSize * (boost > 1 ? 1.08 : 1));
                 }
             }
         });
@@ -1968,6 +2144,28 @@ export class SpaceRenderer {
         this.scene.add(sprite);
         this.effects.push({ object: sprite, velocities: [], life: 0.18, maxLife: 0.18 });
     }
+    // An NPC hyperdrive departure: a short additive warp streak along the
+    // ship's heading that flares and fades as the hull jumps away to another
+    // port (see the despawn cull in updateShips).
+    spawnHyperdriveStreak(position, velocity, color = 0x9fd8ff) {
+        const streak = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 130), new THREE.MeshBasicMaterial({
+            color,
+            transparent: true,
+            opacity: 0.85,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+            toneMapped: false,
+        }));
+        streak.position.set(...position);
+        const direction = new THREE.Vector3(velocity[0], velocity[1], velocity[2]);
+        if (direction.lengthSq() < 1e-4)
+            direction.set(0, 1, 0);
+        direction.normalize();
+        streak.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+        this.scene.add(streak);
+        this.effects.push({ object: streak, streak, velocities: [], life: 0.75, maxLife: 0.75 });
+    }
     updateEffects(dt) {
         for (let index = this.effects.length - 1; index >= 0; index -= 1) {
             const effect = this.effects[index];
@@ -1982,6 +2180,13 @@ export class SpaceRenderer {
                 const material = effect.points.material;
                 if (material instanceof THREE.PointsMaterial)
                     material.opacity = ratio;
+            }
+            else if (effect.streak) {
+                // The warp streak extends along the heading as it fades.
+                effect.streak.scale.y += dt * 300;
+                const material = effect.streak.material;
+                if (material instanceof THREE.MeshBasicMaterial)
+                    material.opacity = ratio * 0.85;
             }
             else if (effect.object instanceof THREE.Sprite) {
                 effect.object.scale.multiplyScalar(1 + dt * 4.2);
@@ -2197,33 +2402,57 @@ export class SpaceRenderer {
         this.bloomBlurTargets = [makeTarget(), makeTarget()];
         this.bloomBlurMaterial.uniforms.uResolution.value.set(width, height);
     }
+    // Bloom costs three extra full-screen passes every frame, which is most of
+    // the GPU bill on a weak chip. The Low quality tier and the auto governor's
+    // low end skip it: the scene still composites through the tone-mapping
+    // shader, just without the bright-pass glow. The governor turns bloom back
+    // on once the device proves it can keep up.
+    bloomEnabled() {
+        if (this.qualityMode === 'high')
+            return true;
+        if (this.qualityMode === 'low')
+            return false;
+        const scale = this.lastQualityScale ?? 1;
+        if (this.bloomOff)
+            return scale >= 0.82 ? (this.bloomOff = false, true) : false;
+        if (scale <= 0.72) {
+            this.bloomOff = true;
+            return false;
+        }
+        return true;
+    }
     render() {
         if (this.contextLost)
             return;
         if (!this.bloomSceneTarget)
             this.resizeBloomTargets();
+        const bloomOn = this.bloomEnabled();
         // Pass 1: the full scene into a float buffer.
         this.renderer.setRenderTarget(this.bloomSceneTarget);
         this.renderer.render(this.scene, this.camera);
-        // Pass 2: bright-only downsample into the first blur target.
-        this.bloomBrightMaterial.uniforms.tDiffuse.value = this.bloomSceneTarget.texture;
-        this.bloomQuad.material = this.bloomBrightMaterial;
-        this.renderer.setRenderTarget(this.bloomBlurTargets[0]);
-        this.renderer.render(this.bloomQuad, this.bloomCamera);
-        // Pass 3: separable Gaussian blur (horizontal then vertical).
-        this.bloomBlurMaterial.uniforms.uDirection.value.set(1, 0);
-        this.bloomBlurMaterial.uniforms.tDiffuse.value = this.bloomBlurTargets[0].texture;
-        this.bloomQuad.material = this.bloomBlurMaterial;
-        this.renderer.setRenderTarget(this.bloomBlurTargets[1]);
-        this.renderer.render(this.bloomQuad, this.bloomCamera);
-        this.bloomBlurMaterial.uniforms.uDirection.value.set(0, 1);
-        this.bloomBlurMaterial.uniforms.tDiffuse.value = this.bloomBlurTargets[1].texture;
-        this.renderer.setRenderTarget(this.bloomBlurTargets[0]);
-        this.renderer.render(this.bloomQuad, this.bloomCamera);
-        // Pass 4: composite scene + bloom to the screen.
+        if (bloomOn) {
+            // Pass 2: bright-only downsample into the first blur target.
+            this.bloomBrightMaterial.uniforms.tDiffuse.value = this.bloomSceneTarget.texture;
+            this.bloomQuad.material = this.bloomBrightMaterial;
+            this.renderer.setRenderTarget(this.bloomBlurTargets[0]);
+            this.renderer.render(this.bloomQuad, this.bloomCamera);
+            // Pass 3: separable Gaussian blur (horizontal then vertical).
+            this.bloomBlurMaterial.uniforms.uDirection.value.set(1, 0);
+            this.bloomBlurMaterial.uniforms.tDiffuse.value = this.bloomBlurTargets[0].texture;
+            this.bloomQuad.material = this.bloomBlurMaterial;
+            this.renderer.setRenderTarget(this.bloomBlurTargets[1]);
+            this.renderer.render(this.bloomQuad, this.bloomCamera);
+            this.bloomBlurMaterial.uniforms.uDirection.value.set(0, 1);
+            this.bloomBlurMaterial.uniforms.tDiffuse.value = this.bloomBlurTargets[1].texture;
+            this.renderer.setRenderTarget(this.bloomBlurTargets[0]);
+            this.renderer.render(this.bloomQuad, this.bloomCamera);
+        }
+        // Pass 4: composite scene + bloom to the screen. With bloom off the
+        // strength is zeroed, so the pass is a plain tone-mapped copy.
         this.bloomCompositeMaterial.uniforms.uExposure.value = this.renderer.toneMappingExposure;
         this.bloomCompositeMaterial.uniforms.tScene.value = this.bloomSceneTarget.texture;
         this.bloomCompositeMaterial.uniforms.tBloom.value = this.bloomBlurTargets[0].texture;
+        this.bloomCompositeMaterial.uniforms.uStrength.value = bloomOn ? 0.6 : 0;
         this.bloomQuad.material = this.bloomCompositeMaterial;
         this.renderer.setRenderTarget(null);
         this.renderer.render(this.bloomQuad, this.bloomCamera);

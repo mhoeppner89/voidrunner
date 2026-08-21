@@ -229,6 +229,13 @@ export const PILOT_LINES = {
             'You caught me off guard before. Not twice.',
             'Stay back — I remember what you did!',
         ],
+        // A passing ship that isn't hostile: nervous, but friendly enough to
+        // say one thing when the player slips close (see maybeNeutralChatter).
+        greet: [
+            'Oh — hello. Nice day for flying.',
+            'Just passing through. Good to see another ship out here.',
+            'Stay safe out there, spacer.',
+        ],
         distress: [
             'Mayday — I\'m hit, I\'m hit!',
             'They\'re all over me — somebody break this off!',
@@ -303,6 +310,13 @@ export const PILOT_LINES = {
             'You think I\'d let you close twice?',
             'I learned from you. Now deal with it.',
         ],
+        // Grudging, not hostile: an aggressive pilot who isn't after the player
+        // says one clipped thing when they pass close.
+        greet: [
+            'Keep your distance and we get along fine.',
+            'Just passing. Do not give me a reason.',
+            'You are in my lane, spacer. Move along.',
+        ],
         pressed: [
             'You\'ll have to kill me to take this kill.',
             'I\'ve lost better ships than yours in worse fights.',
@@ -375,6 +389,11 @@ export const PILOT_LINES = {
             'You think I\'d give you a second shot at me? Hardly.',
             'I slipped away once, darling. Watch me do it again.',
         ],
+        greet: [
+            'Well, hello there. Lovely ship you are flying.',
+            'We must stop meeting like this — though I would not mind.',
+            'Do keep up, dear.',
+        ],
         pressed: [
             'You got lucky. Very lucky.',
             'I\'ve flown through worse than you, darling.',
@@ -392,6 +411,13 @@ export const PILOT_LINES = {
         wary: [
             'You caught me once. I won\'t let it happen again.',
             'I escaped you once. I\'ll do it again.',
+        ],
+        // Steady pilots stay quiet in a fight, but a close pass in neutral
+        // space earns the one friendly line they allow themselves.
+        greet: [
+            'Afternoon, spacer. Quiet run so far?',
+            'Lanes look clear. Watch your six.',
+            'Safe travels, pilot.',
         ],
     },
     // Ace banter: the tier earns the right to talk even when the temperament

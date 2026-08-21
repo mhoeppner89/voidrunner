@@ -94,9 +94,12 @@ const beginSession = (mode, arena) => {
     }, mode === 'arena' ? arena : null, tiltGranted);
     void session.enableAudio();
 };
+// Standard plus the webkit-prefixed element (older Safari/Edge), so the
+// switch's enter/exit decision matches what the browser actually reports.
+const fullscreenElement = () => document.fullscreenElement ?? document.webkitFullscreenElement ?? null;
 const enterFullscreen = async () => {
     try {
-        if (!document.fullscreenElement)
+        if (!fullscreenElement())
             await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
         const orientation = screen.orientation;
         await orientation.lock?.('landscape');
@@ -106,7 +109,8 @@ const enterFullscreen = async () => {
     }
 };
 const toggleFullscreen = async () => {
-    if (document.fullscreenElement) {
+    // A click on the switch while already fullscreen leaves fullscreen.
+    if (fullscreenElement()) {
         try {
             await document.exitFullscreen();
         }
@@ -132,6 +136,8 @@ const actions = {
     trade: (kind, commodityId, quantity) => session?.trade(kind, commodityId, quantity),
     jettison: (commodityId) => session?.jettisonCargo(commodityId),
     payOffMug: () => session?.payOffMug(),
+    patrolReply: () => session?.patrolReply(),
+    paySyndicateBerth: () => session?.paySyndicateBerth(),
     acceptMission: (missionId) => session?.acceptMission(missionId),
     repair: () => session?.repair(),
     refuel: () => session?.refuel(),
@@ -142,7 +148,32 @@ const actions = {
     saveNow: () => session?.saveNow(),
     resumeFlight: () => session?.resumeFlight(),
     quitToTitle: () => session?.quitToTitle(),
-    setSetting: (key, value) => session?.setSetting(key, value),
+    setSetting: (key, value) => {
+        if (session) {
+            session.setSetting(key, value);
+            return;
+        }
+        // No session yet (title-screen options): write the setting straight
+        // into the cached save and persist it, so sound/flight/tilt choices
+        // made before a career starts carry into the next session.
+        const save = cachedSave ?? loadGame();
+        if (!save)
+            return;
+        if (key === 'music' || key === 'effects' || key === 'touchScale' || key === 'tiltSensitivity') {
+            save.settings[key] = Number(value);
+        }
+        else if (key === 'steering') {
+            save.settings.steering = value === 'stick' ? 'stick' : 'tilt';
+        }
+        else if (key === 'tiltInvertPitch' || key === 'tiltInvertYaw' || key === 'flightAssist' || key === 'aimAssist' || key === 'vibration') {
+            save.settings[key] = Boolean(value);
+        }
+        else if (key === 'quality' && (value === 'auto' || value === 'low' || value === 'high')) {
+            save.settings.quality = value;
+        }
+        cachedSave = save;
+        saveGame(save);
+    },
     enableTilt: async () => {
         // In a session the InputManager owns tilt; on the title screen there is
         // no session yet, so request permission here and let the next session

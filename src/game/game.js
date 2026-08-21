@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { AudioManager } from './audio.js';
 import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, GUILD_RANK_NAMES, LOCATIONS, NAV_LOCATION_IDS, SHIPS, displaySpeed, equipmentIds, hyperdriveArrivalRadius, locationInstanceRadius, sectorEncounterChance, spawnClearance } from './data.js';
-import { buyCommodity, cargoCapacity, cargoFree, cargoMass, refreshAllPrices, sellCommodity, tickEconomy } from './economy.js';
+import { buyCommodity, cargoCapacity, cargoFree, cargoMass, denPrice, refreshAllPrices, sellCommodity, SYNDICATE_DEN_FAVOR, tickEconomy } from './economy.js';
 import { InputManager } from './input.js';
 import { acceptMission, awardCareerProgress, completeBountyMission, completeMissionsAtDock, failExpiredMissions, joinGuild, refreshMissionOffers, VALUABLE_CARGO_LABELS, } from './missions.js';
 import { clamp, damp, formatCredits, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
@@ -9,9 +9,10 @@ import { EntityStore } from './entityStore.js';
 import { SpaceRenderer } from './render.js';
 import { saveGame } from './save.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
-import { asteroidCollisionRadius, generateAsteroidField, generateGraveyardPieces, generateWreckNodes, graveyardZoneAt, graveyardZoneLabel, GRAVEYARD_GEOMETRY_PROFILES, wreckNodeCollisionRadius } from './worldData.js';
+import { asteroidCollisionMesh, asteroidCollisionRadius, generateAsteroidField, generateGraveyardPieces, generateWreckNodes, graveyardZoneAt, graveyardZoneLabel, GRAVEYARD_GEOMETRY_PROFILES, wreckNodeCollisionRadius } from './worldData.js';
 import { PILOT_LINES, pilotMod, rollPilot, TEMPERAMENT_LABELS, TIER_LABELS } from './pilots.js';
-import { playerShipVariant, shipVariantForRole } from './voxelModels.js';
+import { MUG_CHANCE, SMUGGLE_CHANCE, createSmuggleTask, createTask, rebasePatrolTask, rollNpcCargo, updateShipAI } from './shipAI.js';
+import { paletteForFaction, playerShipVariant, shipVariantForRole } from './voxelModels.js';
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const UP = new THREE.Vector3(0, 1, 0);
 const RIGHT = new THREE.Vector3(1, 0, 0);
@@ -51,7 +52,14 @@ const ARENA_FIELD_START_OFFSETS = [
 // The widest rendered field obstacle (a scaled monolith ≈ 130u × 1.6) exceeds
 // the old 140u collision margin, so grid queries must pad by this much to catch
 // the surface of the biggest rocks before the ship is inside them.
-const MAX_FIELD_OBSTACLE_RADIUS = 320;
+const MAX_FIELD_OBSTACLE_RADIUS = 380;
+// Asteroids render as a distorted sphere scaled per axis. The ship's hard
+// collision tests against the rock's actual deformed-icosahedron mesh
+// (worldData.asteroidCollisionMesh), while beams and spawn clearance keep the
+// enclosing box — the box derived from this per-axis factor, which sits just
+// under the geometry's widest silhouette (the old bounding sphere of
+// radius × max scale inflated the narrow axes of an elongated rock up to ~2.5×).
+const ASTEROID_COLLISION_FACTOR = 0.9;
 const ENTRY_CLEARANCE = 4;
 const ENTRY_SEARCH_RADII = [64, 128, 256, 512, 1024];
 const ENTRY_SEARCH_DIRECTIONS = [
@@ -92,6 +100,9 @@ const SALVAGE_AMBUSH_MAX_WORTH = 1700;
 const SALVAGE_AMBUSH_MAX_CHANCE = 0.5;
 const SALVAGE_AMBUSH_ESCORT_MIN_WORTH = 500;
 const SALVAGE_AMBUSH_ESCORT_MAX_WORTH = 1400;
+// Claim-jumpers are not parked on the wreck: they only move once the beam has
+// been running a while, so an ambush never opens the moment salvage starts.
+const SALVAGE_AMBUSH_DELAY = 4;
 // Mining jackpot: a fully depleted asteroid occasionally reveals a gold
 // pocket (the mining mirror of the salvage equipment drop). Seeded per node,
 // so the same rock strikes the same pocket every career.
@@ -102,11 +113,15 @@ const GOLD_POCKET_MAX = 3;
 // mid-cut. Seeded per claim node, so the same seam disputes the same way every
 // career, and it fires at most once per claim.
 const CLAIM_DISPUTE_CHANCE = 0.35;
+// A rival doesn't contest the rock on the first ore out: they only move after
+// a couple of units have been cut, so disputes land mid-seam, not at the start.
+const CLAIM_DISPUTE_AFTER_UNITS = 2;
 const CLAIM_DISPUTE_LINES = [
     'That seam is under my crew\'s claim. Cut it any deeper and you will answer for it.',
     'You are on registered ground, spacer. My board holds the papers on this rock.',
     'Walk away from that cut and this stays civil.',
     'That is my ore you are beaming. Step off or get spaced.',
+    'You have cut enough of my rock. Take what you have and go.',
 ];
 // Selling gold marks the player (see economy.js GOLD_HEAT_SECONDS). While the
 // heat is fresh, the Shardbelt's ambient encounter windows shift so pirate
@@ -125,7 +140,6 @@ const ASTEROID_PATROL_CUTOFF = 0.90;
 // cut and breaks off; firing or letting the clock expire commits them to the
 // fight. Gold-heat intercepts reuse the same machinery with a syndicate-tipped
 // demand for every gram of gold aboard.
-const MUG_CHANCE = 0.7;
 const MUG_STANDOFF_SECONDS = 9;
 const MUG_CARGO_SHARE = 0.5;
 const MUG_TOLL_MIN = 120;
@@ -143,7 +157,7 @@ const MUG_TEMPERAMENT_SHARE = {
 const MUG_DEMAND_LINES = [
     'Drop {demand} and keep the hull. {seconds} seconds.',
     'Nice hold you have there. Hand over {demand} and we fly on. {seconds} seconds.',
-    'Toll time, spacer. {demand}, or we take it off the wreck. {seconds} seconds.',
+    'Toll time, spacer. {demand}, or we pry it out of your wreck. {seconds} seconds.',
     'We are not asking twice. {demand}. {seconds} seconds.',
 ];
 const MUG_EMPTY_LINES = [
@@ -152,10 +166,13 @@ const MUG_EMPTY_LINES = [
     'You are not worth our time. Go.',
 ];
 // Claim-jumpers want the wreck, not a kill: they demand the salvage itself.
+// They only move once the pilot has been cutting a while, so the lines own the
+// timing — the pirates watched the work and are collecting the haul.
 const SALVAGE_DEMAND_LINES = [
-    'That wreck is claimed. Drop {demand} and clear off. {seconds} seconds.',
-    'Walk away from our salvage. {demand}, now. {seconds} seconds.',
-    'You are cutting our wreck. Hand over {demand}. {seconds} seconds.',
+    'Nice cutting, spacer. Drop {demand} and clear off. {seconds} seconds.',
+    'We watched you work that wreck. Hand over {demand}. {seconds} seconds.',
+    'You pulled the salvage. We will take {demand}. {seconds} seconds.',
+    'That haul has our name on it. {demand}, now. {seconds} seconds.',
 ];
 // A show of force can end a standoff before it becomes a fight: a hit on a
 // demanding pirate may scare the group off, with timid leads folding easiest
@@ -177,14 +194,259 @@ const GOLD_DEMAND_LINES = [
     'The syndicate wants its cut. Eject the gold or we take it off the wreck. {seconds} seconds.',
     'Nice haul, miner. Leave the gold drifting and nothing gets scuffed. {seconds} seconds.',
 ];
+// Neutral traffic says one thing when the player slips close (see
+// maybeNeutralChatter): patrols keep their official voice, everyone else greets
+// by temperament from the PILOT_LINES pools.
+const PATROL_GREET_LINES = [
+    'Concord patrol. Mind the cordon, pilot.',
+    'Traffic control has you on approach. Keep it clean.',
+    'Quiet night. Keep it that way, spacer.',
+    'Civilian traffic is logged. Safe docking.',
+];
+// Opportunists: spacers who saw the player at work (beaming ore, stripping a
+// wreck, or hauling a valuable hold) occasionally decide the haul is worth
+// taking — but only where the local patrols are not watching. The odds scale
+// with how loud the work is (extracting now + a rich hold), and the lines own
+// the "we watched you" timing.
+const OPPORTUNITY_CHANCE = 0.22;
+const OPPORTUNITY_HOLD_WORTH = 400;
+const OPPORTUNITY_RECENT_SECONDS = 6;
+const OPPORTUNITY_MAX_POLICE = 0.35;
+const OPPORTUNITY_DEMAND_LINES = [
+    'Saw you working that rock. Drop {demand} and fly. {seconds} seconds.',
+    'You have been busy, spacer. Leave {demand} and we all fly on. {seconds} seconds.',
+    'Nice little haul you are building. Hand over {demand}. {seconds} seconds.',
+    'We watched you fill that hold. {demand}, now. {seconds} seconds.',
+];
+// A follow-on ambush (the player was seen working within SEEN_WORKING_SECONDS)
+// that finds an empty hold breaks off with the "watched you work" voice too.
+const OPPORTUNITY_EMPTY_LINES = [
+    'You worked all that for nothing? Not worth the fuel. Go.',
+    'An empty hold after all that effort. Clear off.',
+    'All that work and nothing to show. Fly on.',
+];
+// Station-approach traders occasionally hail with market banter instead of a
+// plain greet. The line keys off the live price at their station, so a
+// commodity trading well draws a tip and one in the gutter draws a grumble —
+// the traffic reads as working pilots, not scenery.
+const MARKET_BANTER_CHANCE = 0.45;
+const MARKET_BANTER_GOOD_PRICE = 1.12;
+const MARKET_BANTER_BAD_PRICE = 0.9;
+const MARKET_BANTER_COMMODITIES = ['medicine', 'electronics', 'machinery', 'luxuries', 'arms', 'ore'];
+const MARKET_BANTER_TIP_LINES = [
+    '{commodity} is trading at {price} cr here. Worth a run if you have the hold.',
+    'They are paying {price} cr for {commodity} right now. Do not tell everyone.',
+    'Lucky break for you — {commodity} is going for {price} cr at {station}.',
+];
+const MARKET_BANTER_GRUMBLE_LINES = [
+    '{price} cr for {commodity}? Highway robbery. I am flying out of here.',
+    'They want {commodity} but only pay {price} cr. Not worth the fuel.',
+    'Do not haul {commodity} to {station} — they are paying a pittance, {price} cr.',
+];
+const MARKET_BANTER_FLAT_LINES = [
+    '{commodity} sits at {price} cr here. Nothing special, but it moves.',
+    'Just offloaded {commodity} at {price} cr. Steady money, no fuss.',
+    '{price} cr for {commodity} at {station}. Fair enough, I suppose.',
+];
+// Station approach traffic keeps docks and planets feeling inhabited: a small
+// rotating cast of traders, patrols, and miners working the approach lane.
+const STATION_TRAFFIC_RANGE = 1500;
+const STATION_TRAFFIC_TARGET = 3;
+// A patrol's passing greeting invites a reply while the call is up: a small
+// Concord reputation courtesy for acknowledging the cordon pilot.
+const PATROL_REPLY_SECONDS = 12;
+const PATROL_REPLY_REP = 2;
+const PATROL_REPLY_LINES = [
+    'Acknowledged, pilot. Concord appreciates the courtesy.',
+    'Good flying, spacer. Report any trouble on the lanes.',
+    'Noted. Keep the peace and we stay friendly.',
+];
+// Search AI: only a ship that already had the player resolved — and then lost
+// the signal — opens a search at the last-known position. A patrol that
+// watched a dark contact vanish sweeps it (blue ring); a hostile actually
+// targeting the player that lost the resolve sweeps it too (red ring). The
+// searcher flies to the anchor, then randomly fans out across the sweep radius
+// for a timed window before giving up for a cooldown. Being caught running
+// dark dings Concord standing once per catch; re-resolving a searched contact
+// closes the search with a hail (patrol) or an engagement (hostile).
+const PATROL_CATCH_REP = -2;
+const PATROL_CATCH_REPEAT = 12;
+const SEARCH_RADIUS = 100;
+const SEARCH_SWEEP_SECONDS = 12;
+// How long the approach may take before the sweep starts anyway: a last-known
+// position that sits inside a rock cluster is unreachable (avoidance orbits
+// it), and a search that can never arrive must not circle forever — fan out
+// from the nearest reachable point instead.
+const SEARCH_APPROACH_TIMEOUT = 20;
+const SEARCH_COOLDOWN = 28;
+// The approach pass pushes harder than the patrol cruise (0.5x) but stays
+// slower than any lit hull at full throttle (0.85 * 36 patrol = 30.6 vs the
+// slowest player hull at 34), so a dark pilot who commits to running bleeds
+// the distance past the dark-detection line and escapes to the last-known
+// sweep.
+const PATROL_SEARCH_SPEED_MUL = 0.85;
+const PATROL_SEARCH_LINES = {
+    catch: [
+        'Dark transponder logged. Hold position — Concord has you on file.',
+        'Unlicensed squawk detected. You have been flagged, pilot.',
+        'Running dark is logged, not ignored. Concord sees you.',
+    ],
+    giveup: [
+        'Contact lost. Logging the sector and resuming patrol.',
+        'Nothing here but noise. Resuming patrol route.',
+    ],
+    firm: [
+        'Contact confirmed. Carry on — and mind the cordon.',
+        'Identity logged. Fly clean and we are done here.',
+    ],
+    // Spoken the moment the patrol loses a contact it had resolved and opens
+    // the sweep — the player hears that they were just shaken, not silently
+    // flagged and forgotten.
+    lost: [
+        'Signal dropped. Sweeping the last-known position.',
+        'Contact lost. Fanning out — there is no cover out here.',
+        'Lost the signature. Sweeping the sector.',
+    ],
+};
+// A hostile that loses the resolve voices the same beat: it knows the pilot
+// slipped away, and it says so before sweeping the last-known spot.
+const SEARCH_LOST_HOSTILE_LINES = [
+    "Where'd you go? Rocks will not save you.",
+    'Lost you for a second. I will find you again.',
+    'Slipped away, did you? Not far enough.',
+];
+// A hunter's first hail on a fresh ship victim — the beat before the guns:
+// the mark bolts, the pirate closes, then the fight starts (see hailHuntChase).
+const PIRATE_CHASE_LINES = {
+    timid: ['Hold course and I will only take the cargo.', 'Slow down. I want the hold, not the fight.'],
+    steady: ['You are hauling something worth my fuel. Hold course.', 'Cut your engines. I will inspect the cargo.'],
+    aggressive: ['Run and I will burn your tail off. HOLD COURSE.', 'Stop or I will shred you, freighter.'],
+    flamboyant: ['A ship like mine deserves a better cargo than yours. Hold still.', 'Do not make me work for it, freighter.'],
+};
+// Rescue & distress. A civilian that takes a hit from a hostile NPC raises a
+// distress beacon (DISTRESS_WINDOW seconds) that surfaces its position on the
+// radar rim and the nav map even beyond the standard sensor horizon, with one
+// MAYDAY callout per ship per DISTRESS_CALL_REPEAT. When the player destroys
+// or drives off the attacker that was actively hitting that civilian (a hit
+// within RESCUE_GRATITUDE_WINDOW), the saved pilot sends thanks and a small
+// tip over the comms.
+const DISTRESS_WINDOW = 60;
+const DISTRESS_CALL_REPEAT = 90;
+const RESCUE_GRATITUDE_WINDOW = 60;
+const RESCUE_TIP_BASE = 140;
+const RESCUE_TIP_RANGE = 240;
+const RESCUE_GRATITUDE_LINES = [
+    'You saved my hull back there. Credits are on their way — stay sharp, spacer.',
+    'That pirate was about to gut my hold. Thank you — really.',
+    'I owe you one. The tip does not cover it, but it is something.',
+    'Another few seconds and I was scrap. You fly like you mean it.',
+    'My cargo is safe because of you. Wired what I could spare.',
+];
+// A Concord patrol stops a dark smuggler: hail to stand by, then either the
+// smuggler dumps the hold (the evidence hits space and the patrol breaks off)
+// or bolts and the patrol gives chase until it gives up and returns to lane.
+const PATROL_ARREST_LINES = {
+    hail: [
+        '{smuggler}, this is Concord patrol. Cut your engines and hold for inspection.',
+        '{smuggler}, you are running dark. Stop and stand by for a scan.',
+        'Dark transponder, {smuggler}. Hold course or I will light you up.',
+        'Concord patrol to {smuggler}: shut down and prepare to be boarded.',
+    ],
+    giveup: [
+        'Lost the signal. Back on the lane.',
+        'Nothing flagged aboard. Moving on.',
+        'Slipped away in the dark. Resuming patrol.',
+    ],
+};
+// What a caught smuggler jettisons when it dumps the hold.
+const SMUGGLER_HOLD_POOL = ['arms', 'luxuries', 'electronics', 'medicine'];
+// How long a patrol keeps a caught smuggler in chase before giving up and
+// returning to its lane, and how far away it can first resolve one.
+const PATROL_ARREST_MIN_SECONDS = 14;
+const PATROL_ARREST_MAX_SECONDS = 24;
+const PATROL_ARREST_RANGE = 500;
+// Odds a caught smuggler dumps the hold (the patrol breaks off with the
+// evidence) rather than bolting for it.
+const SMUGGLER_DUMP_CHANCE = 0.45;
+// The player's smuggler bust: a flat fine plus a per-crate levy, and a
+// Concord standing hit far heavier than a plain dark catch (PATROL_CATCH_REP).
+const SMUGGLE_BUST_FINE = 500;
+const SMUGGLE_BUST_PER_UNIT = 60;
+const SMUGGLE_BUST_REP = -8;
+const PATROL_BUST_LINES = [
+    'Sealed cargo logged. You are flagged, pilot — the cordon will not forget this.',
+    'Cut engines. That hold is the syndicate\'s, and the fine is yours.',
+    'Running dark with a sealed manifest. Consider this your one warning — logged and fined.',
+];
+// How long "seen working" sticks after the player runs the beam: long enough
+// for word to travel, so a follow-on hyperdrive ambush can use the opportunist
+// lines instead of a plain mug.
+const SEEN_WORKING_SECONDS = 120;
+// How far "civilization" reaches: within POLICE_RADIUS of a dock the patrols
+// own the lanes and the pirate window shrinks toward nothing.
+const POLICE_RADIUS = 1400;
 const ENCOUNTER_LOCK_RADIUS = 8000;
 const AUTO_DOCK_SPEED = 8;
 const DOCK_SAFE_RADIUS = 320;
 const COMBAT_CALM_SECONDS = 40;
 const HYPERDRIVE_ALIGNMENT = 0.88;
-// Nav-map contact radii track the doubled base sensor range (radarRange 800/1200),
-// so the map and radar show the same volume target selection can reach.
-const MAP_CONTACT_RANGE = 720;
+// The dark (transponder-off) visibility band, Star-Sector style: a ship
+// running dark is only visible between the floor (200 km — reached at half
+// max speed or slower) and the ceiling (400 km — at full throttle). Speed is
+// the giveaway: a dark hull coasting slow is nearly invisible, one burning
+// hard glows to the whole horizon. The radar's inner ring tracks the pilot's
+// own place in that band (see playerVisibilityFraction).
+const DARK_VIS_MIN = 200;
+const DARK_VIS_MAX = 400;
+const DARK_SPEED_FLOOR = 0.5;
+// NPCs carry the base sensor fit (no mk2): they resolve a broadcasting ship at
+// this range and a dark one only inside its speed-scaled dark band.
+const NPC_SENSOR_RANGE = 1000;
+// The visual lock, Star-Sector style: a target the pilot has locked stays
+// tracked to this range no matter how dark it runs, and only breaks when
+// debris or an asteroid blocks the line of sight for this long. Both apply to
+// the player's locks — a locked dark pirate is still readable to 1000 km; a
+// rock hides it for at most 5 seconds before the lock drops to a last-known
+// cross.
+const VISUAL_LOCK_RANGE = 1000;
+// Lost contacts: a signal the dish just stopped resolving lingers as a cross
+// at its last known position — solid for the hold window, then fading out
+// over the fade window (15 seconds total).
+const LOST_CONTACT_HOLD_SECONDS = 5;
+const LOST_CONTACT_FADE_SECONDS = 10;
+const LOST_CONTACT_LIFETIME = LOST_CONTACT_HOLD_SECONDS + LOST_CONTACT_FADE_SECONDS;
+// How long a ship that just had the pilot resolved keeps the resolve when the
+// pilot slips behind a rock while still inside sensor range — breaking visual
+// contact is a tracked maneuver (hold the line for a couple of seconds), not
+// a one-frame flicker, Star-Sector style. Only occlusion earns the grace; a
+// signature that simply vanishes (range) opens the search immediately.
+const OCCLUSION_TRACK_SECONDS = 2.5;
+// A dark (transponder-off) pilot is far harder to ambush: the pirate tail of
+// the encounter table and hyperdrive intercept odds shrink to this fraction
+// of their lit value, because nobody sees the ship jump or loiter.
+const DARK_ENCOUNTER_MULT = 0.35;
+// The threat-awareness multipliers: a hostile contact's broadcast can be
+// resolved for targeting at 2.2x the radar horizon (nearest-hostile lock at
+// 2.4x) — early warning the pilot can act on. Dark contacts bypass both and
+// are only ever resolved inside their speed-scaled dark band (see
+// playerSeesShip), unless the pilot holds a visual lock on them.
+const THREAT_TARGET_MULT = 2.2;
+const THREAT_NEAREST_MULT = 2.4;
+// The syndicate berth: an unlicensed (transponder-off) ship cannot use the
+// official dock, so it pays a flat handling fee plus a cut of everything in
+// the hold. The fee is shown on the syndicate chip before committing.
+const SYNDICATE_FEE_FLAT = 150;
+const SYNDICATE_FEE_RATE = 0.12;
+// The extraction beam broadcasts a working signature (see playerBroadcasting):
+// while it actually runs in the asteroid field, pirates on the fringes
+// converge on the work on this throttled seeded roll — a dark miner is lit by
+// their own beam the whole time they cut.
+const BEAM_AMBUSH_CHANCE = 0.3;
+const BEAM_AMBUSH_MIN = 9;
+const BEAM_AMBUSH_MAX = 15;
+// Nav-map contact radii: ships track the full sensor horizon (radarRange, read
+// in buildNavigationMapModel) so the map and radar show the same volume;
+// resources and wrecks key to the shorter scan ranges instead.
 const MAP_RESOURCE_CONTACT_RANGE = 300;
 const MAP_RESOURCE_CONTACT_LIMIT = 48;
 // Staked claims surface on the nav map at an extended "from orbit" range so the
@@ -210,6 +472,9 @@ const DISTRESS_CLOSE_RANGE = 300;
 // How close the player must get before a pilot mutters a proximity line — an
 // edge-triggered reaction to being noticed, separate from the timed chatter.
 const PROXIMITY_RANGE = 350;
+// Neutral/friendly traffic only speaks when the player is genuinely beside
+// them — a passing line, not long-distance chatter.
+const NEUTRAL_CHAT_RANGE = 50;
 // One voice at a time: the minimum gap between pilot lines, so a furball of
 // hostiles can't drown the comms bar — each line is fully visible before the
 // next lands. Story lines bypass the gate (they mute everything else).
@@ -262,12 +527,16 @@ const MINER_GOLD_DROP_CHANCE = 0.12;
 // not just what it looks like. Light interceptors turn on a dime; freighters
 // wallow through their turns.
 const HULL_FLIGHT_STATS = {
-    kestrel: { speed: 40, afterburnSpeed: 60, turnRate: 1.5, collisionRadius: 1.3 }, // escort — light interceptor
-    talon: { speed: 38, afterburnSpeed: 57, turnRate: 1.35, collisionRadius: 1.5 }, // pirate — baseline fighter
-    lancer: { speed: 43, afterburnSpeed: 64, turnRate: 1.25, collisionRadius: 2.0 }, // bounty — gunship: fast, slower to turn
-    warden: { speed: 36, afterburnSpeed: 0, turnRate: 1.1, collisionRadius: 1.9 }, // patrol — medium
-    prospector: { speed: 24, afterburnSpeed: 0, turnRate: 0.9, collisionRadius: 2.2 }, // miner — agile industrial
-    'atlas-freighter': { speed: 27, afterburnSpeed: 0, turnRate: 0.55, collisionRadius: 2.9 }, // trader — ponderous
+    // hullHalfExtents: the GLB hull's half-size in the ship frame —
+    // [starboard X, up Y, forward Z] — measured from the baked models
+    // (GLB_SHIP_CONFIG yaw + scale). The player's hard collision is an
+    // oriented ellipsoid of these, so the ship bumps at its visible hull.
+    kestrel: { speed: 40, afterburnSpeed: 60, turnRate: 1.5, collisionRadius: 1.3, hullHalfExtents: [1.38, 2.37, 6.09] }, // escort — light interceptor
+    talon: { speed: 38, afterburnSpeed: 57, turnRate: 1.35, collisionRadius: 1.5, hullHalfExtents: [5.63, 1.37, 5.18] }, // pirate — baseline fighter
+    lancer: { speed: 43, afterburnSpeed: 64, turnRate: 1.25, collisionRadius: 2.0, hullHalfExtents: [6.66, 2.02, 6.45] }, // bounty — gunship: fast, slower to turn
+    warden: { speed: 36, afterburnSpeed: 0, turnRate: 1.1, collisionRadius: 1.9, hullHalfExtents: [4.8, 2.99, 5.9] }, // patrol — medium
+    prospector: { speed: 24, afterburnSpeed: 0, turnRate: 0.9, collisionRadius: 2.2, hullHalfExtents: [3.46, 2.83, 6.7] }, // miner — agile industrial
+    'atlas-freighter': { speed: 27, afterburnSpeed: 0, turnRate: 0.55, collisionRadius: 2.9, hullHalfExtents: [4.35, 4.13, 13.4] }, // trader — ponderous
 };
 const ATTACK_RESET_RANGE = 175;
 const ATTACK_SEPARATION = 22;
@@ -484,6 +753,83 @@ const segmentEngineShellRoot = (sx, sy, sz, dx, dy, dz, radiusCenter, radiusSlop
         return second;
     return undefined;
 };
+// Closest point on triangle ABC to the origin (Ericson, Real-Time Collision
+// Detection), used by the asteroid mesh collider. Writes the closest point to
+// triClosest and returns the squared distance. The origin is the ship's hull
+// centre in player-hull space.
+const triClosest = { x: 0, y: 0, z: 0 };
+const triangleClosestDistSq = (ax, ay, az, bx, by, bz, cx, cy, cz) => {
+    const abx = bx - ax;
+    const aby = by - ay;
+    const abz = bz - az;
+    const acx = cx - ax;
+    const acy = cy - ay;
+    const acz = cz - az;
+    const apx = -ax;
+    const apy = -ay;
+    const apz = -az;
+    const d1 = abx * apx + aby * apy + abz * apz;
+    const d2 = acx * apx + acy * apy + acz * apz;
+    if (d1 <= 0 && d2 <= 0) {
+        triClosest.x = ax;
+        triClosest.y = ay;
+        triClosest.z = az;
+        return apx * apx + apy * apy + apz * apz;
+    }
+    const bpx = -bx;
+    const bpy = -by;
+    const bpz = -bz;
+    const d3 = abx * bpx + aby * bpy + abz * bpz;
+    const d4 = acx * bpx + acy * bpy + acz * bpz;
+    if (d3 >= 0 && d4 <= d3) {
+        triClosest.x = bx;
+        triClosest.y = by;
+        triClosest.z = bz;
+        return bpx * bpx + bpy * bpy + bpz * bpz;
+    }
+    const vc = d1 * d4 - d3 * d2;
+    if (vc <= 0 && d1 >= 0 && d3 <= 0) {
+        const t = d1 / (d1 - d3);
+        triClosest.x = ax + t * abx;
+        triClosest.y = ay + t * aby;
+        triClosest.z = az + t * abz;
+        return triClosest.x * triClosest.x + triClosest.y * triClosest.y + triClosest.z * triClosest.z;
+    }
+    const cpx = -cx;
+    const cpy = -cy;
+    const cpz = -cz;
+    const d5 = abx * cpx + aby * cpy + abz * cpz;
+    const d6 = acx * cpx + acy * cpy + acz * cpz;
+    if (d6 >= 0 && d5 <= d6) {
+        triClosest.x = cx;
+        triClosest.y = cy;
+        triClosest.z = cz;
+        return cpx * cpx + cpy * cpy + cpz * cpz;
+    }
+    const vb = d5 * d2 - d1 * d6;
+    if (vb <= 0 && d2 >= 0 && d6 <= 0) {
+        const t = d2 / (d2 - d6);
+        triClosest.x = ax + t * acx;
+        triClosest.y = ay + t * acy;
+        triClosest.z = az + t * acz;
+        return triClosest.x * triClosest.x + triClosest.y * triClosest.y + triClosest.z * triClosest.z;
+    }
+    const va = d3 * d6 - d5 * d4;
+    if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) {
+        const t = (d4 - d3) / (d4 - d3 + (d5 - d6));
+        triClosest.x = bx + t * (cx - bx);
+        triClosest.y = by + t * (cy - by);
+        triClosest.z = bz + t * (cz - bz);
+        return triClosest.x * triClosest.x + triClosest.y * triClosest.y + triClosest.z * triClosest.z;
+    }
+    const denom = 1 / (va + vb + vc);
+    const v = vb * denom;
+    const w = vc * denom;
+    triClosest.x = ax + abx * v + acx * w;
+    triClosest.y = ay + aby * v + acy * w;
+    triClosest.z = az + abz * v + acz * w;
+    return triClosest.x * triClosest.x + triClosest.y * triClosest.y + triClosest.z * triClosest.z;
+};
 export class GameSession {
     ui;
     onQuit;
@@ -584,6 +930,20 @@ export class GameSession {
     hintCooldown = 0;
     scanCooldown = 0;
     encounterCounter = 0;
+    stationTrafficCounter = 0;
+    // The last moment the player ran the mining/salvage beam, so opportunist
+    // encounters can tell whether the pilot has been visibly at work recently.
+    lastExtractionAt = undefined;
+    // A patrol greeted the player and is waiting for a reply (see
+    // maybeNeutralChatter / patrolReply).
+    patrolReplyWindow = undefined;
+    // When the extraction beam may next draw pirates in the field (see
+    // updateDynamicEncounters). Zero while the beam is off; a standoff keeps
+    // pushing it forward so the beam can't double-ambush a pilot mid-deal.
+    beamAmbushNextAt = 0;
+    // How long the player's work stays "fresh word" so a follow-on hyperdrive
+    // ambush can use the opportunist lines.
+    seenWorkingUntil = 0;
     jumpCounter = 0;
     interceptCounter = 0;
     hyperdriveEncounterAt = null;
@@ -620,6 +980,10 @@ export class GameSession {
     activeInstanceId;
     targetPointer;
     arena = null;
+    // Emergent interactions (mid-flight mugs, smuggler flags) only run in the
+    // live game — headless combat probes build sessions via Object.create and
+    // never set this, so their pirates always fight straight (see shipAI.js).
+    emergentMugs = true;
     constructor(save, ui, onQuit, arena = null, tiltGranted = false) {
         this.arena = arena;
         this.ui = ui;
@@ -880,9 +1244,28 @@ export class GameSession {
         this.input.dispose();
         this.renderer.dispose();
     }
+    // The rAF entry point. A throw anywhere in the frame body must never kill
+    // the loop — a single bad value (e.g. a non-finite AudioParam) used to
+    // propagate out, stop the next requestAnimationFrame from being scheduled,
+    // and silently freeze the game mid-flight. Catch, log once (throttled), and
+    // keep scheduling so the sim always continues.
     frame = (now) => {
         if (!this.active)
             return;
+        try {
+            this.frameBody(now);
+        }
+        catch (error) {
+            if (!this.frameErrorAt || now - this.frameErrorAt > 1000) {
+                this.frameErrorAt = now;
+                console.error('Frame error (sim continues):', error);
+            }
+        }
+        finally {
+            this.frameId = requestAnimationFrame(this.frame);
+        }
+    };
+    frameBody = (now) => {
         let dt = (now - this.lastFrame) / 1000;
         this.lastFrame = now;
         if (dt < 0 || !Number.isFinite(dt))
@@ -938,10 +1321,14 @@ export class GameSession {
             this.simAccumulator = 0;
         }
         const stats = getEffectiveShipStats(this.save.player);
-        const damage = 1 - this.save.player.hull / stats.hull;
-        this.audio.update(dt, this.save.player.throttle, this.afterburning, damage);
+        // Audio params must stay finite: a NaN throttle or hull ratio would
+        // throw inside the Web Audio graph and (before the frame guard) freeze
+        // the whole sim. Clamp to safe numbers before touching the graph.
+        const hullRatio = stats.hull > 0 ? this.save.player.hull / stats.hull : 1;
+        const damage = Number.isFinite(hullRatio) ? 1 - hullRatio : 0;
+        const throttle = Number.isFinite(this.save.player.throttle) ? this.save.player.throttle : 0;
+        this.audio.update(dt, throttle, this.afterburning, damage);
         this.syncRender(dt, now);
-        this.frameId = requestAnimationFrame(this.frame);
     };
     // Copy current entity transforms into prev* slots so the renderer can
     // interpolate. Zero-allocation: the slots are preallocated per entity.
@@ -996,6 +1383,7 @@ export class GameSession {
         }
         this.updatePlayer(dt, actions);
         this.autoScanTarget();
+        this.maintainTargetLock();
         this.autoDockCheck();
         this.updateActiveInstance();
         this.updateBountySpawns();
@@ -1025,6 +1413,13 @@ export class GameSession {
             this.renderer.setTarget();
             this.ui.pushEvent(`${this.save.player.mode.toUpperCase()} systems selected.`, 'info');
             this.audio.play('ui');
+        }
+        if (actions.transponder) {
+            const dark = this.save.player.transponder !== false;
+            this.save.player.transponder = !dark;
+            this.ui.pushSensor(dark ? 'Transponder offline — dark to sensors. Slow to half speed to hide best.' : 'Transponder online — full sensor signature.', dark ? 'warning' : 'success', 4200);
+            this.audio.play('ui');
+            saveGame(this.save);
         }
         if (actions.navNext) {
             const index = NAV_LOCATION_IDS.indexOf(this.save.player.navTargetId);
@@ -1085,7 +1480,7 @@ export class GameSession {
                 this.hyperdriveEncounterAt = null;
                 this.spawnHyperdriveIntercept();
             }
-            if (this.hostilesNear(position, HYPERDRIVE_THREAT_RADIUS)) {
+            if (this.hostilesVisibleNear(position, HYPERDRIVE_THREAT_RADIUS)) {
                 this.autopilot = false;
                 this.hyperdriveEncounterAt = null;
                 this.hyperdriveFx = 'interrupt';
@@ -1215,6 +1610,37 @@ export class GameSession {
         angularVelocity.multiplyScalar(Math.exp(-4.8 * dt));
     }
     resolvePlayerCollisions(position, velocity) {
+        // The player's collision envelope follows the outfitted hull: an
+        // oriented ellipsoid with the GLB hull's half-extents in the ship frame
+        // (HULL_FLIGHT_STATS.hullHalfExtents), so an Atlas bumps at its long
+        // nose and a Talon slips its slender cross-section through gaps the
+        // barge cannot. The ring/engine/dock colliders keep the spherical
+        // collisionRadius as their fit-through envelope.
+        const playerRadius = this.playerCollisionRadius();
+        const hullExtents = this.playerHullExtents();
+        const hullX = hullExtents[0];
+        const hullY = hullExtents[1];
+        const hullZ = hullExtents[2];
+        if (!(this.collisionShipQuat instanceof THREE.Quaternion))
+            this.collisionShipQuat = new THREE.Quaternion();
+        if (!(this.collisionShipQuatInv instanceof THREE.Quaternion))
+            this.collisionShipQuatInv = new THREE.Quaternion();
+        const shipQuat = quat(this.save.player.rotation, this.collisionShipQuat);
+        const shipQuatInv = this.collisionShipQuatInv.copy(shipQuat).invert();
+        // The hull ellipsoid's reach along a unit world direction (support).
+        const hullSupport = (nx, ny, nz) => {
+            const qx = shipQuatInv.x;
+            const qy = shipQuatInv.y;
+            const qz = shipQuatInv.z;
+            const qw = shipQuatInv.w;
+            const tx = 2 * (qy * nz - qz * ny);
+            const ty = 2 * (qz * nx - qx * nz);
+            const tz = 2 * (qx * ny - qy * nx);
+            const sx = nx + qw * tx + (qy * tz - qz * ty);
+            const sy = ny + qw * ty + (qz * tx - qx * tz);
+            const sz = nz + qw * tz + (qx * ty - qy * tx);
+            return Math.hypot(hullX * sx, hullY * sy, hullZ * sz);
+        };
         const resolveContact = (normal, push, label) => {
             position.x += normal.x * push;
             position.y += normal.y * push;
@@ -1234,7 +1660,7 @@ export class GameSession {
             const ox = position.x - x;
             const oy = position.y - y;
             const oz = position.z - z;
-            const minimum = radius + PLAYER_RADIUS;
+            const minimum = radius + playerRadius;
             const distSq = ox * ox + oy * oy + oz * oz;
             if (distSq >= minimum * minimum || distSq < 0.0001)
                 return;
@@ -1260,9 +1686,18 @@ export class GameSession {
             const hx = box.hx;
             const hy = box.hy;
             const hz = box.hz;
-            const ex = hx + PLAYER_RADIUS;
-            const ey = hy + PLAYER_RADIUS;
-            const ez = hz + PLAYER_RADIUS;
+            // The debris box expands by the hull ellipsoid's reach along each of
+            // its faces, not a single ship radius, so a long freighter bumps at
+            // its nose against a panel instead of clipping through it.
+            this.tmpG.set(1, 0, 0).applyQuaternion(this.tmpQ);
+            const supportX = hullSupport(this.tmpG.x, this.tmpG.y, this.tmpG.z);
+            this.tmpG.set(0, 1, 0).applyQuaternion(this.tmpQ);
+            const supportY = hullSupport(this.tmpG.x, this.tmpG.y, this.tmpG.z);
+            this.tmpG.set(0, 0, 1).applyQuaternion(this.tmpQ);
+            const supportZ = hullSupport(this.tmpG.x, this.tmpG.y, this.tmpG.z);
+            const ex = hx + supportX;
+            const ey = hy + supportY;
+            const ez = hz + supportZ;
             if (this.tmpF.x < -ex || this.tmpF.x > ex || this.tmpF.y < -ey || this.tmpF.y > ey || this.tmpF.z < -ez || this.tmpF.z > ez)
                 return;
             const cx = clamp(this.tmpF.x, -hx, hx);
@@ -1278,12 +1713,15 @@ export class GameSession {
             let push;
             if (distSq > 1e-9) {
                 const dist = Math.sqrt(distSq);
-                if (dist >= PLAYER_RADIUS)
+                // The hull's reach along the push direction decides the contact.
+                this.tmpG.set(dx / dist, dy / dist, dz / dist).applyQuaternion(this.tmpQ);
+                const reach = hullSupport(this.tmpG.x, this.tmpG.y, this.tmpG.z);
+                if (dist >= reach)
                     return;
                 nx = dx / dist;
                 ny = dy / dist;
                 nz = dz / dist;
-                push = PLAYER_RADIUS - dist + 0.08;
+                push = reach - dist + 0.08;
             }
             else {
                 // The centre is inside the box (a fast jump tunnelled in):
@@ -1295,23 +1733,236 @@ export class GameSession {
                     nx = this.tmpF.x < 0 ? -1 : 1;
                     ny = 0;
                     nz = 0;
-                    push = px + PLAYER_RADIUS + 0.08;
+                    push = px + supportX + 0.08;
                 }
                 else if (py <= pz) {
                     nx = 0;
                     ny = this.tmpF.y < 0 ? -1 : 1;
                     nz = 0;
-                    push = py + PLAYER_RADIUS + 0.08;
+                    push = py + supportY + 0.08;
                 }
                 else {
                     nx = 0;
                     ny = 0;
                     nz = this.tmpF.z < 0 ? -1 : 1;
-                    push = pz + PLAYER_RADIUS + 0.08;
+                    push = pz + supportZ + 0.08;
                 }
             }
             this.tmpG.set(nx, ny, nz).applyQuaternion(this.tmpQ);
             resolveContact(this.tmpG, push, label);
+        };
+        // The player's hull is an oriented ellipsoid in the ship frame (nose
+        // -Z). Transform the rock's collision mesh into that space so the hull
+        // becomes the unit sphere at the origin and the test is sphere-vs-mesh
+        // against the ACTUAL rendered rock surface — a bump lands on the visible
+        // rock from every angle, dents included, instead of an enclosing box or
+        // ellipsoid that bumps in empty air past a rock's corners.
+        const collideAsteroid = (obstacle, label) => {
+            const mesh = obstacle.meshVerts;
+            const indices = obstacle.meshIndices;
+            if (!mesh || !indices)
+                return;
+            if (!this.asteroidScratch || this.asteroidScratch.length < mesh.length)
+                this.asteroidScratch = new Float32Array(mesh.length);
+            const box = obstacle.box;
+            // Cheap reject: the rock's bounding reach plus the hull's longest.
+            const reach = Math.max(obstacle.radius, obstacle.losRadius ?? obstacle.radius) + Math.max(hullX, hullY, hullZ) + 4;
+            const ox = position.x - obstacle.x;
+            const oy = position.y - obstacle.y;
+            const oz = position.z - obstacle.z;
+            if (ox * ox + oy * oy + oz * oz >= reach * reach)
+                return;
+            const rqx = box.qx;
+            const rqy = box.qy;
+            const rqz = box.qz;
+            const rqw = box.qw;
+            const sqx = shipQuatInv.x;
+            const sqy = shipQuatInv.y;
+            const sqz = shipQuatInv.z;
+            const sqw = shipQuatInv.w;
+            const invHx = 1 / hullX;
+            const invHy = 1 / hullY;
+            const invHz = 1 / hullZ;
+            const scratch = this.asteroidScratch;
+            for (let i = 0; i < mesh.length; i += 3) {
+                // rock-local -> world, then world -> player-hull space.
+                let x = mesh[i];
+                let y = mesh[i + 1];
+                let z = mesh[i + 2];
+                let tX = 2 * (rqy * z - rqz * y);
+                let tY = 2 * (rqz * x - rqx * z);
+                let tZ = 2 * (rqx * y - rqy * x);
+                x = x + rqw * tX + (rqy * tZ - rqz * tY) - ox;
+                y = y + rqw * tY + (rqz * tX - rqx * tZ) - oy;
+                z = z + rqw * tZ + (rqx * tY - rqy * tX) - oz;
+                tX = 2 * (sqy * z - sqz * y);
+                tY = 2 * (sqz * x - sqx * z);
+                tZ = 2 * (sqx * y - sqy * x);
+                scratch[i] = (x + sqw * tX + (sqy * tZ - sqz * tY)) * invHx;
+                scratch[i + 1] = (y + sqw * tY + (sqz * tX - sqx * tZ)) * invHy;
+                scratch[i + 2] = (z + sqw * tZ + (sqx * tY - sqy * tX)) * invHz;
+            }
+            // Closest point on the transformed mesh to the origin (hull centre).
+            // triangleClosestDistSq writes triClosest for every candidate, so
+            // capture the winner's point here — reading it after the loop would
+            // return the last triangle's point, not the best one, and corrupt
+            // both the inside/outside test and the push direction.
+            let bestDistSq = Infinity;
+            let bestTri = -1;
+            let bestCx = 0;
+            let bestCy = 0;
+            let bestCz = 0;
+            for (let t = 0; t < indices.length; t += 3) {
+                const i0 = indices[t] * 3;
+                const i1 = indices[t + 1] * 3;
+                const i2 = indices[t + 2] * 3;
+                const distSq = triangleClosestDistSq(scratch[i0], scratch[i0 + 1], scratch[i0 + 2], scratch[i1], scratch[i1 + 1], scratch[i1 + 2], scratch[i2], scratch[i2 + 1], scratch[i2 + 2]);
+                if (distSq < bestDistSq) {
+                    bestDistSq = distSq;
+                    bestTri = t;
+                    bestCx = triClosest.x;
+                    bestCy = triClosest.y;
+                    bestCz = triClosest.z;
+                }
+            }
+            if (bestTri < 0)
+                return;
+            const dist = Math.sqrt(bestDistSq);
+            const i0 = indices[bestTri] * 3;
+            const i1 = indices[bestTri + 1] * 3;
+            const i2 = indices[bestTri + 2] * 3;
+            const e1x = scratch[i1] - scratch[i0];
+            const e1y = scratch[i1 + 1] - scratch[i0 + 1];
+            const e1z = scratch[i1 + 2] - scratch[i0 + 2];
+            const e2x = scratch[i2] - scratch[i0];
+            const e2y = scratch[i2 + 1] - scratch[i0 + 1];
+            const e2z = scratch[i2 + 2] - scratch[i0 + 2];
+            let nx = e1y * e2z - e1z * e2y;
+            let ny = e1z * e2x - e1x * e2z;
+            let nz = e1x * e2y - e1y * e2x;
+            const nLength = Math.hypot(nx, ny, nz);
+            if (nLength > 1e-9) {
+                nx /= nLength;
+                ny /= nLength;
+                nz /= nLength;
+            }
+            const cX = bestCx;
+            const cY = bestCy;
+            const cZ = bestCz;
+            // Origin inside the rock (a fast jump tunnelled in) vs outside: the
+            // closest face points away from an interior point, toward an
+            // exterior one. A deep inside point has a large nearest-face
+            // distance, so this must be decided before the surface test below.
+            const interior = cX * nx + cY * ny + cZ * nz > 0;
+            if (!interior && dist >= 1)
+                return;
+            let dirX;
+            let dirY;
+            let dirZ;
+            let pushPlayer;
+            if (interior) {
+                // Rare tunnelling: exit along the radial ray from the rock
+                // centre through the ship — the rock is star-shaped, so that ray
+                // always leaves the mesh. Ray-cast the transformed mesh for the
+                // exit distance; a dent's side walls can't wedge the ship.
+                let rcx = -ox;
+                let rcy = -oy;
+                let rcz = -oz;
+                let tX = 2 * (sqy * rcz - sqz * rcy);
+                let tY = 2 * (sqz * rcx - sqx * rcz);
+                let tZ = 2 * (sqx * rcy - sqy * rcx);
+                rcx = (rcx + sqw * tX + (sqy * tZ - sqz * tY)) * invHx;
+                rcy = (rcy + sqw * tY + (sqz * tX - sqx * tZ)) * invHy;
+                rcz = (rcz + sqw * tZ + (sqx * tY - sqy * tX)) * invHz;
+                dirX = -rcx;
+                dirY = -rcy;
+                dirZ = -rcz;
+                const dirLen = Math.hypot(dirX, dirY, dirZ) || 1;
+                dirX /= dirLen;
+                dirY /= dirLen;
+                dirZ /= dirLen;
+                let exitT = Infinity;
+                for (let t = 0; t < indices.length; t += 3) {
+                    const j0 = indices[t] * 3;
+                    const j1 = indices[t + 1] * 3;
+                    const j2 = indices[t + 2] * 3;
+                    const a1x = scratch[j1] - scratch[j0];
+                    const a1y = scratch[j1 + 1] - scratch[j0 + 1];
+                    const a1z = scratch[j1 + 2] - scratch[j0 + 2];
+                    const a2x = scratch[j2] - scratch[j0];
+                    const a2y = scratch[j2 + 1] - scratch[j0 + 1];
+                    const a2z = scratch[j2 + 2] - scratch[j0 + 2];
+                    const pvx = dirY * a2z - dirZ * a2y;
+                    const pvy = dirZ * a2x - dirX * a2z;
+                    const pvz = dirX * a2y - dirY * a2x;
+                    const det = a1x * pvx + a1y * pvy + a1z * pvz;
+                    if (Math.abs(det) < 1e-12)
+                        continue;
+                    const invDet = 1 / det;
+                    const tvx = rcx - scratch[j0];
+                    const tvy = rcy - scratch[j0 + 1];
+                    const tvz = rcz - scratch[j0 + 2];
+                    const u = (tvx * pvx + tvy * pvy + tvz * pvz) * invDet;
+                    if (u < 0 || u > 1)
+                        continue;
+                    const qvx = tvy * a1z - tvz * a1y;
+                    const qvy = tvz * a1x - tvx * a1z;
+                    const qvz = tvx * a1y - tvy * a1x;
+                    const v = (dirX * qvx + dirY * qvy + dirZ * qvz) * invDet;
+                    if (v < 0 || u + v > 1)
+                        continue;
+                    const hit = (a2x * qvx + a2y * qvy + a2z * qvz) * invDet;
+                    if (hit > 1e-6 && hit < exitT)
+                        exitT = hit;
+                }
+                if (exitT === Infinity)
+                    exitT = dist;
+                // exitT is measured from the rock centre (rc), but the push
+                // starts at the ship — subtract the centre-to-ship distance so
+                // the hull lands just past the surface, not past it by the
+                // ship's own offset from the centre.
+                pushPlayer = Math.max(1.08, exitT - Math.hypot(rcx, rcy, rcz) + 1 + 0.08);
+            }
+            else if (dist > 1e-6) {
+                // The closest surface point lies between the hull centre and
+                // the rock, so push AWAY from it (negate) to separate.
+                dirX = -cX / dist;
+                dirY = -cY / dist;
+                dirZ = -cZ / dist;
+                pushPlayer = 1 - dist;
+            }
+            else {
+                dirX = nx;
+                dirY = ny;
+                dirZ = nz;
+                pushPlayer = 1;
+            }
+            // Map back to world: scale the player-space direction by the hull
+            // extents (ship frame), rotate by the ship quaternion.
+            const sqFx = shipQuat.x;
+            const sqFy = shipQuat.y;
+            const sqFz = shipQuat.z;
+            const sqFw = shipQuat.w;
+            let wX = dirX * hullX;
+            let wY = dirY * hullY;
+            let wZ = dirZ * hullZ;
+            let tX = 2 * (sqFy * wZ - sqFz * wY);
+            let tY = 2 * (sqFz * wX - sqFx * wZ);
+            let tZ = 2 * (sqFx * wY - sqFy * wX);
+            wX = wX + sqFw * tX + (sqFy * tZ - sqFz * tY);
+            wY = wY + sqFw * tY + (sqFz * tX - sqFx * tZ);
+            wZ = wZ + sqFw * tZ + (sqFx * tY - sqFy * tX);
+            const support = Math.hypot(dirX * hullX, dirY * hullY, dirZ * hullZ);
+            const worldLength = Math.hypot(wX, wY, wZ) || 1;
+            wX /= worldLength;
+            wY /= worldLength;
+            wZ /= worldLength;
+            const push = pushPlayer * support + 0.08;
+            position.x += wX * push;
+            position.y += wY * push;
+            position.z += wZ * push;
+            this.tmpCollide.set(wX, wY, wZ);
+            resolveContact(this.tmpCollide, 0, label);
         };
         // Rings are toruses, not solid boxes. THREE.TorusGeometry lies in the
         // local XY plane, so the opening runs along local Z. Measure the
@@ -1335,8 +1986,8 @@ export class GameSession {
             const radialDirectionY = radial > 1e-6 ? localY / radial : 0;
             const deltaRadial = radial - GRAVEYARD_GEOMETRY_PROFILES.ring.majorRadius;
             const distanceToTube = Math.hypot(deltaRadial, localZ);
-            const playerRadius = PLAYER_RADIUS / minScale;
-            const expandedTube = GRAVEYARD_GEOMETRY_PROFILES.ring.tubeRadius + playerRadius;
+            const localPlayerRadius = playerRadius / minScale;
+            const expandedTube = GRAVEYARD_GEOMETRY_PROFILES.ring.tubeRadius + localPlayerRadius;
             if (distanceToTube >= expandedTube)
                 return;
             let normalRadial;
@@ -1372,8 +2023,8 @@ export class GameSession {
             const localX = this.tmpF.x / scaleX;
             const localY = this.tmpF.y / scaleY;
             const localZ = this.tmpF.z / scaleZ;
-            const playerRadius = PLAYER_RADIUS / radialScale;
-            const yAllowance = PLAYER_RADIUS / scaleY;
+            const localPlayerRadius = playerRadius / radialScale;
+            const yAllowance = playerRadius / scaleY;
             const profile = GRAVEYARD_GEOMETRY_PROFILES.engine;
             if (localY < -profile.halfHeight - yAllowance || localY > profile.halfHeight + yAllowance)
                 return;
@@ -1388,13 +2039,13 @@ export class GameSession {
             let normalSign;
             if (radial < innerRadius) {
                 distanceToWall = innerRadius - radial;
-                if (distanceToWall >= playerRadius)
+                if (distanceToWall >= localPlayerRadius)
                     return;
                 normalSign = -1;
             }
             else if (radial > wallRadius) {
                 distanceToWall = radial - wallRadius;
-                if (distanceToWall >= playerRadius)
+                if (distanceToWall >= localPlayerRadius)
                     return;
                 normalSign = 1;
             }
@@ -1404,7 +2055,7 @@ export class GameSession {
                 distanceToWall = Math.min(innerDistance, outerDistance);
                 normalSign = innerDistance <= outerDistance ? -1 : 1;
             }
-            const pushLocal = playerRadius - distanceToWall + 0.08 / radialScale;
+            const pushLocal = localPlayerRadius - distanceToWall + 0.08 / radialScale;
             this.tmpG.set(normalSign * radialDirectionX * pushLocal * scaleX, 0, normalSign * radialDirectionZ * pushLocal * scaleZ).applyQuaternion(this.tmpQ);
             const push = this.tmpG.length();
             if (push < 1e-6)
@@ -1423,6 +2074,8 @@ export class GameSession {
                     collideRing(obstacle, label);
                 else if (obstacle.shape === 'engine')
                     collideEngine(obstacle, label);
+                else if (obstacle.shape === 'asteroid')
+                    collideAsteroid(obstacle, label);
                 else if (obstacle.box)
                     collideBox(obstacle, label);
                 else
@@ -1601,6 +2254,8 @@ export class GameSession {
         this.renderer.setUtilityBeam(false, this.save.player.mode, this.save.player.position);
     }
     extractAsteroid(node, dt, rate) {
+        this.lastExtractionAt = this.save.world.time;
+        this.seenWorkingUntil = this.save.world.time + SEEN_WORKING_SECONDS;
         if (cargoFree(this.save.player) < COMMODITIES.ore.mass + 0.001) {
             this.utilityReadout = 'CARGO FULL';
             return;
@@ -1626,6 +2281,8 @@ export class GameSession {
         this.extractionCarry.set(node.id, next);
     }
     extractWreck(node, dt, rate) {
+        this.lastExtractionAt = this.save.world.time;
+        this.seenWorkingUntil = this.save.world.time + SEEN_WORKING_SECONDS;
         if (cargoFree(this.save.player) < COMMODITIES[node.salvage].mass + 0.001) {
             this.utilityReadout = 'CARGO FULL';
             return;
@@ -1718,11 +2375,15 @@ export class GameSession {
         // same rock disputes the same way every career.
         if (this.claimDisputesTriggered.has(nodeId))
             return;
+        const mission = this.activeMiningClaim(nodeId);
+        // The rival doesn't contest the rock the moment the first ore comes off
+        // the seam: they only move once the pilot has actually cut into it.
+        if (!mission || (mission.mined ?? 0) < CLAIM_DISPUTE_AFTER_UNITS)
+            return;
         const rng = seededRandom(`${this.save.world.seed}:claim-dispute:${nodeId}`);
         if (rng() > CLAIM_DISPUTE_CHANCE)
             return;
         this.claimDisputesTriggered.add(nodeId);
-        const mission = this.activeMiningClaim(nodeId);
         const node = this.asteroids.find((entry) => entry.id === nodeId);
         const spawnPosition = node ? this.claimDisputePosition(node, rng) : this.encounterPosition(rng, 150);
         const rival = this.spawnShip('miner', spawnPosition);
@@ -1758,6 +2419,17 @@ export class GameSession {
     }
     triggerSalvageAmbush(node) {
         if (this.salvageAmbushTriggered.has(node.id))
+            return;
+        // The ambush waits for the pilot to commit: the first beaming frame
+        // arms a short delay, and the roll only happens once the beam has been
+        // running that long (while the wreck still has recoveries). So the
+        // pirates arrive mid-salvage, having watched the work, not on the
+        // first spark of the beam.
+        if (node.ambushEligibleAt === undefined) {
+            node.ambushEligibleAt = this.save.world.time + SALVAGE_AMBUSH_DELAY;
+            return;
+        }
+        if (this.save.world.time < node.ambushEligibleAt)
             return;
         const rng = seededRandom(`${this.save.world.seed}:salvage-ambush:${node.id}`);
         // Claim-jumpers chase value, not wrecks: the hold's remaining worth
@@ -1887,6 +2559,10 @@ export class GameSession {
             : (target.kind === 'asteroid' ? this.asteroids : this.wreckNodes).find((entry) => entry.id === target.id);
         if (!entity || entity.scanned)
             return;
+        // A dark contact can only be resolved inside the dark-detection line,
+        // so the auto-scan never reads a ship the sensors can't see.
+        if (target.kind === 'ship' && !this.playerSeesShip(entity, 1))
+            return;
         const stats = getEffectiveShipStats(this.save.player);
         if (this.surfaceDistance(vec(this.save.player.position), target) <= stats.scanRange)
             this.scanTarget();
@@ -1917,6 +2593,15 @@ export class GameSession {
         else if (distance > stats.scanRange) {
             this.setMonitorStatus(`OUT OF RANGE · ${Math.round(distance)}/${stats.scanRange} km`);
             return;
+        }
+        else if (target.kind === 'ship') {
+            const locked = this.ships.find((entry) => entry.id === target.id);
+            // A dark contact can only be resolved inside the dark-detection
+            // line; a rock between pilot and target blocks the scan entirely.
+            if (!locked || !this.playerSeesShip(locked, 1)) {
+                this.setMonitorStatus('CONTACT LOST · SIGNAL BLOCKED');
+                return;
+            }
         }
         if (target.kind === 'asteroid') {
             const node = this.asteroids.find((entry) => entry.id === target.id);
@@ -2004,11 +2689,12 @@ export class GameSession {
         this.applyTarget(next);
     }
     targetNearestHostile() {
-        const player = vec(this.save.player.position);
-        const sensorRange = getEffectiveShipStats(this.save.player).radarRange * 2.4;
+        // The nearest-hostile lock rides the wider threat multiplier for lit
+        // contacts; dark ones are only ever resolved inside the dark-detection
+        // line, so stealth is never leaked through the targeting UI.
         const nearest = this.ships
-            .filter((entry) => entry.hostile && entry.hull > 0 && player.distanceTo(vec(entry.position)) <= sensorRange)
-            .sort((a, b) => player.distanceToSquared(vec(a.position)) - player.distanceToSquared(vec(b.position)))[0];
+            .filter((entry) => entry.hostile && entry.hull > 0 && this.playerSeesShip(entry, THREAT_NEAREST_MULT))
+            .sort((a, b) => vec(a.position).distanceToSquared(vec(this.save.player.position)) - vec(b.position).distanceToSquared(vec(this.save.player.position)))[0];
         if (!nearest) {
             this.setMonitorStatus('NO HOSTILE IN SENSOR RANGE');
             return;
@@ -2024,9 +2710,8 @@ export class GameSession {
         if (!this.save.player.currentTargetId)
             return;
         const player = vec(this.save.player.position);
-        const sensor = getEffectiveShipStats(this.save.player).radarRange * 2.2;
         const nearest = this.ships
-            .filter((entry) => entry.hostile && entry.hull > 0 && player.distanceTo(vec(entry.position)) < sensor)
+            .filter((entry) => entry.hostile && entry.hull > 0 && this.playerSeesShip(entry, THREAT_TARGET_MULT))
             .sort((a, b) => player.distanceToSquared(vec(a.position)) - player.distanceToSquared(vec(b.position)))[0];
         if (!nearest || nearest.id === this.save.player.currentTargetId)
             return;
@@ -2036,11 +2721,16 @@ export class GameSession {
     targetCandidates() {
         const player = vec(this.save.player.position);
         const stats = getEffectiveShipStats(this.save.player);
-        const inRange = (position) => player.distanceTo(vec(position)) < stats.radarRange * 2.2;
         const byDistance = (a, b) => player.distanceToSquared(vec(a.position)) - player.distanceToSquared(vec(b.position));
-        // Tier 1 — opponents: hostile ships in sensor range, closest first.
+        // Ships resolve through the sensor visibility gate: lit contacts at the
+        // threat-aware multiplier (2.2x, see THREAT_TARGET_MULT), dark ones only
+        // inside the dark-detection line — stealth is never leaked through the
+        // targeting UI. A locked ship the pilot can no longer resolve stays in
+        // the cycle as a hold so the lock isn't silently dropped mid-fight.
+        const shipSeen = (entry) => this.playerSeesShip(entry, THREAT_TARGET_MULT) || entry.id === this.save.player.currentTargetId;
+        // Tier 1 — opponents: hostile ships the pilot can resolve, closest first.
         const opponents = this.ships
-            .filter((entry) => entry.hostile && entry.hull > 0 && inRange(entry.position))
+            .filter((entry) => entry.hostile && entry.hull > 0 && shipSeen(entry))
             .sort(byDistance)
             .map((entry) => ({ kind: 'ship', id: entry.id, position: entry.position, name: entry.name }));
         // Tier 2 — mission goals: the thing each active contract points at (the
@@ -2049,9 +2739,9 @@ export class GameSession {
         for (const mission of this.save.activeMissions) {
             if (mission.kind === 'bounty') {
                 const target = this.ships.find((entry) => entry.missionId === mission.id && !entry.claimed && !entry.captured && entry.hull > 0);
-                // Warrant ships are still ships: they follow the radar-range
-                // target rule. Only POIs stay selectable at any distance.
-                if (target && inRange(target.position))
+                // Warrant ships are still ships: they follow the visibility
+                // gate. Only POIs stay selectable at any distance.
+                if (target && shipSeen(target))
                     goals.push({ kind: 'ship', id: target.id, position: target.position, name: target.name });
                 // Before the warrant ship is spawned, the goal is the POI to
                 // fly to — so target cycling still points you somewhere.
@@ -2088,7 +2778,7 @@ export class GameSession {
         // invested makes them the priority), then nearest first.
         const others = [];
         for (const entry of this.ships)
-            if (!entry.hostile && !entry.claimed && !entry.captured && entry.hull > 0 && inRange(entry.position))
+            if (!entry.hostile && !entry.claimed && !entry.captured && entry.hull > 0 && shipSeen(entry))
                 others.push({ kind: 'ship', id: entry.id, position: entry.position, name: entry.name });
         if (this.activeInstanceId === 'shardbelt') {
             for (const node of this.asteroids)
@@ -2179,6 +2869,29 @@ export class GameSession {
         this.save.player.currentTargetId = undefined;
         this.renderer.setTarget();
     }
+    // A locked ship is a visual lock: it survives until the target leaves its
+    // tracked range (lockTrackedRange — the visual-lock 1000 km for dark
+    // ships, the disc horizon for lit ones). Occlusion never breaks a lock —
+    // rocks don't blind the pilot's eye, only distance does — so a target that
+    // ducks behind debris stays tracked until it truly outruns the dish.
+    // Losing it drops the target; the radar keeps the lost-contact cross at
+    // the last known position on its own.
+    maintainTargetLock() {
+        const id = this.save.player.currentTargetId;
+        if (!id)
+            return;
+        const ship = this.ships.find((entry) => entry.id === id && entry.hull > 0);
+        if (!ship)
+            return;
+        const player = vec(this.save.player.position);
+        const distance = player.distanceTo(vec(ship.position));
+        if (distance > this.lockTrackedRange(ship))
+            this.dropTargetLock(ship);
+    }
+    dropTargetLock(ship) {
+        this.clearTarget();
+        this.setMonitorStatus('CONTACT LOST · LOCK BROKEN');
+    }
     getTargetRef(clearInvalid = true) {
         const id = this.save.player.currentTargetId;
         if (!id)
@@ -2232,7 +2945,9 @@ export class GameSession {
         const rng = seededRandom(`${this.save.world.seed}:jump:${++this.jumpCounter}:${Math.floor(this.save.world.time)}`);
         // The calm window after a resolved intercept suppresses new ambushes
         // without touching the drive: jump away freely, just no immediate re-hit.
-        if (!hostileInSector && this.hyperdriveCooldownRemaining() <= 0 && rng() < sectorEncounterChance(nav.id) * this.combatEncounterScale()) {
+        // A dark pilot is far harder to intercept: nobody sees the jump, so the
+        // odds shrink to the DARK_ENCOUNTER_MULT fraction.
+        if (!hostileInSector && this.hyperdriveCooldownRemaining() <= 0 && rng() < sectorEncounterChance(nav.id) * this.combatEncounterScale() * (this.playerBroadcasting() ? 1 : DARK_ENCOUNTER_MULT)) {
             const travelSeconds = HYPERDRIVE_SPOOL_SECONDS + player.distanceTo(vec(nav.position)) / HYPERDRIVE_CRUISE_SPEED;
             this.hyperdriveEncounterAt = this.save.world.time + travelSeconds * randomBetween(rng, 0.4, 0.75);
         }
@@ -2247,7 +2962,7 @@ export class GameSession {
     // so a resolved fight never strands the player from jumping away.
     hyperdriveBlockReason() {
         const player = vec(this.save.player.position);
-        if (this.hostilesNear(player, HYPERDRIVE_THREAT_RADIUS))
+        if (this.hostilesVisibleNear(player, HYPERDRIVE_THREAT_RADIUS))
             return { message: 'Hyperdrive unavailable while an enemy is close.', kind: 'danger' };
         const nav = LOCATIONS[this.save.player.navTargetId];
         const arrivalRadius = hyperdriveArrivalRadius(nav);
@@ -2294,7 +3009,11 @@ export class GameSession {
         const escorts = [];
         let lead;
         for (let index = 0; index < count; index += 1) {
-            const offset = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.5, rng() - 0.5).normalize().multiplyScalar(140 + rng() * 160);
+            // The lead spawns inside the dark-detection line so a dark pilot can
+            // always see — and target — who is hailing them; escorts may ride
+            // the dark band and emerge as the fight develops.
+            const spawnRange = index === 0 ? 100 + rng() * 95 : 140 + rng() * 160;
+            const offset = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.5, rng() - 0.5).normalize().multiplyScalar(spawnRange);
             const pirate = this.spawnShip(index === 0 ? 'pirate' : 'escort', tuple(player.clone().add(offset)));
             pirate.targetId = 'player';
             this.hyperdriveInterceptIds.add(pirate.id);
@@ -2306,8 +3025,17 @@ export class GameSession {
         // A jump ambush opens with the same standoff as ambient pirate traffic:
         // the crew wants cargo (or a hull-and-outfit toll), not necessarily a
         // wreck. The killer minority still jumps straight to weapons-free.
+        // If the player was recently seen working (mining/salvaging), the
+        // ambush carries the opportunist voice — they followed the work.
         if (lead && rng() < MUG_CHANCE)
-            this.openMug(lead, escorts);
+            this.openMug(lead, escorts, this.save.world.time < this.seenWorkingUntil
+                ? {
+                    lines: OPPORTUNITY_DEMAND_LINES,
+                    emptyLines: OPPORTUNITY_EMPTY_LINES,
+                    sensor: 'Pirates closing — they were watching you work.',
+                    emptySensor: 'Pirates break off: your hold is empty.',
+                }
+                : undefined);
         else
             this.ui.pushSensor('Pirate intercept. Weapons free.', 'danger', 4800);
         this.threatAcquireTarget();
@@ -2342,18 +3070,16 @@ export class GameSession {
             // fire (or they already did if the pilot shot first).
             if (ship.holdFire && this.save.world.time >= (ship.demandUntil ?? 0))
                 this.endMugStandoff(ship);
-        const target = this.resolveShipTarget(ship);
-        const deferring = this.deferentialPilot(ship);
-        // A deferential pilot never re-engages: even if an encounter spawner
-        // forced a target, clear it and drift off — no combat AI, no "engaged"
-        // chatter. Wary pilots (escaped once) stay hostile and fight normally.
-        if (target && !deferring)
-            this.updateAttackAI(ship, target.position, target.velocity, dt);
-        else {
-            if (deferring)
-                ship.targetId = undefined;
-            this.updateTravelAI(ship, dt);
-        }
+        // The per-ship AI hierarchy — task (what the ship wants) → interaction
+        // (tasks colliding) → behavior (how it moves this frame). See shipAI.js:
+        // the old flat if/else dispatch (patrol-engage → search → attack →
+        // travel) now lives there as updateShipAI, with the task layer feeding
+        // travel waypoints and the interaction layer running emergent mugs.
+        updateShipAI(this, ship, dt);
+        // Interaction: a patrol that resolves the pilot while they carry
+        // syndicate cargo busts them (seizure + fine + Concord hit).
+        if (ship.role === 'patrol')
+            this.checkSmugglerBust(ship);
         this.resolveNpcCollisions(ship);
         const position = vec(ship.position);
         // Priority order for the one-voice slot: the one-shot recognition
@@ -2362,8 +3088,20 @@ export class GameSession {
         this.maybeRecognitionLine(ship, position, playerPosition);
         this.maybeProximityLine(ship, position, playerPosition);
         this.maybePilotLine(ship, position, playerPosition);
-        if (position.distanceTo(playerPosition) > 950 && ship.lifetime > 40 && !ship.missionId && !ship.captured)
+        // Neutral/friendly passing lines sit at the bottom of the priority
+        // stack: a greeting never steals the floor from a fight.
+        this.maybeNeutralChatter(ship, position, playerPosition);
+        if (position.distanceTo(playerPosition) > 950 && ship.lifetime > 40 && !ship.missionId && !ship.captured) {
+            // An NPC hyperdrive hop: trade, smuggle, and flee pilots jump to
+            // another port — mark the departure with a warp streak instead of
+            // a silent cull (renderer.spawnHyperdriveStreak).
+            const hopping = ship.task?.kind === 'trade' || ship.task?.kind === 'smuggle' || ship.task?.kind === 'flee';
+            if (hopping) {
+                const palette = paletteForFaction(ship.faction, ship.hostile);
+                this.renderer.spawnHyperdriveStreak?.(ship.position, ship.velocity, palette.engine);
+            }
             ship.hull = -1;
+        }
         }
     }
     // The comms surfaces color each line by the speaker's relation to the
@@ -2467,6 +3205,10 @@ export class GameSession {
         const pool = pilot ? PILOT_LINES[pilot.temperament] : undefined;
         if (!pool || !ship.hostile || playerPosition.distanceTo(position) > 550)
             return;
+        // Combat chatter still needs eyes on the target: a hostile can't taunt a
+        // dark pilot it can't resolve (or a ship hiding behind a rock).
+        if (!this.canSee(position, playerPosition, !this.playerBroadcasting(), ...this.playerSensorArgs()))
+            return;
         const engaged = ship.targetId === 'player' || ship.fleeing;
         if (!engaged)
             return;
@@ -2533,7 +3275,7 @@ export class GameSession {
         if (ship.captured)
             return;
         if (ship.surrendered) {
-            if (!ship.saidSurrenderPlead && playerPosition.distanceTo(position) <= PROXIMITY_RANGE && this.chatterOpen()) {
+            if (!ship.saidSurrenderPlead && playerPosition.distanceTo(position) <= PROXIMITY_RANGE && this.canSee(position, playerPosition, !this.playerBroadcasting(), ...this.playerSensorArgs()) && this.chatterOpen()) {
                 ship.saidSurrenderPlead = true;
                 const pool = ship.pilot ? PILOT_LINES[ship.pilot.temperament]?.plead : undefined;
                 if (pool?.length) {
@@ -2547,17 +3289,113 @@ export class GameSession {
             return;
         // The edge is only tracked after a short spawn grace, so a ship that
         // spawns inside range still gets its mutter a beat later instead of
-        // the flag eating the approach edge before it may speak.
+        // the flag eating the approach edge before it may speak. The pilot must
+        // also be able to see the player: no mutter for a dark or occluded ship.
         const tracking = this.save.world.time >= ship.spawnTime + 2;
-        const within = tracking && playerPosition.distanceTo(position) <= PROXIMITY_RANGE;
+        const within = tracking && this.canSee(position, playerPosition, !this.playerBroadcasting(), ...this.playerSensorArgs()) && playerPosition.distanceTo(position) <= PROXIMITY_RANGE;
         const pool = ship.pilot ? PILOT_LINES[ship.pilot.temperament] : undefined;
-        if (within && !ship.nearPlayer && !this.deferentialPilot(ship) && pool?.proximity?.length && this.shipRelation(ship) !== 'ally'
+        // Hostile ships mutter their wary proximity lines; neutral and friendly
+        // traffic say a passing line instead (see maybeNeutralChatter).
+        if (within && !ship.nearPlayer && !this.deferentialPilot(ship) && pool?.proximity?.length && this.shipRelation(ship) === 'hostile'
             && this.save.world.time >= (ship.nextProximityAt ?? 0)) {
             ship.nextProximityAt = this.save.world.time + 25 + ship.proxRng() * 20;
             const line = pool.proximity[Math.floor(ship.proxRng() * pool.proximity.length)];
             this.sayPilotLine(ship, line);
         }
         ship.nearPlayer = within;
+    }
+    // Neutral/friendly traffic: when the player slips close (<NEUTRAL_CHAT_RANGE)
+    // a passing spacer says one line — patrols keep their official voice,
+    // everyone else greets by temperament. Station-approach traders/miners
+    // instead lead with market banter (a tip or grumble keyed to live prices)
+    // about half the time, so the lanes sound like working pilots. A patrol
+    // greet opens a short reply window (see patrolReply) that pays a tiny
+    // Concord courtesy. Edge-triggered with a long cooldown and rolled on the
+    // prox stream so it never perturbs the combat rolls.
+    maybeNeutralChatter(ship, position, playerPosition) {
+        if (this.storyLineActive() || !this.chatterOpen())
+            return;
+        if (ship.hostile || ship.surrendered || ship.captured || ship.standingDown || this.deferentialPilot(ship) || ship.search)
+            return;
+        const tracking = this.save.world.time >= ship.spawnTime + 2;
+        // The greet only lands if the ship can actually see the pilot — a dark
+        // or occluded player gets no hail until they're eyeball-close.
+        const within = tracking && this.canSee(position, playerPosition, !this.playerBroadcasting(), ...this.playerSensorArgs()) && playerPosition.distanceTo(position) <= NEUTRAL_CHAT_RANGE;
+        if (within && !ship.nearNeutral && this.save.world.time >= (ship.nextNeutralChatAt ?? 0)) {
+            ship.nextNeutralChatAt = this.save.world.time + 40 + ship.proxRng() * 30;
+            const banter = ship.role !== 'patrol' && ship.stationTraffic && ship.proxRng() < MARKET_BANTER_CHANCE
+                ? this.marketBanterLine(ship)
+                : undefined;
+            if (banter)
+                this.sayPilotLine(ship, banter);
+            else if (ship.role === 'patrol') {
+                const pool = PATROL_GREET_LINES;
+                const line = pool[Math.floor(ship.proxRng() * pool.length)];
+                this.sayPilotLine(ship, line);
+                // The cordon pilot's greeting invites a courtesy reply while it
+                // is still fresh (see patrolReply / ui REPLY chip).
+                this.patrolReplyWindow = { shipId: ship.id, until: this.save.world.time + PATROL_REPLY_SECONDS };
+            }
+            else {
+                const pool = ship.pilot ? PILOT_LINES[ship.pilot.temperament]?.greet : undefined;
+                if (pool?.length)
+                    this.sayPilotLine(ship, pool[Math.floor(ship.proxRng() * pool.length)]);
+            }
+        }
+        ship.nearNeutral = within;
+    }
+    // Market banter for a station-approach trader/miner: pick a commodity at
+    // their station, compare its live price to base, and say a tip, a grumble,
+    // or a flat observation accordingly. Returns undefined when no station
+    // market is available, so the caller falls back to a plain greet.
+    marketBanterLine(ship) {
+        const locationId = ship.stationTraffic;
+        const market = this.save.world.market?.[locationId];
+        const location = LOCATIONS[locationId];
+        if (!market || !location)
+            return undefined;
+        const commodityId = MARKET_BANTER_COMMODITIES[Math.floor(ship.proxRng() * MARKET_BANTER_COMMODITIES.length)];
+        const item = market[commodityId];
+        if (!item)
+            return undefined;
+        const price = item.lastPrice;
+        const base = COMMODITIES[commodityId].basePrice;
+        const ratio = price / base;
+        const pool = ratio >= MARKET_BANTER_GOOD_PRICE ? MARKET_BANTER_TIP_LINES
+            : ratio <= MARKET_BANTER_BAD_PRICE ? MARKET_BANTER_GRUMBLE_LINES
+            : MARKET_BANTER_FLAT_LINES;
+        return pool[Math.floor(ship.proxRng() * pool.length)]
+            .replace(/\{commodity\}/g, COMMODITIES[commodityId].name)
+            .replace(/\{price\}/g, String(price))
+            .replace(/\{station\}/g, location.shortName ?? location.name);
+    }
+    // The patrol greeting's reply window: live while a patrol is still waiting
+    // for the courtesy. Expires on its own clock and is dropped when the ship
+    // leaves the field.
+    patrolReplyActive() {
+        if (!this.patrolReplyWindow || this.save.world.time >= this.patrolReplyWindow.until)
+            return undefined;
+        const patrol = this.ships.find((ship) => ship.id === this.patrolReplyWindow.shipId && ship.hull > 0);
+        if (!patrol)
+            return undefined;
+        return { seconds: Math.ceil(this.patrolReplyWindow.until - this.save.world.time), shipId: patrol.id };
+    }
+    // The player answers the cordon pilot: a brief official acknowledgment and
+    // a small Concord reputation courtesy (see PATROL_REPLY_REP). One reply
+    // per greeting — the window closes as soon as it is used.
+    patrolReply() {
+        if (!this.patrolReplyActive())
+            return false;
+        const patrol = this.ships.find((ship) => ship.id === this.patrolReplyWindow.shipId && ship.hull > 0);
+        this.patrolReplyWindow = undefined;
+        if (!patrol)
+            return false;
+        const line = PATROL_REPLY_LINES[Math.floor(patrol.proxRng() * PATROL_REPLY_LINES.length)];
+        this.sayPilotLine(patrol, line);
+        this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + PATROL_REPLY_REP, -100, 100);
+        this.ui.pushEvent(`Acknowledged by ${patrol.name}. Concord courtesy +${PATROL_REPLY_REP}.`, 'success', 4200);
+        this.audio.play('ui', 0.6);
+        return true;
     }
     // A pilot the player has beaten before recognizes them on a later
     // encounter: one line when the player gets close, then silence. A captured
@@ -2568,6 +3406,10 @@ export class GameSession {
         if (!this.chatterOpen() || ship.saidRecognition || !ship.recognizesPlayer)
             return;
         if (playerPosition.distanceTo(position) > PROXIMITY_RANGE)
+            return;
+        // Recognition needs eyes too: a dark pilot is just another blip until
+        // the ship can resolve them.
+        if (!this.canSee(position, playerPosition, !this.playerBroadcasting(), ...this.playerSensorArgs()))
             return;
         ship.saidRecognition = true;
         const pool = ship.pilot ? PILOT_LINES[ship.pilot.temperament]?.[this.deferentialPilot(ship) ? 'deference' : 'wary'] : undefined;
@@ -2671,6 +3513,463 @@ export class GameSession {
         // just a sharper moment to speak up.
         this.sayPilotLine(ship, line);
     }
+    // Search AI. Only a ship that already had the player resolved and then lost
+    // the signal opens a search: a patrol that watched a dark contact vanish
+    // (the blue sweep ring) or a hostile actually targeting the player that
+    // lost the resolve (the red sweep ring). The searcher flies to the
+    // last-known waypoint, then randomly fans out across the 100-km sweep
+    // radius for a timed window before giving up for a cooldown. A dark player
+    // shakes the search by outrunning it (speed bleed — the approach is slower
+    // than a lit hull's cruise), by breaking line of sight (occlusion — the
+    // sweep ends at the last-known position), or by dropping the
+    // beam/transponder at range (the vanished-signal trigger). Re-resolving
+    // the player closes the search on the spot: a patrol hails a firm contact,
+    // a hostile re-engages. Returns true while the ship is mid-search — its
+    // movement is the travel AI on the sweep point, not a live chase.
+    updateSearchAI(ship, dt) {
+        if (this.arena)
+            return false;
+        const isPatrol = ship.role === 'patrol' && !ship.hostile;
+        const huntingPlayer = (ship.hostile || ship.role === 'pirate' || ship.role === 'bounty' || ship.role === 'escort') && ship.targetId === 'player';
+        if (!isPatrol && !huntingPlayer)
+            return false;
+        const player = vec(this.save.player.position);
+        const position = vec(ship.position);
+        const broadcasting = this.playerBroadcasting();
+        const dark = !broadcasting;
+        const [playerSpeed, playerMax] = this.playerSensorArgs();
+        const withinRange = player.distanceTo(position) <= (dark ? this.darkVisibilityRange(playerSpeed, playerMax) : NPC_SENSOR_RANGE);
+        const occluded = this.lineBlocked(position, player);
+        let resolvedNow = withinRange && !occluded;
+        if (!resolvedNow && ship.resolvedPlayerLast && withinRange && occluded) {
+            // The pilot ducked behind a rock while still inside sensor range: a
+            // ship that just had eyes on them keeps the resolve for a short
+            // grace while the rock stays in the way — breaking visual contact
+            // is a maneuver (hold the line for a couple of seconds), not a
+            // one-frame flicker. Only occlusion earns the grace; a signature
+            // that simply vanishes (range) opens the search immediately.
+            if (ship.occludedUntil === undefined)
+                ship.occludedUntil = this.save.world.time + OCCLUSION_TRACK_SECONDS;
+            if (this.save.world.time < ship.occludedUntil)
+                resolvedNow = true;
+        }
+        else {
+            ship.occludedUntil = undefined;
+        }
+        if (resolvedNow)
+            ship.lastResolvedPlayer = tuple(player);
+        if (isPatrol) {
+            // A dark contact the patrol can resolve is a catch, not a search:
+            // warn and ding Concord standing, then hold. The sweep only opens
+            // once the patrol loses a contact it had resolved (below).
+            if (!ship.search && resolvedNow && dark && this.save.world.time >= (ship.catchCooldownUntil ?? 0))
+                this.catchDarkPatrol(ship);
+            // Vanished signal: the patrol that already saw the player
+            // investigates the last-known position.
+            if (!ship.search && ship.resolvedPlayerLast && !resolvedNow && dark && this.save.world.time >= (ship.searchCooldownUntil ?? 0)) {
+                this.beginSearch(ship, ship.lastResolvedPlayer ?? player, 'patrol');
+                this.announceSearchStart(ship, 'patrol');
+            }
+        }
+        else if (!ship.search && ship.resolvedPlayerLast && !resolvedNow && this.save.world.time >= (ship.searchCooldownUntil ?? 0)) {
+            // A hostile actually targeting the player that lost the resolve
+            // sweeps the last-known spot instead of flying at the live chase.
+            this.beginSearch(ship, ship.lastResolvedPlayer ?? player, 'hostile');
+            this.announceSearchStart(ship, 'hostile');
+        }
+        ship.resolvedPlayerLast = resolvedNow;
+        if (!ship.search)
+            return false;
+        const search = ship.search;
+        // The pilot went lit mid-search: they are ordinary traffic again, so the
+        // investigation closes quietly (the dark-contact rules no longer apply).
+        if (isPatrol && broadcasting) {
+            this.endSearch(ship, 'clear');
+            return false;
+        }
+        // Found again: the search is over — a patrol hails a firm contact, a
+        // hostile re-engages (the attack AI takes over this same frame).
+        if (resolvedNow) {
+            this.endSearch(ship, 'found');
+            return false;
+        }
+        const anchor = vec(search.anchor);
+        if (search.phase === 'approach') {
+            // Last-known-position waypoint: fly to the anchor, then sweep. If
+            // the anchor is unreachable (tucked inside rocks the avoidance
+            // orbits), the approach deadline hands off to the sweep anyway.
+            ship.destination = search.anchor;
+            ship.searchHold = true;
+            // The approach completes on arrival, on the deadline, or when the
+            // lane is genuinely blocked: after a few seconds of visibly trying,
+            // a searcher that has a rock between it and the spot stops grinding
+            // the rock (wasted time and a crash risk) and the sweep fans out
+            // from the near side instead. "Blocked" means the lane has a rock
+            // in it AND the searcher has stopped making progress toward the
+            // anchor — a stall, not a proximity test — so a rock sitting 100+
+            // units out can't keep the hull grinding outside the old 120 gate.
+            // Stalled = no meaningful progress toward the anchor for 3 seconds.
+            // The improvement timestamp only refreshes when the ship actually
+            // beats its best distance by >1 unit, so a slow-but-closing weave
+            // around a rock never misreads as stuck — only a hull grinding the
+            // rock's face (or an orbit that stopped shrinking) hands off.
+            const approachDist = position.distanceTo(anchor);
+            if (approachDist < (search.approachNearest ?? Infinity) - 1) {
+                search.approachNearest = approachDist;
+                search.approachImprovedAt = this.save.world.time;
+            }
+            const stalled = this.save.world.time - (search.approachImprovedAt ?? search.startedAt) >= 3;
+            // Two independent blocked-lane gates, either of which hands off to
+            // the sweep: the stall detector catches a rock 100+ units out that
+            // the hull grinds against (no progress for 3 s), and the proximity
+            // gate catches a rock sitting near the anchor that the approach
+            // orbits instead of closing (the orbit shrinks too slowly to read
+            // as a stall, so the 20 s deadline would otherwise burn).
+            const blockedNear = this.save.world.time - search.startedAt >= 3 && this.lineBlocked(position, anchor)
+                && (stalled || position.distanceTo(anchor) < 120);
+            if (position.distanceTo(anchor) < 26 || this.save.world.time >= (search.approachDeadline ?? Infinity) || blockedNear) {
+                search.phase = 'sweep';
+                search.sweepUntil = this.save.world.time + SEARCH_SWEEP_SECONDS;
+                search.fanUntil = 0;
+                search.fanPoint = undefined;
+            }
+        }
+        else {
+            // Random fan-out: pick a new waypoint inside the sweep radius on
+            // arrival (or every few seconds) so the sweep reads as a widening
+            // hunt rather than an orbit. All rolls use the ship's seeded rng so
+            // headless probes stay deterministic.
+            if (!search.fanPoint || this.save.world.time >= (search.fanUntil ?? 0) || position.distanceTo(vec(search.fanPoint)) < 26) {
+                const rng = typeof ship.proxRng === 'function' ? ship.proxRng : ship.aiRng;
+                // Fan points must be clear of field obstacles: a sweep that
+                // aims a fast hull at a point inside a rock is a suicide run,
+                // and not dying outranks the fan-out. Re-roll against the
+                // seeded stream, so probes stay exact.
+                const obstacles = this.activeFieldObstacles();
+                const shipRadius = HULL_FLIGHT_STATS[shipVariantForRole(ship.role)]?.collisionRadius ?? NPC_SHIP_RADIUS;
+                let fan = undefined;
+                for (let attempt = 0; attempt < 5; attempt += 1) {
+                    const angle = rng() * Math.PI * 2;
+                    const radial = SEARCH_RADIUS * (0.2 + rng() * 0.8);
+                    this.tmpP2.set(
+                        anchor.x + Math.cos(angle) * radial,
+                        anchor.y + (rng() - 0.5) * SEARCH_RADIUS * 0.5,
+                        anchor.z + Math.sin(angle) * radial,
+                    );
+                    if (!obstacles.length || this.entryPositionClear(this.tmpP2, obstacles, shipRadius + 16)) {
+                        fan = tuple(this.tmpP2);
+                        break;
+                    }
+                }
+                if (!fan) {
+                    // Every roll landed inside the cluster: climb to a clear
+                    // altitude above (or below) the anchor instead of aiming a
+                    // fast hull into a rock. The belt's rocks are thin in y, so
+                    // the vertical escape is almost always free.
+                    this.tmpP2.set(anchor.x, anchor.y + SEARCH_RADIUS * 0.5, anchor.z);
+                    if (obstacles.length && !this.entryPositionClear(this.tmpP2, obstacles, shipRadius + 16))
+                        this.tmpP2.set(anchor.x, anchor.y - SEARCH_RADIUS * 0.5, anchor.z);
+                    fan = tuple(this.tmpP2);
+                }
+                search.fanPoint = fan;
+                search.fanUntil = this.save.world.time + 3 + rng() * 2;
+            }
+            ship.destination = search.fanPoint;
+            ship.searchHold = true;
+            if (this.save.world.time >= search.sweepUntil)
+                this.endSearch(ship, 'giveup');
+        }
+        return true;
+    }
+    // A patrol resolving a dark contact catches the pilot: warning, one Concord
+    // rep ding, and a hail — but no sweep. The search only opens once the
+    // patrol loses the contact (see updateSearchAI), and a fresh catch can't
+    // re-ding faster than PATROL_CATCH_REPEAT seconds. A pilot actually
+    // carrying syndicate cargo gets the full bust instead — the crate, the
+    // fine, and the standing hit.
+    catchDarkPatrol(ship) {
+        if (this.holdingSmuggleCargo()) {
+            this.bustSmuggler(ship);
+            return;
+        }
+        this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + PATROL_CATCH_REP, -100, 100);
+        ship.catchCooldownUntil = this.save.world.time + PATROL_CATCH_REPEAT;
+        this.ui.pushSensor(`${ship.name} flagged your dark transponder. Concord standing ${PATROL_CATCH_REP}.`, 'warning', 5200);
+        this.ui.pushEvent(`Caught running dark by ${ship.name}. Concord reputation ${PATROL_CATCH_REP}.`, 'danger', 4200);
+        this.audio.play('warning');
+        const lines = PATROL_SEARCH_LINES.catch;
+        this.sayPilotLine(ship, lines[Math.floor(ship.proxRng() * lines.length)]);
+    }
+    // Whether the hold currently carries any syndicate-sealed cargo.
+    holdingSmuggleCargo() {
+        return (this.save.player.sealedCargo ?? []).some((cargo) => cargo.smuggled);
+    }
+    // A patrol resolving the player while they carry smuggled cargo busts them:
+    // every crate is seized, the smuggle contracts fail, a fine is levied, and
+    // Concord standing takes a hit far heavier than a plain dark catch. Gated
+    // on a session cooldown so a resolved smuggler is busted once, not per frame.
+    checkSmugglerBust(patrol) {
+        if (!this.emergentMugs || this.arena || patrol.hostile || !this.holdingSmuggleCargo())
+            return;
+        if (this.save.world.time < (this.smugglerBustCooldownUntil ?? 0))
+            return;
+        const player = vec(this.save.player.position);
+        if (vec(patrol.position).distanceTo(player) > NPC_SENSOR_RANGE)
+            return;
+        // A lit runner is resolved at the full sensor horizon; a dark one only
+        // inside the dark-detection line — running dark genuinely hides the
+        // crate, exactly like the stealth rules everywhere else.
+        if (!this.canSee(patrol.position, player, !this.playerBroadcasting(), ...this.playerSensorArgs()))
+            return;
+        this.bustSmuggler(patrol);
+    }
+    bustSmuggler(patrol) {
+        this.smugglerBustCooldownUntil = this.save.world.time + 45;
+        const seized = this.save.player.sealedCargo.filter((cargo) => cargo.smuggled);
+        this.save.player.sealedCargo = this.save.player.sealedCargo.filter((cargo) => !cargo.smuggled);
+        // Every active dark-goods contract tied to the seized crates fails.
+        const failed = [];
+        for (const mission of [...this.save.activeMissions]) {
+            if (mission.kind !== 'smuggle')
+                continue;
+            mission.status = 'failed';
+            this.save.world.failedMissionIds.push(mission.id);
+            this.save.activeMissions = this.save.activeMissions.filter((entry) => entry.id !== mission.id);
+            this.save.player.guildRep.syndicate = Math.max(0, (this.save.player.guildRep.syndicate ?? 0) - Math.max(2, Math.floor(mission.guildRep / 2)));
+            failed.push(mission.title);
+        }
+        const units = seized.reduce((sum, cargo) => sum + cargo.units, 0);
+        const fine = SMUGGLE_BUST_FINE + units * SMUGGLE_BUST_PER_UNIT;
+        const paid = Math.min(fine, this.save.player.credits ?? 0);
+        this.save.player.credits = (this.save.player.credits ?? 0) - paid;
+        this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + SMUGGLE_BUST_REP, -100, 100);
+        const line = PATROL_BUST_LINES[Math.floor(patrol.proxRng() * PATROL_BUST_LINES.length)];
+        this.sayPilotLine(patrol, line);
+        this.ui.pushEvent(`Busted by ${patrol.name}: ${units} units of syndicate cargo seized, ${formatCredits(paid)} fine, Concord standing ${SMUGGLE_BUST_REP}.${failed.length ? ` Contract failed: ${failed[0]}.` : ''}`, 'danger', 6200);
+        this.audio.play('warning');
+    }
+    // Comms the moment a ship that had the pilot resolved loses the signal and
+    // opens a sweep: the player is told, in the searching ship's voice, that it
+    // lost them. The patrol also logs it on the sensor line. The line pick is a
+    // pure function of the search start time so it never perturbs a ship's roll
+    // streams (headless probes stay bit-exact); the sensor note is
+    // unconditional, the spoken line obeys the chatter gap like every other.
+    announceSearchStart(ship, kind) {
+        const started = ship.search?.startedAt ?? this.save.world.time;
+        if (kind === 'patrol') {
+            this.ui.pushSensor(`${ship.name}: contact lost — sweeping the last-known position.`, 'warning', 4600);
+            const pool = PATROL_SEARCH_LINES.lost;
+            if (pool?.length && this.chatterOpen())
+                this.sayPilotLine(ship, pool[Math.floor(started * 7) % pool.length]);
+        }
+        else {
+            const pool = SEARCH_LOST_HOSTILE_LINES;
+            if (pool?.length && this.chatterOpen())
+                this.sayPilotLine(ship, pool[Math.floor(started * 7) % pool.length]);
+        }
+    }
+    // Open a search at the last-known position. The anchor arrives as a tuple
+    // (the recorded last-resolved position) or a Vector3 — normalize before
+    // converting, since tuple() reads .x/.y/.z.
+    beginSearch(ship, anchor, kind) {
+        const anchorPoint = anchor instanceof THREE.Vector3 ? anchor : vec(anchor);
+        ship.search = {
+            phase: 'approach',
+            kind,
+            anchor: tuple(anchorPoint),
+            startedAt: this.save.world.time,
+            approachDeadline: this.save.world.time + SEARCH_APPROACH_TIMEOUT,
+            // Closest the approach has reached so far, and when that best was
+            // last beaten — a stall (no progress for 3 s) with a rock in the
+            // lane hands off to the sweep.
+            approachNearest: Infinity,
+            approachImprovedAt: undefined,
+            sweepUntil: 0,
+            fanUntil: 0,
+            fanPoint: undefined,
+        };
+        ship.searchHold = true;
+        ship.destination = tuple(anchorPoint);
+    }
+    // Close a search. Every outcome sets the give-up cooldown so a fresh
+    // trigger cannot re-open on the same spot immediately.
+    endSearch(ship, outcome) {
+        const kind = ship.search?.kind;
+        ship.search = undefined;
+        ship.searchHold = false;
+        ship.destination = undefined;
+        ship.resolvedPlayerLast = false;
+        ship.searchCooldownUntil = this.save.world.time + SEARCH_COOLDOWN;
+        if (kind === 'patrol') {
+            if (outcome === 'giveup')
+                this.ui.pushSensor(`${ship.name}: no contact at last-known position. Resuming patrol.`, 'info', 4600);
+            else if (outcome === 'found') {
+                this.ui.pushSensor(`${ship.name}: contact confirmed. Concord has you logged.`, 'warning', 4600);
+                this.sayPilotLine(ship, PATROL_SEARCH_LINES.firm[Math.floor(ship.proxRng() * PATROL_SEARCH_LINES.firm.length)]);
+            }
+            // 'clear' ends quietly — the pilot went lit, so there is nothing to log.
+        }
+        else if (outcome === 'giveup') {
+            this.ui.pushSensor(`${ship.name}: lost the signal. Moving on.`, 'info', 4600);
+        }
+        // A hostile 'found' ends quietly — the re-engaged fight speaks for itself.
+    }
+    // Drop a search without the cooldown: used when a patrol acquires a fight
+    // target and combat takes over.
+    clearSearch(ship) {
+        ship.search = undefined;
+        ship.searchHold = false;
+        ship.destination = undefined;
+        ship.resolvedPlayerLast = false;
+    }
+    // A hunter's first hail on a fresh ship victim (see the pursuit hook in
+    // shipAI.updateShipAI) — temperament-flavored, one voice at a time.
+    hailHuntChase(ship) {
+        if (!this.chatterOpen())
+            return;
+        const lines = PIRATE_CHASE_LINES[ship.pilot?.temperament] ?? PIRATE_CHASE_LINES.steady;
+        if (lines?.length)
+            this.sayPilotLine(ship, lines[Math.floor(ship.aiRng() * lines.length)]);
+    }
+    // A readable label for a ship's current task, for the target monitor's
+    // readout once the ship is scanned (see buildHudModel). Trade and smuggle
+    // legs name the ports so the hierarchy reads in-game.
+    shipTaskLabel(ship) {
+        const task = ship.task;
+        if (!task)
+            return 'IN TRANSIT';
+        const short = (id) => (id && LOCATIONS[id] ? LOCATIONS[id].shortName : undefined);
+        switch (task.kind) {
+            case 'trade': {
+                const from = short(task.origin);
+                const to = short(task.port);
+                return from && to ? `TRADING — ${from} → ${to}` : to ? `TRADING — ${to}` : 'IN TRANSIT';
+            }
+            case 'smuggle': {
+                const to = short(task.port);
+                return to ? `SMUGGLING — ${to}` : 'SMUGGLING';
+            }
+            case 'patrol':
+                return 'ON PATROL LANE';
+            case 'mine':
+                return 'WORKING THE SHARDBELT';
+            case 'salvage':
+                return 'STRIPPING A WRECK';
+            case 'hunt':
+                return ship.hostile ? 'HUNTING' : 'IN TRANSIT';
+            case 'flee':
+                return 'FLEEING';
+            default:
+                return 'IN TRANSIT';
+        }
+    }
+    // Interaction: patrols arrest dark smugglers. A patrol that resolves a
+    // dark smuggler hails them to stop; the smuggler either dumps the hold
+    // (drifting pickups) or bolts, and the patrol gives chase until the
+    // window closes, then returns to its lane. Pure comms/ambient — the
+    // player's standing is untouched. Returns true while a chase is active so
+    // the dispatch sends the patrol after the smuggler instead of its lane.
+    updatePatrolArrest(ship) {
+        if (!this.emergentMugs || this.arena || ship.role !== 'patrol' || ship.hostile || ship.targetId)
+            return false;
+        const time = this.save.world.time;
+        if (ship.arrest) {
+            const smuggler = this.ships.find((entry) => entry.id === ship.arrest.smugglerId && entry.hull > 0);
+            if (!smuggler || time >= ship.arrest.until) {
+                this.endPatrolArrest(ship, smuggler);
+                return false;
+            }
+            // Give chase: aim at a lead point ahead of the fleeing smuggler.
+            const position = vec(ship.position);
+            const lead = vec(smuggler.position).addScaledVector(vec(smuggler.velocity), 2.5);
+            ship.destination = tuple(lead);
+            return true;
+        }
+        if (time < (ship.arrestCooldownUntil ?? 0))
+            return false;
+        const position = vec(ship.position);
+        const smuggler = this.ships.find((entry) => entry.hull > 0 && entry !== ship && entry.smuggling && entry.dark
+            && !entry.surrendered && !entry.captured && !entry.poweredDown
+            && time >= (entry.arrestCooldownUntil ?? 0)
+            && vec(entry.position).distanceTo(position) < PATROL_ARREST_RANGE
+            && this.canSee(position, entry.position, true, vec(entry.velocity).length(), entry.speed));
+        if (!smuggler)
+            return false;
+        this.beginPatrolArrest(ship, smuggler);
+        return true;
+    }
+    beginPatrolArrest(ship, smuggler) {
+        const time = this.save.world.time;
+        const rng = seededRandom(`${this.save.world.seed}:arrest:${ship.id}:${smuggler.id}:${Math.floor(time)}`);
+        ship.arrest = { smugglerId: smuggler.id, until: time + randomBetween(rng, PATROL_ARREST_MIN_SECONDS, PATROL_ARREST_MAX_SECONDS) };
+        ship.arrestCooldownUntil = time + 45 + rng() * 30;
+        smuggler.arrestCooldownUntil = time + 60 + rng() * 40;
+        smuggler.arrestedBy = ship.id;
+        const line = PATROL_ARREST_LINES.hail[Math.floor(rng() * PATROL_ARREST_LINES.hail.length)].replace(/\{smuggler\}/g, smuggler.name);
+        this.sayPilotLine(ship, line);
+        if (rng() < SMUGGLER_DUMP_CHANCE) {
+            // Dump the hold: the evidence hits space and the patrol breaks off
+            // — the smuggler is burned, so it becomes ordinary traffic.
+            smuggler.smuggling = false;
+            if (smuggler.task?.kind === 'smuggle')
+                smuggler.task.kind = 'trade';
+            const commodity = SMUGGLER_HOLD_POOL[Math.floor(rng() * SMUGGLER_HOLD_POOL.length)];
+            this.spawnPickup(commodity, smuggler.position, 'combat', 1 + Math.floor(rng() * 2));
+            this.endPatrolArrest(ship, smuggler, true);
+            this.ui.pushSensor(`${ship.name} forces ${smuggler.name} to dump the hold.`, 'warning', 5200);
+        }
+        else {
+            // Run: the smuggler bolts and the patrol gives chase.
+            smuggler.task = { kind: 'flee', prior: smuggler.task, awayFrom: [...smuggler.position] };
+            this.ui.pushSensor(`${ship.name} is chasing ${smuggler.name} running dark.`, 'warning', 5200);
+        }
+    }
+    endPatrolArrest(ship, smuggler, quiet = false) {
+        ship.arrest = undefined;
+        if (smuggler) {
+            smuggler.arrestedBy = undefined;
+            if (smuggler.task?.kind === 'flee')
+                smuggler.task = smuggler.task.prior ?? { kind: 'trade', phase: 'leg', origin: undefined, port: undefined, dwellUntil: 0, dwellPoint: undefined };
+        }
+        if (quiet)
+            return;
+        const rng = seededRandom(`${this.save.world.seed}:arrest-end:${ship.id}:${Math.floor(this.save.world.time)}`);
+        this.sayPilotLine(ship, PATROL_ARREST_LINES.giveup[Math.floor(rng() * PATROL_ARREST_LINES.giveup.length)]);
+        this.ui.pushSensor(`${ship.name}: no flagrant cargo aboard. Resuming patrol.`, 'info', 4600);
+    }
+    // Active search sweeps for the radar: one ring per searching ship, drawn
+    // at the last-known-position anchor at the sweep radius — blue for a
+    // Concord patrol, red for a hostile — so a hunt near the pilot is visible
+    // on the disc, not just a sensor-log note. A search whose anchor sits far
+    // past the horizon still reads: the ring clamps to the disc rim in the
+    // anchor's direction (like the distress beacon), carrying a distance
+    // readout, so a sweep hundreds of km behind the pilot is never silently
+    // culled.
+    searchRings() {
+        const rings = [];
+        const player = vec(this.save.player.position);
+        const inverse = quat(this.save.player.rotation).invert();
+        const range = getEffectiveShipStats(this.save.player).radarRange;
+        for (const ship of this.ships) {
+            if (ship.hull <= 0 || !ship.search)
+                continue;
+            const relative = vec(ship.search.anchor).sub(player).applyQuaternion(inverse);
+            const distance = Math.hypot(relative.x, relative.z);
+            const scale = Math.max(range, distance);
+            // Same normalization as radarContacts: far anchors compress toward
+            // the disc edge, and the ring radius scales with that same scale.
+            const beyond = distance > range * 1.45;
+            rings.push({
+                x: clamp(relative.x / scale, -1, 1) * (beyond ? 0.9 : 1),
+                y: clamp(relative.z / scale, -1, 1) * (beyond ? 0.9 : 1),
+                fraction: Math.max(SEARCH_RADIUS / scale, beyond ? 0.05 : 0),
+                color: ship.search.kind === 'hostile' ? 'red' : 'blue',
+                beyond,
+                distance: Math.round(distance),
+            });
+        }
+        return rings;
+    }
     resolveShipTarget(ship) {
         const playerPosition = vec(this.save.player.position);
         const distSqTo = (from, p) => {
@@ -2680,15 +3979,49 @@ export class GameSession {
             return dx * dx + dy * dy + dz * dz;
         };
         if (!ship.surrendered && !ship.standingDown && !this.deferentialPilot(ship) && (ship.role === 'pirate' || ship.role === 'bounty' || ship.role === 'escort' || ship.hostile) && !ship.targetId) {
-            const victim = this.ships
-                .filter((entry) => !entry.hostile && entry.hull > 0 && (entry.role === 'trader' || entry.role === 'miner'))
-                .sort((a, b) => distSqTo(ship.position, a.position) - distSqTo(ship.position, b.position))[0];
-            ship.targetId = victim && distSqTo(ship.position, victim.position) < 150 * 150 && distSqTo(ship.position, this.save.player.position) > 100 * 100 ? victim.id : 'player';
+            // Nearest non-hostile civilian mark in a single pass — the same
+            // pick as the old filter+sort (a stable sort keeps the earliest
+            // array index on ties, and a strict `<` scan keeps that match),
+            // without allocating a sorted copy every frame.
+            let victim;
+            let bestDistSq = Infinity;
+            for (const entry of this.ships) {
+                if (entry.hostile || entry.hull <= 0 || (entry.role !== 'trader' && entry.role !== 'miner'))
+                    continue;
+                const d = distSqTo(ship.position, entry.position);
+                if (d < bestDistSq) {
+                    bestDistSq = d;
+                    victim = entry;
+                }
+            }
+            ship.targetId = victim && bestDistSq < 150 * 150 && distSqTo(ship.position, this.save.player.position) > 100 * 100 ? victim.id : 'player';
         }
         if (ship.role === 'patrol') {
-            const hostile = this.ships
-                .filter((entry) => entry.hostile && entry.hull > 0)
-                .sort((a, b) => distSqTo(ship.position, a.position) - distSqTo(ship.position, b.position))[0];
+            const playerPos = vec(this.save.player.position);
+            // Patrols engage hostiles they can actually see: lit hostiles at the
+            // standard sensor range, dark ones only inside the dark-detection
+            // line, rocks blocking the view either way. If the player is under
+            // attack and the patrol can see THEM, it answers the distress even
+            // before it can resolve the attacker — that's the rescue leg, and it
+            // costs a dark player their safety net. Nearest satisfying hostile
+            // in a single pass (same pick as filter+sort+find); the player's
+            // sensor args are hoisted out of the candidate loop.
+            const playerBroadcasting = this.playerBroadcasting();
+            const [playerSpeed, playerMax] = this.playerSensorArgs();
+            let hostile;
+            let bestDistSq = Infinity;
+            for (const entry of this.ships) {
+                if (!entry.hostile || entry.hull <= 0)
+                    continue;
+                const d = distSqTo(ship.position, entry.position);
+                if (d >= bestDistSq)
+                    continue;
+                if (this.canSee(ship.position, entry.position, entry.dark, vec(entry.velocity).length(), entry.speed)
+                    || (entry.targetId === 'player' && this.canSee(ship.position, playerPos, !playerBroadcasting, playerSpeed, playerMax))) {
+                    bestDistSq = d;
+                    hostile = entry;
+                }
+            }
             ship.targetId = hostile?.id;
         }
         if (!ship.targetId)
@@ -3018,7 +4351,9 @@ export class GameSession {
         // at short range, aggressive hoses from way out.
         const fireGate = 0.85 + (1 - aim) * 0.1;
         const fireRange = pilotMod(ship, ATTACK_FIRE_RANGE, 'fireRangeMul');
-        if (!fleeing && !ship.holdFire && distance < fireRange && facing > fireGate && ship.fireCooldown <= 0 && !this.lineBlocked(position, predicted, ship.id)) {
+        // The pursuit hold-fire window (see the hunt-chase hook in shipAI) keeps
+        // a hunter from shooting during the short chase before the guns come up.
+        if (!fleeing && !ship.holdFire && !ship.pursuitHoldFire && distance < fireRange && facing > fireGate && ship.fireCooldown <= 0 && !this.lineBlocked(position, predicted, ship.id)) {
             this.fireNpcGun(ship, lead);
         }
     }
@@ -3054,19 +4389,19 @@ export class GameSession {
                 destination = this.tmpD.set(clear[0], clear[1], clear[2]);
                 ship.seekClearSpace = false;
             }
+            else if (ship.searchHold && ship.search) {
+                // A ship holding a search keeps sweeping its point —
+                // updateSearchAI refreshes the destination every frame, so do
+                // not re-roll onto a route mid-sweep.
+                destination = this.tmpD.set(ship.destination[0], ship.destination[1], ship.destination[2]);
+            }
             else {
-                const rng = seededRandom(`${this.save.world.seed}:route:${ship.id}:${Math.floor(ship.lifetime / 20)}`);
-                if (ship.role === 'miner') {
-                    destination = this.tmpD.set(LOCATIONS.shardbelt.position[0] + randomBetween(rng, -110, 110), LOCATIONS.shardbelt.position[1] + randomBetween(rng, -55, 55), LOCATIONS.shardbelt.position[2] + randomBetween(rng, -110, 110));
-                }
-                else if (ship.role === 'patrol') {
-                    const angle = rng() * Math.PI * 2;
-                    destination = this.tmpD.set(LOCATIONS.rook.position[0] + Math.cos(angle) * 95, LOCATIONS.rook.position[1] + randomBetween(rng, -35, 35), LOCATIONS.rook.position[2] + Math.sin(angle) * 95);
-                }
-                else {
-                    const dock = pick(rng, DOCK_LOCATION_IDS);
-                    destination = this.tmpD.set(LOCATIONS[dock].position[0] + randomBetween(rng, -30, 30), LOCATIONS[dock].position[1] + randomBetween(rng, -20, 20), LOCATIONS[dock].position[2] + randomBetween(rng, -30, 30));
-                }
+                // The task layer owns waypoints: tickTask (shipAI.js) refreshes
+                // ship.destination whenever the ship needs one. A ship without
+                // a task simply holds position — it never re-rolls on its own.
+                destination = ship.destination
+                    ? this.tmpD.set(ship.destination[0], ship.destination[1], ship.destination[2])
+                    : this.tmpD.copy(position);
             }
             ship.destination = tuple(destination);
         }
@@ -3076,13 +4411,24 @@ export class GameSession {
         if (shipAvoidance)
             desired.add(shipAvoidance);
         desired.normalize();
+        // Not dying outranks the route: when a rock is dead ahead and close,
+        // brake so the turn has room to do its work instead of slamming the
+        // hull into the field (steering avoidance handles the rest).
+        const aheadClear = this.aheadClearance(position, desired, 70);
+        const brake = aheadClear < 30 ? clamp((30 - aheadClear) / 30, 0, 1) * 0.5 : 0;
         this.tmpQ2.setFromUnitVectors(FORWARD, desired);
         orientation.slerp(this.tmpQ2, 1 - Math.exp(-ship.turnRate * 0.62 * dt));
         orientation.normalize();
         // Fly where the nose points (matching combat AI), so a course change is
         // a real banked turn rather than a sideways slide onto the new heading.
         const forward = this.tmpC.copy(FORWARD).applyQuaternion(orientation).normalize();
-        const travelSpeed = ship.speed * (ship.role === 'trader' ? 0.72 : 0.5);
+        let travelSpeed = ship.speed * (ship.role === 'trader' ? 0.72 : 0.5);
+        // A search approach is an investigation, not a cruise: the patrol
+        // pushes harder than its patrol speed — but still slower than any lit
+        // hull at full throttle, so a running dark pilot bleeds the contact.
+        if (ship.search?.phase === 'approach')
+            travelSpeed = ship.speed * PATROL_SEARCH_SPEED_MUL;
+        travelSpeed *= 1 - brake;
         velocity.lerp(forward.multiplyScalar(travelSpeed), 1 - Math.exp(-0.55 * dt));
         position.addScaledVector(velocity, dt);
         tupleInto(ship.position, position);
@@ -3114,8 +4460,14 @@ export class GameSession {
             if (inward > 0)
                 velocity.addScaledVector(normal, inward * 1.5);
             const impactSpeed = inward + speed * 0.16;
-            if (impactSpeed > 4)
-                impactDamage = Math.max(impactDamage, (impactSpeed - 3) * 1.35);
+            if (impactSpeed > 4) {
+                const raw = (impactSpeed - 3) * 1.35;
+                // A rock can bruise a hull, never one-shot it: cap each impact at
+                // a quarter of the ship's max hull so a searcher that clips a
+                // monolith walks away to seek open space instead of dying.
+                const cap = Math.max(10, ship.maxHull * 0.25);
+                impactDamage = Math.max(impactDamage, Math.min(raw, cap));
+            }
         };
         const collideSphere = (x, y, z, radius) => {
             const ox = position.x - x;
@@ -3312,7 +4664,7 @@ export class GameSession {
                 hitKind = 'obstacle';
             }
             if (projectile.ownerId !== 'player') {
-                const playerT = segmentSphereHit(start, end, playerPos, PLAYER_RADIUS + (projectile.kind === 'missile' ? 0.8 : 0.25));
+                const playerT = segmentSphereHit(start, end, playerPos, this.playerCollisionRadius() + (projectile.kind === 'missile' ? 0.8 : 0.25));
                 if (playerT !== undefined && playerT < bestT) {
                     bestT = playerT;
                     hitKind = 'player';
@@ -3382,7 +4734,42 @@ export class GameSession {
             ship.hull -= remaining;
         const hullDamaged = remaining > 0;
         ship.shieldDelay = 4.5;
+        // An NPC attack on a civilian raises a distress beacon: the ship pings
+        // its position on the radar rim and the nav map even beyond the normal
+        // sensor horizon, and the player gets one MAYDAY callout with the
+        // distance. (Player hits and environment damage don't beacon — the
+        // pilot already knows exactly where those come from.) The victim also
+        // remembers who is shooting it, so a successful rescue can be
+        // acknowledged later (see tryRescueGratitude).
+        if (attackerId !== 'player' && attackerId !== 'environment' && (ship.role === 'trader' || ship.role === 'miner') && ship.hull > 0) {
+            const attacker = this.ships.find((entry) => entry.id === attackerId && entry.hull > 0);
+            if (attacker && (attacker.hostile || attacker.role === 'pirate' || attacker.role === 'bounty' || attacker.role === 'escort')) {
+                ship.attackerId = attacker.id;
+                ship.lastAttackerHitAt = this.save.world.time;
+                ship.distressUntil = this.save.world.time + DISTRESS_WINDOW;
+                if (this.save.world.time >= (ship.nextDistressCallAt ?? 0)) {
+                    ship.nextDistressCallAt = this.save.world.time + DISTRESS_CALL_REPEAT;
+                    const distance = Math.round(vec(ship.position).distanceTo(vec(this.save.player.position)));
+                    this.ui.pushSensor(`DISTRESS CALL — ${ship.name} at ${distance} km.`, 'danger', 5200);
+                    this.audio.play('warning');
+                    const distressPool = PILOT_LINES.timid.distress;
+                    if (distressPool?.length && this.chatterOpen())
+                        this.sayPilotLine(ship, distressPool[Math.floor(ship.aiRng() * distressPool.length)]);
+                }
+            }
+        }
         if (attackerId === 'player' && ship.hull > 0 && !ship.poweredDown) {
+            // A hostile mid-attack on another ship turns to defend itself: the
+            // player engaging it draws its fire away from the victim. This is
+            // self-defense — no unauthorized-attack penalty — and it frees the
+            // mark to resume its course.
+            const hostileFighter = ship.hostile || ship.role === 'pirate' || ship.role === 'bounty' || ship.role === 'escort';
+            if (hostileFighter && ship.targetId && ship.targetId !== 'player') {
+                ship.hostile = true;
+                ship.targetId = 'player';
+                ship.pursuitHoldFire = false;
+                ship.pursuitUntil = 0;
+            }
             // Firing on a demanding pirate ends the standoff one way or
             // another: a scared group breaks off, the rest commit to the fight.
             const brokeOff = ship.mug ? this.tryScareOffMug(ship) : false;
@@ -3405,8 +4792,12 @@ export class GameSession {
                 const hullRatio = ship.maxHull > 0 ? ship.hull / ship.maxHull : 1;
                 const stubborn = pilotMod(ship, 1, 'fleeMul');
                 const chance = (0.04 + (1 - hullRatio) * 0.32) * stubborn * (ship.waryOfPlayer ? WARY_FLEE_MULTIPLIER : 1);
-                if (hullDamaged && !ship.fleeing && !ship.surrendered && ship.aiRng() < chance)
+                if (hullDamaged && !ship.fleeing && !ship.surrendered && ship.aiRng() < chance) {
                     this.surrenderShip(ship);
+                    // The attacker gave up: the mark it was shooting at was just
+                    // saved — thank the pilot if the victim actually took hits.
+                    this.tryRescueGratitude(ship);
+                }
                 // Timid pilots call for help when the player lands a hit: a seeded
                 // chance with its own cooldown, routed through the comms bar like
                 // the rest of the chatter. At close range any hit is worth
@@ -3501,11 +4892,24 @@ export class GameSession {
             this.sayPilotLine(ship, line);
         }
     }
-    // Jettison the hold: a couple of salvage-grade pickups as the pilot runs,
-    // drawn from the role's cargo pool (see SURRENDER_EJECT_POOLS) so the loot
-    // reads like what the ship was actually carrying.
+    // Jettison the hold: a couple of salvage-grade pickups as the pilot runs.
+    // A freighter with a real hold (ship.cargo — see rollNpcCargo) dumps what
+    // it was actually carrying; the role pool remains the fallback for ships
+    // without one, so the loot always reads like the ship's work.
     ejectCargo(ship) {
         const rng = seededRandom(`${this.save.world.seed}:surrender-eject:${ship.id}`);
+        const cargo = ship.cargo;
+        if (cargo && Object.keys(cargo).some((id) => cargo[id] > 0)) {
+            const entries = Object.entries(cargo).filter(([, qty]) => qty > 0);
+            const drops = Math.min(entries.length, 1 + Math.floor(rng() * Math.min(2, entries.length)));
+            for (let index = 0; index < drops; index += 1) {
+                const [commodity, qty] = entries[Math.floor(rng() * entries.length)];
+                this.spawnPickup(commodity, ship.position, 'combat', Math.max(1, Math.round(qty / 2)));
+            }
+            if (ship.role === 'miner' && rng() < MINER_GOLD_DROP_CHANCE)
+                this.spawnPickup('gold', ship.position, 'combat');
+            return;
+        }
         const pool = SURRENDER_EJECT_POOLS[ship.role] ?? ['electronics', 'scrap'];
         const drops = 1 + Math.floor(rng() * 2);
         for (let index = 0; index < drops; index += 1)
@@ -3615,8 +5019,10 @@ export class GameSession {
             this.ui.pushEvent(options.event, 'warning', 6000);
     }
     // Ambient intercepts default to mugging: demand whatever the hold will
-    // bear, or break off when the pilot is flying empty and broke.
-    openMug(lead, escorts) {
+    // bear, or break off when the pilot is flying empty and broke. `options`
+    // lets a caller restyle the standoff (e.g. the "seen working" opportunist
+    // voice) without duplicating the machinery.
+    openMug(lead, escorts, options = {}) {
         const demand = this.mugDemand(this.mugShare(lead.pilot?.temperament));
         if (!demand) {
             for (const ship of [lead, ...escorts]) {
@@ -3626,12 +5032,14 @@ export class GameSession {
                 this.resolveHyperdriveIntercept(ship);
             }
             const rng = seededRandom(`${this.save.world.seed}:mug-empty:${lead.id}:${Math.floor(this.save.world.time)}`);
-            this.sayPilotLine(lead, MUG_EMPTY_LINES[Math.floor(rng() * MUG_EMPTY_LINES.length)]);
-            this.ui.pushSensor('Pirates closing — then breaking off: nothing worth the risk.', 'info', 4800);
+            const emptyLines = options.emptyLines ?? MUG_EMPTY_LINES;
+            this.sayPilotLine(lead, emptyLines[Math.floor(rng() * emptyLines.length)]);
+            this.ui.pushSensor(options.emptySensor ?? 'Pirates closing — then breaking off: nothing worth the risk.', 'info', 4800);
             return;
         }
         this.beginMug(lead, escorts, demand, {
-            sensor: 'Pirates inbound — they are hailing you.',
+            lines: options.lines,
+            sensor: options.sensor ?? 'Pirates inbound — they are hailing you.',
             event: 'Standoff: comply before they fire.',
         });
     }
@@ -3764,6 +5172,24 @@ export class GameSession {
             this.clearTarget();
         return true;
     }
+    // A civilian the player just saved thanks the pilot: a comms line and a
+    // small credit tip. Fires when the player destroys (or drives off) a
+    // hostile that was actively hitting that civilian — the victim has to
+    // have taken a hit from that attacker within the gratitude window, so a
+    // kill on a pirate that merely brushed past a trader stays silent.
+    tryRescueGratitude(attacker) {
+        const victim = this.ships.find((entry) => entry.attackerId === attacker.id && entry.hull > 0 && this.save.world.time - (entry.lastAttackerHitAt ?? -Infinity) < RESCUE_GRATITUDE_WINDOW);
+        if (!victim)
+            return;
+        victim.attackerId = undefined;
+        victim.lastAttackerHitAt = undefined;
+        if (RESCUE_GRATITUDE_LINES.length && this.chatterOpen())
+            this.sayPilotLine(victim, RESCUE_GRATITUDE_LINES[Math.floor(victim.aiRng() * RESCUE_GRATITUDE_LINES.length)]);
+        const tip = Math.round(RESCUE_TIP_BASE + victim.aiRng() * RESCUE_TIP_RANGE);
+        this.save.player.credits = (this.save.player.credits ?? 0) + tip;
+        this.ui.pushEvent(`${victim.name} sends their thanks — ${formatCredits(tip)} tip wired.`, 'success', 4200);
+        this.audio.play('success');
+    }
     destroyShip(ship, attackerId, position) {
         ship.hull = 0;
         this.resolveHyperdriveIntercept(ship);
@@ -3772,6 +5198,8 @@ export class GameSession {
         if (ship.hostile && attackerId === 'player') {
             // Just fought off a threat: calm the lanes for a while.
             this.lastCombatAt = this.save.world.time;
+            // The mark that hostile was hitting is safe now — acknowledge the save.
+            this.tryRescueGratitude(ship);
         }
         if (attackerId === 'player') {
             this.save.player.stats.kills += 1;
@@ -3919,7 +5347,18 @@ export class GameSession {
         // The combat simulator drives its own roster; ambient traffic stays out.
         if (this.arena)
             return;
-        if (this.save.world.time < this.nextEncounterAt || this.ships.filter((entry) => entry.hull > 0).length > 13)
+        // A standoff pauses the beam clock: no second ambush while the player
+        // is mid-deal. This runs before the nextEncounterAt gate and the
+        // hostile lock (both return early during a mug) so the timer keeps
+        // moving forward during the standoff — the moment the deal resolves,
+        // the field doesn't instantly re-roll; the beam restarts from a short
+        // grace instead.
+        if (this.utilityActive && this.activeMug())
+            this.beamAmbushNextAt = this.save.world.time + 4;
+        // Keep the approach lanes populated: station traffic tops up before the
+        // encounter timer (or the near-dock skip) decides anything.
+        this.updateStationTraffic();
+        if (this.save.world.time < this.nextEncounterAt || this.ships.filter((entry) => entry.hull > 0).length > 16)
             return;
         // Jumps roll their own encounters; the ambient timer only applies to manual flight.
         if (this.autopilot)
@@ -3943,6 +5382,110 @@ export class GameSession {
             this.nextEncounterAt = this.save.world.time + 26;
             return;
         }
+        // Policing gradient: near a station or planet the local patrols own the
+        // lanes and the pirate window shrinks toward nothing; far from
+        // civilization the zone defaults stand.
+        const police = this.policePresence(player);
+        // Broadcast state drives both halves of the stealth trade: a lit ship
+        // (transponder on, or the beam running) is a visible target for
+        // opportunists and keeps the full pirate window; a dark idle ship is
+        // nobody to ambush, so the pirate tail shrinks to a fraction.
+        const broadcasting = this.playerBroadcasting();
+        // The extraction beam broadcasts a working signature: while it actually
+        // runs in the asteroid field, pirates on the fringes converge on the
+        // work. A throttled seeded roll keeps a dark miner lit by their own
+        // beam without stacking a second ambush on an active one. The timer
+        // resets when the beam stops so the next session rolls fresh.
+        if (!this.utilityActive)
+            this.beamAmbushNextAt = 0;
+        // A standoff pauses the beam clock: no second ambush while the player
+        // is mid-deal, and the moment the deal resolves the field doesn't
+        // instantly re-roll — the timer restarts from a short grace so the
+        // standoff's own resolution never triggers a fresh window.
+        if (this.utilityActive && this.activeMug())
+            this.beamAmbushNextAt = this.save.world.time + 4;
+        if (this.utilityActive && zone === 'asteroid-field' && police < OPPORTUNITY_MAX_POLICE && !this.activeMug() && this.save.world.time >= (this.beamAmbushNextAt ?? 0)) {
+            this.beamAmbushNextAt = this.save.world.time + randomBetween(rng, BEAM_AMBUSH_MIN, BEAM_AMBUSH_MAX);
+            if (rng() < BEAM_AMBUSH_CHANCE) {
+                const count = randomInt(rng, 1, 2);
+                const escorts = [];
+                let lead;
+                for (let i = 0; i < count; i += 1) {
+                    const pirate = this.spawnShip(i === 0 ? 'pirate' : 'escort', this.encounterPosition(rng, 158 + i * 27));
+                    pirate.targetId = 'player';
+                    if (i === 0)
+                        lead = pirate;
+                    else
+                        escorts.push(pirate);
+                }
+                const demand = lead ? this.mugDemand(this.mugShare(lead.pilot?.temperament)) : undefined;
+                if (lead && demand) {
+                    this.beginMug(lead, escorts, demand, {
+                        lines: OPPORTUNITY_DEMAND_LINES,
+                        sensor: 'Pirates closing — your beam is broadcasting your position.',
+                        event: 'Standoff: the beam drew a crowd.',
+                    });
+                }
+                else {
+                    for (const ship of [lead, ...escorts])
+                        if (ship) {
+                            ship.standingDown = true;
+                            ship.hostile = false;
+                            ship.targetId = undefined;
+                        }
+                    if (lead)
+                        this.sayPilotLine(lead, 'Nothing worth the wait. Fly on, spacer.');
+                    this.ui.pushSensor('Pirates closing — then breaking off: the beam lit the field but the hold is empty.', 'info', 4800);
+                }
+                this.threatAcquireTarget();
+                this.audio.play('warning');
+                this.nextEncounterAt = this.save.world.time + randomBetween(rng, 24, 44);
+                return;
+            }
+        }
+        // Opportunists: a spacer who saw the player at work (beaming ore,
+        // stripping a wreck, or hauling a rich hold) occasionally decides the
+        // haul is worth taking — but only where the patrols are not watching.
+        const recentlyWorking = this.save.world.time - (this.lastExtractionAt ?? Number.NEGATIVE_INFINITY) < OPPORTUNITY_RECENT_SECONDS;
+        const haulWorth = this.holdWorth();
+        const opportunity = (recentlyWorking ? 1 : 0) + (haulWorth >= OPPORTUNITY_HOLD_WORTH ? 1 : 0);
+        if (broadcasting && opportunity > 0 && police < OPPORTUNITY_MAX_POLICE && rng() < OPPORTUNITY_CHANCE * (opportunity / 2) * (1 - police)) {
+            const count = randomInt(rng, 1, 2);
+            const escorts = [];
+            let lead;
+            for (let i = 0; i < count; i += 1) {
+                const pirate = this.spawnShip(i === 0 ? 'pirate' : 'escort', this.encounterPosition(rng, 158 + i * 27));
+                pirate.targetId = 'player';
+                if (i === 0)
+                    lead = pirate;
+                else
+                    escorts.push(pirate);
+            }
+            const demand = lead ? this.mugDemand(this.mugShare(lead.pilot?.temperament)) : undefined;
+            if (lead && demand) {
+                this.beginMug(lead, escorts, demand, {
+                    lines: OPPORTUNITY_DEMAND_LINES,
+                    sensor: 'Pirates closing — they saw your haul and are hailing you.',
+                    event: 'Standoff: an opportunist wants your haul.',
+                });
+            }
+            else {
+                // They watched the work but there is nothing worth taking: break off.
+                for (const ship of [lead, ...escorts])
+                    if (ship) {
+                        ship.standingDown = true;
+                        ship.hostile = false;
+                        ship.targetId = undefined;
+                    }
+                if (lead)
+                    this.sayPilotLine(lead, 'Nothing worth the wait. Fly on, spacer.');
+                this.ui.pushSensor('Pirates closing — then breaking off: nothing worth the risk.', 'info', 4800);
+            }
+            this.threatAcquireTarget();
+            this.audio.play('warning');
+            this.nextEncounterAt = this.save.world.time + randomBetween(rng, 24, 44);
+            return;
+        }
         const bucket = rng();
         // Selling gold is loud: while the sale is fresh (world.goldHeatUntil),
         // the syndicate has the miner's scent and pirates converge on the
@@ -3952,6 +5495,11 @@ export class GameSession {
         const minerCutoff = zone === 'asteroid-field' ? (goldHeat ? GOLD_HEAT_MINER_CUTOFF : 0.42) : zone === 'graveyard' ? 0.28 : 0.22;
         const traderCutoff = zone === 'graveyard' ? 0.72 : zone === 'asteroid-field' ? (goldHeat ? GOLD_HEAT_TRADER_CUTOFF : 0.68) : 0.5;
         const patrolCutoff = zone === 'asteroid-field' ? (goldHeat ? GOLD_HEAT_PATROL_CUTOFF : ASTEROID_PATROL_CUTOFF) : 0.78;
+        // Near civilization the patrol window widens, shrinking the pirate tail;
+        // a dark pilot shrinks it further (nobody sees them to ambush). The gap
+        // between the pirate cutoff and 1 becomes a quiet lane: nothing spawns.
+        const patrolCutoffAdjusted = patrolCutoff + police * (1 - patrolCutoff) * 0.9;
+        const pirateCutoff = patrolCutoffAdjusted + (1 - patrolCutoffAdjusted) * (broadcasting ? 1 : DARK_ENCOUNTER_MULT);
         if (bucket < minerCutoff) {
             const miner = this.spawnShip('miner', this.encounterPosition(rng, 180));
             miner.destination = tuple(vec(LOCATIONS.shardbelt.position).add(new THREE.Vector3(randomBetween(rng, -70, 70), randomBetween(rng, -35, 35), randomBetween(rng, -70, 70))));
@@ -3969,11 +5517,11 @@ export class GameSession {
                 this.ui.pushSensor('Civilian trader entering local space.', 'info');
             }
         }
-        else if (bucket < patrolCutoff) {
+        else if (bucket < patrolCutoffAdjusted) {
             this.spawnShip('patrol', this.encounterPosition(rng, 218));
             this.ui.pushSensor('Concord patrol sweep detected.', 'info');
         }
-        else {
+        else if (bucket < pirateCutoff) {
             const count = randomInt(rng, 1, zone === 'graveyard' ? 3 : 2);
             const escorts = [];
             let lead;
@@ -4002,8 +5550,91 @@ export class GameSession {
             }
             this.audio.play('warning');
         }
+        else {
+            // Quiet lane: a dark ship nobody noticed, or simply an empty stretch.
+            this.nextEncounterAt = this.save.world.time + randomBetween(rng, 24, 44);
+            return;
+        }
         this.threatAcquireTarget();
         this.nextEncounterAt = this.save.world.time + randomBetween(rng, 24, 44);
+    }
+    // 0..1 how much "civilization" is nearby: 1 at a dock, fading to 0 once
+    // the player is POLICE_RADIUS past the station's own clearance. Drives the
+    // encounter table so patrols own the lanes near stations and planets while
+    // open space stays pirate country.
+    policePresence(position) {
+        let nearest = Infinity;
+        for (const id of DOCK_LOCATION_IDS) {
+            const location = LOCATIONS[id];
+            const distance = position.distanceTo(vec(location.position)) - (location.dockRadius ?? location.radius ?? 0);
+            if (distance < nearest)
+                nearest = distance;
+        }
+        return clamp(1 - nearest / POLICE_RADIUS, 0, 1);
+    }
+    // The market value of everything in the hold: loose cargo plus sealed
+    // contract goods. The number opportunist pirates "smell" before deciding
+    // the player is worth the fuel.
+    holdWorth() {
+        const cargo = this.save.player.cargo ?? {};
+        let value = 0;
+        for (const [id, qty] of Object.entries(cargo))
+            if (qty > 0)
+                value += (COMMODITIES[id]?.basePrice ?? 0) * qty;
+        // Sealed contract goods store a label, not a commodity id — value them
+        // at a flat "valuable sealed load" rate so a timed transport of a few
+        // units reads as worth an opportunist's fuel.
+        for (const item of this.save.player.sealedCargo ?? [])
+            value += item.units * 90;
+        return value;
+    }
+    // Approach-lane traffic: when the player is near a dock or planet, top up a
+    // small rotating cast of civilian ships working the lane (mostly traders,
+    // patrols at the fort, miners at the mining world). The travel AI already
+    // re-routes them by role once they arrive, so the lanes stay in motion
+    // without any per-ship scripting. Ships are tagged so each station keeps
+    // its own budget, and they despawn naturally when the player leaves.
+    updateStationTraffic() {
+        const player = vec(this.save.player.position);
+        for (const id of DOCK_LOCATION_IDS) {
+            const location = LOCATIONS[id];
+            const clearance = location.dockRadius ?? location.radius ?? 0;
+            // "Near" means within STATION_TRAFFIC_RANGE of the dock's approach
+            // sphere (not the planet centre), so the lanes fill around planets
+            // too, not just the small stations.
+            if (player.distanceTo(vec(location.position)) - clearance > STATION_TRAFFIC_RANGE)
+                continue;
+            const existing = this.ships.filter((ship) => ship.hull > 0 && ship.stationTraffic === id).length;
+            if (existing >= STATION_TRAFFIC_TARGET)
+                continue;
+            const rng = seededRandom(`${this.save.world.seed}:station-traffic:${id}:${++this.stationTrafficCounter}`);
+            const role = id === 'rook' ? (rng() < 0.5 ? 'patrol' : 'trader')
+                : id === 'vesper' ? (rng() < 0.5 ? 'miner' : 'trader')
+                : rng() < 0.72 ? 'trader' : 'patrol';
+            const direction = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.5, rng() - 0.5).normalize();
+            const ship = this.spawnShip(role, tuple(vec(location.position).clone().addScaledVector(direction, clearance + randomBetween(rng, 60, 260))));
+            ship.stationTraffic = id;
+            // A patrol posted here beats a lane around its own port, not Rook —
+            // that is where the smugglers actually are (see updatePatrolArrest).
+            if (role === 'patrol')
+                rebasePatrolTask(ship, this, id);
+            // A trader away from the bastion sometimes runs dark with a
+            // restricted hold: a smuggle task keeps them off Rook's lanes and a
+            // patrol that resolves them flags them (see shipAI.js).
+            else if (role === 'trader' && id !== 'rook' && rng() < SMUGGLE_CHANCE) {
+                ship.smuggling = true;
+                ship.dark = true;
+                ship.task = createSmuggleTask(ship, this, id);
+            }
+            else if (role === 'trader') {
+                // Tag the home port so the trade task picks a market-aware next
+                // leg (see shipAI.js nextTradeLeg) instead of the player's dock.
+                ship.task.origin = id;
+            }
+            // Point the lane ship at the station itself so it visibly works the
+            // approach; the task layer re-routes it once it arrives.
+            ship.destination = tuple(vec(location.position).add(new THREE.Vector3(randomBetween(rng, -50, 50), randomBetween(rng, -25, 25), randomBetween(rng, -50, 50))));
+        }
     }
     encounterPosition(rng, distance) {
         const player = vec(this.save.player.position);
@@ -4116,8 +5747,20 @@ export class GameSession {
             turnRate: hullFlight.turnRate,
             gunDamage: role === 'bounty' ? 10 : role === 'pirate' ? 7.5 : role === 'escort' ? 6.5 : role === 'patrol' ? 7 : 4,
             hostile: isHostile,
+            // Transponder state: pirates and their escorts run dark (invisible
+            // beyond the dark-detection line) — that's why they can surprise the
+            // pilot from behind a rock. Warrants stay lit: a burned callsign can't
+            // hide, which is exactly how the authorities found them. Civilians
+            // and patrols squawk normally. The combat simulator keeps everyone
+            // lit: the arena is about fighting, not sneaking.
+            dark: !this.arena && (role === 'pirate' || role === 'escort'),
             bountyValue: role === 'bounty' ? 900 : role === 'pirate' || role === 'escort' ? randomInt(rng, 170, 420) : 0,
-            aiState: isHostile ? 'attack' : role === 'miner' ? 'mine' : role === 'patrol' ? 'patrol' : 'travel',
+            // Hunters (pirates and their escorts) can roll an emergent mug when
+            // they close on the player mid-lane (see shipAI.js). Patrols and
+            // bounty hunters never shake anyone down.
+            mugCapable: isHostile && (role === 'pirate' || role === 'escort'),
+            nextMugAt: 0,
+            smuggling: false,
             fireCooldown: randomBetween(rng, 0.2, 0.8),
             missileCooldown: randomBetween(rng, 1, 3),
             shieldDelay: 0,
@@ -4159,13 +5802,37 @@ export class GameSession {
             // then every ~12-24s while engaged. The initial delay comes off the
             // spawn rng so it never perturbs the in-flight aiRng roll stream.
             nextLineAt: this.save.world.time + 2 + rng() * 5,
+            // Search AI transient state: the active search (see updateSearchAI),
+            // the give-up cooldown that gates fresh triggers, the catch cooldown
+            // that spaces re-dings, whether the ship had the player resolved
+            // last frame (the vanished-signal trigger), and the travel-AI hold
+            // flag that keeps a searching ship on its sweep point instead of
+            // re-rolling a route.
+            search: undefined,
+            searchCooldownUntil: 0,
+            catchCooldownUntil: 0,
+            resolvedPlayerLast: false,
+            searchHold: false,
         };
+        // Task layer: what this ship wants (trade, patrol, mine, salvage, hunt).
+        // The dead aiState field this replaces was never read — the hierarchy
+        // in shipAI.js drives the dispatch now. Tasks are transient per-ship
+        // state (ships are never persisted) and every roll rides the ship's own
+        // route stream, so headless probes stay deterministic.
+        ship.task = createTask(ship, this);
+        // A civilian freighter flies with a real hold: it ejects on death and
+        // softens the destination market when its trade task delivers (see
+        // shipAI.rollNpcCargo / economy.deliverCargo).
+        if (role === 'trader' || role === 'miner')
+            ship.cargo = rollNpcCargo(ship, this);
         this.ships.push(ship);
         return ship;
     }
     alertPatrols(position) {
         for (const patrol of this.ships.filter((entry) => entry.role === 'patrol' && entry.hull > 0)) {
-            if (vec(patrol.position).distanceTo(vec(position)) < 320) {
+            // A patrol only turns hostile if it actually saw the incident: close
+            // enough and with a clear line of sight to the ship that was hit.
+            if (vec(patrol.position).distanceTo(vec(position)) < 320 && this.canSee(patrol.position, position, false)) {
                 patrol.hostile = true;
                 patrol.targetId = 'player';
             }
@@ -4220,6 +5887,93 @@ export class GameSession {
     hostilesNear(position, radius) {
         return this.ships.some((ship) => ship.hostile && ship.hull > 0 && position.distanceTo(vec(ship.position)) < radius);
     }
+    // Hostiles the player can actually resolve near a position: lit ships at the
+    // sensor horizon, dark ones only inside the dark-detection line. The
+    // hyperdrive block and the autopilot break both ride this, so an unseen
+    // dark pirate can't pin a dark pilot in place — they only stop you when
+    // you can see them.
+    hostilesVisibleNear(position, radius) {
+        return this.ships.some((ship) => ship.hostile && ship.hull > 0 && position.distanceTo(vec(ship.position)) < radius && this.playerSeesShip(ship, 1));
+    }
+    // The player's ship is visible to sensors when the transponder is ON or the
+    // extraction beam is running — the work broadcasts its own signature, so a
+    // dark miner/salvager is lit up the whole time the beam is active.
+    playerBroadcasting() {
+        return Boolean(this.save.player.transponder !== false || this.utilityActive);
+    }
+    // The player's own visibility as a fraction of the radar horizon, for the
+    // radar's inner ring: full range while broadcasting, and the speed-scaled
+    // dark band otherwise — the ring visibly shrinks as the pilot goes dark
+    // and slows, and swells back toward 400 km at full throttle.
+    playerVisibilityFraction() {
+        const stats = getEffectiveShipStats(this.save.player);
+        if (this.playerBroadcasting())
+            return 1;
+        const visible = this.darkVisibilityRange(vec(this.save.player.velocity).length(), stats.maxSpeed);
+        return clamp(visible / stats.radarRange, 0.05, 1);
+    }
+    // How far a dark (transponder-off) ship's signature carries at a given
+    // speed: DARK_VIS_MIN at half max speed or slower, scaling up to
+    // DARK_VIS_MAX at full throttle. Above max it clamps at the ceiling.
+    darkVisibilityRange(speed, maxSpeed) {
+        const frac = maxSpeed > 0 ? clamp(speed / maxSpeed, 0, 1) : 0;
+        if (frac <= DARK_SPEED_FLOOR)
+            return DARK_VIS_MIN;
+        const t = clamp((frac - DARK_SPEED_FLOOR) / (1 - DARK_SPEED_FLOOR), 0, 1);
+        return DARK_VIS_MIN + (DARK_VIS_MAX - DARK_VIS_MIN) * t;
+    }
+    // Can an observer's sensors resolve a target? A broadcasting target is
+    // visible at the observer's standard sensor range (NPC_SENSOR_RANGE for
+    // NPCs); a dark one only inside its speed-scaled dark band (the target's
+    // speed and max speed decide how far its dark signature carries). Rocks and
+    // wreckage block the line of sight either way. Positions may arrive as
+    // tuples or THREE.Vector3 (patrol targeting passes ship tuples, chatter
+    // passes scratch vectors), so both are normalized here.
+    canSee(observerPosition, targetPosition, targetDark, targetSpeed = 0, targetMaxSpeed = 1) {
+        const observer = Array.isArray(observerPosition) ? vec(observerPosition) : observerPosition;
+        const target = Array.isArray(targetPosition) ? vec(targetPosition) : targetPosition;
+        const distance = observer.distanceTo(target);
+        const range = targetDark ? this.darkVisibilityRange(targetSpeed, targetMaxSpeed) : NPC_SENSOR_RANGE;
+        if (distance > range)
+            return false;
+        return !this.lineBlocked(observer, target);
+    }
+    // Speed + max speed for the player's own dark signature, for canSee gates.
+    playerSensorArgs() {
+        return [vec(this.save.player.velocity).length(), getEffectiveShipStats(this.save.player).maxSpeed];
+    }
+    // How far a locked ship stays tracked: its own sensor ceiling (the radar
+    // disc's 1.45x horizon for lit ships) or the visual-lock range for dark
+    // ones. A lock never outlives what the dish can actually draw, and the
+    // visual-lock floor (1000 km) is what keeps a dark target readable past
+    // its speed band. Shared by the radar, the nav map, the target monitor
+    // and the per-frame lock keeper so every view agrees on where a lock dies.
+    lockTrackedRange(ship) {
+        if (ship.dark)
+            return VISUAL_LOCK_RANGE;
+        return Math.max(getEffectiveShipStats(this.save.player).radarRange * 1.45, VISUAL_LOCK_RANGE);
+    }
+    // The player's sensor resolves a ship. Dark contacts exist inside their
+    // speed-scaled dark band; lit contacts are resolved at the sensor horizon,
+    // optionally boosted by a threat-awareness multiplier for hostile locks. A
+    // locked ship is a visual lock instead: tracked to lockTrackedRange no
+    // matter how dark it runs, and occlusion only breaks it after
+    // occlusion never breaks a lock — only range does.
+    playerSeesShip(ship, threatMult = 1) {
+        const player = vec(this.save.player.position);
+        const locked = ship.id === this.save.player.currentTargetId;
+        const distance = player.distanceTo(vec(ship.position));
+        const range = locked ? this.lockTrackedRange(ship) : (ship.dark
+            ? this.darkVisibilityRange(vec(ship.velocity).length(), ship.speed)
+            : getEffectiveShipStats(this.save.player).radarRange * threatMult);
+        if (distance > range)
+            return false;
+        // You must SEE a ship to acquire it, but a lock is the pilot's own eye:
+        // once locked, occlusion never breaks it — only range does.
+        if (locked)
+            return true;
+        return !this.lineBlocked(player, vec(ship.position));
+    }
     flightLoadScale() {
         const player = this.save.player;
         const capacity = cargoCapacity(player);
@@ -4240,12 +5994,68 @@ export class GameSession {
         const candidate = this.dockCandidate();
         if (!candidate)
             return;
+        // A dark ship lands like anyone else — the syndicate collects its fee
+        // as a starting card on the concourse (pay or launch back out), so the
+        // approach itself is never blocked.
         const speed = vec(this.save.player.velocity).length();
         if (speed > AUTO_DOCK_SPEED)
             return;
         if (this.hostilesNear(vec(this.save.player.position), DOCK_SAFE_RADIUS))
             return;
         this.dockAt(candidate);
+    }
+    // An unlicensed arrival: the station lets the dark ship land, then the
+    // concourse opens on a payment card — the pilot either pays the berth fee
+    // or launches back into space. The pending fee is recorded at landing (see
+    // dockAt) and collected by paySyndicateBerth, so the approach is never
+    // blocked and the fee can't be dodged by docking.
+    beginDarkArrival(locationId) {
+        this.save.world.syndicatePending = {
+            locationId,
+            fee: this.syndicateFee(),
+            at: this.save.world.time,
+        };
+    }
+    // The concourse card's PAY button: collect the pending berth fee (flat fee
+    // plus the cargo cut), bank it into the dock's underworld ledger, and stamp
+    // the visit receipt. Refuses when the pilot can't cover the fee — the only
+    // way out then is launching back into space.
+    paySyndicateBerth() {
+        const pending = this.save.world.syndicatePending;
+        if (!pending || pending.locationId !== this.save.player.dockedAt)
+            return false;
+        const fee = pending.fee;
+        if (this.save.player.credits < fee) {
+            this.ui.showToast(`The syndicate wants ${formatCredits(fee)} — not enough credits.`, 'warning', 4600);
+            this.audio.play('warning');
+            return false;
+        }
+        this.save.player.credits -= fee;
+        const underworld = this.save.world.underworld ?? (this.save.world.underworld = {});
+        underworld[pending.locationId] = (underworld[pending.locationId] ?? 0) + fee;
+        // The berth's receipt: the dock screen shows this saved message for the
+        // whole visit (see renderDockNotice) so the pilot knows what the berth
+        // cost, and the ledger itself remembers every cr paid at this dock.
+        this.save.world.syndicateArrival = { locationId: pending.locationId, fee, at: this.save.world.time };
+        delete this.save.world.syndicatePending;
+        this.ui.pushEvent(`Syndicate berth paid: ${formatCredits(fee)}.`, 'warning', 4200);
+        this.audio.play('ui');
+        saveGame(this.save);
+        // Re-render the dock so the payment card leaves and the receipt notice
+        // takes its place.
+        this.ui.showDock?.(this.save, pending.locationId);
+        return true;
+    }
+    // The syndicate berth's price for an unlicensed arrival: a flat handling
+    // fee plus a cut of everything in the hold (loose cargo and sealed goods).
+    syndicateFee() {
+        return SYNDICATE_FEE_FLAT + Math.round(this.holdWorth() * SYNDICATE_FEE_RATE);
+    }
+    // The local syndicate's ledger at this dock has crossed the favor line: the
+    // fixer opens the smuggler's den to the pilot who paid for it. Paid fees
+    // are the favor — no separate counter, the ledger remembers.
+    denUnlockedAt(locationId) {
+        return (this.save.world.underworld?.[locationId] ?? 0) >= SYNDICATE_DEN_FAVOR;
     }
     activeDockObstacle() {
         const dockLocation = DOCK_LOCATION_IDS.find((id) => id === this.activeInstanceId);
@@ -4262,15 +6072,40 @@ export class GameSession {
             collisionRadius: this.locationCollisionRadius(location),
         };
     }
-    activeFieldObstacles(instanceId = this.activeInstanceId) {
-        if (instanceId === 'shardbelt')
+    activeFieldObstacles(instanceId = this.activeInstanceId) {            if (instanceId === 'shardbelt')
             return this.asteroids.map((node) => {
-                const radius = asteroidCollisionRadius(node);
-                // Hard collision and avoidance use the visual bounding sphere, but
-                // ray/LOS blocking uses the nominal radius: the bounding sphere is
-                // inflated across the narrow axes of an elongated rock, which would
-                // wrongly block a clearly-clear mining beam.
-                return { id: node.id, x: node.position[0], y: node.position[1], z: node.position[2], radius, losRadius: node.radius * 0.9, collisionRadius: radius };
+                // The player's hard collision tests the ship's hull envelope
+                // against the rock's ACTUAL deformed-icosahedron mesh
+                // (obstacle.shape = 'asteroid', meshVerts/meshIndices from
+                // worldData) so a bump lands on the visible surface from any
+                // angle, dents included. The box stays for beam LOS and spawn
+                // clearance, where a conservative corner reach is intentional.
+                // The bounding sphere remains the spatial-grid/avoidance radius.
+                const hx = node.radius * node.scale[0] * ASTEROID_COLLISION_FACTOR;
+                const hy = node.radius * node.scale[1] * ASTEROID_COLLISION_FACTOR;
+                const hz = node.radius * node.scale[2] * ASTEROID_COLLISION_FACTOR;
+                const collisionMesh = asteroidCollisionMesh(node);
+                const rotation = node.rotation ?? [0, 0, 0];
+                const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rotation[0], rotation[1], rotation[2], 'XYZ'));
+                // Steering/avoidance treats the rock as a sphere of its widest
+                // axis (same reach as the old radius × max-scale), while LOS and
+                // the spatial grid use the full corner reach of the box so a
+                // rotated rock never lets a beam slip past a visible corner.
+                const widest = Math.max(hx, hy, hz);
+                const cornerReach = Math.hypot(hx, hy, hz);
+                return {
+                    id: node.id,
+                    x: node.position[0],
+                    y: node.position[1],
+                    z: node.position[2],
+                    radius: widest,
+                    losRadius: cornerReach,
+                    collisionRadius: widest,
+                    shape: 'asteroid',
+                    meshVerts: collisionMesh.verts,
+                    meshIndices: collisionMesh.indices,
+                    box: { hx, hy, hz, qx: q.x, qy: q.y, qz: q.z, qw: q.w },
+                };
             });
         if (instanceId === 'mourning-line') {
             const obstacles = this.graveyard.filter((piece) => piece.collidable !== false).map((piece) => {
@@ -4310,7 +6145,33 @@ export class GameSession {
         }
         return [];
     }
-    entryPositionClear(position, obstacles, clearance = PLAYER_RADIUS + ENTRY_CLEARANCE) {
+    // The player's collision envelope follows the outfitted hull: the same
+    // per-hull collisionRadius the NPCs use, so an Atlas bumps at its full
+    // 2.9 reach while a Wayfarer slips through the same gaps at 1.3.
+    playerCollisionRadius() {
+        return HULL_FLIGHT_STATS[playerShipVariant(this.save.player.shipId)]?.collisionRadius ?? PLAYER_RADIUS;
+    }
+    // The ship's collision hull as an oriented ellipsoid in the ship frame
+    // [starboard X, up Y, forward Z] — measured from the baked GLB models. The
+    // player's hard collision (rocks, debris boxes) tests this shape.
+    playerHullExtents() {
+        return HULL_FLIGHT_STATS[playerShipVariant(this.save.player.shipId)]?.hullHalfExtents ?? [1.4, 2.4, 6.1];
+    }
+    // Entry/spawn clearance must cover the hull's longest reach, not the old
+    // sphere radius, or a spawn could drop the Atlas's nose into a rock.
+    playerSpawnClearance() {
+        const hull = this.playerHullExtents();
+        return Math.max(this.playerCollisionRadius(), hull[0], hull[1], hull[2]) + ENTRY_CLEARANCE;
+    }
+    entryPositionClear(position, obstacles, clearance = this.playerSpawnClearance()) {
+        // Class fields initialize these in the real constructor, but headless
+        // harnesses build sessions via Object.create — keep the box path robust
+        // to whatever the caller left on the instance.
+        if (!(this.tmpEntryQuaternion instanceof THREE.Quaternion))
+            this.tmpEntryQuaternion = new THREE.Quaternion();
+        if (!(this.tmpEntryInverseQuaternion instanceof THREE.Quaternion))
+            this.tmpEntryInverseQuaternion = new THREE.Quaternion();
+        this.tmpEntryLocal ??= new THREE.Vector3();
         const clearanceSq = clearance * clearance;
         for (const obstacle of obstacles) {
             if (obstacle.box) {
@@ -4339,14 +6200,21 @@ export class GameSession {
         return true;
     }
     pushEntryPosition(position, obstacle, preferredDirection) {
+        if (!(this.tmpEntryQuaternion instanceof THREE.Quaternion))
+            this.tmpEntryQuaternion = new THREE.Quaternion();
+        if (!(this.tmpEntryInverseQuaternion instanceof THREE.Quaternion))
+            this.tmpEntryInverseQuaternion = new THREE.Quaternion();
+        this.tmpEntryLocal ??= new THREE.Vector3();
+        this.tmpEntryLocalDirection ??= new THREE.Vector3();
+        const clearance = this.playerSpawnClearance();
         if (obstacle.box) {
             const box = obstacle.box;
             this.tmpEntryQuaternion.set(box.qx, box.qy, box.qz, box.qw);
             this.tmpEntryInverseQuaternion.copy(this.tmpEntryQuaternion).invert();
             this.tmpEntryLocal.set(position.x - obstacle.x, position.y - obstacle.y, position.z - obstacle.z).applyQuaternion(this.tmpEntryInverseQuaternion);
-            const hx = box.hx + PLAYER_RADIUS + ENTRY_CLEARANCE;
-            const hy = box.hy + PLAYER_RADIUS + ENTRY_CLEARANCE;
-            const hz = box.hz + PLAYER_RADIUS + ENTRY_CLEARANCE;
+            const hx = box.hx + clearance;
+            const hy = box.hy + clearance;
+            const hz = box.hz + clearance;
             if (Math.abs(this.tmpEntryLocal.x) > hx || Math.abs(this.tmpEntryLocal.y) > hy || Math.abs(this.tmpEntryLocal.z) > hz)
                 return false;
             const penetrationX = hx - Math.abs(this.tmpEntryLocal.x);
@@ -4366,7 +6234,7 @@ export class GameSession {
         const dx = position.x - obstacle.x;
         const dy = position.y - obstacle.y;
         const dz = position.z - obstacle.z;
-        const minimum = obstacle.collisionRadius + PLAYER_RADIUS + ENTRY_CLEARANCE;
+        const minimum = obstacle.collisionRadius + clearance;
         const distanceSq = dx * dx + dy * dy + dz * dz;
         if (distanceSq >= minimum * minimum)
             return false;
@@ -4392,11 +6260,12 @@ export class GameSession {
         // The configured field radius is the normal cloud edge. Include the
         // live outermost object as well because drift and collectible chunks
         // can extend beyond that seed radius during a long session.
+        const clearance = this.playerSpawnClearance();
         for (const obstacle of obstacles) {
             const dx = obstacle.x - location.position[0];
             const dy = obstacle.y - location.position[1];
             const dz = obstacle.z - location.position[2];
-            entryRadius = Math.max(entryRadius, Math.hypot(dx, dy, dz) + obstacle.radius + PLAYER_RADIUS + ENTRY_CLEARANCE + 0.08);
+            entryRadius = Math.max(entryRadius, Math.hypot(dx, dy, dz) + obstacle.radius + clearance + 0.08);
         }
         position.set(location.position[0], location.position[1], location.position[2]).addScaledVector(direction, entryRadius);
         // Keep the exact oriented-box/sphere check as the final authority in
@@ -4476,12 +6345,13 @@ export class GameSession {
         const location = LOCATIONS[instanceId];
         if (location) {
             const center = location.position;
-            let safeRadius = location.radius + PLAYER_RADIUS + ENTRY_CLEARANCE;
+            const clearance = this.playerSpawnClearance();
+            let safeRadius = location.radius + clearance;
             for (const obstacle of obstacles) {
                 const dx = obstacle.x - center[0];
                 const dy = obstacle.y - center[1];
                 const dz = obstacle.z - center[2];
-                safeRadius = Math.max(safeRadius, Math.hypot(dx, dy, dz) + obstacle.radius + PLAYER_RADIUS + ENTRY_CLEARANCE + 0.08);
+                safeRadius = Math.max(safeRadius, Math.hypot(dx, dy, dz) + obstacle.radius + clearance + 0.08);
             }
             this.tmpEntryCandidate.set(center[0], center[1], center[2]).addScaledVector(this.tmpEntryPreferredDirection, safeRadius);
             position.copy(this.tmpEntryCandidate);
@@ -4540,13 +6410,16 @@ export class GameSession {
             // Index an obstacle in every cell its bounding sphere touches. The
             // old query checked all 26 neighboring cells for every DDA step;
             // that was cheap in open space but became a repeated Map lookup
-            // storm along weapon lines through the dense wreck field.
-            const cx0 = Math.floor((obstacle.x - obstacle.radius) / size);
-            const cy0 = Math.floor((obstacle.y - obstacle.radius) / size);
-            const cz0 = Math.floor((obstacle.z - obstacle.radius) / size);
-            const cx1 = Math.floor((obstacle.x + obstacle.radius) / size);
-            const cy1 = Math.floor((obstacle.y + obstacle.radius) / size);
-            const cz1 = Math.floor((obstacle.z + obstacle.radius) / size);
+            // storm along weapon lines through the dense wreck field. Boxes use
+            // their full corner reach so rotated rocks never let a beam slip
+            // past a visible corner.
+            const reach = Math.max(obstacle.radius, obstacle.losRadius ?? obstacle.radius);
+            const cx0 = Math.floor((obstacle.x - reach) / size);
+            const cy0 = Math.floor((obstacle.y - reach) / size);
+            const cz0 = Math.floor((obstacle.z - reach) / size);
+            const cx1 = Math.floor((obstacle.x + reach) / size);
+            const cy1 = Math.floor((obstacle.y + reach) / size);
+            const cz1 = Math.floor((obstacle.z + reach) / size);
             for (let cx = cx0; cx <= cx1; cx += 1) {
                 for (let cy = cy0; cy <= cy1; cy += 1) {
                     for (let cz = cz0; cz <= cz1; cz += 1) {
@@ -4773,6 +6646,18 @@ export class GameSession {
             ax += ox * weight;
             ay += oy * weight;
             az += oz * weight;
+            // Dead ahead: brake-and-push alone leaves a fast hull sitting in
+            // front of the rock grinding against it. Add a consistent-side
+            // tangent sweep so the ship banks a smooth orbit around the rock
+            // instead of bouncing off its face (the lateral push the radial
+            // term can't provide when the nose is pointed at the center).
+            if (ahead > 0.45) {
+                const tl = Math.hypot(ox, oz) || 1;
+                const tx = -oz / tl;
+                const tz = ox / tl;
+                ax += tx * weight * 1.7;
+                az += tz * weight * 1.7;
+            }
         };
         const dock = this.activeDockObstacle();
         if (dock)
@@ -5037,6 +6922,10 @@ export class GameSession {
         this.save.player.throttle = 0;
         const stats = getEffectiveShipStats(this.save.player);
         this.save.player.shield = stats.shield;
+        // An unlicensed (transponder-off) arrival owes the syndicate berth: the
+        // concourse opens on a payment card (pay or launch back out).
+        if (this.save.player.transponder === false)
+            this.beginDarkArrival(locationId);
         completeMissionsAtDock(this.save, locationId).forEach((message) => this.ui.showToast(message, 'success', 6000));
         refreshMissionOffers(this.save);
         this.renderer.setCockpitVisible(false);
@@ -5083,6 +6972,10 @@ export class GameSession {
         this.save.player.angularVelocity = [0, 0, 0];
         this.save.player.throttle = 0.18;
         this.save.player.dockedAt = undefined;
+        // The syndicate receipt and any unpaid pending berth fee cover only the
+        // visit they belong to — launching clears both.
+        delete this.save.world.syndicateArrival;
+        delete this.save.world.syndicatePending;
         // The body you just left is no longer the target: clear the selection so the
         // target monitor doesn't offer to hyperdrive back to the station you're
         // already standing next to. If the nav point was that location, reset it to
@@ -5110,9 +7003,25 @@ export class GameSession {
         const dock = this.save.player.dockedAt;
         if (!dock)
             return;
-        const result = kind === 'buy' ? buyCommodity(this.save, dock, commodityId, quantity) : sellCommodity(this.save, dock, commodityId, quantity);
+        const den = kind === 'den-buy' || kind === 'den-sell';
+        let price;
+        if (den) {
+            // The den only moves restricted goods: legal cargo gets a refusal
+            // instead of a price. Its quote rides the station's live market
+            // price (denPrice applies the untraceable premium on top).
+            price = denPrice(dock, commodityId, this.save.world.market[dock][commodityId], this.save.world.seed, this.save.world.economyClock);
+            if (price === undefined) {
+                this.ui.showToast('The den does not trade legal goods.', 'warning');
+                this.audio.play('warning', 0.55);
+                return;
+            }
+        }
+        const result = kind === 'buy' || kind === 'den-buy'
+            ? buyCommodity(this.save, dock, commodityId, quantity, price)
+            : sellCommodity(this.save, dock, commodityId, quantity, price);
         const goldHeatNote = result.ok && commodityId === 'gold' ? ' The board marks the sale — expect company on the Shardbelt lanes.' : '';
-        this.ui.showToast(result.message + (result.ok ? ` ${formatCredits(result.total)}.${goldHeatNote}` : ''), result.ok ? 'success' : 'warning');
+        const denNote = result.ok && den ? ' The den pays untraceable — no manifest entry.' : '';
+        this.ui.showToast(result.message + (result.ok ? ` ${formatCredits(result.total)}.${goldHeatNote}${denNote}` : ''), result.ok ? 'success' : 'warning');
         this.audio.play(result.ok ? 'ui' : 'warning', 0.55);
         this.ui.refreshDock(this.save);
         saveGame(this.save);
@@ -5440,7 +7349,7 @@ export class GameSession {
                     captureAvailable,
                     variant: shipVariantForRole(ship.role),
                     heading,
-                    subtitle: `${ship.role.toUpperCase()} · ${ship.surrendered ? 'SURRENDERED' : ship.hostile ? 'HOSTILE' : FACTION_LABEL(ship.faction)}`,
+                    subtitle: `${ship.role.toUpperCase()} · ${ship.surrendered ? 'SURRENDERED' : ship.hostile ? 'HOSTILE' : FACTION_LABEL(ship.faction)}${this.save.world.time < (ship.distressUntil ?? 0) ? ' · DISTRESS' : ''}`,
                     // The monitor's readout line carries the pilot profile so a
                     // locked target's habits are visible at a glance — prefixed
                     // with the recognition marker when the pilot remembers the
@@ -5448,10 +7357,10 @@ export class GameSession {
                     readout: ship.captured || ship.surrendered
                         ? surrenderReadout
                         : ship.scanned
-                        ? (ship.pilot ? `${ship.recognizesPlayer ? `${SPARED_MARK} ` : ''}${TIER_LABELS[ship.pilot.tier] ?? ship.pilot.tier} · ${TEMPERAMENT_LABELS[ship.pilot.temperament] ?? ship.pilot.temperament}` : undefined)
-                        : distance > stats.scanRange
-                            ? `OUT OF RANGE · ${Math.round(distance)}/${stats.scanRange} km`
-                            : 'SCANNING…',
+                            ? `${this.shipTaskLabel(ship)}${ship.pilot ? ` · ${ship.recognizesPlayer ? `${SPARED_MARK} ` : ''}${TIER_LABELS[ship.pilot.tier] ?? ship.pilot.tier} · ${TEMPERAMENT_LABELS[ship.pilot.temperament] ?? ship.pilot.temperament}` : ''}`
+                            : distance > stats.scanRange
+                                ? `OUT OF RANGE · ${Math.round(distance)}/${stats.scanRange} km`
+                                : 'SCANNING…',
                     distance,
                     clipFlash: this.save.world.time < this.targetClipUntil,
                     shield: ship.shield,
@@ -5501,6 +7410,8 @@ export class GameSession {
             }
         }
         const dock = this.dockCandidate();
+        // Dark arrivals land like anyone else — the syndicate collects its fee
+        // on the concourse — so the zone line prompts the normal approach.
         const dockPrompt = dock && vec(this.save.player.velocity).length() > AUTO_DOCK_SPEED
             ? `REDUCE SPEED — ${LOCATIONS[dock].kind === 'planet' ? 'LAND' : 'DOCK'} ${LOCATIONS[dock].shortName}`
             : undefined;
@@ -5552,15 +7463,34 @@ export class GameSession {
             monitorStatus: this.save.world.time < this.monitorStatusUntil ? this.monitorStatus : undefined,
             ownMonitorStatus: this.save.world.time < this.ownMonitorStatusUntil ? this.ownMonitorStatus : undefined,
             standoff,
+            patrolReply: this.patrolReplyActive(),
+            // Radar ring calibration as fractions of the outer (radarRange) ring:
+            // [dark-visibility, scan range, full horizon]. The inner ring tracks
+            // the pilot's own signature — full range while broadcasting, and the
+            // speed-scaled dark band (200–400 km) while dark, so it visibly
+            // shrinks as the pilot slows to hide. mk2 grows the outer and mid
+            // rings.
+            radarRings: [this.playerVisibilityFraction(), stats.scanRange / stats.radarRange, 1],
+            // Transponder state for the radar chip: broadcasting is the actual
+            // sensor signature (transponder ON or the extraction beam running).
+            transponder: this.save.player.transponder !== false,
+            broadcasting: this.playerBroadcasting(),
             contacts: this.radarContacts(),
+            // Active search sweeps (see searchRings): colored rings at
+            // last-known-position anchors so a hunt near the pilot shows on the
+            // radar disc — blue for a Concord patrol, red for a hostile.
+            searchRings: this.searchRings(),
         };
     }
     buildNavigationMapModel() {
         const contacts = [];
         const player = vec(this.save.player.position);
         const inverse = quat(this.save.player.rotation).invert();
+        const stats = getEffectiveShipStats(this.save.player);
         const upgradedRadar = this.save.player.equipment.includes('radar-mk2');
-        const shipRange = upgradedRadar ? MAP_CONTACT_RANGE * 1.45 : MAP_CONTACT_RANGE;
+        // Ship contacts ride the full sensor horizon so the map shows exactly
+        // what the radar does; resources/wrecks stay on their scan-keyed ranges.
+        const shipRange = stats.radarRange;
         const resourceRange = upgradedRadar ? MAP_RESOURCE_CONTACT_RANGE * 1.4 : MAP_RESOURCE_CONTACT_RANGE;
         const wreckRange = upgradedRadar ? MAP_WRECK_CONTACT_RANGE * 1.35 : MAP_WRECK_CONTACT_RANGE;
         const buildContact = (kind, id, name, subtitle, position, range, hostile = false, scanned = false, force = false) => {
@@ -5588,9 +7518,51 @@ export class GameSession {
         for (const ship of this.ships) {
             if (ship.hull <= 0)
                 continue;
-            const contact = buildContact('ship', ship.id, ship.name, `${ship.role.toUpperCase()} · ${ship.hostile ? 'HOSTILE' : FACTION_LABEL(ship.faction)}`, ship.position, shipRange, ship.hostile);
-            if (contact)
+            // Mirror the radar: dark ships exist inside their speed-scaled dark
+            // band, a locked ship is a visual lock (VISUAL_LOCK_RANGE, with a
+            // a locked ship is tracked through occlusion — never broken by a
+            // rock, only by range — and a signal the dish
+            // just lost stays as a lost-contact cross at its last known
+            // position instead of a dashed circle.
+            const shipPos = vec(ship.position);
+            const distance = player.distanceTo(shipPos);
+            const occluded = this.lineBlocked(player, shipPos);
+            const darkVis = ship.dark ? this.darkVisibilityRange(vec(ship.velocity).length(), ship.speed) : shipRange;
+            const seen = !occluded && distance <= darkVis;
+            const selected = ship.id === this.save.player.currentTargetId;
+            // A locked ship is a visual lock: tracked through occlusion all
+            // the way out to lockTrackedRange (see radarContacts).
+            const tracked = selected && distance <= this.lockTrackedRange(ship);
+            const ghost = !seen && !tracked && distance <= shipRange * 2.2 && this.save.world.time < (ship.lastSeenAt ?? 0) + LOST_CONTACT_LIFETIME;
+            // A distress beacon surfaces the source even beyond the normal
+            // horizon: the nav map shows it at its true position (clamped to
+            // the frame) so the pilot can see where the attack is happening.
+            const distressActive = this.save.world.time < (ship.distressUntil ?? 0);
+            if (!seen && !tracked && !ghost) {
+                if (distressActive) {
+                    const beacon = buildContact('ship', ship.id, ship.name, `${ship.role.toUpperCase()} · DISTRESS CALL`, ship.position, shipRange, ship.hostile, false, true);
+                    if (beacon) {
+                        beacon.distress = true;
+                        contacts.push(beacon);
+                    }
+                }
+                continue;
+            }
+            const subtitle = `${ship.role.toUpperCase()} · ${ship.hostile ? 'HOSTILE' : FACTION_LABEL(ship.faction)}${ghost ? ' · CONTACT LOST' : ''}${distressActive ? ' · DISTRESS CALL' : ''}`;
+            const contact = buildContact('ship', ship.id, ship.name, subtitle, ghost ? (ship.lastSeenPosition ?? ship.position) : ship.position, shipRange, ship.hostile, false, ghost);
+            if (contact) {
+                contact.ghost = ghost;
+                if (distressActive)
+                    contact.distress = true;
+                if (ghost) {
+                    const age = this.save.world.time - (ship.lastSeenAt ?? this.save.world.time);
+                    let lostAlpha = 0.9;
+                    if (age >= LOST_CONTACT_HOLD_SECONDS)
+                        lostAlpha = 0.9 * Math.max(0, 1 - (age - LOST_CONTACT_HOLD_SECONDS) / LOST_CONTACT_FADE_SECONDS);
+                    contact.lostAlpha = lostAlpha;
+                }
                 contacts.push(contact);
+            }
         }
         if (this.activeInstanceId === 'shardbelt') {
             const claimNodes = new Set(this.activeMiningClaims().map((mission) => mission.claimNodeId));
@@ -5625,12 +7597,30 @@ export class GameSession {
             }
         }
         contacts.sort((a, b) => Number(b.hostile) - Number(a.hostile) || prioritize(a, b));
+        // Active search sweeps on the chart: one dashed ring per searching ship
+        // at its last-known-position anchor, always visible (clamped to the
+        // frame) so the pilot can see where a patrol or hostile is hunting even
+        // when the search is far beyond the sensor horizon.
+        const searchRings = [];
+        for (const ship of this.ships) {
+            if (ship.hull <= 0 || !ship.search)
+                continue;
+            const relative = vec(ship.search.anchor).sub(player).applyQuaternion(inverse);
+            const distance = relative.length();
+            searchRings.push({
+                x: clamp(relative.x / shipRange, -1, 1),
+                y: clamp(relative.z / shipRange, -1, 1),
+                fraction: Math.max(SEARCH_RADIUS / Math.max(distance, shipRange), 0.06),
+                color: ship.search.kind === 'hostile' ? 'red' : 'blue',
+            });
+        }
         const nearestThreat = contacts.find((contact) => contact.hostile && contact.distance <= HYPERDRIVE_THREAT_RADIUS);
         return {
             playerPosition: [...this.save.player.position],
             navTargetId: this.save.player.navTargetId,
             currentTargetId: this.save.player.currentTargetId,
             contacts,
+            searchRings,
             autopilotAvailable: !nearestThreat,
             threatLabel: nearestThreat
                 ? `${nearestThreat.name} at ${Math.round(nearestThreat.distance)} units`
@@ -5641,22 +7631,81 @@ export class GameSession {
         const contacts = [];
         const player = vec(this.save.player.position);
         const inverse = quat(this.save.player.rotation).invert();
-        const range = this.save.player.equipment.includes('radar-mk2') ? 560 : 380;
-        const add = (position, type, selected, surfaceOffset = 0) => {
+        // The radar normalizes to the full sensor horizon (radarRange), so the
+        // outer ring is exactly the radarRange ring and the inner rings can be
+        // calibrated against it (see radarRings in buildHudModel).
+        const range = getEffectiveShipStats(this.save.player).radarRange;
+        const add = (position, type, selected, surfaceOffset = 0, ghost = false, lostAlpha = 0) => {
             const relative = vec(position).sub(player).applyQuaternion(inverse);
             const distance = Math.hypot(relative.x, relative.z) - surfaceOffset;
-            if (distance > range * 1.45)
+            if (!ghost && distance > range * 1.45)
+                return;
+            // Lost contacts are last-known traces: only draw them within a
+            // generous window around the horizon so a ship that fled far doesn't
+            // leave a permanent phantom on the disc.
+            if (ghost && distance > range * 2.2)
                 return;
             const scale = Math.max(range, distance);
             // Altitude is normalised to the same full-ring scale as the in-plane
             // position, so the out-of-plane tick can grow with how far above or
             // below the contact sits instead of being a fixed stub.
-            contacts.push({ x: clamp(relative.x / scale, -1, 1), y: clamp(relative.z / scale, -1, 1), type, selected, altitude: relative.y / range });
+            contacts.push({ x: clamp(relative.x / scale, -1, 1), y: clamp(relative.z / scale, -1, 1), type, selected, altitude: relative.y / range, ghost, lostAlpha });
         };
         for (const ship of this.ships) {
             if (ship.hull <= 0)
                 continue;
-            add(ship.position, ship.hostile ? 'hostile' : ship.role === 'patrol' ? 'friendly' : 'neutral', ship.id === this.save.player.currentTargetId);
+            // A dark ship exists inside its speed-scaled dark band (200 km at
+            // half speed, 400 at full); lit ships ride the full radar horizon.
+            // A locked ship is a visual lock: tracked to VISUAL_LOCK_RANGE
+            // occlusion never breaks a lock — only range does.
+            // Anything the dish just stopped resolving becomes a lost-contact
+            // cross at its last known position — solid, then fading — instead
+            // of a dashed circle (see drawRadar).
+            const shipPos = vec(ship.position);
+            const distance = player.distanceTo(shipPos);
+            const occluded = this.lineBlocked(player, shipPos);
+            const selected = ship.id === this.save.player.currentTargetId;
+            const darkVis = ship.dark ? this.darkVisibilityRange(vec(ship.velocity).length(), ship.speed) : range * 1.45;
+            const seen = !occluded && distance <= darkVis;
+            // A locked ship is a visual lock: tracked through occlusion (rocks
+            // don't blind the eye) all the way out to lockTrackedRange.
+            const tracked = selected && distance <= this.lockTrackedRange(ship);
+            const type = ship.hostile ? 'hostile' : ship.role === 'patrol' ? 'friendly' : 'neutral';
+            if (seen || tracked) {
+                // tuple() reads .x/.y/.z, so convert the raw array first — a
+                // NaN last-known position would draw the lost cross nowhere.
+                ship.lastSeenPosition = tuple(vec(ship.position));
+                ship.lastSeenAt = this.save.world.time;
+                add(ship.position, type, selected, 0, false);
+            }
+            else if (this.save.world.time < (ship.lastSeenAt ?? 0) + LOST_CONTACT_LIFETIME) {
+                // Lost contact: the cross rides the last known position and
+                // carries a fade alpha so the radar can hold then fade it.
+                const age = this.save.world.time - (ship.lastSeenAt ?? this.save.world.time);
+                let lostAlpha = 0.9;
+                if (age >= LOST_CONTACT_HOLD_SECONDS)
+                    lostAlpha = 0.9 * Math.max(0, 1 - (age - LOST_CONTACT_HOLD_SECONDS) / LOST_CONTACT_FADE_SECONDS);
+                add(ship.lastSeenPosition ?? ship.position, type, selected, 0, true, lostAlpha);
+            }
+            else if (this.save.world.time < (ship.distressUntil ?? 0)) {
+                // A distress beacon surfaces the ship's position even beyond
+                // the radar horizon: a pulsing diamond at the disc rim in the
+                // source's direction, with a distance readout (see drawRadar).
+                const relative = vec(ship.position).sub(player).applyQuaternion(inverse);
+                const horiz = Math.hypot(relative.x, relative.z);
+                if (horiz > range * 1.45) {
+                    contacts.push({
+                        x: (relative.x / horiz) * 0.97,
+                        y: (relative.z / horiz) * 0.97,
+                        type: 'distress',
+                        selected: false,
+                        altitude: relative.y / range,
+                        ghost: false,
+                        distress: true,
+                        distance: Math.round(horiz),
+                    });
+                }
+            }
         }
         for (const id of NAV_LOCATION_IDS)
             add(LOCATIONS[id].position, 'location', id === this.save.player.currentTargetId, LOCATIONS[id].radius);
