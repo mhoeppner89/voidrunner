@@ -11,6 +11,7 @@ import { saveGame } from './save.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
 import { asteroidCollisionMesh, asteroidCollisionRadius, generateAsteroidField, generateGraveyardPieces, generateWreckNodes, graveyardZoneAt, graveyardZoneLabel, GRAVEYARD_GEOMETRY_PROFILES, wreckNodeCollisionRadius } from './worldData.js';
 import { hullVsAsteroid, hullVsBox, hullVsEngine, hullVsHull, hullVsRing, hullVsSphere } from './hullCollision.js';
+import { steerToward } from './npcNav.js';
 import { PILOT_LINES, pilotMod, rollPilot, TEMPERAMENT_LABELS, TIER_LABELS } from './pilots.js';
 import { MUG_CHANCE, SMUGGLE_CHANCE, createSmuggleTask, createTask, rebasePatrolTask, rollNpcCargo, updateShipAI } from './shipAI.js';
 import { paletteForFaction, playerShipVariant, shipVariantForRole } from './voxelModels.js';
@@ -812,6 +813,10 @@ export class GameSession {
     tmpM4 = new THREE.Matrix4();
     tmpAvoidance = new THREE.Vector3();
     tmpShipAvoid = new THREE.Vector3();
+    // NPC navigation controller output/goal scratch (npcNav.js). Lazily
+    // created in Object.create-based headless harnesses via the callers.
+    tmpNavDesired = new THREE.Vector3();
+    tmpNavGoal = new THREE.Vector3();
     // Dedicated scratch for the collision normal: the player position vector in
     // updatePlayer aliases this.tmpA, so writing the normal into tmpA used to
     // overwrite the ship's position with a unit vector (teleport to open space).
@@ -3731,13 +3736,38 @@ export class GameSession {
         if (ship.covering && ship.coverPoint) {
             const cover = this.tmpJ.set(ship.coverPoint[0], ship.coverPoint[1], ship.coverPoint[2]);
             const toCover = this.tmpK.subVectors(cover, position);
-            if (toCover.lengthSq() > COVER_ARRIVE_DIST * COVER_ARRIVE_DIST) {
+            const time = this.save.world.time;
+            // Cover + peek: while holding cover the pilot periodically steers to
+            // the cover edge until LOS opens, fires a burst, then ducks back —
+            // a damaged ship behind a rock is a threat, not a parked target.
+            // Timid pilots hide longer between peeks (coverHoldMul).
+            if (ship.coverPeekPhase === undefined)
+                ship.coverPeekPhase = 0;
+            if (ship.coverPeekPhase === 1) {
+                const peekLateral = this.tmpL.crossVectors(toTarget, UP);
+                if (peekLateral.lengthSq() < 1e-4)
+                    peekLateral.set(1, 0, 0);
+                else
+                    peekLateral.normalize();
+                desired.copy(peekLateral);
+                if (time >= (ship.coverPeekUntil ?? 0)) {
+                    ship.coverPeekPhase = 0;
+                    ship.coverPeekUntil = time + 2 + 2 * pilotMod(ship, 1, 'coverHoldMul');
+                }
+            }
+            else if (toCover.lengthSq() > COVER_ARRIVE_DIST * COVER_ARRIVE_DIST) {
                 desired.copy(toCover).normalize();
             }
             else {
                 if (!ship.coverHoldSince)
-                    ship.coverHoldSince = this.save.world.time;
-                desired.copy(direct);
+                    ship.coverHoldSince = time;
+                // Ducking: hold behind the rock facing away from the threat so
+                // the nav controller keeps the ship tucked in at low speed.
+                desired.copy(direct).negate();
+                if (time >= (ship.coverPeekUntil ?? 0)) {
+                    ship.coverPeekPhase = 1;
+                    ship.coverPeekUntil = time + 1.2;
+                }
             }
         }
         else if (ship.fleeing) {
@@ -3785,7 +3815,25 @@ export class GameSession {
                 upV.normalize();
             desired.addScaledVector(lateral, s * (ship.spiralSign ?? 1)).addScaledVector(upV, c * (ship.spiralSign ?? 1));
         }
-        desired.add(this.getAvoidanceVector(position, desired, 40, currentSpeed));
+        // Terrain-aware steering (npcNav.js): the sampled controller keeps the
+        // combat intent (jinks, spirals, cover, extend, flee) but picks a clear
+        // line through the field. Approach lines route around blocking rocks
+        // (pounce waypoints); evasion and extend keep pure steering so dodges
+        // stay snappy.
+        const navOut = this.tmpNavDesired ?? (this.tmpNavDesired = new THREE.Vector3());
+        let navGoal = targetPosition;
+        if (ship.fleeing)
+            navGoal = (this.tmpNavGoal ?? (this.tmpNavGoal = new THREE.Vector3())).set(position.x + desired.x * 400, position.y + desired.y * 400, position.z + desired.z * 400);
+        else if (ship.covering && ship.coverPoint)
+            navGoal = (this.tmpNavGoal ?? (this.tmpNavGoal = new THREE.Vector3())).set(ship.coverPoint[0], ship.coverPoint[1], ship.coverPoint[2]);
+        const navBrake = steerToward(this, ship, navGoal, {
+            goalDir: desired,
+            speed: currentSpeed,
+            horizon: 1.4,
+            brakeScale: 0.42,
+            synthesize: ship.covering || (!evading && !ship.fleeing && ship.attackPhase === 'approach'),
+        }, navOut);
+        desired.copy(navOut);
         const shipAvoidance = this.getShipAvoidance(position, velocity, ship.id);
         if (shipAvoidance)
             desired.add(shipAvoidance);
@@ -3848,8 +3896,7 @@ export class GameSession {
         const cruise = ship.burning ? ship.afterburnSpeed : ship.speed;
         // Brake only when a collision is truly imminent (rock dead ahead and close);
         // steering avoidance handles the rest so ships keep their combat speed.
-        const aheadClear = this.aheadClearance(position, desired, 70);
-        const brake = aheadClear < 30 ? clamp((30 - aheadClear) / 30, 0, 1) * 0.42 : 0;
+        const brake = navBrake;
         let desiredSpeed = cruise * (holdingCover ? 0.12 : ship.attackPhase === 'extend' || fleeing ? 1.02 : corner) * (evasive ? 1.08 : 1) * (fleeing ? 1.06 : 1) * (1 - brake);
         // Never crawl mid-fight: a hard combat-speed floor keeps the strafing-run
         // energy up even while braking to dodge a rock (cover holds are exempt).
@@ -3922,17 +3969,26 @@ export class GameSession {
             }
             ship.destination = tuple(destination);
         }
-        const desired = this.tmpI.subVectors(destination, position).normalize();
-        desired.add(this.getAvoidanceVector(position, desired, 28, velocity.length()));
+        // Goal-directed navigation (npcNav.js): sample candidate headings,
+        // score them against the actual nearby obstacles, and fly the best
+        // clear line to the destination — including persisted tangent
+        // waypoints around blockers so the ship orbits deliberately instead
+        // of grinding a rock face. Ship-to-ship avoidance layers on top, and
+        // the returned brake is predictive (from the chosen path's clearance).
+        const navOut = this.tmpNavDesired ?? (this.tmpNavDesired = new THREE.Vector3());
+        const brake = steerToward(this, ship, destination, {
+            speed: velocity.length(),
+            horizon: 2.0,
+            brakeScale: 0.5,
+            // Long-range legs plan through the coarse field grid (npcNav.js);
+            // combat callers keep routing off because their goals move.
+            route: true,
+        }, navOut);
+        const desired = this.tmpI.copy(navOut);
         const shipAvoidance = this.getShipAvoidance(position, velocity, ship.id);
         if (shipAvoidance)
             desired.add(shipAvoidance);
         desired.normalize();
-        // Not dying outranks the route: when a rock is dead ahead and close,
-        // brake so the turn has room to do its work instead of slamming the
-        // hull into the field (steering avoidance handles the rest).
-        const aheadClear = this.aheadClearance(position, desired, 70);
-        const brake = aheadClear < 30 ? clamp((30 - aheadClear) / 30, 0, 1) * 0.5 : 0;
         this.tmpQ2.setFromUnitVectors(FORWARD, desired);
         orientation.slerp(this.tmpQ2, 1 - Math.exp(-ship.turnRate * 0.62 * dt));
         orientation.normalize();
@@ -6268,42 +6324,6 @@ export class GameSession {
                 best = { x: cx, y: cy, z: cz }, bestDist = d;
         }
         return best;
-    }
-    aheadClearance(position, direction, maxRange = 70) {
-        // Distance to the nearest obstacle surface directly ahead, or maxRange if
-        // the lane is clear. Used to brake only when a collision is truly imminent.
-        const px = position.x;
-        const py = position.y;
-        const pz = position.z;
-        const dx = direction.x;
-        const dy = direction.y;
-        const dz = direction.z;
-        let closest = maxRange;
-        const accumulate = (obstacle) => {
-            const ox = obstacle.x - px;
-            const oy = obstacle.y - py;
-            const oz = obstacle.z - pz;
-            const distSq = ox * ox + oy * oy + oz * oz;
-            // The rock's own radius is part of its reach: a big monolith's surface
-            // enters the braking window while its center is still far outside it.
-            const reach = maxRange + obstacle.radius;
-            if (distSq >= reach * reach || distSq < 0.0001)
-                return;
-            const dist = Math.sqrt(distSq);
-            const inv = 1 / dist;
-            const ahead = ox * inv * dx + oy * inv * dy + oz * inv * dz;
-            if (ahead < 0.5)
-                return;
-            const surface = dist - (obstacle.radius + 6);
-            if (surface < closest)
-                closest = Math.max(0, surface);
-        };
-        const dock = this.activeDockObstacle();
-        if (dock)
-            accumulate(dock);
-        else
-            this.forEachObstacleInBox(px - (maxRange + MAX_FIELD_OBSTACLE_RADIUS), py - (maxRange + MAX_FIELD_OBSTACLE_RADIUS), pz - (maxRange + MAX_FIELD_OBSTACLE_RADIUS), px + (maxRange + MAX_FIELD_OBSTACLE_RADIUS), py + (maxRange + MAX_FIELD_OBSTACLE_RADIUS), pz + (maxRange + MAX_FIELD_OBSTACLE_RADIUS), accumulate);
-        return closest;
     }
     setSegmentShapeEndpoints(start, end, obstacle) {
         const box = obstacle.box;
