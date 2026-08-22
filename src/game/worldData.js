@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { LOCATIONS } from './data.js';
 import { pick, randomBetween, randomInt, seededRandom } from './random.js';
+import { t } from './i18n.js';
 // The asteroid surface is a detail-2 icosahedron whose vertices are pushed
 // radially by a per-variant distortion function, then scaled per axis by the
 // rock's radius × node.scale. That deformed mesh is the ONLY source of truth
@@ -220,7 +221,7 @@ export const graveyardZoneAt = (position) => {
     }
     return nearest?.id ?? 'field-lanes';
 };
-export const graveyardZoneLabel = (zoneId) => GRAVEYARD_ZONE_DEFINITIONS.find((zone) => zone.id === zoneId)?.label ?? 'FIELD LANES / OPEN DEBRIS';
+export const graveyardZoneLabel = (zoneId) => t(GRAVEYARD_ZONE_DEFINITIONS.find((zone) => zone.id === zoneId)?.label ?? 'FIELD LANES / OPEN DEBRIS');
 export const generateAsteroidField = (seed, depleted, scanned = []) => {
     const rng = seededRandom(`${seed}:asteroid-field`);
     const center = LOCATIONS.shardbelt.position;
@@ -344,7 +345,7 @@ export const miningClaimCandidates = (seed, depleted, scanned = []) => {
 export const miningClaimName = (nodeId) => {
     const parts = nodeId.split('-');
     const number = Number(parts[parts.length - 1]) + 1;
-    return parts[1] === 'monolith' ? `Monolith ${number}` : `Rock ${number}`;
+    return parts[1] === 'monolith' ? t('Monolith {number}', { number }) : t('Rock {number}', { number });
 };
 export const generateGraveyardPieces = (seed) => {
     const rng = seededRandom(`${seed}:graveyard-pieces`);
@@ -677,7 +678,7 @@ export const generateWreckNodes = (seed, depleted, scanned = []) => {
             const id = `salvage-node-${index}`;
             nodes.push({
                 id,
-                name: `${site.label} · ${pick(rng, names)} ${String.fromCharCode(65 + randomInt(rng, 0, 18))}-${randomInt(rng, 10, 99)}`,
+                name: `${t(site.label)} · ${t(pick(rng, names))} ${String.fromCharCode(65 + randomInt(rng, 0, 18))}-${randomInt(rng, 10, 99)}`,
                 position: add(center, local),
                 radius: randomBetween(rng, 4, 12),
                 salvage,

@@ -1,6 +1,7 @@
 import { GameSession } from './game/game.js';
 import { createNewSave, hasSavedGame, loadGame, saveGame } from './game/save.js';
 import { DOCK_LOCATION_IDS, SHIPS } from './game/data.js';
+import { setLanguage, t } from './game/i18n.js';
 import { GameUI } from './game/ui.js';
 const host = document.querySelector('#app');
 if (!host)
@@ -61,10 +62,13 @@ const beginSession = (mode, arena) => {
     session?.dispose();
     const save = mode === 'new' || mode === 'arena' ? createNewSave() : loadGame();
     if (!save) {
-        ui.showToast('No autosave was found.', 'warning');
+        ui.showToast(t('No autosave was found.'), 'warning');
         ui.showTitle(false);
         return;
     }
+    // The save's language wins over the pre-save localStorage choice; keep
+    // both mirrors in sync so the next boot and the settings UI agree.
+    setLanguage(save.settings?.language);
     if (vesperHoverPreview && mode !== 'arena') {
         // Keep the visual preview reachable from either title-screen button
         // without changing the normal career flow when the flag is absent.
@@ -105,7 +109,7 @@ const enterFullscreen = async () => {
         await orientation.lock?.('landscape');
     }
     catch {
-        ui.showToast('Fullscreen or orientation lock was declined by the browser.', 'info');
+        ui.showToast(t('Fullscreen or orientation lock was declined by the browser.'), 'info');
     }
 };
 const toggleFullscreen = async () => {
@@ -149,6 +153,21 @@ const actions = {
     resumeFlight: () => session?.resumeFlight(),
     quitToTitle: () => session?.quitToTitle(),
     setSetting: (key, value) => {
+        // Language changes always persist, reload, and work even before any
+        // save exists: the title-screen flag and the options selector route
+        // through here, and the reload guarantees every surface (static HUD
+        // included) renders in the new language.
+        if (key === 'language') {
+            setLanguage(value === 'en' ? 'en' : 'de');
+            const save = session?.save ?? cachedSave ?? loadGame();
+            if (save) {
+                save.settings.language = value === 'en' ? 'en' : 'de';
+                cachedSave = save;
+                saveGame(save);
+            }
+            location.reload();
+            return;
+        }
         if (session) {
             session.setSetting(key, value);
             return;

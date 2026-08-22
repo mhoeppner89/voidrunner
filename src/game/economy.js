@@ -1,6 +1,7 @@
 import { COMMODITIES, DOCK_LOCATION_IDS, LOCATIONS, commodityIds } from './data.js';
 import { clamp, randomBetween, seededRandom } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
+import { t } from './i18n.js';
 // Selling gold is loud: word reaches the syndicate and pirates watch the
 // Shardbelt lanes for this long after the sale (see updateDynamicEncounters).
 const GOLD_HEAT_SECONDS = 360;
@@ -92,10 +93,10 @@ export const buyCommodity = (save, locationId, commodityId, requestedQuantity = 
     const quantity = Math.max(0, Math.min(requestedQuantity, item.supply, affordable, byCapacity));
     if (quantity <= 0) {
         if (item.supply <= 0)
-            return { ok: false, message: 'Market stock exhausted.', quantity: 0, total: 0 };
+            return { ok: false, message: t('Market stock exhausted.'), quantity: 0, total: 0 };
         if (affordable <= 0)
-            return { ok: false, message: 'Insufficient credits.', quantity: 0, total: 0 };
-        return { ok: false, message: 'Cargo hold has insufficient free mass.', quantity: 0, total: 0 };
+            return { ok: false, message: t('Insufficient credits.'), quantity: 0, total: 0 };
+        return { ok: false, message: t('Cargo hold has insufficient free mass.'), quantity: 0, total: 0 };
     }
     const total = price * quantity;
     save.player.credits -= total;
@@ -104,7 +105,7 @@ export const buyCommodity = (save, locationId, commodityId, requestedQuantity = 
     item.demand = clamp(item.demand + Math.ceil(quantity * 0.3), 0, 99);
     item.lastPrice = marketPrice(locationId, commodityId, item, save.world.seed, save.world.economyClock);
     save.player.stats.trades += quantity;
-    return { ok: true, message: `Loaded ${quantity} ${commodity.name}.`, quantity, total };
+    return { ok: true, message: t('Loaded {quantity} {commodity}.', { quantity, commodity: t(commodity.name) }), quantity, total };
 };
 // A delivered NPC cargo softens the destination market: the inbound stock
 // lands on the exchange (supply up, local demand partly met), which eases
@@ -130,7 +131,7 @@ export const sellCommodity = (save, locationId, commodityId, requestedQuantity =
     const owned = save.player.cargo[commodityId] ?? 0;
     const quantity = Math.max(0, Math.min(requestedQuantity, owned));
     if (quantity <= 0)
-        return { ok: false, message: 'No matching cargo in the hold.', quantity: 0, total: 0 };
+        return { ok: false, message: t('No matching cargo in the hold.'), quantity: 0, total: 0 };
     const item = save.world.market[locationId][commodityId];
     const total = (priceOverride ?? item.lastPrice) * quantity;
     save.player.credits += total;
@@ -144,5 +145,5 @@ export const sellCommodity = (save, locationId, commodityId, requestedQuantity =
         // hunt the lucky miner while the sale is still fresh.
         save.world.goldHeatUntil = save.world.time + GOLD_HEAT_SECONDS;
     }
-    return { ok: true, message: `Sold ${quantity} ${COMMODITIES[commodityId].name}.`, quantity, total };
+    return { ok: true, message: t('Sold {quantity} {commodity}.', { quantity, commodity: t(COMMODITIES[commodityId].name) }), quantity, total };
 };

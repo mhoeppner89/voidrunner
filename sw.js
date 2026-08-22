@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v101-0-4-9c-glb-cache';
+const CACHE = 'voidrunner-v101-0-4-10-glb-cache';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',
@@ -20,6 +20,8 @@ self.addEventListener('install', (event) => {
     './src/game/save.js',
     './src/game/shipStats.js',
     './src/game/types.js',
+    './src/game/i18n.js',
+    './src/game/i18n-de.js',
     './src/game/ui.js',
     './src/game/worldData.js',
     './src/game/quests.js',

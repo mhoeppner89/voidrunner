@@ -13,6 +13,7 @@ import { asteroidCollisionMesh, asteroidCollisionRadius, generateAsteroidField, 
 import { hullVsAsteroid, hullVsBox, hullVsEngine, hullVsHull, hullVsRing, hullVsSphere } from './hullCollision.js';
 import { steerToward } from './npcNav.js';
 import { PILOT_LINES, pilotMod, rollPilot, TEMPERAMENT_LABELS, TIER_LABELS } from './pilots.js';
+import { setLanguage } from './i18n.js';
 import { MUG_CHANCE, SMUGGLE_CHANCE, createSmuggleTask, createTask, rebasePatrolTask, rollNpcCargo, updateShipAI } from './shipAI.js';
 import { paletteForFaction, playerShipVariant, shipVariantForRole } from './voxelModels.js';
 const FORWARD = new THREE.Vector3(0, 0, -1);
@@ -123,11 +124,11 @@ const CLAIM_DISPUTE_CHANCE = 0.35;
 // a couple of units have been cut, so disputes land mid-seam, not at the start.
 const CLAIM_DISPUTE_AFTER_UNITS = 2;
 const CLAIM_DISPUTE_LINES = [
-    'That seam is under my crew\'s claim. Cut it any deeper and you will answer for it.',
-    'You are on registered ground, spacer. My board holds the papers on this rock.',
-    'Walk away from that cut and this stays civil.',
-    'That is my ore you are beaming. Step off or get spaced.',
-    'You have cut enough of my rock. Take what you have and go.',
+    t('That seam is under my crew\'s claim. Cut it any deeper and you will answer for it.'),
+    t('You are on registered ground, spacer. My board holds the papers on this rock.'),
+    t('Walk away from that cut and this stays civil.'),
+    t('That is my ore you are beaming. Step off or get spaced.'),
+    t('You have cut enough of my rock. Take what you have and go.'),
 ];
 // Selling gold marks the player (see economy.js GOLD_HEAT_SECONDS). While the
 // heat is fresh, the Shardbelt's ambient encounter windows shift so pirate
@@ -161,24 +162,24 @@ const MUG_TEMPERAMENT_SHARE = {
     flamboyant: 0.55,
 };
 const MUG_DEMAND_LINES = [
-    'Drop {demand} and keep the hull. {seconds} seconds.',
-    'Nice hold you have there. Hand over {demand} and we fly on. {seconds} seconds.',
-    'Toll time, spacer. {demand}, or we pry it out of your wreck. {seconds} seconds.',
-    'We are not asking twice. {demand}. {seconds} seconds.',
+    t('Drop {demand} and keep the hull. {seconds} seconds.'),
+    t('Nice hold you have there. Hand over {demand} and we fly on. {seconds} seconds.'),
+    t('Toll time, spacer. {demand}, or we pry it out of your wreck. {seconds} seconds.'),
+    t('We are not asking twice. {demand}. {seconds} seconds.'),
 ];
 const MUG_EMPTY_LINES = [
-    'Nothing worth the fuel. Clear off, spacer.',
-    'An empty hold. Not worth the ammo — fly on.',
-    'You are not worth our time. Go.',
+    t('Nothing worth the fuel. Clear off, spacer.'),
+    t('An empty hold. Not worth the ammo — fly on.'),
+    t('You are not worth our time. Go.'),
 ];
 // Claim-jumpers want the wreck, not a kill: they demand the salvage itself.
 // They only move once the pilot has been cutting a while, so the lines own the
 // timing — the pirates watched the work and are collecting the haul.
 const SALVAGE_DEMAND_LINES = [
-    'Nice cutting, spacer. Drop {demand} and clear off. {seconds} seconds.',
-    'We watched you work that wreck. Hand over {demand}. {seconds} seconds.',
-    'You pulled the salvage. We will take {demand}. {seconds} seconds.',
-    'That haul has our name on it. {demand}, now. {seconds} seconds.',
+    t('Nice cutting, spacer. Drop {demand} and clear off. {seconds} seconds.'),
+    t('We watched you work that wreck. Hand over {demand}. {seconds} seconds.'),
+    t('You pulled the salvage. We will take {demand}. {seconds} seconds.'),
+    t('That haul has our name on it. {demand}, now. {seconds} seconds.'),
 ];
 // A show of force can end a standoff before it becomes a fight: a hit on a
 // demanding pirate may scare the group off, with timid leads folding easiest
@@ -190,24 +191,24 @@ const MUG_SCARE_OFF = {
     flamboyant: 0.12,
 };
 const MUG_SCARE_LINES = [
-    'Forget it — this one fights. We will find easier prey.',
-    'Not worth the hull damage. Break off!',
-    'They shoot back! Disengage, disengage!',
+    t('Forget it — this one fights. We will find easier prey.'),
+    t('Not worth the hull damage. Break off!'),
+    t('They shoot back! Disengage, disengage!'),
 ];
 const GOLD_DEMAND_LINES = [
-    'Jettison the gold and we all fly home. {seconds} seconds.',
-    'We know what you sold. Drop the gold, keep the ship. {seconds} seconds.',
-    'The syndicate wants its cut. Eject the gold or we take it off the wreck. {seconds} seconds.',
-    'Nice haul, miner. Leave the gold drifting and nothing gets scuffed. {seconds} seconds.',
+    t('Jettison the gold and we all fly home. {seconds} seconds.'),
+    t('We know what you sold. Drop the gold, keep the ship. {seconds} seconds.'),
+    t('The syndicate wants its cut. Eject the gold or we take it off the wreck. {seconds} seconds.'),
+    t('Nice haul, miner. Leave the gold drifting and nothing gets scuffed. {seconds} seconds.'),
 ];
 // Neutral traffic says one thing when the player slips close (see
 // maybeNeutralChatter): patrols keep their official voice, everyone else greets
 // by temperament from the PILOT_LINES pools.
 const PATROL_GREET_LINES = [
-    'Concord patrol. Mind the cordon, pilot.',
-    'Traffic control has you on approach. Keep it clean.',
-    'Quiet night. Keep it that way, spacer.',
-    'Civilian traffic is logged. Safe docking.',
+    t('Concord patrol. Mind the cordon, pilot.'),
+    t('Traffic control has you on approach. Keep it clean.'),
+    t('Quiet night. Keep it that way, spacer.'),
+    t('Civilian traffic is logged. Safe docking.'),
 ];
 // Opportunists: spacers who saw the player at work (beaming ore, stripping a
 // wreck, or hauling a valuable hold) occasionally decide the haul is worth
@@ -219,17 +220,17 @@ const OPPORTUNITY_HOLD_WORTH = 400;
 const OPPORTUNITY_RECENT_SECONDS = 6;
 const OPPORTUNITY_MAX_POLICE = 0.35;
 const OPPORTUNITY_DEMAND_LINES = [
-    'Saw you working that rock. Drop {demand} and fly. {seconds} seconds.',
-    'You have been busy, spacer. Leave {demand} and we all fly on. {seconds} seconds.',
-    'Nice little haul you are building. Hand over {demand}. {seconds} seconds.',
-    'We watched you fill that hold. {demand}, now. {seconds} seconds.',
+    t('Saw you working that rock. Drop {demand} and fly. {seconds} seconds.'),
+    t('You have been busy, spacer. Leave {demand} and we all fly on. {seconds} seconds.'),
+    t('Nice little haul you are building. Hand over {demand}. {seconds} seconds.'),
+    t('We watched you fill that hold. {demand}, now. {seconds} seconds.'),
 ];
 // A follow-on ambush (the player was seen working within SEEN_WORKING_SECONDS)
 // that finds an empty hold breaks off with the "watched you work" voice too.
 const OPPORTUNITY_EMPTY_LINES = [
-    'You worked all that for nothing? Not worth the fuel. Go.',
-    'An empty hold after all that effort. Clear off.',
-    'All that work and nothing to show. Fly on.',
+    t('You worked all that for nothing? Not worth the fuel. Go.'),
+    t('An empty hold after all that effort. Clear off.'),
+    t('All that work and nothing to show. Fly on.'),
 ];
 // Station-approach traders occasionally hail with market banter instead of a
 // plain greet. The line keys off the live price at their station, so a
@@ -240,19 +241,19 @@ const MARKET_BANTER_GOOD_PRICE = 1.12;
 const MARKET_BANTER_BAD_PRICE = 0.9;
 const MARKET_BANTER_COMMODITIES = ['medicine', 'electronics', 'machinery', 'luxuries', 'arms', 'ore'];
 const MARKET_BANTER_TIP_LINES = [
-    '{commodity} is trading at {price} cr here. Worth a run if you have the hold.',
-    'They are paying {price} cr for {commodity} right now. Do not tell everyone.',
-    'Lucky break for you — {commodity} is going for {price} cr at {station}.',
+    t('{commodity} is trading at {price} cr here. Worth a run if you have the hold.'),
+    t('They are paying {price} cr for {commodity} right now. Do not tell everyone.'),
+    t('Lucky break for you — {commodity} is going for {price} cr at {station}.'),
 ];
 const MARKET_BANTER_GRUMBLE_LINES = [
-    '{price} cr for {commodity}? Highway robbery. I am flying out of here.',
-    'They want {commodity} but only pay {price} cr. Not worth the fuel.',
-    'Do not haul {commodity} to {station} — they are paying a pittance, {price} cr.',
+    t('{price} cr for {commodity}? Highway robbery. I am flying out of here.'),
+    t('They want {commodity} but only pay {price} cr. Not worth the fuel.'),
+    t('Do not haul {commodity} to {station} — they are paying a pittance, {price} cr.'),
 ];
 const MARKET_BANTER_FLAT_LINES = [
-    '{commodity} sits at {price} cr here. Nothing special, but it moves.',
-    'Just offloaded {commodity} at {price} cr. Steady money, no fuss.',
-    '{price} cr for {commodity} at {station}. Fair enough, I suppose.',
+    t('{commodity} sits at {price} cr here. Nothing special, but it moves.'),
+    t('Just offloaded {commodity} at {price} cr. Steady money, no fuss.'),
+    t('{price} cr for {commodity} at {station}. Fair enough, I suppose.'),
 ];
 // Station approach traffic keeps docks and planets feeling inhabited: a small
 // rotating cast of traders, patrols, and miners working the approach lane.
@@ -263,9 +264,9 @@ const STATION_TRAFFIC_TARGET = 3;
 const PATROL_REPLY_SECONDS = 12;
 const PATROL_REPLY_REP = 2;
 const PATROL_REPLY_LINES = [
-    'Acknowledged, pilot. Concord appreciates the courtesy.',
-    'Good flying, spacer. Report any trouble on the lanes.',
-    'Noted. Keep the peace and we stay friendly.',
+    t('Acknowledged, pilot. Concord appreciates the courtesy.'),
+    t('Good flying, spacer. Report any trouble on the lanes.'),
+    t('Noted. Keep the peace and we stay friendly.'),
 ];
 // Search AI: only a ship that already had the player resolved — and then lost
 // the signal — opens a search at the last-known position. A patrol that
@@ -293,41 +294,41 @@ const SEARCH_COOLDOWN = 28;
 const PATROL_SEARCH_SPEED_MUL = 0.85;
 const PATROL_SEARCH_LINES = {
     catch: [
-        'Dark transponder logged. Hold position — Concord has you on file.',
-        'Unlicensed squawk detected. You have been flagged, pilot.',
-        'Running dark is logged, not ignored. Concord sees you.',
+        t('Dark transponder logged. Hold position — Concord has you on file.'),
+        t('Unlicensed squawk detected. You have been flagged, pilot.'),
+        t('Running dark is logged, not ignored. Concord sees you.'),
     ],
     giveup: [
-        'Contact lost. Logging the sector and resuming patrol.',
-        'Nothing here but noise. Resuming patrol route.',
+        t('Contact lost. Logging the sector and resuming patrol.'),
+        t('Nothing here but noise. Resuming patrol route.'),
     ],
     firm: [
-        'Contact confirmed. Carry on — and mind the cordon.',
-        'Identity logged. Fly clean and we are done here.',
+        t('Contact confirmed. Carry on — and mind the cordon.'),
+        t('Identity logged. Fly clean and we are done here.'),
     ],
     // Spoken the moment the patrol loses a contact it had resolved and opens
     // the sweep — the player hears that they were just shaken, not silently
     // flagged and forgotten.
     lost: [
-        'Signal dropped. Sweeping the last-known position.',
-        'Contact lost. Fanning out — there is no cover out here.',
-        'Lost the signature. Sweeping the sector.',
+        t('Signal dropped. Sweeping the last-known position.'),
+        t('Contact lost. Fanning out — there is no cover out here.'),
+        t('Lost the signature. Sweeping the sector.'),
     ],
 };
 // A hostile that loses the resolve voices the same beat: it knows the pilot
 // slipped away, and it says so before sweeping the last-known spot.
 const SEARCH_LOST_HOSTILE_LINES = [
-    "Where'd you go? Rocks will not save you.",
-    'Lost you for a second. I will find you again.',
-    'Slipped away, did you? Not far enough.',
+    t("Where'd you go? Rocks will not save you."),
+    t('Lost you for a second. I will find you again.'),
+    t('Slipped away, did you? Not far enough.'),
 ];
 // A hunter's first hail on a fresh ship victim — the beat before the guns:
 // the mark bolts, the pirate closes, then the fight starts (see hailHuntChase).
 const PIRATE_CHASE_LINES = {
-    timid: ['Hold course and I will only take the cargo.', 'Slow down. I want the hold, not the fight.'],
-    steady: ['You are hauling something worth my fuel. Hold course.', 'Cut your engines. I will inspect the cargo.'],
-    aggressive: ['Run and I will burn your tail off. HOLD COURSE.', 'Stop or I will shred you, freighter.'],
-    flamboyant: ['A ship like mine deserves a better cargo than yours. Hold still.', 'Do not make me work for it, freighter.'],
+    timid: [t('Hold course and I will only take the cargo.'), t('Slow down. I want the hold, not the fight.')],
+    steady: [t('You are hauling something worth my fuel. Hold course.'), t('Cut your engines. I will inspect the cargo.')],
+    aggressive: [t('Run and I will burn your tail off. HOLD COURSE.'), t('Stop or I will shred you, freighter.')],
+    flamboyant: [t('A ship like mine deserves a better cargo than yours. Hold still.'), t('Do not make me work for it, freighter.')],
 };
 // Rescue & distress. A civilian that takes a hit from a hostile NPC raises a
 // distress beacon (DISTRESS_WINDOW seconds) that surfaces its position on the
@@ -342,26 +343,26 @@ const RESCUE_GRATITUDE_WINDOW = 60;
 const RESCUE_TIP_BASE = 140;
 const RESCUE_TIP_RANGE = 240;
 const RESCUE_GRATITUDE_LINES = [
-    'You saved my hull back there. Credits are on their way — stay sharp, spacer.',
-    'That pirate was about to gut my hold. Thank you — really.',
-    'I owe you one. The tip does not cover it, but it is something.',
-    'Another few seconds and I was scrap. You fly like you mean it.',
-    'My cargo is safe because of you. Wired what I could spare.',
+    t('You saved my hull back there. Credits are on their way — stay sharp, spacer.'),
+    t('That pirate was about to gut my hold. Thank you — really.'),
+    t('I owe you one. The tip does not cover it, but it is something.'),
+    t('Another few seconds and I was scrap. You fly like you mean it.'),
+    t('My cargo is safe because of you. Wired what I could spare.'),
 ];
 // A Concord patrol stops a dark smuggler: hail to stand by, then either the
 // smuggler dumps the hold (the evidence hits space and the patrol breaks off)
 // or bolts and the patrol gives chase until it gives up and returns to lane.
 const PATROL_ARREST_LINES = {
     hail: [
-        '{smuggler}, this is Concord patrol. Cut your engines and hold for inspection.',
-        '{smuggler}, you are running dark. Stop and stand by for a scan.',
-        'Dark transponder, {smuggler}. Hold course or I will light you up.',
-        'Concord patrol to {smuggler}: shut down and prepare to be boarded.',
+        t('{smuggler}, this is Concord patrol. Cut your engines and hold for inspection.'),
+        t('{smuggler}, you are running dark. Stop and stand by for a scan.'),
+        t('Dark transponder, {smuggler}. Hold course or I will light you up.'),
+        t('Concord patrol to {smuggler}: shut down and prepare to be boarded.'),
     ],
     giveup: [
-        'Lost the signal. Back on the lane.',
-        'Nothing flagged aboard. Moving on.',
-        'Slipped away in the dark. Resuming patrol.',
+        t('Lost the signal. Back on the lane.'),
+        t('Nothing flagged aboard. Moving on.'),
+        t('Slipped away in the dark. Resuming patrol.'),
     ],
 };
 // What a caught smuggler jettisons when it dumps the hold.
@@ -380,9 +381,9 @@ const SMUGGLE_BUST_FINE = 500;
 const SMUGGLE_BUST_PER_UNIT = 60;
 const SMUGGLE_BUST_REP = -8;
 const PATROL_BUST_LINES = [
-    'Sealed cargo logged. You are flagged, pilot — the cordon will not forget this.',
-    'Cut engines. That hold is the syndicate\'s, and the fine is yours.',
-    'Running dark with a sealed manifest. Consider this your one warning — logged and fined.',
+    t('Sealed cargo logged. You are flagged, pilot — the cordon will not forget this.'),
+    t('Cut engines. That hold is the syndicate\'s, and the fine is yours.'),
+    t('Running dark with a sealed manifest. Consider this your one warning — logged and fined.'),
 ];
 // How long "seen working" sticks after the player runs the beam: long enough
 // for word to travel, so a follow-on hyperdrive ambush can use the opportunist
@@ -1068,10 +1069,10 @@ export class GameSession {
             }
         }
         if (announce) {
-            const envLabel = environment === 'asteroid-field' ? 'ASTEROID FIELD' : environment === 'debris-field' ? 'DEBRIS FIELD' : 'OPEN SPACE';
-            const difficultyLabel = TIER_LABELS[config.difficulty ?? 'veteran'] ?? 'Veteran';
-            this.ui.pushEvent(`COMBAT SIMULATOR · ${scenario.toUpperCase()} · ${envLabel} · ${difficultyLabel.toUpperCase()} PILOTS`, 'info', 5200);
-            this.ui.pushEvent('Hostiles inbound. Weapons free.', 'danger', 3600);
+            const envLabel = t(environment === 'asteroid-field' ? 'ASTEROID FIELD' : environment === 'debris-field' ? 'DEBRIS FIELD' : 'OPEN SPACE');
+            const difficultyLabel = t(TIER_LABELS[config.difficulty ?? 'veteran'] ?? 'Veteran').toUpperCase();
+            this.ui.pushEvent(t('COMBAT SIMULATOR · {scenario} · {env} · {difficulty} PILOTS', { scenario: scenario.toUpperCase(), env: envLabel, difficulty: difficultyLabel }), 'info', 5200);
+            this.ui.pushEvent(t('Hostiles inbound. Weapons free.'), 'danger', 3600);
         }
     }
     restartArena() {
@@ -1090,7 +1091,7 @@ export class GameSession {
         this.ui.hideDock();
         this.ui.showHud();
         this.setupArena(this.arena, false);
-        this.ui.pushEvent('Ship destroyed — arena reset.', 'warning', 3600);
+        this.ui.pushEvent(t('Ship destroyed — arena reset.'), 'warning', 3600);
     }
     onSpacePointerDown = (event) => {
         if (event.button !== 0 || this.save.player.dockedAt || this.ui.isModalOpen)
@@ -1347,13 +1348,13 @@ export class GameSession {
             this.save.player.mode = order[(index + 1) % order.length];
             this.save.player.currentTargetId = undefined;
             this.renderer.setTarget();
-            this.ui.pushEvent(`${this.save.player.mode.toUpperCase()} systems selected.`, 'info');
+            this.ui.pushEvent(t('{mode} systems selected.', { mode: t(this.save.player.mode.toUpperCase()) }), 'info');
             this.audio.play('ui');
         }
         if (actions.transponder) {
             const dark = this.save.player.transponder !== false;
             this.save.player.transponder = !dark;
-            this.ui.pushSensor(dark ? 'Transponder offline — dark to sensors. Slow to half speed to hide best.' : 'Transponder online — full sensor signature.', dark ? 'warning' : 'success', 4200);
+            this.ui.pushSensor(dark ? t('Transponder offline — dark to sensors. Slow to half speed to hide best.') : t('Transponder online — full sensor signature.'), dark ? 'warning' : 'success', 4200);
             this.audio.play('ui');
             saveGame(this.save);
         }
@@ -1402,7 +1403,7 @@ export class GameSession {
             this.hyperdriveFx = 'drop';
             this.hyperdriveFxUntil = this.save.world.time + HYPERDRIVE_FX_DURATION;
             this.save.player.throttle = clamp(this.hyperdriveReturnThrottle, 0, 1);
-            this.setHyperdriveStatus('DISENGAGED · MANUAL INPUT');
+            this.setHyperdriveStatus(t('DISENGAGED · MANUAL INPUT'));
         }
         // Afterburner: the burn is live whenever the button is held with fuel
         // (never in autopilot), at ANY throttle and ANY speed — turn authority
@@ -1426,7 +1427,7 @@ export class GameSession {
                 // Re-sync the local velocity: it was captured before the break, so
                 // otherwise the stale cruise vector would overwrite the combat-speed snap.
                 velocity.copy(vec(this.save.player.velocity));
-                this.setHyperdriveStatus('HYPERDRIVE BREAK · INTERCEPT', 4200);
+                this.setHyperdriveStatus(t('HYPERDRIVE BREAK · INTERCEPT'), 4200);
                 this.audio.play('warning');
             }
             else {
@@ -1525,7 +1526,7 @@ export class GameSession {
             this.save.player.throttle = clamp(this.hyperdriveReturnThrottle, 0, 1);
             this.save.player.velocity = tuple(FORWARD.clone().applyQuaternion(orientation).multiplyScalar(10));
             this.resetPlayerInterpolation();
-            this.setHyperdriveStatus(`ARRIVAL · ${nav.name}`, 3400);
+            this.setHyperdriveStatus(t('ARRIVAL · {name}', { name: nav.name }), 3400);
             this.audio.play('success');
         }
     }
@@ -1570,7 +1571,7 @@ export class GameSession {
                 this.damagePlayer((impactSpeed - 3) * 1.65, label);
                 if (this.collisionMessageCooldown <= 0) {
                     this.collisionMessageCooldown = 1.4;
-                    this.ui.pushEvent(`Collision: ${label}`, 'danger');
+                    this.ui.pushEvent(t('Collision: {label}', { label: t(label) }), 'danger');
                 }
             }
             this.autopilot = false;
@@ -1677,18 +1678,18 @@ export class GameSession {
     }
     fireMissile() {
         if (this.save.player.mode !== 'combat') {
-            this.setMonitorStatus('MISSILES: COMBAT MODE ONLY');
+            this.setMonitorStatus(t('MISSILES: COMBAT MODE ONLY'));
             return;
         }
         if (this.missileCooldown > 0)
             return;
         if (this.save.player.missiles <= 0) {
-            this.setMonitorStatus('MISSILE RACK EMPTY');
+            this.setMonitorStatus(t('MISSILE RACK EMPTY'));
             return;
         }
         const target = this.getTargetRef();
         if (!target || target.kind !== 'ship') {
-            this.setMonitorStatus('NO SHIP TARGET LOCKED');
+            this.setMonitorStatus(t('NO SHIP TARGET LOCKED'));
             return;
         }
         const ship = this.ships.find((entry) => entry.id === target.id);
@@ -1794,7 +1795,7 @@ export class GameSession {
             this.recordClaimMining(node.id, 1);
             if (node.remaining <= 0) {
                 this.strikeGoldPocket(node);
-                this.setMonitorStatus('DEPOSIT EXHAUSTED');
+                this.setMonitorStatus(t('DEPOSIT EXHAUSTED'));
                 this.clearTarget();
                 this.obstacleGridBuiltAt = -Infinity;
                 break;
@@ -1821,7 +1822,7 @@ export class GameSession {
             if (node.remaining <= 0) {
                 if (node.salvage === 'electronics' || node.salvage === 'arms')
                     this.recoverWreckEquipment(node);
-                this.setMonitorStatus('WRECK STRIPPED');
+                this.setMonitorStatus(t('WRECK STRIPPED'));
                 this.clearTarget();
                 this.obstacleGridBuiltAt = -Infinity;
                 break;
@@ -1839,7 +1840,7 @@ export class GameSession {
         if (grant <= 0)
             return;
         this.save.player.cargo.gold = (this.save.player.cargo.gold ?? 0) + grant;
-        this.ui.pushEvent(`Gold pocket struck: +${grant} GOLD.`, 'success', 5600);
+        this.ui.pushEvent(t('Gold pocket struck: +{amount} GOLD.', { amount: grant }), 'success', 5600);
         this.audio.play('success', 1.35);
     }
     collectExtraction(commodity, source, amount) {
@@ -1887,7 +1888,7 @@ export class GameSession {
                 fulfilled = mission;
         }
         if (fulfilled)
-            this.ui.pushEvent(`Claim met: ${fulfilled.claimName ?? fulfilled.claimNodeId} is dry. Return the ore to ${LOCATIONS[fulfilled.destination].name}.`, 'success', 6200);
+            this.ui.pushEvent(t('Claim met: {claim} is dry. Return the ore to {station}.', { claim: fulfilled.claimName ?? fulfilled.claimNodeId, station: LOCATIONS[fulfilled.destination].name }), 'success', 6200);
         if (this.activeMiningClaim(nodeId))
             this.triggerClaimDispute(nodeId);
     }
@@ -1913,7 +1914,7 @@ export class GameSession {
         rival.targetId = 'player';
         rival.bountyValue = 0;
         this.sayPilotLine(rival, CLAIM_DISPUTE_LINES[Math.floor(rng() * CLAIM_DISPUTE_LINES.length)]);
-        this.ui.pushEvent(`Claim dispute: a rival prospector contests ${mission?.claimName ?? 'your staked rock'}.`, 'warning', 5600);
+        this.ui.pushEvent(t('Claim dispute: a rival prospector contests {claim}.', { claim: mission?.claimName ?? t('your staked rock') }), 'warning', 5600);
         this.audio.play('warning');
         this.threatAcquireTarget();
     }
@@ -1936,7 +1937,7 @@ export class GameSession {
         this.save.player.equipment.push(equipmentId);
         const stats = getEffectiveShipStats(this.save.player);
         this.save.player.shield = Math.min(stats.shield, this.save.player.shield + 12);
-        this.ui.pushEvent(`Intact module recovered: ${EQUIPMENT[equipmentId].name} installed.`, 'success', 6200);
+        this.ui.pushEvent(t('Intact module recovered: {name} installed.', { name: t(EQUIPMENT[equipmentId].name) }), 'success', 6200);
         this.audio.play('success', 1.35);
     }
     triggerSalvageAmbush(node) {
@@ -1984,12 +1985,12 @@ export class GameSession {
         if (demand) {
             this.beginMug(lead, escorts, demand, {
                 lines: SALVAGE_DEMAND_LINES,
-                sensor: 'Claim-jumpers inbound — they are hailing you.',
-                event: 'Standoff: drop the salvage or fight.',
+                sensor: t('Claim-jumpers inbound — they are hailing you.'),
+                event: t('Standoff: drop the salvage or fight.'),
             });
         }
         else {
-            this.ui.pushEvent('Salvage claim challenged: hostile drives inbound.', 'danger', 5200);
+            this.ui.pushEvent(t('Salvage claim challenged: hostile drives inbound.'), 'danger', 5200);
         }
         this.threatAcquireTarget();
         this.audio.play('warning');
@@ -2048,7 +2049,7 @@ export class GameSession {
         if (cargoFree(this.save.player) + 0.001 < required) {
             // The HOLD cell on the own-ship monitor flashes CARGO FULL (it's
             // already red while full), so the pickup hint needs no toast.
-            this.setOwnMonitorStatus('CARGO FULL');
+            this.setOwnMonitorStatus(t('CARGO FULL'));
             return;
         }
         this.save.player.cargo[pickup.commodity] = (this.save.player.cargo[pickup.commodity] ?? 0) + pickup.amount;
@@ -2065,7 +2066,7 @@ export class GameSession {
             if (rankMessage)
                 this.ui.pushEvent(rankMessage, 'success', 5000);
         }
-        this.setOwnMonitorStatus(`+${COMMODITIES[pickup.commodity].name.toUpperCase()}`, 2200);
+        this.setOwnMonitorStatus(t('+{commodity}', { commodity: t(COMMODITIES[pickup.commodity].name.toUpperCase()) }), 2200);
     }
     // The cockpit has no manual SCAN control anymore: a selected ship, asteroid,
     // or wreck is resolved automatically the moment the ship closes to scan
@@ -2094,7 +2095,7 @@ export class GameSession {
             return;
         const target = this.getTargetRef();
         if (!target) {
-            this.setMonitorStatus('NO SCAN TARGET');
+            this.setMonitorStatus(t('NO SCAN TARGET'));
             return;
         }
         if (target.kind === 'location') {
@@ -2113,7 +2114,7 @@ export class GameSession {
                 return;
         }
         else if (distance > stats.scanRange) {
-            this.setMonitorStatus(`OUT OF RANGE · ${Math.round(distance)}/${stats.scanRange} km`);
+            this.setMonitorStatus(t('OUT OF RANGE · {current}/{max} km', { current: Math.round(distance), max: stats.scanRange }));
             return;
         }
         else if (target.kind === 'ship') {
@@ -2121,7 +2122,7 @@ export class GameSession {
             // A dark contact can only be resolved inside the dark-detection
             // line; a rock between pilot and target blocks the scan entirely.
             if (!locked || !this.playerSeesShip(locked, 1)) {
-                this.setMonitorStatus('CONTACT LOST · SIGNAL BLOCKED');
+                this.setMonitorStatus(t('CONTACT LOST · SIGNAL BLOCKED'));
                 return;
             }
         }
@@ -2160,24 +2161,24 @@ export class GameSession {
     captureTarget() {
         const target = this.getTargetRef();
         if (!target || target.kind !== 'ship') {
-            this.setMonitorStatus('NO SURRENDERED SHIP LOCKED');
+            this.setMonitorStatus(t('NO SURRENDERED SHIP LOCKED'));
             return;
         }
         const ship = this.ships.find((entry) => entry.id === target.id);
         if (!ship || ship.hull <= 0)
             return;
         if (!ship.surrendered || ship.captured) {
-            this.setMonitorStatus('PILOT HAS NOT SURRENDERED');
+            this.setMonitorStatus(t('PILOT HAS NOT SURRENDERED'));
             return;
         }
         const stats = getEffectiveShipStats(this.save.player);
         const distance = this.surfaceDistance(vec(this.save.player.position), target);
         if (distance > stats.scanRange) {
-            this.setMonitorStatus(`OUT OF RANGE · ${Math.round(distance)}/${stats.scanRange} km`);
+            this.setMonitorStatus(t('OUT OF RANGE · {current}/{max} km', { current: Math.round(distance), max: stats.scanRange }));
             return;
         }
         if (!(ship.bountyValue > 0 || ship.missionId)) {
-            this.setMonitorStatus('NO CAPTURE CLAIM AVAILABLE');
+            this.setMonitorStatus(t('NO CAPTURE CLAIM AVAILABLE'));
             return;
         }
         this.claimSurrendered(ship);
@@ -2186,7 +2187,7 @@ export class GameSession {
         const candidates = this.targetCandidates();
         if (!candidates.length) {
             this.clearTarget();
-            this.setMonitorStatus('NO TARGETS IN SENSOR RANGE');
+            this.setMonitorStatus(t('NO TARGETS IN SENSOR RANGE'));
             return;
         }
         let currentIndex = candidates.findIndex((entry) => entry.id === this.save.player.currentTargetId);
@@ -2218,7 +2219,7 @@ export class GameSession {
             .filter((entry) => entry.hostile && entry.hull > 0 && this.playerSeesShip(entry, THREAT_NEAREST_MULT))
             .sort((a, b) => vec(a.position).distanceToSquared(vec(this.save.player.position)) - vec(b.position).distanceToSquared(vec(this.save.player.position)))[0];
         if (!nearest) {
-            this.setMonitorStatus('NO HOSTILE IN SENSOR RANGE');
+            this.setMonitorStatus(t('NO HOSTILE IN SENSOR RANGE'));
             return;
         }
         this.save.player.mode = 'combat';
@@ -2353,7 +2354,7 @@ export class GameSession {
                 if (claim) {
                     this.save.player.navTargetId = 'shardbelt';
                     this.autopilot = false;
-                    this.ui.pushSensor(`NAV set: The Shardbelt — ${claim.claimName ?? 'claim'} vector locked.`, 'info');
+                    this.ui.pushSensor(t('NAV set: The Shardbelt — {claim} vector locked.', { claim: claim.claimName ?? t('claim') }), 'info');
                     target = { kind: 'location', id: 'shardbelt', position: LOCATIONS.shardbelt.position, name: LOCATIONS.shardbelt.name };
                 }
             }
@@ -2366,7 +2367,7 @@ export class GameSession {
             }
         }
         if (!target) {
-            this.setMonitorStatus('TARGET NO LONGER AVAILABLE');
+            this.setMonitorStatus(t('TARGET NO LONGER AVAILABLE'));
             return;
         }
         this.applyTarget(target);
@@ -2412,7 +2413,7 @@ export class GameSession {
     }
     dropTargetLock(ship) {
         this.clearTarget();
-        this.setMonitorStatus('CONTACT LOST · LOCK BROKEN');
+        this.setMonitorStatus(t('CONTACT LOST · LOCK BROKEN'));
     }
     getTargetRef(clearInvalid = true) {
         const id = this.save.player.currentTargetId;
@@ -2445,7 +2446,7 @@ export class GameSession {
             this.hyperdriveFxUntil = this.save.world.time + HYPERDRIVE_FX_DURATION;
             this.snapToCombatSpeed();
             this.save.player.throttle = clamp(this.hyperdriveReturnThrottle, 0, 1);
-            this.setHyperdriveStatus('DISENGAGED');
+            this.setHyperdriveStatus(t('DISENGAGED'));
             return;
         }
         const block = this.hyperdriveBlockReason();
@@ -2473,7 +2474,7 @@ export class GameSession {
             const travelSeconds = HYPERDRIVE_SPOOL_SECONDS + player.distanceTo(vec(nav.position)) / HYPERDRIVE_CRUISE_SPEED;
             this.hyperdriveEncounterAt = this.save.world.time + travelSeconds * randomBetween(rng, 0.4, 0.75);
         }
-        this.setHyperdriveStatus(`VECTOR SET · ${nav.name}`, 3200);
+        this.setHyperdriveStatus(t('VECTOR SET · {name}', { name: nav.name }), 3200);
         this.audio.play('ui');
     }
     // Why a jump cannot start right now (null = clear). Shared by the toggle
@@ -2485,17 +2486,17 @@ export class GameSession {
     hyperdriveBlockReason() {
         const player = vec(this.save.player.position);
         if (this.hostilesVisibleNear(player, HYPERDRIVE_THREAT_RADIUS))
-            return { message: 'Hyperdrive unavailable while an enemy is close.', kind: 'danger' };
+            return { message: t('Hyperdrive unavailable while an enemy is close.'), kind: 'danger' };
         const nav = LOCATIONS[this.save.player.navTargetId];
         const arrivalRadius = hyperdriveArrivalRadius(nav);
         if (player.distanceTo(vec(nav.position)) < arrivalRadius + 12)
-            return { message: 'Already inside the selected nav drop zone.', kind: 'info' };
+            return { message: t('Already inside the selected nav drop zone.'), kind: 'info' };
         const toNav = vec(nav.position).sub(player);
         const forward = FORWARD.clone().applyQuaternion(quat(this.save.player.rotation)).normalize();
         if (forward.dot(toNav.clone().normalize()) < HYPERDRIVE_ALIGNMENT)
-            return { message: 'Hyperdrive requires a clear vector: align your ship with the nav point.', kind: 'warning', duration: 3800 };
+            return { message: t('Hyperdrive requires a clear vector: align your ship with the nav point.'), kind: 'warning', duration: 3800 };
         if (this.lineBlocked(player, vec(nav.position)))
-            return { message: 'Hyperdrive path obstructed.', kind: 'danger' };
+            return { message: t('Hyperdrive path obstructed.'), kind: 'danger' };
         return null;
     }
     hyperdriveFxState() {
@@ -2554,12 +2555,12 @@ export class GameSession {
                 ? {
                     lines: OPPORTUNITY_DEMAND_LINES,
                     emptyLines: OPPORTUNITY_EMPTY_LINES,
-                    sensor: 'Pirates closing — they were watching you work.',
-                    emptySensor: 'Pirates break off: your hold is empty.',
+                    sensor: t('Pirates closing — they were watching you work.'),
+                    emptySensor: t('Pirates break off: your hold is empty.'),
                 }
                 : undefined);
         else
-            this.ui.pushSensor('Pirate intercept. Weapons free.', 'danger', 4800);
+            this.ui.pushSensor(t('Pirate intercept. Weapons free.'), 'danger', 4800);
         this.threatAcquireTarget();
         this.audio.play('warning');
     }
@@ -2650,14 +2651,18 @@ export class GameSession {
     // then shows the line with the speaker's relation color and chirp.
     sayPilotLine(ship, line, relation = this.shipRelation(ship)) {
         this.nextChatterAt = this.save.world.time + CHATTER_GAP;
-        this.ui.showPilotLine?.(ship.name, line, relation);
+        // Localize here — the single path every spoken line lands through.
+        // Lines already localized at their pool definition pass through
+        // unchanged (the catalog key is English; a German string simply has
+        // no entry and renders as itself).
+        this.ui.showPilotLine?.(ship.name, t(line), relation);
         this.audio?.playComms?.(ship.pilot.temperament);
     }
     // A line from a whole group (a scared-off mug): the comms bar shows every
     // callsign at once so the player sees who folded.
     sayGroupLine(ships, line) {
         this.nextChatterAt = this.save.world.time + CHATTER_GAP;
-        this.ui.showGroupLine?.(ships.map((ship) => ship.name), line, this.shipRelation(ships[0]));
+        this.ui.showGroupLine?.(ships.map((ship) => ship.name), t(line), this.shipRelation(ships[0]));
         this.audio?.playComms?.(ships[0].pilot.temperament);
     }
     playerLosing() {
@@ -2778,7 +2783,7 @@ export class GameSession {
         const line = this.pickPilotLine(ship, key, lines);
         // Chatter goes to the top-center comms bar, not the toast stack —
         // several hostiles talking should never bury real alerts.
-        this.sayPilotLine(ship, key === 'rank' ? line.replace('{rank}', this.rankTitle()) : line);
+        this.sayPilotLine(ship, key === 'rank' ? t(line).replace('{rank}', t(this.rankTitle())) : t(line));
     }
     // Proximity mutter: a pilot says one thing when the player closes inside
     // PROXIMITY_RANGE — a reaction to being noticed, on top of the timed
@@ -2915,7 +2920,7 @@ export class GameSession {
         const line = PATROL_REPLY_LINES[Math.floor(patrol.proxRng() * PATROL_REPLY_LINES.length)];
         this.sayPilotLine(patrol, line);
         this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + PATROL_REPLY_REP, -100, 100);
-        this.ui.pushEvent(`Acknowledged by ${patrol.name}. Concord courtesy +${PATROL_REPLY_REP}.`, 'success', 4200);
+        this.ui.pushEvent(t('Acknowledged by {name}. Concord courtesy +{rep}.', { name: patrol.name, rep: PATROL_REPLY_REP }), 'success', 4200);
         this.audio.play('ui', 0.6);
         return true;
     }
@@ -2969,7 +2974,7 @@ export class GameSession {
         if (!this.save.world.scannedNodes.includes(node.id))
             this.save.world.scannedNodes.push(node.id);
         const tipCommodity = SCAN_COMMODITY_LABELS[node.salvage] ?? COMMODITIES[node.salvage].name.toUpperCase();
-        this.ui.pushSensor(`Tip: ${node.name} carries ${tipCommodity}. Flagged on scanner.`, 'success', 6500);
+        this.ui.pushSensor(t('Tip: {name} carries {commodity}. Flagged on scanner.', { name: node.name, commodity: t(tipCommodity) }), 'success', 6500);
         return true;
     }
     // A trade contact: nudge one station's supply/demand so the tip is real
@@ -2988,8 +2993,8 @@ export class GameSession {
         refreshAllPrices(this.save.world.market, this.save.world.seed, this.save.world.economyClock);
         const tipCommodity = SCAN_COMMODITY_LABELS[commodityId] ?? COMMODITIES[commodityId].name.toUpperCase();
         this.ui.pushSensor(sellTip
-            ? `Tip: ${LOCATIONS[locationId].shortName} pays top credit for ${tipCommodity}.`
-            : `Tip: ${LOCATIONS[locationId].shortName} sells ${tipCommodity} below market.`, 'success', 6500);
+            ? t('Tip: {station} pays top credit for {commodity}.', { station: LOCATIONS[locationId].shortName, commodity: t(tipCommodity) })
+            : t('Tip: {station} sells {commodity} below market.', { station: LOCATIONS[locationId].shortName, commodity: t(tipCommodity) }), 'success', 6500);
         return true;
     }
     // Taunt on a landed hit: ace-tier and flamboyant pilots like to talk while
@@ -3216,8 +3221,8 @@ export class GameSession {
         }
         this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + PATROL_CATCH_REP, -100, 100);
         ship.catchCooldownUntil = this.save.world.time + PATROL_CATCH_REPEAT;
-        this.ui.pushSensor(`${ship.name} flagged your dark transponder. Concord standing ${PATROL_CATCH_REP}.`, 'warning', 5200);
-        this.ui.pushEvent(`Caught running dark by ${ship.name}. Concord reputation ${PATROL_CATCH_REP}.`, 'danger', 4200);
+        this.ui.pushSensor(t('{name} flagged your dark transponder. Concord standing {rep}.', { name: ship.name, rep: PATROL_CATCH_REP }), 'warning', 5200);
+        this.ui.pushEvent(t('Caught running dark by {name}. Concord reputation {rep}.', { name: ship.name, rep: PATROL_CATCH_REP }), 'danger', 4200);
         this.audio.play('warning');
         const lines = PATROL_SEARCH_LINES.catch;
         this.sayPilotLine(ship, lines[Math.floor(ship.proxRng() * lines.length)]);
@@ -3267,7 +3272,7 @@ export class GameSession {
         this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + SMUGGLE_BUST_REP, -100, 100);
         const line = PATROL_BUST_LINES[Math.floor(patrol.proxRng() * PATROL_BUST_LINES.length)];
         this.sayPilotLine(patrol, line);
-        this.ui.pushEvent(`Busted by ${patrol.name}: ${units} units of syndicate cargo seized, ${formatCredits(paid)} fine, Concord standing ${SMUGGLE_BUST_REP}.${failed.length ? ` Contract failed: ${failed[0]}.` : ''}`, 'danger', 6200);
+        this.ui.pushEvent(t('Busted by {patrol}: {units} units of syndicate cargo seized, {fine} fine, Concord standing {rep}.{note}', { patrol: patrol.name, units, fine: formatCredits(paid), rep: SMUGGLE_BUST_REP, note: failed.length ? t(' Contract failed: {name}.', { name: failed[0] }) : '' }), 'danger', 6200);
         this.audio.play('warning');
     }
     // Comms the moment a ship that had the pilot resolved loses the signal and
@@ -3279,7 +3284,7 @@ export class GameSession {
     announceSearchStart(ship, kind) {
         const started = ship.search?.startedAt ?? this.save.world.time;
         if (kind === 'patrol') {
-            this.ui.pushSensor(`${ship.name}: contact lost — sweeping the last-known position.`, 'warning', 4600);
+            this.ui.pushSensor(t('{name}: contact lost — sweeping the last-known position.', { name: ship.name }), 'warning', 4600);
             const pool = PATROL_SEARCH_LINES.lost;
             if (pool?.length && this.chatterOpen())
                 this.sayPilotLine(ship, pool[Math.floor(started * 7) % pool.length]);
@@ -3324,15 +3329,15 @@ export class GameSession {
         ship.searchCooldownUntil = this.save.world.time + SEARCH_COOLDOWN;
         if (kind === 'patrol') {
             if (outcome === 'giveup')
-                this.ui.pushSensor(`${ship.name}: no contact at last-known position. Resuming patrol.`, 'info', 4600);
+                this.ui.pushSensor(t('{name}: no contact at last-known position. Resuming patrol.', { name: ship.name }), 'info', 4600);
             else if (outcome === 'found') {
-                this.ui.pushSensor(`${ship.name}: contact confirmed. Concord has you logged.`, 'warning', 4600);
+                this.ui.pushSensor(t('{name}: contact confirmed. Concord has you logged.', { name: ship.name }), 'warning', 4600);
                 this.sayPilotLine(ship, PATROL_SEARCH_LINES.firm[Math.floor(ship.proxRng() * PATROL_SEARCH_LINES.firm.length)]);
             }
             // 'clear' ends quietly — the pilot went lit, so there is nothing to log.
         }
         else if (outcome === 'giveup') {
-            this.ui.pushSensor(`${ship.name}: lost the signal. Moving on.`, 'info', 4600);
+            this.ui.pushSensor(t('{name}: lost the signal. Moving on.', { name: ship.name }), 'info', 4600);
         }
         // A hostile 'found' ends quietly — the re-engaged fight speaks for itself.
     }
@@ -3359,30 +3364,30 @@ export class GameSession {
     shipTaskLabel(ship) {
         const task = ship.task;
         if (!task)
-            return 'IN TRANSIT';
+            return t('IN TRANSIT');
         const short = (id) => (id && LOCATIONS[id] ? LOCATIONS[id].shortName : undefined);
         switch (task.kind) {
             case 'trade': {
                 const from = short(task.origin);
                 const to = short(task.port);
-                return from && to ? `TRADING — ${from} → ${to}` : to ? `TRADING — ${to}` : 'IN TRANSIT';
+                return from && to ? t('TRADING — {from} → {to}', { from, to }) : to ? t('TRADING — {to}', { to }) : t('IN TRANSIT');
             }
             case 'smuggle': {
                 const to = short(task.port);
-                return to ? `SMUGGLING — ${to}` : 'SMUGGLING';
+                return to ? t('SMUGGLING — {to}', { to }) : t('SMUGGLING');
             }
             case 'patrol':
-                return 'ON PATROL LANE';
+                return t('ON PATROL LANE');
             case 'mine':
-                return 'WORKING THE SHARDBELT';
+                return t('WORKING THE SHARDBELT');
             case 'salvage':
-                return 'STRIPPING A WRECK';
+                return t('STRIPPING A WRECK');
             case 'hunt':
-                return ship.hostile ? 'HUNTING' : 'IN TRANSIT';
+                return ship.hostile ? t('HUNTING') : t('IN TRANSIT');
             case 'flee':
-                return 'FLEEING';
+                return t('FLEEING');
             default:
-                return 'IN TRANSIT';
+                return t('IN TRANSIT');
         }
     }
     // Interaction: patrols arrest dark smugglers. A patrol that resolves a
@@ -3438,12 +3443,12 @@ export class GameSession {
             const commodity = SMUGGLER_HOLD_POOL[Math.floor(rng() * SMUGGLER_HOLD_POOL.length)];
             this.spawnPickup(commodity, smuggler.position, 'combat', 1 + Math.floor(rng() * 2));
             this.endPatrolArrest(ship, smuggler, true);
-            this.ui.pushSensor(`${ship.name} forces ${smuggler.name} to dump the hold.`, 'warning', 5200);
+            this.ui.pushSensor(t('{ship} forces {smuggler} to dump the hold.', { ship: ship.name, smuggler: smuggler.name }), 'warning', 5200);
         }
         else {
             // Run: the smuggler bolts and the patrol gives chase.
             smuggler.task = { kind: 'flee', prior: smuggler.task, awayFrom: [...smuggler.position] };
-            this.ui.pushSensor(`${ship.name} is chasing ${smuggler.name} running dark.`, 'warning', 5200);
+            this.ui.pushSensor(t('{ship} is chasing {smuggler} running dark.', { ship: ship.name, smuggler: smuggler.name }), 'warning', 5200);
         }
     }
     endPatrolArrest(ship, smuggler, quiet = false) {
@@ -3457,7 +3462,7 @@ export class GameSession {
             return;
         const rng = seededRandom(`${this.save.world.seed}:arrest-end:${ship.id}:${Math.floor(this.save.world.time)}`);
         this.sayPilotLine(ship, PATROL_ARREST_LINES.giveup[Math.floor(rng() * PATROL_ARREST_LINES.giveup.length)]);
-        this.ui.pushSensor(`${ship.name}: no flagrant cargo aboard. Resuming patrol.`, 'info', 4600);
+        this.ui.pushSensor(t('{name}: no flagrant cargo aboard. Resuming patrol.', { name: ship.name }), 'info', 4600);
     }
     // Active search sweeps for the radar: one ring per searching ship, drawn
     // at the last-known-position anchor at the sweep radius — blue for a
@@ -4077,7 +4082,7 @@ export class GameSession {
                 this.targetClipUntil = this.save.world.time + 1.4;
             if (this.npcCollisionCooldown <= 0) {
                 this.npcCollisionCooldown = 2.5;
-                this.ui.pushEvent(`${ship.name} clipped ${this.activeInstanceId === 'mourning-line' ? 'wreckage' : 'a rock'}.`, 'warning', 3600);
+                this.ui.pushEvent(t('{name} clipped {obstacle}.', { name: ship.name, obstacle: t(this.activeInstanceId === 'mourning-line' ? 'wreckage' : 'a rock') }), 'warning', 3600);
             }
         }
     }
@@ -4145,7 +4150,7 @@ export class GameSession {
                     this.damagePlayer((playerImpact - 3) * 1.65, ship.name);
                     if (this.collisionMessageCooldown <= 0) {
                         this.collisionMessageCooldown = 1.4;
-                        this.ui.pushEvent(`Collision: ${ship.name}`, 'danger');
+                        this.ui.pushEvent(t('Collision: {label}', { label: ship.name }), 'danger');
                     }
                 }
                 this.autopilot = false;
@@ -4158,7 +4163,7 @@ export class GameSession {
                     ship.destination = undefined;
                     if (this.npcCollisionCooldown <= 0) {
                         this.npcCollisionCooldown = 2.5;
-                        this.ui.pushEvent(`${ship.name} clipped you.`, 'warning', 3600);
+                        this.ui.pushEvent(t('{name} clipped you.', { name: ship.name }), 'warning', 3600);
                     }
                 }
             }
@@ -4368,7 +4373,7 @@ export class GameSession {
                 if (this.save.world.time >= (ship.nextDistressCallAt ?? 0)) {
                     ship.nextDistressCallAt = this.save.world.time + DISTRESS_CALL_REPEAT;
                     const distance = Math.round(vec(ship.position).distanceTo(vec(this.save.player.position)));
-                    this.ui.pushSensor(`DISTRESS CALL — ${ship.name} at ${distance} km.`, 'danger', 5200);
+                    this.ui.pushSensor(t('DISTRESS CALL — {name} at {distance} km.', { name: ship.name, distance }), 'danger', 5200);
                     this.audio.play('warning');
                     const distressPool = PILOT_LINES.timid.distress;
                     if (distressPool?.length && this.chatterOpen())
@@ -4454,14 +4459,14 @@ export class GameSession {
             if (ship.playerDamageTaken < threshold) {
                 if (this.save.world.time >= (ship.fireWarningAt ?? 0)) {
                     ship.fireWarningAt = this.save.world.time + 6;
-                    this.ui.pushEvent(`Watch your fire — ${ship.role === 'patrol' ? 'patrol vessel' : 'civilian vessel'} hit!`, 'warning', 3600);
+                    this.ui.pushEvent(t('Watch your fire — {vessel} hit!', { vessel: t(ship.role === 'patrol' ? 'patrol vessel' : 'civilian vessel') }), 'warning', 3600);
                 }
             }
             else {
                 ship.hostile = true;
                 ship.targetId = 'player';
                 this.save.player.reputation[ship.faction] = clamp(this.save.player.reputation[ship.faction] - (ship.role === 'patrol' ? 16 : 9), -100, 100);
-                this.ui.pushEvent(`Unauthorized attack: ${FACTION_LABEL(ship.faction)} reputation damaged.`, 'danger', 4500);
+                this.ui.pushEvent(t('Unauthorized attack: {faction} reputation damaged.', { faction: t(FACTION_LABEL(ship.faction)) }), 'danger', 4500);
                 this.alertPatrols(ship.position);
             }
         }
@@ -4625,7 +4630,7 @@ export class GameSession {
             ship.demandUntil = this.save.world.time + seconds;
         }
         const label = demand.kind === 'cargo'
-            ? `${demand.quantity} ${COMMODITIES[demand.commodity].name}`
+            ? `${demand.quantity} ${t(COMMODITIES[demand.commodity].name)}`
             : formatCredits(demand.amount);
         const line = lines[Math.floor(rng() * lines.length)]
             .replace(/\{demand\}/g, label)
@@ -4652,13 +4657,13 @@ export class GameSession {
             const rng = seededRandom(`${this.save.world.seed}:mug-empty:${lead.id}:${Math.floor(this.save.world.time)}`);
             const emptyLines = options.emptyLines ?? MUG_EMPTY_LINES;
             this.sayPilotLine(lead, emptyLines[Math.floor(rng() * emptyLines.length)]);
-            this.ui.pushSensor(options.emptySensor ?? 'Pirates closing — then breaking off: nothing worth the risk.', 'info', 4800);
+            this.ui.pushSensor(options.emptySensor ?? t('Pirates closing — then breaking off: nothing worth the risk.'), 'info', 4800);
             return;
         }
         this.beginMug(lead, escorts, demand, {
             lines: options.lines,
-            sensor: options.sensor ?? 'Pirates inbound — they are hailing you.',
-            event: 'Standoff: comply before they fire.',
+            sensor: options.sensor ?? t('Pirates inbound — they are hailing you.'),
+            event: t('Standoff: comply before they fire.'),
         });
     }
     // Compliance: the group takes its cut and leaves the field.
@@ -4694,7 +4699,7 @@ export class GameSession {
         // The whole crew folds together, so the comms bar names every ship
         // that is breaking off — not just the lead.
         this.sayGroupLine(group, line);
-        this.ui.pushEvent('The pirates break off — they want an easier mark.', 'info', 4800);
+        this.ui.pushEvent(t('The pirates break off — they want an easier mark.'), 'info', 4800);
         return true;
     }
     // The window closed (or the pilot shot first): the whole group commits.
@@ -4721,7 +4726,7 @@ export class GameSession {
             return false;
         this.save.player.credits -= amount;
         this.standDownMug(mugger);
-        this.ui.pushEvent(`Toll paid (${formatCredits(amount)}) — the pirates break off.`, 'info', 5200);
+        this.ui.pushEvent(t('Toll paid ({credits}) — the pirates break off.', { credits: formatCredits(amount) }), 'info', 5200);
         this.audio.play('ui', 0.6);
         return true;
     }
@@ -4738,13 +4743,13 @@ export class GameSession {
             const take = Math.min(owned, mugger.mug.demand.quantity);
             this.save.player.cargo[commodityId] = owned - take;
             this.standDownMug(mugger);
-            this.ui.pushEvent(`${COMMODITIES[commodityId].name} jettisoned (${take} units) — the pirates take it and break off.`, 'info', 5200);
+            this.ui.pushEvent(t('{commodity} jettisoned ({units} units) — the pirates take it and break off.', { commodity: t(COMMODITIES[commodityId].name), units: take }), 'info', 5200);
             this.audio.play('ui', 0.6);
             return true;
         }
         this.save.player.cargo[commodityId] = 0;
         this.spawnPickup(commodityId, this.save.player.position, 'combat', owned);
-        this.ui.pushEvent(`${COMMODITIES[commodityId].name} jettisoned (${owned} units).`, 'info', 5200);
+        this.ui.pushEvent(t('{commodity} jettisoned ({units} units).', { commodity: t(COMMODITIES[commodityId].name), units: owned }), 'info', 5200);
         this.audio.play('ui', 0.6);
         return false;
     }
@@ -4777,7 +4782,7 @@ export class GameSession {
             const payment = ship.bountyValue;
             this.save.player.credits += payment;
             this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + 1, -100, 100);
-            this.ui.pushEvent(`Surrendered pilot captured. ${formatCredits(payment)} bounty credited.`, 'success', 4200);
+            this.ui.pushEvent(t('Surrendered pilot captured. {credits} bounty credited.', { credits: formatCredits(payment) }), 'success', 4200);
         }
         if (ship.missionId) {
             const result = completeBountyMission(this.save, ship.missionId);
@@ -4805,7 +4810,7 @@ export class GameSession {
             this.sayPilotLine(victim, RESCUE_GRATITUDE_LINES[Math.floor(victim.aiRng() * RESCUE_GRATITUDE_LINES.length)]);
         const tip = Math.round(RESCUE_TIP_BASE + victim.aiRng() * RESCUE_TIP_RANGE);
         this.save.player.credits = (this.save.player.credits ?? 0) + tip;
-        this.ui.pushEvent(`${victim.name} sends their thanks — ${formatCredits(tip)} tip wired.`, 'success', 4200);
+        this.ui.pushEvent(t('{name} sends their thanks — {credits} tip wired.', { name: victim.name, credits: formatCredits(tip) }), 'success', 4200);
         this.audio.play('success');
     }
     destroyShip(ship, attackerId, position) {
@@ -4825,11 +4830,11 @@ export class GameSession {
                 const payment = ship.bountyValue;
                 this.save.player.credits += payment;
                 this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + 1, -100, 100);
-                this.ui.pushEvent(`Hostile destroyed. ${formatCredits(payment)} defense bounty credited.`, 'success', 4200);
+                this.ui.pushEvent(t('Hostile destroyed. {credits} defense bounty credited.', { credits: formatCredits(payment) }), 'success', 4200);
             }
             else {
                 this.save.player.reputation[ship.faction] = clamp(this.save.player.reputation[ship.faction] - 18, -100, 100);
-                this.ui.pushEvent('Civilian loss recorded. Faction standing severely reduced.', 'danger', 5200);
+                this.ui.pushEvent(t('Civilian loss recorded. Faction standing severely reduced.'), 'danger', 5200);
             }
             if (ship.missionId) {
                 const result = completeBountyMission(this.save, ship.missionId);
@@ -4873,7 +4878,7 @@ export class GameSession {
             this.save.player.hull = 0;
             this.deathTimer = 2.1;
             this.renderer.spawnExplosion(this.save.player.position, false, 1.55);
-            this.ui.pushEvent(`SHIP LOST: ${source}. Emergency beacon transmitting.`, 'danger', 6500);
+            this.ui.pushEvent(t('SHIP LOST: {source}. Emergency beacon transmitting.', { source }), 'danger', 6500);
             this.audio.play('explosion', 1.6);
         }
     }
@@ -4923,7 +4928,7 @@ export class GameSession {
         this.audio.setStationMode(true);
         this.ui.hideHud();
         this.ui.showDock(this.save, dock);
-        this.ui.showToast(`Emergency tow complete. Recovery fee: ${formatCredits(loss)}.`, 'danger', 6500);
+        this.ui.showToast(t('Emergency tow complete. Recovery fee: {credits}.', { credits: formatCredits(loss) }), 'danger', 6500);
         saveGame(this.save);
     }
     updateBountySpawns() {
@@ -4957,7 +4962,7 @@ export class GameSession {
                 escort.targetId = 'player';
             }
             this.threatAcquireTarget();
-            this.ui.pushEvent(`Warrant target detected: ${mission.targetName}`, 'danger', 5600);
+            this.ui.pushEvent(t('Warrant target detected: {name}', { name: mission.targetName }), 'danger', 5600);
             this.audio.play('warning');
         }
     }
@@ -5053,7 +5058,7 @@ export class GameSession {
                         }
                     if (lead)
                         this.sayPilotLine(lead, 'Nothing worth the wait. Fly on, spacer.');
-                    this.ui.pushSensor('Pirates closing — then breaking off: the beam lit the field but the hold is empty.', 'info', 4800);
+                    this.ui.pushSensor(t('Pirates closing — then breaking off: the beam lit the field but the hold is empty.'), 'info', 4800);
                 }
                 this.threatAcquireTarget();
                 this.audio.play('warning');
@@ -5097,7 +5102,7 @@ export class GameSession {
                     }
                 if (lead)
                     this.sayPilotLine(lead, 'Nothing worth the wait. Fly on, spacer.');
-                this.ui.pushSensor('Pirates closing — then breaking off: nothing worth the risk.', 'info', 4800);
+                this.ui.pushSensor(t('Pirates closing — then breaking off: nothing worth the risk.'), 'info', 4800);
             }
             this.threatAcquireTarget();
             this.audio.play('warning');
@@ -5128,16 +5133,16 @@ export class GameSession {
             if (rng() < 0.55) {
                 const pirate = this.spawnShip('pirate', this.encounterPosition(rng, 188));
                 pirate.targetId = trader.id;
-                this.ui.pushSensor('Distress traffic: pirates attacking a civilian vessel.', 'danger', 5200);
+                this.ui.pushSensor(t('Distress traffic: pirates attacking a civilian vessel.'), 'danger', 5200);
                 this.audio.play('warning');
             }
             else {
-                this.ui.pushSensor('Civilian trader entering local space.', 'info');
+                this.ui.pushSensor(t('Civilian trader entering local space.'), 'info');
             }
         }
         else if (bucket < patrolCutoffAdjusted) {
             this.spawnShip('patrol', this.encounterPosition(rng, 218));
-            this.ui.pushSensor('Concord patrol sweep detected.', 'info');
+            this.ui.pushSensor(t('Concord patrol sweep detected.'), 'info');
         }
         else if (bucket < pirateCutoff) {
             const count = randomInt(rng, 1, zone === 'graveyard' ? 3 : 2);
@@ -5156,15 +5161,15 @@ export class GameSession {
                 // of gold aboard, with the board-tip lines and messages.
                 this.beginMug(lead, escorts, { kind: 'cargo', commodity: 'gold', quantity: Math.max(1, this.save.player.cargo.gold ?? 0) }, {
                     lines: GOLD_DEMAND_LINES,
-                    sensor: 'Gold-hunters inbound — they are hailing you.',
-                    event: 'Standoff: jettison gold from the hold before they fire.',
+                    sensor: t('Gold-hunters inbound — they are hailing you.'),
+                    event: t('Standoff: jettison gold from the hold before they fire.'),
                 });
             }
             else if (lead && rng() < MUG_CHANCE) {
                 this.openMug(lead, escorts);
             }
             else {
-                this.ui.pushSensor('Pirate intercept. Weapons free.', 'danger', 4800);
+                this.ui.pushSensor(t('Pirate intercept. Weapons free.'), 'danger', 4800);
             }
             this.audio.play('warning');
         }
@@ -5465,7 +5470,7 @@ export class GameSession {
             const discoveryRadius = location.radius + (location.kind === 'planet' ? 160 : 120);
             if (player.distanceTo(vec(location.position)) <= discoveryRadius && !this.save.player.discovered.includes(id)) {
                 this.save.player.discovered.push(id);
-                this.ui.pushSensor(`NAV DISCOVERY: ${location.name}`, 'success', 4600);
+                this.ui.pushSensor(t('NAV DISCOVERY: {name}', { name: location.name }), 'success', 4600);
                 this.audio.play('success');
             }
         }
@@ -5644,7 +5649,7 @@ export class GameSession {
             return false;
         const fee = pending.fee;
         if (this.save.player.credits < fee) {
-            this.ui.showToast(`The syndicate wants ${formatCredits(fee)} — not enough credits.`, 'warning', 4600);
+            this.ui.showToast(t('The syndicate wants {credits} — not enough credits.', { credits: formatCredits(fee) }), 'warning', 4600);
             this.audio.play('warning');
             return false;
         }
@@ -5656,7 +5661,7 @@ export class GameSession {
         // cost, and the ledger itself remembers every cr paid at this dock.
         this.save.world.syndicateArrival = { locationId: pending.locationId, fee, at: this.save.world.time };
         delete this.save.world.syndicatePending;
-        this.ui.pushEvent(`Syndicate berth paid: ${formatCredits(fee)}.`, 'warning', 4200);
+        this.ui.pushEvent(t('Syndicate berth paid: {credits}.', { credits: formatCredits(fee) }), 'warning', 4200);
         this.audio.play('ui');
         saveGame(this.save);
         // Re-render the dock so the payment card leaves and the receipt notice
@@ -6585,14 +6590,14 @@ export class GameSession {
         this.audio.setStationMode(false);
         this.ui.hideDock();
         this.ui.showHud();
-        this.ui.pushEvent(`Cleared for departure from ${location.name}.`, 'success');
+        this.ui.pushEvent(t('Cleared for departure from {name}.', { name: location.name }), 'success');
         this.updateActiveInstance(true);
         saveGame(this.save);
     }
     setNav(locationId) {
         this.save.player.navTargetId = locationId;
         this.autopilot = false;
-        this.ui.pushSensor(`NAV set: ${LOCATIONS[locationId].name}.`, 'info');
+        this.ui.pushSensor(t('NAV set: {name}.', { name: LOCATIONS[locationId].name }), 'info');
         this.audio.play('ui');
     }
     trade(kind, commodityId, quantity) {
@@ -6607,7 +6612,7 @@ export class GameSession {
             // price (denPrice applies the untraceable premium on top).
             price = denPrice(dock, commodityId, this.save.world.market[dock][commodityId], this.save.world.seed, this.save.world.economyClock);
             if (price === undefined) {
-                this.ui.showToast('The den does not trade legal goods.', 'warning');
+                this.ui.showToast(t('The den does not trade legal goods.'), 'warning');
                 this.audio.play('warning', 0.55);
                 return;
             }
@@ -6615,8 +6620,8 @@ export class GameSession {
         const result = kind === 'buy' || kind === 'den-buy'
             ? buyCommodity(this.save, dock, commodityId, quantity, price)
             : sellCommodity(this.save, dock, commodityId, quantity, price);
-        const goldHeatNote = result.ok && commodityId === 'gold' ? ' The board marks the sale — expect company on the Shardbelt lanes.' : '';
-        const denNote = result.ok && den ? ' The den pays untraceable — no manifest entry.' : '';
+        const goldHeatNote = result.ok && commodityId === 'gold' ? t(' The board marks the sale — expect company on the Shardbelt lanes.') : '';
+        const denNote = result.ok && den ? t(' The den pays untraceable — no manifest entry.') : '';
         this.ui.showToast(result.message + (result.ok ? ` ${formatCredits(result.total)}.${goldHeatNote}${denNote}` : ''), result.ok ? 'success' : 'warning');
         this.audio.play(result.ok ? 'ui' : 'warning', 0.55);
         this.ui.refreshDock(this.save);
@@ -6637,14 +6642,14 @@ export class GameSession {
         if (cost <= 0)
             return;
         if (this.save.player.credits < cost) {
-            this.ui.showToast('Insufficient credits for full repair.', 'warning');
+            this.ui.showToast(t('Insufficient credits for full repair.'), 'warning');
             return;
         }
         const stats = getEffectiveShipStats(this.save.player);
         this.save.player.credits -= cost;
         this.save.player.hull = stats.hull;
         this.save.player.armor = stats.armor;
-        this.ui.showToast(`Repair complete. ${formatCredits(cost)} charged.`, 'success');
+        this.ui.showToast(t('Repair complete. {credits} charged.', { credits: formatCredits(cost) }), 'success');
         this.audio.play('success');
         this.ui.refreshDock(this.save);
         saveGame(this.save);
@@ -6654,14 +6659,14 @@ export class GameSession {
         if (cost <= 0)
             return;
         if (this.save.player.credits < cost) {
-            this.ui.showToast('Insufficient credits for full refill.', 'warning');
+            this.ui.showToast(t('Insufficient credits for full refill.'), 'warning');
             return;
         }
         const stats = getEffectiveShipStats(this.save.player);
         this.save.player.credits -= cost;
         this.save.player.fuel = stats.fuel;
         this.save.player.missiles = stats.missileCapacity;
-        this.ui.showToast(`Fuel and ordnance loaded. ${formatCredits(cost)} charged.`, 'success');
+        this.ui.showToast(t('Fuel and ordnance loaded. {credits} charged.', { credits: formatCredits(cost) }), 'success');
         this.audio.play('success');
         this.ui.refreshDock(this.save);
         saveGame(this.save);
@@ -6671,11 +6676,11 @@ export class GameSession {
         if (this.save.player.equipment.includes(equipmentId))
             return;
         if (!equipmentUnlocked(this.save.player, equipmentId)) {
-            this.ui.showToast('Guild rank requirement not met.', 'warning');
+            this.ui.showToast(t('Guild rank requirement not met.'), 'warning');
             return;
         }
         if (this.save.player.credits < item.price) {
-            this.ui.showToast('Insufficient credits.', 'warning');
+            this.ui.showToast(t('Insufficient credits.'), 'warning');
             return;
         }
         const before = getEffectiveShipStats(this.save.player);
@@ -6684,7 +6689,7 @@ export class GameSession {
         const after = getEffectiveShipStats(this.save.player);
         this.save.player.shield += after.shield - before.shield;
         this.save.player.armor += after.armor - before.armor;
-        this.ui.showToast(`${item.name} installed.`, 'success');
+        this.ui.showToast(t('{name} installed.', { name: t(item.name) }), 'success');
         this.audio.play('success');
         this.ui.refreshDock(this.save);
         saveGame(this.save);
@@ -6692,24 +6697,24 @@ export class GameSession {
     buyShip(shipId) {
         const dock = this.save.player.dockedAt;
         if (!dock || !(LOCATIONS[dock].shipsForSale ?? []).includes(shipId)) {
-            this.ui.showToast('That hull is not for sale at this location.', 'warning');
+            this.ui.showToast(t('That hull is not for sale at this location.'), 'warning');
             return;
         }
         const ship = SHIPS[shipId];
         if (this.save.player.ownedShips.includes(shipId))
             return;
         if (this.save.player.credits < ship.price) {
-            this.ui.showToast('Insufficient credits for this hull.', 'warning');
+            this.ui.showToast(t('Insufficient credits for this hull.'), 'warning');
             return;
         }
         if (cargoMass(this.save.player) > ship.cargo + (this.save.player.equipment.includes('cargo-pods') ? 18 : 0)) {
-            this.ui.showToast('Current cargo exceeds the new hull capacity.', 'warning');
+            this.ui.showToast(t('Current cargo exceeds the new hull capacity.'), 'warning');
             return;
         }
         this.save.player.credits -= ship.price;
         this.save.player.ownedShips.push(shipId);
         this.switchShip(shipId, true);
-        this.ui.showToast(`${ship.name} purchased and commissioned.`, 'success', 6200);
+        this.ui.showToast(t('{name} purchased and commissioned.', { name: ship.name }), 'success', 6200);
         this.audio.play('success', 1.4);
     }
     switchShip(shipId, purchased = false) {
@@ -6720,7 +6725,7 @@ export class GameSession {
         const capacity = cargoCapacity(this.save.player);
         if (cargoMass(this.save.player) > capacity) {
             this.save.player.shipId = previousId;
-            this.ui.showToast('Cargo mass exceeds this hull capacity.', 'warning');
+            this.ui.showToast(t('Cargo mass exceeds this hull capacity.'), 'warning');
             return;
         }
         this.ui.setCockpitShip(shipId);
@@ -6731,7 +6736,7 @@ export class GameSession {
         this.save.player.fuel = stats.fuel;
         this.save.player.missiles = stats.missileCapacity;
         if (!purchased)
-            this.ui.showToast(`${SHIPS[shipId].name} moved to active berth.`, 'success');
+            this.ui.showToast(t('{name} moved to active berth.', { name: SHIPS[shipId].name }), 'success');
         this.ui.refreshDock(this.save);
         saveGame(this.save);
     }
@@ -6749,7 +6754,7 @@ export class GameSession {
     }
     saveNow() {
         const ok = saveGame(this.save);
-        this.ui.showToast(ok ? 'Career state saved locally.' : 'Save failed in this browser context.', ok ? 'success' : 'danger');
+        this.ui.showToast(ok ? t('Career state saved locally.') : t('Save failed in this browser context.'), ok ? 'success' : 'danger');
     }
     resumeFlight() {
         this.ui.hidePause();
@@ -6794,9 +6799,18 @@ export class GameSession {
             this.qualityScale = value === 'low' ? 0.72 : 1;
             this.renderer.setQualityScale(this.qualityScale);
         }
+        else if (key === 'language' && (value === 'de' || value === 'en')) {
+            this.save.settings.language = value;
+            setLanguage(value);
+        }
         this.audio.setVolumes(this.save.settings.music, this.save.settings.effects);
         this.ui.setTouchScale(this.save.settings.touchScale);
         saveGame(this.save);
+        // A language change reloads the page so the static HUD/title shell is
+        // rebuilt in the new language; the save (position included) is already
+        // persisted above, so the pilot resumes where they were.
+        if (key === 'language' && typeof location !== 'undefined')
+            location.reload();
     }
     syncTiltSteering(useTilt) {
         if (useTilt) {
@@ -6945,7 +6959,7 @@ export class GameSession {
                     captureAvailable,
                     variant: shipVariantForRole(ship.role),
                     heading,
-                    subtitle: `${ship.role.toUpperCase()} · ${ship.surrendered ? 'SURRENDERED' : ship.hostile ? 'HOSTILE' : FACTION_LABEL(ship.faction)}${this.save.world.time < (ship.distressUntil ?? 0) ? ' · DISTRESS' : ''}`,
+                    subtitle: `${t(ship.role.toUpperCase())} · ${ship.surrendered ? t('SURRENDERED') : ship.hostile ? t('HOSTILE') : t(FACTION_LABEL(ship.faction))}${this.save.world.time < (ship.distressUntil ?? 0) ? ` · ${t('DISTRESS')}` : ''}`,
                     // The monitor's readout line carries the pilot profile so a
                     // locked target's habits are visible at a glance — prefixed
                     // with the recognition marker when the pilot remembers the
@@ -6953,10 +6967,10 @@ export class GameSession {
                     readout: ship.captured || ship.surrendered
                         ? surrenderReadout
                         : ship.scanned
-                            ? `${this.shipTaskLabel(ship)}${ship.pilot ? ` · ${ship.recognizesPlayer ? `${SPARED_MARK} ` : ''}${TIER_LABELS[ship.pilot.tier] ?? ship.pilot.tier} · ${TEMPERAMENT_LABELS[ship.pilot.temperament] ?? ship.pilot.temperament}` : ''}`
+                            ? `${this.shipTaskLabel(ship)}${ship.pilot ? ` · ${ship.recognizesPlayer ? `${SPARED_MARK} ` : ''}${t(TIER_LABELS[ship.pilot.tier] ?? ship.pilot.tier)} · ${t(TEMPERAMENT_LABELS[ship.pilot.temperament] ?? ship.pilot.temperament)}` : ''}`
                             : distance > stats.scanRange
-                                ? `OUT OF RANGE · ${Math.round(distance)}/${stats.scanRange} km`
-                                : 'SCANNING…',
+                                ? t('OUT OF RANGE · {current}/{max} km', { current: Math.round(distance), max: stats.scanRange })
+                                : t('SCANNING…'),
                     distance,
                     clipFlash: this.save.world.time < this.targetClipUntil,
                     shield: ship.shield,
@@ -6978,7 +6992,7 @@ export class GameSession {
                     : distance > stats.scanRange
                         ? `OUT OF RANGE · ${Math.round(distance)}/${stats.scanRange} km`
                         : 'SCANNING…';
-                hudTarget = { kind: 'asteroid', name: target.name, subtitle: node.scanned ? (claim ? 'MINING CLAIM' : 'ORE') : 'MINERAL SIGNATURE', distance, scanned: node.scanned, readout: this.utilityReadout || scanStatus, ...screen };
+                hudTarget = { kind: 'asteroid', name: target.name, subtitle: node.scanned ? (claim ? t('MINING CLAIM') : t('ORE')) : t('MINERAL SIGNATURE'), distance, scanned: node.scanned, readout: this.utilityReadout || scanStatus, ...screen };
             }
             else if (target.kind === 'wreck') {
                 const node = this.wreckNodes.find((entry) => entry.id === target.id);
@@ -6989,14 +7003,14 @@ export class GameSession {
                     : distance > stats.scanRange
                         ? `OUT OF RANGE · ${Math.round(distance)}/${stats.scanRange} km`
                         : 'SCANNING…';
-                hudTarget = { kind: 'wreck', name: node.name, subtitle: node.scanned ? commodity : 'UNRESOLVED WRECK', distance, scanned: node.scanned, readout: this.utilityReadout || scanStatus, ...screen };
+                hudTarget = { kind: 'wreck', name: node.name, subtitle: node.scanned ? t(commodity) : t('UNRESOLVED WRECK'), distance, scanned: node.scanned, readout: this.utilityReadout || scanStatus, ...screen };
             }
             else {
                 const location = LOCATIONS[target.id];
                 hudTarget = {
                     kind: 'location',
                     name: location.name,
-                    subtitle: `${location.kind.toUpperCase()} · NAV POINT`,
+                    subtitle: `${t(location.kind.toUpperCase())} · ${t('NAV POINT')}`,
                     objectKind: location.kind,
                     distance,
                     scanned: this.save.player.discovered.includes(location.id),
@@ -7144,7 +7158,7 @@ export class GameSession {
                 }
                 continue;
             }
-            const subtitle = `${ship.role.toUpperCase()} · ${ship.hostile ? 'HOSTILE' : FACTION_LABEL(ship.faction)}${ghost ? ' · CONTACT LOST' : ''}${distressActive ? ' · DISTRESS CALL' : ''}`;
+            const subtitle = `${t(ship.role.toUpperCase())} · ${ship.hostile ? t('HOSTILE') : t(FACTION_LABEL(ship.faction))}${ghost ? ` · ${t('CONTACT LOST')}` : ''}${distressActive ? ` · ${t('DISTRESS CALL')}` : ''}`;
             const contact = buildContact('ship', ship.id, ship.name, subtitle, ghost ? (ship.lastSeenPosition ?? ship.position) : ship.position, shipRange, ship.hostile, false, ghost);
             if (contact) {
                 contact.ghost = ghost;
@@ -7322,25 +7336,25 @@ export class GameSession {
     }
     zoneLabel(zone) {
         if (zone === 'asteroid-field')
-            return 'SHARDBELT / COLLISION HAZARD';
+            return t('SHARDBELT / COLLISION HAZARD');
         if (zone === 'graveyard')
-            return `MOURNING LINE / ${graveyardZoneLabel(graveyardZoneAt(this.save.player.position))}`;
+            return t('MOURNING LINE / {zone}', { zone: graveyardZoneLabel(graveyardZoneAt(this.save.player.position)) });
         if (zone === 'near-location')
-            return 'CONTROLLED APPROACH';
-        return 'OPEN SPACE';
+            return t('CONTROLLED APPROACH');
+        return t('OPEN SPACE');
     }
 }
 const FACTION_LABEL = (faction) => {
     switch (faction) {
         case 'concord':
-            return 'CONCORD';
+            return t('CONCORD');
         case 'free-merchants':
-            return 'FREE MERCHANTS';
+            return t('FREE MERCHANTS');
         case 'frontier-miners':
-            return 'FRONTIER MINERS';
+            return t('FRONTIER MINERS');
         case 'salvage-union':
-            return 'SALVAGE UNION';
+            return t('SALVAGE UNION');
         case 'red-talons':
-            return 'RED TALONS';
+            return t('RED TALONS');
     }
 };

@@ -30,6 +30,10 @@ export const defaultSettings = () => ({
     tiltInvertPitch: false,
     tiltInvertYaw: false,
     tiltNeutral: null,
+    // German is the game's default language; English is the secondary.
+    // hydrateSave merges missing settings from the defaults, so existing
+    // careers migrate to German automatically.
+    language: 'de',
 });
 export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0) => {
     const now = Date.now();

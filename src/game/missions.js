@@ -3,6 +3,7 @@ import { miningClaimCandidates, miningClaimName } from './worldData.js';
 import { cargoFree, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { clamp, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
 import { rollPilot, TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
+import { t } from './i18n.js';
 const GUILD_NAMES_FALLBACK = (guild) => guild === 'merchant' ? 'Merchant Guild' : guild === 'bounty' ? 'Bounty Registry' : guild === 'mining' ? 'Prospectors Guild' : guild === 'syndicate' ? 'Red Talon Syndicate' : 'Salvage Union';
 const merchantIssuers = ['Kestrel Freight', 'Orison Combine', 'Free Haulers Desk', 'Sable Route Logistics', 'Guild Dispatch'];
 const bountyIssuers = ['Concord Warrant Desk', 'Frontier Security Office', 'Bounty Hunters Registry', 'Civil Claims Bureau'];
@@ -73,12 +74,12 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             // habits before they accept: the callsign, its tier, and its
             // temperament are stable for the whole contract.
             const pilotProfile = pilot
-                ? ` Pilot profile: ${TIER_LABELS[pilot.tier]} ${TEMPERAMENT_LABELS[pilot.temperament]}${pinnedTier === 'ace' ? ' — expect relentless pursuit.' : ''}.`
+                ? t(' Pilot profile: {tier} {temperament}{note}.', { tier: t(TIER_LABELS[pilot.tier]), temperament: t(TEMPERAMENT_LABELS[pilot.temperament]), note: pinnedTier === 'ace' ? t(' — expect relentless pursuit.') : '' })
                 : '';
             offers.push({
                 id,
                 kind: 'bounty',
-                title: `Warrant: ${targetName}`,
+                title: t('Warrant: {name}', { name: targetName }),
                 issuer: pick(rng, bountyIssuers),
                 origin: locationId,
                 targetZone,
@@ -92,7 +93,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
                 guild: 'bounty',
                 guildRep: 7 + Math.floor(danger * 3),
                 faction: locationId === 'rook' ? 'concord' : LOCATIONS[locationId].faction,
-                briefing: `${targetName} has been positively identified near ${LOCATIONS[targetZone].name}. Locate the ship, confirm identity, and destroy it. Expect armed resistance${danger > 2 ? ' and possible escorts' : ''}.${pilotProfile}`,
+                briefing: t('{name} has been positively identified near {station}. Locate the ship, confirm identity, and destroy it. Expect armed resistance{escorts}.{profile}', { name: targetName, station: LOCATIONS[targetZone].name, escorts: danger > 2 ? t(' and possible escorts') : '', profile: pilotProfile }),
             });
             continue;
         }
@@ -116,7 +117,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             offers.push({
                 id,
                 kind: 'smuggle',
-                title: `Dark run: ${quantity} ${COMMODITIES[commodity].name}`,
+                title: t('Dark run: {quantity} {commodity}', { quantity, commodity: t(COMMODITIES[commodity].name) }),
                 issuer: pick(rng, syndicateIssuers),
                 origin: locationId,
                 destination,
@@ -129,7 +130,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
                 guild: 'syndicate',
                 guildRep: 8 + Math.floor(distance / 160) + Math.floor(quantity / 2),
                 faction: 'red-talons',
-                briefing: `${quantity} units of ${COMMODITIES[commodity].name} that the manifest cannot show. Collect the sealed crate, run dark, and deliver to ${LOCATIONS[destination].name}. A patrol that resolves you seizes the crate and fines you — stay off the cordon.`,
+                briefing: t('{quantity} units of {commodity} that the manifest cannot show. Collect the sealed crate, run dark, and deliver to {station}. A patrol that resolves you seizes the crate and fines you — stay off the cordon.', { quantity, commodity: t(COMMODITIES[commodity].name), station: LOCATIONS[destination].name }),
             });
             continue;
         }
@@ -144,7 +145,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
                 offers.push({
                     id,
                     kind: 'mining',
-                    title: `Mine the ${claimName} claim`,
+                    title: t('Mine the {claim} claim', { claim: t(claimName) }),
                     issuer: pick(rng, miningIssuers),
                     origin: locationId,
                     destination: locationId,
@@ -164,7 +165,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
                     guild: 'mining',
                     guildRep: 6 + Math.floor(quantity / 3) + (save.player.guildRank.mining >= 1 ? 1 : 0),
                     faction: 'frontier-miners',
-                    briefing: `${LOCATIONS[locationId].name} holds the papers on the ${claimName} in the Shardbelt. Cut the whole seam — ${quantity} units — and deliver it back. No deadline: the claim is yours until it runs dry. Bought ore won't clear the manifest.`,
+                    briefing: t('{station} holds the papers on the {claim} in the Shardbelt. Cut the whole seam — {quantity} units — and deliver it back. No deadline: the claim is yours until it runs dry. Bought ore won\'t clear the manifest.', { station: LOCATIONS[locationId].name, claim: t(claimName), quantity }),
                 });
                 continue;
             }
@@ -184,8 +185,8 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
         const reward = contractReward(distance, quantity, danger, rank) * (kind === 'transport' ? 1.15 : 1);
         const deposit = kind === 'delivery' ? Math.round(reward * 0.08) : Math.round(reward * 0.12);
         const title = kind === 'delivery'
-            ? `Deliver ${quantity} ${COMMODITIES[commodity].name}`
-            : `Timed transport to ${LOCATIONS[destination].shortName}`;
+            ? t('Deliver {quantity} {commodity}', { quantity, commodity: t(COMMODITIES[commodity].name) })
+            : t('Timed transport to {station}', { station: LOCATIONS[destination].shortName });
         const cargoLabel = pick(rng, VALUABLE_CARGO_LABELS);
         offers.push({
             id,
@@ -204,8 +205,8 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             guildRep: 5 + Math.floor(distance / 170) + (kind === 'transport' ? 3 : 0),
             faction: LOCATIONS[destination].faction,
             briefing: kind === 'delivery'
-                ? `${quantity} units of ${COMMODITIES[commodity].name} are sealed and waiting. Deliver them intact to ${LOCATIONS[destination].name}. Cargo mass is reserved on acceptance.`
-                : `Carry a ${cargoLabel} to ${LOCATIONS[destination].name}. The case occupies ${(quantity * 1.2).toFixed(1)} cargo mass and the client values punctuality above discretion.`,
+                ? t('{quantity} units of {commodity} are sealed and waiting. Deliver them intact to {station}. Cargo mass is reserved on acceptance.', { quantity, commodity: t(COMMODITIES[commodity].name), station: LOCATIONS[destination].name })
+                : t('Carry a {cargo} to {station}. The case occupies {mass} cargo mass and the client values punctuality above discretion.', { cargo: t(cargoLabel), station: LOCATIONS[destination].name, mass: (quantity * 1.2).toFixed(1) }),
         });
     }
     return offers;
@@ -223,24 +224,24 @@ export const refreshMissionOffers = (save, force = false) => {
 export const acceptMission = (save, locationId, missionId) => {
     const offered = save.world.offers[locationId]?.find((mission) => mission.id === missionId);
     if (!offered || offered.status !== 'offered')
-        return { ok: false, message: 'Contract is no longer available.' };
+        return { ok: false, message: t('Contract is no longer available.') };
     if (save.activeMissions.length >= 6)
-        return { ok: false, message: 'Mission computer has reached its active-contract limit.' };
+        return { ok: false, message: t('Mission computer has reached its active-contract limit.') };
     if (save.player.credits < offered.deposit)
-        return { ok: false, message: `A ${offered.deposit} credit bond is required.` };
+        return { ok: false, message: t('A {credits} credit bond is required.', { credits: offered.deposit }) };
     if (offered.kind === 'delivery' || offered.kind === 'transport' || offered.kind === 'smuggle') {
         const units = offered.quantity ?? 0;
         const massPerUnit = offered.kind === 'transport' ? 1.2 : COMMODITIES[offered.commodity].mass;
         const requiredMass = units * massPerUnit;
         if (cargoFree(save.player) + 0.001 < requiredMass) {
-            return { ok: false, message: `Free ${requiredMass.toFixed(1)} cargo mass before accepting this contract.` };
+            return { ok: false, message: t('Free {mass} cargo mass before accepting this contract.', { mass: requiredMass.toFixed(1) }) };
         }
         const smuggled = offered.kind === 'smuggle';
         save.player.sealedCargo.push({
             missionId: offered.id,
             label: smuggled
-                ? `${COMMODITIES[offered.commodity].name} (syndicate)`
-                : offered.kind === 'delivery' ? COMMODITIES[offered.commodity].name : 'Priority sealed package',
+                ? t('{commodity} (syndicate)', { commodity: t(COMMODITIES[offered.commodity].name) })
+                : offered.kind === 'delivery' ? t(COMMODITIES[offered.commodity].name) : t('Priority sealed package'),
             units,
             mass: massPerUnit,
             ...(smuggled ? { smuggled: true } : {}),
@@ -251,7 +252,7 @@ export const acceptMission = (save, locationId, missionId) => {
     offered.acceptedAt = save.world.time;
     save.activeMissions.push({ ...offered });
     save.world.offers[locationId] = save.world.offers[locationId].filter((mission) => mission.id !== offered.id);
-    return { ok: true, message: `Accepted: ${offered.title}`, mission: offered };
+    return { ok: true, message: t('Accepted: {title}', { title: offered.title }), mission: offered };
 };
 const consumeProcurementCargo = (player, commodity, quantity) => {
     const owned = player.cargo[commodity] ?? 0;
@@ -280,7 +281,7 @@ const awardMission = (save, mission) => {
     save.world.completedMissionIds.push(mission.id);
     save.activeMissions = save.activeMissions.filter((entry) => entry.id !== mission.id);
     const rank = updateGuildRank(save.player, mission.guild);
-    return `${mission.title} complete. ${mission.reward + mission.deposit} credits transferred.${rank.rankedUp ? ` Rank advanced: ${rank.name}.` : ''}`;
+    return t('{title} complete. {credits} credits transferred.{note}', { title: mission.title, credits: mission.reward + mission.deposit, note: rank.rankedUp ? t(' Rank advanced: {rank}.', { rank: t(rank.name) }) : '' });
 };
 export const completeMissionsAtDock = (save, locationId) => {
     const messages = [];
@@ -353,7 +354,7 @@ export const completeBountyMission = (save, missionId) => {
     save.player.reputation['red-talons'] = clamp(save.player.reputation['red-talons'] - 4, -100, 100);
     return {
         ok: true,
-        message: aceKill ? `${message} Ace warrant confirmed — ${ACE_WARRANT_REP} registry rep.` : message,
+        message: aceKill ? `${message} ${t('Ace warrant confirmed — {rep} registry rep.', { rep: ACE_WARRANT_REP })}` : message,
         mission,
     };
 };
@@ -370,25 +371,25 @@ export const failExpiredMissions = (save) => {
         save.player.sealedCargo = save.player.sealedCargo.filter((cargo) => cargo.missionId !== mission.id);
         save.player.guildRep[mission.guild] = Math.max(0, save.player.guildRep[mission.guild] - Math.max(2, Math.floor(mission.guildRep / 2)));
         save.player.reputation[mission.faction] = clamp(save.player.reputation[mission.faction] - 3, -100, 100);
-        messages.push(`Contract failed: ${mission.title}`);
+        messages.push(t('Contract failed: {title}', { title: mission.title }));
     }
     return messages;
 };
 export const guildJoinCost = (guild) => (guild === 'merchant' ? 500 : guild === 'bounty' ? 900 : 650);
 export const joinGuild = (save, guild) => {
     if (save.player.guildRep[guild] > 0)
-        return { ok: false, message: 'Guild membership already active.' };
+        return { ok: false, message: t('Guild membership already active.') };
     const cost = guildJoinCost(guild);
     if (save.player.credits < cost)
-        return { ok: false, message: `Membership requires ${cost} credits.` };
+        return { ok: false, message: t('Membership requires {credits} credits.', { credits: cost }) };
     save.player.credits -= cost;
     save.player.guildRep[guild] = 1;
     updateGuildRank(save.player, guild);
-    return { ok: true, message: `Joined ${guild}. Entry fee paid.` };
+    return { ok: true, message: t('Joined {guild}. Entry fee paid.', { guild: t(GUILD_NAMES_FALLBACK(guild)) }) };
 };
 export const awardCareerProgress = (save, guild, amount, faction) => {
     save.player.guildRep[guild] += amount;
     save.player.reputation[faction] = clamp(save.player.reputation[faction] + Math.max(1, Math.floor(amount / 4)), -100, 100);
     const rank = updateGuildRank(save.player, guild);
-    return rank.rankedUp ? `${GUILD_NAMES_FALLBACK(guild)} rank advanced: ${rank.name}.` : undefined;
+    return rank.rankedUp ? t('{guild} rank advanced: {rank}.', { guild: t(GUILD_NAMES_FALLBACK(guild)), rank: t(rank.name) }) : undefined;
 };
