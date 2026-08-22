@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v101-0-4-10-glb-cache';
+const CACHE = 'voidrunner-v101-0-4-10a-glb-cache';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',

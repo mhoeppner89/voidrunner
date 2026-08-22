@@ -13,7 +13,7 @@ import { asteroidCollisionMesh, asteroidCollisionRadius, generateAsteroidField, 
 import { hullVsAsteroid, hullVsBox, hullVsEngine, hullVsHull, hullVsRing, hullVsSphere } from './hullCollision.js';
 import { steerToward } from './npcNav.js';
 import { PILOT_LINES, pilotMod, rollPilot, TEMPERAMENT_LABELS, TIER_LABELS } from './pilots.js';
-import { setLanguage } from './i18n.js';
+import { setLanguage, t } from './i18n.js';
 import { MUG_CHANCE, SMUGGLE_CHANCE, createSmuggleTask, createTask, rebasePatrolTask, rollNpcCargo, updateShipAI } from './shipAI.js';
 import { paletteForFaction, playerShipVariant, shipVariantForRole } from './voxelModels.js';
 const FORWARD = new THREE.Vector3(0, 0, -1);
@@ -1729,12 +1729,12 @@ export class GameSession {
         const distance = this.surfaceDistance(playerPosition, target);
         if (distance > range) {
             this.renderer.setUtilityBeam(false, mode, this.save.player.position);
-            this.utilityReadout = `OUT OF RANGE · ${Math.round(distance)}/${Math.round(range)} km`;
+            this.utilityReadout = t('OUT OF RANGE · {current}/{max} km', { current: Math.round(distance), max: Math.round(range) });
             return;
         }
         if (this.lineBlocked(playerPosition, vec(target.position), target.id)) {
             this.renderer.setUtilityBeam(false, mode, this.save.player.position);
-            this.utilityReadout = 'BEAM OBSTRUCTED';
+            this.utilityReadout = t('BEAM OBSTRUCTED');
             return;
         }
         if (mode === 'mining') {
@@ -1780,7 +1780,7 @@ export class GameSession {
         this.lastExtractionAt = this.save.world.time;
         this.seenWorkingUntil = this.save.world.time + SEEN_WORKING_SECONDS;
         if (cargoFree(this.save.player) < COMMODITIES.ore.mass + 0.001) {
-            this.utilityReadout = 'CARGO FULL';
+            this.utilityReadout = t('CARGO FULL');
             return;
         }
         const current = this.extractionCarry.get(node.id) ?? 0;
@@ -1807,7 +1807,7 @@ export class GameSession {
         this.lastExtractionAt = this.save.world.time;
         this.seenWorkingUntil = this.save.world.time + SEEN_WORKING_SECONDS;
         if (cargoFree(this.save.player) < COMMODITIES[node.salvage].mass + 0.001) {
-            this.utilityReadout = 'CARGO FULL';
+            this.utilityReadout = t('CARGO FULL');
             return;
         }
         const current = this.extractionCarry.get(node.id) ?? 0;
@@ -2306,7 +2306,7 @@ export class GameSession {
         if (this.activeInstanceId === 'shardbelt') {
             for (const node of this.asteroids)
                 if (node.remaining > 0 && player.distanceTo(vec(node.position)) - asteroidCollisionRadius(node) < stats.radarRange)
-                    others.push({ kind: 'asteroid', id: node.id, position: node.position, name: node.tunnelPart ? 'Rock Crown Deposit' : 'Asteroid Deposit', scanned: node.scanned });
+                    others.push({ kind: 'asteroid', id: node.id, position: node.position, name: t(node.tunnelPart ? 'Rock Crown Deposit' : 'Asteroid Deposit'), scanned: node.scanned });
         }
         if (this.activeInstanceId === 'mourning-line') {
             for (const node of this.wreckNodes)
@@ -2344,7 +2344,7 @@ export class GameSession {
             const node = this.asteroids.find((entry) => entry.id === id && entry.remaining > 0);
             if (node && this.activeInstanceId === 'shardbelt') {
                 this.save.player.mode = 'mining';
-                target = { kind, id, position: node.position, name: node.tunnelPart ? 'Rock Crown Deposit' : 'Asteroid Deposit' };
+                target = { kind, id, position: node.position, name: t(node.tunnelPart ? 'Rock Crown Deposit' : 'Asteroid Deposit') };
             }
             else {
                 // Out of sensor range or not in the field yet: the claim lives in
@@ -5045,8 +5045,8 @@ export class GameSession {
                 if (lead && demand) {
                     this.beginMug(lead, escorts, demand, {
                         lines: OPPORTUNITY_DEMAND_LINES,
-                        sensor: 'Pirates closing — your beam is broadcasting your position.',
-                        event: 'Standoff: the beam drew a crowd.',
+                        sensor: t('Pirates closing — your beam is broadcasting your position.'),
+                        event: t('Standoff: the beam drew a crowd.'),
                     });
                 }
                 else {
@@ -5057,7 +5057,7 @@ export class GameSession {
                             ship.targetId = undefined;
                         }
                     if (lead)
-                        this.sayPilotLine(lead, 'Nothing worth the wait. Fly on, spacer.');
+                        this.sayPilotLine(lead, t('Nothing worth the wait. Fly on, spacer.'));
                     this.ui.pushSensor(t('Pirates closing — then breaking off: the beam lit the field but the hold is empty.'), 'info', 4800);
                 }
                 this.threatAcquireTarget();
@@ -5088,8 +5088,8 @@ export class GameSession {
             if (lead && demand) {
                 this.beginMug(lead, escorts, demand, {
                     lines: OPPORTUNITY_DEMAND_LINES,
-                    sensor: 'Pirates closing — they saw your haul and are hailing you.',
-                    event: 'Standoff: an opportunist wants your haul.',
+                    sensor: t('Pirates closing — they saw your haul and are hailing you.'),
+                    event: t('Standoff: an opportunist wants your haul.'),
                 });
             }
             else {
@@ -5101,7 +5101,7 @@ export class GameSession {
                         ship.targetId = undefined;
                     }
                 if (lead)
-                    this.sayPilotLine(lead, 'Nothing worth the wait. Fly on, spacer.');
+                    this.sayPilotLine(lead, t('Nothing worth the wait. Fly on, spacer.'));
                 this.ui.pushSensor(t('Pirates closing — then breaking off: nothing worth the risk.'), 'info', 4800);
             }
             this.threatAcquireTarget();
@@ -6943,12 +6943,12 @@ export class GameSession {
                 const claimable = ship.surrendered && !ship.claimed && !ship.captured && ship.hull > 0 && (ship.bountyValue > 0 || ship.missionId);
                 const captureAvailable = claimable && distance <= stats.scanRange;
                 const surrenderReadout = ship.captured
-                    ? 'CAPTURED · HULL DRIFTING'
+                    ? t('CAPTURED · HULL DRIFTING')
                     : claimable
                         ? captureAvailable
-                            ? 'SURRENDERED · CLAIM READY'
-                            : 'SURRENDERED · APPROACH TO CLAIM'
-                        : 'SURRENDERED · NO CLAIM';
+                            ? t('SURRENDERED · CLAIM READY')
+                            : t('SURRENDERED · APPROACH TO CLAIM')
+                        : t('SURRENDERED · NO CLAIM');
                 hudTarget = {
                     kind: 'ship',
                     name: ship.name,
@@ -7233,7 +7233,7 @@ export class GameSession {
             searchRings,
             autopilotAvailable: !nearestThreat,
             threatLabel: nearestThreat
-                ? `${nearestThreat.name} at ${Math.round(nearestThreat.distance)} units`
+                ? t('{name} at {units} units', { name: nearestThreat.name, units: Math.round(nearestThreat.distance) })
                 : undefined,
         };
     }

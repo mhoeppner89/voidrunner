@@ -64,7 +64,7 @@ export const radarAltitudeTick = ({ x, y, radius, ratio = 1, direction, magnitud
     const length = Math.max(0, Math.min(desired, room - 2 * ratio));
     return length >= 1.5 * ratio ? { startY, length } : undefined;
 };
-const GAME_VERSION = '0.4.10';
+const GAME_VERSION = '0.4.10a';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -289,7 +289,7 @@ export class GameUI {
         const image = layer?.querySelector('.concourse-hover-ship');
         if (!layer || !image)
             return;
-        const launchLabel = `Launch the docked ${profile.name}`;
+        const launchLabel = t('Launch the docked {name}', { name: profile.name });
         image.src = profile.art;
         image.alt = launchLabel;
         image.setAttribute('aria-label', launchLabel);
@@ -305,7 +305,7 @@ export class GameUI {
         });
         const takeoff = toolbar?.querySelector('[data-vesper-preview-launch]');
         if (takeoff)
-            takeoff.innerHTML = `TAKE OFF <span>${escapeHtml(profile.name)}</span>`;
+            takeoff.innerHTML = `${t('TAKE OFF')} <span>${escapeHtml(profile.name)}</span>`;
     }
     shellMarkup() {
         return `
@@ -343,9 +343,9 @@ export class GameUI {
           <div id="target-bracket" class="target-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
           <div id="target-edge-pointer" class="target-edge-pointer is-hidden" aria-hidden="true"><i></i><span></span></div>
           <div class="reticle" aria-hidden="true"><span></span><span></span><span></span><span></span><b></b></div>
-          <button type="button" id="comms-bar" class="comms-bar" data-ui-command="open-chat" role="button" tabindex="0" aria-label="Open comms log"></button>
+          <button type="button" id="comms-bar" class="comms-bar" data-ui-command="open-chat" role="button" tabindex="0" aria-label="${t('Open comms log')}"></button>
           <button type="button" id="patrol-reply-chip" class="patrol-reply-chip is-hidden" data-ui-command="patrol-reply" role="button" tabindex="0" aria-label="${t('Reply to the patrol greeting')}">${t('REPLY')} <em id="patrol-reply-timer"></em></button>
-          <div class="touch-controls" aria-label="Touch flight controls">
+          <div class="touch-controls" aria-label="${t('Touch flight controls')}">
             <div class="touch-left">
               <div class="touch-throttle" data-touch-throttle>
                 <div class="touch-throttle-fill"></div>
@@ -372,8 +372,8 @@ export class GameUI {
           <div class="title-stars"></div>
           <div class="title-cockpit-frame" aria-hidden="true"></div>
           <div class="title-card">
-            <button class="title-fullscreen-button" data-ui-command="toggle-fullscreen" aria-label="Toggle fullscreen">⛶</button>
-            <button class="title-lang-button" data-ui-command="toggle-language" aria-label="Switch language" title="Deutsch / English">${getLanguage() === 'de' ? '🇩🇪' : '🇬🇧'}</button>
+            <button class="title-fullscreen-button" data-ui-command="toggle-fullscreen" aria-label="${t('Toggle fullscreen')}">⛶</button>
+            <button class="title-lang-button" data-ui-command="toggle-language" aria-label="${t('Switch language')}" title="${getLanguage() === 'de' ? 'English' : 'Deutsch'}">${getLanguage() === 'de' ? '🇬🇧' : '🇩🇪'}</button>
             <span class="title-kicker">${t('FRONTIER COMMERCE / WARRANTS / RECOVERY')}</span>
             <span class="title-version">BUILD ${GAME_VERSION}</span>
             <h1>VOID<br><b>RUNNER</b></h1>
@@ -396,12 +396,12 @@ export class GameUI {
           <div class="copyright-note">${t('LOCAL AUTOSAVE · TOUCH / PAD / KEYBOARD')}</div>
         </section>
 
-        <section id="dock-screen" class="dock-screen is-hidden" aria-label="Docked location"></section>
-        <section id="map-panel" class="modal-panel is-hidden" aria-label="Navigation map"></section>
-        <section id="ship-panel" class="modal-panel is-hidden" aria-label="Ship status"></section>
-        <section id="pause-panel" class="modal-panel is-hidden" aria-label="Pause and settings"></section>
-        <section id="arena-panel" class="modal-panel is-hidden" aria-label="Combat simulator"></section>
-        <section id="chat-panel" class="modal-panel is-hidden" aria-label="Comms log"></section>
+        <section id="dock-screen" class="dock-screen is-hidden" aria-label="${t('Docked location')}"></section>
+        <section id="map-panel" class="modal-panel is-hidden" aria-label="${t('Navigation map')}"></section>
+        <section id="ship-panel" class="modal-panel is-hidden" aria-label="${t('Ship status')}"></section>
+        <section id="pause-panel" class="modal-panel is-hidden" aria-label="${t('Pause and settings')}"></section>
+        <section id="arena-panel" class="modal-panel is-hidden" aria-label="${t('Combat simulator')}"></section>
+        <section id="chat-panel" class="modal-panel is-hidden" aria-label="${t('Comms log')}"></section>
         <div id="toast-stack" class="toast-stack global-toasts" aria-live="polite"></div>
         <div id="rotate-notice" class="rotate-notice is-hidden" role="alertdialog" aria-label="${t('Rotate your screen to landscape')}">
           <div class="rotate-phone" aria-hidden="true"></div>
@@ -843,7 +843,7 @@ export class GameUI {
       <div class="dock-backdrop">${this.locationIllustration(this.dockLocation, illustrationScreen)}</div>
       <div class="dock-scanlines" aria-hidden="true"></div>        <header class="dock-header">
         <div><span>${t(location.kind.toUpperCase())} / ${t(FACTION_NAMES[location.faction])}</span><h2>${escapeHtml(location.name)}</h2></div>
-        ${this.dockTerminal !== 'concourse' ? '<div class="dock-back-button dock-pointer" data-ui-command="dock-concourse" role="button" tabindex="0" aria-label="Return to the concourse">◀ CONCOURSE</div>' : ''}
+        ${this.dockTerminal !== 'concourse' ? `<div class="dock-back-button dock-pointer" data-ui-command="dock-concourse" role="button" tabindex="0" aria-label="${t('Return to the concourse')}">${t('◀ CONCOURSE')}</div>` : ''}
         <div class="dock-wallet-unit"><div class="dock-wallet"><span>${t('AVAILABLE CREDIT')}</span><strong>${formatCredits(this.save.player.credits)}</strong><small>${SHIPS[this.save.player.shipId].name} · ${cargoMass(this.save.player).toFixed(1)}/${cargoCapacity(this.save.player)} mass</small></div><button class="dock-options-button dock-pointer" data-ui-command="options" role="button" tabindex="0" aria-label="${t('Options')}">⚙</button></div>
       </header>
       ${this.renderDockNotice()}
@@ -1186,7 +1186,7 @@ export class GameUI {
               <header><span>${this.missionBadge(mission)}</span><b>${formatCredits(mission.reward)}</b></header>
               <h4>${escapeHtml(t(mission.title))}</h4>
               <p>${escapeHtml(t(mission.briefing))}</p>
-              <dl><div><dt>${t('ISSUER')}</dt><dd>${escapeHtml(mission.issuer)}</dd></div><div><dt>${t('DEADLINE')}</dt><dd>${this.deadlineLabel(mission)}</dd></div><div><dt>${t('BOND')}</dt><dd>${formatCredits(mission.deposit)}</dd></div><div><dt>${t('GUILD REP')}</dt><dd>+${mission.guildRep}</dd></div></dl>
+              <dl><div><dt>${t('ISSUER')}</dt><dd>${escapeHtml(t(mission.issuer))}</dd></div><div><dt>${t('DEADLINE')}</dt><dd>${this.deadlineLabel(mission)}</dd></div><div><dt>${t('BOND')}</dt><dd>${formatCredits(mission.deposit)}</dd></div><div><dt>${t('GUILD REP')}</dt><dd>+${mission.guildRep}</dd></div></dl>
               <button class="primary compact" data-mission-id="${mission.id}">${t('ACCEPT CONTRACT')}</button>
             </article>`).join('') : `<p>${t('No fresh contracts. Launch, trade, or return after the board cycles.')}</p>`}
           </div>

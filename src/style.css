@@ -2694,6 +2694,10 @@ button.compact {
   color: rgba(122, 200, 220, 0.5);
 }
 
+html[lang="de"] .comms-bar::before {
+  content: "FUNKLOG";
+}
+
 .comms-bar.active {
   color: var(--void-cyan);
   background: rgba(2, 8, 10, 0.9);
@@ -6321,6 +6325,13 @@ button.primary,
 .concourse-pointer-services {
   left: var(--concourse-services-left, var(--vesper-services-left, 20%));
   top: var(--concourse-services-top, var(--vesper-services-top, 62%));
+}
+
+/* Helix concourse art: the Services pointer sits 100px left and 50px down
+   from the shared anchor so it clears the plate detail. */
+.dock-screen[data-location="helix"][data-tab="concourse"] .concourse-pointer-services {
+  left: calc(var(--concourse-services-left, 20%) - 100px);
+  top: calc(var(--concourse-services-top, 62%) + 50px);
 }
 .concourse-pointer-market {
   left: var(--concourse-market-left, var(--vesper-market-left, 16%));
