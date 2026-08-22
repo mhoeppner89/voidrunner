@@ -64,7 +64,25 @@ export const radarAltitudeTick = ({ x, y, radius, ratio = 1, direction, magnitud
     const length = Math.max(0, Math.min(desired, room - 2 * ratio));
     return length >= 1.5 * ratio ? { startY, length } : undefined;
 };
-const GAME_VERSION = '0.4.10a';
+// Radar radial warp: almost all combat happens inside ~200 km (the guns' real
+// range sits around 140 km), a thin sliver of the 1000 km horizon — so the
+// inner zone is expanded on a steeper scale and a dogfight reads on the disc.
+// Piecewise-linear through fixed anchors, monotone so no blip can ever
+// overshoot the rim:
+//   (0,0) → (combat, combatDisplay) → (scan, 0.7) → (1,1)
+// The 200 km combat mark renders at combatDisplay (0.45) of the disc on every
+// radar fit — combat is physical, so it owns the same glass regardless of the
+// horizon — and the scan-range ring (500 km) renders at 0.7, so the near/scan
+// zone owns most of the disc and the far band (scan → horizon) compresses
+// into the outer rim.
+const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisplay = 0.45) => {
+    if (fraction <= combat)
+        return fraction * (combatDisplay / combat);
+    if (fraction <= scan)
+        return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
+    return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
+};
+const GAME_VERSION = '0.4.9d';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -323,14 +341,13 @@ export class GameUI {
             <i class="hyperdrive-fx-flash"></i>
           </div>
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="${t('Own ship status display; tap to open ship menu')}">
-            <div class="screen-heading"><span>${t('OWN SHIP STATUS')}</span><b id="own-ship-name">WAYFARER</b></div>
+            <div class="screen-heading"><span>${t('STATUS')}</span><b id="own-ship-name">WAYFARER</b></div>
             <div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
             <div class="screen-ship-layout"><div class="screen-flight"><div><span>${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div><div><span>${t('HOLD')}</span><b id="screen-own-cargo">0.0</b><small id="screen-own-cargo-cap">/32</small></div></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ARMOR')}</span><i><b id="screen-own-armor"></b></i><em id="screen-own-armor-value">100</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">100</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="${t('Radar display; tap to open navigation map')}">
-            <div class="screen-heading"><span>${t('RADAR · TAP MAP')}</span><b id="screen-radar-zone">${t('OPEN SPACE')}</b><b id="screen-radar-transponder" class="radar-transponder" title="${t('Transponder — press B')}">TP ON</b></div>
+            <div class="screen-heading radar-heading" id="screen-radar-transponder" data-touch-action="transponder" role="button" tabindex="0" title="${t('Transponder — press B')}">${t('TRANSPONDER ON')}</div>
             <div class="radar-screen-wrap"><canvas id="radar" width="220" height="220" role="button" tabindex="0" aria-label="${t('Open navigation map')}"></canvas></div>
-            <div class="screen-ticker screen-sensor-log" id="screen-sensor-log" data-tone="info"></div>
           </div>
           <div class="cockpit-screen cockpit-screen-target" data-touch-action="targetNext" aria-label="${t('Target status display; tap to cycle targets')}">
             <div class="screen-heading"><span>${t('TARGET STATUS')}</span><b id="screen-target-name">${t('NO LOCK')}</b></div>
@@ -359,7 +376,6 @@ export class GameUI {
               <button class="touch-boost touch-boost-right" data-touch-action="afterburner" aria-label="${t('Afterburner — hold')}"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" fill-rule="evenodd"><path d="M12 2.2C7.9 7.5 5.4 10.3 5.4 14a6.6 6.6 0 0 0 13.2 0c0-3.7-2.5-6.5-6.6-11.8Zm0 7c-2 2.6-2.8 3.8-2.8 5.3a2.8 2.8 0 0 0 5.6 0c0-1.5-.8-2.7-2.8-5.3Z"/></svg></button>
               <button id="touch-fire" class="touch-fire" data-touch-action="fire" aria-label="${t('Fire — hold')}"><svg data-icon="fire" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.6"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg></button>
               <button id="touch-missile" class="touch-missile" data-touch-action="missile" aria-label="${t('Missile')}"><svg data-icon="missile" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.4 9.3 8.8h5.4Z"/><path d="M9.3 8.8h5.4v6.4H9.3Z"/><path d="M9.3 15.2 6.8 21M14.7 15.2l2.5 5.8"/></svg><svg data-icon="scan" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="is-hidden"><circle cx="12" cy="12" r="6.2"/><path d="M12 5.8V12l4.2 2.4"/><path d="M4.8 4.8 3.4 3.4M19.2 4.8l1.4-1.4M4.8 19.2l-1.4 1.4M19.2 19.2l1.4 1.4"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg><svg data-icon="capture" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M8 3.6h8l1.8 3H6.2Z"/><path d="M9.2 6.6v2.1M14.8 6.6v2.1"/><path d="M7 11.5h10M8.1 14.5h7.8M9.3 17.5h5.4M10.6 20.5h2.8"/></svg></button>
-              <button id="touch-transponder" class="touch-transponder" data-touch-action="transponder" aria-label="${t('Transponder — toggle')}">TP</button>
             </div>
           </div>
           <div class="hud-corner-buttons">
@@ -374,10 +390,9 @@ export class GameUI {
           <div class="title-card">
             <button class="title-fullscreen-button" data-ui-command="toggle-fullscreen" aria-label="${t('Toggle fullscreen')}">⛶</button>
             <button class="title-lang-button" data-ui-command="toggle-language" aria-label="${t('Switch language')}" title="${getLanguage() === 'de' ? 'English' : 'Deutsch'}">${getLanguage() === 'de' ? '🇬🇧' : '🇩🇪'}</button>
-            <span class="title-kicker">${t('FRONTIER COMMERCE / WARRANTS / RECOVERY')}</span>
             <span class="title-version">BUILD ${GAME_VERSION}</span>
             <h1>VOID<br><b>RUNNER</b></h1>
-            <p>${t('Pilot. Trade. Fight. Survive. Make your name on the bright edge of a dangerous frontier.')}</p>
+            <p>${t('Make your name.')}</p>
             <div class="title-actions">
               <button class="primary" data-ui-command="resume">${t('RESUME FLIGHT')}</button>
               <button data-ui-command="new">${t('NEW CAREER')}</button>
@@ -566,6 +581,16 @@ export class GameUI {
                 return;
             event.preventDefault();
             this.actions?.openMap();
+        });
+        // The radar heading is the transponder toggle (tap toggles on touch;
+        // B toggles on keyboard). Enter/Space activate it as a proper button
+        // for keyboard-only players.
+        const transponderToggle = this.root.querySelector('#screen-radar-transponder');
+        transponderToggle?.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ')
+                return;
+            event.preventDefault();
+            this.actions?.toggleTransponder();
         });
         // Tapping the OWN SHIP STATUS monitor opens the paused ship menu
         // (active contracts, cargo hold, account) — the radar's nav-map twin.
@@ -1169,7 +1194,7 @@ export class GameUI {
         }
     }
     missionBadge(mission) {
-        return mission.kind === 'bounty' ? t('WARRANT') : mission.kind === 'transport' ? t('TIMED') : mission.kind === 'smuggle' ? t('DARK RUN') : t(mission.kind.toUpperCase());
+        return mission.kind === 'bounty' ? t('WARRANT') : mission.kind === 'transport' ? t('EXPRESS') : mission.kind === 'smuggle' ? t('DARK RUN') : t(mission.kind.toUpperCase());
     }
     deadlineLabel(mission) {
         return Number.isFinite(mission.deadline) ? formatDuration(mission.deadline - this.save.world.time) : t('NO DEADLINE');
@@ -1418,12 +1443,22 @@ export class GameUI {
             const ticker = this.el(selector);
             if (!ticker)
                 return;
-            ticker.textContent = entry?.message ?? '';
+            // The message rides an inner span so ellipsis truncation works:
+            // text-overflow only applies to block-level inline content, not
+            // to flex items — a bare text node in the flex ticker would just
+            // hard-clip at the row edge. The full text lives in the ship
+            // menu's RECENT EVENTS.
+            let line = ticker.querySelector('.ticker-line');
+            if (!line) {
+                line = document.createElement('span');
+                line.className = 'ticker-line';
+                ticker.appendChild(line);
+            }
+            line.textContent = entry?.message ?? '';
             ticker.dataset.tone = entry?.tone ?? 'info';
             ticker.classList.toggle('is-visible', Boolean(entry));
         };
         renderTicker('#screen-event-ticker', this.currentEntry(this.recentEvents));
-        renderTicker('#screen-sensor-log', this.currentEntry(this.sensorLog));
         // The patrol reply chip: visible while a cordon pilot is still waiting
         // for the courtesy, with the window ticking down.
         const patrolReply = this.el('#patrol-reply-chip');
@@ -1470,20 +1505,18 @@ export class GameUI {
                     timer.textContent = String(model.standoff.seconds);
             }
         }
-        this.drawRadar(model.contacts, model.radarRings, model.searchRings);
+        this.drawRadar(model.contacts, model.radarRings, model.searchRings, model.radarWarp);
         const transponderChip = this.el('#screen-radar-transponder');
         if (transponderChip) {
-            // The chip mirrors the live sensor signature: transponder ON, or a
-            // dark ship lit up by its own extraction beam.
-            transponderChip.textContent = model.broadcasting ? t('TP ON') : t('TP OFF');
+            // The radar heading is the transponder toggle: it reads its own
+            // state — broadcasting (transponder ON, or a dark ship lit up by
+            // its own extraction beam) vs dark — and is the mobile tap target.
+            transponderChip.textContent = model.broadcasting ? t('TRANSPONDER ON') : t('TRANSPONDER OFF');
             transponderChip.classList.toggle('is-dark', !model.broadcasting);
             transponderChip.title = model.broadcasting
                 ? t('Visible to sensors at full range{note}', { note: model.transponder ? t(' · press B to go dark') : t(' · the extraction beam is broadcasting') })
                 : t('Dark to sensors beyond 200 km · press B to transmit');
         }
-        const zoneLabel = this.el('#screen-radar-zone');
-        if (zoneLabel)
-            zoneLabel.textContent = model.zone.toUpperCase();
         setText('#screen-own-shield-value', Math.ceil(model.shield).toString());
         setText('#screen-own-armor-value', Math.ceil(model.armor).toString());
         setText('#screen-own-hull-value', Math.ceil(model.hull).toString());
@@ -1510,11 +1543,6 @@ export class GameUI {
             throttleThumb.style.bottom = `${model.throttle * 100}%`;
         if (throttleFill)
             throttleFill.style.height = `${model.throttle * 100}%`;
-        // The touch transponder pad mirrors the radar chip: amber when dark so
-        // mobile pilots see the squawk state on the pad they toggle it with.
-        const touchTransponder = this.el('#touch-transponder');
-        if (touchTransponder)
-            touchTransponder.classList.toggle('is-dark', model.transponder === false);
     }
     updateTarget(target, mode = this.lastHud?.mode ?? 'combat') {
         const bracket = this.el('#target-bracket');
@@ -1863,7 +1891,7 @@ export class GameUI {
             }
         }
     }
-    drawRadar(contacts, rings, searchRings = []) {
+    drawRadar(contacts, rings, searchRings = [], warpCombat = 0.2) {
         const canvas = this.radarContext.canvas;
         const rect = canvas.getBoundingClientRect();
         const ratio = Math.min(2, window.devicePixelRatio || 1);
@@ -1883,8 +1911,20 @@ export class GameUI {
         ctx.lineWidth = Math.max(1, ratio);
         // Calibrated range rings as fractions of the outer ring (radarRange):
         // the mid ring marks scan range and the warm inner ring marks the
-        // dark-detection line — the "invisible past here" threshold.
+        // dark-detection line — the "invisible past here" threshold. The scan
+        // ring renders at 0.7 of the disc (see radarWarpFraction) so the
+        // near/scan band owns most of the glass.
         const ringFractions = rings && rings.length === 3 ? rings : [0.2, 0.5, 1];
+        const scanFraction = ringFractions[1] ?? 0.5;
+        const combat = Math.min(0.35, Math.max(0.05, warpCombat));
+        const warp = (fraction) => radarWarpFraction(fraction, combat, scanFraction);
+        const warpPoint = (x, y) => {
+            const r = Math.hypot(x, y);
+            if (r <= 0)
+                return [x, y];
+            const scale = warp(r) / r;
+            return [x * scale, y * scale];
+        };
         for (let index = 0; index < ringFractions.length; index += 1) {
             // When the pilot broadcasts, the dark-visibility ring merges with
             // the horizon (full signature) — skip it so only the scan ring and
@@ -1893,7 +1933,7 @@ export class GameUI {
                 continue;
             ctx.strokeStyle = index === 0 ? 'rgba(224, 186, 104, .3)' : 'rgba(115, 203, 185, .35)';
             ctx.beginPath();
-            ctx.arc(0, 0, radius * ringFractions[index], 0, Math.PI * 2);
+            ctx.arc(0, 0, radius * warp(ringFractions[index]), 0, Math.PI * 2);
             ctx.stroke();
         }
         ctx.strokeStyle = 'rgba(115, 203, 185, .35)';
@@ -1919,9 +1959,10 @@ export class GameUI {
         // they stay on top.
         const sweepPulse = 0.65 + 0.35 * Math.sin(now / 260);
         for (const ring of searchRings) {
-            const x = ring.x * radius;
-            const y = ring.y * radius;
-            const r = Math.max(3 * ratio, ring.fraction * radius);
+            const [wx, wy] = warpPoint(ring.x, ring.y);
+            const x = wx * radius;
+            const y = wy * radius;
+            const r = Math.max(3 * ratio, warp(ring.fraction) * radius);
             const stroke = ring.color === 'red' ? 'rgba(255, 90, 67, 0.9)' : 'rgba(108, 200, 228, 0.9)';
             ctx.globalAlpha = sweepPulse;
             ctx.strokeStyle = stroke;
@@ -1952,8 +1993,9 @@ export class GameUI {
             ctx.globalAlpha = 1;
         }
         for (const contact of contacts) {
-            const x = contact.x * radius;
-            const y = contact.y * radius;
+            const [wx, wy] = warpPoint(contact.x, contact.y);
+            const x = wx * radius;
+            const y = wy * radius;
             const size = (contact.selected ? 5.5 : 3.2) * ratio;
             const color = contact.type === 'hostile' ? '#ff5a43' : contact.type === 'friendly' ? '#6cc8e4' : contact.type === 'location' ? '#e6b95f' : contact.type === 'resource' ? '#b8c97b' : contact.type === 'wreck' ? '#87b5aa' : contact.type === 'pickup' ? '#f2df91' : contact.type === 'distress' ? '#ff9442' : '#c9cbc6';
             // A distress beacon from beyond the horizon (see radarContacts): a
@@ -2191,7 +2233,7 @@ export class GameUI {
             return;
         const panel = this.root.querySelector('#map-panel');
         const playerPoint = systemMapPoint(model.playerPosition);
-        const contactTone = (contact) => contact.claim ? 'claim' : contact.hostile ? 'hostile' : contact.kind === 'asteroid' ? 'resource' : contact.kind === 'wreck' ? 'wreck' : 'ship';
+        const contactTone = (contact) => contact.claim ? 'claim' : contact.hostile ? 'hostile' : contact.kind === 'asteroid' || contact.kind === 'pickup' ? 'resource' : contact.kind === 'wreck' ? 'wreck' : 'ship';
         panel.innerHTML = `
       <div class="modal-card map-card">
         <header><div><span class="eyebrow">${t('NAVIGATION COMPUTER / PAUSED')}</span><h2>${t('Helios Verge System')}</h2></div><button data-ui-command="close-map">${t('CLOSE')}</button></header>

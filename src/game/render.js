@@ -1935,8 +1935,22 @@ export class SpaceRenderer {
                 glow.scale.setScalar(3.2);
                 group.add(glow);
                 mesh = group;
+                // The group carries its target identity so a raycast hit walks
+                // up to it (see pickTarget).
+                group.userData.targetKind = 'pickup';
+                group.userData.targetId = pickup.id;
                 this.dynamicRoot.add(mesh);
                 this.pickupMeshes.set(pickup.slot, mesh);
+            }
+            // A locked crate is a findable marker: the glow swells and
+            // brightens while it's the current target, so the loot doesn't get
+            // lost in the field.
+            const selected = pickup.id === this.selectedPickupId;
+            const glow = mesh.children[1];
+            if (glow) {
+                glow.scale.setScalar(selected ? 5 : 3.2);
+                if (glow.material)
+                    glow.material.opacity = selected ? 0.6 : 0.3;
             }
             const i = pickup.slot * 3;
             mesh.position.set(pos[i], pos[i + 1], pos[i + 2]);
@@ -1948,11 +1962,12 @@ export class SpaceRenderer {
             mesh.rotation.y += 0.024;
         });
     }
-    setTarget(targetId, asteroidId, wreckId, locationId) {
+    setTarget(targetId, asteroidId, wreckId, locationId, pickupId) {
         this.targetId = targetId;
         this.selectedAsteroidId = asteroidId;
         this.selectedWreckId = wreckId;
         this.selectedLocationId = locationId;
+        this.selectedPickupId = pickupId;
         this.updateAsteroidInstances();
         if (this.activeInstanceId === 'mourning-line')
             this.updateWreckNodeInstances();
@@ -2002,6 +2017,7 @@ export class SpaceRenderer {
         }
         if (this.activeInstanceId === 'mourning-line')
             targets.push(...this.wreckBatches.map(({ mesh }) => mesh));
+        targets.push(...this.pickupMeshes.values());
         const hits = this.raycaster.intersectObjects(targets, true);
         for (const hit of hits) {
             const asteroidBatch = this.asteroidMeshes.find(({ mesh }) => mesh === hit.object);

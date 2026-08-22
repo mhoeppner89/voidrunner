@@ -12,7 +12,7 @@ import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from
 import { asteroidCollisionMesh, asteroidCollisionRadius, generateAsteroidField, generateGraveyardPieces, generateWreckNodes, graveyardZoneAt, graveyardZoneLabel, GRAVEYARD_GEOMETRY_PROFILES, wreckNodeCollisionRadius } from './worldData.js';
 import { hullVsAsteroid, hullVsBox, hullVsEngine, hullVsHull, hullVsRing, hullVsSphere } from './hullCollision.js';
 import { steerToward } from './npcNav.js';
-import { PILOT_LINES, pilotMod, rollPilot, TEMPERAMENT_LABELS, TIER_LABELS } from './pilots.js';
+import { PILOT_LINES, pilotMod, rollPilot, TIER_LABELS } from './pilots.js';
 import { setLanguage, t } from './i18n.js';
 import { MUG_CHANCE, SMUGGLE_CHANCE, createSmuggleTask, createTask, rebasePatrolTask, rollNpcCargo, updateShipAI } from './shipAI.js';
 import { paletteForFaction, playerShipVariant, shipVariantForRole } from './voxelModels.js';
@@ -406,6 +406,11 @@ const HYPERDRIVE_ALIGNMENT = 0.88;
 const DARK_VIS_MIN = 200;
 const DARK_VIS_MAX = 400;
 const DARK_SPEED_FLOOR = 0.5;
+// The radar's inner-disc expansion anchor: almost all combat happens inside
+// this range (the guns' effective range sits around 140 km), a thin sliver of
+// the 1000 km horizon — so drawRadar gives everything inside it extra space
+// while the scan ring (500 km) and beyond stay on the linear scale.
+const RADAR_COMBAT_RANGE = 200;
 // NPCs carry the base sensor fit (no mk2): they resolve a broadcasting ship at
 // this range and a dark one only inside its speed-scaled dark band.
 const NPC_SENSOR_RANGE = 1000;
@@ -456,6 +461,10 @@ const BEAM_AMBUSH_MAX = 15;
 // resources and wrecks key to the shorter scan ranges instead.
 const MAP_RESOURCE_CONTACT_RANGE = 300;
 const MAP_RESOURCE_CONTACT_LIMIT = 48;
+// Pickups (ejected cargo, combat drops) surface on the nav map like the radar
+// shows them — any crate inside the sensor horizon — capped so a busy furball
+// doesn't flood the contact list.
+const MAP_PICKUP_CONTACT_LIMIT = 24;
 // Staked claims surface on the nav map at an extended "from orbit" range so the
 // pilot can find their rock without scanning half the field first.
 const MAP_CLAIM_CONTACT_RANGE = 1000;
@@ -1348,16 +1357,10 @@ export class GameSession {
             this.save.player.mode = order[(index + 1) % order.length];
             this.save.player.currentTargetId = undefined;
             this.renderer.setTarget();
-            this.ui.pushEvent(t('{mode} systems selected.', { mode: t(this.save.player.mode.toUpperCase()) }), 'info');
             this.audio.play('ui');
         }
-        if (actions.transponder) {
-            const dark = this.save.player.transponder !== false;
-            this.save.player.transponder = !dark;
-            this.ui.pushSensor(dark ? t('Transponder offline — dark to sensors. Slow to half speed to hide best.') : t('Transponder online — full sensor signature.'), dark ? 'warning' : 'success', 4200);
-            this.audio.play('ui');
-            saveGame(this.save);
-        }
+        if (actions.transponder)
+            this.toggleTransponder();
         if (actions.navNext) {
             const index = NAV_LOCATION_IDS.indexOf(this.save.player.navTargetId);
             this.setNav(NAV_LOCATION_IDS[(index + 1) % NAV_LOCATION_IDS.length]);
@@ -2105,6 +2108,8 @@ export class GameSession {
             this.audio.play('scan');
             return;
         }
+        if (target.kind === 'pickup')
+            return;
         const stats = getEffectiveShipStats(this.save.player);
         const distance = this.surfaceDistance(vec(this.save.player.position), target);
         if (target.kind === 'asteroid' || target.kind === 'wreck') {
@@ -2241,6 +2246,14 @@ export class GameSession {
         this.save.player.mode = 'combat';
         this.applyTarget({ kind: 'ship', id: nearest.id, position: nearest.position, name: nearest.name });
     }
+    // Pickup labels: a commodity name for cargo crates, CREDITS for a
+    // surrendered pilot's transfer.
+    pickupLabel(pickup) {
+        return pickup.commodity === 'credits' ? t('CREDITS') : t(COMMODITIES[pickup.commodity].name);
+    }
+    pickupDetail(pickup) {
+        return pickup.commodity === 'credits' ? formatCredits(pickup.amount) : `${pickup.amount} ${t('UNITS')}`;
+    }
     targetCandidates() {
         const player = vec(this.save.player.position);
         const stats = getEffectiveShipStats(this.save.player);
@@ -2313,6 +2326,13 @@ export class GameSession {
                 if (node.remaining > 0 && player.distanceTo(vec(node.position)) - node.radius < stats.radarRange)
                     others.push({ kind: 'wreck', id: node.id, position: node.position, name: node.name, scanned: node.scanned });
         }
+        for (const pickup of this.pickups) {
+            if (pickup.life <= 0)
+                continue;
+            const position = tuple(this.pickupStore.getPos(pickup.slot, this.tmpP1));
+            if (player.distanceTo(vec(position)) < stats.radarRange)
+                others.push({ kind: 'pickup', id: pickup.id, position, name: this.pickupLabel(pickup) });
+        }
         for (const id of NAV_LOCATION_IDS) {
             if (goals.some((goal) => goal.id === id))
                 continue;
@@ -2338,6 +2358,14 @@ export class GameSession {
             if (ship) {
                 this.save.player.mode = 'combat';
                 target = { kind, id, position: ship.position, name: ship.name };
+            }
+        }
+        else if (kind === 'pickup') {
+            const pickup = this.pickups.find((entry) => entry.id === id && entry.life > 0);
+            if (pickup) {
+                // A crate doesn't force a tool mode: ejected cargo can be
+                // scooped in any mode.
+                target = { kind, id, position: tuple(this.pickupStore.getPos(pickup.slot, this.tmpP0)), name: this.pickupLabel(pickup) };
             }
         }
         else if (kind === 'asteroid') {
@@ -2383,7 +2411,7 @@ export class GameSession {
         this.monitorStatusUntil = 0;
         // A fresh lock also clears a lingering clip-flash from the previous hull.
         this.targetClipUntil = 0;
-        this.renderer.setTarget(target.kind === 'ship' ? target.id : undefined, target.kind === 'asteroid' ? target.id : undefined, target.kind === 'wreck' ? target.id : undefined, target.kind === 'location' ? target.id : undefined);
+        this.renderer.setTarget(target.kind === 'ship' ? target.id : undefined, target.kind === 'asteroid' ? target.id : undefined, target.kind === 'wreck' ? target.id : undefined, target.kind === 'location' ? target.id : undefined, target.kind === 'pickup' ? target.id : undefined);
         // No selection pop-up: the target monitor already shows the lock, and
         // the distance readout lives in its heading (below the label row).
         this.audio.play('ui');
@@ -2403,13 +2431,31 @@ export class GameSession {
         const id = this.save.player.currentTargetId;
         if (!id)
             return;
-        const ship = this.ships.find((entry) => entry.id === id && entry.hull > 0);
-        if (!ship)
-            return;
+        const stats = getEffectiveShipStats(this.save.player);
         const player = vec(this.save.player.position);
-        const distance = player.distanceTo(vec(ship.position));
-        if (distance > this.lockTrackedRange(ship))
-            this.dropTargetLock(ship);
+        const ship = this.ships.find((entry) => entry.id === id && entry.hull > 0);
+        if (ship) {
+            const distance = player.distanceTo(vec(ship.position));
+            if (distance > this.lockTrackedRange(ship))
+                this.dropTargetLock(ship);
+            return;
+        }
+        // Anchored targets (deposits, wrecks, pickups) hold only while they're
+        // inside the sensor horizon: flying away drops the lock so the marker
+        // doesn't linger on the map. Depletion already clears via getTargetRef.
+        const asteroid = this.asteroids.find((entry) => entry.id === id && entry.remaining > 0);
+        if (asteroid && this.activeInstanceId === 'shardbelt' && player.distanceTo(vec(asteroid.position)) > stats.radarRange) {
+            this.clearTarget();
+            return;
+        }
+        const wreck = this.wreckNodes.find((entry) => entry.id === id && entry.remaining > 0);
+        if (wreck && this.activeInstanceId === 'mourning-line' && player.distanceTo(vec(wreck.position)) > stats.radarRange) {
+            this.clearTarget();
+            return;
+        }
+        const pickup = this.pickups.find((entry) => entry.id === id && entry.life > 0);
+        if (pickup && player.distanceTo(this.pickupStore.getPos(pickup.slot, this.tmpP0)) > stats.radarRange)
+            this.clearTarget();
     }
     dropTargetLock(ship) {
         this.clearTarget();
@@ -2427,6 +2473,9 @@ export class GameSession {
         const ship = this.ships.find((entry) => entry.id === id && !entry.claimed && !entry.captured && entry.hull > 0);
         if (ship)
             return { kind: 'ship', id, position: ship.position, name: ship.name };
+        const pickup = this.pickups.find((entry) => entry.id === id && entry.life > 0);
+        if (pickup)
+            return { kind: 'pickup', id, position: tuple(this.pickupStore.getPos(pickup.slot, this.tmpP0)), name: this.pickupLabel(pickup) };
         const asteroid = this.asteroids.find((entry) => entry.id === id && entry.remaining > 0);
         if (asteroid && (!clearInvalid || this.activeInstanceId === 'shardbelt')) {
             return { kind: 'asteroid', id, position: asteroid.position, name: asteroid.tunnelPart ? 'Rock Crown Deposit' : 'Asteroid Deposit' };
@@ -3277,14 +3326,13 @@ export class GameSession {
     }
     // Comms the moment a ship that had the pilot resolved loses the signal and
     // opens a sweep: the player is told, in the searching ship's voice, that it
-    // lost them. The patrol also logs it on the sensor line. The line pick is a
+    // lost them. The patrol marks the search on the radar. The line pick is a
     // pure function of the search start time so it never perturbs a ship's roll
     // streams (headless probes stay bit-exact); the sensor note is
     // unconditional, the spoken line obeys the chatter gap like every other.
     announceSearchStart(ship, kind) {
         const started = ship.search?.startedAt ?? this.save.world.time;
         if (kind === 'patrol') {
-            this.ui.pushSensor(t('{name}: contact lost — sweeping the last-known position.', { name: ship.name }), 'warning', 4600);
             const pool = PATROL_SEARCH_LINES.lost;
             if (pool?.length && this.chatterOpen())
                 this.sayPilotLine(ship, pool[Math.floor(started * 7) % pool.length]);
@@ -3328,16 +3376,9 @@ export class GameSession {
         ship.resolvedPlayerLast = false;
         ship.searchCooldownUntil = this.save.world.time + SEARCH_COOLDOWN;
         if (kind === 'patrol') {
-            if (outcome === 'giveup')
-                this.ui.pushSensor(t('{name}: no contact at last-known position. Resuming patrol.', { name: ship.name }), 'info', 4600);
-            else if (outcome === 'found') {
-                this.ui.pushSensor(t('{name}: contact confirmed. Concord has you logged.', { name: ship.name }), 'warning', 4600);
+            if (outcome === 'found')
                 this.sayPilotLine(ship, PATROL_SEARCH_LINES.firm[Math.floor(ship.proxRng() * PATROL_SEARCH_LINES.firm.length)]);
-            }
             // 'clear' ends quietly — the pilot went lit, so there is nothing to log.
-        }
-        else if (outcome === 'giveup') {
-            this.ui.pushSensor(t('{name}: lost the signal. Moving on.', { name: ship.name }), 'info', 4600);
         }
         // A hostile 'found' ends quietly — the re-engaged fight speaks for itself.
     }
@@ -3443,12 +3484,10 @@ export class GameSession {
             const commodity = SMUGGLER_HOLD_POOL[Math.floor(rng() * SMUGGLER_HOLD_POOL.length)];
             this.spawnPickup(commodity, smuggler.position, 'combat', 1 + Math.floor(rng() * 2));
             this.endPatrolArrest(ship, smuggler, true);
-            this.ui.pushSensor(t('{ship} forces {smuggler} to dump the hold.', { ship: ship.name, smuggler: smuggler.name }), 'warning', 5200);
         }
         else {
             // Run: the smuggler bolts and the patrol gives chase.
             smuggler.task = { kind: 'flee', prior: smuggler.task, awayFrom: [...smuggler.position] };
-            this.ui.pushSensor(t('{ship} is chasing {smuggler} running dark.', { ship: ship.name, smuggler: smuggler.name }), 'warning', 5200);
         }
     }
     endPatrolArrest(ship, smuggler, quiet = false) {
@@ -3462,7 +3501,6 @@ export class GameSession {
             return;
         const rng = seededRandom(`${this.save.world.seed}:arrest-end:${ship.id}:${Math.floor(this.save.world.time)}`);
         this.sayPilotLine(ship, PATROL_ARREST_LINES.giveup[Math.floor(rng() * PATROL_ARREST_LINES.giveup.length)]);
-        this.ui.pushSensor(t('{name}: no flagrant cargo aboard. Resuming patrol.', { name: ship.name }), 'info', 4600);
     }
     // Active search sweeps for the radar: one ring per searching ship, drawn
     // at the last-known-position anchor at the sweep radius — blue for a
@@ -4000,7 +4038,11 @@ export class GameSession {
         // Fly where the nose points (matching combat AI), so a course change is
         // a real banked turn rather than a sideways slide onto the new heading.
         const forward = this.tmpC.copy(FORWARD).applyQuaternion(orientation).normalize();
-        let travelSpeed = ship.speed * (ship.role === 'trader' ? 0.72 : 0.5);
+        // A fleeing ship (or a patrol chasing an arrested smuggler) runs at
+        // its full cruise capability: the flight is a chase, not a commute,
+        // and half-throttle getaways feel broken. Everyone else cruises.
+        const inChase = ship.task?.kind === 'flee' || (ship.role === 'patrol' && Boolean(ship.arrest));
+        let travelSpeed = inChase ? ship.speed : ship.speed * (ship.role === 'trader' ? 0.72 : 0.5);
         // A search approach is an investigation, not a cruise: the patrol
         // pushes harder than its patrol speed — but still slower than any lit
         // hull at full throttle, so a running dark pilot bleeds the contact.
@@ -4018,7 +4060,7 @@ export class GameSession {
         // uses, with the NPC's FULL hull (no forgiveness) — an NPC only bumps
         // when its visible model touches. Rocks use the exact mesh, debris
         // panels their flat faces, wreck nodes a support-expanded sphere.
-        if (ship.captured || ship.poweredDown)
+        if (ship.poweredDown)
             return;
         const hullExtents = this.npcHullExtents(ship);
         const position = this.tmpA.set(ship.position[0], ship.position[1], ship.position[2]);
@@ -4080,10 +4122,6 @@ export class GameSession {
             ship.seekClearSpace = ship.maxHull > 0 && ship.hull / ship.maxHull < NPC_BADLY_DAMAGED_HULL_RATIO;
             if (this.save.player.currentTargetId === ship.id)
                 this.targetClipUntil = this.save.world.time + 1.4;
-            if (this.npcCollisionCooldown <= 0) {
-                this.npcCollisionCooldown = 2.5;
-                this.ui.pushEvent(t('{name} clipped {obstacle}.', { name: ship.name, obstacle: t(this.activeInstanceId === 'mourning-line' ? 'wreckage' : 'a rock') }), 'warning', 3600);
-            }
         }
     }
     // Ship-to-ship hard collision: once every ship (player included) has
@@ -4130,7 +4168,7 @@ export class GameSession {
         const ships = this.ships;
         for (let i = 0; i < ships.length; i += 1) {
             const ship = ships[i];
-            if (ship.hull <= 0 || ship.captured || ship.poweredDown)
+            if (ship.hull <= 0 || ship.poweredDown)
                 continue;
             const shipExtents = this.npcHullExtents(ship);
             const shipVolume = shipExtents[0] * shipExtents[1] * shipExtents[2];
@@ -4171,7 +4209,7 @@ export class GameSession {
             shipPos.set(ship.position[0], ship.position[1], ship.position[2]);
             for (let j = i + 1; j < ships.length; j += 1) {
                 const other = ships[j];
-                if (other.hull <= 0 || other.captured || other.poweredDown)
+                if (other.hull <= 0 || other.poweredDown)
                     continue;
                 const otherExtents = this.npcHullExtents(other);
                 const otherVolume = otherExtents[0] * otherExtents[1] * otherExtents[2];
@@ -4340,8 +4378,12 @@ export class GameSession {
         return false;
     }
     damageShip(ship, amount, attackerId, position) {
-        if (ship.captured)
-            return;
+        // A captured hull is still a hull: it takes damage like any other
+        // ship. It stays inert — no AI, no retaliation, no comms (the pilot is
+        // already in cuffs, so the reaction block below is skipped for it) —
+        // and the surrender and unauthorized-attack gates are already guarded
+        // on !ship.surrendered / !ship.hostile, so it cannot re-engage or
+        // double its bounty — only die, and drop scrap on the way out.
         let remaining = amount;
         if (ship.shield > 0) {
             const absorbed = Math.min(ship.shield, remaining);
@@ -4381,7 +4423,7 @@ export class GameSession {
                 }
             }
         }
-        if (attackerId === 'player' && ship.hull > 0 && !ship.poweredDown) {
+        if (attackerId === 'player' && ship.hull > 0 && !ship.poweredDown && !ship.captured) {
             // A hostile mid-attack on another ship turns to defend itself: the
             // player engaging it draws its fire away from the victim. This is
             // self-defense — no unauthorized-attack penalty — and it frees the
@@ -4452,8 +4494,11 @@ export class GameSession {
         // itself is self-defense, so neither is penalized here.
         // A ship that just stood down after a mug (complied or scared off) is
         // not a fresh civilian target: the hit that resolved the standoff is
-        // self-defense, not an unauthorized attack.
-        if (attackerId === 'player' && !ship.hostile && !ship.surrendered && !ship.recognizesPlayer && !ship.standingDown) {
+        // self-defense, not an unauthorized attack — the tally was reset on
+        // stand-down. But the break-off buys no immunity: keep firing and the
+        // standing-down ship re-engages exactly like any other non-hostile
+        // (warning first, then hostile once the damage threshold is crossed).
+        if (attackerId === 'player' && !ship.hostile && !ship.surrendered && !ship.captured && !ship.recognizesPlayer) {
             ship.playerDamageTaken = (ship.playerDamageTaken ?? 0) + (amount - remaining);
             const threshold = Math.max(25, (ship.maxShield + ship.maxArmor + ship.maxHull) * 0.15);
             if (ship.playerDamageTaken < threshold) {
@@ -4677,6 +4722,7 @@ export class GameSession {
             ship.standingDown = true;
             ship.hostile = false;
             ship.targetId = undefined;
+            ship.playerDamageTaken = 0;
             // A peaceful stand-down resolves a hyperdrive intercept too, so the
             // post-intercept calm window still triggers after a paid-off mug.
             this.resolveHyperdriveIntercept(ship);
@@ -4699,7 +4745,6 @@ export class GameSession {
         // The whole crew folds together, so the comms bar names every ship
         // that is breaking off — not just the lead.
         this.sayGroupLine(group, line);
-        this.ui.pushEvent(t('The pirates break off — they want an easier mark.'), 'info', 4800);
         return true;
     }
     // The window closed (or the pilot shot first): the whole group commits.
@@ -4726,7 +4771,7 @@ export class GameSession {
             return false;
         this.save.player.credits -= amount;
         this.standDownMug(mugger);
-        this.ui.pushEvent(t('Toll paid ({credits}) — the pirates break off.', { credits: formatCredits(amount) }), 'info', 5200);
+        this.ui.pushEvent(t('Toll paid ({credits}). Pirates break off.', { credits: formatCredits(amount) }), 'info', 5200);
         this.audio.play('ui', 0.6);
         return true;
     }
@@ -4743,7 +4788,7 @@ export class GameSession {
             const take = Math.min(owned, mugger.mug.demand.quantity);
             this.save.player.cargo[commodityId] = owned - take;
             this.standDownMug(mugger);
-            this.ui.pushEvent(t('{commodity} jettisoned ({units} units) — the pirates take it and break off.', { commodity: t(COMMODITIES[commodityId].name), units: take }), 'info', 5200);
+            this.ui.pushEvent(t('{commodity} jettisoned ({units}) — pirates take it and break off.', { commodity: t(COMMODITIES[commodityId].name), units: take }), 'info', 5200);
             this.audio.play('ui', 0.6);
             return true;
         }
@@ -4825,28 +4870,35 @@ export class GameSession {
             this.tryRescueGratitude(ship);
         }
         if (attackerId === 'player') {
-            this.save.player.stats.kills += 1;
-            if (ship.hostile || ship.faction === 'red-talons') {
+            if (!ship.captured)
+                this.save.player.stats.kills += 1;
+            // The capture already paid the bounty (see claimSurrendered); a
+            // hull destroyed after the fact is scrap, not a second paycheck.
+            if (!ship.captured && (ship.hostile || ship.faction === 'red-talons')) {
                 const payment = ship.bountyValue;
                 this.save.player.credits += payment;
                 this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + 1, -100, 100);
-                this.ui.pushEvent(t('Hostile destroyed. {credits} defense bounty credited.', { credits: formatCredits(payment) }), 'success', 4200);
+                this.ui.pushEvent(t('Hostile destroyed: +{credits} bounty.', { credits: formatCredits(payment) }), 'success', 4200);
             }
-            else {
+            else if (!ship.captured) {
                 this.save.player.reputation[ship.faction] = clamp(this.save.player.reputation[ship.faction] - 18, -100, 100);
-                this.ui.pushEvent(t('Civilian loss recorded. Faction standing severely reduced.'), 'danger', 5200);
+                this.ui.pushEvent(t('Civilian loss. {faction} standing severely reduced.'), 'danger', 5200);
             }
-            if (ship.missionId) {
+            if (ship.missionId && !ship.captured) {
                 const result = completeBountyMission(this.save, ship.missionId);
                 if (result.ok)
                     this.ui.pushEvent(result.message, 'success', 6500);
             }
         }
-        const rng = seededRandom(`${this.save.world.seed}:combat-drop:${ship.id}`);
-        if (rng() < 0.64)
-            this.spawnPickup(rng() > 0.8 ? 'electronics' : 'scrap', position, 'combat');
-        if (ship.role === 'miner' && rng() < MINER_GOLD_DROP_CHANCE)
-            this.spawnPickup('gold', position, 'combat');
+        // A captured hull already paid out on claim — destroying the wreck is
+        // scrap, not a second windfall, so no drop rolls fire for it.
+        if (!ship.captured) {
+            const rng = seededRandom(`${this.save.world.seed}:combat-drop:${ship.id}`);
+            if (rng() < 0.64)
+                this.spawnPickup(rng() > 0.8 ? 'electronics' : 'scrap', position, 'combat');
+            if (ship.role === 'miner' && rng() < MINER_GOLD_DROP_CHANCE)
+                this.spawnPickup('gold', position, 'combat');
+        }
         if (this.save.player.currentTargetId === ship.id)
             this.save.player.currentTargetId = undefined;
     }
@@ -5126,7 +5178,6 @@ export class GameSession {
         if (bucket < minerCutoff) {
             const miner = this.spawnShip('miner', this.encounterPosition(rng, 180));
             miner.destination = tuple(vec(LOCATIONS.shardbelt.position).add(new THREE.Vector3(randomBetween(rng, -70, 70), randomBetween(rng, -35, 35), randomBetween(rng, -70, 70))));
-            this.ui.pushSensor(zone === 'graveyard' ? 'Independent recovery crew on sensors.' : 'Miner traffic crossing the lane.', 'info');
         }
         else if (bucket < traderCutoff) {
             const trader = this.spawnShip('trader', this.encounterPosition(rng, 225));
@@ -5137,12 +5188,11 @@ export class GameSession {
                 this.audio.play('warning');
             }
             else {
-                this.ui.pushSensor(t('Civilian trader entering local space.'), 'info');
+                // The trader is on the radar; no ticker line needed.
             }
         }
         else if (bucket < patrolCutoffAdjusted) {
             this.spawnShip('patrol', this.encounterPosition(rng, 218));
-            this.ui.pushSensor(t('Concord patrol sweep detected.'), 'info');
         }
         else if (bucket < pirateCutoff) {
             const count = randomInt(rng, 1, zone === 'graveyard' ? 3 : 2);
@@ -6752,6 +6802,15 @@ export class GameSession {
             return;
         this.ui.showMap(this.buildNavigationMapModel());
     }
+    toggleTransponder() {
+        if (this.save.player.dockedAt)
+            return;
+        const dark = this.save.player.transponder !== false;
+        this.save.player.transponder = !dark;
+        this.ui.pushSensor(dark ? t('Transponder offline — dark to sensors. Slow to half speed to hide best.') : t('Transponder online — full sensor signature.'), dark ? 'warning' : 'success', 4200);
+        this.audio.play('ui');
+        saveGame(this.save);
+    }
     saveNow() {
         const ok = saveGame(this.save);
         this.ui.showToast(ok ? t('Career state saved locally.') : t('Save failed in this browser context.'), ok ? 'success' : 'danger');
@@ -6961,13 +7020,14 @@ export class GameSession {
                     heading,
                     subtitle: `${t(ship.role.toUpperCase())} · ${ship.surrendered ? t('SURRENDERED') : ship.hostile ? t('HOSTILE') : t(FACTION_LABEL(ship.faction))}${this.save.world.time < (ship.distressUntil ?? 0) ? ` · ${t('DISTRESS')}` : ''}`,
                     // The monitor's readout line carries the pilot profile so a
-                    // locked target's habits are visible at a glance — prefixed
-                    // with the recognition marker when the pilot remembers the
-                    // player (spared or escaped).
+                    // locked target's habits are visible at a glance — job and
+                    // skill tier, prefixed with the recognition marker when the
+                    // pilot remembers the player (spared or escaped). Temperament
+                    // stays off the HUD: it reads through behavior and comms.
                     readout: ship.captured || ship.surrendered
                         ? surrenderReadout
                         : ship.scanned
-                            ? `${this.shipTaskLabel(ship)}${ship.pilot ? ` · ${ship.recognizesPlayer ? `${SPARED_MARK} ` : ''}${t(TIER_LABELS[ship.pilot.tier] ?? ship.pilot.tier)} · ${t(TEMPERAMENT_LABELS[ship.pilot.temperament] ?? ship.pilot.temperament)}` : ''}`
+                            ? `${this.shipTaskLabel(ship)}${ship.pilot ? ` · ${ship.recognizesPlayer ? `${SPARED_MARK} ` : ''}${t(TIER_LABELS[ship.pilot.tier] ?? ship.pilot.tier)}` : ''}`
                             : distance > stats.scanRange
                                 ? t('OUT OF RANGE · {current}/{max} km', { current: Math.round(distance), max: stats.scanRange })
                                 : t('SCANNING…'),
@@ -7004,6 +7064,18 @@ export class GameSession {
                         ? `OUT OF RANGE · ${Math.round(distance)}/${stats.scanRange} km`
                         : 'SCANNING…';
                 hudTarget = { kind: 'wreck', name: node.name, subtitle: node.scanned ? t(commodity) : t('UNRESOLVED WRECK'), distance, scanned: node.scanned, readout: this.utilityReadout || scanStatus, ...screen };
+            }
+            else if (target.kind === 'pickup') {
+                const pickup = this.pickups.find((entry) => entry.id === target.id);
+                const amount = pickup?.amount ?? 1;
+                hudTarget = {
+                    kind: 'pickup',
+                    name: target.name,
+                    subtitle: t('EJECTED CARGO'),
+                    distance,
+                    readout: pickup?.commodity === 'credits' ? formatCredits(amount) : `${amount} ${t('UNITS')}`,
+                    ...screen,
+                };
             }
             else {
                 const location = LOCATIONS[target.id];
@@ -7081,6 +7153,10 @@ export class GameSession {
             // shrinks as the pilot slows to hide. mk2 grows the outer and mid
             // rings.
             radarRings: [this.playerVisibilityFraction(), stats.scanRange / stats.radarRange, 1],
+            // Combat-range anchor for the radar's non-linear radial scale, as
+            // a fraction of the horizon (200 km on a 1000 km radar): the inner
+            // disc is expanded up to this fraction (see drawRadar).
+            radarWarp: RADAR_COMBAT_RANGE / stats.radarRange,
             // Transponder state for the radar chip: broadcasting is the actual
             // sensor signature (transponder ON or the extraction beam running).
             transponder: this.save.player.transponder !== false,
@@ -7193,6 +7269,16 @@ export class GameSession {
                 .slice(0, MAP_WRECK_CONTACT_LIMIT);
             contacts.push(...wrecks);
         }
+        // Ejected cargo and combat drops surface like the radar shows them:
+        // any crate inside the sensor horizon, capped so a busy furball
+        // doesn't flood the contact list.
+        const pickups = this.pickups
+            .filter((pickup) => pickup.life > 0)
+            .map((pickup) => buildContact('pickup', pickup.id, this.pickupLabel(pickup), this.pickupDetail(pickup), tuple(this.pickupStore.getPos(pickup.slot, this.tmpP0)), stats.radarRange))
+            .filter((contact) => Boolean(contact))
+            .sort(prioritize)
+            .slice(0, MAP_PICKUP_CONTACT_LIMIT);
+        contacts.push(...pickups);
         // Staked claims always surface — even far beyond sensor range — so the
         // pilot can see where the rock is and lock a hyperdrive jump to it.
         for (const mission of this.activeMiningClaims()) {
@@ -7321,17 +7407,17 @@ export class GameSession {
             add(LOCATIONS[id].position, 'location', id === this.save.player.currentTargetId, LOCATIONS[id].radius);
         if (this.save.player.mode === 'mining') {
             for (const node of this.asteroids)
-                if (node.scanned || node.id === this.save.player.currentTargetId)
+                if (node.remaining > 0 && (node.scanned || node.id === this.save.player.currentTargetId))
                     add(node.position, 'resource', node.id === this.save.player.currentTargetId);
         }
         if (this.save.player.mode === 'salvage') {
             for (const node of this.wreckNodes)
-                if (node.scanned || node.id === this.save.player.currentTargetId)
+                if (node.remaining > 0 && (node.scanned || node.id === this.save.player.currentTargetId))
                     add(node.position, 'wreck', node.id === this.save.player.currentTargetId);
         }
         for (const pickup of this.pickups)
             if (pickup.life > 0)
-                add(this.pickupStore.pos.subarray(pickup.slot * 3, pickup.slot * 3 + 3), 'pickup', false);
+                add(this.pickupStore.pos.subarray(pickup.slot * 3, pickup.slot * 3 + 3), 'pickup', pickup.id === this.save.player.currentTargetId);
         return contacts;
     }
     zoneLabel(zone) {

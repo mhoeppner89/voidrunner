@@ -762,26 +762,6 @@ button.compact {
   border: 2px solid rgba(140, 219, 240, 0.7);
 }
 
-/* The transponder pad: a compact square that mirrors the radar chip. Lit =
-   cyan squawk, dark = amber squawk-off, so mobile pilots see the state on
-   the same pad they toggle it with. */
-.touch-transponder {
-  width: 44px;
-  height: 44px;
-  color: #cff6ff;
-  background: radial-gradient(circle at 38% 32%, rgba(84, 164, 196, 0.95), rgba(18, 56, 78, 0.96));
-  border: 2px solid rgba(140, 219, 240, 0.7);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
-}
-
-.touch-transponder.is-dark {
-  color: #ffcf7d;
-  background: radial-gradient(circle at 38% 32%, rgba(196, 138, 62, 0.95), rgba(74, 45, 16, 0.96));
-  border-color: rgba(238, 184, 96, 0.75);
-}
-
 /* Contextual pads: FIRE becomes MINE/SALVAGE, while the smaller pad becomes
    SCAN or CAPTURE. The contextual classes win by specificity (0,2,0 vs
    0,1,0) over every plain pad rule, so no !important is needed. */
@@ -2550,26 +2530,31 @@ button.compact {
   white-space: nowrap;
 }
 
-/* Transponder chip on the radar heading: a small status badge that mirrors the
-   ship's live sensor signature. Lit (cyan) = visible at full range; dark
-   (amber) = hidden beyond the dark-detection line. */
-.radar-transponder {
-  align-self: center;
-  padding: 0.08rem 0.3rem;
-  border: 1px solid rgba(105, 224, 210, 0.4);
-  border-radius: 2px;
-  color: var(--void-cyan);
-  font-size: 0.62em;
+/* The radar heading is the transponder toggle: it reads its own state —
+   "TRANSPONDER ON/OFF" — color-coded so the sensor signature reads at a
+   glance (green when lit / visible at full range, amber when dark), and it
+   is the mobile tap target (B on desktop). */
+.screen-heading.radar-heading {
+  justify-content: flex-start;
+  align-items: center;
+  pointer-events: auto;
+  cursor: pointer;
+  touch-action: manipulation;
+  color: #7fe08c;
+  font-weight: 700;
   letter-spacing: 0.1em;
-  text-shadow: 0 0 6px rgba(105, 224, 210, 0.55);
-  box-shadow: inset 0 0 6px rgba(105, 224, 210, 0.18);
+  text-shadow: 0 0 6px rgba(126, 224, 140, 0.55);
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-.radar-transponder.is-dark {
-  border-color: rgba(224, 186, 104, 0.55);
-  color: var(--void-gold);
-  text-shadow: 0 0 6px rgba(224, 186, 104, 0.6);
-  box-shadow: inset 0 0 6px rgba(224, 186, 104, 0.22);
+.screen-heading.radar-heading.is-dark {
+  color: #ff7a66;
+  text-shadow: 0 0 6px rgba(255, 122, 102, 0.55);
+}
+
+.screen-heading.radar-heading.is-active {
+  opacity: 0.55;
 }
 
 /* Standoff readout on the own-ship monitor: the mugger's demand plus the
@@ -3017,7 +3002,11 @@ html[lang="de"] .comms-bar::before {
    with the outline filling the middle, the status bars below it, and the
    flight-recorder ticker as a thin bottom row. */
 .screen-ship-layout {
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  /* Fixed rows: flight strip, outline (flexible), bars, and a RESERVED
+     ticker row. The ticker row never grows with its content — messages
+     are one line with ellipsis — so status bars stay put whether or not
+     a message is showing. */
+  grid-template-rows: auto minmax(0, 1fr) auto 0.98rem;
 }
 
 /* Top-down schematic drawn live so the own and target monitors always show
@@ -3219,8 +3208,9 @@ html[lang="de"] .comms-bar::before {
 
 .radar-screen-wrap {
   position: absolute;
-  /* Bottom inset leaves room for the sensor-log ticker line. */
-  inset: 18% 7% 17%;
+  /* The sensor-log ticker is gone; the disc fills the monitor below the
+     heading. */
+  inset: 18% 7% 2.5%;
   z-index: 1;
 }
 
@@ -3243,7 +3233,10 @@ html[lang="de"] .comms-bar::before {
   z-index: 1;
   display: flex;
   align-items: center;
-  min-height: 10px;
+  /* Height is fixed by the reserved grid row; the message span below does
+     the actual truncation (a flex container can't ellipsize its own text). */
+  height: 100%;
+  min-height: 0;
   padding: 0.08rem 0.4rem 0.1rem;
   color: #8fd1c1;
   border-top: 1px solid rgba(48, 161, 195, 0.3);
@@ -3251,11 +3244,16 @@ html[lang="de"] .comms-bar::before {
   font-size: clamp(0.52rem, 0.95vw, 0.78rem);
   letter-spacing: 0.04em;
   line-height: 1.1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   opacity: 0;
   transition: opacity 160ms ease;
+}
+
+.screen-ticker .ticker-line {
+  display: block;
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .screen-ticker.is-visible {
@@ -3275,17 +3273,6 @@ html[lang="de"] .comms-bar::before {
 .screen-ticker[data-tone='success'] {
   color: #c6e5ba;
   text-shadow: 0 0 6px rgba(198, 229, 186, 0.35);
-}
-
-/* The radar's sensor log sits along the monitor's bottom edge, under the
-   sweep. */
-.screen-sensor-log {
-  position: absolute;
-  left: 4%;
-  right: 4%;
-  bottom: 3%;
-  border-top: none;
-  border-bottom: 1px solid rgba(48, 161, 195, 0.3);
 }
 
 /* The live instrument windows are now the authoritative status/radar layer. */
@@ -3348,8 +3335,7 @@ html[lang="de"] .comms-bar::before {
   }
 
   .radar-screen-wrap {
-    /* Keep the bottom clear for the sensor-log ticker line. */
-    inset: 21% 5% 17%;
+    inset: 21% 5% 2.5%;
   }
 }
 
@@ -6606,14 +6592,17 @@ button.primary,
 }
 
 .cockpit-screen-radar,
-.cockpit-screen-radar .screen-heading,
 .radar-screen-wrap,
 .radar-screen-wrap #radar {
   pointer-events: auto;
 }
 
+/* The radar heading is the transponder toggle button (tap toggles on touch,
+   B on keyboard), so it stays interactive — unlike the other screens'
+   decorative headings. */
 .cockpit-screen-radar .screen-heading {
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .radar-screen-wrap #radar {

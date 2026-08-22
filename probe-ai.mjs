@@ -14,6 +14,13 @@
 // Run: node probe-ai.mjs   (exit code 0 = all green)
 import { register } from 'node:module';
 await register(new URL('./probe-ai-resolver.mjs', import.meta.url));
+// The game's default language is German and a headless probe has no persisted
+// language (node's localStorage is empty), so without this every
+// English-substring assertion below would fail against German output. The
+// game modules are imported after this, so their module-scope t() pools
+// resolve in English too.
+const { setLanguage } = await import('./src/game/i18n.js');
+setLanguage('en');
 const THREE = await import('three');
 const { GameSession } = await import('./src/game/game.js');
 const { EntityStore } = await import('./src/game/entityStore.js');
@@ -473,7 +480,10 @@ assert(recognition.recorded && recognition.recordMatches, 'surrendering records 
 assert(recognition.recognizes && !recognition.hostile, 'a re-encountered captured callsign recognizes the player and spawns non-hostile');
 assert(recognition.targetId === undefined, 'a deferential pilot never acquires a combat target');
 assert(recognition.lines.length === 1 && AGGRESSIVE_DEFERENCE.includes(recognition.lines[0]), `the deferential line lands exactly once (${recognition.lines.length})`);
-assert(recognition.readout.includes('✦') && recognition.readout.includes('Aggressive'), `the target monitor marks a spared pilot (${recognition.readout})`);
+// The pilot profile on the monitor leads with the task and shows the
+// recognition marker + tier; temperament deliberately stays off the HUD
+// (it reads through behavior and comms).
+assert(recognition.readout.includes('✦') && recognition.readout.includes('Veteran'), `the target monitor marks a spared pilot with the recognition marker and tier (${recognition.readout})`);
 const fresh = makeSession('recognize-fresh');
 const freshShip = fresh.spawnShip('pirate', [0, 0, -120], undefined, undefined, { tier: 'veteran', temperament: 'aggressive' });
 assert(freshShip.recognizesPlayer === false && freshShip.hostile === true, 'a fresh callsign stays hostile as usual');
@@ -538,7 +548,7 @@ console.log(`  hostile ${waryShip.hostile} · re-engaged ${waryShip.targetId ===
 assert(waryShip.wary && waryShip.hostile === true, 'an escaped pilot comes back wary and hostile');
 assert(waryShip.targetId === 'player', 'a wary pilot re-engages the player');
 assert(waryShip.waryLine, 'a wary pilot says a wary line, not a deference one');
-assert(waryShip.readout.includes('✦') && waryShip.readout.includes('Aggressive'), `the target monitor marks a wary pilot too (${waryShip.readout})`);
+assert(waryShip.readout.includes('✦') && waryShip.readout.includes('Veteran'), `the target monitor marks a wary pilot too (${waryShip.readout})`);
 assert(waryShip.waryPoint !== null && waryShip.normalPoint !== null && waryShip.waryPoint > waryShip.normalPoint * 1.15, `a wary pilot gives up earlier (${waryShip.waryPoint?.toFixed(3)} vs ${waryShip.normalPoint?.toFixed(3)})`);
 
 // ---------------------------------------------------------------------------
@@ -741,7 +751,7 @@ const profileRun = (seed) => {
 const profile = profileRun('profile-1');
 console.log(`  scan toasts: ${profile.toasts.length} · monitor readout: ${profile.readout}`);
 assert(profile.toasts.length === 0, `the scan no longer toasts — the profile lands on the monitor (${profile.toasts.join(' / ')})`);
-assert(profile.readout === 'HUNTING · Ace · Flamboyant', `target monitor readout leads with the ship's task after scan (${profile.readout})`);
+assert(profile.readout === 'HUNTING · Ace', `target monitor readout leads with the ship's task and tier after scan (${profile.readout})`);
 
 // ---------------------------------------------------------------------------
 console.log('comms: temperament-driven combat lines');
@@ -1435,7 +1445,9 @@ assert(Math.abs(caughtRing.fraction - 0.1) < 0.02, 'the ring radius is the 100-k
 searchFrames(caught, 1500, () => { caughtRun.session.save.player.position[2] += 1; }); // keep sprinting: the approach pass is slower than a lit hull
 assert(caughtPatrol.search === undefined, 'the speed-bleed search gives up after the timed fan-out');
 assert(caughtRun.session.save.world.time < caughtPatrol.searchCooldownUntil, 'every outcome sets the give-up cooldown before a re-trigger');
-assert(caught.sensors.some((line) => line.includes('no contact at last-known position')), 'the give-up logs the inconclusive sweep');
+// The give-up is silent: no sensor note announces it — the sweep ring
+// vanishing is the signal, and the log must not claim a firm contact.
+assert(!caught.sensors.some((line) => line.includes('contact confirmed')), 'the inconclusive give-up is never hailed as a firm contact');
 assert(caughtRun.session.save.player.reputation.concord === -2, 'escaping never adds a second Concord ding');
 assert(rings(caught).length === 0, 'the sweep ring leaves the radar once the search closes');
 
@@ -1471,7 +1483,7 @@ searchFrames(occlude, 1900); // the rock's avoidance makes the approach wander, 
 console.log(`  occlude: concord ${occludeRun.session.save.player.reputation.concord} · ${occlude.sensors.at(-1) ?? 'no sensor line'}`);
 assert(occludePatrol.search === undefined, 'the occluded search gives up after the timed fan-out');
 assert(occludeRun.session.save.player.reputation.concord === -2, 'one catch, one Concord ding');
-assert(occlude.sensors.some((line) => line.includes('no contact at last-known position')), 'the inconclusive sweep is logged');
+assert(occludePatrol.searchCooldownUntil > occludeRun.session.save.world.time, 'the inconclusive sweep still sets the give-up cooldown');
 assert(!occlude.sensors.some((line) => line.includes('contact confirmed')), 'the pilot who slipped away is never logged as a firm contact');
 
 // C — dropping the beam: a broadcasting pilot is resolved at full sensor
@@ -1494,6 +1506,9 @@ const vanishEscape = (seed, sprint) => {
     const opened = patrol.search?.phase === 'approach';
     const dropRing = rings(holder)[0];
     searchFrames(holder, sprint ? 2600 : 1600, sprint ? () => { run.session.save.player.position[2] += 1; } : undefined); // 60 km/s while the patrol investigates
+    // A search's end is spoken, not sensor-logged: finding the pilot again
+    // hails a firm contact on comms; a give-up ends in silence.
+    const firmHailed = run.lines.some((line) => line.includes('Contact confirmed') || line.includes('Identity logged'));
     return {
         resolvedBeforeDrop,
         noSearchBeforeDrop,
@@ -1503,8 +1518,8 @@ const vanishEscape = (seed, sprint) => {
         dinged: run.session.save.player.reputation.concord,
         warned: run.session.warnings,
         closed: patrol.search === undefined,
-        logged: run.sensors.some((line) => line.includes('contact confirmed')),
-        gaveUp: run.sensors.some((line) => line.includes('no contact at last-known position')),
+        logged: firmHailed,
+        gaveUp: !firmHailed,
         sensors: run.sensors.slice(),
     };
 };
@@ -1545,7 +1560,10 @@ const hostileHunt = (seed, flee) => {
         opened,
         ringColor: huntRing?.color,
         closed: pirate.search === undefined,
-        gaveUp: run.sensors.some((line) => line.includes('lost the signal')),
+        // A hostile give-up is silent too — the only trace left is the search
+        // closing and the give-up cooldown (the ring disappearing is the
+        // signal), so the give-up reads as the sweep machinery standing down.
+        gaveUp: pirate.searchCooldownUntil > run.session.save.world.time,
         reEngaged: pirate.attackPhase !== undefined,
         targetId: pirate.targetId,
         cooldown: pirate.searchCooldownUntil > run.session.save.world.time,

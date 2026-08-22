@@ -178,7 +178,7 @@ export const PILOT_LINES = {
             'What do you want? Just... keep flying, okay?',
         ],
         rank: [
-            'Heard you\'re a {rank}. Please — I surrender!',
+            'Heard you\'re a {rank}. Please — I don\'t want any trouble!',
             'A {rank} hunting little old me? I\'m not worth it!',
             'You\'re a {rank}? I\'ll pay you anything — just go!',
         ],

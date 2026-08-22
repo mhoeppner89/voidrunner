@@ -186,7 +186,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
         const deposit = kind === 'delivery' ? Math.round(reward * 0.08) : Math.round(reward * 0.12);
         const title = kind === 'delivery'
             ? t('Deliver {quantity} {commodity}', { quantity, commodity: t(COMMODITIES[commodity].name) })
-            : t('Timed transport to {station}', { station: LOCATIONS[destination].shortName });
+            : t('Express transport to {station}', { station: LOCATIONS[destination].shortName });
         const cargoLabel = pick(rng, VALUABLE_CARGO_LABELS);
         offers.push({
             id,
@@ -199,7 +199,14 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             quantity,
             reward: Math.round(reward),
             deposit,
-            deadline: save.world.time + Math.round(150 + distance * 0.4 + randomBetween(rng, 75, 190)),
+            // Express runs pay a premium (1.15x reward, +3 guild rep) but the
+            // client is buying urgency: the clock is only ~60% of a delivery's,
+            // so accepting one means committing to the destination. The floor
+            // keeps a freshly posted express from reading as already expired
+            // before the board cycles.
+            deadline: save.world.time + (kind === 'transport'
+                ? Math.max(150, Math.round((150 + distance * 0.4 + randomBetween(rng, 75, 190)) * 0.6))
+                : Math.round(150 + distance * 0.4 + randomBetween(rng, 75, 190))),
             status: 'offered',
             guild: 'merchant',
             guildRep: 5 + Math.floor(distance / 170) + (kind === 'transport' ? 3 : 0),

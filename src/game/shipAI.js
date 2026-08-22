@@ -475,9 +475,11 @@ const nextSalvagePoint = (ship, session) => {
 };
 // A hunter with no mark: lurch around the spawn anchor, waiting for prey.
 // A broken-off or deferential hunter instead departs — the old roam to a
-// random port, so a stood-down pirate actually leaves the field.
+// random port, so a stood-down pirate actually leaves the field. Standing
+// down is only a truce: if the player keeps firing and the pirate flips
+// hostile again, it re-engages instead of flying off.
 const huntTick = (ship, session, task) => {
-    if (ship.standingDown || !ship.hostile) {
+    if (ship.standingDown && !ship.hostile) {
         if (staleAt(ship)) {
             const rng = routeRng(ship, session);
             ship.destination = dockPoint(session, randomDock(rng), rng);
