@@ -69,6 +69,7 @@ const ROUTE_BAND_CELLS = 1;       // route may climb this many cells above/below
 const ROUTE_TRUST_WEIGHT = 1.6;   // goal-alignment multiplier while following a route waypoint
 const TURN_BRAKE_MIN = 0.4;       // rad: route legs brake once the goal is this far off the nose
 const TURN_BRAKE_FULL = 1.4;      // rad (80°): above this the ship stops and turns in place
+const ESCAPE_EMERGENCY_BONUS = 3;    // escape wins outright while inside an avoidance surface
 // Vertical steps cost extra so routes stay in the field's plane. The hard
 // guarantee is the goal-centered band (ROUTE_BAND_CELLS); the penalty keeps
 // even in-band paths from zig-zagging vertically when a flat route exists.
@@ -1185,7 +1186,11 @@ export function steerToward(session, ship, goalPos, options, out) {
     }
     // Emergency escape: when the ship is close to an obstacle, the direct away
     // direction is a candidate so a trapped ship can always back out instead
-    // of grinding the rock face (all goal-based candidates may collide).
+    // of grinding the rock face (all goal-based candidates may collide). While
+    // the ship is INSIDE an obstacle's avoidance surface the escape is an
+    // emergency and outranks every goal-weighted candidate: without the bonus,
+    // a wedged ship locks onto its own (clear) forward heading — the only
+    // non-colliding direction — and never turns or moves again.
     {
         let nearest = -1;
         let nearestSq = Infinity;
@@ -1203,7 +1208,19 @@ export function steerToward(session, ship, goalPos, options, out) {
         if (nearest >= 0) {
             const o = obstacles[nearest];
             const dl = Math.sqrt(nearestSq) || 1;
-            consider((px - o.x) / dl, (py - o.y) / dl, (pz - o.z) / dl);
+            const ex = (px - o.x) / dl;
+            const ey = (py - o.y) / dl;
+            const ez = (pz - o.z) / dl;
+            const escRes = scoreCandidate(ex, ey, ez, gx, gy, gz, fx, fy, fz, px, py, pz, lookahead, obstacles, shipClearance, scratch, scoringGoalWeight, smoothWeight);
+            if (escRes.score > -Infinity && obstacleClearanceAt(px, py, pz, o, shipClearance, scratch) < 0)
+                escRes.score += ESCAPE_EMERGENCY_BONUS;
+            if (escRes.score > bestScore) {
+                bestScore = escRes.score;
+                bestX = ex;
+                bestY = ey;
+                bestZ = ez;
+                bestClear = escRes.minClear;
+            }
         }
     }
     // Predictive brake from the tighter of the chosen path's clearance and the

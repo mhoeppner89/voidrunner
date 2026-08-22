@@ -6144,22 +6144,27 @@ export class GameSession {
             }
         };
         visit(cx, cy, cz);
-        let guard = 0;
         while (cx !== ex || cy !== ey || cz !== ez) {
-            if (++guard > 200000)
-                break;
-            if (tMaxX < tMaxY && tMaxX < tMaxZ) {
+            // Never step an axis whose plane crossing lies beyond the ray's end
+            // (tMax > 1): a ray landing exactly on a grid corner ties all three
+            // tMax values at the endpoint, and stepping past it overshoots the
+            // target cell forever (the DDA then grinds to its guard and eats
+            // ~200k grid lookups per query — the player parked at the world
+            // origin hits this constantly). Ties step X first.
+            if (tMaxX <= tMaxY && tMaxX <= tMaxZ && tMaxX <= 1) {
                 cx += stepX;
                 tMaxX += tDeltaX;
             }
-            else if (tMaxY < tMaxZ) {
+            else if (tMaxY <= tMaxZ && tMaxY <= 1) {
                 cy += stepY;
                 tMaxY += tDeltaY;
             }
-            else {
+            else if (tMaxZ <= 1) {
                 cz += stepZ;
                 tMaxZ += tDeltaZ;
             }
+            else
+                break;
             visit(cx, cy, cz);
         }
     }

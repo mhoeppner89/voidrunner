@@ -63,7 +63,7 @@ export const radarAltitudeTick = ({ x, y, radius, ratio = 1, direction, magnitud
     const length = Math.max(0, Math.min(desired, room - 2 * ratio));
     return length >= 1.5 * ratio ? { startY, length } : undefined;
 };
-const GAME_VERSION = '0.4.9b';
+const GAME_VERSION = '0.4.9c';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
