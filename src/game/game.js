@@ -10,6 +10,7 @@ import { SpaceRenderer } from './render.js';
 import { saveGame } from './save.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
 import { asteroidCollisionMesh, asteroidCollisionRadius, generateAsteroidField, generateGraveyardPieces, generateWreckNodes, graveyardZoneAt, graveyardZoneLabel, GRAVEYARD_GEOMETRY_PROFILES, wreckNodeCollisionRadius } from './worldData.js';
+import { hullVsAsteroid, hullVsBox, hullVsEngine, hullVsHull, hullVsRing, hullVsSphere } from './hullCollision.js';
 import { PILOT_LINES, pilotMod, rollPilot, TEMPERAMENT_LABELS, TIER_LABELS } from './pilots.js';
 import { MUG_CHANCE, SMUGGLE_CHANCE, createSmuggleTask, createTask, rebasePatrolTask, rollNpcCargo, updateShipAI } from './shipAI.js';
 import { paletteForFaction, playerShipVariant, shipVariantForRole } from './voxelModels.js';
@@ -23,6 +24,10 @@ const FALLBACK_AI_RNG = () => 0.5;
 // rank, and the valuable-load callouts) — remembered in pilotLineHistory.said.
 const PILOT_ONESHOT_KEYS = new Set(['contact', 'rank', 'case', 'cargo']);
 const PLAYER_RADIUS = 1.25;
+// The player's collision envelope is the GLB hull scaled down by this factor:
+// near-misses that look like they clear usually do, while the wide Talon sweep
+// still registers. NPCs collide at their full hull (no forgiveness).
+const PLAYER_COLLISION_FORGIVENESS = 0.7;
 // Fallback NPC collision radius for hulls without an explicit entry in
 // HULL_FLIGHT_STATS. Debris boxes still resolve against their exact oriented
 // surface, but the ship-side envelope is now per-hull so a freighter bumps at
@@ -753,83 +758,6 @@ const segmentEngineShellRoot = (sx, sy, sz, dx, dy, dz, radiusCenter, radiusSlop
         return second;
     return undefined;
 };
-// Closest point on triangle ABC to the origin (Ericson, Real-Time Collision
-// Detection), used by the asteroid mesh collider. Writes the closest point to
-// triClosest and returns the squared distance. The origin is the ship's hull
-// centre in player-hull space.
-const triClosest = { x: 0, y: 0, z: 0 };
-const triangleClosestDistSq = (ax, ay, az, bx, by, bz, cx, cy, cz) => {
-    const abx = bx - ax;
-    const aby = by - ay;
-    const abz = bz - az;
-    const acx = cx - ax;
-    const acy = cy - ay;
-    const acz = cz - az;
-    const apx = -ax;
-    const apy = -ay;
-    const apz = -az;
-    const d1 = abx * apx + aby * apy + abz * apz;
-    const d2 = acx * apx + acy * apy + acz * apz;
-    if (d1 <= 0 && d2 <= 0) {
-        triClosest.x = ax;
-        triClosest.y = ay;
-        triClosest.z = az;
-        return apx * apx + apy * apy + apz * apz;
-    }
-    const bpx = -bx;
-    const bpy = -by;
-    const bpz = -bz;
-    const d3 = abx * bpx + aby * bpy + abz * bpz;
-    const d4 = acx * bpx + acy * bpy + acz * bpz;
-    if (d3 >= 0 && d4 <= d3) {
-        triClosest.x = bx;
-        triClosest.y = by;
-        triClosest.z = bz;
-        return bpx * bpx + bpy * bpy + bpz * bpz;
-    }
-    const vc = d1 * d4 - d3 * d2;
-    if (vc <= 0 && d1 >= 0 && d3 <= 0) {
-        const t = d1 / (d1 - d3);
-        triClosest.x = ax + t * abx;
-        triClosest.y = ay + t * aby;
-        triClosest.z = az + t * abz;
-        return triClosest.x * triClosest.x + triClosest.y * triClosest.y + triClosest.z * triClosest.z;
-    }
-    const cpx = -cx;
-    const cpy = -cy;
-    const cpz = -cz;
-    const d5 = abx * cpx + aby * cpy + abz * cpz;
-    const d6 = acx * cpx + acy * cpy + acz * cpz;
-    if (d6 >= 0 && d5 <= d6) {
-        triClosest.x = cx;
-        triClosest.y = cy;
-        triClosest.z = cz;
-        return cpx * cpx + cpy * cpy + cpz * cpz;
-    }
-    const vb = d5 * d2 - d1 * d6;
-    if (vb <= 0 && d2 >= 0 && d6 <= 0) {
-        const t = d2 / (d2 - d6);
-        triClosest.x = ax + t * acx;
-        triClosest.y = ay + t * acy;
-        triClosest.z = az + t * acz;
-        return triClosest.x * triClosest.x + triClosest.y * triClosest.y + triClosest.z * triClosest.z;
-    }
-    const va = d3 * d6 - d5 * d4;
-    if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) {
-        const t = (d4 - d3) / (d4 - d3 + (d5 - d6));
-        triClosest.x = bx + t * (cx - bx);
-        triClosest.y = by + t * (cy - by);
-        triClosest.z = bz + t * (cz - bz);
-        return triClosest.x * triClosest.x + triClosest.y * triClosest.y + triClosest.z * triClosest.z;
-    }
-    const denom = 1 / (va + vb + vc);
-    const v = vb * denom;
-    const w = vc * denom;
-    triClosest.x = ax + abx * v + acx * w;
-    triClosest.y = ay + aby * v + acy * w;
-    triClosest.z = az + abz * v + acz * w;
-    return triClosest.x * triClosest.x + triClosest.y * triClosest.y + triClosest.z * triClosest.z;
-};
 export class GameSession {
     ui;
     onQuit;
@@ -1389,6 +1317,9 @@ export class GameSession {
         this.updateBountySpawns();
         this.updateDynamicEncounters();
         this.updateShips(dt);
+        // Ship-to-ship contacts resolve last, once every hull has settled its
+        // position for the frame against the environment.
+        this.resolveShipContacts();
         this.updatePlayerWeapons(dt, actions);
         this.updateProjectiles(dt);
         this.updatePickups(dt);
@@ -1611,42 +1542,25 @@ export class GameSession {
     }
     resolvePlayerCollisions(position, velocity) {
         // The player's collision envelope follows the outfitted hull: an
-        // oriented ellipsoid with the GLB hull's half-extents in the ship frame
-        // (HULL_FLIGHT_STATS.hullHalfExtents), so an Atlas bumps at its long
-        // nose and a Talon slips its slender cross-section through gaps the
-        // barge cannot. The ring/engine/dock colliders keep the spherical
-        // collisionRadius as their fit-through envelope.
-        const playerRadius = this.playerCollisionRadius();
+        // oriented ellipsoid with the GLB hull's half-extents in the ship
+        // frame, scaled by PLAYER_COLLISION_FORGIVENESS so near-misses that
+        // look like they clear usually do (the wide Talon sweep still counts).
+        // Every contact test lives in hullCollision.js — the same module the
+        // NPCs use — so the player and the ships share one geometry.
         const hullExtents = this.playerHullExtents();
-        const hullX = hullExtents[0];
-        const hullY = hullExtents[1];
-        const hullZ = hullExtents[2];
         if (!(this.collisionShipQuat instanceof THREE.Quaternion))
             this.collisionShipQuat = new THREE.Quaternion();
         if (!(this.collisionShipQuatInv instanceof THREE.Quaternion))
             this.collisionShipQuatInv = new THREE.Quaternion();
         const shipQuat = quat(this.save.player.rotation, this.collisionShipQuat);
         const shipQuatInv = this.collisionShipQuatInv.copy(shipQuat).invert();
-        // The hull ellipsoid's reach along a unit world direction (support).
-        const hullSupport = (nx, ny, nz) => {
-            const qx = shipQuatInv.x;
-            const qy = shipQuatInv.y;
-            const qz = shipQuatInv.z;
-            const qw = shipQuatInv.w;
-            const tx = 2 * (qy * nz - qz * ny);
-            const ty = 2 * (qz * nx - qx * nz);
-            const tz = 2 * (qx * ny - qy * nx);
-            const sx = nx + qw * tx + (qy * tz - qz * ty);
-            const sy = ny + qw * ty + (qz * tx - qx * tz);
-            const sz = nz + qw * tz + (qx * ty - qy * tx);
-            return Math.hypot(hullX * sx, hullY * sy, hullZ * sz);
-        };
-        const resolveContact = (normal, push, label) => {
-            position.x += normal.x * push;
-            position.y += normal.y * push;
-            position.z += normal.z * push;
-            const impactSpeed = Math.max(0, -(velocity.x * normal.x + velocity.y * normal.y + velocity.z * normal.z)) + velocity.length() * 0.16;
-            velocity.reflect(normal).multiplyScalar(0.32);
+        const contact = this.tmpCollisionContact ?? (this.tmpCollisionContact = { x: 0, y: 0, z: 0, push: 0 });
+        const resolveContact = (label) => {
+            position.x += contact.x * contact.push;
+            position.y += contact.y * contact.push;
+            position.z += contact.z * contact.push;
+            const impactSpeed = Math.max(0, -(velocity.x * contact.x + velocity.y * contact.y + velocity.z * contact.z)) + velocity.length() * 0.16;
+            velocity.reflect(this.tmpCollide.set(contact.x, contact.y, contact.z)).multiplyScalar(0.32);
             if (impactSpeed > 4) {
                 this.damagePlayer((impactSpeed - 3) * 1.65, label);
                 if (this.collisionMessageCooldown <= 0) {
@@ -1656,433 +1570,36 @@ export class GameSession {
             }
             this.autopilot = false;
         };
-        const collide = (x, y, z, radius, label) => {
-            const ox = position.x - x;
-            const oy = position.y - y;
-            const oz = position.z - z;
-            const minimum = radius + playerRadius;
-            const distSq = ox * ox + oy * oy + oz * oz;
-            if (distSq >= minimum * minimum || distSq < 0.0001)
-                return;
-            const dist = Math.sqrt(distSq);
-            const nx = ox / dist;
-            const ny = oy / dist;
-            const nz = oz / dist;
-            position.x = x + nx * (minimum + 0.08);
-            position.y = y + ny * (minimum + 0.08);
-            position.z = z + nz * (minimum + 0.08);
-            this.tmpCollide.set(nx, ny, nz);
-            resolveContact(this.tmpCollide, 0, label);
-        };
-        // Debris is an oriented box, not a sphere: a flat panel must block its
-        // whole face without ballooning into an invisible sphere around its
-        // thin axis. Transform the player into the box's local frame, push out
-        // along the nearest face, then rotate the normal back to world space.
-        const collideBox = (obstacle, label) => {
-            const box = obstacle.box;
-            this.tmpQ.set(box.qx, box.qy, box.qz, box.qw);
-            this.tmpQ2.copy(this.tmpQ).invert();
-            this.tmpF.set(position.x - obstacle.x, position.y - obstacle.y, position.z - obstacle.z).applyQuaternion(this.tmpQ2);
-            const hx = box.hx;
-            const hy = box.hy;
-            const hz = box.hz;
-            // The debris box expands by the hull ellipsoid's reach along each of
-            // its faces, not a single ship radius, so a long freighter bumps at
-            // its nose against a panel instead of clipping through it.
-            this.tmpG.set(1, 0, 0).applyQuaternion(this.tmpQ);
-            const supportX = hullSupport(this.tmpG.x, this.tmpG.y, this.tmpG.z);
-            this.tmpG.set(0, 1, 0).applyQuaternion(this.tmpQ);
-            const supportY = hullSupport(this.tmpG.x, this.tmpG.y, this.tmpG.z);
-            this.tmpG.set(0, 0, 1).applyQuaternion(this.tmpQ);
-            const supportZ = hullSupport(this.tmpG.x, this.tmpG.y, this.tmpG.z);
-            const ex = hx + supportX;
-            const ey = hy + supportY;
-            const ez = hz + supportZ;
-            if (this.tmpF.x < -ex || this.tmpF.x > ex || this.tmpF.y < -ey || this.tmpF.y > ey || this.tmpF.z < -ez || this.tmpF.z > ez)
-                return;
-            const cx = clamp(this.tmpF.x, -hx, hx);
-            const cy = clamp(this.tmpF.y, -hy, hy);
-            const cz = clamp(this.tmpF.z, -hz, hz);
-            let dx = this.tmpF.x - cx;
-            let dy = this.tmpF.y - cy;
-            let dz = this.tmpF.z - cz;
-            const distSq = dx * dx + dy * dy + dz * dz;
-            let nx;
-            let ny;
-            let nz;
-            let push;
-            if (distSq > 1e-9) {
-                const dist = Math.sqrt(distSq);
-                // The hull's reach along the push direction decides the contact.
-                this.tmpG.set(dx / dist, dy / dist, dz / dist).applyQuaternion(this.tmpQ);
-                const reach = hullSupport(this.tmpG.x, this.tmpG.y, this.tmpG.z);
-                if (dist >= reach)
-                    return;
-                nx = dx / dist;
-                ny = dy / dist;
-                nz = dz / dist;
-                push = reach - dist + 0.08;
-            }
-            else {
-                // The centre is inside the box (a fast jump tunnelled in):
-                // exit through the nearest face.
-                const px = hx - Math.abs(this.tmpF.x);
-                const py = hy - Math.abs(this.tmpF.y);
-                const pz = hz - Math.abs(this.tmpF.z);
-                if (px <= py && px <= pz) {
-                    nx = this.tmpF.x < 0 ? -1 : 1;
-                    ny = 0;
-                    nz = 0;
-                    push = px + supportX + 0.08;
-                }
-                else if (py <= pz) {
-                    nx = 0;
-                    ny = this.tmpF.y < 0 ? -1 : 1;
-                    nz = 0;
-                    push = py + supportY + 0.08;
-                }
-                else {
-                    nx = 0;
-                    ny = 0;
-                    nz = this.tmpF.z < 0 ? -1 : 1;
-                    push = pz + supportZ + 0.08;
-                }
-            }
-            this.tmpG.set(nx, ny, nz).applyQuaternion(this.tmpQ);
-            resolveContact(this.tmpG, push, label);
-        };
-        // The player's hull is an oriented ellipsoid in the ship frame (nose
-        // -Z). Transform the rock's collision mesh into that space so the hull
-        // becomes the unit sphere at the origin and the test is sphere-vs-mesh
-        // against the ACTUAL rendered rock surface — a bump lands on the visible
-        // rock from every angle, dents included, instead of an enclosing box or
-        // ellipsoid that bumps in empty air past a rock's corners.
-        const collideAsteroid = (obstacle, label) => {
-            const mesh = obstacle.meshVerts;
-            const indices = obstacle.meshIndices;
-            if (!mesh || !indices)
-                return;
-            if (!this.asteroidScratch || this.asteroidScratch.length < mesh.length)
-                this.asteroidScratch = new Float32Array(mesh.length);
-            const box = obstacle.box;
-            // Cheap reject: the rock's bounding reach plus the hull's longest.
-            const reach = Math.max(obstacle.radius, obstacle.losRadius ?? obstacle.radius) + Math.max(hullX, hullY, hullZ) + 4;
-            const ox = position.x - obstacle.x;
-            const oy = position.y - obstacle.y;
-            const oz = position.z - obstacle.z;
-            if (ox * ox + oy * oy + oz * oz >= reach * reach)
-                return;
-            const rqx = box.qx;
-            const rqy = box.qy;
-            const rqz = box.qz;
-            const rqw = box.qw;
-            const sqx = shipQuatInv.x;
-            const sqy = shipQuatInv.y;
-            const sqz = shipQuatInv.z;
-            const sqw = shipQuatInv.w;
-            const invHx = 1 / hullX;
-            const invHy = 1 / hullY;
-            const invHz = 1 / hullZ;
-            const scratch = this.asteroidScratch;
-            for (let i = 0; i < mesh.length; i += 3) {
-                // rock-local -> world, then world -> player-hull space.
-                let x = mesh[i];
-                let y = mesh[i + 1];
-                let z = mesh[i + 2];
-                let tX = 2 * (rqy * z - rqz * y);
-                let tY = 2 * (rqz * x - rqx * z);
-                let tZ = 2 * (rqx * y - rqy * x);
-                x = x + rqw * tX + (rqy * tZ - rqz * tY) - ox;
-                y = y + rqw * tY + (rqz * tX - rqx * tZ) - oy;
-                z = z + rqw * tZ + (rqx * tY - rqy * tX) - oz;
-                tX = 2 * (sqy * z - sqz * y);
-                tY = 2 * (sqz * x - sqx * z);
-                tZ = 2 * (sqx * y - sqy * x);
-                scratch[i] = (x + sqw * tX + (sqy * tZ - sqz * tY)) * invHx;
-                scratch[i + 1] = (y + sqw * tY + (sqz * tX - sqx * tZ)) * invHy;
-                scratch[i + 2] = (z + sqw * tZ + (sqx * tY - sqy * tX)) * invHz;
-            }
-            // Closest point on the transformed mesh to the origin (hull centre).
-            // triangleClosestDistSq writes triClosest for every candidate, so
-            // capture the winner's point here — reading it after the loop would
-            // return the last triangle's point, not the best one, and corrupt
-            // both the inside/outside test and the push direction.
-            let bestDistSq = Infinity;
-            let bestTri = -1;
-            let bestCx = 0;
-            let bestCy = 0;
-            let bestCz = 0;
-            for (let t = 0; t < indices.length; t += 3) {
-                const i0 = indices[t] * 3;
-                const i1 = indices[t + 1] * 3;
-                const i2 = indices[t + 2] * 3;
-                const distSq = triangleClosestDistSq(scratch[i0], scratch[i0 + 1], scratch[i0 + 2], scratch[i1], scratch[i1 + 1], scratch[i1 + 2], scratch[i2], scratch[i2 + 1], scratch[i2 + 2]);
-                if (distSq < bestDistSq) {
-                    bestDistSq = distSq;
-                    bestTri = t;
-                    bestCx = triClosest.x;
-                    bestCy = triClosest.y;
-                    bestCz = triClosest.z;
-                }
-            }
-            if (bestTri < 0)
-                return;
-            const dist = Math.sqrt(bestDistSq);
-            const i0 = indices[bestTri] * 3;
-            const i1 = indices[bestTri + 1] * 3;
-            const i2 = indices[bestTri + 2] * 3;
-            const e1x = scratch[i1] - scratch[i0];
-            const e1y = scratch[i1 + 1] - scratch[i0 + 1];
-            const e1z = scratch[i1 + 2] - scratch[i0 + 2];
-            const e2x = scratch[i2] - scratch[i0];
-            const e2y = scratch[i2 + 1] - scratch[i0 + 1];
-            const e2z = scratch[i2 + 2] - scratch[i0 + 2];
-            let nx = e1y * e2z - e1z * e2y;
-            let ny = e1z * e2x - e1x * e2z;
-            let nz = e1x * e2y - e1y * e2x;
-            const nLength = Math.hypot(nx, ny, nz);
-            if (nLength > 1e-9) {
-                nx /= nLength;
-                ny /= nLength;
-                nz /= nLength;
-            }
-            const cX = bestCx;
-            const cY = bestCy;
-            const cZ = bestCz;
-            // Origin inside the rock (a fast jump tunnelled in) vs outside: the
-            // closest face points away from an interior point, toward an
-            // exterior one. A deep inside point has a large nearest-face
-            // distance, so this must be decided before the surface test below.
-            const interior = cX * nx + cY * ny + cZ * nz > 0;
-            if (!interior && dist >= 1)
-                return;
-            let dirX;
-            let dirY;
-            let dirZ;
-            let pushPlayer;
-            if (interior) {
-                // Rare tunnelling: exit along the radial ray from the rock
-                // centre through the ship — the rock is star-shaped, so that ray
-                // always leaves the mesh. Ray-cast the transformed mesh for the
-                // exit distance; a dent's side walls can't wedge the ship.
-                let rcx = -ox;
-                let rcy = -oy;
-                let rcz = -oz;
-                let tX = 2 * (sqy * rcz - sqz * rcy);
-                let tY = 2 * (sqz * rcx - sqx * rcz);
-                let tZ = 2 * (sqx * rcy - sqy * rcx);
-                rcx = (rcx + sqw * tX + (sqy * tZ - sqz * tY)) * invHx;
-                rcy = (rcy + sqw * tY + (sqz * tX - sqx * tZ)) * invHy;
-                rcz = (rcz + sqw * tZ + (sqx * tY - sqy * tX)) * invHz;
-                dirX = -rcx;
-                dirY = -rcy;
-                dirZ = -rcz;
-                const dirLen = Math.hypot(dirX, dirY, dirZ) || 1;
-                dirX /= dirLen;
-                dirY /= dirLen;
-                dirZ /= dirLen;
-                let exitT = Infinity;
-                for (let t = 0; t < indices.length; t += 3) {
-                    const j0 = indices[t] * 3;
-                    const j1 = indices[t + 1] * 3;
-                    const j2 = indices[t + 2] * 3;
-                    const a1x = scratch[j1] - scratch[j0];
-                    const a1y = scratch[j1 + 1] - scratch[j0 + 1];
-                    const a1z = scratch[j1 + 2] - scratch[j0 + 2];
-                    const a2x = scratch[j2] - scratch[j0];
-                    const a2y = scratch[j2 + 1] - scratch[j0 + 1];
-                    const a2z = scratch[j2 + 2] - scratch[j0 + 2];
-                    const pvx = dirY * a2z - dirZ * a2y;
-                    const pvy = dirZ * a2x - dirX * a2z;
-                    const pvz = dirX * a2y - dirY * a2x;
-                    const det = a1x * pvx + a1y * pvy + a1z * pvz;
-                    if (Math.abs(det) < 1e-12)
-                        continue;
-                    const invDet = 1 / det;
-                    const tvx = rcx - scratch[j0];
-                    const tvy = rcy - scratch[j0 + 1];
-                    const tvz = rcz - scratch[j0 + 2];
-                    const u = (tvx * pvx + tvy * pvy + tvz * pvz) * invDet;
-                    if (u < 0 || u > 1)
-                        continue;
-                    const qvx = tvy * a1z - tvz * a1y;
-                    const qvy = tvz * a1x - tvx * a1z;
-                    const qvz = tvx * a1y - tvy * a1x;
-                    const v = (dirX * qvx + dirY * qvy + dirZ * qvz) * invDet;
-                    if (v < 0 || u + v > 1)
-                        continue;
-                    const hit = (a2x * qvx + a2y * qvy + a2z * qvz) * invDet;
-                    if (hit > 1e-6 && hit < exitT)
-                        exitT = hit;
-                }
-                if (exitT === Infinity)
-                    exitT = dist;
-                // exitT is measured from the rock centre (rc), but the push
-                // starts at the ship — subtract the centre-to-ship distance so
-                // the hull lands just past the surface, not past it by the
-                // ship's own offset from the centre.
-                pushPlayer = Math.max(1.08, exitT - Math.hypot(rcx, rcy, rcz) + 1 + 0.08);
-            }
-            else if (dist > 1e-6) {
-                // The closest surface point lies between the hull centre and
-                // the rock, so push AWAY from it (negate) to separate.
-                dirX = -cX / dist;
-                dirY = -cY / dist;
-                dirZ = -cZ / dist;
-                pushPlayer = 1 - dist;
-            }
-            else {
-                dirX = nx;
-                dirY = ny;
-                dirZ = nz;
-                pushPlayer = 1;
-            }
-            // Map back to world: scale the player-space direction by the hull
-            // extents (ship frame), rotate by the ship quaternion.
-            const sqFx = shipQuat.x;
-            const sqFy = shipQuat.y;
-            const sqFz = shipQuat.z;
-            const sqFw = shipQuat.w;
-            let wX = dirX * hullX;
-            let wY = dirY * hullY;
-            let wZ = dirZ * hullZ;
-            let tX = 2 * (sqFy * wZ - sqFz * wY);
-            let tY = 2 * (sqFz * wX - sqFx * wZ);
-            let tZ = 2 * (sqFx * wY - sqFy * wX);
-            wX = wX + sqFw * tX + (sqFy * tZ - sqFz * tY);
-            wY = wY + sqFw * tY + (sqFz * tX - sqFx * tZ);
-            wZ = wZ + sqFw * tZ + (sqFx * tY - sqFy * tX);
-            const support = Math.hypot(dirX * hullX, dirY * hullY, dirZ * hullZ);
-            const worldLength = Math.hypot(wX, wY, wZ) || 1;
-            wX /= worldLength;
-            wY /= worldLength;
-            wZ /= worldLength;
-            const push = pushPlayer * support + 0.08;
-            position.x += wX * push;
-            position.y += wY * push;
-            position.z += wZ * push;
-            this.tmpCollide.set(wX, wY, wZ);
-            resolveContact(this.tmpCollide, 0, label);
-        };
-        // Rings are toruses, not solid boxes. THREE.TorusGeometry lies in the
-        // local XY plane, so the opening runs along local Z. Measure the
-        // player's centre in that scaled local frame and expand only the tube
-        // by the ship radius. A large opening therefore remains flyable; a
-        // small opening naturally closes when the ship cannot fit through it.
-        const collideRing = (obstacle, label) => {
-            const box = obstacle.box;
-            const scaleX = Math.max(0.001, obstacle.scale[0]);
-            const scaleY = Math.max(0.001, obstacle.scale[1]);
-            const scaleZ = Math.max(0.001, obstacle.scale[2]);
-            const minScale = Math.min(scaleX, scaleY, scaleZ);
-            this.tmpQ.set(box.qx, box.qy, box.qz, box.qw);
-            this.tmpQ2.copy(this.tmpQ).invert();
-            this.tmpF.set(position.x - obstacle.x, position.y - obstacle.y, position.z - obstacle.z).applyQuaternion(this.tmpQ2);
-            const localX = this.tmpF.x / scaleX;
-            const localY = this.tmpF.y / scaleY;
-            const localZ = this.tmpF.z / scaleZ;
-            const radial = Math.hypot(localX, localY);
-            const radialDirectionX = radial > 1e-6 ? localX / radial : 1;
-            const radialDirectionY = radial > 1e-6 ? localY / radial : 0;
-            const deltaRadial = radial - GRAVEYARD_GEOMETRY_PROFILES.ring.majorRadius;
-            const distanceToTube = Math.hypot(deltaRadial, localZ);
-            const localPlayerRadius = playerRadius / minScale;
-            const expandedTube = GRAVEYARD_GEOMETRY_PROFILES.ring.tubeRadius + localPlayerRadius;
-            if (distanceToTube >= expandedTube)
-                return;
-            let normalRadial;
-            let normalZ;
-            if (distanceToTube > 1e-6) {
-                normalRadial = deltaRadial / distanceToTube;
-                normalZ = localZ / distanceToTube;
-            }
-            else {
-                normalRadial = 1;
-                normalZ = 0;
-            }
-            const pushLocal = expandedTube - distanceToTube + 0.08 / minScale;
-            this.tmpG.set(normalRadial * radialDirectionX * pushLocal * scaleX, normalRadial * radialDirectionY * pushLocal * scaleY, normalZ * pushLocal * scaleZ).applyQuaternion(this.tmpQ);
-            const push = this.tmpG.length();
-            if (push < 1e-6)
-                return;
-            this.tmpG.multiplyScalar(1 / push);
-            resolveContact(this.tmpG, push, label);
-        };
-        // Engines use a hollow tapered shell. Only the wall and its end rims
-        // collide; the two circular ends stay open, so a ship can pass down
-        // the bore when its radius fits the visible opening.
-        const collideEngine = (obstacle, label) => {
-            const box = obstacle.box;
-            const scaleX = Math.max(0.001, obstacle.scale[0]);
-            const scaleY = Math.max(0.001, obstacle.scale[1]);
-            const scaleZ = Math.max(0.001, obstacle.scale[2]);
-            const radialScale = Math.min(scaleX, scaleZ);
-            this.tmpQ.set(box.qx, box.qy, box.qz, box.qw);
-            this.tmpQ2.copy(this.tmpQ).invert();
-            this.tmpF.set(position.x - obstacle.x, position.y - obstacle.y, position.z - obstacle.z).applyQuaternion(this.tmpQ2);
-            const localX = this.tmpF.x / scaleX;
-            const localY = this.tmpF.y / scaleY;
-            const localZ = this.tmpF.z / scaleZ;
-            const localPlayerRadius = playerRadius / radialScale;
-            const yAllowance = playerRadius / scaleY;
-            const profile = GRAVEYARD_GEOMETRY_PROFILES.engine;
-            if (localY < -profile.halfHeight - yAllowance || localY > profile.halfHeight + yAllowance)
-                return;
-            const surfaceY = clamp(localY, -profile.halfHeight, profile.halfHeight);
-            const yFraction = (surfaceY + profile.halfHeight) / (profile.halfHeight * 2);
-            const wallRadius = profile.radiusBottom + (profile.radiusTop - profile.radiusBottom) * yFraction;
-            const innerRadius = Math.max(0.05, wallRadius - profile.wallThickness);
-            const radial = Math.hypot(localX, localZ);
-            const radialDirectionX = radial > 1e-6 ? localX / radial : 1;
-            const radialDirectionZ = radial > 1e-6 ? localZ / radial : 0;
-            let distanceToWall;
-            let normalSign;
-            if (radial < innerRadius) {
-                distanceToWall = innerRadius - radial;
-                if (distanceToWall >= localPlayerRadius)
-                    return;
-                normalSign = -1;
-            }
-            else if (radial > wallRadius) {
-                distanceToWall = radial - wallRadius;
-                if (distanceToWall >= localPlayerRadius)
-                    return;
-                normalSign = 1;
-            }
-            else {
-                const innerDistance = radial - innerRadius;
-                const outerDistance = wallRadius - radial;
-                distanceToWall = Math.min(innerDistance, outerDistance);
-                normalSign = innerDistance <= outerDistance ? -1 : 1;
-            }
-            const pushLocal = localPlayerRadius - distanceToWall + 0.08 / radialScale;
-            this.tmpG.set(normalSign * radialDirectionX * pushLocal * scaleX, 0, normalSign * radialDirectionZ * pushLocal * scaleZ).applyQuaternion(this.tmpQ);
-            const push = this.tmpG.length();
-            if (push < 1e-6)
-                return;
-            this.tmpG.multiplyScalar(1 / push);
-            resolveContact(this.tmpG, push, label);
-        };
         const dock = this.activeDockObstacle();
-        if (dock)
-            collide(dock.x, dock.y, dock.z, dock.collisionRadius, LOCATIONS[dock.id].name);
+        if (dock) {
+            if (hullVsSphere(position, hullExtents, shipQuatInv, dock.x, dock.y, dock.z, dock.collisionRadius, contact))
+                resolveContact(LOCATIONS[dock.id].name);
+        }
         else {
             const margin = MAX_FIELD_OBSTACLE_RADIUS;
             const label = this.activeInstanceId === 'shardbelt' ? 'asteroid' : 'wreckage';
             this.forEachObstacleInBox(position.x - margin, position.y - margin, position.z - margin, position.x + margin, position.y + margin, position.z + margin, (obstacle) => {
+                let hit = false;
                 if (obstacle.shape === 'ring')
-                    collideRing(obstacle, label);
+                    hit = hullVsRing(position, hullExtents, shipQuatInv, obstacle, contact);
                 else if (obstacle.shape === 'engine')
-                    collideEngine(obstacle, label);
-                else if (obstacle.shape === 'asteroid')
-                    collideAsteroid(obstacle, label);
+                    hit = hullVsEngine(position, hullExtents, shipQuatInv, obstacle, contact);
+                else if (obstacle.shape === 'asteroid') {
+                    const mesh = obstacle.meshVerts;
+                    if (!this.asteroidScratch || this.asteroidScratch.length < mesh.length)
+                        this.asteroidScratch = new Float32Array(mesh.length);
+                    hit = hullVsAsteroid(position, hullExtents, shipQuat, shipQuatInv, obstacle, this.asteroidScratch, contact);
+                }
                 else if (obstacle.box)
-                    collideBox(obstacle, label);
+                    hit = hullVsBox(position, hullExtents, shipQuatInv, obstacle, contact);
                 else
-                    collide(obstacle.x, obstacle.y, obstacle.z, obstacle.collisionRadius, label);
+                    hit = hullVsSphere(position, hullExtents, shipQuatInv, obstacle.x, obstacle.y, obstacle.z, obstacle.collisionRadius, contact);
+                if (hit)
+                    resolveContact(label);
             });
         }
     }
+
     updatePlayerWeapons(dt, actions) {
         this.utilityActive = false;
         this.utilityReadout = '';
@@ -4436,29 +3953,31 @@ export class GameSession {
         quatTupleInto(ship.rotation, orientation);
     }
     resolveNpcCollisions(ship) {
-        // NPC hard-collision pass: mirror the player's field collision so ships
-        // push out of rocks and wreckage instead of ghosting through them. Debris
-        // panels resolve against their exact oriented surface; everything else
-        // (asteroids, wreck nodes, rings/engines) uses its bounding sphere — a
-        // coarse but safe proxy for NPC steering.
+        // NPC hard-collision pass: the same hullCollision.js module the player
+        // uses, with the NPC's FULL hull (no forgiveness) — an NPC only bumps
+        // when its visible model touches. Rocks use the exact mesh, debris
+        // panels their flat faces, wreck nodes a support-expanded sphere.
         if (ship.captured || ship.poweredDown)
             return;
-        const shipRadius = HULL_FLIGHT_STATS[shipVariantForRole(ship.role)]?.collisionRadius ?? NPC_SHIP_RADIUS;
+        const hullExtents = this.npcHullExtents(ship);
         const position = this.tmpA.set(ship.position[0], ship.position[1], ship.position[2]);
         const velocity = this.tmpB.set(ship.velocity[0], ship.velocity[1], ship.velocity[2]);
         const speed = velocity.length();
         let impactDamage = 0;
         let clipped = false;
-        const resolveContact = (normal, push) => {
+        const shipQuat = this.tmpQ.set(ship.rotation[0], ship.rotation[1], ship.rotation[2], ship.rotation[3]);
+        const shipQuatInv = this.tmpQ2.copy(shipQuat).invert();
+        const contact = this.tmpNpcContact ?? (this.tmpNpcContact = { x: 0, y: 0, z: 0, push: 0 });
+        const resolveContact = () => {
             clipped = true;
-            position.x += normal.x * push;
-            position.y += normal.y * push;
-            position.z += normal.z * push;
+            position.x += contact.x * contact.push;
+            position.y += contact.y * contact.push;
+            position.z += contact.z * contact.push;
             // Cancel the inward velocity and add a little outward rebound, so the
             // ship cannot tunnel into or grind along the obstacle's surface.
-            const inward = -(velocity.x * normal.x + velocity.y * normal.y + velocity.z * normal.z);
+            const inward = -(velocity.x * contact.x + velocity.y * contact.y + velocity.z * contact.z);
             if (inward > 0)
-                velocity.addScaledVector(normal, inward * 1.5);
+                velocity.addScaledVector(this.tmpCollide.set(contact.x, contact.y, contact.z), inward * 1.5);
             const impactSpeed = inward + speed * 0.16;
             if (impactSpeed > 4) {
                 const raw = (impactSpeed - 3) * 1.35;
@@ -4469,89 +3988,25 @@ export class GameSession {
                 impactDamage = Math.max(impactDamage, Math.min(raw, cap));
             }
         };
-        const collideSphere = (x, y, z, radius) => {
-            const ox = position.x - x;
-            const oy = position.y - y;
-            const oz = position.z - z;
-            const minimum = radius + shipRadius;
-            const distSq = ox * ox + oy * oy + oz * oz;
-            if (distSq >= minimum * minimum || distSq < 0.0001)
-                return;
-            const dist = Math.sqrt(distSq);
-            const nx = ox / dist;
-            const ny = oy / dist;
-            const nz = oz / dist;
-            position.x = x + nx * minimum;
-            position.y = y + ny * minimum;
-            position.z = z + nz * minimum;
-            this.tmpCollide.set(nx, ny, nz);
-            resolveContact(this.tmpCollide, 0);
-        };
-        const collideBox = (obstacle) => {
-            const box = obstacle.box;
-            this.tmpQ.set(box.qx, box.qy, box.qz, box.qw);
-            this.tmpQ2.copy(this.tmpQ).invert();
-            this.tmpF.set(position.x - obstacle.x, position.y - obstacle.y, position.z - obstacle.z).applyQuaternion(this.tmpQ2);
-            const hx = box.hx;
-            const hy = box.hy;
-            const hz = box.hz;
-            const ex = hx + shipRadius;
-            const ey = hy + shipRadius;
-            const ez = hz + shipRadius;
-            if (this.tmpF.x < -ex || this.tmpF.x > ex || this.tmpF.y < -ey || this.tmpF.y > ey || this.tmpF.z < -ez || this.tmpF.z > ez)
-                return;
-            const cx = clamp(this.tmpF.x, -hx, hx);
-            const cy = clamp(this.tmpF.y, -hy, hy);
-            const cz = clamp(this.tmpF.z, -hz, hz);
-            let dx = this.tmpF.x - cx;
-            let dy = this.tmpF.y - cy;
-            let dz = this.tmpF.z - cz;
-            const distSq = dx * dx + dy * dy + dz * dz;
-            let nx;
-            let ny;
-            let nz;
-            let push;
-            if (distSq > 1e-9) {
-                const dist = Math.sqrt(distSq);
-                if (dist >= shipRadius)
-                    return;
-                nx = dx / dist;
-                ny = dy / dist;
-                nz = dz / dist;
-                push = shipRadius - dist + 0.08;
-            }
-            else {
-                const px = hx - Math.abs(this.tmpF.x);
-                const py = hy - Math.abs(this.tmpF.y);
-                const pz = hz - Math.abs(this.tmpF.z);
-                if (px <= py && px <= pz) {
-                    nx = this.tmpF.x < 0 ? -1 : 1;
-                    ny = 0;
-                    nz = 0;
-                    push = px + shipRadius + 0.08;
-                }
-                else if (py <= pz) {
-                    nx = 0;
-                    ny = this.tmpF.y < 0 ? -1 : 1;
-                    nz = 0;
-                    push = py + shipRadius + 0.08;
-                }
-                else {
-                    nx = 0;
-                    ny = 0;
-                    nz = this.tmpF.z < 0 ? -1 : 1;
-                    push = pz + shipRadius + 0.08;
-                }
-            }
-            this.tmpG.set(nx, ny, nz).applyQuaternion(this.tmpQ);
-            resolveContact(this.tmpG, push);
-        };
-        const margin = MAX_FIELD_OBSTACLE_RADIUS + shipRadius;
+        const margin = MAX_FIELD_OBSTACLE_RADIUS + Math.max(hullExtents[0], hullExtents[1], hullExtents[2]);
         this.forEachObstacleInBox(position.x - margin, position.y - margin, position.z - margin, position.x + margin, position.y + margin, position.z + margin, (obstacle) => {
-            if (obstacle.box)
-                collideBox(obstacle);
+            let hit = false;
+            if (obstacle.shape === 'ring')
+                hit = hullVsRing(position, hullExtents, shipQuatInv, obstacle, contact);
+            else if (obstacle.shape === 'engine')
+                hit = hullVsEngine(position, hullExtents, shipQuatInv, obstacle, contact);
+            else if (obstacle.shape === 'asteroid') {
+                const mesh = obstacle.meshVerts;
+                if (!this.npcAsteroidScratch || this.npcAsteroidScratch.length < mesh.length)
+                    this.npcAsteroidScratch = new Float32Array(mesh.length);
+                hit = hullVsAsteroid(position, hullExtents, shipQuat, shipQuatInv, obstacle, this.npcAsteroidScratch, contact);
+            }
+            else if (obstacle.box)
+                hit = hullVsBox(position, hullExtents, shipQuatInv, obstacle, contact);
             else
-                collideSphere(obstacle.x, obstacle.y, obstacle.z, obstacle.collisionRadius);
+                hit = hullVsSphere(position, hullExtents, shipQuatInv, obstacle.x, obstacle.y, obstacle.z, obstacle.collisionRadius, contact);
+            if (hit)
+                resolveContact();
         });
         tupleInto(ship.position, position);
         tupleInto(ship.velocity, velocity);
@@ -4562,8 +4017,6 @@ export class GameSession {
             // A badly damaged ship flees toward open space instead of re-rolling
             // straight back into the clutter it just bounced off.
             ship.seekClearSpace = ship.maxHull > 0 && ship.hull / ship.maxHull < NPC_BADLY_DAMAGED_HULL_RATIO;
-            // If the player is watching this hull on the target monitor, flash
-            // its outline so the field damage is visible, not just audible.
             if (this.save.player.currentTargetId === ship.id)
                 this.targetClipUntil = this.save.world.time + 1.4;
             if (this.npcCollisionCooldown <= 0) {
@@ -4572,6 +4025,115 @@ export class GameSession {
             }
         }
     }
+    // Ship-to-ship hard collision: once every ship (player included) has
+    // settled its position for the frame, resolve every touching pair exactly
+    // once — player × NPC and NPC × NPC. The push splits by hull volume (the
+    // light ship gets thrown, the heavy one barely moves), both velocities
+    // recoil, and a hard ram deals the same environment-style damage both
+    // sides would take clipping a rock.
+    resolveShipContacts() {
+        const player = this.save.player;
+        const playerPos = this.tmpP3.set(player.position[0], player.position[1], player.position[2]);
+        const playerQuat = quat(player.rotation, this.collisionShipQuat);
+        const playerExtents = this.playerHullExtents();
+        const contact = this.tmpShipContact ?? (this.tmpShipContact = { x: 0, y: 0, z: 0, push: 0 });
+        const playerVolume = playerExtents[0] * playerExtents[1] * playerExtents[2];
+        // One side of a contact: apply the push, recoil the velocity, and
+        // report the impact speed for damage. The impact uses the RELATIVE
+        // closing velocity along the normal (a stationary freighter struck by
+        // a fast fighter still takes the ram), and `sign` flips the normal for
+        // the far side so each ship's recoil points away from the other.
+        const apply = (posArr, velArr, otherVel, vol, otherVol, sign) => {
+            const share = otherVol / (vol + otherVol);
+            const nx = contact.x * sign;
+            const ny = contact.y * sign;
+            const nz = contact.z * sign;
+            posArr[0] += nx * contact.push * share;
+            posArr[1] += ny * contact.push * share;
+            posArr[2] += nz * contact.push * share;
+            const vx = velArr[0];
+            const vy = velArr[1];
+            const vz = velArr[2];
+            // Closing speed along this side's normal (self minus other).
+            const rvx = vx - otherVel[0];
+            const rvy = vy - otherVel[1];
+            const rvz = vz - otherVel[2];
+            const inward = -(rvx * nx + rvy * ny + rvz * nz);
+            if (inward > 0) {
+                velArr[0] += nx * inward * 1.5;
+                velArr[1] += ny * inward * 1.5;
+                velArr[2] += nz * inward * 1.5;
+            }
+            return inward + Math.hypot(rvx, rvy, rvz) * 0.16;
+        };
+        const ships = this.ships;
+        for (let i = 0; i < ships.length; i += 1) {
+            const ship = ships[i];
+            if (ship.hull <= 0 || ship.captured || ship.poweredDown)
+                continue;
+            const shipExtents = this.npcHullExtents(ship);
+            const shipVolume = shipExtents[0] * shipExtents[1] * shipExtents[2];
+            // Player vs ship.
+            const shipPos = this.tmpP0.set(ship.position[0], ship.position[1], ship.position[2]);
+            const shipQuat = this.tmpQ.set(ship.rotation[0], ship.rotation[1], ship.rotation[2], ship.rotation[3]);
+            if (hullVsHull(playerPos, playerExtents, playerQuat, shipPos, shipExtents, shipQuat, contact)) {
+                // Snapshot both velocities before any recoil is applied, so each
+                // side's impact reads the true pre-contact closing speed.
+                const pv = player.velocity;
+                const sv = ship.velocity;
+                const playerVel0 = [pv[0], pv[1], pv[2]];
+                const shipVel0 = [sv[0], sv[1], sv[2]];
+                const playerImpact = apply(player.position, player.velocity, shipVel0, playerVolume, shipVolume, 1);
+                const shipImpact = apply(ship.position, ship.velocity, playerVel0, shipVolume, playerVolume, -1);
+                if (playerImpact > 4) {
+                    this.damagePlayer((playerImpact - 3) * 1.65, ship.name);
+                    if (this.collisionMessageCooldown <= 0) {
+                        this.collisionMessageCooldown = 1.4;
+                        this.ui.pushEvent(`Collision: ${ship.name}`, 'danger');
+                    }
+                }
+                this.autopilot = false;
+                const raw = (shipImpact - 3) * 1.35;
+                const cap = Math.max(10, ship.maxHull * 0.25);
+                const dmg = shipImpact > 4 ? Math.min(raw, cap) : 0;
+                if (dmg > 0)
+                    this.damageShip(ship, dmg, 'player', tuple(playerPos));
+                if (dmg > 0.5) {
+                    ship.destination = undefined;
+                    if (this.npcCollisionCooldown <= 0) {
+                        this.npcCollisionCooldown = 2.5;
+                        this.ui.pushEvent(`${ship.name} clipped you.`, 'warning', 3600);
+                    }
+                }
+            }
+            // Ship vs later ships (each pair exactly once).
+            shipPos.set(ship.position[0], ship.position[1], ship.position[2]);
+            for (let j = i + 1; j < ships.length; j += 1) {
+                const other = ships[j];
+                if (other.hull <= 0 || other.captured || other.poweredDown)
+                    continue;
+                const otherExtents = this.npcHullExtents(other);
+                const otherVolume = otherExtents[0] * otherExtents[1] * otherExtents[2];
+                const otherPos = this.tmpP1.set(other.position[0], other.position[1], other.position[2]);
+                const otherQuat = this.tmpQ2.set(other.rotation[0], other.rotation[1], other.rotation[2], other.rotation[3]);
+                if (hullVsHull(shipPos, shipExtents, shipQuat, otherPos, otherExtents, otherQuat, contact)) {
+                    const sv = ship.velocity;
+                    const ov = other.velocity;
+                    const shipVel0 = [sv[0], sv[1], sv[2]];
+                    const otherVel0 = [ov[0], ov[1], ov[2]];
+                    const shipImpact = apply(ship.position, ship.velocity, otherVel0, shipVolume, otherVolume, 1);
+                    const otherImpact = apply(other.position, other.velocity, shipVel0, otherVolume, shipVolume, -1);
+                    const shipDmg = shipImpact > 4 ? Math.min((shipImpact - 3) * 1.35, Math.max(10, ship.maxHull * 0.25)) : 0;
+                    const otherDmg = otherImpact > 4 ? Math.min((otherImpact - 3) * 1.35, Math.max(10, other.maxHull * 0.25)) : 0;
+                    if (shipDmg > 0)
+                        this.damageShip(ship, shipDmg, other.id, tuple(otherPos));
+                    if (otherDmg > 0)
+                        this.damageShip(other, otherDmg, ship.id, tuple(shipPos));
+                }
+            }
+        }
+    }
+
     findClearSpace(ship) {
         // Search a fan of nearby points for the first pocket clear of field
         // obstacles, so a badly damaged ship can limp out of the clutter before
@@ -6155,8 +5717,17 @@ export class GameSession {
     // [starboard X, up Y, forward Z] — measured from the baked GLB models. The
     // player's hard collision (rocks, debris boxes) tests this shape.
     playerHullExtents() {
-        return HULL_FLIGHT_STATS[playerShipVariant(this.save.player.shipId)]?.hullHalfExtents ?? [1.4, 2.4, 6.1];
+        // The player's collision envelope is the GLB hull scaled by the
+        // forgiveness factor — the same shape, just slimmer, so near-misses
+        // that look like they clear usually do. NPCs use npcHullExtents (full
+        // hull) instead.
+        const base = HULL_FLIGHT_STATS[playerShipVariant(this.save.player.shipId)]?.hullHalfExtents ?? [1.4, 2.4, 6.1];
+        return [base[0] * PLAYER_COLLISION_FORGIVENESS, base[1] * PLAYER_COLLISION_FORGIVENESS, base[2] * PLAYER_COLLISION_FORGIVENESS];
     }
+    npcHullExtents(ship) {
+        return HULL_FLIGHT_STATS[shipVariantForRole(ship.role)]?.hullHalfExtents ?? [1.4, 2.4, 6.1];
+    }
+
     // Entry/spawn clearance must cover the hull's longest reach, not the old
     // sphere radius, or a spawn could drop the Atlas's nose into a rock.
     playerSpawnClearance() {
