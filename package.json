@@ -1,0 +1,8 @@
+{
+  "name": "voidrunner",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --import ./src/game/offlineImportHooks.mjs src/game/shipStats.test.mjs"
+  }
+}

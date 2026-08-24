@@ -889,6 +889,15 @@ const buildHelixStation = () => {
     const staticGrid = new VoxelGrid();
     // Long central spindle with multiple greebled segments.
     staticGrid.fillCylinderX(-46, 50, 5.5, 'hull');
+    // Micro-voxel service conduits and hull plating. These are small enough to
+    // catch the rim shader without changing the station's readable silhouette.
+    for (let x = -42; x <= 46; x += 4) {
+        const jitter = ((x * 73) % 7) - 3;
+        staticGrid.fillBox(x - 1, x + 1, 6 + (jitter % 2), 8, jitter - 1, jitter + 1, x % 12 === 0 ? 'accent' : 'dark');
+        staticGrid.fillBox(x - 2, x + 2, -9 + (jitter % 2), -7, -jitter - 1, -jitter + 1, 'dark');
+        if (((x + 42) / 4) % 3 === 0)
+            staticGrid.fillBox(x, x, -5, 5, -6, -5, 'window');
+    }
     // Mid-body ribbed rings (the silhouette must read as a tower of discs).
     for (const x of [-30, -16, 0, 16, 30])
         staticGrid.fillCylinderX(x - 1, x + 1, 8, 'dark');
@@ -927,15 +936,24 @@ const buildHelixStation = () => {
     // Long navigation antenna + base.
     staticGrid.line([-5, 7, -4], [-5, 28, -10], 1, 'dark');
     staticGrid.line([5, 7, 4], [5, 28, 10], 1, 'dark');
+    for (let index = 0; index < 8; index += 1) {
+        const angle = (index / 8) * Math.PI * 2;
+        const x = Math.round(Math.cos(angle) * 3);
+        const z = Math.round(Math.sin(angle) * 3);
+        staticGrid.line([x, 12, z], [x * 2 + (index % 2 ? 1 : -1), 24 + index % 5, z * 2], index % 4 === 0 ? 1 : 0, 'dark');
+        if (index % 2 === 0)
+            staticGrid.set(x * 2 + (index % 2 ? 1 : -1), 25 + index % 5, z * 2, index % 4 === 0 ? 'warning' : 'window');
+    }
     staticGrid.set(-5, 29, -10, 'warning');
     staticGrid.set(5, 29, 10, 'window');
     staticGrid.set(0, 32, 0, 'accent');
     // Cross-beam solar arrays (additive wing-shaped panels either side).
-    for (const z of [-22, 0, 22]) {
+    for (const z of [-22, -14, 0, 14, 22]) {
         for (const side of [-1, 1]) {
             staticGrid.fillBox(side * 35 - 2, side * 35 + 2, z - 8, z + 8, -1, 1, 'hull');
             staticGrid.fillBox(side * 35, side * 35, z - 7, z + 7, -1, 1, 'window');
             staticGrid.line([side * 36, 0, z - 8], [side * 36, 0, z + 8], 0, 'dark');
+            staticGrid.fillBox(side * 34, side * 36, Math.min(z, 0) - 1, Math.max(z, 0) + 1, 0, 1, 'dark');
         }
     }
     const rotorGrid = new VoxelGrid();
@@ -982,10 +1000,26 @@ const buildRookStation = () => {
     const grid = new VoxelGrid();
     // Beefier central core.
     grid.fillBox(-12, 12, -11, 11, -22, 22, 'hull');
+    // Dense micro-greebles around the core: pipe runs, panel joints and
+    // maintenance lights make the surface read as built machinery at close range.
+    for (let y = -10; y <= 10; y += 2) {
+        const hash = ((y + 20) * 37) % 11;
+        grid.fillBox(-13, -11, y, y, -18 + hash, -18 + hash + 3, hash % 4 === 0 ? 'accent' : 'dark');
+        grid.fillBox(11, 13, y, y, 15 - hash - 3, 15 - hash, hash % 5 === 0 ? 'warning' : 'dark');
+        grid.set(hash > 5 ? -14 : 14, y, hash > 5 ? -16 : 16, hash % 2 ? 'window' : 'accent');
+    }
     grid.fillBox(-10, 10, 12, 16, -28, 28, 'dark');
     grid.fillBox(-10, 10, -16, -12, -28, 28, 'dark');
     grid.fillBox(-16, 16, -7, 7, -27, -22, 'dark');
     grid.fillBox(-16, 16, -7, 7, 22, 27, 'dark');
+    // Docking-bay ribs and hazard chevrons: the core should read as an active
+    // industrial port even before its windows catch the bloom pass.
+    for (let side = -1; side <= 1; side += 2) {
+        for (let step = -18; step <= 18; step += 6) {
+            grid.fillBox(side * 13, side * 15, step, step + 3, -20, 20, step % 12 === 0 ? 'warning' : 'dark');
+            grid.set(side * 16, step + 1, step % 12 === 0 ? 19 : -19, step % 12 === 0 ? 'accent' : 'window');
+        }
+    }
     grid.fillBox(-7, 7, -7, 7, 27, 40, 'dark');
     grid.fillRingX(-1, 1, 7, 1.5, 'hull');
     // Halo of dock lights ringing the core.

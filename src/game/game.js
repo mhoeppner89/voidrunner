@@ -840,6 +840,8 @@ export class GameSession {
     tmpEntryNormal = new THREE.Vector3();
     tmpEntryLocal = new THREE.Vector3();
     tmpEntryLocalDirection = new THREE.Vector3();
+    tmpAudioLocal = new THREE.Vector3();
+    tmpAudioOrientation = new THREE.Quaternion();
     tmpEntryQuaternion = new THREE.Quaternion();
     tmpEntryInverseQuaternion = new THREE.Quaternion();
     // Projectile/pickup step scratches (store reads/writes). Owned by
@@ -849,6 +851,7 @@ export class GameSession {
     tmpP2 = new THREE.Vector3();
     tmpP3 = new THREE.Vector3();
     tmpP4 = new THREE.Vector3();
+    tmpP5 = new THREE.Vector3();
     frameId = 0;
     lastFrame = performance.now();
     simAccumulator = 0;
@@ -1270,7 +1273,41 @@ export class GameSession {
         const hullRatio = stats.hull > 0 ? this.save.player.hull / stats.hull : 1;
         const damage = Number.isFinite(hullRatio) ? 1 - hullRatio : 0;
         const throttle = Number.isFinite(this.save.player.throttle) ? this.save.player.throttle : 0;
-        this.audio.update(dt, throttle, this.afterburning, damage);
+        let nearbyEnemies = 0;
+        if (!this.save.player.dockedAt && this.ships) {
+            const playerPosition = new THREE.Vector3(...this.save.player.position);
+            for (const ship of this.ships) {
+                if ((ship.hostile || ship.role === 'pirate' || ship.role === 'bounty') && ship.targetId === 'player'
+                    && playerPosition.distanceToSquared(ship.position) < 625 * 625)
+                    nearbyEnemies += 1;
+            }
+        }
+        // Ambient music context by nearest region: planets, the belt and the
+        // graveyard each get their own ambience; everything else is open space.
+        // Combat music overrides it inside the audio manager while hostiles
+        // are close.
+        let musicContext = 'open';
+        if (!this.save.player.dockedAt) {
+            const px = this.save.player.position[0];
+            const py = this.save.player.position[1];
+            const pz = this.save.player.position[2];
+            let bestSq = Infinity;
+            for (const id of Object.keys(LOCATIONS)) {
+                const location = LOCATIONS[id];
+                if (location.kind === 'station')
+                    continue;
+                const near = location.kind === 'planet' ? location.radius * 3 : location.radius * 2.2;
+                const dx = px - location.position[0];
+                const dy = py - location.position[1];
+                const dz = pz - location.position[2];
+                const distSq = dx * dx + dy * dy + dz * dz;
+                if (distSq < near * near && distSq < bestSq) {
+                    bestSq = distSq;
+                    musicContext = location.kind === 'planet' ? 'planet' : (id === 'shardbelt' ? 'field' : 'graveyard');
+                }
+            }
+        }
+        this.audio.update(dt, throttle, this.afterburning, damage, nearbyEnemies, musicContext);
         this.syncRender(dt, now);
     };
     // Copy current entity transforms into prev* slots so the renderer can
@@ -1407,6 +1444,7 @@ export class GameSession {
             this.hyperdriveFxUntil = this.save.world.time + HYPERDRIVE_FX_DURATION;
             this.save.player.throttle = clamp(this.hyperdriveReturnThrottle, 0, 1);
             this.setHyperdriveStatus(t('DISENGAGED · MANUAL INPUT'));
+            this.audio.play('hyperDrop');
         }
         // Afterburner: the burn is live whenever the button is held with fuel
         // (never in autopilot), at ANY throttle and ANY speed — turn authority
@@ -1431,6 +1469,7 @@ export class GameSession {
                 // otherwise the stale cruise vector would overwrite the combat-speed snap.
                 velocity.copy(vec(this.save.player.velocity));
                 this.setHyperdriveStatus(t('HYPERDRIVE BREAK · INTERCEPT'), 4200);
+                this.audio.play('hyperDrop');
                 this.audio.play('warning');
             }
             else {
@@ -1530,7 +1569,7 @@ export class GameSession {
             this.save.player.velocity = tuple(FORWARD.clone().applyQuaternion(orientation).multiplyScalar(10));
             this.resetPlayerInterpolation();
             this.setHyperdriveStatus(t('ARRIVAL · {name}', { name: nav.name }), 3400);
-            this.audio.play('success');
+            this.audio.play('hyperDrop');
         }
     }
     steerAutopilot(position, orientation, angularVelocity, dt) {
@@ -2057,6 +2096,7 @@ export class GameSession {
         }
         this.save.player.cargo[pickup.commodity] = (this.save.player.cargo[pickup.commodity] ?? 0) + pickup.amount;
         pickup.life = 0;
+        this.audio.play('pickup', 0.7);
         if (pickup.source === 'mining') {
             this.save.player.stats.mined += pickup.amount;
             const rankMessage = awardCareerProgress(this.save, 'mining', 1, 'frontier-miners');
@@ -2496,6 +2536,7 @@ export class GameSession {
             this.snapToCombatSpeed();
             this.save.player.throttle = clamp(this.hyperdriveReturnThrottle, 0, 1);
             this.setHyperdriveStatus(t('DISENGAGED'));
+            this.audio.play('hyperDrop');
             return;
         }
         const block = this.hyperdriveBlockReason();
@@ -2524,7 +2565,7 @@ export class GameSession {
             this.hyperdriveEncounterAt = this.save.world.time + travelSeconds * randomBetween(rng, 0.4, 0.75);
         }
         this.setHyperdriveStatus(t('VECTOR SET · {name}', { name: nav.name }), 3200);
-        this.audio.play('ui');
+        this.audio.play('hyperSpool');
     }
     // Why a jump cannot start right now (null = clear). Shared by the toggle
     // (toast hints on press) and the HUD model (identity-card ready glow), so
@@ -2558,6 +2599,7 @@ export class GameSession {
             const progress = clamp((now - this.hyperdriveSpoolStartedAt) / HYPERDRIVE_SPOOL_SECONDS, 0, 1);
             if (progress >= 1) {
                 this.hyperdriveFx = 'active';
+                this.audio.play('hyperActive');
                 return { fx: 'active', progress: 1 };
             }
             return { fx: 'spooling', progress };
@@ -4346,6 +4388,9 @@ export class GameSession {
             }
             if (hitKind) {
                 const hitPosition = this.tmpP4.copy(start).lerp(end, bestT);
+                const playerPosition = vec(this.save.player.position, this.tmpP5);
+                const playerOrientation = quat(this.save.player.rotation, this.tmpAudioOrientation);
+                const localHit = this.tmpAudioLocal.copy(hitPosition).sub(playerPosition).applyQuaternion(playerOrientation.invert());
                 projectile.life = 0;
                 this.renderer.spawnImpact(tuple(hitPosition), projectile.kind === 'missile' ? 0xff7a42 : 0xffcb62);
                 if (hitKind === 'player') {
@@ -4358,10 +4403,10 @@ export class GameSession {
                     this.damageShip(hitShip, projectile.damage, projectile.ownerId, tuple(hitPosition));
                 if (projectile.kind === 'missile') {
                     this.renderer.spawnExplosion(tuple(hitPosition), projectile.faction === 'red-talons', 0.65);
-                    this.audio.play('explosion', 0.7);
+                    this.audio.playAtDirection('explosion', 0.8, playerPosition.distanceTo(hitPosition), localHit.x);
                 }
                 else
-                    this.audio.play('impact', 0.35);
+                    this.audio.playAtDirection('impact', 0.45, playerPosition.distanceTo(hitPosition), localHit.x);
             }
             else {
                 this.projStore.setPosV(projectile.slot, end);
@@ -4922,7 +4967,7 @@ export class GameSession {
         this.autopilot = false;
         this.snapToCombatSpeed();
         if (feedback && amount > 1.5) {
-            this.audio.play('impact', clamp(amount / 18, 0.4, 1.4));
+            this.audio.play('hit', clamp(amount / 18, 0.4, 1.4));
             if (navigator.vibrate && this.save.settings.vibration)
                 navigator.vibrate(Math.min(90, 18 + amount * 2));
         }

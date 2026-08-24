@@ -77,6 +77,9 @@ export class SpaceRenderer {
     locationRoot = new THREE.Group();
     instanceRoots = new Map();
     locationMeshes = new Map();
+    // Planet atmosphere shells (halo + haze) that share a camera-distance
+    // near-fade uniform, updated every frame in render().
+    atmosphereShells = [];
     shipMeshes = new Map();
     projectileMeshes = new Map();
     pickupMeshes = new Map();
@@ -628,7 +631,7 @@ export class SpaceRenderer {
         this.pixelTextures.add(texture);
         return texture;
     }
-    createPixelPanelTexture(seed, base, accent, kind = 'metal', size = 64) {
+    createPixelPanelTexture(seed, base, accent, kind = 'metal', size = 64, water = false) {
         const canvas = document.createElement('canvas');
         canvas.width = size;
         canvas.height = size;
@@ -683,14 +686,16 @@ export class SpaceRenderer {
             // Pull palette geography from the seed so every planet gets a
             // unique mix of warm/cool regions instead of a flat single-hue disc.
             const hueShift = (rng() - 0.5) * 0.04 + (baseColor.r > baseColor.b ? 0.02 : -0.02);
-            const continentCount = 8 + Math.floor(rng() * 6);
+            // Water worlds keep their land sparse — a few scattered
+            // archipelagos instead of the dense continents of a desert world.
+            const continentCount = water ? 5 + Math.floor(rng() * 4) : 8 + Math.floor(rng() * 6);
             const continents = [];
             for (let i = 0; i < continentCount; i += 1) {
                 continents.push({
                     cx: rng() * size,
                     cy: 0.14 + rng() * 0.78 * size,
-                    rx: 38 + rng() * 78,
-                    ry: 18 + rng() * 38,
+                    rx: water ? 24 + rng() * 46 : 38 + rng() * 78,
+                    ry: water ? 12 + rng() * 22 : 18 + rng() * 38,
                     rot: rng() * Math.PI * 2,
                     warmth: 0.32 + rng() * 0.34,
                 });
@@ -711,7 +716,9 @@ export class SpaceRenderer {
                 // continent "drift" is a sin-driven horizontal offset so the
                 // continent has curvy coastlines.
                 // Build a per-row mask once per row, then paint only those columns.
-                const continentHue = baseColor.b > baseColor.r ? 0.10 : 0.04;
+                // Islands push greener and brighter than the deep ocean so
+                // they read as land, not depth shading.
+                const continentHue = water ? 0.11 : (baseColor.b > baseColor.r ? 0.10 : 0.04);
                 let lastColor = '';
                 let runStart = -1;
                 const flush = (endX) => {
@@ -736,7 +743,7 @@ export class SpaceRenderer {
                     }
                     if (bestD <= 1) {
                         const warmth = 1 - Math.min(1, bestD);
-                        const landShade = baseC.clone().offsetHSL(hueShift + continentHue + band * 0.02, 0.10, 0.22 + warmth * 0.18);
+                        const landShade = baseC.clone().offsetHSL(hueShift + continentHue + band * 0.02, water ? 0.16 : 0.10, (water ? 0.26 : 0.22) + warmth * 0.18);
                         const color = cssHex(landShade.getHex());
                         if (color !== lastColor) {
                             flush(x);
@@ -752,12 +759,13 @@ export class SpaceRenderer {
                 }
                 flush(size);
             }
-            // 3-5 storm-eye spots (Galilean-style) at varying latitudes.
-            const stormCount = 3 + Math.floor(rng() * 3);
+            // Storm-eye spots (Galilean-style) at varying latitudes; water
+            // worlds carry more and bigger cyclones.
+            const stormCount = water ? 4 + Math.floor(rng() * 3) : 3 + Math.floor(rng() * 3);
             for (let i = 0; i < stormCount; i += 1) {
                 const sy = Math.floor((0.15 + rng() * 0.7) * size);
                 const sx = Math.floor(rng() * size);
-                const r = 5 + Math.floor(rng() * 8);
+                const r = water ? 8 + Math.floor(rng() * 12) : 5 + Math.floor(rng() * 8);
                 const rotate = rng() * Math.PI * 2;
                 // Vortex: hotter core, dark outer ring, hot wisps trailing.
                 for (let dy = -r; dy <= r; dy += 1) {
@@ -805,7 +813,7 @@ export class SpaceRenderer {
                 context.fillRect(0, poleY === 0 ? 0 : size - 28, size, 28);
             }
             // Sparse cloud plumes: long thin warm streaks across the bandline.
-            const plumes = 6 + Math.floor(rng() * 6);
+            const plumes = water ? 10 + Math.floor(rng() * 7) : 6 + Math.floor(rng() * 6);
             for (let i = 0; i < plumes; i += 1) {
                 const py = Math.floor((0.12 + rng() * 0.76) * size);
                 const start = Math.floor(rng() * size);
@@ -932,7 +940,10 @@ export class SpaceRenderer {
     }
     createLocations() {
         this.createPlanet('vesper', 0xa85f36, 0x281611, 0xd78a54, false);
-        this.createPlanet('azure', 0x2b8889, 0x0d2f3a, 0x83e0c7, true);
+        // Azure is a space-age water world: deep blue ocean, a few small
+        // archipelagos, white storm clouds — not the teal gas-giant look it
+        // previously read as from space.
+        this.createPlanet('azure', 0x1e5d8f, 0x081e33, 0x79c8ea, true);
         this.createHelixStation();
         this.createRookStation();
     }
@@ -979,56 +990,138 @@ export class SpaceRenderer {
         const texture = this.configurePixelTexture(new THREE.CanvasTexture(canvas));
         texture.wrapS = THREE.RepeatWrapping;
         texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(4, 2);
+        texture.repeat.set(2, 1);
         return texture;
+    }
+    // A BackSide atmosphere shell with a near-field dome fade. When the camera
+    // is inside the shell, the shell surface right around it glows (the sky
+    // dome); that dome would cut off abruptly the instant the camera crossed
+    // the boundary. Fragments close to the camera are faded out as the camera
+    // approaches the boundary, so entering and leaving the atmosphere read as
+    // a gradient; the far-side limb glow (the atmosphere seen around the
+    // planet from a distance) is untouched.
+    createAtmosphereMaterial(atmosphere, shellRadius, intensity, scatterBoost, sunMod, center) {
+        const material = new THREE.ShaderMaterial({
+            uniforms: {
+                uColor: { value: new THREE.Color(atmosphere) },
+                uSunDirection: { value: this.sunDirection.clone().normalize() },
+                uShellRadius: { value: shellRadius },
+                uCamDist: { value: 0 },
+                uIntensity: { value: intensity },
+                uScatterBoost: { value: scatterBoost },
+                uSunMod: { value: sunMod },
+            },
+            vertexShader: `
+                varying vec3 vWorldPosition;
+                varying vec3 vLocalNormal;
+                void main() {
+                    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                    vWorldPosition = worldPosition.xyz;
+                    vLocalNormal = normalize(normal);
+                    gl_Position = projectionMatrix * viewMatrix * worldPosition;
+                }`,
+            fragmentShader: `
+                uniform vec3 uColor;
+                uniform vec3 uSunDirection;
+                uniform float uShellRadius;
+                uniform float uCamDist;
+                uniform float uIntensity;
+                uniform float uScatterBoost;
+                uniform float uSunMod;
+                varying vec3 vWorldPosition;
+                varying vec3 vLocalNormal;
+                void main() {
+                    vec3 view = normalize(cameraPosition - vWorldPosition);
+                    float facing = clamp(dot(vLocalNormal, view), -1.0, 1.0);
+                    float limb = pow(clamp(1.0 - abs(facing), 0.0, 1.0), 2.7);
+                    float scatter = exp(-max(0.0, abs(facing) * 2.6) * 2.8);
+                    float sunFacing = smoothstep(-0.55, 1.0, dot(normalize(vLocalNormal), normalize(uSunDirection)));
+                    float sunFactor = mix(1.0, mix(0.12, 1.0, sunFacing), uSunMod);
+                    float alpha = (limb * 0.82 + scatter * uScatterBoost) * sunFactor * uIntensity;
+                    vec3 color = mix(uColor, uColor * (0.34 + sunFacing * 0.9) + vec3(0.035, 0.055, 0.085) * scatter, uSunMod);
+                    float shell = uCamDist / uShellRadius;
+                    float fade = 1.0 - smoothstep(0.84, 0.995, shell);
+                    float camFrag = length(cameraPosition - vWorldPosition) / uShellRadius;
+                    float domeMask = mix(fade, 1.0, smoothstep(0.30, 0.55, camFrag));
+                    gl_FragColor = vec4(color * alpha * 2.1 * domeMask, alpha * domeMask);
+                }`,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            side: THREE.BackSide,
+            depthWrite: false,
+            fog: false,
+            toneMapped: false,
+        });
+        this.atmosphereShells.push({ material, center: new THREE.Vector3(...center), shellRadius });
+        return material;
     }
     createPlanet(id, color, dark, atmosphere, ringed) {
         const location = LOCATIONS[id];
         const group = new THREE.Group();
         group.position.set(...location.position);
         group.name = `planet-${id}`;
-        const surfaceTexture = this.createPixelPanelTexture(`${id}-surface`, color, atmosphere, 'planet', 1024);
-        surfaceTexture.repeat.set(id === 'azure' ? 14 : 11, 7);
+        const surfaceTexture = this.createPixelPanelTexture(`${id}-surface`, color, atmosphere, 'planet', 1024, id === 'azure');
+        surfaceTexture.repeat.set(1, 1);
+        surfaceTexture.magFilter = THREE.LinearFilter;
+        surfaceTexture.minFilter = THREE.LinearMipmapLinearFilter;
+        surfaceTexture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
         const surface = new THREE.Mesh(new THREE.SphereGeometry(location.radius, 192, 128), new THREE.MeshStandardMaterial({
             color: 0xffffff,
             map: surfaceTexture,
-            roughness: id === 'azure' ? 0.62 : 0.94,
-            metalness: id === 'azure' ? 0.10 : 0.02,
+            // Water reads smoother and slightly specular; land-heavy worlds
+            // stay rough and dusty.
+            roughness: id === 'azure' ? 0.5 : 0.94,
+            metalness: id === 'azure' ? 0.14 : 0.02,
             emissive: dark,
-            emissiveIntensity: id === 'azure' ? 0.42 : 0.32,
+            emissiveIntensity: id === 'azure' ? 0.36 : 0.32,
+            bumpMap: surfaceTexture,
+            bumpScale: id === 'azure' ? 4 : 18,
             flatShading: false,
             fog: false,
         }));
         surface.name = 'surface';
         group.add(surface);
         const clouds = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.018, 128, 80), new THREE.MeshBasicMaterial({
-            map: this.createCloudTexture(id),
-            color: atmosphere,
+            map: (() => {
+                const map = this.createCloudTexture(id);
+                map.magFilter = THREE.LinearFilter;
+                map.minFilter = THREE.LinearMipmapLinearFilter;
+                map.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+                return map;
+            })(),
+            // Azure's clouds stay white (they ride a blue atmosphere); the
+            // dry worlds take their cloud tint from the atmosphere color.
+            color: id === 'azure' ? 0xf4f9fd : atmosphere,
             transparent: true,
-            opacity: id === 'azure' ? 0.28 : 0.40,
+            opacity: id === 'azure' ? 0.34 : 0.40,
             depthWrite: false,
             fog: false,
         }));
         clouds.name = 'clouds';
         group.add(clouds);
-        // Three-tier atmosphere: tight Fresnel-style rim glow, broad hot halo,
-        // and a far scatter shell that fades into the sky.
-        const halo = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.05, 64, 36), new THREE.MeshBasicMaterial({ color: atmosphere, transparent: true, opacity: 0.34, side: THREE.BackSide, depthWrite: false, fog: false }));
+        // A high, thin haze layer separates the opaque weather deck from the
+        // atmosphere shell. It gives the planet an extra depth cue when the
+        // camera is close to the limb without adding another raycast target.
+        // The halo and haze share one shell shader (with the near-field dome
+        // fade) so neither can pop off when the camera crosses its boundary.
+        const haloMaterial = this.createAtmosphereMaterial(atmosphere, location.radius * 1.16, 1.0, 0.18, 1.0, location.position);
+        const hazeMaterial = this.createAtmosphereMaterial(atmosphere, location.radius * 1.042, id === 'azure' ? 0.047 : 0.076, 0.0, 0.0, location.position);
+        const haze = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.042, 112, 68), hazeMaterial);
+        haze.name = 'haze';
+        group.add(haze);
+        const halo = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.16, 96, 56), haloMaterial);
         group.add(halo);
-        const wideHalo = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.13, 56, 32), new THREE.MeshBasicMaterial({ color: atmosphere, transparent: true, opacity: 0.16, side: THREE.BackSide, depthWrite: false, fog: false }));
-        group.add(wideHalo);
-        const scatterShell = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.32, 40, 24), new THREE.MeshBasicMaterial({ color: atmosphere, transparent: true, opacity: 0.06, side: THREE.BackSide, depthWrite: false, fog: false }));
-        group.add(scatterShell);
         if (ringed) {
-            const ring = new THREE.Mesh(new THREE.RingGeometry(location.radius * 1.42, location.radius * 2.55, 128), new THREE.MeshBasicMaterial({ color: 0xa3c4bd, transparent: true, opacity: 0.36, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+            // Icy pale-blue rings suit the water world's cool palette.
+            const ring = new THREE.Mesh(new THREE.RingGeometry(location.radius * 1.42, location.radius * 2.55, 192), new THREE.MeshBasicMaterial({ color: 0xc3dcea, map: this.createRingTexture(), transparent: true, opacity: 0.52, side: THREE.DoubleSide, depthWrite: false, fog: false }));
             ring.rotation.x = Math.PI / 2.6;
             ring.rotation.z = 0.38;
             group.add(ring);
-            const outerRing = new THREE.Mesh(new THREE.RingGeometry(location.radius * 2.6, location.radius * 2.74, 128), new THREE.MeshBasicMaterial({ color: 0xb6cdc8, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+            const outerRing = new THREE.Mesh(new THREE.RingGeometry(location.radius * 2.6, location.radius * 2.74, 128), new THREE.MeshBasicMaterial({ color: 0xd3e6f0, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false, fog: false }));
             outerRing.rotation.copy(ring.rotation);
             group.add(outerRing);
             // Inner C-ring for a layered Saturn feel.
-            const innerRing = new THREE.Mesh(new THREE.RingGeometry(location.radius * 1.32, location.radius * 1.42, 96), new THREE.MeshBasicMaterial({ color: 0x88aaa6, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+            const innerRing = new THREE.Mesh(new THREE.RingGeometry(location.radius * 1.32, location.radius * 1.42, 96), new THREE.MeshBasicMaterial({ color: 0x9fbfd6, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false, fog: false }));
             innerRing.rotation.copy(ring.rotation);
             group.add(innerRing);
             // Render-only: the rings must not swallow taps from behind the planet.
@@ -1040,13 +1133,39 @@ export class SpaceRenderer {
         // after departure). If they stay raycastable they win every tap, so the
         // player could never select another target after leaving a planet. Only the
         // solid surface may be picked; the shells are render-only.
-        clouds.raycast = () => undefined;
         halo.raycast = () => undefined;
-        wideHalo.raycast = () => undefined;
-        scatterShell.raycast = () => undefined;
+        haze.raycast = () => undefined;
         this.tagTargetable(surface, 'location', id);
         this.locationRoot.add(group);
         this.locationMeshes.set(id, group);
+    }
+    createRingTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 8;
+        const context = canvas.getContext('2d');
+        const rng = seededRandom('azure-ring-bands');
+        const gradient = context.createLinearGradient(0, 0, 512, 0);
+        let cursor = 0;
+        while (cursor < 1) {
+            const width = 0.006 + rng() * 0.045;
+            const end = Math.min(1, cursor + width);
+            const alpha = 0.12 + rng() * 0.68;
+            gradient.addColorStop(cursor, `rgba(255, 255, 255, ${alpha.toFixed(3)})`);
+            gradient.addColorStop(end, `rgba(255, 255, 255, ${(alpha * 0.72).toFixed(3)})`);
+            cursor = Math.min(1, end + rng() * 0.032);
+            if (cursor < 1)
+                gradient.addColorStop(cursor, 'rgba(255, 255, 255, 0)');
+        }
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, 512, 8);
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.magFilter = THREE.LinearFilter;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.generateMipmaps = true;
+        return texture;
     }
     createHelixStation() {
         const location = LOCATIONS.helix;
@@ -1112,35 +1231,41 @@ export class SpaceRenderer {
         // ice (pale frozen, drifts mostly), and dark (carbonaceous, monoliths/rock-crown).
         // Each gets its own pixel texture and slightly different roughness so a
         // belt cluster reads as varied terrain instead of one repeated rock.
-        const ironMap = this.createPixelPanelTexture('shardbelt-iron', 0x54585d, 0xb8a98a, 'rock');
+        const ironMap = this.createPixelPanelTexture('shardbelt-iron', 0x54585d, 0xb8a98a, 'rock', 128);
         ironMap.repeat.set(3.4, 3.4);
         const ironMaterial = new THREE.MeshStandardMaterial({
             color: 0xb0b8c0,
             map: ironMap,
             roughness: 0.78,
             metalness: 0.32,
+            bumpMap: ironMap,
+            bumpScale: 1.15,
             flatShading: true,
             vertexColors: true,
         });
-        const iceMap = this.createPixelPanelTexture('shardbelt-ice', 0xc7d6e2, 0x8eb6cc, 'rock');
+        const iceMap = this.createPixelPanelTexture('shardbelt-ice', 0xc7d6e2, 0x8eb6cc, 'rock', 128);
         iceMap.repeat.set(3.4, 3.4);
         const iceMaterial = new THREE.MeshStandardMaterial({
             color: 0xd6e6f0,
             map: iceMap,
             roughness: 0.42,
             metalness: 0.08,
+            bumpMap: iceMap,
+            bumpScale: 0.72,
             flatShading: true,
             vertexColors: true,
             emissive: 0x0a1822,
             emissiveIntensity: 0.18,
         });
-        const darkMap = this.createPixelPanelTexture('shardbelt-dark', 0x232027, 0xa4553a, 'rock');
+        const darkMap = this.createPixelPanelTexture('shardbelt-dark', 0x232027, 0xa4553a, 'rock', 128);
         darkMap.repeat.set(3.4, 3.4);
         const darkMaterial = new THREE.MeshStandardMaterial({
             color: 0x6a5a5e,
             map: darkMap,
             roughness: 0.88,
             metalness: 0.12,
+            bumpMap: darkMap,
+            bumpScale: 1.35,
             flatShading: true,
             vertexColors: true,
         });
@@ -1396,8 +1521,10 @@ export class SpaceRenderer {
         // reads on a small chunk instead of collapsing into a flat dark blob.
         // The material color stays a light value tint (it multiplies the map),
         // which keeps the detail visible rather than crushing it into shadow.
-        const scrapMap = this.createPixelPanelTexture('wreck-node-scrap', 0x5c6a70, 0xa8b4ba, 'metal');
-        const rustMap = this.createPixelPanelTexture('wreck-node-rust', 0x5c4638, 0xc48152, 'rust');
+        const scrapMap = this.createPixelPanelTexture('wreck-node-scrap', 0x5c6a70, 0xa8b4ba, 'metal', 96);
+        scrapMap.repeat.set(2.2, 2.2);
+        const rustMap = this.createPixelPanelTexture('wreck-node-rust', 0x5c4638, 0xc48152, 'rust', 96);
+        rustMap.repeat.set(2.2, 2.2);
         const geometries = [
             new THREE.IcosahedronGeometry(1, 1),
             new THREE.DodecahedronGeometry(1, 0),
@@ -1414,6 +1541,8 @@ export class SpaceRenderer {
             roughness: 0.84,
             metalness: 0.42,
             flatShading: true,
+            bumpMap: rustMap,
+            bumpScale: 1.05,
             emissive: 0x000000,
             emissiveIntensity: 0,
             side: THREE.DoubleSide,
@@ -1424,6 +1553,8 @@ export class SpaceRenderer {
             roughness: 0.84,
             metalness: 0.6,
             flatShading: true,
+            bumpMap: scrapMap,
+            bumpScale: 0.9,
             emissive: 0x000000,
             emissiveIntensity: 0,
             side: THREE.DoubleSide,
@@ -2442,6 +2573,12 @@ export class SpaceRenderer {
             return;
         if (!this.bloomSceneTarget)
             this.resizeBloomTargets();
+        // Keep the atmosphere shells' camera-distance uniform fresh so the
+        // near-field dome fade tracks the pilot's altitude.
+        const cam = this.camera.position;
+        for (const shell of this.atmosphereShells) {
+            shell.material.uniforms.uCamDist.value = Math.hypot(cam.x - shell.center.x, cam.y - shell.center.y, cam.z - shell.center.z);
+        }
         const bloomOn = this.bloomEnabled();
         // Pass 1: the full scene into a float buffer.
         this.renderer.setRenderTarget(this.bloomSceneTarget);

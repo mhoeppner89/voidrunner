@@ -13,13 +13,12 @@ const LEGACY_LOCATION_POSITIONS = {
     shardbelt: [1800, -800, -19600],
     'mourning-line': [-18000, -2000, 22000],
 };
-// Sound starts OFF: a fresh career is silent until the pilot opens the
-// options menu and raises Music / Effects (the AUDIO section in the pause and
-// options panels). The sliders are the single on/off, so "default off" never
-// needs a second master switch.
+// Sound starts ON at the designed listening levels: a fresh career hears the
+// game (music + effects) immediately, and the AUDIO sliders are the volume /
+// mute control — a lone 0 on either slider silences that bus.
 export const defaultSettings = () => ({
-    music: 0,
-    effects: 0,
+    music: 0.34,
+    effects: 0.68,
     flightAssist: true,
     aimAssist: true,
     quality: 'auto',
@@ -211,7 +210,7 @@ const mergeMarket = (candidateMarket, fallbackMarket) => {
     }
     return merged;
 };
-const hydrateSave = (candidate) => {
+export const hydrateSave = (candidate) => {
     const sourceVersion = Number(candidate.version ?? 1);
     const fallback = createNewSave(candidate.world?.seed);
     const save = {
@@ -219,14 +218,14 @@ const hydrateSave = (candidate) => {
         ...candidate,
         settings: (() => {
             const merged = { ...fallback.settings, ...(candidate.settings ?? {}) };
-            // Sound-default-off migration: a save that still carries the legacy
-            // factory volumes (never adjusted) opens silent too, so the change
-            // applies to existing careers, not just fresh ones. A player who
-            // deliberately set those exact levels is indistinguishable from
-            // untouched, and the options menu restores them in one drag.
-            if (merged.music === 0.34 && merged.effects === 0.68) {
-                merged.music = 0;
-                merged.effects = 0;
+            // Sound-default-on migration: a save that still carries the legacy
+            // silent defaults (0 / 0) opens at the designed listening levels, so
+            // the change applies to existing careers too. A player who
+            // deliberately muted both is indistinguishable from untouched — the
+            // options menu restores silence in one drag.
+            if (merged.music === 0 && merged.effects === 0) {
+                merged.music = 0.34;
+                merged.effects = 0.68;
             }
             return merged;
         })(),

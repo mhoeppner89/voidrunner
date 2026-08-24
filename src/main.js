@@ -68,7 +68,7 @@ const beginSession = (mode, arena) => {
     }
     // The save's language wins over the pre-save localStorage choice; keep
     // both mirrors in sync so the next boot and the settings UI agree.
-    setLanguage(save.settings?.language);
+    setLanguage(typeof localStorage !== 'undefined' ? localStorage.getItem('__VOID_PRIVATEER_PROBE_LANG__') ?? save.settings?.language : save.settings?.language);
     if (vesperHoverPreview && mode !== 'arena') {
         // Keep the visual preview reachable from either title-screen button
         // without changing the normal career flow when the flag is absent.

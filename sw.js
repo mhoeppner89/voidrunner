@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v101-0-4-10a-glb-cache';
+const CACHE = 'voidrunner-v102-0-5-0a-station-atmosphere-audio';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',
