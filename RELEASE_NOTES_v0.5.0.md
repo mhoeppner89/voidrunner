@@ -1,5 +1,11 @@
 # Voidrunner 0.5.0 — Station Detail, Atmosphere, and Audio Overhaul
 
+## Build 0.5.0e — Pirate target-marker restoration
+
+- Restores target brackets and off-screen pointers for pirates and other moving ships. The rendered-position projector now accepts Three.js vectors as well as saved `[x, y, z]` tuples, preventing invalid CSS transforms.
+- Tightens the focused regression so non-finite marker coordinates cannot serialize to `null` and accidentally pass comparison checks again.
+- Validation: live 1v1 combat-sim regression 26/26, finite pirate screen coordinates, visible red on-screen bracket, exact interpolated alignment, zero page errors, bundled Playwright smoke capture, source syntax, and `git diff --check` pass. Service-worker cache: `voidrunner-v104-0-5-0e-pirate-target-markers`.
+
 ## Build 0.5.0d — Audio variety and flight fixes
 
 - Ambient and combat music now uses eight-bar progressions, varied voicings, phrase dynamics, randomized fills, note timing, and stereo placement instead of short identical loops.

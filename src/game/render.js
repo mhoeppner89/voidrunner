@@ -2619,7 +2619,13 @@ export class SpaceRenderer {
         this.renderer.render(this.bloomQuad, this.bloomCamera);
     }
     projectToScreen(position) {
-        const vector = tupleToVector(position, this.tmpPosition).project(this.camera);
+        // Runtime entities store transforms as tuples, while rendered meshes
+        // expose THREE.Vector3 positions. Accept both: treating a Vector3 like
+        // an array returns undefined coordinates and makes every live ship
+        // marker disappear (NaN transforms), most visibly on pirates.
+        const vector = position?.isVector3
+            ? this.tmpPosition.copy(position).project(this.camera)
+            : tupleToVector(position, this.tmpPosition).project(this.camera);
         const behind = vector.z > 1;
         return {
             x: (vector.x * 0.5 + 0.5) * this.viewportWidth,

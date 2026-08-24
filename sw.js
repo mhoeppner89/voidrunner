@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v103-0-5-0d-audio-flight-target-fixes';
+const CACHE = 'voidrunner-v104-0-5-0e-pirate-target-markers';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',
