@@ -60,12 +60,13 @@ const ARENA_FIELD_START_OFFSETS = [
 // the old 140u collision margin, so grid queries must pad by this much to catch
 // the surface of the biggest rocks before the ship is inside them.
 const MAX_FIELD_OBSTACLE_RADIUS = 380;
-// Asteroids render as a distorted sphere scaled per axis. The ship's hard
-// collision tests against the rock's actual deformed-icosahedron mesh
-// (worldData.asteroidCollisionMesh), while beams and spawn clearance keep the
-// enclosing box — the box derived from this per-axis factor, which sits just
-// under the geometry's widest silhouette (the old bounding sphere of
-// radius × max scale inflated the narrow axes of an elongated rock up to ~2.5×).
+// Asteroids render as a distorted sphere scaled per axis. Hard collision AND
+// line of sight both test the rock's actual deformed-icosahedron mesh
+// (worldData.asteroidCollisionMesh), so a shot is blocked only where rock is
+// drawn — the old enclosing box's corners stuck out past the visible rock and
+// ate shots in open space. The box survives only as the spawn-clearance
+// envelope (derived from this per-axis factor, which sits just under the
+// geometry's widest silhouette).
 const ASTEROID_COLLISION_FACTOR = 0.9;
 const ENTRY_CLEARANCE = 4;
 const ENTRY_SEARCH_RADII = [64, 128, 256, 512, 1024];
@@ -623,8 +624,11 @@ const segmentSphereHit = (start, end, center, radius) => {
 };
 // Allocation-free segment/OBB intersection for laser and hyperdrive line of
 // sight. Graveyard pieces are rotated boxes; a bounding sphere can miss a flat
-// face at its corners or make the beam pass through visible debris.
-const segmentBoxHit = (start, end, obstacle, padding = 1.5) => {
+// face at its corners or make the beam pass through visible debris. The box
+// half-extents mirror the rendered piece exactly, so the padding is only a tiny
+// epsilon — enough to keep a muzzle resting on a face from self-hitting, not
+// an inflation that blocks shots in empty space next to the debris.
+const segmentBoxHit = (start, end, obstacle, padding = 0.05) => {
     const box = obstacle.box;
     const qx = box.qx;
     const qy = box.qy;
@@ -715,6 +719,99 @@ const segmentBoxHit = (start, end, obstacle, padding = 1.5) => {
             return undefined;
     }
     return near >= 0 && near <= 1 ? near : undefined;
+};
+// Allocation-free segment/mesh intersection for laser and beam line of sight
+// against asteroids. The rock's deformed-icosahedron collision mesh (shared
+// with the renderer and hard collision) is the exact visible surface, so a
+// shot is blocked only where rock is actually drawn — the old enclosing OBB
+// stuck out past the silhouette at its corners (up to ~1.56× on a round rock)
+// and ate shots in open space. The segment is transformed into the rock's
+// local frame (translate + inverse rotation), then Möller–Trumbore tests each
+// triangle; t is preserved by the rigid transform.
+const segmentMeshHit = (start, end, obstacle) => {
+    const mesh = obstacle.meshVerts;
+    const indices = obstacle.meshIndices;
+    if (!mesh || !indices)
+        return undefined;
+    // Cheap reject: the segment must pass within the rock's bounding reach
+    // (losRadius is the OBB corner reach, which contains the whole mesh).
+    if (segmentSphereHit(start, end, { x: obstacle.x, y: obstacle.y, z: obstacle.z }, obstacle.losRadius) === undefined)
+        return undefined;
+    const box = obstacle.box;
+    const qx = box.qx;
+    const qy = box.qy;
+    const qz = box.qz;
+    const qw = box.qw;
+    // World -> rock-local rotation (the same matrix segmentBoxHit builds).
+    const m00 = 1 - 2 * (qy * qy + qz * qz);
+    const m01 = 2 * (qx * qy - qz * qw);
+    const m02 = 2 * (qx * qz + qy * qw);
+    const m10 = 2 * (qx * qy + qz * qw);
+    const m11 = 1 - 2 * (qx * qx + qz * qz);
+    const m12 = 2 * (qy * qz - qx * qw);
+    const m20 = 2 * (qx * qz - qy * qw);
+    const m21 = 2 * (qy * qz + qx * qw);
+    const m22 = 1 - 2 * (qx * qx + qy * qy);
+    const sx = m00 * (start.x - obstacle.x) + m10 * (start.y - obstacle.y) + m20 * (start.z - obstacle.z);
+    const sy = m01 * (start.x - obstacle.x) + m11 * (start.y - obstacle.y) + m21 * (start.z - obstacle.z);
+    const sz = m02 * (start.x - obstacle.x) + m12 * (start.y - obstacle.y) + m22 * (start.z - obstacle.z);
+    const ex = m00 * (end.x - obstacle.x) + m10 * (end.y - obstacle.y) + m20 * (end.z - obstacle.z);
+    const ey = m01 * (end.x - obstacle.x) + m11 * (end.y - obstacle.y) + m21 * (end.z - obstacle.z);
+    const ez = m02 * (end.x - obstacle.x) + m12 * (end.y - obstacle.y) + m22 * (end.z - obstacle.z);
+    const dx = ex - sx;
+    const dy = ey - sy;
+    const dz = ez - sz;
+    // A projectile starting inside the rock's envelope is already past the
+    // blocker (a muzzle touching rock must not self-hit) — mirrors the OBB test.
+    if (Math.abs(sx) <= box.hx && Math.abs(sy) <= box.hy && Math.abs(sz) <= box.hz)
+        return undefined;
+    let best;
+    for (let t = 0; t < indices.length; t += 3) {
+        const i0 = indices[t] * 3;
+        const i1 = indices[t + 1] * 3;
+        const i2 = indices[t + 2] * 3;
+        const ax = mesh[i0];
+        const ay = mesh[i0 + 1];
+        const az = mesh[i0 + 2];
+        const bx = mesh[i1];
+        const by = mesh[i1 + 1];
+        const bz = mesh[i1 + 2];
+        const cx = mesh[i2];
+        const cy = mesh[i2 + 1];
+        const cz = mesh[i2 + 2];
+        const e1x = bx - ax;
+        const e1y = by - ay;
+        const e1z = bz - az;
+        const e2x = cx - ax;
+        const e2y = cy - ay;
+        const e2z = cz - az;
+        const hx = dy * e2z - dz * e2y;
+        const hy = dz * e2x - dx * e2z;
+        const hz = dx * e2y - dy * e2x;
+        const det = e1x * hx + e1y * hy + e1z * hz;
+        if (det > -1e-9 && det < 1e-9)
+            continue;
+        const invDet = 1 / det;
+        const ox = sx - ax;
+        const oy = sy - ay;
+        const oz = sz - az;
+        const u = invDet * (ox * hx + oy * hy + oz * hz);
+        if (u < 0 || u > 1)
+            continue;
+        // Möller–Trumbore: q = s × e1 (not e2), and t = f * (e2 · q). The two
+        // are easy to swap, and doing so both misses real surface hits and
+        // fabricates phantom ones.
+        const qx2 = oy * e1z - oz * e1y;
+        const qy2 = oz * e1x - ox * e1z;
+        const qz2 = ox * e1y - oy * e1x;
+        const v = invDet * (dx * qx2 + dy * qy2 + dz * qz2);
+        if (v < 0 || u + v > 1)
+            continue;
+        const tt = invDet * (e2x * qx2 + e2y * qy2 + e2z * qz2);
+        if (tt >= 0 && tt <= 1 && (best === undefined || tt < best))
+            best = tt;
+    }
+    return best;
 };
 const segmentRadialBandAt = (s0, s1, d0, d1, t, innerSq, outerSq) => {
     const first = s0 + d0 * t;
@@ -5792,12 +5889,13 @@ export class GameSession {
     }
     activeFieldObstacles(instanceId = this.activeInstanceId) {            if (instanceId === 'shardbelt')
             return this.asteroids.map((node) => {
-                // The player's hard collision tests the ship's hull envelope
-                // against the rock's ACTUAL deformed-icosahedron mesh
-                // (obstacle.shape = 'asteroid', meshVerts/meshIndices from
-                // worldData) so a bump lands on the visible surface from any
-                // angle, dents included. The box stays for beam LOS and spawn
-                // clearance, where a conservative corner reach is intentional.
+                // The player's hard collision AND line of sight both test the
+                // rock's ACTUAL deformed-icosahedron mesh (obstacle.shape =
+                // 'asteroid', meshVerts/meshIndices from worldData) so a bump
+                // lands on the visible surface from any angle, dents included,
+                // and a beam is blocked only where rock is drawn. The box
+                // survives for spawn clearance, where a conservative corner
+                // reach is intentional.
                 // The bounding sphere remains the spatial-grid/avoidance radius.
                 const hx = node.radius * node.scale[0] * ASTEROID_COLLISION_FACTOR;
                 const hy = node.radius * node.scale[1] * ASTEROID_COLLISION_FACTOR;
@@ -6574,6 +6672,17 @@ export class GameSession {
             }
             if (obstacle.shape === 'engine') {
                 const hit = this.segmentEngineHit(start, end, obstacle);
+                if (hit !== undefined && (best === undefined || hit < best))
+                    best = hit;
+                return;
+            }
+            // Asteroids block line of sight on their ACTUAL surface (the
+            // deformed-icosahedron collision mesh), never the enclosing box —
+            // the box's corners stuck out past the visible rock and ate shots
+            // in open space. Debris pieces keep the box, which mirrors their
+            // rendered shape exactly.
+            if (obstacle.shape === 'asteroid') {
+                const hit = segmentMeshHit(start, end, obstacle);
                 if (hit !== undefined && (best === undefined || hit < best))
                     best = hit;
                 return;
