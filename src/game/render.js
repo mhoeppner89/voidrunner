@@ -2628,6 +2628,21 @@ export class SpaceRenderer {
             behind,
         };
     }
+    projectTargetToScreen(kind, id, fallbackPosition) {
+        let renderedPosition;
+        if (kind === 'ship') {
+            renderedPosition = this.shipMeshes.get(id)?.position;
+        }
+        else if (kind === 'pickup') {
+            for (const mesh of this.pickupMeshes.values()) {
+                if (mesh.userData.targetId === id) {
+                    renderedPosition = mesh.position;
+                    break;
+                }
+            }
+        }
+        return this.projectToScreen(renderedPosition ?? fallbackPosition);
+    }
     getCameraForward(out = new THREE.Vector3()) {
         return out.set(0, 0, -1).applyQuaternion(this.camera.quaternion).normalize();
     }

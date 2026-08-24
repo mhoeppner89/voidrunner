@@ -1,5 +1,13 @@
 # Voidrunner 0.5.0 — Station Detail, Atmosphere, and Audio Overhaul
 
+## Build 0.5.0d — Audio variety and flight fixes
+
+- Ambient and combat music now uses eight-bar progressions, varied voicings, phrase dynamics, randomized fills, note timing, and stereo placement instead of short identical loops.
+- Music and effects volume now control both the dry signal and reverb. Landing silences continuous flight layers immediately, and replacing a session closes its old audio context so an arena engine cannot continue under later screens.
+- Cargo load is applied to local flight values without mutating cached ship stats. Loaded ships retain the intended handling penalty instead of losing more steering every simulation step.
+- Target brackets project the rendered, interpolated ship or pickup position, keeping the corners aligned during turns and between fixed simulation steps.
+- Validation: the focused browser regression passes 24/24, including a 30-second loaded-steering run, rendered-marker alignment, audio-session cleanup, and zero page errors. Source syntax, `git diff --check`, and a live landscape flight capture also pass. Service-worker cache: `voidrunner-v103-0-5-0d-audio-flight-target-fixes`.
+
 Two big pillars land in 0.5.0: a complete visual overhaul of the stations, the
 debris field, and the planets, and a from-scratch sound and music rebuild. The
 release also ships the deterministic hyperdrive-intercept test override and the

@@ -27,6 +27,7 @@ assert.doesNotThrow(() => audio.play('impact', 0.8));
 assert.doesNotThrow(() => audio.update(0.016, 0.6, true, 0.4, 2));
 assert.equal(audio.stationMode, true);
 assert.equal(audio.dangerLevel, 0);
+assert.doesNotThrow(() => audio.dispose());
 
 // Every gameplay effect must have an explicit layered generator; this catches
 // accidental fallbacks to the generic impact sound after future refactors.

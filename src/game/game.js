@@ -1300,6 +1300,7 @@ export class GameSession {
         this.renderer.canvas.removeEventListener('pointercancel', this.onSpacePointerCancel);
         this.input.dispose();
         this.renderer.dispose();
+        this.audio.dispose();
     }
     // The rAF entry point. A throw anywhere in the frame body must never kill
     // the loop — a single bad value (e.g. a non-finite AudioParam) used to
@@ -1544,8 +1545,10 @@ export class GameSession {
         const stats = this.playerStats();
         // A laden hold dulls the controls: turn rate and acceleration fall with cargo mass.
         const loadScale = this.flightLoadScale();
-        stats.acceleration *= loadScale;
-        stats.angularAcceleration *= loadScale;
+        // playerStats() is cached for the flight. Never write load penalties
+        // back into it: that compounded at 60 Hz until steering disappeared.
+        const acceleration = stats.acceleration * loadScale;
+        const angularAcceleration = stats.angularAcceleration * loadScale;
         const position = vec(this.save.player.position, this.tmpA);
         const velocity = vec(this.save.player.velocity, this.tmpB);
         const orientation = quat(this.save.player.rotation, this.tmpPlayerOrientation);
@@ -1597,9 +1600,9 @@ export class GameSession {
             // Afterburn doubles turn authority so a boost is also a fight move,
             // not just a straight-line speedup.
             const burnBoost = this.afterburning ? 2 : 1;
-            angularVelocity.x += actions.pitch * stats.angularAcceleration * burnBoost * dt;
-            angularVelocity.y += -actions.yaw * stats.angularAcceleration * burnBoost * dt;
-            angularVelocity.z += -actions.roll * stats.angularAcceleration * burnBoost * dt;
+            angularVelocity.x += actions.pitch * angularAcceleration * burnBoost * dt;
+            angularVelocity.y += -actions.yaw * angularAcceleration * burnBoost * dt;
+            angularVelocity.z += -actions.roll * angularAcceleration * burnBoost * dt;
             const dampingRate = stats.angularDamping * (this.save.settings.flightAssist ? 1 : 0.38);
             angularVelocity.multiplyScalar(Math.exp(-dampingRate * dt));
             const deltaRotation = this.tmpQ2.setFromEuler(this.tmpEuler.set(angularVelocity.x * dt, angularVelocity.y * dt, angularVelocity.z * dt, 'XYZ'));
@@ -1621,7 +1624,7 @@ export class GameSession {
         }
         const forwardSpeed = velocity.dot(forward);
         const lateral = this.tmpE.copy(velocity).addScaledVector(forward, -forwardSpeed);
-        const accelerationResponse = stats.acceleration / Math.max(12, stats.maxSpeed);
+        const accelerationResponse = acceleration / Math.max(12, stats.maxSpeed);
         // Hyperdrive engages and drops out at full cruise/approach speed instantly.
         const nextForwardSpeed = this.autopilot ? targetSpeed : damp(forwardSpeed, targetSpeed, accelerationResponse * 2.2, dt);
         if (this.autopilot) {
@@ -7196,7 +7199,10 @@ export class GameSession {
         const target = this.getTargetRef();
         let hudTarget;
         if (target) {
-            const projection = this.renderer.projectToScreen(target.position);
+            // Project the exact rendered transform. Moving contacts are drawn
+            // between sim steps; using their newer raw state made the bracket
+            // lead and wiggle around the visible target while steering.
+            const projection = this.renderer.projectTargetToScreen(target.kind, target.id, target.position);
             const edge = this.targetEdge(projection);
             const distance = this.surfaceDistance(player, target);
             const screen = { screenX: projection.x, screenY: projection.y, onScreen: projection.visible && !projection.behind, edge };

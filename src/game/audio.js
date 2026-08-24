@@ -52,7 +52,9 @@ export class AudioManager {
     context;
     master;
     effectsGain;
+    effectsReverbGain;
     musicGain;
+    musicReverbGain;
     reverbInput;
     compressor;
     enabled = false;
@@ -79,6 +81,23 @@ export class AudioManager {
     // Discrete combat escalation tier (0/1/2) with hysteresis, so the drums
     // step up as hostiles pile in instead of smearing with the danger decay.
     combatTier = 0;
+    // Session-seeded RNG for music variation. Deterministic per session so
+    // the same seed always produces the same phrase sequence — no repeats
+    // from Math.random() reshuffling every reload.
+    musicRngState = 1;
+    // 8-bar phrase dynamics: bars 0-3 build, 4-7 relax. Each context's bar
+    // player reads this to scale note levels so the music breathes.
+    barIntensity = 0.75;
+    musicRng() {
+        // xorshift32 — fast, no allocation, deterministic.
+        let x = this.musicRngState;
+        x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+        this.musicRngState = x >>> 0;
+        return this.musicRngState / 4294967296;
+    }
+    musicPick(array) { return array[Math.floor(this.musicRng() * array.length)]; }
+    musicChance(p) { return this.musicRng() < p; }
+    musicRange(lo, hi) { return lo + this.musicRng() * (hi - lo); }
 
     engineGain;
     engineFilter;
@@ -120,13 +139,17 @@ export class AudioManager {
         this.limiter.release.value = 0.09;
         this.effectsGain = this.context.createGain();
         this.effectsGain.gain.value = this.effectsVolume;
+        this.effectsReverbGain = this.context.createGain();
+        this.effectsReverbGain.gain.value = this.effectsVolume;
         this.musicGain = this.context.createGain();
         this.musicGain.gain.value = this.musicVolume;
+        this.musicReverbGain = this.context.createGain();
+        this.musicReverbGain.gain.value = this.musicVolume;
         this.crossfadeGain = this.context.createGain();
         this.crossfadeGain.gain.value = 1;
         this.musicBus = this.context.createGain();
         this.musicBus.gain.value = 1;
-        this.musicBus.connect(this.crossfadeGain);
+        this.musicBus.connect(this.musicGain);
         this.effectsGain.connect(this.compressor);
         this.musicGain.connect(this.crossfadeGain);
         this.crossfadeGain.connect(this.compressor);
@@ -137,6 +160,8 @@ export class AudioManager {
         const convolver = this.context.createConvolver();
         convolver.buffer = this.createImpulseResponse(2.35, 2.7);
         this.reverbInput = this.context.createGain();
+        this.effectsReverbGain.connect(this.reverbInput);
+        this.musicReverbGain.connect(this.reverbInput);
         const reverbOutput = this.context.createGain();
         reverbOutput.gain.value = 0.38;
         const preDelay = this.context.createDelay(0.2);
@@ -152,6 +177,9 @@ export class AudioManager {
 
         this.createEngine();
         this.createStationAmbience();
+        // Seed the music RNG from the current time so each session gets a
+        // different but deterministic phrase sequence.
+        this.musicRngState = (Date.now() & 0x7fffffff) || 1;
         this.enabled = true;
         await this.context.resume();
     }
@@ -179,7 +207,7 @@ export class AudioManager {
         this.engineOscB.connect(triangleGain); triangleGain.connect(this.engineFilter);
         this.engineSub.connect(subGain); subGain.connect(this.engineFilter);
         this.engineFilter.connect(this.engineGain); this.engineGain.connect(this.effectsGain);
-        this.engineGain.connect(this.reverbInput);
+        this.engineGain.connect(this.effectsReverbGain);
 
         this.pinkBuffer = new PinkNoise(this.context).buffer;
         this.engineWashSource = this.context.createBufferSource();
@@ -229,11 +257,39 @@ export class AudioManager {
         if (!this.context) return;
         const now = this.context.currentTime;
         this.musicGain?.gain.setTargetAtTime(this.musicVolume, now, 0.04);
+        this.musicReverbGain?.gain.setTargetAtTime(this.musicVolume, now, 0.04);
         this.effectsGain?.gain.setTargetAtTime(this.effectsVolume, now, 0.04);
+        this.effectsReverbGain?.gain.setTargetAtTime(this.effectsVolume, now, 0.04);
     }
 
     setStationMode(station) {
         this.stationMode = station;
+        if (!this.context)
+            return;
+        // State changes can happen between frame updates (landing, quitting,
+        // or replacing a session). Silence continuous flight layers here too.
+        if (station) {
+            const now = this.context.currentTime;
+            this.engineGain?.gain.cancelScheduledValues(now);
+            this.engineGain?.gain.setTargetAtTime(0, now, 0.035);
+            this.engineWashGain?.gain.cancelScheduledValues(now);
+            this.engineWashGain?.gain.setTargetAtTime(0, now, 0.035);
+        }
+    }
+
+    dispose() {
+        if (!this.context)
+            return;
+        const context = this.context;
+        const now = context.currentTime;
+        this.stopDrones();
+        this.master?.gain.cancelScheduledValues(now);
+        this.master?.gain.setTargetAtTime(0, now, 0.02);
+        this.enabled = false;
+        // Closing stops the always-running engine, wash and station sources.
+        // Previously every arena/title/session switch left one graph alive.
+        setTimeout(() => void context.close().catch(() => {}), 80);
+        this.context = undefined;
     }
 
     update(dt, throttle, afterburner, damage = 0, nearbyEnemies = 0, musicContext) {
@@ -245,14 +301,14 @@ export class AudioManager {
         const thrust = this.stationMode ? 0 : throttle;
         const burn = this.stationMode ? 0 : (afterburner ? 1 : 0);
         const engineBase = this.stationMode ? 0 : 0.04 + thrust * 0.06 + burn * 0.05;
-        this.engineGain?.gain.setTargetAtTime(engineBase * this.effectsVolume, now, 0.11);
+        this.engineGain?.gain.setTargetAtTime(engineBase, now, 0.11);
         const pitch = 41 + thrust * 30 + burn * 25 + damage * 7;
         this.engineOscA?.frequency.setTargetAtTime(pitch, now, 0.1);
         this.engineOscB?.frequency.setTargetAtTime(pitch * 1.047, now, 0.1);
         this.engineSub?.frequency.setTargetAtTime(pitch * 0.49, now, 0.12);
         this.engineFilter?.frequency.setTargetAtTime(190 + thrust * 330 + burn * 480, now, 0.1);
         const wash = this.stationMode ? 0 : 0.008 + thrust * 0.038 + burn * 0.028;
-        this.engineWashGain?.gain.setTargetAtTime(wash * this.effectsVolume, now, 0.12);
+        this.engineWashGain?.gain.setTargetAtTime(wash, now, 0.12);
         this.engineWashFilter?.frequency.setTargetAtTime(300 + thrust * 430 + burn * 680, now, 0.12);
         this.stationGain?.gain.setTargetAtTime((this.stationMode ? 0.018 : 0) * this.effectsVolume, now, 0.35);
 
@@ -323,14 +379,14 @@ export class AudioManager {
         const oldBus = this.musicBus;
         const newBus = this.context.createGain();
         newBus.gain.value = 1;
-        newBus.connect(this.crossfadeGain);
+        newBus.connect(this.musicGain);
         this.musicBus = newBus;
         if (oldBus) {
             oldBus.gain.setValueAtTime(Math.max(oldBus.gain.value, 0.0001), now);
             oldBus.gain.linearRampToValueAtTime(0.0001, now + 0.12);
             // Cut the old group after its fade completes so its tails die.
             setTimeout(() => {
-                try { oldBus.disconnect(this.crossfadeGain); } catch { /* already gone */ }
+                try { oldBus.disconnect(this.musicGain); } catch { /* already gone */ }
             }, 140);
         }
     }
@@ -407,7 +463,7 @@ export class AudioManager {
         gain.gain.exponentialRampToValueAtTime(0.0001, at + attack + decay);
         head.connect(gain);
         gain.connect(this.musicOut());
-        gain.connect(this.reverbInput);
+        gain.connect(this.musicReverbGain);
         oscillator.start(at);
         oscillator.stop(at + attack + decay + 0.05);
     }
@@ -434,63 +490,105 @@ export class AudioManager {
         source.connect(filter); head.connect(gain);
         gain.connect(this.musicOut());
         if (reverb)
-            gain.connect(this.reverbInput);
+            gain.connect(this.musicReverbGain);
         source.start(at); source.stop(at + duration + 0.05);
     }
 
     // Deep space: wide, sparse and deep — a low root, a slow triangle pad
     // breathing in staggered, and the rare high sparkle. The quietest, emptiest
     // bed: low register, huge reverb, voices spread across the stereo field.
+    // 8-chord progression with randomized sparkle and occasional bar drops
+    // (skip a voice) so the space never loops identically.
     playOpenBar(now, step) {
-        const progression = [[45, 52, 57, 64], [41, 48, 53, 60], [43, 50, 55, 62], [43, 47, 50, 55]];
+        const di = this.barIntensity;
+        const progression = [
+            [45, 52, 57, 64], [41, 48, 53, 60], [43, 50, 55, 62], [43, 47, 50, 55],
+            [40, 47, 52, 59], [45, 50, 55, 60], [41, 45, 50, 57], [43, 48, 53, 58],
+        ];
         const chord = progression[step % progression.length];
-        this.musicNote({ at: now, midi: chord[0] - 12, type: 'sine', level: 0.096, attack: 1.8, decay: 5.2, filterFreq: 500, pan: -0.25 });
-        chord.forEach((midi, voice) => this.musicNote({
-            at: now + 0.6 + voice * 0.25, midi, type: voice === 0 ? 'sine' : 'triangle',
-            level: voice === 0 ? 0.055 : 0.034, attack: 1.7, decay: 4.6, filterFreq: 850,
-            pan: [-0.4, 0.1, 0.4, -0.15][voice],
-        }));
-        if (step % 2 === 1) {
-            const sparkle = [69, 72, 76, 79][(step >> 1) % 4];
-            this.musicNote({ at: now + 1.4, midi: sparkle, type: 'sine', level: 0.024, attack: 0.35, decay: 3.4, pan: 0.35 });
+        const isLong = step % 4 === 0;
+        // Vary the root level slightly per bar for a breathing feel.
+        const rootLevel = this.musicRange(0.082, 0.108) * di;
+        this.musicNote({ at: now, midi: chord[0] - 12, type: 'sine', level: rootLevel, attack: 1.8, decay: isLong ? 5.6 : 5.0, filterFreq: 500, pan: -0.25 });
+        // Occasionally drop a voice for textural variation.
+        chord.forEach((midi, voice) => {
+            if (voice > 0 && this.musicChance(0.15))
+                return;
+            this.musicNote({
+                at: now + 0.6 + voice * 0.25, midi, type: voice === 0 ? 'sine' : 'triangle',
+                level: (voice === 0 ? 0.055 : this.musicRange(0.028, 0.04)) * di,
+                attack: 1.7, decay: 4.6, filterFreq: 850,
+                pan: [-0.4, 0.1, 0.4, -0.15][voice],
+            });
+        });
+        // Sparkle: random high note from the chord scale, not a fixed cycle.
+        if (this.musicChance(0.5)) {
+            const sparklePool = [69, 72, 76, 79, 81, 84, 88];
+            const sparkle = this.musicPick(sparklePool);
+            this.musicNote({ at: now + this.musicRange(1.0, 2.2), midi: sparkle, type: 'sine', level: this.musicRange(0.018, 0.03) * di, attack: 0.35, decay: this.musicRange(2.8, 4.2), pan: this.musicRange(-0.45, 0.45) });
         }
     }
 
-    // Docked: bright mid-register arpeggios (root–fifth–octave–third) over a
-    // walking bass, a shaker tick and the station bell. The busiest, warmest
-    // bed — a bustling safe haven, unmistakable from the sparse deep-space pad.
+    // Docked: bright mid-register arpeggios over a walking bass, a shaker tick
+    // and the station bell. The busiest, warmest bed — a bustling safe haven.
+    // 8-chord progression with 3 alternating arp patterns and randomized
+    // shaker/bell placement so the dock never loops identically.
     playStationBar(now, step) {
-        const progression = [[48, 52, 55], [47, 50, 55], [45, 48, 52], [41, 45, 48]];
-        const bass = [36, 35, 33, 29];
+        const progression = [
+            [48, 52, 55], [47, 50, 55], [45, 48, 52], [41, 45, 48],
+            [43, 47, 50], [46, 49, 53], [44, 48, 51], [41, 44, 48],
+        ];
+        const bass = [36, 35, 33, 29, 31, 34, 32, 29];
         const chord = progression[step % progression.length];
-        const arp = [chord[0], chord[2], chord[0] + 12, chord[1]];
+        // Three arp shapes rotate and shuffle.
+        const arpShapes = [
+            [chord[0], chord[2], chord[0] + 12, chord[1]],
+            [chord[0] + 12, chord[2], chord[1], chord[0]],
+            [chord[0], chord[1], chord[2], chord[0] + 12],
+        ];
+        const arp = arpShapes[step % arpShapes.length];
+        const arpLevel = this.musicRange(0.038, 0.052);
         arp.forEach((midi, i) => this.musicNote({
-            at: now + i * 0.32, midi, type: 'triangle', level: 0.046,
-            attack: 0.02, decay: 0.9, filterFreq: 1600, pan: [-0.4, 0, 0.4, -0.2][i],
+            at: now + i * 0.32, midi, type: 'triangle', level: arpLevel,
+            attack: 0.02, decay: this.musicRange(0.75, 1.05), filterFreq: 1600, pan: [-0.4, 0, 0.4, -0.2][i],
         }));
-        this.musicNote({ at: now, midi: bass[step % bass.length], type: 'sine', level: 0.085, attack: 0.1, decay: 1.9, pan: -0.15 });
-        this.musicNote({ at: now + 1.1, midi: bass[step % bass.length] + 7, type: 'sine', level: 0.04, attack: 0.1, decay: 0.8, pan: 0.15 });
-        this.musicNoise({ at: now + 1.1, duration: 0.05, filterType: 'highpass', filterFreq: 5200, level: 0.016, pan: 0.2 });
-        if (step % 2 === 0)
-            this.playStationBell(now + 0.8);
+        const b = bass[step % bass.length];
+        this.musicNote({ at: now, midi: b, type: 'sine', level: this.musicRange(0.07, 0.095), attack: 0.1, decay: 1.9, pan: -0.15 });
+        if (this.musicChance(0.7))
+            this.musicNote({ at: now + 1.1, midi: b + 7, type: 'sine', level: 0.04, attack: 0.1, decay: 0.8, pan: 0.15 });
+        this.musicNoise({ at: now + this.musicRange(0.9, 1.3), duration: 0.05, filterType: 'highpass', filterFreq: 5200, level: 0.016, pan: 0.2 });
+        if (this.musicChance(0.4))
+            this.playStationBell(now + this.musicRange(0.5, 1.0));
     }
 
     // Planets: a low drone with warm, sparse pentatonic plucks — each note
     // placed wide in the stereo field like wind over rock. Mid-low register,
     // gentle attack; distinct from open space's big pads and the station's
     // busy arpeggios.
+    // Randomized note selection from a 7-note scale with varied note counts
+    // per bar (3-6 notes) and occasional octave shifts so the wind never
+    // repeats the same phrase.
     playPlanetBar(now, step) {
-        const scale = [45, 48, 43, 41, 38]; // A3 C4 G3 F3 D3
-        const patterns = [[0, 1, 2, 1, 3], [1, 0, 2, 4, 2], [2, 3, 1, 0, 1], [3, 2, 4, 1, 2]];
-        const pattern = patterns[step % patterns.length];
-        const pans = [-0.5, 0.2, 0.5, -0.3, 0.1];
-        pattern.forEach((index, i) => this.musicNote({
-            at: now + i * 0.46, midi: scale[index], type: 'triangle', level: 0.042,
-            attack: 0.02, decay: 1.1, filterFreq: 1500, pan: pans[i % pans.length],
-        }));
-        if (step % 2 === 0) {
-            this.musicNote({ at: now, midi: 33, type: 'sine', level: 0.076, attack: 1.2, decay: 3.4, filterFreq: 300, pan: -0.2 });
-            this.musicNoise({ at: now, duration: 2.0, filterType: 'lowpass', filterFreq: 300, level: 0.023, pan: 0.2 });
+        const scale = [45, 48, 43, 41, 38, 50, 52]; // A3 C4 G3 F3 D3 D4 E4
+        const noteCount = 3 + Math.floor(this.musicRng() * 4); // 3-6 notes
+        const pans = [-0.5, 0.2, 0.5, -0.3, 0.1, 0.35, -0.15];
+        for (let i = 0; i < noteCount; i += 1) {
+            let midi = scale[Math.floor(this.musicRng() * scale.length)];
+            // Occasional octave up for shimmer.
+            if (this.musicChance(0.18))
+                midi += 12;
+            this.musicNote({
+                at: now + i * this.musicRange(0.35, 0.55),
+                midi, type: 'triangle', level: this.musicRange(0.03, 0.05),
+                attack: 0.02, decay: this.musicRange(0.8, 1.3), filterFreq: 1500,
+                pan: pans[i % pans.length],
+            });
+        }
+        // Root drone on odd bars; noise swell randomized.
+        if (step % 2 === 0 || this.musicChance(0.25)) {
+            const roots = [33, 38, 36];
+            this.musicNote({ at: now, midi: this.musicPick(roots), type: 'sine', level: this.musicRange(0.06, 0.09), attack: 1.2, decay: 3.4, filterFreq: 300, pan: -0.2 });
+            this.musicNoise({ at: now, duration: this.musicRange(1.6, 2.4), filterType: 'lowpass', filterFreq: 300, level: this.musicRange(0.018, 0.028), pan: 0.2 });
         }
     }
 
@@ -498,63 +596,90 @@ export class AudioManager {
     // sawtooth pulse with a ringing tick. The most nervous, brightest bed —
     // unmistakable against the warm planet plucks and the graveyard's slow
     // lament.
+    // Randomized cluster pairs from a wider pool, occasional triple-tick,
+    // and varied tick placement so the metallic chatter never repeats.
     playFieldBar(now, step) {
-        const ostinato = [[64, 66], [65, 63], [64, 66], [62, 65]];
-        const pair = ostinato[step % ostinato.length];
-        pair.forEach((midi, i) => this.musicNote({
-            at: now + i * 0.16, midi, type: 'square', level: 0.034, attack: 0.008, decay: 0.3,
-            filterFreq: 2100, pan: i === 0 ? -0.35 : 0.35,
+        const clusters = [[64, 66], [65, 63], [64, 66], [62, 65], [66, 68], [63, 65], [62, 64], [65, 67]];
+        const pair = clusters[step % clusters.length];
+        // Occasionally add a third note to the cluster for tension spikes.
+        const notes = this.musicChance(0.25) ? [pair[0], pair[1], pair[0] + 1] : pair;
+        notes.forEach((midi, i) => this.musicNote({
+            at: now + i * 0.16, midi, type: 'square', level: this.musicRange(0.028, 0.04), attack: 0.008, decay: this.musicRange(0.2, 0.4),
+            filterFreq: 2100, pan: i === 0 ? -0.35 : i === 1 ? 0.35 : 0.1,
         }));
-        this.musicNote({ at: now, midi: 40, type: 'sawtooth', level: 0.048, attack: 0.008, decay: 0.4, filterFreq: 240, pan: 0 });
-        this.musicNoise({ at: now + 0.7, duration: 0.05, filterType: 'bandpass', filterFreq: 2600, q: 6, level: 0.051, reverb: true, pan: 0.3 });
+        // Bass pulse — occasionally drop to let the clusters breathe.
+        if (this.musicChance(0.8))
+            this.musicNote({ at: now, midi: this.musicChance(0.3) ? 38 : 40, type: 'sawtooth', level: this.musicRange(0.038, 0.054), attack: 0.008, decay: this.musicRange(0.3, 0.5), filterFreq: 240, pan: 0 });
+        // Ringing tick — random placement and occasionally double.
+        this.musicNoise({ at: now + this.musicRange(0.5, 0.85), duration: 0.05, filterType: 'bandpass', filterFreq: this.musicRange(2200, 3000), q: 6, level: this.musicRange(0.04, 0.06), reverb: true, pan: 0.3 });
+        if (this.musicChance(0.3))
+            this.musicNoise({ at: now + this.musicRange(0.2, 0.4), duration: 0.04, filterType: 'bandpass', filterFreq: 3000, q: 5, level: 0.035, reverb: true, pan: -0.25 });
     }
 
     // The graveyard: slow mid-low lamenting chords and a distant wailing bend
     // that swells and falls. The sparsest, emptiest register — a hollow dirge
     // that reads instantly against the belt's nervous high clusters.
+    // 8-chord progression with randomized wail pitch, pan, and timing so the
+    // lament never repeats identically.
     playGraveyardBar(now, step) {
-        const progression = [[50, 53, 57], [46, 50, 53], [41, 45, 48], [43, 48, 52]];
+        const progression = [
+            [50, 53, 57], [46, 50, 53], [41, 45, 48], [43, 48, 52],
+            [48, 52, 55], [46, 50, 53], [41, 44, 48], [43, 47, 50],
+        ];
         const chord = progression[step % progression.length];
         chord.forEach((midi, voice) => this.musicNote({
-            at: now, midi, type: 'sine', level: voice === 0 ? 0.043 : 0.022,
-            attack: 1.9, decay: 5.0, pan: [-0.3, 0.15, 0.3][voice],
+            at: now, midi, type: 'sine', level: voice === 0 ? this.musicRange(0.038, 0.048) : this.musicRange(0.018, 0.026),
+            attack: 1.9, decay: this.musicRange(4.5, 5.6), pan: [-0.3, 0.15, 0.3][voice],
         }));
-        if (step % 2 === 0) {
-            const base = 50 + (step % 3) * 2;
+        // Wail: randomized pitch base, pan, and timing within the bar.
+        if (this.musicChance(0.55)) {
+            const base = this.musicPick([46, 48, 50, 52]);
+            const bend = this.musicRange(3, 7);
             const wail = this.context.createOscillator();
             wail.type = 'sine';
             wail.frequency.setValueAtTime(midiToFrequency(base), now + 0.2);
-            wail.frequency.exponentialRampToValueAtTime(midiToFrequency(base + 5), now + 1.1);
-            wail.frequency.exponentialRampToValueAtTime(midiToFrequency(base), now + 2.6);
+            wail.frequency.exponentialRampToValueAtTime(midiToFrequency(base + bend), now + this.musicRange(0.8, 1.4));
+            wail.frequency.exponentialRampToValueAtTime(midiToFrequency(base), now + this.musicRange(2.2, 3.0));
             const gain = this.context.createGain();
             gain.gain.setValueAtTime(0.0001, now);
-            gain.gain.exponentialRampToValueAtTime(0.015, now + 0.9);
-            gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.8);
+            gain.gain.exponentialRampToValueAtTime(this.musicRange(0.012, 0.018), now + this.musicRange(0.7, 1.1));
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + this.musicRange(2.4, 3.2));
             const panner = this.context.createStereoPanner();
-            panner.pan.setValueAtTime(0.4, now);
+            panner.pan.setValueAtTime(this.musicRange(-0.5, 0.5), now);
             wail.connect(gain); gain.connect(panner);
             panner.connect(this.musicOut());
-            gain.connect(this.reverbInput);
-            wail.start(now); wail.stop(now + 2.9);
+            gain.connect(this.musicReverbGain);
+            wail.start(now); wail.stop(now + 3.3);
         }
     }
 
-    // Combat: a driving Em → C → D → Bm loop over a relentless percussion kit
+    // Combat: a driving 8-chord progression over a relentless percussion kit
     // — kick on the downbeat, snare on the backbeat, 8th-note hats, with
     // stabbing square chords and a sawtooth bass pulse. BSG-style: the drums
     // carry the tension, and escalation is a DISCRETE step — tier 1 adds
     // rolling toms and opens the stab filter, tier 2 doubles the kick into a
     // gallop and adds a low bass drone — never a smear of the danger value.
+    // Randomized hat fills and occasional stab drops keep the combat loop
+    // from repeating identically.
     playCombatBar(now, step) {
         const tier = this.combatTier;
-        const progression = [[40, 47, 52], [36, 43, 48], [38, 45, 50], [35, 42, 47]];
-        const bass = [28, 24, 26, 23];
+        const di = this.barIntensity;
+        const progression = [
+            [40, 47, 52], [36, 43, 48], [38, 45, 50], [35, 42, 47],
+            [40, 47, 52], [38, 45, 50], [33, 40, 45], [36, 43, 48],
+        ];
+        const bass = [28, 24, 26, 23, 28, 26, 21, 24];
         const chord = progression[step % progression.length];
-        this.musicNote({ at: now, midi: bass[step % bass.length], type: 'sawtooth', level: [0.024, 0.029, 0.034][tier], attack: 0.005, decay: 0.5, filterFreq: 230, pan: 0 });
-        chord.forEach((midi, voice) => this.musicNote({
-            at: now, midi, type: 'square', level: 0.012 - voice * 0.002, attack: 0.006, decay: 0.42,
-            filterFreq: 680 + tier * 520, pan: [-0.3, 0, 0.3][voice],
-        }));
+        this.musicNote({ at: now, midi: bass[step % bass.length], type: 'sawtooth', level: [0.024, 0.029, 0.034][tier] * di, attack: 0.005, decay: 0.5, filterFreq: 230, pan: 0 });
+        chord.forEach((midi, voice) => {
+            // Occasionally drop a stab voice for textural variation.
+            if (voice > 0 && this.musicChance(0.12))
+                return;
+            this.musicNote({
+                at: now, midi, type: 'square', level: (0.012 - voice * 0.002) * di, attack: 0.006, decay: 0.42,
+                filterFreq: 680 + tier * 520, pan: [-0.3, 0, 0.3][voice],
+            });
+        });
         // Kick on the downbeat; tier 2 doubles it into a galloping 8th so the
         // escalation reads as a loudness step, not just a denser arrangement.
         const kick = this.context.createOscillator();
@@ -564,7 +689,7 @@ export class AudioManager {
         const kickGain = this.context.createGain();
         // The kick itself scales with the tier so escalation reads as a clean
         // loudness step, not just a denser arrangement.
-        kickGain.gain.setValueAtTime([0.07, 0.085, 0.11][tier], now);
+        kickGain.gain.setValueAtTime([0.07, 0.085, 0.11][tier] * di, now);
         kickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
         kick.connect(kickGain); kickGain.connect(this.musicOut());
         kick.start(now); kick.stop(now + 0.18);
@@ -582,9 +707,14 @@ export class AudioManager {
         // Snare on the backbeat — the constant drum anchor, hits harder as the
         // tier climbs.
         this.musicNoise({ at: now + 0.4, duration: 0.13, filterType: 'bandpass', filterFreq: 1900, q: 0.8, level: tier >= 1 ? 0.032 : 0.022, pan: -0.2 });
-        // 8th-note hats keep the pulse relentless.
+        // 8th-note hats keep the pulse relentless. Randomized fills on the
+        // off-beat add variation so the combat loop never repeats identically.
         this.musicNoise({ at: now + 0.2, duration: 0.03, filterType: 'highpass', filterFreq: 6500, level: 0.012, pan: 0.25 });
         this.musicNoise({ at: now + 0.6, duration: 0.03, filterType: 'highpass', filterFreq: 6500, level: 0.012, pan: -0.3 });
+        if (this.musicChance(0.35))
+            this.musicNoise({ at: now + this.musicRange(0.3, 0.5), duration: 0.025, filterType: 'highpass', filterFreq: 7000, level: 0.009, pan: this.musicRange(-0.3, 0.3) });
+        if (tier >= 1 && this.musicChance(0.25))
+            this.musicNoise({ at: now + this.musicRange(0.5, 0.75), duration: 0.025, filterType: 'highpass', filterFreq: 7500, level: 0.011, pan: this.musicRange(-0.3, 0.3) });
         // Tier 1: rolling low toms on the 8ths — the clearest step up.
         if (tier >= 1) {
             this.musicNote({ at: now + 0.2, midi: 45, type: 'sine', level: 0.028, attack: 0.004, decay: 0.12, filterFreq: 900, pan: 0.2 });
@@ -600,6 +730,11 @@ export class AudioManager {
         const now = this.context.currentTime;
         const step = this.chordIndex;
         this.chordIndex += 1;
+        // 8-bar phrase dynamics: build for 4 bars, relax for 4.
+        const phraseStep = step % 8;
+        this.barIntensity = phraseStep < 4
+            ? 0.65 + phraseStep * 0.12  // 0.65 → 1.01
+            : 1.01 - (phraseStep - 3) * 0.12; // 1.01 → 0.41
         switch (context) {
             case 'combat': this.playCombatBar(now, step); break;
             case 'station': this.playStationBar(now, step); break;
@@ -619,7 +754,7 @@ export class AudioManager {
         modulator.frequency.value = midiToFrequency(91);
         modulation.gain.value = 180;
         modulator.connect(modulation); modulation.connect(carrier.frequency);
-        carrier.connect(gain); gain.connect(this.musicOut()); gain.connect(this.reverbInput);
+        carrier.connect(gain); gain.connect(this.musicOut()); gain.connect(this.musicReverbGain);
         gain.gain.setValueAtTime(0.0001, at);
         gain.gain.exponentialRampToValueAtTime(0.013, at + 0.02);
         gain.gain.exponentialRampToValueAtTime(0.0001, at + 1.8);
@@ -635,9 +770,9 @@ export class AudioManager {
         // sounds do not smear into one position (the old single panner).
         const out = this.eventChain(pan, distance);
         out.connect(this.effectsGain);
-        out.connect(this.reverbInput);
+        out.connect(this.effectsReverbGain);
         const release = () => {
-            try { out.disconnect(this.effectsGain); out.disconnect(this.reverbInput); } catch { /* already gone */ }
+            try { out.disconnect(this.effectsGain); out.disconnect(this.effectsReverbGain); } catch { /* already gone */ }
         };
         switch (effect) {
             case 'laser': this.playLaser(now, strength, out); break;
@@ -705,7 +840,7 @@ export class AudioManager {
         source.connect(filter); filter.connect(gain);
         gain.connect(out ?? this.effectsGain);
         if (!out)
-            gain.connect(this.reverbInput);
+            gain.connect(this.effectsReverbGain);
         source.start(at); source.stop(at + duration + 0.03);
     }
 
@@ -726,7 +861,7 @@ export class AudioManager {
         oscillator.connect(filter); filter.connect(gain);
         gain.connect(out ?? this.effectsGain);
         if (!out)
-            gain.connect(this.reverbInput);
+            gain.connect(this.effectsReverbGain);
         oscillator.start(at); oscillator.stop(at + duration + 0.02);
     }
 
