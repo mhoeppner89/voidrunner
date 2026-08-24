@@ -6,6 +6,7 @@ import { GRAVEYARD_GEOMETRY_PROFILES, getAsteroidBaseMeshes, wreckNodeCollisionR
 import { loadGlb } from './glbLoader.js';
 const tupleToVector = (tuple, out = new THREE.Vector3()) => out.set(tuple[0], tuple[1], tuple[2]);
 const NEG_Z = new THREE.Vector3(0, 0, -1);
+const UP_AXIS = new THREE.Vector3(0, 1, 0);
 const cssHex = (value) => `#${value.toString(16).padStart(6, '0')}`;
 // Cockpit sprite scale: idle is held slightly zoomed-in so the frame still
 // fills the view when it relaxes to COCKPIT_ZOOM_BURN under afterburner.
@@ -1318,7 +1319,7 @@ export class SpaceRenderer {
         return this.asteroidMeshes[0]?.mesh;
     }
     updateAsteroidInstances(movingOnly = false) {
-        const color = new THREE.Color();
+        const color = this._asteroidColor ?? (this._asteroidColor = new THREE.Color());
         const palettes = this._asteroidPalettes;
         for (const { mesh, entries, kind } of this.asteroidMeshes) {
             const palette = palettes[kind] ?? palettes.iron;
@@ -1906,6 +1907,7 @@ export class SpaceRenderer {
         });
     }
     syncShips(entities, alpha = 0) {
+        const now = performance.now();
         // Reconcile mesh liveness only when the entity count changed (spawns and
         // deaths) — steady state walks nothing and allocates nothing.
         if (entities.length !== this.shipMeshCount) {
@@ -1957,7 +1959,7 @@ export class SpaceRenderer {
             }
             const damage = 1 - entity.hull / entity.maxHull;
             const baseScale = Number(mesh.userData.baseScale ?? 1);
-            mesh.scale.setScalar(baseScale * (1 + Math.sin(performance.now() * 0.013 + entity.spawnTime) * 0.006));
+            mesh.scale.setScalar(baseScale * (1 + Math.sin(now * 0.013 + entity.spawnTime) * 0.006));
             mesh.visible = entity.hull > 0;
             const emissiveIntensity = entity.hostile ? 0.18 + damage * 0.28 : damage * 0.12;
             const emissiveMaterials = mesh.userData.emissiveMaterials;
@@ -2252,7 +2254,7 @@ export class SpaceRenderer {
         const distance = a.distanceTo(b);
         this.utilityBeam.position.copy(a).lerp(b, 0.5);
         this.utilityBeam.scale.set(mode === 'mining' ? 0.62 : 1.05, distance, mode === 'mining' ? 0.62 : 1.05);
-        this.utilityBeam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+        this.utilityBeam.quaternion.setFromUnitVectors(UP_AXIS, b.clone().sub(a).normalize());
         this.utilityBeamMaterial.color.setHex(mode === 'mining' ? 0xe2b45e : 0x74d5c4);
         this.utilityBeamMaterial.opacity = 0.54 + Math.sin(performance.now() * 0.03) * 0.18;
         this.utilityBeam.visible = true;
@@ -2261,13 +2263,17 @@ export class SpaceRenderer {
         const count = 28;
         const geometry = new THREE.BufferGeometry();
         const positions = new Float32Array(count * 3);
-        const velocities = [];
+        const velocities = new Float32Array(count * 3);
         const rng = seededRandom(`${position.join(':')}:${performance.now()}`);
         for (let index = 0; index < count; index += 1) {
-            positions[index * 3] = 0;
-            positions[index * 3 + 1] = 0;
-            positions[index * 3 + 2] = 0;
-            velocities.push(new THREE.Vector3(rng() - 0.5, rng() - 0.5, rng() - 0.5).normalize().multiplyScalar((2 + rng() * 9) * scale));
+            const vx = rng() - 0.5;
+            const vy = rng() - 0.5;
+            const vz = rng() - 0.5;
+            const len = Math.hypot(vx, vy, vz) || 1;
+            const speed = (2 + rng() * 9) * scale;
+            velocities[index * 3] = (vx / len) * speed;
+            velocities[index * 3 + 1] = (vy / len) * speed;
+            velocities[index * 3 + 2] = (vz / len) * speed;
         }
         geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         const material = new THREE.PointsMaterial({
@@ -2305,11 +2311,11 @@ export class SpaceRenderer {
             toneMapped: false,
         }));
         streak.position.set(...position);
-        const direction = new THREE.Vector3(velocity[0], velocity[1], velocity[2]);
+        const direction = this.tmpPosition.set(velocity[0], velocity[1], velocity[2]);
         if (direction.lengthSq() < 1e-4)
             direction.set(0, 1, 0);
         direction.normalize();
-        streak.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+        streak.quaternion.setFromUnitVectors(UP_AXIS, direction);
         this.scene.add(streak);
         this.effects.push({ object: streak, streak, velocities: [], life: 0.75, maxLife: 0.75 });
     }
@@ -2320,9 +2326,11 @@ export class SpaceRenderer {
             const ratio = clamp(effect.life / effect.maxLife, 0, 1);
             if (effect.points) {
                 const positions = effect.points.geometry.getAttribute('position');
-                effect.velocities.forEach((velocity, particleIndex) => {
-                    positions.setXYZ(particleIndex, positions.getX(particleIndex) + velocity.x * dt, positions.getY(particleIndex) + velocity.y * dt, positions.getZ(particleIndex) + velocity.z * dt);
-                });
+                const vel = effect.velocities;
+                const count = vel.length / 3;
+                for (let i = 0; i < count; i += 1) {
+                    positions.setXYZ(i, positions.getX(i) + vel[i * 3] * dt, positions.getY(i) + vel[i * 3 + 1] * dt, positions.getZ(i) + vel[i * 3 + 2] * dt);
+                }
                 positions.needsUpdate = true;
                 const material = effect.points.material;
                 if (material instanceof THREE.PointsMaterial)

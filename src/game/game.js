@@ -949,6 +949,15 @@ export class GameSession {
     tmpP3 = new THREE.Vector3();
     tmpP4 = new THREE.Vector3();
     tmpP5 = new THREE.Vector3();
+    // Radar/HUD scratch: buildHudModel runs after sim steps, so these never
+    // alias live flight/collision vectors.
+    tmpRadarPlayer = new THREE.Vector3();
+    tmpRadarInv = new THREE.Quaternion();
+    tmpRadarRel = new THREE.Vector3();
+    tmpRadarPos = new THREE.Vector3();
+    // updateShips chatter scratch: canSee/lineBlocked never touch these.
+    tmpShipPlayer = new THREE.Vector3();
+    tmpShipPos = new THREE.Vector3();
     frameId = 0;
     lastFrame = performance.now();
     simAccumulator = 0;
@@ -1372,11 +1381,17 @@ export class GameSession {
         const throttle = Number.isFinite(this.save.player.throttle) ? this.save.player.throttle : 0;
         let nearbyEnemies = 0;
         if (!this.save.player.dockedAt && this.ships) {
-            const playerPosition = new THREE.Vector3(...this.save.player.position);
+            const px = this.save.player.position[0];
+            const py = this.save.player.position[1];
+            const pz = this.save.player.position[2];
             for (const ship of this.ships) {
-                if ((ship.hostile || ship.role === 'pirate' || ship.role === 'bounty') && ship.targetId === 'player'
-                    && playerPosition.distanceToSquared(ship.position) < 625 * 625)
-                    nearbyEnemies += 1;
+                if ((ship.hostile || ship.role === 'pirate' || ship.role === 'bounty') && ship.targetId === 'player') {
+                    const dx = px - ship.position[0];
+                    const dy = py - ship.position[1];
+                    const dz = pz - ship.position[2];
+                    if (dx * dx + dy * dy + dz * dz < 625 * 625)
+                        nearbyEnemies += 1;
+                }
             }
         }
         // Ambient music context by nearest region: planets, the belt and the
@@ -2767,7 +2782,7 @@ export class GameSession {
             this.save.player.velocity = tuple(velocity.normalize().multiplyScalar(cap));
     }
     updateShips(dt) {
-        const playerPosition = vec(this.save.player.position);
+        const playerPosition = vec(this.save.player.position, this.tmpShipPlayer);
         for (const ship of this.ships) {
             if (ship.hull <= 0)
                 continue;
@@ -2792,7 +2807,7 @@ export class GameSession {
         if (ship.role === 'patrol')
             this.checkSmugglerBust(ship);
         this.resolveNpcCollisions(ship);
-        const position = vec(ship.position);
+        const position = vec(ship.position, this.tmpShipPos);
         // Priority order for the one-voice slot: the one-shot recognition
         // line lands first (a wary re-encounter shouldn't lose it to generic
         // combat chatter), then the proximity mutter, then the timed lines.
@@ -5745,8 +5760,9 @@ export class GameSession {
     // tuples or THREE.Vector3 (patrol targeting passes ship tuples, chatter
     // passes scratch vectors), so both are normalized here.
     canSee(observerPosition, targetPosition, targetDark, targetSpeed = 0, targetMaxSpeed = 1) {
-        const observer = Array.isArray(observerPosition) ? vec(observerPosition) : observerPosition;
-        const target = Array.isArray(targetPosition) ? vec(targetPosition) : targetPosition;
+        // Radar scratch: safe in the sim path because HUD runs after.
+        const observer = Array.isArray(observerPosition) ? vec(observerPosition, this.tmpRadarPlayer) : observerPosition;
+        const target = Array.isArray(targetPosition) ? vec(targetPosition, this.tmpRadarPos) : targetPosition;
         const distance = observer.distanceTo(target);
         const range = targetDark ? this.darkVisibilityRange(targetSpeed, targetMaxSpeed) : NPC_SENSOR_RANGE;
         if (distance > range)
@@ -5755,7 +5771,8 @@ export class GameSession {
     }
     // Speed + max speed for the player's own dark signature, for canSee gates.
     playerSensorArgs() {
-        return [vec(this.save.player.velocity).length(), getEffectiveShipStats(this.save.player).maxSpeed];
+        const v = this.save.player.velocity;
+        return [Math.hypot(v[0], v[1], v[2]), getEffectiveShipStats(this.save.player).maxSpeed];
     }
     // How far a locked ship stays tracked: its own sensor ceiling (the radar
     // disc's 1.45x horizon for lit ships) or the visual-lock range for dark
@@ -5775,11 +5792,12 @@ export class GameSession {
     // matter how dark it runs, and occlusion only breaks it after
     // occlusion never breaks a lock — only range does.
     playerSeesShip(ship, threatMult = 1) {
-        const player = vec(this.save.player.position);
+        const player = vec(this.save.player.position, this.tmpRadarPlayer);
         const locked = ship.id === this.save.player.currentTargetId;
-        const distance = player.distanceTo(vec(ship.position));
+        const shipPos = this.tmpRadarPos.set(ship.position[0], ship.position[1], ship.position[2]);
+        const distance = player.distanceTo(shipPos);
         const range = locked ? this.lockTrackedRange(ship) : (ship.dark
-            ? this.darkVisibilityRange(vec(ship.velocity).length(), ship.speed)
+            ? this.darkVisibilityRange(Math.hypot(ship.velocity[0], ship.velocity[1], ship.velocity[2]), ship.speed)
             : getEffectiveShipStats(this.save.player).radarRange * threatMult);
         if (distance > range)
             return false;
@@ -5787,7 +5805,7 @@ export class GameSession {
         // once locked, occlusion never breaks it — only range does.
         if (locked)
             return true;
-        return !this.lineBlocked(player, vec(ship.position));
+        return !this.lineBlocked(player, shipPos);
     }
     flightLoadScale() {
         const player = this.save.player;
@@ -6714,7 +6732,12 @@ export class GameSession {
         const locationId = DOCK_LOCATION_IDS.find((id) => id === this.activeInstanceId);
         if (!locationId)
             return undefined;
-        const distance = vec(this.save.player.position).distanceTo(vec(LOCATIONS[locationId].position));
+        const pp = this.save.player.position;
+        const lp = LOCATIONS[locationId].position;
+        const dx = pp[0] - lp[0];
+        const dy = pp[1] - lp[1];
+        const dz = pp[2] - lp[2];
+        const distance = Math.hypot(dx, dy, dz);
         return distance <= (LOCATIONS[locationId].dockRadius ?? 55) ? locationId : undefined;
     }
     dockAt(locationId) {
@@ -7071,7 +7094,8 @@ export class GameSession {
     }
     syncRender(dt, now) {
         const stats = getEffectiveShipStats(this.save.player);
-        const speed = vec(this.save.player.velocity).length();
+        const vv = this.save.player.velocity;
+        const speed = Math.hypot(vv[0], vv[1], vv[2]);
         const fxState = this.hyperdriveFxState();
         // Interpolation fraction: where the next sim step sits between the last
         // completed step (prev*) and the current state. Zero when docked/paused.
@@ -7138,8 +7162,9 @@ export class GameSession {
     }
     buildHudModel() {
         const stats = getEffectiveShipStats(this.save.player);
-        const player = vec(this.save.player.position);
-        const speed = vec(this.save.player.velocity).length();
+        const player = vec(this.save.player.position, this.tmpShipPlayer);
+        const vv = this.save.player.velocity;
+        const speed = Math.hypot(vv[0], vv[1], vv[2]);
         const nav = LOCATIONS[this.save.player.navTargetId];
         const target = this.getTargetRef();
         let hudTarget;
@@ -7150,8 +7175,9 @@ export class GameSession {
             const screen = { screenX: projection.x, screenY: projection.y, onScreen: projection.visible && !projection.behind, edge };
             if (target.kind === 'ship') {
                 const ship = this.ships.find((entry) => entry.id === target.id);
-                const targetForward = FORWARD.clone().applyQuaternion(quat(ship.rotation));
-                const targetLocal = targetForward.clone().applyQuaternion(quat(this.save.player.rotation).invert());
+                const targetForward = FORWARD.clone().applyQuaternion(quat(ship.rotation, this.tmpRadarInv));
+                const playerInv = quat(this.save.player.rotation, this.tmpRadarInv).invert();
+                const targetLocal = targetForward.clone().applyQuaternion(playerInv);
                 const heading = Math.atan2(targetLocal.x, -targetLocal.z);
                 const claimable = ship.surrendered && !ship.claimed && !ship.captured && ship.hull > 0 && (ship.bountyValue > 0 || ship.missionId);
                 const captureAvailable = claimable && distance <= stats.scanRange;
@@ -7248,7 +7274,7 @@ export class GameSession {
         const dock = this.dockCandidate();
         // Dark arrivals land like anyone else — the syndicate collects its fee
         // on the concourse — so the zone line prompts the normal approach.
-        const dockPrompt = dock && vec(this.save.player.velocity).length() > AUTO_DOCK_SPEED
+        const dockPrompt = dock && speed > AUTO_DOCK_SPEED
             ? `REDUCE SPEED — ${LOCATIONS[dock].kind === 'planet' ? 'LAND' : 'DOCK'} ${LOCATIONS[dock].shortName}`
             : undefined;
         const mug = this.activeMug();
@@ -7282,7 +7308,7 @@ export class GameSession {
             shipId: this.save.player.shipId,
             playerVariant: playerShipVariant(this.save.player.shipId),
             navName: nav.shortName,
-            navDistance: player.distanceTo(vec(nav.position)),
+            navDistance: player.distanceTo(this.tmpRadarPos.set(nav.position[0], nav.position[1], nav.position[2])),
             autopilot: this.autopilot,
             hyperdrive: this.hyperdriveFxState(),
             hyperdriveStatus: this.save.world.time < this.hyperdriveStatusUntil ? this.hyperdriveStatus : undefined,
@@ -7479,14 +7505,14 @@ export class GameSession {
     }
     radarContacts() {
         const contacts = [];
-        const player = vec(this.save.player.position);
-        const inverse = quat(this.save.player.rotation).invert();
+        const player = vec(this.save.player.position, this.tmpRadarPlayer);
+        const inverse = quat(this.save.player.rotation, this.tmpRadarInv).invert();
         // The radar normalizes to the full sensor horizon (radarRange), so the
         // outer ring is exactly the radarRange ring and the inner rings can be
         // calibrated against it (see radarRings in buildHudModel).
         const range = getEffectiveShipStats(this.save.player).radarRange;
         const add = (position, type, selected, surfaceOffset = 0, ghost = false, lostAlpha = 0) => {
-            const relative = vec(position).sub(player).applyQuaternion(inverse);
+            const relative = this.tmpRadarRel.set(position[0], position[1], position[2]).sub(player).applyQuaternion(inverse);
             const distance = Math.hypot(relative.x, relative.z) - surfaceOffset;
             if (!ghost && distance > range * 1.45)
                 return;
@@ -7511,11 +7537,11 @@ export class GameSession {
             // Anything the dish just stopped resolving becomes a lost-contact
             // cross at its last known position — solid, then fading — instead
             // of a dashed circle (see drawRadar).
-            const shipPos = vec(ship.position);
+            const shipPos = this.tmpRadarPos.set(ship.position[0], ship.position[1], ship.position[2]);
             const distance = player.distanceTo(shipPos);
             const occluded = this.lineBlocked(player, shipPos);
             const selected = ship.id === this.save.player.currentTargetId;
-            const darkVis = ship.dark ? this.darkVisibilityRange(vec(ship.velocity).length(), ship.speed) : range * 1.45;
+            const darkVis = ship.dark ? this.darkVisibilityRange(Math.hypot(ship.velocity[0], ship.velocity[1], ship.velocity[2]), ship.speed) : range * 1.45;
             const seen = !occluded && distance <= darkVis;
             // A locked ship is a visual lock: tracked through occlusion (rocks
             // don't blind the eye) all the way out to lockTrackedRange.
@@ -7524,7 +7550,7 @@ export class GameSession {
             if (seen || tracked) {
                 // tuple() reads .x/.y/.z, so convert the raw array first — a
                 // NaN last-known position would draw the lost cross nowhere.
-                ship.lastSeenPosition = tuple(vec(ship.position));
+                ship.lastSeenPosition = [...ship.position];
                 ship.lastSeenAt = this.save.world.time;
                 add(ship.position, type, selected, 0, false);
             }
@@ -7541,7 +7567,7 @@ export class GameSession {
                 // A distress beacon surfaces the ship's position even beyond
                 // the radar horizon: a pulsing diamond at the disc rim in the
                 // source's direction, with a distance readout (see drawRadar).
-                const relative = vec(ship.position).sub(player).applyQuaternion(inverse);
+                const relative = this.tmpRadarRel.set(ship.position[0], ship.position[1], ship.position[2]).sub(player).applyQuaternion(inverse);
                 const horiz = Math.hypot(relative.x, relative.z);
                 if (horiz > range * 1.45) {
                     contacts.push({
