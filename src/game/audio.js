@@ -71,6 +71,11 @@ export class AudioManager {
     // the compressor, ducked briefly on context changes so leaving combat
     // never pops. The user's music volume is untouched.
     crossfadeGain;
+    // The current context's voice bus: every scheduled music voice connects
+    // here, and a context change swaps it (fading the old one out, then
+    // disconnecting it) so the previous theme's long-decay tails and drones
+    // cannot bleed into the new one.
+    musicBus;
     // Discrete combat escalation tier (0/1/2) with hysteresis, so the drums
     // step up as hostiles pile in instead of smearing with the danger decay.
     combatTier = 0;
@@ -119,6 +124,9 @@ export class AudioManager {
         this.musicGain.gain.value = this.musicVolume;
         this.crossfadeGain = this.context.createGain();
         this.crossfadeGain.gain.value = 1;
+        this.musicBus = this.context.createGain();
+        this.musicBus.gain.value = 1;
+        this.musicBus.connect(this.crossfadeGain);
         this.effectsGain.connect(this.compressor);
         this.musicGain.connect(this.crossfadeGain);
         this.crossfadeGain.connect(this.compressor);
@@ -257,6 +265,7 @@ export class AudioManager {
         const context = this.stationMode ? 'station' : (this.dangerLevel > 0.2 ? 'combat' : this.musicContext);
         if (context !== this.currentContext) {
             this.currentContext = context;
+            this.swapMusicBus();
             this.crossfadeContext();
             if (context !== 'combat')
                 this.combatTier = 0;
@@ -296,23 +305,48 @@ export class AudioManager {
         }
     }
 
-    // Where every music voice lands: user volume, then the context crossfade,
-    // then the compressor. Keeps drones, bells and drum transients inside the
-    // same duck so a context change never pops any of them.
+    // Where every music voice lands: the current context's voice bus, then
+    // the crossfade, then the compressor. Keeps drones, bells and drum
+    // transients inside the same group so a context change can cut them all.
     musicOut() {
-        return this.crossfadeGain;
+        return this.musicBus;
     }
 
-    // Ducks the music bus for a beat on context changes so the old context's
-    // sustained voices settle before the new one begins, then restores
-    // smoothly. Short enough to read as a transition, not a glitch.
+    // Replaces the voice bus on a context change so the previous theme's
+    // scheduled voices (bars with multi-second decays, drones) are silenced
+    // instead of bleeding into the new one. The old bus fades out over a beat
+    // then disconnects, which kills every one-shot already connected to it;
+    // the new bus carries the next theme. The crossfade dip then smooths the
+    // transition (see crossfadeContext).
+    swapMusicBus() {
+        const now = this.context.currentTime;
+        const oldBus = this.musicBus;
+        const newBus = this.context.createGain();
+        newBus.gain.value = 1;
+        newBus.connect(this.crossfadeGain);
+        this.musicBus = newBus;
+        if (oldBus) {
+            oldBus.gain.setValueAtTime(Math.max(oldBus.gain.value, 0.0001), now);
+            oldBus.gain.linearRampToValueAtTime(0.0001, now + 0.12);
+            // Cut the old group after its fade completes so its tails die.
+            setTimeout(() => {
+                try { oldBus.disconnect(this.crossfadeGain); } catch { /* already gone */ }
+            }, 140);
+        }
+    }
+
+    // Dips the music bus on a context change so the switch reads as a smooth
+    // transition rather than an abrupt cut. The old theme's voices are already
+    // gone (swapMusicBus disconnected them), so this is a light dip — deep
+    // enough to mask the swap, shallow enough not to blunt the new theme's
+    // first notes.
     crossfadeContext() {
         const now = this.context.currentTime;
         const g = this.crossfadeGain.gain;
         g.cancelScheduledValues(now);
         g.setValueAtTime(Math.max(g.value, 0.0001), now);
-        g.linearRampToValueAtTime(0.0001, now + 0.05);
-        g.linearRampToValueAtTime(1, now + 0.5);
+        g.linearRampToValueAtTime(0.4, now + 0.05);
+        g.linearRampToValueAtTime(1, now + 0.4);
     }
 
     // One sustained oscillator per drone root; replaced whenever the ambient
@@ -505,39 +539,57 @@ export class AudioManager {
         }
     }
 
-    // Combat: a driving Em → C → D → Bm loop with kick, offbeat hats, stabbing
-    // square chords and a sawtooth bass pulse. Escalation is a DISCRETE step:
-    // tier 0 is the base kit, tier 1 adds a snare and opens the stab filter,
-    // tier 2 doubles the hat and adds a low bass drone — a clear jump in
-    // energy, not a continuous smear of the danger value.
+    // Combat: a driving Em → C → D → Bm loop over a relentless percussion kit
+    // — kick on the downbeat, snare on the backbeat, 8th-note hats, with
+    // stabbing square chords and a sawtooth bass pulse. BSG-style: the drums
+    // carry the tension, and escalation is a DISCRETE step — tier 1 adds
+    // rolling toms and opens the stab filter, tier 2 doubles the kick into a
+    // gallop and adds a low bass drone — never a smear of the danger value.
     playCombatBar(now, step) {
         const tier = this.combatTier;
         const progression = [[40, 47, 52], [36, 43, 48], [38, 45, 50], [35, 42, 47]];
         const bass = [28, 24, 26, 23];
         const chord = progression[step % progression.length];
-        this.musicNote({ at: now, midi: bass[step % bass.length], type: 'sawtooth', level: 0.026, attack: 0.005, decay: 0.5, filterFreq: 230, pan: 0 });
+        this.musicNote({ at: now, midi: bass[step % bass.length], type: 'sawtooth', level: [0.024, 0.029, 0.034][tier], attack: 0.005, decay: 0.5, filterFreq: 230, pan: 0 });
         chord.forEach((midi, voice) => this.musicNote({
             at: now, midi, type: 'square', level: 0.012 - voice * 0.002, attack: 0.006, decay: 0.42,
             filterFreq: 680 + tier * 520, pan: [-0.3, 0, 0.3][voice],
         }));
+        // Kick on the downbeat; tier 2 doubles it into a galloping 8th so the
+        // escalation reads as a loudness step, not just a denser arrangement.
         const kick = this.context.createOscillator();
         kick.type = 'sine';
         kick.frequency.setValueAtTime(105, now);
         kick.frequency.exponentialRampToValueAtTime(40, now + 0.13);
         const kickGain = this.context.createGain();
-        // Tier 2's kick hits harder so the escalation reads as a loudness step,
-        // not just a denser arrangement.
-        kickGain.gain.setValueAtTime(tier >= 2 ? 0.12 : 0.085, now);
+        // The kick itself scales with the tier so escalation reads as a clean
+        // loudness step, not just a denser arrangement.
+        kickGain.gain.setValueAtTime([0.07, 0.085, 0.11][tier], now);
         kickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
         kick.connect(kickGain); kickGain.connect(this.musicOut());
         kick.start(now); kick.stop(now + 0.18);
-        // Offbeat hats; tier 2 adds a second hat halfway through the bar.
-        this.musicNoise({ at: now + 0.4, duration: 0.03, filterType: 'highpass', filterFreq: 6500, level: 0.011, pan: 0.25 });
-        if (tier >= 2)
-            this.musicNoise({ at: now + 0.8, duration: 0.03, filterType: 'highpass', filterFreq: 7000, level: 0.009, pan: -0.3 });
-        // Tier 1: offbeat snare (band-passed noise) — the clearest step up.
-        if (tier >= 1)
-            this.musicNoise({ at: now + 0.4, duration: 0.13, filterType: 'bandpass', filterFreq: 1900, q: 0.8, level: 0.026, pan: -0.2 });
+        if (tier >= 2) {
+            const gallop = this.context.createOscillator();
+            gallop.type = 'sine';
+            gallop.frequency.setValueAtTime(96, now + 0.4);
+            gallop.frequency.exponentialRampToValueAtTime(40, now + 0.53);
+            const gallopGain = this.context.createGain();
+            gallopGain.gain.setValueAtTime(0.07, now + 0.4);
+            gallopGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.56);
+            gallop.connect(gallopGain); gallopGain.connect(this.musicOut());
+            gallop.start(now + 0.4); gallop.stop(now + 0.58);
+        }
+        // Snare on the backbeat — the constant drum anchor, hits harder as the
+        // tier climbs.
+        this.musicNoise({ at: now + 0.4, duration: 0.13, filterType: 'bandpass', filterFreq: 1900, q: 0.8, level: tier >= 1 ? 0.032 : 0.022, pan: -0.2 });
+        // 8th-note hats keep the pulse relentless.
+        this.musicNoise({ at: now + 0.2, duration: 0.03, filterType: 'highpass', filterFreq: 6500, level: 0.012, pan: 0.25 });
+        this.musicNoise({ at: now + 0.6, duration: 0.03, filterType: 'highpass', filterFreq: 6500, level: 0.012, pan: -0.3 });
+        // Tier 1: rolling low toms on the 8ths — the clearest step up.
+        if (tier >= 1) {
+            this.musicNote({ at: now + 0.2, midi: 45, type: 'sine', level: 0.028, attack: 0.004, decay: 0.12, filterFreq: 900, pan: 0.2 });
+            this.musicNote({ at: now + 0.6, midi: 48, type: 'sine', level: 0.028, attack: 0.004, decay: 0.12, filterFreq: 900, pan: -0.25 });
+        }
         // Tier 2: a low sustained bass drone under the whole bar.
         if (tier >= 2)
             this.musicNote({ at: now, midi: 40, type: 'sawtooth', level: 0.012, attack: 0.02, decay: 1.1, filterFreq: 170, pan: 0 });
@@ -691,9 +743,9 @@ export class AudioManager {
     // Missile: an ignition puff, a rising rumble, then a long whoosh as the
     // round accelerates away.
     playMissileLaunch(at, intensity, out) {
-        this.playNoiseBurst({ at, duration: 0.07, start: 300, end: 950, level: 0.1 * intensity, playbackRate: 0.8, out });
-        this.playTone({ at, frequency: 68, endFrequency: 132, duration: 0.35, type: 'sine', level: 0.2 * intensity, filterFrequency: 300, out });
-        this.playNoiseBurst({ at: at + 0.05, duration: 0.7, start: 2400, end: 220, level: 0.12 * intensity, playbackRate: 0.66, out });
+        this.playNoiseBurst({ at, duration: 0.07, start: 300, end: 950, level: 0.17 * intensity, playbackRate: 0.8, out });
+        this.playTone({ at, frequency: 68, endFrequency: 132, duration: 0.35, type: 'sine', level: 0.36 * intensity, filterFrequency: 300, out });
+        this.playNoiseBurst({ at: at + 0.05, duration: 0.7, start: 2400, end: 220, level: 0.22 * intensity, playbackRate: 0.66, out });
     }
 
     // Collision / hull impact: a sharp crack, a deep thud, and a short
@@ -707,9 +759,9 @@ export class AudioManager {
     // Hull damage: a sharper clang with an alarm edge so incoming damage reads
     // instantly from nearby impacts.
     playHit(at, intensity, out) {
-        this.playNoiseBurst({ at, duration: 0.05, start: 4200, end: 600, level: 0.12 * intensity, out });
-        this.playTone({ at, frequency: 340, endFrequency: 90, duration: 0.22, type: 'triangle', level: 0.22 * intensity, filterFrequency: 900, out });
-        this.playTone({ at: at + 0.01, frequency: 900, endFrequency: 520, duration: 0.18, type: 'square', level: 0.07 * intensity, filterFrequency: 2600, out });
+        this.playNoiseBurst({ at, duration: 0.05, start: 4200, end: 600, level: 0.2 * intensity, out });
+        this.playTone({ at, frequency: 340, endFrequency: 90, duration: 0.22, type: 'triangle', level: 0.38 * intensity, filterFrequency: 900, out });
+        this.playTone({ at: at + 0.01, frequency: 900, endFrequency: 520, duration: 0.18, type: 'square', level: 0.13 * intensity, filterFrequency: 2600, out });
     }
 
     playMiningHit(intensity, out) {
@@ -818,11 +870,11 @@ export class AudioManager {
     // body rumble, a long airy blast, and a bright debris crackle tail.
     playExplosion(at, intensity, out) {
         const size = clamp(intensity, 0.4, 2);
-        this.playNoiseBurst({ at, duration: 0.05, start: 5200, end: 700, level: 0.09 * size, playbackRate: 0.9, out });
-        this.playTone({ at, frequency: 68 / Math.sqrt(size), endFrequency: 16, duration: 0.9 * size, type: 'sine', level: 0.14 * size, filterFrequency: 300, out });
-        this.playTone({ at: at + 0.01, frequency: 150, endFrequency: 30, duration: 0.5 * size, type: 'sawtooth', level: 0.07 * size, filterFrequency: 420, out });
-        this.playNoiseBurst({ at, duration: 0.7 * size, start: 2400, end: 60, level: 0.11 * size, playbackRate: 0.6, out });
-        this.playNoiseBurst({ at: at + 0.08, duration: 1.3 * size, start: 3200, end: 900, level: 0.045 * size, playbackRate: 1.3, out });
+        this.playNoiseBurst({ at, duration: 0.05, start: 5200, end: 700, level: 0.16 * size, playbackRate: 0.9, out });
+        this.playTone({ at, frequency: 68 / Math.sqrt(size), endFrequency: 16, duration: 0.9 * size, type: 'sine', level: 0.25 * size, filterFrequency: 300, out });
+        this.playTone({ at: at + 0.01, frequency: 150, endFrequency: 30, duration: 0.5 * size, type: 'sawtooth', level: 0.13 * size, filterFrequency: 420, out });
+        this.playNoiseBurst({ at, duration: 0.7 * size, start: 2400, end: 60, level: 0.19 * size, playbackRate: 0.6, out });
+        this.playNoiseBurst({ at: at + 0.08, duration: 1.3 * size, start: 3200, end: 900, level: 0.08 * size, playbackRate: 1.3, out });
     }
 
     playComms(temperament = 'steady') {
