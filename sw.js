@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v102-0-5-0b-perf-combat-music-fix';
+const CACHE = 'voidrunner-v102-0-5-0c-perf-planet-shell-fix';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',

@@ -896,6 +896,11 @@ export class GameSession {
     // arrays, no per-step tuple() allocations, no shared scratch objects).
     projStore = new EntityStore(256);
     pickupStore = new EntityStore(64);
+    // Cached effective ship stats: getEffectiveShipStats allocates a ~15-key
+    // object on every call, and it's called 10+ times per frame. Invalidate
+    // via _statsDirty when equipment or shipId changes (only at dock).
+    _cachedStats;
+    _statsDirty = true;
     extractionCarry = new Map();
     tmpA = new THREE.Vector3();
     tmpB = new THREE.Vector3();
@@ -1372,7 +1377,7 @@ export class GameSession {
         else {
             this.simAccumulator = 0;
         }
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         // Audio params must stay finite: a NaN throttle or hull ratio would
         // throw inside the Web Audio graph and (before the frame guard) freeze
         // the whole sim. Clamp to safe numbers before touching the graph.
@@ -1536,7 +1541,7 @@ export class GameSession {
         }
     }
     updatePlayer(dt, actions) {
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         // A laden hold dulls the controls: turn rate and acceleration fall with cargo mass.
         const loadScale = this.flightLoadScale();
         stats.acceleration *= loadScale;
@@ -1597,10 +1602,10 @@ export class GameSession {
             angularVelocity.z += -actions.roll * stats.angularAcceleration * burnBoost * dt;
             const dampingRate = stats.angularDamping * (this.save.settings.flightAssist ? 1 : 0.38);
             angularVelocity.multiplyScalar(Math.exp(-dampingRate * dt));
-            const deltaRotation = this.tmpQ2.setFromEuler(new THREE.Euler(angularVelocity.x * dt, angularVelocity.y * dt, angularVelocity.z * dt, 'XYZ'));
+            const deltaRotation = this.tmpQ2.setFromEuler(this.tmpEuler.set(angularVelocity.x * dt, angularVelocity.y * dt, angularVelocity.z * dt, 'XYZ'));
             orientation.multiply(deltaRotation).normalize();
         }
-        const forward = FORWARD.clone().applyQuaternion(orientation).normalize();
+        const forward = this.tmpD.copy(FORWARD).applyQuaternion(orientation).normalize();
         let targetSpeed = this.save.player.throttle * stats.maxSpeed;
         // Speed gate: below 90% of max speed the burn holds the current cruise
         // ceiling (turn move); past it the ceiling rises to afterburnSpeed and
@@ -1615,7 +1620,7 @@ export class GameSession {
             this.save.player.throttle = 1;
         }
         const forwardSpeed = velocity.dot(forward);
-        const lateral = velocity.clone().addScaledVector(forward, -forwardSpeed);
+        const lateral = this.tmpE.copy(velocity).addScaledVector(forward, -forwardSpeed);
         const accelerationResponse = stats.acceleration / Math.max(12, stats.maxSpeed);
         // Hyperdrive engages and drops out at full cruise/approach speed instantly.
         const nextForwardSpeed = this.autopilot ? targetSpeed : damp(forwardSpeed, targetSpeed, accelerationResponse * 2.2, dt);
@@ -1639,13 +1644,14 @@ export class GameSession {
             // overshooting it by up to a full frame step at 50000 u/s cruise.
             const nav = LOCATIONS[this.save.player.navTargetId];
             const arrivalRadius = hyperdriveArrivalRadius(nav);
-            const approach = position.distanceTo(vec(nav.position));
+            const navPos = this.tmpD.set(nav.position[0], nav.position[1], nav.position[2]);
+            const approach = position.distanceTo(navPos);
             if (approach - arrivalRadius <= velocity.length() * dt) {
-                const outward = position.clone().sub(vec(nav.position)).normalize();
+                const outward = this.tmpE.copy(position).sub(navPos).normalize();
                 if (nav.kind === 'field' || nav.kind === 'graveyard')
                     this.setFieldEntryPosition(position, nav.id, outward);
                 else {
-                    position.copy(vec(nav.position)).addScaledVector(outward, arrivalRadius + 8);
+                    position.copy(navPos).addScaledVector(outward, arrivalRadius + 8);
                     // Arrival is a spawn event too. Check the destination
                     // instance, not just the source instance currently used by
                     // the obstacle grid.
@@ -1657,16 +1663,20 @@ export class GameSession {
         }
         position.addScaledVector(velocity, dt);
         this.resolvePlayerCollisions(position, velocity);
-        this.save.player.position = tuple(position);
-        this.save.player.velocity = tuple(velocity);
+        const pp = this.save.player.position;
+        pp[0] = position.x; pp[1] = position.y; pp[2] = position.z;
+        const pv = this.save.player.velocity;
+        pv[0] = velocity.x; pv[1] = velocity.y; pv[2] = velocity.z;
         quatTupleInto(this.save.player.rotation, orientation);
-        this.save.player.angularVelocity = tuple(angularVelocity);
+        const pa = this.save.player.angularVelocity;
+        pa[0] = angularVelocity.x; pa[1] = angularVelocity.y; pa[2] = angularVelocity.z;
         const nav = LOCATIONS[this.save.player.navTargetId];
-        const navDistance = position.distanceTo(vec(nav.position));
+        const np = nav.position;
+        const navDistance = Math.hypot(position.x - np[0], position.y - np[1], position.z - np[2]);
         const arrivalRadius = hyperdriveArrivalRadius(nav);
         if (this.autopilot && (hyperdriveDropped || navDistance <= arrivalRadius + 10)) {
             if (!hyperdriveDropped) {
-                const outward = position.clone().sub(vec(nav.position)).normalize();
+                const outward = this.tmpD.copy(position).sub(this.tmpE.set(nav.position[0], nav.position[1], nav.position[2])).normalize();
                 if (nav.kind === 'field' || nav.kind === 'graveyard')
                     this.setFieldEntryPosition(position, nav.id, outward);
                 else
@@ -1686,17 +1696,17 @@ export class GameSession {
     }
     steerAutopilot(position, orientation, angularVelocity, dt) {
         const nav = LOCATIONS[this.save.player.navTargetId];
-        const desired = vec(nav.position).sub(position).normalize();
+        const desired = this.tmpD.set(nav.position[0], nav.position[1], nav.position[2]).sub(position).normalize();
         const avoidance = this.getAvoidanceVector(position, desired, 65);
         desired.add(avoidance.multiplyScalar(0.85)).normalize();
         // Point the ship at the vector without rolling: keep the up axis as close to
         // world-up as possible, and take the full spool to settle rather than snapping.
-        const right = new THREE.Vector3().crossVectors(desired, UP);
+        const right = this.tmpE.crossVectors(desired, UP);
         if (right.lengthSq() < 1e-6)
             right.set(1, 0, 0);
         right.normalize();
-        const up = new THREE.Vector3().crossVectors(right, desired).normalize();
-        this.tmpQ2.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, desired.clone().negate()));
+        const up = this.tmpF.crossVectors(right, desired).normalize();
+        this.tmpQ2.setFromRotationMatrix(this.tmpM4.makeBasis(right, up, this.tmpG.copy(desired).negate()));
         orientation.slerp(this.tmpQ2, 1 - Math.exp(-1.15 * dt));
         angularVelocity.multiplyScalar(Math.exp(-4.8 * dt));
     }
@@ -1772,29 +1782,31 @@ export class GameSession {
         this.updateUtilityTool(dt, actions.utility);
     }
     firePlayerGuns() {
-        const stats = getEffectiveShipStats(this.save.player);
-        const position = vec(this.save.player.position);
-        const orientation = quat(this.save.player.rotation);
-        let direction = FORWARD.clone().applyQuaternion(orientation).normalize();
+        const stats = this.playerStats();
+        const position = vec(this.save.player.position, this.tmpP1);
+        const orientation = quat(this.save.player.rotation, this.tmpPlayerOrientation);
+        const direction = this.tmpP2.copy(FORWARD).applyQuaternion(orientation).normalize();
         const target = this.getTargetRef();
         if (this.save.settings.aimAssist && target?.kind === 'ship') {
             const ship = this.ships.find((entry) => entry.id === target.id);
             if (ship) {
-                const targetPosition = vec(ship.position);
+                const targetPosition = this.tmpP3.set(ship.position[0], ship.position[1], ship.position[2]);
                 const distance = position.distanceTo(targetPosition);
-                const predicted = targetPosition.addScaledVector(vec(ship.velocity), distance / 205);
-                const assistDirection = predicted.sub(position).normalize();
+                const sv = ship.velocity;
+                const predicted = targetPosition.addScaledVector(this.tmpP4.set(sv[0], sv[1], sv[2]), distance / 205);
+                const assistDirection = this.tmpP4.copy(predicted).sub(position).normalize();
                 if (direction.angleTo(assistDirection) < 0.18)
                     direction.lerp(assistDirection, 0.34).normalize();
             }
         }
-        const right = RIGHT.clone().applyQuaternion(orientation).normalize();
-        const down = UP.clone().applyQuaternion(orientation).multiplyScalar(-0.24);
+        const right = this.tmpP4.copy(RIGHT).applyQuaternion(orientation).normalize();
+        const down = this.tmpP5.copy(UP).applyQuaternion(orientation).multiplyScalar(-0.24);
+        const vv = this.save.player.velocity;
         for (const side of [-0.58, 0.58]) {
-            const muzzle = position.clone().addScaledVector(right, side).add(down).addScaledVector(direction, 1.8);
+            const muzzle = this.tmpP0.copy(position).addScaledVector(right, side).add(down).addScaledVector(direction, 1.8);
             const slot = this.projStore.alloc();
             this.projStore.setPos(slot, muzzle.x, muzzle.y, muzzle.z);
-            const shotVel = this.tmpP0.copy(direction).multiplyScalar(205).add(vec(this.save.player.velocity));
+            const shotVel = this.tmpP0.copy(direction).multiplyScalar(205).add(this.tmpP3.set(vv[0], vv[1], vv[2]));
             this.projStore.setVel(slot, shotVel.x, shotVel.y, shotVel.z);
             this.projectiles.push({
                 id: `p-${++this.projectileCounter}`,
@@ -1849,12 +1861,13 @@ export class GameSession {
         const ship = this.ships.find((entry) => entry.id === target.id);
         if (!ship || ship.hull <= 0)
             return;
-        const position = vec(this.save.player.position);
-        const orientation = quat(this.save.player.rotation);
-        const direction = FORWARD.clone().applyQuaternion(orientation).normalize();
+        const position = vec(this.save.player.position, this.tmpP1);
+        const orientation = quat(this.save.player.rotation, this.tmpPlayerOrientation);
+        const direction = this.tmpP2.copy(FORWARD).applyQuaternion(orientation).normalize();
         const slot = this.projStore.alloc();
         this.projStore.setPos(slot, position.x + direction.x * 2.2, position.y + direction.y * 2.2, position.z + direction.z * 2.2);
-        const missileVel = this.tmpP0.copy(direction).multiplyScalar(72).add(vec(this.save.player.velocity));
+        const vv = this.save.player.velocity;
+        const missileVel = this.tmpP0.copy(direction).multiplyScalar(72).add(this.tmpP3.set(vv[0], vv[1], vv[2]));
         this.projStore.setVel(slot, missileVel.x, missileVel.y, missileVel.z);
         this.projectiles.push({
             id: `p-${++this.projectileCounter}`,
@@ -1872,8 +1885,8 @@ export class GameSession {
     }
     updateUtilityTool(dt, active) {
         const target = this.getTargetRef();
-        const stats = getEffectiveShipStats(this.save.player);
-        const playerPosition = vec(this.save.player.position);
+        const stats = this.playerStats();
+        const playerPosition = vec(this.save.player.position, this.tmpShipPlayer);
         const mode = this.save.player.mode;
         const range = mode === 'mining' ? stats.miningRange : stats.salvageRange;
         if (!active || !target || (mode === 'mining' && target.kind !== 'asteroid') || (mode === 'salvage' && target.kind !== 'wreck')) {
@@ -1886,7 +1899,7 @@ export class GameSession {
             this.utilityReadout = t('OUT OF RANGE · {current}/{max} km', { current: Math.round(distance), max: Math.round(range) });
             return;
         }
-        if (this.lineBlocked(playerPosition, vec(target.position), target.id)) {
+        if (this.lineBlocked(playerPosition, this.tmpShipPos.set(target.position[0], target.position[1], target.position[2]), target.id)) {
             this.renderer.setUtilityBeam(false, mode, this.save.player.position);
             this.utilityReadout = t('BEAM OBSTRUCTED');
             return;
@@ -2089,7 +2102,7 @@ export class GameSession {
             return;
         const equipmentId = pick(rng, candidates);
         this.save.player.equipment.push(equipmentId);
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         this.save.player.shield = Math.min(stats.shield, this.save.player.shield + 12);
         this.ui.pushEvent(t('Intact module recovered: {name} installed.', { name: t(EQUIPMENT[equipmentId].name) }), 'success', 6200);
         this.audio.play('success', 1.35);
@@ -2168,7 +2181,7 @@ export class GameSession {
     }
     updatePickups(dt) {
         const player = vec(this.save.player.position, this.tmpP3);
-        const salvageRange = getEffectiveShipStats(this.save.player).salvageRange * 1.5;
+        const salvageRange = this.playerStats().salvageRange * 1.5;
         for (const pickup of this.pickups) {
             pickup.life -= dt;
             const position = this.pickupStore.getPos(pickup.slot, this.tmpP0);
@@ -2241,7 +2254,7 @@ export class GameSession {
         // so the auto-scan never reads a ship the sensors can't see.
         if (target.kind === 'ship' && !this.playerSeesShip(entity, 1))
             return;
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         if (this.surfaceDistance(vec(this.save.player.position), target) <= stats.scanRange)
             this.scanTarget();
     }
@@ -2262,7 +2275,7 @@ export class GameSession {
         }
         if (target.kind === 'pickup')
             return;
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         const distance = this.surfaceDistance(vec(this.save.player.position), target);
         if (target.kind === 'asteroid' || target.kind === 'wreck') {
             // Locked contacts scan automatically in range; the out-of-range
@@ -2328,7 +2341,7 @@ export class GameSession {
             this.setMonitorStatus(t('PILOT HAS NOT SURRENDERED'));
             return;
         }
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         const distance = this.surfaceDistance(vec(this.save.player.position), target);
         if (distance > stats.scanRange) {
             this.setMonitorStatus(t('OUT OF RANGE · {current}/{max} km', { current: Math.round(distance), max: stats.scanRange }));
@@ -2408,7 +2421,7 @@ export class GameSession {
     }
     targetCandidates() {
         const player = vec(this.save.player.position);
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         const byDistance = (a, b) => player.distanceToSquared(vec(a.position)) - player.distanceToSquared(vec(b.position));
         // Ships resolve through the sensor visibility gate: lit contacts at the
         // threat-aware multiplier (2.2x, see THREAT_TARGET_MULT), dark ones only
@@ -2583,7 +2596,7 @@ export class GameSession {
         const id = this.save.player.currentTargetId;
         if (!id)
             return;
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         const player = vec(this.save.player.position);
         const ship = this.ships.find((entry) => entry.id === id && entry.hull > 0);
         if (ship) {
@@ -2777,7 +2790,7 @@ export class GameSession {
     }
     snapToCombatSpeed() {
         const velocity = vec(this.save.player.velocity);
-        const cap = getEffectiveShipStats(this.save.player).maxSpeed * 1.05;
+        const cap = this.playerStats().maxSpeed * 1.05;
         if (velocity.length() > cap)
             this.save.player.velocity = tuple(velocity.normalize().multiplyScalar(cap));
     }
@@ -2869,7 +2882,7 @@ export class GameSession {
         this.audio?.playComms?.(ships[0].pilot.temperament);
     }
     playerLosing() {
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         return stats.hull > 0 && this.save.player.hull / stats.hull < 0.35;
     }
     // Whether the player's bounty rank is high enough to earn a name-drop, and
@@ -3668,7 +3681,7 @@ export class GameSession {
         const rings = [];
         const player = vec(this.save.player.position);
         const inverse = quat(this.save.player.rotation).invert();
-        const range = getEffectiveShipStats(this.save.player).radarRange;
+        const range = this.playerStats().radarRange;
         for (const ship of this.ships) {
             if (ship.hull <= 0 || !ship.search)
                 continue;
@@ -5092,7 +5105,7 @@ export class GameSession {
         }
     }
     updateRegeneration(dt) {
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         if (this.playerShieldDelay <= 0)
             this.save.player.shield = Math.min(stats.shield, this.save.player.shield + dt * 5.3);
     }
@@ -5121,7 +5134,7 @@ export class GameSession {
         this.save.player.sealedCargo = [];
         const dock = this.save.player.lastDockedAt;
         const location = LOCATIONS[dock];
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         this.save.player.position = [...location.position];
         this.save.player.velocity = [0, 0, 0];
         this.save.player.angularVelocity = [0, 0, 0];
@@ -5736,7 +5749,7 @@ export class GameSession {
     // dark band otherwise — the ring visibly shrinks as the pilot goes dark
     // and slows, and swells back toward 400 km at full throttle.
     playerVisibilityFraction() {
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         if (this.playerBroadcasting())
             return 1;
         const visible = this.darkVisibilityRange(vec(this.save.player.velocity).length(), stats.maxSpeed);
@@ -5772,7 +5785,7 @@ export class GameSession {
     // Speed + max speed for the player's own dark signature, for canSee gates.
     playerSensorArgs() {
         const v = this.save.player.velocity;
-        return [Math.hypot(v[0], v[1], v[2]), getEffectiveShipStats(this.save.player).maxSpeed];
+        return [Math.hypot(v[0], v[1], v[2]), this.playerStats().maxSpeed];
     }
     // How far a locked ship stays tracked: its own sensor ceiling (the radar
     // disc's 1.45x horizon for lit ships) or the visual-lock range for dark
@@ -5783,7 +5796,7 @@ export class GameSession {
     lockTrackedRange(ship) {
         if (ship.dark)
             return VISUAL_LOCK_RANGE;
-        return Math.max(getEffectiveShipStats(this.save.player).radarRange * 1.45, VISUAL_LOCK_RANGE);
+        return Math.max(this.playerStats().radarRange * 1.45, VISUAL_LOCK_RANGE);
     }
     // The player's sensor resolves a ship. Dark contacts exist inside their
     // speed-scaled dark band; lit contacts are resolved at the sensor horizon,
@@ -5798,7 +5811,7 @@ export class GameSession {
         const distance = player.distanceTo(shipPos);
         const range = locked ? this.lockTrackedRange(ship) : (ship.dark
             ? this.darkVisibilityRange(Math.hypot(ship.velocity[0], ship.velocity[1], ship.velocity[2]), ship.speed)
-            : getEffectiveShipStats(this.save.player).radarRange * threatMult);
+            : this.playerStats().radarRange * threatMult);
         if (distance > range)
             return false;
         // You must SEE a ship to acquire it, but a lock is the pilot's own eye:
@@ -5806,6 +5819,17 @@ export class GameSession {
         if (locked)
             return true;
         return !this.lineBlocked(player, shipPos);
+    }
+    // Returns cached effective ship stats. Equipment and shipId only change
+    // at dock, so the cache is valid for the entire flight. Replaces ~10
+    // getEffectiveShipStats() calls per frame that each allocated a new
+    // 15-key object. Call _invalidateStats() on equipment/ship changes.
+    playerStats() {
+        if (this._statsDirty || !this._cachedStats) {
+            this._cachedStats = getEffectiveShipStats(this.save.player);
+            this._statsDirty = false;
+        }
+        return this._cachedStats;
     }
     flightLoadScale() {
         const player = this.save.player;
@@ -5901,7 +5925,7 @@ export class GameSession {
             y: location.position[1],
             z: location.position[2],
             radius: location.radius,
-            losRadius: location.kind === 'planet' ? location.radius + 60 : location.radius * 0.73,
+            losRadius: location.kind === 'planet' ? location.radius + 2 : location.radius * 0.73,
             collisionRadius: this.locationCollisionRadius(location),
         };
     }
@@ -6203,7 +6227,7 @@ export class GameSession {
         return moved;
     }
     locationCollisionRadius(location) {
-        return location.kind === 'planet' ? location.radius + 55 : location.radius * 0.72;
+        return location.kind === 'planet' ? location.radius + 2 : location.radius * 0.72;
     }
     // Distance reads for large bodies are measured to the collidable surface,
     // not the center: scanning, mining, salvage, and landing all care how far
@@ -6228,7 +6252,8 @@ export class GameSession {
     surfaceDistance(position, target) {
         if (!target)
             return 0;
-        return Math.max(0, position.distanceTo(vec(target.position)) - this.targetSurfaceRadius(target));
+        const tp = target.position;
+        return Math.max(0, Math.hypot(position.x - tp[0], position.y - tp[1], position.z - tp[2]) - this.targetSurfaceRadius(target));
     }
     ensureObstacleGrid() {
         // Drifting rocks and wreckage move slowly, so the grid is rebuilt at most
@@ -6748,7 +6773,7 @@ export class GameSession {
         this.save.player.velocity = [0, 0, 0];
         this.save.player.angularVelocity = [0, 0, 0];
         this.save.player.throttle = 0;
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         this.save.player.shield = stats.shield;
         // An unlicensed (transponder-off) arrival owes the syndicate berth: the
         // concourse opens on a payment card (pay or launch back out).
@@ -6872,7 +6897,7 @@ export class GameSession {
             this.ui.showToast(t('Insufficient credits for full repair.'), 'warning');
             return;
         }
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         this.save.player.credits -= cost;
         this.save.player.hull = stats.hull;
         this.save.player.armor = stats.armor;
@@ -6889,7 +6914,7 @@ export class GameSession {
             this.ui.showToast(t('Insufficient credits for full refill.'), 'warning');
             return;
         }
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         this.save.player.credits -= cost;
         this.save.player.fuel = stats.fuel;
         this.save.player.missiles = stats.missileCapacity;
@@ -6910,10 +6935,11 @@ export class GameSession {
             this.ui.showToast(t('Insufficient credits.'), 'warning');
             return;
         }
-        const before = getEffectiveShipStats(this.save.player);
+        const before = this.playerStats();
         this.save.player.credits -= item.price;
         this.save.player.equipment.push(equipmentId);
-        const after = getEffectiveShipStats(this.save.player);
+        this._statsDirty = true;
+        const after = this.playerStats();
         this.save.player.shield += after.shield - before.shield;
         this.save.player.armor += after.armor - before.armor;
         this.ui.showToast(t('{name} installed.', { name: t(item.name) }), 'success');
@@ -6949,6 +6975,7 @@ export class GameSession {
             return;
         const previousId = this.save.player.shipId;
         this.save.player.shipId = shipId;
+        this._statsDirty = true;
         const capacity = cargoCapacity(this.save.player);
         if (cargoMass(this.save.player) > capacity) {
             this.save.player.shipId = previousId;
@@ -6956,7 +6983,7 @@ export class GameSession {
             return;
         }
         this.ui.setCockpitShip(shipId);
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         this.save.player.shield = stats.shield;
         this.save.player.armor = stats.armor;
         this.save.player.hull = stats.hull;
@@ -7093,7 +7120,7 @@ export class GameSession {
         return neutral;
     }
     syncRender(dt, now) {
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         const vv = this.save.player.velocity;
         const speed = Math.hypot(vv[0], vv[1], vv[2]);
         const fxState = this.hyperdriveFxState();
@@ -7161,7 +7188,7 @@ export class GameSession {
         return { x: cx + vx * t, y: cy + vy * t, angleDeg: (angle * 180) / Math.PI + 90 };
     }
     buildHudModel() {
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         const player = vec(this.save.player.position, this.tmpShipPlayer);
         const vv = this.save.player.velocity;
         const speed = Math.hypot(vv[0], vv[1], vv[2]);
@@ -7352,7 +7379,7 @@ export class GameSession {
         const contacts = [];
         const player = vec(this.save.player.position);
         const inverse = quat(this.save.player.rotation).invert();
-        const stats = getEffectiveShipStats(this.save.player);
+        const stats = this.playerStats();
         const upgradedRadar = this.save.player.equipment.includes('radar-mk2');
         // Ship contacts ride the full sensor horizon so the map shows exactly
         // what the radar does; resources/wrecks stay on their scan-keyed ranges.
@@ -7510,7 +7537,7 @@ export class GameSession {
         // The radar normalizes to the full sensor horizon (radarRange), so the
         // outer ring is exactly the radarRange ring and the inner rings can be
         // calibrated against it (see radarRings in buildHudModel).
-        const range = getEffectiveShipStats(this.save.player).radarRange;
+        const range = this.playerStats().radarRange;
         const add = (position, type, selected, surfaceOffset = 0, ghost = false, lostAlpha = 0) => {
             const relative = this.tmpRadarRel.set(position[0], position[1], position[2]).sub(player).applyQuaternion(inverse);
             const distance = Math.hypot(relative.x, relative.z) - surfaceOffset;
