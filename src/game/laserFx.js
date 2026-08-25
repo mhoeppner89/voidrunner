@@ -31,7 +31,7 @@ export const LASER_FX_TUNING = {
     glowOpacity: 0.17,
     headSize: 3.4,
     headOpacity: 0.42,
-    muzzleSize: 1.6,
+    muzzleSize: 0.8,
     muzzleLife: 0.06,
     impactFlashSize: 3.8,
     impactFlashLife: 0.2,

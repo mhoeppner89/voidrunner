@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v110-0-7-4-weapon-roster';
+const CACHE = 'voidrunner-v111-0-7-5-weapon-roster';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',
