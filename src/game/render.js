@@ -1268,9 +1268,15 @@ export class SpaceRenderer {
             // Encke bands) is sampled RADIALLY — RingGeometry's planar UVs used
             // to smear it into straight stripes — and the shader adds a soft
             // planet shadow across the anti-sun side plus sun-side brightening.
-            const ring = new THREE.Mesh(new THREE.RingGeometry(location.radius * 1.3, location.radius * 2.74, 256, 1), this.createRingMaterial(location));
+            const ring = new THREE.Mesh(new THREE.RingGeometry(location.radius * 1.3, location.radius * 2.74, 256, 1));
             ring.rotation.x = Math.PI / 2.6;
             ring.rotation.z = 0.38;
+            // The shader needs the ring plane's TRUE normal. RingGeometry lies
+            // in XY (normal +Z); deriving it from the mesh's own quaternion
+            // keeps shader and geometry in lockstep — deriving it from the
+            // Euler applied to (0,1,0) put the plane ~60° off, which made the
+            // radial fade eat whole arcs of the ring.
+            ring.material = this.createRingMaterial(location, new THREE.Vector3(0, 0, 1).applyQuaternion(ring.quaternion));
             group.add(ring);
             // Render-only: the ring must not swallow taps from behind the planet.
             ring.raycast = () => undefined;
@@ -1286,11 +1292,11 @@ export class SpaceRenderer {
         this.locationRoot.add(group);
         this.locationMeshes.set(id, group);
     }
-    createRingMaterial(location) {
+    createRingMaterial(location, ringNormal) {
         // One draw call, no lights: radial band profile from the region texture,
         // a soft planet shadow across the anti-sun side of the plane, and
         // sun-facing brightening. All per-fragment math, zero textures updated.
-        const ringNormal = new THREE.Vector3(0, 1, 0).applyEuler(new THREE.Euler(Math.PI / 2.6, 0, 0.38));
+        // `ringNormal` is the mesh's true plane normal (from its quaternion).
         return new THREE.ShaderMaterial({
             uniforms: {
                 uRingMap: { value: this.createRingTexture() },
