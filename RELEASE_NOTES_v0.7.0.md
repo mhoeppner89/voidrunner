@@ -38,7 +38,12 @@ German.
 ## Feel
 
 Five new synth voices (rail crack, PDC buzz, scatter thump, ion zap, mortar
-thoomp) and per-kind bolt visuals. The combat-feel pass rebuilt laser bolt
+thoomp) and per-kind bolt visuals. Review pass 0.7.2: muzzle flashes are
+small, faction-tinted, half-opacity pops (no more per-shot strobe), bolt
+glow/head layers are roughly half their first-pass size with harder
+close-camera attenuation — the magrail tracer included — and the Ripper
+cone tightens from 11° to ~6° so shells land on the target instead of
+spraying the sky. The combat-feel pass rebuilt laser bolt
 tracers (hot core + crossed glow + head sprite), added muzzle flashes and
 layered impact bursts, NPC muzzle flashes, and a missile ember read.
 `playAtDirection` guards non-finite audio inputs — a NaN pan throws on

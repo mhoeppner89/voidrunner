@@ -20,23 +20,27 @@ const Z_AXIS = new THREE.Vector3(0, 0, 1);
 const cssHex = (value) => `#${value.toString(16).padStart(6, '0')}`;
 
 export const LASER_FX_TUNING = {
-    coreRadius: 0.26,
+    // Review pass (v0.7.1): the r1 overhaul read as blinding flashes when a
+    // bolt crossed the camera. The core keeps its read; the additive layers
+    // (glow, head, muzzle, impact flash) give back most of their size and
+    // opacity, and close-range attenuation bites much harder.
+    coreRadius: 0.2,
     coreLength: 3.2,
-    glowWidth: 11,
-    glowLength: 15,
-    glowOpacity: 0.3,
-    headSize: 6,
-    headOpacity: 0.6,
-    muzzleSize: 5,
-    muzzleLife: 0.09,
-    impactFlashSize: 5.4,
-    impactFlashLife: 0.22,
-    sparkCount: 16,
-    sparkCountHeavy: 24,
+    glowWidth: 6.5,
+    glowLength: 10,
+    glowOpacity: 0.17,
+    headSize: 3.4,
+    headOpacity: 0.42,
+    muzzleSize: 1.6,
+    muzzleLife: 0.06,
+    impactFlashSize: 3.8,
+    impactFlashLife: 0.2,
+    sparkCount: 14,
+    sparkCountHeavy: 20,
     sparkSpeedMin: 14,
     sparkSpeedMax: 34,
-    sparkLife: 0.55,
-    sparkSize: 0.85,
+    sparkLife: 0.5,
+    sparkSize: 0.8,
     emberCount: 5,
     emberSpeedMin: 3,
     emberSpeedMax: 7,
@@ -46,9 +50,9 @@ export const LASER_FX_TUNING = {
     // must not paint a screen-filling wash. Scale the whole bolt group by
     // dist/attenuationRange (clamped) so close tracers shrink and distant ones
     // keep their read. Applied per bolt per frame — allocation-free.
-    attenuationRange: 50,
-    attenuationMin: 0.34,
-    attenuationMax: 1.12,
+    attenuationRange: 60,
+    attenuationMin: 0.2,
+    attenuationMax: 0.92,
 };
 
 // Faction palette shared by bolts, muzzle flashes and impacts: the core is a
@@ -230,11 +234,15 @@ export class LaserFx {
     }
     muzzleFlash(x, y, z, colorHex = LASER_FACTION_COLORS.player.bolt) {
         const tuning = LASER_FX_TUNING;
-        const sprite = new THREE.Sprite(this.flashMaterial(colorHex, `muzzle-${colorHex.toString(16)}`, '#fff6d8'));
+        // Review fix: the muzzle pop sat ~10u from the third-person camera,
+        // additive with a near-white core — every shot strobed the screen.
+        // Small, faction-tinted, half-opacity, and flagged `muzzle` so the
+        // renderer fades it without the generic sprite growth branch.
+        const sprite = new THREE.Sprite(this.flashMaterial(colorHex, `muzzle-${colorHex.toString(16)}`, cssHex(colorHex)));
         sprite.position.set(x, y, z);
         sprite.scale.setScalar(tuning.muzzleSize);
         this.scene.add(sprite);
-        this.effects.push({ object: sprite, velocities: [], life: tuning.muzzleLife, maxLife: tuning.muzzleLife });
+        this.effects.push({ object: sprite, velocities: [], life: tuning.muzzleLife, maxLife: tuning.muzzleLife, muzzle: true });
     }
     // Layered hit: white-hot flash + faction-colored swell, a radial spark
     // burst, and for heavy (missile) hits a slow ember afterglow.
