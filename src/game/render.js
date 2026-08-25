@@ -4,6 +4,7 @@ import { createVoxelShipModel, createVoxelStationModel, paletteForFaction, shipV
 import { clamp, seededRandom } from './random.js';
 import { GRAVEYARD_GEOMETRY_PROFILES, getAsteroidBaseMeshes, wreckNodeCollisionRadius } from './worldData.js';
 import { loadGlb } from './glbLoader.js';
+import { LaserFx } from './laserFx.js';
 const tupleToVector = (tuple, out = new THREE.Vector3()) => out.set(tuple[0], tuple[1], tuple[2]);
 const NEG_Z = new THREE.Vector3(0, 0, -1);
 const UP_AXIS = new THREE.Vector3(0, 1, 0);
@@ -69,42 +70,6 @@ const ENGINE_FLARE_SIZE = 0.9;
 const ENGINE_FLARE_SIZE_ATLAS = 1.6;
 const ENGINE_FLARE_HOSTILE_BOOST = 1.12;
 const ENGINE_FLARE_BURNING_BOOST = 1.45;
-// Laser bolt FX tuning (visual gauntlet overhaul): the world scale is huge —
-// at a 60-unit engagement range one internal-resolution pixel is ~3.8 world
-// units — so a bare 0.16-radius capsule reads as a sub-pixel speck. The bolt
-// is now a hot core plus a crossed additive glow pair that keeps a bold
-// tracer read at range, plus a hot head sprite for the tip. World units.
-const LASER_FX_TUNING = {
-    coreRadius: 0.3,
-    coreLength: 3.6,
-    glowWidth: 16,
-    glowLength: 21,
-    glowOpacity: 0.5,
-    headSize: 8.5,
-    headOpacity: 0.85,
-    muzzleSize: 6.5,
-    muzzleLife: 0.11,
-    impactFlashSize: 5.4,
-    impactFlashLife: 0.22,
-    sparkCount: 12,
-    sparkCountHeavy: 18,
-    sparkSpeedMin: 14,
-    sparkSpeedMax: 34,
-    sparkLife: 0.55,
-    sparkSize: 1.15,
-    emberCount: 5,
-    emberSpeedMin: 3,
-    emberSpeedMax: 7,
-    emberLife: 1.3,
-    emberSize: 1.7,
-};
-// Faction palette shared by bolts, muzzle flashes and impacts: the core is a
-// near-white hot tint of the faction color; glow and head ride the pure hue.
-const LASER_FACTION_COLORS = {
-    player: { bolt: 0xffc35a, core: 0xfff3d2 },
-    'red-talons': { bolt: 0xff4b39, core: 0xffe2d8 },
-    patrol: { bolt: 0x75cfff, core: 0xe6f9ff },
-};
 export class SpaceRenderer {
     container;
     scene = new THREE.Scene();
@@ -122,13 +87,11 @@ export class SpaceRenderer {
     shipMeshes = new Map();
     projectileMeshes = new Map();
     pickupMeshes = new Map();
-    // Shared laser-FX assets (gauntlet overhaul): geometries/materials/textures
-    // created once per faction and reused by every bolt, muzzle flash and
-    // impact. Everything cached here is flagged userData.shared so
-    // disposeObject (called when a single bolt mesh is removed) skips it; the
-    // cache itself is released in dispose().
-    boltAssets = null;
-    fxTextureCache = new Map();
+    // Shared laser-FX (gauntlet overhaul): owns bolt/muzzle/impact assets in
+    // src/game/laserFx.js. Lazily created on first bolt; everything it caches
+    // is flagged userData.shared so disposeObject skips it, and it releases
+    // the whole cache in dispose().
+    laserFx = null;
     raceGateRoot = null;
     raceGateMeshes = [];
     raceActiveGate;
@@ -2096,10 +2059,11 @@ export class SpaceRenderer {
             let mesh = this.projectileMeshes.get(projectile.slot);
             if (!mesh) {
                 if (projectile.kind === 'laser') {
-                    mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.8, 3, 6), new THREE.MeshBasicMaterial({
-                        color: projectile.faction === 'player' ? 0xffc35a : projectile.faction === 'red-talons' ? 0xff4b39 : 0x75cfff,
-                    }));
-                    mesh.rotation.x = Math.PI / 2;
+                    // Gauntlet overhaul: hot core + crossed additive glow pair
+                    // + head sprite (see laserFx.js). Shared assets per faction;
+                    // the per-bolt cost is just the small group wrapper.
+                    this.laserFx ??= new LaserFx(this.scene, this.effects);
+                    mesh = this.laserFx.boltFor(projectile.faction);
                 }
                 else if (projectile.kind === 'gauss') {
                     // Magrail slug: a long hypervelocity tracer — thin white-blue
@@ -2527,12 +2491,16 @@ export class SpaceRenderer {
         this.scene.add(points);
         this.effects.push({ object: points, points, velocities, life: 1.05, maxLife: 1.05 });
     }
-    spawnImpact(position, color = 0xffc36a) {
-        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.radialTexture('#ffffff', `#${color.toString(16).padStart(6, '0')}`), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
-        sprite.position.set(...position);
-        sprite.scale.setScalar(3.4);
-        this.scene.add(sprite);
-        this.effects.push({ object: sprite, velocities: [], life: 0.18, maxLife: 0.18 });
+    spawnImpact(position, color = 0xffc36a, heavy = false) {
+        // Gauntlet overhaul: layered hit (flash + spark burst + embers) lives in
+        // laserFx.js; heavy hits (missiles) add a slower ember afterglow.
+        this.laserFx ??= new LaserFx(this.scene, this.effects);
+        this.laserFx.impact(position, color, heavy);
+    }
+    spawnMuzzleFlash(x, y, z, color = 0xffc35a) {
+        // Brief additive flash at a gun port on fire (see laserFx.js).
+        this.laserFx ??= new LaserFx(this.scene, this.effects);
+        this.laserFx.muzzleFlash(x, y, z, color);
     }
     // Missile-exhaust smoke: a diffuse (non-additive) puff that expands and
     // fades on the generic effects pool. Diffuse blending is the point —
@@ -2967,16 +2935,20 @@ export class SpaceRenderer {
             if (!(child instanceof THREE.Mesh || child instanceof THREE.Points || child instanceof THREE.Sprite))
                 return;
             const mesh = child;
-            mesh.geometry?.dispose?.();
+            // Assets flagged userData.shared (laserFx caches) are reused across
+            // many live objects — a single bolt's death must not dispose them.
+            if (mesh.geometry && !mesh.geometry.userData?.shared)
+                mesh.geometry.dispose();
             const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
             materials.forEach((material) => {
                 if (!material)
                     return;
                 for (const value of Object.values(material)) {
-                    if (value instanceof THREE.Texture)
+                    if (value instanceof THREE.Texture && !value.userData?.shared)
                         value.dispose();
                 }
-                material.dispose();
+                if (!material.userData?.shared)
+                    material.dispose();
             });
         });
     }
@@ -2985,6 +2957,8 @@ export class SpaceRenderer {
         this.renderer.domElement.removeEventListener('webglcontextlost', this.onContextLost);
         this.renderer.domElement.removeEventListener('webglcontextrestored', this.onContextRestored);
         this.disposeObject(this.scene);
+        this.laserFx?.dispose();
+        this.laserFx = null;
         this.pixelTextures.forEach((texture) => texture.dispose());
         this.pixelTextures.clear();
         this.screenTextures.length = 0;

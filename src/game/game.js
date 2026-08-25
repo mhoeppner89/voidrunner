@@ -2156,6 +2156,7 @@ export class GameSession {
             const muzzle = this.tmpP0.copy(position).add(down).addScaledVector(direction, 2.4);
             const slot = this.projStore.alloc();
             this.projStore.setPos(slot, muzzle.x, muzzle.y, muzzle.z);
+            this.renderer.spawnMuzzleFlash(muzzle.x, muzzle.y, muzzle.z, 0xbfe9ff);
             const shotVel = this.tmpP0.copy(direction).multiplyScalar(weapon.speed).add(this.tmpP3.set(vv[0], vv[1], vv[2]));
             this.projStore.setVel(slot, shotVel.x, shotVel.y, shotVel.z);
             this.projectiles.push({
@@ -2188,6 +2189,7 @@ export class GameSession {
             const muzzleX = position.x + down.x + boltDir.x * 1.9;
             const muzzleY = position.y + down.y + boltDir.y * 1.9;
             const muzzleZ = position.z + down.z + boltDir.z * 1.9;
+            this.renderer.spawnMuzzleFlash(muzzleX, muzzleY, muzzleZ, 0xcfe4ff);
             const slot = this.projStore.alloc();
             this.projStore.setPos(slot, muzzleX, muzzleY, muzzleZ);
             this.projStore.setVel(slot, boltDir.x * weapon.speed + vv[0], boltDir.y * weapon.speed + vv[1], boltDir.z * weapon.speed + vv[2]);
@@ -2223,6 +2225,8 @@ export class GameSession {
                 // Component-inline spawn: pelletDir rides tmpP0 through the
                 // whole volley, so nothing here may borrow a scratch vector.
                 const lateral = (pellet / Math.max(1, pelletCount - 1) - 0.5) * 0.9;
+                if (pellet === 0)
+                    this.renderer.spawnMuzzleFlash(position.x + right.x * lateral + down.x + pelletDir.x * 1.8, position.y + right.y * lateral + down.y + pelletDir.y * 1.8, position.z + right.z * lateral + down.z + pelletDir.z * 1.8, 0xffc9a0);
                 const slot = this.projStore.alloc();
                 this.projStore.setPos(
                     slot,
@@ -2251,6 +2255,7 @@ export class GameSession {
             const muzzle = this.tmpP0.copy(position).add(down).addScaledVector(direction, 2.1);
             const slot = this.projStore.alloc();
             this.projStore.setPos(slot, muzzle.x, muzzle.y, muzzle.z);
+            this.renderer.spawnMuzzleFlash(muzzle.x, muzzle.y, muzzle.z, weapon.kind === 'ion' ? 0x9be8f2 : 0xffb066);
             const shotVel = this.tmpP0.copy(direction).multiplyScalar(weapon.speed).add(this.tmpP3.set(vv[0], vv[1], vv[2]));
             this.projStore.setVel(slot, shotVel.x, shotVel.y, shotVel.z);
             this.projectiles.push({
@@ -2270,6 +2275,7 @@ export class GameSession {
                 const muzzle = this.tmpP0.copy(position).addScaledVector(right, side).add(down).addScaledVector(direction, 1.8);
                 const slot = this.projStore.alloc();
                 this.projStore.setPos(slot, muzzle.x, muzzle.y, muzzle.z);
+                this.renderer.spawnMuzzleFlash(muzzle.x, muzzle.y, muzzle.z, 0xffc35a);
                 const shotVel = this.tmpP0.copy(direction).multiplyScalar(weapon.speed).add(this.tmpP3.set(vv[0], vv[1], vv[2]));
                 this.projStore.setVel(slot, shotVel.x, shotVel.y, shotVel.z);
                 this.projectiles.push({
@@ -5020,7 +5026,7 @@ export class GameSession {
                     const playerPosition = vec(this.save.player.position, this.tmpP5);
                     const playerOrientation = quat(this.save.player.rotation, this.tmpAudioOrientation);
                     const localHit = this.tmpAudioLocal.copy(hitPosition).sub(playerPosition).applyQuaternion(playerOrientation.invert());
-                    this.renderer.spawnImpact(tuple(hitPosition), projectile.kind === 'missile' ? 0xff7a42 : projectile.kind === 'gauss' ? 0xbfe9ff : 0xffcb62);
+                    this.renderer.spawnImpact(tuple(hitPosition), projectile.kind === 'missile' ? 0xff7a42 : projectile.kind === 'gauss' ? 0xbfe9ff : projectile.kind === 'ion' ? 0x8fe4f0 : projectile.kind === 'mortar' ? 0xffa04d : 0xffcb62, projectile.kind === 'missile' || projectile.kind === 'mortar');
                     if (hitKind === 'player') {
                         this.damagePlayer(projectile.damage, projectile.kind === 'missile' ? 'missile strike' : 'weapons fire');
                         // A landed shot is a moment worth talking about: ace and

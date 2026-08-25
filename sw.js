@@ -13,6 +13,7 @@ self.addEventListener('install', (event) => {
     './src/game/entityStore.js',
     './src/game/game.js',
     './src/game/input.js',
+    './src/game/laserFx.js',
     './src/game/missions.js',
     './src/game/pilots.js',
     './src/game/random.js',
