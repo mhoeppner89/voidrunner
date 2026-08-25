@@ -776,6 +776,7 @@ export class AudioManager {
         };
         switch (effect) {
             case 'laser': this.playLaser(now, strength, out); break;
+            case 'gauss': this.playGauss(now, strength, out); break;
             case 'missile': this.playMissileLaunch(now, strength, out); break;
             case 'impact': this.playImpact(now, strength, out); break;
             case 'hit': this.playHit(now, strength, out); break;
@@ -794,7 +795,7 @@ export class AudioManager {
             default: this.playImpact(now, strength, out); break;
         }
         // Release the chain when the effect is done (the longest tail wins).
-        const releaseAt = { explosion: 1.6, dock: 1.1, missile: 0.85, scan: 0.5, hyperSpool: 2.1, hyperActive: 4.0, hyperDrop: 0.6, pickup: 0.35 }[effect] ?? 0.4;
+        const releaseAt = { explosion: 1.6, dock: 1.1, missile: 0.85, gauss: 0.5, scan: 0.5, hyperSpool: 2.1, hyperActive: 4.0, hyperDrop: 0.6, pickup: 0.35 }[effect] ?? 0.4;
         setTimeout(release, releaseAt * 1000 + 60);
     }
 
@@ -881,6 +882,16 @@ export class AudioManager {
         this.playNoiseBurst({ at, duration: 0.07, start: 300, end: 950, level: 0.17 * intensity, playbackRate: 0.8, out });
         this.playTone({ at, frequency: 68, endFrequency: 132, duration: 0.35, type: 'sine', level: 0.36 * intensity, filterFrequency: 300, out });
         this.playNoiseBurst({ at: at + 0.05, duration: 0.7, start: 2400, end: 220, level: 0.22 * intensity, playbackRate: 0.66, out });
+    }
+
+    // Magrail: a full-power rail discharge — a hard wide-spectrum crack, a fast
+    // detuned rail-whine falling two octaves, and a deep recoil thump. Deliberately
+    // heavier and longer than the pulse laser's zing: one shot, real weight.
+    playGauss(at, intensity, out) {
+        this.playNoiseBurst({ at, duration: 0.05, start: 9000, end: 1400, q: 0.5, level: 0.11 * intensity, out });
+        this.playTone({ at, frequency: 2400, endFrequency: 190, duration: 0.17, type: 'sawtooth', level: 0.075 * intensity, filterFrequency: 5200, out });
+        this.playTone({ at, frequency: 2430, endFrequency: 205, duration: 0.15, type: 'square', level: 0.05 * intensity, filterFrequency: 4800, out });
+        this.playTone({ at, frequency: 95, endFrequency: 42, duration: 0.14, type: 'sine', level: 0.12 * intensity, filterFrequency: 300, out });
     }
 
     // Collision / hull impact: a sharp crack, a deep thud, and a short
