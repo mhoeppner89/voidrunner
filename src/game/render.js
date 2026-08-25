@@ -1215,7 +1215,7 @@ export class SpaceRenderer {
             // dry worlds take their cloud tint from the atmosphere color.
             color: id === 'azure' ? 0xf4f9fd : atmosphere,
             transparent: true,
-            opacity: id === 'azure' ? 0.22 : 0.40,
+            opacity: id === 'azure' ? 0.16 : 0.40,
             depthWrite: false,
             fog: false,
         }));
