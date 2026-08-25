@@ -75,7 +75,8 @@ R2 · planets+ring: Azure surface rebuilt on seeded value-noise fbm (archipelago
 R2 · perf gate re-checked after shader ring: 43.2/34.2/30.4 fps — inside noise band, no regression.
 R2 · delegation still down (7th failed ping) — critic verdicts for lasers/missiles/planets/ring all pending platform recovery; pairs will stage automatically via gauntlet/stage-pairs.mjs.
 R3 · missiles: plume/flare enlarged (ember read at 30-60u), camera attenuation; NPC guns now flash faction-colored on every shot — furballs show where fire comes from. Azure deck 0.22→0.16 (ocean blue survives at distance).
-R3 · all four critic pairs STAGED (gauntlet/state/pairs/: lasers, missiles, ring, planets — keys hidden from critics). Delegation ping #9 failed; critics execute the moment subagents recover.</div>
+R3 · all four critic pairs STAGED (gauntlet/state/pairs/: lasers, missiles, ring, planets — keys hidden from critics). Delegation ping #9 failed; critics execute the moment subagents recover.
+R3 · RING BUG (user-reported): ring broke into arcs, not going all around. Root cause: shader's ring-plane normal was the Euler applied to (0,1,0), but RingGeometry's plane normal is +Z — projection plane sat ~60° off, so the radial edge fade ate whole arcs. Normal now derives from the mesh quaternion (gauntlet/shots/ring-fix/).</div>
     <p class="note">Refresh after each round. Blind A/B pairs staged per piece; critic sees only A/B labels. Refs are evaluation-only, never shipped.</p>
 </main>
 </body>
