@@ -131,6 +131,15 @@ try {
     await sleep(700);
     await shoot('vesper-view');
 
+    // Asteroid field: frame the shardbelt from outside the drift so no
+    // monolith swallows the camera.
+    const belt = LOCATIONS.shardbelt.position;
+    await evaluate(lookAt([belt[0] + 40, belt[1] + 320, belt[2] + 60], belt));
+    await sleep(700);
+    await shoot('asteroid-field');
+    await sleep(350);
+    await shoot('asteroid-field-b');
+
     // --- Combat scenes -----------------------------------------------------
     await evaluate(`window.__VOID_PRIVATEER__.startArena('open', '1v1')`);
     await sleep(900);
