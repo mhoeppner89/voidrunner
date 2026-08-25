@@ -72,15 +72,15 @@ export const WEAPONS = {
         envelopeKey: 'WINS INSIDE {range}U · USELESS BEYOND',
         kind: 'ripper',
         slot: 4,
-        // Brawler: seven pellets per shell across a ~6° cone; wins inside
-        // their turn circle, useless beyond ~120u. Pellet speeds jitter so
-        // the cloud arrives ragged, not as a ring. (Review pass: the original
-        // 11° cone sprayed half the sky — tightened to keep the brawler
-        // honest without wasting shells.)
+        // Brawler: seven pellets per shell across a ~6° gaussian-clumped
+        // cone; wins inside their turn circle, useless beyond ~55u. Pellet
+        // speeds jitter so the cloud arrives ragged, not as a ring. (Review
+        // passes: the original 11° single-axis fan sprayed half the sky, and
+        // the 0.5s reach let it snipe — both reined in.)
         speed: 165,
         cooldown: 0.78,
         damageMul: 0.55,
-        life: 0.5,
+        life: 0.35,
         audioKey: 'ripper',
         assist: 1.1,
         ammoId: 'shells',

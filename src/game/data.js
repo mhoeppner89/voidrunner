@@ -425,7 +425,7 @@ export const EQUIPMENT = {
         category: 'weapon',
         price: 3600,
         description: 'Seven-pellet shell cloud for turning fights. Devastating inside their turn circle, useless beyond it.',
-        stat: '7 pellets · wins inside ~80u',
+        stat: '7 pellets · wins inside ~55u',
     },
     'ion-lance': {
         id: 'ion-lance',

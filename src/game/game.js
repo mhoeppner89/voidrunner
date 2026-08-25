@@ -2128,6 +2128,20 @@ export class GameSession {
         const index = WEAPON_ORDER.indexOf(this.save.player.weaponId);
         this.switchWeapon(WEAPON_ORDER[(index + 1) % WEAPON_ORDER.length]);
     }
+    // 2D cone spread with a gaussian-clumped center: the old single-axis tilt
+    // fanned pellets vertically only (the roll around the direction axis was
+    // a no-op — a vector rotated about itself is itself). The offset now
+    // spreads evenly around the compass with density falling toward the cone
+    // edge, seeded for headless reproducibility. Allocation-free: `out` and
+    // `right`/`up` are caller-owned scratches.
+    spreadDirection(direction, right, up, spread, rng, out) {
+        const angle = rng() * Math.PI * 2;
+        const radius = ((rng() + rng() + rng()) / 1.5 - 1) * spread;
+        return out.copy(direction)
+            .addScaledVector(right, Math.cos(angle) * radius)
+            .addScaledVector(up, Math.sin(angle) * radius)
+            .normalize();
+    }
     firePlayerGuns() {
         const stats = this.playerStats();
         const weapon = this.currentWeapon();
@@ -2171,8 +2185,9 @@ export class GameSession {
         const vv = this.save.player.velocity;
         if (weapon.kind === 'gauss') {
             // Single centerline magrail mount: one hypervelocity slug that
-            // over-penetrates (see updateProjectiles' pierce sweep).
-            const muzzle = this.tmpP0.copy(position).add(down).addScaledVector(direction, 2.4);
+            // over-penetrates (see updateProjectiles' pierce sweep). Spawns
+            // well up the bore so the muzzle pop lands off the pilot's face.
+            const muzzle = this.tmpP0.copy(position).add(down).addScaledVector(direction, 7);
             const slot = this.projStore.alloc();
             this.projStore.setPos(slot, muzzle.x, muzzle.y, muzzle.z);
             this.renderer.spawnMuzzleFlash(muzzle.x, muzzle.y, muzzle.z, 0xbfe9ff);
@@ -2193,21 +2208,17 @@ export class GameSession {
         }
         else if (weapon.kind === 'pdc') {
             // Cluster barrel: one stubby bolt per tick with a tight seeded
-            // wobble; the stream plus passive missile interception is the
-            // weapon's identity (see updatePlayerWeapons' intercept pass).
+            // 2D wobble (denser center); the stream plus passive missile
+            // interception is the weapon's identity (see updatePlayerWeapons'
+            // intercept pass). Spawns up the bore, off the pilot's face.
             const rng = seededRandom(`${this.save.world.seed}:wpn:${Math.floor(this.save.world.time * 1000)}:${this.projectileCounter}`);
-            const spread = (rng() - 0.5) * 2 * (weapon.spreadRad ?? 0);
-            const wobble = this.tmpP3.crossVectors(direction, UP);
-            if (wobble.lengthSq() < 1e-6)
-                wobble.set(1, 0, 0);
-            else
-                wobble.normalize();
-            const boltDir = this.tmpP0.copy(direction).applyAxisAngle(wobble, spread);
+            const upBasis = this.tmpP3.copy(UP).applyQuaternion(orientation);
+            const boltDir = this.spreadDirection(direction, right, upBasis, weapon.spreadRad ?? 0, rng, this.tmpP0);
             // Component-inline spawn: boltDir lives on tmpP0, so neither the
             // muzzle nor the shot velocity may route through a scratch.
-            const muzzleX = position.x + down.x + boltDir.x * 1.9;
-            const muzzleY = position.y + down.y + boltDir.y * 1.9;
-            const muzzleZ = position.z + down.z + boltDir.z * 1.9;
+            const muzzleX = position.x + down.x + boltDir.x * 6.5;
+            const muzzleY = position.y + down.y + boltDir.y * 6.5;
+            const muzzleZ = position.z + down.z + boltDir.z * 6.5;
             this.renderer.spawnMuzzleFlash(muzzleX, muzzleY, muzzleZ, 0xcfe4ff);
             const slot = this.projStore.alloc();
             this.projStore.setPos(slot, muzzleX, muzzleY, muzzleZ);
@@ -2224,34 +2235,26 @@ export class GameSession {
             });
         }
         else if (weapon.kind === 'ripper') {
-            // Seven pellets across an 11° cone, each with its own seeded angle
-            // and speed so the cloud arrives ragged rather than as a ring.
-            // One shell per trigger pull.
+            // Seven pellets across a ~6° gaussian-clumped cone, each with its
+            // own seeded offset and speed so the cloud arrives ragged rather
+            // than as a ring. One shell per trigger pull. Spawns up the bore.
             const rng = seededRandom(`${this.save.world.seed}:wpn:${Math.floor(this.save.world.time * 1000)}:${this.projectileCounter}`);
+            const upBasis = this.tmpP3.copy(UP).applyQuaternion(orientation);
             const pelletCount = weapon.pellets ?? 7;
             for (let pellet = 0; pellet < pelletCount; pellet += 1) {
-                const spread = (rng() - 0.5) * 2 * (weapon.spreadRad ?? 0);
-                const rollSeed = rng();
-                const wobble = this.tmpP3.crossVectors(direction, UP);
-                if (wobble.lengthSq() < 1e-6)
-                    wobble.set(1, 0, 0);
-                else
-                    wobble.normalize();
-                const pelletDir = this.tmpP0.copy(direction)
-                    .applyAxisAngle(wobble, spread)
-                    .applyAxisAngle(direction, (rollSeed - 0.5) * 2 * (weapon.spreadRad ?? 0));
+                const pelletDir = this.spreadDirection(direction, right, upBasis, weapon.spreadRad ?? 0, rng, this.tmpP0);
                 const pelletSpeed = weapon.speed + (rng() - 0.5) * 2 * (weapon.speedJitter ?? 0);
                 // Component-inline spawn: pelletDir rides tmpP0 through the
                 // whole volley, so nothing here may borrow a scratch vector.
                 const lateral = (pellet / Math.max(1, pelletCount - 1) - 0.5) * 0.9;
                 if (pellet === 0)
-                    this.renderer.spawnMuzzleFlash(position.x + right.x * lateral + down.x + pelletDir.x * 1.8, position.y + right.y * lateral + down.y + pelletDir.y * 1.8, position.z + right.z * lateral + down.z + pelletDir.z * 1.8, 0xffc9a0);
+                    this.renderer.spawnMuzzleFlash(position.x + right.x * lateral + down.x + pelletDir.x * 6, position.y + right.y * lateral + down.y + pelletDir.y * 6, position.z + right.z * lateral + down.z + pelletDir.z * 6, 0xffc9a0);
                 const slot = this.projStore.alloc();
                 this.projStore.setPos(
                     slot,
-                    position.x + right.x * lateral + down.x + pelletDir.x * 1.8,
-                    position.y + right.y * lateral + down.y + pelletDir.y * 1.8,
-                    position.z + right.z * lateral + down.z + pelletDir.z * 1.8,
+                    position.x + right.x * lateral + down.x + pelletDir.x * 6,
+                    position.y + right.y * lateral + down.y + pelletDir.y * 6,
+                    position.z + right.z * lateral + down.z + pelletDir.z * 6,
                 );
                 this.projStore.setVel(slot, pelletDir.x * pelletSpeed + vv[0], pelletDir.y * pelletSpeed + vv[1], pelletDir.z * pelletSpeed + vv[2]);
                 this.projectiles.push({
@@ -2271,7 +2274,7 @@ export class GameSession {
             // Lance and mortar throw one centerline orb; their identity lives
             // in the impact hooks — shield crack + gun jam / splash + burn.
             const damage = weapon.damageFlat ?? stats.gunDamage * weapon.damageMul;
-            const muzzle = this.tmpP0.copy(position).add(down).addScaledVector(direction, 2.1);
+            const muzzle = this.tmpP0.copy(position).add(down).addScaledVector(direction, 6.5);
             const slot = this.projStore.alloc();
             this.projStore.setPos(slot, muzzle.x, muzzle.y, muzzle.z);
             this.renderer.spawnMuzzleFlash(muzzle.x, muzzle.y, muzzle.z, weapon.kind === 'ion' ? 0x9be8f2 : 0xffb066);
@@ -2291,7 +2294,7 @@ export class GameSession {
         }
         else {
             for (const side of [-0.58, 0.58]) {
-                const muzzle = this.tmpP0.copy(position).addScaledVector(right, side).add(down).addScaledVector(direction, 1.8);
+                const muzzle = this.tmpP0.copy(position).addScaledVector(right, side).add(down).addScaledVector(direction, 6.5);
                 const slot = this.projStore.alloc();
                 this.projStore.setPos(slot, muzzle.x, muzzle.y, muzzle.z);
                 this.renderer.spawnMuzzleFlash(muzzle.x, muzzle.y, muzzle.z, 0xffc35a);
