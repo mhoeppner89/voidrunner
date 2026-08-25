@@ -329,15 +329,10 @@ export class SpaceRenderer {
             context.fillStyle = blob;
             context.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
         }
-        for (let index = 0; index < 240; index += 1) {
-            const x = Math.random() * 512;
-            const y = Math.random() * 256;
-            const r = 0.4 + Math.random() * 1.6;
-            context.fillStyle = `rgba(255,230,180,${(0.25 + Math.random() * 0.75).toFixed(2)})`;
-            context.beginPath();
-            context.arc(x, y, r, 0, Math.PI * 2);
-            context.fill();
-        }
+        // No star dots in the IBL canvas: scene.environment feeds every
+        // standard material's specular, and 1px stars at 512x256 alias into
+        // speckled dots on any glossy surface seen from orbit (Azure's seas).
+        // The visible starfield is the Points shell from createStarfield.
         const texture = new THREE.CanvasTexture(canvas);
         texture.mapping = THREE.EquirectangularReflectionMapping;
         texture.colorSpace = THREE.SRGBColorSpace;
