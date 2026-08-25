@@ -92,6 +92,21 @@ difference is provable in sim telemetry (probe assertions), not just on paper.
 - Serve via python3 http.server 4173; clear /tmp/vr-*-profile first; probes
   run ONE AT A TIME (shared CDP ports 9333/9336).
 
+### Verified status (lead run, post-roster)
+
+Green: probe-weapons 15/15 · probe-sim-fixed 26/26 · probe-theme 7/7 ·
+probe-tilt 14/14 · probe-store 8/8 (1-in-N timing flake: the transform
+sample needs a live projectile). probe-ai 97-98/101, probe-r1 11/12,
+probe-hyperdrive-fx ~24/30 — every remaining failure was bisected against
+the pre-roster release (5c30292) and is PRE-EXISTING, not roster-caused:
+2 documented debris flakes + 2 cover-scenario failures (ai), the load-rule
+drift (r1), and the interrupt-encounter scenario (hyperdrive-fx). Probe
+tooling fixes by the lead: `--no-sandbox --disable-gpu-sandbox` added to six
+stale probes, `__VOID_PRIVATEER_PROBE_LANG__='en'` pin in r1/hyperdrive-fx
+(fresh profiles boot German-default saves). A zombie `http.server 8123`
+served stale builds to hyperdrive-fx until killed — always check the port
+the probe actually uses.
+
 ## Gauntlet protocol per piece
 
 Builder implements → SEPARATE fresh-context critic compares against the

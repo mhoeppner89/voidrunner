@@ -36,29 +36,34 @@
     <h1>VOIDRUNNER · VISUAL GAUNTLET</h1>
     <div class="sub">Builder/critic loop · bar: Elite Dangerous (real captured stills) · judged blind, labels stripped</div>
 </header>
-<div class="bar">Bar refs: <b>gauntlet/refs/</b> (local evaluation only) · Baseline: <b>gauntlet/shots/baseline/</b> · Perf gate: relative frame-time parity via <b>.freebuff/perf-probe.mjs</b></div>
+<div class="bar">Bar refs: <b>gauntlet/refs/</b> (local evaluation only) · Shots: <b>gauntlet/shots/</b> · Perf gate: <b>.freebuff/perf-probe.mjs</b> · Workspace note: shared with sibling agent sessions — pieces coordinate via commits</div>
 <main>
     <h2>Pieces</h2>
     <table>
-        <tr><th>Piece</th><th>Bar ref</th><th>Status</th><th>Round</th><th>Last verdict</th></tr>
-        <tr><td>1 · Laser bolts + impact FX</td><td>ed-03, ed-12, ed-13</td><td><span class="st building">builder round 1</span></td><td>1</td><td>baseline: bolts are sub-2px specks at combat range</td></tr>
-        <tr><td>2 · Rockets / missiles + exhaust</td><td>ed-03 (smoke trails), ed-16</td><td><span class="st pending">queued</span></td><td>—</td><td>baseline: missile is a dot, no trail</td></tr>
+        <tr><th>Piece</th><th>Bar ref</th><th>Status</th><th>Round</th><th>Notes</th></tr>
+        <tr><td>1 · Laser bolts + impact FX</td><td>ed-03, ed-12, ed-13</td><td><span class="st critic">built r1–r4 · critic pending</span></td><td>1</td><td>invisible specks → hot-core + crossed-glow tracers, muzzle flashes, layered impact bursts; camera-attenuation kills near wash</td></tr>
+        <tr><td>2 · Rockets / missiles + exhaust</td><td>ed-03 (trails), ed-16</td><td><span class="st building">puff fix r1.3 · polish pending</span></td><td>1</td><td>roster work (sibling session) added plume+fins+smoke; I fixed the ×34 puff ballooning that washed frames white</td></tr>
         <tr><td>3 · Planet surfaces (Azure + Vesper)</td><td>ed-02, ed-10, ed-15</td><td><span class="st pending">queued</span></td><td>—</td><td>baseline: flat banded ball, magenta blotches</td></tr>
-        <tr><td>4 · Ring of Azure</td><td>ed-05, ed-15</td><td><span class="st pending">queued</span></td><td>—</td><td>baseline: one flat grey band, no gaps/shadow</td></tr>
-        <tr><td>5 · Clouds (cheap fluid-style drift)</td><td>ed-02, ed-15</td><td><span class="st pending">queued</span></td><td>—</td><td>baseline: static blotch texture, slow spin</td></tr>
-        <tr><td>6 · Perf gate (all devices)</td><td>measurable half</td><td><span class="st pending">queued</span></td><td>—</td><td>must hold baseline frame times</td></tr>
+        <tr><td>4 · Ring of Azure</td><td>ed-05, ed-15</td><td><span class="st pending">queued</span></td><td>—</td><td>baseline: one flat grey band, no gaps/shadow; halo reads as soap bubble</td></tr>
+        <tr><td>5 · Clouds (cheap fluid-style drift)</td><td>ed-02, ed-15</td><td><span class="st building">sibling session</span></td><td>—</td><td>cloudLayers zonal shear landed in updateWorld — coordinated, not duplicated</td></tr>
+        <tr><td>6 · Perf gate (all devices)</td><td>measurable half</td><td><span class="st won">pass r1</span></td><td>1</td><td>43.7 / 37.3 / 31.6 fps (SwiftShader ceiling ~43) · overhaul strictly reduces per-bolt work (no per-spawn canvas textures/compiles) · true pre-gauntlet A/B blocked by probe hangs in /tmp</td></tr>
     </table>
 
-    <h2>Baseline (before) — captured this round</h2>
+    <h2>Laser piece — before / after</h2>
     <div class="pair">
-        <figure><img src="shots/baseline/azure-rings.png" alt=""><figcaption>azure-rings — ring reads as a single grey band; halo shell reads as a soap bubble; surface has magenta blotches</figcaption></figure>
-        <figure><img src="shots/baseline/laser-volley.png" alt=""><figcaption>laser-volley — player fired 2 pairs at 60u; bolts are barely-visible specks</figcaption></figure>
-        <figure><img src="shots/baseline/missile-run.png" alt=""><figcaption>missile-run — missile in flight is a dot; no exhaust trail</figcaption></figure>
+        <figure><img src="shots/small/laser-volley.png" alt=""><figcaption>BEFORE (baseline) — two pairs fired at 60u: bolts are sub-2px specks; nothing reads</figcaption></figure>
+        <figure><img src="shots/lasers-r4/laser-volley.png" alt=""><figcaption>AFTER (r4) — gold tracer with white-hot head mid-flight; hostile taking an orange impact flash on the hull</figcaption></figure>
+        <figure><img src="shots/lasers-r3/missile-run.png" alt=""><figcaption>MISSILE (r3) — dart + flame plume + smoke trail that reads as smoke, not a white ball</figcaption></figure>
+        <figure><img src="shots/small/azure-rings.png" alt=""><figcaption>NEXT UP — Azure: flat band ring + soap-bubble halo + blotchy surface are pieces 3/4</figcaption></figure>
     </div>
 
     <h2>Round log</h2>
-    <div class="log" id="log">R1 · gauntlet started · bar picked: Elite Dangerous · refs fetched (16 stills, Steam CDN) · capture rig built (gauntlet/capture.mjs, 7 scenes, CDP + ws client, Chrome needs --no-sandbox-class elevation on this machine) · baseline captured clean (no page errors) · builder round 1 dispatched: laser bolts + impact FX.</div>
-    <p class="note">Watch this page: refresh after each round. Shots are re-captured per round under <b>gauntlet/shots/&lt;piece&gt;-r&lt;n&gt;/</b>; blind A/B pairs are staged for the critic with labels stripped.</p>
+    <div class="log" id="log">R1 · bar picked: Elite Dangerous · 16 refs fetched (Steam CDN, local-only) · capture rig built (gauntlet/capture.mjs, 7 scenes) · Chrome sandbox fix documented + applied (--no-sandbox --disable-gpu-sandbox) · baseline captured clean
+R1 · lasers: r1 glow too big/white → r2 tuned + camera attenuation → r3 missile-puff ballooning fixed (dedicated effect branch) → r4 finer denser sparks. Bolt now: hot core + crossed additive glow pair + head sprite, shared per-faction assets, zero canvas churn (src/game/laserFx.js, cached in sw.js).
+R1 · perf gate PASS: 43.7/37.3/31.6 fps vs ~43 ceiling, stable across runs.
+R1 · delegation outage: subagent layer failed 5× (even trivial pings) → builder work done in-session; blind CRITIC verdicts pending until it recovers. Pairs will be staged with gauntlet/stage-pairs.mjs.
+R1 · coordination: sibling sessions shipped weapon roster (6 guns) + racing release 0.6.0a + cloudLayers start; weapon-select UI chips missing from ui.js (flagged for roster owner).</div>
+    <p class="note">Refresh after each round. Blind A/B pairs staged per piece; critic sees only A/B labels. Refs are evaluation-only, never shipped.</p>
 </main>
 </body>
 </html>
