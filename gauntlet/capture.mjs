@@ -116,7 +116,7 @@ try {
     await sleep(600);
 
     // --- Planet scenes -----------------------------------------------------
-    const rings = planetScene('azure-rings', 'azure', 4.6, 1.15);
+    const rings = planetScene('azure-rings', 'azure', Number(process.env.AZURE_DIST ?? 4.6), 1.15);
     await evaluate(rings.setup);
     await sleep(700);
     await shoot('azure-rings');
