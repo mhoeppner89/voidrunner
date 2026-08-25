@@ -1253,9 +1253,9 @@ export class SpaceRenderer {
         // The halo and haze share one shell shader (with the near-field dome
         // fade) so neither can pop off when the camera crosses its boundary.
         // Halo intensity 1.0 painted a hard soap-bubble edge around the whole
-        // disc; 0.7 with the same shell keeps the limb glow but lets the planet
-        // surface read through it.
-        const haloMaterial = this.createAtmosphereMaterial(atmosphere, location.radius * 1.16, 0.7, 0.14, 1.0, location.position);
+        // disc; 0.62 with a near-zero scatter boost keeps the limb glow and the
+        // near-field dome fade but lets the lit surface read through it.
+        const haloMaterial = this.createAtmosphereMaterial(atmosphere, location.radius * 1.16, 0.62, 0.06, 1.0, location.position);
         const hazeMaterial = this.createAtmosphereMaterial(atmosphere, location.radius * 1.042, id === 'azure' ? 0.047 : 0.076, 0.0, 0.0, location.position);
         const haze = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.042, 112, 68), hazeMaterial);
         haze.name = 'haze';
