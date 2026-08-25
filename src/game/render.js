@@ -730,19 +730,20 @@ export class SpaceRenderer {
                 };
             };
             if (water) {
-                const abyss = new THREE.Color(0x0d3357);
-                const ocean = new THREE.Color(0x1c639c);
-                const shelf = new THREE.Color(0x3f9cc4);
-                const sand = new THREE.Color(0xd6c491);
-                const scrub = new THREE.Color(0x5d8a52);
-                const highland = new THREE.Color(0x9aa877);
+                const abyss = new THREE.Color(0x082238);
+                const ocean = new THREE.Color(0x155a92);
+                const shelf = new THREE.Color(0x2f86b4);
+                const sand = new THREE.Color(0xd0bd8a);
+                const scrub = new THREE.Color(0x527e4c);
+                const highland = new THREE.Color(0x8d9c72);
                 const noiseA = makeLattice(6);
                 const noiseB = makeLattice(14);
                 const noiseC = makeLattice(34);
-                const fbm = (u, v) => noiseA(u, v) * 0.52 + noiseB(u, v) * 0.3 + noiseC(u, v) * 0.18;
+                const noiseD = makeLattice(64);
+                const fbm = (u, v) => noiseA(u, v) * 0.44 + noiseB(u, v) * 0.28 + noiseC(u, v) * 0.18 + noiseD(u, v) * 0.1;
                 const image = context.getImageData(0, 0, size, size);
                 const pixels = image.data;
-                const landThreshold = 0.585;
+                const landThreshold = 0.6;
                 for (let y = 0; y < size; y += 1) {
                     const v = y / size;
                     const lat = v * 2 - 1;
@@ -753,9 +754,14 @@ export class SpaceRenderer {
                         let g;
                         let b;
                         if (n > landThreshold) {
-                            // Archipelago: sand rim → scrub → pale highland.
-                            const t = Math.min(1, (n - landThreshold) * 4.5);
-                            const c = sand.clone().lerp(scrub, Math.min(1, t * 2.4)).lerp(highland, Math.max(0, t - 0.55) * 1.4);
+                            // Archipelago: sand rim → scrub → highland, with a
+                            // second noise channel breaking the flat tone into
+                            // vegetated/rocky patchwork.
+                            const t = Math.min(1, (n - landThreshold) * 5.5);
+                            const patch = noiseC((x + 137) / size, (v + 59) / size);
+                            const c = sand.clone()
+                                .lerp(scrub, Math.min(1, t * 3.2 + patch * 0.5))
+                                .lerp(highland, Math.max(0, t - 0.5) * 1.6 * (0.5 + patch));
                             r = c.r;
                             g = c.g;
                             b = c.b;
@@ -764,7 +770,7 @@ export class SpaceRenderer {
                             // Depth-graded ocean: pale shelf at the coast, abyss
                             // in the basins — the sea reads as water, not paint.
                             const d = landThreshold - n;
-                            const c = shelf.clone().lerp(ocean, Math.min(1, d * 7)).lerp(abyss, Math.min(1, d * 2.6));
+                            const c = shelf.clone().lerp(ocean, Math.min(1, d * 5)).lerp(abyss, Math.min(1, d * 2.2));
                             r = c.r;
                             g = c.g;
                             b = c.b;
@@ -1189,7 +1195,7 @@ export class SpaceRenderer {
             roughness: id === 'azure' ? 0.5 : 0.94,
             metalness: id === 'azure' ? 0.14 : 0.02,
             emissive: dark,
-            emissiveIntensity: id === 'azure' ? 0.36 : 0.32,
+            emissiveIntensity: id === 'azure' ? 0.2 : 0.32,
             bumpMap: surfaceTexture,
             bumpScale: id === 'azure' ? 4 : 18,
             flatShading: false,
@@ -1209,7 +1215,7 @@ export class SpaceRenderer {
             // dry worlds take their cloud tint from the atmosphere color.
             color: id === 'azure' ? 0xf4f9fd : atmosphere,
             transparent: true,
-            opacity: id === 'azure' ? 0.34 : 0.40,
+            opacity: id === 'azure' ? 0.22 : 0.40,
             depthWrite: false,
             fog: false,
         }));
@@ -1333,7 +1339,7 @@ export class SpaceRenderer {
                     float face = abs(dot(uRingNormal, sunDir));
                     float bright = 0.62 + 0.38 * face;
                     vec3 color = uTint * (0.72 + 0.5 * band.r) * bright * shadow;
-                    gl_FragColor = vec4(color, alpha * 0.78);
+                    gl_FragColor = vec4(color, alpha * 0.66);
                 }`,
             transparent: true,
             side: THREE.DoubleSide,
