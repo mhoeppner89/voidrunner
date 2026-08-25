@@ -42,7 +42,7 @@
     <table>
         <tr><th>Piece</th><th>Bar ref</th><th>Status</th><th>Round</th><th>Notes</th></tr>
         <tr><td>1 · Laser bolts + impact FX</td><td>ed-03, ed-12, ed-13</td><td><span class="st critic">built r1–r4 · critic pending</span></td><td>1</td><td>invisible specks → hot-core + crossed-glow tracers, muzzle flashes, layered impact bursts; camera-attenuation kills near wash</td></tr>
-        <tr><td>2 · Rockets / missiles + exhaust</td><td>ed-03 (trails), ed-16</td><td><span class="st building">puff fix r1.3 · polish pending</span></td><td>1</td><td>roster work (sibling session) added plume+fins+smoke; I fixed the ×34 puff ballooning that washed frames white</td></tr>
+        <tr><td>2 · Rockets / missiles + exhaust</td><td>ed-03 (trails), ed-16</td><td><span class="st critic">built r3 · critic pending</span></td><td>3</td><td>ember plume + smoke trail + camera attenuation; NPC muzzle flashes now fire every shot (faction-colored)</td></tr>
         <tr><td>3 · Planet surfaces (Azure + Vesper)</td><td>ed-02, ed-10, ed-15</td><td><span class="st critic">built r2.1–r2.3 · critic pending</span></td><td>2</td><td>Azure: fbm archipelagos + depth-graded ocean + noisy caps (violet landmasses dead); Vesper: dusty amber storms; halo de-bubbled (scatter 0.18→0.06)</td></tr>
         <tr><td>4 · Ring of Azure</td><td>ed-05, ed-15</td><td><span class="st critic">built r2 · critic pending</span></td><td>2</td><td>one shader ring: sibling's C/B/Cassini/Encke texture sampled radially (was planar-smeared stripes) + planet shadow + sun-side light</td></tr>
         <tr><td>5 · Clouds (cheap fluid-style drift)</td><td>ed-02, ed-15</td><td><span class="st building">sibling session</span></td><td>—</td><td>cloudLayers zonal shear + Azure second counter-drifting deck; I tuned deck opacity 0.34→0.22 to kill the white wash</td></tr>
@@ -73,7 +73,9 @@ R1 · delegation outage: subagent layer failed 5× (even trivial pings) → buil
 R1 · coordination: sibling sessions shipped weapon roster (6 guns) + racing release 0.6.0a + cloudLayers start; weapon-select UI chips missing from ui.js (flagged for roster owner).
 R2 · planets+ring: Azure surface rebuilt on seeded value-noise fbm (archipelagos, depth-graded ocean, noisy caps) — root cause of violet blotches was land hue = ocean blue +0.11; ring rebuilt as ONE shader (sibling's region texture now sampled radially — RingGeometry planar UVs used to smear it into stripes — plus soft planet shadow, sun-side brightening); halo de-bubbled (intensity 1.0→0.62, scatter 0.18→0.06); Azure cloud decks 0.34→0.22, emissive 0.36→0.2. Iterations r2.1–r2.3 captured.
 R2 · perf gate re-checked after shader ring: 43.2/34.2/30.4 fps — inside noise band, no regression.
-R2 · delegation still down (7th failed ping) — critic verdicts for lasers/missiles/planets/ring all pending platform recovery; pairs will stage automatically via gauntlet/stage-pairs.mjs.</div>
+R2 · delegation still down (7th failed ping) — critic verdicts for lasers/missiles/planets/ring all pending platform recovery; pairs will stage automatically via gauntlet/stage-pairs.mjs.
+R3 · missiles: plume/flare enlarged (ember read at 30-60u), camera attenuation; NPC guns now flash faction-colored on every shot — furballs show where fire comes from. Azure deck 0.22→0.16 (ocean blue survives at distance).
+R3 · all four critic pairs STAGED (gauntlet/state/pairs/: lasers, missiles, ring, planets — keys hidden from critics). Delegation ping #9 failed; critics execute the moment subagents recover.</div>
     <p class="note">Refresh after each round. Blind A/B pairs staged per piece; critic sees only A/B labels. Refs are evaluation-only, never shipped.</p>
 </main>
 </body>
