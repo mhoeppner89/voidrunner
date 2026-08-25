@@ -89,6 +89,11 @@ const beginSession = (mode, arena) => {
     }
     if (mode === 'arena')
         save.arena = arena;
+    // The combat sim is a sandbox: every gun is unlocked there so players can
+    // review the whole roster without a shopping trip. Career saves are not
+    // affected — ownership there derives from purchased equipment.
+    if (mode === 'arena')
+        save.player.equipment = ['pdc-cluster', 'ripper-scattergun', 'ion-lance', 'sunlance-mortar'];
     cachedSave = save;
     saveGame(save);
     session = new GameSession(save, ui, () => {
