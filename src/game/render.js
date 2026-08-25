@@ -760,7 +760,12 @@ export class SpaceRenderer {
                 const noiseB = makeLattice(14);
                 const noiseC = makeLattice(34);
                 const noiseD = makeLattice(64);
-                const fbm = (u, v) => noiseA(u, v) * 0.46 + noiseB(u, v) * 0.3 + noiseC(u, v) * 0.17 + noiseD(u, v) * 0.07;
+                // Land/ocean is decided by the LOW-frequency octaves only:
+                // letting the 64-lattice octave into the threshold scatters
+                // single-texel islands that render as dirt speckle from orbit.
+                // The fine octave still shades land interiors and shallows.
+                const fbmLow = (u, v) => noiseA(u, v) * 0.62 + noiseB(u, v) * 0.38;
+                const fbm = (u, v) => fbmLow(u, v) + (noiseC(u, v) - 0.5) * 0.24 + (noiseD(u, v) - 0.5) * 0.12;
                 const image = context.getImageData(0, 0, size, size);
                 const pixels = image.data;
                 const landThreshold = 0.6;
@@ -768,16 +773,17 @@ export class SpaceRenderer {
                     const v = y / size;
                     const lat = v * 2 - 1;
                     for (let x = 0; x < size; x += 1) {
-                        const n = fbm(x / size, v);
+                        const nLow = fbmLow(x / size, v);
+                        const n = nLow + (noiseC(x / size, v) - 0.5) * 0.2 + (noiseD(x / size, v) - 0.5) * 0.1;
                         const idx = (y * size + x) * 4;
                         let r;
                         let g;
                         let b;
-                        if (n > landThreshold) {
+                        if (nLow > landThreshold) {
                             // Archipelago: sand rim → scrub → highland, with a
                             // second noise channel breaking the flat tone into
                             // vegetated/rocky patchwork.
-                            const t = Math.min(1, (n - landThreshold) * 5.5);
+                            const t = Math.min(1, (n - nLow) * 2.2 + (nLow - landThreshold) * 4.5);
                             const patch = noiseC((x + 137) / size, (v + 59) / size);
                             const c = sand.clone()
                                 .lerp(scrub, Math.min(1, t * 3.2 + patch * 0.5))
@@ -789,14 +795,14 @@ export class SpaceRenderer {
                         else {
                             // Depth-graded ocean: pale shelf at the coast, deep
                             // basins beyond — the sea reads as water, not paint.
-                            const d = landThreshold - n;
+                            const d = landThreshold - nLow;
                             const c = shelf.clone().lerp(ocean, Math.min(1, d * 5)).lerp(abyss, Math.min(1, d * 1.5));
                             r = c.r;
                             g = c.g;
                             b = c.b;
                         }
-                        // Noisy polar caps.
-                        const capEdge = 0.8 + (n - 0.5) * 0.14;
+                        // Noisy polar caps — low-frequency edge, no speckle.
+                        const capEdge = 0.8 + (nLow - 0.5) * 0.14;
                         const capT = Math.min(1, Math.max(0, (Math.abs(lat) - capEdge) * 8));
                         if (capT > 0) {
                             r += (0.93 - r) * capT;
