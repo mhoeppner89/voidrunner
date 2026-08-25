@@ -1211,6 +1211,23 @@ export class SpaceRenderer {
         surfaceTexture.magFilter = THREE.LinearFilter;
         surfaceTexture.minFilter = THREE.LinearMipmapLinearFilter;
         surfaceTexture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+        // Bump from a DOWNSAMPLED, blurred copy of the surface: the full-res
+        // height field's screen-space derivatives explode at orbital distance
+        // (bump mapping has no mip-aware falloff) and per-texel spikes alias
+        // into black speckle on the lit disc. Blur keeps continent-scale
+        // relief while killing the spikes.
+        let bumpMap = surfaceTexture;
+        if (id === 'azure') {
+            const bumpCanvas = document.createElement('canvas');
+            bumpCanvas.width = 128;
+            bumpCanvas.height = 128;
+            const bumpContext = bumpCanvas.getContext('2d');
+            bumpContext.filter = 'blur(4px)';
+            bumpContext.drawImage(surfaceTexture.image, 0, 0, 128, 128);
+            bumpMap = new THREE.CanvasTexture(bumpCanvas);
+            bumpMap.wrapS = THREE.RepeatWrapping;
+            bumpMap.wrapT = THREE.RepeatWrapping;
+        }
         const surface = new THREE.Mesh(new THREE.SphereGeometry(location.radius, 192, 128), new THREE.MeshStandardMaterial({
             color: 0xffffff,
             map: surfaceTexture,
@@ -1220,8 +1237,8 @@ export class SpaceRenderer {
             metalness: id === 'azure' ? 0.14 : 0.02,
             emissive: dark,
             emissiveIntensity: id === 'azure' ? 0.12 : 0.32,
-            bumpMap: surfaceTexture,
-            bumpScale: id === 'azure' ? 2.5 : 18,
+            bumpMap,
+            bumpScale: id === 'azure' ? 2.2 : 18,
             flatShading: false,
             fog: false,
         }));
@@ -1494,8 +1511,10 @@ export class SpaceRenderer {
         const ironMaterial = new THREE.MeshStandardMaterial({
             color: 0xb0b8c0,
             map: ironMap,
-            roughness: 0.78,
-            metalness: 0.32,
+            // Matte: flat-shaded facets sweeping through a sharp GGX highlight
+            // read as flickering light points in the belt — rocks are diffuse.
+            roughness: 1,
+            metalness: 0.08,
             bumpMap: ironMap,
             bumpScale: 1.15,
             flatShading: true,
@@ -1506,8 +1525,8 @@ export class SpaceRenderer {
         const iceMaterial = new THREE.MeshStandardMaterial({
             color: 0xd6e6f0,
             map: iceMap,
-            roughness: 0.42,
-            metalness: 0.08,
+            roughness: 0.85,
+            metalness: 0.02,
             bumpMap: iceMap,
             bumpScale: 0.72,
             flatShading: true,
@@ -1520,8 +1539,8 @@ export class SpaceRenderer {
         const darkMaterial = new THREE.MeshStandardMaterial({
             color: 0x6a5a5e,
             map: darkMap,
-            roughness: 0.88,
-            metalness: 0.12,
+            roughness: 1,
+            metalness: 0.04,
             bumpMap: darkMap,
             bumpScale: 1.35,
             flatShading: true,
