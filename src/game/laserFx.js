@@ -20,15 +20,15 @@ const Z_AXIS = new THREE.Vector3(0, 0, 1);
 const cssHex = (value) => `#${value.toString(16).padStart(6, '0')}`;
 
 export const LASER_FX_TUNING = {
-    coreRadius: 0.3,
-    coreLength: 3.6,
-    glowWidth: 16,
-    glowLength: 21,
-    glowOpacity: 0.5,
-    headSize: 8.5,
-    headOpacity: 0.85,
-    muzzleSize: 6.5,
-    muzzleLife: 0.11,
+    coreRadius: 0.26,
+    coreLength: 3.2,
+    glowWidth: 11,
+    glowLength: 15,
+    glowOpacity: 0.3,
+    headSize: 6,
+    headOpacity: 0.6,
+    muzzleSize: 5,
+    muzzleLife: 0.09,
     impactFlashSize: 5.4,
     impactFlashLife: 0.22,
     sparkCount: 12,
@@ -42,6 +42,13 @@ export const LASER_FX_TUNING = {
     emberSpeedMax: 7,
     emberLife: 1.3,
     emberSize: 1.7,
+    // Camera-distance attenuation: a bolt crossing 8 units from the camera
+    // must not paint a screen-filling wash. Scale the whole bolt group by
+    // dist/attenuationRange (clamped) so close tracers shrink and distant ones
+    // keep their read. Applied per bolt per frame — allocation-free.
+    attenuationRange: 50,
+    attenuationMin: 0.34,
+    attenuationMax: 1.12,
 };
 
 // Faction palette shared by bolts, muzzle flashes and impacts: the core is a
@@ -196,6 +203,17 @@ export class LaserFx {
         head.position.z = -(tuning.coreLength / 2);
         group.add(head);
         return group;
+    }
+    // Camera-distance attenuation for one bolt group: allocation-free — reads
+    // numbers off the already-set mesh position and the camera. Call after the
+    // renderer positions the bolt each frame.
+    attenuate(group, cameraPosition) {
+        const dx = cameraPosition.x - group.position.x;
+        const dy = cameraPosition.y - group.position.y;
+        const dz = cameraPosition.z - group.position.z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const tuning = LASER_FX_TUNING;
+        group.scale.setScalar(clamp(dist / tuning.attenuationRange, tuning.attenuationMin, tuning.attenuationMax));
     }
     // Cloned per-event material so updateEffects can fade opacity without
     // cross-talk between simultaneous flashes; the underlying map stays shared.

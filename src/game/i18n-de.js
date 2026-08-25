@@ -1089,4 +1089,6 @@ export const DE_CATALOG = {
     'VENTING': 'ENTLÜFTET',
     '{weapon} EMPTY — SWAP': '{weapon} LEER — WECHSELN',
     'WEAPON · {name}': 'WAFFE · {name}',
+    'Weapon — press X': 'Waffe — X drücken',
+    'MAGRAIL': 'MAGRAIL',
 };

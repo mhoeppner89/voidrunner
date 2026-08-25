@@ -2174,6 +2174,11 @@ export class SpaceRenderer {
                 this.tmpQuaternion.setFromUnitVectors(NEG_Z, this.forward);
                 mesh.quaternion.copy(this.tmpQuaternion);
             }
+            if (projectile.kind === 'laser' && this.laserFx) {
+                // Close tracers shrink so a bolt crossing the camera doesn't
+                // paint a screen-filling wash (allocation-free, see laserFx.js).
+                this.laserFx.attenuate(mesh, this.camera.position);
+            }
             if (projectile.kind === 'missile') {
                 // Exhaust flicker + a sparse smoke trail: the plume strobes
                 // with the engine, and every ~90ms a dissipating puff drifts
