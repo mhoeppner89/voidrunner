@@ -11,7 +11,7 @@ import { SpaceRenderer } from './render.js';
 import { saveGame } from './save.js';
 import { getQuest, setFlag, setStep, startQuest } from './quests.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
-import { ammoCapacity, AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, weaponForSlot } from './weapons.js';
+import { ammoCapacity, AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, weaponForSlot, weaponOwned } from './weapons.js';
 import { asteroidCollisionMesh, asteroidCollisionRadius, generateAsteroidField, generateGraveyardPieces, generateWreckNodes, graveyardZoneAt, graveyardZoneLabel, GRAVEYARD_GEOMETRY_PROFILES, wreckNodeCollisionRadius } from './worldData.js';
 import { hullVsAsteroid, hullVsBox, hullVsEngine, hullVsHull, hullVsRing, hullVsSphere } from './hullCollision.js';
 import { steerToward } from './npcNav.js';
@@ -2104,6 +2104,13 @@ export class GameSession {
         const weapon = typeof selection === 'number' ? weaponForSlot(selection) : WEAPONS[selection];
         if (!weapon || weapon.id === this.save.player.weaponId)
             return;
+        // Guns are gained, not granted: an unowned mount refuses to slot and
+        // the HOLD cell says where to get it (station equipment shop).
+        if (!weaponOwned(this.save.player, weapon.id)) {
+            this.setOwnMonitorStatus(t('{weapon} NOT INSTALLED', { weapon: t(weapon.nameKey) }), 2000);
+            this.audio.play('warning', 0.5);
+            return;
+        }
         this.save.player.weaponId = weapon.id;
         // A fresh mount needs a beat before it speaks — same idea as the
         // missile rack's post-launch cooldown, just shorter.
@@ -2125,6 +2132,13 @@ export class GameSession {
         const stats = this.playerStats();
         const weapon = this.currentWeapon();
         const ammoId = weapon.ammoId;
+        // Belt-and-braces: the switch gate is the real lock, but a save edited
+        // under us must never fire an unowned mount either.
+        if (!weaponOwned(this.save.player, weapon.id)) {
+            this.setOwnMonitorStatus(t('{weapon} NOT INSTALLED', { weapon: t(weapon.nameKey) }), 2000);
+            this.gunCooldown = 0.3;
+            return;
+        }
         if (ammoId && (this.save.player.ammo?.[ammoId] ?? 0) <= 0) {
             // Dry: a dull click and a HOLD-cell flash. Running empty is a
             // rhythm break, not a death sentence — the pulse laser is one
@@ -4947,6 +4961,9 @@ export class GameSession {
         this.projStore.setPos(slot, position.x, position.y, position.z);
         const shotVel = this.tmpP0.copy(aimDir).multiplyScalar(150).add(vec(ship.velocity));
         this.projStore.setVel(slot, shotVel.x, shotVel.y, shotVel.z);
+        // Muzzle flash on every NPC shot: in a furball you should see WHERE
+        // fire comes from, not just bolts in flight (faction-matched color).
+        this.renderer.spawnMuzzleFlash(position.x, position.y, position.z, ship.faction === 'red-talons' ? 0xff4b39 : 0x75cfff);
         this.projectiles.push({
             id: `p-${++this.projectileCounter}`,
             kind: 'laser',
@@ -7596,6 +7613,15 @@ export class GameSession {
         const after = this.playerStats();
         this.save.player.shield += after.shield - before.shield;
         this.save.player.armor += after.armor - before.armor;
+        // A bought gun slots itself immediately — the pilot walks out of the
+        // shop already firing the thing they came for.
+        const purchasedWeapon = WEAPON_ORDER.find((id) => WEAPONS[id].equipmentId === equipmentId);
+        if (purchasedWeapon) {
+            this.save.player.weaponId = purchasedWeapon;
+            this.gunCooldown = Math.max(this.gunCooldown, 0.12);
+            const weapon = WEAPONS[purchasedWeapon];
+            this.ui.pushEvent(`${t('WEAPON · {name}', { name: t(weapon.nameKey) })} — ${t(weapon.envelopeKey, { range: Math.round(weapon.speed * weapon.life) })}`, 'success', 4200);
+        }
         this.ui.showToast(t('{name} installed.', { name: t(item.name) }), 'success');
         this.audio.play('success');
         this.ui.refreshDock(this.save);
@@ -8001,6 +8027,7 @@ export class GameSession {
                 name: t(WEAPONS[id].nameKey),
                 envelope: t(WEAPONS[id].envelopeKey, { range: Math.round(WEAPONS[id].speed * WEAPONS[id].life) }),
                 slot: WEAPONS[id].slot,
+                owned: weaponOwned(this.save.player, id),
             })),
             cargo: cargoMass(this.save.player),
             cargoCapacity: cargoCapacity(this.save.player),

@@ -2314,10 +2314,11 @@ export class SpaceRenderer {
                         depthWrite: false,
                     }));
                     flare.position.z = 0.55;
-                    flare.scale.setScalar(1.4);
+                    flare.scale.setScalar(2);
                     group.add(flare);
                     // Engine plume: an additive teardrop behind the nozzle —
-                    // tagged so the frame pass can flicker it.
+                    // tagged so the frame pass can flicker it. Sized so the
+                    // missile reads as a moving ember at 30-60 units.
                     const plume = new THREE.Sprite(new THREE.SpriteMaterial({
                         map: this.radialTexture('#ffe7b0', '#ff6a1f'),
                         transparent: true,
@@ -2325,8 +2326,8 @@ export class SpaceRenderer {
                         depthWrite: false,
                         opacity: 0.95,
                     }));
-                    plume.position.z = 0.98;
-                    plume.scale.set(0.85, 2.1, 1);
+                    plume.position.z = 1.15;
+                    plume.scale.set(1.25, 3.1, 1);
                     plume.name = 'plume';
                     group.add(plume);
                     mesh = group;
@@ -2348,6 +2349,11 @@ export class SpaceRenderer {
             if (projectile.kind === 'laser' && this.laserFx) {
                 // Close tracers shrink so a bolt crossing the camera doesn't
                 // paint a screen-filling wash (allocation-free, see laserFx.js).
+                this.laserFx.attenuate(mesh, this.camera.position);
+            }
+            if (projectile.kind === 'missile' && this.laserFx) {
+                // Same treatment for missiles: the plume must not wash the
+                // frame when one crosses the camera's own space.
                 this.laserFx.attenuate(mesh, this.camera.position);
             }
             if (projectile.kind === 'missile') {
