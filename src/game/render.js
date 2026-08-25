@@ -69,6 +69,42 @@ const ENGINE_FLARE_SIZE = 0.9;
 const ENGINE_FLARE_SIZE_ATLAS = 1.6;
 const ENGINE_FLARE_HOSTILE_BOOST = 1.12;
 const ENGINE_FLARE_BURNING_BOOST = 1.45;
+// Laser bolt FX tuning (visual gauntlet overhaul): the world scale is huge —
+// at a 60-unit engagement range one internal-resolution pixel is ~3.8 world
+// units — so a bare 0.16-radius capsule reads as a sub-pixel speck. The bolt
+// is now a hot core plus a crossed additive glow pair that keeps a bold
+// tracer read at range, plus a hot head sprite for the tip. World units.
+const LASER_FX_TUNING = {
+    coreRadius: 0.3,
+    coreLength: 3.6,
+    glowWidth: 16,
+    glowLength: 21,
+    glowOpacity: 0.5,
+    headSize: 8.5,
+    headOpacity: 0.85,
+    muzzleSize: 6.5,
+    muzzleLife: 0.11,
+    impactFlashSize: 5.4,
+    impactFlashLife: 0.22,
+    sparkCount: 12,
+    sparkCountHeavy: 18,
+    sparkSpeedMin: 14,
+    sparkSpeedMax: 34,
+    sparkLife: 0.55,
+    sparkSize: 1.15,
+    emberCount: 5,
+    emberSpeedMin: 3,
+    emberSpeedMax: 7,
+    emberLife: 1.3,
+    emberSize: 1.7,
+};
+// Faction palette shared by bolts, muzzle flashes and impacts: the core is a
+// near-white hot tint of the faction color; glow and head ride the pure hue.
+const LASER_FACTION_COLORS = {
+    player: { bolt: 0xffc35a, core: 0xfff3d2 },
+    'red-talons': { bolt: 0xff4b39, core: 0xffe2d8 },
+    patrol: { bolt: 0x75cfff, core: 0xe6f9ff },
+};
 export class SpaceRenderer {
     container;
     scene = new THREE.Scene();
@@ -86,6 +122,13 @@ export class SpaceRenderer {
     shipMeshes = new Map();
     projectileMeshes = new Map();
     pickupMeshes = new Map();
+    // Shared laser-FX assets (gauntlet overhaul): geometries/materials/textures
+    // created once per faction and reused by every bolt, muzzle flash and
+    // impact. Everything cached here is flagged userData.shared so
+    // disposeObject (called when a single bolt mesh is removed) skips it; the
+    // cache itself is released in dispose().
+    boltAssets = null;
+    fxTextureCache = new Map();
     raceGateRoot = null;
     raceGateMeshes = [];
     raceActiveGate;
@@ -1105,6 +1148,32 @@ export class SpaceRenderer {
         }));
         clouds.name = 'clouds';
         group.add(clouds);
+        // Pseudo-fluid weather: each cloud deck drifts at its own rate, so
+        // banded texture shears against banded texture — the same trick real
+        // gas giants play with zonal jets. Azure gets a second, counter-
+        // drifting high deck for a visible two-layer circulation.
+        if (!this.cloudLayers)
+            this.cloudLayers = [];
+        this.cloudLayers.push({ mesh: clouds, rate: id === 'azure' ? 0.0085 : 0.005 });
+        if (id === 'azure') {
+            const highDeck = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.034, 96, 60), new THREE.MeshBasicMaterial({
+                map: (() => {
+                    const map = this.createCloudTexture(`${id}-high`);
+                    map.magFilter = THREE.LinearFilter;
+                    map.minFilter = THREE.LinearMipmapLinearFilter;
+                    map.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+                    return map;
+                })(),
+                color: 0xeaf4fb,
+                transparent: true,
+                opacity: 0.2,
+                depthWrite: false,
+                fog: false,
+            }));
+            highDeck.name = 'clouds-high';
+            group.add(highDeck);
+            this.cloudLayers.push({ mesh: highDeck, rate: -0.0135 });
+        }
         // A high, thin haze layer separates the opaque weather deck from the
         // atmosphere shell. It gives the planet an extra depth cue when the
         // camera is close to the limb without adding another raycast target.
@@ -1146,25 +1215,41 @@ export class SpaceRenderer {
         this.locationMeshes.set(id, group);
     }
     createRingTexture() {
+        // Overhauled Azure ring plate: real ring systems read as MACRO regions
+        // (dim C, bright B, the Cassini division, A with its Encke gap) each
+        // filled with dozens of fine stochastic bands — one gradient of noise
+        // reads as static, not as ice. 1024x32 so mipmaps stay crisp.
         const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 8;
+        canvas.width = 1024;
+        canvas.height = 32;
         const context = canvas.getContext('2d');
         const rng = seededRandom('azure-ring-bands');
-        const gradient = context.createLinearGradient(0, 0, 512, 0);
-        let cursor = 0;
-        while (cursor < 1) {
-            const width = 0.006 + rng() * 0.045;
-            const end = Math.min(1, cursor + width);
-            const alpha = 0.12 + rng() * 0.68;
-            gradient.addColorStop(cursor, `rgba(255, 255, 255, ${alpha.toFixed(3)})`);
-            gradient.addColorStop(end, `rgba(255, 255, 255, ${(alpha * 0.72).toFixed(3)})`);
-            cursor = Math.min(1, end + rng() * 0.032);
-            if (cursor < 1)
-                gradient.addColorStop(cursor, 'rgba(255, 255, 255, 0)');
+        // Macro regions: [start, end, base luminance, fine-band density].
+        const regions = [
+            { start: 0.0, end: 0.09, lum: 0.30, density: 0.5 },   // C ring: dim rubble
+            { start: 0.10, end: 0.44, lum: 0.92, density: 1.0 },  // B ring: brightest
+            { start: 0.44, end: 0.485, lum: 0.04, density: 0.2 }, // Cassini division
+            { start: 0.49, end: 0.80, lum: 0.68, density: 0.85 }, // A ring
+            { start: 0.795, end: 0.815, lum: 0.06, density: 0.2 },// Encke gap
+            { start: 0.82, end: 0.97, lum: 0.5, density: 0.6 },   // outer A
+            { start: 0.975, end: 1.0, lum: 0.22, density: 0.4 },  // fringe
+        ];
+        const gradient = context.createLinearGradient(0, 0, 1024, 0);
+        for (const region of regions) {
+            const bands = Math.round(14 + region.density * 46);
+            let cursor = region.start;
+            while (cursor < region.end) {
+                const width = Math.min(region.end - cursor, 0.0022 + rng() * 0.010 * (0.4 + region.density));
+                const end = cursor + width;
+                const wobble = (rng() - 0.5) * 0.34;
+                const alpha = Math.max(0, Math.min(1, (region.lum + wobble) * (0.55 + rng() * 0.45)));
+                gradient.addColorStop(Math.min(1, cursor), `rgba(255, 255, 255, ${alpha.toFixed(3)})`);
+                gradient.addColorStop(Math.min(1, end), `rgba(255, 255, 255, ${(alpha * 0.78).toFixed(3)})`);
+                cursor = end + rng() * 0.0035;
+            }
         }
         context.fillStyle = gradient;
-        context.fillRect(0, 0, 512, 8);
+        context.fillRect(0, 0, 1024, 32);
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         texture.magFilter = THREE.LinearFilter;
@@ -2080,8 +2165,11 @@ export class SpaceRenderer {
                     mesh.add(halo);
                 }
                 else {
+                    // Missile overhaul: pale hull, twin stabilizer fins read at
+                    // distance, and a hot exhaust plume at the tail that the
+                    // per-frame pass flickers while the engine burns.
                     const group = new THREE.Group();
-                    const body = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.7, 6), new THREE.MeshBasicMaterial({ color: 0xe8e0cb }));
+                    const body = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.7, 6), new THREE.MeshStandardMaterial({ color: 0xf2ead8, roughness: 0.55, metalness: 0.1 }));
                     body.rotation.x = -Math.PI / 2;
                     group.add(body);
                     const flare = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -2093,6 +2181,19 @@ export class SpaceRenderer {
                     flare.position.z = 0.55;
                     flare.scale.setScalar(1.4);
                     group.add(flare);
+                    // Engine plume: an additive teardrop behind the nozzle —
+                    // tagged so the frame pass can flicker it.
+                    const plume = new THREE.Sprite(new THREE.SpriteMaterial({
+                        map: this.radialTexture('#ffe7b0', '#ff6a1f'),
+                        transparent: true,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false,
+                        opacity: 0.95,
+                    }));
+                    plume.position.z = 0.98;
+                    plume.scale.set(0.85, 2.1, 1);
+                    plume.name = 'plume';
+                    group.add(plume);
                     mesh = group;
                 }
                 this.dynamicRoot.add(mesh);
@@ -2108,6 +2209,19 @@ export class SpaceRenderer {
                 this.forward.set(vel[i], vel[i + 1], vel[i + 2]).normalize();
                 this.tmpQuaternion.setFromUnitVectors(NEG_Z, this.forward);
                 mesh.quaternion.copy(this.tmpQuaternion);
+            }
+            if (projectile.kind === 'missile') {
+                // Exhaust flicker + a sparse smoke trail: the plume strobes
+                // with the engine, and every ~90ms a dissipating puff drifts
+                // where the missile just was. Sparse by design — a volley of
+                // missiles must not flood the effects pool.
+                const plume = mesh.getObjectByName('plume');
+                if (plume)
+                    plume.material.opacity = 0.72 + Math.sin(this.skyTime * 47 + projectile.slot * 3.3) * 0.26;
+                if (this.skyTime - (projectile.lastTrailAt ?? -1) > 0.09) {
+                    projectile.lastTrailAt = this.skyTime;
+                    this.spawnMissilePuff(mesh.position);
+                }
             }
         });
     }
@@ -2420,6 +2534,21 @@ export class SpaceRenderer {
         this.scene.add(sprite);
         this.effects.push({ object: sprite, velocities: [], life: 0.18, maxLife: 0.18 });
     }
+    // Missile-exhaust smoke: a diffuse (non-additive) puff that expands and
+    // fades on the generic effects pool. Diffuse blending is the point —
+    // additive would make the trail glow like another engine.
+    spawnMissilePuff(position) {
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: this.radialTexture('#efeae0', '#7a746a'),
+            transparent: true,
+            opacity: 0.34,
+            depthWrite: false,
+        }));
+        sprite.position.copy(position);
+        sprite.scale.setScalar(1.1 + Math.random() * 0.5);
+        this.scene.add(sprite);
+        this.effects.push({ object: sprite, velocities: [], life: 0.85, maxLife: 0.85 });
+    }
     // An NPC hyperdrive departure: a short additive warp streak along the
     // ship's heading that flares and fades as the hull jumps away to another
     // port (see the despawn cull in updateShips).
@@ -2483,6 +2612,12 @@ export class SpaceRenderer {
         this.skyTime += dt;
         if (this.starShimmer)
             this.starShimmer.opacity = 0.42 + Math.sin(this.skyTime * 2.4) * 0.14;
+        // Cloud decks shear past each other at their own zonal rates — the
+        // cheap, allocation-free stand-in for a fluid advection pass.
+        if (this.cloudLayers) {
+            for (const layer of this.cloudLayers)
+                layer.mesh.rotation.y += layer.rate * dt;
+        }
         this.asteroids.forEach((node) => {
             if (!node.moving)
                 return;

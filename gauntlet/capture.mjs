@@ -7,18 +7,12 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { LOCATIONS } from '../src/game/data.js';
-// Node ≥22's native WebSocket client never delivers Chrome DevTools frames
-// (undici permessage-deflate handshake bug); the `ws` package works.
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
-const WS = (() => {
-    try {
-        return require('/Users/mhoeppner/Documents/Codex/2026-08-25/i-x20/node_modules/.pnpm/ws@8.21.3/node_modules/ws');
-    }
-    catch {
-        return WebSocket;
-    }
-})();
+
+// Node's built-in WebSocket (the script referenced an undefined `WS`).
+const WS = WebSocket;
+
+// Chrome needs --no-sandbox --disable-gpu-sandbox under the session sandbox;
+// with those flags Node's native WebSocket transport works (see AGENTS.md).
 
 const OUT = process.argv[2] ?? 'gauntlet/shots/run';
 mkdirSync(OUT, { recursive: true });
@@ -27,7 +21,8 @@ const cdpPort = 9435;
 const chromeProfile = mkdtempSync(join(tmpdir(), 'vr-capture-'));
 
 const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
-    '--headless=new', '--disable-gpu', '--enable-unsafe-swiftshader', `--remote-debugging-port=${cdpPort}`,
+    '--headless=new', '--disable-gpu', '--enable-unsafe-swiftshader',
+    '--no-sandbox', '--disable-gpu-sandbox', `--remote-debugging-port=${cdpPort}`,
     `--user-data-dir=${chromeProfile}`, '--no-first-run', '--no-default-browser-check',
     '--window-size=1280,720', 'about:blank',
 ], { stdio: 'ignore' });
