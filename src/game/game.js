@@ -2183,7 +2183,7 @@ export class GameSession {
         const right = this.tmpP4.copy(RIGHT).applyQuaternion(orientation).normalize();
         // Gun mounts sit UNDER the cockpit (belly guns): below the centerline,
         // at the nose — not at canopy height, and not floating out in space.
-        const down = this.tmpP5.copy(UP).applyQuaternion(orientation).multiplyScalar(-0.42);
+        const down = this.tmpP5.copy(UP).applyQuaternion(orientation).multiplyScalar(-0.6);
         const vv = this.save.player.velocity;
         if (weapon.kind === 'gauss') {
             // Single centerline magrail mount: one hypervelocity slug that

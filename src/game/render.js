@@ -2277,7 +2277,7 @@ export class SpaceRenderer {
                     // core, three times the laser bolt's length so the lane it
                     // owns reads at a glance, plus a cold additive glow at the head.
                     this.laserFx ??= new LaserFx(this.scene, this.effects);
-                    mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 2.4, 3, 6), new THREE.MeshBasicMaterial({ color: 0xcfeeff }));
+                    mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 4.8, 3, 6), new THREE.MeshBasicMaterial({ color: 0xcfeeff }));
                     mesh.rotation.x = Math.PI / 2;
                     const glow = new THREE.Sprite(new THREE.SpriteMaterial({
                         map: this.radialTexture('#eaffff', '#4fb8d8'),
@@ -2285,7 +2285,7 @@ export class SpaceRenderer {
                         blending: THREE.AdditiveBlending,
                         depthWrite: false,
                     }));
-                    glow.scale.setScalar(0.7);
+                    glow.scale.setScalar(1.4);
                     mesh.add(glow);
                 }
                 else if (projectile.kind === 'pdc') {

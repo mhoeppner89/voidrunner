@@ -20,6 +20,8 @@ const Z_AXIS = new THREE.Vector3(0, 0, 1);
 const cssHex = (value) => `#${value.toString(16).padStart(6, '0')}`;
 
 export const LASER_FX_TUNING = {
+    // Review pass (v0.7.6): laser bolts render at half their first-pass size.
+    boltScale: 0.5,
     // Review pass (v0.7.1): the r1 overhaul read as blinding flashes when a
     // bolt crossed the camera. The core keeps its read; the additive layers
     // (glow, head, muzzle, impact flash) give back most of their size and
@@ -31,7 +33,7 @@ export const LASER_FX_TUNING = {
     glowOpacity: 0.17,
     headSize: 3.4,
     headOpacity: 0.42,
-    muzzleSize: 0.8,
+    muzzleSize: 0.5,
     muzzleLife: 0.06,
     impactFlashSize: 3.8,
     impactFlashLife: 0.2,
@@ -135,7 +137,8 @@ export class LaserFx {
     sharedAssets() {
         if (!this.shared) {
             const tuning = LASER_FX_TUNING;
-            const coreGeometry = new THREE.CapsuleGeometry(tuning.coreRadius, Math.max(0.2, tuning.coreLength - tuning.coreRadius * 2), 3, 8);
+            const boltScale = tuning.boltScale ?? 1;
+            const coreGeometry = new THREE.CapsuleGeometry(tuning.coreRadius * boltScale, Math.max(0.2, (tuning.coreLength - tuning.coreRadius * 2) * boltScale), 3, 8);
             coreGeometry.userData.shared = true;
             const glowGeometry = new THREE.PlaneGeometry(1, 1);
             glowGeometry.userData.shared = true;
@@ -195,16 +198,16 @@ export class LaserFx {
         core.rotation.x = Math.PI / 2;
         group.add(core);
         const glowA = new THREE.Mesh(this.sharedAssets().glowGeometry, assets.glowMaterial);
-        glowA.scale.set(tuning.glowWidth, tuning.glowLength, 1);
+        glowA.scale.set(tuning.glowWidth * tuning.boltScale, tuning.glowLength * tuning.boltScale, 1);
         glowA.quaternion.copy(assets.glowQuatA);
         group.add(glowA);
         const glowB = new THREE.Mesh(this.sharedAssets().glowGeometry, assets.glowMaterial);
-        glowB.scale.set(tuning.glowWidth, tuning.glowLength, 1);
+        glowB.scale.set(tuning.glowWidth * tuning.boltScale, tuning.glowLength * tuning.boltScale, 1);
         glowB.quaternion.copy(assets.glowQuatB);
         group.add(glowB);
         const head = new THREE.Sprite(assets.headMaterial);
-        head.scale.setScalar(tuning.headSize);
-        head.position.z = -(tuning.coreLength / 2);
+        head.scale.setScalar(tuning.headSize * tuning.boltScale);
+        head.position.z = -(tuning.coreLength * tuning.boltScale / 2);
         group.add(head);
         return group;
     }
