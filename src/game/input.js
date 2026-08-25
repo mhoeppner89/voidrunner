@@ -362,6 +362,7 @@ export class InputManager {
             throttleDelta: -deadzone(pad.axes[3] ?? 0) * 0.42,
             fire: button(7),
             missile: this.gamepadEdge(5, button(5)),
+            weaponCycle: this.gamepadEdge(2, button(2)),
             afterburner: button(4),
             utility: button(5),
             targetNext: this.gamepadEdge(0, button(0)),
@@ -392,6 +393,12 @@ export class InputManager {
             throttleDelta: throttleKeyboard * 0.46 + (gamepad.throttleDelta ?? 0),
             throttleSet,
             fire: this.keys.has('Space') || this.touchHeld.has('fire') || Boolean(gamepad.fire),
+            // Weapon slots: Digit1/Digit2 (extend alongside WEAPON_ORDER as new
+            // guns land) or the touch weapon chips. Both sources consume in the
+            // same frame so a stale chip edge cannot leak into the next tick.
+            weaponSelect: (this.consumePressed('Digit1') ? 1 : 0) + (this.consumePressed('Digit2') ? 2 : 0)
+                + (this.consumeTouch('weapon-1') ? 1 : 0) + (this.consumeTouch('weapon-2') ? 2 : 0),
+            weaponCycle: this.consumePressed('KeyX') || this.consumeTouch('weaponCycle') || Boolean(gamepad.weaponCycle),
             missile: this.consumePressed('KeyM') || this.consumeTouch('missile') || Boolean(gamepad.missile),
             scan: this.consumeTouch('scan'),
             utility: this.keys.has('KeyM') || this.touchHeld.has('utility') || Boolean(gamepad.utility),

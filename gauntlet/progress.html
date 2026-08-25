@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voidrunner Visual Gauntlet — Live Progress</title>
+<style>
+    :root { color-scheme: dark; }
+    body { margin: 0; background: #0a0e1a; color: #cfd8ea; font: 15px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    header { padding: 22px 28px 10px; border-bottom: 1px solid #1d2740; }
+    h1 { margin: 0 0 4px; font-size: 20px; color: #ffd97a; letter-spacing: 0.04em; }
+    .sub { color: #7f8db0; font-size: 13px; }
+    .bar { padding: 10px 28px; background: #101627; border-bottom: 1px solid #1d2740; font-size: 13px; }
+    .bar b { color: #ffd97a; }
+    main { padding: 18px 28px 60px; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0 26px; }
+    th, td { text-align: left; padding: 7px 12px; border-bottom: 1px solid #1d2740; font-size: 13.5px; }
+    th { color: #7f8db0; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.08em; }
+    .st { padding: 2px 9px; border-radius: 10px; font-size: 11.5px; white-space: nowrap; }
+    .st.pending { background: #232c44; color: #9fb0d8; }
+    .st.building { background: #3a2f14; color: #ffd97a; }
+    .st.critic { background: #14303a; color: #7fd8e8; }
+    .st.won { background: #163a24; color: #7fe8a4; }
+    .st.lost { background: #3a1616; color: #ff9d8a; }
+    h2 { color: #ffd97a; font-size: 15px; margin: 30px 0 10px; letter-spacing: 0.03em; }
+    .pair { display: flex; gap: 14px; flex-wrap: wrap; }
+    figure { margin: 0; flex: 1 1 380px; max-width: 560px; }
+    figure img { width: 100%; border: 1px solid #26314f; border-radius: 4px; display: block; }
+    figcaption { font-size: 12px; color: #7f8db0; padding: 5px 2px 0; }
+    .log { margin: 8px 0 0; padding: 12px 16px; background: #101627; border: 1px solid #1d2740; border-radius: 4px; font-size: 12.5px; white-space: pre-wrap; }
+    .note { color: #7f8db0; font-size: 12.5px; }
+</style>
+</head>
+<body>
+<header>
+    <h1>VOIDRUNNER · VISUAL GAUNTLET</h1>
+    <div class="sub">Builder/critic loop · bar: Elite Dangerous (real captured stills) · judged blind, labels stripped</div>
+</header>
+<div class="bar">Bar refs: <b>gauntlet/refs/</b> (local evaluation only) · Baseline: <b>gauntlet/shots/baseline/</b> · Perf gate: relative frame-time parity via <b>.freebuff/perf-probe.mjs</b></div>
+<main>
+    <h2>Pieces</h2>
+    <table>
+        <tr><th>Piece</th><th>Bar ref</th><th>Status</th><th>Round</th><th>Last verdict</th></tr>
+        <tr><td>1 · Laser bolts + impact FX</td><td>ed-03, ed-12, ed-13</td><td><span class="st building">builder round 1</span></td><td>1</td><td>baseline: bolts are sub-2px specks at combat range</td></tr>
+        <tr><td>2 · Rockets / missiles + exhaust</td><td>ed-03 (smoke trails), ed-16</td><td><span class="st pending">queued</span></td><td>—</td><td>baseline: missile is a dot, no trail</td></tr>
+        <tr><td>3 · Planet surfaces (Azure + Vesper)</td><td>ed-02, ed-10, ed-15</td><td><span class="st pending">queued</span></td><td>—</td><td>baseline: flat banded ball, magenta blotches</td></tr>
+        <tr><td>4 · Ring of Azure</td><td>ed-05, ed-15</td><td><span class="st pending">queued</span></td><td>—</td><td>baseline: one flat grey band, no gaps/shadow</td></tr>
+        <tr><td>5 · Clouds (cheap fluid-style drift)</td><td>ed-02, ed-15</td><td><span class="st pending">queued</span></td><td>—</td><td>baseline: static blotch texture, slow spin</td></tr>
+        <tr><td>6 · Perf gate (all devices)</td><td>measurable half</td><td><span class="st pending">queued</span></td><td>—</td><td>must hold baseline frame times</td></tr>
+    </table>
+
+    <h2>Baseline (before) — captured this round</h2>
+    <div class="pair">
+        <figure><img src="shots/baseline/azure-rings.png" alt=""><figcaption>azure-rings — ring reads as a single grey band; halo shell reads as a soap bubble; surface has magenta blotches</figcaption></figure>
+        <figure><img src="shots/baseline/laser-volley.png" alt=""><figcaption>laser-volley — player fired 2 pairs at 60u; bolts are barely-visible specks</figcaption></figure>
+        <figure><img src="shots/baseline/missile-run.png" alt=""><figcaption>missile-run — missile in flight is a dot; no exhaust trail</figcaption></figure>
+    </div>
+
+    <h2>Round log</h2>
+    <div class="log" id="log">R1 · gauntlet started · bar picked: Elite Dangerous · refs fetched (16 stills, Steam CDN) · capture rig built (gauntlet/capture.mjs, 7 scenes, CDP + ws client, Chrome needs --no-sandbox-class elevation on this machine) · baseline captured clean (no page errors) · builder round 1 dispatched: laser bolts + impact FX.</div>
+    <p class="note">Watch this page: refresh after each round. Shots are re-captured per round under <b>gauntlet/shots/&lt;piece&gt;-r&lt;n&gt;/</b>; blind A/B pairs are staged for the critic with labels stripped.</p>
+</main>
+</body>
+</html>

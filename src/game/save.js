@@ -3,6 +3,7 @@ import { LOCATIONS } from './data.js';
 import { refreshMissionOffers } from './missions.js';
 import { clamp } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
+import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS } from './weapons.js';
 export const SAVE_KEY = 'void-privateer-save-v1';
 export const SAVE_VERSION = 5;
 const LEGACY_LOCATION_POSITIONS = {
@@ -56,6 +57,11 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             armor: 85,
             hull: 100,
             missiles: 4,
+            // Active primary weapon + per-weapon ammo pools. hydrateSave
+            // default-fills both for careers written before the weapon roster
+            // shipped, so old saves load straight into the pulse laser.
+            weaponId: 'pulse',
+            ammo: { slugs: AMMO_CAPACITY.slugs },
             shipId: 'wayfarer',
             ownedShips: ['wayfarer'],
             cargo: {},
@@ -238,6 +244,9 @@ export const hydrateSave = (candidate) => {
             guildRep: { ...fallback.player.guildRep, ...(candidate.player?.guildRep ?? {}) },
             guildRank: { ...fallback.player.guildRank, ...(candidate.player?.guildRank ?? {}) },
             stats: { ...fallback.player.stats, ...(candidate.player?.stats ?? {}) },
+            // Weapon ammo pools merge per-key like cargo so a save written
+            // before a weapon shipped still receives the new pool's default.
+            ammo: { ...fallback.player.ammo, ...(candidate.player?.ammo ?? {}) },
             equipment: candidate.player?.equipment ?? fallback.player.equipment,
             ownedShips: candidate.player?.ownedShips ?? fallback.player.ownedShips,
             sealedCargo: candidate.player?.sealedCargo ?? fallback.player.sealedCargo,
@@ -290,6 +299,17 @@ export const hydrateSave = (candidate) => {
     save.player.armor = clamp(save.player.armor, 0, stats.armor);
     save.player.hull = clamp(save.player.hull, 1, stats.hull);
     save.player.missiles = clamp(save.player.missiles, 0, stats.missileCapacity);
+    // Weapon state hygiene: an unknown weaponId (registry change, corrupted
+    // save) falls back to the pulse laser, and every ammo pool clamps to its
+    // capacity so imported/hand-edited saves cannot carry negative or
+    // overfilled stock.
+    if (!WEAPONS[save.player.weaponId])
+        save.player.weaponId = 'pulse';
+    for (const id of WEAPON_ORDER) {
+        const ammoId = WEAPONS[id].ammoId;
+        if (ammoId)
+            save.player.ammo[ammoId] = clamp(save.player.ammo[ammoId] ?? 0, 0, AMMO_CAPACITY[ammoId]);
+    }
     // Re-derive market prices from the current base prices on load, so a
     // balance pass (e.g. ore/salvage revaluation) lands immediately instead of
     // waiting for the next 45s economy tick.

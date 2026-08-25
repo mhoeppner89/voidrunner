@@ -1,4 +1,5 @@
 import { EQUIPMENT, SHIPS } from './data.js';
+import { AMMO_CAPACITY, AMMO_UNIT_COST, WEAPON_ORDER, WEAPONS } from './weapons.js';
 export const getEffectiveShipStats = (player) => {
     const base = SHIPS[player.shipId];
     const has = (id) => player.equipment.includes(id);
@@ -33,7 +34,16 @@ export const refillCost = (player) => {
     const stats = getEffectiveShipStats(player);
     const fuel = Math.max(0, stats.fuel - player.fuel) * 6;
     const missiles = Math.max(0, stats.missileCapacity - player.missiles) * 240;
-    return Math.ceil(fuel + missiles);
+    // Weapon ammo restocks through the same REFILL service as ordnance, priced
+    // per unit from the weapon registry.
+    let ammo = 0;
+    const pools = player.ammo ?? {};
+    for (const id of WEAPON_ORDER) {
+        const ammoId = WEAPONS[id].ammoId;
+        if (ammoId)
+            ammo += Math.max(0, AMMO_CAPACITY[ammoId] - (pools[ammoId] ?? 0)) * AMMO_UNIT_COST[ammoId];
+    }
+    return Math.ceil(fuel + missiles + ammo);
 };
 export const equipmentUnlocked = (player, equipmentId) => {
     const equipment = EQUIPMENT[equipmentId];

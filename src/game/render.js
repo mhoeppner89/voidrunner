@@ -2016,6 +2016,21 @@ export class SpaceRenderer {
                     }));
                     mesh.rotation.x = Math.PI / 2;
                 }
+                else if (projectile.kind === 'gauss') {
+                    // Magrail slug: a long hypervelocity tracer — thin white-blue
+                    // core, three times the laser bolt's length so the lane it
+                    // owns reads at a glance, plus a cold additive glow at the head.
+                    mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 2.4, 3, 6), new THREE.MeshBasicMaterial({ color: 0xcfeeff }));
+                    mesh.rotation.x = Math.PI / 2;
+                    const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+                        map: this.radialTexture('#eaffff', '#4fb8d8'),
+                        transparent: true,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false,
+                    }));
+                    glow.scale.setScalar(0.9);
+                    mesh.add(glow);
+                }
                 else {
                     const group = new THREE.Group();
                     const body = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.7, 6), new THREE.MeshBasicMaterial({ color: 0xe8e0cb }));
