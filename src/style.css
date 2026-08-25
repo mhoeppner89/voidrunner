@@ -2113,6 +2113,16 @@ button.compact {
   color: #dfb75d;
 }
 
+.weapon-row.is-locked span,
+.weapon-row.is-locked small {
+  color: #5d6a63;
+}
+
+.weapon-row.is-locked em {
+  color: #8a94a2;
+  font-size: 0.6rem;
+}
+
 .cargo-row button,
 .ship-account-row button {
   flex: none;

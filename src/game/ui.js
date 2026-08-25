@@ -2,7 +2,7 @@ import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, 
 import { cargoCapacity, cargoMass, denPrice, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { formatCredits, formatDuration } from './random.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
-import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS } from './weapons.js';
+import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, weaponOwned } from './weapons.js';
 import { TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 import { shipTopDownProfile } from './voxelModels.js';
 import { defaultSettings } from './save.js';
@@ -2382,13 +2382,17 @@ export class GameUI {
             : `<p class="ship-menu-empty">${t('No flight events recorded. The recorder logs combat, salvage, and pickups.')}</p>`;
         // Weapon systems card: every gun with its engagement envelope (derived
         // from the registry — speed × life — so the promise cannot drift from
-        // sim truth) and its ammo pool. The active mount is marked.
+        // sim truth) and its ammo pool. The active mount is marked; unowned
+        // guns show their station price — gained, not granted.
         const weaponRows = WEAPON_ORDER.map((id) => {
             const weapon = WEAPONS[id];
             const active = player.weaponId === id;
+            const owned = weaponOwned(player, id);
             const ammo = weapon.ammoId ? `${player.ammo?.[weapon.ammoId] ?? 0}/${AMMO_CAPACITY[weapon.ammoId]}` : '∞';
             const envelope = t(weapon.envelopeKey, { range: Math.round(weapon.speed * weapon.life) });
-            return `<div class="weapon-row${active ? ' is-active' : ''}"><span>${active ? '▸ ' : ''}${escapeHtml(t(weapon.nameKey))}</span><small>${escapeHtml(envelope)}</small><em>${ammo}</em></div>`;
+            const price = weapon.equipmentId ? EQUIPMENT[weapon.equipmentId]?.price : undefined;
+            const state = owned ? ammo : `${t('NOT INSTALLED')} · ${formatCredits(price ?? 0)}`;
+            return `<div class="weapon-row${active ? ' is-active' : ''}${owned ? '' : ' is-locked'}"><span>${active ? '▸ ' : ''}${escapeHtml(t(weapon.nameKey))}</span><small>${escapeHtml(envelope)}</small><em>${state}</em></div>`;
         }).join('');
         panel.innerHTML = `
       <div class="modal-card ship-card">

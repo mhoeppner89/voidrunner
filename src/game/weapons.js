@@ -45,6 +45,7 @@ export const WEAPONS = {
     pdc: {
         id: 'pdc',
         nameKey: 'POINT-DEFENSE CLUSTER',
+        equipmentId: 'pdc-cluster',
         envelopeKey: 'WINS INSIDE {range}U · SHREDS MISSILES',
         kind: 'pdc',
         slot: 3,
@@ -67,6 +68,7 @@ export const WEAPONS = {
     ripper: {
         id: 'ripper',
         nameKey: 'RIPPER SCATTERGUN',
+        equipmentId: 'ripper-scattergun',
         envelopeKey: 'WINS INSIDE {range}U · USELESS BEYOND',
         kind: 'ripper',
         slot: 4,
@@ -88,6 +90,7 @@ export const WEAPONS = {
     ion: {
         id: 'ion',
         nameKey: 'ION LANCE',
+        equipmentId: 'ion-lance',
         envelopeKey: 'CRACKS SHIELDS ×4 · JAMS GUNS · SOFT VS HULL',
         kind: 'ion',
         slot: 5,
@@ -108,6 +111,7 @@ export const WEAPONS = {
     mortar: {
         id: 'mortar',
         nameKey: 'SUNLANCE PLASMA MORTAR',
+        equipmentId: 'sunlance-mortar',
         envelopeKey: 'SIEGE · SPLASH + BURN · LOB AND WAIT',
         kind: 'mortar',
         slot: 6,
@@ -147,3 +151,14 @@ export const AMMO_UNIT_COST = {
 };
 export const ammoCapacity = (ammoId) => (ammoId ? AMMO_CAPACITY[ammoId] ?? 0 : 0);
 export const weaponForSlot = (slot) => WEAPONS[WEAPON_ORDER[slot - 1]];
+// Guns are GAINED, not granted (bar pattern: acquisition economy): pulse and
+// magrail are standard issue on every hull, the other four are station
+// equipment purchases. Ownership DERIVES from the existing equipment list —
+// no new save schema, and a career that already flies a gun keeps it.
+export const STANDARD_ISSUE = ['pulse', 'gauss'];
+export const weaponOwned = (player, weaponId) => {
+    if (STANDARD_ISSUE.includes(weaponId))
+        return true;
+    const equipmentId = WEAPONS[weaponId]?.equipmentId;
+    return Boolean(equipmentId && player.equipment?.includes(equipmentId));
+};

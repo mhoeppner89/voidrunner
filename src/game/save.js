@@ -305,6 +305,14 @@ export const hydrateSave = (candidate) => {
     // overfilled stock.
     if (!WEAPONS[save.player.weaponId])
         save.player.weaponId = 'pulse';
+    // Acquisition-economy migration courtesy: a career saved while the four
+    // later guns were granted outright keeps flying whatever it had equipped —
+    // grant the matching equipment so ownership derives cleanly from here on.
+    {
+        const equipped = WEAPONS[save.player.weaponId];
+        if (equipped.equipmentId && !save.player.equipment.includes(equipped.equipmentId))
+            save.player.equipment.push(equipped.equipmentId);
+    }
     for (const id of WEAPON_ORDER) {
         const ammoId = WEAPONS[id].ammoId;
         if (ammoId)
