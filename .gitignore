@@ -33,3 +33,6 @@ PLAYABLE_README.md
 !assets/remaster/ship-isometric-lancer.webp
 !assets/remaster/ship-isometric-atlas.webp
 .workbench/
+
+# Nested checkouts (agent worktrees) — never commit these.
+.worktrees/
