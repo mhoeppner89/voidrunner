@@ -2068,6 +2068,51 @@ button.compact {
   white-space: nowrap;
 }
 
+/* Weapon systems card: name · envelope · ammo. The envelope line is the
+   gun's promise (where it wins, where it dies) — registry-derived, so it
+   always matches sim truth. Active mount carries the ▸ marker + gold name. */
+.weapon-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.34rem 0;
+  border-bottom: 1px solid rgba(119, 139, 130, 0.14);
+  font-size: 0.66rem;
+}
+
+.weapon-row span {
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: #9ea6a2;
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.weapon-row small {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: #6f7d77;
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.weapon-row em {
+  flex: 0 0 auto;
+  color: #dfb75d;
+  font-size: 0.68rem;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.weapon-row.is-active span {
+  color: #dfb75d;
+}
+
 .cargo-row button,
 .ship-account-row button {
   flex: none;

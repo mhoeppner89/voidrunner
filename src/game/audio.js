@@ -822,6 +822,15 @@ export class AudioManager {
     // keeps nearby combat punchy while far-away fights feel physically remote.
     playAtDirection(effect, intensity, distance, localX) {
         const range = effect === 'explosion' ? 900 : 520;
+        // Web audio THROWS on non-finite AudioParam values, and a throw inside
+        // updateProjectiles would take the sim loop down with it — a NaN that
+        // slips out of a sim edge case must stay a silent non-event.
+        if (!Number.isFinite(distance))
+            distance = range;
+        if (!Number.isFinite(localX))
+            localX = 0;
+        if (!Number.isFinite(intensity))
+            intensity = 0.4;
         const proximity = clamp(1 - clamp(distance, 0, range) / range, 0, 1);
         const direction = clamp(localX / Math.max(1, distance), -1, 1);
         // Distance dominates at long range; stereo separation becomes clearer

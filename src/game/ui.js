@@ -2,6 +2,7 @@ import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, 
 import { cargoCapacity, cargoMass, denPrice, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { formatCredits, formatDuration } from './random.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
+import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS } from './weapons.js';
 import { TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 import { shipTopDownProfile } from './voxelModels.js';
 import { defaultSettings } from './save.js';
@@ -2379,12 +2380,23 @@ export class GameUI {
         const eventRows = this.recentEvents.length
             ? [...this.recentEvents].reverse().map((entry) => `<div class="event-row" data-tone="${escapeHtml(entry.tone)}"><span>${escapeHtml(entry.message)}</span></div>`).join('')
             : `<p class="ship-menu-empty">${t('No flight events recorded. The recorder logs combat, salvage, and pickups.')}</p>`;
+        // Weapon systems card: every gun with its engagement envelope (derived
+        // from the registry — speed × life — so the promise cannot drift from
+        // sim truth) and its ammo pool. The active mount is marked.
+        const weaponRows = WEAPON_ORDER.map((id) => {
+            const weapon = WEAPONS[id];
+            const active = player.weaponId === id;
+            const ammo = weapon.ammoId ? `${player.ammo?.[weapon.ammoId] ?? 0}/${AMMO_CAPACITY[weapon.ammoId]}` : '∞';
+            const envelope = t(weapon.envelopeKey, { range: Math.round(weapon.speed * weapon.life) });
+            return `<div class="weapon-row${active ? ' is-active' : ''}"><span>${active ? '▸ ' : ''}${escapeHtml(t(weapon.nameKey))}</span><small>${escapeHtml(envelope)}</small><em>${ammo}</em></div>`;
+        }).join('');
         panel.innerHTML = `
       <div class="modal-card ship-card">
         <header><div><span class="eyebrow">${t('SHIP STATUS / PAUSED')}</span><h2>${escapeHtml(ship?.name ?? 'VOIDRUNNER')}</h2></div><button data-ui-command="close-ship">${t('CLOSE')}</button></header>
         <div class="pause-grid ship-menu-grid">
           <section class="ship-menu-missions"><h3>${t('ACTIVE CONTRACTS · {count}/6', { count: missions.length })}</h3>${missionRows}</section>
           <section class="ship-menu-cargo"><h3>${t('CARGO HOLD · {mass}/{capacity} MASS ({percent}%)', { mass: mass.toFixed(1), capacity, percent: loadPercent })}</h3>${cargoRows}</section>
+          <section class="ship-menu-weapons"><h3>${t('WEAPON SYSTEMS')}</h3>${weaponRows}</section>
           <section class="ship-menu-account"><h3>${t('ACCOUNT')}</h3>
             <div class="ship-account-row"><span>${t('AVAILABLE CREDIT')}</span><b>${formatCredits(player.credits)}</b></div>
             ${mug?.kind === 'credits' ? `<div class="ship-account-row"><span>${t('STANDOFF TOLL')}</span><button data-pay-mug="1">${t('PAY')} ${formatCredits(mug.amount)}</button></div>` : ''}

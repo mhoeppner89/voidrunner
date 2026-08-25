@@ -11,6 +11,7 @@ export const WEAPONS = {
     pulse: {
         id: 'pulse',
         nameKey: 'PULSE LASER',
+        envelopeKey: 'ANY-RANGE REPEATER · REACH {range}U',
         kind: 'laser',
         slot: 1,
         // Baseline energy repeater — byte-identical to the historical gun.
@@ -26,6 +27,7 @@ export const WEAPONS = {
     gauss: {
         id: 'gauss',
         nameKey: 'MAGRAIL',
+        envelopeKey: 'DUELIST · WINS BEYOND 300U · PUNCHES THROUGH',
         kind: 'gauss',
         slot: 2,
         // Long-range duelist: one hypervelocity slug, slow cadence, half the
@@ -43,6 +45,7 @@ export const WEAPONS = {
     pdc: {
         id: 'pdc',
         nameKey: 'POINT-DEFENSE CLUSTER',
+        envelopeKey: 'WINS INSIDE {range}U · SHREDS MISSILES',
         kind: 'pdc',
         slot: 3,
         // Guardian: a buzz-saw spray of stubby bolts whose point-blank DPS
@@ -64,6 +67,7 @@ export const WEAPONS = {
     ripper: {
         id: 'ripper',
         nameKey: 'RIPPER SCATTERGUN',
+        envelopeKey: 'WINS INSIDE {range}U · USELESS BEYOND',
         kind: 'ripper',
         slot: 4,
         // Brawler: seven pellets per shell across an 11° cone; wins inside
@@ -84,6 +88,7 @@ export const WEAPONS = {
     ion: {
         id: 'ion',
         nameKey: 'ION LANCE',
+        envelopeKey: 'CRACKS SHIELDS ×4 · JAMS GUNS · SOFT VS HULL',
         kind: 'ion',
         slot: 5,
         // Shield-cracker: half hull damage but ×4 against shields, and every
@@ -103,6 +108,7 @@ export const WEAPONS = {
     mortar: {
         id: 'mortar',
         nameKey: 'SUNLANCE PLASMA MORTAR',
+        envelopeKey: 'SIEGE · SPLASH + BURN · LOB AND WAIT',
         kind: 'mortar',
         slot: 6,
         // Siege: a slow heavy orb. Flat direct damage, splash with falloff to

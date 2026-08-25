@@ -2109,6 +2109,11 @@ export class GameSession {
         // missile rack's post-launch cooldown, just shorter.
         this.gunCooldown = Math.max(this.gunCooldown, 0.12);
         this.setOwnMonitorStatus(t('WEAPON · {name}', { name: t(weapon.nameKey) }), 1600);
+        // The envelope rides the flight recorder: every switch tells the pilot
+        // WHERE the gun wins and where it dies (bar pattern: envelope on the
+        // tin). Range derives from the registry so the string cannot drift
+        // from sim truth.
+        this.ui.pushEvent(`${t('WEAPON · {name}', { name: t(weapon.nameKey) })} — ${t(weapon.envelopeKey, { range: Math.round(weapon.speed * weapon.life) })}`, 'info', 4200);
         this.audio.play('ui', 0.7);
     }
     // Tap the weapon readout (or press X / gamepad cycle): next gun in order.
@@ -7986,11 +7991,17 @@ export class GameSession {
             weapon: {
                 id: weapon.id,
                 name: t(weapon.nameKey),
+                envelope: t(weapon.envelopeKey, { range: Math.round(weapon.speed * weapon.life) }),
                 slot: weapon.slot,
                 ammo: weaponAmmoId ? (this.save.player.ammo?.[weaponAmmoId] ?? 0) : undefined,
                 maxAmmo: weaponAmmoId ? AMMO_CAPACITY[weaponAmmoId] : undefined,
             },
-            weaponRoster: WEAPON_ORDER.map((id) => ({ id, name: t(WEAPONS[id].nameKey), slot: WEAPONS[id].slot })),
+            weaponRoster: WEAPON_ORDER.map((id) => ({
+                id,
+                name: t(WEAPONS[id].nameKey),
+                envelope: t(WEAPONS[id].envelopeKey, { range: Math.round(WEAPONS[id].speed * WEAPONS[id].life) }),
+                slot: WEAPONS[id].slot,
+            })),
             cargo: cargoMass(this.save.player),
             cargoCapacity: cargoCapacity(this.save.player),
             credits: this.save.player.credits,
