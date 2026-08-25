@@ -343,6 +343,23 @@ export class SpaceRenderer {
         texture.colorSpace = THREE.SRGBColorSpace;
         this.scene.environment = texture;
     }
+    // Transparent canvases store empty pixels as transparent BLACK (0,0,0,0).
+    // GPU mipmap generation averages RGB uniformly — not alpha-weighted — so
+    // at distance the mip chain bleeds that black into the wisps' RGB while
+    // alpha stays visible: distant clouds/rings speckle with dark dots. This
+    // pass rewrites RGB to white under the existing alpha so mips fade to
+    // white; blending only multiplies by material color, so near-field pixels
+    // are unchanged.
+    opaqueRgbUnderAlpha(context, width, height) {
+        const image = context.getImageData(0, 0, width, height);
+        const pixels = image.data;
+        for (let i = 0; i < pixels.length; i += 4) {
+            pixels[i] = 255;
+            pixels[i + 1] = 255;
+            pixels[i + 2] = 255;
+        }
+        context.putImageData(image, 0, 0);
+    }
     radialTexture(inner, outer) {
         const canvas = document.createElement('canvas');
         canvas.width = 256;
@@ -1109,6 +1126,7 @@ export class SpaceRenderer {
             context.fillStyle = gradient;
             context.fillRect(x - r, y - r, r * 2, r * 2);
         }
+        this.opaqueRgbUnderAlpha(context, canvas.width, canvas.height);
         const texture = this.configurePixelTexture(new THREE.CanvasTexture(canvas));
         texture.wrapS = THREE.RepeatWrapping;
         texture.wrapT = THREE.RepeatWrapping;
@@ -1390,6 +1408,9 @@ export class SpaceRenderer {
         }
         context.fillStyle = gradient;
         context.fillRect(0, 0, 1024, 32);
+        // Same mip-bleed guard as the cloud decks: keep RGB white under the
+        // alpha so the distant ring dims instead of speckling black.
+        this.opaqueRgbUnderAlpha(context, 1024, 32);
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         texture.magFilter = THREE.LinearFilter;
@@ -2246,6 +2267,7 @@ export class SpaceRenderer {
                     // Magrail slug: a long hypervelocity tracer — thin white-blue
                     // core, three times the laser bolt's length so the lane it
                     // owns reads at a glance, plus a cold additive glow at the head.
+                    this.laserFx ??= new LaserFx(this.scene, this.effects);
                     mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 2.4, 3, 6), new THREE.MeshBasicMaterial({ color: 0xcfeeff }));
                     mesh.rotation.x = Math.PI / 2;
                     const glow = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -2254,7 +2276,7 @@ export class SpaceRenderer {
                         blending: THREE.AdditiveBlending,
                         depthWrite: false,
                     }));
-                    glow.scale.setScalar(0.9);
+                    glow.scale.setScalar(0.7);
                     mesh.add(glow);
                 }
                 else if (projectile.kind === 'pdc') {
@@ -2352,9 +2374,11 @@ export class SpaceRenderer {
                 this.tmpQuaternion.setFromUnitVectors(NEG_Z, this.forward);
                 mesh.quaternion.copy(this.tmpQuaternion);
             }
-            if (projectile.kind === 'laser' && this.laserFx) {
+            if ((projectile.kind === 'laser' || projectile.kind === 'gauss') && this.laserFx) {
                 // Close tracers shrink so a bolt crossing the camera doesn't
                 // paint a screen-filling wash (allocation-free, see laserFx.js).
+                // The magrail's long tracer is the worst close-pass offender —
+                // it gets the same treatment.
                 this.laserFx.attenuate(mesh, this.camera.position);
             }
             if (projectile.kind === 'missile' && this.laserFx) {
