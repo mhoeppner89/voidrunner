@@ -747,8 +747,11 @@ export class SpaceRenderer {
                 };
             };
             if (water) {
-                const abyss = new THREE.Color(0x082238);
-                const ocean = new THREE.Color(0x155a92);
+                // Abyss stays clearly above black: near-black single-pixel
+                // noise dips read as dirt speckle from orbit (and the bump map
+                // amplifies them), not as ocean depth.
+                const abyss = new THREE.Color(0x0e3a60);
+                const ocean = new THREE.Color(0x1a5f97);
                 const shelf = new THREE.Color(0x2f86b4);
                 const sand = new THREE.Color(0xd0bd8a);
                 const scrub = new THREE.Color(0x527e4c);
@@ -757,7 +760,7 @@ export class SpaceRenderer {
                 const noiseB = makeLattice(14);
                 const noiseC = makeLattice(34);
                 const noiseD = makeLattice(64);
-                const fbm = (u, v) => noiseA(u, v) * 0.44 + noiseB(u, v) * 0.28 + noiseC(u, v) * 0.18 + noiseD(u, v) * 0.1;
+                const fbm = (u, v) => noiseA(u, v) * 0.46 + noiseB(u, v) * 0.3 + noiseC(u, v) * 0.17 + noiseD(u, v) * 0.07;
                 const image = context.getImageData(0, 0, size, size);
                 const pixels = image.data;
                 const landThreshold = 0.6;
@@ -784,10 +787,10 @@ export class SpaceRenderer {
                             b = c.b;
                         }
                         else {
-                            // Depth-graded ocean: pale shelf at the coast, abyss
-                            // in the basins — the sea reads as water, not paint.
+                            // Depth-graded ocean: pale shelf at the coast, deep
+                            // basins beyond — the sea reads as water, not paint.
                             const d = landThreshold - n;
-                            const c = shelf.clone().lerp(ocean, Math.min(1, d * 5)).lerp(abyss, Math.min(1, d * 2.2));
+                            const c = shelf.clone().lerp(ocean, Math.min(1, d * 5)).lerp(abyss, Math.min(1, d * 1.5));
                             r = c.r;
                             g = c.g;
                             b = c.b;
@@ -1215,7 +1218,7 @@ export class SpaceRenderer {
             emissive: dark,
             emissiveIntensity: id === 'azure' ? 0.2 : 0.32,
             bumpMap: surfaceTexture,
-            bumpScale: id === 'azure' ? 4 : 18,
+            bumpScale: id === 'azure' ? 2.5 : 18,
             flatShading: false,
             fog: false,
         }));
@@ -2785,6 +2788,14 @@ export class SpaceRenderer {
                 const material = effect.object.material;
                 if (material instanceof THREE.SpriteMaterial)
                     material.opacity = ratio * 0.34;
+            }
+            else if (effect.muzzle) {
+                // Muzzle pops fade at half opacity and do NOT grow — a flash,
+                // not a bloom (the generic sprite branch below grows ×4.2/s,
+                // which strobed the screen on every shot).
+                const material = effect.object.material;
+                if (material instanceof THREE.SpriteMaterial)
+                    material.opacity = ratio * 0.5;
             }
             else if (effect.object instanceof THREE.Sprite) {
                 effect.object.scale.multiplyScalar(1 + dt * 4.2);
