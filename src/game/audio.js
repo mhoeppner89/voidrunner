@@ -777,6 +777,10 @@ export class AudioManager {
         switch (effect) {
             case 'laser': this.playLaser(now, strength, out); break;
             case 'gauss': this.playGauss(now, strength, out); break;
+            case 'pdc': this.playPdc(now, strength, out); break;
+            case 'ripper': this.playRipper(now, strength, out); break;
+            case 'ion': this.playIon(now, strength, out); break;
+            case 'mortar': this.playMortar(now, strength, out); break;
             case 'missile': this.playMissileLaunch(now, strength, out); break;
             case 'impact': this.playImpact(now, strength, out); break;
             case 'hit': this.playHit(now, strength, out); break;
@@ -795,7 +799,7 @@ export class AudioManager {
             default: this.playImpact(now, strength, out); break;
         }
         // Release the chain when the effect is done (the longest tail wins).
-        const releaseAt = { explosion: 1.6, dock: 1.1, missile: 0.85, gauss: 0.5, scan: 0.5, hyperSpool: 2.1, hyperActive: 4.0, hyperDrop: 0.6, pickup: 0.35 }[effect] ?? 0.4;
+        const releaseAt = { explosion: 1.6, dock: 1.1, missile: 0.85, gauss: 0.5, pdc: 0.3, ripper: 0.6, ion: 0.45, mortar: 0.8, scan: 0.5, hyperSpool: 2.1, hyperActive: 4.0, hyperDrop: 0.6, pickup: 0.35 }[effect] ?? 0.4;
         setTimeout(release, releaseAt * 1000 + 60);
     }
 
@@ -892,6 +896,39 @@ export class AudioManager {
         this.playTone({ at, frequency: 2400, endFrequency: 190, duration: 0.17, type: 'sawtooth', level: 0.075 * intensity, filterFrequency: 5200, out });
         this.playTone({ at, frequency: 2430, endFrequency: 205, duration: 0.15, type: 'square', level: 0.05 * intensity, filterFrequency: 4800, out });
         this.playTone({ at, frequency: 95, endFrequency: 42, duration: 0.14, type: 'sine', level: 0.12 * intensity, filterFrequency: 300, out });
+    }
+
+    // Point-Defense Cluster: a dry electric buzz-rip — two short detuned
+    // square blips over a tight noise tick. Reads as a machine, not a cannon:
+    // it fires sixteen times a second and must never pile into a wall of sound.
+    playPdc(at, intensity, out) {
+        this.playNoiseBurst({ at, duration: 0.02, start: 6000, end: 2200, level: 0.05 * intensity, out });
+        this.playTone({ at, frequency: 1150, endFrequency: 640, duration: 0.05, type: 'square', level: 0.042 * intensity, filterFrequency: 3400, out });
+        this.playTone({ at: at + 0.004, frequency: 1180, endFrequency: 700, duration: 0.045, type: 'square', level: 0.03 * intensity, filterFrequency: 3100, out });
+    }
+
+    // Ripper Scattergun: a boom-scatter — one fat low thump with a wide noise
+    // spray falling off slowly behind it, like the pellets losing cohesion.
+    playRipper(at, intensity, out) {
+        this.playTone({ at, frequency: 130, endFrequency: 38, duration: 0.24, type: 'triangle', level: 0.24 * intensity, filterFrequency: 520, out });
+        this.playNoiseBurst({ at, duration: 0.16, start: 2600, end: 320, level: 0.14 * intensity, playbackRate: 0.72, out });
+        this.playNoiseBurst({ at: at + 0.06, duration: 0.22, start: 1400, end: 180, level: 0.07 * intensity, playbackRate: 0.6, out });
+    }
+
+    // Ion Lance: a zap-hum — a bright sawtooth that snaps up then hums down,
+    // with a thin fifth above it. Energy discharge, not a kinetic hit.
+    playIon(at, intensity, out) {
+        this.playTone({ at, frequency: 520, endFrequency: 1500, duration: 0.06, type: 'sawtooth', level: 0.07 * intensity, filterFrequency: 4200, out });
+        this.playTone({ at: at + 0.055, frequency: 780, endFrequency: 210, duration: 0.22, type: 'sawtooth', level: 0.055 * intensity, filterFrequency: 2400, out });
+        this.playTone({ at: at + 0.055, frequency: 1170, endFrequency: 315, duration: 0.19, type: 'sine', level: 0.03 * intensity, filterFrequency: 2800, out });
+    }
+
+    // Sunlance Plasma Mortar: a thoomp — a deep bowl-shaped drop with a slow
+    // pressurized-noise exhale. Slow, heavy, and unmistakably lobbed.
+    playMortar(at, intensity, out) {
+        this.playTone({ at, frequency: 210, endFrequency: 46, duration: 0.34, type: 'sine', level: 0.22 * intensity, filterFrequency: 380, out });
+        this.playNoiseBurst({ at, duration: 0.28, start: 900, end: 160, level: 0.1 * intensity, playbackRate: 0.55, out });
+        this.playTone({ at: at + 0.02, frequency: 74, endFrequency: 40, duration: 0.26, type: 'triangle', level: 0.1 * intensity, filterFrequency: 260, out });
     }
 
     // Collision / hull impact: a sharp crack, a deep thud, and a short

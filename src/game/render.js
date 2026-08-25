@@ -2031,6 +2031,54 @@ export class SpaceRenderer {
                     glow.scale.setScalar(0.9);
                     mesh.add(glow);
                 }
+                else if (projectile.kind === 'pdc') {
+                    // Point-defense stub: a short COLD white-blue dart — kept
+                    // far from the pulse laser's amber so the two streams
+                    // never read as the same gun at combat distance.
+                    mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.34, 3, 6), new THREE.MeshBasicMaterial({
+                        color: projectile.faction === 'player' ? 0xdce9ff : 0xff8a5b,
+                    }));
+                    mesh.rotation.x = Math.PI / 2;
+                }
+                else if (projectile.kind === 'ripper') {
+                    // Scattergun pellet: a small warm spark; seven per shell
+                    // reads as a cloud without any one pellet drawing attention.
+                    mesh = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 5), new THREE.MeshBasicMaterial({ color: 0xffb066 }));
+                    const glint = new THREE.Sprite(new THREE.SpriteMaterial({
+                        map: this.radialTexture('#ffe9c9', '#ff7a2b'),
+                        transparent: true,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false,
+                    }));
+                    glint.scale.setScalar(0.55);
+                    mesh.add(glint);
+                }
+                else if (projectile.kind === 'ion') {
+                    // Ion Lance bolt: a cool cyan blob with an arcing halo —
+                    // reads as energy discharge rather than a kinetic round.
+                    mesh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshBasicMaterial({ color: 0x69e4f2 }));
+                    const arc = new THREE.Sprite(new THREE.SpriteMaterial({
+                        map: this.radialTexture('#d8fbff', '#1f7fa8'),
+                        transparent: true,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false,
+                    }));
+                    arc.scale.setScalar(1.5);
+                    mesh.add(arc);
+                }
+                else if (projectile.kind === 'mortar') {
+                    // Sunlance orb: big slow ember with a heavy additive halo —
+                    // the slowest thing in the sky, so it must look dangerous.
+                    mesh = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff9a3d }));
+                    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+                        map: this.radialTexture('#ffd9a0', '#c33d12'),
+                        transparent: true,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false,
+                    }));
+                    halo.scale.setScalar(2.6);
+                    mesh.add(halo);
+                }
                 else {
                     const group = new THREE.Group();
                     const body = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.7, 6), new THREE.MeshBasicMaterial({ color: 0xe8e0cb }));

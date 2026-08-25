@@ -61,7 +61,7 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             // default-fills both for careers written before the weapon roster
             // shipped, so old saves load straight into the pulse laser.
             weaponId: 'pulse',
-            ammo: { slugs: AMMO_CAPACITY.slugs },
+            ammo: Object.fromEntries(Object.entries(AMMO_CAPACITY).map(([ammoId, capacity]) => [ammoId, capacity])),
             shipId: 'wayfarer',
             ownedShips: ['wayfarer'],
             cargo: {},

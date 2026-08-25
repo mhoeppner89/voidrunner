@@ -136,6 +136,7 @@ const actions = {
     setNav: (locationId) => session?.setNav(locationId),
     openMap: () => session?.openMap(),
     openShipMenu: () => session?.openShipMenu(),
+    weaponCycle: () => session?.cycleWeapon(),
     selectTarget: (kind, id) => session?.selectTarget(kind, id),
     trade: (kind, commodityId, quantity) => session?.trade(kind, commodityId, quantity),
     jettison: (commodityId) => session?.jettisonCargo(commodityId),

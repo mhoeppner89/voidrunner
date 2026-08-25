@@ -1078,4 +1078,15 @@ export const DE_CATALOG = {
     '{course} · GRID': '{course} · STARTGRID',
     'T-{seconds}': 'T-{seconds}',
     '{course} · GATE {current}/{total}': '{course} · TOR {current}/{total}',
+
+    // ── Weapon roster ─────────────────────────────────────────────────────
+    'PULSE LASER': 'IMPULSLASER',
+    'POINT-DEFENSE CLUSTER': 'PUNKTABWEHRCLUSTER',
+    'RIPPER SCATTERGUN': 'RIPPER-STREUKANONE',
+    'ION LANCE': 'IONENLANZE',
+    'SUNLANCE PLASMA MORTAR': 'SUNLANC-PLASMAMÖRSER',
+    'PDC VENTING': 'PDC ENTLÜFTET',
+    'VENTING': 'ENTLÜFTET',
+    '{weapon} EMPTY — SWAP': '{weapon} LEER — WECHSELN',
+    'WEAPON · {name}': 'WAFFE · {name}',
 };

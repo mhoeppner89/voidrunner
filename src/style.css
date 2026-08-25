@@ -2653,6 +2653,46 @@ button.compact {
   text-overflow: ellipsis;
 }
 
+/* Mounted-weapon readout on the own-ship monitor: gun name left, ammo pool
+   right (∞ for energy/heat guns); amber while the PDC is venting. */
+.screen-own-weapon {
+  display: none;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin: 0.14rem 0.48rem 0;
+  padding-top: 0.12rem;
+  border-top: 1px solid rgba(115, 198, 180, 0.28);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: clamp(0.5rem, 0.86vw, 0.72rem);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.screen-own-weapon.is-visible {
+  display: flex;
+}
+
+.screen-own-weapon[data-venting='true'] span,
+.screen-own-weapon[data-venting='true'] em {
+  color: var(--retro-amber);
+}
+
+.screen-own-weapon span {
+  overflow: hidden;
+  color: var(--teal);
+  letter-spacing: 0.1em;
+  text-overflow: ellipsis;
+}
+
+.screen-own-weapon em {
+  overflow: hidden;
+  color: var(--retro-green);
+  font-style: normal;
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
 /* The slow-down call for an approach rides the target monitor's readout: an
    amber blink while the ship needs to slow to land/dock, so the radar zone
    line keeps showing the zone name. */

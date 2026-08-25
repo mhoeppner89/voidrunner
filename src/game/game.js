@@ -11,7 +11,7 @@ import { SpaceRenderer } from './render.js';
 import { saveGame } from './save.js';
 import { getQuest, setFlag, setStep, startQuest } from './quests.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
-import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, weaponForSlot } from './weapons.js';
+import { ammoCapacity, AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, weaponForSlot } from './weapons.js';
 import { asteroidCollisionMesh, asteroidCollisionRadius, generateAsteroidField, generateGraveyardPieces, generateWreckNodes, graveyardZoneAt, graveyardZoneLabel, GRAVEYARD_GEOMETRY_PROFILES, wreckNodeCollisionRadius } from './worldData.js';
 import { hullVsAsteroid, hullVsBox, hullVsEngine, hullVsHull, hullVsRing, hullVsSphere } from './hullCollision.js';
 import { steerToward } from './npcNav.js';
@@ -1738,6 +1738,22 @@ export class GameSession {
         if (!existingRecord?.active)
             this.save.world.raceRecords[course.id] = { ...existingRecord, active: true };
     }
+    // Cockpit weapon readout: mounted gun name plus its ammo pool (or heat
+    // state for the energy/heat weapons) for the own-ship monitor line.
+    weaponHud() {
+        const weapon = this.currentWeapon();
+        if (!weapon)
+            return undefined;
+        const ammoId = weapon.ammoId;
+        const stock = ammoId ? Math.max(0, Math.floor(this.save.player.ammo?.[ammoId] ?? 0)) : null;
+        return {
+            name: t(weapon.nameKey),
+            slot: weapon.slot,
+            venting: weapon.kind === 'pdc' ? this.save.world.time < (this.pdcVentUntil ?? 0) : false,
+            heatPercent: weapon.kind === 'pdc' ? Math.round(Math.min(1, (this.pdcHeat ?? 0) / 3.5) * 100) : undefined,
+            ammo: stock === null ? undefined : { current: stock, capacity: ammoCapacity(ammoId) },
+        };
+    }
     // Cockpit race telemetry for the own-ship monitor strip. One small object
     // per HUD tick (~24 Hz) — cheap next to the rest of buildHudModel.
     raceHud() {
@@ -2014,8 +2030,64 @@ export class GameSession {
     updatePlayerWeapons(dt, actions) {
         this.utilityActive = false;
         this.utilityReadout = '';
-        if (actions.fire && this.gunCooldown <= 0)
-            this.firePlayerGuns();
+        const weapon = this.currentWeapon();
+        // Point-Defense Cluster heat: sustained fire builds pressure, 3.5s of
+        // continuous trigger forces a 1.6s vent, off-trigger cools. Pressure
+        // is session state — it means nothing between flights.
+        if (weapon.kind === 'pdc') {
+            this.pdcHeat ??= 0;
+            this.pdcVentUntil ??= 0;
+            if (this.save.world.time < this.pdcVentUntil) {
+                if (actions.fire && !this.pdcVentAnnounced) {
+                    this.setOwnMonitorStatus(t('PDC VENTING'), 1400);
+                    this.pdcVentAnnounced = true;
+                }
+            }
+            else if (actions.fire) {
+                this.pdcHeat += dt;
+                if (this.pdcHeat >= 3.5) {
+                    this.pdcVentUntil = this.save.world.time + 1.6;
+                    this.pdcVentAnnounced = false;
+                    this.audio.play('warning', 0.4);
+                }
+            }
+            else
+                this.pdcHeat = Math.max(0, this.pdcHeat - dt * 0.8);
+            // Passive interception: the cluster's own tracker kills the nearest
+            // hostile missile inside 60u even while the trigger aims elsewhere.
+            // Pauses while venting — the barrels are open.
+            if (this.save.world.time >= (this.pdcInterceptAt ?? 0)) {
+                let bestMissile = null;
+                let bestDistance = 60;
+                for (const projectile of this.projectiles) {
+                    if (projectile.ownerId === 'player' || projectile.kind !== 'missile' || projectile.life <= 0)
+                        continue;
+                    const p = this.projStore.getPos(projectile.slot, this.tmpP5);
+                    const dxp = p.x - this.save.player.position[0];
+                    const dyp = p.y - this.save.player.position[1];
+                    const dzp = p.z - this.save.player.position[2];
+                    const distance = Math.sqrt(dxp * dxp + dyp * dyp + dzp * dzp);
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        bestMissile = { projectile, x: p.x, y: p.y, z: p.z };
+                    }
+                }
+                if (bestMissile) {
+                    this.pdcInterceptAt = this.save.world.time + 0.25;
+                    bestMissile.projectile.life = 0;
+                    this.renderer.spawnExplosion([bestMissile.x, bestMissile.y, bestMissile.z], true, 0.5);
+                    this.audio.play('impact', 0.55);
+                }
+            }
+            const ventingNow = this.save.world.time < this.pdcVentUntil;
+            if (actions.fire && !ventingNow && this.gunCooldown <= 0)
+                this.firePlayerGuns();
+        }
+        else {
+            this.pdcHeat = Math.max(0, (this.pdcHeat ?? 0) - dt * 2);
+            if (actions.fire && this.gunCooldown <= 0)
+                this.firePlayerGuns();
+        }
         if (this.save.player.mode === 'combat') {
             this.renderer.setUtilityBeam(false, 'combat', this.save.player.position);
             return;
@@ -2038,6 +2110,11 @@ export class GameSession {
         this.gunCooldown = Math.max(this.gunCooldown, 0.12);
         this.setOwnMonitorStatus(t('WEAPON · {name}', { name: t(weapon.nameKey) }), 1600);
         this.audio.play('ui', 0.7);
+    }
+    // Tap the weapon readout (or press X / gamepad cycle): next gun in order.
+    cycleWeapon() {
+        const index = WEAPON_ORDER.indexOf(this.save.player.weaponId);
+        this.switchWeapon(WEAPON_ORDER[(index + 1) % WEAPON_ORDER.length]);
     }
     firePlayerGuns() {
         const stats = this.playerStats();
@@ -2094,6 +2171,100 @@ export class GameSession {
             });
             this.save.player.ammo[ammoId] -= 1;
         }
+        else if (weapon.kind === 'pdc') {
+            // Cluster barrel: one stubby bolt per tick with a tight seeded
+            // wobble; the stream plus passive missile interception is the
+            // weapon's identity (see updatePlayerWeapons' intercept pass).
+            const rng = seededRandom(`${this.save.world.seed}:wpn:${Math.floor(this.save.world.time * 1000)}:${this.projectileCounter}`);
+            const spread = (rng() - 0.5) * 2 * (weapon.spreadRad ?? 0);
+            const wobble = this.tmpP3.crossVectors(direction, UP);
+            if (wobble.lengthSq() < 1e-6)
+                wobble.set(1, 0, 0);
+            else
+                wobble.normalize();
+            const boltDir = this.tmpP0.copy(direction).applyAxisAngle(wobble, spread);
+            // Component-inline spawn: boltDir lives on tmpP0, so neither the
+            // muzzle nor the shot velocity may route through a scratch.
+            const muzzleX = position.x + down.x + boltDir.x * 1.9;
+            const muzzleY = position.y + down.y + boltDir.y * 1.9;
+            const muzzleZ = position.z + down.z + boltDir.z * 1.9;
+            const slot = this.projStore.alloc();
+            this.projStore.setPos(slot, muzzleX, muzzleY, muzzleZ);
+            this.projStore.setVel(slot, boltDir.x * weapon.speed + vv[0], boltDir.y * weapon.speed + vv[1], boltDir.z * weapon.speed + vv[2]);
+            this.projectiles.push({
+                id: `p-${++this.projectileCounter}`,
+                kind: weapon.kind,
+                ownerId: 'player',
+                slot,
+                damage: stats.gunDamage * weapon.damageMul,
+                life: weapon.life,
+                targetId: target?.kind === 'ship' ? target.id : undefined,
+                faction: 'player',
+            });
+        }
+        else if (weapon.kind === 'ripper') {
+            // Seven pellets across an 11° cone, each with its own seeded angle
+            // and speed so the cloud arrives ragged rather than as a ring.
+            // One shell per trigger pull.
+            const rng = seededRandom(`${this.save.world.seed}:wpn:${Math.floor(this.save.world.time * 1000)}:${this.projectileCounter}`);
+            const pelletCount = weapon.pellets ?? 7;
+            for (let pellet = 0; pellet < pelletCount; pellet += 1) {
+                const spread = (rng() - 0.5) * 2 * (weapon.spreadRad ?? 0);
+                const rollSeed = rng();
+                const wobble = this.tmpP3.crossVectors(direction, UP);
+                if (wobble.lengthSq() < 1e-6)
+                    wobble.set(1, 0, 0);
+                else
+                    wobble.normalize();
+                const pelletDir = this.tmpP0.copy(direction)
+                    .applyAxisAngle(wobble, spread)
+                    .applyAxisAngle(direction, (rollSeed - 0.5) * 2 * (weapon.spreadRad ?? 0));
+                const pelletSpeed = weapon.speed + (rng() - 0.5) * 2 * (weapon.speedJitter ?? 0);
+                // Component-inline spawn: pelletDir rides tmpP0 through the
+                // whole volley, so nothing here may borrow a scratch vector.
+                const lateral = (pellet / Math.max(1, pelletCount - 1) - 0.5) * 0.9;
+                const slot = this.projStore.alloc();
+                this.projStore.setPos(
+                    slot,
+                    position.x + right.x * lateral + down.x + pelletDir.x * 1.8,
+                    position.y + right.y * lateral + down.y + pelletDir.y * 1.8,
+                    position.z + right.z * lateral + down.z + pelletDir.z * 1.8,
+                );
+                this.projStore.setVel(slot, pelletDir.x * pelletSpeed + vv[0], pelletDir.y * pelletSpeed + vv[1], pelletDir.z * pelletSpeed + vv[2]);
+                this.projectiles.push({
+                    id: `p-${++this.projectileCounter}`,
+                    kind: weapon.kind,
+                    ownerId: 'player',
+                    slot,
+                    damage: stats.gunDamage * weapon.damageMul,
+                    life: weapon.life,
+                    targetId: target?.kind === 'ship' ? target.id : undefined,
+                    faction: 'player',
+                });
+            }
+            this.save.player.ammo[ammoId] -= 1;
+        }
+        else if (weapon.kind === 'ion' || weapon.kind === 'mortar') {
+            // Lance and mortar throw one centerline orb; their identity lives
+            // in the impact hooks — shield crack + gun jam / splash + burn.
+            const damage = weapon.damageFlat ?? stats.gunDamage * weapon.damageMul;
+            const muzzle = this.tmpP0.copy(position).add(down).addScaledVector(direction, 2.1);
+            const slot = this.projStore.alloc();
+            this.projStore.setPos(slot, muzzle.x, muzzle.y, muzzle.z);
+            const shotVel = this.tmpP0.copy(direction).multiplyScalar(weapon.speed).add(this.tmpP3.set(vv[0], vv[1], vv[2]));
+            this.projStore.setVel(slot, shotVel.x, shotVel.y, shotVel.z);
+            this.projectiles.push({
+                id: `p-${++this.projectileCounter}`,
+                kind: weapon.kind,
+                ownerId: 'player',
+                slot,
+                damage,
+                life: weapon.life,
+                targetId: target?.kind === 'ship' ? target.id : undefined,
+                faction: 'player',
+            });
+            this.save.player.ammo[ammoId] -= 1;
+        }
         else {
             for (const side of [-0.58, 0.58]) {
                 const muzzle = this.tmpP0.copy(position).addScaledVector(right, side).add(down).addScaledVector(direction, 1.8);
@@ -2114,7 +2285,7 @@ export class GameSession {
             }
         }
         this.gunCooldown = weapon.cooldown;
-        this.audio.play(weapon.audioKey, weapon.kind === 'gauss' ? 0.85 : 0.72);
+        this.audio.play(weapon.audioKey, weapon.kind === 'gauss' ? 0.85 : weapon.kind === 'mortar' ? 0.95 : 0.72);
     }
     // Transient target-monitor status: missile and target-cycle errors land on
     // the TARGET monitor's readout line instead of the toast stack.
@@ -3098,6 +3269,19 @@ export class GameSession {
             // not touch them (a trade AI would fly them off to a port mid-race).
             if (ship.race)
                 continue;
+            // Plasma burn chews the hull for a few seconds after a mortar hit:
+            // ticked damage so the death/bounty pipeline sees normal hits.
+            if (ship.burn !== undefined) {
+                if (this.save.world.time < ship.burn.until) {
+                    ship.burn.tick -= dt;
+                    if (ship.burn.tick <= 0) {
+                        ship.burn.tick = 0.5;
+                        this.damageShip(ship, ship.burn.dps * 0.5, ship.burn.attackerId, undefined);
+                    }
+                }
+                else
+                    delete ship.burn;
+            }
             ship.lifetime += dt;
             ship.fireCooldown -= dt;
             ship.missileCooldown -= dt;
@@ -4843,14 +5027,46 @@ export class GameSession {
                         // flamboyant pilots get a seeded chance to rub it in.
                         this.maybeHitTaunt(projectile.ownerId);
                     }
-                    else if (hitKind === 'ship' && hitShip)
+                    else if (hitKind === 'ship' && hitShip && projectile.kind === 'ion') {
+                        // Ion Lance: shields soak four times the bolt's base
+                        // damage while the hull carryover stays at base rate,
+                        // and the discharge jams the target's guns briefly.
+                        const ship = hitShip;
+                        const soaked = Math.min(Math.max(0, ship.shield), projectile.damage * 4);
+                        ship.shield -= soaked;
+                        const carried = projectile.damage - soaked / 4;
+                        this.damageShip(ship, carried, projectile.ownerId, tuple(hitPosition));
+                        ship.fireCooldown = Math.max(ship.fireCooldown ?? 0, 1.8);
+                    }
+                    else if (hitKind === 'ship' && hitShip && projectile.kind !== 'mortar')
                         this.damageShip(hitShip, projectile.damage, projectile.ownerId, tuple(hitPosition));
-                    if (projectile.kind === 'missile') {
+                    if (projectile.kind === 'mortar') {
+                        // Sunlance detonation on any impact: splash with linear
+                        // falloff to every hull near the blast, each ship left
+                        // burning for a few seconds afterwards.
+                        const radius = projectile.splashRadius ?? 26;
+                        const minDamage = projectile.splashMin ?? 12;
+                        for (const ship of this.ships) {
+                            if (ship.hull <= 0 || ship.race)
+                                continue;
+                            const dxs = ship.position[0] - hitPosition.x;
+                            const dys = ship.position[1] - hitPosition.y;
+                            const dzs = ship.position[2] - hitPosition.z;
+                            const distance = Math.sqrt(dxs * dxs + dys * dys + dzs * dzs);
+                            if (distance > radius)
+                                continue;
+                            const falloff = 1 - distance / radius;
+                            this.damageShip(ship, minDamage + (projectile.damage - minDamage) * falloff, projectile.ownerId, undefined);
+                            ship.burn = { dps: projectile.burnDps ?? 6, until: this.save.world.time + (projectile.burnSeconds ?? 4), tick: 0.5, attackerId: projectile.ownerId };
+                        }
+                        this.renderer.spawnExplosion(tuple(hitPosition), false, 1.15);
+                    }
+                    else if (projectile.kind === 'missile') {
                         this.renderer.spawnExplosion(tuple(hitPosition), projectile.faction === 'red-talons', 0.65);
                         this.audio.playAtDirection('explosion', 0.8, playerPosition.distanceTo(hitPosition), localHit.x);
                     }
                     else
-                        this.audio.playAtDirection('impact', projectile.kind === 'gauss' ? 0.6 : 0.45, playerPosition.distanceTo(hitPosition), localHit.x);
+                        this.audio.playAtDirection('impact', projectile.kind === 'gauss' ? 0.6 : projectile.kind === 'ripper' || projectile.kind === 'pdc' ? 0.3 : 0.45, playerPosition.distanceTo(hitPosition), localHit.x);
                     // Over-penetration: punch through the ship and keep the
                     // remaining step. Rocks, the player, and a spent pierce
                     // budget all end the slug here instead.
@@ -7796,6 +8012,7 @@ export class GameSession {
             standoff,
             patrolReply: this.patrolReplyActive(),
             race: this.raceHud(),
+            weapon: this.weaponHud(),
             // Radar ring calibration as fractions of the outer (radarRange) ring:
             // [dark-visibility, scan range, full horizon]. The inner ring tracks
             // the pilot's own signature — full range while broadcasting, and the

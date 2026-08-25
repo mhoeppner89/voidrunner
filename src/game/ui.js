@@ -344,7 +344,7 @@ export class GameUI {
             <div class="screen-heading"><span>${t('STATUS')}</span><b id="own-ship-name">WAYFARER</b></div>
             <div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
             <div class="screen-race-strip" id="screen-race-strip"><span id="screen-race-label"></span><b id="screen-race-value"></b></div>
-            <div class="screen-ship-layout"><div class="screen-flight"><div><span>${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div><div><span>${t('HOLD')}</span><b id="screen-own-cargo">0.0</b><small id="screen-own-cargo-cap">/32</small></div></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ARMOR')}</span><i><b id="screen-own-armor"></b></i><em id="screen-own-armor-value">100</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">100</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
+            <div class="screen-ship-layout"><div class="screen-flight"><div><span>${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div><div><span>${t('HOLD')}</span><b id="screen-own-cargo">0.0</b><small id="screen-own-cargo-cap">/32</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Weapon — press X')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ARMOR')}</span><i><b id="screen-own-armor"></b></i><em id="screen-own-armor-value">100</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">100</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="${t('Radar display; tap to open navigation map')}">
             <div class="screen-heading radar-heading" id="screen-radar-transponder" data-touch-action="transponder" role="button" tabindex="0" title="${t('Transponder — press B')}">${t('TRANSPONDER ON')}</div>
@@ -600,6 +600,21 @@ export class GameUI {
             event.preventDefault();
             event.stopPropagation();
             this.actions?.openShipMenu();
+        });
+        // The weapon readout line is the exception: tapping it cycles guns
+        // instead of opening the menu (same pattern as the transponder chip).
+        const weaponReadout = this.root.querySelector('#screen-own-weapon');
+        weaponReadout?.addEventListener('pointerup', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.actions?.weaponCycle?.();
+        });
+        weaponReadout?.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ')
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.actions?.weaponCycle?.();
         });
         ownScreen?.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter' && event.key !== ' ')
@@ -1469,6 +1484,20 @@ export class GameUI {
                 const timer = this.el('#patrol-reply-timer');
                 if (timer)
                     timer.textContent = String(model.patrolReply.seconds);
+            }
+        }
+        // Weapon readout on the own-ship monitor: mounted gun name plus its
+        // ammo pool (∞ for energy/heat weapons), amber while the PDC vents.
+        const weaponReadout = this.el('#screen-own-weapon');
+        if (weaponReadout) {
+            const weapon = model.weapon;
+            weaponReadout.classList.toggle('is-visible', Boolean(weapon));
+            weaponReadout.dataset.venting = weapon?.venting ? 'true' : 'false';
+            if (weapon) {
+                setText('#screen-own-weapon-name', weapon.name);
+                setText('#screen-own-weapon-ammo', weapon.ammo
+                    ? `${weapon.ammo.current}/${weapon.ammo.capacity}`
+                    : weapon.venting ? t('VENTING') : '∞');
             }
         }
         // Race strip: compact circuit telemetry on the own-ship monitor while

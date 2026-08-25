@@ -29,7 +29,7 @@ play style, judged against **Everspace 2's primary weapon lineup** (see
 |---|---|---|---|---|
 | pulse | Pulse Laser Array (existing, renamed) | All-rounder energy repeater | speed 205, cd 0.17, dmg gunDamage, life 1.35 | ∞ |
 | gauss | Magrail Gauss Rifle | Long-range duelist: line them up, delete them | speed 620, cd 0.95, dmg 3.2×gunDamage, life 1.6, **over-penetrates** first ship hit (continues to second target), tracer leaves ionized trail | Slugs: 48 cap |
-| pdc | Point-Defense Cluster | Guardian: shred missiles + point-blank spray | speed 170, cd 0.06, dmg 0.35×gunDamage, life 0.42, spread cone 4°, **auto-intercepts hostile missiles within 60u** even when not aiming at them | ∞ (heat-gated: 3.5s sustained → 1.6s vent) |
+| pdc | Point-Defense Cluster | Guardian: shred missiles + point-blank king | speed 170, cd 0.06, dmg 0.55×gunDamage (**101 DPS inside 71u** — beats pulse point-blank), life 0.42, spread cone 4°, **auto-intercepts hostile missiles within 60u** even when not aiming at them | ∞ (heat-gated: 3.5s sustained → 1.6s vent) |
 | ripper | Ripper Scattergun | Brawler: get inside their turn | 7 pellets/shot, speed 150–185 per pellet, cd 0.78, dmg 0.55×gunDamage per pellet, spread cone 11°, life 0.5 | Shells: 36 cap |
 | ion | Ion Lance | Shield-cracker / support control | speed 240, cd 0.62, dmg 0.5×gunDamage to hull but **×4 vs shields** + target weapons jammed 1.8s (NPC holdFire), blob render w/ arc flash | Cells: 60 cap |
 | mortar | Sunlance Plasma Mortar | Siege: bombard camps, freighters, rocks | speed 85 arcing blob, cd 2.2, direct dmg 30, **splash r=26** falloff to 12, applies burn 6dmg/s ×4s, big slow orb w/ ember trail | Pods: 10 cap |
