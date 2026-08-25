@@ -697,9 +697,108 @@ export class SpaceRenderer {
             const phaseOffset = rng() * Math.PI * 2;
             // Pull palette geography from the seed so every planet gets a
             // unique mix of warm/cool regions instead of a flat single-hue disc.
+            // Seeded value-noise fbm (wrapped in longitude so the sphere has no
+            // seam) drives the water world: depth-graded oceans, archipelago
+            // chains with pale shallows, noisy polar caps. The old path hue-
+            // shifted ocean blue +0.11 for land — straight into violet — which
+            // is where the magenta blotches came from.
+            const makeLattice = (gridSize) => {
+                const lattice = new Float32Array((gridSize + 1) * (gridSize + 1));
+                for (let y = 0; y <= gridSize; y += 1)
+                    for (let x = 0; x < gridSize; x += 1)
+                        lattice[y * (gridSize + 1) + x] = rng();
+                // Duplicate column 0 into the wrap column: seamless longitude.
+                for (let y = 0; y <= gridSize; y += 1)
+                    lattice[y * (gridSize + 1) + gridSize] = lattice[y * (gridSize + 1)];
+                return (u, v) => {
+                    const gx = (((u % 1) + 1) % 1) * gridSize;
+                    const gy = Math.min(gridSize - 1e-6, Math.max(0, v * gridSize));
+                    const x0 = Math.floor(gx);
+                    const y0 = Math.floor(gy);
+                    const tx = gx - x0;
+                    const ty = gy - y0;
+                    const sx = tx * tx * (3 - 2 * tx);
+                    const sy = ty * ty * (3 - 2 * ty);
+                    const x1 = (x0 + 1) % gridSize;
+                    const row = gridSize + 1;
+                    const i00 = y0 * row + x0;
+                    const i10 = y0 * row + x1;
+                    const i01 = (y0 + 1) * row + x0;
+                    const i11 = (y0 + 1) * row + x1;
+                    return (lattice[i00] * (1 - sx) + lattice[i10] * sx) * (1 - sy)
+                        + (lattice[i01] * (1 - sx) + lattice[i11] * sx) * sy;
+                };
+            };
+            if (water) {
+                const abyss = new THREE.Color(0x0d3357);
+                const ocean = new THREE.Color(0x1c639c);
+                const shelf = new THREE.Color(0x3f9cc4);
+                const sand = new THREE.Color(0xd6c491);
+                const scrub = new THREE.Color(0x5d8a52);
+                const highland = new THREE.Color(0x9aa877);
+                const noiseA = makeLattice(6);
+                const noiseB = makeLattice(14);
+                const noiseC = makeLattice(34);
+                const fbm = (u, v) => noiseA(u, v) * 0.52 + noiseB(u, v) * 0.3 + noiseC(u, v) * 0.18;
+                const image = context.getImageData(0, 0, size, size);
+                const pixels = image.data;
+                const landThreshold = 0.585;
+                for (let y = 0; y < size; y += 1) {
+                    const v = y / size;
+                    const lat = v * 2 - 1;
+                    for (let x = 0; x < size; x += 1) {
+                        const n = fbm(x / size, v);
+                        const idx = (y * size + x) * 4;
+                        let r;
+                        let g;
+                        let b;
+                        if (n > landThreshold) {
+                            // Archipelago: sand rim → scrub → pale highland.
+                            const t = Math.min(1, (n - landThreshold) * 4.5);
+                            const c = sand.clone().lerp(scrub, Math.min(1, t * 2.4)).lerp(highland, Math.max(0, t - 0.55) * 1.4);
+                            r = c.r;
+                            g = c.g;
+                            b = c.b;
+                        }
+                        else {
+                            // Depth-graded ocean: pale shelf at the coast, abyss
+                            // in the basins — the sea reads as water, not paint.
+                            const d = landThreshold - n;
+                            const c = shelf.clone().lerp(ocean, Math.min(1, d * 7)).lerp(abyss, Math.min(1, d * 2.6));
+                            r = c.r;
+                            g = c.g;
+                            b = c.b;
+                        }
+                        // Noisy polar caps.
+                        const capEdge = 0.8 + (n - 0.5) * 0.14;
+                        const capT = Math.min(1, Math.max(0, (Math.abs(lat) - capEdge) * 8));
+                        if (capT > 0) {
+                            r += (0.93 - r) * capT;
+                            g += (0.96 - g) * capT;
+                            b += (0.99 - b) * capT;
+                        }
+                        pixels[idx] = r * 255;
+                        pixels[idx + 1] = g * 255;
+                        pixels[idx + 2] = b * 255;
+                        pixels[idx + 3] = 255;
+                    }
+                }
+                context.putImageData(image, 0, 0);
+                // Sparse bright storm speckles — small, soft, white; mid-lat.
+                for (let i = 0; i < 30; i += 1) {
+                    const sy = (0.2 + rng() * 0.6) * size;
+                    const sx = rng() * size;
+                    const r = 1.5 + rng() * 2.6;
+                    const gradient = context.createRadialGradient(sx, sy, 0, sx, sy, r);
+                    gradient.addColorStop(0, 'rgba(255,255,255,0.42)');
+                    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+                    context.fillStyle = gradient;
+                    context.fillRect(sx - r, sy - r, r * 2, r * 2);
+                }
+            }
+            else {
             const hueShift = (rng() - 0.5) * 0.04 + (baseColor.r > baseColor.b ? 0.02 : -0.02);
-            // Water worlds keep their land sparse — a few scattered
-            // archipelagos instead of the dense continents of a desert world.
+            // Dry worlds: dense continents on a banded desert base.
             const continentCount = water ? 5 + Math.floor(rng() * 4) : 8 + Math.floor(rng() * 6);
             const continents = [];
             for (let i = 0; i < continentCount; i += 1) {
@@ -793,9 +892,10 @@ export class SpaceRenderer {
                         let alpha = 0;
                         let rC = accentC.r, gC = accentC.g, bC = accentC.b;
                         if (t < 0.32) {
-                            // Hot eye
+                            // Hot eye: dusty amber, never white-pink — white
+                            // cores over a blue ocean read as magenta scars.
                             alpha = 0.62 * (1 - t / 0.32);
-                            rC = 1; gC = 0.95; bC = 0.86;
+                            rC = 0.93; gC = 0.72; bC = 0.48;
                         }
                         else if (t < 0.62) {
                             // Mid eye wall
@@ -815,7 +915,10 @@ export class SpaceRenderer {
                     }
                 }
             }
-            // Twin polar caps: dim white caps ringed by cooler bands.
+            }
+            // Twin polar caps: dim white caps ringed by cooler bands. Water
+            // worlds bake their own noisy caps per-pixel above.
+            if (!water) {
             for (const poleY of [0, size]) {
                 const grad = context.createLinearGradient(0, poleY === 0 ? 0 : size - 28, 0, poleY === 0 ? 28 : size);
                 grad.addColorStop(0, 'rgba(232, 240, 246, 0.86)');
@@ -823,6 +926,7 @@ export class SpaceRenderer {
                 grad.addColorStop(1, 'rgba(120, 156, 188, 0)');
                 context.fillStyle = grad;
                 context.fillRect(0, poleY === 0 ? 0 : size - 28, size, 28);
+            }
             }
             // Sparse cloud plumes: long thin warm streaks across the bandline.
             const plumes = water ? 10 + Math.floor(rng() * 7) : 6 + Math.floor(rng() * 6);
@@ -1142,7 +1246,10 @@ export class SpaceRenderer {
         // camera is close to the limb without adding another raycast target.
         // The halo and haze share one shell shader (with the near-field dome
         // fade) so neither can pop off when the camera crosses its boundary.
-        const haloMaterial = this.createAtmosphereMaterial(atmosphere, location.radius * 1.16, 1.0, 0.18, 1.0, location.position);
+        // Halo intensity 1.0 painted a hard soap-bubble edge around the whole
+        // disc; 0.7 with the same shell keeps the limb glow but lets the planet
+        // surface read through it.
+        const haloMaterial = this.createAtmosphereMaterial(atmosphere, location.radius * 1.16, 0.7, 0.14, 1.0, location.position);
         const hazeMaterial = this.createAtmosphereMaterial(atmosphere, location.radius * 1.042, id === 'azure' ? 0.047 : 0.076, 0.0, 0.0, location.position);
         const haze = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.042, 112, 68), hazeMaterial);
         haze.name = 'haze';
@@ -1150,21 +1257,17 @@ export class SpaceRenderer {
         const halo = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.16, 96, 56), haloMaterial);
         group.add(halo);
         if (ringed) {
-            // Icy pale-blue rings suit the water world's cool palette.
-            const ring = new THREE.Mesh(new THREE.RingGeometry(location.radius * 1.42, location.radius * 2.55, 192), new THREE.MeshBasicMaterial({ color: 0xc3dcea, map: this.createRingTexture(), transparent: true, opacity: 0.52, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+            // Gauntlet ring overhaul: one shader-driven ring instead of three
+            // flat unlit discs. The sibling-built region texture (C/B/Cassini/
+            // Encke bands) is sampled RADIALLY — RingGeometry's planar UVs used
+            // to smear it into straight stripes — and the shader adds a soft
+            // planet shadow across the anti-sun side plus sun-side brightening.
+            const ring = new THREE.Mesh(new THREE.RingGeometry(location.radius * 1.3, location.radius * 2.74, 256, 1), this.createRingMaterial(location));
             ring.rotation.x = Math.PI / 2.6;
             ring.rotation.z = 0.38;
             group.add(ring);
-            const outerRing = new THREE.Mesh(new THREE.RingGeometry(location.radius * 2.6, location.radius * 2.74, 128), new THREE.MeshBasicMaterial({ color: 0xd3e6f0, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false, fog: false }));
-            outerRing.rotation.copy(ring.rotation);
-            group.add(outerRing);
-            // Inner C-ring for a layered Saturn feel.
-            const innerRing = new THREE.Mesh(new THREE.RingGeometry(location.radius * 1.32, location.radius * 1.42, 96), new THREE.MeshBasicMaterial({ color: 0x9fbfd6, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false, fog: false }));
-            innerRing.rotation.copy(ring.rotation);
-            group.add(innerRing);
-            // Render-only: the rings must not swallow taps from behind the planet.
+            // Render-only: the ring must not swallow taps from behind the planet.
             ring.raycast = () => undefined;
-            outerRing.raycast = () => undefined;
         }
         // Atmospheric shells are huge transparent spheres that surround the launch
         // point (the halo/outer-halo BackSide spheres even enclose the camera right
@@ -1176,6 +1279,68 @@ export class SpaceRenderer {
         this.tagTargetable(surface, 'location', id);
         this.locationRoot.add(group);
         this.locationMeshes.set(id, group);
+    }
+    createRingMaterial(location) {
+        // One draw call, no lights: radial band profile from the region texture,
+        // a soft planet shadow across the anti-sun side of the plane, and
+        // sun-facing brightening. All per-fragment math, zero textures updated.
+        const ringNormal = new THREE.Vector3(0, 1, 0).applyEuler(new THREE.Euler(Math.PI / 2.6, 0, 0.38));
+        return new THREE.ShaderMaterial({
+            uniforms: {
+                uRingMap: { value: this.createRingTexture() },
+                uSunDirection: { value: this.sunDirection.clone().normalize() },
+                uPlanetCenter: { value: new THREE.Vector3(...location.position) },
+                uPlanetRadius: { value: location.radius },
+                uInnerRadius: { value: location.radius * 1.3 },
+                uOuterRadius: { value: location.radius * 2.74 },
+                uRingNormal: { value: ringNormal },
+                uTint: { value: new THREE.Color(0xcfe2ee) },
+            },
+            vertexShader: `
+                varying vec3 vWorldPosition;
+                void main() {
+                    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                    vWorldPosition = worldPosition.xyz;
+                    gl_Position = projectionMatrix * viewMatrix * worldPosition;
+                }`,
+            fragmentShader: `
+                uniform sampler2D uRingMap;
+                uniform vec3 uSunDirection;
+                uniform vec3 uPlanetCenter;
+                uniform vec3 uRingNormal;
+                uniform float uPlanetRadius;
+                uniform float uInnerRadius;
+                uniform float uOuterRadius;
+                uniform vec3 uTint;
+                varying vec3 vWorldPosition;
+                void main() {
+                    vec3 toFrag = vWorldPosition - uPlanetCenter;
+                    vec3 radial = toFrag - uRingNormal * dot(toFrag, uRingNormal);
+                    float r = length(radial);
+                    float t = clamp((r - uInnerRadius) / (uOuterRadius - uInnerRadius), 0.0, 1.0);
+                    vec4 band = texture2D(uRingMap, vec2(t, 0.5));
+                    float alpha = band.a;
+                    alpha *= smoothstep(0.0, 0.035, t) * (1.0 - smoothstep(0.955, 1.0, t));
+                    if (alpha < 0.004)
+                        discard;
+                    // Planet shadow: on the anti-sun side of the center, inside
+                    // the shadow cylinder, the rings drop to 18% light.
+                    vec3 sunDir = normalize(uSunDirection);
+                    float along = dot(toFrag, sunDir);
+                    float perp = length(toFrag - sunDir * along);
+                    float shadow = mix(0.18, 1.0, smoothstep(uPlanetRadius * 0.92, uPlanetRadius * 1.14, perp));
+                    shadow = mix(shadow, 1.0, smoothstep(-uPlanetRadius * 0.4, uPlanetRadius * 1.6, along));
+                    float face = abs(dot(uRingNormal, sunDir));
+                    float bright = 0.62 + 0.38 * face;
+                    vec3 color = uTint * (0.72 + 0.5 * band.r) * bright * shadow;
+                    gl_FragColor = vec4(color, alpha * 0.78);
+                }`,
+            transparent: true,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            fog: false,
+            toneMapped: false,
+        });
     }
     createRingTexture() {
         // Overhauled Azure ring plate: real ring systems read as MACRO regions
