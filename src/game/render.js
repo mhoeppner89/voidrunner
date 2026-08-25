@@ -2518,9 +2518,11 @@ export class SpaceRenderer {
             depthWrite: false,
         }));
         sprite.position.copy(position);
-        sprite.scale.setScalar(1.1 + Math.random() * 0.5);
+        sprite.scale.setScalar(1.3 + Math.random() * 0.6);
         this.scene.add(sprite);
-        this.effects.push({ object: sprite, velocities: [], life: 0.85, maxLife: 0.85 });
+        // `puff` routes the effect to the gentle-growth branch in updateEffects
+        // instead of the auto-swelling sprite branch.
+        this.effects.push({ object: sprite, velocities: [], life: 0.85, maxLife: 0.85, puff: true });
     }
     // An NPC hyperdrive departure: a short additive warp streak along the
     // ship's heading that flares and fades as the hull jumps away to another
@@ -2567,6 +2569,15 @@ export class SpaceRenderer {
                 const material = effect.streak.material;
                 if (material instanceof THREE.MeshBasicMaterial)
                     material.opacity = ratio * 0.85;
+            }
+            else if (effect.puff) {
+                // Missile smoke: expands gently (×~3 total, not the sprite
+                // branch's ×34) and fades — a growing puff must never become a
+                // screen-filling white ball across the missile's flight path.
+                effect.object.scale.multiplyScalar(1 + dt * 2.6);
+                const material = effect.object.material;
+                if (material instanceof THREE.SpriteMaterial)
+                    material.opacity = ratio * 0.34;
             }
             else if (effect.object instanceof THREE.Sprite) {
                 effect.object.scale.multiplyScalar(1 + dt * 4.2);
