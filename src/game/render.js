@@ -1097,20 +1097,22 @@ export class SpaceRenderer {
         const context = canvas.getContext('2d');
         const rng = seededRandom(`${seed}:clouds`);
         context.clearRect(0, 0, 256, 128);
-        // Latitude-driven storm ribbons: 3 wide bands at varying latitudes
-        // look like real atmospheric circulation, not random blotches.
+        // Latitude-driven storm ribbons: 3 bands at varying latitudes read as
+        // real atmospheric circulation. Wisps are FEWER and more distinct than
+        // the old haze — overlapping soft blobs at ~60% coverage washed the
+        // whole disc pale; distinct shapes at ~35% read as weather.
         const bands = [
-            { y: 36, h: 18, count: 22 },
-            { y: 64, h: 22, count: 28 },
-            { y: 96, h: 16, count: 20 },
+            { y: 36, h: 18, count: 11 },
+            { y: 64, h: 22, count: 14 },
+            { y: 96, h: 16, count: 10 },
         ];
         for (const band of bands) {
             for (let i = 0; i < band.count; i += 1) {
                 const cx = rng() * 256;
                 const cy = band.y + (rng() - 0.5) * band.h;
-                const rx = 18 + rng() * 32;
+                const rx = 14 + rng() * 26;
                 const ry = 4 + rng() * 6;
-                const alpha = 0.18 + rng() * 0.34;
+                const alpha = 0.3 + rng() * 0.34;
                 const gradient = context.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rx, ry));
                 gradient.addColorStop(0, `rgba(255, 255, 255, ${alpha.toFixed(3)})`);
                 gradient.addColorStop(0.55, `rgba(255, 255, 255, ${(alpha * 0.4).toFixed(3)})`);
@@ -1119,13 +1121,13 @@ export class SpaceRenderer {
                 context.fillRect(cx - rx, cy - ry, rx * 2, ry * 2);
             }
         }
-        // Plus stray wisps between bands.
-        for (let i = 0; i < 18; i += 1) {
+        // Plus a few stray wisps between bands.
+        for (let i = 0; i < 9; i += 1) {
             const x = rng() * 256;
             const y = rng() * 128;
-            const r = 7 + rng() * 14;
+            const r = 6 + rng() * 12;
             const gradient = context.createRadialGradient(x, y, 0, x, y, r);
-            gradient.addColorStop(0, `rgba(255, 255, 255, ${(0.06 + rng() * 0.12).toFixed(3)})`);
+            gradient.addColorStop(0, `rgba(255, 255, 255, ${(0.1 + rng() * 0.16).toFixed(3)})`);
             gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
             context.fillStyle = gradient;
             context.fillRect(x - r, y - r, r * 2, r * 2);
