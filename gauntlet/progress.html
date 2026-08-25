@@ -43,9 +43,9 @@
         <tr><th>Piece</th><th>Bar ref</th><th>Status</th><th>Round</th><th>Notes</th></tr>
         <tr><td>1 · Laser bolts + impact FX</td><td>ed-03, ed-12, ed-13</td><td><span class="st critic">built r1–r4 · critic pending</span></td><td>1</td><td>invisible specks → hot-core + crossed-glow tracers, muzzle flashes, layered impact bursts; camera-attenuation kills near wash</td></tr>
         <tr><td>2 · Rockets / missiles + exhaust</td><td>ed-03 (trails), ed-16</td><td><span class="st building">puff fix r1.3 · polish pending</span></td><td>1</td><td>roster work (sibling session) added plume+fins+smoke; I fixed the ×34 puff ballooning that washed frames white</td></tr>
-        <tr><td>3 · Planet surfaces (Azure + Vesper)</td><td>ed-02, ed-10, ed-15</td><td><span class="st pending">queued</span></td><td>—</td><td>baseline: flat banded ball, magenta blotches</td></tr>
-        <tr><td>4 · Ring of Azure</td><td>ed-05, ed-15</td><td><span class="st pending">queued</span></td><td>—</td><td>baseline: one flat grey band, no gaps/shadow; halo reads as soap bubble</td></tr>
-        <tr><td>5 · Clouds (cheap fluid-style drift)</td><td>ed-02, ed-15</td><td><span class="st building">sibling session</span></td><td>—</td><td>cloudLayers zonal shear landed in updateWorld — coordinated, not duplicated</td></tr>
+        <tr><td>3 · Planet surfaces (Azure + Vesper)</td><td>ed-02, ed-10, ed-15</td><td><span class="st critic">built r2.1–r2.3 · critic pending</span></td><td>2</td><td>Azure: fbm archipelagos + depth-graded ocean + noisy caps (violet landmasses dead); Vesper: dusty amber storms; halo de-bubbled (scatter 0.18→0.06)</td></tr>
+        <tr><td>4 · Ring of Azure</td><td>ed-05, ed-15</td><td><span class="st critic">built r2 · critic pending</span></td><td>2</td><td>one shader ring: sibling's C/B/Cassini/Encke texture sampled radially (was planar-smeared stripes) + planet shadow + sun-side light</td></tr>
+        <tr><td>5 · Clouds (cheap fluid-style drift)</td><td>ed-02, ed-15</td><td><span class="st building">sibling session</span></td><td>—</td><td>cloudLayers zonal shear + Azure second counter-drifting deck; I tuned deck opacity 0.34→0.22 to kill the white wash</td></tr>
         <tr><td>6 · Perf gate (all devices)</td><td>measurable half</td><td><span class="st won">pass r1</span></td><td>1</td><td>43.7 / 37.3 / 31.6 fps (SwiftShader ceiling ~43) · overhaul strictly reduces per-bolt work (no per-spawn canvas textures/compiles) · true pre-gauntlet A/B blocked by probe hangs in /tmp</td></tr>
     </table>
 
@@ -57,12 +57,23 @@
         <figure><img src="shots/small/azure-rings.png" alt=""><figcaption>NEXT UP — Azure: flat band ring + soap-bubble halo + blotchy surface are pieces 3/4</figcaption></figure>
     </div>
 
+    <h2>Planet piece — before / after</h2>
+    <div class="pair">
+        <figure><img src="shots/small/azure-rings.png" alt=""><figcaption>BEFORE (baseline) — flat grey band ring, soap-bubble halo, violet blotch surface</figcaption></figure>
+        <figure><img src="shots/azure-r4/azure-rings.png" alt=""><figcaption>AFTER (r4) — structured ring with Cassini gap + shadow, ocean world with continents and caps</figcaption></figure>
+        <figure><img src="shots/azure-r4/vesper-view.png" alt=""><figcaption>VESPER (r4) — banded desert world, dusty amber storms (was pink-scarred)</figcaption></figure>
+        <figure><img src="shots/azure-r4/azure-limb.png" alt=""><figcaption>AZURE LIMB (r4) — coastal shallows, land patchwork, thin blue limb</figcaption></figure>
+    </div>
+
     <h2>Round log</h2>
     <div class="log" id="log">R1 · bar picked: Elite Dangerous · 16 refs fetched (Steam CDN, local-only) · capture rig built (gauntlet/capture.mjs, 7 scenes) · Chrome sandbox fix documented + applied (--no-sandbox --disable-gpu-sandbox) · baseline captured clean
 R1 · lasers: r1 glow too big/white → r2 tuned + camera attenuation → r3 missile-puff ballooning fixed (dedicated effect branch) → r4 finer denser sparks. Bolt now: hot core + crossed additive glow pair + head sprite, shared per-faction assets, zero canvas churn (src/game/laserFx.js, cached in sw.js).
 R1 · perf gate PASS: 43.7/37.3/31.6 fps vs ~43 ceiling, stable across runs.
 R1 · delegation outage: subagent layer failed 5× (even trivial pings) → builder work done in-session; blind CRITIC verdicts pending until it recovers. Pairs will be staged with gauntlet/stage-pairs.mjs.
-R1 · coordination: sibling sessions shipped weapon roster (6 guns) + racing release 0.6.0a + cloudLayers start; weapon-select UI chips missing from ui.js (flagged for roster owner).</div>
+R1 · coordination: sibling sessions shipped weapon roster (6 guns) + racing release 0.6.0a + cloudLayers start; weapon-select UI chips missing from ui.js (flagged for roster owner).
+R2 · planets+ring: Azure surface rebuilt on seeded value-noise fbm (archipelagos, depth-graded ocean, noisy caps) — root cause of violet blotches was land hue = ocean blue +0.11; ring rebuilt as ONE shader (sibling's region texture now sampled radially — RingGeometry planar UVs used to smear it into stripes — plus soft planet shadow, sun-side brightening); halo de-bubbled (intensity 1.0→0.62, scatter 0.18→0.06); Azure cloud decks 0.34→0.22, emissive 0.36→0.2. Iterations r2.1–r2.3 captured.
+R2 · perf gate re-checked after shader ring: 43.2/34.2/30.4 fps — inside noise band, no regression.
+R2 · delegation still down (7th failed ping) — critic verdicts for lasers/missiles/planets/ring all pending platform recovery; pairs will stage automatically via gauntlet/stage-pairs.mjs.</div>
     <p class="note">Refresh after each round. Blind A/B pairs staged per piece; critic sees only A/B labels. Refs are evaluation-only, never shipped.</p>
 </main>
 </body>
