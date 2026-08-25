@@ -2605,6 +2605,54 @@ button.compact {
   font-weight: 700;
 }
 
+/* Circuit race strip on the own-ship monitor: one compact row while an
+   entry is live (travel leg → grid countdown → gate/rank/clock). Same
+   absolute-row pattern as the standoff call above. */
+.screen-race-strip {
+  display: none;
+  position: absolute;
+  z-index: 2;
+  top: 26%;
+  left: 0;
+  right: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.18rem 0.48rem;
+  border-top: 1px solid rgba(115, 198, 180, 0.35);
+  border-bottom: 1px solid rgba(115, 198, 180, 0.35);
+  background: rgba(10, 14, 16, 0.82);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: clamp(0.5rem, 0.86vw, 0.72rem);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.screen-race-strip.is-visible {
+  display: flex;
+}
+
+/* Grid hold reads amber (waiting), running reads teal (live). */
+.screen-race-strip[data-phase='countdown'] span,
+.screen-race-strip[data-phase='countdown'] b {
+  color: var(--retro-amber);
+}
+
+.screen-race-strip span {
+  overflow: hidden;
+  color: var(--teal);
+  letter-spacing: 0.1em;
+  text-overflow: ellipsis;
+}
+
+.screen-race-strip b {
+  overflow: hidden;
+  color: var(--retro-green);
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
 /* The slow-down call for an approach rides the target monitor's readout: an
    amber blink while the ship needs to slow to land/dock, so the radar zone
    line keeps showing the zone name. */

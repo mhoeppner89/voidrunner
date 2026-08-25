@@ -112,6 +112,7 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             completedMissionIds: [],
             failedMissionIds: [],
             bountyKills: [],
+            raceRecords: {},
             // Cleared-warrant registry: callsign → { tier, temperament, danger,
             // count, clearedAt }. The bounty board reads this to remember which
             // named pilots the player has taken down (ace kills pay bonus rep).
@@ -253,6 +254,7 @@ export const hydrateSave = (candidate) => {
             failedMissionIds: candidate.world?.failedMissionIds ?? [],
             bountyKills: candidate.world?.bountyKills ?? [],
             registry: candidate.world?.registry ?? {},
+            raceRecords: candidate.world?.raceRecords ?? {},
             // Legacy saves stored surrendered callsigns as a plain array (no
             // capture/fled distinction); default those to 'captured' so existing
             // recognition behavior is preserved.

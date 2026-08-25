@@ -4,6 +4,7 @@ import { cargoFree, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { clamp, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
 import { rollPilot, TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 import { t } from './i18n.js';
+import { RACE_COURSES, raceBriefingLine, raceOfferForLocation } from './racing.js';
 const GUILD_NAMES_FALLBACK = (guild) => guild === 'merchant' ? 'Merchant Guild' : guild === 'bounty' ? 'Bounty Registry' : guild === 'mining' ? 'Prospectors Guild' : guild === 'syndicate' ? 'Red Talon Syndicate' : 'Salvage Union';
 const merchantIssuers = ['Kestrel Freight', 'Orison Combine', 'Free Haulers Desk', 'Sable Route Logistics', 'Guild Dispatch'];
 const bountyIssuers = ['Concord Warrant Desk', 'Frontier Security Office', 'Bounty Hunters Registry', 'Civil Claims Bureau'];
@@ -39,6 +40,26 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
     const cycle = missionCycle(save.world.time);
     const rng = seededRandom(`${save.world.seed}:missions:${cycle}:${locationId}`);
     const offers = [];
+    const raceCourseId = raceOfferForLocation(locationId);
+    const raceCourse = raceCourseId ? RACE_COURSES[raceCourseId] : undefined;
+    // Races are repeatable events: the board always posts them.
+    if (raceCourse)
+        offers.push({
+            id: `race-${raceCourse.id}`,
+            kind: 'race',
+            title: t('Race: {course}', { course: raceCourse.title }),
+            issuer: raceCourse.issuer,
+            origin: locationId,
+            destination: raceCourse.zone,
+            reward: Math.max(...raceCourse.payouts),
+            deposit: raceCourse.entryFee,
+            deadline: save.world.time + raceCourse.deadlineSeconds,
+            status: 'offered',
+            guild: 'merchant',
+            guildRep: 4,
+            faction: 'free-merchants',
+            briefing: `${raceBriefingLine(raceCourse)} Entry is ${raceCourse.entryFee} cr. Payouts by rank: ${raceCourse.payouts.map((amount, index) => `${index + 1}${['st','nd','rd','th'][index] || 'th'} ${Math.abs(amount)}${amount < 0 ? ' loss' : ''}`).join(', ')}.`,
+        });
     const dangerBase = clamp(save.world.danger, 0.2, 3.5);
     const claimedNodeIds = new Set();
     for (let index = 0; index < count; index += 1) {

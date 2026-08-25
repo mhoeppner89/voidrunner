@@ -4,10 +4,12 @@ import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, GUILD_RANK_NAMES, LOCATIONS,
 import { buyCommodity, cargoCapacity, cargoFree, cargoMass, denPrice, refreshAllPrices, sellCommodity, SYNDICATE_DEN_FAVOR, tickEconomy } from './economy.js';
 import { InputManager } from './input.js';
 import { acceptMission, awardCareerProgress, completeBountyMission, completeMissionsAtDock, failExpiredMissions, joinGuild, refreshMissionOffers, VALUABLE_CARGO_LABELS, } from './missions.js';
+import { RACE_QUEST_ID, createRaceRacers, generateRaceCourse, racePayout, raceRankLabel, updateRaceRacer } from './racing.js';
 import { clamp, damp, formatCredits, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
 import { EntityStore } from './entityStore.js';
 import { SpaceRenderer } from './render.js';
 import { saveGame } from './save.js';
+import { getQuest, setFlag, setStep, startQuest } from './quests.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
 import { asteroidCollisionMesh, asteroidCollisionRadius, generateAsteroidField, generateGraveyardPieces, generateWreckNodes, graveyardZoneAt, graveyardZoneLabel, GRAVEYARD_GEOMETRY_PROFILES, wreckNodeCollisionRadius } from './worldData.js';
 import { hullVsAsteroid, hullVsBox, hullVsEngine, hullVsHull, hullVsRing, hullVsSphere } from './hullCollision.js';
@@ -1037,6 +1039,7 @@ export class GameSession {
     activeInstanceId;
     targetPointer;
     arena = null;
+    activeRace = null;
     // Emergent interactions (mid-flight mugs, smuggler flags) only run in the
     // live game — headless combat probes build sessions via Object.create and
     // never set this, so their pirates always fight straight (see shipAI.js).
@@ -1097,10 +1100,12 @@ export class GameSession {
         this.nextEncounterAt = save.world.time + 12 + seededRandom(`${save.world.seed}:next-encounter:${Math.floor(save.world.time)}`)() * 14;
         if (arena)
             this.setupArena(arena);
-        else
+        else {
             this.spawnInitialTraffic();
+        }
         this.updateActiveInstance(true);
         this.restoreViewState();
+        this.restoreActiveRace();
         this.frameId = requestAnimationFrame(this.frame);
     }
     setupArena(config, announce = true) {
@@ -1384,7 +1389,10 @@ export class GameSession {
         // the whole sim. Clamp to safe numbers before touching the graph.
         const hullRatio = stats.hull > 0 ? this.save.player.hull / stats.hull : 1;
         const damage = Number.isFinite(hullRatio) ? 1 - hullRatio : 0;
-        const throttle = Number.isFinite(this.save.player.throttle) ? this.save.player.throttle : 0;
+        // Docked ships have no engines running: the last in-flight throttle
+        // must not keep the engine wash alive on landing screens. (`flying`
+        // is already declared above — same frame-gating value.)
+        const throttle = flying && Number.isFinite(this.save.player.throttle) ? this.save.player.throttle : 0;
         let nearbyEnemies = 0;
         if (!this.save.player.dockedAt && this.ships) {
             const px = this.save.player.position[0];
@@ -1425,7 +1433,7 @@ export class GameSession {
                 }
             }
         }
-        this.audio.update(dt, throttle, this.afterburning, damage, nearbyEnemies, musicContext);
+        this.audio.update(dt, throttle, flying && this.afterburning, damage, nearbyEnemies, musicContext);
         this.syncRender(dt, now);
     };
     // Copy current entity transforms into prev* slots so the renderer can
@@ -1486,6 +1494,7 @@ export class GameSession {
         this.updateActiveInstance();
         this.updateBountySpawns();
         this.updateDynamicEncounters();
+        this.updateRace(dt);
         this.updateShips(dt);
         // Ship-to-ship contacts resolve last, once every hull has settled its
         // position for the frame against the environment.
@@ -1540,6 +1549,210 @@ export class GameSession {
             else if (!((this.save.player.mode === 'mining' && target?.kind === 'asteroid') || (this.save.player.mode === 'salvage' && target?.kind === 'wreck')))
                 this.fireMissile();
         }
+    }
+    // Race lifecycle: 'travel' (fly to the course zone) → 'countdown' (grid
+    // hold) → 'running' (gates + live rank) → terminal. One activeRace object
+    // is the single source of truth; racers ride this.ships (rendered, on the
+    // radar) but are driven only by updateRaceRacer.
+    updateRace(dt) {
+        const race = this.activeRace;
+        if (!race || race.state === 'finished' || race.state === 'failed')
+            return;
+        const player = this.save.player;
+        const now = this.save.world.time;
+        if (race.state === 'travel') {
+            // The board's clock runs from purchase, anywhere in the void —
+            // miss the window and the entry is the house's.
+            if (now > race.deadline) {
+                this.failRace(t('RACE ENTRY EXPIRED · ENTRY FORFEIT'));
+                return;
+            }
+            if (this.activeInstanceId !== race.course.zone)
+                return;
+            const firstGate = race.course.gates[0].position;
+            if (Math.hypot(player.position[0] - firstGate[0], player.position[1] - firstGate[1], player.position[2] - firstGate[2]) > race.course.gateRadius * 2.2)
+                return;
+            this.startRaceAt(race.course);
+            return;
+        }
+        // Leaving the zone mid-race kills the entry — the fee is the house's.
+        if (this.activeInstanceId !== race.course.zone) {
+            this.failRace(t('RACE ABANDONED · ENTRY FORFEIT'));
+            return;
+        }
+        if (now < race.startedAt) {
+            // Grid hold: pin the ship until the lights go green.
+            player.velocity = [0, 0, 0];
+            const remaining = Math.ceil(race.startedAt - now);
+            if (remaining !== race.lastCountdown && remaining <= 3) {
+                race.lastCountdown = remaining;
+                this.ui.pushSensor(t('{count}…', { count: remaining }), 'info', 900);
+                this.audio.play('ui', 0.8);
+            }
+            return;
+        }
+        if (race.state === 'countdown') {
+            race.state = 'running';
+            race.playerStartTime = now;
+            this.ui.pushEvent(t('GO · PASS ALL {count} GATES', { count: race.course.gates.length }), 'success', 3200);
+            this.audio.play('success', 1.2);
+        }
+        const nextGate = race.course.gates[player.raceGateIndex];
+        if (!nextGate) {
+            this.finishRace();
+            return;
+        }
+        const dx = player.position[0] - nextGate.position[0];
+        const dy = player.position[1] - nextGate.position[1];
+        const dz = player.position[2] - nextGate.position[2];
+        const playerDistance = Math.hypot(dx, dy, dz);
+        if (playerDistance <= nextGate.radius) {
+            player.raceGateIndex += 1;
+            this.renderer.syncRaceGates(race.course.gates, player.raceGateIndex, LOCATIONS[race.course.zone].position);
+            if (player.raceGateIndex >= race.course.gates.length) {
+                player.raceFinishTime = now;
+                this.finishRace();
+                return;
+            }
+            this.ui.pushSensor(t('GATE {current}/{total} · {rank}', { current: player.raceGateIndex + 1, total: race.course.gates.length, rank: raceRankLabel(this.racePlayerRank()) }), 'success', 1400);
+            this.audio.play('success', 0.9);
+        }
+        let aheadCount = 0;
+        for (const racer of race.racers) {
+            updateRaceRacer(racer, race.course, dt, now);
+            if ((racer.raceFinished && racer.raceFinishTime <= now)
+                || (!racer.raceFinished && racer.raceGateIndex > player.raceGateIndex)) {
+                aheadCount += 1;
+                continue;
+            }
+            if (!racer.raceFinished && racer.raceGateIndex === player.raceGateIndex) {
+                const gate = race.course.gates[racer.raceGateIndex];
+                if (Math.hypot(racer.position[0] - gate.position[0], racer.position[1] - gate.position[1], racer.position[2] - gate.position[2]) < playerDistance)
+                    aheadCount += 1;
+            }
+        }
+        race.playerRank = aheadCount + 1;
+    }
+    // Live rank read: finished pilots that beat the player's finish time, or
+    // unfinished pilots further along the track than the player right now.
+    racePlayerRank() {
+        const race = this.activeRace;
+        if (!race)
+            return 4;
+        let aheadCount = 0;
+        for (const racer of race.racers) {
+            if (racer.raceFinished || racer.raceGateIndex > this.save.player.raceGateIndex)
+                aheadCount += 1;
+        }
+        return aheadCount + 1;
+    }
+    finishRace() {
+        const race = this.activeRace;
+        if (!race)
+            return;
+        // Anyone already across the line beat the player; everyone else is behind.
+        const rank = 1 + race.racers.filter((racer) => racer.raceFinished).length;
+        const payout = racePayout(race.course, rank);
+        this.save.player.credits += payout;
+        const finishTime = this.save.world.time - (race.playerStartTime ?? this.save.world.time);
+        const quest = getQuest(this.save, RACE_QUEST_ID);
+        if (quest) {
+            quest.stepId = 'complete';
+            quest.flags.finishTime = finishTime;
+            quest.flags.rank = rank;
+            quest.completedAt = this.save.world.time;
+        }
+        race.state = 'finished';
+        this.endRaceField();
+        this.save.world.raceRecords[race.course.id] = { rank, time: finishTime, at: this.save.world.time, active: false };
+        this.ui.pushEvent(t('{course} FINISHED · {rank} · {amount}', { course: race.course.title.toUpperCase(), rank: raceRankLabel(rank), amount: `${payout >= 0 ? '+' : ''}${formatCredits(payout)}` }), payout >= 0 ? 'success' : 'danger', 8000);
+        this.audio.play(payout >= 0 ? 'success' : 'warning', 1.1);
+        saveGame(this.save);
+    }
+    failRace(message) {
+        const race = this.activeRace;
+        if (!race || race.state === 'finished' || race.state === 'failed')
+            return;
+        race.state = 'failed';
+        this.endRaceField();
+        // The board clears the live entry and the quest record closes, so a
+        // reload can't resurrect a forfeit ticket (see restoreActiveRace).
+        const record = this.save.world.raceRecords[race.course.id];
+        if (record?.active)
+            this.save.world.raceRecords[race.course.id] = { ...record, active: false, failed: true, at: this.save.world.time };
+        const quest = getQuest(this.save, RACE_QUEST_ID);
+        if (quest && quest.completedAt === undefined && quest.stepId !== 'complete')
+            quest.completedAt = this.save.world.time;
+        this.ui.pushEvent(message, 'danger', 6000);
+        this.audio.play('warning', 1.0);
+        saveGame(this.save);
+    }
+    // Despawn racers with warp streaks and drop the gate markers.
+    endRaceField() {
+        const race = this.activeRace;
+        this.renderer.clearRaceGates();
+        if (race?.racers?.length) {
+            for (const racer of race.racers) {
+                this.renderer.spawnHyperdriveStreak?.(racer.position, racer.velocity, paletteForFaction(racer.faction, false).engine);
+            }
+        }
+        this.ships = this.ships.filter((ship) => !ship.race);
+        this.activeRace = null;
+        delete this.save.player.raceGateIndex;
+        delete this.save.player.raceFinishTime;
+    }
+    // A paid-but-unraced entry survives a reload: rebuild the travel leg from
+    // the persisted quest flags. Mid-race reloads downgrade to travel — grid,
+    // racers and gate markers rebuild when the pilot re-reaches Gate 1.
+    restoreActiveRace() {
+        const quest = getQuest(this.save, RACE_QUEST_ID);
+        if (!quest || quest.completedAt !== undefined || !quest.flags.paid || quest.stepId !== 'travel')
+            return;
+        const course = generateRaceCourse(quest.flags.courseId, this.save.world.seed);
+        if (!course)
+            return;
+        this.activeRace = {
+            state: 'travel',
+            course,
+            racers: [],
+            startedAt: 0,
+            playerStartTime: undefined,
+            playerRank: 4,
+            lastCountdown: 99,
+            deadline: quest.flags.deadline ?? (this.save.world.time + course.deadlineSeconds),
+        };
+        // Keep the board consistent: an open ticket always reads as live so
+        // the offer stays hidden until this entry resolves.
+        if (!this.save.world.raceRecords[course.id]?.active)
+            this.save.world.raceRecords[course.id] = { active: true };
+    }
+    // Cockpit race telemetry for the own-ship monitor strip. One small object
+    // per HUD tick (~24 Hz) — cheap next to the rest of buildHudModel.
+    raceHud() {
+        const race = this.activeRace;
+        if (!race || race.state === 'finished' || race.state === 'failed')
+            return undefined;
+        const player = this.save.player;
+        const course = race.course;
+        if (race.state === 'travel') {
+            const gate = course.gates[0].position;
+            return {
+                phase: 'travel',
+                title: course.title,
+                distance: Math.round(Math.hypot(gate[0] - player.position[0], gate[1] - player.position[1], gate[2] - player.position[2])),
+            };
+        }
+        if (race.state === 'countdown') {
+            return { phase: 'countdown', title: course.title, seconds: Math.max(1, Math.ceil(race.startedAt - this.save.world.time)) };
+        }
+        return {
+            phase: 'running',
+            title: course.title,
+            gate: Math.min(player.raceGateIndex + 1, course.gates.length),
+            gateCount: course.gates.length,
+            rankLabel: raceRankLabel(this.racePlayerRank()),
+            time: Math.max(0, this.save.world.time - (race.playerStartTime ?? this.save.world.time)),
+        };
     }
     updatePlayer(dt, actions) {
         const stats = this.playerStats();
@@ -1667,9 +1880,17 @@ export class GameSession {
         position.addScaledVector(velocity, dt);
         this.resolvePlayerCollisions(position, velocity);
         const pp = this.save.player.position;
-        pp[0] = position.x; pp[1] = position.y; pp[2] = position.z;
-        const pv = this.save.player.velocity;
-        pv[0] = velocity.x; pv[1] = velocity.y; pv[2] = velocity.z;
+        if (Number.isFinite(position.x) && Number.isFinite(position.y) && Number.isFinite(position.z)) {
+            pp[0] = position.x; pp[1] = position.y; pp[2] = position.z;
+            const pv = this.save.player.velocity;
+            pv[0] = velocity.x; pv[1] = velocity.y; pv[2] = velocity.z;
+        }
+        else {
+            // Belt-and-braces for the guard above: hold last known good state
+            // instead of ever committing non-finite transforms to the save.
+            position.set(pp[0], pp[1], pp[2]);
+            velocity.set(0, 0, 0);
+        }
         quatTupleInto(this.save.player.rotation, orientation);
         const pa = this.save.player.angularVelocity;
         pa[0] = angularVelocity.x; pa[1] = angularVelocity.y; pa[2] = angularVelocity.z;
@@ -1729,6 +1950,11 @@ export class GameSession {
         const shipQuatInv = this.collisionShipQuatInv.copy(shipQuat).invert();
         const contact = this.tmpCollisionContact ?? (this.tmpCollisionContact = { x: 0, y: 0, z: 0, push: 0 });
         const resolveContact = (label) => {
+            // Degenerate contacts (a spawn buried deep in a rock, zero-length
+            // normals) used to poison position/velocity with NaN and take the
+            // whole sim down with it. Skip instead of solve.
+            if (!Number.isFinite(contact.x) || !Number.isFinite(contact.y) || !Number.isFinite(contact.z) || !Number.isFinite(contact.push))
+                return;
             position.x += contact.x * contact.push;
             position.y += contact.y * contact.push;
             position.z += contact.z * contact.push;
@@ -2801,6 +3027,11 @@ export class GameSession {
         const playerPosition = vec(this.save.player.position, this.tmpShipPlayer);
         for (const ship of this.ships) {
             if (ship.hull <= 0)
+                continue;
+            // Race pilots are kinematic props of an active race: updateRaceRacer
+            // drives them gate-to-gate, so the AI/collision/chatter stack must
+            // not touch them (a trade AI would fly them off to a port mid-race).
+            if (ship.race)
                 continue;
             ship.lifetime += dt;
             ship.fireCooldown -= dt;
@@ -4313,6 +4544,10 @@ export class GameSession {
         // a fast fighter still takes the ram), and `sign` flips the normal for
         // the far side so each ship's recoil points away from the other.
         const apply = (posArr, velArr, otherVel, vol, otherVol, sign) => {
+            // Degenerate contacts (deep spawn overlaps, zero normals) used to
+            // write NaN straight into live tuples and kill the sim.
+            if (!Number.isFinite(contact.x) || !Number.isFinite(contact.y) || !Number.isFinite(contact.z) || !Number.isFinite(contact.push))
+                return 0;
             const share = otherVol / (vol + otherVol);
             const nx = contact.x * sign;
             const ny = contact.y * sign;
@@ -4339,6 +4574,10 @@ export class GameSession {
         for (let i = 0; i < ships.length; i += 1) {
             const ship = ships[i];
             if (ship.hull <= 0 || ship.poweredDown)
+                continue;
+            // Race pilots are kinematic props on a rail: they neither push the
+            // player nor each other, and grid slots never overlap hulls.
+            if (ship.race)
                 continue;
             const shipExtents = this.npcHullExtents(ship);
             const shipVolume = shipExtents[0] * shipExtents[1] * shipExtents[2];
@@ -4379,7 +4618,7 @@ export class GameSession {
             shipPos.set(ship.position[0], ship.position[1], ship.position[2]);
             for (let j = i + 1; j < ships.length; j += 1) {
                 const other = ships[j];
-                if (other.hull <= 0 || other.poweredDown)
+                if (other.hull <= 0 || other.poweredDown || other.race)
                     continue;
                 const otherExtents = this.npcHullExtents(other);
                 const otherVolume = otherExtents[0] * otherExtents[1] * otherExtents[2];
@@ -5194,6 +5433,10 @@ export class GameSession {
     updateDynamicEncounters() {
         // The combat simulator drives its own roster; ambient traffic stays out.
         if (this.arena)
+            return;
+        // A live race owns the zone: no pirate ambushes stack onto the parcours
+        // (house rule — the run stays a test of flying, not of guns).
+        if (this.activeRace)
             return;
         // A standoff pauses the beam clock: no second ambush while the player
         // is mid-deal. This runs before the nextEncounterAt gate and the
@@ -6886,11 +7129,93 @@ export class GameSession {
         const dock = this.save.player.dockedAt;
         if (!dock)
             return;
+        if (missionId?.startsWith?.('race-'))
+            return this.acceptRace(missionId.slice(5));
         const result = acceptMission(this.save, dock, missionId);
         this.ui.showToast(result.message, result.ok ? 'success' : 'warning', result.ok ? 4300 : 3200);
         this.audio.play(result.ok ? 'success' : 'warning', 0.7);
         this.ui.refreshDock(this.save);
         saveGame(this.save);
+    }
+    acceptRace(courseId) {
+        if (this.activeRace && this.activeRace.state !== 'finished' && this.activeRace.state !== 'failed') {
+            this.ui.showToast(t('You already have a race entry on the books.'), 'warning');
+            return;
+        }
+        const course = generateRaceCourse(courseId, this.save.world.seed);
+        if (!course)
+            return;
+        if (this.save.player.credits < course.entryFee) {
+            this.ui.showToast(t('Not enough credits for the race entry.'), 'warning');
+            return;
+        }
+        this.save.player.credits -= course.entryFee;
+        startQuest(this.save, RACE_QUEST_ID, this.save.world.time);
+        setStep(this.save, RACE_QUEST_ID, 'travel');
+        setFlag(this.save, RACE_QUEST_ID, 'courseId', courseId);
+        setFlag(this.save, RACE_QUEST_ID, 'paid', true);
+        setFlag(this.save, RACE_QUEST_ID, 'deadline', this.save.world.time + course.deadlineSeconds);
+        // The board marks the ticket live: hides the offer until it resolves
+        // and lets restoreActiveRace recognize an open entry after a reload.
+        this.save.world.raceRecords[course.id] = { active: true };
+        this.activeRace = { state: 'travel', course, racers: [], startedAt: 0, playerStartTime: undefined, playerRank: 4, lastCountdown: 99, deadline: this.save.world.time + course.deadlineSeconds };
+        this.ui.showToast(t('{course} entry paid. Fly to the {zone} and line up at the marker.', { course: course.title, zone: LOCATIONS[course.zone].name.toUpperCase() }), 'success', 6200);
+        this.save.player.navTargetId = course.zone;
+        this.ui.refreshDock(this.save);
+        saveGame(this.save);
+    }
+    // Grid start: everyone lines up behind Gate 1 facing through it; the
+    // countdown holds velocity at zero until the lights go green.
+    startRaceAt(course) {
+        const player = this.save.player;
+        const gate0 = course.gates[0];
+        const zonePos = vec(LOCATIONS[course.zone].position);
+        const gatePos = vec(gate0.position);
+        const outward = gatePos.clone().sub(zonePos).normalize();
+        const start = gatePos.clone().addScaledVector(outward, -(gate0.radius * 1.8));
+        // Player holds a laterally offset slot; racers take the wing positions
+        // (see createRaceRacers). Slots must never overlap hull envelopes.
+        // Perpendicular in the horizontal plane: outward × up.
+        const side = new THREE.Vector3().crossVectors(outward, new THREE.Vector3(0, 1, 0));
+        if (side.lengthSq() < 1e-8)
+            side.set(1, 0, 0);
+        start.addScaledVector(side.normalize(), 24);
+        // Gates thread the rock field, so grid slots can land inside a piece:
+        // push out to guaranteed obstacle clearance before pinning the ship
+        // (a buried spawn used to produce a degenerate collision contact).
+        this.ensurePlayerEntryClearance(start, course.zone, outward);
+        player.dockedAt = undefined;
+        player.position = [start.x, start.y + 12, start.z];
+        player.velocity = [0, 0, 0];
+        player.angularVelocity = [0, 0, 0];
+        player.throttle = 0;
+        const towardGate = gatePos.clone().sub(start).normalize();
+        player.rotation = quatTuple(this.tmpQ.setFromUnitVectors(FORWARD, towardGate));
+        player.currentTargetId = undefined;
+        player.raceGateIndex = 0;
+        this.resetPlayerInterpolation(true);
+        this.ships = [];
+        this.projectiles = [];
+        this.pickups = [];
+        const racers = createRaceRacers(course, this.save.world.seed, this.save.world.time);
+        for (const racer of racers)
+            this.ships.push(racer);
+        Object.assign(this.activeRace, {
+            state: 'countdown',
+            startedAt: this.save.world.time + 4,
+            playerStartTime: undefined,
+            playerRank: 4,
+            lastCountdown: 99,
+            racers,
+        });
+        this.autopilot = false;
+        this.afterburning = false;
+        this.renderer.setCockpitVisible(true);
+        this.renderer.syncRaceGates(course.gates, 0, LOCATIONS[course.zone].position);
+        this.audio.setStationMode(false);
+        this.ui.hideDock();
+        this.ui.showHud();
+        this.ui.pushEvent(t('{course} · FOUR SHIPS · PASS ALL {count} GATES', { course: course.title.toUpperCase(), count: course.gates.length }), 'info', 6200);
     }
     repair() {
         const cost = repairCost(this.save.player);
@@ -7137,6 +7462,11 @@ export class GameSession {
         this.renderer.syncProjectiles(this.projectiles, this.projStore, alpha);
         this.renderer.syncPickups(this.pickups, this.pickupStore, alpha);
         this.renderer.render();
+        // The bracket/edge-pointer transform tracks the camera every frame;
+        // leaving it on the 42ms HUD cadence made it swim around the target
+        // while steering (render 60fps vs HUD ~24fps sampling).
+        if (!this.save.player.dockedAt && !this.ui.isModalOpen)
+            this.updateTargetMarkerLive();
         if (!this.save.player.dockedAt && now - this.lastHudUpdate > 42) {
             this.lastHudUpdate = now;
             this.ui.updateHud(this.buildHudModel());
@@ -7359,6 +7689,7 @@ export class GameSession {
             ownMonitorStatus: this.save.world.time < this.ownMonitorStatusUntil ? this.ownMonitorStatus : undefined,
             standoff,
             patrolReply: this.patrolReplyActive(),
+            race: this.raceHud(),
             // Radar ring calibration as fractions of the outer (radarRange) ring:
             // [dark-visibility, scan range, full horizon]. The inner ring tracks
             // the pilot's own signature — full range while broadcasting, and the

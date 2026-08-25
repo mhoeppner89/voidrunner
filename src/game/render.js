@@ -7,6 +7,8 @@ import { loadGlb } from './glbLoader.js';
 const tupleToVector = (tuple, out = new THREE.Vector3()) => out.set(tuple[0], tuple[1], tuple[2]);
 const NEG_Z = new THREE.Vector3(0, 0, -1);
 const UP_AXIS = new THREE.Vector3(0, 1, 0);
+const FORWARD_AXIS = new THREE.Vector3(0, 0, 1);
+const tmpGateAxis = new THREE.Vector3();
 const cssHex = (value) => `#${value.toString(16).padStart(6, '0')}`;
 // Cockpit sprite scale: idle is held slightly zoomed-in so the frame still
 // fills the view when it relaxes to COCKPIT_ZOOM_BURN under afterburner.
@@ -84,6 +86,9 @@ export class SpaceRenderer {
     shipMeshes = new Map();
     projectileMeshes = new Map();
     pickupMeshes = new Map();
+    raceGateRoot = null;
+    raceGateMeshes = [];
+    raceActiveGate;
     shipMeshCount = 0;
     // GLB ship hulls: per-variant cached model (or null when the load failed),
     // plus the in-flight promises so concurrent spawns share one fetch.
@@ -2095,6 +2100,61 @@ export class SpaceRenderer {
             mesh.rotation.y += 0.024;
         });
     }
+    // Race gates: one ring per checkpoint, pooled and reused across races.
+    // Static geometry — syncRaceGates only places/tints them; updateWorld
+    // pulses the active ring so the next checkpoint reads at race speed.
+    syncRaceGates(gates, activeIndex, center) {
+        if (!this.raceGateRoot) {
+            this.raceGateRoot = new THREE.Group();
+            this.scene.add(this.raceGateRoot);
+        }
+        while (this.raceGateMeshes.length < gates.length) {
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.055, 10, 40), new THREE.MeshBasicMaterial({ color: 0x53e6c8, transparent: true, opacity: 0.9 }));
+            const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.radialTexture('#53e6c8', '#123a33'), transparent: true, opacity: 0.34, blending: THREE.AdditiveBlending, depthWrite: false }));
+            const group = new THREE.Group();
+            group.add(ring);
+            group.add(glow);
+            this.raceGateRoot.add(group);
+            this.raceGateMeshes.push(group);
+        }
+        gates.forEach((gate, index) => {
+            const group = this.raceGateMeshes[index];
+            group.visible = true;
+            group.position.set(gate.position[0], gate.position[1], gate.position[2]);
+            // Face along the track: gate N aims from its predecessor (the first
+            // gate aims away from the zone center).
+            const prev = index > 0 ? gates[index - 1].position : center;
+            const dx = gate.position[0] - prev[0];
+            const dy = gate.position[1] - prev[1];
+            const dz = gate.position[2] - prev[2];
+            const length = Math.hypot(dx, dy, dz) || 1;
+            group.quaternion.setFromUnitVectors(FORWARD_AXIS, tmpGateAxis.set(dx / length, dy / length, dz / length));
+            group.scale.setScalar(gate.radius);
+            group.userData.baseRadius = gate.radius;
+            const [ring, glow] = group.children;
+            if (index === activeIndex) {
+                ring.material.color.setHex(0x53e6c8);
+                ring.material.opacity = 0.95;
+                glow.material.opacity = 0.42;
+            }
+            else if (index < activeIndex) {
+                ring.material.color.setHex(0x27514a);
+                ring.material.opacity = 0.35;
+                glow.material.opacity = 0.08;
+            }
+            else {
+                ring.material.color.setHex(0x3f9d8d);
+                ring.material.opacity = 0.6;
+                glow.material.opacity = 0.22;
+            }
+        });
+        this.raceActiveGate = activeIndex;
+    }
+    clearRaceGates() {
+        this.raceActiveGate = undefined;
+        for (const group of this.raceGateMeshes ?? [])
+            group.visible = false;
+    }
     setTarget(targetId, asteroidId, wreckId, locationId, pickupId) {
         this.targetId = targetId;
         this.selectedAsteroidId = asteroidId;
@@ -2396,6 +2456,12 @@ export class SpaceRenderer {
         const helixRotor = this.locationMeshes.get('helix')?.getObjectByName('rotor');
         if (helixRotor)
             helixRotor.rotation.x += dt * 0.16;
+        // The active race gate breathes so it reads as "next" at speed.
+        if (this.raceActiveGate !== undefined) {
+            const active = this.raceGateMeshes[this.raceActiveGate];
+            if (active?.visible)
+                active.children[0].rotation.z += dt * 1.6;
+        }
         const vesper = this.locationMeshes.get('vesper');
         if (vesper) {
             const surface = vesper.getObjectByName('surface');

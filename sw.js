@@ -16,6 +16,7 @@ self.addEventListener('install', (event) => {
     './src/game/missions.js',
     './src/game/pilots.js',
     './src/game/random.js',
+    './src/game/racing.js',
     './src/game/render.js',
     './src/game/save.js',
     './src/game/shipStats.js',

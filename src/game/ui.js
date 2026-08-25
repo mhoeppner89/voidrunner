@@ -343,6 +343,7 @@ export class GameUI {
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="${t('Own ship status display; tap to open ship menu')}">
             <div class="screen-heading"><span>${t('STATUS')}</span><b id="own-ship-name">WAYFARER</b></div>
             <div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
+            <div class="screen-race-strip" id="screen-race-strip"><span id="screen-race-label"></span><b id="screen-race-value"></b></div>
             <div class="screen-ship-layout"><div class="screen-flight"><div><span>${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div><div><span>${t('HOLD')}</span><b id="screen-own-cargo">0.0</b><small id="screen-own-cargo-cap">/32</small></div></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ARMOR')}</span><i><b id="screen-own-armor"></b></i><em id="screen-own-armor-value">100</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">100</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="${t('Radar display; tap to open navigation map')}">
@@ -1468,6 +1469,36 @@ export class GameUI {
                 const timer = this.el('#patrol-reply-timer');
                 if (timer)
                     timer.textContent = String(model.patrolReply.seconds);
+            }
+        }
+        // Race strip: compact circuit telemetry on the own-ship monitor while
+        // an entry is live — travel leg, grid countdown, or gate/rank/clock.
+        const raceStrip = this.el('#screen-race-strip');
+        if (raceStrip) {
+            const race = model.race;
+            raceStrip.classList.toggle('is-visible', Boolean(race));
+            raceStrip.dataset.phase = race?.phase ?? '';
+            if (race) {
+                const label = this.el('#screen-race-label');
+                const value = this.el('#screen-race-value');
+                const clock = (seconds) => {
+                    const total = Math.max(0, Math.floor(seconds));
+                    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+                };
+                if (label && value) {
+                    if (race.phase === 'travel') {
+                        label.textContent = t('{course} · TO GATE 1', { course: race.title.toUpperCase() });
+                        value.textContent = `${Math.round(race.distance).toLocaleString('en-US')} km`;
+                    }
+                    else if (race.phase === 'countdown') {
+                        label.textContent = t('{course} · GRID', { course: race.title.toUpperCase() });
+                        value.textContent = t('T-{seconds}', { seconds: race.seconds });
+                    }
+                    else {
+                        label.textContent = t('{course} · GATE {current}/{total}', { course: race.title.toUpperCase(), current: race.gate, total: race.gateCount });
+                        value.textContent = `${race.rankLabel} · ${clock(race.time)}`;
+                    }
+                }
             }
         }
         setText('#hud-zone', model.zone.toUpperCase());
