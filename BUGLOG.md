@@ -366,6 +366,15 @@ Verification probe: `.freebuff/probe-round10-verify.mjs` — **8/8 checks pass**
 **CSS family verification (same round):** re-ran the full dock matrix (`probe-bughunt2.mjs`) at 844×390 DE+EN — findings vs the round-2 baseline: market-commodities **40 → 1**, bar-missions/guilds **33 → 1**, market-equipment 5 → 2, market-shipyard 10 → 1, concourse/market-floor **3 → 0**. The one remaining finding per state is the by-design scrollable page (`dock-content` v-clip), now with visible themed scrollbars. BUG-14 measured directly: `.market-layout` 841/841 (was 880 overflow) — root cause was the table as a flex/grid item with `min-width: auto`; `min-width: 0` cures it (same disease family as BUG-01). BUG-05's map-card change is code-verified only (needs a ≤520px-height run); BUG-08 is code-verified only (portrait sits behind the rotate gate).
 
 
+## Post-fix re-measurement (round 10, agent B) — BUG-01/02/20/21
+
+`.freebuff/probe-postfix-strips.mjs` at 844×390 + 1280×720, after both agents' fixes:
+
+- **BUG-01 own-monitor clip: gone.** 169/167 (phone, was 218>167), 256/252 (desktop, was 315>252 with a 447 spike).
+- **BUG-21 race strip: gone.** Label 92/92 (was 146>106), value 53/53 (was 53>39); desktop 158/158 and 73/73 — gate counter, rank and clock all fully visible during a running race.
+- **BUG-02 comms pseudos: gone.** During a German story line the FUNKLOG hint is suppressed (`content: "none"`) and "CONTINUE ▸" fits on one line (56.4px phone / 72px desktop) — no letter-stacks.
+- **BUG-20 standoff strip:** same strip family, fixed in the same commit (2e3d537); direct re-measurement pending a live pirate encounter (none spawned in the race session — seeded standoff needs `hostile && hull > 0`, career traffic at the belt was neutral).
+
 ## Suggested next rounds
 
 1. Agent B (next): BUG-18 (race briefing i18n — missions.js + i18n-de.js), then the CSS family (BUG-05/06/08/10/11/12/14/15/16/17) once Agent A's style.css sections settle; re-measure BUG-20/21 strips post-BUG-01-fix.
