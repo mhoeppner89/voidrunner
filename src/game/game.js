@@ -5610,7 +5610,11 @@ export class GameSession {
         this.ui.pushEvent(t('{name} sends their thanks — {credits} tip wired.', { name: victim.name, credits: formatCredits(tip) }), 'success', 4200);
         this.audio.play('success');
     }
-    destroyShip(ship, attackerId, position) {
+    // `position` defaults to the dying ship's own coordinates: mortar splash and
+    // burn ticks call damageShip without a hit position, so a killing blow used
+    // to hand `undefined` to spawnPickup's vec() — a TypeError inside the frame
+    // guard that silently ate the combat drop and aborted the sim step.
+    destroyShip(ship, attackerId, position = ship.position) {
         ship.hull = 0;
         this.resolveHyperdriveIntercept(ship);
         this.renderer.spawnExplosion(ship.position, ship.hostile, ship.role === 'trader' ? 1.5 : 1);

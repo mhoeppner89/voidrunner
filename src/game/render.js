@@ -1090,55 +1090,6 @@ export class SpaceRenderer {
         this.createHelixStation();
         this.createRookStation();
     }
-    createCloudTexture(seed) {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 128;
-        const context = canvas.getContext('2d');
-        const rng = seededRandom(`${seed}:clouds`);
-        context.clearRect(0, 0, 256, 128);
-        // Latitude-driven storm ribbons: 3 bands at varying latitudes read as
-        // real atmospheric circulation. Wisps are FEWER and more distinct than
-        // the old haze — overlapping soft blobs at ~60% coverage washed the
-        // whole disc pale; distinct shapes at ~35% read as weather.
-        const bands = [
-            { y: 36, h: 18, count: 11 },
-            { y: 64, h: 22, count: 14 },
-            { y: 96, h: 16, count: 10 },
-        ];
-        for (const band of bands) {
-            for (let i = 0; i < band.count; i += 1) {
-                const cx = rng() * 256;
-                const cy = band.y + (rng() - 0.5) * band.h;
-                const rx = 14 + rng() * 26;
-                const ry = 4 + rng() * 6;
-                const alpha = 0.3 + rng() * 0.34;
-                const gradient = context.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rx, ry));
-                gradient.addColorStop(0, `rgba(255, 255, 255, ${alpha.toFixed(3)})`);
-                gradient.addColorStop(0.55, `rgba(255, 255, 255, ${(alpha * 0.4).toFixed(3)})`);
-                gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                context.fillStyle = gradient;
-                context.fillRect(cx - rx, cy - ry, rx * 2, ry * 2);
-            }
-        }
-        // Plus a few stray wisps between bands.
-        for (let i = 0; i < 9; i += 1) {
-            const x = rng() * 256;
-            const y = rng() * 128;
-            const r = 6 + rng() * 12;
-            const gradient = context.createRadialGradient(x, y, 0, x, y, r);
-            gradient.addColorStop(0, `rgba(255, 255, 255, ${(0.1 + rng() * 0.16).toFixed(3)})`);
-            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            context.fillStyle = gradient;
-            context.fillRect(x - r, y - r, r * 2, r * 2);
-        }
-        this.opaqueRgbUnderAlpha(context, canvas.width, canvas.height);
-        const texture = this.configurePixelTexture(new THREE.CanvasTexture(canvas));
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(2, 1);
-        return texture;
-    }
     // A BackSide atmosphere shell with a near-field dome fade. When the camera
     // is inside the shell, the shell surface right around it glows (the sky
     // dome); that dome would cut off abruptly the instant the camera crossed
@@ -1244,50 +1195,11 @@ export class SpaceRenderer {
         }));
         surface.name = 'surface';
         group.add(surface);
-        const clouds = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.018, 128, 80), new THREE.MeshBasicMaterial({
-            map: (() => {
-                const map = this.createCloudTexture(id);
-                map.magFilter = THREE.LinearFilter;
-                map.minFilter = THREE.LinearMipmapLinearFilter;
-                map.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
-                return map;
-            })(),
-            // Azure's clouds stay white (they ride a blue atmosphere); the
-            // dry worlds take their cloud tint from the atmosphere color.
-            color: id === 'azure' ? 0xf4f9fd : atmosphere,
-            transparent: true,
-            opacity: id === 'azure' ? 0.11 : 0.40,
-            depthWrite: false,
-            fog: false,
-        }));
-        clouds.name = 'clouds';
-        group.add(clouds);
-        // Pseudo-fluid weather: each cloud deck drifts at its own rate, so
-        // banded texture shears against banded texture — the same trick real
-        // gas giants play with zonal jets. Azure gets a second, counter-
-        // drifting high deck for a visible two-layer circulation.
-        if (!this.cloudLayers)
-            this.cloudLayers = [];
-        this.cloudLayers.push({ mesh: clouds, rate: id === 'azure' ? 0.0085 : 0.005 });
-        if (id === 'azure') {
-            const highDeck = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.034, 96, 60), new THREE.MeshBasicMaterial({
-                map: (() => {
-                    const map = this.createCloudTexture(`${id}-high`);
-                    map.magFilter = THREE.LinearFilter;
-                    map.minFilter = THREE.LinearMipmapLinearFilter;
-                    map.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
-                    return map;
-                })(),
-                color: 0xeaf4fb,
-                transparent: true,
-                opacity: 0.13,
-                depthWrite: false,
-                fog: false,
-            }));
-            highDeck.name = 'clouds-high';
-            group.add(highDeck);
-            this.cloudLayers.push({ mesh: highDeck, rate: -0.0135 });
-        }
+        // Cloud decks scrapped (0.7.7b): Azure's two layers rendered at 0.11/0.13
+        // opacity — invisible at play distances — and the dry worlds' 0.40 deck
+        // washed the disc for two extra transparent sphere passes + per-frame
+        // rotation updates on weak phones. The atmosphere halo/haze shells below
+        // carry the limb depth cue instead.
         // A high, thin haze layer separates the opaque weather deck from the
         // atmosphere shell. It gives the planet an extra depth cue when the
         // camera is close to the limb without adding another raycast target.
@@ -1376,6 +1288,31 @@ export class SpaceRenderer {
                     alpha *= smoothstep(0.0, 0.035, t) * (1.0 - smoothstep(0.955, 1.0, t));
                     if (alpha < 0.004)
                         discard;
+                    // Analytic planet occlusion: the depth buffer cannot separate
+                    // the ring plane from the surface at orbital range (near
+                    // 0.08 / far 2e6 leaves kilometre-scale precision out there,
+                    // so the far half of the ring passed the depth test and drew
+                    // straight across the disc). Ray-test the camera→fragment
+                    // segment against the planet sphere instead — exact at any
+                    // distance, with a soft fade at the grazing limb so the cut
+                    // doesn't alias. cameraPosition is a built-in uniform.
+                    vec3 rayDir = vWorldPosition - cameraPosition;
+                    float rayLen = length(rayDir);
+                    rayDir /= rayLen;
+                    vec3 oc = cameraPosition - uPlanetCenter;
+                    float b = dot(oc, rayDir);
+                    float c = dot(oc, oc) - uPlanetRadius * uPlanetRadius;
+                    float disc = b * b - c;
+                    if (disc > 0.0) {
+                        float tHit = -b - sqrt(disc);
+                        // tHit in (0, rayLen) → the surface stands between the
+                        // camera and this fragment. Fade over a view-distance-
+                        // scaled band so the limb crossing stays smooth.
+                        float fade = max(uPlanetRadius * 0.02, rayLen * 0.0015);
+                        alpha *= smoothstep(-fade, fade, rayLen - tHit);
+                        if (alpha < 0.004)
+                            discard;
+                    }
                     // Planet shadow: on the anti-sun side of the center, inside
                     // the shadow cylinder, the rings drop to 18% light.
                     vec3 sunDir = normalize(uSunDirection);
@@ -2836,12 +2773,6 @@ export class SpaceRenderer {
         this.skyTime += dt;
         if (this.starShimmer)
             this.starShimmer.opacity = 0.42 + Math.sin(this.skyTime * 2.4) * 0.14;
-        // Cloud decks shear past each other at their own zonal rates — the
-        // cheap, allocation-free stand-in for a fluid advection pass.
-        if (this.cloudLayers) {
-            for (const layer of this.cloudLayers)
-                layer.mesh.rotation.y += layer.rate * dt;
-        }
         this.asteroids.forEach((node) => {
             if (!node.moving)
                 return;
@@ -2887,20 +2818,14 @@ export class SpaceRenderer {
         const vesper = this.locationMeshes.get('vesper');
         if (vesper) {
             const surface = vesper.getObjectByName('surface');
-            const clouds = vesper.getObjectByName('clouds');
             if (surface)
                 surface.rotation.y += dt * 0.012;
-            if (clouds)
-                clouds.rotation.y += dt * 0.018;
         }
         const azure = this.locationMeshes.get('azure');
         if (azure) {
             const surface = azure.getObjectByName('surface');
-            const clouds = azure.getObjectByName('clouds');
             if (surface)
                 surface.rotation.y += dt * 0.009;
-            if (clouds)
-                clouds.rotation.y += dt * 0.016;
         }
         if (this.instanceRoots.get('mourning-line')?.visible)
             this.updateWreckNodeInstances(dt);

@@ -2768,7 +2768,13 @@ button.compact {
   position: relative;
   z-index: 1;
   display: grid;
-  /* Outline on top, bars below: the bars span the full monitor width. */
+  /* Outline on top, bars below: the bars span the full monitor width.
+     The single column is pinned to the monitor's content box — an auto
+     track lets the hull canvas' intrinsic 300px bitmap and long nowrap
+     ticker lines inflate the track past the monitor edge, which silently
+     clipped the right side of the STATUS readouts (ellipsis never fired
+     because the row was as wide as its content). */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
   align-items: stretch;
   gap: 0.22rem;
@@ -2814,14 +2820,21 @@ button.compact {
 }
 
 /* Idle hint: visible only while no transmission is on the bar, so the top
-   edge always advertises the log without competing with live chatter. */
+   edge always advertises the log without competing with live chatter.
+   Both pseudo-elements are flex items: without nowrap + flex-shrink:0 a
+   squeezed bar letter-wraps them into vertical stacks ("CON/TIN/UE ▸"). */
 .comms-bar::before {
   content: "COMMS LOG";
+  flex-shrink: 0;
+  white-space: nowrap;
   font-size: 0.66em;
   letter-spacing: 0.14em;
   color: rgba(122, 200, 220, 0.5);
 }
 
+/* The German override keeps its higher specificity on purpose — the active
+   suppressor below must therefore match it explicitly, or FUNKLOG stays
+   visible during a transmission in the German UI. */
 html[lang="de"] .comms-bar::before {
   content: "FUNKLOG";
 }
@@ -2834,7 +2847,8 @@ html[lang="de"] .comms-bar::before {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
-.comms-bar.active::before {
+.comms-bar.active::before,
+html[lang="de"] .comms-bar.active::before {
   content: none;
 }
 
@@ -2856,6 +2870,8 @@ html[lang="de"] .comms-bar::before {
 
 .comms-bar.story::after {
   content: "CONTINUE ▸";
+  flex-shrink: 0;
+  white-space: nowrap;
   margin-left: 0.55rem;
   padding-left: 0.55rem;
   border-left: 1px solid currentColor;
@@ -3072,8 +3088,13 @@ html[lang="de"] .comms-bar::before {
 
 .comms-row p {
   margin: 0;
+  min-width: 0;
   color: #c9d2cd;
   line-height: 1.4;
+  /* Long unbreakable tokens (callsigns, pasted strings) must wrap like the
+     live bar's .talker-text does — without this a single long word ran the
+     row under the log card's edge, unreachable past the clip. */
+  overflow-wrap: anywhere;
 }
 
 .talker-text {
