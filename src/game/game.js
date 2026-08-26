@@ -738,7 +738,31 @@ const segmentMeshHit = (start, end, obstacle) => {
         return undefined;
     // Cheap reject: the segment must pass within the rock's bounding reach
     // (losRadius is the OBB corner reach, which contains the whole mesh).
-    if (segmentSphereHit(start, end, { x: obstacle.x, y: obstacle.y, z: obstacle.z }, obstacle.losRadius) === undefined)
+    // Use the closest-approach distance, NOT segmentSphereHit: that helper
+    // returns undefined when BOTH endpoints are inside the sphere (both roots
+    // fall outside [0, 1]) — exactly the case once a projectile's step-start
+    // enters the rock's envelope. Treating that as a miss culled every shot
+    // from the moment it entered the bounding reach (~3.4x the visible
+    // surface along a diagonal) and let bolts sail clean through the rock.
+    const ocx = start.x - obstacle.x;
+    const ocy = start.y - obstacle.y;
+    const ocz = start.z - obstacle.z;
+    const sdx = end.x - start.x;
+    const sdy = end.y - start.y;
+    const sdz = end.z - start.z;
+    const segLenSq = sdx * sdx + sdy * sdy + sdz * sdz;
+    let closestSq;
+    if (segLenSq < 1e-12) {
+        closestSq = ocx * ocx + ocy * ocy + ocz * ocz;
+    }
+    else {
+        const tc = Math.max(0, Math.min(1, -(ocx * sdx + ocy * sdy + ocz * sdz) / segLenSq));
+        const ccx = ocx + sdx * tc;
+        const ccy = ocy + sdy * tc;
+        const ccz = ocz + sdz * tc;
+        closestSq = ccx * ccx + ccy * ccy + ccz * ccz;
+    }
+    if (closestSq > obstacle.losRadius * obstacle.losRadius)
         return undefined;
     const box = obstacle.box;
     const qx = box.qx;
@@ -765,8 +789,15 @@ const segmentMeshHit = (start, end, obstacle) => {
     const dy = ey - sy;
     const dz = ez - sz;
     // A projectile starting inside the rock's envelope is already past the
-    // blocker (a muzzle touching rock must not self-hit) — mirrors the OBB test.
-    if (Math.abs(sx) <= box.hx && Math.abs(sy) <= box.hy && Math.abs(sz) <= box.hz)
+    // blocker (a muzzle touching rock must not self-hit). The envelope is the
+    // rock's INSCRIBED sphere (minReach), NOT the oriented box: the box's
+    // corner reach overhangs the visible surface by up to ~2x along diagonals
+    // (half-extents are 0.9x the mesh axes, but hypot(hx,hy,hz) spans the
+    // corners), so a box test declared approaching shots "already past" once
+    // their step-start entered the overhang and let them sail through the
+    // rock. Any point within minReach is provably inside the closed mesh;
+    // points beyond it are still tested against the real surface.
+    if (Number.isFinite(obstacle.minReach) && ocx * ocx + ocy * ocy + ocz * ocz <= obstacle.minReach * obstacle.minReach)
         return undefined;
     let best;
     for (let t = 0; t < indices.length; t += 3) {
@@ -1882,6 +1913,12 @@ export class GameSession {
             this.hyperdriveEncounterAt = null;
             this.hyperdriveFx = 'drop';
             this.hyperdriveFxUntil = this.save.world.time + HYPERDRIVE_FX_DURATION;
+            // A manual break must shed the cruise vector as fast as every other
+            // exit (arrival drop, hyperdrive toggle, intercept): snap to combat
+            // speed, then re-sync the local velocity captured before the break
+            // so the stale cruise vector can't overwrite the snap below.
+            this.snapToCombatSpeed();
+            velocity.copy(vec(this.save.player.velocity));
             this.save.player.throttle = clamp(this.hyperdriveReturnThrottle, 0, 1);
             this.setHyperdriveStatus(t('DISENGAGED · MANUAL INPUT'));
             this.audio.play('hyperDrop');
@@ -5145,10 +5182,12 @@ export class GameSession {
                 let bestT = 2;
                 let hitKind;
                 let hitShip;
-                const obstacleHit = this.firstObstacleHit(sweepFrom, end, projectile.ownerId);
-                if (obstacleHit !== undefined && obstacleHit < bestT) {
-                    bestT = obstacleHit;
+                let hitObstacle;
+                const obstacleResult = this.firstObstacleHitInfo(sweepFrom, end, projectile.ownerId);
+                if (obstacleResult !== undefined && obstacleResult.t < bestT) {
+                    bestT = obstacleResult.t;
                     hitKind = 'obstacle';
+                    hitObstacle = obstacleResult.obstacle;
                 }
                 if (projectile.ownerId !== 'player') {
                     const playerT = segmentSphereHit(sweepFrom, end, playerPos, this.playerCollisionRadius() + (projectile.kind === 'missile' ? 0.8 : 0.25));
@@ -5217,10 +5256,19 @@ export class GameSession {
                             ship.burn = { dps: projectile.burnDps ?? 6, until: this.save.world.time + (projectile.burnSeconds ?? 4), tick: 0.5, attackerId: projectile.ownerId };
                         }
                         this.renderer.spawnExplosion(tuple(hitPosition), false, 1.15);
+                        if (hitKind === 'obstacle' && hitObstacle?.shape === 'asteroid')
+                            this.renderer.spawnRockImpact(tuple(hitPosition), [hitObstacle.x, hitObstacle.y, hitObstacle.z]);
                     }
                     else if (projectile.kind === 'missile') {
                         this.renderer.spawnExplosion(tuple(hitPosition), projectile.faction === 'red-talons', 0.65);
                         this.audio.playAtDirection('explosion', 0.8, playerPosition.distanceTo(hitPosition), localHit.x);
+                    }
+                    else if (hitKind === 'obstacle' && hitObstacle?.shape === 'asteroid') {
+                        // Belt rock: the impact spark PLUS a matte chip/dust
+                        // burst knocked off the surface, and a dry gravel
+                        // crunch instead of the hull-impact crack.
+                        this.renderer.spawnRockImpact(tuple(hitPosition), [hitObstacle.x, hitObstacle.y, hitObstacle.z]);
+                        this.audio.playAtDirection('rock', projectile.kind === 'gauss' ? 0.6 : projectile.kind === 'ripper' || projectile.kind === 'pdc' ? 0.3 : 0.45, playerPosition.distanceTo(hitPosition), localHit.x);
                     }
                     else
                         this.audio.playAtDirection('impact', projectile.kind === 'gauss' ? 0.6 : projectile.kind === 'ripper' || projectile.kind === 'pdc' ? 0.3 : 0.45, playerPosition.distanceTo(hitPosition), localHit.x);
@@ -6676,6 +6724,7 @@ export class GameSession {
                     shape: 'asteroid',
                     meshVerts: collisionMesh.verts,
                     meshIndices: collisionMesh.indices,
+                    minReach: collisionMesh.minReach,
                     box: { hx, hy, hz, qx: q.x, qy: q.y, qz: q.z, qw: q.w },
                 };
             });
@@ -7416,21 +7465,32 @@ export class GameSession {
     lineBlocked(start, end, ignoreId) {
         return this.firstObstacleHit(start, end, ignoreId) !== undefined;
     }
+    // The line-test entry point: returns the nearest obstacle hit's parameter
+    // t along the segment (or undefined). Callers that need to know WHAT was
+    // hit (projectile impact flavour) use firstObstacleHitInfo instead.
     firstObstacleHit(start, end, ignoreId) {
+        return this.firstObstacleHitInfo(start, end, ignoreId)?.t;
+    }
+    firstObstacleHitInfo(start, end, ignoreId) {
         let best;
+        let bestObstacle;
         const test = (obstacle) => {
             if (obstacle.id === ignoreId)
                 return;
             if (obstacle.shape === 'ring') {
                 const hit = this.segmentRingHit(start, end, obstacle);
-                if (hit !== undefined && (best === undefined || hit < best))
+                if (hit !== undefined && (best === undefined || hit < best)) {
                     best = hit;
+                    bestObstacle = obstacle;
+                }
                 return;
             }
             if (obstacle.shape === 'engine') {
                 const hit = this.segmentEngineHit(start, end, obstacle);
-                if (hit !== undefined && (best === undefined || hit < best))
+                if (hit !== undefined && (best === undefined || hit < best)) {
                     best = hit;
+                    bestObstacle = obstacle;
+                }
                 return;
             }
             // Asteroids block line of sight on their ACTUAL surface (the
@@ -7440,14 +7500,18 @@ export class GameSession {
             // rendered shape exactly.
             if (obstacle.shape === 'asteroid') {
                 const hit = segmentMeshHit(start, end, obstacle);
-                if (hit !== undefined && (best === undefined || hit < best))
+                if (hit !== undefined && (best === undefined || hit < best)) {
                     best = hit;
+                    bestObstacle = obstacle;
+                }
                 return;
             }
             if (obstacle.box) {
                 const hit = segmentBoxHit(start, end, obstacle);
-                if (hit !== undefined && (best === undefined || hit < best))
+                if (hit !== undefined && (best === undefined || hit < best)) {
                     best = hit;
+                    bestObstacle = obstacle;
+                }
                 return;
             }
             const sx = start.x - obstacle.x;
@@ -7457,15 +7521,17 @@ export class GameSession {
             if (sx * sx + sy * sy + sz * sz < clearance * clearance)
                 return;
             const hit = segmentSphereHit(start, end, { x: obstacle.x, y: obstacle.y, z: obstacle.z }, obstacle.losRadius);
-            if (hit !== undefined && (best === undefined || hit < best))
+            if (hit !== undefined && (best === undefined || hit < best)) {
                 best = hit;
+                bestObstacle = obstacle;
+            }
         };
         const dock = this.activeDockObstacle();
         if (dock)
             test(dock);
         else
             this.forEachObstacleAlongSegment(start, end, test);
-        return best;
+        return best === undefined ? undefined : { t: best, obstacle: bestObstacle };
     }
     dockCandidate() {
         const locationId = DOCK_LOCATION_IDS.find((id) => id === this.activeInstanceId);

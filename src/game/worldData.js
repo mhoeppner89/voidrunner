@@ -61,12 +61,19 @@ export const asteroidCollisionMesh = (node) => {
         const sz = node.radius * node.scale[2];
         const src = base.positions;
         const verts = new Float32Array(src.length);
+        let minReachSq = Infinity;
         for (let i = 0; i < src.length; i += 3) {
             verts[i] = src[i] * sx;
             verts[i + 1] = src[i + 1] * sy;
             verts[i + 2] = src[i + 2] * sz;
+            const d = verts[i] * verts[i] + verts[i + 1] * verts[i + 1] + verts[i + 2] * verts[i + 2];
+            if (d < minReachSq)
+                minReachSq = d;
         }
-        node._collisionMesh = { verts, indices: base.indices };
+        // minReach is the rock's INSCRIBED sphere: the closest any surface
+        // vertex sits to the center. It is the exact-conservative "inside the
+        // rock" envelope for projectile line tests — see segmentMeshHit.
+        node._collisionMesh = { verts, indices: base.indices, minReach: Math.sqrt(minReachSq) };
     }
     return node._collisionMesh;
 };

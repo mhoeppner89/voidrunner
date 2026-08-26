@@ -548,17 +548,18 @@ export class AudioManager {
         ];
         const arp = arpShapes[step % arpShapes.length];
         const arpLevel = this.musicRange(0.038, 0.052);
+        // A warm rolling arpeggio, not percussive plucks: slow attack, low
+        // filter, capped register — anything with a fast attack up here read
+        // as a "ding" no matter how quiet.
         arp.forEach((midi, i) => this.musicNote({
-            at: now + i * 0.32, midi, type: 'triangle', level: arpLevel,
-            attack: 0.02, decay: this.musicRange(0.75, 1.05), filterFreq: 1600, pan: [-0.4, 0, 0.4, -0.2][i],
+            at: now + i * 0.32, midi: Math.min(midi, 57), type: 'triangle', level: arpLevel,
+            attack: this.musicRange(0.25, 0.4), decay: this.musicRange(1.2, 1.6), filterFreq: 850, pan: [-0.4, 0, 0.4, -0.2][i],
         }));
         const b = bass[step % bass.length];
         this.musicNote({ at: now, midi: b, type: 'sine', level: this.musicRange(0.07, 0.095), attack: 0.1, decay: 1.9, pan: -0.15 });
         if (this.musicChance(0.7))
             this.musicNote({ at: now + 1.1, midi: b + 7, type: 'sine', level: 0.04, attack: 0.1, decay: 0.8, pan: 0.15 });
         this.musicNoise({ at: now + this.musicRange(0.9, 1.3), duration: 0.05, filterType: 'highpass', filterFreq: 5200, level: 0.016, pan: 0.2 });
-        if (this.musicChance(0.4))
-            this.playStationBell(now + this.musicRange(0.5, 1.0));
     }
 
     // Planets: a low drone with warm, sparse pentatonic plucks — each note
@@ -566,21 +567,24 @@ export class AudioManager {
     // gentle attack; distinct from open space's big pads and the station's
     // busy arpeggios.
     // Randomized note selection from a 7-note scale with varied note counts
-    // per bar (3-6 notes) and occasional octave shifts so the wind never
-    // repeats the same phrase.
+    // per bar (3-6 notes) so the wind never repeats the same phrase. The
+    // plucks stay in the low-mid register with a slow attack and warm filter:
+    // an earlier version hit the D4/E4 range with a near-instant attack and
+    // short decay, so every bar rang a bright repetitive "ding".
     playPlanetBar(now, step) {
-        const scale = [45, 48, 43, 41, 38, 50, 52]; // A3 C4 G3 F3 D3 D4 E4
+        const scale = [38, 41, 43, 45, 46, 48, 50]; // D3 F3 G3 A3 Bb3 C4 D4
         const noteCount = 3 + Math.floor(this.musicRng() * 4); // 3-6 notes
         const pans = [-0.5, 0.2, 0.5, -0.3, 0.1, 0.35, -0.15];
         for (let i = 0; i < noteCount; i += 1) {
             let midi = scale[Math.floor(this.musicRng() * scale.length)];
-            // Occasional octave up for shimmer.
-            if (this.musicChance(0.18))
-                midi += 12;
+            // Rare, capped octave shimmer — never above G4 so the wind never
+            // spikes into a bell-like ring.
+            if (this.musicChance(0.08))
+                midi = Math.min(midi + 12, 55);
             this.musicNote({
-                at: now + i * this.musicRange(0.35, 0.55),
-                midi, type: 'triangle', level: this.musicRange(0.03, 0.05),
-                attack: 0.02, decay: this.musicRange(0.8, 1.3), filterFreq: 1500,
+                at: now + i * this.musicRange(0.4, 0.6),
+                midi, type: 'triangle', level: this.musicRange(0.028, 0.042),
+                attack: this.musicRange(0.25, 0.45), decay: this.musicRange(1.5, 2.2), filterFreq: 900,
                 pan: pans[i % pans.length],
             });
         }
@@ -745,22 +749,6 @@ export class AudioManager {
         }
     }
 
-    playStationBell(at) {
-        const carrier = this.context.createOscillator();
-        const modulator = this.context.createOscillator();
-        const modulation = this.context.createGain();
-        const gain = this.context.createGain();
-        carrier.frequency.value = midiToFrequency(79);
-        modulator.frequency.value = midiToFrequency(91);
-        modulation.gain.value = 180;
-        modulator.connect(modulation); modulation.connect(carrier.frequency);
-        carrier.connect(gain); gain.connect(this.musicOut()); gain.connect(this.musicReverbGain);
-        gain.gain.setValueAtTime(0.0001, at);
-        gain.gain.exponentialRampToValueAtTime(0.013, at + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, at + 1.8);
-        carrier.start(at); modulator.start(at); carrier.stop(at + 1.85); modulator.stop(at + 1.85);
-    }
-
     play(effect, intensity = 1, pan = 0, distance = 0) {
         if (!this.context || !this.effectsGain || !this.reverbInput || !this.enabled || this.effectsVolume <= 0.001)
             return;
@@ -783,6 +771,7 @@ export class AudioManager {
             case 'mortar': this.playMortar(now, strength, out); break;
             case 'missile': this.playMissileLaunch(now, strength, out); break;
             case 'impact': this.playImpact(now, strength, out); break;
+            case 'rock': this.playRockImpact(now, strength, out); break;
             case 'hit': this.playHit(now, strength, out); break;
             case 'explosion': this.playExplosion(now, strength, out); break;
             case 'scan': this.playTone({ at: now, frequency: 320, endFrequency: 1050, duration: 0.38, type: 'sine', level: 0.035, out }); break;
@@ -938,6 +927,15 @@ export class AudioManager {
         this.playTone({ at, frequency: 210, endFrequency: 46, duration: 0.34, type: 'sine', level: 0.22 * intensity, filterFrequency: 380, out });
         this.playNoiseBurst({ at, duration: 0.28, start: 900, end: 160, level: 0.1 * intensity, playbackRate: 0.55, out });
         this.playTone({ at: at + 0.02, frequency: 74, endFrequency: 40, duration: 0.26, type: 'triangle', level: 0.1 * intensity, filterFrequency: 260, out });
+    }
+
+    // Rock impact (belt/grazing fire): a dry gravel crunch with a dull thud —
+    // no metallic ring, so shots landing on asteroids read as stone, distinct
+    // from the sharp crack of a hull impact.
+    playRockImpact(at, intensity, out) {
+        this.playNoiseBurst({ at, duration: 0.14, start: 2400, end: 280, level: 0.09 * intensity, out });
+        this.playTone({ at, frequency: 150, endFrequency: 44, duration: 0.2, type: 'triangle', level: 0.17 * intensity, filterFrequency: 480, out });
+        this.playTone({ at: at + 0.015, frequency: 520, endFrequency: 210, duration: 0.12, type: 'square', level: 0.035 * intensity, filterFrequency: 1400, out });
     }
 
     // Collision / hull impact: a sharp crack, a deep thud, and a short

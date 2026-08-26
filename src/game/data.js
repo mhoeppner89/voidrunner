@@ -308,7 +308,9 @@ export const LOCATIONS = {
         kind: 'planet',
         position: [-208000, -24000, -180000],
         radius: 15250,
-        dockRadius: 15860,
+        // Landing engages 5km above the surface, so the surface texture is
+        // never seen at close range.
+        dockRadius: 20250,
         faction: 'frontier-miners',
         accent: '#d77742',
         secondary: '#4f281f',
@@ -325,7 +327,9 @@ export const LOCATIONS = {
         kind: 'planet',
         position: [236000, -36000, -144000],
         radius: 17400,
-        dockRadius: 18096,
+        // Landing engages 5km above the surface, so the surface texture is
+        // never seen at close range.
+        dockRadius: 22400,
         faction: 'free-merchants',
         accent: '#65c5b8',
         secondary: '#173d42',
@@ -618,15 +622,24 @@ export const LOCATION_ORDER = ['helix', 'rook', 'azure', 'shardbelt', 'vesper', 
 export const SYSTEM_MAP_EXTENT = 256000;
 export const ROUTE_DISTANCE_SCALE = 480;
 export const displaySpeed = (unitsPerSecond) => unitsPerSecond * 2;
+// NPC spawns stay well outside the cloud (their ships drift while the player
+// engages); the player's own hyperdrive arrival uses FIELD_ARRIVAL_MARGIN.
 const FIELD_ENTRY_MARGIN = 250;
+// The player drops right at the cloud's rock shell instead of 250 units
+// outside it. The base sits just inside the nominal radius on purpose:
+// setFieldEntryPosition extends the entry out past the outermost live
+// obstacle (obstacle edge + ship clearance) so the drop is always clear of
+// rock, but the ship regains control with the field filling the view (user
+// request: get way closer, just not on an asteroid).
+const FIELD_ARRIVAL_MARGIN = -60;
 export const hyperdriveArrivalRadius = (location) => {
     if (location.kind === 'field' || location.kind === 'graveyard')
-        // Field destinations are navigationally centred on the cloud, but the
-        // player should regain control just beyond its visible/collidable edge.
-        return location.radius + FIELD_ENTRY_MARGIN;
-    // Planets are huge now: exit hyperdrive at a distance proportional to the surface.
+        return location.radius + FIELD_ARRIVAL_MARGIN;
+    // Planets are huge now: exit hyperdrive well clear of the surface so the
+    // approach reads as a long glide in (and the low-res surface texture stays
+    // out of close-up range). 7km above the surface.
     if (location.kind === 'planet')
-        return location.radius * 1.12;
+        return location.radius + 7000;
     return location.radius + 2000;
 };
 export const spawnClearance = (location) => {

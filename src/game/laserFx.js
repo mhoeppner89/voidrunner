@@ -48,6 +48,23 @@ export const LASER_FX_TUNING = {
     emberSpeedMax: 7,
     emberLife: 1.3,
     emberSize: 1.7,
+    // Belt-rock hits: a matte chip burst (solid stone, normal blending) plus a
+    // slow dust puff. Chips fly OUTWARD from the rock (hemisphere-biased about
+    // the surface normal) and shed speed; dust hangs and fades in place.
+    chipCount: 12,
+    chipSpeedMin: 10,
+    chipSpeedMax: 26,
+    chipLife: 0.45,
+    chipSize: 1.3,
+    chipColor: 0x8d939b,
+    chipDamping: 2.5,
+    dustCount: 9,
+    dustSpeedMin: 2,
+    dustSpeedMax: 7,
+    dustLife: 0.8,
+    dustSize: 3.2,
+    dustColor: 0x555b63,
+    dustDamping: 5,
     // Camera-distance attenuation: a bolt crossing 8 units from the camera
     // must not paint a screen-filling wash. Scale the whole bolt group by
     // dist/attenuationRange (clamped) so close tracers shrink and distant ones
@@ -266,6 +283,67 @@ export class LaserFx {
         this.sparkBurst(position, colorHex, heavy ? tuning.sparkCountHeavy : tuning.sparkCount, tuning.sparkSpeedMin, tuning.sparkSpeedMax, tuning.sparkLife, tuning.sparkSize, 0.95);
         if (heavy)
             this.sparkBurst(position, 0xff8a4d, tuning.emberCount, tuning.emberSpeedMin, tuning.emberSpeedMax, tuning.emberLife, tuning.emberSize, 0.8);
+    }
+    // Asteroid/belt hit: a matte grey chip burst and a slow dust puff, both
+    // pushed outward from the rock surface. Unlike the hot additive impact
+    // sparks (laserFx.impact), chips use NORMAL blending and damped velocity
+    // so they read as solid stone knocked off the belt — dust hangs and fades.
+    rockImpact(position, rockCenter) {
+        const tuning = LASER_FX_TUNING;
+        this.rockBurst(position, rockCenter, tuning.chipColor, tuning.chipCount, tuning.chipSpeedMin, tuning.chipSpeedMax, tuning.chipLife, tuning.chipSize, 0.95, tuning.chipDamping);
+        this.rockBurst(position, rockCenter, tuning.dustColor, tuning.dustCount, tuning.dustSpeedMin, tuning.dustSpeedMax, tuning.dustLife, tuning.dustSize, 0.4, tuning.dustDamping);
+    }
+    rockBurst(position, rockCenter, colorHex, count, speedMin, speedMax, life, size, opacity, damping) {
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(count * 3);
+        const velocities = new Float32Array(count * 3);
+        // Outward hemisphere: the hit normal (away from the rock centre) biases
+        // the burst so chips fly off the surface instead of through it.
+        const ox = position[0] - rockCenter[0];
+        const oy = position[1] - rockCenter[1];
+        const oz = position[2] - rockCenter[2];
+        const olen = Math.hypot(ox, oy, oz) || 1;
+        const nx = ox / olen;
+        const ny = oy / olen;
+        const nz = oz / olen;
+        for (let index = 0; index < count; index += 1) {
+            // Rejection-sample the unit sphere, then mirror any direction that
+            // points into the rock so the burst fills the outward hemisphere.
+            let vx = 0;
+            let vy = 0;
+            let vz = 0;
+            let len = 0;
+            do {
+                vx = Math.random() * 2 - 1;
+                vy = Math.random() * 2 - 1;
+                vz = Math.random() * 2 - 1;
+                len = Math.hypot(vx, vy, vz);
+            } while (len > 1 || len < 1e-4);
+            if (vx * nx + vy * ny + vz * nz < 0) {
+                vx = -vx;
+                vy = -vy;
+                vz = -vz;
+            }
+            const speed = speedMin + (speedMax - speedMin) * Math.random();
+            velocities[index * 3] = (vx / len) * speed;
+            velocities[index * 3 + 1] = (vy / len) * speed;
+            velocities[index * 3 + 2] = (vz / len) * speed;
+        }
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const material = new THREE.PointsMaterial({
+            color: colorHex,
+            size,
+            sizeAttenuation: true,
+            transparent: true,
+            opacity,
+            blending: THREE.NormalBlending,
+            depthWrite: false,
+            fog: false,
+        });
+        const points = new THREE.Points(geometry, material);
+        points.position.set(position[0], position[1], position[2]);
+        this.scene.add(points);
+        this.effects.push({ object: points, points, velocities, life, maxLife: life, damping });
     }
     sparkBurst(position, colorHex, count, speedMin, speedMax, life, size, opacity) {
         const geometry = new THREE.BufferGeometry();

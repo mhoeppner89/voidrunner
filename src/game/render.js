@@ -1208,12 +1208,15 @@ export class SpaceRenderer {
         // Halo intensity 1.0 painted a hard soap-bubble edge around the whole
         // disc; 0.62 with a near-zero scatter boost keeps the limb glow and the
         // near-field dome fade but lets the lit surface read through it.
-        const haloMaterial = this.createAtmosphereMaterial(atmosphere, location.radius * 1.16, 0.45, 0.05, 1.0, location.position);
-        const hazeMaterial = this.createAtmosphereMaterial(atmosphere, location.radius * 1.042, id === 'azure' ? 0.047 : 0.076, 0.0, 0.0, location.position);
-        const haze = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.042, 112, 68), hazeMaterial);
+        // Atmosphere shells hug the surface: the limb glow and haze band read
+        // as a thin atmosphere (a few percent of the radius), not a separate
+        // bubble floating kilometres off the disc.
+        const haloMaterial = this.createAtmosphereMaterial(atmosphere, location.radius * 1.06, 0.45, 0.05, 1.0, location.position);
+        const hazeMaterial = this.createAtmosphereMaterial(atmosphere, location.radius * 1.02, id === 'azure' ? 0.047 : 0.076, 0.0, 0.0, location.position);
+        const haze = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.02, 112, 68), hazeMaterial);
         haze.name = 'haze';
         group.add(haze);
-        const halo = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.16, 96, 56), haloMaterial);
+        const halo = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.06, 96, 56), haloMaterial);
         group.add(halo);
         if (ringed) {
             // Gauntlet ring overhaul: one shader-driven ring instead of three
@@ -1296,22 +1299,36 @@ export class SpaceRenderer {
                     // segment against the planet sphere instead — exact at any
                     // distance, with a soft fade at the grazing limb so the cut
                     // doesn't alias. cameraPosition is a built-in uniform.
+                    // Impact-parameter form via the CROSS product: the ray
+                    // LINE's distance from the center is |oc × d| computed
+                    // directly, so its precision at |camera-center| ~ 1e5 keeps
+                    // ~7 digits where the naive b²−c discriminant (or even
+                    // |oc|² − (oc·d)²) cancels catastrophically for grazing
+                    // rays. oc points from the planet TO the camera, so for a
+                    // ray aimed at the planet camAlong = oc·d is NEGATIVE and
+                    // tHit = −camAlong − sqrt(r² − impact²) is the near-surface
+                    // hit distance along the ray.
                     vec3 rayDir = vWorldPosition - cameraPosition;
                     float rayLen = length(rayDir);
                     rayDir /= rayLen;
                     vec3 oc = cameraPosition - uPlanetCenter;
-                    float b = dot(oc, rayDir);
-                    float c = dot(oc, oc) - uPlanetRadius * uPlanetRadius;
-                    float disc = b * b - c;
-                    if (disc > 0.0) {
-                        float tHit = -b - sqrt(disc);
-                        // tHit in (0, rayLen) → the surface stands between the
-                        // camera and this fragment. Fade over a view-distance-
-                        // scaled band so the limb crossing stays smooth.
-                        float fade = max(uPlanetRadius * 0.02, rayLen * 0.0015);
-                        alpha *= smoothstep(-fade, fade, rayLen - tHit);
-                        if (alpha < 0.004)
-                            discard;
+                    float camAlong = dot(oc, rayDir);
+                    vec3 impactVec = cross(oc, rayDir);
+                    float impact2 = dot(impactVec, impactVec);
+                    float r2 = uPlanetRadius * uPlanetRadius;
+                    if (impact2 < r2) {
+                        float tHit = -camAlong - sqrt(r2 - impact2);
+                        if (tHit > 0.0 && tHit < rayLen) {
+                            // The surface stands between the camera and this
+                            // fragment: fade the alpha out across a
+                            // view-distance-scaled band so the limb crossing
+                            // stays smooth. (1 − smoothstep: fragments beyond
+                            // the hit, rayLen − tHit > 0, must be HIDDEN.)
+                            float fade = max(uPlanetRadius * 0.02, rayLen * 0.0015);
+                            alpha *= 1.0 - smoothstep(-fade, fade, rayLen - tHit);
+                            if (alpha < 0.004)
+                                discard;
+                        }
                     }
                     // Planet shadow: on the anti-sun side of the center, inside
                     // the shadow cylinder, the rings drop to 18% light.
@@ -2349,17 +2366,12 @@ export class SpaceRenderer {
                 this.laserFx.attenuate(mesh, this.camera.position);
             }
             if (projectile.kind === 'missile') {
-                // Exhaust flicker + a sparse smoke trail: the plume strobes
-                // with the engine, and every ~90ms a dissipating puff drifts
-                // where the missile just was. Sparse by design — a volley of
-                // missiles must not flood the effects pool.
+                // Exhaust flicker: the engine plume strobes while the motor
+                // burns. No smoke trail — there is no atmosphere out here to
+                // suspend one (user report); the hot plume is the whole trail.
                 const plume = mesh.getObjectByName('plume');
                 if (plume)
                     plume.material.opacity = 0.72 + Math.sin(this.skyTime * 47 + projectile.slot * 3.3) * 0.26;
-                if (this.skyTime - (projectile.lastTrailAt ?? -1) > 0.09) {
-                    projectile.lastTrailAt = this.skyTime;
-                    this.spawnMissilePuff(mesh.position);
-                }
             }
         });
     }
@@ -2692,27 +2704,17 @@ export class SpaceRenderer {
         this.laserFx ??= new LaserFx(this.scene, this.effects);
         this.laserFx.impact(position, color, heavy);
     }
+    // Rock hit: matte chip + dust burst on top of the impact spark (see
+    // laserFx.js rockImpact). `rockCenter` biases the debris outward from the
+    // surface so chips fly off the belt instead of through it.
+    spawnRockImpact(position, rockCenter) {
+        this.laserFx ??= new LaserFx(this.scene, this.effects);
+        this.laserFx.rockImpact(position, rockCenter);
+    }
     spawnMuzzleFlash(x, y, z, color = 0xffc35a) {
         // Brief additive flash at a gun port on fire (see laserFx.js).
         this.laserFx ??= new LaserFx(this.scene, this.effects);
         this.laserFx.muzzleFlash(x, y, z, color);
-    }
-    // Missile-exhaust smoke: a diffuse (non-additive) puff that expands and
-    // fades on the generic effects pool. Diffuse blending is the point —
-    // additive would make the trail glow like another engine.
-    spawnMissilePuff(position) {
-        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-            map: this.radialTexture('#efeae0', '#7a746a'),
-            transparent: true,
-            opacity: 0.34,
-            depthWrite: false,
-        }));
-        sprite.position.copy(position);
-        sprite.scale.setScalar(1.3 + Math.random() * 0.6);
-        this.scene.add(sprite);
-        // `puff` routes the effect to the gentle-growth branch in updateEffects
-        // instead of the auto-swelling sprite branch.
-        this.effects.push({ object: sprite, velocities: [], life: 0.85, maxLife: 0.85, puff: true });
     }
     // An NPC hyperdrive departure: a short additive warp streak along the
     // ship's heading that flares and fades as the hull jumps away to another
@@ -2748,6 +2750,16 @@ export class SpaceRenderer {
                 for (let i = 0; i < count; i += 1) {
                     positions.setXYZ(i, positions.getX(i) + vel[i * 3] * dt, positions.getY(i) + vel[i * 3 + 1] * dt, positions.getZ(i) + vel[i * 3 + 2] * dt);
                 }
+                // Damped bursts (rock chips/dust) shed speed so they read as
+                // solid debris — sparks keep flying at constant velocity.
+                if (effect.damping) {
+                    const damp = Math.max(0, 1 - effect.damping * dt);
+                    for (let i = 0; i < count; i += 1) {
+                        vel[i * 3] *= damp;
+                        vel[i * 3 + 1] *= damp;
+                        vel[i * 3 + 2] *= damp;
+                    }
+                }
                 positions.needsUpdate = true;
                 const material = effect.points.material;
                 if (material instanceof THREE.PointsMaterial)
@@ -2759,15 +2771,6 @@ export class SpaceRenderer {
                 const material = effect.streak.material;
                 if (material instanceof THREE.MeshBasicMaterial)
                     material.opacity = ratio * 0.85;
-            }
-            else if (effect.puff) {
-                // Missile smoke: expands gently (×~3 total, not the sprite
-                // branch's ×34) and fades — a growing puff must never become a
-                // screen-filling white ball across the missile's flight path.
-                effect.object.scale.multiplyScalar(1 + dt * 2.6);
-                const material = effect.object.material;
-                if (material instanceof THREE.SpriteMaterial)
-                    material.opacity = ratio * 0.34;
             }
             else if (effect.muzzle) {
                 // Muzzle pops fade at half opacity and do NOT grow — a flash,

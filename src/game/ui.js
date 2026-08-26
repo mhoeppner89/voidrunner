@@ -83,7 +83,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.7.7b-test.1';
+const GAME_VERSION = '0.7.7b';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -342,7 +342,6 @@ export class GameUI {
             <i class="hyperdrive-fx-flash"></i>
           </div>
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="${t('Own ship status display; tap to open ship menu')}">
-            <div class="screen-heading"><span>${t('STATUS')}</span><b id="own-ship-name">WAYFARER</b></div>
             <div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
             <div class="screen-race-strip" id="screen-race-strip"><span id="screen-race-label"></span><b id="screen-race-value"></b></div>
             <div class="screen-ship-layout"><div class="screen-flight"><div><span>${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div><div><span>${t('HOLD')}</span><b id="screen-own-cargo">0.0</b><small id="screen-own-cargo-cap">/32</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Weapon — press X')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ARMOR')}</span><i><b id="screen-own-armor"></b></i><em id="screen-own-armor-value">100</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">100</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
@@ -1505,7 +1504,10 @@ export class GameUI {
         // an entry is on the grid or running. The travel leg hides the strip —
         // its boxed row read as a stray overlay card (user report), and the
         // approach is now carried by the world gate marker, the radar blip,
-        // and the lockable nav-map contact.
+        // and the lockable nav-map contact. The strip rides a band the own
+        // monitor reserves permanently at its foot, so it can never print
+        // over the hull outline or the bars — and its appearance never
+        // shifts the layout (stable positions).
         const raceStrip = this.el('#screen-race-strip');
         if (raceStrip) {
             const race = model.race;
@@ -1556,7 +1558,6 @@ export class GameUI {
                 cargoCap.textContent = `/${model.cargoCapacity ?? 0}`;
             }
         }
-        setText('#own-ship-name', model.shipName.toUpperCase());
         const standoff = this.el('#screen-standoff');
         if (standoff) {
             standoff.classList.toggle('is-visible', Boolean(model.standoff));
@@ -2123,6 +2124,22 @@ export class GameUI {
                     ctx.textBaseline = 'middle';
                     ctx.fillText(`${contact.raceGate.distance}`, x * 0.8, y * 0.8);
                 }
+                // Out-of-plane tick, same language as the other contacts: a stub
+                // pointing up when the gate rides above the ecliptic, down when
+                // below — at race speed the climb/dive cue matters.
+                ctx.globalAlpha = 0.8;
+                const gateAltitudeRatio = Math.max(-1, Math.min(1, contact.altitude || 0));
+                const gateAltitudeMagnitude = Math.abs(gateAltitudeRatio);
+                if (gateAltitudeMagnitude > 0.02) {
+                    const gateDirection = gateAltitudeRatio > 0 ? -1 : 1;
+                    const gateTick = radarAltitudeTick({ x, y, radius, ratio, direction: gateDirection, magnitude: gateAltitudeMagnitude, size: gateSize });
+                    if (gateTick) {
+                        ctx.beginPath();
+                        ctx.moveTo(x, gateTick.startY);
+                        ctx.lineTo(x, gateTick.startY + gateDirection * gateTick.length);
+                        ctx.stroke();
+                    }
+                }
                 ctx.globalAlpha = 1;
                 continue;
             }
@@ -2228,7 +2245,12 @@ export class GameUI {
     // ticker and persist in the ship menu's RECENT EVENTS (like the comms log).
     pushEvent(message, tone = 'info', duration = 5600) {
         const now = this.save?.world.time ?? 0;
-        this.recentEvents.push({ message, tone, at: now, until: now + duration / 1000 });
+        // `until` rides the sim clock (the ship-menu history ordering); the
+        // ticker window itself expires on the REAL clock — sim time stalls
+        // (throttled tab, frame drops, menu pauses), and a world-time-only
+        // expiry left the last line stuck on the monitor forever (user
+        // report: the bounty message never disappeared).
+        this.recentEvents.push({ message, tone, at: now, until: now + duration / 1000, expiresAt: performance.now() + duration });
         if (this.recentEvents.length > 24)
             this.recentEvents.shift();
     }
@@ -2236,17 +2258,21 @@ export class GameUI {
     // monitor's ticker rather than the toast stack.
     pushSensor(message, tone = 'info', duration = 5600) {
         const now = this.save?.world.time ?? 0;
-        this.sensorLog.push({ message, tone, at: now, until: now + duration / 1000 });
+        this.sensorLog.push({ message, tone, at: now, until: now + duration / 1000, expiresAt: performance.now() + duration });
         if (this.sensorLog.length > 12)
             this.sensorLog.shift();
     }
     // The newest entry whose display window is still open; undefined when the
     // line has expired (the ticker then fades back to its idle state).
     currentEntry(log) {
-        const now = this.save?.world.time ?? 0;
+        const nowReal = performance.now();
+        const nowSim = this.save?.world.time ?? 0;
         for (let index = log.length - 1; index >= 0; index -= 1) {
-            if (log[index].until > now)
-                return log[index];
+            const entry = log[index];
+            // Prefer the real-clock window; fall back to the sim clock for
+            // entries pushed before the real-clock field existed.
+            if (entry.expiresAt !== undefined ? entry.expiresAt > nowReal : entry.until > nowSim)
+                return entry;
         }
         return undefined;
     }
@@ -2605,7 +2631,11 @@ export class GameUI {
         });
     };
     get isModalOpen() {
-        return !this.root.querySelector('#map-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#ship-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#pause-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#arena-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#chat-panel')?.classList.contains('is-hidden');
+        // The forced-landscape overlay is a modal too: while it blocks play the
+        // sim must freeze (the frame loop drops the accumulator for any open
+        // modal), so a pilot can't drift into a wall or a pirate's guns while
+        // the game is waiting for the phone to be flipped.
+        return !this.root.querySelector('#map-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#ship-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#pause-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#arena-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#chat-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#rotate-notice')?.classList.contains('is-hidden');
     }
     get isTitleVisible() {
         return this.titleVisible;
