@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v113-0-7-7-visual-gauntlet';
+const CACHE = 'voidrunner-v117-0-7-7b-bugfix-gauntlet';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',

@@ -381,3 +381,33 @@ Verification probe: `.freebuff/probe-round10-verify.mjs` — **8/8 checks pass**
 2. Regression sweep of all findings via the full probe suite (probe-bughunt 1-5, bughunt-followup/culprit/scroll/inflate/wreck/killloop/racefinish, probe-round10-verify — server on :4173, check it's alive first).
 3. Remaining game.js corners: encounterPosition helpers, save/load interplay inside game.js.
 4. Optional: audio subsystem pass (autoplay policy, node leaks) — audio.js untouched so far.
+
+## Round 11 — Agent A fix session complete (0.7.7b)
+
+**Commit note for agent B:** your uncommitted round-10 fixes (laserFx/random/missions/main.js + the two ui.js lines + i18n-de entries) were folded into Agent A's commit `2e3d537` via `git add -A`, exactly as requested in your round-10 note — do NOT re-commit them. The independent 0.7.7a racing-guidance port stays on `release/0.7.7a` (worktree `.worktrees/ox-alpha`); main carries Agent A's own gate-target implementation (`gate` kind + `raceGateById`) — a merge decision is still open, the two are API-incompatible (`selectTarget('raceGate', '<courseId>')` vs `selectTarget('gate', '<courseId>-gate-<n>')`).
+
+### Fixed and verified by Agent A (evidence)
+
+| Item | Fix | Verification |
+| --- | --- | --- |
+| Azure ring renders THROUGH the planet (user screenshot) | Analytic ray-sphere occlusion in the ring fragment shader (depth buffer cannot separate ring/surface at orbital range: near 0.08 / far 2e6 → depth precision worse than the planet radius). Soft view-distance fade at the grazing limb. | Captures `.freebuff/azure-ring-shots/azure-{mid,front-low}.png`: far arc hidden at the limb, near arc in front, at mid/close/far framings |
+| Cloud decks scrapped (user OK; no wave layers exist) | Removed both Azure decks + dry-world deck, `createCloudTexture`, per-frame rotations | Surface reads clean in captures; two transparent passes + textures gone per planet |
+| BUG-01 monitor clip (high) | `grid-template-columns: minmax(0,1fr)` on both cockpit layouts | Hunt round 9 (252=252) + Agent A re-check: 167=167 at 844×390 with a stress ticker line; ellipsis fires; FRACHT value visible in capture |
+| BUG-03 flight font floors | 0.32/0.33rem → 0.45rem on `.screen-flight` / `.screen-bars > div` | Measured 7.2px at 844×390 (was 4.3–5.3px); bars track absorbs the width |
+| BUG-02 comms bar | Active suppressor matches the German rule's specificity; both pseudos `nowrap` + `flex-shrink:0` | Agent B round-10 post-fix measurement (FUNKLOG suppressed, CONTINUE one line) |
+| BUG-04 comms-row wrap | `overflow-wrap: anywhere` + `min-width:0` on `.comms-row p` | Code-level; same property as the live bar's verified `.talker-text` |
+| BUG-20/21 strip truncation + box overlay (user report) | Strips de-boxed (no opaque backdrop on the monitor glass); race strip hidden during travel; running label "TOR n/total" (no course title); value `flex-shrink:0` | `probe-gate-targets.mjs`: strip hidden in travel, visible on grid; Agent B round-10 re-measure: label 92/92, value 53/53 during a running race |
+| Racing: first gate not visible/selectable during travel | `syncRaceGates` at accept + reload-restore; `gate` target kind (lock at any distance, monitor ring schematic + state readout); nav-map contacts (cleared + next three, forced); radar blips (green cleared + tick, yellow next pulsing, grey upcoming; beyond-horizon clamps to rim with distance) | `.freebuff/probe-gate-targets.mjs` — 10/10 PASS (travel visibility 13 meshes, map contacts at 200k units, lock + monitor render, blip states advance after gate 1, countdown → running) |
+| BUG-24 splash/burn kill crash | `destroyShip(ship, attackerId, position = ship.position)` | Code-level; call sites confirmed (mortar splash game.js ~5092, burn tick ~3309 pass undefined) |
+| BUG-25 updateSearchAI allocations | player/position/anchor/fanPoint on tmpA–tmpD (callees audited: none touch them; beginSearch tuples its anchor) | Syntax + full probe-ai suite passes modulo documented flakes; allocation sites removed |
+| Aim assist wrong lead (user report) | Per-weapon intercept solved in the shooter's frame (bolt inherits player velocity; old code hardcoded distance/205 → mortar lead 2.4× short, magrail 3× long). NOTE: the first rewrite had a tmpP4 aliasing bug (wiped w before addScaledVector → assist aimed at the target's CURRENT spot) — caught by the probe, fixed with a dedicated scratch | `.freebuff/probe-aim.mjs`: pulse bolt 1.87° from true intercept (was aimed 2.98° off — error reduced), mortar 0.93° (was 1.56°); NPC ace hit-rate ≈100% vs static target (13 shots → 72 dmg) |
+| Ship timers NaN guard | `fireCooldown`/`missileCooldown`/`shieldDelay` decrement with `?? 0` — a malformed spawn used to produce a ship that NEVER fired (undefined − dt → NaN → `NaN <= 0` false) | Found live while probing (seeded pirate fired 0 shots in 12s); guarded + re-verified |
+
+### Probe-suite status after all fixes (main tree)
+
+- `probe-gate-targets` 10/10 · `probe-aim` all pass · `probe-sim-fixed` 26/26 · `probe-store` 8/8 (after fixing its racy sample — now fires a player bolt first) · `probe-theme` 7/7
+- `probe-r1` 11/12: the one failure is a stale assertion — the probe expected the pre-0.4.7t 24%/full handling rule; updated to the shipped 10%/full rule. The hyperdrive charge-hold check flaked only under parallel-probe CPU contention (passed in isolation).
+- `probe-ai` 97–99/101 per run: the two debris-field joust checks are the documented flakes; the two cover checks (`never entered covering`) failed 3/4 runs under contention — the cover trigger needs `distance > 140` at sample time and the cover code path is untouched by these fixes; needs one quiet-machine re-run.
+- `.freebuff/probe-racing.mjs` is now the 0.7.7a branch's probe (expects `raceGateApproach`/`'raceGate'`) — NOT applicable to main; use `probe-gate-targets.mjs` here.
+
+## Suggested next rounds
