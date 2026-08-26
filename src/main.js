@@ -68,7 +68,13 @@ const beginSession = (mode, arena) => {
     }
     // The save's language wins over the pre-save localStorage choice; keep
     // both mirrors in sync so the next boot and the settings UI agree.
-    setLanguage(typeof localStorage !== 'undefined' ? localStorage.getItem('__VOID_PRIVATEER_PROBE_LANG__') ?? save.settings?.language : save.settings?.language);
+    // The probe/dev key (`__VOID_PRIVATEER_PROBE_LANG__`) is single-shot: it
+    // forces the boot language once, then clears itself — a value left behind
+    // by a dev session used to override the player's saved choice forever.
+    const probeLanguage = typeof localStorage !== 'undefined' ? localStorage.getItem('__VOID_PRIVATEER_PROBE_LANG__') : null;
+    setLanguage(probeLanguage ?? save.settings?.language);
+    if (probeLanguage && typeof localStorage !== 'undefined')
+        localStorage.removeItem('__VOID_PRIVATEER_PROBE_LANG__');
     if (vesperHoverPreview && mode !== 'arena') {
         // Keep the visual preview reachable from either title-screen button
         // without changing the normal career flow when the flag is absent.

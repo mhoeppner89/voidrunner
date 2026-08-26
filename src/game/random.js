@@ -1,3 +1,5 @@
+import { getLanguage } from './i18n.js';
+
 export const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 export const lerp = (a, b, t) => a + (b - a) * t;
 export const damp = (current, target, lambda, dt) => lerp(current, target, 1 - Math.exp(-lambda * dt));
@@ -37,7 +39,15 @@ const CALLSIGNS = [
 ];
 export const proceduralPersonName = (rng) => `${pick(rng, GIVEN_NAMES)} ${pick(rng, SURNAMES)}`;
 export const proceduralCallsign = (rng) => `${proceduralPersonName(rng)} “${pick(rng, CALLSIGNS)}”`;
-export const formatCredits = (value) => `${Math.max(0, Math.floor(value)).toLocaleString('en-US')} cr`;
+// Locale-aware grouping: the German UI reads "3.200 cr", English "3,200 cr".
+// Non-finite values (corrupted save, upstream NaN) render as 0 instead of
+// "NaN cr"; negatives clamp to 0 so a bookkeeping bug can't show phantom debt.
+export const formatNumber = (value) => {
+    if (!Number.isFinite(value))
+        return '0';
+    return Math.round(value).toLocaleString(getLanguage() === 'de' ? 'de-DE' : 'en-US');
+};
+export const formatCredits = (value) => `${Number.isFinite(value) ? Math.max(0, Math.floor(value)).toLocaleString(getLanguage() === 'de' ? 'de-DE' : 'en-US') : '0'} cr`;
 export const formatDuration = (seconds) => {
     const clamped = Math.max(0, Math.ceil(seconds));
     const minutes = Math.floor(clamped / 60);

@@ -1395,7 +1395,7 @@ button.compact {
 
 .market-row {
   display: grid;
-  grid-template-columns: minmax(190px, 1.25fr) minmax(95px, 0.55fr) minmax(95px, 0.55fr) 70px minmax(250px, 1.15fr);
+  grid-template-columns: minmax(190px, 1.25fr) minmax(95px, 0.55fr) minmax(95px, 0.55fr) 70px minmax(190px, 1.15fr);
   align-items: center;
   gap: 0.65rem;
   min-height: 61px;
@@ -1420,7 +1420,7 @@ button.compact {
 .market-row > span small {
   margin-top: 0.12rem;
   color: #68746f;
-  font-size: 0.53rem;
+  font-size: 0.58rem;
 }
 
 .market-row.restricted > span:first-child b {
@@ -1443,7 +1443,7 @@ button.compact {
 
 .market-actions button {
   padding: 0.42rem 0.22rem;
-  font-size: 0.52rem;
+  font-size: 0.56rem;
   letter-spacing: 0.02em;
 }
 
@@ -1523,7 +1523,7 @@ button.compact {
 .mission-card dt,
 .ship-card dt {
   color: #61706a;
-  font-size: 0.48rem;
+  font-size: 0.56rem;
 }
 
 .mission-card dd,
@@ -2626,16 +2626,16 @@ button.compact {
   align-items: baseline;
   justify-content: space-between;
   gap: 0.4rem;
-  padding: 0.18rem 0.48rem;
-  border-top: 1px solid rgba(223, 183, 93, 0.35);
-  border-bottom: 1px solid rgba(223, 183, 93, 0.35);
-  background: rgba(10, 14, 16, 0.82);
+  padding: 0.1rem 0.48rem;
   color: #e0a06a;
   font-family: "Courier New", ui-monospace, monospace;
   font-size: clamp(0.5rem, 0.86vw, 0.72rem);
   letter-spacing: 0.06em;
   white-space: nowrap;
   pointer-events: none;
+  /* Same de-boxing as the race strip: text + glow on the monitor glass, no
+     opaque overlay card (user report: stray dialog on the own-ship monitor). */
+  text-shadow: 0 0 6px rgba(2, 8, 24, 0.95), 0 0 3px rgba(2, 8, 24, 0.95);
 }
 
 .screen-standoff.is-visible {
@@ -2649,6 +2649,7 @@ button.compact {
 
 .screen-standoff b {
   overflow: hidden;
+  flex-shrink: 0;
   color: #d7d0bd;
   font-weight: 700;
   text-overflow: ellipsis;
@@ -2661,8 +2662,11 @@ button.compact {
 }
 
 /* Circuit race strip on the own-ship monitor: one compact row while an
-   entry is live (travel leg → grid countdown → gate/rank/clock). Same
-   absolute-row pattern as the standoff call above. */
+   entry is on the grid or running (travel hides it — the gate marker, radar
+   blip and nav-map contact carry the approach). No boxed backdrop: an
+   opaque overlay card on the monitor glass read as a stray dialog (user
+   report), so the row rides the monitor's own dark background like the
+   flight strip does. Same absolute-row pattern as the standoff call. */
 .screen-race-strip {
   display: none;
   position: absolute;
@@ -2673,15 +2677,13 @@ button.compact {
   align-items: baseline;
   justify-content: space-between;
   gap: 0.4rem;
-  padding: 0.18rem 0.48rem;
-  border-top: 1px solid rgba(115, 198, 180, 0.35);
-  border-bottom: 1px solid rgba(115, 198, 180, 0.35);
-  background: rgba(10, 14, 16, 0.82);
+  padding: 0.1rem 0.48rem;
   font-family: "Courier New", ui-monospace, monospace;
   font-size: clamp(0.5rem, 0.86vw, 0.72rem);
   letter-spacing: 0.06em;
   white-space: nowrap;
   pointer-events: none;
+  text-shadow: 0 0 6px rgba(2, 8, 24, 0.95), 0 0 3px rgba(2, 8, 24, 0.95);
 }
 
 .screen-race-strip.is-visible {
@@ -2696,13 +2698,18 @@ button.compact {
 
 .screen-race-strip span {
   overflow: hidden;
+  min-width: 0;
+  flex: 1 1 auto;
   color: var(--teal);
   letter-spacing: 0.1em;
   text-overflow: ellipsis;
 }
 
 .screen-race-strip b {
+  /* The value carries rank + clock — the time-critical half never shrinks;
+     the label ellipsizes instead (BUG-21). */
   overflow: hidden;
+  flex-shrink: 0;
   color: var(--retro-green);
   font-weight: 700;
   text-overflow: ellipsis;
@@ -3226,7 +3233,10 @@ html[lang="de"] .comms-bar.active::before {
   align-items: center;
   gap: 0.18rem;
   min-width: 0;
-  font-size: clamp(0.33rem, 0.56vw, 0.56rem);
+  /* Floor raised 0.33rem → 0.45rem (BUG-03): the old floor rendered the
+     SHIELDS/ARMOR/HULL labels at ~5.3px on phones — unreadable. The flexible
+     bar track absorbs the extra width. */
+  font-size: clamp(0.45rem, 0.56vw, 0.56rem);
 }
 
 .screen-bars span,
@@ -3297,7 +3307,10 @@ html[lang="de"] .comms-bar.active::before {
   min-width: 0;
   padding-bottom: 0.14rem;
   border-bottom: 1px solid rgba(48, 161, 195, 0.4);
-  font-size: clamp(0.32rem, 0.58vw, 0.58rem);
+  /* Floor raised 0.32rem → 0.45rem (BUG-03): GESCHW./TREIBST./FRACHT values
+     measured 4.3–5.3px on phones. Values ellipsize inside their column, so
+     the raised floor cannot push the row past the monitor. */
+  font-size: clamp(0.45rem, 0.58vw, 0.58rem);
   letter-spacing: 0.02em;
 }
 
@@ -4189,7 +4202,7 @@ button.primary,
   margin-top: 0.4rem;
   color: #77827e;
   font-family: "Courier New", ui-monospace, monospace;
-  font-size: 0.52rem;
+  font-size: 0.56rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -4387,7 +4400,7 @@ button.primary,
     justify-content: center;
     gap: 0.2rem 1.2rem;
     margin: 0.45rem 0 0;
-    font-size: clamp(0.48rem, 1.6vh, 0.6rem);
+    font-size: clamp(0.58rem, 1.6vh, 0.66rem);
   }
 
   .title-controls span {
@@ -6136,7 +6149,7 @@ button.primary,
   .dock-screen[data-tab="market"] .market-points button {
     min-height: 38px;
     padding: 0.32rem 0.28rem;
-    font-size: 0.46rem;
+    font-size: 0.56rem;
   }
 
   .dock-screen[data-tab="market"] .table-title {
@@ -6607,7 +6620,7 @@ button.primary,
   }
 
   .scene-pointer b { font-size: 0.54rem; }
-  .scene-pointer small { font-size: 0.46rem; }
+  .scene-pointer small { font-size: 0.52rem; }
   .scene-pointer i { width: 1.16rem; height: 1.16rem; font-size: 0.72rem; }
 
   .bar-dialogue-card {
@@ -6630,7 +6643,7 @@ button.primary,
     padding: 0.22rem 0.28rem 0.22rem 0.5rem;
   }
 
-  .scene-pointer b { font-size: 0.46rem; }
+  .scene-pointer b { font-size: 0.56rem; }
   .scene-pointer small { display: none; }
   .scene-pointer i { top: 0.05rem; left: -0.12rem; width: 0.95rem; height: 0.95rem; font-size: 0.56rem; }
   .scene-return-pointer { top: 0.65rem; left: 0.65rem; }
@@ -7034,6 +7047,25 @@ button.primary,
   border: 2px dashed #cf9f62;
 }
 
+/* Race checkpoint on the chart: a teal ring (matches the world gate rings),
+   with a slow pulse so the live course reads as active, not decorative. */
+.tactical-contact.gate i {
+  background: transparent;
+  border: 2px solid #53e6c8;
+  box-shadow: 0 0 8px rgba(83, 230, 200, 0.7);
+  animation: tactical-gate-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes tactical-gate-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 6px rgba(83, 230, 200, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 14px rgba(83, 230, 200, 0.95);
+  }
+}
+
 /* An active search sweep on the chart: a dashed ring at the searching ship's
    last-known-position anchor — blue for a Concord patrol, red for a hostile —
    always visible (clamped to the frame) so a hunt beyond the sensor horizon
@@ -7194,6 +7226,12 @@ button.primary,
 .contact-row.claim > i {
   background: #ffd24a;
   box-shadow: 0 0 6px rgba(255, 199, 66, 0.7);
+}
+
+.contact-row.gate > i {
+  background: transparent;
+  border: 2px solid #53e6c8;
+  box-shadow: 0 0 6px rgba(83, 230, 200, 0.7);
 }
 
 .contact-row span,
@@ -7370,7 +7408,14 @@ button.primary,
   .map-card {
     width: min(98vw, 1120px);
     max-height: 96vh;
-    overflow: hidden;
+    /* Keep the card scrollable at compact heights: overflow:hidden used
+       to slice the bottom row (legend/jump info) with no way to reach it. */
+    overflow: auto;
+  }
+
+  .system-map {
+    height: min(420px, 52vh);
+    min-height: 240px;
   }
 
   .map-card > header {
@@ -7899,5 +7944,59 @@ button.primary,
 
   .dock-screen[data-tab="concourse"] .vesper-preview-takeoff {
     margin-left: 0;
+  }
+}
+
+/* ── Bug-hunt round 10 (agent B): scroll affordance + compact reflows ──────
+   BUG-15/06/16: overlay scrollbars rendered the tall dock pages and modals
+   scrollable with zero-width bars — content just cut at the fold. Thin themed
+   scrollbars make the scroll discoverable; the pause grid reflows to one
+   column at short heights so settings stop slicing mid-row. */
+.dock-content,
+.modal-card,
+.market-layout {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(166, 172, 154, 0.55) transparent;
+}
+
+.dock-content::-webkit-scrollbar,
+.modal-card::-webkit-scrollbar,
+.market-layout::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dock-content::-webkit-scrollbar-thumb,
+.modal-card::-webkit-scrollbar-thumb,
+.market-layout::-webkit-scrollbar-thumb {
+  background: rgba(166, 172, 154, 0.5);
+  border-radius: 4px;
+}
+
+.dock-content::-webkit-scrollbar-track,
+.modal-card::-webkit-scrollbar-track {
+  background: rgba(4, 8, 8, 0.5);
+}
+
+@media (max-height: 640px) {
+  .pause-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* BUG-14: 2×2 action grid halves the commodity row's min-content so all four
+   trade buttons fit an 844px viewport without the horizontal pan. */
+@media (max-width: 960px) {
+  .market-actions {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* BUG-08: the concourse ship preview is sized in absolute px and stuck out
+   past narrow viewports (hidden behind the rotate gate today). Cap it. */
+@media (max-width: 540px) {
+  .concourse-hover-preview {
+    max-width: 100%;
+    overflow: hidden;
   }
 }

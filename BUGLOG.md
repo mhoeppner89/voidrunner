@@ -35,18 +35,18 @@ Severity: **high** = player sees broken UI in normal play · **medium** = visibl
 
 - **BUG-05** — map card clipped ≤520px height (style.css map modal block)
 - **BUG-06 + BUG-16** — pause/settings card compact reflow + visible scroll affordance (style.css modal block; pairs with BUG-15)
-- **BUG-07** — laser flash material clone leak (laserFx.js + `disposeObject` in render.js — that function ONLY; do not touch `createPlanet`/`createRingMaterial`/`updateWorld`)
+- **BUG-07** — laser flash material clone leak — **FIXED (agent B, round 10)**: `flashMaterial` clears the clone's inherited `shared` flag (`laserFx.js`); verified by firing smoke test, 0 console errors
 - **BUG-08** — portrait concourse preview overflow (style.css dock block)
-- **BUG-09** (+ round-3 update: target distance `toLocaleString('en-US')` ui.js:1631) — locale-aware formatting (random.js `formatCredits` + the one ui.js line; re-read files first)
+- **BUG-09** (+ round-3 update: target distance `toLocaleString('en-US')` ui.js:1631) — **FIXED (agent B, round 10)**: locale-aware `formatNumber`/`formatCredits` in random.js (de-DE/en-US grouping, NaN→0, negatives clamp); target distance uses `formatNumber`. Verified live: DE "3.200 cr" / "261.368 km"
 - **BUG-10** — title-screen control hint font floors (style.css title block)
 - **BUG-11** — concourse hotspot label floors (style.css)
 - **BUG-12** — system-map node label clip (style.css)
 - **BUG-14** — market table SELL ALL clipped / hidden horizontal pan (style.css market block)
 - **BUG-15** — dock-content scroll affordance (style.css)
 - **BUG-17** — dock-wide tiny type floors (style.css dock blocks; verify at 844×390)
-- **BUG-18** — race briefing untranslated EN fragments (missions.js + i18n-de.js)
-- **BUG-19** — mission-board cycle check NaN (missions.js)
-- **BUG-23** — probe language key overrides saved language (main.js boot path)
+- **BUG-18** — race briefing untranslated EN fragments — **FIXED (agent B, round 10)**: entry fee + payout ladder go through `t()` with placeholders (missions.js), rank list is language-neutral ("1: 4.200"), DE catalog gains the two entries; verified live on the German board (see Round 10 section)
+- **BUG-19** — mission-board cycle check NaN — **FIXED (agent B, round 10)**: `refreshMissionOffers` trusts only numeric dash segments, so race-first boards parse the real cycle (missions.js)
+- **BUG-23** — probe language key overrides saved language — **FIXED (agent B, round 10)**: key is single-shot in `main.js` beginSession (forces the session language once, then clears itself); verified live (lang=en on first boot, key removed, stays removed)
 
 **Ground rules for the second agent:** re-read any file immediately before editing (Agent A commits incrementally); keep fixes inside the listed areas; document completed fixes + verification evidence in a "Round 10 — agent B fixes" section here; do NOT bump `GAME_VERSION`/`CACHE` or edit `sw.js` (release protocol stays with Agent A).
 
@@ -349,8 +349,24 @@ Combined with earlier rounds, the now-covered game.js surface includes: construc
   - `bughunt-inflate.mjs`: after locking a far target (the case that measured **447 > 252** in round 3), scrollWidth stays **252 = 252** with zero children exceeding the monitor — the dynamic inflation is gone too.
 - Remaining watch-item: the race/standoff strips (BUG-20/21) sit inside the same monitor and should now have ~63px more room; their clipping should be re-measured in the next regression sweep.
 
+## Round 10 — agent B fixes (BUG-07, BUG-09, BUG-18, BUG-19, BUG-23)
+
+All four are **in the working tree, uncommitted** — Agent A, please fold them into your next incremental commit. Files touched by agent B: `src/game/laserFx.js`, `src/game/random.js`, `src/game/missions.js`, `src/main.js`, and exactly two lines in `src/game/ui.js` (random.js import gains `formatNumber`; `#screen-target-distance` uses `formatNumber(target.distance)`). Do not revert those two ui.js lines when editing the race-strip/drawRadar blocks.
+
+| Bug | Fix | Verification |
+| --- | --- | --- |
+| BUG-07 (flash clone leak) | `flashMaterial` sets `clone.userData.shared = false` after `base.clone()` — the clone had inherited the cache flag through Material.copy's deep userData copy, so `disposeObject` skipped every per-shot flash material. The clone's map texture keeps its own `shared` flag (textureFor), so the cache survives disposal. | Firing smoke in arena: effects list alive (2 effects / 1 sprite at read), **0 console errors** across the session (`.freebuff/probe-round10-verify.mjs`) |
+| BUG-09 (EN-only number formatting) | New locale-aware `formatNumber`/`formatCredits` in random.js (`de-DE`/`en-US` grouping, NaN → `'0'`, negatives clamp to 0); target-distance readout uses `formatNumber`. | Live in DE session: **"3.200 cr"**, distance **"261.368 km"**, `formatCredits(NaN) === '0 cr'`, `formatCredits(-50) === '0 cr'` |
+| BUG-19 (cycle parse NaN on race-first boards) | `refreshMissionOffers` now extracts the cycle only from numeric dash segments, so `race-<course>` ids at index 0 no longer poison the guard. | Syntax-verified; behavioral note kept honest: the original defect was masked by seed-deterministic regeneration, so there is no observable before/after — the fix removes the latent re-roll trigger. Race flow re-verified working in round 9. |
+| BUG-23 (probe key overrides saved language) | `beginSession` treats `__VOID_PRIVATEER_PROBE_LANG__` as single-shot: read → apply → `removeItem`. | Live: with key `en`, first boot's session language is `en` and the key is gone; later boots keep the key absent. |
+| BUG-18 (untranslated race briefing) | Entry fee + payout ladder wrapped in `t()` with placeholders (missions.js); rank list language-neutral (`1: 4.200`); DE catalog gains `'Entry is {fee} cr. Payouts by rank: {ranks}.'` and `' (pay-in)'`. | Live German mission board: "Der Einsatz beträgt 500 cr. Auszahlungen nach Rang: 1: 4.200, 2: 1.600, 3: 300 (Einzahlung), 4: 800 (Einzahlung)." — zero EN fragments (`.freebuff/probe-bug18-verify.mjs`, 3/3 checks) |
+
+Verification probe: `.freebuff/probe-round10-verify.mjs` — **8/8 checks pass**; BUG-18 probe `.freebuff/probe-bug18-verify.mjs` — **3/3**. Files touched by agent B now also include `src/game/i18n-de.js` (two catalog entries). Known pre-existing quirk left as-is (not in scope): the probe key path never writes `save.settings.language`, so a probe-forced language applies to the session but not to a *new* save's settings mirror (matches the pre-fix flow).
+
+
 ## Suggested next rounds
 
-1. Regression sweep of all findings via the full probe suite (probe-bughunt 1-5, bughunt-followup/culprit/scroll/inflate/wreck/killloop/racefinish — server on :4173, check it's alive first). Re-measure BUG-20/21 strips post-BUG-01-fix.
-2. Remaining game.js corners: encounterPosition helpers, save/load interplay inside game.js.
-3. Optional: audio subsystem pass (autoplay policy, node leaks) — audio.js untouched so far.
+1. Agent B (next): BUG-18 (race briefing i18n — missions.js + i18n-de.js), then the CSS family (BUG-05/06/08/10/11/12/14/15/16/17) once Agent A's style.css sections settle; re-measure BUG-20/21 strips post-BUG-01-fix.
+2. Regression sweep of all findings via the full probe suite (probe-bughunt 1-5, bughunt-followup/culprit/scroll/inflate/wreck/killloop/racefinish, probe-round10-verify — server on :4173, check it's alive first).
+3. Remaining game.js corners: encounterPosition helpers, save/load interplay inside game.js.
+4. Optional: audio subsystem pass (autoplay policy, node leaks) — audio.js untouched so far.

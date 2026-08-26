@@ -1,6 +1,6 @@
 import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, LOCATIONS, SHIPS, SUN_POSITION, commodityIds, displaySpeed, equipmentIds } from './data.js';
 import { cargoCapacity, cargoMass, denPrice, SYNDICATE_DEN_FAVOR } from './economy.js';
-import { formatCredits, formatDuration } from './random.js';
+import { formatCredits, formatDuration, formatNumber } from './random.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
 import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, weaponOwned } from './weapons.js';
 import { TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
@@ -1502,13 +1502,17 @@ export class GameUI {
             }
         }
         // Race strip: compact circuit telemetry on the own-ship monitor while
-        // an entry is live — travel leg, grid countdown, or gate/rank/clock.
+        // an entry is on the grid or running. The travel leg hides the strip —
+        // its boxed row read as a stray overlay card (user report), and the
+        // approach is now carried by the world gate marker, the radar blip,
+        // and the lockable nav-map contact.
         const raceStrip = this.el('#screen-race-strip');
         if (raceStrip) {
             const race = model.race;
-            raceStrip.classList.toggle('is-visible', Boolean(race));
+            const stripLive = Boolean(race) && race.phase !== 'travel';
+            raceStrip.classList.toggle('is-visible', stripLive);
             raceStrip.dataset.phase = race?.phase ?? '';
-            if (race) {
+            if (stripLive) {
                 const label = this.el('#screen-race-label');
                 const value = this.el('#screen-race-value');
                 const clock = (seconds) => {
@@ -1516,16 +1520,15 @@ export class GameUI {
                     return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
                 };
                 if (label && value) {
-                    if (race.phase === 'travel') {
-                        label.textContent = t('{course} · TO GATE 1', { course: race.title.toUpperCase() });
-                        value.textContent = `${Math.round(race.distance).toLocaleString('en-US')} km`;
-                    }
-                    else if (race.phase === 'countdown') {
+                    if (race.phase === 'countdown') {
                         label.textContent = t('{course} · GRID', { course: race.title.toUpperCase() });
                         value.textContent = t('T-{seconds}', { seconds: race.seconds });
                     }
                     else {
-                        label.textContent = t('{course} · GATE {current}/{total}', { course: race.title.toUpperCase(), current: race.gate, total: race.gateCount });
+                        // Running label drops the course title — mid-race the
+                        // pilot knows the course; "TOR 3/13" + rank + clock is
+                        // the information that must never clip (BUG-21).
+                        label.textContent = t('GATE {n}/{total}', { n: race.gate, total: race.gateCount });
                         value.textContent = `${race.rankLabel} · ${clock(race.time)}`;
                     }
                 }
@@ -1628,7 +1631,7 @@ export class GameUI {
         bracket?.classList.toggle('is-surrendered', surrendered && !hostile);
         edgePointer?.classList.toggle('is-hostile', hostile);
         edgePointer?.classList.toggle('is-surrendered', surrendered && !hostile);
-        this.el('#screen-target-distance').textContent = `${Math.round(target.distance).toLocaleString('en-US')} km`;
+        this.el('#screen-target-distance').textContent = `${formatNumber(target.distance)} km`;
         this.el('#screen-target-readout').textContent = target.readout ?? '—';
         this.setTargetScreenValue(target);
         this.updateWeaponButtons(target, mode);
@@ -1831,6 +1834,26 @@ export class GameUI {
             for (const [dx, dy, cr] of [[-0.3, -0.15, 0.14], [0.2, 0.25, 0.1], [0.05, -0.32, 0.08]]) {
                 ctx.beginPath();
                 ctx.arc(cx + r * dx, cy + r * dy, r * cr, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+        else if (kind === 'gate') {
+            // Race checkpoint: a ring with course tick marks, so the target
+            // monitor reads "gate" at a glance (matches the teal world rings).
+            ctx.strokeStyle = 'rgba(83, 230, 200, 0.95)';
+            ctx.lineWidth = Math.max(1.5, ratio * 1.5);
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(83, 230, 200, 0.5)';
+            ctx.beginPath();
+            ctx.arc(cx, cy, r * 0.62, 0, Math.PI * 2);
+            ctx.stroke();
+            for (let i = 0; i < 4; i += 1) {
+                const a = (i / 4) * Math.PI * 2;
+                ctx.beginPath();
+                ctx.moveTo(cx + Math.cos(a) * r * 0.62, cy + Math.sin(a) * r * 0.62);
+                ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
                 ctx.stroke();
             }
         }
@@ -2054,6 +2077,55 @@ export class GameUI {
             ctx.globalAlpha = 1;
         }
         for (const contact of contacts) {
+            // Race checkpoints: a circle per gate — the cleared gate green with
+            // a tick inside, the next checkpoint yellow with a slow pulse, the
+            // first upcoming one grey. Beyond-horizon gates clamp to the rim
+            // and carry their distance, so the first gate is findable while
+            // still flying in (mission anchors, see radarContacts).
+            if (contact.type === 'racegate' && contact.raceGate) {
+                const [wx, wy] = warpPoint(contact.x, contact.y);
+                const x = wx * radius;
+                const y = wy * radius;
+                const state = contact.raceGate.state;
+                const color = state === 'passed' ? '#79e77f' : state === 'next' ? '#f2d06b' : '#9fb0bd';
+                const gateSize = 4.2 * ratio;
+                ctx.strokeStyle = color;
+                ctx.lineWidth = Math.max(1.2, 1.5 * ratio);
+                ctx.globalAlpha = state === 'future' ? 0.72 : 1;
+                ctx.beginPath();
+                ctx.arc(x, y, gateSize, 0, Math.PI * 2);
+                ctx.stroke();
+                if (state === 'next') {
+                    const pulse = 0.45 + 0.35 * Math.sin(now / 300);
+                    ctx.globalAlpha = pulse;
+                    ctx.beginPath();
+                    ctx.arc(x, y, gateSize + 3.2 * ratio, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                if (state === 'passed') {
+                    // Tick inside the cleared gate's circle.
+                    ctx.globalAlpha = 0.95;
+                    ctx.beginPath();
+                    ctx.moveTo(x - gateSize * 0.5, y);
+                    ctx.lineTo(x - gateSize * 0.1, y + gateSize * 0.42);
+                    ctx.lineTo(x + gateSize * 0.58, y - gateSize * 0.42);
+                    ctx.stroke();
+                }
+                if (contact.selected) {
+                    ctx.globalAlpha = 0.85;
+                    ctx.strokeRect(x - gateSize * 2, y - gateSize * 2, gateSize * 4, gateSize * 4);
+                }
+                if (contact.raceGate.beyond) {
+                    ctx.globalAlpha = 0.9;
+                    ctx.fillStyle = color;
+                    ctx.font = `${Math.max(8, Math.floor(8.5 * ratio))}px ui-monospace, monospace`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(`${contact.raceGate.distance}`, x * 0.8, y * 0.8);
+                }
+                ctx.globalAlpha = 1;
+                continue;
+            }
             const [wx, wy] = warpPoint(contact.x, contact.y);
             const x = wx * radius;
             const y = wy * radius;
@@ -2294,7 +2366,7 @@ export class GameUI {
             return;
         const panel = this.root.querySelector('#map-panel');
         const playerPoint = systemMapPoint(model.playerPosition);
-        const contactTone = (contact) => contact.claim ? 'claim' : contact.hostile ? 'hostile' : contact.kind === 'asteroid' || contact.kind === 'pickup' ? 'resource' : contact.kind === 'wreck' ? 'wreck' : 'ship';
+        const contactTone = (contact) => contact.gate ? 'gate' : contact.claim ? 'claim' : contact.hostile ? 'hostile' : contact.kind === 'asteroid' || contact.kind === 'pickup' ? 'resource' : contact.kind === 'wreck' ? 'wreck' : 'ship';
         panel.innerHTML = `
       <div class="modal-card map-card">
         <header><div><span class="eyebrow">${t('NAVIGATION COMPUTER / PAUSED')}</span><h2>${t('Helios Verge System')}</h2></div><button data-ui-command="close-map">${t('CLOSE')}</button></header>

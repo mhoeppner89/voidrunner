@@ -1708,6 +1708,10 @@ export class GameSession {
         }
         this.ships = this.ships.filter((ship) => !ship.race);
         this.activeRace = null;
+        // A gate lock must not outlive the entry (raceGateTarget now resolves
+        // to undefined, but clear explicitly so the monitor drops immediately).
+        if (this.save.player.currentTargetId && this.save.player.currentTargetId.includes('-gate-'))
+            this.clearTarget();
         delete this.save.player.raceGateIndex;
         delete this.save.player.raceFinishTime;
     }
@@ -1731,6 +1735,8 @@ export class GameSession {
             lastCountdown: 99,
             deadline: quest.flags.deadline ?? (this.save.world.time + course.deadlineSeconds),
         };
+        // Rebuild the gate markers for the restored travel leg (see acceptRace).
+        this.renderer.syncRaceGates(course.gates, 0, LOCATIONS[course.zone].position);
         // Keep the board consistent: an open ticket always reads as live so
         // the offer stays hidden until this entry resolves. Preserve any
         // earlier results on the same course (best rank/time history).
@@ -1752,6 +1758,28 @@ export class GameSession {
             venting: weapon.kind === 'pdc' ? this.save.world.time < (this.pdcVentUntil ?? 0) : false,
             heatPercent: weapon.kind === 'pdc' ? Math.round(Math.min(1, (this.pdcHeat ?? 0) / 3.5) * 100) : undefined,
             ammo: stock === null ? undefined : { current: stock, capacity: ammoCapacity(ammoId) },
+        };
+    }
+    // Resolve a race-gate target id ('{courseId}-gate-{n}') against the live
+    // entry. Gates are mission anchors: selectable from the nav map and radar
+    // at ANY distance while an entry is live (travel included), like mining
+    // claims — the pilot must be able to lock the next checkpoint from anywhere.
+    raceGateById(id) {
+        const course = this.activeRace?.course;
+        if (!course)
+            return undefined;
+        const gate = course.gates.find((entry) => entry.id === id);
+        return gate ? { course, gate, index: gate.index } : undefined;
+    }
+    raceGateTarget(id) {
+        const found = this.raceGateById(id);
+        if (!found)
+            return undefined;
+        return {
+            kind: 'gate',
+            id,
+            position: found.gate.position,
+            name: t('GATE {n}/{total}', { n: found.index + 1, total: found.course.gates.length }),
         };
     }
     // Cockpit race telemetry for the own-ship monitor strip. One small object
@@ -2165,15 +2193,40 @@ export class GameSession {
         const position = vec(this.save.player.position, this.tmpP1);
         const orientation = quat(this.save.player.rotation, this.tmpPlayerOrientation);
         const direction = this.tmpP2.copy(FORWARD).applyQuaternion(orientation).normalize();
+        const vv = this.save.player.velocity;
         const target = this.getTargetRef();
         if (this.save.settings.aimAssist && target?.kind === 'ship') {
             const ship = this.ships.find((entry) => entry.id === target.id);
             if (ship) {
-                const targetPosition = this.tmpP3.set(ship.position[0], ship.position[1], ship.position[2]);
-                const distance = position.distanceTo(targetPosition);
+                // Intercept solved in the shooter's frame (same math as the NPC
+                // gunnery): the bolt leaves at weapon.speed RELATIVE to the ship
+                // because it inherits the pilot's velocity, so the lead uses the
+                // target's RELATIVE velocity and THIS weapon's speed. The old
+                // distance/205 hardcoded the pulse speed — the mortar's lead was
+                // 2.4× too short and the magrail's 3× too long, so the assist
+                // pulled shots BEHIND crossing targets (user report: "aim
+                // assistance seems bugged").
+                const r = this.tmpP3.set(ship.position[0] - position.x, ship.position[1] - position.y, ship.position[2] - position.z);
+                const distance = r.length();
                 const sv = ship.velocity;
-                const predicted = targetPosition.addScaledVector(this.tmpP4.set(sv[0], sv[1], sv[2]), distance / 205);
-                const assistDirection = this.tmpP4.copy(predicted).sub(position).normalize();
+                const w = this.tmpP4.set(sv[0] - vv[0], sv[1] - vv[1], sv[2] - vv[2]);
+                const speed = weapon.speed;
+                let t = distance / speed;
+                const a = w.lengthSq() - speed * speed;
+                if (a !== 0) {
+                    const rw = r.dot(w);
+                    const disc = rw * rw - a * distance * distance;
+                    if (disc >= 0) {
+                        const sRoot = Math.sqrt(disc);
+                        const candidates = [(-rw - sRoot) / a, (-rw + sRoot) / a].filter((c) => c > 0);
+                        if (candidates.length)
+                            t = Math.min(...candidates);
+                    }
+                }
+                // assistDirection needs its OWN scratch: w rides tmpP4 and must
+                // survive until the addScaledVector below (tmpP4.copy here
+                // would wipe w and silently aim at the target's CURRENT spot).
+                const assistDirection = this.tmpP0.copy(r).addScaledVector(w, t).normalize();
                 // Assist cone scales per weapon: the magrail earns its damage,
                 // so long lanes stay a skill shot while the pulse stays friendly.
                 if (direction.angleTo(assistDirection) < 0.18 * weapon.assist)
@@ -2184,7 +2237,6 @@ export class GameSession {
         // Gun mounts sit UNDER the cockpit (belly guns): below the centerline,
         // at the nose — not at canopy height, and not floating out in space.
         const down = this.tmpP5.copy(UP).applyQuaternion(orientation).multiplyScalar(-0.6);
-        const vv = this.save.player.velocity;
         if (weapon.kind === 'gauss') {
             // Single centerline magrail mount: one hypervelocity slug that
             // over-penetrates (see updateProjectiles' pierce sweep). Spawns
@@ -3047,6 +3099,13 @@ export class GameSession {
                 }
             }
         }
+        else if (kind === 'gate') {
+            // Race checkpoint: a mission anchor, lockable at any distance while
+            // an entry is live (see raceGateById). No tool-mode change.
+            const gateTarget = this.raceGateTarget(id);
+            if (gateTarget)
+                target = gateTarget;
+        }
         else {
             const node = this.wreckNodes.find((entry) => entry.id === id && entry.remaining > 0);
             if (node && this.activeInstanceId === 'mourning-line') {
@@ -3116,6 +3175,10 @@ export class GameSession {
         const pickup = this.pickups.find((entry) => entry.id === id && entry.life > 0);
         if (pickup && player.distanceTo(this.pickupStore.getPos(pickup.slot, this.tmpP0)) > stats.radarRange)
             this.clearTarget();
+        // Race gates are mission anchors: the lock holds at any distance while
+        // the entry is live (endRaceField invalidates it via raceGateTarget).
+        if (this.raceGateById(id))
+            return;
     }
     dropTargetLock(ship) {
         this.clearTarget();
@@ -3143,6 +3206,9 @@ export class GameSession {
         const wreck = this.wreckNodes.find((entry) => entry.id === id && entry.remaining > 0);
         if (wreck && (!clearInvalid || this.activeInstanceId === 'mourning-line'))
             return { kind: 'wreck', id, position: wreck.position, name: wreck.name };
+        const gate = this.raceGateTarget(id);
+        if (gate)
+            return gate;
         if (clearInvalid)
             this.clearTarget();
         return undefined;
@@ -3313,9 +3379,12 @@ export class GameSession {
                     delete ship.burn;
             }
             ship.lifetime += dt;
-            ship.fireCooldown -= dt;
-            ship.missileCooldown -= dt;
-            ship.shieldDelay -= dt;
+            // ?? 0 guard: a spawn path that forgets these fields (probe seeds,
+            // future spawners) must not NaN-poison the timers — a NaN
+            // fireCooldown silently produced a pirate that NEVER fired.
+            ship.fireCooldown = (ship.fireCooldown ?? 0) - dt;
+            ship.missileCooldown = (ship.missileCooldown ?? 0) - dt;
+            ship.shieldDelay = (ship.shieldDelay ?? 0) - dt;
             if (ship.shieldDelay <= 0)
                 ship.shield = Math.min(ship.maxShield, ship.shield + dt * 3.8);
             // The standoff clock runs down: once it expires the hunters open
@@ -3789,8 +3858,12 @@ export class GameSession {
         const huntingPlayer = (ship.hostile || ship.role === 'pirate' || ship.role === 'bounty' || ship.role === 'escort') && ship.targetId === 'player';
         if (!isPatrol && !huntingPlayer)
             return false;
-        const player = vec(this.save.player.position);
-        const position = vec(ship.position);
+        // Allocation-free (BUG-25): this runs per searching ship per step, so
+        // player/position/anchor ride the session scratches (tmpA..tmpD — none
+        // of the callees below touch them; beginSearch tuples its anchor on
+        // entry). Only STORED tuples (lastResolvedPlayer, fanPoint) allocate.
+        const player = this.tmpA.set(this.save.player.position[0], this.save.player.position[1], this.save.player.position[2]);
+        const position = this.tmpB.set(ship.position[0], ship.position[1], ship.position[2]);
         const broadcasting = this.playerBroadcasting();
         const dark = !broadcasting;
         const [playerSpeed, playerMax] = this.playerSensorArgs();
@@ -3849,7 +3922,7 @@ export class GameSession {
             this.endSearch(ship, 'found');
             return false;
         }
-        const anchor = vec(search.anchor);
+        const anchor = this.tmpC.set(search.anchor[0], search.anchor[1], search.anchor[2]);
         if (search.phase === 'approach') {
             // Last-known-position waypoint: fly to the anchor, then sweep. If
             // the anchor is unreachable (tucked inside rocks the avoidance
@@ -3895,7 +3968,7 @@ export class GameSession {
             // arrival (or every few seconds) so the sweep reads as a widening
             // hunt rather than an orbit. All rolls use the ship's seeded rng so
             // headless probes stay deterministic.
-            if (!search.fanPoint || this.save.world.time >= (search.fanUntil ?? 0) || position.distanceTo(vec(search.fanPoint)) < 26) {
+            if (!search.fanPoint || this.save.world.time >= (search.fanUntil ?? 0) || position.distanceTo(this.tmpD.set(search.fanPoint[0], search.fanPoint[1], search.fanPoint[2])) < 26) {
                 const rng = typeof ship.proxRng === 'function' ? ship.proxRng : ship.aiRng;
                 // Fan points must be clear of field obstacles: a sweep that
                 // aims a fast hull at a point inside a rock is a suicide run,
@@ -7503,6 +7576,11 @@ export class GameSession {
         // and lets restoreActiveRace recognize an open entry after a reload.
         this.save.world.raceRecords[course.id] = { active: true };
         this.activeRace = { state: 'travel', course, racers: [], startedAt: 0, playerStartTime: undefined, playerRank: 4, lastCountdown: 99, deadline: this.save.world.time + course.deadlineSeconds };
+        // Gate markers render from the moment the entry is paid: the pilot must
+        // SEE the first checkpoint when flying in (it used to pop only at the
+        // grid, leaving the approach unmarked), and it is lockable from the
+        // nav map / radar at any distance (see raceGateById).
+        this.renderer.syncRaceGates(course.gates, 0, LOCATIONS[course.zone].position);
         this.ui.showToast(t('{course} entry paid. Fly to the {zone} and line up at the marker.', { course: course.title, zone: LOCATIONS[course.zone].name.toUpperCase() }), 'success', 6200);
         this.save.player.navTargetId = course.zone;
         this.ui.refreshDock(this.save);
@@ -7976,6 +8054,26 @@ export class GameSession {
                     ...screen,
                 };
             }
+            else if (target.kind === 'gate') {
+                const found = this.raceGateById(target.id);
+                if (found) {
+                    const nextIndex = this.save.player.raceGateIndex ?? 0;
+                    const passed = found.index < nextIndex;
+                    hudTarget = {
+                        kind: 'gate',
+                        name: t('GATE {n}/{total}', { n: found.index + 1, total: found.course.gates.length }),
+                        subtitle: `${t(found.course.title.toUpperCase())} · ${t('RACE CHECKPOINT')}`,
+                        distance,
+                        objectKind: 'gate',
+                        readout: passed
+                            ? t('GATE CLEARED')
+                            : found.index === nextIndex
+                                ? (this.activeRace?.state === 'travel' ? t('START/FINISH · LINE UP TO BEGIN') : t('NEXT CHECKPOINT · FLY THROUGH'))
+                                : t('UPCOMING CHECKPOINT'),
+                        ...screen,
+                    };
+                }
+            }
             else {
                 const location = LOCATIONS[target.id];
                 hudTarget = {
@@ -8212,6 +8310,22 @@ export class GameSession {
                 contacts.push(contact);
             }
         }
+        // Live race entry: the course checkpoints surface on the chart at ANY
+        // distance (mission anchors, like claims) — the just-cleared gate for
+        // orientation plus the next three, so the route direction reads and
+        // the first gate is lockable while still flying in.
+        if (this.activeRace && this.activeRace.state !== 'finished' && this.activeRace.state !== 'failed') {
+            const nextIndex = this.save.player.raceGateIndex ?? 0;
+            this.activeRace.course.gates.forEach((gate, index) => {
+                if (index < nextIndex - 1 || index > nextIndex + 2)
+                    return;
+                const contact = buildContact('gate', gate.id, t('GATE {n}/{total}', { n: index + 1, total: this.activeRace.course.gates.length }), `${t(this.activeRace.course.title.toUpperCase())} · ${index < nextIndex ? t('CLEARED') : index === nextIndex ? t('NEXT CHECKPOINT') : t('RACE COURSE')}`, gate.position, stats.radarRange, false, true, true);
+                if (contact) {
+                    contact.gate = true;
+                    contacts.push(contact);
+                }
+            });
+        }
         contacts.sort((a, b) => Number(b.hostile) - Number(a.hostile) || prioritize(a, b));
         // Active search sweeps on the chart: one dashed ring per searching ship
         // at its last-known-position anchor, always visible (clamped to the
@@ -8338,6 +8452,35 @@ export class GameSession {
         for (const pickup of this.pickups)
             if (pickup.life > 0)
                 add(this.pickupStore.pos.subarray(pickup.slot * 3, pickup.slot * 3 + 3), 'pickup', pickup.id === this.save.player.currentTargetId);
+        // Race checkpoints on the disc: the cleared gate (green, ticked), the
+        // next checkpoint (yellow), and the first upcoming one (grey). They are
+        // mission anchors, so beyond-horizon gates clamp to the rim (same
+        // scale rule as add()) instead of vanishing — drawRadar renders the
+        // circle + tick treatment.
+        const race = this.activeRace;
+        if (race && race.state !== 'finished' && race.state !== 'failed') {
+            const nextIndex = this.save.player.raceGateIndex ?? 0;
+            for (const index of [nextIndex - 1, nextIndex, nextIndex + 1]) {
+                const gate = race.course.gates[index];
+                if (!gate)
+                    continue;
+                const relative = this.tmpRadarRel.set(gate.position[0], gate.position[1], gate.position[2]).sub(player).applyQuaternion(inverse);
+                const distance = Math.hypot(relative.x, relative.z);
+                contacts.push({
+                    x: clamp(relative.x / Math.max(range, distance), -1, 1),
+                    y: clamp(relative.z / Math.max(range, distance), -1, 1),
+                    type: 'racegate',
+                    selected: gate.id === this.save.player.currentTargetId,
+                    altitude: relative.y / range,
+                    ghost: false,
+                    raceGate: {
+                        state: index < nextIndex ? 'passed' : index === nextIndex ? 'next' : 'future',
+                        distance: Math.round(distance),
+                        beyond: distance > range,
+                    },
+                });
+            }
+        }
         return contacts;
     }
     zoneLabel(zone) {

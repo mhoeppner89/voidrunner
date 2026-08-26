@@ -1063,6 +1063,8 @@ export const DE_CATALOG = {
     'Not enough credits for the race entry.': 'Nicht genug Credits für das Renneintrittsgeld.',
     'You already have a race entry on the books.': 'Du hast schon ein Rennen auf dem Brett.',
     '{course} entry paid. Fly to the {zone} and line up at the marker.': '{course}-Einstieg bezahlt. Fliege zur {zone} und stell dich an die Markierung.',
+    'Entry is {fee} cr. Payouts by rank: {ranks}.': 'Der Einsatz beträgt {fee} cr. Auszahlungen nach Rang: {ranks}.',
+    ' (pay-in)': ' (Einzahlung)',
     '{course} · FOUR SHIPS · PASS ALL {count} GATES': '{course} · VIER SCHIFFE · PASSIERE ALLE {count} TORE',
     '{count}…': '{count}…',
     'GO · PASS ALL {count} GATES': 'LOS · PASSIERE ALLE {count} GATES',
@@ -1078,6 +1080,16 @@ export const DE_CATALOG = {
     '{course} · GRID': '{course} · STARTGRID',
     'T-{seconds}': 'T-{seconds}',
     '{course} · GATE {current}/{total}': '{course} · TOR {current}/{total}',
+    // Race gate targets (0.7.7b): target monitor, nav map, radar blips
+    'GATE {n}/{total}': 'TOR {n}/{total}',
+    'RACE CHECKPOINT': 'RENNENTOR',
+    'GATE CLEARED': 'TOR PASSIERT',
+    'NEXT CHECKPOINT · FLY THROUGH': 'NÄCHSTES TOR · DURCHFLIEGEN',
+    'START/FINISH · LINE UP TO BEGIN': 'START/ZIEL · AM GRID POSITIONIEREN',
+    'UPCOMING CHECKPOINT': 'WEITERES RENNENTOR',
+    'CLEARED': 'PASSIERT',
+    'NEXT CHECKPOINT': 'NÄCHSTES TOR',
+    'RACE COURSE': 'RENNSTRECKE',
 
     // ── Weapon roster ─────────────────────────────────────────────────────
     'PULSE LASER': 'IMPULSLASER',

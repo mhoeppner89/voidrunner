@@ -1,7 +1,7 @@
 import { COMMODITIES, DOCK_LOCATION_IDS, GUILD_RANK_NAMES, LOCATIONS, commodityIds, routeDistanceBetween } from './data.js';
 import { miningClaimCandidates, miningClaimName } from './worldData.js';
 import { cargoFree, SYNDICATE_DEN_FAVOR } from './economy.js';
-import { clamp, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
+import { clamp, formatNumber, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
 import { rollPilot, TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 import { t } from './i18n.js';
 import { RACE_COURSES, raceBriefingLine, raceOfferForLocation } from './racing.js';
@@ -58,7 +58,19 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             guild: 'merchant',
             guildRep: 4,
             faction: 'free-merchants',
-            briefing: `${raceBriefingLine(raceCourse)} Entry is ${raceCourse.entryFee} cr. Payouts by rank: ${raceCourse.payouts.map((amount, index) => `${index + 1}${['st','nd','rd','th'][index] || 'th'} ${Math.abs(amount)}${amount < 0 ? ' loss' : ''}`).join(', ')}.`,
+            // Entry fee + payout ladder go through t() so the German board
+            // stops appending an English sentence with EN ordinals; the rank
+            // list itself is language-neutral ("1: 4200").
+            briefing: `${raceBriefingLine(raceCourse)} ${t('Entry is {fee} cr. Payouts by rank: {ranks}.', {
+                fee: formatNumber(raceCourse.entryFee),
+                ranks: raceCourse.payouts
+                    .map((amount, index) => t('{rank}: {amount}{loss}', {
+                        rank: index + 1,
+                        amount: formatNumber(Math.abs(amount)),
+                        loss: amount < 0 ? t(' (pay-in)') : '',
+                    }))
+                    .join(', '),
+            })}`,
         });
     const dangerBase = clamp(save.world.danger, 0.2, 3.5);
     const claimedNodeIds = new Set();
@@ -243,7 +255,14 @@ export const refreshMissionOffers = (save, force = false) => {
     const cycle = missionCycle(save.world.time);
     for (const locationId of DOCK_LOCATION_IDS) {
         const existing = save.world.offers[locationId] ?? [];
-        const existingCycle = existing[0]?.id.split('-')[1];
+        // The cycle lives in the second dash segment of mission ids
+        // (`<location>-<cycle>-<index>-<rand>`), but race offers (pushed
+        // first) id as `race-<course>` — parsing those yielded NaN, which
+        // failed the `!== cycle` guard for every board refresh. Only trust
+        // segments that are actually numeric.
+        const existingCycle = existing
+            .map((offer) => offer.id.split('-')[1])
+            .find((segment) => /^\d+$/.test(segment));
         if (force || existing.length === 0 || Number(existingCycle) !== cycle) {
             save.world.offers[locationId] = generateMissionOffers(locationId, save);
         }

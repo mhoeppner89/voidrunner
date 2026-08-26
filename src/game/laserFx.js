@@ -233,7 +233,14 @@ export class LaserFx {
             fog: false,
             toneMapped: false,
         }));
-        return base.clone();
+        // Material.clone() deep-copies userData, so the clone inherited the
+        // cache's `shared` flag and disposeObject skipped every flash clone —
+        // a per-shot material leak. Per-event clones are disposable by
+        // definition; their map texture stays flagged shared (textureFor), so
+        // the cache survives the clone's disposal.
+        const clone = base.clone();
+        clone.userData.shared = false;
+        return clone;
     }
     muzzleFlash(x, y, z, colorHex = LASER_FACTION_COLORS.player.bolt) {
         const tuning = LASER_FX_TUNING;
