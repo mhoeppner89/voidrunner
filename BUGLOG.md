@@ -33,17 +33,17 @@ Severity: **high** = player sees broken UI in normal play · **medium** = visibl
 
 **FREE for the second agent (no overlap expected):**
 
-- **BUG-05** — map card clipped ≤520px height (style.css map modal block)
-- **BUG-06 + BUG-16** — pause/settings card compact reflow + visible scroll affordance (style.css modal block; pairs with BUG-15)
+- **BUG-05** — map card clipped ≤520px height — **FIXED (agent B, round 10)**: compact-height block keeps the card scrollable (`overflow: auto`) and shrinks the system-map stage
+- **BUG-06 + BUG-16** — pause/settings card — **FIXED (agent B, round 10)**: `.pause-grid` reflows to one column ≤640px height; themed thin scrollbars on `.dock-content`/`.modal-card`/`.market-layout`
 - **BUG-07** — laser flash material clone leak — **FIXED (agent B, round 10)**: `flashMaterial` clears the clone's inherited `shared` flag (`laserFx.js`); verified by firing smoke test, 0 console errors
-- **BUG-08** — portrait concourse preview overflow (style.css dock block)
+- **BUG-08** — portrait concourse preview overflow — **FIXED (agent B, round 10)**: preview capped to viewport (≤540px); untestable live behind the rotate gate, code-level fix
 - **BUG-09** (+ round-3 update: target distance `toLocaleString('en-US')` ui.js:1631) — **FIXED (agent B, round 10)**: locale-aware `formatNumber`/`formatCredits` in random.js (de-DE/en-US grouping, NaN→0, negatives clamp); target distance uses `formatNumber`. Verified live: DE "3.200 cr" / "261.368 km"
-- **BUG-10** — title-screen control hint font floors (style.css title block)
-- **BUG-11** — concourse hotspot label floors (style.css)
+- **BUG-10** — title-screen control hint font floors — **FIXED (agent B, round 10)**: clamp floor 0.48→0.58rem
+- **BUG-11** — concourse hotspot label floors — **FIXED (agent B, round 10)**: winning cascade rule (style.css:6762) 0.49→0.56rem; concourse scan now 0 findings at 844×390
 - **BUG-12** — system-map node label clip (style.css)
-- **BUG-14** — market table SELL ALL clipped / hidden horizontal pan (style.css market block)
-- **BUG-15** — dock-content scroll affordance (style.css)
-- **BUG-17** — dock-wide tiny type floors (style.css dock blocks; verify at 844×390)
+- **BUG-14** — market table SELL ALL clipped / hidden horizontal pan — **FIXED (agent B, round 10)**: 2×2 action wrap + `min-width: 0` on `.market-table`; measured layout 841/841 (was 880 overflow)
+- **BUG-15** — dock-content scroll affordance — **FIXED (agent B, round 10)**: themed thin scrollbars (see BUG-06/16)
+- **BUG-17** — dock-wide tiny type floors — **FIXED (agent B, round 10)**: market tabs/smalls/buttons, mission dt, ship-overview-meta floors ≥0.56rem; market-commodities scan 40→1 findings, bar-missions 33→1 (remaining finding is the by-design scrollable page)
 - **BUG-18** — race briefing untranslated EN fragments — **FIXED (agent B, round 10)**: entry fee + payout ladder go through `t()` with placeholders (missions.js), rank list is language-neutral ("1: 4.200"), DE catalog gains the two entries; verified live on the German board (see Round 10 section)
 - **BUG-19** — mission-board cycle check NaN — **FIXED (agent B, round 10)**: `refreshMissionOffers` trusts only numeric dash segments, so race-first boards parse the real cycle (missions.js)
 - **BUG-23** — probe language key overrides saved language — **FIXED (agent B, round 10)**: key is single-shot in `main.js` beginSession (forces the session language once, then clears itself); verified live (lang=en on first boot, key removed, stays removed)
@@ -362,6 +362,8 @@ All four are **in the working tree, uncommitted** — Agent A, please fold them 
 | BUG-18 (untranslated race briefing) | Entry fee + payout ladder wrapped in `t()` with placeholders (missions.js); rank list language-neutral (`1: 4.200`); DE catalog gains `'Entry is {fee} cr. Payouts by rank: {ranks}.'` and `' (pay-in)'`. | Live German mission board: "Der Einsatz beträgt 500 cr. Auszahlungen nach Rang: 1: 4.200, 2: 1.600, 3: 300 (Einzahlung), 4: 800 (Einzahlung)." — zero EN fragments (`.freebuff/probe-bug18-verify.mjs`, 3/3 checks) |
 
 Verification probe: `.freebuff/probe-round10-verify.mjs` — **8/8 checks pass**; BUG-18 probe `.freebuff/probe-bug18-verify.mjs` — **3/3**. Files touched by agent B now also include `src/game/i18n-de.js` (two catalog entries). Known pre-existing quirk left as-is (not in scope): the probe key path never writes `save.settings.language`, so a probe-forced language applies to the session but not to a *new* save's settings mirror (matches the pre-fix flow).
+
+**CSS family verification (same round):** re-ran the full dock matrix (`probe-bughunt2.mjs`) at 844×390 DE+EN — findings vs the round-2 baseline: market-commodities **40 → 1**, bar-missions/guilds **33 → 1**, market-equipment 5 → 2, market-shipyard 10 → 1, concourse/market-floor **3 → 0**. The one remaining finding per state is the by-design scrollable page (`dock-content` v-clip), now with visible themed scrollbars. BUG-14 measured directly: `.market-layout` 841/841 (was 880 overflow) — root cause was the table as a flex/grid item with `min-width: auto`; `min-width: 0` cures it (same disease family as BUG-01). BUG-05's map-card change is code-verified only (needs a ≤520px-height run); BUG-08 is code-verified only (portrait sits behind the rotate gate).
 
 
 ## Suggested next rounds

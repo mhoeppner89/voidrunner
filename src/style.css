@@ -6759,7 +6759,7 @@ button.primary,
     height: 0.92rem;
   }
 
-  .scene-pointer b { font-size: 0.49rem; }
+  .scene-pointer b { font-size: 0.56rem; }
   .scene-pointer small { display: none; }
 }
 
@@ -7985,10 +7985,18 @@ button.primary,
 }
 
 /* BUG-14: 2×2 action grid halves the commodity row's min-content so all four
-   trade buttons fit an 844px viewport without the horizontal pan. */
+   trade buttons fit an 844px viewport without the horizontal pan. The table
+   itself must be allowed to shrink below its content's min-content — without
+   `min-width: 0` it stays at the rows' unwrapped width and overflows the
+   layout no matter how narrow the buttons get. */
 @media (max-width: 960px) {
   .market-actions {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .market-table {
+    min-width: 0;
+    max-width: 100%;
   }
 }
 
