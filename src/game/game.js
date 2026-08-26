@@ -8061,7 +8061,10 @@ export class GameSession {
             vx = -vx;
             vy = -vy;
         }
-        const margin = 54;
+        // The off-screen arrow is 84px across (see .target-edge-pointer); the
+        // clamp keeps its center 69px from the edge so the whole pointer —
+        // chevron, halo, and distance label — stays on screen.
+        const margin = 69;
         const halfW = Math.max(1, width / 2 - margin);
         const halfH = Math.max(1, height / 2 - margin);
         let t = Number.POSITIVE_INFINITY;

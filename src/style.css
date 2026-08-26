@@ -328,10 +328,10 @@ button.compact {
   position: absolute;
   top: 0;
   left: 0;
-  width: 54px;
-  height: 54px;
-  margin-left: -27px;
-  margin-top: -27px;
+  width: 84px;
+  height: 84px;
+  margin-left: -42px;
+  margin-top: -42px;
   transition: transform 60ms linear;
   pointer-events: none;
 }
@@ -339,32 +339,60 @@ button.compact {
 .target-edge-pointer i {
   position: absolute;
   inset: 0;
-}
+}  /* A dark halo behind the arrow so the marker reads against bright planets,
+     nebulas, and station hulls — the pointer used to vanish on light ground.
+     ::after is the halo, told to sit beneath the chevron (z-index 0) so it
+     darkens only the background, never the arrow itself. */
+  .target-edge-pointer i::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 50%;
+    width: 78px;
+    height: 78px;
+    margin-left: -39px;
+    border-radius: 50%;
+    z-index: 0;
+    background: radial-gradient(circle, rgba(1, 3, 2, 0.94) 0%, rgba(1, 3, 2, 0.36) 55%, rgba(1, 3, 2, 0) 72%);
+  }
 
-.target-edge-pointer i::before {
-  content: "";
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  width: 11px;
-  height: 11px;
-  margin-left: -5.5px;
-  border-top: 3px solid #efc56c;
-  border-left: 3px solid #efc56c;
-  transform: rotate(45deg);
-  filter: drop-shadow(0 0 4px rgba(239, 197, 108, 0.75));
+  .target-edge-pointer i::before {
+    content: "";
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    width: 26px;
+    height: 26px;
+    margin-left: -13px;
+    z-index: 1;
+    border-top: 6px solid #ffd977;
+    border-left: 6px solid #ffd977;
+    transform: rotate(45deg);
+    filter: drop-shadow(0 0 4px rgba(255, 217, 119, 0.95)) drop-shadow(0 0 12px rgba(255, 217, 119, 0.7)) drop-shadow(0 0 26px rgba(255, 217, 119, 0.45));
+    animation: target-edge-pulse 1.1s ease-in-out infinite;
+  }
+
+@keyframes target-edge-pulse {
+  0%,
+  100% {
+    transform: rotate(45deg) scale(1);
+  }
+  50% {
+    transform: rotate(45deg) scale(1.22);
+  }
 }
 
 .target-edge-pointer span {
   position: absolute;
-  bottom: 3px;
+  bottom: 2px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 0.5rem;
-  letter-spacing: 0.05em;
-  color: #efc56c;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #ffd977;
   white-space: nowrap;
-  text-shadow: 0 0 4px #000, 0 0 2px #000;
+  text-shadow: 0 0 6px #000, 0 0 3px #000, 0 1px 1px #000;
 }
 
 .target-bracket.is-hostile i,
@@ -376,8 +404,12 @@ button.compact {
   filter: drop-shadow(0 0 4px rgba(255, 83, 64, 0.85));
 }
 
+.target-edge-pointer.is-hostile i::before {
+  filter: drop-shadow(0 0 4px rgba(255, 83, 64, 0.95)) drop-shadow(0 0 12px rgba(255, 83, 64, 0.75)) drop-shadow(0 0 26px rgba(255, 83, 64, 0.5));
+}
+
 .target-edge-pointer.is-hostile span {
-  color: #ff6a55;
+  color: #ff8a75;
 }
 
 /* Surrendered targets: orange, no longer a threat (see surrenderShip). */
@@ -390,8 +422,12 @@ button.compact {
   filter: drop-shadow(0 0 4px rgba(255, 160, 64, 0.85));
 }
 
+.target-edge-pointer.is-surrendered i::before {
+  filter: drop-shadow(0 0 4px rgba(255, 160, 64, 0.95)) drop-shadow(0 0 12px rgba(255, 160, 64, 0.75)) drop-shadow(0 0 26px rgba(255, 160, 64, 0.5));
+}
+
 .target-edge-pointer.is-surrendered span {
-  color: #ffab55;
+  color: #ffc266;
 }
 
 .radar-shell {
