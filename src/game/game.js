@@ -1471,6 +1471,19 @@ export class GameSession {
         }
     }
     updateSimulation(dt, actions) {
+        // Headless drivers (probes, tests) may pass sparse action objects:
+        // default the numeric axes in place so a missing field can't NaN the
+        // throttle and freeze the ship. The frame path always supplies all of
+        // these; in-place defaulting allocates nothing. (Ported from the
+        // parallel 0.7.7a branch, agent B.)
+        if (actions.throttleDelta === undefined)
+            actions.throttleDelta = 0;
+        if (actions.pitch === undefined)
+            actions.pitch = 0;
+        if (actions.yaw === undefined)
+            actions.yaw = 0;
+        if (actions.roll === undefined)
+            actions.roll = 0;
         this.snapshotInterpolationState();
         this.renderer.updateWorld(dt);
         this.save.world.time += dt;
@@ -1736,6 +1749,7 @@ export class GameSession {
             deadline: quest.flags.deadline ?? (this.save.world.time + course.deadlineSeconds),
         };
         // Rebuild the gate markers for the restored travel leg (see acceptRace).
+        this.hardenRaceCourse(course);
         this.renderer.syncRaceGates(course.gates, 0, LOCATIONS[course.zone].position);
         // Keep the board consistent: an open ticket always reads as live so
         // the offer stays hidden until this entry resolves. Preserve any
@@ -1770,6 +1784,43 @@ export class GameSession {
             return undefined;
         const gate = course.gates.find((entry) => entry.id === id);
         return gate ? { course, gate, index: gate.index } : undefined;
+    }
+    // Gates must be flyable: any checkpoint that generated inside a rock is
+    // nudged to the nearest clear spot on a deterministic search ring. Runs
+    // at accept, at grid start, and on reload-restore (idempotent — gates
+    // that are already clear stay exactly where they are). Ported from the
+    // parallel 0.7.7a branch (agent B).
+    hardenRaceCourse(course) {
+        const obstacles = this.activeFieldObstacles(course.zone);
+        if (!obstacles.length)
+            return course;
+        const candidate = new THREE.Vector3();
+        for (let index = 0; index < course.gates.length; index += 1) {
+            const gate = course.gates[index];
+            candidate.set(gate.position[0], gate.position[1], gate.position[2]);
+            if (this.entryPositionClear(candidate, obstacles))
+                continue;
+            const rng = seededRandom(`${course.id}:gate-harden:${index}`);
+            const baseAngle = rng() * Math.PI * 2;
+            let settled = false;
+            for (const radius of [gate.radius * 0.8, gate.radius * 1.6, gate.radius * 2.4, gate.radius * 3.4]) {
+                for (let spoke = 0; spoke < 12 && !settled; spoke += 1) {
+                    const angle = baseAngle + (spoke * Math.PI * 2) / 12;
+                    candidate.set(
+                        gate.position[0] + Math.cos(angle) * radius,
+                        gate.position[1] + Math.sin(angle * 1.7) * radius * 0.35,
+                        gate.position[2] + Math.sin(angle) * radius,
+                    );
+                    if (this.entryPositionClear(candidate, obstacles)) {
+                        gate.position = [candidate.x, candidate.y, candidate.z];
+                        settled = true;
+                    }
+                }
+                if (settled)
+                    break;
+            }
+        }
+        return course;
     }
     raceGateTarget(id) {
         const found = this.raceGateById(id);
@@ -7575,6 +7626,10 @@ export class GameSession {
         // The board marks the ticket live: hides the offer until it resolves
         // and lets restoreActiveRace recognize an open entry after a reload.
         this.save.world.raceRecords[course.id] = { active: true };
+        // Gates must be flyable: nudge any checkpoint that generated inside a
+        // rock BEFORE the markers sync, so they land on the hardened geometry
+        // (ported from the parallel 0.7.7a branch).
+        this.hardenRaceCourse(course);
         this.activeRace = { state: 'travel', course, racers: [], startedAt: 0, playerStartTime: undefined, playerRank: 4, lastCountdown: 99, deadline: this.save.world.time + course.deadlineSeconds };
         // Gate markers render from the moment the entry is paid: the pilot must
         // SEE the first checkpoint when flying in (it used to pop only at the
@@ -7589,6 +7644,9 @@ export class GameSession {
     // Grid start: everyone lines up behind Gate 1 facing through it; the
     // countdown holds velocity at zero until the lights go green.
     startRaceAt(course) {
+        // Harden first: the grid slot is computed off Gate 1, so any buried
+        // checkpoint must be nudged before anything reads the geometry.
+        this.hardenRaceCourse(course);
         const player = this.save.player;
         const gate0 = course.gates[0];
         const zonePos = vec(LOCATIONS[course.zone].position);

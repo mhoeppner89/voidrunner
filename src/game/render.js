@@ -2425,7 +2425,9 @@ export class SpaceRenderer {
         }
         while (this.raceGateMeshes.length < gates.length) {
             const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.055, 10, 40), new THREE.MeshBasicMaterial({ color: 0x53e6c8, transparent: true, opacity: 0.9 }));
-            const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.radialTexture('#53e6c8', '#123a33'), transparent: true, opacity: 0.34, blending: THREE.AdditiveBlending, depthWrite: false }));
+            // Neutral glow texture tinted per state below (ported from the
+            // parallel 0.7.7a branch — matches the radar's gate blip language).
+            const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.radialTexture('#ffffff', '#5a6a78'), transparent: true, opacity: 0.34, blending: THREE.AdditiveBlending, depthWrite: false }));
             const group = new THREE.Group();
             group.add(ring);
             group.add(glow);
@@ -2447,20 +2449,39 @@ export class SpaceRenderer {
             group.scale.setScalar(gate.radius);
             group.userData.baseRadius = gate.radius;
             const [ring, glow] = group.children;
+            // Color language (ported from the parallel 0.7.7a branch, matching
+            // the radar blips): GREEN = fly through now, YELLOW = next after
+            // that, GREY = the one after, everything further ahead fades to
+            // the same grey but far more transparent. Passed gates dim out.
             if (index === activeIndex) {
-                ring.material.color.setHex(0x53e6c8);
+                ring.material.color.setHex(0x3dff6e);
                 ring.material.opacity = 0.95;
-                glow.material.opacity = 0.42;
+                glow.material.color.setHex(0x3dff6e);
+                glow.material.opacity = 0.5;
+            }
+            else if (index === activeIndex + 1) {
+                ring.material.color.setHex(0xffd24a);
+                ring.material.opacity = 0.8;
+                glow.material.color.setHex(0xffd24a);
+                glow.material.opacity = 0.3;
+            }
+            else if (index === activeIndex + 2) {
+                ring.material.color.setHex(0x9aa6b0);
+                ring.material.opacity = 0.5;
+                glow.material.color.setHex(0x9aa6b0);
+                glow.material.opacity = 0.1;
             }
             else if (index < activeIndex) {
-                ring.material.color.setHex(0x27514a);
-                ring.material.opacity = 0.35;
-                glow.material.opacity = 0.08;
+                ring.material.color.setHex(0x6b7680);
+                ring.material.opacity = 0.12;
+                glow.material.color.setHex(0x6b7680);
+                glow.material.opacity = 0.03;
             }
             else {
-                ring.material.color.setHex(0x3f9d8d);
-                ring.material.opacity = 0.6;
-                glow.material.opacity = 0.22;
+                ring.material.color.setHex(0x9aa6b0);
+                ring.material.opacity = 0.14;
+                glow.material.color.setHex(0x9aa6b0);
+                glow.material.opacity = 0.04;
             }
         });
         this.raceActiveGate = activeIndex;
@@ -2812,8 +2833,12 @@ export class SpaceRenderer {
         // The active race gate breathes so it reads as "next" at speed.
         if (this.raceActiveGate !== undefined) {
             const active = this.raceGateMeshes[this.raceActiveGate];
-            if (active?.visible)
+            if (active?.visible) {
+                // The green gate breathes: slow spin + a scale pulse so the
+                // start line reads from across the belt.
                 active.children[0].rotation.z += dt * 1.6;
+                active.children[0].scale.setScalar(1 + Math.sin(this.skyTime * 5.2) * 0.07);
+            }
         }
         const vesper = this.locationMeshes.get('vesper');
         if (vesper) {
