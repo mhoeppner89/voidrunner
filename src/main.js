@@ -11,6 +11,7 @@ let session;
 let cachedSave = loadGame();
 const vesperHoverPreview = new URLSearchParams(location.search).get('vesper-hover') === '1';
 const devPreviewParams = new URLSearchParams(location.search);
+const devAutoStart = devPreviewParams.get('dev-autostart') === '1';
 const devPreviewLocationParam = devPreviewParams.get('dev-dock');
 const devPreviewLocation = DOCK_LOCATION_IDS.includes(devPreviewLocationParam) ? devPreviewLocationParam : undefined;
 const devPreviewShipParam = devPreviewParams.get('dev-ship');
@@ -269,3 +270,65 @@ window.__VOID_PRIVATEER__ = {
     // until dismissed (tap the CONTINUE bar) or the duration elapses.
     playStoryLine: (name, text) => session?.playStoryLine(name, text),
 };
+
+// Small, stable browser-game hooks for the shared Playwright development
+// loop. Keep this deliberately narrower than getRuntime(): it describes only
+// the live, player-relevant scene and never serializes the renderer's circular
+// object graph.
+window.render_game_to_text = () => {
+    const runtime = session;
+    const save = runtime?.save ?? cachedSave;
+    if (!save)
+        return JSON.stringify({ mode: 'title', coordinates: 'world [x,y,z]; +y is up; ship forward is local -z' });
+    const race = runtime?.activeRace;
+    return JSON.stringify({
+        mode: save.player.dockedAt ? 'docked' : race?.state ? `race-${race.state}` : 'flight',
+        coordinates: 'world [x,y,z]; +y is up; ship forward is local -z',
+        player: {
+            position: save.player.position.map((value) => Math.round(value * 10) / 10),
+            velocity: save.player.velocity.map((value) => Math.round(value * 10) / 10),
+            fuel: Math.round(save.player.fuel * 10) / 10,
+            dockedAt: save.player.dockedAt ?? null,
+            targetId: save.player.currentTargetId ?? null,
+        },
+        race: race ? {
+            courseId: race.course.id,
+            state: race.state,
+            gate: save.player.raceGateIndex ?? 0,
+            gateCount: race.course.gates.length,
+            rank: race.playerRank,
+            draft: Math.round((race.slipstream?.strength ?? 0) * 100) / 100,
+            shortcutId: race.shortcut?.id ?? null,
+            visibleCourseGates: runtime.renderer?.raceGateMeshes?.filter((mesh) => mesh.visible).length ?? 0,
+            visibleShortcutGates: runtime.renderer?.raceShortcutMeshes?.filter((mesh) => mesh.visible).length ?? 0,
+            racers: race.racers.map((racer) => ({
+                id: racer.id,
+                variant: racer.variant,
+                gate: racer.raceGateIndex,
+                finished: Boolean(racer.raceFinished),
+                position: racer.position.map((value) => Math.round(value * 10) / 10),
+            })),
+        } : null,
+    });
+};
+
+// Deterministic stepping for browser QA. Normal play continues to use the
+// fixed-step rAF accumulator; this hook simply advances that same simulation
+// in exact 60 Hz slices and renders the resulting state once.
+window.advanceTime = (milliseconds) => {
+    if (!session || session.save.player.dockedAt)
+        return;
+    const steps = Math.max(1, Math.min(600, Math.round(Number(milliseconds) / (1000 / 60))));
+    const actions = { throttleDelta: 0, pitch: 0, yaw: 0, roll: 0 };
+    session.simAccumulator = 0;
+    for (let index = 0; index < steps; index += 1)
+        session.updateSimulation(1 / 60, actions);
+    session.simAccumulator = 0;
+    session.syncRender(0, performance.now());
+};
+
+// Query-gated development boot used by the shared browser-game smoke client.
+// It never alters a normal load and avoids timing a click against the title
+// screen while the first 3D session is still being constructed.
+if (devAutoStart)
+    beginSession('new');

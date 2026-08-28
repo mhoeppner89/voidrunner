@@ -784,11 +784,12 @@ export class AudioManager {
             case 'hyperSpool': this.playHyperdriveSpool(strength, out); break;
             case 'hyperDrop': this.playHyperdriveDrop(strength, out); break;
             case 'hyperActive': this.playHyperdriveActive(out); break;
+            case 'slipstream': this.playSlipstream(strength, out); break;
             case 'pickup': this.playPickup(strength, out); break;
             default: this.playImpact(now, strength, out); break;
         }
         // Release the chain when the effect is done (the longest tail wins).
-        const releaseAt = { explosion: 1.6, dock: 1.1, missile: 0.85, gauss: 0.5, pdc: 0.3, ripper: 0.6, ion: 0.45, mortar: 0.8, scan: 0.5, hyperSpool: 2.1, hyperActive: 4.0, hyperDrop: 0.6, pickup: 0.35 }[effect] ?? 0.4;
+        const releaseAt = { explosion: 1.6, dock: 1.1, missile: 0.85, gauss: 0.5, pdc: 0.3, ripper: 0.6, ion: 0.45, mortar: 0.8, scan: 0.5, hyperSpool: 2.1, hyperActive: 4.0, hyperDrop: 0.6, slipstream: 0.75, pickup: 0.35 }[effect] ?? 0.4;
         setTimeout(release, releaseAt * 1000 + 60);
     }
 
@@ -993,6 +994,16 @@ export class AudioManager {
         const now = this.context.currentTime;
         this.playNoiseBurst({ at: now, duration: 2.6, start: 900, end: 1800, level: 0.018, playbackRate: 0.6, out });
         this.playNoiseBurst({ at: now + 1.3, duration: 2.6, start: 1400, end: 700, level: 0.014, playbackRate: 0.45, out });
+    }
+
+    // Drafting cue: a short filtered rush that rises as the ship enters the
+    // narrow wake, followed by a bright slingshot tick. It is deliberately
+    // brief; the race code plays it only on entry so it never becomes a drone.
+    playSlipstream(intensity = 1, out) {
+        const now = this.context.currentTime;
+        this.playNoiseBurst({ at: now, duration: 0.58, start: 420, end: 2600, level: 0.028 * intensity, playbackRate: 1.15, out });
+        this.playTone({ at: now + 0.18, frequency: 310, endFrequency: 1040, duration: 0.34, type: 'sine', level: 0.025 * intensity, filterFrequency: 2800, out });
+        this.playTone({ at: now + 0.43, frequency: 1180, endFrequency: 1540, duration: 0.12, type: 'triangle', level: 0.018 * intensity, filterFrequency: 3400, out });
     }
 
     // A bright rising chime for tractored cargo / ore / loot.

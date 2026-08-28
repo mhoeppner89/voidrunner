@@ -2,6 +2,61 @@ import * as THREE from 'three';
 import { LOCATIONS } from './data.js';
 import { pick, randomBetween, randomInt, seededRandom } from './random.js';
 import { t } from './i18n.js';
+import { RACE_COURSES } from './racing.js';
+
+// Fixed race courses need fixed flyable corridors. The surrounding fields may
+// still vary by seed, but random rocks, fragments, and salvage nodes are never
+// placed through an authored main or shortcut line. Large authored wrecks are
+// left untouched: those are the meaningful obstacles the Mourning courses are
+// designed around.
+const RACE_CORRIDOR_MARGIN = 12;
+const buildRaceCorridors = (zone) => {
+    const segments = [];
+    for (const course of Object.values(RACE_COURSES)) {
+        if (course.zone !== zone)
+            continue;
+        const points = course.localPoints ?? [];
+        for (let index = 1; index < points.length; index += 1)
+            segments.push([points[index - 1], points[index]]);
+        for (const shortcut of course.shortcuts ?? []) {
+            const shortcutPoints = shortcut.gates?.map((gate) => gate.localPosition) ?? [];
+            if (!shortcutPoints.length)
+                continue;
+            // entryIndex is the next mandatory gate when the branch becomes
+            // available; exitIndex is the next mandatory gate after it rejoins.
+            const entry = points[Math.max(0, Math.min(points.length - 1, shortcut.entryIndex))];
+            const exit = points[Math.max(0, Math.min(points.length - 1, shortcut.exitIndex + 1))];
+            const branch = [entry, ...shortcutPoints, exit].filter(Boolean);
+            for (let index = 1; index < branch.length; index += 1)
+                segments.push([branch[index - 1], branch[index]]);
+        }
+    }
+    return segments;
+};
+const RACE_CORRIDORS = {
+    shardbelt: buildRaceCorridors('shardbelt'),
+    'mourning-line': buildRaceCorridors('mourning-line'),
+};
+const pointSegmentDistanceSq = (point, start, end) => {
+    const dx = end[0] - start[0];
+    const dy = end[1] - start[1];
+    const dz = end[2] - start[2];
+    const lengthSq = dx * dx + dy * dy + dz * dz;
+    const along = lengthSq > 1e-8
+        ? Math.max(0, Math.min(1, ((point[0] - start[0]) * dx + (point[1] - start[1]) * dy + (point[2] - start[2]) * dz) / lengthSq))
+        : 0;
+    const ox = point[0] - (start[0] + dx * along);
+    const oy = point[1] - (start[1] + dy * along);
+    const oz = point[2] - (start[2] + dz * along);
+    return ox * ox + oy * oy + oz * oz;
+};
+const intersectsRaceCorridor = (zone, local, reach) => {
+    const limitSq = (Math.max(0, reach) + RACE_CORRIDOR_MARGIN) ** 2;
+    for (const [start, end] of RACE_CORRIDORS[zone] ?? [])
+        if (pointSegmentDistanceSq(local, start, end) <= limitSq)
+            return true;
+    return false;
+};
 // The asteroid surface is a detail-2 icosahedron whose vertices are pushed
 // radially by a per-variant distortion function, then scaled per axis by the
 // rock's radius × node.scale. That deformed mesh is the ONLY source of truth
@@ -234,6 +289,14 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
     const center = LOCATIONS.shardbelt.position;
     const nodes = [];
     const shape = () => randomInt(rng, 0, 3);
+    const pushIfRaceClear = (node, local, movingMargin = 0) => {
+        // Clear the rock's full envelope (sphere ∪ box corner reach), not just
+        // its bounding sphere: a rock that misses the corridor by its sphere
+        // can still have a spawn-clearance box corner intruding on a gate.
+        const reach = asteroidEnvelopeReach(node) + movingMargin;
+        if (!intersectsRaceCorridor('shardbelt', local, reach))
+            nodes.push(node);
+    };
     // Rock crown: a broad, flyable tunnel through a ring of massive static bodies.
     const ringRadius = 372;
     for (let index = 0; index < 36; index += 1) {
@@ -242,7 +305,7 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
         const local = [Math.cos(angle) * radial, Math.sin(angle) * radial * 0.78, randomBetween(rng, -78, 78)];
         const id = `rock-crown-${index}`;
         const remaining = depletedOrRoll(rng, depleted, id, 3.4, 7.8);
-        nodes.push({
+        const node = {
             id,
             position: add(center, local),
             velocity: [0, 0, 0],
@@ -256,14 +319,15 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
             scanned: scanned.includes(id),
             tunnelPart: true,
             shape: shape(),
-        });
+        };
+        pushIfRaceClear(node, local);
     }
     // Monoliths: huge, jagged slabs you can tuck behind for cover or mine dry.
     for (let index = 0; index < 18; index += 1) {
         const offset = sphericalOffset(rng, 1860, 900);
         const id = `asteroid-monolith-${index}`;
         const remaining = depletedOrRoll(rng, depleted, id, 4, 8);
-        nodes.push({
+        const node = {
             id,
             position: add(center, offset),
             velocity: [0, 0, 0],
@@ -277,7 +341,8 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
             scanned: scanned.includes(id),
             tunnelPart: false,
             shape: shape(),
-        });
+        };
+        pushIfRaceClear(node, offset);
     }
     for (let index = 0; index < 330; index += 1) {
         let offset = sphericalOffset(rng, 2200, 210);
@@ -286,7 +351,7 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
             offset = [offset[0] + 405, offset[1], offset[2]];
         const id = `asteroid-static-${index}`;
         const remaining = depletedOrRoll(rng, depleted, id, 1.2, 5.4);
-        nodes.push({
+        const node = {
             id,
             position: add(center, offset),
             velocity: [0, 0, 0],
@@ -300,7 +365,8 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
             scanned: scanned.includes(id),
             tunnelPart: false,
             shape: shape(),
-        });
+        };
+        pushIfRaceClear(node, offset);
     }
     for (let index = 0; index < 150; index += 1) {
         const offset = sphericalOffset(rng, 2160, 114);
@@ -308,7 +374,7 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
         const theta = rng() * Math.PI * 2;
         const id = `asteroid-drift-${index}`;
         const remaining = depletedOrRoll(rng, depleted, id, 0.4, 1.8);
-        nodes.push({
+        const node = {
             id,
             position: add(center, offset),
             velocity: [Math.cos(theta) * speed, randomBetween(rng, -0.25, 0.25), Math.sin(theta) * speed],
@@ -322,7 +388,10 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
             scanned: scanned.includes(id),
             tunnelPart: false,
             shape: shape(),
-        });
+        };
+        // Drifters remain genuine live hazards, but do not begin directly in
+        // a race line. The extra band gives a pilot time to read their motion.
+        pushIfRaceClear(node, offset, 34);
     }
     return nodes;
 };
@@ -331,6 +400,20 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
 // actually touches. This is the single source of truth for both hard collision
 // and "distance to the surface" reads (scanning, mining, landing).
 export const asteroidCollisionRadius = (node) => node.radius * Math.max(node.scale[0], node.scale[1], node.scale[2]);
+// The spawn-clearance envelope game.js builds for each rock is an oriented box
+// scaled to radius·scale·ASTEROID_COLLISION_FACTOR (0.9). Its corners reach
+// 0.9·radius·hypot(scale), which on anisotropic rocks pokes up to ~56% past the
+// bounding sphere that asteroidCollisionRadius reports — the hard-collision
+// mesh lives between the two. Corridor reservation must clear the LARGER of
+// the sphere and the box corner reach, or a rock's box can still intrude on an
+// authored gate even though its sphere missed the race line.
+export const ASTEROID_COLLISION_FACTOR = 0.9;
+export const asteroidEnvelopeReach = (node) => {
+    const sx = node.scale[0];
+    const sy = node.scale[1];
+    const sz = node.scale[2];
+    return node.radius * Math.max(Math.max(sx, sy, sz), ASTEROID_COLLISION_FACTOR * Math.hypot(sx, sy, sz));
+};
 // Wreck nodes use the same scale for their rendered collectible chunk and their
 // spherical player/beam collision envelope. Keeping this in worldData avoids the
 // renderer and simulation drifting apart as the chunk size is tuned.
@@ -362,7 +445,20 @@ export const generateGraveyardPieces = (seed) => {
     // starboard, and +Y is up. The fixed formations tell the battle story;
     // seeded fragment streams add variation without dissolving the landmarks.
     const worldPosition = (local) => add(center, local);
-    const pushPiece = ({ id, kind, local, rotation = [0, 0, 0], scale, collisionRadius, moving = false, drift = [0, 0, 0], spin = [0, 0, 0], finish, collidable = true, zone, route }) => {
+    const pushPiece = ({ id, kind, local, rotation = [0, 0, 0], scale, collisionRadius, moving = false, drift = [0, 0, 0], spin = [0, 0, 0], finish, collidable = true, zone, route, reserveRaceCorridor = false }) => {
+        // Fixed wreck structures are authored around the courses and remain
+        // meaningful obstacles. Seeded loose debris is different: reject it
+        // before insertion when its full visual reach would intrude into a
+        // fixed main or shortcut line.
+        const geometryHalfExtents = GRAVEYARD_GEOMETRY_HALF_EXTENTS[kind] ?? [0.5, 0.5, 0.5];
+        const visualReach = Math.max(1, Math.hypot(
+            geometryHalfExtents[0] * scale[0],
+            geometryHalfExtents[1] * scale[1],
+            geometryHalfExtents[2] * scale[2],
+        ));
+        const raceReach = Math.max(collisionRadius ?? 0, visualReach) + (moving ? 28 : 0);
+        if (reserveRaceCorridor && intersectsRaceCorridor('mourning-line', local, raceReach))
+            return;
         const piece = {
             id,
             kind,
@@ -633,6 +729,7 @@ export const generateGraveyardPieces = (seed) => {
                 zone,
                 route,
                 finish,
+                reserveRaceCorridor: true,
             });
         }
     };
@@ -683,7 +780,7 @@ export const generateWreckNodes = (seed, depleted, scanned = []) => {
             ];
             const salvage = pick(rng, salvageTypes);
             const id = `salvage-node-${index}`;
-            nodes.push({
+            const node = {
                 id,
                 name: `${t(site.label)} · ${t(pick(rng, names))} ${String.fromCharCode(65 + randomInt(rng, 0, 18))}-${randomInt(rng, 10, 99)}`,
                 position: add(center, local),
@@ -693,7 +790,9 @@ export const generateWreckNodes = (seed, depleted, scanned = []) => {
                 scanned: scanned.includes(id),
                 zone: site.zone,
                 route: site.route,
-            });
+            };
+            if (!intersectsRaceCorridor('mourning-line', local, wreckNodeCollisionRadius(node)))
+                nodes.push(node);
             index += 1;
         }
     });

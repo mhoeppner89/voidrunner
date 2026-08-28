@@ -1512,6 +1512,20 @@ button.compact {
   border-top-color: #c69a3f;
 }
 
+.mission-card.race {
+  border-top-color: var(--void-gold);
+}
+
+.mission-card.is-locked {
+  border-color: rgba(135, 154, 145, 0.14);
+  border-top-color: #4d5754;
+  filter: saturate(0.55);
+}
+
+.mission-card.is-locked > :not(button) {
+  opacity: 0.68;
+}
+
 .mission-card header,
 .equipment-card header,
 .ship-card header {
@@ -1568,6 +1582,29 @@ button.compact {
   color: #c5c5b9;
   font-family: "Courier New", ui-monospace, monospace;
   font-size: 0.58rem;
+}
+
+.race-course-meta {
+  display: grid;
+  gap: 0.2rem;
+  margin: -0.18rem 0 0.72rem;
+  color: var(--teal);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.56rem;
+  letter-spacing: 0.045em;
+}
+
+.race-course-meta span:last-child {
+  color: var(--retro-amber);
+}
+
+.race-unlock-note {
+  display: block;
+  min-height: 2.1em;
+  margin: -0.35rem 0 0.58rem;
+  color: #9da6a1;
+  font-size: 0.58rem;
+  line-height: 1.35;
 }
 
 .active-list {
@@ -2735,6 +2772,12 @@ button.compact {
   color: var(--retro-amber);
 }
 
+.screen-race-strip[data-phase='finished'] span,
+.screen-race-strip[data-phase='finished'] b {
+  color: var(--void-gold);
+  text-shadow: 0 0 8px rgba(224, 186, 104, 0.65), 0 0 3px rgba(2, 8, 24, 0.95);
+}
+
 .screen-race-strip span {
   overflow: hidden;
   min-width: 0;
@@ -2752,6 +2795,22 @@ button.compact {
   color: var(--retro-green);
   font-weight: 700;
   text-overflow: ellipsis;
+}
+
+/* The landscape-phone cockpit gives the own-ship monitor about 160 px. Keep
+   both shortcut/draft state and the non-shrinking rank/clock readable there. */
+@media (max-width: 900px), (pointer: coarse) {
+  .screen-race-strip {
+    gap: 0.14rem;
+    padding-right: 0.2rem;
+    padding-left: 0.2rem;
+    font-size: clamp(0.44rem, 0.78vw, 0.6rem);
+    letter-spacing: 0.02em;
+  }
+
+  .screen-race-strip span {
+    letter-spacing: 0.025em;
+  }
 }
 
 /* Mounted-weapon readout on the own-ship monitor: gun name left, ammo pool
@@ -7122,6 +7181,31 @@ button.primary,
   50% {
     box-shadow: 0 0 14px rgba(83, 230, 200, 0.95);
   }
+}
+
+/* Out-of-plane cue on the chart: a short tick above or below a race
+   checkpoint when it rides above/below the ecliptic. Its length scales with
+   the marker's elevation angle (--alt, 0..1, distance-aware — see
+   buildNavigationMapModel), so a far gathering reads as a shallow stub and a
+   close steep gate reads long. */
+.tactical-contact .tactical-alt {
+  position: absolute;
+  left: 50%;
+  width: 2px;
+  height: calc(5px + var(--alt) * 11px);
+  background: #53e6c8;
+  box-shadow: 0 0 5px rgba(83, 230, 200, 0.75);
+  pointer-events: none;
+}
+
+.tactical-contact .tactical-alt.up {
+  top: -5px;
+  transform: translateX(-50%);
+}
+
+.tactical-contact .tactical-alt.down {
+  bottom: -5px;
+  transform: translateX(-50%);
 }
 
 /* An active search sweep on the chart: a dashed ring at the searching ship's

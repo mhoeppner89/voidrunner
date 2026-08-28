@@ -10,6 +10,9 @@ const NEG_Z = new THREE.Vector3(0, 0, -1);
 const UP_AXIS = new THREE.Vector3(0, 1, 0);
 const FORWARD_AXIS = new THREE.Vector3(0, 0, 1);
 const tmpGateAxis = new THREE.Vector3();
+const tmpRacePosition = new THREE.Vector3();
+const tmpRaceCenter = new THREE.Vector3();
+const tmpRacePrevious = new THREE.Vector3();
 const cssHex = (value) => `#${value.toString(16).padStart(6, '0')}`;
 // Cockpit sprite scale: idle is held slightly zoomed-in so the frame still
 // fills the view when it relaxes to COCKPIT_ZOOM_BURN under afterburner.
@@ -55,6 +58,26 @@ export const GLB_SHIP_CONFIG = {
     lancer: { file: 'lancer.glb', yaw: Math.PI / 2, scale: 6.65, rearAxis: [-1, 0, 0], enginePorts: [[-0.85, 0, -0.22], [-0.85, 0, 0], [-0.85, 0, 0.22]] },
     'atlas-freighter': { file: 'atlas.glb', yaw: Math.PI / 2, scale: 13.4, rearAxis: [-1, 0, 0], enginePorts: [[-0.9, 0, -0.25], [-0.9, 0, 0.25]] },
 };
+// Race entities carry their own hull variant so the starting grid can show
+// the actual ships that are about to race. Ordinary traffic still only has a
+// role, so retain the role mapping as the fallback for every other ship.
+const shipVariantForEntity = (entity) => entity?.variant ?? shipVariantForRole(entity?.role);
+const paletteForEntity = (entity) => {
+    const palette = paletteForFaction(entity?.faction, entity?.hostile);
+    return entity?.race && entity?.raceLivery ? { ...palette, ...entity.raceLivery } : palette;
+};
+const vectorInto = (value, out) => {
+    if (value?.isVector3)
+        return out.copy(value);
+    out.set(Number.isFinite(value?.[0]) ? value[0] : 0, Number.isFinite(value?.[1]) ? value[1] : 0, Number.isFinite(value?.[2]) ? value[2] : 0);
+    return out;
+};
+const unitDirectionInto = (value, out) => {
+    vectorInto(value, out);
+    if (out.lengthSq() < 1e-6)
+        out.set(0, 0, 1);
+    return out.normalize();
+};
 // Per-variant engine glow tuning, applied on top of the shared defaults. The
 // talon's twin ports sit close together, so its two additive flares overlap
 // into one bright blob that reads hotter than any other ship.
@@ -94,6 +117,8 @@ export class SpaceRenderer {
     laserFx = null;
     raceGateRoot = null;
     raceGateMeshes = [];
+    raceShortcutMeshes = [];
+    raceStartRoot = null;
     raceActiveGate;
     shipMeshCount = 0;
     // GLB ship hulls: per-variant cached model (or null when the load failed),
@@ -1947,8 +1972,8 @@ export class SpaceRenderer {
         return texture;
     }
     createShipMesh(entity) {
-        const variant = shipVariantForRole(entity.role);
-        const palette = paletteForFaction(entity.faction, entity.hostile);
+        const variant = shipVariantForEntity(entity);
+        const palette = paletteForEntity(entity);
         const model = createVoxelShipModel(variant, palette);
         const group = model.group;
         const baseScale = variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1;
@@ -2048,18 +2073,25 @@ export class SpaceRenderer {
     // mesh's quaternion and scale every frame, which would wipe the yaw and
     // world size if they lived on the same object. Geometry and textures stay
     // shared with the cached model.
-    createGlbShipMesh(entity, model, config) {
+    createGlbShipMesh(entity, model, config, variantOverride) {
         const wrapper = new THREE.Group();
         const group = model.clone(true);
         wrapper.add(group);
-        const variant = shipVariantForRole(entity.role);
-        const palette = paletteForFaction(entity.faction, entity.hostile);
+        const variant = variantOverride ?? shipVariantForEntity(entity);
+        const palette = paletteForEntity(entity);
         const tint = new THREE.Color(palette.hull);
         const emissiveMaterials = [];
         group.traverse((child) => {
             if (child.material instanceof THREE.MeshStandardMaterial) {
                 const material = child.material.clone();
                 material.color.copy(tint).lerp(new THREE.Color(0xffffff), 0.45);
+                if (entity.race) {
+                    // A low self-lit wash keeps the custom race paint readable
+                    // while the ships idle at the gathering point and under
+                    // the Shardbelt's uneven lighting.
+                    material.emissive.copy(tint);
+                    material.emissiveIntensity = 0.24;
+                }
                 child.material = material;
                 emissiveMaterials.push(material);
             }
@@ -2117,7 +2149,8 @@ export class SpaceRenderer {
     }
     // Replace a voxel placeholder with the real hull once its GLB resolves.
     swapShipMesh(entity, voxelMesh, model, variant) {
-        const glbMesh = this.createGlbShipMesh(entity, model, GLB_SHIP_CONFIG[variant]);
+        const resolvedVariant = variant ?? shipVariantForEntity(entity);
+        const glbMesh = this.createGlbShipMesh(entity, model, GLB_SHIP_CONFIG[resolvedVariant], resolvedVariant);
         glbMesh.position.copy(voxelMesh.position);
         glbMesh.quaternion.copy(voxelMesh.quaternion);
         this.dynamicRoot.remove(voxelMesh);
@@ -2156,11 +2189,24 @@ export class SpaceRenderer {
         }
         entities.forEach((entity) => {
             let mesh = this.shipMeshes.get(entity.id);
+            const variant = shipVariantForEntity(entity);
+            // A race grid can supply an explicit hull variant even though the
+            // entity role remains `trader`. Reconcile a changed variant just
+            // like a newly spawned entity so a recycled id cannot keep the old
+            // hull shape.
+            if (mesh && mesh.userData.variant !== variant) {
+                this.dynamicRoot.remove(mesh);
+                if (mesh.userData.glb)
+                    this.disposeGlbShip(mesh);
+                else
+                    this.disposeObject(mesh);
+                this.shipMeshes.delete(entity.id);
+                mesh = undefined;
+            }
             if (!mesh) {
-                const variant = shipVariantForRole(entity.role);
                 const ready = this.glbShipModels.get(variant);
                 if (ready) {
-                    mesh = this.createGlbShipMesh(entity, ready, GLB_SHIP_CONFIG[variant]);
+                    mesh = this.createGlbShipMesh(entity, ready, GLB_SHIP_CONFIG[variant], variant);
                 }
                 else {
                     mesh = this.createShipMesh(entity); // voxel placeholder
@@ -2189,9 +2235,13 @@ export class SpaceRenderer {
             }
             const damage = 1 - entity.hull / entity.maxHull;
             const baseScale = Number(mesh.userData.baseScale ?? 1);
-            mesh.scale.setScalar(baseScale * (1 + Math.sin(now * 0.013 + entity.spawnTime) * 0.006));
+            // Older/special entities may not carry spawnTime. A NaN phase
+            // makes the whole object matrix NaN and silently draws nothing,
+            // even though mesh.visible remains true.
+            const spawnPhase = Number.isFinite(entity.spawnTime) ? entity.spawnTime : 0;
+            mesh.scale.setScalar(baseScale * (1 + Math.sin(now * 0.013 + spawnPhase) * 0.006));
             mesh.visible = entity.hull > 0;
-            const emissiveIntensity = entity.hostile ? 0.18 + damage * 0.28 : damage * 0.12;
+            const emissiveIntensity = entity.race ? 0.24 + damage * 0.12 : entity.hostile ? 0.18 + damage * 0.28 : damage * 0.12;
             const emissiveMaterials = mesh.userData.emissiveMaterials;
             if (emissiveMaterials) {
                 for (const material of emissiveMaterials)
@@ -2205,7 +2255,7 @@ export class SpaceRenderer {
             if (flares) {
                 const variant = mesh.userData.variant;
                 const glow = ENGINE_GLOW_TUNING[variant];
-                const boost = entity.burning ? ENGINE_FLARE_BURNING_BOOST : entity.hostile && entity.targetId ? ENGINE_FLARE_HOSTILE_BOOST : 1;
+                const boost = entity.burning ? ENGINE_FLARE_BURNING_BOOST : entity.race ? 1.65 : entity.hostile && entity.targetId ? ENGINE_FLARE_HOSTILE_BOOST : 1;
                 const baseOpacity = (variant === 'atlas-freighter' ? ENGINE_FLARE_OPACITY_ATLAS : ENGINE_FLARE_OPACITY) * (glow?.flareOpacity ?? 1);
                 const baseSize = (variant === 'atlas-freighter' ? ENGINE_FLARE_SIZE_ATLAS : ENGINE_FLARE_SIZE) * (glow?.flareScale ?? 1);
                 for (const flare of flares) {
@@ -2427,81 +2477,312 @@ export class SpaceRenderer {
             mesh.rotation.y += 0.024;
         });
     }
+    // Race presentation is deliberately render-only. None of these groups is
+    // added to the dynamic entity store or tagged as a gameplay target, and
+    // every child has a no-op raycast so a gate can never become a collision or
+    // tap-selection surface by accident.
+    ensureRaceGateRoot() {
+        if (!this.raceGateRoot) {
+            this.raceGateRoot = new THREE.Group();
+            this.raceGateRoot.name = 'race-course-visuals';
+            this.raceGateRoot.raycast = () => { };
+            this.scene.add(this.raceGateRoot);
+        }
+        return this.raceGateRoot;
+    }
+    createRaceGateMesh() {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.055, 10, 40), new THREE.MeshBasicMaterial({ color: 0x53e6c8, transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false }));
+        // Neutral glow texture tinted per state below (ported from the
+        // parallel 0.7.7a branch — matches the radar's gate blip language).
+        const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.radialTexture('#ffffff', '#5a6a78'), transparent: true, opacity: 0.34, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+        // The finish ring stays hidden for ordinary checkpoints. Keeping it in
+        // every pooled group avoids allocating when a shorter course reuses a
+        // renderer that previously displayed a finish gate.
+        const finishRing = new THREE.Mesh(new THREE.TorusGeometry(1, 0.04, 10, 40), new THREE.MeshBasicMaterial({ color: 0xfff6d8, transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false }));
+        finishRing.visible = false;
+        finishRing.scale.setScalar(1.16);
+        const group = new THREE.Group();
+        group.name = 'race-gate';
+        group.raycast = () => { };
+        ring.raycast = () => { };
+        glow.raycast = () => { };
+        finishRing.raycast = () => { };
+        group.add(ring);
+        group.add(glow);
+        group.add(finishRing);
+        group.userData.baseRingScale = 1;
+        group.userData.finishRingScale = 1.16;
+        group.userData.glowOpacity = 0.34;
+        group.userData.pulseUntil = 0;
+        return group;
+    }
+    createRaceShortcutMesh() {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.042, 8, 28), new THREE.MeshBasicMaterial({ color: 0xc894ff, transparent: true, opacity: 0.72, depthWrite: false, toneMapped: false }));
+        const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.radialTexture('#ffffff', '#9b68d8'), transparent: true, opacity: 0.27, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+        glow.scale.setScalar(1.55);
+        const group = new THREE.Group();
+        group.name = 'race-shortcut-gate';
+        group.raycast = () => { };
+        ring.raycast = () => { };
+        glow.raycast = () => { };
+        group.add(ring);
+        group.add(glow);
+        group.userData.glowOpacity = 0.27;
+        group.userData.baseRingScale = 1;
+        return group;
+    }
+    // A compact physical marker at the gathering point. It is visible during
+    // travel and the countdown but has no physics representation. The ring is
+    // aligned to the supplied direction; the post remains upright so the
+    // marker reads clearly even when approached from above or below.
+    syncRaceStart(gathering, phase = 'travel') {
+        if (!gathering?.position)
+            return this.clearRaceStart();
+        if (!this.raceStartRoot) {
+            const root = new THREE.Group();
+            root.name = 'race-gathering-marker';
+            root.raycast = () => { };
+            const frame = new THREE.Group();
+            frame.name = 'race-start-frame';
+            frame.raycast = () => { };
+            const ringMaterial = new THREE.MeshBasicMaterial({ color: 0x5be4d0, transparent: true, opacity: 0.8, depthWrite: false, toneMapped: false });
+            const railMaterial = new THREE.MeshBasicMaterial({ color: 0x53b8cb, transparent: true, opacity: 0.48, depthWrite: false, toneMapped: false });
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.055, 10, 40), ringMaterial);
+            const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.radialTexture('#ffffff', '#4fcfc4'), transparent: true, opacity: 0.26, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+            glow.scale.setScalar(2.1);
+            const railA = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, 1.5), railMaterial);
+            railA.position.x = -0.44;
+            const railB = railA.clone();
+            railB.position.x = 0.44;
+            railB.material = railMaterial;
+            const crossbar = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.035, 0.035), railMaterial);
+            crossbar.position.z = 0.22;
+            frame.add(ring);
+            frame.add(glow);
+            frame.add(railA);
+            frame.add(railB);
+            frame.add(crossbar);
+            const postMaterial = new THREE.MeshBasicMaterial({ color: 0xf4c766, transparent: true, opacity: 0.76, depthWrite: false, toneMapped: false });
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.07, 1.25, 8), postMaterial);
+            post.position.y = 0.7;
+            const beacon = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.radialTexture('#fff8db', '#e7ae4d'), transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+            beacon.position.y = 1.42;
+            beacon.scale.setScalar(1.3);
+            for (const object of [frame, ring, glow, railA, railB, crossbar, post, beacon])
+                object.raycast = () => { };
+            root.add(frame);
+            root.add(post);
+            root.add(beacon);
+            root.userData.frame = frame;
+            root.userData.ring = ring;
+            root.userData.glow = glow;
+            root.userData.post = post;
+            root.userData.beacon = beacon;
+            this.raceStartRoot = root;
+            this.scene.add(root);
+        }
+        const root = this.raceStartRoot;
+        const frame = root.userData.frame;
+        const ring = root.userData.ring;
+        const glow = root.userData.glow;
+        const post = root.userData.post;
+        const beacon = root.userData.beacon;
+        const radius = Math.max(0.1, Number.isFinite(gathering.radius) ? gathering.radius : 1);
+        // Arrival uses the full authored radius, but the world marker is only
+        // a signpost. Capping its visual size keeps the three waiting hulls
+        // visible through and around it during the approach.
+        const visualRadius = Math.min(radius, 30);
+        vectorInto(gathering.position, root.position);
+        unitDirectionInto(gathering.direction, tmpGateAxis);
+        frame.quaternion.setFromUnitVectors(FORWARD_AXIS, tmpGateAxis);
+        frame.scale.setScalar(visualRadius);
+        frame.userData.baseRadius = visualRadius;
+        // Travel is cool teal; countdown warms the same marker to gold without
+        // introducing a screen-space overlay or a new HUD card.
+        const countdown = phase !== 'travel';
+        ring.material.color.setHex(countdown ? 0xffd26b : 0x5be4d0);
+        ring.material.opacity = countdown ? 0.92 : 0.8;
+        glow.material.color.setHex(countdown ? 0xffc65b : 0x4fcfc4);
+        glow.material.opacity = countdown ? 0.38 : 0.26;
+        post.material.color.setHex(countdown ? 0xffd26b : 0xf4c766);
+        post.material.opacity = countdown ? 0.88 : 0.76;
+        beacon.material.color.setHex(countdown ? 0xffffe7 : 0xffe5a1);
+        beacon.material.opacity = countdown ? 0.62 : 0.42;
+        post.scale.setScalar(visualRadius);
+        beacon.scale.setScalar(visualRadius * (countdown ? 1.55 : 1.3));
+        beacon.position.y = visualRadius * 1.42;
+        root.userData.phase = phase;
+        root.userData.radius = visualRadius;
+        root.visible = true;
+    }
+    clearRaceStart() {
+        if (this.raceStartRoot)
+            this.raceStartRoot.visible = false;
+    }
     // Race gates: one ring per checkpoint, pooled and reused across races.
     // Static geometry — syncRaceGates only places/tints them; updateWorld
     // pulses the active ring so the next checkpoint reads at race speed.
-    syncRaceGates(gates, activeIndex, center) {
-        if (!this.raceGateRoot) {
-            this.raceGateRoot = new THREE.Group();
-            this.scene.add(this.raceGateRoot);
+    // `options.shortcuts` is intentionally separate from ordinary gates so a
+    // branch can be shown only at the segment where it is actually usable.
+    syncRaceGates(gates = [], activeIndex = 0, center = [0, 0, 0], options = {}) {
+        if (!Array.isArray(gates) || gates.length === 0) {
+            this.clearRaceGates();
+            return;
         }
+        const root = this.ensureRaceGateRoot();
+        const currentIndex = Number.isFinite(activeIndex) ? activeIndex : 0;
         while (this.raceGateMeshes.length < gates.length) {
-            const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.055, 10, 40), new THREE.MeshBasicMaterial({ color: 0x53e6c8, transparent: true, opacity: 0.9 }));
-            // Neutral glow texture tinted per state below (ported from the
-            // parallel 0.7.7a branch — matches the radar's gate blip language).
-            const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.radialTexture('#ffffff', '#5a6a78'), transparent: true, opacity: 0.34, blending: THREE.AdditiveBlending, depthWrite: false }));
-            const group = new THREE.Group();
-            group.add(ring);
-            group.add(glow);
-            this.raceGateRoot.add(group);
+            const group = this.createRaceGateMesh();
+            root.add(group);
             this.raceGateMeshes.push(group);
         }
+        vectorInto(center, tmpRaceCenter);
         gates.forEach((gate, index) => {
             const group = this.raceGateMeshes[index];
+            if (!gate?.position) {
+                group.visible = false;
+                return;
+            }
             group.visible = true;
-            group.position.set(gate.position[0], gate.position[1], gate.position[2]);
-            // Face along the track: gate N aims from its predecessor (the first
-            // gate aims away from the zone center).
-            const prev = index > 0 ? gates[index - 1].position : center;
-            const dx = gate.position[0] - prev[0];
-            const dy = gate.position[1] - prev[1];
-            const dz = gate.position[2] - prev[2];
-            const length = Math.hypot(dx, dy, dz) || 1;
-            group.quaternion.setFromUnitVectors(FORWARD_AXIS, tmpGateAxis.set(dx / length, dy / length, dz / length));
-            group.scale.setScalar(gate.radius);
-            group.userData.baseRadius = gate.radius;
-            const [ring, glow] = group.children;
-            // Color language (ported from the parallel 0.7.7a branch, matching
-            // the radar blips): GREEN = fly through now, YELLOW = next after
-            // that, GREY = the one after, everything further ahead fades to
-            // the same grey but far more transparent. Passed gates dim out.
-            if (index === activeIndex) {
+            vectorInto(gate.position, group.position);
+            // Honor an authored gate direction. Older courses did not carry
+            // one, so retain the predecessor/center fallback.
+            if (gate.direction !== undefined && gate.direction !== null) {
+                unitDirectionInto(gate.direction, tmpGateAxis);
+            }
+            else {
+                vectorInto(index > 0 ? gates[index - 1]?.position : tmpRaceCenter, tmpRacePrevious);
+                tmpGateAxis.subVectors(group.position, tmpRacePrevious);
+                if (tmpGateAxis.lengthSq() < 1e-6)
+                    tmpGateAxis.set(0, 0, 1);
+                else
+                    tmpGateAxis.normalize();
+            }
+            group.quaternion.setFromUnitVectors(FORWARD_AXIS, tmpGateAxis);
+            const radius = Math.max(0.1, Number.isFinite(gate.radius) ? gate.radius : 1);
+            group.scale.setScalar(radius);
+            group.userData.baseRadius = radius;
+            group.userData.finish = gate.kind === 'finish';
+            group.userData.pulseUntil = 0;
+            group.userData.pulseDuration = 0;
+            const [ring, glow, finishRing] = group.children;
+            const isFinish = gate.kind === 'finish';
+            finishRing.visible = isFinish;
+            finishRing.scale.setScalar(group.userData.finishRingScale);
+            // Color language (matching the radar's gate blips): GREEN = fly
+            // through now, YELLOW = next after that, GREY = later, and dim
+            // GREY = passed. Only a gate explicitly marked `kind: 'finish'`
+            // receives the gold/white double-ring treatment.
+            if (isFinish) {
+                ring.material.color.setHex(0xffd36b);
+                ring.material.opacity = 0.96;
+                glow.material.color.setHex(0xffd36b);
+                glow.material.opacity = 0.52;
+                finishRing.material.color.setHex(0xffffed);
+                finishRing.material.opacity = 0.94;
+                group.userData.glowOpacity = 0.52;
+            }
+            else if (index === currentIndex) {
                 ring.material.color.setHex(0x3dff6e);
                 ring.material.opacity = 0.95;
                 glow.material.color.setHex(0x3dff6e);
                 glow.material.opacity = 0.5;
+                group.userData.glowOpacity = 0.5;
             }
-            else if (index === activeIndex + 1) {
+            else if (index === currentIndex + 1) {
                 ring.material.color.setHex(0xffd24a);
                 ring.material.opacity = 0.8;
                 glow.material.color.setHex(0xffd24a);
                 glow.material.opacity = 0.3;
+                group.userData.glowOpacity = 0.3;
             }
-            else if (index === activeIndex + 2) {
+            else if (index === currentIndex + 2) {
                 ring.material.color.setHex(0x9aa6b0);
                 ring.material.opacity = 0.5;
                 glow.material.color.setHex(0x9aa6b0);
                 glow.material.opacity = 0.1;
+                group.userData.glowOpacity = 0.1;
             }
-            else if (index < activeIndex) {
+            else if (index < currentIndex) {
                 ring.material.color.setHex(0x6b7680);
                 ring.material.opacity = 0.12;
                 glow.material.color.setHex(0x6b7680);
                 glow.material.opacity = 0.03;
+                group.userData.glowOpacity = 0.03;
             }
             else {
                 ring.material.color.setHex(0x9aa6b0);
                 ring.material.opacity = 0.14;
                 glow.material.color.setHex(0x9aa6b0);
                 glow.material.opacity = 0.04;
+                group.userData.glowOpacity = 0.04;
             }
+            ring.scale.setScalar(group.userData.baseRingScale);
         });
-        this.raceActiveGate = activeIndex;
+        for (let index = gates.length; index < this.raceGateMeshes.length; index += 1)
+            this.raceGateMeshes[index].visible = false;
+
+        const shortcuts = Array.isArray(options?.shortcuts) ? options.shortcuts : [];
+        while (this.raceShortcutMeshes.length < shortcuts.length) {
+            const group = this.createRaceShortcutMesh();
+            root.add(group);
+            this.raceShortcutMeshes.push(group);
+        }
+        for (const group of this.raceShortcutMeshes)
+            group.visible = false;
+        shortcuts.forEach((shortcut, index) => {
+            const group = this.raceShortcutMeshes[index];
+            if (!shortcut || shortcut.atGateIndex !== currentIndex || !shortcut.position)
+                return;
+            group.visible = true;
+            vectorInto(shortcut.position, group.position);
+            if (shortcut.direction !== undefined && shortcut.direction !== null) {
+                unitDirectionInto(shortcut.direction, tmpGateAxis);
+            }
+            else {
+                const exitGate = gates[shortcut.exitGateIndex];
+                vectorInto(exitGate?.position ?? gates[currentIndex]?.position, tmpRacePrevious);
+                tmpGateAxis.subVectors(group.position, tmpRacePrevious);
+                if (tmpGateAxis.lengthSq() < 1e-6)
+                    tmpGateAxis.set(0, 0, 1);
+                else
+                    tmpGateAxis.normalize();
+            }
+            group.quaternion.setFromUnitVectors(FORWARD_AXIS, tmpGateAxis);
+            const radius = Math.max(0.1, Number.isFinite(shortcut.radius) ? shortcut.radius : 1);
+            group.scale.setScalar(radius);
+            group.userData.id = shortcut.id;
+            group.userData.atGateIndex = shortcut.atGateIndex;
+            group.userData.exitGateIndex = shortcut.exitGateIndex;
+            group.children[0].scale.setScalar(group.userData.baseRingScale);
+            group.children[1].material.opacity = group.userData.glowOpacity;
+        });
+        this.raceActiveGate = currentIndex;
+        root.visible = true;
     }
     clearRaceGates() {
         this.raceActiveGate = undefined;
         for (const group of this.raceGateMeshes ?? [])
             group.visible = false;
+        for (const group of this.raceShortcutMeshes ?? [])
+            group.visible = false;
+        if (this.raceGateRoot)
+            this.raceGateRoot.visible = false;
+    }
+    // A one-shot pulse stored on the pooled gate itself. It is cleared by the
+    // normal world update, so callers never own an effect object or cleanup
+    // callback. `finish` only strengthens the pulse; finish styling still
+    // comes exclusively from gate.kind === 'finish'.
+    pulseRaceGate(index, { centered = false, finish = false } = {}) {
+        const group = this.raceGateMeshes[index];
+        if (!group)
+            return false;
+        const duration = finish ? 1.1 : 0.68;
+        group.userData.pulseUntil = this.skyTime + duration;
+        group.userData.pulseDuration = duration;
+        group.userData.pulseCentered = !!centered;
+        group.userData.pulseFinish = !!finish;
+        return true;
     }
     setTarget(targetId, asteroidId, wreckId, locationId, pickupId) {
         this.targetId = targetId;
@@ -2833,15 +3114,63 @@ export class SpaceRenderer {
         const helixRotor = this.locationMeshes.get('helix')?.getObjectByName('rotor');
         if (helixRotor)
             helixRotor.rotation.x += dt * 0.16;
-        // The active race gate breathes so it reads as "next" at speed.
-        if (this.raceActiveGate !== undefined) {
-            const active = this.raceGateMeshes[this.raceActiveGate];
-            if (active?.visible) {
-                // The green gate breathes: slow spin + a scale pulse so the
-                // start line reads from across the belt.
-                active.children[0].rotation.z += dt * 1.6;
-                active.children[0].scale.setScalar(1 + Math.sin(this.skyTime * 5.2) * 0.07);
+        // Race visuals are pooled. The active gate breathes, while a caller's
+        // one-shot pulse is represented by a short scale/glow envelope stored
+        // in userData (no effect object to clean up after a finish transition).
+        if (this.raceGateRoot?.visible) {
+            for (let index = 0; index < this.raceGateMeshes.length; index += 1) {
+                const group = this.raceGateMeshes[index];
+                if (!group.visible)
+                    continue;
+                const ring = group.children[0];
+                const glow = group.children[1];
+                const finishRing = group.children[2];
+                const active = index === this.raceActiveGate;
+                const until = Number(group.userData.pulseUntil ?? 0);
+                const duration = Number(group.userData.pulseDuration ?? 0);
+                const remaining = until - this.skyTime;
+                const pulseProgress = until > this.skyTime && duration > 0
+                    ? clamp((duration - remaining) / duration, 0, 1)
+                    : 0;
+                const pulseEnvelope = pulseProgress > 0 ? Math.sin(pulseProgress * Math.PI) : 0;
+                const baseScale = Number(group.userData.baseRingScale ?? 1);
+                const activeBreath = active ? Math.sin(this.skyTime * 5.2) * 0.07 : 0;
+                const pulseAmplitude = group.userData.pulseCentered ? 0.16 : 0.1;
+                ring.rotation.z += dt * (active ? 1.6 : pulseEnvelope > 0 ? 0.34 : 0);
+                ring.scale.setScalar(baseScale + activeBreath + pulseEnvelope * pulseAmplitude);
+                if (finishRing?.visible) {
+                    finishRing.rotation.z += dt * (active ? 1.6 : pulseEnvelope > 0 ? 0.34 : 0);
+                    finishRing.scale.setScalar(Number(group.userData.finishRingScale ?? 1.16) + pulseEnvelope * (group.userData.pulseFinish ? 0.13 : 0.08));
+                }
+                if (glow?.material) {
+                    const glowBase = Number(group.userData.glowOpacity ?? 0);
+                    const glowBoost = group.userData.pulseFinish ? 1.3 : 0.8;
+                    glow.material.opacity = clamp(glowBase * (1 + pulseEnvelope * glowBoost), 0, 1);
+                }
+                if (until > 0 && remaining <= 0) {
+                    group.userData.pulseUntil = 0;
+                    group.userData.pulseDuration = 0;
+                    group.userData.pulseCentered = false;
+                    group.userData.pulseFinish = false;
+                }
             }
+        }
+        if (this.raceStartRoot?.visible) {
+            const frame = this.raceStartRoot.userData.frame;
+            const ring = this.raceStartRoot.userData.ring;
+            const glow = this.raceStartRoot.userData.glow;
+            const beacon = this.raceStartRoot.userData.beacon;
+            const radius = Number(frame?.userData.baseRadius ?? this.raceStartRoot.userData.radius ?? 1);
+            const breathe = 1 + Math.sin(this.skyTime * 3.1) * 0.045;
+            if (frame) {
+                frame.scale.setScalar(radius * breathe);
+                if (ring)
+                    ring.rotation.z += dt * 0.35;
+            }
+            if (glow?.material)
+                glow.material.opacity = (this.raceStartRoot.userData.phase === 'travel' ? 0.26 : 0.38) * (0.9 + Math.sin(this.skyTime * 3.1) * 0.1);
+            if (beacon?.material)
+                beacon.material.opacity = (this.raceStartRoot.userData.phase === 'travel' ? 0.42 : 0.62) * (0.92 + Math.sin(this.skyTime * 4.2) * 0.08);
         }
         const vesper = this.locationMeshes.get('vesper');
         if (vesper) {

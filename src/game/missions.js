@@ -4,7 +4,7 @@ import { cargoFree, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { clamp, formatNumber, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
 import { rollPilot, TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 import { t } from './i18n.js';
-import { RACE_COURSES, raceBriefingLine, raceOfferForLocation } from './racing.js';
+import { RACE_COURSES, raceBriefingLine, raceOffersForLocation, raceCourseUnlocked, normalizeRaceRecord } from './racing.js';
 const GUILD_NAMES_FALLBACK = (guild) => guild === 'merchant' ? 'Merchant Guild' : guild === 'bounty' ? 'Bounty Registry' : guild === 'mining' ? 'Prospectors Guild' : guild === 'syndicate' ? 'Red Talon Syndicate' : 'Salvage Union';
 const merchantIssuers = ['Kestrel Freight', 'Orison Combine', 'Free Haulers Desk', 'Sable Route Logistics', 'Guild Dispatch'];
 const bountyIssuers = ['Concord Warrant Desk', 'Frontier Security Office', 'Bounty Hunters Registry', 'Civil Claims Bureau'];
@@ -40,10 +40,23 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
     const cycle = missionCycle(save.world.time);
     const rng = seededRandom(`${save.world.seed}:missions:${cycle}:${locationId}`);
     const offers = [];
-    const raceCourseId = raceOfferForLocation(locationId);
-    const raceCourse = raceCourseId ? RACE_COURSES[raceCourseId] : undefined;
-    // Races are repeatable events: the board always posts them.
-    if (raceCourse)
+    // Races are repeatable events: the board always posts all three fixed
+    // courses at the field's home dock. Later tiers remain visible so the
+    // player can see the progression, but only a podium on the prerequisite
+    // course unlocks acceptance. An active legacy entry is never hidden by the
+    // unlock check, which keeps an in-flight ticket recoverable after reload.
+    const raceRecords = save.world.raceRecords ?? {};
+    for (const raceCourseId of raceOffersForLocation(locationId)) {
+        const raceCourse = RACE_COURSES[raceCourseId];
+        if (!raceCourse)
+            continue;
+        const record = normalizeRaceRecord(raceRecords[raceCourse.id]);
+        const unlocked = raceCourseUnlocked(raceCourse.id, raceRecords);
+        const active = record.active === true;
+        const prerequisite = raceCourse.unlock ? RACE_COURSES[raceCourse.unlock.courseId] : undefined;
+        const unlockLabel = !unlocked && !active && prerequisite
+            ? t('Podium in {course} to unlock.', { course: prerequisite.title })
+            : undefined;
         offers.push({
             id: `race-${raceCourse.id}`,
             kind: 'race',
@@ -54,9 +67,29 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             reward: Math.max(...raceCourse.payouts),
             deposit: raceCourse.entryFee,
             deadline: save.world.time + raceCourse.deadlineSeconds,
-            status: 'offered',
+            status: active ? 'active' : 'offered',
+            active,
+            locked: !unlocked && !active,
+            tier: raceCourse.tier,
+            unlock: raceCourse.unlock ? { ...raceCourse.unlock } : null,
+            target: raceCourse.target,
+            targetText: raceCourse.targetText,
+            targetTimeSeconds: raceCourse.targetTimeSeconds,
+            recommendedShip: raceCourse.recommendedShip,
+            recommendedShipText: raceCourse.recommendedShipText,
+            centerFuelReward: raceCourse.centerFuelReward,
+            record,
+            bestTime: record.bestTime,
+            bestRank: record.bestRank,
+            personalBestTime: record.bestTime,
+            personalBestRank: record.bestRank,
+            personalBestSplits: record.bestSplits ? [...record.bestSplits] : undefined,
+            pbTime: record.bestTime,
+            pbRank: record.bestRank,
+            attempts: record.attempts,
+            unlockLabel,
             guild: 'merchant',
-            guildRep: 4,
+            guildRep: 4 + raceCourse.tier,
             faction: 'free-merchants',
             // Entry fee + payout ladder go through t() so the German board
             // stops appending an English sentence with EN ordinals; the rank
@@ -70,8 +103,9 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
                         loss: amount < 0 ? t(' (pay-in)') : '',
                     }))
                     .join(', '),
-            })}`,
+            })} ${t(raceCourse.targetText)} · ${t(raceCourse.recommendedShipText)}`,
         });
+    }
     const dangerBase = clamp(save.world.danger, 0.2, 3.5);
     const claimedNodeIds = new Set();
     for (let index = 0; index < count; index += 1) {

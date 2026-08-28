@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v131-edgearrow';
+const CACHE = 'voidrunner-v137-map-alt';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',

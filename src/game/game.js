@@ -4,7 +4,7 @@ import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, GUILD_RANK_NAMES, LOCATIONS,
 import { buyCommodity, cargoCapacity, cargoFree, cargoMass, denPrice, refreshAllPrices, sellCommodity, SYNDICATE_DEN_FAVOR, tickEconomy } from './economy.js';
 import { InputManager } from './input.js';
 import { acceptMission, awardCareerProgress, completeBountyMission, completeMissionsAtDock, failExpiredMissions, joinGuild, refreshMissionOffers, VALUABLE_CARGO_LABELS, } from './missions.js';
-import { RACE_QUEST_ID, createRaceRacers, generateRaceCourse, racePayout, raceRankLabel, updateRaceRacer } from './racing.js';
+import { RACE_QUEST_ID, createRaceRacers, crossedRaceGate, generateRaceCourse, normalizeRaceRecord, raceCourseUnlocked, racePayout, raceRankLabel, raceRacerTarget, recordRaceResult, stageRaceRacers, updateRaceRacer } from './racing.js';
 import { clamp, damp, formatCredits, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
 import { EntityStore } from './entityStore.js';
 import { SpaceRenderer } from './render.js';
@@ -12,7 +12,7 @@ import { saveGame } from './save.js';
 import { getQuest, setFlag, setStep, startQuest } from './quests.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
 import { ammoCapacity, AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, weaponForSlot, weaponOwned } from './weapons.js';
-import { asteroidCollisionMesh, asteroidCollisionRadius, generateAsteroidField, generateGraveyardPieces, generateWreckNodes, graveyardZoneAt, graveyardZoneLabel, GRAVEYARD_GEOMETRY_PROFILES, wreckNodeCollisionRadius } from './worldData.js';
+import { asteroidCollisionMesh, asteroidCollisionRadius, ASTEROID_COLLISION_FACTOR, generateAsteroidField, generateGraveyardPieces, generateWreckNodes, graveyardZoneAt, graveyardZoneLabel, GRAVEYARD_GEOMETRY_PROFILES, wreckNodeCollisionRadius } from './worldData.js';
 import { hullVsAsteroid, hullVsBox, hullVsEngine, hullVsHull, hullVsRing, hullVsSphere } from './hullCollision.js';
 import { steerToward } from './npcNav.js';
 import { PILOT_LINES, pilotMod, rollPilot, TIER_LABELS } from './pilots.js';
@@ -70,7 +70,6 @@ const MAX_FIELD_OBSTACLE_RADIUS = 380;
 // ate shots in open space. The box survives only as the spawn-clearance
 // envelope (derived from this per-axis factor, which sits just under the
 // geometry's widest silhouette).
-const ASTEROID_COLLISION_FACTOR = 0.9;
 const ENTRY_CLEARANCE = 4;
 const ENTRY_SEARCH_RADII = [64, 128, 256, 512, 1024];
 const ENTRY_SEARCH_DIRECTIONS = [
@@ -963,6 +962,39 @@ export class GameSession {
     // created in Object.create-based headless harnesses via the callers.
     tmpNavDesired = new THREE.Vector3();
     tmpNavGoal = new THREE.Vector3();
+    // Race steering and slipstream scratches. Keep these separate from the
+    // player/collision vectors: updateRace runs after updatePlayer, while the
+    // draft controller runs immediately before it.
+    tmpRaceGoal = {
+        x: NaN,
+        y: NaN,
+        z: NaN,
+        0: NaN,
+        1: NaN,
+        2: NaN,
+        set(x, y, z) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this[0] = x;
+            this[1] = y;
+            this[2] = z;
+            return this;
+        },
+        copy(value) {
+            return this.set(value?.x ?? value?.[0] ?? 0, value?.y ?? value?.[1] ?? 0, value?.z ?? value?.[2] ?? 0);
+        },
+    };
+    tmpRaceGoalVector = new THREE.Vector3();
+    tmpRaceSteer = new THREE.Vector3();
+    tmpRaceForward = new THREE.Vector3();
+    tmpRaceGathering = {
+        id: '',
+        position: [0, 0, 0],
+        direction: [0, 0, 1],
+        radius: 1,
+        arrivalRadius: 2,
+    };
     // Dedicated scratch for the collision normal: the player position vector in
     // updatePlayer aliases this.tmpA, so writing the normal into tmpA used to
     // overwrite the ship's position with a unit vector (teleport to open space).
@@ -1075,6 +1107,10 @@ export class GameSession {
     targetPointer;
     arena = null;
     activeRace = null;
+    // Race slipstream assist is computed before updatePlayer and consumed by
+    // that controller without changing the player's ship-class statistics.
+    raceDraftStrength = 0;
+    raceDraftFuelMultiplier = 1;
     // Emergent interactions (mid-flight mugs, smuggler flags) only run in the
     // live game — headless combat probes build sessions via Object.create and
     // never set this, so their pirates always fight straight (see shipAI.js).
@@ -1535,6 +1571,11 @@ export class GameSession {
                 this.recoverPlayer();
             return;
         }
+        // Drafting is a race-only assist and must be sampled from the previous
+        // racer positions before the player's movement for this step. It feeds
+        // updatePlayer's acceleration/speed/fuel terms without changing the
+        // ship-class stats returned by playerStats().
+        this.updateRaceSlipstreamState(dt);
         this.updatePlayer(dt, actions);
         this.autoScanTarget();
         this.maintainTargetLock();
@@ -1604,27 +1645,426 @@ export class GameSession {
                 this.fireMissile();
         }
     }
-    // Race lifecycle: 'travel' (fly to the course zone) → 'countdown' (grid
-    // hold) → 'running' (gates + live rank) → terminal. One activeRace object
-    // is the single source of truth; racers ride this.ships (rendered, on the
-    // radar) but are driven only by updateRaceRacer.
+    // Sample a narrow slipstream behind a visible race rival. The sample uses
+    // the rival positions from the previous simulation state (this method runs
+    // before updatePlayer), then exposes only scalar strength to the flight
+    // controller. No allocations occur while a draft is being maintained.
+    updateRaceSlipstreamState(dt) {
+        const race = this.activeRace;
+        const previousStrength = this.raceDraftStrength ?? 0;
+        this.raceDraftStrength = 0;
+        this.raceDraftFuelMultiplier = 1;
+        if (!race || race.state !== 'running') {
+            const draft = race?.draft;
+            if (draft?.active) {
+                draft.active = false;
+                draft.strength = 0;
+                draft.sourceId = undefined;
+                draft.savePercent = 0;
+                draft.lastStrength = 0;
+            }
+            return;
+        }
+        const draft = race.draft ?? race.slipstream ?? (race.draft = {
+            active: false,
+            sourceId: undefined,
+            sourceName: undefined,
+            strength: 0,
+            savePercent: 0,
+            lastStrength: 0,
+            audioCooldownUntil: 0,
+        });
+        race.draft = draft;
+        race.slipstream = draft;
+        const player = this.save.player;
+        const orientation = quat(player.rotation, this.tmpPlayerOrientation);
+        const forward = this.tmpRaceForward.copy(FORWARD).applyQuaternion(orientation).normalize();
+        const px = player.position[0];
+        const py = player.position[1];
+        const pz = player.position[2];
+        const corridor = 22;
+        const corridorSq = corridor * corridor;
+        const minAhead = 18;
+        const maxAhead = 150;
+        let sourceId;
+        let sourceName;
+        let strength = 0;
+        for (const racer of race.racers ?? []) {
+            if (!racer || racer.hull <= 0 || racer.raceFinished)
+                continue;
+            const dx = racer.position[0] - px;
+            const dy = racer.position[1] - py;
+            const dz = racer.position[2] - pz;
+            const ahead = dx * forward.x + dy * forward.y + dz * forward.z;
+            if (ahead < minAhead || ahead > maxAhead)
+                continue;
+            const racerSpeed = Math.hypot(racer.velocity[0], racer.velocity[1], racer.velocity[2]);
+            if (racerSpeed < 1)
+                continue;
+            // A ship crossing the player's nose is not a useful wake. Require
+            // both pilots to be travelling broadly the same way, with the
+            // player genuinely behind the rival along the rival's own line.
+            const headingDot = (racer.velocity[0] * forward.x + racer.velocity[1] * forward.y + racer.velocity[2] * forward.z) / racerSpeed;
+            const behindRacer = (dx * racer.velocity[0] + dy * racer.velocity[1] + dz * racer.velocity[2]) / racerSpeed;
+            if (headingDot < 0.62 || behindRacer < minAhead * 0.7)
+                continue;
+            const distanceSq = dx * dx + dy * dy + dz * dz;
+            const lateralSq = Math.max(0, distanceSq - ahead * ahead);
+            if (lateralSq > corridorSq)
+                continue;
+            const lateral = Math.sqrt(lateralSq);
+            const candidate = clamp((1 - (ahead - minAhead) / (maxAhead - minAhead)) * (1 - lateral / corridor), 0, 1);
+            if (candidate <= strength)
+                continue;
+            strength = candidate;
+            sourceId = racer.id;
+            sourceName = racer.name;
+        }
+        const active = strength >= 0.08;
+        const wasActive = Boolean(draft.active);
+        const sourceChanged = active && sourceId !== draft.sourceId;
+        draft.active = active;
+        draft.sourceId = active ? sourceId : undefined;
+        draft.sourceName = active ? sourceName : undefined;
+        draft.strength = active ? strength : 0;
+        // A perfect wake saves 38% (inside the requested 35–40% band); a weak
+        // edge wake scales up smoothly instead of granting the full benefit.
+        // The multiplier is consumed only by afterburning fuel.
+        draft.savePercent = active ? Math.round(38 * strength) : 0;
+        this.raceDraftStrength = active ? strength : 0;
+        this.raceDraftFuelMultiplier = active ? 1 - 0.38 * strength : 1;
+        const now = this.save.world.time;
+        if (active && (!wasActive || sourceChanged || strength - (draft.lastStrength ?? previousStrength) >= 0.28)) {
+            if (now >= (draft.audioCooldownUntil ?? 0)) {
+                this.audio.play('slipstream', clamp(strength, 0.35, 1));
+                draft.audioCooldownUntil = now + 1.2;
+            }
+            if (!wasActive || sourceChanged) {
+                this.ui.pushSensor(t('SLIPSTREAM · {name}', { name: sourceName ?? t('RIVAL') }), 'success', 1000);
+                if (this.save.settings.vibration)
+                    try { globalThis.navigator?.vibrate?.(18); } catch { /* vibration is optional */ }
+            }
+        }
+        else if (!active && wasActive) {
+            this.ui.pushSensor(t('SLIPSTREAM LOST'), 'info', 700);
+            if (this.save.settings.vibration)
+                try { globalThis.navigator?.vibrate?.([10, 12, 10]); } catch { /* vibration is optional */ }
+        }
+        draft.lastStrength = active ? strength : 0;
+    }
+    // Return the authored gathering point. The fallback keeps old saved races
+    // readable while the fixed course definitions are upgraded; it never
+    // mutates a generated gate or course.
+    raceGathering(course) {
+        if (course?.gathering?.position)
+            return course.gathering;
+        const fallback = this.tmpRaceGathering;
+        const gate = course?.gates?.[0];
+        const zone = LOCATIONS[course?.zone];
+        if (!gate?.position)
+            return fallback;
+        fallback.id = `${course.id}-start`;
+        fallback.position[0] = gate.position[0];
+        fallback.position[1] = gate.position[1];
+        fallback.position[2] = gate.position[2];
+        const center = zone?.position ?? [0, 0, 0];
+        const dx = gate.position[0] - center[0];
+        const dy = gate.position[1] - center[1];
+        const dz = gate.position[2] - center[2];
+        const length = Math.hypot(dx, dy, dz) || 1;
+        fallback.direction[0] = dx / length;
+        fallback.direction[1] = dy / length;
+        fallback.direction[2] = dz / length;
+        fallback.radius = gate.radius ?? course.gateRadius ?? 1;
+        fallback.arrivalRadius = fallback.radius * 2.2;
+        return fallback;
+    }
+    raceGatheringPosition(course, out = this.tmpRaceGoalVector) {
+        const position = this.raceGathering(course).position;
+        if (position?.isVector3)
+            return out.copy(position);
+        return out.set(position?.[0] ?? 0, position?.[1] ?? 0, position?.[2] ?? 0);
+    }
+    raceGatheringDirection(course, out = this.tmpRaceSteer) {
+        const gathering = this.raceGathering(course);
+        const direction = gathering.direction;
+        if (direction?.isVector3)
+            return out.copy(direction).normalize();
+        out.set(direction?.[0] ?? 0, direction?.[1] ?? 0, direction?.[2] ?? 1);
+        if (out.lengthSq() < 1e-6)
+            out.set(0, 0, 1);
+        return out.normalize();
+    }
+    createRaceState(course, racers, deadline) {
+        const draft = {
+            active: false,
+            sourceId: undefined,
+            sourceName: undefined,
+            strength: 0,
+            savePercent: 0,
+            lastStrength: 0,
+            audioCooldownUntil: 0,
+        };
+        return {
+            state: 'travel',
+            course,
+            // Keep this exact array in both places: renderer/radar consume
+            // this.ships while lifecycle/ranking consume activeRace.racers.
+            racers,
+            startedAt: 0,
+            playerStartTime: undefined,
+            playerRank: 4,
+            lastCountdown: 99,
+            deadline,
+            playerSplits: [],
+            centerFuelRewarded: new Set(),
+            shortcut: undefined,
+            draft,
+            slipstream: draft,
+            finishResult: undefined,
+            cleanupAt: 0,
+        };
+    }
+    raceGridSlot(gathering, out = this.tmpRaceGoalVector) {
+        const slot = gathering?.playerSlot;
+        let value = slot;
+        if (Number.isInteger(slot))
+            value = gathering.grid?.[slot] ?? gathering.slots?.[slot];
+        else if (slot && !Array.isArray(slot) && !slot.isVector3 && slot.position)
+            value = slot.position;
+        if (!value && gathering?.grid) {
+            value = gathering.grid.player ?? gathering.grid[0];
+        }
+        if (value?.position)
+            value = value.position;
+        if (value?.isVector3)
+            return out.copy(value);
+        if (Array.isArray(value) && value.length >= 3) {
+            out.set(value[0], value[1], value[2]);
+            return out;
+        }
+        return undefined;
+    }
+    raceShortcutForIndex(race, index) {
+        const shortcuts = race?.course?.shortcuts;
+        if (!Array.isArray(shortcuts))
+            return undefined;
+        for (const shortcut of shortcuts) {
+            const entryIndex = shortcut?.entryIndex ?? shortcut?.entryGateIndex ?? shortcut?.atGateIndex;
+            if (entryIndex === index && Array.isArray(shortcut.gates) && shortcut.gates.length)
+                return shortcut;
+        }
+        return undefined;
+    }
+    raceActiveShortcut(race) {
+        const active = race?.shortcut;
+        if (active?.data?.gates?.length)
+            return active;
+        return undefined;
+    }
+    // Renderer-facing shortcut descriptors are only produced at the active
+    // branch. Travel never calls this, so the full course remains hidden until
+    // the player reaches the gathering and the race starts.
+    raceShortcutRenderData(race) {
+        const currentIndex = this.save.player.raceGateIndex ?? 0;
+        const active = this.raceActiveShortcut(race);
+        const shortcut = active?.data ?? this.raceShortcutForIndex(race, currentIndex);
+        if (!shortcut)
+            return [];
+        const exitIndex = shortcut.exitIndex ?? shortcut.exitGateIndex ?? currentIndex + 1;
+        return shortcut.gates.map((gate, index) => ({
+            ...gate,
+            id: gate.id ?? `${race.course.id}-shortcut-${shortcut.entryIndex ?? currentIndex}-${index}`,
+            position: gate.position,
+            radius: gate.radius ?? shortcut.radius ?? Math.max(4, race.course.gateRadius * 0.42),
+            direction: gate.direction,
+            atGateIndex: currentIndex,
+            exitGateIndex: exitIndex,
+            shortcutIndex: index,
+            shortcutId: shortcut.id,
+        }));
+    }
+    syncRaceCourse(race) {
+        if (!race?.course || race.state === 'travel')
+            return;
+        const center = race.course.gateCenter?.position ?? LOCATIONS[race.course.zone]?.position ?? [0, 0, 0];
+        this.renderer.syncRaceGates(race.course.gates, this.save.player.raceGateIndex ?? 0, center, { shortcuts: this.raceShortcutRenderData(race) });
+    }
+    raceVectorFromTarget(value, out = this.tmpRaceGoalVector) {
+        const x = Number.isFinite(value?.x) ? value.x : value?.[0];
+        const y = Number.isFinite(value?.y) ? value.y : value?.[1];
+        const z = Number.isFinite(value?.z) ? value.z : value?.[2];
+        if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z))
+            return out.set(x, y, z);
+        return undefined;
+    }
+    raceCrossedGate(previous, current, gate) {
+        if (typeof crossedRaceGate === 'function')
+            return crossedRaceGate(previous, current, gate);
+        // Legacy fallback for a course without the directional helper. New
+        // courses always use crossedRaceGate so a near miss cannot count.
+        const dx = current[0] - gate.position[0];
+        const dy = current[1] - gate.position[1];
+        const dz = current[2] - gate.position[2];
+        return Math.hypot(dx, dy, dz) <= (gate.radius ?? 0);
+    }
+    raceGateClosestDistanceSq(previous, current, gate) {
+        const ax = previous[0];
+        const ay = previous[1];
+        const az = previous[2];
+        const dx = current[0] - ax;
+        const dy = current[1] - ay;
+        const dz = current[2] - az;
+        const ox = gate.position[0] - ax;
+        const oy = gate.position[1] - ay;
+        const oz = gate.position[2] - az;
+        const lengthSq = dx * dx + dy * dy + dz * dz;
+        const along = lengthSq > 1e-8 ? clamp((ox * dx + oy * dy + oz * dz) / lengthSq, 0, 1) : 1;
+        const cx = ax + dx * along - gate.position[0];
+        const cy = ay + dy * along - gate.position[1];
+        const cz = az + dz * along - gate.position[2];
+        return cx * cx + cy * cy + cz * cz;
+    }
+    raceAwardGate(gate, previous, current, centeredOnly = false) {
+        const race = this.activeRace;
+        if (!race || !gate)
+            return false;
+        const radius = gate.radius ?? race.course.gateRadius ?? 1;
+        const centerRadius = gate.centerRadius ?? race.course.centerGateRadius ?? radius * 0.34;
+        const centered = this.raceGateClosestDistanceSq(previous, current, gate) <= centerRadius * centerRadius;
+        if (centeredOnly && !centered)
+            return false;
+        race.centerFuelRewarded ??= new Set();
+        if (centered && !race.centerFuelRewarded.has(gate.id)) {
+            const stats = this.playerStats();
+            const reward = gate.centerFuelReward ?? race.course.centerFuelReward ?? 2.5;
+            this.save.player.fuel = Math.min(stats.fuel, (this.save.player.fuel ?? 0) + reward);
+            race.centerFuelRewarded.add(gate.id);
+        }
+        return centered;
+    }
+    raceAdvanceMainGate(race, previous, current, now) {
+        const player = this.save.player;
+        const currentIndex = player.raceGateIndex ?? 0;
+        const mainGate = race.course.gates[currentIndex];
+        if (!mainGate)
+            return false;
+        // The first tight branch gate is checked before the main checkpoint.
+        // If the main gate is crossed first, the safe route wins and the branch
+        // is no longer available for this segment.
+        const candidate = this.raceShortcutForIndex(race, currentIndex);
+        if (candidate && !race.shortcut) {
+            const tightGate = candidate.gates[0];
+            if (this.raceCrossedGate(previous, current, tightGate)) {
+                this.raceAwardGate(tightGate, previous, current);
+                race.shortcut = {
+                    data: candidate,
+                    id: candidate.id,
+                    index: 1,
+                    committed: true,
+                    entryIndex: candidate.entryIndex ?? currentIndex,
+                    exitIndex: candidate.exitIndex ?? candidate.exitGateIndex ?? currentIndex + 1,
+                };
+                this.ui.pushSensor(t('SHORTCUT COMMITTED · HOLD THE LINE'), 'success', 1500);
+                this.audio.play('success', 0.85);
+                if (candidate.gates.length <= 1)
+                    this.raceCompleteShortcut(race, now);
+                else
+                    this.syncRaceCourse(race);
+                return true;
+            }
+        }
+        if (!this.raceCrossedGate(previous, current, mainGate))
+            return false;
+        const centered = this.raceAwardGate(mainGate, previous, current);
+        player.raceGateIndex = currentIndex + 1;
+        race.playerSplits ??= [];
+        race.playerSplits[currentIndex] = Math.max(0, now - (race.playerStartTime ?? now));
+        race.playerSplitDelta = this.raceSplitDelta(race, currentIndex);
+        race.splitAt = now;
+        this.renderer.pulseRaceGate?.(currentIndex, { centered, finish: mainGate.kind === 'finish' || player.raceGateIndex >= race.course.gates.length });
+        if (player.raceGateIndex >= race.course.gates.length) {
+            player.raceFinishTime = now;
+            this.finishRace();
+            return true;
+        }
+        this.syncRaceCourse(race);
+        this.ui.pushSensor(t('GATE {current}/{total} · {rank}', { current: player.raceGateIndex + 1, total: race.course.gates.length, rank: raceRankLabel(this.racePlayerRank()) }), 'success', 1400);
+        this.audio.play('success', centered ? 1 : 0.9);
+        return true;
+    }
+    raceCompleteShortcut(race, now) {
+        const shortcut = race.shortcut;
+        if (!shortcut)
+            return;
+        const exitIndex = Number.isFinite(shortcut.exitIndex) ? shortcut.exitIndex : (this.save.player.raceGateIndex ?? 0) + 1;
+        // The branch's final ring rejoins at the authored exit index. This is
+        // the same next-gate semantics used by rival progression.
+        this.save.player.raceGateIndex = Math.max(this.save.player.raceGateIndex ?? 0, exitIndex);
+        race.shortcut = undefined;
+        race.playerSplits ??= [];
+        if (this.save.player.raceGateIndex > 0)
+            race.playerSplits[this.save.player.raceGateIndex - 1] = Math.max(0, now - (race.playerStartTime ?? now));
+        race.playerSplitDelta = this.raceSplitDelta(race, this.save.player.raceGateIndex - 1);
+        race.splitAt = now;
+        if (this.save.player.raceGateIndex >= race.course.gates.length) {
+            this.save.player.raceFinishTime = now;
+            this.finishRace();
+            return;
+        }
+        this.ui.pushSensor(t('SHORTCUT COMPLETE · REJOIN AT GATE {gate}', { gate: this.save.player.raceGateIndex + 1 }), 'success', 1600);
+        this.audio.play('success', 1);
+        this.syncRaceCourse(race);
+    }
+    raceAdvanceShortcut(race, previous, current, now) {
+        const shortcut = race.shortcut;
+        if (!shortcut?.committed)
+            return false;
+        const gate = shortcut.data.gates[shortcut.index];
+        if (!gate)
+            return false;
+        if (!this.raceCrossedGate(previous, current, gate))
+            return false;
+        const centered = this.raceAwardGate(gate, previous, current);
+        shortcut.index += 1;
+        this.renderer.pulseRaceGate?.(this.save.player.raceGateIndex ?? 0, { centered });
+        if (shortcut.index >= shortcut.data.gates.length)
+            this.raceCompleteShortcut(race, now);
+        else
+            this.syncRaceCourse(race);
+        return true;
+    }
+    // Race lifecycle: 'travel' (fly to the gathering) → 'countdown' (grid
+    // hold) → 'running' (directional gate crossings + live rank) → terminal.
+    // Racers are ordinary rendered/radar ships, but updateShips and contact
+    // resolution deliberately skip them so a race never becomes a combat.
     updateRace(dt) {
         const race = this.activeRace;
-        if (!race || race.state === 'finished' || race.state === 'failed')
+        if (!race)
             return;
         const player = this.save.player;
         const now = this.save.world.time;
+        if (race.state === 'finished') {
+            if (now >= (race.cleanupAt ?? Infinity))
+                this.endRaceField();
+            return;
+        }
+        if (race.state === 'failed')
+            return;
         if (race.state === 'travel') {
-            // The board's clock runs from purchase, anywhere in the void —
-            // miss the window and the entry is the house's.
             if (now > race.deadline) {
                 this.failRace(t('RACE ENTRY EXPIRED · ENTRY FORFEIT'));
                 return;
             }
             if (this.activeInstanceId !== race.course.zone)
                 return;
-            const firstGate = race.course.gates[0].position;
-            if (Math.hypot(player.position[0] - firstGate[0], player.position[1] - firstGate[1], player.position[2] - firstGate[2]) > race.course.gateRadius * 2.2)
+            const gathering = this.raceGathering(race.course);
+            const position = this.raceGatheringPosition(race.course);
+            const arrivalRadius = gathering.arrivalRadius ?? Math.max(1, gathering.radius ?? race.course.gateRadius ?? 1) * 2.2;
+            const dx = player.position[0] - position.x;
+            const dy = player.position[1] - position.y;
+            const dz = player.position[2] - position.z;
+            if (dx * dx + dy * dy + dz * dz > arrivalRadius * arrivalRadius)
                 return;
             this.startRaceAt(race.course);
             return;
@@ -1635,8 +2075,9 @@ export class GameSession {
             return;
         }
         if (now < race.startedAt) {
-            // Grid hold: pin the ship until the lights go green.
-            player.velocity = [0, 0, 0];
+            player.velocity[0] = 0;
+            player.velocity[1] = 0;
+            player.velocity[2] = 0;
             const remaining = Math.ceil(race.startedAt - now);
             if (remaining !== race.lastCountdown && remaining <= 3) {
                 race.lastCountdown = remaining;
@@ -1648,77 +2089,119 @@ export class GameSession {
         if (race.state === 'countdown') {
             race.state = 'running';
             race.playerStartTime = now;
+            player.prevPosition?.set?.(player.position);
+            this.syncRaceCourse(race);
             this.ui.pushEvent(t('GO · PASS ALL {count} GATES', { count: race.course.gates.length }), 'success', 3200);
             this.audio.play('success', 1.2);
         }
-        const nextGate = race.course.gates[player.raceGateIndex];
-        if (!nextGate) {
-            this.finishRace();
+        const previous = player.prevPosition ?? player.position;
+        if (this.raceActiveShortcut(race))
+            this.raceAdvanceShortcut(race, previous, player.position, now);
+        else
+            this.raceAdvanceMainGate(race, previous, player.position, now);
+        if (!this.activeRace || this.activeRace.state !== 'running')
             return;
-        }
-        const dx = player.position[0] - nextGate.position[0];
-        const dy = player.position[1] - nextGate.position[1];
-        const dz = player.position[2] - nextGate.position[2];
-        const playerDistance = Math.hypot(dx, dy, dz);
-        if (playerDistance <= nextGate.radius) {
-            player.raceGateIndex += 1;
-            this.renderer.syncRaceGates(race.course.gates, player.raceGateIndex, LOCATIONS[race.course.zone].position);
-            if (player.raceGateIndex >= race.course.gates.length) {
-                player.raceFinishTime = now;
-                this.finishRace();
-                return;
-            }
-            this.ui.pushSensor(t('GATE {current}/{total} · {rank}', { current: player.raceGateIndex + 1, total: race.course.gates.length, rank: raceRankLabel(this.racePlayerRank()) }), 'success', 1400);
-            this.audio.play('success', 0.9);
-        }
-        let aheadCount = 0;
-        for (const racer of race.racers) {
-            updateRaceRacer(racer, race.course, dt, now);
-            if ((racer.raceFinished && racer.raceFinishTime <= now)
-                || (!racer.raceFinished && racer.raceGateIndex > player.raceGateIndex)) {
-                aheadCount += 1;
+        // Track the authored course pace only. No player-ship class multiplier
+        // or skill scaling leaks into these opponents.
+        for (const racer of race.racers ?? []) {
+            if (!racer || racer.hull <= 0 || racer.raceFinished)
                 continue;
-            }
-            if (!racer.raceFinished && racer.raceGateIndex === player.raceGateIndex) {
-                const gate = race.course.gates[racer.raceGateIndex];
-                if (Math.hypot(racer.position[0] - gate.position[0], racer.position[1] - gate.position[1], racer.position[2] - gate.position[2]) < playerDistance)
-                    aheadCount += 1;
-            }
+            this.tmpRaceGoal.x = NaN;
+            this.tmpRaceGoal.y = NaN;
+            this.tmpRaceGoal.z = NaN;
+            this.tmpRaceGoal[0] = NaN;
+            this.tmpRaceGoal[1] = NaN;
+            this.tmpRaceGoal[2] = NaN;
+            const returned = typeof raceRacerTarget === 'function' ? raceRacerTarget(racer, race.course, this.tmpRaceGoal) : undefined;
+            const goal = this.raceVectorFromTarget(returned ?? this.tmpRaceGoal);
+            const fallback = goal ?? this.raceVectorFromTarget(race.course.gates[racer.raceGateIndex ?? 0]?.position);
+            if (!fallback)
+                continue;
+            const speed = Math.hypot(racer.velocity[0], racer.velocity[1], racer.velocity[2]);
+            const brake = steerToward(this, racer, fallback, {
+                route: true,
+                speed,
+                horizon: 1.8,
+                brakeScale: 0.55,
+                synthesize: true,
+            }, this.tmpRaceSteer);
+            updateRaceRacer(racer, race.course, dt, now, { direction: this.tmpRaceSteer, brake });
         }
-        race.playerRank = aheadCount + 1;
+        race.playerRank = this.racePlayerRank();
+    }
+    raceProgressForShip(ship, race) {
+        if (ship.raceFinished)
+            return race.course.gates.length + 2;
+        let progress = ship.raceGateIndex ?? 0;
+        const shortcut = ship === this.save.player ? race.shortcut : ship.raceShortcut;
+        if (shortcut?.committed) {
+            const count = shortcut.data?.gates?.length ?? 1;
+            progress += (shortcut.index ?? 0) / Math.max(1, count + 1);
+        }
+        const gate = race.course.gates[ship.raceGateIndex ?? 0];
+        if (gate) {
+            const dx = ship.position[0] - gate.position[0];
+            const dy = ship.position[1] - gate.position[1];
+            const dz = ship.position[2] - gate.position[2];
+            progress += 1e-4 / Math.max(1, Math.hypot(dx, dy, dz));
+        }
+        return progress;
     }
     // Live rank read: finished pilots that beat the player's finish time, or
-    // unfinished pilots further along the track than the player right now.
+    // unfinished pilots further along the authored route than the player.
     racePlayerRank() {
         const race = this.activeRace;
         if (!race)
             return 4;
+        const player = this.save.player;
+        const playerProgress = this.raceProgressForShip(player, race);
         let aheadCount = 0;
-        for (const racer of race.racers) {
-            if (racer.raceFinished || racer.raceGateIndex > this.save.player.raceGateIndex)
+        for (const racer of race.racers ?? [])
+            if (this.raceProgressForShip(racer, race) > playerProgress)
                 aheadCount += 1;
-        }
         return aheadCount + 1;
     }
     finishRace() {
         const race = this.activeRace;
-        if (!race)
+        if (!race || race.state === 'finished')
             return;
         // Anyone already across the line beat the player; everyone else is behind.
-        const rank = 1 + race.racers.filter((racer) => racer.raceFinished).length;
+        const rank = this.racePlayerRank();
         const payout = racePayout(race.course, rank);
         this.save.player.credits += payout;
         const finishTime = this.save.world.time - (race.playerStartTime ?? this.save.world.time);
+        const previous = normalizeRaceRecord(this.save.world.raceRecords[race.course.id]);
+        const result = recordRaceResult(previous, {
+            rank,
+            time: finishTime,
+            splits: race.playerSplits ?? [],
+            at: this.save.world.time,
+        }) ?? { ...previous, rank, time: finishTime, at: this.save.world.time };
         const quest = getQuest(this.save, RACE_QUEST_ID);
         if (quest) {
             quest.stepId = 'complete';
+            quest.flags ??= {};
             quest.flags.finishTime = finishTime;
             quest.flags.rank = rank;
+            quest.flags.splits = race.playerSplits ?? [];
             quest.completedAt = this.save.world.time;
         }
         race.state = 'finished';
-        this.endRaceField();
-        this.save.world.raceRecords[race.course.id] = { rank, time: finishTime, at: this.save.world.time, active: false };
+        race.finishResult = {
+            rank,
+            rankLabel: raceRankLabel(rank),
+            time: finishTime,
+            payout,
+            splits: race.playerSplits ?? [],
+            splitDelta: race.playerSplitDelta,
+            personalBest: !Number.isFinite(previous?.bestTime) || finishTime < previous.bestTime,
+        };
+        // Leave the finish gate, frozen field, and cockpit result visible long
+        // enough to read before the racers jump out and the course clears.
+        race.cleanupAt = this.save.world.time + 5;
+        this.save.world.raceRecords[race.course.id] = { ...result, active: false, failed: false };
+        this.renderer.pulseRaceGate?.(Math.max(0, race.course.gates.length - 1), { centered: true, finish: true });
+        this.ui.pushSensor(t('FINISH LINE · RESULTS LOCKED'), 'success', 1800);
         this.ui.pushEvent(t('{course} FINISHED · {rank} · {amount}', { course: race.course.title.toUpperCase(), rank: raceRankLabel(rank), amount: `${payout >= 0 ? '+' : ''}${formatCredits(payout)}` }), payout >= 0 ? 'success' : 'danger', 8000);
         this.audio.play(payout >= 0 ? 'success' : 'warning', 1.1);
         saveGame(this.save);
@@ -1733,7 +2216,7 @@ export class GameSession {
         // reload can't resurrect a forfeit ticket (see restoreActiveRace).
         const record = this.save.world.raceRecords[race.course.id];
         if (record?.active)
-            this.save.world.raceRecords[race.course.id] = { ...record, active: false, failed: true, at: this.save.world.time };
+            this.save.world.raceRecords[race.course.id] = recordRaceResult(record, { failed: true, at: this.save.world.time });
         const quest = getQuest(this.save, RACE_QUEST_ID);
         if (quest && quest.completedAt === undefined && quest.stepId !== 'complete')
             quest.completedAt = this.save.world.time;
@@ -1744,7 +2227,9 @@ export class GameSession {
     // Despawn racers with warp streaks and drop the gate markers.
     endRaceField() {
         const race = this.activeRace;
+        const gatheringId = race?.course ? this.raceGathering(race.course).id : undefined;
         this.renderer.clearRaceGates();
+        this.renderer.clearRaceStart?.();
         if (race?.racers?.length) {
             for (const racer of race.racers) {
                 this.renderer.spawnHyperdriveStreak?.(racer.position, racer.velocity, paletteForFaction(racer.faction, false).engine);
@@ -1754,40 +2239,46 @@ export class GameSession {
         this.activeRace = null;
         // A gate lock must not outlive the entry (raceGateTarget now resolves
         // to undefined, but clear explicitly so the monitor drops immediately).
-        if (this.save.player.currentTargetId && this.save.player.currentTargetId.includes('-gate-'))
+        if (this.save.player.currentTargetId && (this.save.player.currentTargetId.includes('-gate-') || this.save.player.currentTargetId.includes('-shortcut-') || this.save.player.currentTargetId === gatheringId || this.save.player.currentTargetId === `${race?.course?.id}-start`))
             this.clearTarget();
         delete this.save.player.raceGateIndex;
         delete this.save.player.raceFinishTime;
+        this.raceDraftStrength = 0;
+        this.raceDraftFuelMultiplier = 1;
     }
     // A paid-but-unraced entry survives a reload: rebuild the travel leg from
     // the persisted quest flags. Mid-race reloads downgrade to travel — grid,
     // racers and gate markers rebuild when the pilot re-reaches Gate 1.
     restoreActiveRace() {
         const quest = getQuest(this.save, RACE_QUEST_ID);
-        if (!quest || quest.completedAt !== undefined || !quest.flags.paid || quest.stepId !== 'travel')
+        const flags = quest?.flags ?? {};
+        if (!quest || quest.completedAt !== undefined || !flags.paid || quest.stepId !== 'travel')
             return;
-        const course = generateRaceCourse(quest.flags.courseId, this.save.world.seed);
+        const course = generateRaceCourse(flags.courseId, this.save.world.seed);
         if (!course)
             return;
-        this.activeRace = {
-            state: 'travel',
-            course,
-            racers: [],
-            startedAt: 0,
-            playerStartTime: undefined,
-            playerRank: 4,
-            lastCountdown: 99,
-            deadline: quest.flags.deadline ?? (this.save.world.time + course.deadlineSeconds),
-        };
-        // Rebuild the gate markers for the restored travel leg (see acceptRace).
-        this.hardenRaceCourse(course);
-        this.renderer.syncRaceGates(course.gates, 0, LOCATIONS[course.zone].position);
+        const racers = createRaceRacers(course, this.save.world.seed, this.save.world.time);
+        const staged = stageRaceRacers(racers, course);
+        const liveRacers = Array.isArray(staged) && staged.length === 3 ? staged : racers;
+        this.ships = this.ships.filter((ship) => !ship.race);
+        this.ships.push(...liveRacers);
+        this.activeRace = this.createRaceState(course, liveRacers, flags.deadline ?? (this.save.world.time + course.deadlineSeconds));
+        delete this.save.player.raceGateIndex;
+        delete this.save.player.raceFinishTime;
+        if (this.save.player.currentTargetId && (this.save.player.currentTargetId.includes?.('-gate-') || this.save.player.currentTargetId.includes?.('-shortcut-')))
+            this.clearTarget();
+        // Restore exactly the travel presentation: one gathering marker, no
+        // course gates. The racers are already ordinary visible/radar ships at
+        // their authored grid positions.
+        this.renderer.clearRaceGates();
+        this.renderer.syncRaceStart?.(this.raceGathering(course), 'travel');
+        this.save.player.currentTargetId = this.raceGathering(course).id;
         // Keep the board consistent: an open ticket always reads as live so
         // the offer stays hidden until this entry resolves. Preserve any
         // earlier results on the same course (best rank/time history).
         const existingRecord = this.save.world.raceRecords[course.id];
         if (!existingRecord?.active)
-            this.save.world.raceRecords[course.id] = { ...existingRecord, active: true };
+            this.save.world.raceRecords[course.id] = { ...normalizeRaceRecord(existingRecord), active: true };
     }
     // Cockpit weapon readout: mounted gun name plus its ammo pool (or heat
     // state for the energy/heat weapons) for the own-ship monitor line.
@@ -1805,84 +2296,123 @@ export class GameSession {
             ammo: stock === null ? undefined : { current: stock, capacity: ammoCapacity(ammoId) },
         };
     }
-    // Resolve a race-gate target id ('{courseId}-gate-{n}') against the live
-    // entry. Gates are mission anchors: selectable from the nav map and radar
-    // at ANY distance while an entry is live (travel included), like mining
-    // claims — the pilot must be able to lock the next checkpoint from anywhere.
+    // Resolve only the contacts that are currently part of the race phase. In
+    // travel that is one gathering marker; course and shortcut contacts become
+    // targetable only after the grid is reached.
     raceGateById(id) {
-        const course = this.activeRace?.course;
-        if (!course)
+        const race = this.activeRace;
+        const course = race?.course;
+        if (!race || !course)
             return undefined;
-        const gate = course.gates.find((entry) => entry.id === id);
-        return gate ? { course, gate, index: gate.index } : undefined;
-    }
-    // Gates must be flyable: any checkpoint that generated inside a rock is
-    // nudged to the nearest clear spot on a deterministic search ring. Runs
-    // at accept, at grid start, and on reload-restore (idempotent — gates
-    // that are already clear stay exactly where they are). Ported from the
-    // parallel 0.7.7a branch (agent B).
-    hardenRaceCourse(course) {
-        const obstacles = this.activeFieldObstacles(course.zone);
-        if (!obstacles.length)
-            return course;
-        const candidate = new THREE.Vector3();
-        for (let index = 0; index < course.gates.length; index += 1) {
-            const gate = course.gates[index];
-            candidate.set(gate.position[0], gate.position[1], gate.position[2]);
-            if (this.entryPositionClear(candidate, obstacles))
-                continue;
-            const rng = seededRandom(`${course.id}:gate-harden:${index}`);
-            const baseAngle = rng() * Math.PI * 2;
-            let settled = false;
-            for (const radius of [gate.radius * 0.8, gate.radius * 1.6, gate.radius * 2.4, gate.radius * 3.4]) {
-                for (let spoke = 0; spoke < 12 && !settled; spoke += 1) {
-                    const angle = baseAngle + (spoke * Math.PI * 2) / 12;
-                    candidate.set(
-                        gate.position[0] + Math.cos(angle) * radius,
-                        gate.position[1] + Math.sin(angle * 1.7) * radius * 0.35,
-                        gate.position[2] + Math.sin(angle) * radius,
-                    );
-                    if (this.entryPositionClear(candidate, obstacles)) {
-                        gate.position = [candidate.x, candidate.y, candidate.z];
-                        settled = true;
-                    }
-                }
-                if (settled)
-                    break;
-            }
+        const gathering = this.raceGathering(course);
+        const gatheringId = gathering.id ?? `${course.id}-start`;
+        if (race.state === 'travel') {
+            if (id === course.id || id === gatheringId || id === `${course.id}-start`)
+                return { course, gate: gathering, index: 0, gathering: true };
+            return undefined;
         }
+        const gate = course.gates.find((entry) => entry.id === id);
+        if (gate)
+            return { course, gate, index: gate.index };
+        const shortcut = this.raceActiveShortcut(race)?.data ?? this.raceShortcutForIndex(race, this.save.player.raceGateIndex ?? 0);
+        if (shortcut?.gates) {
+            const shortcutIndex = shortcut.gates.findIndex((entry) => entry.id === id);
+            if (shortcutIndex >= 0)
+                return { course, gate: shortcut.gates[shortcutIndex], index: this.save.player.raceGateIndex ?? shortcut.entryIndex ?? 0, shortcut, shortcutIndex };
+        }
+        return undefined;
+    }
+    // Course geometry is authored and deterministic. Older builds nudged gates
+    // around live rocks here, which changed the meaningful line from run to run;
+    // fixed courses now stay untouched and the route-aware racer steering handles
+    // obstacle avoidance instead.
+    hardenRaceCourse(course) {
         return course;
     }
     raceGateTarget(id) {
         const found = this.raceGateById(id);
         if (!found)
             return undefined;
+        if (found.gathering) {
+            return {
+                kind: 'gate',
+                id,
+                position: found.gate.position,
+                name: t('RACE START · {course}', { course: found.course.title }),
+                gathering: true,
+            };
+        }
+        const shortcut = found.shortcut;
         return {
             kind: 'gate',
             id,
             position: found.gate.position,
-            name: t('GATE {n}/{total}', { n: found.index + 1, total: found.course.gates.length }),
+            name: shortcut
+                ? t('SHORTCUT {n}/{total}', { n: found.shortcutIndex + 1, total: shortcut.gates.length })
+                : t('GATE {n}/{total}', { n: found.index + 1, total: found.course.gates.length }),
+            shortcut: Boolean(shortcut),
         };
+    }
+    raceSplitDelta(race, index) {
+        if (!race || !Number.isFinite(index) || index < 0)
+            return undefined;
+        const record = normalizeRaceRecord(this.save.world.raceRecords[race.course.id]);
+        const bestSplits = record?.bestSplits ?? record?.splits;
+        const current = race.playerSplits?.[index];
+        const best = bestSplits?.[index];
+        if (!Number.isFinite(current) || !Number.isFinite(best))
+            return undefined;
+        return current - best;
     }
     // Cockpit race telemetry for the own-ship monitor strip. One small object
     // per HUD tick (~24 Hz) — cheap next to the rest of buildHudModel.
     raceHud() {
         const race = this.activeRace;
-        if (!race || race.state === 'finished' || race.state === 'failed')
+        if (!race || race.state === 'failed')
             return undefined;
         const player = this.save.player;
         const course = race.course;
+        const record = normalizeRaceRecord(this.save.world.raceRecords[course.id]);
+        const personalBest = Number.isFinite(record?.bestTime)
+            ? record.bestTime
+            : Number.isFinite(record?.time) && !record?.active ? record.time : undefined;
+        if (race.state === 'finished') {
+            return {
+                phase: 'finished',
+                title: course.title,
+                rank: race.finishResult?.rank,
+                rankLabel: race.finishResult?.rankLabel,
+                time: race.finishResult?.time,
+                payout: race.finishResult?.payout,
+                personalBest: Boolean(race.finishResult?.personalBest),
+                personalBestTime: personalBest,
+                pbTime: personalBest,
+                pbRank: record?.bestRank,
+                splitDelta: race.finishResult?.splitDelta,
+            };
+        }
         if (race.state === 'travel') {
-            const gate = course.gates[0].position;
+            const gathering = this.raceGatheringPosition(course);
             return {
                 phase: 'travel',
                 title: course.title,
-                distance: Math.round(Math.hypot(gate[0] - player.position[0], gate[1] - player.position[1], gate[2] - player.position[2])),
+                distance: Math.round(Math.hypot(gathering.x - player.position[0], gathering.y - player.position[1], gathering.z - player.position[2])),
+                gathering: true,
             };
         }
         if (race.state === 'countdown') {
-            return { phase: 'countdown', title: course.title, seconds: Math.max(1, Math.ceil(race.startedAt - this.save.world.time)) };
+            return {
+                phase: 'countdown',
+                title: course.title,
+                seconds: Math.max(1, Math.ceil(race.startedAt - this.save.world.time)),
+                personalBest,
+                pbTime: personalBest,
+                pbRank: record?.bestRank,
+                draft: 0,
+            };
         }
+        const shortcut = this.raceActiveShortcut(race);
+        const availableShortcut = shortcut?.data ?? this.raceShortcutForIndex(race, player.raceGateIndex ?? 0);
         return {
             phase: 'running',
             title: course.title,
@@ -1890,15 +2420,33 @@ export class GameSession {
             gateCount: course.gates.length,
             rankLabel: raceRankLabel(this.racePlayerRank()),
             time: Math.max(0, this.save.world.time - (race.playerStartTime ?? this.save.world.time)),
+            personalBest,
+            pbTime: personalBest,
+            pbRank: record?.bestRank,
+            splitDelta: race.playerSplitDelta,
+            splitAge: Number.isFinite(race.splitAt) ? Math.max(0, this.save.world.time - race.splitAt) : undefined,
+            draft: race.draft?.active ? race.draft.strength : 0,
+            draftSavePercent: race.draft?.active ? race.draft.savePercent : 0,
+            draftSourceName: race.draft?.active ? race.draft.sourceName : undefined,
+            shortcut: availableShortcut
+                ? { active: Boolean(shortcut?.committed), available: !shortcut?.committed, entryIndex: availableShortcut.entryIndex, exitIndex: availableShortcut.exitIndex ?? availableShortcut.exitGateIndex, gate: (shortcut?.index ?? 0) + 1, gateCount: availableShortcut.gates.length }
+                : undefined,
         };
     }
     updatePlayer(dt, actions) {
         const stats = this.playerStats();
         // A laden hold dulls the controls: turn rate and acceleration fall with cargo mass.
         const loadScale = this.flightLoadScale();
+        // Slipstream is deliberately a small, universal race assist. It never
+        // changes the selected hull's published stats; the transient strength
+        // is computed by updateRaceSlipstreamState immediately before this
+        // controller runs.
+        const draftStrength = this.activeRace?.state === 'running'
+            ? clamp(this.raceDraftStrength ?? 0, 0, 1)
+            : 0;
         // playerStats() is cached for the flight. Never write load penalties
         // back into it: that compounded at 60 Hz until steering disappeared.
-        const acceleration = stats.acceleration * loadScale;
+        const acceleration = stats.acceleration * loadScale * (1 + draftStrength * 0.08);
         const angularAcceleration = stats.angularAcceleration * loadScale;
         const position = vec(this.save.player.position, this.tmpA);
         const velocity = vec(this.save.player.velocity, this.tmpB);
@@ -1972,6 +2520,11 @@ export class GameSession {
         // the damped acceleration below ramps the boost in smoothly.
         if (this.afterburning && velocity.length() >= 0.9 * stats.maxSpeed)
             targetSpeed = this.save.player.throttle * stats.afterburnSpeed;
+        // Apply the wake after selecting the normal/afterburn ceiling so the
+        // player gets a readable slingshot in either mode. The small overrun is
+        // transient and cannot modify the hull's published ship stats.
+        if (draftStrength > 0)
+            targetSpeed = Math.min(stats.afterburnSpeed * 1.06, targetSpeed * (1 + draftStrength * 0.06));
         if (this.autopilot) {
             // Charge-up hold: the ship stays put (steering only) while the drive spools,
             // then snaps to full cruise the moment the charge completes. This is the fix
@@ -1995,7 +2548,7 @@ export class GameSession {
         // Fuel is afterburner propellant and nothing else: normal flight and
         // the hyperdrive cruise never touch it. Running dry only kills the burn.
         if (this.afterburning)
-            this.save.player.fuel = Math.max(0, this.save.player.fuel - dt * 1.025);
+            this.save.player.fuel = Math.max(0, this.save.player.fuel - dt * 1.025 * (this.raceDraftFuelMultiplier ?? 1));
         if (this.save.player.fuel <= 0)
             this.afterburning = false;
         let hyperdriveDropped = false;
@@ -3187,7 +3740,7 @@ export class GameSession {
                 }
             }
         }
-        else if (kind === 'gate') {
+        else if (kind === 'gate' || kind === 'raceGate') {
             // Race checkpoint: a mission anchor, lockable at any distance while
             // an entry is live (see raceGateById). No tool-mode change.
             const gateTarget = this.raceGateTarget(id);
@@ -4063,7 +4616,8 @@ export class GameSession {
                 // and not dying outranks the fan-out. Re-roll against the
                 // seeded stream, so probes stay exact.
                 const obstacles = this.activeFieldObstacles();
-                const shipRadius = HULL_FLIGHT_STATS[shipVariantForRole(ship.role)]?.collisionRadius ?? NPC_SHIP_RADIUS;
+                const shipVariant = HULL_FLIGHT_STATS[ship.variant] ? ship.variant : shipVariantForRole(ship.role);
+                const shipRadius = HULL_FLIGHT_STATS[shipVariant]?.collisionRadius ?? NPC_SHIP_RADIUS;
                 let fan = undefined;
                 for (let attempt = 0; attempt < 5; attempt += 1) {
                     const angle = rng() * Math.PI * 2;
@@ -5088,7 +5642,8 @@ export class GameSession {
         // committing to its next route. Deterministic per ship/lifetime window.
         const obstacles = this.activeFieldObstacles();
         const origin = vec(ship.position, this.tmpP2);
-        const shipRadius = HULL_FLIGHT_STATS[shipVariantForRole(ship.role)]?.collisionRadius ?? NPC_SHIP_RADIUS;
+        const shipVariant = HULL_FLIGHT_STATS[ship.variant] ? ship.variant : shipVariantForRole(ship.role);
+        const shipRadius = HULL_FLIGHT_STATS[shipVariant]?.collisionRadius ?? NPC_SHIP_RADIUS;
         const clearance = shipRadius + 24;
         const rng = seededRandom(`${this.save.world.seed}:clearpath:${ship.id}:${Math.floor(ship.lifetime / 20)}`);
         const base = rng() * Math.PI * 2;
@@ -6784,7 +7339,8 @@ export class GameSession {
         return [base[0] * PLAYER_COLLISION_FORGIVENESS, base[1] * PLAYER_COLLISION_FORGIVENESS, base[2] * PLAYER_COLLISION_FORGIVENESS];
     }
     npcHullExtents(ship) {
-        return HULL_FLIGHT_STATS[shipVariantForRole(ship.role)]?.hullHalfExtents ?? [1.4, 2.4, 6.1];
+        const variant = HULL_FLIGHT_STATS[ship?.variant] ? ship.variant : shipVariantForRole(ship?.role);
+        return HULL_FLIGHT_STATS[variant]?.hullHalfExtents ?? [1.4, 2.4, 6.1];
     }
 
     // Entry/spawn clearance must cover the hull's longest reach, not the old
@@ -7676,88 +8232,133 @@ export class GameSession {
             this.ui.showToast(t('You already have a race entry on the books.'), 'warning');
             return;
         }
+        if (this.activeRace)
+            this.endRaceField();
         const course = generateRaceCourse(courseId, this.save.world.seed);
         if (!course)
             return;
+        const expectedOrigin = typeof course.origin === 'string'
+            ? course.origin
+            : course.origin?.id ?? (course.zone === 'shardbelt' ? 'helix' : course.zone === 'mourning-line' ? 'rook' : undefined);
+        if (expectedOrigin && this.save.player.dockedAt !== expectedOrigin) {
+            this.ui.showToast(t('Race entries are accepted only at {origin}.', { origin: LOCATIONS[expectedOrigin]?.name ?? expectedOrigin.toUpperCase() }), 'warning');
+            return;
+        }
+        if (typeof raceCourseUnlocked === 'function' && !raceCourseUnlocked(courseId, this.save.world.raceRecords ?? {})) {
+            this.ui.showToast(t('That course is still locked. Finish the earlier circuit first.'), 'warning');
+            return;
+        }
         if (this.save.player.credits < course.entryFee) {
             this.ui.showToast(t('Not enough credits for the race entry.'), 'warning');
             return;
         }
+        const now = this.save.world.time;
         this.save.player.credits -= course.entryFee;
-        startQuest(this.save, RACE_QUEST_ID, this.save.world.time);
+        // Races are repeatable. Reset the prior quest run's transient flags so
+        // a completion/forfeit cannot leak its course or deadline into a new
+        // ticket, while the separate race record keeps the personal best.
+        const quest = startQuest(this.save, RACE_QUEST_ID, now);
+        quest.stepId = 'travel';
+        quest.flags = {};
+        quest.choices = {};
+        quest.startedAt = now;
+        quest.completedAt = undefined;
         setStep(this.save, RACE_QUEST_ID, 'travel');
         setFlag(this.save, RACE_QUEST_ID, 'courseId', courseId);
         setFlag(this.save, RACE_QUEST_ID, 'paid', true);
-        setFlag(this.save, RACE_QUEST_ID, 'deadline', this.save.world.time + course.deadlineSeconds);
-        // The board marks the ticket live: hides the offer until it resolves
-        // and lets restoreActiveRace recognize an open entry after a reload.
-        this.save.world.raceRecords[course.id] = { active: true };
-        // Gates must be flyable: nudge any checkpoint that generated inside a
-        // rock BEFORE the markers sync, so they land on the hardened geometry
-        // (ported from the parallel 0.7.7a branch).
-        this.hardenRaceCourse(course);
-        this.activeRace = { state: 'travel', course, racers: [], startedAt: 0, playerStartTime: undefined, playerRank: 4, lastCountdown: 99, deadline: this.save.world.time + course.deadlineSeconds };
-        // Gate markers render from the moment the entry is paid: the pilot must
-        // SEE the first checkpoint when flying in (it used to pop only at the
-        // grid, leaving the approach unmarked), and it is lockable from the
-        // nav map / radar at any distance (see raceGateById).
-        this.renderer.syncRaceGates(course.gates, 0, LOCATIONS[course.zone].position);
-        this.ui.showToast(t('{course} entry paid. Fly to the {zone} and line up at the marker.', { course: course.title, zone: LOCATIONS[course.zone].name.toUpperCase() }), 'success', 6200);
-        this.save.player.navTargetId = course.zone;
+        setFlag(this.save, RACE_QUEST_ID, 'deadline', now + course.deadlineSeconds);
+        this.save.world.raceRecords ??= {};
+        const prior = normalizeRaceRecord(this.save.world.raceRecords[course.id]);
+        this.save.world.raceRecords[course.id] = { ...prior, active: true };
+        delete this.save.world.raceRecords[course.id].failed;
+        const racers = createRaceRacers(course, this.save.world.seed, now);
+        const staged = typeof stageRaceRacers === 'function' ? stageRaceRacers(racers, course) : racers;
+        const liveRacers = Array.isArray(staged) && staged.length === 3 ? staged : racers;
+        this.ships = this.ships.filter((ship) => !ship.race);
+        this.ships.push(...liveRacers);
+        this.activeRace = this.createRaceState(course, liveRacers, now + course.deadlineSeconds);
+        // The approach shows exactly one gathering marker. Course gates stay
+        // hidden until the player arrives, while all three racers are already
+        // present in the same ships array used by rendering and radar.
+        this.renderer.clearRaceGates();
+        this.renderer.syncRaceStart?.(this.raceGathering(course), 'travel');
+        this.save.player.currentTargetId = this.raceGathering(course).id;
+        this.ui.showToast(t('{course} entry paid. Fly to the {zone} gathering marker.', { course: course.title, zone: LOCATIONS[course.zone].name.toUpperCase() }), 'success', 6200);
+        if (LOCATIONS[course.zone])
+            this.save.player.navTargetId = course.zone;
         this.ui.refreshDock(this.save);
         saveGame(this.save);
     }
-    // Grid start: everyone lines up behind Gate 1 facing through it; the
-    // countdown holds velocity at zero until the lights go green.
+    // Grid start: reuse the three racers staged at acceptance, place the player
+    // in the authored gathering slot, then reveal the fixed course.
     startRaceAt(course) {
-        // Harden first: the grid slot is computed off Gate 1, so any buried
-        // checkpoint must be nudged before anything reads the geometry.
-        this.hardenRaceCourse(course);
+        const race = this.activeRace;
+        if (!race || race.course !== course)
+            return;
+        const racers = Array.isArray(race.racers) ? race.racers : [];
+        if (racers.length !== 3)
+            return;
+        const staged = typeof stageRaceRacers === 'function' ? stageRaceRacers(racers, course) : racers;
+        const liveRacers = Array.isArray(staged) && staged.length === 3 ? staged : racers;
+        race.racers = liveRacers;
+        // Keep ambient traffic out of the course, but retain the exact racer
+        // objects created during acceptance (no replacement grid ships).
+        this.ships = this.ships.filter((ship) => liveRacers.includes(ship));
+        for (const racer of liveRacers)
+            if (!this.ships.includes(racer))
+                this.ships.push(racer);
         const player = this.save.player;
         const gate0 = course.gates[0];
-        const zonePos = vec(LOCATIONS[course.zone].position);
-        const gatePos = vec(gate0.position);
-        const outward = gatePos.clone().sub(zonePos).normalize();
-        const start = gatePos.clone().addScaledVector(outward, -(gate0.radius * 1.8));
-        // Player holds a laterally offset slot; racers take the wing positions
-        // (see createRaceRacers). Slots must never overlap hull envelopes.
-        // Perpendicular in the horizontal plane: outward × up.
-        const side = new THREE.Vector3().crossVectors(outward, new THREE.Vector3(0, 1, 0));
-        if (side.lengthSq() < 1e-8)
-            side.set(1, 0, 0);
-        start.addScaledVector(side.normalize(), 24);
-        // Gates thread the rock field, so grid slots can land inside a piece:
-        // push out to guaranteed obstacle clearance before pinning the ship
-        // (a buried spawn used to produce a degenerate collision contact).
+        const gathering = this.raceGathering(course);
+        const gatePos = vec(gate0.position, this.tmpRaceGoalVector);
+        let start = this.raceGridSlot(gathering, this.tmpEntryAnchor);
+        const outward = this.raceGatheringDirection(course, this.tmpEntryDirection);
+        if (!start) {
+            // Legacy authored courses have no explicit grid array. Keep the
+            // player in the gathering formation beside the staged racers rather
+            // than falling back to the first course gate far away.
+            start = this.tmpEntryAnchor.copy(this.raceGatheringPosition(course)).addScaledVector(outward, -30);
+            const side = this.tmpEntryLocal.crossVectors(outward, UP);
+            if (side.lengthSq() < 1e-8)
+                side.set(1, 0, 0);
+            start.addScaledVector(side.normalize(), 24);
+        }
         this.ensurePlayerEntryClearance(start, course.zone, outward);
         player.dockedAt = undefined;
-        player.position = [start.x, start.y + 12, start.z];
-        player.velocity = [0, 0, 0];
-        player.angularVelocity = [0, 0, 0];
+        player.position[0] = start.x;
+        player.position[1] = start.y;
+        player.position[2] = start.z;
+        player.velocity[0] = 0;
+        player.velocity[1] = 0;
+        player.velocity[2] = 0;
+        player.angularVelocity[0] = 0;
+        player.angularVelocity[1] = 0;
+        player.angularVelocity[2] = 0;
         player.throttle = 0;
-        const towardGate = gatePos.clone().sub(start).normalize();
-        player.rotation = quatTuple(this.tmpQ.setFromUnitVectors(FORWARD, towardGate));
-        player.currentTargetId = undefined;
+        const towardGate = this.tmpEntryLocalDirection.copy(gatePos).sub(start);
+        if (towardGate.lengthSq() < 1e-8)
+            towardGate.copy(outward);
+        towardGate.normalize();
+        quatTupleInto(player.rotation, this.tmpQ.setFromUnitVectors(FORWARD, towardGate));
+        player.currentTargetId = gate0.id;
         player.raceGateIndex = 0;
         this.resetPlayerInterpolation(true);
-        this.ships = [];
         this.projectiles = [];
         this.pickups = [];
-        const racers = createRaceRacers(course, this.save.world.seed, this.save.world.time);
-        for (const racer of racers)
-            this.ships.push(racer);
         Object.assign(this.activeRace, {
             state: 'countdown',
             startedAt: this.save.world.time + 4,
             playerStartTime: undefined,
             playerRank: 4,
             lastCountdown: 99,
-            racers,
+            playerSplits: [],
+            shortcut: undefined,
         });
         this.autopilot = false;
         this.afterburning = false;
         this.renderer.setCockpitVisible(true);
-        this.renderer.syncRaceGates(course.gates, 0, LOCATIONS[course.zone].position);
+        this.renderer.clearRaceStart?.();
+        this.syncRaceCourse(this.activeRace);
         this.audio.setStationMode(false);
         this.ui.hideDock();
         this.ui.showHud();
@@ -8120,7 +8721,7 @@ export class GameSession {
                     captured: ship.captured,
                     captureClaimable: Boolean(claimable),
                     captureAvailable,
-                    variant: shipVariantForRole(ship.role),
+                    variant: ship.variant ?? shipVariantForRole(ship.role),
                     heading,
                     subtitle: `${t(ship.role.toUpperCase())} · ${ship.surrendered ? t('SURRENDERED') : ship.hostile ? t('HOSTILE') : t(FACTION_LABEL(ship.faction))}${this.save.world.time < (ship.distressUntil ?? 0) ? ` · ${t('DISTRESS')}` : ''}`,
                     // The monitor's readout line carries the pilot profile so a
@@ -8188,14 +8789,20 @@ export class GameSession {
                     const passed = found.index < nextIndex;
                     hudTarget = {
                         kind: 'gate',
-                        name: t('GATE {n}/{total}', { n: found.index + 1, total: found.course.gates.length }),
-                        subtitle: `${t(found.course.title.toUpperCase())} · ${t('RACE CHECKPOINT')}`,
+                        name: found.gathering
+                            ? t('RACE START · {course}', { course: t(found.course.title) })
+                            : t('GATE {n}/{total}', { n: found.index + 1, total: found.course.gates.length }),
+                        subtitle: found.gathering
+                            ? `${t(found.course.title.toUpperCase())} · ${t('START LINE')}`
+                            : `${t(found.course.title.toUpperCase())} · ${t('RACE CHECKPOINT')}`,
                         distance,
                         objectKind: 'gate',
-                        readout: passed
+                        readout: found.gathering
+                            ? t('GATHERING POINT · LINE UP TO START')
+                            : passed
                             ? t('GATE CLEARED')
                             : found.index === nextIndex
-                                ? (this.activeRace?.state === 'travel' ? t('START/FINISH · LINE UP TO BEGIN') : t('NEXT CHECKPOINT · FLY THROUGH'))
+                                ? t('NEXT CHECKPOINT · FLY THROUGH')
                                 : t('UPCOMING CHECKPOINT'),
                         ...screen,
                     };
@@ -8278,7 +8885,11 @@ export class GameSession {
             // No hyperdriveCooldown field: the post-intercept calm window only
             // suppresses new ambushes (see toggleHyperdrive) and never blocks the
             // drive, so the card has nothing to count down.
-            hyperdriveReady: !this.autopilot && !this.hyperdriveBlockReason(),
+            // Never advertise READY through a drop/interrupt flash. An
+            // intercepting crew can transition into a non-hostile toll hail
+            // immediately after breaking the drive; threat state alone would
+            // otherwise produce READY and INTERRUPTED on the same card.
+            hyperdriveReady: !this.autopilot && this.hyperdriveFx === 'none' && !this.hyperdriveBlockReason(),
             loadPercent: Math.round((cargoMass(this.save.player) / Math.max(1, cargoCapacity(this.save.player))) * 100),
             // Handling reflects the cargo-load penalty on turn/acceleration.
             handlingPercent: Math.round(this.flightLoadScale() * 100),
@@ -8338,6 +8949,11 @@ export class GameSession {
                 distance,
                 x: clamp(relative.x / range, -1, 1),
                 y: clamp(relative.z / range, -1, 1),
+                // Elevation angle — vertical offset over the true 3D distance —
+                // the same distance-aware normalization the radar uses, so the
+                // chart's out-of-plane cue shrinks as a marker recedes and
+                // grows as it closes instead of scaling off the fixed range.
+                altitude: relative.y / Math.max(distance, 1),
                 hostile,
                 scanned,
                 selected: id === this.save.player.currentTargetId,
@@ -8374,6 +8990,8 @@ export class GameSession {
                     const beacon = buildContact('ship', ship.id, ship.name, `${ship.role.toUpperCase()} · DISTRESS CALL`, ship.position, shipRange, ship.hostile, false, true);
                     if (beacon) {
                         beacon.distress = true;
+                        beacon.race = Boolean(ship.race);
+                        beacon.racer = Boolean(ship.race);
                         contacts.push(beacon);
                     }
                 }
@@ -8383,6 +9001,10 @@ export class GameSession {
             const contact = buildContact('ship', ship.id, ship.name, subtitle, ghost ? (ship.lastSeenPosition ?? ship.position) : ship.position, shipRange, ship.hostile, false, ghost);
             if (contact) {
                 contact.ghost = ghost;
+                contact.race = Boolean(ship.race);
+                contact.racer = Boolean(ship.race);
+                if (ship.race)
+                    contact.racerId = ship.id;
                 if (distressActive)
                     contact.distress = true;
                 if (ghost) {
@@ -8437,21 +9059,43 @@ export class GameSession {
                 contacts.push(contact);
             }
         }
-        // Live race entry: the course checkpoints surface on the chart at ANY
-        // distance (mission anchors, like claims) — the just-cleared gate for
-        // orientation plus the next three, so the route direction reads and
-        // the first gate is lockable while still flying in.
-        if (this.activeRace && this.activeRace.state !== 'finished' && this.activeRace.state !== 'failed') {
-            const nextIndex = this.save.player.raceGateIndex ?? 0;
-            this.activeRace.course.gates.forEach((gate, index) => {
-                if (index < nextIndex - 1 || index > nextIndex + 2)
-                    return;
-                const contact = buildContact('gate', gate.id, t('GATE {n}/{total}', { n: index + 1, total: this.activeRace.course.gates.length }), `${t(this.activeRace.course.title.toUpperCase())} · ${index < nextIndex ? t('CLEARED') : index === nextIndex ? t('NEXT CHECKPOINT') : t('RACE COURSE')}`, gate.position, stats.radarRange, false, true, true);
+        // Race contacts are intentionally phase-scoped. During travel the
+        // chart exposes one gathering marker; once the grid starts it exposes
+        // the authored course plus only the shortcut branch at the current
+        // entry, never a hidden full route during the approach.
+        const race = this.activeRace;
+        if (race && race.state !== 'finished' && race.state !== 'failed') {
+            if (race.state === 'travel') {
+                const gathering = this.raceGathering(race.course);
+                const id = gathering.id ?? `${race.course.id}-start`;
+                const contact = buildContact('gate', id, t('RACE GATHERING'), `${t(race.course.title.toUpperCase())} · ${t('START LINE')}`, gathering.position, stats.radarRange, false, true, true);
                 if (contact) {
                     contact.gate = true;
+                    contact.raceGathering = true;
                     contacts.push(contact);
                 }
-            });
+            }
+            else {
+                const nextIndex = this.save.player.raceGateIndex ?? 0;
+                race.course.gates.forEach((gate, index) => {
+                    const contact = buildContact('gate', gate.id, t('GATE {n}/{total}', { n: index + 1, total: race.course.gates.length }), `${t(race.course.title.toUpperCase())} · ${index < nextIndex ? t('CLEARED') : index === nextIndex ? t('NEXT CHECKPOINT') : t('RACE COURSE')}`, gate.position, stats.radarRange, false, true, true);
+                    if (contact) {
+                        contact.gate = true;
+                        contact.raceGate = true;
+                        contact.raceGateState = index < nextIndex ? 'passed' : index === nextIndex ? 'next' : 'future';
+                        contacts.push(contact);
+                    }
+                });
+                for (const shortcut of this.raceShortcutRenderData(race)) {
+                    const contact = buildContact('gate', shortcut.id, t('SHORTCUT'), `${t(race.course.title.toUpperCase())} · ${t('TIGHT LINE')}`, shortcut.position, stats.radarRange, false, true, true);
+                    if (contact) {
+                        contact.gate = true;
+                        contact.raceGate = true;
+                        contact.raceShortcut = true;
+                        contacts.push(contact);
+                    }
+                }
+            }
         }
         contacts.sort((a, b) => Number(b.hostile) - Number(a.hostile) || prioritize(a, b));
         // Active search sweeps on the chart: one dashed ring per searching ship
@@ -8492,7 +9136,7 @@ export class GameSession {
         // outer ring is exactly the radarRange ring and the inner rings can be
         // calibrated against it (see radarRings in buildHudModel).
         const range = this.playerStats().radarRange;
-        const add = (position, type, selected, surfaceOffset = 0, ghost = false, lostAlpha = 0) => {
+        const add = (position, type, selected, surfaceOffset = 0, ghost = false, lostAlpha = 0, race = false) => {
             const relative = this.tmpRadarRel.set(position[0], position[1], position[2]).sub(player).applyQuaternion(inverse);
             const distance = Math.hypot(relative.x, relative.z) - surfaceOffset;
             if (!ghost && distance > range * 1.45)
@@ -8503,10 +9147,13 @@ export class GameSession {
             if (ghost && distance > range * 2.2)
                 return;
             const scale = Math.max(range, distance);
-            // Altitude is normalised to the same full-ring scale as the in-plane
-            // position, so the out-of-plane tick can grow with how far above or
-            // below the contact sits instead of being a fixed stub.
-            contacts.push({ x: clamp(relative.x / scale, -1, 1), y: clamp(relative.z / scale, -1, 1), type, selected, altitude: relative.y / range, ghost, lostAlpha });
+            // Altitude is the contact's elevation angle — vertical offset over
+            // the true 3D distance — so the out-of-plane tick shrinks as the
+            // target recedes and grows as it closes: a target 100 km up at 800
+            // km reads as a shallow climb, while the same offset next to you
+            // reads as a steep one. It is bounded (sin of the angle) and the
+            // drawer clamps it anyway.
+            contacts.push({ x: clamp(relative.x / scale, -1, 1), y: clamp(relative.z / scale, -1, 1), type, selected, altitude: relative.y / Math.max(relative.length(), 1), ghost, lostAlpha, race, racer: race });
         };
         for (const ship of this.ships) {
             if (ship.hull <= 0)
@@ -8533,7 +9180,7 @@ export class GameSession {
                 // NaN last-known position would draw the lost cross nowhere.
                 ship.lastSeenPosition = [...ship.position];
                 ship.lastSeenAt = this.save.world.time;
-                add(ship.position, type, selected, 0, false);
+                add(ship.position, type, selected, 0, false, 0, Boolean(ship.race));
             }
             else if (this.save.world.time < (ship.lastSeenAt ?? 0) + LOST_CONTACT_LIFETIME) {
                 // Lost contact: the cross rides the last known position and
@@ -8542,7 +9189,7 @@ export class GameSession {
                 let lostAlpha = 0.9;
                 if (age >= LOST_CONTACT_HOLD_SECONDS)
                     lostAlpha = 0.9 * Math.max(0, 1 - (age - LOST_CONTACT_HOLD_SECONDS) / LOST_CONTACT_FADE_SECONDS);
-                add(ship.lastSeenPosition ?? ship.position, type, selected, 0, true, lostAlpha);
+                add(ship.lastSeenPosition ?? ship.position, type, selected, 0, true, lostAlpha, Boolean(ship.race));
             }
             else if (this.save.world.time < (ship.distressUntil ?? 0)) {
                 // A distress beacon surfaces the ship's position even beyond
@@ -8556,7 +9203,7 @@ export class GameSession {
                         y: (relative.z / horiz) * 0.97,
                         type: 'distress',
                         selected: false,
-                        altitude: relative.y / range,
+                        altitude: relative.y / Math.max(relative.length(), 1),
                         ghost: false,
                         distress: true,
                         distance: Math.round(horiz),
@@ -8579,33 +9226,77 @@ export class GameSession {
         for (const pickup of this.pickups)
             if (pickup.life > 0)
                 add(this.pickupStore.pos.subarray(pickup.slot * 3, pickup.slot * 3 + 3), 'pickup', pickup.id === this.save.player.currentTargetId);
-        // Race checkpoints on the disc: the cleared gate (green, ticked), the
-        // next checkpoint (yellow), and the first upcoming one (grey). They are
-        // mission anchors, so beyond-horizon gates clamp to the rim (same
-        // scale rule as add()) instead of vanishing — drawRadar renders the
-        // circle + tick treatment.
+        // Race checkpoints on the disc are phase-scoped just like the nav map:
+        // travel has one gathering contact; countdown/running expose the fixed
+        // course and any currently available shortcut rings.
         const race = this.activeRace;
         if (race && race.state !== 'finished' && race.state !== 'failed') {
-            const nextIndex = this.save.player.raceGateIndex ?? 0;
-            for (const index of [nextIndex - 1, nextIndex, nextIndex + 1]) {
-                const gate = race.course.gates[index];
-                if (!gate)
-                    continue;
-                const relative = this.tmpRadarRel.set(gate.position[0], gate.position[1], gate.position[2]).sub(player).applyQuaternion(inverse);
+            if (race.state === 'travel') {
+                const gathering = this.raceGathering(race.course);
+                const relative = this.tmpRadarRel.set(gathering.position[0], gathering.position[1], gathering.position[2]).sub(player).applyQuaternion(inverse);
                 const distance = Math.hypot(relative.x, relative.z);
                 contacts.push({
                     x: clamp(relative.x / Math.max(range, distance), -1, 1),
                     y: clamp(relative.z / Math.max(range, distance), -1, 1),
                     type: 'racegate',
-                    selected: gate.id === this.save.player.currentTargetId,
-                    altitude: relative.y / range,
+                    selected: gathering.id === this.save.player.currentTargetId,
+                    altitude: relative.y / Math.max(relative.length(), 1),
                     ghost: false,
+                    race: true,
+                    raceGathering: true,
                     raceGate: {
-                        state: index < nextIndex ? 'passed' : index === nextIndex ? 'next' : 'future',
+                        state: 'next',
                         distance: Math.round(distance),
                         beyond: distance > range,
                     },
                 });
+            }
+            else {
+                // The disc shows only the next gate (green) and the one after
+                // it (yellow), matching the in-world ring colors — a full line
+                // of rings turns the radar into noise at race speed. The whole
+                // course stays visible in the world and on the nav map.
+                const nextIndex = this.save.player.raceGateIndex ?? 0;
+                for (let index = nextIndex; index <= nextIndex + 1; index += 1) {
+                    const gate = race.course.gates[index];
+                    if (!gate)
+                        continue;
+                    const relative = this.tmpRadarRel.set(gate.position[0], gate.position[1], gate.position[2]).sub(player).applyQuaternion(inverse);
+                    const distance = Math.hypot(relative.x, relative.z);
+                    contacts.push({
+                        x: clamp(relative.x / Math.max(range, distance), -1, 1),
+                        y: clamp(relative.z / Math.max(range, distance), -1, 1),
+                        type: 'racegate',
+                        selected: gate.id === this.save.player.currentTargetId,
+                        altitude: relative.y / Math.max(relative.length(), 1),
+                        ghost: false,
+                        race: true,
+                        raceGate: {
+                            state: index === nextIndex ? 'next' : 'upcoming',
+                            distance: Math.round(distance),
+                            beyond: distance > range,
+                        },
+                    });
+                }
+                for (const shortcut of this.raceShortcutRenderData(race)) {
+                    const relative = this.tmpRadarRel.set(shortcut.position[0], shortcut.position[1], shortcut.position[2]).sub(player).applyQuaternion(inverse);
+                    const distance = Math.hypot(relative.x, relative.z);
+                    contacts.push({
+                        x: clamp(relative.x / Math.max(range, distance), -1, 1),
+                        y: clamp(relative.z / Math.max(range, distance), -1, 1),
+                        type: 'racegate',
+                        selected: shortcut.id === this.save.player.currentTargetId,
+                        altitude: relative.y / Math.max(relative.length(), 1),
+                        ghost: false,
+                        race: true,
+                        raceShortcut: true,
+                        raceGate: {
+                            state: 'shortcut',
+                            distance: Math.round(distance),
+                            beyond: distance > range,
+                        },
+                    });
+                }
             }
         }
         return contacts;

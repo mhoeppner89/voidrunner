@@ -1,478 +1,417 @@
-// probe-race-flight.mjs — bar-circuit race quest, end to end, headless.
+// probe-race-flight.mjs — fixed six-course racing career, end to end, headless.
 //
-// Drives a real session through window.__VOID_PRIVATEER__.getRuntime() and
-// steps updateSimulation(1/60) directly (no rAF): offer → accept (fee,
-// travel leg) → manual fly-in to the start line (proximity handoff) →
-// countdown hold → gate-by-gate flight at cruise speed with live rank →
-// finish payout + records → expiry forfeit path → paid-entry reload restore.
-// Also verifies the 0.7.7b gate-as-targets layer: gate lock via
-// raceGateById / kind 'gate', gate radar blips + altitude ticks, and the
-// own-monitor race strip. Exits nonzero on failure.
+// The authoritative racing regression suite (replaces the retired 0.7.7
+// bar-circuit probe, which required every course gate on the map and radar
+// before the grid — the polished career deliberately exposes only the
+// gathering during travel, then reveals the course at countdown). Covers the
+// mission board, gathering-only travel phase, visible staged rivals,
+// countdown/course reveal, finish presentation, drafting, centered fuel
+// rewards, tight shortcut lifecycle, progression, persistence, and all six
+// configured courses. Drives the real GameSession through Playwright.
 import { spawn } from 'node:child_process';
+import { chromium } from '/Users/mhoeppner/.codex/node_modules/playwright/index.mjs';
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const httpd = spawn('python3', ['-m', 'http.server', '4173'], { stdio: 'ignore', cwd: process.cwd() });
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const ROOT = '/Users/mhoeppner/Desktop/Voidrunner';
+const BASE_URL = process.env.VR_BASE_URL ?? 'http://127.0.0.1:4173/';
+const ownServer = !process.env.VR_BASE_URL;
+const httpd = ownServer ? spawn('python3', ['-m', 'http.server', '4173'], { stdio: 'ignore', cwd: ROOT }) : null;
 const FAILURES = [];
-const PASS = [];
-const check = (name, ok, detail) => {
-    if (ok) PASS.push(name);
-    else FAILURES.push(`${name} :: ${detail}`);
-    console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : ' :: ' + detail}`);
+const PASSES = [];
+const check = (name, ok, detail = '') => {
+    if (ok)
+        PASSES.push(name);
+    else
+        FAILURES.push(`${name} :: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`);
+    console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : ` :: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`}`);
 };
 
-const chrome = spawn(process.env.CHROME_BIN ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
-    '--headless=new', '--disable-gpu', '--enable-unsafe-swiftshader', '--no-sandbox', '--disable-gpu-sandbox',
-    // CDP over pipe: Node 25's global WebSocket stalls against DevTools in
-    // this sandboxed environment, and Chrome's own child-process sandbox
-    // collides with the outer one unless disabled. The pipe + --no-sandbox
-    // pair boots cleanly where --remote-debugging-port hangs.
-    '--remote-debugging-pipe',
-    `--user-data-dir=${process.env.VR_PROFILE ?? '/tmp/vr-race-flight-profile'}`, '--no-first-run', '--no-default-browser-check',
-    '--window-size=640,480', 'about:blank',
-], { cwd: process.cwd(), stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] });
-
-let msgId = 0;
-let pageSession = null;
-const pending = new Map();
 const pageErrors = [];
-{
-    let buf = '';
-    chrome.stdio[4].on('data', (chunk) => {
-        buf += chunk.toString('utf8');
-        let idx;
-        while ((idx = buf.indexOf('\0')) >= 0) {
-            const line = buf.slice(0, idx);
-            buf = buf.slice(idx + 1);
-            if (!line.trim())
-                continue;
-            let msg;
-            try { msg = JSON.parse(line); } catch { continue; }
-            if (msg.id !== undefined && pending.has(msg.id)) {
-                const { resolve, reject } = pending.get(msg.id);
-                pending.delete(msg.id);
-                msg.error ? reject(new Error(msg.error.message)) : resolve(msg.result);
-                continue;
-            }
-            if (msg.method === 'Target.attachedToTarget' && msg.params.targetInfo.type === 'page')
-                pageSession = msg.params.sessionId;
-            else if (msg.sessionId === pageSession && msg.method === 'Runtime.exceptionThrown')
-                pageErrors.push(msg.params.exceptionDetails?.exception?.description ?? msg.params.exceptionDetails?.text ?? 'exception');
-        }
-    });
-}
-const rawSend = (method, params = {}, sessionId) => {
-    const id = ++msgId;
-    const payload = { id, method, params };
-    if (sessionId)
-        payload.sessionId = sessionId;
-    return new Promise((resolve, reject) => {
-        pending.set(id, { resolve, reject });
-        chrome.stdio[3].write(JSON.stringify(payload) + '\0');
-        setTimeout(() => {
-            if (pending.has(id)) {
-                pending.delete(id);
-                reject(new Error('cdp timeout: ' + method));
-            }
-        }, 30000);
-    });
-};
-const send = (method, params = {}) => rawSend(method, params, pageSession);
-const evaluate = async (expression) => {
-    const r = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
-    if (r.exceptionDetails) throw new Error('eval: ' + String(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text).slice(0, 500));
-    return r.result?.value;
-};
+let browser;
+let page;
+const evaluate = (expression) => page.evaluate(expression);
 
 try {
-    await rawSend('Target.setAutoAttach', { autoAttach: false, waitForDebuggerOnStart: false, flatten: true });
-    await sleep(400);
-    const { targetId } = await rawSend('Target.createTarget', { url: 'about:blank' });
-    const attached = await rawSend('Target.attachToTarget', { targetId, flatten: true });
-    pageSession = attached.sessionId;
-    await send('Runtime.enable');
-    await send('Page.enable');
-    await send('Page.navigate', { url: 'http://127.0.0.1:4173/' });
-    let hookReady = false;
-    for (let i = 0; i < 40 && !hookReady; i += 1) {
-        await sleep(300);
-        hookReady = await evaluate('Boolean(window.__VOID_PRIVATEER__)').catch(() => false);
+    browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader'] });
+    page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    page.on('console', (message) => {
+        if (message.type() === 'error')
+            pageErrors.push(message.text());
+    });
+    page.on('pageerror', (error) => pageErrors.push(String(error)));
+    await page.goto(`${BASE_URL}${BASE_URL.includes('?') ? '&' : '?'}race-probe=1`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    let ready = false;
+    for (let attempt = 0; attempt < 80 && !ready; attempt += 1) {
+        await sleep(250);
+        ready = await evaluate('Boolean(window.__VOID_PRIVATEER__)').catch(() => false);
     }
-    if (!hookReady) throw new Error('page hook never appeared');
-    await evaluate('window.__VOID_PRIVATEER__.newGame()');
+    if (!ready)
+        throw new Error('debug hook never appeared');
+    await evaluate("localStorage.setItem('__VOID_PRIVATEER_PROBE_LANG__', 'en'); window.__VOID_PRIVATEER__.newGame()");
     let booted = false;
-    for (let i = 0; i < 60 && !booted; i += 1) {
-        await sleep(300);
-        booted = await evaluate('Boolean(window.__VOID_PRIVATEER__?.getRuntime?.()?.save?.player && window.__VOID_PRIVATEER__?.getRuntime?.()?.updateSimulation)').catch(() => false);
+    for (let attempt = 0; attempt < 100 && !booted; attempt += 1) {
+        await sleep(250);
+        booted = await evaluate('Boolean(window.__VOID_PRIVATEER__?.getRuntime?.()?.save?.player && window.__VOID_PRIVATEER__?.getRuntime?.()?.renderer)').catch(() => false);
     }
-    if (!booted) throw new Error('session never booted');
+    if (!booted)
+        throw new Error('game session never booted');
+    // Stop wall-clock rAF advancement. Every lifecycle transition below is
+    // driven explicitly, so assertions cannot race the five-second cleanup.
+    await evaluate(`(() => { const rt = window.__VOID_PRIVATEER__.getRuntime(); cancelAnimationFrame(rt.frameId); rt.frameId = 0; return true; })()`);
+    await sleep(1200);
 
-    // Pin the world seed: course geometry (and therefore flight duration)
-    // must be identical across runs or the timing band below is noise.
-    await evaluate("window.__VOID_PRIVATEER__.getRuntime().save.world.seed = 'race-flight-probe';");
-
-    const STEP = 1 / 60;
-
-    // ── Offer + accept ────────────────────────────────────────────────────
-    await evaluate(`(() => {
+    const board = await evaluate(`(() => {
         const rt = window.__VOID_PRIVATEER__.getRuntime();
-        rt.save.player.credits = 5000;
+        rt.save.player.credits = 500000;
+        const raceIds = (dock) => (rt.save.world.offers[dock] ?? []).filter((offer) => offer.kind === 'race').map((offer) => ({ id: offer.id, locked: offer.locked, tier: offer.tier, recommended: offer.recommendedShipText }));
+        return { helix: raceIds('helix'), rook: raceIds('rook') };
+    })()`);
+    check('mission boards expose exactly three fixed courses per field', board.helix.length === 3 && board.rook.length === 3, board);
+    check('each board starts with only tier one unlocked', board.helix.filter((offer) => !offer.locked).length === 1 && board.rook.filter((offer) => !offer.locked).length === 1, board);
+    check('track recommendations carry the intended ship guidance', board.helix[2]?.recommended?.includes('heavy afterburner') && board.rook[0]?.recommended?.includes('Talon'), board);
+
+    const lockedAttempt = await evaluate(`(() => {
+        const rt = window.__VOID_PRIVATEER__.getRuntime();
         rt.save.player.dockedAt = 'helix';
-        rt.updateActiveInstance(true);
-        return true;
+        const before = rt.save.player.credits;
+        rt.acceptRace('shard-switchback');
+        return { unchanged: before === rt.save.player.credits, active: rt.activeRace?.course?.id ?? null };
     })()`);
-    await evaluate(`window.__VOID_PRIVATEER__.getRuntime().updateSimulation(${STEP}, {})`);
-    check('offer posted at helix', await evaluate(
-        `window.__VOID_PRIVATEER__.getState().world.offers.helix?.some((m) => m.id === 'race-shard-gauntlet') ?? false`,
-    ), 'race-shard-gauntlet offer missing from helix board');
+    check('locked courses cannot be bought early', lockedAttempt.unchanged && lockedAttempt.active === null, lockedAttempt);
 
-    await evaluate(`window.__VOID_PRIVATEER__.getRuntime().acceptRace('shard-gauntlet')`);
-    check('entry fee deducted', await evaluate(
-        `window.__VOID_PRIVATEER__.getState().player.credits === 4500`,
-    ), `credits=${await evaluate('window.__VOID_PRIVATEER__.getState().player.credits')} expected 4500`);
-    check('travel leg live', await evaluate(
-        `(() => { const rt = window.__VOID_PRIVATEER__.getRuntime();
-           return !!rt.activeRace && rt.activeRace.state === 'travel'
-             && rt.activeRace.course.id === 'shard-gauntlet'
-             && rt.save.player.navTargetId === 'shardbelt'
-             && rt.save.world.raceRecords['shard-gauntlet']?.active === true
-             && Number.isFinite(rt.activeRace.deadline); })()`,
-    ), JSON.stringify(await evaluate(`(() => { const rt = window.__VOID_PRIVATEER__.getRuntime(); return { race: rt.activeRace?.state, nav: rt.save.player.navTargetId, rec: rt.save.world.raceRecords['shard-gauntlet'], dl: rt.activeRace?.deadline }; })()`)));
-    check('second entry refused while one is live', await evaluate(
-        `(() => { const rt = window.__VOID_PRIVATEER__.getRuntime(); const c = rt.save.player.credits;
-           rt.acceptRace('mourning-run'); return rt.save.player.credits === c && rt.activeRace.course.id === 'shard-gauntlet'; })()`,
-    ), 'double entry changed credits or overwrote the live race');
-
-    // ── Visible start line + gate-as-target layer ─────────────────────────
-    // The parcours must be VISIBLE from the moment the entry is paid: gate 1
-    // is the pulsing active marker the pilot flies toward. And it must be
-    // LOCKABLE from anywhere — raceGateById resolves the '{course}-gate-{n}'
-    // ids the nav map and radar carry (mission anchors, like claims).
-    check('gates visible during travel leg', await evaluate(`(() => {
+    const travel = await evaluate(`(() => {
         const rt = window.__VOID_PRIVATEER__.getRuntime();
-        const gates = rt.renderer.raceGateMeshes;
-        return { ok: gates.length === 13 && gates[0].visible && gates[12].visible, count: gates.length };
-    })()`), 'parcours not rendered while travelling');
-
-    check('gate lock via raceGateById (kind gate)', await evaluate(`(() => {
-        const rt = window.__VOID_PRIVATEER__.getRuntime();
-        const found = rt.raceGateById('shard-gauntlet-gate-0');
-        if (!found || found.index !== 0) return { ok: false, found: Boolean(found) };
-        const target = rt.raceGateTarget('shard-gauntlet-gate-0');
-        if (!target || target.kind !== 'gate') return { ok: false, kind: target?.kind };
-        rt.selectTarget('gate', 'shard-gauntlet-gate-0');
-        const ref = rt.getTargetRef(false);
-        return { ok: ref?.kind === 'gate' && rt.save.player.currentTargetId === 'shard-gauntlet-gate-0', refKind: ref?.kind };
-    })()`), 'gate not lockable as a gate target');
-    check('gate HUD model carries the checkpoint readout', await evaluate(`(() => {
-        const rt = window.__VOID_PRIVATEER__.getRuntime();
-        const model = rt.buildHudModel();
-        const t = model.target;
+        rt.acceptRace('shard-gauntlet');
+        const race = rt.activeRace;
+        const visibleGates = rt.renderer.raceGateMeshes.filter((mesh) => mesh.visible).length;
+        const gateRadar = rt.radarContacts().filter((contact) => contact.type === 'racegate');
+        const mapGates = rt.buildNavigationMapModel().contacts.filter((contact) => contact.kind === 'gate');
         return {
-            ok: t?.kind === 'gate' && t.name.startsWith('GATE') && t.readout !== undefined,
-            name: t?.name, readout: t?.readout,
+            state: race?.state,
+            feePaid: rt.save.player.credits === 499500,
+            racers: race?.racers?.length,
+            shipRacers: rt.ships.filter((ship) => ship.race).length,
+            variants: [...new Set(race?.racers?.map((ship) => ship.variant) ?? [])],
+            visibleGates,
+            startVisible: Boolean(rt.renderer.raceStartRoot?.visible),
+            target: rt.save.player.currentTargetId,
+            gatheringId: race?.course?.gathering?.id,
+            firstGateHiddenFromTargeting: !rt.raceGateById(race?.course?.gates?.[0]?.id),
+            gateRadar: gateRadar.map((contact) => ({ gathering: contact.raceGathering, state: contact.raceGate?.state })),
+            mapGateIds: mapGates.map((contact) => contact.id),
         };
-    })()`), 'gate target missing from the HUD model');
+    })()`);
+    check('entry starts a paid travel leg with three persistent rivals', travel.state === 'travel' && travel.feePaid && travel.racers === 3 && travel.shipRacers === 3 && travel.variants.length === 3, travel);
+    check('travel reveals only the gathering marker', travel.visibleGates === 0 && travel.startVisible && travel.target === travel.gatheringId && travel.firstGateHiddenFromTargeting && travel.gateRadar.length === 1 && travel.gateRadar[0].gathering === true && travel.mapGateIds.length === 1 && travel.mapGateIds[0] === travel.gatheringId, travel);
 
-    check('every gate is clear of rocks (reachable)', await evaluate(`(() => {
+    const gatherElevation = await evaluate(`(() => {
+        // The radar altitude must be the true elevation angle (vertical offset
+        // over 3D distance), so the tick shrinks as the gathering recedes. A
+        // regression to a fixed dy/range scale fails this check.
         const rt = window.__VOID_PRIVATEER__.getRuntime();
-        const course = rt.activeRace.course;
-        const obstacles = rt.activeFieldObstacles(course.zone);
-        if (!obstacles.length) return { ok: true, skipped: 'no obstacles' };
-        const v = rt.tmpA;
-        const blocked = [];
-        course.gates.forEach((gate, i) => {
-            v.set(gate.position[0], gate.position[1], gate.position[2]);
-            if (!rt.entryPositionClear(v, obstacles))
-                blocked.push(i);
-        });
-        return { ok: blocked.length === 0, blocked };
-    })()`), 'buried gates remain');
+        const gathering = rt.raceGathering(rt.activeRace.course);
+        const player = rt.save.player.position;
+        const dx = gathering.position[0] - player[0];
+        const dy = gathering.position[1] - player[1];
+        const dz = gathering.position[2] - player[2];
+        const dist3d = Math.hypot(dx, dy, dz);
+        const trueMagnitude = Math.abs(dy) / Math.max(dist3d, 1);
+        const contact = rt.radarContacts().find((c) => c.raceGathering);
+        return { trueMagnitude, radarMagnitude: contact ? Math.abs(contact.altitude) : null };
+    })()`);
+    check('the gathering radar tick magnitude is the true distance-aware elevation', gatherElevation.radarMagnitude !== null && Math.abs(gatherElevation.radarMagnitude - gatherElevation.trueMagnitude) < 1e-6, gatherElevation);
 
-    // ── Gate color language + map-targetable start ────────────────────────
-    check('gate colors: green active, yellow next, grey after, faint rest', await evaluate(`(() => {
+    const mapElevation = await evaluate(`(() => {
+        // The nav map must carry the same distance-aware elevation on its
+        // gate/gathering markers as the radar (both are dy / 3D distance in
+        // the player frame) — a map regression to a fixed dy/range scale
+        // fails this check.
         const rt = window.__VOID_PRIVATEER__.getRuntime();
-        // Mid-race view: gate 3 is current, 4 next, 5 after, 6+ far ahead.
-        rt.renderer.syncRaceGates(rt.activeRace.course.gates, 3, [0, 0, 0]);
-        const hex = (group) => '#' + group.children[0].material.color.getHexString();
-        const op = (group) => Math.round(group.children[0].material.opacity * 100) / 100;
-        const gates = rt.renderer.raceGateMeshes;
+        const radar = rt.radarContacts().find((c) => c.raceGathering);
+        const map = rt.buildNavigationMapModel().contacts.find((c) => c.raceGathering);
+        return { radar: radar ? Math.abs(radar.altitude) : null, map: map ? Math.abs(map.altitude ?? 0) : null };
+    })()`);
+    check('the nav map gathering marker carries the same distance-aware elevation as the radar', mapElevation.radar !== null && mapElevation.map !== null && Math.abs(mapElevation.radar - mapElevation.map) < 1e-6, mapElevation);
+
+    const mapCue = await evaluate(`(() => {
+        // The chart renders a distance-scaled out-of-plane tick on race
+        // markers: present only above a small elevation threshold, with the
+        // --alt length and up/down direction matching the contact's altitude.
+        const rt = window.__VOID_PRIVATEER__.getRuntime();
+        const model = rt.buildNavigationMapModel();
+        rt.ui.showMap(model);
+        const contact = model.contacts.find((c) => c.raceGathering);
+        const cue = document.querySelector('#map-panel .tactical-contact.gate .tactical-alt');
         const result = {
-            active: hex(gates[3]), next: hex(gates[4]), after: hex(gates[5]), far: hex(gates[9]),
-            activeOp: op(gates[3]), nextOp: op(gates[4]), afterOp: op(gates[5]), farOp: op(gates[9]),
+            hasCue: Boolean(cue),
+            alt: cue ? parseFloat(cue.style.getPropertyValue('--alt')) : null,
+            up: cue ? cue.classList.contains('up') : null,
+            expectedAlt: contact ? Math.round(Math.min(1, Math.abs(contact.altitude ?? 0)) * 100) / 100 : null,
+            expectedUp: contact ? (contact.altitude ?? 0) > 0 : null,
         };
-        rt.renderer.syncRaceGates(rt.activeRace.course.gates, 0, [0, 0, 0]);
-        result.ok = result.active === '#3dff6e' && result.next === '#ffd24a'
-            && result.after === '#9aa6b0' && result.far === '#9aa6b0'
-            && result.afterOp === 0.5 && result.farOp === 0.14 && result.nextOp > result.afterOp;
-        return result;
-    })()`), 'color language wrong');
-    check('race start is a map-targetable gate node', await evaluate(`(() => {
-        const rt = window.__VOID_PRIVATEER__.getRuntime();
-        rt.ui.showMap(rt.buildNavigationMapModel());
-        const node = document.querySelector('#map-panel [data-map-target-kind="gate"][data-map-target-id="shard-gauntlet-gate-0"]');
-        const label = node?.getAttribute('aria-label') ?? '';
         rt.ui.hideMap();
-        return { ok: Boolean(node), label };
-    })()`), 'gate node missing from the map');
-    check('tapping the gate node locks it as the target', await evaluate(`(() => {
-        const rt = window.__VOID_PRIVATEER__.getRuntime();
-        rt.selectTarget('gate', 'shard-gauntlet-gate-0');
-        return { locked: rt.save.player.currentTargetId === 'shard-gauntlet-gate-0', kind: rt.getTargetRef(false)?.kind };
-    })()`), 'gate not locked after selection');
-
-    // ── Radar: gate blips + altitude ticks ────────────────────────────────
-    check('radar carries the next/cleared/future gate blips', await evaluate(`(() => {
-        const rt = window.__VOID_PRIVATEER__.getRuntime();
-        const contacts = rt.radarContacts().filter((c) => c.type === 'racegate');
-        const states = contacts.map((c) => c.raceGate?.state);
-        return {
-            ok: contacts.length >= 2 && states.includes('next') && states.includes('future'),
-            states, count: contacts.length,
-        };
-    })()`), 'racegate contacts missing from the radar');
-    const altResult = await evaluate(`(() => {
-        const rt = window.__VOID_PRIVATEER__.getRuntime();
-        // The radar disc is normalized to [-1, 1]; any contact whose gate
-        // rides above/below the ecliptic gets a stub in that direction. Verify
-        // at least one out-of-plane gate contact reaches the tick drawer.
-        const contacts = rt.radarContacts().filter((c) => c.type === 'racegate' && Math.abs(c.altitude || 0) > 0.02);
-        return { ok: contacts.length > 0, altitudes: contacts.map((c) => Math.round(c.altitude * 100) / 100) };
+        return result;
     })()`);
-    check('out-of-plane gates draw an altitude tick', altResult.ok, JSON.stringify(altResult));
-    check('radarAltitudeTick geometry helper', await evaluate(`(async () => {
-        const mod = await import('/src/game/ui.js');
-        const tick = mod.radarAltitudeTick({ x: 0.3, y: 0.2, radius: 1, ratio: 1, direction: -1, magnitude: 0.6, size: 4.2 });
-        return { ok: Boolean(tick) && tick.length >= 1.5 && tick.startY < 0.2, tick };
-    })()`), 'radarAltitudeTick failed to produce a stub');
+    const expectCue = mapCue.expectedAlt !== null && mapCue.expectedAlt > 0.02;
+    check('the nav map renders a distance-scaled out-of-plane tick on the gathering marker', mapCue.hasCue === expectCue && (!expectCue || (mapCue.alt === mapCue.expectedAlt && mapCue.up === mapCue.expectedUp)), mapCue);
 
-    // ── Fly-in: manual approach triggers the proximity handoff ────────────
-    // The 0.7.7b travel leg hands off to the grid by PROXIMITY (within
-    // 2.2× gateRadius of Gate 1), not the removed 0.7.7a approach autopilot:
-    // undock, jump the instance, fly at Gate 1 at cruise speed, and the
-    // grid start must fire on its own.
-    await evaluate(`(() => {
+    const sammelTick = await evaluate(`(async () => {
+        // The gathering rides the radar rim for the whole travel leg. Its
+        // altitude tick must render in BOTH directions there — the outward
+        // one used to be suppressed because it had no room inside the disc.
+        const { radarAltitudeTick } = await import('/src/game/ui.js');
+        const radius = 66;
+        const rimY = -Math.sqrt(radius * radius - 20 * 20);
+        const outward = radarAltitudeTick({ x: 20, y: rimY, radius, ratio: 1, direction: -1, magnitude: 0.8, size: 4.2, canvasHeight: 150 });
+        const inward = radarAltitudeTick({ x: 20, y: rimY, radius, ratio: 1, direction: 1, magnitude: 0.8, size: 4.2, canvasHeight: 150 });
+        return {
+            outward: outward ? { startY: outward.startY, length: outward.length } : null,
+            inward: inward ? { startY: inward.startY, length: inward.length } : null,
+        };
+    })()`);
+    check('the gathering altitude tick renders at the radar rim in both directions', Boolean(sammelTick.outward && sammelTick.inward && sammelTick.outward.length >= 1.5 && sammelTick.inward.length >= 1.5), sammelTick);
+
+    const waiting = await evaluate(`(() => {
         const rt = window.__VOID_PRIVATEER__.getRuntime();
-        const course = rt.activeRace.course;
-        const g = course.gates[0].position;
+        const race = rt.activeRace;
+        const g = race.course.gathering;
+        const d = g.direction;
         rt.save.player.dockedAt = undefined;
-        rt.activeInstanceId = course.zone;
-        rt.renderer.setActiveInstance(course.zone);
-        const d = Math.hypot(g[0], g[1], g[2]) || 1;
-        rt.save.player.position = [g[0] + 400 * g[0] / d, g[1] + 400 * g[1] / d, g[2] + 400 * g[2] / d];
+        rt.save.player.position = [g.position[0] - d[0] * 230, g.position[1] - d[1] * 230, g.position[2] - d[2] * 230];
         rt.save.player.velocity = [0, 0, 0];
-        rt.save.player.raceGateIndex = 0;
-        rt.save.player.currentTargetId = undefined;
-        rt.resetPlayerInterpolation(true);
-        return true;
-    })()`);
-    const flyIn = await evaluate(`(async () => {
-        const rt = window.__VOID_PRIVATEER__.getRuntime();
-        const STEP = ${STEP};
-        const course = rt.activeRace.course;
-        const cruise = rt.playerStats().maxSpeed;
-        const g = course.gates[0].position;
-        let steps = 0;
-        while (rt.activeRace?.state === 'travel' && steps < 60 * 60) {
-            const p = rt.save.player.position;
-            // Steer like the autopilot: desired vector to the gate, blended with
-            // the obstacle-avoidance push so the fly-in bends around rocks that
-            // happen to sit on the direct chord (the field layout is per-session
-            // random — see createNewSave — so the chord is not always clear).
-            const dx = g[0] - p[0], dy = g[1] - p[1], dz = g[2] - p[2];
-            const d = Math.hypot(dx, dy, dz) || 1;
-            const desired = { x: dx / d, y: dy / d, z: dz / d };
-            const avoid = rt.getAvoidanceVector({ x: p[0], y: p[1], z: p[2] }, desired, 65, cruise);
-            let nx = desired.x + avoid.x * 0.85;
-            let ny = desired.y + avoid.y * 0.85;
-            let nz = desired.z + avoid.z * 0.85;
-            const nl = Math.hypot(nx, ny, nz) || 1;
-            const move = Math.min(cruise * STEP, d);
-            rt.save.player.position = [p[0] + nx / nl * move, p[1] + ny / nl * move, p[2] + nz / nl * move];
-            rt.save.player.velocity = [0, 0, 0];
-            rt.updateSimulation(STEP, {});
-            steps += 1;
+        const dot = -d[2];
+        if (dot < -0.999999) {
+            rt.save.player.rotation = [0, 1, 0, 0];
         }
-        return { state: rt.activeRace?.state ?? 'none', steps };
+        else {
+            const scale = Math.sqrt((1 + dot) * 2);
+            rt.save.player.rotation = [d[1] / scale, -d[0] / scale, 0, scale * 0.5];
+        }
+        rt.activeInstanceId = race.course.zone;
+        rt.renderer.setActiveInstance(race.course.zone);
+        rt.resetPlayerInterpolation(true);
+        rt.syncRender(0, performance.now());
+        const meshes = race.racers.map((racer) => {
+            const mesh = rt.renderer.shipMeshes.get(racer.id);
+            const projection = mesh ? rt.renderer.projectToScreen(mesh.position) : null;
+            return {
+                id: racer.id,
+                expected: racer.variant,
+                actual: mesh?.userData?.variant,
+                visible: mesh?.visible !== false,
+                projection,
+                scale: mesh?.scale?.toArray?.(),
+            };
+        });
+        const radarRacers = rt.radarContacts().filter((contact) => contact.racer).length;
+        const mapRacers = rt.buildNavigationMapModel().contacts.filter((contact) => contact.racer).length;
+        return { state: race.state, meshes, radarRacers, mapRacers };
     })()`);
-    check('manual fly-in hands off to the grid (countdown)', flyIn.state === 'countdown',
-        `travel leg never handed off: ${JSON.stringify(flyIn)}`);
+    check('actual opponent ships wait visibly at the gathering point', waiting.state === 'travel' && waiting.meshes.length === 3 && waiting.meshes.every((mesh) => mesh.visible && mesh.actual === mesh.expected && mesh.projection?.visible && !mesh.projection?.behind && mesh.scale?.every((value) => Number.isFinite(value) && value > 0)), waiting);
+    check('waiting opponents are ordinary radar and map ship contacts', waiting.radarRacers === 3 && waiting.mapRacers === 3, waiting);
 
-    // Countdown hold: velocity pinned during the count, then green.
-    let sawHold = false;
-    for (let step = 0; step < Math.ceil(4.6 / STEP); step += 1) {
-        const held = await evaluate(`(() => { const rt = window.__VOID_PRIVATEER__.getRuntime();
-            rt.updateSimulation(${STEP}, {});
-            const v = rt.save.player.velocity;
-            return rt.activeRace.state !== 'running' ? Math.hypot(v[0], v[1], v[2]) : -1; })()`);
-        if (held > -1 && held < 1e-6)
-            sawHold = true;
-        if (await evaluate(`window.__VOID_PRIVATEER__.getRuntime().activeRace.state`) === 'running')
-            break;
-    }
-    check('countdown reached running', await evaluate(
-        `window.__VOID_PRIVATEER__.getRuntime().activeRace.state === 'running'`,
-    ), 'race never left countdown after 4.6s of sim steps');
-    check('grid hold pinned velocity', sawHold, 'velocity was never observed pinned at zero during the hold');
-
-    // ── Race strip on the own-ship monitor ────────────────────────────────
-    const stripResult = await evaluate(`(() => {
+    const countdown = await evaluate(`(() => {
         const rt = window.__VOID_PRIVATEER__.getRuntime();
-        const hud = rt.raceHud();
-        const okModel = hud?.phase === 'running' && hud.gate >= 1 && hud.gateCount === 13
-            && hud.rankLabel !== undefined && Number.isFinite(hud.time);
-        rt.ui.updateHud(rt.buildHudModel());
-        const strip = document.querySelector('#screen-race-strip');
-        const label = document.querySelector('#screen-race-label')?.textContent ?? '';
-        const value = document.querySelector('#screen-race-value')?.textContent ?? '';
+        const race = rt.activeRace;
+        const racerIds = race.racers.map((racer) => racer.id).join(',');
+        rt.save.player.position = [...race.course.gathering.position];
+        rt.save.player.velocity = [0, 0, 0];
+        rt.resetPlayerInterpolation(true);
+        rt.updateSimulation(1 / 60, {});
+        const visible = rt.renderer.raceGateMeshes.filter((mesh) => mesh.visible);
+        const finish = visible.filter((mesh) => mesh.userData.finish);
+        const mapGates = rt.buildNavigationMapModel().contacts.filter((contact) => contact.kind === 'gate');
+        const radarGateStates = rt.radarContacts().filter((contact) => contact.type === 'racegate' && !contact.raceGathering && !contact.raceShortcut).map((contact) => contact.raceGate.state);
         return {
-            ok: okModel && strip?.classList.contains('is-visible')
-                && /GATE|TOR/.test(label) && value.includes('·'),
-            phase: hud?.phase, gate: hud?.gate, label, value,
+            state: rt.activeRace?.state,
+            sameRacers: racerIds === rt.activeRace?.racers?.map((racer) => racer.id).join(','),
+            target: rt.save.player.currentTargetId,
+            firstGate: rt.activeRace?.course?.gates?.[0]?.id,
+            visible: visible.length,
+            expected: rt.activeRace?.course?.gates?.length,
+            finishCount: finish.length,
+            finishDoubleRing: finish[0]?.children?.[2]?.visible === true,
+            nonFinishDoubleRings: visible.filter((mesh) => !mesh.userData.finish && mesh.children?.[2]?.visible).length,
+            startVisible: Boolean(rt.renderer.raceStartRoot?.visible),
+            mapGates: mapGates.length,
+            radarGateStates,
         };
     })()`);
-    check('race strip live while racing (label + value + rank)', stripResult.ok, JSON.stringify(stripResult));
+    check('arrival reuses the grid ships and reveals the full fixed course', countdown.state === 'countdown' && countdown.sameRacers && countdown.target === countdown.firstGate && countdown.visible === countdown.expected && !countdown.startVisible && countdown.mapGates === countdown.expected, countdown);
+    check('radar shows only the next gate and the one after it', countdown.radarGateStates.length === 2 && countdown.radarGateStates[0] === 'next' && countdown.radarGateStates[1] === 'upcoming', countdown);
+    check('only the finish gate receives the special double ring', countdown.finishCount === 1 && countdown.finishDoubleRing && countdown.nonFinishDoubleRings === 0, countdown);
 
-    // ── Race the course at cruise speed (straight-line ideal) ─────────────
-    // Each step: aim at the next gate, move along the chord at maxSpeed, then
-    // run one sim step so updateRace sees the new position. This measures the
-    // lower bound on real flight time — turning losses land above it.
-    const finish = await evaluate(`(async () => {
+    const go = await evaluate(`(() => {
         const rt = window.__VOID_PRIVATEER__.getRuntime();
-        const STEP = ${STEP};
-        const stats = rt.playerStats();
-        const cruise = stats.maxSpeed;
-        const p = rt.save.player;
-        let steps = 0;
-        const maxSteps = 60 * 400; // hard stop ≈ 6.7 min of sim time
-        // Count gate passes by the highest gate index the player TARGETED:
-        // endRaceField deletes raceGateIndex the same step the final gate is
-        // crossed, so counting post-step increments would always undercount by
-        // one. Crossing the last gate is the only path to a finished race, so
-        // a finished run implies targetedMax + 1 gates were passed.
-        let targetedMax = 0;
-        while (rt.activeRace && rt.activeRace.state === 'running' && steps < maxSteps) {
-            const course = rt.activeRace.course;
-            const gate = course.gates[p.raceGateIndex];
-            if (!gate) break;
-            targetedMax = Math.max(targetedMax, p.raceGateIndex ?? 0);
-            // Obstacle-aware steering (same blend the autopilot uses): the
-            // straight chord between gates can clip a rock in a random field
-            // layout, and teleporting into it makes the collision resolver
-            // push the player back every step — a permanent stall. Bending
-            // around rocks is what a real pilot does and keeps the ideal-time
-            // lower bound honest.
-            const dx = gate.position[0] - p.position[0];
-            const dy = gate.position[1] - p.position[1];
-            const dz = gate.position[2] - p.position[2];
-            const d = Math.hypot(dx, dy, dz) || 1;
-            const desired = { x: dx / d, y: dy / d, z: dz / d };
-            const avoid = rt.getAvoidanceVector({ x: p.position[0], y: p.position[1], z: p.position[2] }, desired, 65, cruise);
-            let nx = desired.x + avoid.x * 0.85;
-            let ny = desired.y + avoid.y * 0.85;
-            let nz = desired.z + avoid.z * 0.85;
-            const nl = Math.hypot(nx, ny, nz) || 1;
-            const move = Math.min(cruise * STEP, d);
-            p.position = [p.position[0] + nx / nl * move, p.position[1] + ny / nl * move, p.position[2] + nz / nl * move];
-            p.velocity = [0, 0, 0];
-            rt.updateSimulation(STEP, {});
-            steps += 1;
-        }
-        const gatePasses = rt.activeRace ? targetedMax : targetedMax + 1;
-        return { steps, seconds: steps * STEP, gatePasses, finished: !rt.activeRace, rank: rt.save.world.raceRecords['shard-gauntlet']?.rank ?? null };
+        rt.save.player.velocity = [40, 0, 0];
+        rt.updateSimulation(1 / 60, {});
+        const held = Math.hypot(...rt.save.player.velocity) < 1e-8;
+        rt.save.world.time = rt.activeRace.startedAt + 0.01;
+        rt.updateRace(1 / 60);
+        const before = rt.activeRace.racers.map((racer) => [...racer.position]);
+        for (let index = 0; index < 60; index += 1)
+            rt.updateRace(1 / 60);
+        const moved = rt.activeRace.racers.every((racer, index) => Math.hypot(racer.position[0] - before[index][0], racer.position[1] - before[index][1], racer.position[2] - before[index][2]) > 1);
+        return { held, state: rt.activeRace.state, moved, paces: rt.activeRace.racers.map((racer) => racer.pace) };
     })()`);
-    check('all 13 gates passed', finish.gatePasses === 13, `gatePasses=${finish.gatePasses}`);
-    check('course finished', finish.finished, `sim ended with activeRace=${JSON.stringify(finish)}`);
-    check('rank recorded', finish.rank >= 1 && finish.rank <= 4, `rank=${finish.rank}`);
-    // Course length is seed-dependent (radius jitter), so this is a sanity
-    // floor/ceiling, not a fixed band: a collapsed or exploded course would
-    // land far outside it.
-    check('ideal-flight duration 45–300s (sanity band)', finish.seconds >= 45 && finish.seconds <= 300,
-        `ideal straight-line time ${finish.seconds.toFixed(1)}s — tune baseRadius/racerSpeed`);
-    console.log(`INFO ideal straight-line duration: ${finish.seconds.toFixed(1)}s, rank ${finish.rank}, gates ${finish.gatePasses}/13`);
+    check('countdown holds the player, then all rivals race at track pace', go.held && go.state === 'running' && go.moved && go.paces.join(',') === '42,44,46', go);
 
-    check('payout applied by rank', await evaluate(`(() => {
-        const s = window.__VOID_PRIVATEER__.getState();
-        const payouts = [4200, 1600, -300, -800];
-        const expected = 4500 + payouts[(s.world.raceRecords['shard-gauntlet'].rank ?? 4) - 1];
-        return s.player.credits === expected; })()`),
-    `credits=${await evaluate('window.__VOID_PRIVATEER__.getState().player.credits')}`);
-    check('quest closed + record written', await evaluate(`(() => {
-        const s = window.__VOID_PRIVATEER__.getState();
-        const q = s.quests.find((q) => q.id === 'bar-circuit');
-        const rec = s.world.raceRecords['shard-gauntlet'];
-        return q?.completedAt !== undefined && q.stepId === 'complete'
-          && rec?.active === false && Number.isFinite(rec.time); })()`),
-    JSON.stringify(await evaluate(`(() => { const s = window.__VOID_PRIVATEER__.getState(); return { q: s.quests.find((x) => x.id === 'bar-circuit'), rec: s.world.raceRecords['shard-gauntlet'] }; })()`)));
-    check('field cleared after finish (gate lock dropped too)', await evaluate(`(() => {
+    const fuel = await evaluate(`(() => {
         const rt = window.__VOID_PRIVATEER__.getRuntime();
-        return rt.ships.filter((sh) => sh.race).length === 0
-          && rt.save.player.raceGateIndex === undefined
-          && rt.renderer.raceActiveGate === undefined
-          && rt.raceGateById('shard-gauntlet-gate-0') === undefined
-          && !(rt.save.player.currentTargetId ?? '').includes('-gate-'); })()`),
-    'racers, gate markers, or the gate lock survived endRaceField');
+        const gate = rt.activeRace.course.gates[0];
+        const d = gate.direction;
+        const before = gate.position.map((value, index) => value - d[index] * 2);
+        const after = gate.position.map((value, index) => value + d[index] * 2);
+        rt.save.player.fuel = 10;
+        const centered = rt.raceAwardGate(gate, before, after);
+        const once = rt.save.player.fuel;
+        rt.raceAwardGate(gate, before, after);
+        const twice = rt.save.player.fuel;
+        return { centered, once, twice, reward: rt.activeRace.course.centerFuelReward };
+    })()`);
+    check('centered gates grant their small fuel reward exactly once', fuel.centered && Math.abs(fuel.once - (10 + fuel.reward)) < 1e-6 && fuel.twice === fuel.once, fuel);
 
-    // ── Reload restore: a paid-but-open entry rebuilds the travel leg ─────
-    check('paid-entry restore rebuilds travel leg', await evaluate(`(() => {
+    const draft = await evaluate(`(() => {
         const rt = window.__VOID_PRIVATEER__.getRuntime();
-        const s = rt.save;
-        const q = s.quests.find((x) => x.id === 'bar-circuit');
-        q.completedAt = undefined; q.stepId = 'travel'; q.flags.paid = true; q.flags.courseId = 'shard-gauntlet';
-        delete q.flags.deadline;
-        rt.restoreActiveRace();
-        const ok = !!rt.activeRace && rt.activeRace.state === 'travel' && Number.isFinite(rt.activeRace.deadline)
-            && rt.renderer.raceGateMeshes.length === 13;
-        // Tear the rebuilt entry back down so the next scenario books cleanly.
-        rt.activeRace = null;
-        rt.renderer.clearRaceGates();
-        if (s.world.raceRecords['shard-gauntlet'])
-            s.world.raceRecords['shard-gauntlet'].active = false;
-        return ok; })()`),
-    'restoreActiveRace did not rebuild the travel leg from quest flags');
+        const p = rt.save.player;
+        const rival = rt.activeRace.racers[0];
+        p.position = [1000, 1000, 1000];
+        p.rotation = [0, 0, 0, 1];
+        rival.position[0] = 1000; rival.position[1] = 1000; rival.position[2] = 950;
+        rival.velocity[0] = 0; rival.velocity[1] = 0; rival.velocity[2] = -60;
+        rt.updateRaceSlipstreamState(1 / 60);
+        const aligned = { active: rt.activeRace.draft.active, strength: rt.activeRace.draft.strength, save: rt.activeRace.draft.savePercent, multiplier: rt.raceDraftFuelMultiplier };
+        rival.velocity[2] = 60;
+        rt.updateRaceSlipstreamState(1 / 60);
+        const opposite = { active: rt.activeRace.draft.active, strength: rt.activeRace.draft.strength };
+        return { aligned, opposite };
+    })()`);
+    check('drafting requires a same-direction rival and scales fuel savings', draft.aligned.active && draft.aligned.strength > 0.5 && draft.aligned.save > 0 && draft.aligned.save < 38 && draft.aligned.multiplier > 0.62 && draft.aligned.multiplier < 1 && !draft.opposite.active, draft);
 
-    // ── Expiry forfeit on the mourning-run ticket ──────────────────────────
-    await evaluate(`window.__VOID_PRIVATEER__.getRuntime().acceptRace('mourning-run')`);
-    check('mourning-run accepted', await evaluate(
-        `(() => { const rt = window.__VOID_PRIVATEER__.getRuntime(); return rt.activeRace?.course?.id === 'mourning-run' && rt.save.world.raceRecords['mourning-run']?.active === true; })()`,
-    ), 'second-course entry failed to book');
-    await evaluate(`(() => { const rt = window.__VOID_PRIVATEER__.getRuntime();
-        rt.activeRace.deadline = rt.save.world.time - 1;
-        rt.updateSimulation(${STEP}, {}); return true; })()`);
-    check('expired entry forfeits', await evaluate(`(() => {
+    const shortcut = await evaluate(`(() => {
         const rt = window.__VOID_PRIVATEER__.getRuntime();
-        const s = rt.save;
-        const rec = s.world.raceRecords['mourning-run'];
-        const q = s.quests.find((x) => x.id === 'bar-circuit');
-        return !rt.activeRace && rec?.failed === true && rec?.active === false && q?.completedAt !== undefined; })()`),
-    JSON.stringify(await evaluate(`(() => { const rt = window.__VOID_PRIVATEER__.getRuntime(); return { race: rt.activeRace?.state ?? null, rec: rt.save.world.raceRecords['mourning-run'] }; })()`)));
-    check('offer returns after forfeit', await evaluate(
-        `(() => { const rt = window.__VOID_PRIVATEER__.getRuntime(); rt.updateSimulation(${STEP}, {}); return rt.save.world.offers.rook?.some((m) => m.id === 'race-mourning-run') ?? false; })()`,
-    ), 'forfeited course never re-offered at rook');
+        const race = rt.activeRace;
+        const route = race.course.shortcuts[0];
+        rt.save.player.raceGateIndex = route.entryIndex;
+        race.shortcut = undefined;
+        rt.syncRaceCourse(race);
+        const tight = route.gates.every((gate) => gate.radius >= 12 && gate.radius <= 16);
+        const cross = (gate) => [
+            gate.position.map((value, index) => value - gate.direction[index] * 2),
+            gate.position.map((value, index) => value + gate.direction[index] * 2),
+        ];
+        let [before, after] = cross(route.gates[0]);
+        const committed = rt.raceAdvanceMainGate(race, before, after, rt.save.world.time);
+        const rendered = rt.renderer.raceShortcutMeshes.filter((mesh) => mesh.visible).length;
+        while (race.shortcut?.committed) {
+            const gate = race.shortcut.data.gates[race.shortcut.index];
+            [before, after] = cross(gate);
+            rt.raceAdvanceShortcut(race, before, after, rt.save.world.time += 0.2);
+        }
+        return { tight, committed, rendered, rejoined: rt.save.player.raceGateIndex, exitIndex: route.exitIndex, shortcutCleared: !race.shortcut };
+    })()`);
+    check('very tight optional shortcut commits, renders, and rejoins correctly', shortcut.tight && shortcut.committed && shortcut.rendered > 0 && shortcut.rejoined === shortcut.exitIndex && shortcut.shortcutCleared, shortcut);
 
-    // ── Save round-trip keeps race records ────────────────────────────────
-    const recordsDump = await evaluate(`(() => {
+    const firstFinish = await evaluate(`(() => {
         const rt = window.__VOID_PRIVATEER__.getRuntime();
-        const raw = JSON.parse(JSON.stringify(rt.save));
-        return JSON.stringify(raw.world.raceRecords ?? null); })()`);
-    let parsedRecords = null;
-    try { parsedRecords = JSON.parse(recordsDump); } catch { /* handled below */ }
-    check('raceRecords survive saveGame round-trip',
-        Boolean(parsedRecords?.['shard-gauntlet']?.rank >= 1 && typeof parsedRecords?.['mourning-run']?.failed === 'boolean'),
-        `records=${recordsDump}`);
-    // No page exceptions across the whole run (a NaN gate transform or a
-    // missing renderer method would surface here first).
-    check('no page exceptions', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | ') || 'clean');
+        const race = rt.activeRace;
+        const cross = (gate) => [
+            gate.position.map((value, index) => value - gate.direction[index] * 2),
+            gate.position.map((value, index) => value + gate.direction[index] * 2),
+        ];
+        while (rt.activeRace?.state === 'running') {
+            const gate = race.course.gates[rt.save.player.raceGateIndex];
+            if (!gate) break;
+            const [before, after] = cross(gate);
+            rt.save.world.time += 0.25;
+            rt.raceAdvanceMainGate(race, before, after, rt.save.world.time);
+        }
+        const record = rt.save.world.raceRecords['shard-gauntlet'];
+        const hud = rt.raceHud();
+        return { state: race.state, hud, record, cleanupDelay: race.cleanupAt - rt.save.world.time, finishPulse: rt.renderer.raceGateMeshes.at(-1)?.userData?.pulseFinish };
+    })()`);
+    check('finish locks rank, payout, PB, splits, and readable result phase', firstFinish.state === 'finished' && firstFinish.hud?.phase === 'finished' && firstFinish.record?.active === false && firstFinish.record?.attempts === 1 && Number.isFinite(firstFinish.record?.bestTime) && firstFinish.cleanupDelay >= 4.9 && firstFinish.finishPulse === true, firstFinish);
+
+    const resultHold = await evaluate(`(() => {
+        const rt = window.__VOID_PRIVATEER__.getRuntime();
+        for (let index = 0; index < 240; index += 1) rt.updateSimulation(1 / 60, {});
+        const held = rt.activeRace?.state === 'finished';
+        for (let index = 0; index < 70; index += 1) rt.updateSimulation(1 / 60, {});
+        return { held, cleared: !rt.activeRace && rt.ships.every((ship) => !ship.race) && rt.renderer.raceGateMeshes.every((mesh) => !mesh.visible) };
+    })()`);
+    check('finish presentation stays readable, then cleans the field', resultHold.held && resultHold.cleared, resultHold);
+
+    const sixCourses = await evaluate(`(() => {
+        const rt = window.__VOID_PRIVATEER__.getRuntime();
+        const ids = ['shard-switchback', 'shard-miners-knife', 'mourning-run', 'mourning-breach', 'mourning-relict-gauntlet'];
+        const results = [];
+        const cross = (gate) => [
+            gate.position.map((value, index) => value - gate.direction[index] * 2),
+            gate.position.map((value, index) => value + gate.direction[index] * 2),
+        ];
+        for (const id of ids) {
+            const origin = id.startsWith('shard-') ? 'helix' : 'rook';
+            rt.save.player.dockedAt = origin;
+            rt.save.player.credits = Math.max(rt.save.player.credits, 500000);
+            rt.acceptRace(id);
+            const race = rt.activeRace;
+            if (!race || race.course.id !== id) {
+                results.push({ id, accepted: false });
+                continue;
+            }
+            const obstacles = rt.activeFieldObstacles(race.course.zone);
+            const marked = [race.course.gathering, ...race.course.gates, ...race.course.shortcuts.flatMap((route) => route.gates)];
+            const blocked = marked.filter((gate) => {
+                rt.tmpA.set(gate.position[0], gate.position[1], gate.position[2]);
+                return !rt.entryPositionClear(rt.tmpA, obstacles);
+            }).map((gate) => gate.id);
+            rt.activeInstanceId = race.course.zone;
+            rt.renderer.setActiveInstance(race.course.zone);
+            rt.startRaceAt(race.course);
+            rt.save.world.time = race.startedAt + 0.01;
+            rt.updateRace(0);
+            while (rt.activeRace?.state === 'running') {
+                const gate = race.course.gates[rt.save.player.raceGateIndex];
+                if (!gate) break;
+                const [before, after] = cross(gate);
+                rt.save.world.time += 0.25;
+                rt.raceAdvanceMainGate(race, before, after, rt.save.world.time);
+            }
+            const record = rt.save.world.raceRecords[id];
+            results.push({ id, accepted: true, state: race.state, rank: record?.lastRank, attempts: record?.attempts, bestTime: record?.bestTime, blocked, finish: race.course.gates.at(-1).kind });
+            rt.endRaceField();
+        }
+        return { results, records: rt.save.world.raceRecords };
+    })()`);
+    check('all six courses accept in progression order and finish end to end', sixCourses.results.length === 5 && sixCourses.results.every((result) => result.accepted && result.state === 'finished' && result.rank >= 1 && result.rank <= 4 && result.attempts === 1 && Number.isFinite(result.bestTime) && result.finish === 'finish'), sixCourses.results);
+    check('every authored gathering/gate/shortcut marker is collision-clear', sixCourses.results.every((result) => result.blocked.length === 0), sixCourses.results.map((result) => ({ id: result.id, blocked: result.blocked })));
+    const recordsClean = Object.values(sixCourses.records).every((record) => !('ghost' in record) && !('replay' in record) && !('champion' in record));
+    check('records persist per course without replay or champion ghosts', Object.keys(sixCourses.records).length === 6 && recordsClean, sixCourses.records);
+
+    const difficulty = await evaluate(`(() => {
+        const records = window.__VOID_PRIVATEER__.getRuntime().save.world.raceRecords;
+        return {
+            shardIds: ['shard-gauntlet', 'shard-switchback', 'shard-miners-knife'].every((id) => Number.isFinite(records[id]?.bestTime)),
+            mourningIds: ['mourning-run', 'mourning-breach', 'mourning-relict-gauntlet'].every((id) => Number.isFinite(records[id]?.bestTime)),
+        };
+    })()`);
+    check('both three-course career ladders retain independent progress', difficulty.shardIds && difficulty.mourningIds, difficulty);
+
+    await sleep(500);
+    check('clean browser console', pageErrors.length === 0, pageErrors.slice(0, 8));
 }
-catch (err) {
-    check('probe completed', false, String(err));
+catch (error) {
+    check('probe completed', false, error?.stack ?? String(error));
 }
 finally {
-    chrome.kill('SIGKILL');
-    httpd.kill();
+    await browser?.close();
+    httpd?.kill();
 }
 
 if (FAILURES.length) {
     console.error(`\n${FAILURES.length} FAILURE(S)`);
+    for (const failure of FAILURES)
+        console.error(`- ${failure}`);
     process.exit(1);
 }
-console.log(`\nALL ${PASS.length} CHECKS PASSED`);
+console.log(`\nALL ${PASSES.length} RACING CHECKS PASSED`);

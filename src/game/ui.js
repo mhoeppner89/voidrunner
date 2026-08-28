@@ -50,11 +50,17 @@ export const callsignHandle = (callsign) => {
     return quoted ? quoted[0].slice(1, -1) : callsign;
 };
 // Radar altitude tick geometry. The caller picks the direction sign (-1 = up
-// the screen, +1 = down), and the tick grows toward ~80% of the ring for a
-// full-range climb while being normalised to the room left before the rim so a
-// contact near the edge never spills off the readable disc. Returns undefined
-// when there is no room for a legible tick.
-export const radarAltitudeTick = ({ x, y, radius, ratio = 1, direction, magnitude, size = 3.2 }) => {
+// the screen, +1 = down); magnitude is the contact's elevation ratio (sin of
+// the angle, distance-aware — see radarContacts), and the tick grows toward
+// 40% of the ring for an overhead target while being normalised to the room
+// left before the rim so a contact near the edge never spills off the
+// readable disc. A rim-pinned
+// contact (the race gathering beyond the horizon) has no in-disc room on its
+// outward side; the tick then keeps its direction and extends past the rim
+// toward the canvas edge instead of vanishing — the disc is inset from the
+// canvas, so the above/below cue still reads. Returns undefined only when no
+// legible tick fits anywhere on the glass.
+export const radarAltitudeTick = ({ x, y, radius, ratio = 1, direction, magnitude, size = 3.2, canvasHeight }) => {
     const gap = (size + 1.5) * ratio;
     const startY = y + direction * gap;
     const half = Math.sqrt(Math.max(0, radius * radius - x * x));
@@ -62,7 +68,16 @@ export const radarAltitudeTick = ({ x, y, radius, ratio = 1, direction, magnitud
     // Ticks stay short: a full-range climb reads as a stub, not a spike —
     // capped at half the ring so above/below never dominates the blip.
     const desired = Math.max(3, magnitude * radius * 0.4) * ratio;
-    const length = Math.max(0, Math.min(desired, room - 2 * ratio));
+    const inward = room - 2 * ratio;
+    let length;
+    if (inward >= 1.5 * ratio) {
+        length = Math.min(desired, inward);
+    }
+    else {
+        const limit = direction < 0 ? -(canvasHeight ?? radius * 2) * 0.5 : (canvasHeight ?? radius * 2) * 0.5;
+        const outward = direction < 0 ? startY - limit : limit - startY;
+        length = Math.min(desired, Math.max(0, outward - ratio));
+    }
     return length >= 1.5 * ratio ? { startY, length } : undefined;
 };
 // Radar radial warp: almost all combat happens inside ~200 km (the guns' real
@@ -83,7 +98,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.7.7c';
+const GAME_VERSION = '0.7.8';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -1218,18 +1233,39 @@ export class GameUI {
     renderMissions() {
         const offers = this.save.world.offers[this.dockLocation] ?? [];
         const active = this.save.activeMissions;
+        const raceClock = (seconds) => {
+            if (!Number.isFinite(seconds))
+                return t('NO TIME');
+            const whole = Math.max(0, Math.floor(seconds));
+            const tenths = Math.floor((seconds - whole) * 10);
+            return `${String(Math.floor(whole / 60)).padStart(2, '0')}:${String(whole % 60).padStart(2, '0')}.${tenths}`;
+        };
+        const missionCard = (mission) => {
+            const locked = Boolean(mission.locked);
+            const bestTime = mission.bestTime ?? mission.record?.bestTime;
+            const bestRank = mission.bestRank ?? mission.record?.bestRank;
+            const bestRankLabel = Number.isFinite(bestRank) ? t(['1ST', '2ND', '3RD', '4TH'][bestRank - 1] ?? `${bestRank}TH`) : '—';
+            const recommended = mission.recommendedShipText ?? mission.recommendedShip ?? mission.recommendedShipId;
+            const raceMeta = mission.kind === 'race'
+                ? `<div class="race-course-meta"><span>${t('TIER {tier}', { tier: mission.tier ?? 1 })}</span><span>${recommended ? t('RECOMMENDED: {ship}', { ship: t(recommended).toUpperCase() }) : t('FIXED TRACK PACE')}</span><span>${Number.isFinite(bestTime) ? t('PERSONAL BEST: {time} · {rank}', { time: raceClock(bestTime), rank: bestRankLabel }) : t('PERSONAL BEST: —')}</span></div>`
+                : '';
+            const buttonLabel = locked ? t('COURSE LOCKED') : mission.active ? t('ENTRY ACTIVE') : t('ACCEPT CONTRACT');
+            return `<article class="mission-card ${mission.kind}${locked ? ' is-locked' : ''}">
+              <header><span>${this.missionBadge(mission)}</span><b>${formatCredits(mission.reward)}</b></header>
+              <h4>${escapeHtml(t(mission.title))}</h4>
+              <p>${escapeHtml(t(mission.briefing))}</p>
+              ${raceMeta}
+              <dl><div><dt>${t('ISSUER')}</dt><dd>${escapeHtml(t(mission.issuer))}</dd></div><div><dt>${t('DEADLINE')}</dt><dd>${this.deadlineLabel(mission)}</dd></div><div><dt>${t('BOND')}</dt><dd>${formatCredits(mission.deposit)}</dd></div><div><dt>${t('GUILD REP')}</dt><dd>+${mission.guildRep}</dd></div></dl>
+              ${locked && mission.unlockLabel ? `<small class="race-unlock-note">${escapeHtml(t(mission.unlockLabel))}</small>` : ''}
+              <button class="primary compact" data-mission-id="${mission.id}" ${locked || mission.active ? 'disabled' : ''}>${buttonLabel}</button>
+            </article>`;
+        };
         return `
       <div class="mission-layout">
         <section>
           <div class="table-title"><div><span class="eyebrow">${t('CONTRACT TERMINAL')}</span><h3>${t('Available work')}</h3></div><small>${t('Maximum 6 active')}</small></div>
           <div class="mission-grid">
-            ${offers.length ? offers.map((mission) => `<article class="mission-card ${mission.kind}">
-              <header><span>${this.missionBadge(mission)}</span><b>${formatCredits(mission.reward)}</b></header>
-              <h4>${escapeHtml(t(mission.title))}</h4>
-              <p>${escapeHtml(t(mission.briefing))}</p>
-              <dl><div><dt>${t('ISSUER')}</dt><dd>${escapeHtml(t(mission.issuer))}</dd></div><div><dt>${t('DEADLINE')}</dt><dd>${this.deadlineLabel(mission)}</dd></div><div><dt>${t('BOND')}</dt><dd>${formatCredits(mission.deposit)}</dd></div><div><dt>${t('GUILD REP')}</dt><dd>+${mission.guildRep}</dd></div></dl>
-              <button class="primary compact" data-mission-id="${mission.id}">${t('ACCEPT CONTRACT')}</button>
-            </article>`).join('') : `<p>${t('No fresh contracts. Launch, trade, or return after the board cycles.')}</p>`}
+            ${offers.length ? offers.map(missionCard).join('') : `<p>${t('No fresh contracts. Launch, trade, or return after the board cycles.')}</p>`}
           </div>
         </section>
         <aside class="active-list"><span class="eyebrow">${t('ACTIVE')}</span>${active.length ? active.map((mission) => `<article><b>${escapeHtml(t(mission.title))}</b><small>${this.deadlineLabel(mission)} · ${formatCredits(mission.reward)}</small></article>`).join('') : `<p>${t('None.')}</p>`}</aside>
@@ -1519,19 +1555,29 @@ export class GameUI {
                 const value = this.el('#screen-race-value');
                 const clock = (seconds) => {
                     const total = Math.max(0, Math.floor(seconds));
-                    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+                    const tenths = Math.floor((Math.max(0, seconds) - total) * 10);
+                    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}.${tenths}`;
                 };
                 if (label && value) {
                     if (race.phase === 'countdown') {
                         label.textContent = t('{course} · GRID', { course: race.title.toUpperCase() });
                         value.textContent = t('T-{seconds}', { seconds: race.seconds });
                     }
+                    else if (race.phase === 'finished') {
+                        label.textContent = t('FINISH · {rank}', { rank: race.rankLabel });
+                        value.textContent = race.personalBest ? t('NEW PB · {time}', { time: clock(race.time) }) : clock(race.time);
+                    }
                     else {
                         // Running label drops the course title — mid-race the
                         // pilot knows the course; "TOR 3/13" + rank + clock is
                         // the information that must never clip (BUG-21).
-                        label.textContent = t('GATE {n}/{total}', { n: race.gate, total: race.gateCount });
-                        value.textContent = `${race.rankLabel} · ${clock(race.time)}`;
+                        const shortcut = race.shortcut
+                            ? t('CUT {n}/{total}', { n: race.shortcut.gate, total: race.shortcut.gateCount })
+                            : t('GATE {n}/{total}', { n: race.gate, total: race.gateCount });
+                        label.textContent = race.draft > 0.15 ? `${shortcut} · ${t('DRAFT')}` : shortcut;
+                        value.textContent = Number.isFinite(race.splitDelta) && (race.splitAge ?? 99) < 2.2
+                            ? `${race.rankLabel} · ${t('PB {delta}', { delta: `${race.splitDelta <= 0 ? '−' : '+'}${Math.abs(race.splitDelta).toFixed(1)}` })}`
+                            : `${race.rankLabel} · ${clock(race.time)}`;
                     }
                 }
             }
@@ -2078,21 +2124,20 @@ export class GameUI {
             ctx.globalAlpha = 1;
         }
         for (const contact of contacts) {
-            // Race checkpoints: a circle per gate — the cleared gate green with
-            // a tick inside, the next checkpoint yellow with a slow pulse, the
-            // first upcoming one grey. Beyond-horizon gates clamp to the rim
-            // and carry their distance, so the first gate is findable while
-            // still flying in (mission anchors, see radarContacts).
+            // Race checkpoints on the disc match the in-world ring colors: the
+            // next gate GREEN with a slow pulse, the one after it YELLOW, an
+            // available shortcut PURPLE, and the travel gathering marker TEAL.
+            // Beyond-horizon gates clamp to the rim and carry their distance.
             if (contact.type === 'racegate' && contact.raceGate) {
                 const [wx, wy] = warpPoint(contact.x, contact.y);
                 const x = wx * radius;
                 const y = wy * radius;
                 const state = contact.raceGate.state;
-                const color = state === 'passed' ? '#79e77f' : state === 'next' ? '#f2d06b' : '#9fb0bd';
+                const color = contact.raceGathering ? '#5be4d0' : state === 'next' ? '#3dff6e' : state === 'upcoming' ? '#ffd24a' : state === 'shortcut' ? '#c894ff' : '#9fb0bd';
                 const gateSize = 4.2 * ratio;
                 ctx.strokeStyle = color;
                 ctx.lineWidth = Math.max(1.2, 1.5 * ratio);
-                ctx.globalAlpha = state === 'future' ? 0.72 : 1;
+                ctx.globalAlpha = 1;
                 ctx.beginPath();
                 ctx.arc(x, y, gateSize, 0, Math.PI * 2);
                 ctx.stroke();
@@ -2103,18 +2148,27 @@ export class GameUI {
                     ctx.arc(x, y, gateSize + 3.2 * ratio, 0, Math.PI * 2);
                     ctx.stroke();
                 }
-                if (state === 'passed') {
-                    // Tick inside the cleared gate's circle.
-                    ctx.globalAlpha = 0.95;
-                    ctx.beginPath();
-                    ctx.moveTo(x - gateSize * 0.5, y);
-                    ctx.lineTo(x - gateSize * 0.1, y + gateSize * 0.42);
-                    ctx.lineTo(x + gateSize * 0.58, y - gateSize * 0.42);
-                    ctx.stroke();
-                }
                 if (contact.selected) {
                     ctx.globalAlpha = 0.85;
                     ctx.strokeRect(x - gateSize * 2, y - gateSize * 2, gateSize * 4, gateSize * 4);
+                }
+                // Out-of-plane tick, same language as the other contacts: a stub
+                // pointing up when the gate rides above the ecliptic, down when
+                // below — at race speed the climb/dive cue matters. Drawn before
+                // the distance label so a rim-pinned gate's tick never runs
+                // through its own readout.
+                ctx.globalAlpha = 0.8;
+                const gateAltitudeRatio = Math.max(-1, Math.min(1, contact.altitude || 0));
+                const gateAltitudeMagnitude = Math.abs(gateAltitudeRatio);
+                if (gateAltitudeMagnitude > 0.02) {
+                    const gateDirection = gateAltitudeRatio > 0 ? -1 : 1;
+                    const gateTick = radarAltitudeTick({ x, y, radius, ratio, direction: gateDirection, magnitude: gateAltitudeMagnitude, size: gateSize, canvasHeight: height });
+                    if (gateTick) {
+                        ctx.beginPath();
+                        ctx.moveTo(x, gateTick.startY);
+                        ctx.lineTo(x, gateTick.startY + gateDirection * gateTick.length);
+                        ctx.stroke();
+                    }
                 }
                 if (contact.raceGate.beyond) {
                     ctx.globalAlpha = 0.9;
@@ -2123,22 +2177,6 @@ export class GameUI {
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(`${contact.raceGate.distance}`, x * 0.8, y * 0.8);
-                }
-                // Out-of-plane tick, same language as the other contacts: a stub
-                // pointing up when the gate rides above the ecliptic, down when
-                // below — at race speed the climb/dive cue matters.
-                ctx.globalAlpha = 0.8;
-                const gateAltitudeRatio = Math.max(-1, Math.min(1, contact.altitude || 0));
-                const gateAltitudeMagnitude = Math.abs(gateAltitudeRatio);
-                if (gateAltitudeMagnitude > 0.02) {
-                    const gateDirection = gateAltitudeRatio > 0 ? -1 : 1;
-                    const gateTick = radarAltitudeTick({ x, y, radius, ratio, direction: gateDirection, magnitude: gateAltitudeMagnitude, size: gateSize });
-                    if (gateTick) {
-                        ctx.beginPath();
-                        ctx.moveTo(x, gateTick.startY);
-                        ctx.lineTo(x, gateTick.startY + gateDirection * gateTick.length);
-                        ctx.stroke();
-                    }
                 }
                 ctx.globalAlpha = 1;
                 continue;
@@ -2213,7 +2251,7 @@ export class GameUI {
             if (altitudeMagnitude > 0.02) {
                 // Cockpit intuition: above the plane points up, below points down.
                 const direction = altitudeRatio > 0 ? -1 : 1;
-                const tick = radarAltitudeTick({ x, y, radius, ratio, direction, magnitude: altitudeMagnitude, size });
+                const tick = radarAltitudeTick({ x, y, radius, ratio, direction, magnitude: altitudeMagnitude, size, canvasHeight: height });
                 if (tick) {
                     ctx.beginPath();
                     ctx.moveTo(x, tick.startY);
@@ -2414,7 +2452,7 @@ export class GameUI {
             <div class="map-section-heading"><span>${t('LOCAL CONTACTS')}</span><b>${model.contacts.length} ${t('TRACKED')}</b></div>              <div class="tactical-map map-stage">
               <div class="tactical-rings"></div><div class="tactical-player"></div>
               ${(model.searchRings ?? []).map((ring) => `<span class="tactical-search-ring ${ring.color}" style="left:${(50 + ring.x * 42).toFixed(2)}%;top:${(50 + ring.y * 42).toFixed(2)}%;width:${Math.max(6, ring.fraction * 84).toFixed(1)}%;height:${Math.max(6, ring.fraction * 84).toFixed(1)}%"></span>`).join('')}
-              ${model.contacts.map((contact) => `<button class="tactical-contact ${contactTone(contact)} ${contact.ghost ? 'ghost' : ''} ${contact.distress ? 'distress' : ''} ${contact.selected ? 'selected' : ''}" style="left:${(50 + contact.x * 42).toFixed(2)}%;top:${(50 + contact.y * 42).toFixed(2)}%;opacity:${contact.ghost ? (contact.lostAlpha ?? 0.9) : 1}" data-map-target-kind="${contact.kind}" data-map-target-id="${escapeHtml(contact.id)}" aria-label="${escapeHtml(contact.name)}"><i></i></button>`).join('')}
+              ${model.contacts.map((contact) => `<button class="tactical-contact ${contactTone(contact)} ${contact.ghost ? 'ghost' : ''} ${contact.distress ? 'distress' : ''} ${contact.selected ? 'selected' : ''}" style="left:${(50 + contact.x * 42).toFixed(2)}%;top:${(50 + contact.y * 42).toFixed(2)}%;opacity:${contact.ghost ? (contact.lostAlpha ?? 0.9) : 1}" data-map-target-kind="${contact.kind}" data-map-target-id="${escapeHtml(contact.id)}" aria-label="${escapeHtml(contact.name)}"><i></i>${contact.gate && Math.abs(contact.altitude ?? 0) > 0.02 ? `<b class="tactical-alt ${(contact.altitude ?? 0) > 0 ? 'up' : 'down'}" style="--alt:${Math.min(1, Math.abs(contact.altitude ?? 0)).toFixed(2)}"></b>` : ''}</button>`).join('')}
             </div>
             <div class="contact-list">
               ${model.contacts.length ? model.contacts.map((contact) => `<button class="contact-row ${contactTone(contact)} ${contact.selected ? 'selected' : ''}" data-map-target-kind="${contact.kind}" data-map-target-id="${escapeHtml(contact.id)}"><i></i><span><b>${escapeHtml(contact.name)}</b><small>${escapeHtml(t(contact.subtitle))}</small></span><em>${Math.round(contact.distance)}u</em></button>`).join('') : `<div class="contact-empty"><b>${t('NO LOCAL CONTACTS')}</b><span>${t('Only contacts inside sensor range appear here.')}</span></div>`}

@@ -1,6 +1,7 @@
 import { createInitialMarket, refreshAllPrices } from './economy.js';
 import { LOCATIONS } from './data.js';
 import { refreshMissionOffers } from './missions.js';
+import { normalizeRaceRecord } from './racing.js';
 import { clamp } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
 import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS } from './weapons.js';
@@ -217,6 +218,10 @@ const mergeMarket = (candidateMarket, fallbackMarket) => {
     }
     return merged;
 };
+const normalizeRaceRecords = (records) => Object.fromEntries(
+    Object.entries(records && typeof records === 'object' ? records : {})
+        .map(([courseId, record]) => [courseId, normalizeRaceRecord(record)]),
+);
 export const hydrateSave = (candidate) => {
     const sourceVersion = Number(candidate.version ?? 1);
     const fallback = createNewSave(candidate.world?.seed);
@@ -263,7 +268,9 @@ export const hydrateSave = (candidate) => {
             failedMissionIds: candidate.world?.failedMissionIds ?? [],
             bountyKills: candidate.world?.bountyKills ?? [],
             registry: candidate.world?.registry ?? {},
-            raceRecords: candidate.world?.raceRecords ?? {},
+            // Upgrade legacy rank/time entries into the persistent PB/split
+            // shape and deliberately discard any old replay/ghost payloads.
+            raceRecords: normalizeRaceRecords(candidate.world?.raceRecords),
             // Legacy saves stored surrendered callsigns as a plain array (no
             // capture/fled distinction); default those to 'captured' so existing
             // recognition behavior is preserved.
