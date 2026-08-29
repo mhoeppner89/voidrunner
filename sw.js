@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v137-map-alt';
+const CACHE = 'voidrunner-v139-market-scroll';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',
@@ -39,6 +39,16 @@ self.addEventListener('install', (event) => {
     './vendor/three.module.min.js',
     './vendor/three.core.min.js',
     './art/career-mining.webp',
+    './art/commodities/arms.webp',
+    './art/commodities/electronics.webp',
+    './art/commodities/food.webp',
+    './art/commodities/gold.webp',
+    './art/commodities/luxuries.webp',
+    './art/commodities/machinery.webp',
+    './art/commodities/medicine.webp',
+    './art/commodities/ore.webp',
+    './art/commodities/scrap.webp',
+    './art/commodities/water.webp',
     './art/locations/v3/azure.png',
     './art/locations/v3/azure-hd-v1.png',
     './art/locations/v3/bar-azure.png',

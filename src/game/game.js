@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { AudioManager } from './audio.js';
 import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, GUILD_RANK_NAMES, LOCATIONS, NAV_LOCATION_IDS, SHIPS, displaySpeed, equipmentIds, hyperdriveArrivalRadius, locationInstanceRadius, sectorEncounterChance, spawnClearance } from './data.js';
-import { buyCommodity, cargoCapacity, cargoFree, cargoMass, denPrice, refreshAllPrices, sellCommodity, SYNDICATE_DEN_FAVOR, tickEconomy } from './economy.js';
+import { buyCommodity, cargoCapacity, cargoFree, cargoMass, denPrice, recordMarketVisit, refreshAllPrices, sellCommodity, SYNDICATE_DEN_FAVOR, tickEconomy } from './economy.js';
 import { InputManager } from './input.js';
 import { acceptMission, awardCareerProgress, completeBountyMission, completeMissionsAtDock, failExpiredMissions, joinGuild, refreshMissionOffers, VALUABLE_CARGO_LABELS, } from './missions.js';
 import { RACE_QUEST_ID, createRaceRacers, crossedRaceGate, generateRaceCourse, normalizeRaceRecord, raceCourseUnlocked, racePayout, raceRankLabel, raceRacerTarget, recordRaceResult, stageRaceRacers, updateRaceRacer } from './racing.js';
@@ -1341,6 +1341,7 @@ export class GameSession {
             this.renderer.setCockpitVisible(false);
             const messages = completeMissionsAtDock(this.save, this.save.player.dockedAt);
             refreshMissionOffers(this.save);
+            recordMarketVisit(this.save.world, this.save.player.dockedAt);
             this.ui.showDock(this.save, this.save.player.dockedAt);
             messages.forEach((message) => this.ui.showToast(message, 'success', 5200));
             saveGame(this.save);
@@ -6462,6 +6463,7 @@ export class GameSession {
         this.renderer.setCockpitVisible(false);
         this.audio.setStationMode(true);
         this.ui.hideHud();
+        recordMarketVisit(this.save.world, dock);
         this.ui.showDock(this.save, dock);
         this.ui.showToast(t('Emergency tow complete. Recovery fee: {credits}.', { credits: formatCredits(loss) }), 'danger', 6500);
         saveGame(this.save);
@@ -8122,6 +8124,7 @@ export class GameSession {
         this.audio.setStationMode(true);
         this.audio.play('dock');
         this.ui.hideHud();
+        recordMarketVisit(this.save.world, locationId);
         this.ui.showDock(this.save, locationId);
         saveGame(this.save);
     }
@@ -8208,9 +8211,12 @@ export class GameSession {
         const result = kind === 'buy' || kind === 'den-buy'
             ? buyCommodity(this.save, dock, commodityId, quantity, price)
             : sellCommodity(this.save, dock, commodityId, quantity, price);
+        if (result.ok)
+            recordMarketVisit(this.save.world, dock);
         const goldHeatNote = result.ok && commodityId === 'gold' ? t(' The board marks the sale — expect company on the Shardbelt lanes.') : '';
         const denNote = result.ok && den ? t(' The den pays untraceable — no manifest entry.') : '';
-        this.ui.showToast(result.message + (result.ok ? ` ${formatCredits(result.total)}.${goldHeatNote}${denNote}` : ''), result.ok ? 'success' : 'warning');
+        const holdNote = result.ok ? t(' Hold: {used}/{capacity} mass.', { used: result.postCargoMass.toFixed(1), capacity: cargoCapacity(this.save.player) }) : '';
+        this.ui.showToast(result.message + (result.ok ? ` ${formatCredits(result.total)}.${holdNote}${goldHeatNote}${denNote}` : ''), result.ok ? 'success' : 'warning');
         this.audio.play(result.ok ? 'ui' : 'warning', 0.55);
         this.ui.refreshDock(this.save);
         saveGame(this.save);

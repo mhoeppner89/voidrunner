@@ -291,6 +291,14 @@ window.render_game_to_text = () => {
             dockedAt: save.player.dockedAt ?? null,
             targetId: save.player.currentTargetId ?? null,
         },
+        market: save.player.dockedAt ? {
+            locationId: save.player.dockedAt,
+            terminal: runtime?.ui?.dockTerminal ?? null,
+            point: runtime?.ui?.marketPoint || null,
+            selectedCommodityId: runtime?.ui?.marketCommodityId ?? null,
+            quantity: runtime?.ui?.marketQuantity ?? 1,
+            credits: save.player.credits,
+        } : null,
         race: race ? {
             courseId: race.course.id,
             state: race.state,

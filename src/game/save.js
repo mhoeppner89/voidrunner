@@ -1,4 +1,4 @@
-import { createInitialMarket, refreshAllPrices } from './economy.js';
+import { createInitialMarket, normalizeMarketIntel, refreshAllPrices } from './economy.js';
 import { LOCATIONS } from './data.js';
 import { refreshMissionOffers } from './missions.js';
 import { normalizeRaceRecord } from './racing.js';
@@ -6,7 +6,7 @@ import { clamp } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
 import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS } from './weapons.js';
 export const SAVE_KEY = 'void-privateer-save-v1';
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 const LEGACY_LOCATION_POSITIONS = {
     helix: [-14400, 1800, 12400],
     rook: [16400, 3200, 15200],
@@ -108,6 +108,9 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             encounterClock: 0,
             goldHeatUntil: 0,
             market: createInitialMarket(seed),
+            // Sparse learned-price ledger. Ports are added by recordMarketVisit
+            // only when the player has actually visited them.
+            marketIntel: {},
             offers: {
                 helix: [],
                 rook: [],
@@ -261,6 +264,7 @@ export const hydrateSave = (candidate) => {
             ...fallback.world,
             ...(candidate.world ?? {}),
             market: mergeMarket(candidate.world?.market, fallback.world.market),
+            marketIntel: normalizeMarketIntel(candidate.world?.marketIntel),
             offers: { ...fallback.world.offers, ...(candidate.world?.offers ?? {}) },
             depletedAsteroids: candidate.world?.depletedAsteroids ?? {},
             depletedWrecks: candidate.world?.depletedWrecks ?? {},

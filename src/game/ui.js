@@ -1,5 +1,5 @@
 import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, LOCATIONS, SHIPS, SUN_POSITION, commodityIds, displaySpeed, equipmentIds } from './data.js';
-import { cargoCapacity, cargoMass, denPrice, SYNDICATE_DEN_FAVOR } from './economy.js';
+import { bestKnownTradeRoute, cargoCapacity, cargoMass, currentProfitableRoutes, denPrice, knownMarketQuotes, quoteCommodityTrade, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { formatCredits, formatDuration, formatNumber } from './random.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
 import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, weaponOwned } from './weapons.js';
@@ -98,7 +98,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.7.8';
+const GAME_VERSION = '0.7.9';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -228,6 +228,8 @@ export class GameUI {
     dockTab = 'concourse';
     dockTerminal = 'concourse';
     marketPoint = '';
+    marketCommodityId = commodityIds[0];
+    marketQuantity = 1;
     shipDetailId;
     barPanel = 'people';
     barPersonId;
@@ -491,7 +493,7 @@ export class GameUI {
                 this.startVesperLaunchTransition();
                 return;
             }
-            const target = event.target.closest('[data-ui-command], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-nav-id], [data-trade], [data-jettison], [data-mission-id], [data-equipment-id], [data-ship-id], [data-switch-ship], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty], [data-pay-mug]');
+            const target = event.target.closest('[data-ui-command], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-commodity-id], [data-market-qty], [data-bar-panel], [data-nav-id], [data-trade], [data-jettison], [data-mission-id], [data-equipment-id], [data-ship-id], [data-switch-ship], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty], [data-pay-mug]');
             if (!target)
                 return;
             if (target.dataset.uiCommand)
@@ -543,6 +545,12 @@ export class GameUI {
             else if (target.dataset.marketPoint) {
                 this.openMarketPoint(target.dataset.marketPoint);
             }
+            else if (target.dataset.commodityId) {
+                this.selectMarketCommodity(target.dataset.commodityId);
+            }
+            else if (target.dataset.marketQty) {
+                this.setMarketQuantity(target.dataset.marketQty);
+            }
             else if (target.dataset.navId) {
                 this.actions?.setNav(target.dataset.navId);
                 this.hideMap();
@@ -586,6 +594,11 @@ export class GameUI {
                 this.talkToPerson(target.dataset.personId);
             }
         });
+        this.root.addEventListener('error', (event) => {
+            const image = event.target;
+            if (image instanceof HTMLImageElement && image.matches('.commodity-art img'))
+                image.closest('.commodity-art')?.classList.add('is-missing');
+        }, true);
         const radar = this.root.querySelector('#radar');
         radar?.addEventListener('pointerup', (event) => {
             event.preventDefault();
@@ -1121,13 +1134,30 @@ export class GameUI {
         if (!person)
             return this.renderBar();
         const lineIndex = Math.max(0, (this.npcLineIndex.get(personId) ?? 1) - 1);
-        const line = person.lines[lineIndex % person.lines.length];
+        const routes = person.marketTipster ? currentProfitableRoutes(this.save.world, this.dockLocation, 3) : [];
+        const route = routes.length ? routes[lineIndex % routes.length] : undefined;
+        const marketTip = route
+            ? t('Load {commodity} here at {buyPrice}. {destination} is paying {sellPrice} — about {profit} per unit if the board holds.', {
+                commodity: t(COMMODITIES[route.commodityId].name),
+                buyPrice: formatCredits(route.buyPrice),
+                destination: LOCATIONS[route.destinationId].name,
+                sellPrice: formatCredits(route.sellPrice),
+                profit: formatCredits(route.profitPerUnit),
+            })
+            : undefined;
+        // The first line from each port's market-connected regular is always a
+        // live, truthful outbound route. Their authored conversation follows,
+        // then the current board tip cycles back in on the next round.
+        const lines = marketTip ? [marketTip, ...person.lines] : person.lines;
+        const activeLine = lineIndex % lines.length;
+        const line = lines[activeLine];
+        const liveTip = Boolean(marketTip) && activeLine === 0;
         return `
       <div class="bar-dialogue-screen station-scene" aria-label="${t('Conversation with {name}', { name: person.name })}">
         <div class="scene-pointer scene-return-pointer" data-ui-command="bar-scene" role="button" tabindex="0" aria-label="${t('Return to the bar')}"><i>◀</i><b>${t('BAR FLOOR')}</b><small>${t('Back to the room')}</small></div>
         <section class="bar-dialogue-card" data-person-id="${person.id}" role="button" tabindex="0" aria-label="${t('Continue talking to {name}', { name: person.name })}">
           ${this.portraitImage(person.id, person.name)}
-          <div><span class="eyebrow">${escapeHtml(person.name)} / ${escapeHtml(t(person.affiliation))}</span><h3>${escapeHtml(t(person.role))}</h3><p>“${escapeHtml(t(line))}”</p></div>
+          <div><span class="eyebrow">${escapeHtml(person.name)} / ${escapeHtml(t(person.affiliation))}</span><h3>${escapeHtml(t(person.role))}</h3>${liveTip ? `<b class="live-route-tip">${t('LIVE ROUTE TIP · CURRENT BOARD')}</b>` : ''}<p>“${escapeHtml(t(line))}”</p></div>
         </section>
       </div>
     `;
@@ -1157,7 +1187,152 @@ export class GameUI {
         this.marketPoint = point;
         this.dockTab = 'market';
         this.dockTerminal = 'market';
+        if (point === 'commodities' && !COMMODITIES[this.marketCommodityId])
+            this.marketCommodityId = commodityIds[0];
+        if (point === 'den')
+            this.marketCommodityId = commodityIds.find((id) => !COMMODITIES[id].legal) ?? commodityIds[0];
         this.renderDock();
+    }
+    selectMarketCommodity(commodityId) {
+        if (!COMMODITIES[commodityId])
+            return;
+        if (this.marketPoint === 'den' && COMMODITIES[commodityId].legal)
+            return;
+        this.marketCommodityId = commodityId;
+        this.marketQuantity = 1;
+        this.renderMarketPoint(this.marketPoint || 'commodities');
+    }
+    setMarketQuantity(command) {
+        const current = Math.max(1, Math.floor(this.marketQuantity || 1));
+        if (command === 'minus')
+            this.marketQuantity = Math.max(1, current - 1);
+        else if (command === 'plus')
+            this.marketQuantity = Math.min(999, current + 1);
+        else if (command === 'one')
+            this.marketQuantity = 1;
+        else if (command === 'five')
+            this.marketQuantity = 5;
+        this.renderMarketPoint(this.marketPoint || 'commodities');
+    }
+    commodityArt(commodity, size = 'thumb') {
+        return `<figure class="commodity-art commodity-art-${size}" style="--commodity-accent:${commodity.accent}" aria-hidden="true"><span>${escapeHtml(commodity.name.slice(0, 2).toUpperCase())}</span><img src="${commodity.image}" alt="" decoding="async"></figure>`;
+    }
+    marketCondition(item) {
+        const spread = item.supply - item.demand;
+        if (spread >= 16)
+            return { label: t('SURPLUS'), className: 'surplus' };
+        if (spread <= -16)
+            return { label: t('SHORTAGE'), className: 'shortage' };
+        return { label: t('BALANCED'), className: 'balanced' };
+    }
+    marketPriceBand(price, commodity) {
+        if (price < commodity.basePrice * 0.9)
+            return { label: t('LOW'), className: 'low' };
+        if (price > commodity.basePrice * 1.15)
+            return { label: t('HIGH'), className: 'high' };
+        return { label: t('NOMINAL'), className: 'nominal' };
+    }
+    marketIntelEntry(locationId, commodityId) {
+        const location = this.save.world.marketIntel?.[locationId];
+        return location?.[commodityId] ?? location?.prices?.[commodityId];
+    }
+    marketTrend(price, intel) {
+        const previous = intel?.previousPrice;
+        if (!Number.isFinite(previous) || previous === price)
+            return { label: t('STEADY'), symbol: '—', className: 'steady' };
+        return price > previous
+            ? { label: t('RISING'), symbol: '▲', className: 'rising' }
+            : { label: t('FALLING'), symbol: '▼', className: 'falling' };
+    }
+    marketAge(seenAt) {
+        if (!Number.isFinite(seenAt))
+            return t('UNKNOWN AGE');
+        const age = Math.max(0, this.save.world.time - seenAt);
+        return age < 10 ? t('JUST NOW') : t('{time} AGO', { time: formatDuration(age) });
+    }
+    tradeFailureLabel(reason) {
+        if (reason === 'stock' || reason === 'out-of-stock')
+            return t('Market stock exhausted.');
+        if (reason === 'credits' || reason === 'insufficient-credits')
+            return t('Insufficient credits.');
+        if (reason === 'capacity' || reason === 'insufficient-capacity')
+            return t('Cargo hold has insufficient free mass.');
+        if (reason === 'cargo' || reason === 'owned' || reason === 'no-cargo')
+            return t('No matching cargo in the hold.');
+        return t('Trade unavailable.');
+    }
+    renderCommodityExchange(den = false) {
+        const market = this.save.world.market[this.dockLocation];
+        const ids = commodityIds.filter((id) => den ? !COMMODITIES[id].legal : true);
+        if (!ids.includes(this.marketCommodityId))
+            this.marketCommodityId = ids[0];
+        const commodityId = this.marketCommodityId;
+        const commodity = COMMODITIES[commodityId];
+        const item = market[commodityId];
+        const owned = this.save.player.cargo[commodityId] ?? 0;
+        const price = den ? denPrice(this.dockLocation, commodityId, item, this.save.world.seed, this.save.world.economyClock) ?? 0 : item.lastPrice;
+        const quantity = Math.max(1, Math.min(999, Math.floor(this.marketQuantity || 1)));
+        const buyQuote = quoteCommodityTrade(this.save, this.dockLocation, commodityId, 'buy', quantity, price);
+        const sellQuote = quoteCommodityTrade(this.save, this.dockLocation, commodityId, 'sell', quantity, price);
+        const maxBuy = quoteCommodityTrade(this.save, this.dockLocation, commodityId, 'buy', 999, price);
+        const sellAll = quoteCommodityTrade(this.save, this.dockLocation, commodityId, 'sell', 999, price);
+        const condition = this.marketCondition(item);
+        const band = this.marketPriceBand(price, commodity);
+        const intel = this.marketIntelEntry(this.dockLocation, commodityId);
+        const trend = this.marketTrend(price, intel);
+        const remoteQuotes = den ? [] : knownMarketQuotes(this.save.world, commodityId, this.dockLocation);
+        const bestRoute = den ? undefined : bestKnownTradeRoute(this.save.world, this.dockLocation, commodityId);
+        const localLegal = commodityIds.filter((id) => COMMODITIES[id].legal);
+        const bestLocalBuy = [...localLegal].sort((a, b) => market[a].lastPrice / COMMODITIES[a].basePrice - market[b].lastPrice / COMMODITIES[b].basePrice)[0];
+        const strongestDemand = [...localLegal].sort((a, b) => (market[b].demand - market[b].supply) - (market[a].demand - market[a].supply))[0];
+        const quoteLine = (quote) => quote.quantity > 0
+            ? t('{quantity} units · {total} · {mass} mass', { quantity: quote.quantity, total: formatCredits(quote.total), mass: Math.abs(quote.massDelta ?? commodity.mass * quote.quantity).toFixed(1) })
+            : this.tradeFailureLabel(quote.reason);
+        const catalog = ids.map((id) => {
+            const entry = COMMODITIES[id];
+            const stock = market[id];
+            const entryPrice = den ? denPrice(this.dockLocation, id, stock, this.save.world.seed, this.save.world.economyClock) ?? 0 : stock.lastPrice;
+            const entryBand = this.marketPriceBand(entryPrice, entry);
+            const entryCondition = this.marketCondition(stock);
+            const entryOwned = this.save.player.cargo[id] ?? 0;
+            return `<button type="button" class="commodity-card ${id === commodityId ? 'selected' : ''} ${entry.legal ? '' : 'restricted'}" data-commodity-id="${id}" role="option" aria-selected="${id === commodityId}" style="--commodity-accent:${entry.accent}">
+              ${this.commodityArt(entry)}
+              <span class="commodity-card-copy"><b>${escapeHtml(t(entry.name))}</b><small>${escapeHtml(t(entry.packaging))} · ${entry.mass} ${t('MASS')}</small><em class="market-condition ${entryCondition.className}">${entryCondition.label}</em></span>
+              <span class="commodity-card-price"><b>${formatCredits(entryPrice)}</b><small class="price-${entryBand.className}">${entryBand.label}</small><em>${t('HOLD')} ${entryOwned}</em></span>
+            </button>`;
+        }).join('');
+        const quoteRows = remoteQuotes.length ? remoteQuotes.slice(0, 4).map((quote) => {
+            const margin = quote.price - price;
+            return `<li class="${margin > 0 ? 'profitable' : margin < 0 ? 'loss' : ''}"><span><b>${escapeHtml(LOCATIONS[quote.locationId]?.shortName ?? quote.locationId)}</b><small>${this.marketAge(quote.seenAt)}</small></span><strong>${formatCredits(quote.price)}</strong><em>${margin > 0 ? '+' : margin < 0 ? '−' : ''}${formatCredits(Math.abs(margin))}/${t('UNIT')}</em></li>`;
+        }).join('') : `<li class="market-intel-empty">${t('Visit another port to record a comparison price.')}</li>`;
+        const routeCallout = bestRoute?.profitPerUnit > 0
+            ? `<div class="best-known-route"><span>${t('BEST KNOWN ROUTE')}</span><b>${escapeHtml(LOCATIONS[bestRoute.destinationId]?.shortName ?? bestRoute.destinationId)} · +${formatCredits(bestRoute.profitPerUnit)}/${t('UNIT')}</b><small>${t('Estimate from your last observed destination price.')}</small></div>`
+            : `<div class="best-known-route muted"><span>${t('BEST KNOWN ROUTE')}</span><b>${t('NO PROFITABLE QUOTE RECORDED')}</b><small>${t('Visit ports or ask around at the bar.')}</small></div>`;
+        return `
+        <div class="market-layout commodity-exchange ${den ? 'is-den' : ''}">
+          <div class="table-title commodity-market-title"><div><span class="eyebrow">${den ? t('UNLICENSED EXCHANGE') : t('COMMODITY EXCHANGE')}</span><h3>${den ? t('Smuggler\'s den') : t('Cargo catalog')}</h3></div><div><span>${t('HOLD')}</span><b>${cargoMass(this.save.player).toFixed(1)} / ${cargoCapacity(this.save.player)} ${t('MASS')}</b></div></div>
+          ${den ? '' : `<div class="market-opportunity-strip"><span><small>${t('BEST LOCAL BUY')}</small><b>${escapeHtml(t(COMMODITIES[bestLocalBuy].name))} · ${formatCredits(market[bestLocalBuy].lastPrice)}</b></span><span><small>${t('STRONGEST LOCAL DEMAND')}</small><b>${escapeHtml(t(COMMODITIES[strongestDemand].name))}</b></span><em>${t('Remote quotes are last-known, not live.')}</em></div>`}
+          <div class="commodity-market-shell">
+            <div class="commodity-catalog" role="listbox" aria-label="${t('Commodities')}">${catalog}</div>
+            <section class="trade-ticket ${commodity.legal ? '' : 'restricted'}" style="--commodity-accent:${commodity.accent}">
+              <div class="trade-ticket-hero">${this.commodityArt(commodity, 'hero')}<div><span class="eyebrow">${escapeHtml(t(commodity.category))} · ${escapeHtml(t(commodity.packaging))}</span><h3>${escapeHtml(t(commodity.name))}</h3><p>${escapeHtml(t(commodity.description))}</p><blockquote>${escapeHtml(t(commodity.flavor))}</blockquote></div></div>
+              <div class="trade-market-readout">
+                <div><span>${t('UNIT PRICE')}</span><b>${formatCredits(price)}</b><small class="price-${band.className}">${band.label}</small></div>
+                <div><span>${t('MARKET')}</span><b>${condition.label}</b><small>${item.supply} ${t('SUPPLY')} / ${item.demand} ${t('DEMAND')}</small></div>
+                <div><span>${t('DIRECTION')}</span><b class="price-${trend.className}">${trend.symbol} ${trend.label}</b><small>${intel?.previousPrice ? t('SINCE LAST VISIT') : t('FIRST RECORDED QUOTE')}</small></div>
+                <div><span>${t('YOUR HOLD')}</span><b>${owned} ${t('UNITS')}</b><small>${(owned * commodity.mass).toFixed(1)} ${t('MASS')}</small></div>
+              </div>
+              <div class="trade-quantity"><span>${t('QUANTITY')}</span><div><button type="button" data-market-qty="minus" aria-label="${t('Decrease quantity')}">−</button><output>${quantity}</output><button type="button" data-market-qty="plus" aria-label="${t('Increase quantity')}">+</button><button type="button" data-market-qty="one">1</button><button type="button" data-market-qty="five">5</button></div></div>
+              <div class="trade-actions-ticket">
+                <button type="button" class="trade-buy" data-trade="${den ? 'den-buy' : 'buy'}:${commodityId}:${quantity}" ${buyQuote.quantity > 0 ? '' : 'disabled'}><span>${t('BUY')} ${buyQuote.quantity || quantity}</span><small>${escapeHtml(quoteLine(buyQuote))}</small></button>
+                <button type="button" class="trade-sell" data-trade="${den ? 'den-sell' : 'sell'}:${commodityId}:${quantity}" ${sellQuote.quantity > 0 ? '' : 'disabled'}><span>${t('SELL')} ${sellQuote.quantity || quantity}</span><small>${escapeHtml(quoteLine(sellQuote))}</small></button>
+                <button type="button" data-trade="${den ? 'den-buy' : 'buy'}:${commodityId}:999" ${maxBuy.quantity > 0 ? '' : 'disabled'}>${t('BUY MAX')} · ${maxBuy.quantity}</button>
+                <button type="button" data-trade="${den ? 'den-sell' : 'sell'}:${commodityId}:999" ${sellAll.quantity > 0 ? '' : 'disabled'}>${t('SELL ALL')} · ${sellAll.quantity}</button>
+              </div>
+              ${den ? `<p class="den-footnote">${t('Untraceable cargo. The den pays off-manifest and never writes the transaction to a licensed manifest.')}</p>` : `<div class="route-intelligence">${routeCallout}<ol>${quoteRows}</ol></div>`}
+            </section>
+          </div>
+        </div>`;
     }
     renderMarketPoint(point) {
         const content = this.root.querySelector('#market-point-content');
@@ -1169,59 +1344,20 @@ export class GameUI {
             this.shipDetailId = undefined;
         this.disposeShipPreviews();
         marketScreen.querySelectorAll('[data-market-point]').forEach((button) => button.classList.toggle('active', button.dataset.marketPoint === point));
+        // A commodity selection refreshes the same exchange panel; keep the
+        // catalog's scroll anchor instead of bouncing back to the top.
+        const prevCatalogScroll = content.querySelector('.commodity-catalog')?.scrollTop ?? 0;
         if (point === 'equipment')
             content.innerHTML = this.renderEquipment();
         else if (point === 'shipyard') {
             content.innerHTML = this.renderShipyard();
             this.mountShipPreviews();
         }
-        else if (point === 'den') {
-            const market = this.save.world.market[this.dockLocation];
-            const rows = commodityIds.filter((id) => !COMMODITIES[id].legal).map((id) => {
-                const item = market[id];
-                const commodity = COMMODITIES[id];
-                const owned = this.save.player.cargo[id] ?? 0;
-                const price = denPrice(this.dockLocation, id, item, this.save.world.seed, this.save.world.economyClock) ?? 0;
-                return `<div class="market-row restricted">
-              <span><b>${escapeHtml(t(commodity.name))}</b><small>${escapeHtml(t(commodity.description))}</small></span>
-              <span><b>${formatCredits(price)}</b><small>${t('DEN PRICE')}</small></span>
-              <span><b>${item.supply} / ${item.demand}</b><small>${t('UNDER THE COUNTER')}</small></span>
-              <span><b>${owned}</b><small>${t('UNITS')}</small></span>
-              <span class="market-actions"><button data-trade="den-buy:${id}:1">${t('BUY 1')}</button><button data-trade="den-buy:${id}:5">${t('BUY 5')}</button><button data-trade="den-sell:${id}:1" ${owned <= 0 ? 'disabled' : ''}>${t('SELL 1')}</button><button data-trade="den-sell:${id}:999" ${owned <= 0 ? 'disabled' : ''}>${t('SELL ALL')}</button></span>
-            </div>`;
-            }).join('');
-            const paidHere = this.save.world.underworld?.[this.dockLocation] ?? 0;
-            content.innerHTML = `
-        <div class="market-layout">
-          <div class="table-title"><div><span class="eyebrow">${t('UNLICENSED EXCHANGE')}</span><h3>${t('Smuggler\'s den')}</h3></div><div><span>${t('YOUR LEDGER HERE')}</span><b>${formatCredits(paidHere)} cr</b></div></div>
-          <div class="market-table">
-          <div class="market-row market-head"><span>${t('COMMODITY')}</span><span>${t('PRICE')}</span><span>${t('SUP / DEM')}</span><span>${t('HOLD')}</span><span>${t('ACTIONS')}</span></div>
-          ${rows}
-          </div>
-          <p class="den-footnote">${t('The den only moves restricted goods. Untraceable arms fetch {percent}% of the counter price — and no manifest entry ever gets written.', { percent: Math.round((denPrice(this.dockLocation, 'arms', market.arms, this.save.world.seed, this.save.world.economyClock) / Math.max(1, market.arms.lastPrice)) * 100) })}</p>
-        </div>`;
-        }
         else {
-            const market = this.save.world.market[this.dockLocation];
-            content.innerHTML = `
-        <div class="market-layout">
-          <div class="table-title"><div><span class="eyebrow">${t('COMMODITY EXCHANGE')}</span><h3>${t('Spot market')}</h3></div><div><span>${t('HOLD')}</span><b>${cargoMass(this.save.player).toFixed(1)} / ${cargoCapacity(this.save.player)} mass</b></div></div>
-          <div class="market-table">
-          <div class="market-row market-head"><span>${t('COMMODITY')}</span><span>${t('PRICE')}</span><span>${t('SUP / DEM')}</span><span>${t('HOLD')}</span><span>${t('ACTIONS')}</span></div>
-          ${commodityIds.map((id) => {
-                const item = market[id];
-                const commodity = COMMODITIES[id];
-                const owned = this.save.player.cargo[id] ?? 0;
-                return `<div class="market-row ${commodity.legal ? '' : 'restricted'}">
-              <span><b>${escapeHtml(t(commodity.name))}</b><small>${escapeHtml(t(commodity.category))} · ${commodity.mass} mass</small></span>
-              <span><b>${formatCredits(item.lastPrice)}</b><small>${item.lastPrice < commodity.basePrice * 0.9 ? t('LOW') : item.lastPrice > commodity.basePrice * 1.15 ? t('HIGH') : t('NOMINAL')}</small></span>
-              <span><b>${item.supply} / ${item.demand}</b><small>${item.supply > item.demand ? t('SURPLUS') : t('DEMAND')}</small></span>
-              <span><b>${owned}</b><small>${t('UNITS')}</small></span>
-              <span class="market-actions"><button data-trade="buy:${id}:1">${t('BUY 1')}</button><button data-trade="buy:${id}:5">${t('BUY 5')}</button><button data-trade="sell:${id}:1" ${owned <= 0 ? 'disabled' : ''}>${t('SELL 1')}</button><button data-trade="sell:${id}:999" ${owned <= 0 ? 'disabled' : ''}>${t('SELL ALL')}</button></span>
-            </div>`;
-            }).join('')}
-          </div>
-        </div>`;
+            content.innerHTML = this.renderCommodityExchange(point === 'den');
+            const catalog = content.querySelector('.commodity-catalog');
+            if (catalog && prevCatalogScroll > 0)
+                catalog.scrollTop = prevCatalogScroll;
         }
     }
     missionBadge(mission) {

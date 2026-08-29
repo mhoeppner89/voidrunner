@@ -21,6 +21,7 @@ RELEASE_NOTES_v0.3.0.md
 README.md
 PLAYABLE_README.md
 *.webp
+!art/commodities/*.webp
 !assets/remaster/cockpit-vanguard.webp
 !assets/remaster/cockpit-talon.webp
 !assets/remaster/cockpit-prospector.webp

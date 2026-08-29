@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --import ./src/game/offlineImportHooks.mjs src/game/shipStats.test.mjs && node src/game/racing.test.mjs && node --import ./src/game/offlineImportHooks.mjs src/game/racingWorld.test.mjs"
+    "test": "node --import ./src/game/offlineImportHooks.mjs src/game/shipStats.test.mjs && node src/game/racing.test.mjs && node --import ./src/game/offlineImportHooks.mjs src/game/racingWorld.test.mjs && node --import ./src/game/offlineImportHooks.mjs src/game/economy.test.mjs"
   }
 }
