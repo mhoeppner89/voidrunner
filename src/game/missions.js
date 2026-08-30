@@ -1,4 +1,4 @@
-import { COMMODITIES, DOCK_LOCATION_IDS, GUILD_RANK_NAMES, LOCATIONS, commodityIds, routeDistanceBetween } from './data.js';
+import { COMMODITIES, DOCK_LOCATION_IDS, GUILD_RANK_NAMES, LOCATIONS, MISSION_LOCATION_IDS, commodityIds, routeDistanceBetween } from './data.js';
 import { miningClaimCandidates, miningClaimName } from './worldData.js';
 import { cargoFree, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { clamp, formatNumber, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
@@ -106,6 +106,8 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             })} ${t(raceCourse.targetText)} · ${t(raceCourse.recommendedShipText)}`,
         });
     }
+    if (!LOCATIONS[locationId].services?.missions)
+        return offers;
     const dangerBase = clamp(save.world.danger, 0.2, 3.5);
     const claimedNodeIds = new Set();
     for (let index = 0; index < count; index += 1) {
@@ -201,7 +203,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             });
             continue;
         }
-        if ((LOCATIONS[locationId].economy?.ore ?? 1) > 1 && index < 2) {
+        if (LOCATIONS[locationId].systemId === 'helios-verge' && (LOCATIONS[locationId].economy?.ore ?? 1) > 1 && index < 2) {
             const candidates = miningClaimCandidates(save.world.seed, save.world.depletedAsteroids, save.world.scannedNodes)
                 .filter((node) => !claimedNodeIds.has(node.id));
             const claim = pick(rng, candidates);
@@ -287,7 +289,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
 };
 export const refreshMissionOffers = (save, force = false) => {
     const cycle = missionCycle(save.world.time);
-    for (const locationId of DOCK_LOCATION_IDS) {
+    for (const locationId of MISSION_LOCATION_IDS) {
         const existing = save.world.offers[locationId] ?? [];
         // The cycle lives in the second dash segment of mission ids
         // (`<location>-<cycle>-<index>-<rand>`), but race offers (pushed

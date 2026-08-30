@@ -1,12 +1,11 @@
 import * as THREE from 'three';
 
-// Minimal GLB loader for the Modelr-exported ship hulls (assets/models/):
-// a single scene node holding one indexed mesh with POSITION/NORMAL/TEXCOORD
-// and a PBR material with baked base-color + metallic-roughness textures.
-// No animations, skins, morphs, or external buffers — the full GLTFLoader
-// addon would be dead weight for that shape. The converted GLBs are tiny
-// (JSON + one BIN chunk) and the loader is deliberately synchronous after
-// the texture decode.
+// Minimal GLB loader for the static ship hulls in assets/models/. It supports
+// the node, mesh, transform, embedded-texture, and PBR material features used
+// by both the original player ships and the adapted Concord capital hulls.
+// No animations, skins, morphs, or external buffers are shipped, so the full
+// GLTFLoader addon would be dead weight. Geometry construction is deliberately
+// synchronous after the embedded textures finish decoding.
 const COMPONENT_SIZE = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
 const TYPE_COUNT = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 };
 
@@ -68,46 +67,74 @@ export async function buildGlbScene(arrayBuffer) {
 
     // Decode embedded textures first: every material slot is a separate image
     // in these models (base color, metallic-roughness).
-    const textures = [];
+    const bitmaps = [];
     for (const image of json.images ?? []) {
         const bufferView = json.bufferViews[image.bufferView];
         const bytes = bin.subarray(bufferView.byteOffset, bufferView.byteOffset + bufferView.byteLength);
         const bitmap = await decodeImage(bytes, image.mimeType ?? 'image/png');
-        const texture = new THREE.Texture(bitmap);
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.needsUpdate = true;
-        const sampler = json.samplers?.[image.sampler];
-        if (sampler?.wrapS !== undefined)
-            texture.wrapS = sampler.wrapS;
-        if (sampler?.wrapT !== undefined)
-            texture.wrapT = sampler.wrapT;
-        textures.push(texture);
+        bitmaps.push(bitmap);
     }
+    const wrapping = (value) => value === 33071 ? THREE.ClampToEdgeWrapping : value === 33648 ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping;
+    const textureDefs = json.textures ?? bitmaps.map((_, source) => ({ source }));
+    const textures = textureDefs.map((definition, index) => {
+        const bitmap = bitmaps[definition.source ?? index];
+        if (!bitmap)
+            return undefined;
+        const texture = new THREE.Texture(bitmap);
+        const sampler = json.samplers?.[definition.sampler];
+        if (sampler?.wrapS !== undefined)
+            texture.wrapS = wrapping(sampler.wrapS);
+        if (sampler?.wrapT !== undefined)
+            texture.wrapT = wrapping(sampler.wrapT);
+        texture.needsUpdate = true;
+        return texture;
+    });
 
     const materials = (json.materials ?? []).map((definition) => {
         const pbr = definition.pbrMetallicRoughness ?? {};
+        const factor = pbr.baseColorFactor ?? [1, 1, 1, 1];
         const material = new THREE.MeshStandardMaterial({
+            color: new THREE.Color(factor[0], factor[1], factor[2]),
+            opacity: factor[3] ?? 1,
             roughness: pbr.roughnessFactor ?? 1,
             metalness: pbr.metalnessFactor ?? 1,
+            side: definition.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
         });
         if (pbr.baseColorTexture !== undefined) {
             const texture = textures[pbr.baseColorTexture.index];
             if (pbr.baseColorTexture.texCoord && pbr.baseColorTexture.texCoord > 0)
                 console.warn('GLB: extra UV sets unsupported');
-            material.map = texture;
+            if (texture) {
+                texture.colorSpace = THREE.SRGBColorSpace;
+                material.map = texture;
+            }
         }
         if (pbr.metallicRoughnessTexture !== undefined) {
             const texture = textures[pbr.metallicRoughnessTexture.index];
             // GLTF packs R=occlusion, G=roughness, B=metalness; three.js reads
             // the same channels, and the texture is linear data, not sRGB.
-            texture.colorSpace = THREE.NoColorSpace;
-            material.roughnessMap = texture;
-            material.metalnessMap = texture;
+            if (texture) {
+                texture.colorSpace = THREE.NoColorSpace;
+                material.roughnessMap = texture;
+                material.metalnessMap = texture;
+            }
         }
+        const emissiveFactor = definition.emissiveFactor;
+        if (emissiveFactor)
+            material.emissive.setRGB(emissiveFactor[0], emissiveFactor[1], emissiveFactor[2]);
+        if (definition.emissiveTexture !== undefined) {
+            const texture = textures[definition.emissiveTexture.index];
+            if (texture) {
+                texture.colorSpace = THREE.SRGBColorSpace;
+                material.emissiveMap = texture;
+            }
+        }
+        material.emissiveIntensity = definition.extensions?.KHR_materials_emissive_strength?.emissiveStrength ?? 1;
         if (definition.alphaMode === 'MASK')
-            material.alphaTest = 0.5;
-        else if (definition.alphaMode === 'BLEND')
+            material.alphaTest = definition.alphaCutoff ?? 0.5;
+        else if (definition.alphaMode === 'BLEND' || material.opacity < 1)
             material.transparent = true;
+        material.name = definition.name ?? '';
         return material;
     });
 
@@ -150,6 +177,7 @@ export async function buildGlbScene(arrayBuffer) {
     const buildNode = (nodeIndex, parent) => {
         const node = json.nodes[nodeIndex];
         const object = new THREE.Group();
+        object.name = node.name ?? '';
         if (node.matrix) {
             object.matrix.fromArray(node.matrix);
             object.matrixAutoUpdate = false;
@@ -165,6 +193,7 @@ export async function buildGlbScene(arrayBuffer) {
         if (node.mesh !== undefined) {
             for (const primitive of json.meshes[node.mesh].primitives) {
                 const mesh = new THREE.Mesh(buildGeometry(primitive), materials[primitive.material ?? 0]);
+                mesh.name = json.meshes[node.mesh].name ?? object.name;
                 mesh.castShadow = true;
                 object.add(mesh);
             }

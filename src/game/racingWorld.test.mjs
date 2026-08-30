@@ -3,9 +3,11 @@ import { LOCATIONS, SHIPS } from './data.js';
 import {
     asteroidCollisionRadius,
     asteroidEnvelopeReach,
+    GRAVEYARD_GEOMETRY_HALF_EXTENTS,
     generateAsteroidField,
     generateGraveyardPieces,
     generateWreckNodes,
+    overlapsGraveyardModelWreck,
 } from './worldData.js';
 import {
     RACE_COURSES,
@@ -56,6 +58,7 @@ const randomFragment = /^(carrier-wake|impact-port|impact-starboard|frigate-alph
 let checkedRocks = 0;
 let checkedFragments = 0;
 let checkedSalvage = 0;
+let checkedWreckClearances = 0;
 
 for (let seed = 0; seed < 30; seed += 1) {
     for (const rock of generateAsteroidField(seed, {})) {
@@ -64,19 +67,29 @@ for (let seed = 0; seed < 30; seed += 1) {
         checkedRocks += 1;
     }
     for (const piece of generateGraveyardPieces(seed)) {
+        assert.notEqual(piece.kind, 'modelCollision', `seed ${seed}: obsolete model collision proxy ${piece.id} returned`);
+        const local = piece.position.map((value, index) => value - mourningCenter[index]);
+        const profile = GRAVEYARD_GEOMETRY_HALF_EXTENTS[piece.kind] ?? [0.5, 0.5, 0.5];
+        const visualReach = Math.hypot(profile[0] * piece.scale[0], profile[1] * piece.scale[1], profile[2] * piece.scale[2]);
+        if (!piece.id.startsWith('route-') && overlapsGraveyardModelWreck(local, visualReach)) {
+            assert.equal(piece.render, false, `seed ${seed}: ${piece.id} visibly overlaps an adapted wreck`);
+            assert.equal(piece.collidable, false, `seed ${seed}: ${piece.id} blocks an adapted wreck fly-through`);
+            checkedWreckClearances += 1;
+        }
         if (!randomFragment.test(piece.id))
             continue;
-        const local = piece.position.map((value, index) => value - mourningCenter[index]);
         assert.ok(clearOfCorridors(local, Math.hypot(...piece.halfExtents), mourningSegments), `seed ${seed}: ${piece.id} intrudes into a fixed Mourning race corridor`);
         checkedFragments += 1;
     }
     for (const node of generateWreckNodes(seed, {})) {
         const local = node.position.map((value, index) => value - mourningCenter[index]);
         assert.ok(clearOfCorridors(local, node.radius * 1.6, mourningSegments), `seed ${seed}: ${node.id} intrudes into a fixed Mourning race corridor`);
+        assert.equal(overlapsGraveyardModelWreck(local, node.radius * 1.6), false, `seed ${seed}: ${node.id} blocks an adapted wreck fly-through`);
         checkedSalvage += 1;
     }
 }
 assert.ok(checkedRocks > 14000 && checkedFragments > 5000 && checkedSalvage > 1800, 'the seed sweep exercised the full random fields');
+assert.ok(checkedWreckClearances > 500, 'the seed sweep exercised the adapted wreck clearance volumes');
 
 // The corridor reservation must clear a rock's FULL envelope — the spawn-
 // clearance box corner reach (0.9·radius·hypot(scale)), not just its bounding

@@ -221,11 +221,11 @@ export const RACE_COURSES = Object.freeze({
         id: 'mourning-run',
         title: 'Mourning Run',
         zone: 'mourning-line',
-        origin: 'rook',
+        origin: 'cairn',
         tier: 1,
         unlock: null,
         difficulty: 'advanced',
-        issuer: 'Salvage Union Steward',
+        issuer: 'Cairn Race Steward',
         entryFee: 1800,
         payouts: Object.freeze([14000, 5600, -1200, -3200]),
         deadlineSeconds: 900,
@@ -251,11 +251,11 @@ export const RACE_COURSES = Object.freeze({
         id: 'mourning-breach',
         title: 'Breach Crossing',
         zone: 'mourning-line',
-        origin: 'rook',
+        origin: 'cairn',
         tier: 2,
         unlock: { courseId: 'mourning-run', rankAtMost: 2 },
         difficulty: 'hard',
-        issuer: 'Salvage Union Steward',
+        issuer: 'Cairn Race Steward',
         entryFee: 3000,
         payouts: Object.freeze([24000, 9600, -1800, -5200]),
         deadlineSeconds: 900,
@@ -280,11 +280,11 @@ export const RACE_COURSES = Object.freeze({
         id: 'mourning-relict-gauntlet',
         title: 'Relict Gauntlet',
         zone: 'mourning-line',
-        origin: 'rook',
+        origin: 'cairn',
         tier: 3,
         unlock: { courseId: 'mourning-breach', rankAtMost: 2 },
         difficulty: 'expert',
-        issuer: 'Salvage Union Steward',
+        issuer: 'Cairn Race Steward',
         entryFee: 5000,
         payouts: Object.freeze([42000, 16800, -3000, -9000]),
         deadlineSeconds: 900,
@@ -318,7 +318,7 @@ const MOURNING_RACE_IDS = Object.freeze(['mourning-run', 'mourning-breach', 'mou
 export const raceOffersForLocation = (locationId) => {
     if (locationId === 'helix' || locationId === 'shardbelt')
         return [...SHARD_RACE_IDS];
-    if (locationId === 'rook' || locationId === 'mourning-line')
+    if (locationId === 'cairn' || locationId === 'mourning-line')
         return [...MOURNING_RACE_IDS];
     return [];
 };
@@ -788,8 +788,6 @@ export const createRaceRacers = (course, _seed, worldTime) => {
             rotation: [0, 0, 0, 1],
             shield: 1,
             maxShield: 1,
-            armor: 1,
-            maxArmor: 1,
             hull: 1,
             maxHull: 1,
             pace,

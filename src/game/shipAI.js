@@ -21,7 +21,7 @@
 // stream (seededRandom(`...:route:${ship.id}:${bucket}`), a fresh stream per
 // call, keyed exactly like the old travel-AI re-roll) — never the ship's
 // aiRng/proxRng combat streams, so headless combat probes stay byte-identical.
-import { COMMODITIES, DOCK_LOCATION_IDS, LOCATIONS } from './data.js';
+import { COMMODITIES, LOCATIONS, activityLocationIdsForSystem, dockLocationIdsForSystem, marketLocationIdsForSystem } from './data.js';
 import { deliverCargo } from './economy.js';
 import { pick, randomBetween, seededRandom } from './random.js';
 
@@ -88,7 +88,9 @@ const dockPoint = (session, dock, rng) => [
     LOCATIONS[dock].position[1] + randomBetween(rng, -20, 20),
     LOCATIONS[dock].position[2] + randomBetween(rng, -30, 30),
 ];
-const randomDock = (rng) => pick(rng, DOCK_LOCATION_IDS);
+const activeDocks = (session) => dockLocationIdsForSystem(session.save.player.systemId);
+const activeMarkets = (session) => marketLocationIdsForSystem(session.save.player.systemId);
+const randomDock = (rng, session) => pick(rng, activeDocks(session));
 // The port whose live market prices run highest on average — the trader's
 // "good sell market". Undefined when the economy has no data yet.
 const bestSellDock = (session, originId) => {
@@ -97,7 +99,7 @@ const bestSellDock = (session, originId) => {
         return undefined;
     let bestId;
     let bestScore = -Infinity;
-    for (const id of DOCK_LOCATION_IDS) {
+    for (const id of activeMarkets(session)) {
         if (id === originId)
             continue;
         const prices = market[id];
@@ -142,16 +144,19 @@ const createTradeTask = (ship, session) => {
     ship.destination = nextTradeLeg(ship, session, task);
     return task;
 };
-const createPatrolTask = (ship, session, homeId = ship.patrolHome ?? 'rook') => {
+const createPatrolTask = (ship, session, homeId = ship.patrolHome ?? activeDocks(session)[0] ?? 'rook') => {
     const rng = routeRng(ship, session);
-    const home = LOCATIONS[homeId]?.position ?? LOCATIONS.rook.position;
+    const home = ship.patrolAnchor ?? LOCATIONS[homeId]?.position ?? LOCATIONS.rook.position;
+    const radiusMin = ship.patrolRadiusMin ?? 80;
+    const radiusMax = ship.patrolRadiusMax ?? 135;
+    const vertical = ship.patrolVertical ?? 40;
     const points = [];
     for (let index = 0; index < PATROL_LANE_POINTS; index += 1) {
         const angle = (index / PATROL_LANE_POINTS) * Math.PI * 2 + rng() * 0.6;
-        const radius = 80 + rng() * 55;
+        const radius = radiusMin + rng() * Math.max(0, radiusMax - radiusMin);
         points.push([
             home[0] + Math.cos(angle) * radius,
-            home[1] + randomBetween(rng, -40, 40),
+            home[1] + randomBetween(rng, -vertical, vertical),
             home[2] + Math.sin(angle) * radius,
         ]);
     }
@@ -377,14 +382,14 @@ const nextTradeLeg = (ship, session, task) => {
         dock = bestSellDock(session, origin);
     }
     if (!dock)
-        dock = randomDock(rng);
+        dock = randomDock(rng, session);
     task.port = dock;
     return dockPoint(session, dock, rng);
 };
 const nextSmuggleLeg = (ship, session, task) => {
     const rng = routeRng(ship, session);
     // Smugglers steer clear of the Concord bastion.
-    const ports = DOCK_LOCATION_IDS.filter((id) => id !== 'rook' && id !== task.port);
+    const ports = activeDocks(session).filter((id) => id !== 'rook' && id !== task.port);
     const dock = pick(rng, ports);
     task.port = dock;
     return dockPoint(session, dock, rng);
@@ -430,7 +435,8 @@ const mineTick = (ship, session, task) => {
 };
 const nextMinePoint = (ship, session) => {
     const rng = routeRng(ship, session);
-    const belt = LOCATIONS.shardbelt.position;
+    const zoneId = activityLocationIdsForSystem(session.save.player.systemId)[0] ?? 'shardbelt';
+    const belt = LOCATIONS[zoneId].position;
     return [
         belt[0] + randomBetween(rng, -110, 110),
         belt[1] + randomBetween(rng, -55, 55),
@@ -466,7 +472,8 @@ const nextSalvagePoint = (ship, session) => {
         return [...nodes[Math.floor(rng() * nodes.length)].position];
     // No intact wrecks left: drift across the field so the crew still reads
     // as working the graveyard.
-    const grave = LOCATIONS['mourning-line'].position;
+    const zoneId = activityLocationIdsForSystem(session.save.player.systemId)[0] ?? 'mourning-line';
+    const grave = LOCATIONS[zoneId].position;
     return [
         grave[0] + randomBetween(rng, -140, 140),
         grave[1] + randomBetween(rng, -70, 70),
@@ -482,7 +489,7 @@ const huntTick = (ship, session, task) => {
     if (ship.standingDown && !ship.hostile) {
         if (staleAt(ship)) {
             const rng = routeRng(ship, session);
-            ship.destination = dockPoint(session, randomDock(rng), rng);
+            ship.destination = dockPoint(session, randomDock(rng, session), rng);
         }
         return;
     }

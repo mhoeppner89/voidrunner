@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { LOCATIONS, SUN_POSITION } from './data.js';
+import { LOCATIONS, SUN_POSITION, sunPositionForSystem } from './data.js';
 import { createVoxelShipModel, createVoxelStationModel, paletteForFaction, shipVariantForRole } from './voxelModels.js';
 import { clamp, seededRandom } from './random.js';
-import { GRAVEYARD_GEOMETRY_PROFILES, getAsteroidBaseMeshes, wreckNodeCollisionRadius } from './worldData.js';
+import { GRAVEYARD_GEOMETRY_PROFILES, GRAVEYARD_MODEL_WRECKS, getAsteroidBaseMeshes, wreckNodeCollisionRadius } from './worldData.js';
 import { loadGlb } from './glbLoader.js';
 import { LaserFx } from './laserFx.js';
 const tupleToVector = (tuple, out = new THREE.Vector3()) => out.set(tuple[0], tuple[1], tuple[2]);
@@ -17,14 +17,78 @@ const cssHex = (value) => `#${value.toString(16).padStart(6, '0')}`;
 // Cockpit sprite scale: idle is held slightly zoomed-in so the frame still
 // fills the view when it relaxes to COCKPIT_ZOOM_BURN under afterburner.
 const COCKPIT_ZOOM_IDLE = 1.018;
-// Debris visibility cutoff: graveyard pieces and salvage chunks farther than
-// this from the camera are hidden (instances zero-scaled, wreck markers not
-// drawn). Keep the complete graveyard visible from Helix's 20,000-unit
-// sunward viewing distance, with room for its outer wake. The batches stay
-// instanced; this increases visible coverage without multiplying draw calls.
+// Activity-field visibility cutoff: nearby hubs can see their neighboring
+// field on the horizon (Helix/Shardbelt and Cairn/Mourning). Graveyard pieces
+// beyond this range are also zero-scaled. Both fields remain instanced, so the
+// distant silhouettes do not multiply draw calls.
 const DEBRIS_CULL_RANGE = 25000;
 const DEBRIS_CULL_RANGE_SQ = DEBRIS_CULL_RANGE * DEBRIS_CULL_RANGE;
 const HIDDEN_SCALE = [0.0001, 0.0001, 0.0001];
+const SYSTEM_RENDER_STYLE = Object.freeze({
+    'helios-verge': { clear: 0x0d1a3c, fog: 0x2a1e44, density: 0.000115 },
+    meridian: { clear: 0x10253a, fog: 0x284358, density: 0.000105 },
+    redwake: { clear: 0x240f1b, fog: 0x4b2029, density: 0.00013 },
+    'pale-ring': { clear: 0x101c2b, fog: 0x273b49, density: 0.000095 },
+});
+const SYSTEM_STAR_PROFILE = Object.freeze({
+    'helios-verge': Object.freeze({
+        radius: 22000,
+        core: 0xffe1a0,
+        corona: [
+            ['#fff5cf', '#ffaf3d', 48000, 0.55],
+            ['#ffd57a', '#ff6b2a', 110000, 0.32],
+            ['#ffe9a8', '#e07a3a', 220000, 0.14],
+        ],
+        hemisphere: [0xffd2a8, 0x32284c, 2.4],
+        fill: [0x7a6caa, 1.0],
+        key: [0xffa566, 5.0],
+        rim: [0x66b9ff, 1.4],
+    }),
+    meridian: Object.freeze({
+        radius: 19000,
+        core: 0xfff2c7,
+        corona: [
+            ['#fffbea', '#efc86f', 44000, 0.52],
+            ['#fff0b0', '#d89038', 98000, 0.28],
+            ['#fff7d5', '#d6a652', 190000, 0.12],
+        ],
+        hemisphere: [0xffe7bd, 0x263b55, 2.3],
+        fill: [0x7195bc, 1.0],
+        key: [0xffc978, 4.8],
+        rim: [0x77c9ff, 1.35],
+    }),
+    redwake: Object.freeze({
+        // A compact red dwarf: physically smaller on the far shell and much
+        // redder than Helios, with a restrained corona rather than a recolored
+        // copy of the same yellow star.
+        radius: 11000,
+        core: 0xff6046,
+        corona: [
+            ['#ffb08a', '#e33b25', 30000, 0.48],
+            ['#ff6a48', '#971c24', 66000, 0.29],
+            ['#ee4937', '#5d1021', 135000, 0.13],
+        ],
+        hemisphere: [0xff8c69, 0x321421, 2.15],
+        fill: [0x6a405d, 0.9],
+        key: [0xff5538, 4.4],
+        rim: [0xb65f8f, 1.15],
+    }),
+    'pale-ring': Object.freeze({
+        // Pale Ring is lit by a blue giant: a larger blue-white disc with a
+        // broad cold corona and correspondingly cool key light.
+        radius: 38000,
+        core: 0xe9fbff,
+        corona: [
+            ['#ffffff', '#8fdcff', 78000, 0.62],
+            ['#c8efff', '#418dff', 165000, 0.38],
+            ['#9edcff', '#245bb8', 310000, 0.17],
+        ],
+        hemisphere: [0xc8efff, 0x192b4f, 2.65],
+        fill: [0x638bc7, 1.15],
+        key: [0x9bdcff, 5.6],
+        rim: [0xd7f6ff, 1.65],
+    }),
+});
 // Half the previous pull-back (was 0.97): the frame relaxes to 0.994 under
 // burn, and the grime follows at half that rate via the 0.5 factor below.
 const COCKPIT_ZOOM_BURN = 0.994;
@@ -57,6 +121,21 @@ export const GLB_SHIP_CONFIG = {
     prospector: { file: 'prospector.glb', yaw: Math.PI / 2, scale: 6.7, rearAxis: [-1, 0, 0], enginePorts: [[-0.9, 0, -0.3], [-0.9, 0, 0.3]] },
     lancer: { file: 'lancer.glb', yaw: Math.PI / 2, scale: 6.65, rearAxis: [-1, 0, 0], enginePorts: [[-0.85, 0, -0.22], [-0.85, 0, 0], [-0.85, 0, 0.22]] },
     'atlas-freighter': { file: 'atlas.glb', yaw: Math.PI / 2, scale: 13.4, rearAxis: [-1, 0, 0], enginePorts: [[-0.9, 0, -0.25], [-0.9, 0, 0.25]] },
+    // Capital hulls preserve their authored blue Concord paint and load only
+    // when one actually enters the scene. Their exact lengths are 10x and
+    // 100x the baked Talon hull respectively.
+    'concord-frigate': {
+        path: 'assets/models/capital/concord-frigate.glb', yaw: -Math.PI / 2, scale: 56.5,
+        rearAxis: [1, 0, 0], enginePorts: [[0.89, -0.07, -0.22], [0.9, -0.07, 0], [0.89, -0.07, 0.22]],
+        preload: false, preserveColor: true, placeholderVariant: 'warden', placeholderScale: 10,
+        flareSize: 3.4, flareOpacity: 0.2, trailLength: 24, trailWidth: 1.8, trailOpacity: 0.54,
+    },
+    'concord-battleship': {
+        path: 'assets/models/capital/concord-battleship.glb', yaw: -Math.PI / 2, scale: 565,
+        rearAxis: [1, 0, 0], enginePorts: [[0.9, -0.14, -0.25], [0.9, 0.11, -0.25], [0.9, -0.14, 0.25], [0.9, 0.11, 0.25]],
+        preload: false, preserveColor: true, placeholderVariant: 'warden', placeholderScale: 100,
+        flareSize: 15, flareOpacity: 0.18, trailLength: 90, trailWidth: 7, trailOpacity: 0.42,
+    },
 };
 // Race entities carry their own hull variant so the starting grid can show
 // the actual ships that are about to race. Ordinary traffic still only has a
@@ -124,6 +203,8 @@ export class SpaceRenderer {
     // GLB ship hulls: per-variant cached model (or null when the load failed),
     // plus the in-flight promises so concurrent spawns share one fetch.
     glbShipModels = new Map();
+    graveyardModelLoading = null;
+    graveyardModelMeshes = [];
     glbShipLoading = new Map();
     projectileMeshCount = 0;
     pickupMeshCount = 0;
@@ -133,6 +214,20 @@ export class SpaceRenderer {
     effects = [];
     cockpit = new THREE.Group();
     cockpitWarning;
+    hyperdriveFxRoot = new THREE.Group();
+    hyperdriveStreaks;
+    hyperdriveStreakMaterial;
+    hyperdriveStreakSeeds;
+    hyperdriveRings;
+    hyperdriveRingMaterial;
+    hyperdriveFlash;
+    hyperdriveFlashMaterial;
+    hyperdriveFxState = 'none';
+    hyperdriveFxProgress = 0;
+    hyperdriveFxPhase = 0;
+    hyperdriveFxPulse = 0;
+    reducedHyperdriveMotion = false;
+    hyperdriveRingTint = new THREE.Color();
     utilityBeam;
     utilityBeamMaterial;
     tmpMatrix = new THREE.Matrix4();
@@ -152,6 +247,8 @@ export class SpaceRenderer {
     pointer = new THREE.Vector2();
     asteroidMeshes = [];
     asteroids;
+    regionalFields = new Map();
+    regionalAsteroidMeshes = [];
     graveyard;
     wreckNodes;
     viewportWidth = 1;
@@ -179,9 +276,21 @@ export class SpaceRenderer {
     selectedWreckId;
     selectedLocationId;
     activeInstanceId;
-    constructor(container, seed, asteroids, graveyard, wreckNodes, quality) {
+    systemId = 'helios-verge';
+    sunVisuals = [];
+    starCoronas = [];
+    starTextureCache = new Map();
+    jumpPointVisuals = [];
+    armedJumpPointId;
+    starBody;
+    hemisphereLight;
+    fillLight;
+    sunLight;
+    rimLight;
+    constructor(container, seed, asteroids, graveyard, wreckNodes, quality, systemId = 'helios-verge', regionalFields = new Map()) {
         this.container = container;
         this.asteroids = asteroids;
+        this.regionalFields = regionalFields;
         this.qualityMode = quality;
         // Touch-primary devices get the phone render tier regardless of CSS
         // width — landscape phones are 900+ CSS px wide, and the old <900
@@ -232,7 +341,9 @@ export class SpaceRenderer {
         this.createAsteroids();
         this.createGraveyard();
         this.createWreckNodes();
+        this.createHyperdriveFx();
         this.createCockpit();
+        this.setSystem(systemId);
         this.setActiveInstance(undefined);
         this.utilityBeamMaterial = new THREE.MeshBasicMaterial({
             color: 0x83e7d4,
@@ -260,30 +371,32 @@ export class SpaceRenderer {
         // orange sun whose key light pushes hulls toward gold, paired with a cool
         // cyan counter-rim that catches the shadow side. Fill is held at half the
         // sun's strength so the unlit side never collapses to black.
-        const ambient = new THREE.HemisphereLight(0xffd2a8, 0x32284c, 2.4);
-        this.scene.add(ambient);
-        const fillLight = new THREE.AmbientLight(0x7a6caa, 1.0);
-        this.scene.add(fillLight);
+        this.hemisphereLight = new THREE.HemisphereLight(0xffd2a8, 0x32284c, 2.4);
+        this.scene.add(this.hemisphereLight);
+        this.fillLight = new THREE.AmbientLight(0x7a6caa, 1.0);
+        this.scene.add(this.fillLight);
         // Sun is positioned *forward* (slightly above horizon, in -y so the
         // player tends to look at it) so chase-camera frames include the
         // sun-lit silhouette against the warm sky.
         const sunDir = new THREE.Vector3(-0.45, 0.18, 1.0).normalize();
-        const sunLight = new THREE.DirectionalLight(0xffa566, 5.0);
-        sunLight.position.copy(sunDir).multiplyScalar(1);
-        this.scene.add(sunLight);
-        const rimLight = new THREE.DirectionalLight(0x66b9ff, 1.4);
-        rimLight.position.set(0.58, -0.24, -0.78).normalize();
-        this.scene.add(rimLight);
+        this.sunLight = new THREE.DirectionalLight(0xffa566, 5.0);
+        this.sunLight.position.copy(sunDir).multiplyScalar(1);
+        this.scene.add(this.sunLight);
+        this.rimLight = new THREE.DirectionalLight(0x66b9ff, 1.4);
+        this.rimLight.position.set(0.58, -0.24, -0.78).normalize();
+        this.scene.add(this.rimLight);
         // The sun sits on the star shell, far outside the playable system. The
         // body is a slightly oversized golden disc with two coronae stacked
         // around it (tight inner halo + broad out-of-system bloom) plus a thin
         // anamorphic streak so it reads as a *star* and not just a sphere.
         const sunPos = new THREE.Vector3(...SUN_POSITION);
-        const sun = new THREE.Mesh(new THREE.SphereGeometry(22000, 32, 20), new THREE.MeshBasicMaterial({ color: 0xffe1a0, fog: false }));
+        const sun = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), new THREE.MeshBasicMaterial({ color: 0xffe1a0, fog: false }));
         sun.position.copy(sunPos);
         this.skyRoot.add(sun);
+        this.sunVisuals.push(sun);
+        this.starBody = sun;
         const innerCorona = new THREE.Sprite(new THREE.SpriteMaterial({
-            map: this.radialTexture('#fff5cf', '#ffaf3d'),
+            map: this.starTexture('#fff5cf', '#ffaf3d'),
             transparent: true,
             opacity: 0.55,
             blending: THREE.AdditiveBlending,
@@ -293,8 +406,10 @@ export class SpaceRenderer {
         innerCorona.position.copy(sunPos);
         innerCorona.scale.setScalar(48000);
         this.skyRoot.add(innerCorona);
+        this.sunVisuals.push(innerCorona);
+        this.starCoronas.push(innerCorona);
         const outerCorona = new THREE.Sprite(new THREE.SpriteMaterial({
-            map: this.radialTexture('#ffd57a', '#ff6b2a'),
+            map: this.starTexture('#ffd57a', '#ff6b2a'),
             transparent: true,
             opacity: 0.32,
             blending: THREE.AdditiveBlending,
@@ -304,8 +419,10 @@ export class SpaceRenderer {
         outerCorona.position.copy(sunPos);
         outerCorona.scale.setScalar(110000);
         this.skyRoot.add(outerCorona);
+        this.sunVisuals.push(outerCorona);
+        this.starCoronas.push(outerCorona);
         const farHalo = new THREE.Sprite(new THREE.SpriteMaterial({
-            map: this.radialTexture('#ffe9a8', '#e07a3a'),
+            map: this.starTexture('#ffe9a8', '#e07a3a'),
             transparent: true,
             opacity: 0.14,
             blending: THREE.AdditiveBlending,
@@ -315,10 +432,52 @@ export class SpaceRenderer {
         farHalo.position.copy(sunPos);
         farHalo.scale.setScalar(220000);
         this.skyRoot.add(farHalo);
+        this.sunVisuals.push(farHalo);
+        this.starCoronas.push(farHalo);
         // Persist the sun direction in render-space so other systems (rim shader,
         // engine flare bias, sub-light point glows) can use it without re-reading
         // the directional light.
         this.sunDirection = sunDir.clone();
+        this.applySystemStarProfile('helios-verge');
+    }
+    starTexture(inner, outer) {
+        const key = `${inner}:${outer}`;
+        if (!this.starTextureCache.has(key))
+            this.starTextureCache.set(key, this.radialTexture(inner, outer));
+        return this.starTextureCache.get(key);
+    }
+    applySystemStarProfile(systemId) {
+        const profile = SYSTEM_STAR_PROFILE[systemId] ?? SYSTEM_STAR_PROFILE['helios-verge'];
+        if (this.starBody) {
+            this.starBody.scale.setScalar(profile.radius);
+            this.starBody.material.color.setHex(profile.core);
+        }
+        profile.corona.forEach(([inner, outer, scale, opacity], index) => {
+            const sprite = this.starCoronas[index];
+            if (!sprite)
+                return;
+            sprite.material.map = this.starTexture(inner, outer);
+            sprite.material.opacity = opacity;
+            sprite.material.needsUpdate = true;
+            sprite.scale.setScalar(scale);
+        });
+        const [skyColor, groundColor, hemisphereIntensity] = profile.hemisphere;
+        this.hemisphereLight?.color.setHex(skyColor);
+        this.hemisphereLight?.groundColor.setHex(groundColor);
+        if (this.hemisphereLight)
+            this.hemisphereLight.intensity = hemisphereIntensity;
+        const [fillColor, fillIntensity] = profile.fill;
+        this.fillLight?.color.setHex(fillColor);
+        if (this.fillLight)
+            this.fillLight.intensity = fillIntensity;
+        const [keyColor, keyIntensity] = profile.key;
+        this.sunLight?.color.setHex(keyColor);
+        if (this.sunLight)
+            this.sunLight.intensity = keyIntensity;
+        const [rimColor, rimIntensity] = profile.rim;
+        this.rimLight?.color.setHex(rimColor);
+        if (this.rimLight)
+            this.rimLight.intensity = rimIntensity;
     }
     createEnvironmentMap() {
         // Painterly galactic sky used as an IBL environment so glossy, clearcoated
@@ -1114,6 +1273,615 @@ export class SpaceRenderer {
         this.createPlanet('azure', 0x1e5d8f, 0x081e33, 0x79c8ea, true);
         this.createHelixStation();
         this.createRookStation();
+        for (const id of Object.keys(LOCATIONS)) {
+            if (this.locationMeshes.has(id) || id === 'shardbelt' || id === 'mourning-line')
+                continue;
+            this.createGenericLocation(id);
+        }
+    }
+    createGenericLocation(id) {
+        const location = LOCATIONS[id];
+        if (!location)
+            return;
+        const group = new THREE.Group();
+        group.name = `generic-location-${id}`;
+        group.position.set(...location.position);
+        const accent = new THREE.Color(location.accent ?? '#80bad0');
+        const secondary = new THREE.Color(location.secondary ?? '#243444');
+        const rng = seededRandom(`generic-location:${id}`);
+        if (location.kind === 'planet') {
+            const planet = new THREE.Mesh(
+                new THREE.SphereGeometry(location.radius, 48, 28),
+                new THREE.MeshStandardMaterial({
+                    color: accent,
+                    emissive: secondary,
+                    emissiveIntensity: 0.2,
+                    roughness: 0.82,
+                    metalness: id === 'boreal' ? 0.08 : 0.02,
+                    fog: false,
+                }),
+            );
+            group.add(planet);
+            const halo = new THREE.Mesh(
+                new THREE.SphereGeometry(location.radius * 1.035, 36, 20),
+                new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.09, side: THREE.BackSide, depthWrite: false, fog: false }),
+            );
+            halo.raycast = () => {};
+            group.add(halo);
+        }
+        else if (location.kind === 'jump-point') {
+            group.add(this.createJumpPointVisual(id, location, accent, secondary, rng));
+        }
+        else if (location.kind === 'field' || location.kind === 'rings') {
+            this.createRegionalAsteroidField(group, id, location, accent, secondary);
+        }
+        else if (location.id === 'blackglass' && location.radius > 2500) {
+            const moon = new THREE.Mesh(
+                new THREE.IcosahedronGeometry(location.radius * 0.82, 3),
+                new THREE.MeshStandardMaterial({ color: 0x181b23, roughness: 0.96, metalness: 0.04 }),
+            );
+            group.add(moon);
+            const dockRing = new THREE.Mesh(
+                new THREE.TorusGeometry(location.radius * 0.68, 90, 10, 64),
+                new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.28, roughness: 0.5, metalness: 0.55 }),
+            );
+            dockRing.rotation.x = Math.PI / 2.7;
+            group.add(dockRing);
+        }
+        else {
+            const station = this.createDistinctStationModel(id, accent, secondary);
+            station.rotation.set((rng() - 0.5) * 0.18, rng() * Math.PI * 2, (rng() - 0.5) * 0.14);
+            // The normalized identity models are authored to fit the station's
+            // physical collision sphere. Per-silhouette factors keep the
+            // longest boom just inside that envelope while making approaches
+            // read as stations rather than fighter-sized props.
+            const stationScale = {
+                cairn: 0.66,
+                argent: 0.62,
+                'gatehouse-twelve': 0.62,
+                cinder: 0.58,
+                torchwell: 0.62,
+                nacre: 0.72,
+                shepherd: 0.7,
+            }[id] ?? 0.6;
+            station.scale.setScalar(location.radius * stationScale);
+            group.add(station);
+            this.makeFogExempt(station);
+        }
+        this.tagTargetable(group, 'location', id);
+        this.locationRoot.add(group);
+        this.locationMeshes.set(id, group);
+    }
+    createJumpPointVisual(id, location, accent, secondary, rng) {
+        const landmark = new THREE.Group();
+        landmark.name = `jump-point-landmark-${id}`;
+        const gateNormal = new THREE.Vector3(...location.position);
+        if (gateNormal.lengthSq() < 0.0001)
+            gateNormal.set(0, 0, 1);
+        landmark.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), gateNormal.normalize());
+        landmark.userData.activationRadius = 1000;
+        const radius = location.radius;
+        const frameMaterial = new THREE.MeshStandardMaterial({
+            color: secondary.clone().lerp(new THREE.Color(0x66717a), 0.18),
+            roughness: 0.62,
+            metalness: 0.78,
+            emissive: secondary,
+            emissiveIntensity: 0.16,
+            fog: false,
+        });
+        const energizedMaterial = new THREE.MeshBasicMaterial({
+            color: accent,
+            transparent: true,
+            opacity: 0.92,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            fog: false,
+        });
+        const outerRing = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.72, radius * 0.065, 10, 72), frameMaterial);
+        landmark.add(outerRing);
+        const innerRing = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.535, radius * 0.018, 8, 72), energizedMaterial);
+        landmark.add(innerRing);
+
+        // A heavy segmented frame and radial braces make the point read as a
+        // built piece of infrastructure, even before the bright aperture does.
+        const pylonGeometry = new THREE.BoxGeometry(radius * 0.18, radius * 0.31, radius * 0.095);
+        const braceGeometry = new THREE.BoxGeometry(radius * 0.19, radius * 0.026, radius * 0.038);
+        for (let index = 0; index < 12; index += 1) {
+            const angle = index / 12 * Math.PI * 2;
+            const pylon = new THREE.Mesh(pylonGeometry, index % 3 === 0 ? energizedMaterial : frameMaterial);
+            pylon.position.set(Math.cos(angle) * radius * 0.72, Math.sin(angle) * radius * 0.72, 0);
+            pylon.rotation.z = angle;
+            landmark.add(pylon);
+            const brace = new THREE.Mesh(braceGeometry, frameMaterial);
+            brace.position.set(Math.cos(angle) * radius * 0.625, Math.sin(angle) * radius * 0.625, 0);
+            brace.rotation.z = angle;
+            landmark.add(brace);
+        }
+
+        const portal = new THREE.Mesh(
+            new THREE.CircleGeometry(radius * 0.515, 64),
+            new THREE.MeshBasicMaterial({
+                color: accent,
+                transparent: true,
+                opacity: 0.13,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                side: THREE.DoubleSide,
+                fog: false,
+            }),
+        );
+        portal.name = 'jump-aperture';
+        landmark.add(portal);
+        const portalGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: this.radialTexture('#ffffff', cssHex(accent.getHex())),
+            color: accent,
+            transparent: true,
+            opacity: 0.44,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            fog: false,
+        }));
+        portalGlow.scale.setScalar(radius * 1.17);
+        landmark.add(portalGlow);
+
+        // Six moving charge blocks give the aperture a clear sense of direction
+        // without filling its traversable centre with another solid object.
+        const spinner = new THREE.Group();
+        const chargeGeometry = new THREE.BoxGeometry(radius * 0.09, radius * 0.035, radius * 0.045);
+        for (let index = 0; index < 6; index += 1) {
+            const angle = index / 6 * Math.PI * 2;
+            const charge = new THREE.Mesh(chargeGeometry, energizedMaterial);
+            charge.position.set(Math.cos(angle) * radius * 0.46, Math.sin(angle) * radius * 0.46, radius * 0.035);
+            charge.rotation.z = angle;
+            spinner.add(charge);
+        }
+        landmark.add(spinner);
+        const beaconTexture = this.radialTexture('#ffffff', cssHex(accent.getHex()));
+        const beacons = [];
+        for (let index = 0; index < 4; index += 1) {
+            const angle = index / 4 * Math.PI * 2 + Math.PI / 4;
+            const beacon = new THREE.Sprite(new THREE.SpriteMaterial({
+                map: beaconTexture,
+                color: accent,
+                transparent: true,
+                opacity: 0.7,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                fog: false,
+            }));
+            beacon.position.set(Math.cos(angle) * radius * 0.91, Math.sin(angle) * radius * 0.91, radius * 0.04);
+            beacon.scale.setScalar(radius * 0.18);
+            landmark.add(beacon);
+            beacons.push(beacon);
+        }
+        this.jumpPointVisuals.push({ id, landmark, spinner, innerRing, portal, portalGlow, beacons, phase: rng() * Math.PI * 2 });
+        return landmark;
+    }
+    createRegionalAsteroidField(group, id, location, accent, secondary) {
+        const nodes = this.regionalFields.get(id) ?? [];
+        if (!nodes.length)
+            return;
+        const style = {
+            'foundry-lanes': { texture: 'foundry-slag', dark: 0x3f4447, light: 0xb99770, color: 0x9d8c78, roughness: 0.94, metalness: 0.2, dust: 0xb88a57 },
+            'redwake-belt': { texture: 'redwake-rock', dark: 0x211d24, light: 0x8f4a3b, color: 0x66505a, roughness: 1, metalness: 0.03, dust: 0x8a3c36 },
+            'pale-rings': { texture: 'pale-ring-ice', dark: 0x587381, light: 0xd8f2f5, color: 0xc8e0e8, roughness: 0.78, metalness: 0.015, dust: 0xafdfea, emissive: 0x102c42 },
+        }[id];
+        if (!style)
+            return;
+        const map = this.createPixelPanelTexture(style.texture, style.dark, style.light, 'rock', 128);
+        map.repeat.set(3.6, 3.6);
+        const material = new THREE.MeshStandardMaterial({
+            color: style.color,
+            map,
+            bumpMap: map,
+            bumpScale: id === 'pale-rings' ? 0.62 : 1.05,
+            roughness: style.roughness,
+            metalness: style.metalness,
+            flatShading: true,
+            vertexColors: true,
+            emissive: style.emissive ?? 0x000000,
+            emissiveIntensity: style.emissive ? 0.22 : 0,
+            fog: false,
+        });
+        const geometries = getAsteroidBaseMeshes().map((entry) => entry.geometry);
+        const byShape = new Map();
+        nodes.forEach((node) => {
+            const shape = node.shape ?? 0;
+            const entries = byShape.get(shape) ?? [];
+            entries.push(node);
+            byShape.set(shape, entries);
+        });
+        const tint = new THREE.Color();
+        byShape.forEach((entries, shape) => {
+            const mesh = new THREE.InstancedMesh(geometries[shape % geometries.length], material, entries.length);
+            mesh.name = `${id}-terrain-${shape}`;
+            mesh.frustumCulled = false;
+            entries.forEach((node, index) => {
+                this.tmpPosition.set(
+                    node.position[0] - location.position[0],
+                    node.position[1] - location.position[1],
+                    node.position[2] - location.position[2],
+                );
+                this.tmpEuler.set(...node.rotation);
+                this.tmpQuaternion.setFromEuler(this.tmpEuler);
+                this.tmpScale.set(node.radius * node.scale[0], node.radius * node.scale[1], node.radius * node.scale[2]);
+                mesh.setMatrixAt(index, this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale));
+                tint.setHex(style.color).offsetHSL((index % 5 - 2) * 0.006, 0, (index % 7 - 3) * 0.018 + (node.landmark ? 0.045 : 0));
+                mesh.setColorAt(index, tint);
+            });
+            mesh.instanceMatrix.needsUpdate = true;
+            if (mesh.instanceColor)
+                mesh.instanceColor.needsUpdate = true;
+            group.add(mesh);
+            this.regionalAsteroidMeshes.push({ id, mesh, entries });
+        });
+
+        // Fine dust makes each field read as one environment at long range;
+        // the solid deformed rocks remain the only collidable geometry.
+        const dustCount = id === 'pale-rings' ? 220 : 130;
+        const dustPositions = new Float32Array(dustCount * 3);
+        const rng = seededRandom(`regional-dust:${id}`);
+        for (let index = 0; index < dustCount; index += 1) {
+            const angle = rng() * Math.PI * 2;
+            const radial = location.radius * (0.18 + Math.sqrt(rng()) * 0.8);
+            dustPositions[index * 3] = Math.cos(angle) * radial;
+            dustPositions[index * 3 + 1] = (rng() - 0.5) * location.radius * (id === 'pale-rings' ? 0.08 : 0.36);
+            dustPositions[index * 3 + 2] = Math.sin(angle) * radial;
+        }
+        const dustGeometry = new THREE.BufferGeometry();
+        dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+        const dust = new THREE.Points(dustGeometry, new THREE.PointsMaterial({
+            color: style.dust,
+            size: id === 'pale-rings' ? 9 : 6,
+            transparent: true,
+            opacity: id === 'redwake-belt' ? 0.24 : 0.3,
+            depthWrite: false,
+            fog: false,
+        }));
+        dust.name = `${id}-dust`;
+        group.add(dust);
+    }
+    createDistinctStationModel(id, accent, secondary) {
+        const station = new THREE.Group();
+        station.name = `station-identity-${id}`;
+        station.userData.stationIdentity = id;
+
+        const panelMap = this.createPixelPanelTexture(
+            `station-${id}-panels`,
+            secondary.clone().lerp(new THREE.Color(0x667178), 0.28).getHex(),
+            accent.clone().lerp(new THREE.Color(0xd5d1bb), 0.38).getHex(),
+            'metal',
+            128,
+        );
+        panelMap.repeat.set(3, 3);
+        panelMap.magFilter = THREE.LinearFilter;
+        panelMap.minFilter = THREE.LinearMipmapLinearFilter;
+        panelMap.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+        panelMap.needsUpdate = true;
+        const hull = new THREE.MeshStandardMaterial({
+            color: 0xd4d8d7,
+            map: panelMap,
+            bumpMap: panelMap,
+            bumpScale: 0.025,
+            roughness: 0.56,
+            metalness: 0.72,
+            fog: false,
+        });
+        const dark = new THREE.MeshStandardMaterial({
+            color: secondary.clone().multiplyScalar(0.42),
+            roughness: 0.68,
+            metalness: 0.72,
+            fog: false,
+        });
+        const pale = new THREE.MeshStandardMaterial({
+            color: secondary.clone().lerp(new THREE.Color(0xc9d1d0), 0.62),
+            roughness: 0.42,
+            metalness: 0.78,
+            fog: false,
+        });
+        const trim = new THREE.MeshStandardMaterial({
+            color: accent,
+            emissive: accent,
+            emissiveIntensity: 0.38,
+            roughness: 0.32,
+            metalness: 0.74,
+            fog: false,
+        });
+        const windowMaterial = new THREE.MeshStandardMaterial({
+            color: accent.clone().lerp(new THREE.Color(0xffffff), 0.48),
+            emissive: accent,
+            emissiveIntensity: 1.9,
+            roughness: 0.18,
+            metalness: 0.08,
+            fog: false,
+        });
+        const radiatorMaterial = new THREE.MeshStandardMaterial({
+            color: secondary.clone().lerp(new THREE.Color(0x101923), 0.48),
+            roughness: 0.76,
+            metalness: 0.42,
+            emissive: accent,
+            emissiveIntensity: 0.055,
+            fog: false,
+        });
+        const light = new THREE.MeshBasicMaterial({ color: accent.clone().lerp(new THREE.Color(0xffffff), 0.24), fog: false });
+        const unitBox = new THREE.BoxGeometry(1, 1, 1, 1, 1, 1);
+        const unitBeam = new THREE.CylinderGeometry(1, 1, 1, 10, 1, false);
+        const unitSphere = new THREE.SphereGeometry(1, 20, 12);
+        const geometryCache = new Map();
+        const cachedGeometry = (key, create) => {
+            if (!geometryCache.has(key))
+                geometryCache.set(key, create());
+            return geometryCache.get(key);
+        };
+        const add = (geometry, material, position = [0, 0, 0], rotation = [0, 0, 0], scale) => {
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.name = `${id}-detail-${station.children.length}`;
+            mesh.position.set(...position);
+            mesh.rotation.set(...rotation);
+            if (scale)
+                mesh.scale.set(...scale);
+            station.add(mesh);
+            return mesh;
+        };
+        const box = (size, position, material = hull, rotation = [0, 0, 0]) => add(unitBox, material, position, rotation, size);
+        const cylinder = (radiusTop, radiusBottom, height, position, material = hull, rotation = [0, 0, 0], segments = 24) => add(
+            cachedGeometry(`c:${radiusTop}:${radiusBottom}:${height}:${segments}`, () => new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments, 2, false)),
+            material,
+            position,
+            rotation,
+        );
+        const torus = (radius, tube, position, material = trim, rotation = [0, 0, 0]) => add(
+            cachedGeometry(`t:${radius}:${tube}`, () => new THREE.TorusGeometry(radius, tube, 12, 56)),
+            material,
+            position,
+            rotation,
+        );
+        const sphere = (radius, position, material = hull, scale = [1, 1, 1]) => add(unitSphere, material, position, [0, 0, 0], scale.map((axis) => axis * radius));
+        const beam = (from, to, radius = 0.025, material = dark) => {
+            const a = new THREE.Vector3(...from);
+            const b = new THREE.Vector3(...to);
+            const delta = b.clone().sub(a);
+            const length = delta.length();
+            const midpoint = a.add(b).multiplyScalar(0.5);
+            const mesh = add(unitBeam, material, [midpoint.x, midpoint.y, midpoint.z], [0, 0, 0], [radius, length, radius]);
+            mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize());
+            return mesh;
+        };
+        const beacon = (position, size = 0.038) => sphere(size, position, light);
+        const window = (size, position, rotation = [0, 0, 0]) => box(size, position, windowMaterial, rotation);
+        const dock = (position, radius = 0.16, rotation = [0, 0, 0]) => {
+            torus(radius, radius * 0.13, position, trim, rotation);
+            torus(radius * 0.73, radius * 0.035, [position[0], position[1], position[2] + 0.006], windowMaterial, rotation);
+        };
+        const radiator = (center, size = [0.72, 0.035, 0.34], rotation = [0, 0, 0]) => {
+            box(size, center, radiatorMaterial, rotation);
+            const horizontal = size[0] >= size[2];
+            for (const offset of [-0.36, -0.12, 0.12, 0.36]) {
+                const x = horizontal ? center[0] + offset * size[0] : center[0];
+                const z = horizontal ? center[2] : center[2] + offset * size[2];
+                box(horizontal ? [0.012, size[1] * 1.9, size[2] * 1.03] : [size[0] * 1.03, size[1] * 1.9, 0.012], [x, center[1], z], pale, rotation);
+            }
+        };
+        const trussBox = (center, half = [0.4, 0.28, 0.3], radius = 0.018, material = dark) => {
+            const [cx, cy, cz] = center;
+            const [hx, hy, hz] = half;
+            const corners = [
+                [cx - hx, cy - hy, cz - hz], [cx + hx, cy - hy, cz - hz],
+                [cx - hx, cy + hy, cz - hz], [cx + hx, cy + hy, cz - hz],
+                [cx - hx, cy - hy, cz + hz], [cx + hx, cy - hy, cz + hz],
+                [cx - hx, cy + hy, cz + hz], [cx + hx, cy + hy, cz + hz],
+            ];
+            [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7], [0, 3], [4, 7]].forEach(([a, b]) => beam(corners[a], corners[b], radius, material));
+        };
+
+        switch (id) {
+            case 'cairn': {
+                // Patchwork racing yard: a long service spine, three open start
+                // hoops, salvage pods and an intentionally uneven workshop side.
+                box([0.22, 0.2, 2.72], [0, 0, 0], dark);
+                box([0.34, 0.1, 2.48], [0, 0.12, 0], hull);
+                [-0.94, 0, 0.94].forEach((z, hoopIndex) => {
+                    torus(0.48, 0.052, [0, 0, z], hoopIndex === 1 ? trim : pale);
+                    torus(0.405, 0.012, [0, 0, z + 0.012], windowMaterial);
+                    for (let index = 0; index < 8; index += 1) {
+                        const angle = index / 8 * Math.PI * 2;
+                        const inner = [Math.cos(angle) * 0.49, Math.sin(angle) * 0.49, z];
+                        const outer = [Math.cos(angle) * 0.61, Math.sin(angle) * 0.61, z + (index % 2 ? 0.08 : -0.08)];
+                        beam(inner, outer, 0.017, index % 2 ? dark : hull);
+                        if (index % 2 === 0)
+                            beacon([Math.cos(angle) * 0.535, Math.sin(angle) * 0.535, z + 0.025], 0.026);
+                    }
+                });
+                box([1.18, 0.16, 0.44], [0, -0.25, -0.32], hull);
+                trussBox([0, -0.28, -0.32], [0.64, 0.16, 0.28], 0.018);
+                [[-0.58, 0.19, -0.52], [-0.49, 0.22, 0.24], [0.48, -0.04, 0.34], [0.57, 0.08, -0.2]].forEach((position, index) => {
+                    box(index % 2 ? [0.42, 0.27, 0.42] : [0.52, 0.31, 0.5], position, index === 2 ? dark : hull, [0.04 * index, 0.07 * (index - 1), index % 2 ? 0.08 : -0.05]);
+                    window([0.012, 0.055, 0.24], [position[0] + (position[0] < 0 ? -0.23 : 0.23), position[1] + 0.04, position[2]]);
+                });
+                [-0.72, 0.72].forEach((x, side) => {
+                    beam([x * 0.35, 0, 0.58], [x, 0.03, 0.74], 0.035, hull);
+                    cylinder(0.13, 0.13, 0.52, [x, 0.04, 0.75], pale, [0, 0, Math.PI / 2]);
+                    cylinder(0.155, 0.155, 0.04, [x + (side ? 0.27 : -0.27), 0.04, 0.75], trim, [0, 0, Math.PI / 2]);
+                });
+                radiator([-0.78, -0.12, -0.82], [0.46, 0.025, 0.3], [0.08, 0.12, -0.12]);
+                radiator([0.77, 0.19, 0.82], [0.48, 0.025, 0.28], [-0.06, -0.15, 0.08]);
+                dock([0, -0.05, -1.4], 0.15);
+                dock([0, 0.02, 1.4], 0.15);
+                for (let z = -1.18; z <= 1.18; z += 0.24)
+                    window([0.17, 0.025, 0.045], [0, 0.185, z]);
+                break;
+            }
+            case 'argent': {
+                // Monumental shipworks: three genuinely open drydocks hung from
+                // a dense cross-braced yard, with cranes and a habitation drum.
+                box([2.82, 0.14, 0.14], [0, 0, 0], dark);
+                box([2.5, 0.055, 0.26], [0, 0.18, 0], hull);
+                [-0.9, 0, 0.9].forEach((x, index) => {
+                    trussBox([x, 0, 0], [0.23, 0.56, 0.51], 0.026, index === 1 ? pale : hull);
+                    torus(0.43, 0.025, [x, 0, -0.52], trim, [0, Math.PI / 2, 0]);
+                    [-0.36, 0, 0.36].forEach((y) => {
+                        beam([x - 0.23, y, -0.51], [x + 0.23, -y, 0.51], 0.014, dark);
+                        window([0.09, 0.025, 0.04], [x, y + 0.08, -0.545]);
+                    });
+                    const craneX = x + (index === 1 ? 0.16 : -0.16);
+                    beam([craneX, 0.57, -0.5], [craneX, 0.83, 0.18], 0.024, trim);
+                    beam([craneX, 0.83, 0.18], [craneX, 0.2, 0.26], 0.012, pale);
+                    beacon([x, 0.64, index % 2 ? -0.52 : 0.52], 0.03);
+                });
+                cylinder(0.23, 0.23, 0.7, [0.08, -0.7, 0], hull, [0, 0, Math.PI / 2], 32);
+                torus(0.245, 0.025, [-0.27, -0.7, 0], trim, [0, Math.PI / 2, 0]);
+                torus(0.245, 0.025, [0.43, -0.7, 0], trim, [0, Math.PI / 2, 0]);
+                for (let index = 0; index < 10; index += 1) {
+                    const angle = index / 10 * Math.PI * 2;
+                    window([0.035, 0.06, 0.08], [0.08, -0.7 + Math.cos(angle) * 0.225, Math.sin(angle) * 0.225], [0, 0, angle]);
+                }
+                box([0.46, 0.3, 0.38], [-1.23, 0.24, 0.22], pale);
+                dock([-1.47, 0.24, 0.22], 0.14, [0, Math.PI / 2, 0]);
+                radiator([1.2, -0.44, 0.46], [0.5, 0.025, 0.36], [0.12, -0.18, 0]);
+                radiator([-1.15, -0.4, -0.45], [0.48, 0.025, 0.34], [-0.08, 0.14, 0]);
+                break;
+            }
+            case 'gatehouse-twelve': {
+                // Customs fortress: a clear scanner throat between armored
+                // bastions, inspection piers and layered sensor architecture.
+                torus(0.67, 0.075, [0, 0, 0], pale);
+                torus(0.555, 0.025, [0, 0, 0.035], trim);
+                torus(0.47, 0.012, [0, 0, 0.06], windowMaterial);
+                for (let index = 0; index < 12; index += 1) {
+                    const angle = index / 12 * Math.PI * 2;
+                    box([0.2, 0.11, 0.18], [Math.cos(angle) * 0.69, Math.sin(angle) * 0.69, 0], index % 3 ? hull : trim, [0, 0, angle]);
+                    beam([Math.cos(angle) * 0.47, Math.sin(angle) * 0.47, -0.05], [Math.cos(angle) * 0.63, Math.sin(angle) * 0.63, 0], 0.018, dark);
+                }
+                box([2.35, 0.16, 0.2], [0, 0, -0.06], dark);
+                [-0.94, 0.94].forEach((x, side) => {
+                    box([0.5, 0.58, 0.66], [x, 0, 0], hull);
+                    box([0.38, 0.7, 0.48], [x, 0, -0.08], dark);
+                    trussBox([x, 0, 0], [0.28, 0.42, 0.4], 0.018, pale);
+                    dock([x + (side ? 0.27 : -0.27), -0.18, 0.08], 0.13, [0, Math.PI / 2, 0]);
+                    for (let y = -0.22; y <= 0.28; y += 0.125)
+                        window([0.02, 0.055, 0.22], [x + (side ? 0.256 : -0.256), y, 0.08]);
+                    radiator([x, -0.54, -0.02], [0.42, 0.025, 0.4]);
+                    beacon([x, 0.47, 0.33], 0.045);
+                });
+                box([0.34, 0.28, 0.66], [0, 0.91, 0], pale);
+                cylinder(0.26, 0.07, 0.12, [0, 1.13, 0.05], trim, [Math.PI / 2, 0, 0], 32);
+                beam([0, 0.92, 0], [0, 1.38, 0], 0.025, dark);
+                beacon([0, 1.4, 0], 0.045);
+                break;
+            }
+            case 'cinder': {
+                // Vertical refinery: furnace stack, tank farm, pipe bridges,
+                // heat radiators and an unmistakable flare-tower crown.
+                cylinder(0.34, 0.42, 1.76, [0, 0, 0], hull, [0, 0, 0], 32);
+                [-0.62, -0.28, 0.12, 0.48].forEach((y, index) => torus(0.39 - index * 0.015, 0.035, [0, y, 0], index === 2 ? trim : dark, [Math.PI / 2, 0, 0]));
+                [[-0.6, -0.17, 0.12], [0.6, -0.1, -0.12], [-0.48, 0.35, -0.34], [0.47, 0.42, 0.34]].forEach((position, index) => {
+                    cylinder(0.19 + (index % 2) * 0.03, 0.22 + (index % 2) * 0.03, 0.95 - index * 0.08, position, index % 2 ? dark : pale, [0, 0, 0], 24);
+                    torus(0.215 + (index % 2) * 0.03, 0.018, [position[0], position[1] - 0.25, position[2]], trim, [Math.PI / 2, 0, 0]);
+                    torus(0.215 + (index % 2) * 0.03, 0.018, [position[0], position[1] + 0.25, position[2]], dark, [Math.PI / 2, 0, 0]);
+                    beam([position[0], position[1] + 0.35, position[2]], [0, position[1] + 0.35, 0], 0.026, trim);
+                });
+                [-1, 1].forEach((side) => {
+                    beam([side * 0.25, 0.28, 0], [side * 0.88, 0.36, 0], 0.042, hull);
+                    radiator([side * 0.91, 0.36, 0], [0.62, 0.03, 0.52], [0, 0, side * 0.15]);
+                    dock([side * 1.19, -0.04, 0], 0.14, [0, Math.PI / 2, 0]);
+                });
+                cylinder(0.095, 0.14, 0.84, [0.12, 1.22, 0], dark, [0, 0, 0], 20);
+                torus(0.145, 0.018, [0.12, 1.42, 0], trim, [Math.PI / 2, 0, 0]);
+                sphere(0.09, [0.12, 1.67, 0], windowMaterial, [0.8, 1.35, 0.8]);
+                for (let index = 0; index < 12; index += 1) {
+                    const angle = index / 12 * Math.PI * 2;
+                    window([0.055, 0.07, 0.018], [Math.cos(angle) * 0.345, 0.61, Math.sin(angle) * 0.345], [0, -angle, 0]);
+                }
+                break;
+            }
+            case 'torchwell': {
+                // Skeletal fuel platform: paired tank cages on a narrow boom,
+                // one service bay, radiators and a lonely long-range beacon.
+                box([0.14, 0.14, 2.74], [0, 0, 0], dark);
+                trussBox([0, 0, 0], [0.22, 0.22, 1.34], 0.016, pale);
+                const tanks = [[-0.5, 0.08, -0.72], [0.48, -0.08, -0.45], [-0.46, -0.02, 0.08], [0.5, 0.1, 0.35], [-0.42, 0.04, 0.78], [0.44, -0.06, 0.96]];
+                tanks.forEach((position, index) => {
+                    cylinder(0.18, 0.18, 0.54, position, index % 3 === 0 ? pale : hull, [0, 0, Math.PI / 2], 24);
+                    torus(0.185, 0.016, [position[0] - 0.2, position[1], position[2]], trim, [0, Math.PI / 2, 0]);
+                    torus(0.185, 0.016, [position[0] + 0.2, position[1], position[2]], dark, [0, Math.PI / 2, 0]);
+                    beam([position[0] * 0.35, 0, position[2]], position, 0.024, hull);
+                });
+                torus(0.43, 0.055, [0, 0, 1.23], pale);
+                torus(0.35, 0.014, [0, 0, 1.245], windowMaterial);
+                box([0.96, 0.09, 0.3], [0, -0.32, 0.72], hull);
+                trussBox([0, -0.32, 0.72], [0.5, 0.13, 0.19], 0.016);
+                radiator([-0.72, 0.34, -0.16], [0.72, 0.024, 0.3], [0.08, 0.04, 0.14]);
+                radiator([0.72, -0.34, -0.02], [0.72, 0.024, 0.3], [-0.08, -0.04, -0.14]);
+                dock([0, 0, -1.42], 0.14);
+                beam([0, 0.1, -1.16], [0, 0.72, -1.16], 0.024, dark);
+                beacon([0, 0.76, -1.16], 0.052);
+                break;
+            }
+            case 'nacre': {
+                // Precision research station: pearl core, nested articulated
+                // instrument rings, isolated labs and symmetric sensor petals.
+                sphere(0.43, [0, 0, 0], pale, [1, 0.86, 1]);
+                torus(0.78, 0.048, [0, 0, 0], trim, [0.58, 0.18, 0.22]);
+                torus(0.66, 0.026, [0, 0, 0], pale, [-0.44, 0.36, -0.18]);
+                torus(0.54, 0.014, [0, 0, 0], windowMaterial, [0.16, -0.52, 0.44]);
+                const labs = [[0.88, 0.12, 0], [-0.88, -0.12, 0], [0, 0.16, 0.88], [0, -0.16, -0.88], [0.62, -0.24, 0.58], [-0.62, 0.24, -0.58]];
+                labs.forEach((position, index) => {
+                    beam([position[0] * 0.42, position[1] * 0.42, position[2] * 0.42], [position[0] * 0.86, position[1] * 0.86, position[2] * 0.86], 0.022, pale);
+                    sphere(0.19, position, index % 2 ? hull : pale, [1.05, 0.68, 1.05]);
+                    torus(0.145, 0.012, position, trim, [Math.PI / 2, index * 0.4, 0]);
+                    beacon([position[0] * 1.11, position[1] + 0.13, position[2] * 1.11], 0.026);
+                });
+                [-1, 1].forEach((side) => {
+                    radiator([side * 1.04, 0, side * 0.16], [0.42, 0.02, 0.48], [0.14, side * 0.36, side * 0.22]);
+                    cylinder(0.25, 0.045, 0.1, [side * 0.58, 0.58, 0], trim, [0, 0, side * Math.PI / 2], 32);
+                });
+                for (let index = 0; index < 14; index += 1) {
+                    const angle = index / 14 * Math.PI * 2;
+                    window([0.025, 0.055, 0.07], [Math.cos(angle) * 0.39, Math.sin(angle) * 0.335, 0], [0, 0, angle]);
+                }
+                dock([0, 0, -1.14], 0.13);
+                break;
+            }
+            case 'shepherd': {
+                // Long-range navigation relay: segmented mast, deep dish,
+                // counterweights, sensor cages and redundant antenna arrays.
+                cylinder(0.1, 0.14, 2.2, [0, 0, 0], dark, [0, 0, 0], 20);
+                [-0.72, -0.24, 0.28, 0.72].forEach((y, index) => {
+                    torus(0.21 + (index % 2) * 0.06, 0.022, [0, y, 0], index === 2 ? trim : pale, [Math.PI / 2, 0, 0]);
+                    for (let spoke = 0; spoke < 4; spoke += 1) {
+                        const angle = spoke / 4 * Math.PI * 2;
+                        beam([0, y, 0], [Math.cos(angle) * 0.24, y, Math.sin(angle) * 0.24], 0.012, hull);
+                    }
+                });
+                sphere(0.25, [0, -0.22, 0], hull, [1, 0.72, 1]);
+                cylinder(0.5, 0.08, 0.17, [0, 0.77, 0.1], pale, [Math.PI / 2, 0, 0], 40);
+                torus(0.37, 0.022, [0, 0.77, 0.19], trim);
+                beam([0, 0.77, 0.14], [0, 0.77, 0.56], 0.018, trim);
+                beacon([0, 0.77, 0.58], 0.034);
+                [-1, 1].forEach((side) => {
+                    beam([0, -0.62, 0], [side * 0.72, -0.72, side * 0.08], 0.032, pale);
+                    cylinder(0.17, 0.17, 0.42, [side * 0.82, -0.74, side * 0.09], hull, [0, 0, Math.PI / 2], 24);
+                    radiator([side * 0.82, -0.33, -side * 0.28], [0.48, 0.02, 0.32], [0.16, side * 0.14, side * 0.2]);
+                    for (let tier = 0; tier < 3; tier += 1) {
+                        const y = 0.18 + tier * 0.21;
+                        beam([0, y, 0], [side * (0.35 + tier * 0.08), y + 0.04, 0], 0.013, dark);
+                        beacon([side * (0.35 + tier * 0.08), y + 0.04, 0], 0.022);
+                    }
+                });
+                dock([0, -1.13, 0], 0.12, [Math.PI / 2, 0, 0]);
+                beam([0, 0.98, 0], [0, 1.39, 0], 0.018, pale);
+                beacon([0, 1.42, 0], 0.048);
+                break;
+            }
+            default:
+                sphere(0.38, [0, 0, 0], hull);
+                torus(0.7, 0.06, [0, 0, 0]);
+                box([1.8, 0.16, 0.16], [0, 0, 0], dark);
+                break;
+        }
+        station.userData.detailMeshes = station.children.length;
+        station.userData.highDetail = true;
+        return station;
     }
     // A BackSide atmosphere shell with a near-field dome fade. When the camera
     // is inside the shell, the shell surface right around it glows (the sky
@@ -1622,6 +2390,8 @@ export class SpaceRenderer {
         distantMap.repeat.set(2.8, 1.8);
         const grouped = new Map();
         for (const piece of this.graveyard) {
+            if (piece.render === false)
+                continue;
             const finish = piece.finish ?? (piece.kind === 'panel' || piece.id.includes('carrier') ? 'rust' : 'metal');
             const key = `${piece.kind}:${finish}`;
             const list = grouped.get(key) ?? [];
@@ -1738,6 +2508,68 @@ export class SpaceRenderer {
             this.graveyardBatches.push({ mesh, pieces });
         });
         this.updateGraveyardInstances();
+    }
+    // The two adapted wreck files are deliberately absent from the install
+    // cache and boot preload. They begin loading when the surrounding field
+    // first becomes visible; one frigate model is cloned for both casualties.
+    ensureGraveyardModels() {
+        if (this.graveyardModelLoading || this.graveyardModelMeshes.length)
+            return this.graveyardModelLoading;
+        const files = [...new Set(GRAVEYARD_MODEL_WRECKS.map((entry) => entry.file))];
+        this.graveyardModelLoading = Promise.all(files.map(async (file) => {
+            try {
+                return [file, await loadGlb(file)];
+            }
+            catch (error) {
+                console.warn(`Graveyard wreck ${file} failed to load.`, error);
+                return [file, null];
+            }
+        })).then((loaded) => {
+            const models = new Map(loaded);
+            const root = this.instanceRoots.get('mourning-line');
+            const center = LOCATIONS['mourning-line'].position;
+            for (const config of GRAVEYARD_MODEL_WRECKS) {
+                const source = models.get(config.file);
+                if (!source || !root)
+                    continue;
+                const wreck = source.clone(true);
+                wreck.traverse((child) => {
+                    if (!(child.material instanceof THREE.MeshStandardMaterial))
+                        return;
+                    const material = child.material.clone();
+                    // The wreck texture already carries a pale, desaturated
+                    // battlefield wash. Preserve it instead of multiplying it
+                    // by the old near-black soot tint.
+                    const ember = material.emissive.r + material.emissive.g + material.emissive.b >= 0.001;
+                    if (!ember && material.map)
+                        material.color.lerp(new THREE.Color(0xe7e9e5), 0.18);
+                    material.roughness = Math.max(0.88, material.roughness);
+                    material.metalness = Math.min(0.48, material.metalness);
+                    material.side = THREE.DoubleSide;
+                    child.material = material;
+                });
+                wreck.name = config.id;
+                wreck.position.set(center[0] + config.local[0], center[1] + config.local[1], center[2] + config.local[2]);
+                wreck.rotation.set(...config.rotation);
+                wreck.scale.setScalar(config.scale);
+                root.add(wreck);
+                this.graveyardModelMeshes.push(wreck);
+            }
+            this.updateGraveyardModelVisibility();
+            return this.graveyardModelMeshes;
+        });
+        return this.graveyardModelLoading;
+    }
+    updateGraveyardModelVisibility() {
+        const root = this.instanceRoots.get('mourning-line');
+        const rootVisible = Boolean(root?.visible && this.systemId === 'helios-verge');
+        const cam = this.camera.position;
+        for (const wreck of this.graveyardModelMeshes) {
+            const dx = wreck.position.x - cam.x;
+            const dy = wreck.position.y - cam.y;
+            const dz = wreck.position.z - cam.z;
+            wreck.visible = rootVisible && dx * dx + dy * dy + dz * dz <= DEBRIS_CULL_RANGE_SQ;
+        }
     }
     updateGraveyardInstances(movingOnly = false) {
         const cam = this.camera.position;
@@ -1885,6 +2717,260 @@ export class SpaceRenderer {
                 batch.mesh.instanceMatrix.needsUpdate = true;
         }
     }
+    createHyperdriveStreakTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 128;
+        const context = canvas.getContext('2d');
+        const crossFade = context.createLinearGradient(0, 0, canvas.width, 0);
+        crossFade.addColorStop(0, 'rgba(255,255,255,0)');
+        crossFade.addColorStop(0.32, 'rgba(176,232,255,0.24)');
+        crossFade.addColorStop(0.5, 'rgba(255,255,255,1)');
+        crossFade.addColorStop(0.68, 'rgba(176,232,255,0.24)');
+        crossFade.addColorStop(1, 'rgba(255,255,255,0)');
+        context.fillStyle = crossFade;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.globalCompositeOperation = 'destination-in';
+        const lengthFade = context.createLinearGradient(0, 0, 0, canvas.height);
+        lengthFade.addColorStop(0, 'rgba(255,255,255,0)');
+        lengthFade.addColorStop(0.18, 'rgba(255,255,255,0.24)');
+        lengthFade.addColorStop(0.7, 'rgba(255,255,255,1)');
+        lengthFade.addColorStop(1, 'rgba(255,255,255,0)');
+        context.fillStyle = lengthFade;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.generateMipmaps = false;
+        return texture;
+    }
+    createHyperdriveFlareTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const context = canvas.getContext('2d');
+        const glow = context.createRadialGradient(128, 128, 0, 128, 128, 128);
+        glow.addColorStop(0, 'rgba(255,255,255,1)');
+        glow.addColorStop(0.045, 'rgba(244,253,255,0.98)');
+        glow.addColorStop(0.16, 'rgba(151,226,255,0.66)');
+        glow.addColorStop(0.48, 'rgba(74,146,255,0.18)');
+        glow.addColorStop(1, 'rgba(21,54,130,0)');
+        context.fillStyle = glow;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.generateMipmaps = false;
+        return texture;
+    }
+    createHyperdriveFx() {
+        const streakCount = this.qualityMode === 'low' ? 44 : this.qualityMode === 'high' ? 88 : 68;
+        const ringCount = this.qualityMode === 'low' ? 5 : 7;
+        const rng = seededRandom('hyperdrive-world-fx');
+        this.reducedHyperdriveMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        this.hyperdriveFxRoot.name = 'hyperdrive-world-fx';
+        this.hyperdriveFxRoot.visible = false;
+
+        this.hyperdriveStreakMaterial = new THREE.MeshBasicMaterial({
+            map: this.createHyperdriveStreakTexture(),
+            color: 0xb9edff,
+            transparent: true,
+            opacity: 0,
+            blending: THREE.AdditiveBlending,
+            depthTest: false,
+            depthWrite: false,
+            fog: false,
+            side: THREE.DoubleSide,
+            toneMapped: false,
+        });
+        this.hyperdriveStreaks = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), this.hyperdriveStreakMaterial, streakCount);
+        this.hyperdriveStreaks.name = 'hyperdrive-streak-field';
+        this.hyperdriveStreaks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        this.hyperdriveStreaks.frustumCulled = false;
+        this.hyperdriveStreaks.renderOrder = 900;
+        this.hyperdriveStreakSeeds = new Float32Array(streakCount * 4);
+        const tint = new THREE.Color();
+        for (let index = 0; index < streakCount; index += 1) {
+            const offset = index * 4;
+            this.hyperdriveStreakSeeds[offset] = rng() * Math.PI * 2;
+            this.hyperdriveStreakSeeds[offset + 1] = 0.12 + rng() * 0.62;
+            this.hyperdriveStreakSeeds[offset + 2] = rng();
+            this.hyperdriveStreakSeeds[offset + 3] = 0.72 + rng() * 0.62;
+            tint.setRGB(0.78 + rng() * 0.22, 0.88 + rng() * 0.12, 1);
+            this.hyperdriveStreaks.setColorAt(index, tint);
+        }
+        if (this.hyperdriveStreaks.instanceColor)
+            this.hyperdriveStreaks.instanceColor.needsUpdate = true;
+        this.hyperdriveFxRoot.add(this.hyperdriveStreaks);
+
+        this.hyperdriveRingMaterial = new THREE.MeshBasicMaterial({
+            color: 0x91dcff,
+            transparent: true,
+            opacity: 0,
+            blending: THREE.AdditiveBlending,
+            depthTest: false,
+            depthWrite: false,
+            fog: false,
+            side: THREE.DoubleSide,
+            toneMapped: false,
+        });
+        this.hyperdriveRings = new THREE.InstancedMesh(new THREE.TorusGeometry(1, 0.007, 3, 72), this.hyperdriveRingMaterial, ringCount);
+        this.hyperdriveRings.name = 'hyperdrive-compression-rings';
+        this.hyperdriveRings.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        this.hyperdriveRings.frustumCulled = false;
+        this.hyperdriveRings.renderOrder = 901;
+        for (let index = 0; index < ringCount; index += 1)
+            this.hyperdriveRings.setColorAt(index, this.hyperdriveRingTint.setRGB(1, 1, 1));
+        if (this.hyperdriveRings.instanceColor) {
+            this.hyperdriveRings.instanceColor.setUsage(THREE.DynamicDrawUsage);
+            this.hyperdriveRings.instanceColor.needsUpdate = true;
+        }
+        this.hyperdriveFxRoot.add(this.hyperdriveRings);
+
+        this.hyperdriveFlashMaterial = new THREE.SpriteMaterial({
+            map: this.createHyperdriveFlareTexture(),
+            color: 0xc7f5ff,
+            transparent: true,
+            opacity: 0,
+            blending: THREE.AdditiveBlending,
+            depthTest: false,
+            depthWrite: false,
+            fog: false,
+            toneMapped: false,
+        });
+        this.hyperdriveFlash = new THREE.Sprite(this.hyperdriveFlashMaterial);
+        this.hyperdriveFlash.name = 'hyperdrive-transition-flare';
+        this.hyperdriveFlash.position.set(0, 0, -18);
+        this.hyperdriveFlash.frustumCulled = false;
+        this.hyperdriveFlash.renderOrder = 902;
+        this.hyperdriveFxRoot.add(this.hyperdriveFlash);
+        // The camera-local group is rendered by WebGL behind the whole DOM HUD.
+        // It therefore fills the canopy view while every frame rail and monitor
+        // remains clean and readable in front of it.
+        this.camera.add(this.hyperdriveFxRoot);
+    }
+    updateHyperdriveFx(dt) {
+        if (!this.hyperdriveStreaks || !this.hyperdriveRings || !this.hyperdriveFlash)
+            return;
+        const state = this.hyperdriveFxState;
+        const progress = this.hyperdriveFxProgress;
+        if (state === 'none') {
+            this.hyperdriveFxRoot.visible = false;
+            this.hyperdriveStreakMaterial.opacity = 0;
+            this.hyperdriveRingMaterial.opacity = 0;
+            this.hyperdriveFlashMaterial.opacity = 0;
+            return;
+        }
+        this.hyperdriveFxRoot.visible = true;
+        this.hyperdriveFxPulse = Math.max(0, this.hyperdriveFxPulse - dt * 2.6);
+        let streakOpacity = 0;
+        let ringOpacity = 0;
+        let flashOpacity = 0;
+        let speed = 1;
+        let color = 0xa8e8ff;
+        if (state === 'spooling') {
+            streakOpacity = 0.025 + progress * progress * 0.34;
+            ringOpacity = 0.14 + progress * 0.5;
+            flashOpacity = Math.max(0, (progress - 0.82) / 0.18) * 0.16;
+            speed = 0.35 + progress * 1.6;
+        }
+        else if (state === 'active') {
+            streakOpacity = 0.86;
+            ringOpacity = 0.2;
+            flashOpacity = 0.035 + this.hyperdriveFxPulse * 0.48;
+            speed = 4.5;
+        }
+        else if (state === 'gate') {
+            const envelope = Math.sin(progress * Math.PI);
+            streakOpacity = 0.48 + envelope * 0.46;
+            ringOpacity = 0.32 + envelope * 0.5;
+            flashOpacity = 0.1 + envelope * 0.6;
+            speed = 5.8;
+            color = 0xd5faff;
+        }
+        else if (state === 'drop') {
+            streakOpacity = progress * 0.58;
+            ringOpacity = progress * 0.3;
+            flashOpacity = Math.pow(progress, 1.25) * 0.34;
+            speed = 2.8;
+        }
+        else if (state === 'interrupt') {
+            streakOpacity = progress * 0.56;
+            ringOpacity = progress * 0.46;
+            flashOpacity = Math.pow(progress, 1.2) * 0.56;
+            speed = 3.4;
+            color = 0xff6548;
+        }
+        const motionScale = this.reducedHyperdriveMotion ? 0.16 : 1;
+        this.hyperdriveFxPhase += dt * speed * motionScale;
+        this.hyperdriveStreakMaterial.opacity = streakOpacity;
+        this.hyperdriveRingMaterial.opacity = ringOpacity;
+        this.hyperdriveFlashMaterial.opacity = flashOpacity;
+        this.hyperdriveStreakMaterial.color.setHex(color);
+        this.hyperdriveRingMaterial.color.setHex(state === 'interrupt' ? 0xff8169 : state === 'gate' ? 0xe3fcff : 0x91dcff);
+        this.hyperdriveFlashMaterial.color.setHex(state === 'interrupt' ? 0xff4e32 : state === 'drop' ? 0x9bdfff : 0xd5f8ff);
+        const intensity = clamp(streakOpacity / 0.86, 0, 1);
+        const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(this.camera.fov * 0.5));
+        const phase = this.hyperdriveFxPhase;
+        const streakCount = this.hyperdriveStreaks.count;
+        for (let index = 0; index < streakCount; index += 1) {
+            const offset = index * 4;
+            const angle = this.hyperdriveStreakSeeds[offset] + phase * 0.035;
+            const lane = this.hyperdriveStreakSeeds[offset + 1];
+            const travel = (this.hyperdriveStreakSeeds[offset + 2] + phase * 0.24) % 1;
+            const depth = 170 - travel * 163;
+            const near = travel * travel;
+            const screenRadius = lane + near * (0.32 + lane * 0.18);
+            const radius = screenRadius * depth * tanHalfFov;
+            this.tmpPosition.set(Math.cos(angle) * radius * this.camera.aspect, Math.sin(angle) * radius, -depth);
+            this.tmpEuler.set(0, 0, angle - Math.PI * 0.5);
+            this.tmpQuaternion.setFromEuler(this.tmpEuler);
+            const length = depth * (0.017 + intensity * 0.024 + near * 0.086) * this.hyperdriveStreakSeeds[offset + 3];
+            const width = depth * (0.001 + intensity * 0.00135);
+            this.tmpScale.set(width, length, 1);
+            this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
+            this.hyperdriveStreaks.setMatrixAt(index, this.tmpMatrix);
+        }
+        this.hyperdriveStreaks.instanceMatrix.needsUpdate = true;
+        const ringCount = this.hyperdriveRings.count;
+        for (let index = 0; index < ringCount; index += 1) {
+            const travel = (index / ringCount + phase * 0.14) % 1;
+            const depth = 150 - travel * 145;
+            this.tmpPosition.set(0, 0, -depth);
+            this.tmpEuler.set(Math.sin(phase * 0.28 + index) * 0.055, Math.cos(phase * 0.24 + index * 0.7) * 0.045, phase * 0.025);
+            this.tmpQuaternion.setFromEuler(this.tmpEuler);
+            const radius = 12.5 + intensity * 2;
+            this.tmpScale.setScalar(radius);
+            this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
+            this.hyperdriveRings.setMatrixAt(index, this.tmpMatrix);
+            const brightness = 0.14 + Math.pow(travel, 1.45) * 0.86;
+            this.hyperdriveRingTint.setRGB(brightness, brightness, brightness);
+            this.hyperdriveRings.setColorAt(index, this.hyperdriveRingTint);
+        }
+        this.hyperdriveRings.instanceMatrix.needsUpdate = true;
+        if (this.hyperdriveRings.instanceColor)
+            this.hyperdriveRings.instanceColor.needsUpdate = true;
+        this.hyperdriveFlash.scale.set(30 * this.camera.aspect, 30, 1);
+        this.hyperdriveFxRoot.rotation.z = state === 'interrupt'
+            ? Math.sin(phase * 11) * 0.012 * progress
+            : Math.sin(phase * 0.35) * 0.006;
+    }
+    hyperdriveFxSnapshot() {
+        return {
+            state: this.hyperdriveFxState,
+            progress: this.hyperdriveFxProgress,
+            rootVisible: this.hyperdriveFxRoot.visible,
+            parent: this.hyperdriveFxRoot.parent === this.camera ? 'camera' : 'other',
+            streakCount: this.hyperdriveStreaks?.count ?? 0,
+            ringCount: this.hyperdriveRings?.count ?? 0,
+            streakOpacity: this.hyperdriveStreakMaterial?.opacity ?? 0,
+            ringOpacity: this.hyperdriveRingMaterial?.opacity ?? 0,
+            flashOpacity: this.hyperdriveFlashMaterial?.opacity ?? 0,
+            flashColor: this.hyperdriveFlashMaterial ? `#${this.hyperdriveFlashMaterial.color.getHexString()}` : '',
+        };
+    }
     createCockpit() {
         // Scrapped: every 3D cockpit mesh (frame rails, console boxes,
         // screen planes, instrument lamps, fasteners, canopy rails, vents,
@@ -1973,10 +3059,13 @@ export class SpaceRenderer {
     }
     createShipMesh(entity) {
         const variant = shipVariantForEntity(entity);
+        const config = GLB_SHIP_CONFIG[variant];
+        const voxelVariant = config?.placeholderVariant ?? variant;
         const palette = paletteForEntity(entity);
-        const model = createVoxelShipModel(variant, palette);
+        const model = createVoxelShipModel(voxelVariant, palette);
         const group = model.group;
-        const baseScale = variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1;
+        const placeholderScale = config?.placeholderScale ?? 1;
+        const baseScale = (variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1) * placeholderScale;
         const engineColor = palette.engine;
         const engineFlareTexture = this.radialTexture(cssHex(engineColor), cssHex(engineColor));
         const flameTex = this.engineFlameTexture();
@@ -1992,7 +3081,10 @@ export class SpaceRenderer {
                 depthWrite: false,
             }));
             flare.position.copy(port).add(new THREE.Vector3(0, 0, 0.18));
-            flare.scale.setScalar(variant === 'atlas-freighter' ? ENGINE_FLARE_SIZE_ATLAS : ENGINE_FLARE_SIZE);
+            const flareSize = (config?.flareSize ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_SIZE_ATLAS : ENGINE_FLARE_SIZE)) / placeholderScale;
+            flare.scale.setScalar(flareSize);
+            flare.userData.baseSize = flareSize;
+            flare.userData.baseOpacity = config?.flareOpacity ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_OPACITY_ATLAS : ENGINE_FLARE_OPACITY);
             flares.push(flare);
             group.add(flare);
             // Long exhaust trail: a thin plane stretched along the ship's
@@ -2007,8 +3099,10 @@ export class SpaceRenderer {
                 side: THREE.DoubleSide,
                 toneMapped: false,
             });
-            const trailLen = variant === 'atlas-freighter' ? 9 : variant === 'kestrel' ? 6 : 7;
-            const trailMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.45, trailLen), trailMat);
+            const trailLen = (config?.trailLength ?? (variant === 'atlas-freighter' ? 9 : variant === 'kestrel' ? 6 : 7)) / placeholderScale;
+            const trailWidth = (config?.trailWidth ?? 0.45) / placeholderScale;
+            trailMat.opacity = 0.78 * (config?.trailOpacity ?? ENGINE_GLOW_TUNING[variant]?.trailOpacity ?? 1);
+            const trailMesh = new THREE.Mesh(new THREE.PlaneGeometry(trailWidth, trailLen), trailMat);
             trailMesh.position.copy(port).add(new THREE.Vector3(0, 0, trailLen * 0.45));
             trailMesh.rotation.x = Math.PI / 2;
             trailMesh.userData.isTrail = true;
@@ -2037,8 +3131,9 @@ export class SpaceRenderer {
     // Start the per-variant fetches; ships spawn with the voxel placeholder
     // until a variant's model resolves (see swapShipMesh).
     preloadGlbShips() {
-        for (const variant of Object.keys(GLB_SHIP_CONFIG))
-            this.ensureGlbShipModel(variant);
+        for (const [variant, config] of Object.entries(GLB_SHIP_CONFIG))
+            if (config.preload !== false)
+                this.ensureGlbShipModel(variant);
     }
     ensureGlbShipModel(variant) {
         if (this.glbShipModels.has(variant) || this.glbShipLoading.has(variant))
@@ -2046,14 +3141,14 @@ export class SpaceRenderer {
         const config = GLB_SHIP_CONFIG[variant];
         if (!config)
             return;
-        const promise = loadGlb(`assets/models/ships/${config.file}`)
+        const promise = loadGlb(config.path ?? `assets/models/ships/${config.file}`)
             .then((model) => {
                 const ready = this.prepareGlbShip(model, config);
                 this.glbShipModels.set(variant, ready);
                 return ready;
             })
             .catch((error) => {
-                console.warn(`GLB hull ${variant} (${config.file}) failed to load; using voxels.`, error);
+                console.warn(`GLB hull ${variant} (${config.path ?? config.file}) failed to load; using voxels.`, error);
                 this.glbShipModels.set(variant, null);
                 return null;
             });
@@ -2084,7 +3179,8 @@ export class SpaceRenderer {
         group.traverse((child) => {
             if (child.material instanceof THREE.MeshStandardMaterial) {
                 const material = child.material.clone();
-                material.color.copy(tint).lerp(new THREE.Color(0xffffff), 0.45);
+                if (!config.preserveColor)
+                    material.color.copy(tint).lerp(new THREE.Color(0xffffff), 0.45);
                 if (entity.race) {
                     // A low self-lit wash keeps the custom race paint readable
                     // while the ships idle at the gathering point and under
@@ -2096,7 +3192,7 @@ export class SpaceRenderer {
                 emissiveMaterials.push(material);
             }
         });
-        const baseScale = variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1;
+        const baseScale = config.baseScale ?? (variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1);
         const engineColor = palette.engine;
         const engineFlareTexture = this.radialTexture(cssHex(engineColor), cssHex(engineColor));
         const flameTex = this.engineFlameTexture();
@@ -2104,17 +3200,22 @@ export class SpaceRenderer {
         const trail = [];
         const rear = new THREE.Vector3(config.rearAxis[0], config.rearAxis[1], config.rearAxis[2]);
         const up = new THREE.Vector3(0, 1, 0);
-        const trailLen = variant === 'atlas-freighter' ? 9 : variant === 'kestrel' ? 6 : 7;
+        const trailLen = config.trailLength ?? (variant === 'atlas-freighter' ? 9 : variant === 'kestrel' ? 6 : 7);
+        const trailWidth = config.trailWidth ?? 0.45;
         for (const port of config.enginePorts) {
+            const flareOpacity = config.flareOpacity ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_OPACITY_ATLAS : ENGINE_FLARE_OPACITY);
+            const flareWorldSize = config.flareSize ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_SIZE_ATLAS : ENGINE_FLARE_SIZE);
             const flare = new THREE.Sprite(new THREE.SpriteMaterial({
                 map: engineFlareTexture,
                 transparent: true,
-                opacity: variant === 'atlas-freighter' ? ENGINE_FLARE_OPACITY_ATLAS : ENGINE_FLARE_OPACITY,
+                opacity: flareOpacity,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
             }));
             flare.position.set(port[0], port[1], port[2]);
-            flare.scale.setScalar((variant === 'atlas-freighter' ? ENGINE_FLARE_SIZE_ATLAS : ENGINE_FLARE_SIZE) / config.scale);
+            flare.scale.setScalar(flareWorldSize / config.scale);
+            flare.userData.baseSize = flareWorldSize / config.scale;
+            flare.userData.baseOpacity = flareOpacity;
             flares.push(flare);
             group.add(flare);
             // Long exhaust trail: a thin plane stretched along the model's rear
@@ -2125,13 +3226,13 @@ export class SpaceRenderer {
                 map: flameTex,
                 color: engineColor,
                 transparent: true,
-                opacity: 0.78 * (ENGINE_GLOW_TUNING[variant]?.trailOpacity ?? 1),
+                opacity: 0.78 * (config.trailOpacity ?? ENGINE_GLOW_TUNING[variant]?.trailOpacity ?? 1),
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
                 side: THREE.DoubleSide,
                 toneMapped: false,
             });
-            const trailMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.45 / config.scale, trailLen / config.scale), trailMat);
+            const trailMesh = new THREE.Mesh(new THREE.PlaneGeometry(trailWidth / config.scale, trailLen / config.scale), trailMat);
             trailMesh.quaternion.setFromUnitVectors(up, rear);
             trailMesh.position.set(port[0], port[1], port[2]).addScaledVector(rear, (trailLen * 0.45) / config.scale);
             trailMesh.userData.isTrail = true;
@@ -2190,6 +3291,8 @@ export class SpaceRenderer {
         entities.forEach((entity) => {
             let mesh = this.shipMeshes.get(entity.id);
             const variant = shipVariantForEntity(entity);
+            if (GLB_SHIP_CONFIG[variant] && !this.glbShipModels.has(variant) && !this.glbShipLoading.has(variant))
+                this.ensureGlbShipModel(variant);
             // A race grid can supply an explicit hull variant even though the
             // entity role remains `trader`. Reconcile a changed variant just
             // like a newly spawned entity so a recycled id cannot keep the old
@@ -2256,8 +3359,8 @@ export class SpaceRenderer {
                 const variant = mesh.userData.variant;
                 const glow = ENGINE_GLOW_TUNING[variant];
                 const boost = entity.burning ? ENGINE_FLARE_BURNING_BOOST : entity.race ? 1.65 : entity.hostile && entity.targetId ? ENGINE_FLARE_HOSTILE_BOOST : 1;
-                const baseOpacity = (variant === 'atlas-freighter' ? ENGINE_FLARE_OPACITY_ATLAS : ENGINE_FLARE_OPACITY) * (glow?.flareOpacity ?? 1);
-                const baseSize = (variant === 'atlas-freighter' ? ENGINE_FLARE_SIZE_ATLAS : ENGINE_FLARE_SIZE) * (glow?.flareScale ?? 1);
+                const baseOpacity = (flares[0]?.userData.baseOpacity ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_OPACITY_ATLAS : ENGINE_FLARE_OPACITY)) * (glow?.flareOpacity ?? 1);
+                const baseSize = (flares[0]?.userData.baseSize ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_SIZE_ATLAS : ENGINE_FLARE_SIZE)) * (glow?.flareScale ?? 1);
                 for (const flare of flares) {
                     flare.material.opacity = baseOpacity * boost;
                     flare.scale.setScalar(baseSize * (boost > 1 ? 1.08 : 1));
@@ -2409,6 +3512,8 @@ export class SpaceRenderer {
                 // The magrail's long tracer is the worst close-pass offender —
                 // it gets the same treatment.
                 this.laserFx.attenuate(mesh, this.camera.position);
+                if (projectile.visualScale)
+                    mesh.scale.multiplyScalar(projectile.visualScale);
             }
             if (projectile.kind === 'missile' && this.laserFx) {
                 // Same treatment for missiles: the plume must not wash the
@@ -2794,28 +3899,60 @@ export class SpaceRenderer {
         if (this.activeInstanceId === 'mourning-line')
             this.updateWreckNodeInstances();
     }
+    setArmedJumpPoint(id) {
+        this.armedJumpPointId = id;
+    }
+    setSystem(systemId) {
+        this.systemId = SYSTEM_RENDER_STYLE[systemId] ? systemId : 'helios-verge';
+        const style = SYSTEM_RENDER_STYLE[this.systemId];
+        this.renderer.setClearColor(style.clear, 1);
+        if (this.scene.fog) {
+            this.scene.fog.color.setHex(style.fog);
+            this.scene.fog.density = style.density;
+        }
+        this.applySystemStarProfile(this.systemId);
+        const sunPosition = sunPositionForSystem(this.systemId);
+        for (const visual of this.sunVisuals)
+            visual.position.set(...sunPosition);
+        for (const [id, mesh] of this.locationMeshes)
+            mesh.visible = LOCATIONS[id]?.systemId === this.systemId;
+        if (this.selectedLocationId && LOCATIONS[this.selectedLocationId]?.systemId !== this.systemId)
+            this.selectedLocationId = undefined;
+        this.setActiveInstance(undefined);
+    }
     setActiveInstance(id) {
-        this.activeInstanceId = id;
+        this.activeInstanceId = LOCATIONS[id]?.systemId === this.systemId ? id : undefined;
         this.instanceRoots.forEach((root, rootId) => {
-            root.visible = rootId === id;
+            root.visible = rootId === this.activeInstanceId && LOCATIONS[rootId]?.systemId === this.systemId;
         });
         this.updateDistantInstanceVisibility();
-        if (id === 'mourning-line')
+        if (id === 'mourning-line') {
+            void this.ensureGraveyardModels();
             this.updateWreckNodeInstances();
+        }
     }
     updateDistantInstanceVisibility() {
-        const graveyardRoot = this.instanceRoots.get('mourning-line');
-        if (!graveyardRoot)
-            return;
-        if (this.activeInstanceId === 'mourning-line') {
-            graveyardRoot.visible = true;
-            return;
+        for (const id of ['shardbelt', 'mourning-line']) {
+            const root = this.instanceRoots.get(id);
+            if (!root)
+                continue;
+            if (this.systemId !== 'helios-verge') {
+                root.visible = false;
+                continue;
+            }
+            if (this.activeInstanceId === id) {
+                root.visible = true;
+                continue;
+            }
+            const center = LOCATIONS[id].position;
+            const dx = this.camera.position.x - center[0];
+            const dy = this.camera.position.y - center[1];
+            const dz = this.camera.position.z - center[2];
+            root.visible = dx * dx + dy * dy + dz * dz <= DEBRIS_CULL_RANGE_SQ;
+            if (id === 'mourning-line' && root.visible)
+                void this.ensureGraveyardModels();
         }
-        const center = LOCATIONS['mourning-line'].position;
-        const dx = this.camera.position.x - center[0];
-        const dy = this.camera.position.y - center[1];
-        const dz = this.camera.position.z - center[2];
-        graveyardRoot.visible = dx * dx + dy * dy + dz * dz <= DEBRIS_CULL_RANGE_SQ;
+        this.updateGraveyardModelVisibility();
     }
     get canvas() {
         return this.renderer.domElement;
@@ -2878,11 +4015,16 @@ export class SpaceRenderer {
         }
     }
     setHyperdriveFx(fx, progress) {
-        if (!this.shell)
-            return;
         const state = fx && fx !== 'none' ? fx : 'none';
-        this.shell.dataset.hyperdriveFx = state;
-        this.shell.style.setProperty('--hyperdrive-progress', clamp(progress, 0, 1).toFixed(3));
+        if (state !== this.hyperdriveFxState) {
+            this.hyperdriveFxPulse = state === 'active' || state === 'gate' || state === 'drop' || state === 'interrupt' ? 1 : 0;
+            if (state === 'gate')
+                this.hyperdriveFxPhase = 0;
+        }
+        this.hyperdriveFxState = state;
+        this.hyperdriveFxProgress = clamp(progress, 0, 1);
+        if (this.shell)
+            this.shell.dataset.hyperdriveFx = state;
     }
     updateCamera(position, prevPosition, rotation, prevRotation, angularVelocity, speedRatio, afterburner, dt, alpha = 0) {
         this.camera.position.set(...position);
@@ -3076,8 +4218,29 @@ export class SpaceRenderer {
     }
     updateWorld(dt) {
         this.skyTime += dt;
+        this.updateHyperdriveFx(dt);
         if (this.starShimmer)
             this.starShimmer.opacity = 0.42 + Math.sin(this.skyTime * 2.4) * 0.14;
+        for (const visual of this.jumpPointVisuals) {
+            if (LOCATIONS[visual.id]?.systemId !== this.systemId)
+                continue;
+            const pulse = 0.5 + Math.sin(this.skyTime * 2.1 + visual.phase) * 0.5;
+            const armed = visual.id === this.armedJumpPointId;
+            const radius = LOCATIONS[visual.id]?.radius ?? 460;
+            visual.spinner.rotation.z += dt * (armed ? 1.75 : 0.24);
+            visual.spinner.rotation.x = Math.sin(this.skyTime * 0.38 + visual.phase) * 0.08;
+            visual.innerRing.rotation.y = Math.sin(this.skyTime * 0.31 + visual.phase) * 0.12;
+            // Keep the throat visibly open. Arming energizes its edge and
+            // charge blocks, but never turns the fly-through hole into a blue wall.
+            visual.portal.material.opacity = (armed ? 0.055 : 0.018) + pulse * (armed ? 0.045 : 0.018);
+            visual.portalGlow.material.opacity = (armed ? 0.2 : 0.09) + pulse * (armed ? 0.12 : 0.07);
+            visual.portalGlow.scale.setScalar(radius * ((armed ? 1.16 : 1.1) + pulse * (armed ? 0.1 : 0.07)));
+            visual.beacons.forEach((beacon, index) => {
+                const beaconPulse = 0.5 + Math.sin(this.skyTime * 3.2 + visual.phase + index * Math.PI / 2) * 0.5;
+                beacon.material.opacity = 0.42 + beaconPulse * 0.42;
+                beacon.scale.setScalar(radius * (0.14 + beaconPulse * 0.07));
+            });
+        }
         this.asteroids.forEach((node) => {
             if (!node.moving)
                 return;

@@ -1,4 +1,5 @@
-import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, LOCATIONS, SHIPS, SUN_POSITION, commodityIds, displaySpeed, equipmentIds } from './data.js';
+import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, LOCATIONS, SHIPS, SYSTEM_MAP_EXTENT, commodityIds, displaySpeed } from './data.js';
+import { JUMP_ROUTES, SYSTEMS } from './galaxy.js';
 import { bestKnownTradeRoute, cargoCapacity, cargoMass, currentProfitableRoutes, denPrice, knownMarketQuotes, quoteCommodityTrade, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { formatCredits, formatDuration, formatNumber } from './random.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
@@ -8,36 +9,154 @@ import { shipTopDownProfile } from './voxelModels.js';
 import { defaultSettings } from './save.js';
 import { getLanguage, t } from './i18n.js';
 import { ShipPreview } from './shipPreview.js';
+import { HULL_TRADE_IN_RATE } from './shipTrade.js';
+import { HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RATE, itemAvailable, itemFitsMount, loadoutFor, outfittingUsage, quoteOutfitting } from './outfitting.js';
 const escapeHtml = (value) => value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const percent = (value, max) => (max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100)));
-// The rendered star sits far outside the playable system. Use its real
-// position for radial distance, then use the canonical system X/Z plane for
-// the POI angles. Using the far-shell sun for both would collapse every
-// destination into one narrow sunward wedge instead of centering the system
-// map around the star.
-const SYSTEM_MAP_RADIAL_MIN = 16;
-const SYSTEM_MAP_RADIAL_MAX = 42;
-// Helix and Mourning Line are intentionally only 20,000 units apart, which
-// is less than one map-card width at this system scale. Give the graveyard a
-// schematic bearing offset so both POIs remain readable; its radial distance
-// (and therefore its closer-to-the-sun relationship) is unchanged.
-const SYSTEM_MAP_ANGLE_OFFSETS = Object.freeze({ 'mourning-line': 1.0 });
-const systemMapDistance = (position) => Math.hypot(position[0] - SUN_POSITION[0], position[1] - SUN_POSITION[1], position[2] - SUN_POSITION[2]);
-const SYSTEM_MAP_DISTANCE_RANGE = (() => {
-    const distances = Object.values(LOCATIONS).map((location) => systemMapDistance(location.position));
-    const min = Math.min(...distances);
-    const max = Math.max(...distances);
-    return { min, span: Math.max(1, max - min) };
-})();
-const systemMapPoint = (position, locationId) => {
-    const distance = systemMapDistance(position);
-    const radial = Math.max(SYSTEM_MAP_RADIAL_MIN, Math.min(SYSTEM_MAP_RADIAL_MAX, SYSTEM_MAP_RADIAL_MIN + ((distance - SYSTEM_MAP_DISTANCE_RANGE.min) / SYSTEM_MAP_DISTANCE_RANGE.span) * (SYSTEM_MAP_RADIAL_MAX - SYSTEM_MAP_RADIAL_MIN)));
-    const angle = Math.atan2(position[2], position[0]) + (SYSTEM_MAP_ANGLE_OFFSETS[locationId] ?? 0);
+const LEGACY_DOCK_ART_IDS = new Set(['helix', 'rook', 'vesper', 'azure']);
+const NEW_DOCK_ART_IDS = new Set([
+    'cairn',
+    'meridian-prime',
+    'argent',
+    'gatehouse-twelve',
+    'blackglass',
+    'cinder',
+    'torchwell',
+    'nacre',
+    'boreal',
+    'shepherd',
+]);
+const NEW_HD_BAR_ART_IDS = new Set([
+    'cairn',
+    'meridian-prime',
+    'argent',
+    'blackglass',
+    'cinder',
+    'nacre',
+    'boreal',
+]);
+const NEW_HD_MARKET_ART_IDS = new Set([
+    'meridian-prime',
+    'argent',
+    'blackglass',
+    'cinder',
+    'nacre',
+    'boreal',
+]);
+const LEGACY_PORTRAIT_IDS = new Set(['captain-dorne', 'devi-castor', 'doctor-ames', 'ivo-senn', 'kes-ali', 'linh-sorel', 'mara-vek', 'oskar-brill', 'ren-iverson', 'sana-kell', 'tovik', 'yara-tan']);
+const FULL_DOCK_SERVICES = Object.freeze({ fuel: true, repair: true, market: true, bar: true, shipyard: true, outfitting: true, missions: true });
+const locationServices = (locationId) => LOCATIONS[locationId]?.services ?? FULL_DOCK_SERVICES;
+const hasLocationService = (locationId, service) => Boolean(locationServices(locationId)?.[service]);
+const hasAnyLocationService = (locationId, services) => services.some((service) => hasLocationService(locationId, service));
+// The regional chart follows the real four-system corridor, but bends it into
+// a broad zig-zag so the route has rhythm and room for full labels.
+const REGIONAL_SYSTEM_LAYOUT = Object.freeze({
+    'helios-verge': Object.freeze({ left: 14, top: 69 }),
+    meridian: Object.freeze({ left: 38, top: 29 }),
+    'pale-ring': Object.freeze({ left: 64, top: 68 }),
+    redwake: Object.freeze({ left: 87, top: 27 }),
+});
+const REGIONAL_SYSTEM_ORDER = Object.freeze(['helios-verge', 'meridian', 'pale-ring', 'redwake']);
+const SYSTEM_STAR_TYPES = Object.freeze({
+    'helios-verge': 'YELLOW STAR',
+    meridian: 'WHITE STAR',
+    redwake: 'RED DWARF',
+    'pale-ring': 'BLUE GIANT',
+});
+// Local charts use the real X/Z coordinates again. Tiny label nudges separate
+// genuinely close neighbours (Helix/Shardbelt, Cairn/Mourning Line, and the
+// Meridian yard cluster) without turning the whole system into a matrix.
+const SYSTEM_MAP_NUDGES = Object.freeze({
+    'helios-verge': Object.freeze({
+        helix: { left: 0, top: -4 },
+        'mourning-line': { left: 0, top: 8 },
+        cairn: { left: 0, top: -7 },
+    }),
+    meridian: Object.freeze({
+        argent: { left: 0, top: -5 },
+        'foundry-lanes': { left: 2, top: 4 },
+        'gatehouse-twelve': { left: -4, top: 3 },
+        'verge-pale-point': { left: 1, top: 2 },
+    }),
+    redwake: Object.freeze({
+        torchwell: { left: -3, top: -3 },
+        'redwake-verge-point': { left: 3, top: 4 },
+    }),
+    'pale-ring': Object.freeze({
+        shepherd: { left: 3, top: -5 },
+        'pale-verge-point': { left: -3, top: 4 },
+        'verge-redwake-point': { left: 2, top: 1 },
+    }),
+});
+const systemMapPoint = (position, locationId, systemId = 'helios-verge') => {
+    const x = Number(position?.[0]) || 0;
+    const z = Number(position?.[2]) || 0;
+    const nudge = SYSTEM_MAP_NUDGES[systemId]?.[locationId] ?? { left: 0, top: 0 };
     return {
-        left: 50 + Math.cos(angle) * radial,
-        top: 50 + Math.sin(angle) * radial,
+        left: Math.max(14, Math.min(86, 50 + (x / SYSTEM_MAP_EXTENT) * 36 + nudge.left)),
+        top: Math.max(14, Math.min(86, 50 + (z / SYSTEM_MAP_EXTENT) * 36 + nudge.top)),
     };
 };
+const layoutSystemMapPoints = (locationIds, systemId) => {
+    const points = locationIds.map((id) => ({ id, ...systemMapPoint(LOCATIONS[id].position, id, systemId) }));
+    // The star is a real visual anchor again. Keep the centre clear enough for
+    // its disc on both desktop and compact landscape screens before resolving
+    // point-to-point label collisions.
+    for (const point of points) {
+        const dx = point.left - 50;
+        const dy = point.top - 50;
+        if (Math.abs(dx) >= 18 || Math.abs(dy) >= 14)
+            continue;
+        if (Math.abs(dx) / 18 >= Math.abs(dy) / 14)
+            point.left = 50 + (dx < 0 ? -18 : 18);
+        else
+            point.top = 50 + (dy < 0 ? -14 : 14);
+    }
+    // Preserve the physical projection, then only repel labels that would
+    // overlap. The spacing is sized for the compact landscape-phone map; on a
+    // desktop it leaves a little extra breathing room. This is a label-layout
+    // pass, not a grid: isolated points never move.
+    const minimumX = 23;
+    const minimumY = 18;
+    for (let iteration = 0; iteration < 48; iteration += 1) {
+        let moved = false;
+        for (let first = 0; first < points.length; first += 1) {
+            for (let second = first + 1; second < points.length; second += 1) {
+                const a = points[first];
+                const b = points[second];
+                const dx = b.left - a.left;
+                const dy = b.top - a.top;
+                const overlapX = minimumX - Math.abs(dx);
+                const overlapY = minimumY - Math.abs(dy);
+                if (overlapX <= 0 || overlapY <= 0)
+                    continue;
+                moved = true;
+                if (overlapX <= overlapY) {
+                    const direction = Math.abs(dx) > 0.01 ? Math.sign(dx) : ((first + second) % 2 ? 1 : -1);
+                    const push = overlapX / 2 + 0.08;
+                    a.left -= direction * push;
+                    b.left += direction * push;
+                }
+                else {
+                    const direction = Math.abs(dy) > 0.01 ? Math.sign(dy) : ((first + second) % 2 ? 1 : -1);
+                    const push = overlapY / 2 + 0.08;
+                    a.top -= direction * push;
+                    b.top += direction * push;
+                }
+                a.left = Math.max(13, Math.min(87, a.left));
+                b.left = Math.max(13, Math.min(87, b.left));
+                a.top = Math.max(11, Math.min(89, a.top));
+                b.top = Math.max(11, Math.min(89, b.top));
+            }
+        }
+        if (!moved)
+            break;
+    }
+    return new Map(points.map(({ id, left, top }) => [id, { left, top }]));
+};
+const mapLocationLabel = (location) => location?.kind === 'jump-point' && location.destinationSystemId
+    ? t('TO {system}', { system: SYSTEMS[location.destinationSystemId]?.shortName ?? location.shortName })
+    : location?.shortName ?? '';
 // Talker identity for the comms surfaces: the color follows the speaker's
 // relation to the player — hostiles red, allies blue, neutral white — so the
 // strip reads at a glance without a per-ship legend. The text shows the
@@ -98,7 +217,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.7.9';
+const GAME_VERSION = '0.7.19';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -219,6 +338,14 @@ const COCKPIT_ART_BY_SHIP = Object.freeze({
     lancer: './assets/remaster/cockpit-lancer.webp',
     atlas: './assets/remaster/cockpit-atlas.webp',
 });
+const OUTFIT_CATEGORY_KEYS = Object.freeze({ guns: 'GUNS', launchers: 'LAUNCHER', drive: 'DRIVE', defense: 'DEFENSE', utility: 'UTILITY' });
+const OUTFIT_CATEGORY_TO_KEY = Object.freeze({ gun: 'guns', launcher: 'launchers', drive: 'drive', defense: 'defense', utility: 'utility' });
+const OUTFIT_DEALER_CATEGORIES = Object.freeze({
+    guns: Object.freeze({ label: 'GUNS', accepts: ['gun'] }),
+    launchers: Object.freeze({ label: 'MISSILES', accepts: ['launcher'] }),
+    systems: Object.freeze({ label: 'SYSTEMS', accepts: ['drive', 'defense', 'utility'] }),
+    locker: Object.freeze({ label: 'LOCKER', accepts: ['gun', 'launcher', 'drive', 'defense', 'utility'] }),
+});
 export class GameUI {
     root;
     viewport;
@@ -252,12 +379,20 @@ export class GameUI {
     sensorLog = [];
     mapPointer;
     lastMapPointerSelection;
+    mapView = 'sector';
     lastHud;
     npcLineIndex = new Map();
     cockpitShipId = 'wayfarer';
     vesperPreviewShipId = INITIAL_PREVIEW_SHIP_ID;
     vesperLaunchTransition = false;
     vesperLaunchTimer;
+    // The dealer is item-first: select hardware, then one compatible bay, and
+    // confirm that single transaction. No fleet tabs or multi-step draft live
+    // behind the screen.
+    outfittingItemId;
+    outfittingMountId;
+    outfittingCategory = 'guns';
+    outfittingNotice;
     constructor(host) {
         host.innerHTML = this.shellMarkup();
         this.root = host.querySelector('#game-shell');
@@ -352,16 +487,10 @@ export class GameUI {
           <div class="cockpit-vignette" aria-hidden="true"></div>
           <div class="cockpit-art" aria-hidden="true"></div>
           <div class="cockpit-glass" aria-hidden="true"></div>
-          <div class="hyperdrive-fx" aria-hidden="true">
-            <i class="hyperdrive-fx-vignette"></i>
-            <i class="hyperdrive-fx-ring"></i>
-            <i class="hyperdrive-fx-streaks"></i>
-            <i class="hyperdrive-fx-flash"></i>
-          </div>
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="${t('Own ship status display; tap to open ship menu')}">
             <div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
             <div class="screen-race-strip" id="screen-race-strip"><span id="screen-race-label"></span><b id="screen-race-value"></b></div>
-            <div class="screen-ship-layout"><div class="screen-flight"><div><span>${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div><div><span>${t('HOLD')}</span><b id="screen-own-cargo">0.0</b><small id="screen-own-cargo-cap">/32</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Weapon — press X')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ARMOR')}</span><i><b id="screen-own-armor"></b></i><em id="screen-own-armor-value">100</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">100</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
+            <div class="screen-ship-layout"><div class="screen-flight"><div><span>${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div><div><span>${t('HOLD')}</span><b id="screen-own-cargo">0.0</b><small id="screen-own-cargo-cap">/32</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i><em id="screen-own-energy-value">72</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">185</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="${t('Radar display; tap to open navigation map')}">
             <div class="screen-heading radar-heading" id="screen-radar-transponder" data-touch-action="transponder" role="button" tabindex="0" title="${t('Transponder — press B')}">${t('TRANSPONDER ON')}</div>
@@ -371,7 +500,7 @@ export class GameUI {
             <div class="screen-heading"><span>${t('TARGET STATUS')}</span><b id="screen-target-name">${t('NO LOCK')}</b></div>
             <div id="screen-target-distance" class="screen-target-distance">—</div>
             <div id="screen-target-readout" class="screen-target-readout">—</div>
-            <div class="screen-target-layout"><canvas class="hull-outline" id="target-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>SHIELDS</span><i><b id="screen-target-shield"></b></i><em id="screen-target-shield-value">—</em></div><div><span>ARMOR</span><i><b id="screen-target-armor"></b></i><em id="screen-target-armor-value">—</em></div><div><span>HULL</span><i><b id="screen-target-hull"></b></i><em id="screen-target-hull-value">—</em></div></div></div>
+            <div class="screen-target-layout"><canvas class="hull-outline" id="target-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-target-shield"></b></i><em id="screen-target-shield-value">—</em></div><div><span>${t('HULL')}</span><i><b id="screen-target-hull"></b></i><em id="screen-target-hull-value">—</em></div></div></div>
           </div>
           <button type="button" id="hyperdrive-card" class="cockpit-identity" data-touch-action="autopilot" aria-label="${t('Hyperdrive: engage jump to nav point')}"><b>${t('HYPERDRIVE')}</b><em id="hyperdrive-card-status" class="is-hidden"></em></button>
 
@@ -493,11 +622,13 @@ export class GameUI {
                 this.startVesperLaunchTransition();
                 return;
             }
-            const target = event.target.closest('[data-ui-command], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-commodity-id], [data-market-qty], [data-bar-panel], [data-nav-id], [data-trade], [data-jettison], [data-mission-id], [data-equipment-id], [data-ship-id], [data-switch-ship], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty], [data-pay-mug]');
+            const target = event.target.closest('[data-ui-command], [data-map-view], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-commodity-id], [data-market-qty], [data-bar-panel], [data-nav-id], [data-trade], [data-jettison], [data-mission-id], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action], [data-equipment-id], [data-ship-id], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty], [data-pay-mug]');
             if (!target)
                 return;
             if (target.dataset.uiCommand)
                 this.handleCommand(target.dataset.uiCommand, target);
+            else if (target.dataset.mapView)
+                this.setMapView(target.dataset.mapView);
             else if (target.dataset.arenaEnv) {
                 this.arenaEnv = target.dataset.arenaEnv;
                 this.root.querySelectorAll('[data-arena-env]').forEach((button) => button.classList.toggle('selected', button === target));
@@ -545,6 +676,21 @@ export class GameUI {
             else if (target.dataset.marketPoint) {
                 this.openMarketPoint(target.dataset.marketPoint);
             }
+            else if (target.dataset.outfitSlot) {
+                this.selectOutfittingMount(target.dataset.outfitSlot);
+            }
+            else if (target.dataset.outfitView) {
+                this.setOutfittingView(target.dataset.outfitView);
+            }
+            else if (target.dataset.outfitItem) {
+                this.installOutfittingItem(target.dataset.outfitItem);
+            }
+            else if (target.dataset.outfitGroup) {
+                this.setOutfittingFireGroup(target.dataset.outfitGroup);
+            }
+            else if (target.dataset.outfitAction) {
+                this.handleOutfittingAction(target.dataset.outfitAction);
+            }
             else if (target.dataset.commodityId) {
                 this.selectMarketCommodity(target.dataset.commodityId);
             }
@@ -576,9 +722,6 @@ export class GameUI {
             else if (target.dataset.shipId) {
                 this.actions?.buyShip(target.dataset.shipId);
             }
-            else if (target.dataset.switchShip) {
-                this.actions?.switchShip(target.dataset.switchShip);
-            }
             else if (target.dataset.shipDetail) {
                 this.shipDetailId = target.dataset.shipDetail;
                 this.renderMarketPoint('shipyard');
@@ -596,8 +739,12 @@ export class GameUI {
         });
         this.root.addEventListener('error', (event) => {
             const image = event.target;
-            if (image instanceof HTMLImageElement && image.matches('.commodity-art img'))
+            if (!(image instanceof HTMLImageElement))
+                return;
+            if (image.matches('.commodity-art img'))
                 image.closest('.commodity-art')?.classList.add('is-missing');
+            else if (image.matches('.outfit-item-art'))
+                image.closest('.outfit-item-art-wrap')?.classList.add('is-missing');
         }, true);
         const radar = this.root.querySelector('#radar');
         radar?.addEventListener('pointerup', (event) => {
@@ -658,10 +805,16 @@ export class GameUI {
             const value = element instanceof HTMLInputElement && element.type === 'checkbox' ? element.checked : element.type === 'range' ? Number(element.value) : element.value;
             this.actions?.setSetting(setting, value);
         });
+        this.root.addEventListener('change', (event) => {
+            const element = event.target;
+            if (!(element instanceof HTMLSelectElement) || !element.matches('[data-outfit-select]'))
+                return;
+            this.installOutfittingItem(element.value);
+        });
         this.root.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter' && event.key !== ' ')
                 return;
-            const target = event.target.closest('[data-ui-command], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-person-id], [data-ship-detail], [data-ship-detail-back]');
+            const target = event.target.closest('[data-ui-command], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-person-id], [data-ship-detail], [data-ship-detail-back], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action]');
             if (!target)
                 return;
             event.preventDefault();
@@ -819,6 +972,7 @@ export class GameUI {
         this.dockTab = 'concourse';
         this.dockTerminal = 'concourse';
         this.marketPoint = '';
+        this.resetOutfittingDrafts();
         this.barPanel = 'people';
         this.barPersonId = undefined;
         this.hideTitle();
@@ -835,6 +989,7 @@ export class GameUI {
     hideDock() {
         this.cancelVesperLaunchTransition();
         this.disposeShipPreviews();
+        this.resetOutfittingDrafts();
         this.root.querySelector('#dock-screen')?.classList.add('is-hidden');
         this.dockLocation = undefined;
     }
@@ -896,12 +1051,18 @@ export class GameUI {
         // scroll position; only actual navigation resets it to the top.
         const prevTab = dock.dataset.tab;
         const prevTerminal = dock.dataset.terminal;
+        const prevMarketPoint = dock.dataset.marketPoint ?? '';
+        const prevBarPanel = dock.dataset.barPanel ?? '';
+        const prevBarPerson = dock.dataset.barPerson ?? '';
         const prevScroll = dock.querySelector('.dock-content')?.scrollTop ?? 0;
         dock.style.setProperty('--dock-accent', location.accent);
         dock.style.setProperty('--dock-secondary', location.secondary);
         dock.dataset.location = this.dockLocation;
         dock.dataset.tab = this.dockTab;
         dock.dataset.terminal = this.dockTerminal;
+        dock.dataset.marketPoint = this.marketPoint ?? '';
+        dock.dataset.barPanel = this.barPanel ?? '';
+        dock.dataset.barPerson = this.barPersonId ?? '';
         const illustrationScreen = this.dockTerminal === 'bar'
             ? 'bar'
             : this.dockTerminal === 'market'
@@ -920,7 +1081,11 @@ export class GameUI {
       ${this.renderSyndicateCard()}
     `;
         const content = dock.querySelector('.dock-content');
-        const preserveScroll = prevTab === this.dockTab && prevTerminal === this.dockTerminal;
+        const preserveScroll = prevTab === this.dockTab
+            && prevTerminal === this.dockTerminal
+            && prevMarketPoint === (this.marketPoint ?? '')
+            && prevBarPanel === (this.barPanel ?? '')
+            && prevBarPerson === (this.barPersonId ?? '');
         if (content)
             content.scrollTop = preserveScroll ? prevScroll : 0;
         const illustration = dock.querySelector('.dock-backdrop img');
@@ -1031,12 +1196,16 @@ export class GameUI {
     renderDockTab(tab) {
         if (!this.save || !this.dockLocation)
             return '';
-        if (tab === 'services')
+        if (tab === 'services' && hasAnyLocationService(this.dockLocation, ['repair', 'fuel']))
             return this.renderServices();
         switch (tab) {
             case 'bar':
+                if (!hasAnyLocationService(this.dockLocation, ['bar', 'missions', 'race']))
+                    return this.renderConcourse();
                 return this.renderBar();
             case 'market':
+                if (!hasAnyLocationService(this.dockLocation, ['market', 'outfitting', 'shipyard']))
+                    return this.renderConcourse();
                 return this.renderMarket();
             case 'missions':
                 return this.renderMissions();
@@ -1052,11 +1221,18 @@ export class GameUI {
         }
     }
     renderConcourse() {
-        const showShipPreview = DOCK_LOCATION_IDS.includes(this.dockLocation);
+        const showShipPreview = LEGACY_DOCK_ART_IDS.has(this.dockLocation);
         const livePreview = PREVIEW_MODE && PREVIEW_LOCATION === this.dockLocation;
         const profile = this.getVesperShipProfile();
         const selectedShipId = this.getVesperShipId();
         const launchLabel = t('Launch the docked {ship}', { ship: profile.name });
+        const serviceDesk = hasAnyLocationService(this.dockLocation, ['repair', 'fuel']);
+        const market = hasAnyLocationService(this.dockLocation, ['market', 'outfitting', 'shipyard']);
+        const bar = hasAnyLocationService(this.dockLocation, ['bar', 'missions', 'race']);
+        const raceOnly = hasLocationService(this.dockLocation, 'race') && !hasLocationService(this.dockLocation, 'missions');
+        const contractsOnly = hasLocationService(this.dockLocation, 'missions') && !hasLocationService(this.dockLocation, 'bar');
+        const deskLabel = raceOnly ? t('RACE DESK') : contractsOnly ? t('CONTRACTS') : t('BAR');
+        const deskDetail = raceOnly ? t('Pilots and race entries') : contractsOnly ? t('Local contract terminal') : t('Guilds and missions');
         const previewToolbar = livePreview ? `
         <div class="vesper-preview-toolbar" aria-label="${t('Live concourse ship preview')}">
           <div class="vesper-preview-heading"><span>${t('LIVE CONCOURSE PREVIEW')}</span><b>${escapeHtml(profile.name)}</b></div>
@@ -1076,9 +1252,9 @@ export class GameUI {
         </div>` : ''}
         <div class="scene-pointers" aria-label="${t('Concourse actions')}">
           ${showShipPreview ? '' : `<div class="scene-pointer concourse-pointer-ship" data-ui-command="launch" role="button" tabindex="0" aria-label="${t('Launch the docked ship')}"><i>↗</i><b>${t('YOUR SHIP')}</b><small>${t('Launch')}</small></div>`}
-          <div class="scene-pointer concourse-pointer-services" data-dock-hotspot="services" role="button" tabindex="0" aria-label="${t('Open services')}"><i>⚙</i><b>${t('SERVICES')}</b><small>${t('Repair and refuel')}</small></div>
-          <div class="scene-pointer concourse-pointer-market" data-dock-hotspot="market" role="button" tabindex="0" aria-label="${t('Enter the market')}"><i>▣</i><b>${t('MARKET')}</b><small>${t('Trade and fit out')}</small></div>
-          <div class="scene-pointer concourse-pointer-bar" data-dock-hotspot="bar" role="button" tabindex="0" aria-label="${t('Enter the bar')}"><i>✦</i><b>${t('BAR')}</b><small>${t('Guilds and missions')}</small></div>
+          ${serviceDesk ? `<div class="scene-pointer concourse-pointer-services" data-dock-hotspot="services" role="button" tabindex="0" aria-label="${t('Open services')}"><i>⚙</i><b>${t('SERVICES')}</b><small>${hasLocationService(this.dockLocation, 'repair') && hasLocationService(this.dockLocation, 'fuel') ? t('Repair and refuel') : hasLocationService(this.dockLocation, 'repair') ? t('Repair bay') : t('Fuel and ordnance')}</small></div>` : ''}
+          ${market ? `<div class="scene-pointer concourse-pointer-market" data-dock-hotspot="market" role="button" tabindex="0" aria-label="${t('Enter the market')}"><i>▣</i><b>${t('MARKET')}</b><small>${hasLocationService(this.dockLocation, 'market') ? t('Trade and fit out') : t('Ship services')}</small></div>` : ''}
+          ${bar ? `<div class="scene-pointer concourse-pointer-bar" data-dock-hotspot="bar" role="button" tabindex="0" aria-label="${escapeHtml(deskLabel)}"><i>✦</i><b>${deskLabel}</b><small>${deskDetail}</small></div>` : ''}
           ${this.denUnlockedAt(this.dockLocation) ? `<div class="scene-pointer concourse-pointer-den" data-market-point="den" role="button" tabindex="0" aria-label="${t('Enter the smuggler\'s den')}"><i>☣</i><b>${t('SMUGGLER\'S DEN')}</b><small>${t('Black-market prices')}</small></div>` : ''}
         </div>
       </div>
@@ -1101,6 +1277,8 @@ export class GameUI {
     }
     renderBar() {
         const people = LOCATIONS[this.dockLocation].people ?? [];
+        const missionDesk = hasAnyLocationService(this.dockLocation, ['missions', 'race']);
+        const guildDesk = hasLocationService(this.dockLocation, 'missions');
         if (this.barPanel === 'missions')
             return this.renderMissions();
         if (this.barPanel === 'guilds')
@@ -1110,8 +1288,8 @@ export class GameUI {
         return `
       <div class="bar-scene station-scene" aria-label="${t('Bar points of interest')}">
         <div class="scene-pointers" aria-label="${t('Bar actions')}">
-          <div class="scene-pointer bar-pointer-missions" data-bar-panel="missions" role="button" tabindex="0" aria-label="${t('Open the mission board')}"><i>✦</i><b>${t('MISSION BOARD')}</b><small>${t('Find work')}</small></div>
-          <div class="scene-pointer bar-pointer-guilds" data-bar-panel="guilds" role="button" tabindex="0" aria-label="${t('Open guilds')}"><i>◇</i><b>${t('GUILDS')}</b><small>${t('Find allies')}</small></div>
+          ${missionDesk ? `<div class="scene-pointer bar-pointer-missions" data-bar-panel="missions" role="button" tabindex="0" aria-label="${t('Open the mission board')}"><i>✦</i><b>${hasLocationService(this.dockLocation, 'race') && !hasLocationService(this.dockLocation, 'missions') ? t('RACE BOARD') : t('MISSION BOARD')}</b><small>${hasLocationService(this.dockLocation, 'race') ? t('Enter a course') : t('Find work')}</small></div>` : ''}
+          ${guildDesk ? `<div class="scene-pointer bar-pointer-guilds" data-bar-panel="guilds" role="button" tabindex="0" aria-label="${t('Open guilds')}"><i>◇</i><b>${t('GUILDS')}</b><small>${t('Find allies')}</small></div>` : ''}
           ${people.map((person, index) => `
             <div class="scene-pointer bar-person-pointer bar-person-${index}" data-person-id="${person.id}" role="button" tabindex="0" aria-label="${t('Talk to {name}', { name: person.name })}"><i>●</i><b>${escapeHtml(person.name)}</b><small>${escapeHtml(t(person.role))}</small></div>
           `).join('')}
@@ -1163,13 +1341,16 @@ export class GameUI {
     `;
     }
     renderMarket() {
+        const commodityMarket = hasLocationService(this.dockLocation, 'market');
+        const outfitting = hasLocationService(this.dockLocation, 'outfitting');
+        const shipyard = hasLocationService(this.dockLocation, 'shipyard');
         if (!this.marketPoint) {
             return `
         <div class="market-scene station-scene" aria-label="${t('Market points of interest')}">
           <div class="scene-pointers" aria-label="${t('Market actions')}">
-            <div class="scene-pointer market-pointer-commodities" data-market-point="commodities" role="button" tabindex="0" aria-label="${t('Open commodity market')}"><i>▦</i><b>${t('COMMODITY MARKET')}</b><small>${t('Buy and sell cargo')}</small></div>
-            <div class="scene-pointer market-pointer-equipment" data-market-point="equipment" role="button" tabindex="0" aria-label="${t('Open ship parts')}"><i>⚙</i><b>${t('SHIP PARTS')}</b><small>${t('Fit out your ship')}</small></div>
-            <div class="scene-pointer market-pointer-shipyard" data-market-point="shipyard" role="button" tabindex="0" aria-label="${t('Open the ship dealer')}"><i>↗</i><b>${t('NEW SHIP')}</b><small>${t('Hulls for sale')}</small></div>
+            ${commodityMarket ? `<div class="scene-pointer market-pointer-commodities" data-market-point="commodities" role="button" tabindex="0" aria-label="${t('Open commodity market')}"><i>▦</i><b>${t('COMMODITY MARKET')}</b><small>${t('Buy and sell cargo')}</small></div>` : ''}
+            ${outfitting ? `<div class="scene-pointer market-pointer-equipment" data-market-point="equipment" role="button" tabindex="0" aria-label="${t('Open ship parts')}"><i>⚙</i><b>${t('SHIP PARTS')}</b><small>${t('Fit out your ship')}</small></div>` : ''}
+            ${shipyard ? `<div class="scene-pointer market-pointer-shipyard" data-market-point="shipyard" role="button" tabindex="0" aria-label="${t('Open the ship dealer')}"><i>↗</i><b>${t('NEW SHIP')}</b><small>${t('Hulls for sale')}</small></div>` : ''}
             ${this.denUnlockedAt(this.dockLocation) ? `<div class="scene-pointer market-pointer-den" data-market-point="den" role="button" tabindex="0" aria-label="${t('Enter the smuggler\'s den')}"><i>☣</i><b>${t('SMUGGLER\'S DEN')}</b><small>${t('Black-market prices')}</small></div>` : ''}
           </div>
         </div>
@@ -1178,12 +1359,19 @@ export class GameUI {
         return `
       <div class="market-screen market-menu-screen">
         <div class="scene-pointer scene-return-pointer" data-ui-command="market-overview" role="button" tabindex="0" aria-label="${t('Return to the market floor')}"><i>◀</i><b>${t('MARKET FLOOR')}</b><small>${t('Back to the scene')}</small></div>
-        <nav class="market-points" aria-label="${t('Market points')}"><button class="${this.marketPoint === 'commodities' ? 'active' : ''}" data-market-point="commodities">${t('COMMODITY MARKET')}</button><button class="${this.marketPoint === 'equipment' ? 'active' : ''}" data-market-point="equipment">${t('SHIP PARTS')}</button><button class="${this.marketPoint === 'shipyard' ? 'active' : ''}" data-market-point="shipyard">${t('NEW SHIP')}</button>${this.denUnlockedAt(this.dockLocation) ? `<button class="${this.marketPoint === 'den' ? 'active' : ''}" data-market-point="den">${t('SMUGGLER\'S DEN')}</button>` : ''}</nav>
+        <nav class="market-points" aria-label="${t('Market points')}">${commodityMarket ? `<button class="${this.marketPoint === 'commodities' ? 'active' : ''}" data-market-point="commodities">${t('COMMODITY MARKET')}</button>` : ''}${outfitting ? `<button class="${this.marketPoint === 'equipment' ? 'active' : ''}" data-market-point="equipment">${t('SHIP PARTS')}</button>` : ''}${shipyard ? `<button class="${this.marketPoint === 'shipyard' ? 'active' : ''}" data-market-point="shipyard">${t('NEW SHIP')}</button>` : ''}${this.denUnlockedAt(this.dockLocation) ? `<button class="${this.marketPoint === 'den' ? 'active' : ''}" data-market-point="den">${t('SMUGGLER\'S DEN')}</button>` : ''}</nav>
         <div id="market-point-content"></div>
       </div>
     `;
     }
     openMarketPoint(point) {
+        const allowed = point === 'commodities' ? hasLocationService(this.dockLocation, 'market')
+            : point === 'equipment' ? hasLocationService(this.dockLocation, 'outfitting')
+                : point === 'shipyard' ? hasLocationService(this.dockLocation, 'shipyard')
+                    : point === 'den' ? this.denUnlockedAt(this.dockLocation)
+                        : false;
+        if (!allowed)
+            return;
         this.marketPoint = point;
         this.dockTab = 'market';
         this.dockTerminal = 'market';
@@ -1339,6 +1527,9 @@ export class GameUI {
         const marketScreen = this.root.querySelector('.market-screen');
         if (!content || !marketScreen || !this.save || !this.dockLocation)
             return;
+        const changedPoint = this.marketPoint !== point;
+        const prevItemScroll = content.querySelector('.dealer-item-list')?.scrollTop ?? 0;
+        const prevFitScroll = content.querySelector('.dealer-fit-summary')?.scrollTop ?? 0;
         this.marketPoint = point;
         if (point !== 'shipyard')
             this.shipDetailId = undefined;
@@ -1347,8 +1538,17 @@ export class GameUI {
         // A commodity selection refreshes the same exchange panel; keep the
         // catalog's scroll anchor instead of bouncing back to the top.
         const prevCatalogScroll = content.querySelector('.commodity-catalog')?.scrollTop ?? 0;
-        if (point === 'equipment')
-            content.innerHTML = this.renderEquipment();
+        if (point === 'equipment') {
+            content.innerHTML = this.renderOutfitting();
+            if (!changedPoint) {
+                const itemList = content.querySelector('.dealer-item-list');
+                const fitSummary = content.querySelector('.dealer-fit-summary');
+                if (itemList)
+                    itemList.scrollTop = prevItemScroll;
+                if (fitSummary)
+                    fitSummary.scrollTop = prevFitScroll;
+            }
+        }
         else if (point === 'shipyard') {
             content.innerHTML = this.renderShipyard();
             this.mountShipPreviews();
@@ -1358,6 +1558,13 @@ export class GameUI {
             const catalog = content.querySelector('.commodity-catalog');
             if (catalog && prevCatalogScroll > 0)
                 catalog.scrollTop = prevCatalogScroll;
+        }
+        if (changedPoint) {
+            marketScreen.scrollTop = 0;
+            content.scrollTop = 0;
+            const dockContent = marketScreen.closest('.dock-content');
+            if (dockContent)
+                dockContent.scrollTop = 0;
         }
     }
     missionBadge(mission) {
@@ -1412,30 +1619,358 @@ export class GameUI {
         const stats = getEffectiveShipStats(this.save.player);
         const repairs = repairCost(this.save.player);
         const refill = refillCost(this.save.player);
+        const repairBay = hasLocationService(this.dockLocation, 'repair');
+        const fuelDepot = hasLocationService(this.dockLocation, 'fuel');
         return `
       <div class="service-grid">
-        <article class="service-card"><span class="eyebrow">${t('HULL / ARMOR')}</span><h3>${t('Repair bay')}</h3><div class="service-bars"><label>${t('HULL')} <i><b style="width:${percent(this.save.player.hull, stats.hull)}%"></b></i><em>${Math.ceil(this.save.player.hull)}/${stats.hull}</em></label><label>${t('ARMOR')} <i><b style="width:${percent(this.save.player.armor, stats.armor)}%"></b></i><em>${Math.ceil(this.save.player.armor)}/${stats.armor}</em></label></div><p>${t('Replace ablative plate, patch pressure structure, and clear combat faults.')}</p><button class="primary" data-ui-command="repair" ${repairs <= 0 ? 'disabled' : ''}>${t('REPAIR')} · ${formatCredits(repairs)}</button></article>
-        <article class="service-card"><span class="eyebrow">${t('CONSUMABLES')}</span><h3>${t('Fuel and ordnance')}</h3><div class="service-bars"><label>${t('FUEL')} <i><b style="width:${percent(this.save.player.fuel, stats.fuel)}%"></b></i><em>${Math.ceil(this.save.player.fuel)}/${stats.fuel}</em></label><label>${t('MISSILES')} <i><b style="width:${percent(this.save.player.missiles, stats.missileCapacity)}%"></b></i><em>${this.save.player.missiles}/${stats.missileCapacity}</em></label></div><p>${t('Refill afterburner propellant and standard seeker missiles.')}</p><button class="primary" data-ui-command="refuel" ${refill <= 0 ? 'disabled' : ''}>${t('REFILL')} · ${formatCredits(refill)}</button></article>
+        ${repairBay ? `<article class="service-card"><span class="eyebrow">${t('HULL INTEGRITY')}</span><h3>${t('Repair bay')}</h3><div class="service-bars"><label>${t('HULL INTEGRITY')} <i><b style="width:${percent(this.save.player.hull, stats.hull)}%"></b></i><em>${Math.ceil(this.save.player.hull)}/${stats.hull}</em></label></div><p>${t('Replace ablative plate, patch pressure structure, and clear combat faults.')}</p><button class="primary" data-ui-command="repair" ${repairs <= 0 ? 'disabled' : ''}>${t('REPAIR')} · ${formatCredits(repairs)}</button></article>` : ''}
+        ${fuelDepot ? `<article class="service-card"><span class="eyebrow">${t('CONSUMABLES')}</span><h3>${t('Fuel and ordnance')}</h3><div class="service-bars"><label>${t('FUEL')} <i><b style="width:${percent(this.save.player.fuel, stats.fuel)}%"></b></i><em>${Math.ceil(this.save.player.fuel)}/${stats.fuel}</em></label><label>${t('MISSILES')} <i><b style="width:${percent(this.save.player.missiles, stats.missileCapacity)}%"></b></i><em>${this.save.player.missiles}/${stats.missileCapacity}</em></label></div><p>${t('Refill afterburner propellant, mounted-rack ordnance, and installed gun magazines.')}</p><button class="primary" data-ui-command="refuel" ${refill <= 0 ? 'disabled' : ''}>${t('REFILL')} · ${formatCredits(refill)}</button></article>` : ''}
         <article class="service-card danger-service"><span class="eyebrow">${t('INSURANCE NOTE')}</span><h3>${t('Emergency recovery')}</h3><p>${t('A destroyed ship is towed to the last safe dock. The service retains cargo, mission bonds, and a percentage of liquid credit.')}</p><b>${t('FLY WITH A RESERVE.')}</b></article>
       </div>
     `;
     }
+    resetOutfittingDrafts() {
+        this.outfittingItemId = undefined;
+        this.outfittingMountId = undefined;
+        this.outfittingCategory = 'guns';
+        this.outfittingNotice = undefined;
+    }
+    outfittingMountInfo(mountId, shipId = this.save?.player?.shipId) {
+        const spec = HARDPOINT_SPECS[shipId];
+        if (!spec)
+            return undefined;
+        for (const key of ['guns', 'launchers', 'drive', 'defense', 'utility']) {
+            const index = spec[key].findIndex((mountPoint) => mountPoint.id === mountId);
+            if (index >= 0)
+                return { key, category: key === 'guns' ? 'gun' : key === 'launchers' ? 'launcher' : key, index, mount: spec[key][index] };
+        }
+        return undefined;
+    }
+    outfittingMounts(shipId = this.save?.player?.shipId) {
+        const spec = HARDPOINT_SPECS[shipId];
+        if (!spec)
+            return [];
+        return ['guns', 'launchers', 'drive', 'defense', 'utility'].flatMap((key) => spec[key].map((mount, index) => ({
+            key,
+            category: key === 'guns' ? 'gun' : key === 'launchers' ? 'launcher' : key,
+            index,
+            mount,
+        })));
+    }
+    outfittingSelectedMount(item = OUTFIT_ITEMS[this.outfittingItemId], loadout = loadoutFor(this.save.player, this.save.player.shipId)) {
+        const mounts = this.outfittingMounts();
+        const selected = mounts.find((entry) => entry.mount.id === this.outfittingMountId);
+        if (selected && (!item || itemFitsMount(item, selected.mount)))
+            return selected;
+        const compatible = item ? mounts.filter((entry) => itemFitsMount(item, entry.mount)) : mounts;
+        // If the chosen module is already mounted, lead with that bay. This
+        // makes its remove and fire-group controls visible immediately; an
+        // empty compatible bay remains the next choice for a second copy.
+        const next = (item ? compatible.find((entry) => loadout?.[entry.key]?.[entry.index] === item.id) : undefined)
+            ?? compatible.find((entry) => !loadout?.[entry.key]?.[entry.index])
+            ?? compatible[0];
+        this.outfittingMountId = next?.mount.id;
+        return next;
+    }
+    outfittingStatsFor(shipId, loadout) {
+        const player = this.save?.player;
+        if (!player)
+            return {};
+        const savedOutfitting = player.outfitting && typeof player.outfitting === 'object'
+            ? JSON.parse(JSON.stringify(player.outfitting))
+            : { schema: 1, locker: {}, loadouts: {} };
+        savedOutfitting.loadouts = { ...(savedOutfitting.loadouts ?? {}), [shipId]: loadout };
+        return getEffectiveShipStats({ ...player, shipId, outfitting: savedOutfitting });
+    }
+    outfittingInstalledCount(loadout, itemId) {
+        return ['guns', 'launchers', 'drive', 'defense', 'utility'].reduce((count, key) => count + (loadout?.[key] ?? []).filter((id) => id === itemId).length, 0);
+    }
+    outfittingQuote(draft, options = {}) {
+        return quoteOutfitting(this.save.player, this.save.player.shipId, draft, {
+            ...options,
+            locationId: this.dockLocation,
+            cargoMass: cargoMass(this.save.player),
+        });
+    }
+    outfittingErrorLabel(code) {
+        const labels = {
+            'unknown-ship': t('Unknown hull.'),
+            'ship-not-owned': t('This is not your current hull.'),
+            'unknown-item': t('Unknown module.'),
+            'invalid-item': t('Invalid module assignment.'),
+            'incompatible-mount': t('That module does not fit this mount.'),
+            'too-many-items': t('Too many modules in this group.'),
+            'mass-over-budget': t('Fitting mass exceeded.'),
+            'cargo-over-capacity': t('Current cargo would exceed the new capacity.'),
+            'duplicate-unique-module': t('This utility can only be fitted once.'),
+            'item-unavailable': t('That module is not available at this dock.'),
+            'not-enough-stock-to-sell': t('Not enough locker stock to sell.'),
+            'insufficient-credits': t('Insufficient credits.'),
+            'invalid-credits': t('Credit balance is invalid. Reload the save.'),
+            'stale-quote': t('The fitting changed; review and apply again.'),
+            'invalid-quote': t('This fitting is no longer valid.'),
+        };
+        return labels[code] ?? t('Fitting could not be applied.');
+    }
+    setOutfittingNotice(message, tone = 'info') {
+        this.outfittingNotice = { message, tone };
+        this.renderMarketPoint('equipment');
+    }
+    selectOutfittingShip(shipId) {
+        if (shipId === this.save?.player?.shipId)
+            this.renderMarketPoint('equipment');
+    }
+    selectOutfittingMount(mountId) {
+        const selected = this.outfittingMountInfo(mountId);
+        if (!selected)
+            return;
+        this.outfittingMountId = mountId;
+        const item = OUTFIT_ITEMS[this.outfittingItemId];
+        const fittedId = loadoutFor(this.save.player, this.save.player.shipId)?.[selected.key]?.[selected.index];
+        if (item && !itemFitsMount(item, selected.mount) && fittedId)
+            this.outfittingItemId = fittedId;
+        this.outfittingNotice = undefined;
+        this.renderMarketPoint('equipment');
+    }
+    setOutfittingView(category) {
+        if (!OUTFIT_DEALER_CATEGORIES[category])
+            return;
+        this.outfittingCategory = category;
+        this.outfittingItemId = undefined;
+        this.outfittingMountId = undefined;
+        this.outfittingNotice = undefined;
+        this.renderMarketPoint('equipment');
+    }
+    installOutfittingItem(itemId) {
+        const item = OUTFIT_ITEMS[itemId];
+        if (!item)
+            return;
+        this.outfittingItemId = item.id;
+        const loadout = loadoutFor(this.save.player, this.save.player.shipId);
+        const selected = this.outfittingMountInfo(this.outfittingMountId);
+        if (!selected || !itemFitsMount(item, selected.mount))
+            this.outfittingMountId = undefined;
+        this.outfittingSelectedMount(item, loadout);
+        this.outfittingNotice = undefined;
+        this.renderMarketPoint('equipment');
+    }
+    handleOutfittingAction(action) {
+        if (action === 'install')
+            this.installSelectedOutfittingItem();
+        else if (action === 'remove')
+            this.removeSelectedOutfittingItem();
+        else if (action === 'sell')
+            this.sellSelectedOutfittingItem();
+    }
+    runOutfittingTransaction(draft, options, successMessage) {
+        if (!draft || !this.actions?.applyOutfitting) {
+            this.setOutfittingNotice(t('Outfitting is unavailable.'), 'warning');
+            return;
+        }
+        let result;
+        try {
+            result = this.actions.applyOutfitting(this.save.player.shipId, draft, {
+                ...options,
+                locationId: this.dockLocation,
+                cargoMass: cargoMass(this.save.player),
+            });
+        }
+        catch (error) {
+            this.setOutfittingNotice(this.outfittingErrorLabel(error?.code), 'warning');
+            return;
+        }
+        const finish = (outcome) => {
+            if (!outcome?.ok) {
+                this.setOutfittingNotice(this.outfittingErrorLabel(outcome?.code), 'warning');
+                return;
+            }
+            this.outfittingNotice = { message: successMessage, tone: 'success' };
+            this.renderMarketPoint('equipment');
+        };
+        if (result && typeof result.then === 'function')
+            void result.then(finish).catch((error) => this.setOutfittingNotice(this.outfittingErrorLabel(error?.code), 'warning'));
+        else
+            finish(result);
+    }
+    installSelectedOutfittingItem() {
+        const item = OUTFIT_ITEMS[this.outfittingItemId];
+        const actual = loadoutFor(this.save.player, this.save.player.shipId);
+        const selected = this.outfittingSelectedMount(item, actual);
+        if (!item || !selected)
+            return this.setOutfittingNotice(t('Choose an item and a compatible mount.'), 'warning');
+        const draft = JSON.parse(JSON.stringify(actual));
+        if (draft[selected.key]?.[selected.index] === item.id)
+            return;
+        draft[selected.key][selected.index] = item.id;
+        const quote = this.outfittingQuote(draft);
+        if (!quote.ok)
+            return this.setOutfittingNotice(this.outfittingErrorLabel(quote.code), 'warning');
+        this.runOutfittingTransaction(draft, {}, t('{name} installed. Removed hardware was returned to your locker.', { name: t(item.name) }));
+    }
+    removeSelectedOutfittingItem() {
+        const actual = loadoutFor(this.save.player, this.save.player.shipId);
+        const selected = this.outfittingMountInfo(this.outfittingMountId);
+        const itemId = selected ? actual[selected.key]?.[selected.index] : undefined;
+        if (!selected || !itemId)
+            return;
+        const draft = JSON.parse(JSON.stringify(actual));
+        draft[selected.key][selected.index] = null;
+        const quote = this.outfittingQuote(draft);
+        if (!quote.ok)
+            return this.setOutfittingNotice(this.outfittingErrorLabel(quote.code), 'warning');
+        this.runOutfittingTransaction(draft, {}, t('{name} moved to your locker.', { name: t(OUTFIT_ITEMS[itemId]?.name ?? itemId) }));
+    }
+    sellSelectedOutfittingItem() {
+        const item = OUTFIT_ITEMS[this.outfittingItemId];
+        if (!item)
+            return;
+        const actual = loadoutFor(this.save.player, this.save.player.shipId);
+        const quote = this.outfittingQuote(actual, { sales: { [item.id]: 1 } });
+        if (!quote.ok)
+            return this.setOutfittingNotice(this.outfittingErrorLabel(quote.code), 'warning');
+        this.runOutfittingTransaction(actual, { sales: { [item.id]: 1 } }, t('{name} sold for {credits}.', { name: t(item.name), credits: formatCredits(quote.resale) }));
+    }
+    setOutfittingFireGroup(group) {
+        if (group !== 'A' && group !== 'B')
+            return;
+        const shipId = this.save.player.shipId;
+        const actual = loadoutFor(this.save.player, shipId);
+        const selected = this.outfittingMountInfo(this.outfittingMountId, shipId);
+        if (selected?.key !== 'guns')
+            return;
+        const current = actual.fireGroups?.assignments?.[selected.mount.id] === 'B' ? 'B' : 'A';
+        if (current === group)
+            return;
+        const draft = JSON.parse(JSON.stringify(actual));
+        draft.fireGroups ??= { activeGroup: 'A', assignments: {} };
+        draft.fireGroups.assignments ??= {};
+        draft.fireGroups.assignments[selected.mount.id] = group;
+        const active = draft.fireGroups.activeGroup === 'B' ? 'B' : 'A';
+        const activeStillHasGun = (HARDPOINT_SPECS[shipId]?.guns ?? []).some((mount, index) => draft.guns?.[index]
+            && (draft.fireGroups.assignments[mount.id] === 'B' ? 'B' : 'A') === active);
+        if (!activeStillHasGun)
+            draft.fireGroups.activeGroup = group;
+        const quote = this.outfittingQuote(draft);
+        if (!quote.ok)
+            return this.setOutfittingNotice(this.outfittingErrorLabel(quote.code), 'warning');
+        this.runOutfittingTransaction(draft, {}, t('Bay assigned to fire group {group}.', { group }));
+    }
+    outfittingStatValue(value, digits = 0) {
+        return Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : '—';
+    }
+    outfittingItemsForCategory(category = this.outfittingCategory) {
+        const config = OUTFIT_DEALER_CATEGORIES[category] ?? OUTFIT_DEALER_CATEGORIES.guns;
+        const locker = this.save.player.outfitting?.locker ?? {};
+        return OUTFIT_ITEM_IDS.map((id) => OUTFIT_ITEMS[id]).filter((item) => config.accepts.includes(item.category)
+            && (category !== 'locker' || Number(locker[item.id] ?? 0) > 0));
+    }
+    renderOutfittingMountRack(loadout, selectedItem, selectedMount) {
+        const shipId = this.save.player.shipId;
+        if (!selectedItem)
+            return `<p class="dealer-empty">${t('Pick an item to see where it fits.')}</p>`;
+        const mounts = ['guns', 'launchers', 'drive', 'defense', 'utility'].flatMap((key) => (HARDPOINT_SPECS[shipId]?.[key] ?? [])
+            .map((mount, index) => ({ key, mount, index }))
+            .filter(({ mount }) => itemFitsMount(selectedItem, mount)));
+        if (!mounts.length)
+            return `<p class="dealer-empty">${t('NO COMPATIBLE MOUNT')}</p>`;
+        const rows = mounts.map(({ key, mount, index }) => {
+            const fitted = OUTFIT_ITEMS[loadout[key]?.[index]];
+            const active = selectedMount?.mount.id === mount.id;
+            const group = key === 'guns' ? (loadout.fireGroups?.assignments?.[mount.id] === 'B' ? 'B' : 'A') : undefined;
+            const mountKind = key === 'guns' ? t('GUN') : t(OUTFIT_CATEGORY_KEYS[key]);
+            const label = `${mountKind} ${index + 1} · ${mount.size} · ${fitted ? t(fitted.name) : t('EMPTY')}${group ? ` · ${t('FIRE GROUP')} ${group}` : ''}`;
+            return `<button type="button" class="dealer-mount is-compatible ${active ? 'is-selected' : ''} ${fitted ? 'is-filled' : 'is-empty'}" data-outfit-slot="${mount.id}" aria-label="${escapeHtml(label)}" aria-pressed="${active}">
+              <span>${mountKind} ${index + 1} <em>${mount.size}${group ? ` · ${group}` : ''}</em></span>
+              <b>${fitted ? escapeHtml(t(fitted.name)) : t('EMPTY')}</b>
+              <small>${active ? t('SELECTED BAY') : t('CHOOSE THIS BAY')}</small>
+            </button>`;
+        }).join('');
+        return `<div class="dealer-mount-rack" aria-label="${t('Compatible ship mounts')}">${rows}</div>`;
+    }
+    renderOutfittingItemTile(item, loadout) {
+        const selected = item.id === this.outfittingItemId;
+        const locker = Number(this.save.player.outfitting?.locker?.[item.id] ?? 0);
+        const installed = this.outfittingInstalledCount(loadout, item.id);
+        const available = itemAvailable(this.save.player, item, this.dockLocation);
+        const ownership = locker > 0 ? t('LOCKER ×{count}', { count: locker }) : installed > 0 ? t('INSTALLED') : formatCredits(item.price);
+        return `<button type="button" class="dealer-item-tile ${selected ? 'is-selected' : ''} ${available || locker || installed ? '' : 'is-locked'}" data-outfit-item="${item.id}" aria-pressed="${selected}">
+          <figure class="outfit-item-art-wrap"><span>${escapeHtml(t(item.name).slice(0, 2).toUpperCase())}</span><img class="outfit-item-art" src="${escapeHtml(item.artPath ?? item.art)}" alt="" loading="lazy" decoding="async"></figure>
+          <span><b>${escapeHtml(t(item.name))}</b><small>${escapeHtml(ownership)}</small></span>
+        </button>`;
+    }
+    renderOutfitting() {
+        if (!this.save?.player)
+            return '';
+        const shipId = this.save.player.shipId;
+        if (!OUTFIT_DEALER_CATEGORIES[this.outfittingCategory])
+            this.outfittingCategory = 'guns';
+        const actualLoadout = loadoutFor(this.save.player, shipId);
+        const items = this.outfittingItemsForCategory();
+        if (!items.some((item) => item.id === this.outfittingItemId))
+            this.outfittingItemId = items[0]?.id;
+        const item = OUTFIT_ITEMS[this.outfittingItemId];
+        const selected = item ? this.outfittingSelectedMount(item, actualLoadout) : this.outfittingMountInfo(this.outfittingMountId);
+        const fitted = selected ? OUTFIT_ITEMS[actualLoadout[selected.key]?.[selected.index]] : undefined;
+        const draft = JSON.parse(JSON.stringify(actualLoadout));
+        if (item && selected)
+            draft[selected.key][selected.index] = item.id;
+        const quote = item && selected ? this.outfittingQuote(draft) : { ok: false, code: 'incompatible-mount' };
+        const beforeStats = this.outfittingStatsFor(shipId, actualLoadout);
+        const afterStats = this.outfittingStatsFor(shipId, draft);
+        const usage = outfittingUsage(this.save.player, shipId, draft);
+        const locker = this.save.player.outfitting?.locker ?? {};
+        const baseQuote = this.outfittingQuote(actualLoadout);
+        const lockerCount = item ? Number(locker[item.id] ?? 0) : 0;
+        const sellable = item ? Number(baseQuote.sellable?.[item.id] ?? 0) : 0;
+        const installedHere = Boolean(item && fitted?.id === item.id);
+        const purchaseCount = item ? Number(quote.purchases?.[item.id] ?? 0) : 0;
+        const actionLabel = purchaseCount > 0 ? t('BUY & INSTALL') : t('INSTALL FROM LOCKER');
+        const actionDetail = quote.ok ? (quote.netCost > 0 ? formatCredits(quote.netCost) : t('NO CHARGE')) : this.outfittingErrorLabel(quote.code);
+        const notice = this.outfittingNotice;
+        const impactRows = [
+            ['HULL INTEGRITY', beforeStats.hull, afterStats.hull, 0],
+            ['SHIELD', beforeStats.shield, afterStats.shield, 0],
+            ['REACTOR', beforeStats.reactorOutput, afterStats.reactorOutput, 0],
+            ['CAPACITOR', beforeStats.energyCapacity, afterStats.energyCapacity, 0],
+        ].filter(([, before, after]) => Number(after) !== Number(before)).map(([label, before, after, digits]) => {
+            const changed = Number((after - before).toFixed(digits));
+            return `<div class="dealer-impact"><span>${t(label)}</span><b>${this.outfittingStatValue(before, digits)} → ${this.outfittingStatValue(after, digits)}</b><em class="${changed > 0 ? 'up' : 'down'}">${changed > 0 ? '+' : ''}${changed.toFixed(digits)}</em></div>`;
+        }).join('');
+        const categories = Object.entries(OUTFIT_DEALER_CATEGORIES).map(([id, config]) => `<button type="button" class="${id === this.outfittingCategory ? 'is-active' : ''}" data-outfit-view="${id}" aria-pressed="${id === this.outfittingCategory}">${t(config.label)}</button>`).join('');
+        const selectedCopy = item ? `<div class="dealer-selected-item">
+          <figure class="outfit-item-art-wrap"><span>${escapeHtml(t(item.name).slice(0, 2).toUpperCase())}</span><img class="outfit-item-art" src="${escapeHtml(item.artPath ?? item.art)}" alt="${escapeHtml(t('{name} module art', { name: t(item.name) }))}" decoding="async"></figure>
+          <div><span>${t(OUTFIT_CATEGORY_KEYS[OUTFIT_CATEGORY_TO_KEY[item.category]])} · ${item.size}</span><h4>${escapeHtml(t(item.name))}</h4><strong>${escapeHtml(t(item.stat))}</strong><p>${escapeHtml(t(item.description))}</p>${item.category === 'gun' ? `<small>${t('ENERGY PER SHOT')}: ${item.energyCost}</small>` : ''}</div>
+        </div>` : `<p class="dealer-empty">${t('Your locker is empty.')}</p>`;
+        const selectedFireGroup = selected?.key === 'guns'
+            ? (actualLoadout.fireGroups?.assignments?.[selected.mount.id] === 'B' ? 'B' : 'A')
+            : undefined;
+        const otherFireGroup = selectedFireGroup === 'A' ? 'B' : 'A';
+        const actionButtons = [
+            fitted ? `<button type="button" data-outfit-action="remove"><span>${t('REMOVE')}</span><small>${t('TO LOCKER')}</small></button>` : '',
+            this.outfittingCategory === 'locker' && item ? `<button type="button" data-outfit-action="sell" ${sellable > 0 ? '' : 'disabled'}><span>${t('SELL ONE')}</span>${sellable > 0 ? `<small>+${formatCredits(Math.round(item.price * RESALE_RATE))}</small>` : ''}</button>` : '',
+            selectedFireGroup ? `<button type="button" class="dealer-group-toggle" data-outfit-group="${otherFireGroup}" aria-label="${escapeHtml(t('Fire group {group}; change to {other}.', { group: selectedFireGroup, other: otherFireGroup }))}"><span>${t('GROUP')} ${selectedFireGroup} → ${otherFireGroup}</span><small>${t('CHANGE TO {group}', { group: otherFireGroup })}</small></button>` : '',
+            item && selected && !installedHere ? `<button type="button" class="primary" data-outfit-action="install" ${quote.ok ? '' : 'disabled'}><span>${actionLabel}</span><small>${escapeHtml(actionDetail)}</small></button>` : '',
+        ].filter(Boolean);
+        return `<div class="outfit-dealer" data-outfitting-ship="${shipId}" style="--dealer-backdrop:url('../art/outfitting/v2/dealer-workshop-backdrop-v2.png')">
+          <header class="dealer-header"><img class="dealer-mechanic-portrait" src="./art/outfitting/v2/dealer-mechanic-portrait-v2.png" alt=""><div><span class="eyebrow">${t('DOCKYARD OUTFITTER')}</span><h3>${escapeHtml(SHIPS[shipId].name)}</h3><p>${t('Choose a part, choose a compatible bay, then install.')}</p></div></header>
+          ${notice ? `<div class="dealer-notice is-${notice.tone}" role="status" aria-live="polite">${escapeHtml(notice.message)}</div>` : ''}
+          <div class="dealer-workbench">
+            <section class="dealer-catalog"><div class="dealer-step-heading"><b>1</b><span>${t('PICK EQUIPMENT')}</span></div><nav class="dealer-categories" aria-label="${t('Equipment categories')}">${categories}</nav>${selectedCopy}<div class="dealer-item-list" role="list">${items.length ? items.map((entry) => this.renderOutfittingItemTile(entry, actualLoadout)).join('') : `<p class="dealer-empty">${t('Your locker is empty.')}</p>`}</div></section>
+            <section class="dealer-fit-panel">
+              <div class="dealer-fit-heading"><div class="dealer-step-heading"><b>2</b><span>${t('CHOOSE A BAY')}</span></div><strong>${escapeHtml(SHIPS[shipId].className)}</strong></div>
+              ${this.renderOutfittingMountRack(actualLoadout, item, selected)}
+              <div class="dealer-fit-summary">
+                <div class="dealer-current-fit"><span>${t('CURRENTLY FITTED')}</span><b>${fitted ? escapeHtml(t(fitted.name)) : t('EMPTY MOUNT')}</b><small>${fitted && item && fitted.id !== item.id ? t('{name} returns to your locker.', { name: t(fitted.name) }) : item ? (lockerCount ? t('Owned copies in locker: {count}', { count: lockerCount }) : itemAvailable(this.save.player, item, this.dockLocation) ? t('Available at this dock.') : t('Locked or not stocked here.')) : ''}</small></div>
+                <div class="dealer-fit-metrics"><div><span>${t('FITTING MASS')}</span><b>${usage.mass} / ${usage.massLimit}</b></div>${item?.category === 'gun' ? `<div><span>${t('ENERGY PER SHOT')}</span><b>${item.energyCost}</b></div>` : ''}</div>
+                ${impactRows ? `<div class="dealer-impact-list"><h5>${t('EFFECT ON SHIP')}</h5>${impactRows}</div>` : ''}
+              </div>
+              <div class="dealer-fit-actions"><div class="dealer-step-heading"><b>3</b><span>${t('CONFIRM')}</span></div><div class="dealer-actions action-count-${actionButtons.length}">${actionButtons.join('')}</div></div>
+            </section>
+          </div>
+        </div>`;
+    }
     renderEquipment() {
-        return `
-      <div class="equipment-grid">
-        ${equipmentIds.map((id) => {
-            const item = EQUIPMENT[id];
-            const owned = this.save.player.equipment.includes(id);
-            const unlocked = equipmentUnlocked(this.save.player, id);
-            return `<article class="equipment-card ${owned ? 'owned' : ''} ${unlocked ? '' : 'locked'}">
-            <header><span>${t(item.category.toUpperCase())}</span><b>${owned ? t('INSTALLED') : formatCredits(item.price)}</b></header>
-            <h3>${escapeHtml(t(item.name))}</h3><p>${escapeHtml(t(item.description))}</p><strong>${escapeHtml(t(item.stat))}</strong>
-            ${item.requiredGuild ? `<small>${t('Requires {guild} rank {rank}', { guild: t(GUILD_NAMES[item.requiredGuild]), rank: item.requiredRank })}</small>` : `<small>${t('Open market equipment')}</small>`}
-            <button data-equipment-id="${id}" ${owned || !unlocked ? 'disabled' : ''}>${owned ? t('INSTALLED') : unlocked ? t('PURCHASE / INSTALL') : t('GUILD LOCKED')}</button>
-          </article>`;
-        }).join('')}
-      </div>
-    `;
+        return this.renderOutfitting();
     }
     renderShipyard() {
         const stockIds = LOCATIONS[this.dockLocation].shipsForSale ?? [];
@@ -1448,15 +1983,17 @@ export class GameUI {
     }
     renderShipOverview(saleId) {
         const ship = SHIPS[saleId];
-        const owned = this.save.player.ownedShips.includes(saleId);
         const active = this.save.player.shipId === saleId;
+        const current = SHIPS[this.save.player.shipId] ?? SHIPS.wayfarer;
+        const tradeIn = Math.round(current.price * HULL_TRADE_IN_RATE);
+        const due = ship.price - tradeIn;
         return `
       <article class="ship-card ship-overview ${active ? 'active' : ''}" data-ship-detail="${saleId}" role="button" tabindex="0" aria-label="${t('View {name} details', { name: ship.name })}">
         <div class="ship-silhouette ${saleId}" data-variant="${ship.variant}"></div>
-        <header><span>${escapeHtml(t(ship.className))}</span><b>${formatCredits(ship.price)}</b></header>
+        <header><span>${escapeHtml(t(ship.className))}</span><b>${active ? t('CURRENT HULL') : due >= 0 ? formatCredits(due) : `+${formatCredits(Math.abs(due))}`}</b></header>
         <h3>${escapeHtml(ship.name)}</h3>
         <p class="ship-personality">${escapeHtml(t(ship.personality ?? ''))}</p>
-        <div class="ship-overview-meta"><span>${active ? t('ACTIVE SHIP') : owned ? t('IN YOUR FLEET') : t('FOR SALE')}</span><b>${t('DETAILS')} ▸</b></div>
+        <div class="ship-overview-meta"><span>${active ? t('YOUR ONLY SHIP') : t('AFTER 50% TRADE-IN')}</span><b>${t('DETAILS')} ▸</b></div>
       </article>
     `;
     }
@@ -1471,10 +2008,11 @@ export class GameUI {
     renderShipCard(saleId) {
         const ship = SHIPS[saleId];
         const current = SHIPS[this.save.player.shipId] ?? SHIPS.wayfarer;
-        const owned = this.save.player.ownedShips.includes(saleId);
         const active = this.save.player.shipId === saleId;
         const speedDelta = displaySpeed(ship.maxSpeed) - displaySpeed(current.maxSpeed);
         const turnDelta = ship.angularAcceleration - current.angularAcceleration;
+        const tradeIn = Math.round(current.price * HULL_TRADE_IN_RATE);
+        const amountDue = ship.price - tradeIn;
         return `
       <article class="ship-card ship-detail ${active ? 'active' : ''}">
         <div class="ship-silhouette ship-silhouette-large ${saleId}" data-variant="${ship.variant}" aria-label="${t('Rotating 3D preview of the {name}', { name: ship.name })}"></div>
@@ -1482,9 +2020,9 @@ export class GameUI {
         <h3>${escapeHtml(ship.name)}</h3>
         <p class="ship-personality">${escapeHtml(t(ship.personality ?? ''))}</p>
         <p>${escapeHtml(t(ship.description))}</p>
-        <dl><div><dt>${t('SPEED')}</dt><dd>${displaySpeed(ship.maxSpeed)} ${this.statDelta(speedDelta)}</dd></div><div><dt>${t('SHIELD')}</dt><dd>${ship.shield} ${this.statDelta(ship.shield - current.shield)}</dd></div><div><dt>${t('ARMOR')}</dt><dd>${ship.armor} ${this.statDelta(ship.armor - current.armor)}</dd></div><div><dt>${t('CARGO')}</dt><dd>${ship.cargo} ${this.statDelta(ship.cargo - current.cargo)}</dd></div><div><dt>${t('MISSILES')}</dt><dd>${ship.missileCapacity} ${this.statDelta(ship.missileCapacity - current.missileCapacity)}</dd></div><div><dt>${t('GUN')}</dt><dd>${ship.gunDamage} ${this.statDelta(ship.gunDamage - current.gunDamage)}</dd></div><div><dt>${t('TURN')}</dt><dd>${ship.angularAcceleration.toFixed(2)} ${this.statDelta(turnDelta, 2)}</dd></div><div><dt>${t('ACCL')}</dt><dd>${ship.acceleration} ${this.statDelta(ship.acceleration - current.acceleration)}</dd></div></dl>
+        <dl><div><dt>${t('SPEED')}</dt><dd>${displaySpeed(ship.maxSpeed)} ${this.statDelta(speedDelta)}</dd></div><div><dt>${t('SHIELD')}</dt><dd>${ship.shield} ${this.statDelta(ship.shield - current.shield)}</dd></div><div><dt>${t('HULL INTEGRITY')}</dt><dd>${ship.hull} ${this.statDelta(ship.hull - current.hull)}</dd></div><div><dt>${t('REACTOR')}</dt><dd>${ship.reactorOutput} ${this.statDelta(ship.reactorOutput - current.reactorOutput)}</dd></div><div><dt>${t('CAPACITOR')}</dt><dd>${ship.energyCapacity} ${this.statDelta(ship.energyCapacity - current.energyCapacity)}</dd></div><div><dt>${t('CARGO')}</dt><dd>${ship.cargo} ${this.statDelta(ship.cargo - current.cargo)}</dd></div><div><dt>${t('TURN')}</dt><dd>${ship.angularAcceleration.toFixed(2)} ${this.statDelta(turnDelta, 2)}</dd></div><div><dt>${t('ACCL')}</dt><dd>${ship.acceleration} ${this.statDelta(ship.acceleration - current.acceleration)}</dd></div></dl>
         <p class="ship-handling-note">${t('Handling falls up to 24% as the cargo hold fills.')}</p>
-        ${active ? `<button disabled>${t('ACTIVE SHIP')}</button>` : owned ? `<button data-switch-ship="${saleId}">${t('SWITCH TO SHIP')}</button>` : `<button class="primary" data-ship-id="${saleId}">${t('PURCHASE HULL')}</button>`}
+        ${active ? `<button disabled>${t('THIS IS YOUR CURRENT SHIP')}</button>` : `<div class="ship-trade-quote"><span>${t('NEW HULL')} <b>${formatCredits(ship.price)}</b></span><span>${t('YOUR 50% TRADE-IN')} <b>−${formatCredits(tradeIn)}</b></span><strong>${amountDue >= 0 ? t('YOU PAY') : t('YARD PAYS YOU')} <b>${formatCredits(Math.abs(amountDue))}</b></strong><small>${t('Purchased modules move to your locker. Factory equipment leaves with the old hull.')}</small></div><button class="primary" data-ship-id="${saleId}" ${amountDue > this.save.player.credits ? 'disabled' : ''}>${amountDue >= 0 ? t('TRADE SHIP') : t('TRADE AND COLLECT')} · ${formatCredits(Math.abs(amountDue))}</button>`}
       </article>
     `;
     }
@@ -1543,11 +2081,31 @@ export class GameUI {
     `;
     }
     portraitImage(personId, personName) {
+        if (!LEGACY_PORTRAIT_IDS.has(personId)) {
+            const initials = personName.split(/\s+/).slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
+            return `<span class="avatar generated-avatar" aria-label="${t('Portrait of {name}', { name: escapeHtml(personName) })}">${escapeHtml(initials)}</span>`;
+        }
         return `<img class="avatar" src="./art/portraits/${escapeHtml(personId)}.webp" alt="${t('Pixel portrait of {name}', { name: personName })}" draggable="false">`;
     }
 
     locationIllustration(locationId, screen = 'concourse') {
         const location = LOCATIONS[locationId];
+        const label = screen === 'bar'
+            ? t('{name} bar', { name: location.name })
+            : screen === 'market'
+                ? t('{name} market', { name: location.name })
+                : location.name;
+        if (NEW_DOCK_ART_IDS.has(locationId)) {
+            if (screen === 'bar' && NEW_HD_BAR_ART_IDS.has(locationId))
+                return `<img src="./art/locations/v5/bar-${escapeHtml(locationId)}-hd-v1.png" alt="${t('HD view')} of ${escapeHtml(label)}" draggable="false">`;
+            if (screen === 'market' && NEW_HD_MARKET_ART_IDS.has(locationId))
+                return `<img src="./art/locations/v5/market-${escapeHtml(locationId)}-hd-v1.png" alt="${t('HD view')} of ${escapeHtml(label)}" draggable="false">`;
+            return `<img src="./art/locations/v4/${escapeHtml(locationId)}.webp" alt="${t('HD view')} of ${escapeHtml(label)}" draggable="false">`;
+        }
+        if (!LEGACY_DOCK_ART_IDS.has(locationId)) {
+            const screenLabel = screen === 'bar' ? t('BAR') : screen === 'market' ? t('MARKET') : t('CONCOURSE');
+            return `<div class="procedural-location-plate system-${escapeHtml(location.systemId ?? 'helios-verge')}" style="--plate-accent:${escapeHtml(location.accent ?? '#80b7c8')};--plate-secondary:${escapeHtml(location.secondary ?? '#182b36')}" role="img" aria-label="${escapeHtml(location.name)} · ${escapeHtml(screenLabel)}"><span>${escapeHtml(location.shortName)}</span><b>${escapeHtml(screenLabel)}</b><i aria-hidden="true"></i></div>`;
+        }
         const file = screen === 'bar'
             ? `bar-${locationId}`
             : screen === 'market'
@@ -1578,11 +2136,6 @@ export class GameUI {
                 : VESPER_HOVER_PREVIEW && locationId === 'vesper' && screen === 'concourse'
                     ? 'vesper-preview'
                     : file;
-        const label = screen === 'bar'
-            ? t('{name} bar', { name: location.name })
-            : screen === 'market'
-                ? t('{name} market', { name: location.name })
-                : location.name;
         const artDescription = illustrationFile.endsWith('-hd-v1') || illustrationFile === 'vesper-preview'
             ? t('HD view')
             : t('Pixel-art view');
@@ -1614,8 +2167,12 @@ export class GameUI {
                 status = t('CHARGING {percent}%', { percent: Math.round(progress * 100) });
             else if (state === 'active')
                 status = t('ENGAGED');
+            else if (state === 'gate')
+                status = t('IN TRANSIT');
             else if (state === 'interrupt')
                 status = t('INTERRUPTED');
+            else if (model.gateArmed)
+                status = t('GATE LIVE · FLY THROUGH');
             else if (model.hyperdriveStatus)
                 status = t(model.hyperdriveStatus);
             // No COOLDOWN state: the post-intercept calm window only suppresses
@@ -1643,10 +2200,21 @@ export class GameUI {
                 ticker.appendChild(line);
             }
             line.textContent = entry?.message ?? '';
+            line.title = entry?.message ?? '';
             ticker.dataset.tone = entry?.tone ?? 'info';
             ticker.classList.toggle('is-visible', Boolean(entry));
         };
-        renderTicker('#screen-event-ticker', this.currentEntry(this.recentEvents));
+        // Short-lived own-ship notices used to replace the cargo value inside
+        // one third of the telemetry row. Messages such as CAPACITOR LOW or a
+        // full weapon name were reduced to a few unreadable letters there.
+        // The full-width event line is the cockpit's dedicated message lane.
+        const ownStatus = model.ownMonitorStatus
+            ? {
+                message: model.ownMonitorStatus,
+                tone: String(model.ownMonitorStatus).startsWith('+') ? 'success' : 'warning',
+            }
+            : this.currentEntry(this.recentEvents);
+        renderTicker('#screen-event-ticker', ownStatus);
         // The patrol reply chip: visible while a cordon pilot is still waiting
         // for the courtesy, with the window ticking down.
         const patrolReply = this.el('#patrol-reply-chip');
@@ -1666,11 +2234,17 @@ export class GameUI {
             weaponReadout.classList.toggle('is-visible', Boolean(weapon));
             weaponReadout.dataset.venting = weapon?.venting ? 'true' : 'false';
             if (weapon) {
-                setText('#screen-own-weapon-name', weapon.name);
+                const groupPrefix = weapon.group ? `${weapon.group} · ` : '';
+                const additionalMounts = Math.max(0, Number(weapon.mountCount ?? 1) - 1);
+                const displayName = `${groupPrefix}${weapon.name}${additionalMounts ? ` +${additionalMounts}` : ''}`;
+                setText('#screen-own-weapon-name', displayName);
                 setText('#screen-own-weapon-ammo', weapon.ammo
                     ? `${weapon.ammo.current}/${weapon.ammo.capacity}`
                     : weapon.venting ? t('VENTING') : '∞');
+                weaponReadout.title = `${t('Switch fire group — press X or tap')} · ${weapon.fullName ?? weapon.name}`;
             }
+            else
+                weaponReadout.title = t('Switch fire group — press X or tap');
         }
         // Race strip: compact circuit telemetry on the own-ship monitor while
         // an entry is on the grid or running. The travel leg hides the strip —
@@ -1715,30 +2289,37 @@ export class GameUI {
                             ? `${race.rankLabel} · ${t('PB {delta}', { delta: `${race.splitDelta <= 0 ? '−' : '+'}${Math.abs(race.splitDelta).toFixed(1)}` })}`
                             : `${race.rankLabel} · ${clock(race.time)}`;
                     }
+                    raceStrip.title = `${label.textContent} · ${value.textContent}`;
                 }
             }
+            else
+                raceStrip.title = '';
         }
         setText('#hud-zone', model.zone.toUpperCase());
         setText('#hud-mode', model.mode.toUpperCase());
-        setText('#screen-own-speed', Math.round(model.speed).toString());
-        setText('#screen-own-max-speed', `/${Math.round(model.maxSpeed)}`);
+        const speed = Math.round(model.speed);
+        const maxSpeed = Math.round(model.maxSpeed);
+        const speedValue = this.el('#screen-own-speed');
+        const speedLimit = this.el('#screen-own-max-speed');
+        if (speedValue && speedLimit) {
+            speedValue.textContent = String(speed);
+            speedLimit.textContent = `/${maxSpeed}`;
+            const speedCell = speedValue.parentElement;
+            // Four-digit hyperdrive values do not fit beside another
+            // four-digit maximum in the narrow physical phone monitor. Keep
+            // the live speed full-size there; the equal limit is redundant.
+            speedCell?.classList.toggle('is-wide-speed', Math.max(Math.abs(speed), Math.abs(maxSpeed)) >= 1000);
+            speedCell?.setAttribute('aria-label', `${t('SPEED')} ${speed} / ${maxSpeed}`);
+            speedCell?.setAttribute('title', `${t('SPEED')} ${speed} / ${maxSpeed}`);
+        }
         setText('#screen-own-fuel', Math.round((model.fuel / model.maxFuel) * 100).toString());
         const cargoValue = this.el('#screen-own-cargo');
         const cargoCap = this.el('#screen-own-cargo-cap');
         if (cargoValue && cargoCap) {
-            if (model.ownMonitorStatus) {
-                // A transient HOLD message (e.g. CARGO FULL on a pickup attempt)
-                // flashes in place of the mass readout for the status duration.
-                cargoValue.textContent = model.ownMonitorStatus;
-                cargoValue.classList.add('is-alert');
-                cargoCap.textContent = '';
-            }
-            else {
-                cargoValue.textContent = (model.cargo ?? 0).toFixed(1);
-                cargoValue.classList.toggle('is-full', (model.loadPercent ?? 0) >= 100);
-                cargoValue.classList.remove('is-alert');
-                cargoCap.textContent = `/${model.cargoCapacity ?? 0}`;
-            }
+            cargoValue.textContent = (model.cargo ?? 0).toFixed(1);
+            cargoValue.classList.toggle('is-full', (model.loadPercent ?? 0) >= 100);
+            cargoValue.classList.remove('is-alert');
+            cargoCap.textContent = `/${model.cargoCapacity ?? 0}`;
         }
         const standoff = this.el('#screen-standoff');
         if (standoff) {
@@ -1750,7 +2331,10 @@ export class GameUI {
                     demand.textContent = model.standoff.kind === 'credits' ? t('PAY {label}', { label: model.standoff.label }) : t('DROP {label}', { label: model.standoff.label });
                 if (timer)
                     timer.textContent = String(model.standoff.seconds);
+                standoff.title = `${demand?.textContent ?? ''} · ${timer?.textContent ?? ''}`;
             }
+            else
+                standoff.title = '';
         }
         this.drawRadar(model.contacts, model.radarRings, model.searchRings, model.radarWarp);
         const transponderChip = this.el('#screen-radar-transponder');
@@ -1765,10 +2349,10 @@ export class GameUI {
                 : t('Dark to sensors beyond 200 km · press B to transmit');
         }
         setText('#screen-own-shield-value', Math.ceil(model.shield).toString());
-        setText('#screen-own-armor-value', Math.ceil(model.armor).toString());
+        setText('#screen-own-energy-value', Math.ceil(model.energy).toString());
         setText('#screen-own-hull-value', Math.ceil(model.hull).toString());
         setBar('#screen-own-shield', percent(model.shield, model.maxShield));
-        setBar('#screen-own-armor', percent(model.armor, model.maxArmor));
+        setBar('#screen-own-energy', percent(model.energy, model.maxEnergy));
         setBar('#screen-own-hull', percent(model.hull, model.maxHull));
         this.updateTarget(model.target, model.mode);
         const targetReadout = this.el('#screen-target-readout');
@@ -1782,6 +2366,7 @@ export class GameUI {
                 targetReadout.textContent = model.monitorStatus;
             else if (model.dockPrompt)
                 targetReadout.textContent = model.dockPrompt;
+            targetReadout.title = targetReadout.textContent === '—' ? '' : targetReadout.textContent;
         }
         this.drawHullOutline(this.ownHullCanvas, model.playerVariant ?? 'kestrel', 0, 'rgba(111, 216, 236, 0.9)', false, model.missiles, model.maxMissiles);
         const throttleThumb = this.el('[data-touch-throttle-thumb]');
@@ -1816,6 +2401,7 @@ export class GameUI {
         edgePointer?.classList.toggle('is-surrendered', surrendered && !hostile);
         this.el('#screen-target-distance').textContent = `${formatNumber(target.distance)} km`;
         this.el('#screen-target-readout').textContent = target.readout ?? '—';
+        this.el('#screen-target-readout').title = target.readout ?? '';
         this.setTargetScreenValue(target);
         this.updateWeaponButtons(target, mode);
         // A clipped NPC flashes its outline on the target monitor for a beat.
@@ -1901,26 +2487,24 @@ export class GameUI {
                 canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
         };
         const isShip = Boolean(target && target.kind === 'ship');
-        // Ships show shield/armor/hull bars; stations, planets, asteroids and wrecks
+        // Ships show shield/hull bars; stations, planets, asteroids and wrecks
         // are invulnerable, so the target monitor shows only their outline.
         this.targetLayout?.classList.toggle('no-bars', !isShip);
         if (!target) {
             setText('#screen-target-name', t('NO LOCK'));
+            this.el('#screen-target-name').title = '';
             setText('#screen-target-shield-value', '—');
-            setText('#screen-target-armor-value', '—');
             setText('#screen-target-hull-value', '—');
             setBar('#screen-target-shield', 0);
-            setBar('#screen-target-armor', 0);
             setBar('#screen-target-hull', 0);
             clearHull();
             return;
         }
         setText('#screen-target-name', target.name.toUpperCase());
+        this.el('#screen-target-name').title = target.name;
         setText('#screen-target-shield-value', isShip ? Math.ceil(target.shield ?? 0).toString() : '—');
-        setText('#screen-target-armor-value', isShip ? Math.ceil(target.armor ?? 0).toString() : '—');
         setText('#screen-target-hull-value', isShip ? Math.ceil(target.hull ?? 0).toString() : '—');
         setBar('#screen-target-shield', percent(target.shield ?? 0, target.maxShield ?? 0));
-        setBar('#screen-target-armor', percent(target.armor ?? 0, target.maxArmor ?? 0));
         setBar('#screen-target-hull', percent(target.hull ?? 0, target.maxHull ?? 0));
         if (isShip) {
             this.drawHullOutline(this.targetHullCanvas, target.variant ?? 'kestrel', target.heading ?? 0, 'rgba(255, 192, 70, 0.92)', Boolean(target.hostile));
@@ -2172,6 +2756,10 @@ export class GameUI {
         const cx = width / 2;
         const cy = height / 2;
         const radius = Math.min(width, height) * 0.44;
+        // Distance labels are sparse but important. Keep them at a true 10px
+        // CSS floor rather than the old 8px bitmap text, including on 1x
+        // landscape-phone captures; DPR still scales the backing-store glyphs.
+        const radarTextFont = `${Math.max(10, Math.floor(10.5 * ratio))}px ui-monospace, monospace`;
         ctx.clearRect(0, 0, width, height);
         ctx.save();
         ctx.translate(cx, cy);
@@ -2252,7 +2840,7 @@ export class GameUI {
             // tucked just inside the ring toward the disc center.
             if (ring.beyond) {
                 ctx.fillStyle = ring.color === 'red' ? '#ff9a7a' : '#a8e2f2';
-                ctx.font = `${Math.max(8, Math.floor(8.5 * ratio))}px ui-monospace, monospace`;
+                ctx.font = radarTextFont;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(`${ring.distance}`, x * 0.8, y * 0.8);
@@ -2309,7 +2897,7 @@ export class GameUI {
                 if (contact.raceGate.beyond) {
                     ctx.globalAlpha = 0.9;
                     ctx.fillStyle = color;
-                    ctx.font = `${Math.max(8, Math.floor(8.5 * ratio))}px ui-monospace, monospace`;
+                    ctx.font = radarTextFont;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(`${contact.raceGate.distance}`, x * 0.8, y * 0.8);
@@ -2342,7 +2930,7 @@ export class GameUI {
                 ctx.arc(x, y, size * 2.5, 0, Math.PI * 2);
                 ctx.stroke();
                 ctx.fillStyle = '#ffab6b';
-                ctx.font = `${Math.max(8, Math.floor(8.5 * ratio))}px ui-monospace, monospace`;
+                ctx.font = radarTextFont;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(`${contact.distance}`, x * 0.82, y * 0.82);
@@ -2561,45 +3149,106 @@ export class GameUI {
         this.root.querySelector('#chat-panel')?.classList.add('is-hidden');
         this.updateOrientationNotice();
     }
+    setMapView(view) {
+        if (view !== 'sector' && view !== 'galaxy')
+            return;
+        this.mapView = view;
+        const card = this.root.querySelector('#map-panel .map-card');
+        if (!card)
+            return;
+        card.dataset.activeView = view;
+        card.querySelectorAll('[data-map-view]').forEach((button) => {
+            const selected = button.dataset.mapView === view;
+            button.classList.toggle('selected', selected);
+            button.setAttribute('aria-selected', String(selected));
+            button.tabIndex = selected ? 0 : -1;
+        });
+        card.querySelectorAll('[data-map-view-panel]').forEach((section) => {
+            section.hidden = section.dataset.mapViewPanel !== view;
+        });
+    }
     showMap(model) {
         if (!this.save)
             return;
         const panel = this.root.querySelector('#map-panel');
-        const playerPoint = systemMapPoint(model.playerPosition);
+        const system = SYSTEMS[model.systemId] ?? SYSTEMS['helios-verge'];
+        const localIds = model.navLocationIds ?? Object.keys(LOCATIONS).filter((id) => LOCATIONS[id].systemId === system.id);
+        const localMapPoints = layoutSystemMapPoints(localIds, system.id);
+        const playerPoint = systemMapPoint(model.playerPosition, undefined, system.id);
         const contactTone = (contact) => contact.gate ? 'gate' : contact.claim ? 'claim' : contact.hostile ? 'hostile' : contact.kind === 'asteroid' || contact.kind === 'pickup' ? 'resource' : contact.kind === 'wreck' ? 'wreck' : 'ship';
+        const systemRank = new Map(REGIONAL_SYSTEM_ORDER.map((id, index) => [id, index]));
+        const visibleSystems = [...(model.systems ?? Object.values(SYSTEMS))]
+            .sort((first, second) => (systemRank.get(first.id) ?? 99) - (systemRank.get(second.id) ?? 99));
         panel.innerHTML = `
-      <div class="modal-card map-card">
-        <header><div><span class="eyebrow">${t('NAVIGATION COMPUTER / PAUSED')}</span><h2>${t('Helios Verge System')}</h2></div><button data-ui-command="close-map">${t('CLOSE')}</button></header>
-        <div class="navigation-map-layout">
-          <section class="map-section system-map-section">
-            <div class="map-section-heading"><span>${t('SYSTEM POINTS')}</span><b>${escapeHtml(LOCATIONS[model.navTargetId].shortName)} ${t('VECTOR')}</b></div>
-            <div class="system-map map-stage">
-              <div class="map-orbit orbit-a"></div><div class="map-orbit orbit-b"></div><div class="map-star" aria-label="${t('Helios star')}"></div>
-              <div class="map-player-marker" style="left:${playerPoint.left.toFixed(2)}%;top:${playerPoint.top.toFixed(2)}%" aria-label="${t('Current position')}"><i></i><span>${t('YOU')}</span></div>
-              ${Object.keys(LOCATIONS).map((id) => {
+      <div class="modal-card map-card" data-active-view="${this.mapView}">
+        <header>
+          <div class="map-title"><span class="eyebrow">${t('NAVIGATION COMPUTER / PAUSED')}</span><h2>${escapeHtml(system.name)} ${t('System')}</h2></div>
+          <div class="map-header-controls">
+            <div class="map-view-toggle" role="tablist" aria-label="${t('Switch navigation view')}">
+              <button id="map-sector-tab" type="button" role="tab" data-map-view="sector" aria-controls="map-sector-view">${t('SECTOR')}</button>
+              <button id="map-galaxy-tab" type="button" role="tab" data-map-view="galaxy" aria-controls="map-galaxy-view">${t('GALAXY')}</button>
+            </div>
+            <button type="button" data-ui-command="close-map">${t('CLOSE')}</button>
+          </div>
+        </header>
+        <div id="map-sector-view" class="map-view map-view-sector" role="tabpanel" aria-labelledby="map-sector-tab" data-map-view-panel="sector">
+          <div class="navigation-map-layout sector-map-layout">
+            <section class="map-section system-map-section">
+              <div class="map-section-heading"><span>${t('SYSTEM POINTS')} <em class="system-star-key star-${escapeHtml(system.id)}"><i aria-hidden="true"></i>${t(SYSTEM_STAR_TYPES[system.id] ?? 'STAR')}</em></span><b>${escapeHtml(mapLocationLabel(LOCATIONS[model.navTargetId]))} ${t('VECTOR')}</b></div>
+              <div class="system-map sector-system-map map-stage" aria-label="${escapeHtml(system.name)} ${t('Sector chart')}">
+                <div class="map-orbit orbit-a" aria-hidden="true"></div><div class="map-orbit orbit-b" aria-hidden="true"></div><div class="map-orbit orbit-c" aria-hidden="true"></div>
+                <div class="map-star star-${escapeHtml(system.id)}" aria-hidden="true"></div>
+                <div class="map-player-marker" style="left:${playerPoint.left.toFixed(2)}%;top:${playerPoint.top.toFixed(2)}%" aria-label="${t('Current position')}"><i></i><span>${t('YOU')}</span></div>
+                ${localIds.map((id) => {
             const location = LOCATIONS[id];
-            const point = systemMapPoint(location.position, id);
+            const point = localMapPoints.get(id) ?? systemMapPoint(location.position, id, system.id);
             const selected = model.navTargetId === id || model.currentTargetId === id;
-            return `<button class="map-node kind-${location.kind} ${selected ? 'selected' : ''}" style="left:${point.left.toFixed(2)}%;top:${point.top.toFixed(2)}%" data-map-target-kind="location" data-map-target-id="${id}"><i></i><b>${escapeHtml(location.shortName)}</b><span>${this.save.player.discovered.includes(id) ? escapeHtml(t(location.kind)) : t('UNSURVEYED')}</span></button>`;
+            const kind = this.save.player.discovered.includes(id) ? t(location.kind) : t('UNSURVEYED');
+            return `<button class="map-node kind-${location.kind} ${selected ? 'selected' : ''}" style="left:${point.left.toFixed(2)}%;top:${point.top.toFixed(2)}%" data-map-layout="spatial" data-map-target-kind="location" data-map-target-id="${id}" aria-label="${escapeHtml(mapLocationLabel(location))} · ${escapeHtml(kind)}"><i aria-hidden="true"></i><b>${escapeHtml(mapLocationLabel(location))}</b></button>`;
         }).join('')}
-            </div>
-          </section>
-          <section class="map-section local-map-section">
-            <div class="map-section-heading"><span>${t('LOCAL CONTACTS')}</span><b>${model.contacts.length} ${t('TRACKED')}</b></div>              <div class="tactical-map map-stage">
-              <div class="tactical-rings"></div><div class="tactical-player"></div>
-              ${(model.searchRings ?? []).map((ring) => `<span class="tactical-search-ring ${ring.color}" style="left:${(50 + ring.x * 42).toFixed(2)}%;top:${(50 + ring.y * 42).toFixed(2)}%;width:${Math.max(6, ring.fraction * 84).toFixed(1)}%;height:${Math.max(6, ring.fraction * 84).toFixed(1)}%"></span>`).join('')}
-              ${model.contacts.map((contact) => `<button class="tactical-contact ${contactTone(contact)} ${contact.ghost ? 'ghost' : ''} ${contact.distress ? 'distress' : ''} ${contact.selected ? 'selected' : ''}" style="left:${(50 + contact.x * 42).toFixed(2)}%;top:${(50 + contact.y * 42).toFixed(2)}%;opacity:${contact.ghost ? (contact.lostAlpha ?? 0.9) : 1}" data-map-target-kind="${contact.kind}" data-map-target-id="${escapeHtml(contact.id)}" aria-label="${escapeHtml(contact.name)}"><i></i>${contact.gate && Math.abs(contact.altitude ?? 0) > 0.02 ? `<b class="tactical-alt ${(contact.altitude ?? 0) > 0 ? 'up' : 'down'}" style="--alt:${Math.min(1, Math.abs(contact.altitude ?? 0)).toFixed(2)}"></b>` : ''}</button>`).join('')}
-            </div>
-            <div class="contact-list">
-              ${model.contacts.length ? model.contacts.map((contact) => `<button class="contact-row ${contactTone(contact)} ${contact.selected ? 'selected' : ''}" data-map-target-kind="${contact.kind}" data-map-target-id="${escapeHtml(contact.id)}"><i></i><span><b>${escapeHtml(contact.name)}</b><small>${escapeHtml(t(contact.subtitle))}</small></span><em>${Math.round(contact.distance)}u</em></button>`).join('') : `<div class="contact-empty"><b>${t('NO LOCAL CONTACTS')}</b><span>${t('Only contacts inside sensor range appear here.')}</span></div>`}
-            </div>
+              </div>
+            </section>
+            <section class="map-section local-map-section">
+              <div class="map-section-heading"><span>${t('LOCAL CONTACTS')}</span><b>${model.contacts.length} ${t('TRACKED')}</b></div>
+              <div class="tactical-map map-stage">
+                <div class="tactical-rings"></div><div class="tactical-player"></div>
+                ${(model.searchRings ?? []).map((ring) => `<span class="tactical-search-ring ${ring.color}" style="left:${(50 + ring.x * 42).toFixed(2)}%;top:${(50 + ring.y * 42).toFixed(2)}%;width:${Math.max(6, ring.fraction * 84).toFixed(1)}%;height:${Math.max(6, ring.fraction * 84).toFixed(1)}%"></span>`).join('')}
+                ${model.contacts.map((contact) => `<button class="tactical-contact ${contactTone(contact)} ${contact.ghost ? 'ghost' : ''} ${contact.distress ? 'distress' : ''} ${contact.selected ? 'selected' : ''}" style="left:${(50 + contact.x * 42).toFixed(2)}%;top:${(50 + contact.y * 42).toFixed(2)}%;opacity:${contact.ghost ? (contact.lostAlpha ?? 0.9) : 1}" data-map-target-kind="${contact.kind}" data-map-target-id="${escapeHtml(contact.id)}" aria-label="${escapeHtml(contact.name)}"><i></i>${contact.gate && Math.abs(contact.altitude ?? 0) > 0.02 ? `<b class="tactical-alt ${(contact.altitude ?? 0) > 0 ? 'up' : 'down'}" style="--alt:${Math.min(1, Math.abs(contact.altitude ?? 0)).toFixed(2)}"></b>` : ''}</button>`).join('')}
+              </div>
+              <div class="contact-list">
+                ${model.contacts.length ? model.contacts.map((contact) => `<button class="contact-row ${contactTone(contact)} ${contact.selected ? 'selected' : ''}" data-map-target-kind="${contact.kind}" data-map-target-id="${escapeHtml(contact.id)}"><i></i><span><b>${escapeHtml(contact.name)}</b><small>${escapeHtml(t(contact.subtitle))}</small></span><em>${Math.round(contact.distance)}u</em></button>`).join('') : `<div class="contact-empty"><b>${t('NO LOCAL CONTACTS')}</b><span>${t('Only contacts inside sensor range appear here.')}</span></div>`}
+              </div>
+            </section>
+          </div>
+        </div>
+        <div id="map-galaxy-view" class="map-view map-view-galaxy" role="tabpanel" aria-labelledby="map-galaxy-tab" data-map-view-panel="galaxy" hidden>
+          <section class="map-section galaxy-map-section">
+            <div class="map-section-heading"><span>${t('ROUTE NETWORK')}</span><b>${t('4 SYSTEMS · 3 JUMPS')}</b></div>
+            <nav class="regional-galaxy-map galaxy-map-stage" aria-label="${t('Regional systems')}">
+              <svg class="regional-route-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                ${JUMP_ROUTES.map((route) => {
+            const from = REGIONAL_SYSTEM_LAYOUT[route.fromSystemId];
+            const to = REGIONAL_SYSTEM_LAYOUT[route.toSystemId];
+            return from && to ? `<line data-route-id="${escapeHtml(route.id)}" data-from-system="${escapeHtml(route.fromSystemId)}" data-to-system="${escapeHtml(route.toSystemId)}" x1="${from.left}" y1="${from.top}" x2="${to.left}" y2="${to.top}"></line>` : '';
+        }).join('')}
+              </svg>
+              ${visibleSystems.map((entry) => {
+            const current = entry.id === model.systemId;
+            const planned = entry.id === model.plannedSystemId;
+            const point = REGIONAL_SYSTEM_LAYOUT[entry.id] ?? REGIONAL_SYSTEM_LAYOUT['helios-verge'];
+            const state = current ? t('CURRENT') : planned ? t('ROUTE SET') : t('VISIBLE');
+            const order = (systemRank.get(entry.id) ?? 0) + 1;
+            return `<button class="regional-system system-${escapeHtml(entry.id)} ${current ? 'current' : ''} ${planned ? 'planned' : ''}" style="left:${point.left}%;top:${point.top}%" data-system-order="${order}" data-map-target-kind="system" data-map-target-id="${escapeHtml(entry.id)}" aria-label="${escapeHtml(entry.name)} · ${escapeHtml(state)}"><em>${String(order).padStart(2, '0')}</em><i aria-hidden="true"></i><span>${escapeHtml(state)}</span><b>${escapeHtml(entry.name)}</b></button>`;
+        }).join('')}
+            </nav>
           </section>
         </div>
-        <footer><span>${model.autopilotAvailable ? t('HYPERDRIVE READY — plot a jump vector.') : t('HYPERDRIVE LOCKED — {threat}.', { threat: model.threatLabel ?? t('hostile proximity') })}</span></footer>
+        <footer><span>${model.autopilotAvailable ? t('HYPERDRIVE READY — plot a jump vector.') : t('HYPERDRIVE LOCKED — {threat}.', { threat: model.threatLabel ?? t('hostile proximity') })}</span><span>${t('FLY THROUGH JUMP GATES · NO ACTIVATION REQUIRED · valuable cargo raises pirate activity around jump points.')}</span></footer>
       </div>`;
         this.hidePause();
         this.hideShipMenu();
         panel.classList.remove('is-hidden');
+        this.setMapView(this.mapView);
         this.updateOrientationNotice();
     }
     hideMap() {
@@ -2703,7 +3352,7 @@ export class GameUI {
           <section><h3>${t('AUDIO')}</h3><label><span>${t('Music')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.music}" data-setting="music"></label><label><span>${t('Effects')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.effects}" data-setting="effects"></label><label><span>${t('Haptics')}</span><input type="checkbox" data-setting="vibration" ${settings.vibration ? 'checked' : ''}></label></section>
           <section><h3>${t('DISPLAY')}</h3><label><span>${t('Fullscreen')}</span><button type="button" class="fullscreen-switch" data-ui-command="toggle-fullscreen" role="switch" aria-label="${t('Toggle fullscreen')}" aria-checked="false">⛶</button></label></section>
           <section><h3>${t('LANGUAGE')}</h3><label><span>${t('Language')}</span><select data-setting="language"><option value="de" ${settings.language !== 'en' ? 'selected' : ''}>Deutsch</option><option value="en" ${settings.language === 'en' ? 'selected' : ''}>English</option></select></label></section>
-          <section class="controls-reference"><h3>${t('KEYBOARD / CONTROLLER')}</h3><p>${t('W/S pitch · A/D yaw · Q/E roll · R/F throttle · Shift afterburn · Space fire · hold M secondary tool / tap missile or capture · T target · C mode · N nav · J hyperdrive · K map · B transponder')}</p><p>${t('Gamepad: left stick steer · right stick roll/throttle · RT fire · hold RB secondary tool / tap missile or capture · LB afterburn · face buttons target/mode/hyperdrive · left stick click transponder · D-pad capture/hostile/nav.')}</p></section>
+          <section class="controls-reference"><h3>${t('KEYBOARD / CONTROLLER')}</h3><p>${t('W/S pitch · A/D yaw · Q/E roll · R/F throttle · Shift afterburn · Space fire · X fire group · hold M secondary tool / tap missile or capture · T target · C mode · N nav · J hyperdrive · K map · B transponder')}</p><p>${t('Gamepad: left stick steer · right stick roll/throttle · RT fire · hold RB secondary tool / tap missile or capture · LB afterburn · face buttons target/mode/fire group/hyperdrive · left stick click transponder · D-pad capture/hostile/nav.')}</p></section>
         </div>`;
     }
     showPause() {

@@ -10,7 +10,7 @@ import {
     sellCommodity,
     TRADE_FAILURE_REASONS,
 } from './economy.js';
-import { DOCK_LOCATION_IDS, commodityIds } from './data.js';
+import { MARKET_LOCATION_IDS, commodityIds } from './data.js';
 import { createNewSave, hydrateSave } from './save.js';
 
 const fresh = (seed = 0xdecafbad) => createNewSave(seed);
@@ -155,7 +155,7 @@ const setPrice = (world, locationId, commodityId, price, supply = 50) => {
     assert.equal(known.creditsPerUnit, 70);
     assert.equal(known.creditsPerMass, 70);
 
-    for (const locationId of DOCK_LOCATION_IDS)
+    for (const locationId of MARKET_LOCATION_IDS)
         for (const commodityId of commodityIds)
             setPrice(world, locationId, commodityId, 100);
     setPrice(world, 'helix', 'gold', 50);
@@ -202,5 +202,5 @@ const setPrice = (world, locationId, commodityId, price, supply = 50) => {
 
 // Keep this test's market fixture intentionally independent from the generated
 // market so route tests don't accidentally rely on a seed-specific price.
-assert.equal(Object.keys(createInitialMarket(21)).length, DOCK_LOCATION_IDS.length);
+assert.equal(Object.keys(createInitialMarket(21)).length, MARKET_LOCATION_IDS.length);
 console.log('all economy assertions passed');

@@ -1,12 +1,18 @@
 import { createInitialMarket, normalizeMarketIntel, refreshAllPrices } from './economy.js';
-import { LOCATIONS } from './data.js';
+import { DEFAULT_NAV_LOCATION_BY_SYSTEM, LOCATIONS, MISSION_LOCATION_IDS, SHIPS, navLocationIdsForSystem } from './data.js';
+import { SYSTEM_IDS, getRoute, hasSystem } from './galaxy.js';
 import { refreshMissionOffers } from './missions.js';
 import { normalizeRaceRecord } from './racing.js';
 import { clamp } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
 import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS } from './weapons.js';
+import { collapseOutfittingToSingleShip, createOutfittingState, normalizeOutfitting, projectLegacyEquipment, projectLegacyWeaponId } from './outfitting.js';
+import { combinedHullIntegrity, normalizeEnergy } from './combatResources.js';
 export const SAVE_KEY = 'void-privateer-save-v1';
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 9;
+// Test-funds build: a fresh career starts with enough credits to try any ship,
+// outfitting module or trade route without grinding first.
+export const STARTING_CREDITS = 500000;
 const LEGACY_LOCATION_POSITIONS = {
     helix: [-14400, 1800, 12400],
     rook: [16400, 3200, 15200],
@@ -43,20 +49,21 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
         createdAt: now,
         updatedAt: now,
         player: {
+            systemId: 'helios-verge',
             position: [...LOCATIONS.helix.position],
             rotation: [0, 0, 0, 1],
             velocity: [0, 0, 0],
             angularVelocity: [0, 0, 0],
             throttle: 0,
-            credits: 3200,
+            credits: STARTING_CREDITS,
             fuel: 100,
             // Transponder state: ON squawks a full sensor signature (visible at
             // standard radar range), OFF hides the ship from sensors beyond the
             // dark-detection line — at the cost of being an unlicensed squawk.
             transponder: true,
             shield: 90,
-            armor: 85,
-            hull: 100,
+            hull: 185,
+            energy: 72,
             missiles: 4,
             // Active primary weapon + per-weapon ammo pools. hydrateSave
             // default-fills both for careers written before the weapon roster
@@ -68,6 +75,9 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             cargo: {},
             sealedCargo: [],
             equipment: [],
+            // Canonical ship-local hardpoints and counted module locker. The
+            // flat equipment array remains a derived compatibility projection.
+            outfitting: createOutfittingState(['wayfarer']),
             mode: 'combat',
             navTargetId: 'shardbelt',
             dockedAt: 'helix',
@@ -94,6 +104,7 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
                 syndicate: 0,
             },
             discovered: ['helix'],
+            discoveredSystems: [...SYSTEM_IDS],
             stats: {
                 kills: 0,
                 trades: 0,
@@ -111,12 +122,10 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             // Sparse learned-price ledger. Ports are added by recordMarketVisit
             // only when the player has actually visited them.
             marketIntel: {},
-            offers: {
-                helix: [],
-                rook: [],
-                vesper: [],
-                azure: [],
-            },
+            offers: Object.fromEntries(MISSION_LOCATION_IDS.map((locationId) => [locationId, []])),
+            plannedSystemId: null,
+            plannedDestinationId: null,
+            pendingJump: null,
             depletedAsteroids: {},
             depletedWrecks: {},
             completedMissionIds: [],
@@ -146,6 +155,11 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
     return save;
 };
 const storageAvailable = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+const finiteTuple = (value, length) => Array.isArray(value)
+    && value.length === length
+    && value.every((entry) => Number.isFinite(entry));
+const finiteRotation = (value) => finiteTuple(value, 4)
+    && value.reduce((sum, entry) => sum + entry * entry, 0) > 1e-12;
 const migrateLegacyPosition = (save, sourceVersion) => {
     if (sourceVersion >= 4)
         return;
@@ -160,9 +174,10 @@ const migrateLegacyPosition = (save, sourceVersion) => {
         return { id, distance: Math.hypot(dx, dy, dz), offset: [dx, dy, dz] };
     })
         .sort((a, b) => a.distance - b.distance)[0];
-    const fallbackAnchor = save.player.dockedAt ?? save.player.lastDockedAt;
-    const selected = save.player.dockedAt
-        ? { id: save.player.dockedAt, distance: 0, offset: [0, 0, 0] }
+    const dockedAnchor = LOCATIONS[save.player.dockedAt] ? save.player.dockedAt : undefined;
+    const fallbackAnchor = LOCATIONS[save.player.lastDockedAt] ? save.player.lastDockedAt : 'helix';
+    const selected = dockedAnchor
+        ? { id: dockedAnchor, distance: 0, offset: [0, 0, 0] }
         : anchor && anchor.distance < 1150
             ? anchor
             : { id: fallbackAnchor, distance: 0, offset: [0, 0, (LOCATIONS[fallbackAnchor].dockRadius ?? 80) + 35] };
@@ -190,7 +205,10 @@ export const saveGame = (save) => {
         // has gone non-finite (a crash glitch), keep the last good autosave
         // instead of overwriting the career with garbage.
         const state = save.player;
-        if ([state.position, state.velocity, state.angularVelocity].some((arr) => !Array.isArray(arr) || arr.some((v) => !Number.isFinite(v)))) {
+        if (!finiteTuple(state.position, 3)
+            || !finiteTuple(state.velocity, 3)
+            || !finiteTuple(state.angularVelocity, 3)
+            || !finiteRotation(state.rotation)) {
             console.warn('Refusing to persist non-finite player state.');
             return false;
         }
@@ -199,6 +217,7 @@ export const saveGame = (save) => {
         const persist = { ...save, player: { ...save.player } };
         delete persist.player.prevPosition;
         delete persist.player.prevRotation;
+        delete persist.player.shipStates;
         window.localStorage.setItem(SAVE_KEY, JSON.stringify(persist));
         return true;
     }
@@ -225,8 +244,25 @@ const normalizeRaceRecords = (records) => Object.fromEntries(
     Object.entries(records && typeof records === 'object' ? records : {})
         .map(([courseId, record]) => [courseId, normalizeRaceRecord(record)]),
 );
+// Version 8 stored armor and hull separately. These maxima let a damaged save
+// with one missing legacy field migrate conservatively instead of receiving a
+// free full repair or losing durability.
+const LEGACY_DURABILITY = Object.freeze({
+    wayfarer: { armor: 85, hull: 100 },
+    vanguard: { armor: 135, hull: 160 },
+    talon: { armor: 58, hull: 80 },
+    prospector: { armor: 120, hull: 150 },
+    lancer: { armor: 115, hull: 145 },
+    atlas: { armor: 165, hull: 190 },
+});
+const validFleetIds = (player = {}) => {
+    const listed = Array.isArray(player.ownedShips) ? player.ownedShips : [];
+    return [...new Set([player.shipId, ...listed].filter((id) => SHIPS[id]))];
+};
 export const hydrateSave = (candidate) => {
-    const sourceVersion = Number(candidate.version ?? 1);
+    candidate = candidate && typeof candidate === 'object' && !Array.isArray(candidate) ? candidate : {};
+    const parsedVersion = Number(candidate.version ?? 1);
+    const sourceVersion = Number.isFinite(parsedVersion) ? parsedVersion : 1;
     const fallback = createNewSave(candidate.world?.seed);
     const save = {
         ...fallback,
@@ -255,10 +291,19 @@ export const hydrateSave = (candidate) => {
             // Weapon ammo pools merge per-key like cargo so a save written
             // before a weapon shipped still receives the new pool's default.
             ammo: { ...fallback.player.ammo, ...(candidate.player?.ammo ?? {}) },
-            equipment: candidate.player?.equipment ?? fallback.player.equipment,
+            // The schema-6 field was always an array. Treat hand-edited or
+            // corrupted values as empty instead of letting later compatibility
+            // projections call .includes/.push on a string or object.
+            equipment: Array.isArray(candidate.player?.equipment)
+                ? [...candidate.player.equipment]
+                : fallback.player.equipment,
+            // Keep legacy saves on the migration path instead of inheriting
+            // the fallback's seeded wayfarer state.
+            outfitting: candidate.player?.outfitting ?? undefined,
             ownedShips: candidate.player?.ownedShips ?? fallback.player.ownedShips,
             sealedCargo: candidate.player?.sealedCargo ?? fallback.player.sealedCargo,
             discovered: candidate.player?.discovered ?? fallback.player.discovered,
+            discoveredSystems: [...SYSTEM_IDS],
         },
         world: {
             ...fallback.world,
@@ -290,40 +335,124 @@ export const hydrateSave = (candidate) => {
         save.player.dockedAt = undefined;
     if (candidate.player && !Object.prototype.hasOwnProperty.call(candidate.player, 'currentTargetId'))
         save.player.currentTargetId = undefined;
+    if (save.player.dockedAt && !LOCATIONS[save.player.dockedAt])
+        save.player.dockedAt = undefined;
+    if (!LOCATIONS[save.player.lastDockedAt])
+        save.player.lastDockedAt = save.player.dockedAt ?? 'helix';
+    const anchoredSystemId = LOCATIONS[save.player.dockedAt]?.systemId
+        ?? LOCATIONS[save.player.lastDockedAt]?.systemId;
+    save.player.systemId = hasSystem(save.player.systemId)
+        ? save.player.systemId
+        : (anchoredSystemId ?? 'helios-verge');
+    const localNavIds = navLocationIdsForSystem(save.player.systemId);
+    if (!localNavIds.includes(save.player.navTargetId))
+        save.player.navTargetId = DEFAULT_NAV_LOCATION_BY_SYSTEM[save.player.systemId] ?? localNavIds[0] ?? 'shardbelt';
+    if (save.player.currentTargetId && LOCATIONS[save.player.currentTargetId]?.systemId !== save.player.systemId)
+        save.player.currentTargetId = undefined;
+    if (save.world.pendingJump) {
+        const pending = save.world.pendingJump;
+        const route = getRoute(pending.routeId);
+        const validArrival = hasSystem(pending.toSystemId)
+            && LOCATIONS[pending.toLocationId]?.systemId === pending.toSystemId;
+        const validDeparture = hasSystem(pending.fromSystemId)
+            && LOCATIONS[pending.fromLocationId]?.systemId === pending.fromSystemId;
+        if (!route || !validArrival || !validDeparture
+            || !route.systemIds.includes(pending.fromSystemId)
+            || !route.systemIds.includes(pending.toSystemId))
+            save.world.pendingJump = null;
+    }
+    if (!hasSystem(save.world.plannedSystemId)) {
+        save.world.plannedSystemId = null;
+        save.world.plannedDestinationId = null;
+    }
+    else if (save.world.plannedDestinationId
+        && LOCATIONS[save.world.plannedDestinationId]?.systemId !== save.world.plannedSystemId) {
+        save.world.plannedDestinationId = null;
+    }
     // A save written by a crashed session may hold a non-finite position
     // (JSON round-trips NaN as null). Snap it back to the last dock so the
     // pilot always recovers instead of spawning into corrupted coordinates.
     const savedPosition = save.player.position;
-    if (!Array.isArray(savedPosition) || savedPosition.some((v) => !Number.isFinite(v))) {
+    if (!finiteTuple(savedPosition, 3)) {
         const anchorId = save.player.dockedAt ?? save.player.lastDockedAt ?? 'helix';
         const anchor = LOCATIONS[anchorId] ?? LOCATIONS.helix;
         save.player.position = [...anchor.position];
-        save.player.velocity = [0, 0, 0];
-        save.player.angularVelocity = [0, 0, 0];
         save.player.throttle = 0;
     }
+    if (!finiteTuple(save.player.velocity, 3))
+        save.player.velocity = [0, 0, 0];
+    if (!finiteTuple(save.player.angularVelocity, 3))
+        save.player.angularVelocity = [0, 0, 0];
+    if (!finiteRotation(save.player.rotation))
+        save.player.rotation = [0, 0, 0, 1];
+    else {
+        const rotationLength = Math.hypot(...save.player.rotation);
+        save.player.rotation = save.player.rotation.map((entry) => entry / rotationLength);
+    }
     migrateLegacyPosition(save, sourceVersion);
+    const activeShipId = SHIPS[save.player.shipId] ? save.player.shipId : 'wayfarer';
+    const legacyFleet = validFleetIds({
+        shipId: activeShipId,
+        ownedShips: Array.isArray(candidate.player?.ownedShips)
+            ? candidate.player.ownedShips
+            : save.player.ownedShips,
+    });
+    // Fleet-era careers keep the active ship. Every other hull is bought back
+    // once at the same 50% base-value rule used by the new ship dealer.
+    const fleetCredit = legacyFleet
+        .filter((shipId) => shipId !== activeShipId)
+        .reduce((total, shipId) => total + Math.round(SHIPS[shipId].price * 0.5), 0);
+    const savedCredits = Number(save.player.credits);
+    save.player.credits = (Number.isFinite(savedCredits) ? Math.max(0, savedCredits) : 0) + fleetCredit;
+    // Outfitting is the source of truth from schema 7 onward. A schema-6
+    // career is converted from its flat equipment array. Keep that original
+    // flat list on the first load so older callers still see the exact ids
+    // they wrote; commitOutfitting refreshes it from canonical state. A save
+    // that already carries canonical state gets a fresh projection now.
+    const hadCanonicalOutfitting = Boolean(candidate.player?.outfitting);
+    save.player.shipId = activeShipId;
+    save.player.outfitting = collapseOutfittingToSingleShip({
+        ...save.player,
+        ownedShips: legacyFleet,
+    }, activeShipId);
+    save.player.ownedShips = [activeShipId];
+    delete save.player.shipStates;
+    save.player.outfitting = normalizeOutfitting(save.player);
+    if (hadCanonicalOutfitting) {
+        save.player.equipment = projectLegacyEquipment(save.player, save.player.outfitting);
+        save.player.weaponId = projectLegacyWeaponId(save.player, save.player.shipId, save.player.outfitting.loadouts?.[save.player.shipId]?.fireGroups?.activeGroup);
+    }
     save.version = SAVE_VERSION;
     const stats = getEffectiveShipStats(save.player);
-    save.player.fuel = clamp(save.player.fuel, 0, stats.fuel);
-    save.player.shield = clamp(save.player.shield, 0, stats.shield);
-    save.player.armor = clamp(save.player.armor, 0, stats.armor);
-    save.player.hull = clamp(save.player.hull, 1, stats.hull);
-    save.player.missiles = clamp(save.player.missiles, 0, stats.missileCapacity);
+    if (sourceVersion < 9) {
+        const legacy = LEGACY_DURABILITY[activeShipId] ?? LEGACY_DURABILITY.wayfarer;
+        const legacyNumber = (value, fallbackValue) => value !== null && value !== '' && Number.isFinite(Number(value))
+            ? Number(value)
+            : fallbackValue;
+        save.player.hull = combinedHullIntegrity(
+            legacyNumber(candidate.player?.hull, legacy.hull),
+            legacyNumber(candidate.player?.armor, legacy.armor),
+        );
+        save.player.energy = stats.energyCapacity;
+    }
+    const currentResource = (value, fallbackValue) => value !== null && value !== '' && Number.isFinite(Number(value))
+        ? Number(value)
+        : fallbackValue;
+    save.player.fuel = clamp(currentResource(save.player.fuel, stats.fuel), 0, stats.fuel);
+    save.player.shield = clamp(currentResource(save.player.shield, stats.shield), 0, stats.shield);
+    save.player.hull = clamp(currentResource(save.player.hull, stats.hull), 1, stats.hull);
+    save.player.energy = normalizeEnergy(save.player.energy, stats.energyCapacity);
+    delete save.player.armor;
+    save.player.missiles = clamp(currentResource(save.player.missiles, stats.missileCapacity), 0, stats.missileCapacity);
     // Weapon state hygiene: an unknown weaponId (registry change, corrupted
     // save) falls back to the pulse laser, and every ammo pool clamps to its
     // capacity so imported/hand-edited saves cannot carry negative or
     // overfilled stock.
     if (!WEAPONS[save.player.weaponId])
         save.player.weaponId = 'pulse';
-    // Acquisition-economy migration courtesy: a career saved while the four
-    // later guns were granted outright keeps flying whatever it had equipped —
-    // grant the matching equipment so ownership derives cleanly from here on.
-    {
-        const equipped = WEAPONS[save.player.weaponId];
-        if (equipped.equipmentId && !save.player.equipment.includes(equipped.equipmentId))
-            save.player.equipment.push(equipped.equipmentId);
-    }
+    // Legacy weapon-only ownership is folded into canonical outfitting during
+    // normalizeOutfitting. Never append it here: the flat equipment array is a
+    // compatibility projection and would be discarded at the runtime boundary.
     for (const id of WEAPON_ORDER) {
         const ammoId = WEAPONS[id].ammoId;
         if (ammoId)

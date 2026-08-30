@@ -22,6 +22,8 @@ README.md
 PLAYABLE_README.md
 *.webp
 !art/commodities/*.webp
+!art/outfitting/*.webp
+!art/locations/v4/*.webp
 !assets/remaster/cockpit-vanguard.webp
 !assets/remaster/cockpit-talon.webp
 !assets/remaster/cockpit-prospector.webp

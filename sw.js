@@ -1,4 +1,4 @@
-const CACHE = 'voidrunner-v139-market-scroll';
+const CACHE = 'voidrunner-v160-0-7-19-torn-wrecks';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([
     './',
@@ -9,12 +9,18 @@ self.addEventListener('install', (event) => {
     './src/main.js',
     './src/game/audio.js',
     './src/game/data.js',
+    './src/game/galaxy.js',
+    './src/game/galaxyContent.js',
+    './src/game/combatResources.js',
     './src/game/economy.js',
+    './src/game/outfitting.js',
     './src/game/entityStore.js',
     './src/game/game.js',
+    './src/game/hullCollision.js',
     './src/game/input.js',
     './src/game/laserFx.js',
     './src/game/missions.js',
+    './src/game/npcNav.js',
     './src/game/pilots.js',
     './src/game/random.js',
     './src/game/racing.js',
@@ -22,6 +28,10 @@ self.addEventListener('install', (event) => {
     './src/game/render.js',
     './src/game/save.js',
     './src/game/shipStats.js',
+    './src/game/shipMounts.js',
+    './src/game/shipPreview.js',
+    './src/game/shipProfiles.js',
+    './src/game/shipTrade.js',
     './src/game/types.js',
     './src/game/i18n.js',
     './src/game/i18n-de.js',
@@ -49,6 +59,26 @@ self.addEventListener('install', (event) => {
     './art/commodities/ore.webp',
     './art/commodities/scrap.webp',
     './art/commodities/water.webp',
+    './art/outfitting/armor-mk2.webp',
+    './art/outfitting/cargo-pods.webp',
+    './art/outfitting/engine-mk2.webp',
+    './art/outfitting/gauss-cannon.webp',
+    './art/outfitting/ion-blaster.webp',
+    './art/outfitting/mining-mk2.webp',
+    './art/outfitting/mortar.webp',
+    './art/outfitting/pdc.webp',
+    './art/outfitting/pulse-cannon.webp',
+    './art/outfitting/pulse-mk2.webp',
+    './art/outfitting/radar-mk2.webp',
+    './art/outfitting/ripper.webp',
+    './art/outfitting/salvage-mk2.webp',
+    './art/outfitting/seeker-launcher.webp',
+    './art/outfitting/shield-mk2.webp',
+    './art/outfitting/swarm-launcher.webp',
+    './art/outfitting/thrusters-mk2.webp',
+    './art/outfitting/torpedo-launcher.webp',
+    './art/outfitting/v2/dealer-mechanic-portrait-v2.png',
+    './art/outfitting/v2/dealer-workshop-backdrop-v2.png',
     './art/locations/v3/azure.png',
     './art/locations/v3/azure-hd-v1.png',
     './art/locations/v3/bar-azure.png',
@@ -72,6 +102,29 @@ self.addEventListener('install', (event) => {
     './art/locations/v3/rook.png',
     './art/locations/v3/rook-hd-v1.png',
     './art/locations/v3/vesper.png',
+    './art/locations/v4/argent.webp',
+    './art/locations/v4/blackglass.webp',
+    './art/locations/v4/boreal.webp',
+    './art/locations/v4/cairn.webp',
+    './art/locations/v4/cinder.webp',
+    './art/locations/v4/gatehouse-twelve.webp',
+    './art/locations/v4/meridian-prime.webp',
+    './art/locations/v4/nacre.webp',
+    './art/locations/v4/shepherd.webp',
+    './art/locations/v4/torchwell.webp',
+    './art/locations/v5/bar-argent-hd-v1.png',
+    './art/locations/v5/bar-blackglass-hd-v1.png',
+    './art/locations/v5/bar-boreal-hd-v1.png',
+    './art/locations/v5/bar-cairn-hd-v1.png',
+    './art/locations/v5/bar-cinder-hd-v1.png',
+    './art/locations/v5/bar-meridian-prime-hd-v1.png',
+    './art/locations/v5/bar-nacre-hd-v1.png',
+    './art/locations/v5/market-argent-hd-v1.png',
+    './art/locations/v5/market-blackglass-hd-v1.png',
+    './art/locations/v5/market-boreal-hd-v1.png',
+    './art/locations/v5/market-cinder-hd-v1.png',
+    './art/locations/v5/market-meridian-prime-hd-v1.png',
+    './art/locations/v5/market-nacre-hd-v1.png',
     './art/portraits/captain-dorne.webp',
     './art/portraits/devi-castor.webp',
     './art/portraits/doctor-ames.webp',
@@ -109,12 +162,12 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 // Immutable, content-addressed art (sprites, location plates, portraits, the
-// cockpit frame, fonts): the URL only changes when a new image is published,
-// so it never needs a blocking revalidation. Serve the cached copy immediately
-// and refresh it in the background (stale-while-revalidate) so returning to a
-// station never re-downloads the plates — the old network-first path forced a
-// revalidation round trip on every image, every time.
-const IMMUTABLE_ART = /\.(?:png|jpe?g|webp|gif|svg|avif|ico|woff2?|ttf|otf)$/i;
+// cockpit frame, fonts, and versioned GLB models): the URL changes when a new
+// asset is published, so it never needs a blocking revalidation. Serve the
+// cached copy immediately and refresh it in the background
+// (stale-while-revalidate) so returning to a station or capital-ship patrol
+// never waits for the same large asset twice.
+const IMMUTABLE_ART = /\.(?:png|jpe?g|webp|gif|svg|avif|ico|woff2?|ttf|otf|glb)$/i;
 const isArtAsset = (request) => IMMUTABLE_ART.test(new URL(request.url).pathname);
 const staleWhileRevalidate = async (request) => {
   const cache = await caches.open(CACHE);

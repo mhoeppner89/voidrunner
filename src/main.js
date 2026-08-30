@@ -1,6 +1,6 @@
 import { GameSession } from './game/game.js';
 import { createNewSave, hasSavedGame, loadGame, saveGame } from './game/save.js';
-import { DOCK_LOCATION_IDS, SHIPS } from './game/data.js';
+import { DOCK_LOCATION_IDS, LOCATIONS, SHIPS } from './game/data.js';
 import { setLanguage, t } from './game/i18n.js';
 import { GameUI } from './game/ui.js';
 const host = document.querySelector('#app');
@@ -89,6 +89,8 @@ const beginSession = (mode, arena) => {
         // in the normal career flow, but uses the same saved-game dock path.
         save.player.dockedAt = devPreviewLocation;
         save.player.lastDockedAt = devPreviewLocation;
+        save.player.systemId = LOCATIONS[devPreviewLocation].systemId;
+        save.player.position = [...LOCATIONS[devPreviewLocation].position];
         save.player.velocity = [0, 0, 0];
         save.player.throttle = 0;
         if (devPreviewShip)
@@ -96,11 +98,10 @@ const beginSession = (mode, arena) => {
     }
     if (mode === 'arena')
         save.arena = arena;
-    // The combat sim is a sandbox: every gun is unlocked there so players can
-    // review the whole roster without a shopping trip. Career saves are not
-    // affected — ownership there derives from purchased equipment.
-    if (mode === 'arena')
-        save.player.equipment = ['pdc-cluster', 'ripper-scattergun', 'ion-lance', 'sunlance-mortar'];
+    // The combat sim uses the same canonical factory hardpoints as a career.
+    // Its disposable save still keeps the sortie consequence-free, while an
+    // arena run can no longer bypass installed-only weapons through the old
+    // flat equipment list.
     cachedSave = save;
     saveGame(save);
     session = new GameSession(save, ui, () => {
@@ -159,6 +160,7 @@ const actions = {
     repair: () => session?.repair(),
     refuel: () => session?.refuel(),
     buyEquipment: (equipmentId) => session?.buyEquipment(equipmentId),
+    applyOutfitting: (shipId, draft, options) => session?.applyOutfitting(shipId, draft, options),
     buyShip: (shipId) => session?.buyShip(shipId),
     switchShip: (shipId) => session?.switchShip(shipId),
     joinGuild: (guildId) => session?.joinGuild(guildId),
@@ -265,6 +267,7 @@ window.__VOID_PRIVATEER__ = {
     pickTarget: (x, y) => session?.renderer?.pickTarget(x, y),
     projectToScreen: (position) => session?.renderer?.projectToScreen(position),
     launch: () => session?.launch(),
+    jumpToSystem: (systemId) => session?.debugJumpToSystem(systemId),
     saveNow: () => session?.saveNow(),
     // Mock story-mission line: pins the comms bar in amber, mutes all chatter
     // until dismissed (tap the CONTINUE bar) or the duration elapses.
@@ -285,11 +288,18 @@ window.render_game_to_text = () => {
         mode: save.player.dockedAt ? 'docked' : race?.state ? `race-${race.state}` : 'flight',
         coordinates: 'world [x,y,z]; +y is up; ship forward is local -z',
         player: {
+            systemId: save.player.systemId,
             position: save.player.position.map((value) => Math.round(value * 10) / 10),
             velocity: save.player.velocity.map((value) => Math.round(value * 10) / 10),
             fuel: Math.round(save.player.fuel * 10) / 10,
             dockedAt: save.player.dockedAt ?? null,
             targetId: save.player.currentTargetId ?? null,
+            navTargetId: save.player.navTargetId,
+        },
+        galaxy: {
+            plannedSystemId: save.world.plannedSystemId ?? null,
+            plannedDestinationId: save.world.plannedDestinationId ?? null,
+            pendingJump: save.world.pendingJump ?? null,
         },
         market: save.player.dockedAt ? {
             locationId: save.player.dockedAt,

@@ -1,4 +1,4 @@
-import { COMMODITIES, DOCK_LOCATION_IDS, LOCATIONS, commodityIds } from './data.js';
+import { COMMODITIES, LOCATIONS, MARKET_LOCATION_IDS, commodityIds } from './data.js';
 import { clamp, randomBetween, seededRandom } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
 import { t } from './i18n.js';
@@ -22,7 +22,7 @@ export const denPrice = (locationId, commodityId, item, seed, economyClock) => {
 };
 export const createInitialMarket = (seed) => {
     const market = {};
-    for (const locationId of DOCK_LOCATION_IDS) {
+    for (const locationId of MARKET_LOCATION_IDS) {
         market[locationId] = {};
         for (const commodityId of commodityIds) {
             const rng = seededRandom(`${seed}:${locationId}:${commodityId}`);
@@ -49,7 +49,7 @@ export const marketPrice = (locationId, commodityId, item, seed, economyClock) =
     return Math.max(3, Math.round(commodity.basePrice * locationModifier * (1 + pressure + cycle) * restrictedPremium));
 };
 export const refreshAllPrices = (market, seed, economyClock) => {
-    for (const locationId of DOCK_LOCATION_IDS) {
+    for (const locationId of MARKET_LOCATION_IDS) {
         for (const commodityId of commodityIds) {
             const item = market[locationId][commodityId];
             item.lastPrice = marketPrice(locationId, commodityId, item, seed, economyClock);
@@ -62,7 +62,7 @@ export const tickEconomy = (world, seconds) => {
     const currentCycle = Math.floor(world.economyClock / 45);
     if (currentCycle === previousCycle)
         return;
-    for (const locationId of DOCK_LOCATION_IDS) {
+    for (const locationId of MARKET_LOCATION_IDS) {
         for (const commodityId of commodityIds) {
             const item = world.market[locationId][commodityId];
             const rng = seededRandom(`${world.seed}:economy:${currentCycle}:${locationId}:${commodityId}`);
@@ -116,7 +116,7 @@ export const normalizeMarketIntel = (candidate) => {
     const result = {};
     if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate))
         return result;
-    for (const locationId of DOCK_LOCATION_IDS) {
+    for (const locationId of MARKET_LOCATION_IDS) {
         const source = candidate[locationId];
         if (!source || typeof source !== 'object' || Array.isArray(source))
             continue;
@@ -406,7 +406,7 @@ export const knownMarketQuotes = (worldOrSave, commodityId, originId) => {
         return [];
     const now = clockFor(world);
     const result = [];
-    for (const locationId of DOCK_LOCATION_IDS) {
+    for (const locationId of MARKET_LOCATION_IDS) {
         if (originId && locationId === originId)
             continue;
         const port = intel[locationId];
@@ -520,7 +520,7 @@ export const currentProfitableRoutes = (worldOrSave, originId, limit = 3) => {
             continue;
         if (finiteNumber(originItem?.supply) !== undefined && originItem.supply <= 0)
             continue;
-        for (const destinationId of DOCK_LOCATION_IDS) {
+        for (const destinationId of MARKET_LOCATION_IDS) {
             if (destinationId === originId)
                 continue;
             const sellPrice = livePriceFor(world, destinationId, id);

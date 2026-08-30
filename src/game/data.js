@@ -1,3 +1,6 @@
+import { GALAXY_LOCATIONS } from './galaxyContent.js';
+import { JUMP_ROUTES, SYSTEMS, systemHops } from './galaxy.js';
+
 export const FACTION_NAMES = {
     concord: 'Concord Patrol',
     'free-merchants': 'Free Merchants Compact',
@@ -233,7 +236,7 @@ const vesperPeople = [
     {
         id: 'devi-castor',
         name: 'Devi Castor',
-        role: 'Pit boss',
+        role: 'Mining foreman',
         marketTipster: true,
         affiliation: 'Frontier Miners Cooperative',
         portraitSeed: 121,
@@ -310,13 +313,15 @@ const azurePeople = [
         ],
     },
 ];
-export const LOCATIONS = {
+const HELIOS_LOCATIONS = {
     helix: {
         id: 'helix',
         name: 'Helix Freeport',
         shortName: 'HELIX',
         kind: 'station',
-        position: [-144000, 18000, 124000],
+        // Helix services the Shardbelt directly: close enough for the rock
+        // crown to hang on the horizon, but well outside the active field.
+        position: [18000, -8000, -176000],
         radius: 880,
         dockRadius: 1420,
         faction: 'free-merchants',
@@ -398,10 +403,10 @@ export const LOCATIONS = {
     'mourning-line': {
         id: 'mourning-line',
         name: 'Mourning Line',
-        shortName: 'GRAVEYARD',
+        shortName: 'MOURNING',
         kind: 'graveyard',
-        // Keep the wreck fleet in Helix's far viewing distance, on the
-        // sunward side: roughly 20,000 world units from the station.
+        // Cairn Yard remains tucked beside the wreck fleet so the graveyard
+        // is visible from its approaches and immediately reachable from dock.
         position: [-149994, 21496, 142758],
         radius: 2580,
         faction: 'salvage-union',
@@ -410,12 +415,115 @@ export const LOCATIONS = {
         description: 'A battlefield graveyard of shattered hulls, unstable reactors, and salvage claims with flexible ownership.',
     },
 };
-// The visible star is placed on the far star shell rather than at world
-// origin. Navigation-map projections use the same anchor so sunward routes
-// are not judged against the wrong point.
-export const SUN_POSITION = [-360000, 144000, 800000];
-export const DOCK_LOCATION_IDS = ['helix', 'rook', 'vesper', 'azure'];
-export const NAV_LOCATION_IDS = ['helix', 'rook', 'vesper', 'azure', 'shardbelt', 'mourning-line'];
+
+const FULL_DOCK_SERVICES = Object.freeze({
+    fuel: true,
+    repair: true,
+    market: true,
+    bar: true,
+    shipyard: true,
+    outfitting: true,
+    missions: true,
+    race: false,
+});
+const ACTIVITY_SERVICES = Object.freeze({
+    fuel: false,
+    repair: false,
+    market: false,
+    bar: false,
+    shipyard: false,
+    outfitting: false,
+    missions: false,
+    race: false,
+});
+const HELIOS_WITH_SYSTEM = Object.fromEntries(Object.entries(HELIOS_LOCATIONS).map(([id, location]) => [id, {
+    ...location,
+    systemId: 'helios-verge',
+    services: ['station', 'planet'].includes(location.kind) ? FULL_DOCK_SERVICES : ACTIVITY_SERVICES,
+}]));
+
+const JUMP_POINT_POSITIONS = Object.freeze({
+    'verge-meridian-point': [250000, 45000, 210000],
+    'meridian-verge-point': [-250000, 18000, 225000],
+    'verge-redwake-point': [245000, 16000, 205000],
+    'redwake-verge-point': [-70000, -12000, 245000],
+    'verge-pale-point': [255000, 50000, 200000],
+    'pale-verge-point': [-80000, 10000, 220000],
+});
+const jumpPointLocations = {};
+for (const route of JUMP_ROUTES) {
+    const endpoints = [
+        [route.fromSystemId, route.toSystemId, route.fromLocationId, route.toLocationId],
+        [route.toSystemId, route.fromSystemId, route.toLocationId, route.fromLocationId],
+    ];
+    for (const [systemId, destinationSystemId, id, destinationLocationId] of endpoints) {
+        const destinationSystem = SYSTEMS[destinationSystemId];
+        jumpPointLocations[id] = {
+            id,
+            systemId,
+            name: `${destinationSystem.name} Jump Point`,
+            shortName: `TO ${destinationSystem.shortName}`,
+            kind: 'jump-point',
+            position: JUMP_POINT_POSITIONS[id],
+            radius: 460,
+            faction: systemId === 'redwake' ? 'red-talons' : 'concord',
+            accent: systemId === 'redwake' ? '#d26759' : '#80bad0',
+            secondary: '#202c38',
+            description: `A stabilized jump approach linking ${SYSTEMS[systemId].name} with ${destinationSystem.name}.`,
+            routeId: route.id,
+            destinationSystemId,
+            destinationLocationId,
+            services: ACTIVITY_SERVICES,
+            encounterRate: systemId === 'redwake' || destinationSystemId === 'redwake' ? 0.72 : 0.38,
+        };
+    }
+}
+
+export const LOCATIONS = Object.freeze({
+    ...HELIOS_WITH_SYSTEM,
+    ...GALAXY_LOCATIONS,
+    ...jumpPointLocations,
+});
+
+// Local coordinates are reused in each system. Only the active system is
+// rendered and simulated, while these anchors keep each navigation chart
+// visually distinct.
+export const SYSTEM_SUN_POSITIONS = Object.freeze({
+    'helios-verge': [-360000, 144000, 800000],
+    meridian: [620000, 110000, 690000],
+    redwake: [-680000, -60000, 590000],
+    'pale-ring': [130000, 260000, 830000],
+});
+export const SUN_POSITION = SYSTEM_SUN_POSITIONS['helios-verge'];
+export const sunPositionForSystem = (systemId) => SYSTEM_SUN_POSITIONS[systemId] ?? SUN_POSITION;
+export const DEFAULT_NAV_LOCATION_BY_SYSTEM = Object.freeze({
+    'helios-verge': 'shardbelt',
+    meridian: 'foundry-lanes',
+    redwake: 'redwake-belt',
+    'pale-ring': 'pale-rings',
+});
+export const DEFAULT_DOCK_LOCATION_BY_SYSTEM = Object.freeze({
+    'helios-verge': 'helix',
+    meridian: 'meridian-prime',
+    redwake: 'cinder',
+    'pale-ring': 'nacre',
+});
+export const locationIdsForSystem = (systemId) => Object.values(LOCATIONS)
+    .filter((location) => location.systemId === systemId)
+    .map((location) => location.id);
+export const navLocationIdsForSystem = locationIdsForSystem;
+export const dockLocationIdsForSystem = (systemId) => locationIdsForSystem(systemId)
+    .filter((id) => LOCATIONS[id].dockRadius && Object.values(LOCATIONS[id].services ?? {}).some(Boolean));
+export const marketLocationIdsForSystem = (systemId) => dockLocationIdsForSystem(systemId)
+    .filter((id) => LOCATIONS[id].services?.market);
+export const activityLocationIdsForSystem = (systemId) => locationIdsForSystem(systemId)
+    .filter((id) => ['field', 'graveyard', 'rings'].includes(LOCATIONS[id].kind));
+export const DOCK_LOCATION_IDS = Object.freeze(Object.keys(LOCATIONS).filter((id) =>
+    LOCATIONS[id].dockRadius && Object.values(LOCATIONS[id].services ?? {}).some(Boolean)));
+export const MARKET_LOCATION_IDS = Object.freeze(DOCK_LOCATION_IDS.filter((id) => LOCATIONS[id].services?.market));
+export const MISSION_LOCATION_IDS = Object.freeze(DOCK_LOCATION_IDS.filter((id) =>
+    LOCATIONS[id].services?.missions || LOCATIONS[id].services?.race));
+export const NAV_LOCATION_IDS = Object.freeze(Object.keys(LOCATIONS));
 export const EQUIPMENT = {
     'engine-mk2': {
         id: 'engine-mk2',
@@ -443,11 +551,11 @@ export const EQUIPMENT = {
     },
     'armor-mk2': {
         id: 'armor-mk2',
-        name: 'Ablative Armor Weave',
-        category: 'armor',
+        name: 'Ablative Hull Weave',
+        category: 'hull',
         price: 6500,
-        description: 'Segmented sacrificial plating for extended combat endurance.',
-        stat: '+40 armor capacity',
+        description: 'Segmented sacrificial plating around the pressure hull.',
+        stat: '+40 hull integrity',
     },
     'pulse-mk2': {
         id: 'pulse-mk2',
@@ -549,8 +657,9 @@ export const SHIPS = {
         angularAcceleration: 1.65,
         angularDamping: 2.8,
         shield: 90,
-        armor: 85,
-        hull: 100,
+        hull: 185,
+        reactorOutput: 18,
+        energyCapacity: 72,
         cargo: 32,
         fuel: 100,
         missileCapacity: 4,
@@ -570,8 +679,9 @@ export const SHIPS = {
         angularAcceleration: 1.95,
         angularDamping: 3.1,
         shield: 150,
-        armor: 145,
-        hull: 150,
+        hull: 295,
+        reactorOutput: 27,
+        energyCapacity: 108,
         cargo: 58,
         fuel: 130,
         missileCapacity: 8,
@@ -591,8 +701,9 @@ export const SHIPS = {
         angularAcceleration: 2.45,
         angularDamping: 3.4,
         shield: 75,
-        armor: 60,
-        hull: 78,
+        hull: 138,
+        reactorOutput: 22,
+        energyCapacity: 58,
         cargo: 16,
         fuel: 85,
         missileCapacity: 4,
@@ -612,8 +723,9 @@ export const SHIPS = {
         angularAcceleration: 1.15,
         angularDamping: 2.2,
         shield: 120,
-        armor: 130,
-        hull: 140,
+        hull: 270,
+        reactorOutput: 16,
+        energyCapacity: 92,
         cargo: 96,
         fuel: 150,
         missileCapacity: 2,
@@ -633,8 +745,9 @@ export const SHIPS = {
         angularAcceleration: 2.15,
         angularDamping: 3.05,
         shield: 140,
-        armor: 125,
-        hull: 135,
+        hull: 260,
+        reactorOutput: 30,
+        energyCapacity: 96,
         cargo: 30,
         fuel: 120,
         missileCapacity: 10,
@@ -654,15 +767,21 @@ export const SHIPS = {
         angularAcceleration: 0.85,
         angularDamping: 1.9,
         shield: 170,
-        armor: 165,
-        hull: 190,
+        hull: 355,
+        reactorOutput: 20,
+        energyCapacity: 124,
         cargo: 160,
         fuel: 200,
         missileCapacity: 4,
         gunDamage: 9,
     },
 };
-export const LOCATION_ORDER = ['helix', 'rook', 'azure', 'shardbelt', 'vesper', 'mourning-line'];
+export const LOCATION_ORDER = Object.freeze([
+    'helix', 'rook', 'azure', 'shardbelt', 'vesper', 'mourning-line', 'cairn',
+    'meridian-prime', 'argent', 'gatehouse-twelve', 'foundry-lanes',
+    'blackglass', 'cinder', 'torchwell', 'redwake-belt',
+    'nacre', 'boreal', 'shepherd', 'pale-rings',
+]);
 export const SYSTEM_MAP_EXTENT = 256000;
 export const ROUTE_DISTANCE_SCALE = 480;
 export const displaySpeed = (unitsPerSecond) => unitsPerSecond * 2;
@@ -676,9 +795,15 @@ const FIELD_ENTRY_MARGIN = 250;
 // rock, but the ship regains control with the field filling the view (user
 // request: get way closer, just not on an asteroid).
 const FIELD_ARRIVAL_MARGIN = -60;
+// A system jump is a close-range interaction with the physical gate. Local
+// hyperdrive can carry the player to this boundary, but the actual inter-system
+// jump will not arm until the ship is within one kilometre of the centre.
+export const JUMP_POINT_ACTIVATION_RADIUS = 1000;
 export const hyperdriveArrivalRadius = (location) => {
-    if (location.kind === 'field' || location.kind === 'graveyard')
+    if (location.kind === 'field' || location.kind === 'graveyard' || location.kind === 'rings')
         return location.radius + FIELD_ARRIVAL_MARGIN;
+    if (location.kind === 'jump-point')
+        return JUMP_POINT_ACTIVATION_RADIUS;
     // Planets are huge now: exit hyperdrive well clear of the surface so the
     // approach reads as a long glide in (and the low-res surface texture stays
     // out of close-up range). 7km above the surface.
@@ -688,7 +813,7 @@ export const hyperdriveArrivalRadius = (location) => {
 };
 export const spawnClearance = (location) => {
     // Ships must spawn well clear of the body and its landing zone.
-    if (location.kind === 'field' || location.kind === 'graveyard')
+    if (location.kind === 'field' || location.kind === 'graveyard' || location.kind === 'rings')
         return location.radius + FIELD_ENTRY_MARGIN;
     return (location.dockRadius ?? location.radius) + 120;
 };
@@ -703,16 +828,22 @@ export const SECTOR_ENCOUNTER_RATE = {
     shardbelt: 0.45,
     'mourning-line': 0.5,
 };
-export const sectorEncounterChance = (id) => SECTOR_ENCOUNTER_RATE[id] ?? 0.3;
+export const sectorEncounterChance = (id) => LOCATIONS[id]?.encounterRate ?? SECTOR_ENCOUNTER_RATE[id] ?? 0.3;
 export const locationInstanceRadius = (id) => {
     const location = LOCATIONS[id];
-    if (location.kind === 'field' || location.kind === 'graveyard')
+    if (location.kind === 'field' || location.kind === 'graveyard' || location.kind === 'rings')
         return location.radius + 330;
     if (location.kind === 'planet')
         return (location.dockRadius ?? location.radius) + 330;
     return (location.dockRadius ?? location.radius) + 240;
 };
 export const routeDistanceBetween = (a, b) => {
+    const fromSystemId = LOCATIONS[a]?.systemId;
+    const toSystemId = LOCATIONS[b]?.systemId;
+    if (!fromSystemId || !toSystemId)
+        return 0;
+    if (fromSystemId !== toSystemId)
+        return (systemHops(fromSystemId, toSystemId) ?? 3) * 950;
     const pa = LOCATIONS[a].position;
     const pb = LOCATIONS[b].position;
     const dx = pa[0] - pb[0];

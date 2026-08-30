@@ -178,6 +178,25 @@ export const GRAVEYARD_GEOMETRY_HALF_EXTENTS = {
     // Loose hull fragments use a faceted chunk rather than an aligned cube.
     hull: [0.68, 0.68, 0.68],
 };
+// High-detail wreck landmarks rendered from the same Concord hulls that patrol
+// live space. Positions stay in Mourning Line local coordinates so the model,
+// its collision chunks, salvage sites, and authored race routes share one
+// frame. The frigate file is loaded once and cloned for the two casualties.
+export const GRAVEYARD_MODEL_WRECKS = Object.freeze([
+    Object.freeze({ id: 'concord-battleship-wreck', file: 'assets/models/wrecks/concord-battleship-wreck.glb', local: [140, -330, 680], rotation: [0.04, -0.12, 0.05], scale: 565, clearanceRadius: 730 }),
+    Object.freeze({ id: 'concord-frigate-alpha-wreck', file: 'assets/models/wrecks/concord-frigate-wreck.glb', local: [-980, 560, -650], rotation: [0.16, -1.91, 0.12], scale: 56.5, clearanceRadius: 115 }),
+    Object.freeze({ id: 'concord-frigate-beta-wreck', file: 'assets/models/wrecks/concord-frigate-wreck.glb', local: [980, -520, 980], rotation: [-0.2, -1.11, -0.14], scale: 56.5, clearanceRadius: 115 }),
+]);
+// The adapted wrecks are visual fly-through landmarks. Keep procedural debris
+// and salvage chunks outside these volumes so nothing invisible blocks a hull
+// breach and no large old stand-in intersects the detailed model.
+export const overlapsGraveyardModelWreck = (local, reach = 0) => GRAVEYARD_MODEL_WRECKS.some((wreck) => {
+    const dx = local[0] - wreck.local[0];
+    const dy = local[1] - wreck.local[1];
+    const dz = local[2] - wreck.local[2];
+    const clearance = wreck.clearanceRadius + Math.max(0, reach);
+    return dx * dx + dy * dy + dz * dz < clearance * clearance;
+});
 // Open graveyard forms keep their real profile in the simulation too. A box
 // around a ring or engine would fill the visible hole and turn it into an
 // invisible wall for the player.
@@ -395,6 +414,74 @@ export const generateAsteroidField = (seed, depleted, scanned = []) => {
     }
     return nodes;
 };
+
+// These secondary fields are environmental terrain rather than mining nodes.
+// They still use the exact same deformed base meshes as Shardbelt so their
+// visible surfaces and hard collision stay in lockstep.
+export const REGIONAL_ASTEROID_FIELD_IDS = Object.freeze([
+    'foundry-lanes',
+    'redwake-belt',
+    'pale-rings',
+]);
+const REGIONAL_FIELD_PROFILES = Object.freeze({
+    'foundry-lanes': Object.freeze({ count: 92, flatten: 0.34, corridor: 250, maxRock: 66, landmarks: 7 }),
+    'redwake-belt': Object.freeze({ count: 138, flatten: 0.58, corridor: 210, maxRock: 82, landmarks: 12 }),
+    'pale-rings': Object.freeze({ count: 168, flatten: 0.075, corridor: 180, maxRock: 58, landmarks: 9, rings: true }),
+});
+export const generateRegionalAsteroidField = (seed, locationId) => {
+    const location = LOCATIONS[locationId];
+    const profile = REGIONAL_FIELD_PROFILES[locationId];
+    if (!location || !profile)
+        return [];
+    const rng = seededRandom(`${seed}:regional-asteroids:${locationId}`);
+    const nodes = [];
+    for (let index = 0; index < profile.count; index += 1) {
+        const angle = rng() * Math.PI * 2;
+        let local;
+        if (profile.rings) {
+            // Pale Ring is a broad, thin ice sheet with a readable inner lane.
+            // A little radial wobble keeps it natural rather than diagrammatic.
+            const radial = location.radius * (0.24 + Math.sqrt(rng()) * 0.7);
+            local = [
+                Math.cos(angle) * radial * randomBetween(rng, 0.88, 1.12),
+                randomBetween(rng, -location.radius * profile.flatten, location.radius * profile.flatten),
+                Math.sin(angle) * radial * randomBetween(rng, 0.82, 1.16),
+            ];
+        }
+        else {
+            local = sphericalOffset(rng, location.radius * 0.91, location.radius * 0.12);
+            local[1] *= profile.flatten;
+        }
+        // Preserve one long approach corridor through every field. The rocks
+        // remain dense to either side, but a new arrival is never born inside
+        // an unreadable wall of geometry.
+        if (Math.hypot(local[0], local[1]) < profile.corridor && Math.abs(local[2]) < location.radius * 0.78) {
+            const side = local[0] < 0 ? -1 : 1;
+            local[0] += side * (profile.corridor + randomBetween(rng, 35, 150));
+        }
+        const landmark = index < profile.landmarks;
+        const radius = landmark
+            ? randomBetween(rng, profile.maxRock * 1.05, profile.maxRock * 1.75)
+            : randomBetween(rng, profile.rings ? 5 : 8, profile.maxRock);
+        const scale = profile.rings
+            ? [randomBetween(rng, 1.15, 2.35), randomBetween(rng, 0.16, 0.42), randomBetween(rng, 0.7, 1.65)]
+            : [randomBetween(rng, 0.68, 1.58), randomBetween(rng, 0.62, 1.34), randomBetween(rng, 0.72, 1.66)];
+        nodes.push({
+            id: `${locationId}-asteroid-${index}`,
+            fieldId: locationId,
+            position: add(location.position, local),
+            velocity: [0, 0, 0],
+            radius,
+            scale,
+            rotation: [rng() * Math.PI, rng() * Math.PI, rng() * Math.PI],
+            rotationSpeed: [0, 0, 0],
+            moving: false,
+            shape: randomInt(rng, 0, 3),
+            landmark,
+        });
+    }
+    return nodes;
+};
 // The rendered rock is a distorted icosahedron scaled by node.scale on each
 // axis, so the widest axis — not the nominal node.radius — is what a ship
 // actually touches. This is the single source of truth for both hard collision
@@ -445,7 +532,7 @@ export const generateGraveyardPieces = (seed) => {
     // starboard, and +Y is up. The fixed formations tell the battle story;
     // seeded fragment streams add variation without dissolving the landmarks.
     const worldPosition = (local) => add(center, local);
-    const pushPiece = ({ id, kind, local, rotation = [0, 0, 0], scale, collisionRadius, moving = false, drift = [0, 0, 0], spin = [0, 0, 0], finish, collidable = true, zone, route, reserveRaceCorridor = false }) => {
+    const pushPiece = ({ id, kind, local, rotation = [0, 0, 0], scale, collisionRadius, halfExtents, moving = false, drift = [0, 0, 0], spin = [0, 0, 0], finish, collidable = true, render = true, zone, route, reserveRaceCorridor = false }) => {
         // Fixed wreck structures are authored around the courses and remain
         // meaningful obstacles. Seeded loose debris is different: reject it
         // before insertion when its full visual reach would intrude into a
@@ -474,6 +561,10 @@ export const generateGraveyardPieces = (seed) => {
             piece.finish = finish;
         if (!collidable)
             piece.collidable = false;
+        if (!render)
+            piece.render = false;
+        if (halfExtents)
+            piece.halfExtents = [...halfExtents];
         if (zone)
             piece.zone = zone;
         if (route)
@@ -594,6 +685,8 @@ export const generateGraveyardPieces = (seed) => {
     // than sharing the carrier/battleship plane.
     addFrigate('frigate-alpha', [-980, 560, -650], -0.34, 0.12, 0.16);
     addFrigate('frigate-beta', [980, -520, 980], 0.46, -0.14, -0.2);
+    // The adapted GLBs are visual fly-through landmarks. Their open breaches
+    // must remain traversable, so they deliberately add no collision proxies.
     // Static, painted structural hoops make the routes legible without adding
     // beacon lights or extra animated effects. They are visual-only: a pilot
     // can cut across them, and the actual hull collision remains authoritative.
@@ -749,8 +842,20 @@ export const generateGraveyardPieces = (seed) => {
     // collision uses halfExtents as an oriented box so a flat panel blocks its
     // whole face without ballooning into an invisible sphere.
     for (const piece of pieces) {
+        // Procedural stand-ins for the three landmark hulls are replaced by
+        // the adapted GLBs. Their route hoops remain, but duplicate hull art
+        // and its old oversized collision are suppressed.
+        const replacedBattleship = piece.id.startsWith('battleship-');
+        const replacedFrigate = /^frigate-(?:alpha|beta)-(?:mid|bow|deck|prow|keel|bridge|turret|mast|engine|gate)$/.test(piece.id);
         const base = GRAVEYARD_GEOMETRY_HALF_EXTENTS[piece.kind] ?? [0.5, 0.5, 0.5];
-        piece.halfExtents = [base[0] * piece.scale[0], base[1] * piece.scale[1], base[2] * piece.scale[2]];
+        const visualReach = Math.hypot(base[0] * piece.scale[0], base[1] * piece.scale[1], base[2] * piece.scale[2]);
+        const local = [piece.position[0] - center[0], piece.position[1] - center[1], piece.position[2] - center[2]];
+        const overlapsModel = !piece.id.startsWith('route-') && overlapsGraveyardModelWreck(local, visualReach);
+        if (replacedBattleship || replacedFrigate || overlapsModel) {
+            piece.render = false;
+            piece.collidable = false;
+        }
+        piece.halfExtents ??= [base[0] * piece.scale[0], base[1] * piece.scale[1], base[2] * piece.scale[2]];
         const bounding = Math.hypot(piece.halfExtents[0], piece.halfExtents[1], piece.halfExtents[2]);
         piece.collisionRadius = Math.min(piece.collisionRadius, bounding);
     }
@@ -765,9 +870,9 @@ export const generateWreckNodes = (seed, depleted, scanned = []) => {
     const salvageSites = [
         { id: 'carrier-hangar', zone: 'carrier-hangar', route: 'upper-hangar-run', label: 'Carrier hangar', center: [0, 520, -1240], spread: [270, 150, 250], count: 14 },
         { id: 'carrier-engines', zone: 'outer-wake', route: 'upper-hangar-run', label: 'Carrier engine bank', center: [0, 540, 300], spread: [280, 160, 200], count: 10 },
-        { id: 'battleship-impact', zone: 'battleship-breach', route: 'lower-breach-crossing', label: 'Battleship breach', center: [40, -290, 800], spread: [310, 180, 270], count: 14 },
-        { id: 'frigate-alpha', zone: 'frigate-alpha', route: 'port-frigate-tunnel', label: 'Frigate Alpha', center: [-980, 560, -650], spread: [180, 150, 210], count: 10 },
-        { id: 'frigate-beta', zone: 'frigate-beta', route: 'starboard-frigate-tunnel', label: 'Frigate Beta', center: [980, -520, 980], spread: [180, 150, 210], count: 10 },
+        { id: 'battleship-impact', zone: 'battleship-breach', route: 'lower-breach-crossing', label: 'Battleship breach', center: [1080, -250, 940], spread: [190, 150, 190], count: 14 },
+        { id: 'frigate-alpha', zone: 'frigate-alpha', route: 'port-frigate-tunnel', label: 'Frigate Alpha', center: [-1180, 670, -820], spread: [130, 110, 130], count: 10 },
+        { id: 'frigate-beta', zone: 'frigate-beta', route: 'starboard-frigate-tunnel', label: 'Frigate Beta', center: [1190, -640, 1160], spread: [130, 110, 130], count: 10 },
         { id: 'far-wake', zone: 'outer-wake', route: 'outer-wake-run', label: 'Impact wake', center: [0, 450, 2400], spread: [300, 220, 230], count: 6 },
     ];
     let index = 0;
@@ -791,7 +896,8 @@ export const generateWreckNodes = (seed, depleted, scanned = []) => {
                 zone: site.zone,
                 route: site.route,
             };
-            if (!intersectsRaceCorridor('mourning-line', local, wreckNodeCollisionRadius(node)))
+            const nodeReach = wreckNodeCollisionRadius(node);
+            if (!intersectsRaceCorridor('mourning-line', local, nodeReach) && !overlapsGraveyardModelWreck(local, nodeReach))
                 nodes.push(node);
             index += 1;
         }

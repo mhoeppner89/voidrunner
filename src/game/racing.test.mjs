@@ -17,7 +17,7 @@ import {
 const ids = Object.keys(RACE_COURSES);
 assert.equal(ids.length, 6, 'the board has exactly six authored courses');
 assert.deepEqual(raceOffersForLocation('helix'), ['shard-gauntlet', 'shard-switchback', 'shard-miners-knife']);
-assert.deepEqual(raceOffersForLocation('rook'), ['mourning-run', 'mourning-breach', 'mourning-relict-gauntlet']);
+assert.deepEqual(raceOffersForLocation('cairn'), ['mourning-run', 'mourning-breach', 'mourning-relict-gauntlet']);
 assert.equal(raceOffersForLocation('vesper').length, 0);
 const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 const dotUnit = (a, b) => {
@@ -68,7 +68,7 @@ for (const id of ids) {
 }
 
 assert.deepEqual(raceOffersForLocation('shardbelt'), raceOffersForLocation('helix'), 'field alias resolves Shardbelt board');
-assert.deepEqual(raceOffersForLocation('mourning-line'), raceOffersForLocation('rook'), 'field alias resolves Mourning board');
+assert.deepEqual(raceOffersForLocation('mourning-line'), raceOffersForLocation('cairn'), 'field alias resolves Mourning board');
 assert.equal(raceCourseUnlocked('shard-gauntlet', {}), true);
 assert.equal(raceCourseUnlocked('shard-switchback', {}), false);
 assert.equal(raceCourseUnlocked('shard-switchback', { 'shard-gauntlet': { rank: 2 } }), true, 'legacy rank unlocks the next tier');

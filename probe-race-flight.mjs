@@ -64,11 +64,11 @@ try {
         const rt = window.__VOID_PRIVATEER__.getRuntime();
         rt.save.player.credits = 500000;
         const raceIds = (dock) => (rt.save.world.offers[dock] ?? []).filter((offer) => offer.kind === 'race').map((offer) => ({ id: offer.id, locked: offer.locked, tier: offer.tier, recommended: offer.recommendedShipText }));
-        return { helix: raceIds('helix'), rook: raceIds('rook') };
+        return { helix: raceIds('helix'), cairn: raceIds('cairn') };
     })()`);
-    check('mission boards expose exactly three fixed courses per field', board.helix.length === 3 && board.rook.length === 3, board);
-    check('each board starts with only tier one unlocked', board.helix.filter((offer) => !offer.locked).length === 1 && board.rook.filter((offer) => !offer.locked).length === 1, board);
-    check('track recommendations carry the intended ship guidance', board.helix[2]?.recommended?.includes('heavy afterburner') && board.rook[0]?.recommended?.includes('Talon'), board);
+    check('mission boards expose exactly three fixed courses per field', board.helix.length === 3 && board.cairn.length === 3, board);
+    check('each board starts with only tier one unlocked', board.helix.filter((offer) => !offer.locked).length === 1 && board.cairn.filter((offer) => !offer.locked).length === 1, board);
+    check('track recommendations carry the intended ship guidance', board.helix[2]?.recommended?.includes('heavy afterburner') && board.cairn[0]?.recommended?.includes('Talon'), board);
 
     const lockedAttempt = await evaluate(`(() => {
         const rt = window.__VOID_PRIVATEER__.getRuntime();
@@ -350,7 +350,7 @@ try {
             gate.position.map((value, index) => value + gate.direction[index] * 2),
         ];
         for (const id of ids) {
-            const origin = id.startsWith('shard-') ? 'helix' : 'rook';
+            const origin = id.startsWith('shard-') ? 'helix' : 'cairn';
             rt.save.player.dockedAt = origin;
             rt.save.player.credits = Math.max(rt.save.player.credits, 500000);
             rt.acceptRace(id);

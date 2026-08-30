@@ -43,6 +43,11 @@ const modelBox = (scene) => {
 };
 
 for (const [variant, config] of Object.entries(GLB_SHIP_CONFIG)) {
+    // Capital hulls (preload: false, `path` not `file`) are authored GLBs that
+    // only load when a capital ship enters the scene; they are not baked from
+    // voxel ships, so there is nothing to measure against the baked envelope.
+    if (!config.file)
+        continue;
     const buffer = fs.readFileSync(`assets/models/ships/${config.file}`);
     const scene = await buildGlbScene(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
     const dump = (object, depth = 0) => {
