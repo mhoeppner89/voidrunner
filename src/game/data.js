@@ -408,7 +408,9 @@ const HELIOS_LOCATIONS = {
         // Cairn Yard remains tucked beside the wreck fleet so the graveyard
         // is visible from its approaches and immediately reachable from dock.
         position: [-149994, 21496, 142758],
-        radius: 2580,
+        // Twelve full-scale Concord wrecks and their cleared approach lanes
+        // form a broad battlefield around this exact navigation centre.
+        radius: 5000,
         faction: 'salvage-union',
         accent: '#a2b9b0',
         secondary: '#293738',

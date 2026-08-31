@@ -4343,7 +4343,7 @@ button.primary,
 
 .person-card .avatar {
   height: 208px;
-  image-rendering: pixelated;
+  image-rendering: auto;
   filter: contrast(1.08) saturate(0.86);
   border-bottom: 2px solid color-mix(in srgb, var(--dock-accent), transparent 22%);
 }
@@ -7189,7 +7189,7 @@ button.primary,
   top: var(--concourse-bar-top, var(--vesper-bar-top, 45%));
 }
 
-/* The v4 plates were painted for their actual locations. Keep the action
+/* The location plates were painted for their actual docks. Keep the action
    pointers on the depicted pads, desks, and hangars instead of applying one
    generic station layout to ten different scenes. */
 .dock-screen[data-location="cairn"] {
@@ -7249,6 +7249,45 @@ button.primary,
   --concourse-bar-left: 20%; --concourse-bar-top: 32%;
 }
 
+/* The live hull inherits the practical light of each v6 landing plate. Warm
+   industrial docks share amber deck bounce; exposed and civic pads use cool
+   star or station light. The filter follows the sprite alpha, so no coloured
+   rectangle can wash over the painted background. */
+.dock-screen[data-location="cairn"],
+.dock-screen[data-location="blackglass"],
+.dock-screen[data-location="cinder"],
+.dock-screen[data-location="torchwell"] {
+  --concourse-shadow-core: rgba(13, 8, 4, 0.9);
+  --concourse-shadow-mid: rgba(42, 24, 9, 0.62);
+  --concourse-shadow-edge: rgba(73, 43, 18, 0.28);
+  --concourse-shadow-glow: rgba(255, 156, 62, 0.16);
+  --concourse-shadow-after: rgba(227, 112, 40, 0.13);
+}
+
+.dock-screen[data-location="meridian-prime"],
+.dock-screen[data-location="argent"],
+.dock-screen[data-location="gatehouse-twelve"],
+.dock-screen[data-location="nacre"],
+.dock-screen[data-location="boreal"],
+.dock-screen[data-location="shepherd"] {
+  --concourse-shadow-core: rgba(3, 10, 20, 0.88);
+  --concourse-shadow-mid: rgba(9, 28, 48, 0.58);
+  --concourse-shadow-edge: rgba(31, 72, 98, 0.24);
+  --concourse-shadow-glow: rgba(83, 181, 239, 0.15);
+  --concourse-shadow-after: rgba(65, 151, 210, 0.12);
+}
+
+.dock-screen[data-location="cairn"] { --concourse-ship-filter: brightness(0.82) saturate(0.82) contrast(1.08) sepia(0.1) drop-shadow(0 12px 7px rgba(22, 12, 5, 0.46)) drop-shadow(0 0 11px rgba(255, 172, 79, 0.14)); }
+.dock-screen[data-location="meridian-prime"] { --concourse-ship-filter: brightness(0.94) saturate(0.76) contrast(1.04) drop-shadow(0 12px 7px rgba(8, 23, 38, 0.4)) drop-shadow(0 0 11px rgba(99, 205, 255, 0.13)); }
+.dock-screen[data-location="argent"] { --concourse-ship-filter: brightness(0.84) saturate(0.74) contrast(1.09) drop-shadow(0 12px 7px rgba(5, 16, 27, 0.48)) drop-shadow(0 0 10px rgba(89, 183, 226, 0.11)); }
+.dock-screen[data-location="gatehouse-twelve"] { --concourse-ship-filter: brightness(0.74) saturate(0.7) contrast(1.12) drop-shadow(0 12px 7px rgba(1, 8, 18, 0.55)) drop-shadow(0 0 12px rgba(55, 143, 221, 0.14)); }
+.dock-screen[data-location="blackglass"] { --concourse-ship-filter: brightness(0.7) saturate(0.76) contrast(1.1) sepia(0.08) drop-shadow(0 12px 8px rgba(8, 5, 3, 0.6)) drop-shadow(0 0 10px rgba(224, 126, 55, 0.11)); }
+.dock-screen[data-location="cinder"] { --concourse-ship-filter: brightness(0.75) saturate(0.78) contrast(1.1) sepia(0.08) drop-shadow(0 12px 8px rgba(12, 7, 3, 0.55)) drop-shadow(0 0 12px rgba(255, 133, 49, 0.14)); }
+.dock-screen[data-location="torchwell"] { --concourse-ship-filter: brightness(0.7) saturate(0.76) contrast(1.11) sepia(0.1) drop-shadow(0 12px 8px rgba(10, 5, 3, 0.58)) drop-shadow(0 0 10px rgba(213, 82, 47, 0.13)); }
+.dock-screen[data-location="nacre"] { --concourse-ship-filter: brightness(0.88) saturate(0.67) contrast(1.06) drop-shadow(0 12px 7px rgba(5, 15, 27, 0.45)) drop-shadow(0 0 12px rgba(116, 206, 255, 0.15)); }
+.dock-screen[data-location="boreal"] { --concourse-ship-filter: brightness(0.82) saturate(0.72) contrast(1.08) drop-shadow(0 12px 7px rgba(2, 13, 28, 0.5)) drop-shadow(0 0 12px rgba(92, 181, 236, 0.15)); }
+.dock-screen[data-location="shepherd"] { --concourse-ship-filter: brightness(0.73) saturate(0.7) contrast(1.1) drop-shadow(0 12px 7px rgba(2, 9, 20, 0.55)) drop-shadow(0 0 12px rgba(62, 151, 222, 0.13)); }
+
 /* The smuggler's den has no storefront: the pointer sits low under the pad,
    the way a back door should read. */
 .concourse-pointer-den { left: 55%; top: 72%; }
@@ -7291,8 +7330,8 @@ button.primary,
   width: 128px;
   height: 152px;
   object-fit: cover;
-  image-rendering: pixelated;
-  filter: contrast(1.08) saturate(0.94) drop-shadow(0 0 12px rgba(29, 170, 224, 0.2));
+  image-rendering: auto;
+  filter: saturate(0.96) drop-shadow(0 0 12px rgba(29, 170, 224, 0.16));
 }
 
 .bar-dialogue-card h3 {
@@ -9029,12 +9068,12 @@ button.primary,
   width: var(--vesper-shadow-width, 430px);
   height: var(--vesper-shadow-height, 58px);
   border-radius: 50%;
-  transform: translate(-50%, -50%) rotate(3deg) scale(1);
+  transform: translate(-50%, -50%) rotate(var(--vesper-shadow-angle, 3deg)) scale(1);
   transform-origin: center;
   animation: vesper-hover-shadow 5.8s ease-in-out infinite;
   background:
-    radial-gradient(ellipse at center, rgba(13, 9, 6, 0.92) 0 22%, rgba(24, 15, 8, 0.68) 43%, rgba(31, 22, 12, 0.34) 61%, transparent 79%),
-    radial-gradient(ellipse at center, rgba(255, 165, 74, 0.2), transparent 70%);
+    radial-gradient(ellipse at center, var(--concourse-shadow-core, rgba(13, 9, 6, 0.92)) 0 22%, var(--concourse-shadow-mid, rgba(24, 15, 8, 0.68)) 43%, var(--concourse-shadow-edge, rgba(31, 22, 12, 0.34)) 61%, transparent 79%),
+    radial-gradient(ellipse at center, var(--concourse-shadow-glow, rgba(255, 165, 74, 0.2)), transparent 70%);
   filter: blur(3px);
   opacity: 1;
   will-change: transform, opacity;
@@ -9044,8 +9083,8 @@ button.primary,
   position: absolute;
   inset: 24% 12%;
   border-radius: 50%;
-  background: rgba(232, 129, 47, 0.16);
-  box-shadow: 0 0 20px rgba(255, 177, 83, 0.2);
+  background: var(--concourse-shadow-after, rgba(232, 129, 47, 0.16));
+  box-shadow: 0 0 20px var(--concourse-shadow-glow, rgba(255, 177, 83, 0.2));
   content: "";
   filter: blur(5px);
 }
@@ -9114,9 +9153,10 @@ button.primary,
   pointer-events: auto;
   cursor: pointer;
   object-fit: contain;
-  filter: brightness(0.78) saturate(0.78) contrast(1.12) sepia(0.08)
+  filter: var(--concourse-ship-filter,
+    brightness(0.78) saturate(0.78) contrast(1.12) sepia(0.08)
     drop-shadow(0 12px 7px rgba(27, 15, 7, 0.42))
-    drop-shadow(0 0 10px rgba(255, 177, 83, 0.1));
+    drop-shadow(0 0 10px rgba(255, 177, 83, 0.1)));
 }
 
 .dock-screen[data-tab="concourse"] .concourse-hover-ship:focus-visible {

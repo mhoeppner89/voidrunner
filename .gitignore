@@ -9,6 +9,7 @@ voidrunner-*.png
 # Dev tooling — not part of the shipped game.
 .freebuff/
 screenshots/
+output/
 
 # Source ship models (full-res GLBs + reference art). Dev-only: the game
 # loads optimized copies generated from these, never the folder itself.
@@ -24,6 +25,9 @@ PLAYABLE_README.md
 !art/commodities/*.webp
 !art/outfitting/*.webp
 !art/locations/v4/*.webp
+!art/portraits/v2/*.webp
+!art/portraits/v3/*.webp
+!art/sky/*.webp
 !assets/remaster/cockpit-vanguard.webp
 !assets/remaster/cockpit-talon.webp
 !assets/remaster/cockpit-prospector.webp

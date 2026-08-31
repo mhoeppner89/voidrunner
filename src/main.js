@@ -9,9 +9,10 @@ if (!host)
 const ui = new GameUI(host);
 let session;
 let cachedSave = loadGame();
-const vesperHoverPreview = new URLSearchParams(location.search).get('vesper-hover') === '1';
 const devPreviewParams = new URLSearchParams(location.search);
+const vesperHoverPreview = devPreviewParams.get('vesper-hover') === '1';
 const devAutoStart = devPreviewParams.get('dev-autostart') === '1';
+const debrisCollisionTest = devPreviewParams.get('test') === 'debris-collision';
 const devPreviewLocationParam = devPreviewParams.get('dev-dock');
 const devPreviewLocation = DOCK_LOCATION_IDS.includes(devPreviewLocationParam) ? devPreviewLocationParam : undefined;
 const devPreviewShipParam = devPreviewParams.get('dev-ship');
@@ -267,6 +268,7 @@ window.__VOID_PRIVATEER__ = {
     pickTarget: (x, y) => session?.renderer?.pickTarget(x, y),
     projectToScreen: (position) => session?.renderer?.projectToScreen(position),
     launch: () => session?.launch(),
+    restartArena: () => session?.arena && session.restartArena(),
     jumpToSystem: (systemId) => session?.debugJumpToSystem(systemId),
     saveNow: () => session?.saveNow(),
     // Mock story-mission line: pins the comms bar in amber, mutes all chatter
@@ -286,6 +288,7 @@ window.render_game_to_text = () => {
     const race = runtime?.activeRace;
     return JSON.stringify({
         mode: save.player.dockedAt ? 'docked' : race?.state ? `race-${race.state}` : 'flight',
+        testMode: runtime?.arena?.testMode ?? null,
         coordinates: 'world [x,y,z]; +y is up; ship forward is local -z',
         player: {
             systemId: save.player.systemId,
@@ -348,5 +351,14 @@ window.advanceTime = (milliseconds) => {
 // Query-gated development boot used by the shared browser-game smoke client.
 // It never alters a normal load and avoids timing a click against the title
 // screen while the first 3D session is still being constructed.
-if (devAutoStart)
+if (debrisCollisionTest) {
+    document.title = 'Voidrunner — Debris Collision Test';
+    beginSession('arena', {
+        environment: 'debris-field',
+        scenario: 'free-flight',
+        difficulty: 'rookie',
+        testMode: 'debris-collision',
+    });
+}
+else if (devAutoStart)
     beginSession('new');

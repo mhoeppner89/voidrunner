@@ -2,13 +2,16 @@ import * as THREE from 'three';
 import { LOCATIONS, SUN_POSITION, sunPositionForSystem } from './data.js';
 import { createVoxelShipModel, createVoxelStationModel, paletteForFaction, shipVariantForRole } from './voxelModels.js';
 import { clamp, seededRandom } from './random.js';
-import { GRAVEYARD_GEOMETRY_PROFILES, GRAVEYARD_MODEL_WRECKS, getAsteroidBaseMeshes, wreckNodeCollisionRadius } from './worldData.js';
+import { GRAVEYARD_MODEL_WRECKS, getAsteroidBaseMeshes, getGraveyardGeometry, getWreckNodeGeometry, wreckNodeVisualScale } from './worldData.js';
 import { loadGlb } from './glbLoader.js';
 import { LaserFx } from './laserFx.js';
 const tupleToVector = (tuple, out = new THREE.Vector3()) => out.set(tuple[0], tuple[1], tuple[2]);
 const NEG_Z = new THREE.Vector3(0, 0, -1);
 const UP_AXIS = new THREE.Vector3(0, 1, 0);
 const FORWARD_AXIS = new THREE.Vector3(0, 0, 1);
+const GALACTIC_PLANE_NORMAL = new THREE.Vector3(0.38, 0.79, -0.48).normalize();
+const GALACTIC_BELT_LATITUDE_FRACTION = 0.28;
+const GALACTIC_BELT_TEXTURE_ASPECT = 2 / GALACTIC_BELT_LATITUDE_FRACTION;
 const tmpGateAxis = new THREE.Vector3();
 const tmpRacePosition = new THREE.Vector3();
 const tmpRaceCenter = new THREE.Vector3();
@@ -25,10 +28,10 @@ const DEBRIS_CULL_RANGE = 25000;
 const DEBRIS_CULL_RANGE_SQ = DEBRIS_CULL_RANGE * DEBRIS_CULL_RANGE;
 const HIDDEN_SCALE = [0.0001, 0.0001, 0.0001];
 const SYSTEM_RENDER_STYLE = Object.freeze({
-    'helios-verge': { clear: 0x0d1a3c, fog: 0x2a1e44, density: 0.000115 },
-    meridian: { clear: 0x10253a, fog: 0x284358, density: 0.000105 },
-    redwake: { clear: 0x240f1b, fog: 0x4b2029, density: 0.00013 },
-    'pale-ring': { clear: 0x101c2b, fog: 0x273b49, density: 0.000095 },
+    'helios-verge': { clear: 0x0a1735, fog: 0x2a1e44, density: 0.000115, stars: 0xfff1df, band: 0xffffff, bandOpacity: 0.72, nebula: 0xd8a38c, nebulaOpacity: 0.72 },
+    meridian: { clear: 0x0d2032, fog: 0x284358, density: 0.000105, stars: 0xe4f4ff, band: 0xffffff, bandOpacity: 0.68, nebula: 0x91b5c3, nebulaOpacity: 0.68 },
+    redwake: { clear: 0x1f0d18, fog: 0x4b2029, density: 0.00013, stars: 0xffd2ca, band: 0xffffff, bandOpacity: 0.66, nebula: 0xa86268, nebulaOpacity: 0.6 },
+    'pale-ring': { clear: 0x0d1825, fog: 0x273b49, density: 0.000095, stars: 0xd9f2ff, band: 0xffffff, bandOpacity: 0.7, nebula: 0x759fbd, nebulaOpacity: 0.64 },
 });
 const SYSTEM_STAR_PROFILE = Object.freeze({
     'helios-verge': Object.freeze({
@@ -121,9 +124,10 @@ export const GLB_SHIP_CONFIG = {
     prospector: { file: 'prospector.glb', yaw: Math.PI / 2, scale: 6.7, rearAxis: [-1, 0, 0], enginePorts: [[-0.9, 0, -0.3], [-0.9, 0, 0.3]] },
     lancer: { file: 'lancer.glb', yaw: Math.PI / 2, scale: 6.65, rearAxis: [-1, 0, 0], enginePorts: [[-0.85, 0, -0.22], [-0.85, 0, 0], [-0.85, 0, 0.22]] },
     'atlas-freighter': { file: 'atlas.glb', yaw: Math.PI / 2, scale: 13.4, rearAxis: [-1, 0, 0], enginePorts: [[-0.9, 0, -0.25], [-0.9, 0, 0.25]] },
-    // Capital hulls preserve their authored blue Concord paint and load only
-    // when one actually enters the scene. Their exact lengths are 10x and
-    // 100x the baked Talon hull respectively.
+    // Capital hulls preserve their authored Concord paint and load only when
+    // one actually enters the scene. Carrier and cruiser were normalized to a
+    // two-unit longitudinal axis during export; their scales are measured from
+    // the shipped battleship bounds for exact 0.8x and 0.5x visible lengths.
     'concord-frigate': {
         path: 'assets/models/capital/concord-frigate.glb', yaw: -Math.PI / 2, scale: 56.5,
         rearAxis: [1, 0, 0], enginePorts: [[0.89, -0.07, -0.22], [0.9, -0.07, 0], [0.89, -0.07, 0.22]],
@@ -136,7 +140,23 @@ export const GLB_SHIP_CONFIG = {
         preload: false, preserveColor: true, placeholderVariant: 'warden', placeholderScale: 100,
         flareSize: 15, flareOpacity: 0.18, trailLength: 90, trailWidth: 7, trailOpacity: 0.42,
     },
+    'concord-carrier': {
+        path: 'assets/models/capital/concord-carrier.glb', yaw: -Math.PI / 2, scale: 451.2754,
+        rearAxis: [1, 0, 0], enginePorts: [[0.92, -0.08, -0.34], [0.94, -0.08, 0], [0.92, -0.08, 0.34]],
+        preload: false, preserveColor: true, placeholderVariant: 'warden', placeholderScale: 80,
+        flareSize: 13, flareOpacity: 0.18, trailLength: 82, trailWidth: 6.2, trailOpacity: 0.42,
+    },
+    'concord-cruiser': {
+        path: 'assets/models/capital/concord-cruiser.glb', yaw: -Math.PI / 2, scale: 282.0471,
+        rearAxis: [1, 0, 0], enginePorts: [[0.93, -0.27, -0.18], [0.93, 0.27, -0.18], [0.93, -0.27, 0.18], [0.93, 0.27, 0.18]],
+        preload: false, preserveColor: true, placeholderVariant: 'warden', placeholderScale: 50,
+        flareSize: 8, flareOpacity: 0.19, trailLength: 56, trailWidth: 4.1, trailOpacity: 0.46,
+    },
 };
+// In-flight traffic is intentionally larger than the legacy presentation.
+// Keep the source GLB calibration unchanged so shipyard previews retain their
+// framing; only world-space hulls and their voxel loading placeholders grow.
+export const NPC_SHIP_SCALE = 2;
 // Race entities carry their own hull variant so the starting grid can show
 // the actual ships that are about to race. Ordinary traffic still only has a
 // role, so retain the role mapping as the fallback for every other ship.
@@ -180,6 +200,9 @@ export class SpaceRenderer {
     shell;
     dynamicRoot = new THREE.Group();
     skyRoot = new THREE.Group();
+    starMaterials = [];
+    nebulaMaterials = [];
+    galacticBandMaterial;
     locationRoot = new THREE.Group();
     instanceRoots = new Map();
     locationMeshes = new Map();
@@ -334,6 +357,7 @@ export class SpaceRenderer {
         this.scene.add(this.camera);
         this.createLighting();
         this.createEnvironmentMap();
+        this.createGalacticBand();
         this.createStarfield(seed, quality);
         this.createNebulae(seed, quality);
         this.createFieldDust(seed, quality);
@@ -554,20 +578,71 @@ export class SpaceRenderer {
         texture.colorSpace = THREE.SRGBColorSpace;
         return texture;
     }
+    createGalacticBand() {
+        // The artwork carries real per-pixel alpha: its luminous clouds and
+        // dust remain, while the former opaque black sky is absent. Normal
+        // blending now moves directly from galaxy into the system clear color
+        // without a dark trough or an additive grey wash.
+        const texture = new THREE.TextureLoader().load('./art/sky/milky-way-wide-alpha-v3.webp');
+        texture.name = 'milky-way-wide-alpha-v3';
+        texture.colorSpace = THREE.SRGBColorSpace;
+        // The full source width wraps once around the complete horizon. The
+        // band becomes narrower through the belt geometry below, never by
+        // cropping longitude or squeezing the source pixels.
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        texture.repeat.set(1, 1);
+        texture.offset.set(0, 0);
+        texture.magFilter = THREE.LinearFilter;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
+        texture.anisotropy = Math.min(4, this.renderer.capabilities.getMaxAnisotropy());
+        this.galacticBandMaterial = new THREE.MeshBasicMaterial({
+            map: texture,
+            color: 0xffffff,
+            opacity: 0.72,
+            transparent: true,
+            depthWrite: false,
+            // Transparent objects draw after opaque geometry in Three.js. The
+            // old disabled depth test therefore painted this sphere over ships
+            // and wrecks despite its negative renderOrder. Keep the far sphere
+            // depth-tested so every nearer world surface wins.
+            depthTest: true,
+            side: THREE.BackSide,
+            blending: THREE.NormalBlending,
+            fog: false,
+            toneMapped: false,
+        });
+        // Map the complete artwork onto a thin spherical belt. The mesh spans
+        // 360° by 50.4°, so the texture is authored at the matching 50:7
+        // aspect ratio. Equal angular distances therefore consume equal pixel
+        // distances at the belt centre instead of stretching the sky sideways.
+        const beltLatitude = Math.PI * GALACTIC_BELT_LATITUDE_FRACTION;
+        const beltStart = (Math.PI - beltLatitude) * 0.5;
+        const band = new THREE.Mesh(new THREE.SphereGeometry(940000, 96, 16, 0, Math.PI * 2, beltStart, beltLatitude), this.galacticBandMaterial);
+        band.quaternion.setFromUnitVectors(UP_AXIS, GALACTIC_PLANE_NORMAL);
+        band.name = 'galactic-orientation-band';
+        band.renderOrder = -100;
+        band.userData.fullLongitude = true;
+        band.userData.latitudeScale = GALACTIC_BELT_LATITUDE_FRACTION;
+        band.userData.textureAspect = GALACTIC_BELT_TEXTURE_ASPECT;
+        band.userData.transparentArtwork = true;
+        band.userData.backgroundDepthTest = true;
+        band.frustumCulled = false;
+        this.skyRoot.add(band);
+    }
     createStarfield(seed, quality) {
         const rng = seededRandom(`${seed}:stars`);
-        // The shell sits far beyond the whole system so stars read as a fixed sky.
-        const SHELL_RADIUS = 900000;
-        const layer = (count, size, blending, tint) => {
+        const layer = (count, size, blending, radius, opacity, tint) => {
             const positions = new Float32Array(count * 3);
             const colors = new Float32Array(count * 3);
             const color = new THREE.Color();
             for (let index = 0; index < count; index += 1) {
                 const theta = rng() * Math.PI * 2;
                 const phi = Math.acos(2 * rng() - 1);
-                positions[index * 3] = Math.sin(phi) * Math.cos(theta) * SHELL_RADIUS;
-                positions[index * 3 + 1] = Math.cos(phi) * SHELL_RADIUS;
-                positions[index * 3 + 2] = Math.sin(phi) * Math.sin(theta) * SHELL_RADIUS;
+                const depth = radius * (0.94 + rng() * 0.06);
+                positions[index * 3] = Math.sin(phi) * Math.cos(theta) * depth;
+                positions[index * 3 + 1] = Math.cos(phi) * depth;
+                positions[index * 3 + 2] = Math.sin(phi) * Math.sin(theta) * depth;
                 tint(color, rng);
                 colors[index * 3] = color.r;
                 colors[index * 3 + 1] = color.g;
@@ -581,33 +656,40 @@ export class SpaceRenderer {
                 sizeAttenuation: false,
                 vertexColors: true,
                 fog: false,
-                transparent: blending === 'additive',
-                opacity: 1,
+                transparent: true,
+                opacity,
                 blending: blending === 'additive' ? THREE.AdditiveBlending : THREE.NormalBlending,
-                depthWrite: blending !== 'additive',
+                depthWrite: false,
+                // Sky points remain behind every nearer ship, wreck, and POI.
+                depthTest: true,
             });
-            this.skyRoot.add(new THREE.Points(geometry, material));
+            material.userData.baseOpacity = opacity;
+            const points = new THREE.Points(geometry, material);
+            points.renderOrder = -10;
+            this.skyRoot.add(points);
+            this.starMaterials.push(material);
             return material;
         };
-        // Dense field of mixed-temperature stars. Rebalanced toward warm
-        // giants (40% warm, 50% cool-bluish, 10% distant red) so the sky keeps
-        // its sunset lean when the camera looks upward in chase views.
-        layer(quality === 'low' ? 1900 : 3400, 1.5, 'normal', (color, rng) => {
+        // Most stars are tiny, muted points on the far shell. The old 3,400
+        // bright pixels competed with every ship and POI in the scene.
+        const quietCount = quality === 'high' ? 1450 : quality === 'low' ? 700 : 1050;
+        layer(quietCount, 0.78, 'normal', 900000, 0.78, (color, rng) => {
             const r = rng();
-            if (r < 0.4) {
-                color.setHSL(0.05 + rng() * 0.1, 0.55 + rng() * 0.32, 0.55 + rng() * 0.28);
+            if (r < 0.32) {
+                color.setHSL(0.06 + rng() * 0.08, 0.18 + rng() * 0.24, 0.56 + rng() * 0.2);
             }
-            else if (r < 0.9) {
-                color.setHSL(0.55 + (rng() - 0.5) * 0.18, 0.22 + rng() * 0.32, 0.5 + rng() * 0.28);
+            else if (r < 0.94) {
+                color.setHSL(0.57 + (rng() - 0.5) * 0.12, 0.1 + rng() * 0.2, 0.52 + rng() * 0.22);
             }
             else {
-                color.setHSL(0.97 + rng() * 0.06, 0.45 + rng() * 0.3, 0.45 + rng() * 0.25);
+                color.setHSL(0.98 + rng() * 0.035, 0.2 + rng() * 0.18, 0.5 + rng() * 0.18);
             }
         });
-        // Sparse bright layer that shimmers — the main source of "HDR glare", so its
-        // peak lightness is capped below full white.
-        this.starShimmer = layer(quality === 'low' ? 110 : 190, 2.7, 'additive', (color, rng) => {
-            color.setHSL(0.06 + rng() * 0.08, 0.3 + rng() * 0.3, 0.6 + rng() * 0.16);
+        // A much sparser, slightly nearer layer supplies depth landmarks
+        // without returning the square, confetti-like glare.
+        const guideCount = quality === 'high' ? 70 : quality === 'low' ? 34 : 50;
+        this.starShimmer = layer(guideCount, 1.35, 'additive', 790000, 0.3, (color, rng) => {
+            color.setHSL(0.07 + rng() * 0.06, 0.14 + rng() * 0.18, 0.62 + rng() * 0.13);
         });
     }
     createNebulae(seed, quality) {
@@ -633,9 +715,12 @@ export class SpaceRenderer {
             const plane = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
             plane.position.set(dir[0] * FAR, dir[1] * FAR, dir[2] * FAR);
             plane.lookAt(0, 0, 0);
+            plane.renderOrder = -20;
             this.skyRoot.add(plane);
+            material.userData.baseOpacity = opacity;
+            this.nebulaMaterials.push(material);
         };
-        const count = quality === 'high' ? 12 : 9;
+        const count = quality === 'high' ? 5 : 4;
         // Distinct color themes — mostly one hue per nebula, with a minority of
         // two-tone clouds, so the sky reads as varied regions rather than one
         // repeating multicolor smear.
@@ -662,16 +747,10 @@ export class SpaceRenderer {
             makeCloud(
                 this.nebulaTexture(`${seed}:nebula:${index}`, themes[index % themes.length]),
                 dir,
-                280000 + rng() * 140000,
-                180000 + rng() * 100000,
-                0.24 + rng() * 0.1,
+                220000 + rng() * 90000,
+                135000 + rng() * 65000,
+                0.07 + rng() * 0.035,
             );
-        }
-        // A faint cool milky band, barely brighter than the starfield.
-        for (let index = 0; index < 3; index += 1) {
-            const angle = phase + (index / 3) * Math.PI * 2;
-            const dir = [Math.cos(angle) * 0.95, 0.08 + rng() * 0.1, Math.sin(angle) * 0.95];
-            makeCloud(this.bandTexture(`${seed}:band:${index}`), dir, 680000, 160000 + rng() * 100000, 0.12);
         }
     }
     nebulaTexture(seed, theme) {
@@ -773,57 +852,6 @@ export class SpaceRenderer {
         sctx.drawImage(blurredMask, 0, 0);
         sctx.globalCompositeOperation = 'source-over';
         const texture = new THREE.CanvasTexture(source);
-        texture.colorSpace = THREE.SRGBColorSpace;
-        return texture;
-    }
-    bandTexture(seed) {
-        // A faint, cool milky band: soft bluish-white streaks with feathered top and
-        // bottom edges, so it never shows a hard rectangle against the sky.
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 256;
-        const context = canvas.getContext('2d');
-        const rng = seededRandom(`${seed}:band`);
-        context.clearRect(0, 0, 512, 256);
-        const colors = [[150, 190, 235], [205, 214, 240], [125, 150, 200]];
-        for (let i = 0; i < 110; i += 1) {
-            const color = colors[Math.floor(rng() * colors.length)];
-            const x = rng() * 512;
-            const y = 36 + rng() * 184;
-            const radius = 24 + rng() * 120;
-            const height = 4 + rng() * 20;
-            const alpha = 0.05 + rng() * 0.15;
-            const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
-            gradient.addColorStop(0, `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha})`);
-            gradient.addColorStop(1, `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0)`);
-            context.fillStyle = gradient;
-            context.save();
-            context.translate(x, y);
-            context.scale(1, height / radius);
-            context.translate(-x, -y);
-            context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-            context.restore();
-        }
-        context.globalCompositeOperation = 'destination-in';
-        const falloff = context.createLinearGradient(0, 0, 0, 256);
-        falloff.addColorStop(0, 'rgba(255, 255, 255, 0)');
-        falloff.addColorStop(0.5, 'rgba(255, 255, 255, 1)');
-        falloff.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        context.fillStyle = falloff;
-        context.fillRect(0, 0, 512, 256);
-        // Same falloff along the horizontal axis: the streaks run edge to edge, so
-        // without this the band's left/right borders keep ~8% alpha and show as
-        // hard rectangular edges against the sky (top/bottom were already feathered
-        // by the vertical pass above). Destination-in multiplies, so the two passes
-        // feather all four sides.
-        const falloffX = context.createLinearGradient(0, 0, 512, 0);
-        falloffX.addColorStop(0, 'rgba(255, 255, 255, 0)');
-        falloffX.addColorStop(0.5, 'rgba(255, 255, 255, 1)');
-        falloffX.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        context.fillStyle = falloffX;
-        context.fillRect(0, 0, 512, 256);
-        context.globalCompositeOperation = 'source-over';
-        const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         return texture;
     }
@@ -2398,75 +2426,6 @@ export class SpaceRenderer {
             list.push(piece);
             grouped.set(key, list);
         }
-        const extrudedProfileGeometry = (profile) => {
-            const shape = new THREE.Shape();
-            profile.outline.forEach(([x, z], index) => {
-                if (index === 0)
-                    shape.moveTo(x, z);
-                else
-                    shape.lineTo(x, z);
-            });
-            shape.closePath();
-            const geometry = new THREE.ExtrudeGeometry(shape, {
-                depth: profile.depth,
-                steps: 1,
-                bevelEnabled: true,
-                bevelThickness: profile.bevelThickness,
-                bevelSize: profile.bevelSize,
-                bevelSegments: 1,
-                curveSegments: 1,
-            });
-            // The outline is authored in local X/Z; rotate the extrusion's
-            // local depth into Y so ship silhouettes have a thin vertical hull
-            // and the existing oriented-box collision frame remains correct.
-            geometry.rotateX(Math.PI / 2);
-            geometry.center();
-            return geometry;
-        };
-        const geometryFor = (kind) => {
-            switch (kind) {
-                case 'engine': {
-                    const profile = GRAVEYARD_GEOMETRY_PROFILES.engine;
-                    const rimDepth = Math.min(profile.rimDepth, profile.halfHeight * 0.3);
-                    const innerTop = Math.max(0.05, profile.radiusTop - profile.wallThickness);
-                    const innerBottom = Math.max(0.05, profile.radiusBottom - profile.wallThickness);
-                    // LatheGeometry revolves this local-radius/local-Y
-                    // section around Y. The final point closes the section so
-                    // both open ends get a visible metal rim; the bore itself
-                    // remains open for the player's fly-through.
-                    const shellProfile = [
-                        new THREE.Vector2(profile.radiusBottom, -profile.halfHeight),
-                        new THREE.Vector2(profile.radiusBottom, -profile.halfHeight + rimDepth),
-                        new THREE.Vector2(profile.radiusTop, profile.halfHeight - rimDepth),
-                        new THREE.Vector2(profile.radiusTop, profile.halfHeight),
-                        new THREE.Vector2(innerTop, profile.halfHeight),
-                        new THREE.Vector2(innerTop, profile.halfHeight - rimDepth),
-                        new THREE.Vector2(innerBottom, -profile.halfHeight + rimDepth),
-                        new THREE.Vector2(innerBottom, -profile.halfHeight),
-                        new THREE.Vector2(profile.radiusBottom, -profile.halfHeight),
-                    ];
-                    return new THREE.LatheGeometry(shellProfile, 12);
-                }
-                case 'carrierHull':
-                case 'battleshipHull':
-                case 'frigateHull':
-                case 'bridge':
-                    return extrudedProfileGeometry(GRAVEYARD_GEOMETRY_PROFILES[kind]);
-                case 'panel': {
-                    return extrudedProfileGeometry(GRAVEYARD_GEOMETRY_PROFILES.panel);
-                }
-                case 'disc': return new THREE.CylinderGeometry(1, 1, 0.16, 14);
-                case 'turret': return new THREE.CylinderGeometry(0.72, 1, 0.34, 8);
-                case 'ring': {
-                    const profile = GRAVEYARD_GEOMETRY_PROFILES.ring;
-                    return new THREE.TorusGeometry(profile.majorRadius, profile.tubeRadius, 6, 18);
-                }
-                case 'spine': return new THREE.BoxGeometry(0.34, 0.34, 1);
-                case 'hull': return new THREE.DodecahedronGeometry(0.68, 0);
-                case 'beam': return new THREE.OctahedronGeometry(0.68, 0);
-                default: return new THREE.BoxGeometry(1, 1, 1);
-            }
-        };
         const root = this.instanceRoots.get('mourning-line');
         grouped.forEach((pieces, key) => {
             const [kindRaw, finish] = key.split(':');
@@ -2500,7 +2459,7 @@ export class SpaceRenderer {
                 // reverse face must keep its texture instead of disappearing.
                 side: THREE.DoubleSide,
             });
-            const mesh = new THREE.InstancedMesh(geometryFor(kind), material, pieces.length);
+            const mesh = new THREE.InstancedMesh(getGraveyardGeometry(kind), material, pieces.length);
             mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
             mesh.frustumCulled = false;
             mesh.name = `graveyard-${key}`;
@@ -2509,9 +2468,10 @@ export class SpaceRenderer {
         });
         this.updateGraveyardInstances();
     }
-    // The two adapted wreck files are deliberately absent from the install
+    // The six adapted wreck files are deliberately absent from the install
     // cache and boot preload. They begin loading when the surrounding field
-    // first becomes visible; one frigate model is cloned for both casualties.
+    // first becomes visible, then supply twelve fleet casualties and two
+    // smaller textured fighter breakups.
     ensureGraveyardModels() {
         if (this.graveyardModelLoading || this.graveyardModelMeshes.length)
             return this.graveyardModelLoading;
@@ -2534,19 +2494,47 @@ export class SpaceRenderer {
                     continue;
                 const wreck = source.clone(true);
                 wreck.traverse((child) => {
-                    if (!(child.material instanceof THREE.MeshStandardMaterial))
+                    // Earlier wreck exports carried long emissive conduit rods
+                    // that read as neon stripes floating off the dead hulls.
+                    // Remove the objects completely; their collision profiles
+                    // are filtered by the same name in the asset pipeline.
+                    if (/hot conduit/i.test(child.name) || /^COLLISION /i.test(child.name)) {
+                        child.visible = false;
                         return;
-                    const material = child.material.clone();
-                    // The wreck texture already carries a pale, desaturated
-                    // battlefield wash. Preserve it instead of multiplying it
-                    // by the old near-black soot tint.
-                    const ember = material.emissive.r + material.emissive.g + material.emissive.b >= 0.001;
-                    if (!ember && material.map)
-                        material.color.lerp(new THREE.Color(0xe7e9e5), 0.18);
-                    material.roughness = Math.max(0.88, material.roughness);
-                    material.metalness = Math.min(0.48, material.metalness);
-                    material.side = THREE.DoubleSide;
-                    child.material = material;
+                    }
+                    const sourceMaterials = Array.isArray(child.material) ? child.material : [child.material];
+                    if (!sourceMaterials.some((material) => material instanceof THREE.MeshStandardMaterial))
+                        return;
+                    const prepareMaterial = (sourceMaterial) => {
+                        if (!(sourceMaterial instanceof THREE.MeshStandardMaterial))
+                            return sourceMaterial;
+                        const material = sourceMaterial.clone();
+                        // The wreck texture already carries a pale, desaturated
+                        // battlefield wash. Preserve it instead of multiplying
+                        // it by the old near-black soot tint.
+                        if (material.map)
+                            material.color.lerp(new THREE.Color(0xe7e9e5), 0.18);
+                        // A wreck is cold. This also disables emissive paint or
+                        // nav textures inherited by the fighter source hulls.
+                        material.emissive.set(0x000000);
+                        material.emissiveMap = null;
+                        material.emissiveIntensity = 0;
+                        material.roughness = Math.max(0.88, material.roughness);
+                        material.metalness = Math.min(0.48, material.metalness);
+                        // Multi-material capital sections previously skipped
+                        // this pass, so their inner faces vanished. Wreck hulls
+                        // are opaque and two-sided: closed sections look solid,
+                        // while the authored bays show their lined interior.
+                        material.transparent = false;
+                        material.opacity = 1;
+                        material.alphaTest = 0;
+                        material.depthWrite = true;
+                        material.side = THREE.DoubleSide;
+                        return material;
+                    };
+                    child.material = Array.isArray(child.material)
+                        ? child.material.map(prepareMaterial)
+                        : prepareMaterial(child.material);
                 });
                 wreck.name = config.id;
                 wreck.position.set(center[0] + config.local[0], center[1] + config.local[1], center[2] + config.local[2]);
@@ -2613,12 +2601,7 @@ export class SpaceRenderer {
         scrapMap.repeat.set(2.2, 2.2);
         const rustMap = this.createPixelPanelTexture('wreck-node-rust', 0x5c4638, 0xc48152, 'rust', 96);
         rustMap.repeat.set(2.2, 2.2);
-        const geometries = [
-            new THREE.IcosahedronGeometry(1, 1),
-            new THREE.DodecahedronGeometry(1, 0),
-            new THREE.BoxGeometry(1.2, 0.7, 1.6),
-            new THREE.CylinderGeometry(0.55, 0.8, 1.5, 8),
-        ];
+        const geometries = [0, 1, 2, 3].map((shape) => getWreckNodeGeometry(shape));
         // Two value-tinted materials instead of one per chunk: tech wrecks
         // (arms/electronics) get the warm rust look, bulk wrecks (scrap/
         // machinery) the cool scrap grey. Sharing materials keeps 64 nodes
@@ -2650,19 +2633,14 @@ export class SpaceRenderer {
         const materialFor = (node) => (node.salvage === 'arms' || node.salvage === 'electronics' ? techMaterial : bulkMaterial);
         const groups = new Map();
         this.wreckNodes.forEach((node, nodeIndex) => {
-            let hash = 2166136261;
-            for (let index = 0; index < node.id.length; index += 1) {
-                hash ^= node.id.charCodeAt(index);
-                hash = (hash * 16777619) >>> 0;
-            }
-            const geometryIndex = hash % geometries.length;
+            const geometryIndex = node.shape % geometries.length;
             const tier = materialFor(node) === techMaterial ? 'tech' : 'bulk';
             const key = `${geometryIndex}:${tier}`;
             const entries = groups.get(key) ?? [];
             entries.push({
                 node,
                 nodeIndex,
-                rotation: [(hash % 5) * 0.7, (hash % 7) * 0.9, (hash % 3) * 0.5],
+                rotation: node.rotation,
             });
             groups.set(key, entries);
         });
@@ -2709,7 +2687,7 @@ export class SpaceRenderer {
                 this.tmpPosition.set(...node.position);
                 this.tmpEuler.set(...entry.rotation);
                 this.tmpQuaternion.setFromEuler(this.tmpEuler);
-                this.tmpScale.setScalar(hidden ? HIDDEN_SCALE[0] : wreckNodeCollisionRadius(node));
+                this.tmpScale.setScalar(hidden ? HIDDEN_SCALE[0] : wreckNodeVisualScale(node));
                 this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
                 batch.mesh.setMatrixAt(index, this.tmpMatrix);
             });
@@ -3065,7 +3043,7 @@ export class SpaceRenderer {
         const model = createVoxelShipModel(voxelVariant, palette);
         const group = model.group;
         const placeholderScale = config?.placeholderScale ?? 1;
-        const baseScale = (variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1) * placeholderScale;
+        const baseScale = (variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1) * placeholderScale * NPC_SHIP_SCALE;
         const engineColor = palette.engine;
         const engineFlareTexture = this.radialTexture(cssHex(engineColor), cssHex(engineColor));
         const flameTex = this.engineFlameTexture();
@@ -3158,7 +3136,7 @@ export class SpaceRenderer {
     // inherits the same flight orientation and world size.
     prepareGlbShip(model, config) {
         model.rotation.y = config.yaw;
-        model.scale.setScalar(config.scale);
+        model.scale.setScalar(config.scale * NPC_SHIP_SCALE);
         return model;
     }
     // A GLB ship with per-ship material tints (faction livery), engine flares
@@ -3910,6 +3888,16 @@ export class SpaceRenderer {
             this.scene.fog.color.setHex(style.fog);
             this.scene.fog.density = style.density;
         }
+        for (const material of this.starMaterials)
+            material.color.setHex(style.stars);
+        if (this.galacticBandMaterial) {
+            this.galacticBandMaterial.color.setHex(style.band);
+            this.galacticBandMaterial.opacity = style.bandOpacity;
+        }
+        for (const material of this.nebulaMaterials) {
+            material.color.setHex(style.nebula);
+            material.opacity = material.userData.baseOpacity * style.nebulaOpacity;
+        }
         this.applySystemStarProfile(this.systemId);
         const sunPosition = sunPositionForSystem(this.systemId);
         for (const visual of this.sunVisuals)
@@ -4219,8 +4207,10 @@ export class SpaceRenderer {
     updateWorld(dt) {
         this.skyTime += dt;
         this.updateHyperdriveFx(dt);
-        if (this.starShimmer)
-            this.starShimmer.opacity = 0.42 + Math.sin(this.skyTime * 2.4) * 0.14;
+        if (this.starShimmer) {
+            const baseOpacity = this.starShimmer.userData.baseOpacity ?? 0.3;
+            this.starShimmer.opacity = baseOpacity + Math.sin(this.skyTime * 2.4) * 0.055;
+        }
         for (const visual of this.jumpPointVisuals) {
             if (LOCATIONS[visual.id]?.systemId !== this.systemId)
                 continue;

@@ -8,7 +8,7 @@ import { acceptMission, awardCareerProgress, completeBountyMission, completeMiss
 import { RACE_QUEST_ID, createRaceRacers, crossedRaceGate, generateRaceCourse, normalizeRaceRecord, raceCourseUnlocked, racePayout, raceRankLabel, raceRacerTarget, recordRaceResult, stageRaceRacers, updateRaceRacer } from './racing.js';
 import { clamp, damp, formatCredits, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
 import { EntityStore } from './entityStore.js';
-import { SpaceRenderer } from './render.js';
+import { NPC_SHIP_SCALE, SpaceRenderer } from './render.js';
 import { saveGame } from './save.js';
 import { getQuest, setFlag, setStep, startQuest } from './quests.js';
 import { getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
@@ -17,7 +17,7 @@ import { HULL_HARDPOINTS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, canonicalOutfitId, coll
 import { combinedHullIntegrity, normalizeEnergy, regenerateCombatResources, spendEnergy } from './combatResources.js';
 import { commitShipTrade, quoteShipTrade } from './shipTrade.js';
 import { SHIP_MOUNT_ANCHORS } from './shipMounts.js';
-import { asteroidCollisionMesh, asteroidCollisionRadius, ASTEROID_COLLISION_FACTOR, generateAsteroidField, generateGraveyardPieces, generateRegionalAsteroidField, generateWreckNodes, graveyardZoneAt, graveyardZoneLabel, GRAVEYARD_GEOMETRY_PROFILES, REGIONAL_ASTEROID_FIELD_IDS, wreckNodeCollisionRadius } from './worldData.js';
+import { asteroidCollisionMesh, asteroidCollisionRadius, ASTEROID_COLLISION_FACTOR, generateAsteroidField, generateGraveyardPieces, generateRegionalAsteroidField, generateWreckNodes, graveyardCollisionMesh, graveyardZoneAt, graveyardZoneLabel, GRAVEYARD_GEOMETRY_PROFILES, GRAVEYARD_MODEL_COLLIDERS, GRAVEYARD_MODEL_COLLIDER_MAX_RADIUS, GRAVEYARD_MODEL_WRECKS, REGIONAL_ASTEROID_FIELD_IDS, wreckNodeCollisionMesh, wreckNodeCollisionRadius } from './worldData.js';
 import { hullVsAsteroid, hullVsBox, hullVsEngine, hullVsHull, hullVsRing, hullVsSphere } from './hullCollision.js';
 import { steerToward } from './npcNav.js';
 import { PILOT_LINES, pilotMod, rollPilot, TIER_LABELS } from './pilots.js';
@@ -67,7 +67,7 @@ const ARENA_FIELD_START_OFFSETS = [
 // The widest rendered field obstacle (a scaled monolith ≈ 130u × 1.6) exceeds
 // the old 140u collision margin, so grid queries must pad by this much to catch
 // the surface of the biggest rocks before the ship is inside them.
-const MAX_FIELD_OBSTACLE_RADIUS = 380;
+const MAX_FIELD_OBSTACLE_RADIUS = Math.max(380, Math.ceil(GRAVEYARD_MODEL_COLLIDER_MAX_RADIUS + 4));
 // Asteroids render as a distorted sphere scaled per axis. Hard collision AND
 // line of sight both test the rock's actual deformed-icosahedron mesh
 // (worldData.asteroidCollisionMesh), so a shot is blocked only where rock is
@@ -273,6 +273,7 @@ const STATION_TRAFFIC_TARGET = 3;
 // a frigate and its sole battleship guard. No other system can spawn one.
 const CAPITAL_TRAFFIC_CHECK_SECONDS = 1;
 const CAPITAL_HOMEWORLD_RANGE = 7000;
+const CAPITAL_GATEHOUSE_RANGE = 5200;
 const CAPITAL_ROOK_RANGE = 3600;
 // A patrol's passing greeting invites a reply while the call is up: a small
 // Concord reputation courtesy for acknowledging the cordon pilot.
@@ -569,20 +570,68 @@ const HULL_FLIGHT_STATS = {
     prospector: { speed: 24, afterburnSpeed: 0, turnRate: 0.9, collisionRadius: 2.2, hullHalfExtents: [3.46, 2.83, 6.7] }, // miner — agile industrial
     'atlas-freighter': { speed: 27, afterburnSpeed: 0, turnRate: 0.55, collisionRadius: 2.9, hullHalfExtents: [4.35, 4.13, 13.4] }, // trader — ponderous
     'concord-frigate': { speed: 18, afterburnSpeed: 0, turnRate: 0.34, collisionRadius: 56.5, hullHalfExtents: [18.73, 22.46, 56.45] },
+    'concord-cruiser': { speed: 9, afterburnSpeed: 0, turnRate: 0.12, collisionRadius: 282.05, hullHalfExtents: [96.31, 155.54, 282.05] },
+    'concord-carrier': { speed: 4.5, afterburnSpeed: 0, turnRate: 0.06, collisionRadius: 451.28, hullHalfExtents: [210.41, 117.01, 451.28] },
     'concord-battleship': { speed: 5, afterburnSpeed: 0, turnRate: 0.055, collisionRadius: 565, hullHalfExtents: [301.84, 226.78, 564.92] },
 };
+const CAPITAL_CLASS_BY_VARIANT = Object.freeze({
+    'concord-frigate': 'frigate',
+    'concord-cruiser': 'cruiser',
+    'concord-carrier': 'carrier',
+    'concord-battleship': 'battleship',
+});
+const CAPITAL_SHIP_STATS = Object.freeze({
+    frigate: Object.freeze({
+        maxShield: 1400, maxHull: 2600, shieldRegen: 8, gunDamage: 12, fireInterval: 0.62,
+        fireRange: 840, muzzleOffset: 108, projectileLife: 4, projectileVisualScale: 2,
+        passRange: 360, resetRange: 1200, patrolRadiusMin: 520, patrolRadiusMax: 1040,
+        patrolVertical: 180, fireCooldown: 0.35, witnessRange: 1300, explosionScale: 3.5,
+        approachOutward: 560, approachTangent: 1040, approachUp: 240,
+    }),
+    cruiser: Object.freeze({
+        maxShield: 5800, maxHull: 10500, shieldRegen: 15, gunDamage: 18, fireInterval: 0.82,
+        fireRange: 1900, muzzleOffset: 535, projectileLife: 7, projectileVisualScale: 3,
+        passRange: 1100, resetRange: 2600, patrolRadiusMin: 850, patrolRadiusMax: 1500,
+        patrolVertical: 260, fireCooldown: 0.55, witnessRange: 2200, explosionScale: 6,
+        approachOutward: 1100, approachTangent: 1450, approachUp: 340,
+    }),
+    carrier: Object.freeze({
+        maxShield: 9800, maxHull: 20000, shieldRegen: 22, gunDamage: 20, fireInterval: 0.95,
+        fireRange: 2450, muzzleOffset: 860, projectileLife: 9, projectileVisualScale: 3.5,
+        passRange: 1700, resetRange: 3400, patrolRadiusMin: 1000, patrolRadiusMax: 1900,
+        patrolVertical: 340, fireCooldown: 0.7, witnessRange: 2600, explosionScale: 7.2,
+        approachOutward: 1550, approachTangent: 2550, approachUp: 520,
+    }),
+    battleship: Object.freeze({
+        maxShield: 12000, maxHull: 24000, shieldRegen: 24, gunDamage: 24, fireInterval: 1.05,
+        fireRange: 2700, muzzleOffset: 1090, projectileLife: 10, projectileVisualScale: 4,
+        passRange: 2100, resetRange: 3800, patrolRadiusMin: 900, patrolRadiusMax: 1700,
+        patrolVertical: 320, fireCooldown: 0.8, witnessRange: 2800, explosionScale: 8,
+        approachOutward: 1700, approachTangent: 1700, approachUp: 500,
+    }),
+});
+// Rendering doubles every NPC hull in flight. Precompute the matching physical
+// profiles once at module load so collision and avoidance remain allocation-
+// free in the per-ship hot paths. Player collision stays at cockpit scale.
+const NPC_HULL_FLIGHT_STATS = Object.freeze(Object.fromEntries(Object.entries(HULL_FLIGHT_STATS).map(([variant, stats]) => [variant, Object.freeze({
+    ...stats,
+    collisionRadius: stats.collisionRadius * NPC_SHIP_SCALE,
+    hullHalfExtents: Object.freeze(stats.hullHalfExtents.map((extent) => extent * NPC_SHIP_SCALE)),
+})])));
+const npcFlightVariant = (ship) => NPC_HULL_FLIGHT_STATS[ship?.variant] ? ship.variant : shipVariantForRole(ship?.role);
+const npcCollisionRadius = (ship) => NPC_HULL_FLIGHT_STATS[npcFlightVariant(ship)]?.collisionRadius ?? NPC_SHIP_RADIUS * NPC_SHIP_SCALE;
 const ATTACK_RESET_RANGE = 175;
-const ATTACK_SEPARATION = 22;
+const ATTACK_SEPARATION = 44;
 const ATTACK_FIRE_RANGE = 140;
 // Lateral aim offset so a strafing pass is a near-miss beside the target
 // (WW2-style deflection joust) rather than a ram through its center.
-const ATTACK_PASS_STANDOFF = 15;
-const ATTACK_PASS_STANDOFF_FLOOR = 10;
+const ATTACK_PASS_STANDOFF = 30;
+const ATTACK_PASS_STANDOFF_FLOOR = 20;
 // Ship-to-ship avoidance: when another ship (usually the player) is closing on a
 // line that will cross within a few units, the pilot throws in a decisive evasive
 // turn rather than riding the line into a collision. The separation threshold sits
 // below the intended near-miss pass standoff so normal jousts are unaffected.
-const SHIP_AVOID_SEPARATION = 10;
+const SHIP_AVOID_SEPARATION = 20;
 const SHIP_AVOID_HORIZON = 4.0;
 const SHIP_AVOID_RANGE = 240;
 const SHIP_AVOID_STEER = 1.8;
@@ -1349,6 +1398,8 @@ export class GameSession {
         this.resetArenaWeaponState();
         const environment = config.environment ?? 'open';
         const scenario = config.scenario ?? '1v1';
+        const debrisCollisionTest = config.testMode === 'debris-collision';
+        const freeFlight = scenario === 'free-flight';
         const centers = {
             open: new THREE.Vector3(0, 0, 0),
             'asteroid-field': vec(LOCATIONS.shardbelt.position),
@@ -1360,8 +1411,11 @@ export class GameSession {
         // the player sees the relict scene immediately. Hyperdrive arrivals
         // still use the outer edge path below; this exception is only for the
         // deliberate arena staging start.
+        let stagedForward;
         if (instanceId) {
-            if (environment === 'debris-field')
+            if (debrisCollisionTest)
+                stagedForward = this.setDebrisCollisionTestPosition(center);
+            else if (environment === 'debris-field')
                 this.setFieldArenaPosition(center, instanceId);
             else
                 this.setFieldEntryPosition(center, instanceId, FORWARD);
@@ -1376,7 +1430,10 @@ export class GameSession {
         player.position = tuple(center);
         // The interior debris arena faces the normal -Z scene direction. The
         // edge-start asteroid arena still turns inward from its boundary.
-        if (instanceId && environment !== 'debris-field') {
+        if (stagedForward) {
+            player.rotation = quatTuple(this.tmpQ.setFromUnitVectors(FORWARD, vec(stagedForward, this.tmpD)));
+        }
+        else if (instanceId && environment !== 'debris-field') {
             const inward = this.tmpEntryDirection.copy(FORWARD).multiplyScalar(-1);
             player.rotation = quatTuple(this.tmpQ.setFromUnitVectors(FORWARD, inward));
         }
@@ -1385,7 +1442,7 @@ export class GameSession {
         }
         player.velocity = [0, 0, 0];
         player.angularVelocity = [0, 0, 0];
-        player.throttle = 0.35;
+        player.throttle = debrisCollisionTest ? 0 : 0.35;
         player.fuel = stats.fuel;
         player.shield = stats.shield;
         player.hull = stats.hull;
@@ -1393,53 +1450,86 @@ export class GameSession {
         player.missiles = stats.missileCapacity;
         player.navTargetId = environment === 'asteroid-field' ? 'shardbelt' : environment === 'debris-field' ? 'mourning-line' : 'helix';
         this.resetPlayerInterpolation(true);
-        const hostileCount = scenario === '1v2' ? 2 : scenario === '1v3' || scenario === '2v3' ? 3 : 1;
-        const withWingman = scenario === '2v3';
-        // The difficulty selector pins the hostile pilot tier (temperament still
-        // rolls per faction); ROOKIE / VETERAN / ACE map straight onto the pilot
-        // tiers, so the arena is a clean skill ladder.
-        const hostilePilot = { tier: config.difficulty ?? 'veteran' };
-        let wingman;
-        if (withWingman) {
-            // 2v3 is two concurrent dogfights: a wingman pockets one hostile off
-            // to the side while two hostiles press the player. The pair spawns
-            // facing each other so they open with a head-on joust instead of a
-            // slow conga-line tail chase.
-            const wingDir = new THREE.Vector3(0, 0.15, -1).normalize();
-            const wingmanPos = center.clone().addScaledVector(wingDir, 170);
-            const attackerPos = center.clone().addScaledVector(wingDir, 360);
-            wingman = this.spawnShip('patrol', tuple(wingmanPos));
-            const wingAttacker = this.spawnShip('escort', tuple(attackerPos), undefined, undefined, hostilePilot);
-            wingAttacker.targetId = wingman.id;
-            const faceToward = (ship, toward) => {
-                const dir = toward.clone().sub(vec(ship.position)).normalize();
-                ship.rotation = quatTuple(new THREE.Quaternion().setFromUnitVectors(FORWARD, dir));
-            };
-            faceToward(wingman, attackerPos);
-            faceToward(wingAttacker, wingmanPos);
-        }
-        if (withWingman) {
-            // Two hostiles press the player from opposite flanks.
-            const flanks = [new THREE.Vector3(1, 0, 0.25), new THREE.Vector3(-0.9, 0, -0.3)];
-            flanks.forEach((dir, index) => {
-                const hostile = this.spawnShip(index === 0 ? 'pirate' : 'escort', tuple(center.clone().addScaledVector(dir.normalize(), 220 + index * 40)), undefined, undefined, hostilePilot);
-                hostile.targetId = 'player';
-            });
-        }
-        else {
-            for (let index = 0; index < hostileCount; index += 1) {
-                const angle = (index / Math.max(1, hostileCount)) * Math.PI * 2 + 0.6;
-                const offset = new THREE.Vector3(Math.cos(angle), index % 2 ? 0.5 : -0.35, Math.sin(angle)).normalize().multiplyScalar(220 + index * 40);
-                const hostile = this.spawnShip(index === 0 ? 'pirate' : 'escort', tuple(center.clone().add(offset)), undefined, undefined, hostilePilot);
-                hostile.targetId = 'player';
+        if (!freeFlight) {
+            const hostileCount = scenario === '1v2' ? 2 : scenario === '1v3' || scenario === '2v3' ? 3 : 1;
+            const withWingman = scenario === '2v3';
+            // The difficulty selector pins the hostile pilot tier (temperament still
+            // rolls per faction); ROOKIE / VETERAN / ACE map straight onto the pilot
+            // tiers, so the arena is a clean skill ladder.
+            const hostilePilot = { tier: config.difficulty ?? 'veteran' };
+            let wingman;
+            if (withWingman) {
+                // 2v3 is two concurrent dogfights: a wingman pockets one hostile off
+                // to the side while two hostiles press the player. The pair spawns
+                // facing each other so they open with a head-on joust instead of a
+                // slow conga-line tail chase.
+                const wingDir = new THREE.Vector3(0, 0.15, -1).normalize();
+                const wingmanPos = center.clone().addScaledVector(wingDir, 170);
+                const attackerPos = center.clone().addScaledVector(wingDir, 360);
+                wingman = this.spawnShip('patrol', tuple(wingmanPos));
+                const wingAttacker = this.spawnShip('escort', tuple(attackerPos), undefined, undefined, hostilePilot);
+                wingAttacker.targetId = wingman.id;
+                const faceToward = (ship, toward) => {
+                    const dir = toward.clone().sub(vec(ship.position)).normalize();
+                    ship.rotation = quatTuple(new THREE.Quaternion().setFromUnitVectors(FORWARD, dir));
+                };
+                faceToward(wingman, attackerPos);
+                faceToward(wingAttacker, wingmanPos);
+            }
+            if (withWingman) {
+                // Two hostiles press the player from opposite flanks.
+                const flanks = [new THREE.Vector3(1, 0, 0.25), new THREE.Vector3(-0.9, 0, -0.3)];
+                flanks.forEach((dir, index) => {
+                    const hostile = this.spawnShip(index === 0 ? 'pirate' : 'escort', tuple(center.clone().addScaledVector(dir.normalize(), 220 + index * 40)), undefined, undefined, hostilePilot);
+                    hostile.targetId = 'player';
+                });
+            }
+            else {
+                for (let index = 0; index < hostileCount; index += 1) {
+                    const angle = (index / Math.max(1, hostileCount)) * Math.PI * 2 + 0.6;
+                    const offset = new THREE.Vector3(Math.cos(angle), index % 2 ? 0.5 : -0.35, Math.sin(angle)).normalize().multiplyScalar(220 + index * 40);
+                    const hostile = this.spawnShip(index === 0 ? 'pirate' : 'escort', tuple(center.clone().add(offset)), undefined, undefined, hostilePilot);
+                    hostile.targetId = 'player';
+                }
             }
         }
         if (announce) {
-            const envLabel = t(environment === 'asteroid-field' ? 'ASTEROID FIELD' : environment === 'debris-field' ? 'DEBRIS FIELD' : 'OPEN SPACE');
-            const difficultyLabel = t(TIER_LABELS[config.difficulty ?? 'veteran'] ?? 'Veteran').toUpperCase();
-            this.ui.pushEvent(t('COMBAT SIMULATOR · {scenario} · {env} · {difficulty} PILOTS', { scenario: scenario.toUpperCase(), env: envLabel, difficulty: difficultyLabel }), 'info', 5200);
-            this.ui.pushEvent(t('Hostiles inbound. Weapons free.'), 'danger', 3600);
+            if (debrisCollisionTest) {
+                this.ui.pushEvent(t('TEST FLIGHT · DEBRIS FIELD · NO HOSTILES'), 'info', 6200);
+                this.ui.pushEvent(t('Reload to return to the carrier bay.'), 'info', 6200);
+            }
+            else {
+                const envLabel = t(environment === 'asteroid-field' ? 'ASTEROID FIELD' : environment === 'debris-field' ? 'DEBRIS FIELD' : 'OPEN SPACE');
+                const difficultyLabel = t(TIER_LABELS[config.difficulty ?? 'veteran'] ?? 'Veteran').toUpperCase();
+                this.ui.pushEvent(t('COMBAT SIMULATOR · {scenario} · {env} · {difficulty} PILOTS', { scenario: scenario.toUpperCase(), env: envLabel, difficulty: difficultyLabel }), 'info', 5200);
+                this.ui.pushEvent(t('Hostiles inbound. Weapons free.'), 'danger', 3600);
+            }
         }
+    }
+    setDebrisCollisionTestPosition(position) {
+        const field = LOCATIONS['mourning-line'];
+        const wreck = GRAVEYARD_MODEL_WRECKS.find((entry) => entry.id === 'concord-carrier-wreck');
+        if (!field || !wreck?.interior) {
+            this.setFieldArenaPosition(position, 'mourning-line');
+            return tuple(FORWARD);
+        }
+        // This runs only when creating/resetting the disposable test sortie, so
+        // clarity wins over routing the staging math through the hot-path
+        // scratch vectors used by collision. Start just outside the carrier's
+        // negative-X opening and look down the bay's exact authored centreline.
+        const wreckRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(...wreck.rotation, 'XYZ'));
+        const bayCenter = new THREE.Vector3(...wreck.interior.center)
+            .multiplyScalar(wreck.scale)
+            .applyQuaternion(wreckRotation)
+            .add(new THREE.Vector3(
+                field.position[0] + wreck.local[0],
+                field.position[1] + wreck.local[1],
+                field.position[2] + wreck.local[2],
+            ));
+        const bayAxis = new THREE.Vector3(1, 0, 0).applyQuaternion(wreckRotation).normalize();
+        position.copy(bayCenter).addScaledVector(bayAxis, -(wreck.interior.halfLength * wreck.scale + 180));
+        this.ensurePlayerEntryClearance(position, 'mourning-line', bayAxis);
+        return tuple(bayCenter.sub(position).normalize());
     }
     restartArena() {
         this.ships = [];
@@ -2923,7 +3013,7 @@ export class GameSession {
                     hit = hullVsRing(position, hullExtents, shipQuatInv, obstacle, contact);
                 else if (obstacle.shape === 'engine')
                     hit = hullVsEngine(position, hullExtents, shipQuatInv, obstacle, contact);
-                else if (obstacle.shape === 'asteroid') {
+                else if (obstacle.meshVerts) {
                     const mesh = obstacle.meshVerts;
                     if (!this.asteroidScratch || this.asteroidScratch.length < mesh.length)
                         this.asteroidScratch = new Float32Array(mesh.length);
@@ -5445,8 +5535,7 @@ export class GameSession {
                 // and not dying outranks the fan-out. Re-roll against the
                 // seeded stream, so probes stay exact.
                 const obstacles = this.activeFieldObstacles();
-                const shipVariant = HULL_FLIGHT_STATS[ship.variant] ? ship.variant : shipVariantForRole(ship.role);
-                const shipRadius = HULL_FLIGHT_STATS[shipVariant]?.collisionRadius ?? NPC_SHIP_RADIUS;
+                const shipRadius = npcCollisionRadius(ship);
                 let fan = undefined;
                 for (let attempt = 0; attempt < 5; attempt += 1) {
                     const angle = rng() * Math.PI * 2;
@@ -5627,7 +5716,7 @@ export class GameSession {
     // readout once the ship is scanned (see buildHudModel). Trade and smuggle
     // legs name the ports so the hierarchy reads in-game.
     shipRoleLabel(ship) {
-        return t(ship.capitalClass === 'battleship' ? 'BATTLESHIP' : ship.capitalClass === 'frigate' ? 'FRIGATE' : ship.role.toUpperCase());
+        return t(ship.capitalClass ? ship.capitalClass.toUpperCase() : ship.role.toUpperCase());
     }
     shipTaskLabel(ship) {
         const task = ship.task;
@@ -6325,7 +6414,7 @@ export class GameSession {
                 hit = hullVsRing(position, hullExtents, shipQuatInv, obstacle, contact);
             else if (obstacle.shape === 'engine')
                 hit = hullVsEngine(position, hullExtents, shipQuatInv, obstacle, contact);
-            else if (obstacle.shape === 'asteroid') {
+            else if (obstacle.meshVerts) {
                 const mesh = obstacle.meshVerts;
                 if (!this.npcAsteroidScratch || this.npcAsteroidScratch.length < mesh.length)
                     this.npcAsteroidScratch = new Float32Array(mesh.length);
@@ -6474,8 +6563,7 @@ export class GameSession {
         // committing to its next route. Deterministic per ship/lifetime window.
         const obstacles = this.activeFieldObstacles();
         const origin = vec(ship.position, this.tmpP2);
-        const shipVariant = HULL_FLIGHT_STATS[ship.variant] ? ship.variant : shipVariantForRole(ship.role);
-        const shipRadius = HULL_FLIGHT_STATS[shipVariant]?.collisionRadius ?? NPC_SHIP_RADIUS;
+        const shipRadius = npcCollisionRadius(ship);
         const clearance = shipRadius + 24;
         const rng = seededRandom(`${this.save.world.seed}:clearpath:${ship.id}:${Math.floor(ship.lifetime / 20)}`);
         const base = rng() * Math.PI * 2;
@@ -6509,7 +6597,9 @@ export class GameSession {
                 axis.normalize();
             aimDir = this.tmpP4.copy(direction).applyAxisAngle(axis, (ship.aiRng() - 0.5) * 2 * spread).normalize();
         }
-        const position = vec(ship.position).addScaledVector(aimDir, ship.muzzleOffset ?? 2.4);
+        const hull = this.npcHullExtents(ship);
+        const muzzleOffset = ship.muzzleOffset ?? Math.max(2.4 * NPC_SHIP_SCALE, hull[2] * 0.9);
+        const position = vec(ship.position).addScaledVector(aimDir, muzzleOffset);
         const slot = this.projStore.alloc();
         this.projStore.setPos(slot, position.x, position.y, position.z);
         const shotVel = this.tmpP0.copy(aimDir).multiplyScalar(150).add(vec(ship.velocity));
@@ -6597,9 +6687,7 @@ export class GameSession {
                         continue;
                     if (projectile.ownerId !== 'player' && !this.projectileCanHitShip(projectile, ship))
                         continue;
-                    const hit = ship.capitalClass
-                        ? segmentShipHullHit(sweepFrom, end, ship, this.npcHullExtents(ship), projectile.kind === 'missile' ? 0.8 : 0.12)
-                        : segmentSphereHit(sweepFrom, end, vec(ship.position, this.tmpP4), (ship.role === 'trader' ? 3.8 : 2.4) + (projectile.kind === 'missile' ? 0.8 : 0));
+                    const hit = segmentShipHullHit(sweepFrom, end, ship, this.npcHullExtents(ship), projectile.kind === 'missile' ? 0.8 : 0.12);
                     if (hit !== undefined && hit < bestT) {
                         bestT = hit;
                         hitKind = 'ship';
@@ -7208,7 +7296,7 @@ export class GameSession {
     destroyShip(ship, attackerId, position = ship.position) {
         ship.hull = 0;
         this.resolveHyperdriveIntercept(ship);
-        const explosionScale = ship.capitalClass === 'battleship' ? 8 : ship.capitalClass === 'frigate' ? 3.5 : ship.role === 'trader' ? 1.5 : 1;
+        const explosionScale = (CAPITAL_SHIP_STATS[ship.capitalClass]?.explosionScale ?? (ship.role === 'trader' ? 1.5 : 1)) * NPC_SHIP_SCALE;
         this.renderer.spawnExplosion(ship.position, ship.hostile, explosionScale);
         this.audio.play('explosion', 1.1);
         if (ship.hostile && attackerId === 'player') {
@@ -7627,15 +7715,15 @@ export class GameSession {
             tangent.copy(RIGHT);
         else
             tangent.normalize();
-        const battleship = capitalClass === 'battleship';
+        const profile = CAPITAL_SHIP_STATS[capitalClass] ?? CAPITAL_SHIP_STATS.frigate;
         return tuple(player.clone()
-            .addScaledVector(outward, battleship ? 850 : 280)
-            .addScaledVector(tangent, flankSign * (battleship ? 850 : 520))
-            .addScaledVector(UP, battleship ? 250 : 120));
+            .addScaledVector(outward, profile.approachOutward)
+            .addScaledVector(tangent, flankSign * profile.approachTangent)
+            .addScaledVector(UP, profile.approachUp));
     }
     // Capital ships are authored landmarks with strict jurisdiction. The
-    // battleship can only exist on Meridian Prime's orbital cordon; frigates
-    // also work that cordon and Rookhaven's Helios patrol lane.
+    // The homeworld cordon fields the battleship, carrier, and an escort. The
+    // cruiser guards Gatehouse Twelve while frigates also patrol Rookhaven.
     updateCapitalTraffic(force = false) {
         if (this.arena || (!force && this.save.world.time < this.nextCapitalTrafficCheckAt))
             return;
@@ -7654,8 +7742,13 @@ export class GameSession {
             const clearance = home.dockRadius ?? home.radius;
             if (player.distanceTo(vec(home.position)) <= clearance + CAPITAL_HOMEWORLD_RANGE) {
                 ensure('concord-battleship', 'battleship', home.id, 'CNS Vigilance', 1);
+                ensure('concord-carrier', 'carrier', home.id, 'CNS Aegis', -1);
                 ensure('concord-frigate', 'frigate', home.id, 'CPV Resolute', -1);
             }
+            const gatehouse = LOCATIONS['gatehouse-twelve'];
+            const gatehouseClearance = gatehouse.dockRadius ?? gatehouse.radius;
+            if (player.distanceTo(vec(gatehouse.position)) <= gatehouseClearance + CAPITAL_GATEHOUSE_RANGE)
+                ensure('concord-cruiser', 'cruiser', gatehouse.id, 'CNS Arbiter', 1);
         }
         else if (this.save.player.systemId === 'helios-verge') {
             const home = LOCATIONS.rook;
@@ -7915,8 +8008,10 @@ export class GameSession {
         return ship;
     }
     spawnCapitalShip(variant, position, homeId, name) {
-        const capitalClass = variant === 'concord-battleship' ? 'battleship' : 'frigate';
-        const battleship = capitalClass === 'battleship';
+        const capitalClass = CAPITAL_CLASS_BY_VARIANT[variant];
+        const profile = CAPITAL_SHIP_STATS[capitalClass];
+        if (!profile)
+            throw new Error(`Unknown Concord capital variant: ${variant}`);
         const ship = this.spawnShip('patrol', position, undefined, name, { tier: 'ace', temperament: 'steady' });
         const flight = HULL_FLIGHT_STATS[variant];
         ship.variant = variant;
@@ -7928,28 +8023,28 @@ export class GameSession {
         ship.velocity[0] = 0;
         ship.velocity[1] = 0;
         ship.velocity[2] = 0;
-        ship.maxShield = battleship ? 12000 : 1400;
+        ship.maxShield = profile.maxShield;
         ship.shield = ship.maxShield;
-        ship.maxHull = battleship ? 24000 : 2600;
+        ship.maxHull = profile.maxHull;
         ship.hull = ship.maxHull;
-        ship.shieldRegen = battleship ? 24 : 8;
-        ship.gunDamage = battleship ? 24 : 12;
-        ship.fireInterval = battleship ? 1.05 : 0.62;
-        ship.fireRange = battleship ? 1350 : 420;
-        ship.muzzleOffset = battleship ? 545 : 54;
-        ship.projectileLife = battleship ? 10 : 4;
-        ship.projectileVisualScale = battleship ? 4 : 2;
-        ship.passRange = battleship ? 1050 : 180;
-        ship.resetRange = battleship ? 1900 : 600;
+        ship.shieldRegen = profile.shieldRegen;
+        ship.gunDamage = profile.gunDamage;
+        ship.fireInterval = profile.fireInterval;
+        ship.fireRange = profile.fireRange;
+        ship.muzzleOffset = profile.muzzleOffset;
+        ship.projectileLife = profile.projectileLife;
+        ship.projectileVisualScale = profile.projectileVisualScale;
+        ship.passRange = profile.passRange;
+        ship.resetRange = profile.resetRange;
         ship.patrolAnchor = [...position];
-        ship.patrolRadiusMin = battleship ? 450 : 260;
-        ship.patrolRadiusMax = battleship ? 850 : 520;
-        ship.patrolVertical = battleship ? 160 : 90;
+        ship.patrolRadiusMin = profile.patrolRadiusMin;
+        ship.patrolRadiusMax = profile.patrolRadiusMax;
+        ship.patrolVertical = profile.patrolVertical;
         ship.noSurrender = true;
         ship.dark = false;
         ship.bountyValue = 0;
         ship.mugCapable = false;
-        ship.fireCooldown = battleship ? 0.8 : 0.35;
+        ship.fireCooldown = profile.fireCooldown;
         rebasePatrolTask(ship, this, homeId);
         // Begin the lazy fetch as soon as the landmark is authorized. The
         // correctly scaled voxel silhouette covers only the short load window.
@@ -7960,7 +8055,7 @@ export class GameSession {
         for (const patrol of this.ships.filter((entry) => entry.role === 'patrol' && entry.hull > 0)) {
             // A patrol only turns hostile if it actually saw the incident: close
             // enough and with a clear line of sight to the ship that was hit.
-            const witnessRange = patrol.capitalClass === 'battleship' ? 1400 : patrol.capitalClass === 'frigate' ? 650 : 320;
+            const witnessRange = CAPITAL_SHIP_STATS[patrol.capitalClass]?.witnessRange ?? 320;
             if (vec(patrol.position).distanceTo(vec(position)) < witnessRange && this.canSee(patrol.position, position, false)) {
                 patrol.hostile = true;
                 patrol.targetId = 'player';
@@ -8269,34 +8364,65 @@ export class GameSession {
             const obstacles = this.graveyard.filter((piece) => piece.collidable !== false).map((piece) => {
                 const [hx, hy, hz] = piece.halfExtents;
                 const q = this.tmpQ.setFromEuler(this.tmpEuler.set(piece.rotation[0], piece.rotation[1], piece.rotation[2], 'XYZ'));
-                // radius is the bounding sphere used for the spatial grid and
-                // avoidance; hard collision uses the oriented box so a flat
-                // panel blocks its face without an inflated sphere around it.
-                return {
+                const analyticalShape = piece.kind === 'ring' || piece.kind === 'engine' ? piece.kind : undefined;
+                const collisionMesh = graveyardCollisionMesh(piece);
+                const obstacle = {
                     id: piece.id,
                     x: piece.position[0],
                     y: piece.position[1],
                     z: piece.position[2],
-                    radius: Math.hypot(hx, hy, hz),
-                    losRadius: piece.collisionRadius,
-                    collisionRadius: Math.hypot(hx, hy, hz),
-                    shape: piece.kind === 'ring' || piece.kind === 'engine' ? piece.kind : undefined,
+                    radius: collisionMesh.radius,
+                    losRadius: collisionMesh.radius,
+                    collisionRadius: collisionMesh.radius,
+                    shape: analyticalShape ?? 'debris-mesh',
                     scale: piece.scale,
                     box: { hx, hy, hz, qx: q.x, qy: q.y, qz: q.z, qw: q.w },
                 };
+                obstacle.meshVerts = collisionMesh.verts;
+                obstacle.meshIndices = collisionMesh.indices;
+                obstacle.minReach = collisionMesh.minReach;
+                return obstacle;
             });
+            for (const collider of GRAVEYARD_MODEL_COLLIDERS) {
+                const [hx, hy, hz] = collider.halfExtents;
+                const [qx, qy, qz, qw] = collider.quaternion;
+                obstacles.push({
+                    id: collider.id,
+                    modelWreckId: collider.modelWreckId,
+                    sectionName: collider.sectionName,
+                    x: collider.position[0],
+                    y: collider.position[1],
+                    z: collider.position[2],
+                    radius: collider.collisionRadius,
+                    losRadius: collider.collisionRadius,
+                    collisionRadius: collider.collisionRadius,
+                    shape: 'wreck-mesh',
+                    meshVerts: collider.meshVerts,
+                    meshIndices: collider.meshIndices,
+                    minReach: collider.minReach,
+                    surfaceOnly: collider.surfaceOnly,
+                    box: { hx, hy, hz, qx, qy, qz, qw },
+                });
+            }
             for (const node of this.wreckNodes) {
                 if (node.remaining <= 0)
                     continue;
-                const radius = wreckNodeCollisionRadius(node);
+                const collisionMesh = wreckNodeCollisionMesh(node);
+                const q = this.tmpQ.setFromEuler(this.tmpEuler.set(node.rotation[0], node.rotation[1], node.rotation[2], 'XYZ'));
+                const [hx, hy, hz] = collisionMesh.halfExtents;
                 obstacles.push({
                     id: node.id,
                     x: node.position[0],
                     y: node.position[1],
                     z: node.position[2],
-                    radius,
-                    losRadius: radius,
-                    collisionRadius: radius,
+                    radius: collisionMesh.radius,
+                    losRadius: collisionMesh.radius,
+                    collisionRadius: collisionMesh.radius,
+                    shape: 'wreck-node-mesh',
+                    meshVerts: collisionMesh.verts,
+                    meshIndices: collisionMesh.indices,
+                    minReach: collisionMesh.minReach,
+                    box: { hx, hy, hz, qx: q.x, qy: q.y, qz: q.z, qw: q.w },
                 });
             }
             return obstacles;
@@ -8321,8 +8447,7 @@ export class GameSession {
         return [base[0] * PLAYER_COLLISION_FORGIVENESS, base[1] * PLAYER_COLLISION_FORGIVENESS, base[2] * PLAYER_COLLISION_FORGIVENESS];
     }
     npcHullExtents(ship) {
-        const variant = HULL_FLIGHT_STATS[ship?.variant] ? ship.variant : shipVariantForRole(ship?.role);
-        return HULL_FLIGHT_STATS[variant]?.hullHalfExtents ?? [1.4, 2.4, 6.1];
+        return NPC_HULL_FLIGHT_STATS[npcFlightVariant(ship)]?.hullHalfExtents ?? NPC_HULL_FLIGHT_STATS.kestrel.hullHalfExtents;
     }
 
     // Entry/spawn clearance must cover the hull's longest reach, not the old
@@ -8425,15 +8550,22 @@ export class GameSession {
         direction.normalize();
         const obstacles = this.activeFieldObstacles(instanceId);
         let entryRadius = hyperdriveArrivalRadius(location);
-        // The configured field radius is the normal cloud edge. Include the
-        // live outermost object as well because drift and collectible chunks
-        // can extend beyond that seed radius during a long session.
+        // The configured radius is the normal cloud edge. Extend it only for
+        // objects that actually cross this arrival ray; using the furthest
+        // object anywhere in the field left every other approach floating far
+        // outside the visible debris instead of dropping at its edge.
         const clearance = this.playerSpawnClearance();
         for (const obstacle of obstacles) {
             const dx = obstacle.x - location.position[0];
             const dy = obstacle.y - location.position[1];
             const dz = obstacle.z - location.position[2];
-            entryRadius = Math.max(entryRadius, Math.hypot(dx, dy, dz) + obstacle.radius + clearance + 0.08);
+            const along = dx * direction.x + dy * direction.y + dz * direction.z;
+            const distanceSq = dx * dx + dy * dy + dz * dz;
+            const perpendicularSq = Math.max(0, distanceSq - along * along);
+            const obstacleReach = obstacle.radius + clearance + 0.08;
+            if (perpendicularSq > obstacleReach * obstacleReach)
+                continue;
+            entryRadius = Math.max(entryRadius, along + Math.sqrt(Math.max(0, obstacleReach * obstacleReach - perpendicularSq)));
         }
         position.set(location.position[0], location.position[1], location.position[2]).addScaledVector(direction, entryRadius);
         // Keep the exact oriented-box/sphere check as the final authority in
@@ -9016,7 +9148,7 @@ export class GameSession {
             if (obstacle.id === ignoreId)
                 return;
             if (obstacle.shape === 'ring') {
-                const hit = this.segmentRingHit(start, end, obstacle);
+                const hit = obstacle.meshVerts ? segmentMeshHit(start, end, obstacle) : this.segmentRingHit(start, end, obstacle);
                 if (hit !== undefined && (best === undefined || hit < best)) {
                     best = hit;
                     bestObstacle = obstacle;
@@ -9024,7 +9156,7 @@ export class GameSession {
                 return;
             }
             if (obstacle.shape === 'engine') {
-                const hit = this.segmentEngineHit(start, end, obstacle);
+                const hit = obstacle.meshVerts ? segmentMeshHit(start, end, obstacle) : this.segmentEngineHit(start, end, obstacle);
                 if (hit !== undefined && (best === undefined || hit < best)) {
                     best = hit;
                     bestObstacle = obstacle;
@@ -9036,7 +9168,7 @@ export class GameSession {
             // the box's corners stuck out past the visible rock and ate shots
             // in open space. Debris pieces keep the box, which mirrors their
             // rendered shape exactly.
-            if (obstacle.shape === 'asteroid') {
+            if (obstacle.meshVerts) {
                 const hit = segmentMeshHit(start, end, obstacle);
                 if (hit !== undefined && (best === undefined || hit < best)) {
                     best = hit;

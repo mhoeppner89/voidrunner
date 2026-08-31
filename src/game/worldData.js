@@ -3,6 +3,7 @@ import { LOCATIONS } from './data.js';
 import { pick, randomBetween, randomInt, seededRandom } from './random.js';
 import { t } from './i18n.js';
 import { RACE_COURSES } from './racing.js';
+import { GRAVEYARD_COLLISION_PROFILES } from './graveyardCollisionProfiles.js';
 
 // Fixed race courses need fixed flyable corridors. The surrounding fields may
 // still vary by seed, but random rocks, fragments, and salvage nodes are never
@@ -10,26 +11,29 @@ import { RACE_COURSES } from './racing.js';
 // left untouched: those are the meaningful obstacles the Mourning courses are
 // designed around.
 const RACE_CORRIDOR_MARGIN = 12;
+const courseCorridorSegments = (course) => {
+    const segments = [];
+    const points = course?.localPoints ?? [];
+    for (let index = 1; index < points.length; index += 1)
+        segments.push([points[index - 1], points[index]]);
+    for (const shortcut of course?.shortcuts ?? []) {
+        const shortcutPoints = shortcut.gates?.map((gate) => gate.localPosition) ?? [];
+        if (!shortcutPoints.length)
+            continue;
+        const entry = points[Math.max(0, Math.min(points.length - 1, shortcut.entryIndex))];
+        const exit = points[Math.max(0, Math.min(points.length - 1, shortcut.exitIndex + 1))];
+        const branch = [entry, ...shortcutPoints, exit].filter(Boolean);
+        for (let index = 1; index < branch.length; index += 1)
+            segments.push([branch[index - 1], branch[index]]);
+    }
+    return segments;
+};
 const buildRaceCorridors = (zone) => {
     const segments = [];
     for (const course of Object.values(RACE_COURSES)) {
         if (course.zone !== zone)
             continue;
-        const points = course.localPoints ?? [];
-        for (let index = 1; index < points.length; index += 1)
-            segments.push([points[index - 1], points[index]]);
-        for (const shortcut of course.shortcuts ?? []) {
-            const shortcutPoints = shortcut.gates?.map((gate) => gate.localPosition) ?? [];
-            if (!shortcutPoints.length)
-                continue;
-            // entryIndex is the next mandatory gate when the branch becomes
-            // available; exitIndex is the next mandatory gate after it rejoins.
-            const entry = points[Math.max(0, Math.min(points.length - 1, shortcut.entryIndex))];
-            const exit = points[Math.max(0, Math.min(points.length - 1, shortcut.exitIndex + 1))];
-            const branch = [entry, ...shortcutPoints, exit].filter(Boolean);
-            for (let index = 1; index < branch.length; index += 1)
-                segments.push([branch[index - 1], branch[index]]);
-        }
+        segments.push(...courseCorridorSegments(course));
     }
     return segments;
 };
@@ -56,6 +60,32 @@ const intersectsRaceCorridor = (zone, local, reach) => {
         if (pointSegmentDistanceSq(local, start, end) <= limitSq)
             return true;
     return false;
+};
+const closestRaceFrame = (zone, local, courseId) => {
+    let bestDistanceSq = Infinity;
+    let bestDirection = [0, 0, 1];
+    let bestCenter = [...local];
+    const segments = courseId ? courseCorridorSegments(RACE_COURSES[courseId]) : (RACE_CORRIDORS[zone] ?? []);
+    for (const [start, end] of segments) {
+        const dx = end[0] - start[0];
+        const dy = end[1] - start[1];
+        const dz = end[2] - start[2];
+        const lengthSq = dx * dx + dy * dy + dz * dz;
+        const along = lengthSq > 1e-8
+            ? Math.max(0, Math.min(1, ((local[0] - start[0]) * dx + (local[1] - start[1]) * dy + (local[2] - start[2]) * dz) / lengthSq))
+            : 0;
+        const center = [start[0] + dx * along, start[1] + dy * along, start[2] + dz * along];
+        const ox = local[0] - center[0];
+        const oy = local[1] - center[1];
+        const oz = local[2] - center[2];
+        const distanceSq = ox * ox + oy * oy + oz * oz;
+        if (distanceSq >= bestDistanceSq)
+            continue;
+        bestDistanceSq = distanceSq;
+        bestDirection = [dx, dy, dz];
+        bestCenter = center;
+    }
+    return { center: bestCenter, direction: bestDirection };
 };
 // The asteroid surface is a detail-2 icosahedron whose vertices are pushed
 // radially by a per-variant distortion function, then scaled per axis by the
@@ -145,7 +175,6 @@ const sphericalOffset = (rng, radius, inner = 0) => {
     ];
 };
 const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-const clamp01 = (value) => Math.max(0, Math.min(1, value));
 // Depletion overlays a worked-out amount but must NOT re-order the rng stream:
 // a field's layout (positions and per-node rolls) has to stay byte-identical
 // whether or not a rock/wreck has been tapped. Always roll, then override with
@@ -178,18 +207,36 @@ export const GRAVEYARD_GEOMETRY_HALF_EXTENTS = {
     // Loose hull fragments use a faceted chunk rather than an aligned cube.
     hull: [0.68, 0.68, 0.68],
 };
-// High-detail wreck landmarks rendered from the same Concord hulls that patrol
-// live space. Positions stay in Mourning Line local coordinates so the model,
-// its collision chunks, salvage sites, and authored race routes share one
-// frame. The frigate file is loaded once and cloned for the two casualties.
+const WRECK_INTERIORS = Object.freeze({
+    // Runtime/glTF axes are X=length, Y=height, Z=-Blender-side. The values
+    // below deliberately match the shipped GLB frame, not Blender's Z-up view.
+    battleship: Object.freeze({ sectionName: 'Battleship wreck midsection', center: Object.freeze([0.072063, 0.065, 0.05]), halfLength: 0.356085, halfWidth: 0.19, halfHeight: 0.14, hotspotCount: 10 }),
+    carrier: Object.freeze({ sectionName: 'Carrier wreck flight deck', center: Object.freeze([0.087386, 0.015, -0.07]), halfLength: 0.382288, halfWidth: 0.205, halfHeight: 0.145, hotspotCount: 10 }),
+    cruiser: Object.freeze({ sectionName: 'Cruiser wreck command hull', center: Object.freeze([0.033398, 0.19, 0.04]), halfLength: 0.421548, halfWidth: 0.13, halfHeight: 0.12, hotspotCount: 6 }),
+});
+// High-detail wreck landmarks rendered from the same hulls that fly in live
+// space. The three capital midsections have naturally torn, end-to-end
+// openings; there are no freestanding liner boxes. Repeated cruiser and
+// frigate files load once and clone across their casualties.
 export const GRAVEYARD_MODEL_WRECKS = Object.freeze([
-    Object.freeze({ id: 'concord-battleship-wreck', file: 'assets/models/wrecks/concord-battleship-wreck.glb', local: [140, -330, 680], rotation: [0.04, -0.12, 0.05], scale: 565, clearanceRadius: 730 }),
-    Object.freeze({ id: 'concord-frigate-alpha-wreck', file: 'assets/models/wrecks/concord-frigate-wreck.glb', local: [-980, 560, -650], rotation: [0.16, -1.91, 0.12], scale: 56.5, clearanceRadius: 115 }),
-    Object.freeze({ id: 'concord-frigate-beta-wreck', file: 'assets/models/wrecks/concord-frigate-wreck.glb', local: [980, -520, 980], rotation: [-0.2, -1.11, -0.14], scale: 56.5, clearanceRadius: 115 }),
+    Object.freeze({ id: 'concord-battleship-wreck', class: 'battleship', file: 'assets/models/wrecks/concord-battleship-wreck-v4.glb', local: [350, -700, 1900], rotation: [0.04, -0.12, 0.05], scale: 1130, clearanceRadius: 1460, interior: WRECK_INTERIORS.battleship }),
+    Object.freeze({ id: 'concord-carrier-wreck', class: 'carrier', file: 'assets/models/wrecks/concord-carrier-wreck-v4.glb', local: [-650, 850, -1850], rotation: [0.04, -1.21, 0.05], scale: 902.5508, clearanceRadius: 1250, interior: WRECK_INTERIORS.carrier }),
+    Object.freeze({ id: 'concord-cruiser-alpha-wreck', class: 'cruiser', file: 'assets/models/wrecks/concord-cruiser-wreck-v4.glb', local: [2850, 850, -1500], rotation: [-0.08, -0.42, 0.16], scale: 564.0943, clearanceRadius: 900, interior: WRECK_INTERIORS.cruiser }),
+    Object.freeze({ id: 'concord-cruiser-beta-wreck', class: 'cruiser', file: 'assets/models/wrecks/concord-cruiser-wreck-v4.glb', local: [-3000, -650, 1200], rotation: [0.12, 0.82, -0.18], scale: 564.0943, clearanceRadius: 900, interior: WRECK_INTERIORS.cruiser }),
+    Object.freeze({ id: 'concord-frigate-alpha-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-2200, 1300, -850], rotation: [0.16, -1.91, 0.12], scale: 113, clearanceRadius: 230 }),
+    Object.freeze({ id: 'concord-frigate-beta-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [1900, -1400, 100], rotation: [-0.2, -1.11, -0.14], scale: 113, clearanceRadius: 230 }),
+    Object.freeze({ id: 'concord-frigate-gamma-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-3600, 1100, -2600], rotation: [0.12, -0.45, 0.21], scale: 113, clearanceRadius: 230 }),
+    Object.freeze({ id: 'concord-frigate-delta-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [3500, -1200, -2500], rotation: [-0.16, 0.52, -0.1], scale: 113, clearanceRadius: 230 }),
+    Object.freeze({ id: 'concord-frigate-epsilon-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-4300, -300, -100], rotation: [0.25, -2.35, 0.08], scale: 113, clearanceRadius: 230 }),
+    Object.freeze({ id: 'concord-frigate-zeta-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [4200, 500, 600], rotation: [-0.1, 1.22, -0.2], scale: 113, clearanceRadius: 230 }),
+    Object.freeze({ id: 'concord-frigate-eta-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-2700, 300, 3300], rotation: [0.18, -0.78, 0.14], scale: 113, clearanceRadius: 230 }),
+    Object.freeze({ id: 'concord-frigate-theta-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [2600, -200, 3600], rotation: [-0.22, 0.34, -0.12], scale: 113, clearanceRadius: 230 }),
+    Object.freeze({ id: 'wayfarer-fighter-wreck', class: 'wayfarer', file: 'assets/models/wrecks/wayfarer-wreck.glb', local: [1100, 900, 3200], rotation: [0.34, -0.88, 0.28], scale: 18, clearanceRadius: 62 }),
+    Object.freeze({ id: 'talon-fighter-wreck', class: 'talon', file: 'assets/models/wrecks/talon-wreck.glb', local: [-1650, -1050, -3250], rotation: [-0.26, 0.64, -0.31], scale: 18, clearanceRadius: 62 }),
 ]);
-// The adapted wrecks are visual fly-through landmarks. Keep procedural debris
-// and salvage chunks outside these volumes so nothing invisible blocks a hull
-// breach and no large old stand-in intersects the detailed model.
+// Loose procedural wreckage stays outside the authored hull envelopes. Most
+// salvage does too; the explicitly marked capital-belly hotspots are the sole
+// exception. Clearances are placement envelopes, not collision surfaces.
 export const overlapsGraveyardModelWreck = (local, reach = 0) => GRAVEYARD_MODEL_WRECKS.some((wreck) => {
     const dx = local[0] - wreck.local[0];
     const dy = local[1] - wreck.local[1];
@@ -197,6 +244,114 @@ export const overlapsGraveyardModelWreck = (local, reach = 0) => GRAVEYARD_MODEL
     const clearance = wreck.clearanceRadius + Math.max(0, reach);
     return dx * dx + dy * dy + dz * dz < clearance * clearance;
 });
+
+const interiorPoint = new THREE.Vector3();
+const interiorQuaternion = new THREE.Quaternion();
+const interiorEuler = new THREE.Euler();
+const pointInWreckInterior = (wreck, local, reach = 0) => {
+    if (!wreck.interior)
+        return false;
+    interiorEuler.set(...wreck.rotation, 'XYZ');
+    interiorQuaternion.setFromEuler(interiorEuler).invert();
+    interiorPoint.set(
+        local[0] - wreck.local[0],
+        local[1] - wreck.local[1],
+        local[2] - wreck.local[2],
+    ).applyQuaternion(interiorQuaternion).multiplyScalar(1 / wreck.scale);
+    const padding = Math.max(0, reach) / wreck.scale;
+    const bay = wreck.interior;
+    return Math.abs(interiorPoint.x - bay.center[0]) <= bay.halfLength - padding
+        && Math.abs(interiorPoint.z - bay.center[2]) <= bay.halfWidth - padding
+        && Math.abs(interiorPoint.y - bay.center[1]) <= bay.halfHeight - padding;
+};
+export const graveyardWreckInteriorAt = (local, reach = 0) => GRAVEYARD_MODEL_WRECKS.find((wreck) => pointInWreckInterior(wreck, local, reach))?.id;
+
+const modelColliderMeshCache = new Map();
+const scaledColliderMesh = (profileName, sectionIndex, profile, scale) => {
+    const key = `${profileName}:${sectionIndex}:${scale}`;
+    let cached = modelColliderMeshCache.get(key);
+    if (cached)
+        return cached;
+    const vertices = new Float32Array(profile.vertices.length);
+    let radiusSq = 0;
+    for (let index = 0; index < profile.vertices.length; index += 3) {
+        const x = profile.vertices[index] * scale;
+        const y = profile.vertices[index + 1] * scale;
+        const z = profile.vertices[index + 2] * scale;
+        vertices[index] = x;
+        vertices[index + 1] = y;
+        vertices[index + 2] = z;
+        radiusSq = Math.max(radiusSq, x * x + y * y + z * z);
+    }
+    const indices = new Uint16Array(profile.indices);
+    let minReach = Infinity;
+    for (let index = 0; index < indices.length; index += 3) {
+        const ia = indices[index] * 3;
+        const ib = indices[index + 1] * 3;
+        const ic = indices[index + 2] * 3;
+        const ax = vertices[ia];
+        const ay = vertices[ia + 1];
+        const az = vertices[ia + 2];
+        const abx = vertices[ib] - ax;
+        const aby = vertices[ib + 1] - ay;
+        const abz = vertices[ib + 2] - az;
+        const acx = vertices[ic] - ax;
+        const acy = vertices[ic + 1] - ay;
+        const acz = vertices[ic + 2] - az;
+        const nx = aby * acz - abz * acy;
+        const ny = abz * acx - abx * acz;
+        const nz = abx * acy - aby * acx;
+        const normalLength = Math.hypot(nx, ny, nz);
+        if (normalLength > 1e-8)
+            minReach = Math.min(minReach, Math.abs(ax * nx + ay * ny + az * nz) / normalLength);
+    }
+    cached = Object.freeze({
+        verts: vertices,
+        indices,
+        radius: Math.sqrt(radiusSq),
+        minReach: Number.isFinite(minReach) ? minReach : 0,
+    });
+    modelColliderMeshCache.set(key, cached);
+    return cached;
+};
+
+const buildGraveyardModelColliders = () => {
+    const center = new THREE.Vector3(...LOCATIONS['mourning-line'].position);
+    const configQuaternion = new THREE.Quaternion();
+    const sectionCenter = new THREE.Vector3();
+    const worldCenter = new THREE.Vector3();
+    const colliders = [];
+    for (const wreck of GRAVEYARD_MODEL_WRECKS) {
+        const profiles = GRAVEYARD_COLLISION_PROFILES[wreck.class] ?? [];
+        configQuaternion.setFromEuler(new THREE.Euler(...wreck.rotation, 'XYZ'));
+        profiles.forEach((profile, sectionIndex) => {
+            const mesh = scaledColliderMesh(wreck.class, sectionIndex, profile, wreck.scale);
+            sectionCenter.set(...profile.center).multiplyScalar(wreck.scale).applyQuaternion(configQuaternion);
+            worldCenter.copy(center).add(new THREE.Vector3(...wreck.local)).add(sectionCenter);
+            const halfExtents = profile.halfExtents.map((extent) => extent * wreck.scale);
+            colliders.push(Object.freeze({
+                id: `${wreck.id}:section:${sectionIndex}`,
+                modelWreckId: wreck.id,
+                modelClass: wreck.class,
+                sectionName: profile.name,
+                position: Object.freeze(worldCenter.toArray()),
+                halfExtents: Object.freeze(halfExtents),
+                quaternion: Object.freeze(configQuaternion.toArray()),
+                collisionRadius: mesh.radius,
+                meshVerts: mesh.verts,
+                meshIndices: mesh.indices,
+                minReach: mesh.minReach,
+                surfaceOnly: profile.surfaceOnly === true,
+            }));
+        });
+    }
+    return Object.freeze(colliders);
+};
+
+// Every collider is a simplified copy of the rendered surface. A torn opening
+// therefore stays empty instead of being filled by a convex wrapper.
+export const GRAVEYARD_MODEL_COLLIDERS = buildGraveyardModelColliders();
+export const GRAVEYARD_MODEL_COLLIDER_MAX_RADIUS = GRAVEYARD_MODEL_COLLIDERS.reduce((largest, collider) => Math.max(largest, collider.collisionRadius), 0);
 // Open graveyard forms keep their real profile in the simulation too. A box
 // around a ring or engine would fill the visible hole and turn it into an
 // invisible wall for the player.
@@ -271,17 +426,190 @@ export const GRAVEYARD_GEOMETRY_PROFILES = {
     },
     ring: { majorRadius: 1, tubeRadius: 0.18 },
 };
+
+// Rendering and collision share these exact base geometries. Keeping one
+// source of truth matters most for flat plates and faceted chunks: an enclosing
+// box around either shape creates corners the player cannot see.
+const graveyardGeometryCache = new Map();
+const extrudedGraveyardGeometry = (profile) => {
+    const shape = new THREE.Shape();
+    profile.outline.forEach(([x, z], index) => {
+        if (index === 0)
+            shape.moveTo(x, z);
+        else
+            shape.lineTo(x, z);
+    });
+    shape.closePath();
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: profile.depth,
+        steps: 1,
+        bevelEnabled: true,
+        bevelThickness: profile.bevelThickness,
+        bevelSize: profile.bevelSize,
+        bevelSegments: 1,
+        curveSegments: 1,
+    });
+    geometry.rotateX(Math.PI / 2);
+    geometry.center();
+    return geometry;
+};
+export const getGraveyardGeometry = (kind) => {
+    let geometry = graveyardGeometryCache.get(kind);
+    if (geometry)
+        return geometry;
+    switch (kind) {
+        case 'engine': {
+            const profile = GRAVEYARD_GEOMETRY_PROFILES.engine;
+            const rimDepth = Math.min(profile.rimDepth, profile.halfHeight * 0.3);
+            const innerTop = Math.max(0.05, profile.radiusTop - profile.wallThickness);
+            const innerBottom = Math.max(0.05, profile.radiusBottom - profile.wallThickness);
+            geometry = new THREE.LatheGeometry([
+                new THREE.Vector2(profile.radiusBottom, -profile.halfHeight),
+                new THREE.Vector2(profile.radiusBottom, -profile.halfHeight + rimDepth),
+                new THREE.Vector2(profile.radiusTop, profile.halfHeight - rimDepth),
+                new THREE.Vector2(profile.radiusTop, profile.halfHeight),
+                new THREE.Vector2(innerTop, profile.halfHeight),
+                new THREE.Vector2(innerTop, profile.halfHeight - rimDepth),
+                new THREE.Vector2(innerBottom, -profile.halfHeight + rimDepth),
+                new THREE.Vector2(innerBottom, -profile.halfHeight),
+                new THREE.Vector2(profile.radiusBottom, -profile.halfHeight),
+            ], 12);
+            break;
+        }
+        case 'carrierHull':
+        case 'battleshipHull':
+        case 'frigateHull':
+        case 'bridge':
+        case 'panel':
+            geometry = extrudedGraveyardGeometry(GRAVEYARD_GEOMETRY_PROFILES[kind]);
+            break;
+        case 'disc': geometry = new THREE.CylinderGeometry(1, 1, 0.16, 14); break;
+        case 'turret': geometry = new THREE.CylinderGeometry(0.72, 1, 0.34, 8); break;
+        case 'ring': {
+            const profile = GRAVEYARD_GEOMETRY_PROFILES.ring;
+            geometry = new THREE.TorusGeometry(profile.majorRadius, profile.tubeRadius, 6, 18);
+            break;
+        }
+        case 'spine': geometry = new THREE.BoxGeometry(0.34, 0.34, 1); break;
+        case 'hull': geometry = new THREE.DodecahedronGeometry(0.68, 0); break;
+        case 'beam': geometry = new THREE.OctahedronGeometry(0.68, 0); break;
+        default: geometry = new THREE.BoxGeometry(1, 1, 1); break;
+    }
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+    graveyardGeometryCache.set(kind, geometry);
+    return geometry;
+};
+
+const scaledGeometryCollisionMesh = (geometry, scale) => {
+    const source = geometry.getAttribute('position');
+    const vertices = new Float32Array(source.count * 3);
+    let radiusSq = 0;
+    let maxX = 0;
+    let maxY = 0;
+    let maxZ = 0;
+    for (let index = 0; index < source.count; index += 1) {
+        const offset = index * 3;
+        const x = source.getX(index) * scale[0];
+        const y = source.getY(index) * scale[1];
+        const z = source.getZ(index) * scale[2];
+        vertices[offset] = x;
+        vertices[offset + 1] = y;
+        vertices[offset + 2] = z;
+        const reachSq = x * x + y * y + z * z;
+        radiusSq = Math.max(radiusSq, reachSq);
+        maxX = Math.max(maxX, Math.abs(x));
+        maxY = Math.max(maxY, Math.abs(y));
+        maxZ = Math.max(maxZ, Math.abs(z));
+    }
+    const geometryIndex = geometry.getIndex();
+    let indices;
+    if (geometryIndex) {
+        indices = source.count > 65535
+            ? new Uint32Array(geometryIndex.array)
+            : new Uint16Array(geometryIndex.array);
+    }
+    else {
+        indices = source.count > 65535 ? new Uint32Array(source.count) : new Uint16Array(source.count);
+        for (let index = 0; index < source.count; index += 1)
+            indices[index] = index;
+    }
+    let minReach = Infinity;
+    for (let index = 0; index < indices.length; index += 3) {
+        const ia = indices[index] * 3;
+        const ib = indices[index + 1] * 3;
+        const ic = indices[index + 2] * 3;
+        const ax = vertices[ia];
+        const ay = vertices[ia + 1];
+        const az = vertices[ia + 2];
+        const abx = vertices[ib] - ax;
+        const aby = vertices[ib + 1] - ay;
+        const abz = vertices[ib + 2] - az;
+        const acx = vertices[ic] - ax;
+        const acy = vertices[ic + 1] - ay;
+        const acz = vertices[ic + 2] - az;
+        const nx = aby * acz - abz * acy;
+        const ny = abz * acx - abx * acz;
+        const nz = abx * acy - aby * acx;
+        const normalLength = Math.hypot(nx, ny, nz);
+        if (normalLength > 1e-8)
+            minReach = Math.min(minReach, Math.abs(ax * nx + ay * ny + az * nz) / normalLength);
+    }
+    return Object.freeze({
+        verts: vertices,
+        indices,
+        radius: Math.sqrt(radiusSq),
+        minReach: Number.isFinite(minReach) ? minReach : 0,
+        halfExtents: Object.freeze([maxX, maxY, maxZ]),
+    });
+};
+
+export const graveyardCollisionMesh = (piece) => {
+    if (!piece._collisionMesh) {
+        const mesh = scaledGeometryCollisionMesh(getGraveyardGeometry(piece.kind), piece.scale);
+        // Hollow/non-convex shapes have no safe inscribed solid sphere. Their
+        // mesh is used for exact weapon rays while hard collision keeps the
+        // analytical open ring/engine test.
+        piece._collisionMesh = piece.kind === 'ring' || piece.kind === 'engine'
+            ? Object.freeze({ ...mesh, minReach: 0 })
+            : mesh;
+    }
+    return piece._collisionMesh;
+};
+
+const wreckNodeGeometryCache = [];
+export const getWreckNodeGeometry = (shape = 0) => {
+    const index = Math.abs(Math.trunc(shape)) % 4;
+    if (!wreckNodeGeometryCache[index]) {
+        wreckNodeGeometryCache[index] = [
+            () => new THREE.IcosahedronGeometry(1, 1),
+            () => new THREE.DodecahedronGeometry(1, 0),
+            () => new THREE.BoxGeometry(1.2, 0.7, 1.6),
+            () => new THREE.CylinderGeometry(0.55, 0.8, 1.5, 8),
+        ][index]();
+        wreckNodeGeometryCache[index].computeBoundingBox();
+        wreckNodeGeometryCache[index].computeBoundingSphere();
+    }
+    return wreckNodeGeometryCache[index];
+};
+export const wreckNodeVisualScale = (node) => node.radius * 1.6;
+export const wreckNodeCollisionMesh = (node) => {
+    node._collisionMesh ??= scaledGeometryCollisionMesh(getWreckNodeGeometry(node.shape), [wreckNodeVisualScale(node), wreckNodeVisualScale(node), wreckNodeVisualScale(node)]);
+    return node._collisionMesh;
+};
 // The debris field is composed as a handful of readable spaces rather than a
 // uniform cloud. These are local coordinates around the mourning-line centre;
 // the renderer uses the same data for the visual route markers and the game
 // uses it for the compact zone label on the cockpit monitor.
 export const GRAVEYARD_ZONE_DEFINITIONS = [
-    { id: 'entry-pocket', label: 'ENTRY POCKET / QUIET APPROACH', center: [0, 0, 0], radius: 360 },
-    { id: 'carrier-hangar', label: 'CARRIER HANGAR / TIGHT RUN', center: [0, 500, -930], radius: 540 },
-    { id: 'battleship-breach', label: 'BATTLESHIP BREACH / CROSSING', center: [0, -300, 700], radius: 600 },
-    { id: 'frigate-alpha', label: 'FRIGATE TUNNEL / PORT', center: [-760, 480, -520], radius: 500 },
-    { id: 'frigate-beta', label: 'FRIGATE TUNNEL / STARBOARD', center: [760, -420, 820], radius: 520 },
-    { id: 'outer-wake', label: 'OUTER WAKE / OPEN DRIFT', center: [0, 410, 2200], radius: 780 },
+    { id: 'entry-pocket', label: 'ENTRY POCKET / QUIET APPROACH', center: [0, 0, 0], radius: 520 },
+    { id: 'carrier-hangar', label: 'CARRIER SALVAGE BAY / NORTH RUN', center: [-650, 850, -1850], radius: 1450 },
+    { id: 'battleship-breach', label: 'BATTLESHIP SALVAGE BAY / SOUTH RUN', center: [350, -700, 1900], radius: 1450 },
+    { id: 'cruiser-alpha', label: 'CRUISER BREAK / STARBOARD', center: [2850, 850, -1500], radius: 1050 },
+    { id: 'cruiser-beta', label: 'CRUISER BREAK / PORT', center: [-3000, -650, 1200], radius: 1050 },
+    { id: 'frigate-alpha', label: 'FRIGATE SCREEN / PORT', center: [-2200, 1300, -850], radius: 900 },
+    { id: 'frigate-beta', label: 'FRIGATE SCREEN / STARBOARD', center: [1900, -1400, 100], radius: 900 },
+    { id: 'outer-wake', label: 'OUTER ESCORT LINE / OPEN DRIFT', center: [0, 100, 3400], radius: 1900 },
 ];
 export const graveyardZoneAt = (position) => {
     const origin = LOCATIONS['mourning-line'].position;
@@ -501,10 +829,9 @@ export const asteroidEnvelopeReach = (node) => {
     const sz = node.scale[2];
     return node.radius * Math.max(Math.max(sx, sy, sz), ASTEROID_COLLISION_FACTOR * Math.hypot(sx, sy, sz));
 };
-// Wreck nodes use the same scale for their rendered collectible chunk and their
-// spherical player/beam collision envelope. Keeping this in worldData avoids the
-// renderer and simulation drifting apart as the chunk size is tuned.
-export const wreckNodeCollisionRadius = (node) => node.radius * 1.6;
+// Broad-phase queries use the exact rendered chunk mesh's farthest vertex.
+// Hard collision and weapon hits use the triangles themselves below.
+export const wreckNodeCollisionRadius = (node) => wreckNodeCollisionMesh(node).radius;
 // A mining claim needs a specific, still-rich rock: contracts stake one of the
 // monoliths (a big, landmark body) with enough ore left to be worth a trip.
 // Replaying the field generation keeps the claim's ore exactly in sync with
@@ -528,6 +855,7 @@ export const generateGraveyardPieces = (seed) => {
     const rng = seededRandom(`${seed}:graveyard-pieces`);
     const center = LOCATIONS['mourning-line'].position;
     const pieces = [];
+    const looseDebrisClearances = [];
     // Local field coordinates: +Z is the player's approach direction, +X is
     // starboard, and +Y is up. The fixed formations tell the battle story;
     // seeded fragment streams add variation without dissolving the landmarks.
@@ -544,8 +872,18 @@ export const generateGraveyardPieces = (seed) => {
             geometryHalfExtents[2] * scale[2],
         ));
         const raceReach = Math.max(collisionRadius ?? 0, visualReach) + (moving ? 28 : 0);
-        if (reserveRaceCorridor && intersectsRaceCorridor('mourning-line', local, raceReach))
-            return;
+        if (reserveRaceCorridor) {
+            if (intersectsRaceCorridor('mourning-line', local, raceReach) || overlapsGraveyardModelWreck(local, raceReach))
+                return false;
+            for (const placed of looseDebrisClearances) {
+                const dx = local[0] - placed.local[0];
+                const dy = local[1] - placed.local[1];
+                const dz = local[2] - placed.local[2];
+                const separation = raceReach + placed.reach + 6;
+                if (dx * dx + dy * dy + dz * dz < separation * separation)
+                    return false;
+            }
+        }
         const piece = {
             id,
             kind,
@@ -570,6 +908,9 @@ export const generateGraveyardPieces = (seed) => {
         if (route)
             piece.route = route;
         pieces.push(piece);
+        if (reserveRaceCorridor)
+            looseDebrisClearances.push({ local: [...local], reach: raceReach });
+        return true;
     };
     const rotateLocalOffset = ([x, y, z], yaw) => {
         const cosine = Math.cos(yaw);
@@ -587,6 +928,10 @@ export const generateGraveyardPieces = (seed) => {
     const carrierOffset = [0, 560, -420];
     const pushCarrierPiece = ({ local, rotation = [0, 0, 0], ...piece }) => pushPiece({
         ...piece,
+        // The enlarged authored Concord wrecks now carry the field's scale.
+        // Retain the carrier silhouette and hangar route, but trim its old
+        // oversized proxy chunks so they read as secondary debris.
+        scale: piece.scale.map((value) => value * 0.72),
         local: add(rotateLocalOffset(local, carrierYaw), carrierOffset),
         rotation: [rotation[0], rotation[1] + carrierYaw, rotation[2]],
         zone: piece.zone ?? 'carrier-hangar',
@@ -683,49 +1028,49 @@ export const generateGraveyardPieces = (seed) => {
     };
     // Two frigates were thrown into distinct upper and lower routes, rather
     // than sharing the carrier/battleship plane.
-    addFrigate('frigate-alpha', [-980, 560, -650], -0.34, 0.12, 0.16);
-    addFrigate('frigate-beta', [980, -520, 980], 0.46, -0.14, -0.2);
-    // The adapted GLBs are visual fly-through landmarks. Their open breaches
-    // must remain traversable, so they deliberately add no collision proxies.
-    // Static, painted structural hoops make the routes legible without adding
-    // beacon lights or extra animated effects. They are visual-only: a pilot
-    // can cut across them, and the actual hull collision remains authoritative.
-    const addRouteFrames = ({ route, zone, finish, points, widths, heights }) => {
+    addFrigate('frigate-alpha', [-1220, 760, -1050], -0.34, 0.12, 0.16);
+    addFrigate('frigate-beta', [1500, -780, 100], 0.46, -0.14, -0.2);
+    // Painted structural hoops make the routes legible without beacon lights.
+    // Their torus walls and broken fins are physical; the openings remain true
+    // holes, so a precise pilot can thread them while a clipped edge collides.
+    const addRouteFrames = ({ route, course, zone, finish, points, widths, heights }) => {
         points.forEach((point, index) => {
-            const next = points[Math.min(index + 1, points.length - 1)];
-            const previous = points[Math.max(0, index - 1)];
-            const dx = (next[0] - previous[0]) || 0;
-            const dy = (next[1] - previous[1]) || 0;
-            const dz = (next[2] - previous[2]) || 1;
-            const horizontal = Math.hypot(dx, dz) || 1;
-            const yaw = Math.atan2(dx, dz);
-            const pitch = -Math.atan2(dy, horizontal);
+            // Face each physical hoop down the nearest authored race segment.
+            // A hoop at a bend aligned to the next decorative hoop instead of
+            // the incoming flight line forced racers through its visible wall.
+            const frame = closestRaceFrame('mourning-line', point, course);
+            const [dx, dy, dz] = frame.direction;
+            const frameCenter = frame.center;
+            const hoopQuaternion = new THREE.Quaternion().setFromUnitVectors(
+                new THREE.Vector3(0, 0, 1),
+                new THREE.Vector3(dx, dy, dz).normalize(),
+            );
+            const hoopEuler = new THREE.Euler().setFromQuaternion(hoopQuaternion, 'XYZ');
+            const pitch = hoopEuler.x;
+            const yaw = hoopEuler.y;
             const width = widths[index] ?? widths[widths.length - 1];
             const height = heights[index] ?? heights[heights.length - 1];
             pushPiece({
                 id: `route-${route}-${index}-hoop`,
                 kind: 'ring',
-                local: point,
+                local: frameCenter,
                 rotation: [pitch, yaw, 0],
                 scale: [width / 2.36, height / 2.36, 16],
                 finish,
-                collidable: false,
                 zone,
                 route,
             });
             // Broken chevrons on the hoop sides indicate the route direction
             // even when the player approaches from an oblique roll angle.
-            const sideX = Math.cos(yaw);
-            const sideZ = -Math.sin(yaw);
+            const sideVector = new THREE.Vector3(1, 0, 0).applyQuaternion(hoopQuaternion);
             [-1, 1].forEach((side) => {
                 pushPiece({
                     id: `route-${route}-${index}-fin-${side < 0 ? 'port' : 'starboard'}`,
                     kind: 'panel',
-                    local: [point[0] + sideX * side * width * 0.34, point[1] + height * 0.08, point[2] + sideZ * side * width * 0.34],
+                    local: [frameCenter[0] + sideVector.x * side * width * 0.34, frameCenter[1] + sideVector.y * side * width * 0.34 + height * 0.08, frameCenter[2] + sideVector.z * side * width * 0.34],
                     rotation: [pitch, yaw + side * 0.34, side * 0.16],
                     scale: [width * 0.13, 5, 18],
                     finish,
-                    collidable: false,
                     zone,
                     route,
                 });
@@ -734,6 +1079,7 @@ export const generateGraveyardPieces = (seed) => {
     };
     addRouteFrames({
         route: 'upper-hangar-run',
+        course: 'mourning-run',
         zone: 'carrier-hangar',
         finish: 'route-gold',
         points: [[0, 90, -250], [0, 420, -620], [0, 520, -980]],
@@ -742,35 +1088,39 @@ export const generateGraveyardPieces = (seed) => {
     });
     addRouteFrames({
         route: 'lower-breach-crossing',
+        course: 'mourning-breach',
         zone: 'battleship-breach',
         finish: 'route-ice',
-        points: [[0, -80, 220], [0, -260, 520], [0, -340, 780]],
-        widths: [300, 390, 340],
-        heights: [170, 210, 180],
+        points: [[0, -90, 420], [60, -260, 900], [110, -400, 1480]],
+        widths: [330, 430, 390],
+        heights: [185, 230, 205],
     });
     addRouteFrames({
         route: 'port-frigate-tunnel',
+        course: 'mourning-relict-gauntlet',
         zone: 'frigate-alpha',
         finish: 'route-copper',
-        points: [[-150, 45, -150], [-500, 390, -370], [-790, 520, -560]],
+        points: [[-260, 100, -240], [-760, 480, -650], [-1130, 710, -980]],
         widths: [180, 220, 195],
         heights: [150, 180, 165],
     });
     addRouteFrames({
         route: 'starboard-frigate-tunnel',
+        course: 'mourning-relict-gauntlet',
         zone: 'frigate-beta',
         finish: 'route-teal',
-        points: [[150, -45, 220], [520, -330, 600], [800, -480, 870]],
-        widths: [180, 220, 195],
-        heights: [150, 180, 165],
+        points: [[400, -420, 950], [720, -180, 900], [800, -480, 870]],
+        widths: [240, 260, 240],
+        heights: [200, 220, 200],
     });
     addRouteFrames({
         route: 'outer-wake-run',
+        course: 'mourning-relict-gauntlet',
         zone: 'outer-wake',
         finish: 'route-ash',
-        points: [[0, 250, 1480], [0, 390, 2020]],
-        widths: [420, 480],
-        heights: [260, 280],
+        points: [[180, -180, 2700], [0, 420, 3500]],
+        widths: [480, 560],
+        heights: [285, 320],
     });
     const fragmentScale = (kind, large) => {
         switch (kind) {
@@ -780,6 +1130,10 @@ export const generateGraveyardPieces = (seed) => {
             case 'engine': return [randomBetween(rng, 16, large ? 32 : 23), randomBetween(rng, 16, large ? 30 : 22), randomBetween(rng, 22, large ? 58 : 38)];
             case 'spine': return [randomBetween(rng, 5, large ? 12 : 8), randomBetween(rng, 5, large ? 12 : 8), randomBetween(rng, 24, large ? 70 : 46)];
             case 'disc': return [randomBetween(rng, 16, large ? 34 : 23), randomBetween(rng, 4, large ? 11 : 7), randomBetween(rng, 16, large ? 34 : 23)];
+            case 'ring': {
+                const radius = randomBetween(rng, 16, large ? 46 : 30);
+                return [radius, radius * randomBetween(rng, 0.72, 1.12), randomBetween(rng, 4, large ? 10 : 7)];
+            }
             default: return [20, 10, 40];
         }
     };
@@ -787,13 +1141,20 @@ export const generateGraveyardPieces = (seed) => {
         const magnitude = Math.hypot(...direction) || 1;
         const unitDirection = direction.map((value) => value / magnitude);
         const yaw = Math.atan2(unitDirection[0], unitDirection[2]);
-        for (let index = 0; index < count; index += 1) {
-            const fraction = clamp01((index + randomBetween(rng, -0.28, 0.28)) / Math.max(1, count - 1));
+        let accepted = 0;
+        let attempts = 0;
+        while (accepted < count && attempts < count * 32) {
+            attempts += 1;
+            // Impact fragments bunch close to their parent wreck and thin into
+            // a directional wake. This preserves the requested quantity while
+            // making the field read as several breakups instead of one cloud.
+            const fraction = Math.pow(rng(), 1.62);
             const distance = fraction * length;
+            const scatter = 0.2 + fraction * 0.8;
             const local = [
-                origin[0] + unitDirection[0] * distance + randomBetween(rng, -spread[0], spread[0]),
-                origin[1] + unitDirection[1] * distance + randomBetween(rng, -spread[1], spread[1]),
-                origin[2] + unitDirection[2] * distance + randomBetween(rng, -spread[2], spread[2]),
+                origin[0] + unitDirection[0] * distance + randomBetween(rng, -spread[0] * scatter, spread[0] * scatter),
+                origin[1] + unitDirection[1] * distance + randomBetween(rng, -spread[1] * scatter, spread[1] * scatter),
+                origin[2] + unitDirection[2] * distance + randomBetween(rng, -spread[2] * scatter, spread[2] * scatter),
             ];
             // Preserve a readable central staging pocket. Fragments still fan
             // through the field, but a random wake point cannot land directly
@@ -804,14 +1165,16 @@ export const generateGraveyardPieces = (seed) => {
                 local[1] += (rng() < 0.5 ? -1 : 1) * randomBetween(rng, 180, 320);
             }
             const kind = pick(rng, kinds);
-            const large = index < count * 0.18;
-            const moving = index >= count * 0.48;
+            // Only a few loose pieces get the upper size range now that the
+            // landmark wrecks themselves supply the field's large silhouettes.
+            const large = fraction < 0.2 && rng() < 0.38;
+            const moving = fraction > 0.54;
             const speed = moving ? randomBetween(rng, 0.12, 0.48) : 0;
             const drift = moving
                 ? [unitDirection[0] * speed, unitDirection[1] * speed + randomBetween(rng, -0.05, 0.05), unitDirection[2] * speed]
                 : [0, 0, 0];
-            pushPiece({
-                id: `${prefix}-${index}`,
+            const inserted = pushPiece({
+                id: `${prefix}-${accepted}`,
                 kind,
                 local,
                 rotation: [randomBetween(rng, -0.18, 0.18), yaw + randomBetween(rng, -0.24, 0.24), randomBetween(rng, -0.38, 0.38)],
@@ -824,40 +1187,51 @@ export const generateGraveyardPieces = (seed) => {
                 finish,
                 reserveRaceCorridor: true,
             });
+            if (inserted)
+                accepted += 1;
         }
     };
-    // Coherent wakes and impact fans replace the old uniform spherical scatter.
-    addFragmentStream({ prefix: 'carrier-wake', origin: [0, 560, 320], direction: [0.08, 0.2, 1], length: 1500, spread: [360, 320, 230], count: 36, kinds: ['panel', 'beam', 'hull', 'spine', 'disc'], zone: 'outer-wake', route: 'upper-hangar-run' });
-    addFragmentStream({ prefix: 'impact-port', origin: [-20, -280, 680], direction: [-0.86, 0.26, -0.3], length: 1450, spread: [230, 280, 220], count: 34, kinds: ['panel', 'beam', 'hull', 'engine', 'spine'], zone: 'battleship-breach', route: 'lower-breach-crossing' });
-    addFragmentStream({ prefix: 'impact-starboard', origin: [35, -300, 720], direction: [0.84, -0.28, 0.34], length: 1480, spread: [230, 260, 220], count: 34, kinds: ['panel', 'beam', 'hull', 'engine', 'spine'], zone: 'battleship-breach', route: 'lower-breach-crossing' });
-    addFragmentStream({ prefix: 'frigate-alpha-wake', origin: [-980, 560, -430], direction: [-0.68, 0.18, -0.65], length: 980, spread: [160, 170, 150], count: 22, kinds: ['panel', 'beam', 'hull', 'spine'], zone: 'frigate-alpha', route: 'port-frigate-tunnel' });
-    addFragmentStream({ prefix: 'frigate-beta-wake', origin: [980, -520, 1120], direction: [0.62, -0.18, 0.78], length: 1040, spread: [170, 160, 150], count: 22, kinds: ['panel', 'beam', 'hull', 'engine', 'spine'], zone: 'frigate-beta', route: 'starboard-frigate-tunnel' });
-    // A sparse, low-contrast outer wake gives the field a visible exit and
-    // keeps the far boundary from ending abruptly at the battleship fan.
-    addFragmentStream({ prefix: 'outer-wake', origin: [0, 360, 1420], direction: [0.04, 0.08, 1], length: 1800, spread: [420, 290, 260], count: 26, kinds: ['panel', 'beam', 'hull', 'spine', 'disc'], zone: 'outer-wake', route: 'outer-wake-run', finish: 'distant' });
-    // Collision spheres may be tuned smaller than a long piece's visual extent
-    // (the carrier keels keep the passage open), but they must never exceed the
-    // visual bounding radius — an oversized sphere is an invisible wall that
-    // traps the ship. The sphere survives only as the LOS blocking radius; hard
-    // collision uses halfExtents as an oriented box so a flat panel blocks its
-    // whole face without ballooning into an invisible sphere.
+    // Coherent wakes and impact fans replace a uniform spherical scatter. The
+    // mix deliberately contains many plates, bars, rings, and faceted chunks;
+    // retrying rejected candidates keeps the density stable after the race
+    // corridors and all twelve authored wrecks have been reserved.
+    addFragmentStream({ prefix: 'carrier-wake', origin: [-650, 850, -1850], direction: [0.16, -0.04, 1], length: 2650, spread: [500, 330, 280], count: 38, kinds: ['panel', 'panel', 'beam', 'hull', 'spine', 'disc', 'ring'], zone: 'carrier-hangar', route: 'upper-hangar-run' });
+    addFragmentStream({ prefix: 'impact-port', origin: [350, -700, 1900], direction: [-0.86, 0.26, -0.3], length: 2700, spread: [400, 340, 330], count: 28, kinds: ['panel', 'panel', 'beam', 'hull', 'hull', 'engine', 'spine', 'ring'], zone: 'battleship-breach', route: 'lower-breach-crossing' });
+    addFragmentStream({ prefix: 'impact-starboard', origin: [350, -700, 1900], direction: [0.84, -0.28, 0.34], length: 2700, spread: [400, 330, 330], count: 28, kinds: ['panel', 'beam', 'beam', 'hull', 'hull', 'engine', 'spine', 'ring'], zone: 'battleship-breach', route: 'lower-breach-crossing' });
+    addFragmentStream({ prefix: 'cruiser-alpha-shatter', origin: [2850, 850, -1500], direction: [0.55, 0.18, -0.82], length: 1550, spread: [240, 200, 220], count: 20, kinds: ['panel', 'beam', 'hull', 'hull', 'spine', 'disc', 'ring'], zone: 'cruiser-alpha' });
+    addFragmentStream({ prefix: 'cruiser-beta-shatter', origin: [-3000, -650, 1200], direction: [-0.62, -0.1, 0.78], length: 1550, spread: [240, 200, 220], count: 20, kinds: ['panel', 'beam', 'hull', 'hull', 'spine', 'disc', 'ring'], zone: 'cruiser-beta' });
+    addFragmentStream({ prefix: 'frigate-alpha-wake', origin: [-2200, 1300, -850], direction: [-0.68, 0.18, -0.65], length: 1450, spread: [210, 190, 190], count: 16, kinds: ['panel', 'beam', 'hull', 'spine', 'ring'], zone: 'frigate-alpha', route: 'port-frigate-tunnel' });
+    addFragmentStream({ prefix: 'frigate-beta-wake', origin: [1900, -1400, 100], direction: [0.62, -0.18, 0.78], length: 1450, spread: [210, 190, 190], count: 16, kinds: ['panel', 'beam', 'hull', 'engine', 'spine', 'ring'], zone: 'frigate-beta', route: 'starboard-frigate-tunnel' });
+    addFragmentStream({ prefix: 'escort-crossfire', origin: [-2700, 300, 3300], direction: [1, -0.1, 0.06], length: 5300, spread: [190, 170, 160], count: 22, kinds: ['panel', 'panel', 'beam', 'beam', 'hull', 'spine', 'disc', 'ring'], zone: 'outer-wake' });
+    addFragmentStream({ prefix: 'outer-wake', origin: [0, 250, 3000], direction: [0.04, 0.08, 1], length: 2200, spread: [620, 420, 380], count: 24, kinds: ['panel', 'beam', 'hull', 'hull', 'spine', 'disc', 'ring'], zone: 'outer-wake', route: 'outer-wake-run', finish: 'distant' });
+    // Finish every physical piece from the same geometry the renderer uses.
+    // Rings and engine shells retain their analytical hollow collision; plates,
+    // bars, discs, and chunks use their exact triangles.
     for (const piece of pieces) {
-        // Procedural stand-ins for the three landmark hulls are replaced by
-        // the adapted GLBs. Their route hoops remain, but duplicate hull art
-        // and its old oversized collision are suppressed.
+        // Procedural stand-ins for the landmark hulls are replaced by adapted
+        // GLBs. Route hoops and the carrier impact wake remain, but duplicate
+        // hull art and its old oversized collision are suppressed.
         const replacedBattleship = piece.id.startsWith('battleship-');
+        const replacedCarrier = piece.id.startsWith('carrier-') && !piece.id.startsWith('carrier-wake-');
         const replacedFrigate = /^frigate-(?:alpha|beta)-(?:mid|bow|deck|prow|keel|bridge|turret|mast|engine|gate)$/.test(piece.id);
         const base = GRAVEYARD_GEOMETRY_HALF_EXTENTS[piece.kind] ?? [0.5, 0.5, 0.5];
         const visualReach = Math.hypot(base[0] * piece.scale[0], base[1] * piece.scale[1], base[2] * piece.scale[2]);
         const local = [piece.position[0] - center[0], piece.position[1] - center[1], piece.position[2] - center[2]];
         const overlapsModel = !piece.id.startsWith('route-') && overlapsGraveyardModelWreck(local, visualReach);
-        if (replacedBattleship || replacedFrigate || overlapsModel) {
+        if (replacedBattleship || replacedCarrier || replacedFrigate || overlapsModel) {
             piece.render = false;
             piece.collidable = false;
         }
-        piece.halfExtents ??= [base[0] * piece.scale[0], base[1] * piece.scale[1], base[2] * piece.scale[2]];
-        const bounding = Math.hypot(piece.halfExtents[0], piece.halfExtents[1], piece.halfExtents[2]);
-        piece.collisionRadius = Math.min(piece.collisionRadius, bounding);
+        if (piece.collidable !== false && piece.kind !== 'ring' && piece.kind !== 'engine') {
+            const collisionMesh = graveyardCollisionMesh(piece);
+            piece.halfExtents = [...collisionMesh.halfExtents];
+            piece.collisionRadius = collisionMesh.radius;
+        }
+        else {
+            piece.halfExtents ??= [base[0] * piece.scale[0], base[1] * piece.scale[1], base[2] * piece.scale[2]];
+            const bounding = Math.hypot(piece.halfExtents[0], piece.halfExtents[1], piece.halfExtents[2]);
+            piece.collisionRadius = Math.min(piece.collisionRadius, bounding);
+        }
     }
     return pieces;
 };
@@ -865,43 +1239,142 @@ export const generateWreckNodes = (seed, depleted, scanned = []) => {
     const rng = seededRandom(`${seed}:wreck-nodes`);
     const center = LOCATIONS['mourning-line'].position;
     const salvageTypes = ['scrap', 'electronics', 'machinery', 'arms'];
-    const names = ['Courier bow', 'Patrol avionics bay', 'Freighter spindle', 'Carrier lifeboat rack', 'Gunship reactor shroud', 'Survey ship core'];
+    const hotspotSalvageTypes = ['electronics', 'machinery', 'arms', 'electronics', 'machinery'];
+    const names = ['Armor plate', 'Avionics bay', 'Drive spindle', 'Lifeboat rack', 'Reactor shroud', 'Sensor core', 'Gun mount', 'Coolant manifold'];
     const nodes = [];
-    const salvageSites = [
-        { id: 'carrier-hangar', zone: 'carrier-hangar', route: 'upper-hangar-run', label: 'Carrier hangar', center: [0, 520, -1240], spread: [270, 150, 250], count: 14 },
-        { id: 'carrier-engines', zone: 'outer-wake', route: 'upper-hangar-run', label: 'Carrier engine bank', center: [0, 540, 300], spread: [280, 160, 200], count: 10 },
-        { id: 'battleship-impact', zone: 'battleship-breach', route: 'lower-breach-crossing', label: 'Battleship breach', center: [1080, -250, 940], spread: [190, 150, 190], count: 14 },
-        { id: 'frigate-alpha', zone: 'frigate-alpha', route: 'port-frigate-tunnel', label: 'Frigate Alpha', center: [-1180, 670, -820], spread: [130, 110, 130], count: 10 },
-        { id: 'frigate-beta', zone: 'frigate-beta', route: 'starboard-frigate-tunnel', label: 'Frigate Beta', center: [1190, -640, 1160], spread: [130, 110, 130], count: 10 },
-        { id: 'far-wake', zone: 'outer-wake', route: 'outer-wake-run', label: 'Impact wake', center: [0, 450, 2400], spread: [300, 220, 230], count: 6 },
-    ];
-    let index = 0;
-    salvageSites.forEach((site) => {
-        for (let siteIndex = 0; siteIndex < site.count; siteIndex += 1) {
-            const local = [
-                site.center[0] + randomBetween(rng, -site.spread[0], site.spread[0]),
-                site.center[1] + randomBetween(rng, -site.spread[1], site.spread[1]),
-                site.center[2] + randomBetween(rng, -site.spread[2], site.spread[2]),
-            ];
-            const salvage = pick(rng, salvageTypes);
-            const id = `salvage-node-${index}`;
-            const node = {
-                id,
-                name: `${t(site.label)} · ${t(pick(rng, names))} ${String.fromCharCode(65 + randomInt(rng, 0, 18))}-${randomInt(rng, 10, 99)}`,
-                position: add(center, local),
-                radius: randomBetween(rng, 4, 12),
-                salvage,
-                remaining: depletedOrRoll(rng, depleted, id, 0.9, 4.2),
-                scanned: scanned.includes(id),
-                zone: site.zone,
-                route: site.route,
-            };
-            const nodeReach = wreckNodeCollisionRadius(node);
-            if (!intersectsRaceCorridor('mourning-line', local, nodeReach) && !overlapsGraveyardModelWreck(local, nodeReach))
-                nodes.push(node);
-            index += 1;
-        }
+    const salvageSites = GRAVEYARD_MODEL_WRECKS.map((wreck) => {
+        const suffix = wreck.id.replace(/^concord-/, '').replace(/-wreck$/, '').split('-').map((part) => `${part[0].toUpperCase()}${part.slice(1)}`).join(' ');
+        const isAlpha = wreck.id.includes('frigate-alpha');
+        const isBeta = wreck.id.includes('frigate-beta');
+        return {
+            wreck,
+            label: suffix,
+            count: wreck.class === 'battleship' ? 16 : wreck.class === 'carrier' ? 14 : wreck.class === 'cruiser' ? 10 : 5,
+            interiorCount: wreck.interior?.hotspotCount ?? 0,
+            zone: wreck.class === 'carrier'
+                ? 'carrier-hangar'
+                : wreck.class === 'battleship'
+                    ? 'battleship-breach'
+                    : wreck.id.includes('cruiser-alpha')
+                        ? 'cruiser-alpha'
+                        : wreck.id.includes('cruiser-beta')
+                            ? 'cruiser-beta'
+                            : isAlpha
+                                ? 'frigate-alpha'
+                                : isBeta
+                                    ? 'frigate-beta'
+                                    : 'outer-wake',
+            route: wreck.class === 'carrier' ? 'upper-hangar-run' : wreck.class === 'battleship' ? 'lower-breach-crossing' : isAlpha ? 'port-frigate-tunnel' : isBeta ? 'starboard-frigate-tunnel' : undefined,
+        };
     });
+    let index = 0;
+    const overlapsNode = (node, extra = 4) => nodes.some((placed) => {
+        const reach = wreckNodeCollisionRadius(node) + wreckNodeCollisionRadius(placed) + extra;
+        const dx = node.position[0] - placed.position[0];
+        const dy = node.position[1] - placed.position[1];
+        const dz = node.position[2] - placed.position[2];
+        return dx * dx + dy * dy + dz * dz < reach * reach;
+    });
+    const createNode = (site, hotspot) => {
+        const candidateIndex = index;
+        index += 1;
+        const shape = candidateIndex % 4;
+        const radius = randomBetween(rng, 2.6, 7.2);
+        const salvage = pick(rng, hotspot ? hotspotSalvageTypes : salvageTypes);
+        const id = `salvage-node-${candidateIndex}`;
+        return {
+            id,
+            name: `${t(site.label)} · ${t(pick(rng, names))} ${String.fromCharCode(65 + randomInt(rng, 0, 18))}-${randomInt(rng, 10, 99)}`,
+            position: [0, 0, 0],
+            radius,
+            shape,
+            rotation: [
+                (candidateIndex * 0.73) % Math.PI,
+                (candidateIndex * 1.17) % Math.PI,
+                (candidateIndex * 0.41) % Math.PI,
+            ],
+            salvage,
+            remaining: depletedOrRoll(rng, depleted, id, hotspot ? 1.6 : 0.9, hotspot ? 5.4 : 4.2),
+            scanned: scanned.includes(id),
+            zone: site.zone,
+            route: site.route,
+            hotspot: hotspot ? `${site.wreck.id}:belly` : undefined,
+            insideWreckId: hotspot ? site.wreck.id : undefined,
+        };
+    };
+    const wreckQuaternion = new THREE.Quaternion();
+    const wreckOffset = new THREE.Vector3();
+    const wreckEuler = new THREE.Euler();
+    const fieldLocalFromModel = (wreck, modelLocal) => {
+        wreckEuler.set(...wreck.rotation, 'XYZ');
+        wreckQuaternion.setFromEuler(wreckEuler);
+        wreckOffset.set(...modelLocal).multiplyScalar(wreck.scale).applyQuaternion(wreckQuaternion);
+        return [
+            wreck.local[0] + wreckOffset.x,
+            wreck.local[1] + wreckOffset.y,
+            wreck.local[2] + wreckOffset.z,
+        ];
+    };
+    for (const site of salvageSites) {
+        // The carrier, battleship and both cruisers are the purposeful reward
+        // spaces: valuable salvage sits in side pockets while the middle half
+        // of each torn belly stays open for flight, combat and racing.
+        let interiorAccepted = 0;
+        let interiorAttempts = 0;
+        while (interiorAccepted < site.interiorCount && interiorAttempts < site.interiorCount * 48) {
+            interiorAttempts += 1;
+            const node = createNode(site, true);
+            const bay = site.wreck.interior;
+            const reach = wreckNodeCollisionRadius(node);
+            const modelPadding = reach / site.wreck.scale;
+            const pairIndex = Math.floor(interiorAccepted / 2);
+            const pairCount = Math.ceil(site.interiorCount / 2);
+            const side = interiorAccepted % 2 === 0 ? -1 : 1;
+            const xFraction = -0.72 + (pairIndex / Math.max(1, pairCount - 1)) * 1.44;
+            const modelLocal = [
+                bay.center[0] + bay.halfLength * xFraction + randomBetween(rng, -0.018, 0.018),
+                bay.center[1] - bay.halfHeight * randomBetween(rng, 0.08, 0.28),
+                bay.center[2] + side * (bay.halfWidth * randomBetween(rng, 0.69, 0.8)),
+            ];
+            // Keep the salvage's full collision envelope within the cavity.
+            modelLocal[0] = Math.max(bay.center[0] - bay.halfLength + modelPadding, Math.min(bay.center[0] + bay.halfLength - modelPadding, modelLocal[0]));
+            modelLocal[1] = Math.max(bay.center[1] - bay.halfHeight + modelPadding, Math.min(bay.center[1] + bay.halfHeight - modelPadding, modelLocal[1]));
+            modelLocal[2] = Math.max(bay.center[2] - bay.halfWidth + modelPadding, Math.min(bay.center[2] + bay.halfWidth - modelPadding, modelLocal[2]));
+            const local = fieldLocalFromModel(site.wreck, modelLocal);
+            node.position = add(center, local);
+            if (intersectsRaceCorridor('mourning-line', local, reach)
+                || graveyardWreckInteriorAt(local, reach) !== site.wreck.id
+                || overlapsNode(node, 8))
+                continue;
+            nodes.push(node);
+            interiorAccepted += 1;
+        }
+
+        let accepted = 0;
+        let attempts = 0;
+        const exteriorCount = site.count - interiorAccepted;
+        while (accepted < exteriorCount && attempts < Math.max(1, exteriorCount) * 96) {
+            attempts += 1;
+            const node = createNode(site, false);
+            const nodeReach = wreckNodeCollisionRadius(node);
+            const theta = rng() * Math.PI * 2;
+            const vertical = randomBetween(rng, -0.68, 0.68);
+            const planar = Math.sqrt(1 - vertical * vertical);
+            const radial = site.wreck.clearanceRadius + nodeReach + randomBetween(rng, 70, site.wreck.class === 'frigate' ? 240 : 380);
+            const local = [
+                site.wreck.local[0] + Math.cos(theta) * planar * radial,
+                site.wreck.local[1] + vertical * radial,
+                site.wreck.local[2] + Math.sin(theta) * planar * radial,
+            ];
+            node.position = add(center, local);
+            if (Math.hypot(...local) > 5300 || intersectsRaceCorridor('mourning-line', local, nodeReach) || overlapsGraveyardModelWreck(local, nodeReach))
+                continue;
+            if (overlapsNode(node))
+                continue;
+            nodes.push(node);
+            accepted += 1;
+        }
+    }
     return nodes;
 };
 export const buildStaticObstacles = (asteroids, graveyard) => {

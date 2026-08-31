@@ -402,7 +402,13 @@ export const hullVsAsteroid = (pos, hull, quat, quatInv, obstacle, scratch, cont
     let dirX;
     let dirY;
     let dirZ;
-    if (dist >= 1 && dotInterior <= -0.3 * dist) {
+    if (obstacle.surfaceOnly) {
+        // Wreck shells can be open, concave and multiply connected. Their
+        // collision is the visible skin only: never infer a filled interior
+        // from a ray cast through a torn aperture.
+        interior = false;
+    }
+    else if (dist >= 1 && dotInterior <= -0.3 * dist) {
         // Clearly outside and the closest face faces the ship: the dot test
         // is decisive, no extra pass needed.
         interior = false;
@@ -535,16 +541,9 @@ export const hullVsRing = (pos, hull, quatInv, obstacle, contact) => {
     const scaleX = Math.max(0.001, obstacle.scale[0]);
     const scaleY = Math.max(0.001, obstacle.scale[1]);
     const scaleZ = Math.max(0.001, obstacle.scale[2]);
-    const minScale = Math.min(scaleX, scaleY, scaleZ);
-    // The hole plane is the ring's local XY: sample the hull's reach across
-    // it (world frame) for the fit-through envelope.
-    const ax = rotateAxis(box.qx, box.qy, box.qz, box.qw, 1, 0, 0);
-    const ay = rotateAxis(box.qx, box.qy, box.qz, box.qw, 0, 1, 0);
     const hx = hull[0];
     const hy = hull[1];
     const hz = hull[2];
-    const reach = hullReachInPlane(quatInv.x, quatInv.y, quatInv.z, quatInv.w, hx, hy, hz, ax.x, ax.y, ax.z, ay.x, ay.y, ay.z);
-    const localPlayerRadius = reach / minScale;
     const dqx = -box.qx;
     const dqy = -box.qy;
     const dqz = -box.qz;
@@ -562,28 +561,44 @@ export const hullVsRing = (pos, hull, quatInv, obstacle, contact) => {
     const radialDirectionX = radial > 1e-6 ? localX / radial : 1;
     const radialDirectionY = radial > 1e-6 ? localY / radial : 0;
     const deltaRadial = radial - GRAVEYARD_GEOMETRY_PROFILES.ring.majorRadius;
-    const distanceToTube = Math.hypot(deltaRadial, localZ);
-    const expandedTube = GRAVEYARD_GEOMETRY_PROFILES.ring.tubeRadius + localPlayerRadius;
-    if (distanceToTube >= expandedTube)
+    // Non-uniformly scaled rings are elliptical. Expanding the tube by a hull
+    // using the old smallest scale made the thin Z thickness close a huge XY
+    // opening with invisible collision. Measure radial and axial support in
+    // their own world directions so the collision follows the visible torus.
+    const radialNormalLength = Math.hypot(radialDirectionX / scaleX, radialDirectionY / scaleY) || 1;
+    const radialLocalNormalX = (radialDirectionX / scaleX) / radialNormalLength;
+    const radialLocalNormalY = (radialDirectionY / scaleY) / radialNormalLength;
+    const radialWorldNormal = rotateAxis(box.qx, box.qy, box.qz, box.qw, radialLocalNormalX, radialLocalNormalY, 0);
+    const axialWorldNormal = rotateAxis(box.qx, box.qy, box.qz, box.qw, 0, 0, 1);
+    const radialWorldScale = 1 / radialNormalLength;
+    const radialAllowance = hullSupport(quatInv.x, quatInv.y, quatInv.z, quatInv.w, hx, hy, hz, radialWorldNormal.x, radialWorldNormal.y, radialWorldNormal.z) / radialWorldScale;
+    const axialAllowance = hullSupport(quatInv.x, quatInv.y, quatInv.z, quatInv.w, hx, hy, hz, axialWorldNormal.x, axialWorldNormal.y, axialWorldNormal.z) / scaleZ;
+    const expandedRadial = GRAVEYARD_GEOMETRY_PROFILES.ring.tubeRadius + radialAllowance;
+    const expandedAxial = GRAVEYARD_GEOMETRY_PROFILES.ring.tubeRadius + axialAllowance;
+    const normalizedDistance = Math.hypot(deltaRadial / expandedRadial, localZ / expandedAxial);
+    if (normalizedDistance >= 1)
         return false;
     let normalRadial;
     let normalZ;
-    if (distanceToTube > 1e-6) {
-        normalRadial = deltaRadial / distanceToTube;
-        normalZ = localZ / distanceToTube;
+    if (normalizedDistance > 1e-6) {
+        const gradientRadial = deltaRadial / (expandedRadial * expandedRadial);
+        const gradientZ = localZ / (expandedAxial * expandedAxial);
+        const gradientLength = Math.hypot(gradientRadial, gradientZ) || 1;
+        normalRadial = gradientRadial / gradientLength;
+        normalZ = gradientZ / gradientLength;
     }
     else {
         normalRadial = 1;
         normalZ = 0;
     }
-    const pushLocal = expandedTube - distanceToTube + 0.08 / minScale;
-    const wx = normalRadial * radialDirectionX * pushLocal * scaleX;
-    const wy = normalRadial * radialDirectionY * pushLocal * scaleY;
-    const wz = normalZ * pushLocal * scaleZ;
-    const push = Math.hypot(wx, wy, wz);
-    if (push < 1e-6)
+    const wx = normalRadial * radialDirectionX * scaleX;
+    const wy = normalRadial * radialDirectionY * scaleY;
+    const wz = normalZ * scaleZ;
+    const directionLength = Math.hypot(wx, wy, wz);
+    const push = (1 - normalizedDistance) * Math.min(expandedRadial * radialWorldScale, expandedAxial * scaleZ) + 0.08;
+    if (push < 1e-6 || directionLength < 1e-6)
         return false;
-    const wr = rotateAxis(box.qx, box.qy, box.qz, box.qw, wx / push, wy / push, wz / push);
+    const wr = rotateAxis(box.qx, box.qy, box.qz, box.qw, wx / directionLength, wy / directionLength, wz / directionLength);
     contact.x = wr.x;
     contact.y = wr.y;
     contact.z = wr.z;

@@ -13,37 +13,111 @@ import { HULL_TRADE_IN_RATE } from './shipTrade.js';
 import { HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RATE, itemAvailable, itemFitsMount, loadoutFor, outfittingUsage, quoteOutfitting } from './outfitting.js';
 const escapeHtml = (value) => value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const percent = (value, max) => (max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100)));
-const LEGACY_DOCK_ART_IDS = new Set(['helix', 'rook', 'vesper', 'azure']);
-const NEW_DOCK_ART_IDS = new Set([
-    'cairn',
-    'meridian-prime',
-    'argent',
-    'gatehouse-twelve',
-    'blackglass',
-    'cinder',
-    'torchwell',
-    'nacre',
-    'boreal',
-    'shepherd',
-]);
-const NEW_HD_BAR_ART_IDS = new Set([
-    'cairn',
-    'meridian-prime',
-    'argent',
-    'blackglass',
-    'cinder',
-    'nacre',
-    'boreal',
-]);
-const NEW_HD_MARKET_ART_IDS = new Set([
-    'meridian-prime',
-    'argent',
-    'blackglass',
-    'cinder',
-    'nacre',
-    'boreal',
-]);
-const LEGACY_PORTRAIT_IDS = new Set(['captain-dorne', 'devi-castor', 'doctor-ames', 'ivo-senn', 'kes-ali', 'linh-sorel', 'mara-vek', 'oskar-brill', 'ren-iverson', 'sana-kell', 'tovik', 'yara-tan']);
+// Every dock screen resolves through one explicit art record. This keeps minor
+// ports on their dedicated mission terminals and prevents a missing plate from
+// silently falling back to an unrelated concourse image.
+const DOCK_ART_BY_LOCATION = Object.freeze({
+    helix: Object.freeze({
+        concourse: './art/locations/v3/helix-hd-v1.png',
+        bar: './art/locations/v3/bar-helix-hd-v1.png',
+        market: './art/locations/v3/market-helix-hd-v1.png',
+    }),
+    rook: Object.freeze({
+        concourse: './art/locations/v3/rook-hd-v1.png',
+        bar: './art/locations/v3/bar-rook-hd-v1.png',
+        market: './art/locations/v3/market-rook-hd-v1.png',
+    }),
+    vesper: Object.freeze({
+        concourse: './art/locations/v3/vesper.png',
+        bar: './art/locations/v3/bar-vesper-hd-v1.png',
+        market: './art/locations/v3/market-vesper-hd-v1.png',
+    }),
+    azure: Object.freeze({
+        concourse: './art/locations/v3/azure-hd-v1.png',
+        bar: './art/locations/v3/bar-azure-hd-v1.png',
+        market: './art/locations/v3/market-azure-hd-v1.png',
+    }),
+    cairn: Object.freeze({
+        concourse: './art/locations/v6/concourse-cairn-hd-v2.png',
+        bar: './art/locations/v6/mission-cairn-hd-v1.png',
+    }),
+    'meridian-prime': Object.freeze({
+        concourse: './art/locations/v6/concourse-meridian-prime-hd-v2.png',
+        bar: './art/locations/v5/bar-meridian-prime-hd-v1.png',
+        market: './art/locations/v5/market-meridian-prime-hd-v1.png',
+    }),
+    argent: Object.freeze({
+        concourse: './art/locations/v6/concourse-argent-hd-v2.png',
+        bar: './art/locations/v6/bar-argent-hd-v2.png',
+        market: './art/locations/v6/market-argent-hd-v2.png',
+    }),
+    'gatehouse-twelve': Object.freeze({
+        concourse: './art/locations/v6/concourse-gatehouse-twelve-hd-v2.png',
+        bar: './art/locations/v6/mission-gatehouse-twelve-hd-v1.png',
+    }),
+    blackglass: Object.freeze({
+        concourse: './art/locations/v6/concourse-blackglass-hd-v2.png',
+        bar: './art/locations/v6/bar-blackglass-hd-v2.png',
+        market: './art/locations/v6/market-blackglass-hd-v2.png',
+    }),
+    cinder: Object.freeze({
+        concourse: './art/locations/v6/concourse-cinder-hd-v2.png',
+        bar: './art/locations/v6/bar-cinder-hd-v2.png',
+        market: './art/locations/v6/market-cinder-hd-v2.png',
+    }),
+    torchwell: Object.freeze({
+        concourse: './art/locations/v6/concourse-torchwell-hd-v2.png',
+        bar: './art/locations/v6/mission-torchwell-hd-v1.png',
+    }),
+    nacre: Object.freeze({
+        concourse: './art/locations/v6/concourse-nacre-hd-v2.png',
+        bar: './art/locations/v5/bar-nacre-hd-v1.png',
+        market: './art/locations/v5/market-nacre-hd-v1.png',
+    }),
+    boreal: Object.freeze({
+        concourse: './art/locations/v6/concourse-boreal-hd-v2.png',
+        bar: './art/locations/v6/bar-boreal-hd-v2.png',
+        market: './art/locations/v5/market-boreal-hd-v1.png',
+    }),
+    shepherd: Object.freeze({
+        concourse: './art/locations/v6/concourse-shepherd-hd-v2.png',
+        bar: './art/locations/v6/mission-shepherd-hd-v1.png',
+    }),
+});
+const NPC_PORTRAIT_BY_ID = Object.freeze({
+    'captain-dorne': './art/portraits/v2/captain-dorne-hd-v2.webp',
+    'devi-castor': './art/portraits/v2/devi-castor-hd-v2.webp',
+    'doctor-ames': './art/portraits/v2/doctor-ames-hd-v2.webp',
+    'ivo-senn': './art/portraits/v2/ivo-senn-hd-v2.webp',
+    'kes-ali': './art/portraits/v2/kes-ali-hd-v2.webp',
+    'linh-sorel': './art/portraits/v2/linh-sorel-hd-v2.webp',
+    'mara-vek': './art/portraits/v2/mara-vek-hd-v2.webp',
+    'oskar-brill': './art/portraits/v2/oskar-brill-hd-v2.webp',
+    'ren-iverson': './art/portraits/v2/ren-iverson-hd-v2.webp',
+    'sana-kell': './art/portraits/v2/sana-kell-hd-v2.webp',
+    'tovik': './art/portraits/v2/tovik-hd-v2.webp',
+    'yara-tan': './art/portraits/v2/yara-tan-hd-v2.webp',
+    'juno-rell': './art/portraits/v3/juno-rell-hd-v1.webp',
+    'merrit-voss': './art/portraits/v3/merrit-voss-hd-v1.webp',
+    'leon-vale': './art/portraits/v3/leon-vale-hd-v1.webp',
+    'sela-orrin': './art/portraits/v3/sela-orrin-hd-v1.webp',
+    'tomas-quin': './art/portraits/v3/tomas-quin-hd-v1.webp',
+    'arden-kai': './art/portraits/v3/arden-kai-hd-v1.webp',
+    'mira-kest': './art/portraits/v3/mira-kest-hd-v1.webp',
+    'bram-tel': './art/portraits/v3/bram-tel-hd-v1.webp',
+    'vesh-orr': './art/portraits/v3/vesh-orr-hd-v1.webp',
+    'nara-quill': './art/portraits/v3/nara-quill-hd-v1.webp',
+    'kellan-rusk': './art/portraits/v3/kellan-rusk-hd-v1.webp',
+    'mara-jen': './art/portraits/v3/mara-jen-hd-v1.webp',
+    'dax-hollis': './art/portraits/v3/dax-hollis-hd-v1.webp',
+    'rhea-sol': './art/portraits/v3/rhea-sol-hd-v1.webp',
+    'dr-elin-saye': './art/portraits/v3/dr-elin-saye-hd-v1.webp',
+    'pavel-orn': './art/portraits/v3/pavel-orn-hd-v1.webp',
+    'tessa-rye': './art/portraits/v3/tessa-rye-hd-v1.webp',
+    'soren-vek': './art/portraits/v3/soren-vek-hd-v1.webp',
+    'aya-north': './art/portraits/v3/aya-north-hd-v1.webp',
+    'halden-ree': './art/portraits/v3/halden-ree-hd-v1.webp',
+});
 const FULL_DOCK_SERVICES = Object.freeze({ fuel: true, repair: true, market: true, bar: true, shipyard: true, outfitting: true, missions: true });
 const locationServices = (locationId) => LOCATIONS[locationId]?.services ?? FULL_DOCK_SERVICES;
 const hasLocationService = (locationId, service) => Boolean(locationServices(locationId)?.[service]);
@@ -217,7 +291,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.7.19';
+const GAME_VERSION = '0.7.31';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -324,6 +398,16 @@ const CONCOURSE_PREVIEW_ANCHORS = Object.freeze({
     helix: Object.freeze({ shipX: 1280, shipY: 520, smallShipY: 560, shadowX: 1280, shadowY: 680, services: { x: 1010, y: 520 }, market: { x: 320, y: 500 }, bar: { x: 280, y: 320 } }),
     rook: Object.freeze({ shipX: 836, shipY: 560, smallShipY: 568, shadowX: 836, shadowY: 690, services: { x: 1240, y: 470 }, market: { x: 380, y: 470 }, bar: { x: 340, y: 280 } }),
     azure: Object.freeze({ shipX: 680, shipY: 430, shadowX: 500, shadowY: 580, smallShipX: 540, smallShipY: 500, smallShadowX: 450, smallShadowY: 590, atlasShipX: 650, atlasShadowX: 470, services: { x: 1190, y: 650 }, market: { x: 1290, y: 350 }, bar: { x: 250, y: 320 } }),
+    cairn: Object.freeze({ shipX: 820, shipY: 600, shadowX: 770, shadowY: 720, shipScale: 1.15, shadowScale: 1.15, services: { x: 240, y: 480 }, market: { x: 1000, y: 450 }, bar: { x: 1350, y: 440 } }),
+    'meridian-prime': Object.freeze({ shipX: 500, shipY: 620, shadowX: 450, shadowY: 735, shipScale: 1.18, shadowScale: 1.18, services: { x: 1320, y: 620 }, market: { x: 1380, y: 360 }, bar: { x: 1050, y: 480 } }),
+    argent: Object.freeze({ shipX: 840, shipY: 600, shadowX: 790, shadowY: 705, shipScale: 1.18, shadowScale: 1.18, services: { x: 440, y: 500 }, market: { x: 1320, y: 500 }, bar: { x: 650, y: 300 } }),
+    'gatehouse-twelve': Object.freeze({ shipX: 560, shipY: 600, shadowX: 510, shadowY: 710, shipScale: 1.08, shadowScale: 1.08, services: { x: 260, y: 420 }, market: { x: 1100, y: 400 }, bar: { x: 1300, y: 300 } }),
+    blackglass: Object.freeze({ shipX: 420, shipY: 620, shadowX: 370, shadowY: 730, shipScale: 1.05, shadowScale: 1.05, services: { x: 1320, y: 700 }, market: { x: 1260, y: 480 }, bar: { x: 1250, y: 250 } }),
+    cinder: Object.freeze({ shipX: 1130, shipY: 610, shadowX: 1070, shadowY: 725, shipScale: 1.15, shadowScale: 1.15, services: { x: 1280, y: 520 }, market: { x: 250, y: 680 }, bar: { x: 300, y: 350 } }),
+    torchwell: Object.freeze({ shipX: 840, shipY: 600, shadowX: 790, shadowY: 710, shipScale: 1.05, shadowScale: 1.05, services: { x: 420, y: 540 }, market: { x: 700, y: 480 }, bar: { x: 900, y: 470 } }),
+    nacre: Object.freeze({ shipX: 390, shipY: 610, shadowX: 340, shadowY: 720, shipScale: 1.1, shadowScale: 1.1, services: { x: 40, y: 650 }, market: { x: 900, y: 410 }, bar: { x: 340, y: 390 } }),
+    boreal: Object.freeze({ shipX: 1230, shipY: 640, shadowX: 1175, shadowY: 750, shipScale: 1.15, shadowScale: 1.15, services: { x: 300, y: 620 }, market: { x: 650, y: 540 }, bar: { x: 960, y: 330 } }),
+    shepherd: Object.freeze({ shipX: 450, shipY: 610, shadowX: 400, shadowY: 710, shipScale: 1.05, shadowScale: 1.05, services: { x: 690, y: 560 }, market: { x: 900, y: 450 }, bar: { x: 370, y: 360 } }),
 });
 const INITIAL_PREVIEW_SHIP_ID = VESPER_SHIP_PROFILES[DEV_PREVIEW_SHIP_ID]
     ? DEV_PREVIEW_SHIP_ID
@@ -1172,17 +1256,18 @@ export class GameUI {
         const shipAnchorY = shipBaseY + (profile.anchorY - DEFAULT_VESPER_SHIP_PROFILE.anchorY);
         const shadowAnchorX = shadowBaseX + (profile.shadowX - DEFAULT_VESPER_SHIP_PROFILE.shadowX);
         const shadowAnchorY = shadowBaseY + (profile.shadowY - DEFAULT_VESPER_SHIP_PROFILE.shadowY);
-        const concourseShipScale = this.dockLocation === 'rook' ? 0.86 : 1;
-        const concourseShadowScale = this.dockLocation === 'rook' ? 0.9 : 1;
+        const concourseShipScale = anchors.shipScale ?? (this.dockLocation === 'rook' ? 0.86 : 1);
+        const concourseShadowScale = anchors.shadowScale ?? (this.dockLocation === 'rook' ? 0.9 : 1);
         layer.style.setProperty('--vesper-ship-left', anchorX(shipAnchorX));
         layer.style.setProperty('--vesper-ship-top', anchorY(shipAnchorY));
         layer.style.setProperty('--vesper-ship-width', `${(profile.width * scale * concourseShipScale).toFixed(2)}px`);
-        layer.style.setProperty('--vesper-ship-angle', `${profile.angle}deg`);
+        layer.style.setProperty('--vesper-ship-angle', `${profile.angle + (anchors.angleOffset ?? 0)}deg`);
         layer.style.setProperty('--vesper-ship-bob', `${(profile.bob * scale * concourseShipScale).toFixed(2)}px`);
         layer.style.setProperty('--vesper-shadow-left', anchorX(shadowAnchorX));
         layer.style.setProperty('--vesper-shadow-top', anchorY(shadowAnchorY));
         layer.style.setProperty('--vesper-shadow-width', `${(profile.shadowWidth * scale * concourseShadowScale).toFixed(2)}px`);
         layer.style.setProperty('--vesper-shadow-height', `${(58 * scale * concourseShadowScale).toFixed(2)}px`);
+        layer.style.setProperty('--vesper-shadow-angle', `${anchors.shadowAngle ?? 3}deg`);
         scene.style.setProperty('--concourse-services-left', anchorX(anchors.services.x));
         scene.style.setProperty('--concourse-services-top', anchorY(anchors.services.y));
         scene.style.setProperty('--concourse-market-left', anchorX(anchors.market.x));
@@ -1221,7 +1306,7 @@ export class GameUI {
         }
     }
     renderConcourse() {
-        const showShipPreview = LEGACY_DOCK_ART_IDS.has(this.dockLocation);
+        const showShipPreview = DOCK_LOCATION_IDS.includes(this.dockLocation);
         const livePreview = PREVIEW_MODE && PREVIEW_LOCATION === this.dockLocation;
         const profile = this.getVesperShipProfile();
         const selectedShipId = this.getVesperShipId();
@@ -2081,11 +2166,12 @@ export class GameUI {
     `;
     }
     portraitImage(personId, personName) {
-        if (!LEGACY_PORTRAIT_IDS.has(personId)) {
+        const source = NPC_PORTRAIT_BY_ID[personId];
+        if (!source) {
             const initials = personName.split(/\s+/).slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
             return `<span class="avatar generated-avatar" aria-label="${t('Portrait of {name}', { name: escapeHtml(personName) })}">${escapeHtml(initials)}</span>`;
         }
-        return `<img class="avatar" src="./art/portraits/${escapeHtml(personId)}.webp" alt="${t('Pixel portrait of {name}', { name: personName })}" draggable="false">`;
+        return `<img class="avatar" src="${source}" alt="${t('Portrait of {name}', { name: personName })}" draggable="false">`;
     }
 
     locationIllustration(locationId, screen = 'concourse') {
@@ -2095,51 +2181,15 @@ export class GameUI {
             : screen === 'market'
                 ? t('{name} market', { name: location.name })
                 : location.name;
-        if (NEW_DOCK_ART_IDS.has(locationId)) {
-            if (screen === 'bar' && NEW_HD_BAR_ART_IDS.has(locationId))
-                return `<img src="./art/locations/v5/bar-${escapeHtml(locationId)}-hd-v1.png" alt="${t('HD view')} of ${escapeHtml(label)}" draggable="false">`;
-            if (screen === 'market' && NEW_HD_MARKET_ART_IDS.has(locationId))
-                return `<img src="./art/locations/v5/market-${escapeHtml(locationId)}-hd-v1.png" alt="${t('HD view')} of ${escapeHtml(label)}" draggable="false">`;
-            return `<img src="./art/locations/v4/${escapeHtml(locationId)}.webp" alt="${t('HD view')} of ${escapeHtml(label)}" draggable="false">`;
+        const art = DOCK_ART_BY_LOCATION[locationId];
+        if (art) {
+            const source = VESPER_HOVER_PREVIEW && locationId === 'vesper' && screen === 'concourse'
+                ? './art/locations/v3/vesper-preview.png'
+                : art[screen] ?? art.concourse;
+            return `<img src="${source}" alt="${t('HD view')} of ${escapeHtml(label)}" draggable="false">`;
         }
-        if (!LEGACY_DOCK_ART_IDS.has(locationId)) {
-            const screenLabel = screen === 'bar' ? t('BAR') : screen === 'market' ? t('MARKET') : t('CONCOURSE');
-            return `<div class="procedural-location-plate system-${escapeHtml(location.systemId ?? 'helios-verge')}" style="--plate-accent:${escapeHtml(location.accent ?? '#80b7c8')};--plate-secondary:${escapeHtml(location.secondary ?? '#182b36')}" role="img" aria-label="${escapeHtml(location.name)} · ${escapeHtml(screenLabel)}"><span>${escapeHtml(location.shortName)}</span><b>${escapeHtml(screenLabel)}</b><i aria-hidden="true"></i></div>`;
-        }
-        const file = screen === 'bar'
-            ? `bar-${locationId}`
-            : screen === 'market'
-                ? `market-${locationId}`
-                : locationId;
-        const illustrationFile = locationId === 'vesper' && screen === 'bar'
-            ? 'bar-vesper-hd-v1'
-            : locationId === 'vesper' && screen === 'market'
-                ? 'market-vesper-hd-v1'
-                : locationId === 'azure' && screen === 'concourse'
-                    ? 'azure-hd-v1'
-                : locationId === 'azure' && screen === 'bar'
-                    ? 'bar-azure-hd-v1'
-                : locationId === 'azure' && screen === 'market'
-                    ? 'market-azure-hd-v1'
-                : locationId === 'helix' && screen === 'concourse'
-                    ? 'helix-hd-v1'
-                : locationId === 'helix' && screen === 'bar'
-                    ? 'bar-helix-hd-v1'
-                : locationId === 'helix' && screen === 'market'
-                    ? 'market-helix-hd-v1'
-                : locationId === 'rook' && screen === 'concourse'
-                    ? 'rook-hd-v1'
-                : locationId === 'rook' && screen === 'bar'
-                    ? 'bar-rook-hd-v1'
-                : locationId === 'rook' && screen === 'market'
-                    ? 'market-rook-hd-v1'
-                : VESPER_HOVER_PREVIEW && locationId === 'vesper' && screen === 'concourse'
-                    ? 'vesper-preview'
-                    : file;
-        const artDescription = illustrationFile.endsWith('-hd-v1') || illustrationFile === 'vesper-preview'
-            ? t('HD view')
-            : t('Pixel-art view');
-        return `<img src="./art/locations/v3/${illustrationFile}.png" alt="${artDescription} of ${escapeHtml(label)}" draggable="false">`;
+        const screenLabel = screen === 'bar' ? t('BAR') : screen === 'market' ? t('MARKET') : t('CONCOURSE');
+        return `<div class="procedural-location-plate system-${escapeHtml(location.systemId ?? 'helios-verge')}" style="--plate-accent:${escapeHtml(location.accent ?? '#80b7c8')};--plate-secondary:${escapeHtml(location.secondary ?? '#182b36')}" role="img" aria-label="${escapeHtml(location.name)} · ${escapeHtml(screenLabel)}"><span>${escapeHtml(location.shortName)}</span><b>${escapeHtml(screenLabel)}</b><i aria-hidden="true"></i></div>`;
     }
     updateHud(model) {
         this.lastHud = model;
