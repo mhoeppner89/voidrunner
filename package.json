@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node src/game/combatResources.test.mjs && node --import ./src/game/offlineImportHooks.mjs src/game/shipStats.test.mjs && node --import ./src/game/offlineImportHooks.mjs src/game/outfitting.test.mjs && node --import ./src/game/offlineImportHooks.mjs src/game/shipTrade.test.mjs && node src/game/galaxy.test.mjs && node src/game/racing.test.mjs && node --import ./src/game/offlineImportHooks.mjs src/game/racingWorld.test.mjs && node --import ./src/game/offlineImportHooks.mjs src/game/economy.test.mjs"
+    "test": "node src/game/combatResources.test.mjs && node --import ./src/game/offlineImportHooks.mjs src/game/shipStats.test.mjs && node --import ./src/game/offlineImportHooks.mjs src/game/outfitting.test.mjs && node --import ./src/game/offlineImportHooks.mjs src/game/shipTrade.test.mjs && node --import ./src/game/offlineImportHooks.mjs src/game/save.test.mjs && node --import ./src/game/offlineImportHooks.mjs src/game/missions.test.mjs && node src/game/input.test.mjs && node src/game/galaxy.test.mjs && node src/game/racing.test.mjs && node --import ./src/game/offlineImportHooks.mjs src/game/racingWorld.test.mjs && node --import ./src/game/offlineImportHooks.mjs src/game/economy.test.mjs"
   }
 }

@@ -1,5 +1,5 @@
 import { createInitialMarket, normalizeMarketIntel, refreshAllPrices } from './economy.js';
-import { DEFAULT_NAV_LOCATION_BY_SYSTEM, LOCATIONS, MISSION_LOCATION_IDS, SHIPS, navLocationIdsForSystem } from './data.js';
+import { DEFAULT_NAV_LOCATION_BY_SYSTEM, LOCATIONS, MISSION_LOCATION_IDS, SHIPS, commodityIds, navLocationIdsForSystem } from './data.js';
 import { SYSTEM_IDS, getRoute, hasSystem } from './galaxy.js';
 import { refreshMissionOffers } from './missions.js';
 import { normalizeRaceRecord } from './racing.js';
@@ -259,6 +259,38 @@ const validFleetIds = (player = {}) => {
     const listed = Array.isArray(player.ownedShips) ? player.ownedShips : [];
     return [...new Set([player.shipId, ...listed].filter((id) => SHIPS[id]))];
 };
+const safeCargoNumber = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0
+        ? Math.min(parsed, Number.MAX_SAFE_INTEGER)
+        : 0;
+};
+const normalizeCargo = (candidate) => {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate))
+        return {};
+    return Object.fromEntries(commodityIds
+        .map((commodityId) => [commodityId, safeCargoNumber(candidate[commodityId])])
+        .filter(([, units]) => units > 0));
+};
+const normalizeSealedCargo = (candidate) => {
+    if (!Array.isArray(candidate))
+        return [];
+    const result = [];
+    for (const item of candidate) {
+        if (!item || typeof item !== 'object' || Array.isArray(item))
+            continue;
+        const missionId = typeof item.missionId === 'string' ? item.missionId.trim() : '';
+        const units = safeCargoNumber(item.units);
+        const mass = safeCargoNumber(item.mass);
+        if (!missionId || units <= 0 || mass <= 0)
+            continue;
+        const label = typeof item.label === 'string' && item.label.trim()
+            ? item.label.trim()
+            : 'Sealed cargo';
+        result.push({ missionId, label, units, mass, ...(item.smuggled ? { smuggled: true } : {}) });
+    }
+    return result;
+};
 export const hydrateSave = (candidate) => {
     candidate = candidate && typeof candidate === 'object' && !Array.isArray(candidate) ? candidate : {};
     const parsedVersion = Number(candidate.version ?? 1);
@@ -283,7 +315,7 @@ export const hydrateSave = (candidate) => {
         player: {
             ...fallback.player,
             ...(candidate.player ?? {}),
-            cargo: { ...fallback.player.cargo, ...(candidate.player?.cargo ?? {}) },
+            cargo: normalizeCargo(candidate.player?.cargo),
             reputation: { ...fallback.player.reputation, ...(candidate.player?.reputation ?? {}) },
             guildRep: { ...fallback.player.guildRep, ...(candidate.player?.guildRep ?? {}) },
             guildRank: { ...fallback.player.guildRank, ...(candidate.player?.guildRank ?? {}) },
@@ -301,7 +333,7 @@ export const hydrateSave = (candidate) => {
             // the fallback's seeded wayfarer state.
             outfitting: candidate.player?.outfitting ?? undefined,
             ownedShips: candidate.player?.ownedShips ?? fallback.player.ownedShips,
-            sealedCargo: candidate.player?.sealedCargo ?? fallback.player.sealedCargo,
+            sealedCargo: normalizeSealedCargo(candidate.player?.sealedCargo),
             discovered: candidate.player?.discovered ?? fallback.player.discovered,
             discoveredSystems: [...SYSTEM_IDS],
         },
@@ -339,11 +371,13 @@ export const hydrateSave = (candidate) => {
         save.player.dockedAt = undefined;
     if (!LOCATIONS[save.player.lastDockedAt])
         save.player.lastDockedAt = save.player.dockedAt ?? 'helix';
-    const anchoredSystemId = LOCATIONS[save.player.dockedAt]?.systemId
-        ?? LOCATIONS[save.player.lastDockedAt]?.systemId;
-    save.player.systemId = hasSystem(save.player.systemId)
-        ? save.player.systemId
-        : (anchoredSystemId ?? 'helios-verge');
+    const dockedSystemId = LOCATIONS[save.player.dockedAt]?.systemId;
+    const anchoredSystemId = dockedSystemId ?? LOCATIONS[save.player.lastDockedAt]?.systemId;
+    // A dock is an authoritative physical anchor. A valid but contradictory
+    // system id can otherwise load Helix's UI while navigation and encounters
+    // are running Redwake's world.
+    save.player.systemId = dockedSystemId
+        ?? (hasSystem(save.player.systemId) ? save.player.systemId : (anchoredSystemId ?? 'helios-verge'));
     const localNavIds = navLocationIdsForSystem(save.player.systemId);
     if (!localNavIds.includes(save.player.navTargetId))
         save.player.navTargetId = DEFAULT_NAV_LOCATION_BY_SYSTEM[save.player.systemId] ?? localNavIds[0] ?? 'shardbelt';
@@ -356,9 +390,17 @@ export const hydrateSave = (candidate) => {
             && LOCATIONS[pending.toLocationId]?.systemId === pending.toSystemId;
         const validDeparture = hasSystem(pending.fromSystemId)
             && LOCATIONS[pending.fromLocationId]?.systemId === pending.fromSystemId;
-        if (!route || !validArrival || !validDeparture
-            || !route.systemIds.includes(pending.fromSystemId)
-            || !route.systemIds.includes(pending.toSystemId))
+        const exactForward = route
+            && pending.fromSystemId === route.fromSystemId
+            && pending.toSystemId === route.toSystemId
+            && pending.fromLocationId === route.fromLocationId
+            && pending.toLocationId === route.toLocationId;
+        const exactReverse = route
+            && pending.fromSystemId === route.toSystemId
+            && pending.toSystemId === route.fromSystemId
+            && pending.fromLocationId === route.toLocationId
+            && pending.toLocationId === route.fromLocationId;
+        if (!route || !validArrival || !validDeparture || (!exactForward && !exactReverse))
             save.world.pendingJump = null;
     }
     if (!hasSystem(save.world.plannedSystemId)) {

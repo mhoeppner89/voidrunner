@@ -78,7 +78,11 @@ export class InputManager {
     };
     onBlur = () => {
         this.keys.clear();
+        this.pressed.clear();
         this.touchHeld.clear();
+        this.touchEdges.clear();
+        this.throttleSet = undefined;
+        this.activeThrottlePointer = undefined;
         this.joystickX = 0;
         this.joystickY = 0;
         if (this.joystickKnob) {
@@ -345,21 +349,30 @@ export class InputManager {
         return pressed && !previous;
     }
     readGamepad() {
-        const pads = navigator.getGamepads?.() ?? [];
-        const pad = Array.from(pads).find((entry) => Boolean(entry && entry.connected));
+        const pads = navigator.getGamepads?.();
+        const padList = pads && typeof pads[Symbol.iterator] === 'function' ? Array.from(pads) : [];
+        const pad = padList.find((entry) => Boolean(entry && entry.connected));
         if (!pad) {
             this.gamepadConnected = false;
             this.gamepadButtons.clear();
             return {};
         }
         this.gamepadConnected = true;
-        const deadzone = (value) => (Math.abs(value) < 0.13 ? 0 : value);
-        const button = (index) => Boolean(pad.buttons[index]?.pressed);
+        const axes = pad.axes && typeof pad.axes.length === 'number' ? pad.axes : [];
+        const buttons = pad.buttons && typeof pad.buttons.length === 'number' ? pad.buttons : [];
+        const deadzone = (value) => {
+            const finite = Number(value);
+            if (!Number.isFinite(finite))
+                return 0;
+            const bounded = clamp(finite, -1, 1);
+            return Math.abs(bounded) < 0.13 ? 0 : bounded;
+        };
+        const button = (index) => Boolean(buttons[index]?.pressed);
         return {
-            yaw: deadzone(pad.axes[0] ?? 0),
-            pitch: deadzone(pad.axes[1] ?? 0),
-            roll: deadzone(pad.axes[2] ?? 0),
-            throttleDelta: -deadzone(pad.axes[3] ?? 0) * 0.42,
+            yaw: deadzone(axes[0] ?? 0),
+            pitch: deadzone(axes[1] ?? 0),
+            roll: deadzone(axes[2] ?? 0),
+            throttleDelta: -deadzone(axes[3] ?? 0) * 0.42,
             fire: button(7),
             missile: this.gamepadEdge(5, button(5)),
             weaponCycle: this.gamepadEdge(2, button(2)),

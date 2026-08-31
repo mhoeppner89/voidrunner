@@ -75,12 +75,23 @@ export const tickEconomy = (world, seconds) => {
     }
     refreshAllPrices(world.market, world.seed, world.economyClock);
 };
+const safeCargoNumber = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0
+        ? Math.min(parsed, Number.MAX_SAFE_INTEGER)
+        : 0;
+};
 export const cargoMass = (player) => {
-    let mass = (Array.isArray(player?.sealedCargo) ? player.sealedCargo : []).reduce((sum, item) => sum + item.mass * item.units, 0);
-    for (const commodityId of commodityIds) {
-        mass += (player?.cargo?.[commodityId] ?? 0) * COMMODITIES[commodityId].mass;
+    let mass = 0;
+    for (const item of Array.isArray(player?.sealedCargo) ? player.sealedCargo : []) {
+        if (!item || typeof item !== 'object')
+            continue;
+        mass += safeCargoNumber(item.mass) * safeCargoNumber(item.units);
     }
-    return mass;
+    for (const commodityId of commodityIds) {
+        mass += safeCargoNumber(player?.cargo?.[commodityId]) * COMMODITIES[commodityId].mass;
+    }
+    return Number.isFinite(mass) ? mass : Number.MAX_SAFE_INTEGER;
 };
 export const cargoCapacity = (player) => getEffectiveShipStats(player).cargo;
 export const cargoFree = (player) => Math.max(0, cargoCapacity(player) - cargoMass(player));
