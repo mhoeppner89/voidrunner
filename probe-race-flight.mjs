@@ -359,13 +359,24 @@ try {
                 results.push({ id, accepted: false });
                 continue;
             }
-            const obstacles = rt.activeFieldObstacles(race.course.zone);
+            rt.activeInstanceId = race.course.zone;
+            rt.obstacleGridBuiltAt = -Infinity;
             const marked = [race.course.gathering, ...race.course.gates, ...race.course.shortcuts.flatMap((route) => route.gates)];
             const blocked = marked.filter((gate) => {
-                rt.tmpA.set(gate.position[0], gate.position[1], gate.position[2]);
-                return !rt.entryPositionClear(rt.tmpA, obstacles);
+                // Use the same shape-aware collision path as live flight. The
+                // spawn-clearance helper deliberately treats every box as
+                // solid, which makes the empty bore of a ring look blocked.
+                const direction = gate.direction ?? [0, 0, -1];
+                const orientation = rt.tmpPlayerOrientation.setFromUnitVectors(
+                    rt.tmpD.set(0, 0, -1),
+                    rt.tmpE.set(direction[0], direction[1], direction[2]).normalize(),
+                );
+                rt.save.player.rotation = [orientation.x, orientation.y, orientation.z, orientation.w];
+                const position = rt.tmpEntryCandidate.set(gate.position[0], gate.position[1], gate.position[2]);
+                const before = [position.x, position.y, position.z];
+                rt.resolvePlayerCollisions(position, rt.tmpEntryDirection.set(0, 0, 0));
+                return Math.hypot(position.x - before[0], position.y - before[1], position.z - before[2]) > 0.001;
             }).map((gate) => gate.id);
-            rt.activeInstanceId = race.course.zone;
             rt.renderer.setActiveInstance(race.course.zone);
             rt.startRaceAt(race.course);
             rt.save.world.time = race.startedAt + 0.01;

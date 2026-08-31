@@ -3707,6 +3707,7 @@ export class GameSession {
             // Recovered components go straight to the hold — no pickup to chase.
             // The monitor's remaining-recoveries count ticks down, so no per-unit toast.
             this.collectExtraction(node.salvage, 'salvage', 1);
+            this.recordClaimSalvage(node.id, 1);
             if (node.remaining <= 0) {
                 if (node.salvage === 'electronics' || node.salvage === 'arms')
                     this.recoverWreckEquipment(node);
@@ -3752,6 +3753,12 @@ export class GameSession {
     activeMiningClaims() {
         return this.save.activeMissions.filter((mission) => mission.kind === 'mining' && mission.claimNodeId);
     }
+    activeSalvageClaim(nodeId) {
+        return this.save.activeMissions.find((mission) => mission.kind === 'salvage' && mission.targetNodeId === nodeId);
+    }
+    activeSalvageClaims() {
+        return this.save.activeMissions.filter((mission) => mission.kind === 'salvage' && mission.targetNodeId);
+    }
     claimNodePosition(nodeId) {
         const live = this.asteroids.find((node) => node.id === nodeId);
         if (live)
@@ -3779,6 +3786,23 @@ export class GameSession {
             this.ui.pushEvent(t('Claim met: {claim} is dry. Return the ore to {station}.', { claim: fulfilled.claimName ?? fulfilled.claimNodeId, station: LOCATIONS[fulfilled.destination].name }), 'success', 6200);
         if (this.activeMiningClaim(nodeId))
             this.triggerClaimDispute(nodeId);
+    }
+    recordClaimSalvage(nodeId, amount) {
+        let fulfilled;
+        for (const mission of this.save.activeMissions) {
+            if (mission.kind !== 'salvage' || mission.targetNodeId !== nodeId)
+                continue;
+            const before = mission.salvaged ?? 0;
+            mission.salvaged = Math.min(mission.quantity, before + amount);
+            if (before < mission.quantity && mission.salvaged >= mission.quantity)
+                fulfilled = mission;
+        }
+        if (fulfilled) {
+            this.ui.pushEvent(t('Recovery complete: {wreck}. Return the components to {station}.', {
+                wreck: fulfilled.targetName ?? fulfilled.targetNodeId,
+                station: LOCATIONS[fulfilled.destination].name,
+            }), 'success', 6200);
+        }
     }
     triggerClaimDispute(nodeId) {
         // A staked rock occasionally draws a rival prospector who contests the
@@ -4194,6 +4218,22 @@ export class GameSession {
                 }
                 else {
                     goals.push({ kind: 'location', id: 'shardbelt', position: LOCATIONS.shardbelt.position, name: LOCATIONS.shardbelt.name });
+                }
+            }
+            else if (mission.kind === 'salvage') {
+                const doneSalvaging = (mission.salvaged ?? 0) >= mission.quantity;
+                if (doneSalvaging || !mission.targetNodeId) {
+                    const destination = LOCATIONS[mission.destination];
+                    goals.push({ kind: 'location', id: mission.destination, position: destination.position, name: destination.name });
+                }
+                else if (this.activeInstanceId === 'mourning-line') {
+                    const wreck = this.wreckNodes.find((node) => node.id === mission.targetNodeId && node.remaining > 0);
+                    if (wreck)
+                        goals.push({ kind: 'wreck', id: wreck.id, position: wreck.position, name: t('Recovery: {wreck}', { wreck: mission.targetName ?? wreck.name }), scanned: wreck.scanned });
+                }
+                else {
+                    const field = LOCATIONS[mission.targetZone] ?? LOCATIONS['mourning-line'];
+                    goals.push({ kind: 'location', id: field.id, position: field.position, name: field.name });
                 }
             }
             else if (mission.destination && Object.prototype.hasOwnProperty.call(LOCATIONS, mission.destination)) {
@@ -10227,8 +10267,9 @@ export class GameSession {
             contacts.push(...resources);
         }
         if (this.activeInstanceId === 'mourning-line') {
+            const claimNodes = new Set(this.activeSalvageClaims().map((mission) => mission.targetNodeId));
             const wrecks = this.wreckNodes
-                .filter((node) => node.remaining > 0)
+                .filter((node) => node.remaining > 0 && !claimNodes.has(node.id))
                 .map((node) => buildContact('wreck', node.id, node.name, node.scanned ? (SCAN_COMMODITY_LABELS[node.salvage] ?? COMMODITIES[node.salvage].name.toUpperCase()) : 'UNSCANNED WRECK', node.position, wreckRange, false, node.scanned))
                 .filter((contact) => Boolean(contact))
                 .sort(prioritize)
@@ -10255,6 +10296,30 @@ export class GameSession {
             const contact = buildContact('asteroid', mission.claimNodeId, `Claim: ${mission.claimName ?? mission.claimNodeId}`, `MINING CLAIM · ${mission.mined ?? 0}/${mission.quantity} MINED`, position, MAP_CLAIM_CONTACT_RANGE, false, liveScanned, true);
             if (contact) {
                 contact.claim = true;
+                contacts.push(contact);
+            }
+        }
+        for (const mission of this.activeSalvageClaims()) {
+            if ((mission.salvaged ?? 0) >= mission.quantity)
+                continue;
+            const live = this.wreckNodes.find((node) => node.id === mission.targetNodeId);
+            const position = live?.position ?? mission.targetPosition;
+            if (!position)
+                continue;
+            const contact = buildContact(
+                'wreck',
+                mission.targetNodeId,
+                t('Recovery: {wreck}', { wreck: mission.targetName ?? mission.targetNodeId }),
+                t('SALVAGE CLAIM · {current}/{total} RECOVERED', { current: mission.salvaged ?? 0, total: mission.quantity }),
+                position,
+                MAP_CLAIM_CONTACT_RANGE,
+                false,
+                Boolean(live?.scanned),
+                true,
+            );
+            if (contact) {
+                contact.claim = true;
+                contact.salvageClaim = true;
                 contacts.push(contact);
             }
         }

@@ -1,5 +1,5 @@
 import { COMMODITIES, DOCK_LOCATION_IDS, GUILD_RANK_NAMES, LOCATIONS, MISSION_LOCATION_IDS, commodityIds, routeDistanceBetween } from './data.js';
-import { miningClaimCandidates, miningClaimName } from './worldData.js';
+import { generateWreckNodes, miningClaimCandidates, miningClaimName } from './worldData.js';
 import { cargoFree, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { clamp, formatNumber, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
 import { rollPilot, TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
@@ -10,6 +10,7 @@ const merchantIssuers = ['Kestrel Freight', 'Orison Combine', 'Free Haulers Desk
 const bountyIssuers = ['Concord Warrant Desk', 'Frontier Security Office', 'Bounty Hunters Registry', 'Civil Claims Bureau'];
 const miningIssuers = ['Frontier Miners Cooperative', 'Prospectors Guild', 'Coreward Refinery Trust', 'Vesper Smelting Desk'];
 const syndicateIssuers = ['The Fixer', 'Den Concierge', 'Syndicate Broker'];
+const salvageIssuers = ['Salvage Union Dispatch', 'Mourning Line Claims Office', 'Cairn Recovery Desk', 'Independent Recovery Board'];
 // Dark-goods runs only move what the manifest cannot show.
 const SMUGGLE_COMMODITIES = ['arms', 'luxuries', 'electronics', 'medicine'];
 // Special labeled cargo only comes from transport contracts; the game's AI
@@ -36,6 +37,13 @@ const bountyReward = (danger, rank, zone) => {
     const zoneFactor = zone === 'mourning-line' ? 1.25 : zone === 'shardbelt' ? 1.1 : 1;
     return Math.round((2600 + danger * 1650 + rank * 950) * zoneFactor);
 };
+const salvageReward = (quantity, commodity, danger, rank) => Math.round(1200 + quantity * COMMODITIES[commodity].basePrice * 1.65 + danger * 520 + rank * 420);
+// Wreck deposits can hold a fractional final unit, but the cutter awards one
+// whole cargo unit whenever it consumes that remainder. Mission progress must
+// therefore count extraction cycles, not raw remaining mass.
+const salvageUnitsRemaining = (remaining) => Math.ceil(Math.max(0, Number(remaining) || 0));
+const wreckNodeForSave = (save, nodeId) => generateWreckNodes(save.world.seed, save.world.depletedWrecks, save.world.scannedNodes)
+    .find((node) => node.id === nodeId);
 export const generateMissionOffers = (locationId, save, count = 7) => {
     const cycle = missionCycle(save.world.time);
     const rng = seededRandom(`${save.world.seed}:missions:${cycle}:${locationId}`);
@@ -110,6 +118,10 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
         return offers;
     const dangerBase = clamp(save.world.danger, 0.2, 3.5);
     const claimedNodeIds = new Set();
+    const postedSalvageNodeIds = new Set();
+    const activeSalvageNodeIds = new Set(save.activeMissions
+        .filter((mission) => mission.kind === 'salvage' && mission.targetNodeId)
+        .map((mission) => mission.targetNodeId));
     for (let index = 0; index < count; index += 1) {
         const isBounty = index >= Math.ceil(count * 0.62);
         const id = `${locationId}-${cycle}-${index}-${Math.floor(rng() * 99999)}`;
@@ -285,6 +297,49 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
                 : t('Carry a {cargo} to {station}. The case occupies {mass} cargo mass and the client values punctuality above discretion.', { cargo: t(cargoLabel), station: LOCATIONS[destination].name, mass: (quantity * 1.2).toFixed(1) }),
         });
     }
+    // Keep the existing ordinary board intact and add one concrete Salvage
+    // Union recovery slot on Helios boards. The target is a real Mourning Line
+    // deposit, not an abstract cargo request: completion reads the same
+    // depleted-wreck ledger that the flight extractor updates. This keeps
+    // bought components from satisfying a contract without a second progress
+    // system, while leaving all pre-existing offer rolls unchanged.
+    if (count > 0 && LOCATIONS[locationId].systemId === LOCATIONS['mourning-line'].systemId) {
+        const candidates = generateWreckNodes(save.world.seed, save.world.depletedWrecks, save.world.scannedNodes)
+            .filter((node) => node.remaining > 0 && !postedSalvageNodeIds.has(node.id) && !activeSalvageNodeIds.has(node.id));
+        const target = pick(rng, candidates);
+        if (target) {
+            postedSalvageNodeIds.add(target.id);
+            const rank = save.player.guildRank.salvage ?? 0;
+            const danger = dangerBase + randomBetween(rng, 0.2, 0.9);
+            const quantity = randomInt(rng, 1, Math.min(salvageUnitsRemaining(target.remaining), 2 + rank));
+            const reward = salvageReward(quantity, target.salvage, danger, rank);
+            offers.push({
+                id: `${locationId}-${cycle}-salvage-${Math.floor(rng() * 99999)}`,
+                kind: 'salvage',
+                title: t('Recover {quantity} {commodity}', { quantity, commodity: t(COMMODITIES[target.salvage].name) }),
+                issuer: pick(rng, salvageIssuers),
+                origin: locationId,
+                destination: locationId,
+                targetZone: 'mourning-line',
+                targetNodeId: target.id,
+                targetName: target.name,
+                targetPosition: [...target.position],
+                targetRemaining: target.remaining,
+                salvaged: 0,
+                commodity: target.salvage,
+                quantity,
+                reward,
+                deposit: Math.round(reward * 0.07),
+                danger,
+                deadline: save.world.time + randomInt(rng, 360, 700),
+                status: 'offered',
+                guild: 'salvage',
+                guildRep: 7 + Math.floor(quantity / 2) + rank,
+                faction: 'salvage-union',
+                briefing: t('Recover {quantity} units of {commodity} from {wreck} in the Mourning Line and bring them back to {station}. Only components cut from that deposit count; market cargo cannot clear the claim.', { quantity, commodity: t(COMMODITIES[target.salvage].name), wreck: target.name, station: LOCATIONS[locationId].name }),
+            });
+        }
+    }
     return offers;
 };
 export const refreshMissionOffers = (save, force = false) => {
@@ -312,6 +367,18 @@ export const acceptMission = (save, locationId, missionId) => {
         return { ok: false, message: t('Mission computer has reached its active-contract limit.') };
     if (save.player.credits < offered.deposit)
         return { ok: false, message: t('A {credits} credit bond is required.', { credits: offered.deposit }) };
+    if (offered.kind === 'salvage') {
+        const target = wreckNodeForSave(save, offered.targetNodeId);
+        const quantity = Number(offered.quantity);
+        const alreadyClaimed = save.activeMissions.some((mission) => mission.kind === 'salvage' && mission.targetNodeId === offered.targetNodeId);
+        if (alreadyClaimed || !target || target.salvage !== offered.commodity || !Number.isFinite(quantity) || quantity <= 0 || salvageUnitsRemaining(target.remaining) < quantity) {
+            return { ok: false, message: t('That salvage claim is no longer available.') };
+        }
+        // The board can remain open while the pilot is away. Capture the live
+        // deposit at acceptance so progress is measured only after the bond is
+        // posted, even if a stale board entry has a different snapshot.
+        offered.targetRemaining = target.remaining;
+    }
     if (offered.kind === 'delivery' || offered.kind === 'transport' || offered.kind === 'smuggle') {
         const units = offered.quantity ?? 0;
         const massPerUnit = offered.kind === 'transport' ? 1.2 : COMMODITIES[offered.commodity].mass;
@@ -378,6 +445,26 @@ export const completeMissionsAtDock = (save, locationId) => {
                 continue;
             save.player.sealedCargo.splice(cargoIndex, 1);
             messages.push(awardMission(save, mission));
+        }
+        else if (mission.kind === 'salvage' && mission.targetNodeId && mission.commodity && mission.quantity) {
+            // A salvage contract points at one generated wreck deposit. The
+            // flight extractor writes that node's remaining units to
+            // `depletedWrecks`; comparing the accepted baseline with the live
+            // node makes progress real and target-specific. Carrying bought
+            // components alone therefore cannot clear the contract.
+            const target = wreckNodeForSave(save, mission.targetNodeId);
+            if (!target || target.salvage !== mission.commodity)
+                continue;
+            const baseline = Number(mission.targetRemaining);
+            const remaining = Number(target.remaining);
+            if (!Number.isFinite(baseline) || !Number.isFinite(remaining))
+                continue;
+            const recovered = Math.max(0, salvageUnitsRemaining(baseline) - salvageUnitsRemaining(remaining));
+            mission.salvaged = Math.min(mission.quantity, recovered);
+            if (recovered + 0.001 < mission.quantity)
+                continue;
+            if (consumeProcurementCargo(save.player, mission.commodity, mission.quantity))
+                messages.push(awardMission(save, mission));
         }
         else if (mission.kind === 'mining' && mission.commodity && mission.quantity) {
             // Claim contracts only clear on rock the pilot actually cut: bought

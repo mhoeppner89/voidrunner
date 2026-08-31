@@ -135,7 +135,7 @@ try {
         shipyard: Boolean(document.querySelector('[data-market-point="shipyard"]')),
     }));
     check('Cairn Yard concourse shows services and race desk only', cairnConcourse.location === 'cairn'
-        && cairnConcourse.art.endsWith('/art/locations/v4/cairn.webp')
+        && cairnConcourse.art.endsWith('/art/locations/v6/concourse-cairn-hd-v2.png')
         && !cairnConcourse.proceduralPlate
         && cairnConcourse.services
         && cairnConcourse.raceDesk
@@ -183,16 +183,53 @@ try {
     const galaxyQuality = await page.evaluate(async () => {
         const runtime = window.__VOID_PRIVATEER__.getRuntime();
         const THREE = await import('/vendor/three.module.min.js');
-        const artIds = ['cairn', 'meridian-prime', 'argent', 'gatehouse-twelve', 'blackglass', 'cinder', 'torchwell', 'nacre', 'boreal', 'shepherd'];
+        const concourseArt = {
+            cairn: '/art/locations/v6/concourse-cairn-hd-v2.png',
+            'meridian-prime': '/art/locations/v6/concourse-meridian-prime-hd-v2.png',
+            argent: '/art/locations/v6/concourse-argent-hd-v2.png',
+            'gatehouse-twelve': '/art/locations/v6/concourse-gatehouse-twelve-hd-v2.png',
+            blackglass: '/art/locations/v6/concourse-blackglass-hd-v2.png',
+            cinder: '/art/locations/v6/concourse-cinder-hd-v2.png',
+            torchwell: '/art/locations/v6/concourse-torchwell-hd-v2.png',
+            nacre: '/art/locations/v6/concourse-nacre-hd-v2.png',
+            boreal: '/art/locations/v6/concourse-boreal-hd-v2.png',
+            shepherd: '/art/locations/v6/concourse-shepherd-hd-v2.png',
+        };
+        const artIds = Object.keys(concourseArt);
         const art = await Promise.all(artIds.map(async (id) => {
-            const path = `/art/locations/v4/${id}.webp`;
+            const path = concourseArt[id];
             const response = await fetch(path);
             return { id, ok: response.ok, markup: runtime.ui.locationIllustration(id).includes(path.slice(1)) };
         }));
-        const majorServiceIds = ['meridian-prime', 'argent', 'blackglass', 'cinder', 'nacre', 'boreal'];
+        const serviceArtPaths = {
+            'meridian-prime': {
+                bar: '/art/locations/v5/bar-meridian-prime-hd-v1.png',
+                market: '/art/locations/v5/market-meridian-prime-hd-v1.png',
+            },
+            argent: {
+                bar: '/art/locations/v6/bar-argent-hd-v2.png',
+                market: '/art/locations/v6/market-argent-hd-v2.png',
+            },
+            blackglass: {
+                bar: '/art/locations/v6/bar-blackglass-hd-v2.png',
+                market: '/art/locations/v6/market-blackglass-hd-v2.png',
+            },
+            cinder: {
+                bar: '/art/locations/v6/bar-cinder-hd-v2.png',
+                market: '/art/locations/v6/market-cinder-hd-v2.png',
+            },
+            nacre: {
+                bar: '/art/locations/v5/bar-nacre-hd-v1.png',
+                market: '/art/locations/v5/market-nacre-hd-v1.png',
+            },
+            boreal: {
+                bar: '/art/locations/v6/bar-boreal-hd-v2.png',
+                market: '/art/locations/v5/market-boreal-hd-v1.png',
+            },
+        };
+        const majorServiceIds = Object.keys(serviceArtPaths);
         const serviceArt = await Promise.all(majorServiceIds.map(async (id) => {
-            const barPath = `/art/locations/v5/bar-${id}-hd-v1.png`;
-            const marketPath = `/art/locations/v5/market-${id}-hd-v1.png`;
+            const { bar: barPath, market: marketPath } = serviceArtPaths[id];
             const [barResponse, marketResponse] = await Promise.all([fetch(barPath), fetch(marketPath)]);
             return {
                 id,
@@ -203,7 +240,7 @@ try {
                 distinct: runtime.ui.locationIllustration(id, 'bar') !== runtime.ui.locationIllustration(id, 'market'),
             };
         }));
-        const cairnBarPath = '/art/locations/v5/bar-cairn-hd-v1.png';
+        const cairnBarPath = '/art/locations/v6/mission-cairn-hd-v1.png';
         const cairnBar = {
             ok: (await fetch(cairnBarPath)).ok,
             markup: runtime.ui.locationIllustration('cairn', 'bar').includes(cairnBarPath.slice(1)),

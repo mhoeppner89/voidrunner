@@ -3337,10 +3337,16 @@ export class GameUI {
                         ? ((mission.mined ?? 0) >= mission.quantity
                             ? t('RETURN TO {name}', { name: (LOCATIONS[mission.destination]?.name ?? 'DOCK').toUpperCase() })
                             : t('MINE {name}', { name: (mission.claimName ?? 'SHARDBELT CLAIM').toUpperCase() }))
+                        : mission.kind === 'salvage'
+                            ? ((mission.salvaged ?? 0) >= mission.quantity
+                                ? t('RETURN TO {name}', { name: (LOCATIONS[mission.destination]?.name ?? 'DOCK').toUpperCase() })
+                                : t('SALVAGE {name}', { name: (mission.targetName ?? 'MOURNING LINE CLAIM').toUpperCase() }))
                         : (destination ? t('FLY TO {name}', { name: destination.name.toUpperCase() }) : '—');
                 const progress = mission.kind === 'mining' && mission.claimNodeId
                     ? `<div><dt>${t('PROGRESS')}</dt><dd>${mission.mined ?? 0}/${mission.quantity} ${t('MINED')}</dd></div>`
-                    : '';
+                    : mission.kind === 'salvage' && mission.targetNodeId
+                        ? `<div><dt>${t('PROGRESS')}</dt><dd>${mission.salvaged ?? 0}/${mission.quantity} ${t('RECOVERED')}</dd></div>`
+                        : '';
                 return `<article class="mission-card ${mission.kind} ship-mission-card">
                 <header><span>${this.missionBadge(mission)}</span><b>${formatCredits(mission.reward)}</b></header>
                 <h4>${escapeHtml(mission.title)}</h4>

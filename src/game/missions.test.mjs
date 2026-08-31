@@ -50,6 +50,9 @@ const projection = (offers) => offers.map((offer) => ({
     origin: offer.origin,
     destination: offer.destination,
     targetZone: offer.targetZone,
+    targetNodeId: offer.targetNodeId,
+    targetName: offer.targetName,
+    targetRemaining: offer.targetRemaining,
     commodity: offer.commodity,
     quantity: offer.quantity,
     claimNodeId: offer.claimNodeId,
@@ -368,9 +371,9 @@ const projection = (offers) => offers.map((offer) => ({
 }
 
 // Guild entry costs, duplicate membership, and rank/reputation progression are
-// public career APIs. Salvage has a guild but no generated/completable salvage
-// contract yet; the final assertions make that missing gameplay path explicit
-// instead of pretending a salvage objective exists.
+// public career APIs. Salvage contracts point at real Mourning Line deposits:
+// accepting one posts a bond, only depletion of its target node advances it,
+// and returning the recovered commodity pays the normal career ledgers.
 {
     assert.equal(guildJoinCost('merchant'), 500);
     assert.equal(guildJoinCost('bounty'), 900);
@@ -399,21 +402,84 @@ const projection = (offers) => offers.map((offer) => ({
     assert.equal(salvage.player.guildRep.salvage, 20);
     assert.equal(salvage.player.guildRank.salvage, 1);
     assert.equal(salvage.player.reputation['salvage-union'], 4);
-    assert.equal(generateMissionOffers('rook', salvage).some((offer) => offer.kind === 'salvage'), false);
-    salvage.player.credits = 100;
+    const generatedSalvage = generateMissionOffers('rook', salvage).find((offer) => offer.kind === 'salvage');
+    assert.ok(generatedSalvage, 'Helios mission boards post a salvage recovery job');
+    assert.equal(generatedSalvage.guild, 'salvage');
+    assert.equal(generatedSalvage.faction, 'salvage-union');
+    assert.equal(generatedSalvage.targetZone, 'mourning-line');
+    assert.equal(typeof generatedSalvage.targetNodeId, 'string');
+    assert.equal(typeof generatedSalvage.targetName, 'string');
+    assert.equal(typeof generatedSalvage.targetRemaining, 'number');
+    assert.ok(Math.ceil(generatedSalvage.targetRemaining) >= generatedSalvage.quantity);
+    assert.ok(generatedSalvage.quantity > 0);
+    assert.ok(generatedSalvage.deadline > salvage.world.time, 'salvage jobs have a live deadline');
+    assert.ok(generatedSalvage.deposit > 0, 'salvage jobs require a bond');
+    assert.ok(generatedSalvage.reward > generatedSalvage.deposit, 'salvage jobs pay more than their bond');
 
-    const noSalvageCompletion = postOffer(salvage, 'helix', fixture({
-        id: 'helix-0-0-salvage',
-        kind: 'salvage',
-        destination: 'rook',
-        commodity: undefined,
-        quantity: undefined,
-        guild: 'salvage',
-        faction: 'salvage-union',
-    }));
-    assert.equal(acceptMission(salvage, 'helix', noSalvageCompletion.id).ok, true);
-    assert.deepEqual(completeMissionsAtDock(salvage, 'rook'), [], 'there is currently no salvage completion branch');
-    assert.deepEqual(salvage.activeMissions.map((mission) => mission.id), ['helix-0-0-salvage']);
+    const salvageOffer = postOffer(salvage, 'rook', generatedSalvage);
+    salvage.player.credits = salvageOffer.deposit + 5000;
+    const startingCredits = salvage.player.credits;
+    assert.equal(acceptMission(salvage, 'rook', salvageOffer.id).ok, true);
+    assert.equal(salvage.player.credits, startingCredits - salvageOffer.deposit);
+    assert.equal(salvage.player.sealedCargo.length, 0, 'salvage is recovered in the field, not reserved at acceptance');
+    const activeSalvage = salvage.activeMissions[0];
+    assert.equal(activeSalvage.salvaged, 0);
+    assert.notEqual(generateMissionOffers('helix', salvage).find((offer) => offer.kind === 'salvage')?.targetNodeId, activeSalvage.targetNodeId, 'active recovery claims are not reposted');
+    const duplicateClaim = postOffer(salvage, 'helix', { ...salvageOffer, id: 'helix-0-salvage-duplicate', status: 'offered' });
+    const creditsBeforeDuplicate = salvage.player.credits;
+    assert.equal(acceptMission(salvage, 'helix', duplicateClaim.id).ok, false, 'one wreck cannot be claimed twice');
+    assert.equal(salvage.player.credits, creditsBeforeDuplicate);
+    assert.equal(salvage.activeMissions.length, 1);
+
+    // Cargo without depletion cannot clear the claim, and arriving at another
+    // dock never hands in a contract whose destination is Rookhaven.
+    salvage.player.cargo[activeSalvage.commodity] = activeSalvage.quantity;
+    assert.deepEqual(completeMissionsAtDock(salvage, 'helix'), []);
+    assert.deepEqual(completeMissionsAtDock(salvage, 'rook'), []);
+    assert.equal(salvage.activeMissions.length, 1);
+    assert.equal(salvage.player.cargo[activeSalvage.commodity], activeSalvage.quantity);
+
+    // These are the same persisted writes made by Game.extractWreck: the
+    // target node's remaining units fall, while the recovered commodity enters
+    // the hold. A partial cut advances progress but still cannot pay out.
+    const partial = Math.max(0, activeSalvage.quantity - 1);
+    salvage.world.depletedWrecks[activeSalvage.targetNodeId] = Math.max(0, activeSalvage.targetRemaining - partial);
+    assert.deepEqual(completeMissionsAtDock(salvage, 'rook'), []);
+    assert.equal(activeSalvage.salvaged, partial);
+    assert.equal(salvage.activeMissions.length, 1);
+
+    salvage.world.depletedWrecks[activeSalvage.targetNodeId] = Math.max(0, activeSalvage.targetRemaining - activeSalvage.quantity);
+    const messages = completeMissionsAtDock(salvage, 'rook');
+    assert.equal(messages.length, 1, 'a fully cut target deposit completes at the issuing dock');
+    assert.equal(salvage.player.credits, startingCredits + activeSalvage.reward, 'completion returns the bond and pays the reward');
+    assert.equal(salvage.player.cargo[activeSalvage.commodity], 0);
+    assert.equal(salvage.activeMissions.length, 0);
+    assert.deepEqual(salvage.world.completedMissionIds, [activeSalvage.id]);
+    assert.equal(salvage.player.stats.contracts, 1);
+    assert.equal(salvage.player.guildRep.salvage, 20 + activeSalvage.guildRep);
+    assert.equal(salvage.player.reputation['salvage-union'], 4 + Math.max(1, Math.floor(activeSalvage.guildRep / 3)));
+
+    const expired = fresh(273);
+    const expiredOffer = postOffer(expired, 'rook', generateMissionOffers('rook', expired).find((offer) => offer.kind === 'salvage'));
+    const expiredCredits = expired.player.credits;
+    assert.equal(acceptMission(expired, 'rook', expiredOffer.id).ok, true);
+    expired.world.time = expiredOffer.deadline + 1;
+    assert.equal(failExpiredMissions(expired).length, 1, 'salvage deadlines fail overdue contracts');
+    assert.equal(expired.player.credits, expiredCredits - expiredOffer.deposit, 'an expired salvage bond is kept');
+    assert.equal(expired.activeMissions.length, 0);
+    assert.deepEqual(expired.world.failedMissionIds, [expiredOffer.id]);
+    assert.equal(expired.player.reputation['salvage-union'], -3);
+
+    const fractional = fresh(274);
+    const fractionalOffer = generateMissionOffers('rook', fractional).find((offer) => offer.kind === 'salvage');
+    fractional.world.depletedWrecks[fractionalOffer.targetNodeId] = 0.6;
+    fractionalOffer.quantity = 1;
+    fractionalOffer.targetRemaining = 0.6;
+    postOffer(fractional, 'rook', fractionalOffer);
+    assert.equal(acceptMission(fractional, 'rook', fractionalOffer.id).ok, true, 'a fractional final deposit still represents one recovery cycle');
+    fractional.player.cargo[fractionalOffer.commodity] = 1;
+    fractional.world.depletedWrecks[fractionalOffer.targetNodeId] = 0;
+    assert.equal(completeMissionsAtDock(fractional, 'rook').length, 1, 'cutting the fractional final unit completes its recovery contract');
 }
 
 // A JSON save/reload round trip keeps an accepted procedural mission, its
