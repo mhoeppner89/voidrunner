@@ -9,6 +9,7 @@ import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS } from './weapons.js';
 import { collapseOutfittingToSingleShip, createOutfittingState, normalizeOutfitting, projectLegacyEquipment, projectLegacyWeaponId } from './outfitting.js';
 import { combinedHullIntegrity, normalizeEnergy } from './combatResources.js';
 export const SAVE_KEY = 'void-privateer-save-v1';
+export const SETTINGS_KEY = 'void-privateer-settings-v1';
 export const SAVE_VERSION = 9;
 // Test-funds build: a fresh career starts with enough credits to try any ship,
 // outfitting module or trade route without grinding first.
@@ -155,6 +156,66 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
     return save;
 };
 const storageAvailable = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+const normalizeSettings = (candidate) => {
+    const defaults = defaultSettings();
+    const source = candidate && typeof candidate === 'object' && !Array.isArray(candidate) ? candidate : {};
+    const numberInRange = (key, min, max) => {
+        const raw = source[key];
+        const value = raw === null || raw === '' ? NaN : Number(raw);
+        return Number.isFinite(value) ? clamp(value, min, max) : defaults[key];
+    };
+    const boolean = (key) => typeof source[key] === 'boolean' ? source[key] : defaults[key];
+    const neutral = source.tiltNeutral;
+    const validNeutral = neutral
+        && typeof neutral === 'object'
+        && Number.isFinite(Number(neutral.beta))
+        && Number.isFinite(Number(neutral.gamma))
+        && Number.isFinite(Number(neutral.angle));
+    return {
+        music: numberInRange('music', 0, 1),
+        effects: numberInRange('effects', 0, 1),
+        flightAssist: boolean('flightAssist'),
+        aimAssist: boolean('aimAssist'),
+        quality: ['auto', 'low', 'high'].includes(source.quality) ? source.quality : defaults.quality,
+        touchScale: numberInRange('touchScale', 0.8, 1.3),
+        vibration: boolean('vibration'),
+        steering: source.steering === 'stick' ? 'stick' : 'tilt',
+        tiltSensitivity: numberInRange('tiltSensitivity', 0.4, 1.8),
+        tiltInvertPitch: boolean('tiltInvertPitch'),
+        tiltInvertYaw: boolean('tiltInvertYaw'),
+        tiltNeutral: validNeutral
+            ? { beta: Number(neutral.beta), gamma: Number(neutral.gamma), angle: Number(neutral.angle) }
+            : null,
+        language: source.language === 'en' ? 'en' : 'de',
+    };
+};
+// Settings are global player preferences, not career progress. Keeping a
+// small independent record lets title-screen choices survive a reload and the
+// first NEW CAREER click, before a career autosave exists at all.
+export const loadSettingsPreferences = () => {
+    if (!storageAvailable())
+        return undefined;
+    try {
+        const raw = window.localStorage.getItem(SETTINGS_KEY);
+        return raw ? normalizeSettings(JSON.parse(raw)) : undefined;
+    }
+    catch (error) {
+        console.warn('Unable to load settings preferences.', error);
+        return undefined;
+    }
+};
+export const saveSettingsPreferences = (settings) => {
+    if (!storageAvailable())
+        return false;
+    try {
+        window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(normalizeSettings(settings)));
+        return true;
+    }
+    catch (error) {
+        console.warn('Unable to save settings preferences.', error);
+        return false;
+    }
+};
 const finiteTuple = (value, length) => Array.isArray(value)
     && value.length === length
     && value.every((entry) => Number.isFinite(entry));
@@ -300,13 +361,12 @@ export const hydrateSave = (candidate) => {
         ...fallback,
         ...candidate,
         settings: (() => {
-            const merged = { ...fallback.settings, ...(candidate.settings ?? {}) };
+            const merged = normalizeSettings({ ...fallback.settings, ...(candidate.settings ?? {}) });
             // Sound-default-on migration: a save that still carries the legacy
             // silent defaults (0 / 0) opens at the designed listening levels, so
-            // the change applies to existing careers too. A player who
-            // deliberately muted both is indistinguishable from untouched — the
-            // options menu restores silence in one drag.
-            if (merged.music === 0 && merged.effects === 0) {
+            // the change applies to old careers once. Current saves preserve a
+            // deliberate full mute across reloads.
+            if (sourceVersion < 9 && merged.music === 0 && merged.effects === 0) {
                 merged.music = 0.34;
                 merged.effects = 0.68;
             }

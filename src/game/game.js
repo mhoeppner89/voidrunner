@@ -7394,7 +7394,7 @@ export class GameSession {
         this.snapToCombatSpeed();
         if (feedback && amount > 1.5) {
             this.audio.play('hit', clamp(amount / 18, 0.4, 1.4));
-            if (navigator.vibrate && this.save.settings.vibration)
+            if (navigator.vibrate && this.save.settings.vibration && (navigator.userActivation?.hasBeenActive ?? true))
                 navigator.vibrate(Math.min(90, 18 + amount * 2));
         }
         if (this.save.player.hull <= 0) {
@@ -10002,14 +10002,18 @@ export class GameSession {
             }
             else if (target.kind === 'wreck') {
                 const node = this.wreckNodes.find((entry) => entry.id === target.id);
+                const claim = this.activeSalvageClaim(node.id);
                 const commodity = SCAN_COMMODITY_LABELS[node.salvage] ?? COMMODITIES[node.salvage].name.toUpperCase();
-                // Scanned wrecks report only commodity + recoveries left.
+                // A claimed wreck mirrors mining's manifest counter; ordinary
+                // scanned wrecks keep the commodity + recoveries-left readout.
                 const scanStatus = node.scanned
-                    ? t('{commodity} · {amount} LEFT', { commodity: t(commodity), amount: Math.ceil(node.remaining) })
+                    ? claim
+                        ? t('CLAIM · {current}/{total} RECOVERED', { current: claim.salvaged ?? 0, total: claim.quantity })
+                        : t('{commodity} · {amount} LEFT', { commodity: t(commodity), amount: Math.ceil(node.remaining) })
                     : distance > stats.scanRange
                         ? t('OUT OF RANGE · {current}/{max} km', { current: Math.round(distance), max: stats.scanRange })
                         : t('SCANNING…');
-                hudTarget = { kind: 'wreck', name: node.name, subtitle: node.scanned ? t(commodity) : t('UNRESOLVED WRECK'), distance, scanned: node.scanned, readout: this.utilityReadout || scanStatus, ...screen };
+                hudTarget = { kind: 'wreck', name: node.name, subtitle: node.scanned ? (claim ? t('SALVAGE CLAIM') : t(commodity)) : t('UNRESOLVED WRECK'), distance, scanned: node.scanned, readout: this.utilityReadout || scanStatus, ...screen };
             }
             else if (target.kind === 'pickup') {
                 const pickup = this.pickups.find((entry) => entry.id === target.id);

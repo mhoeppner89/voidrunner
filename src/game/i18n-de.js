@@ -372,6 +372,7 @@ export const DE_CATALOG = {
     'RECOVERED': 'GEBORGEN',
     'SALVAGE CLAIM · {current}/{total} RECOVERED': 'BERGUNGSRECHT · {current}/{total} GEBORGEN',
     'CLAIM · {current}/{total} MINED': 'ABBAURECHT · {current}/{total} ABGEBAUT',
+    'CLAIM · {current}/{total} RECOVERED': 'BERGUNGSRECHT · {current}/{total} GEBORGEN',
     'ORE · {amount} LEFT': 'ERZ · {amount} ÜBRIG',
     '{commodity} · {amount} LEFT': '{commodity} · {amount} ÜBRIG',
     'VECTOR': 'VEKTOR',

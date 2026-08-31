@@ -1,7 +1,7 @@
 import { GameSession } from './game/game.js';
-import { createNewSave, hasSavedGame, loadGame, saveGame } from './game/save.js';
+import { createNewSave, defaultSettings, loadGame, loadSettingsPreferences, saveGame, saveSettingsPreferences } from './game/save.js';
 import { DOCK_LOCATION_IDS, LOCATIONS, SHIPS } from './game/data.js';
-import { setLanguage, t } from './game/i18n.js';
+import { getLanguage, setLanguage, t } from './game/i18n.js';
 import { GameUI } from './game/ui.js';
 const host = document.querySelector('#app');
 if (!host)
@@ -9,6 +9,26 @@ if (!host)
 const ui = new GameUI(host);
 let session;
 let cachedSave = loadGame();
+// Title options must work before the first career save exists. Preferences
+// override the factory defaults (and an older career mirror), while language
+// remains anchored to i18n's dedicated boot key so the static shell agrees.
+const titleSettings = {
+    ...defaultSettings(),
+    ...(cachedSave?.settings ?? {}),
+    ...(loadSettingsPreferences() ?? {}),
+    language: getLanguage(),
+};
+const titleSave = () => cachedSave ?? { settings: titleSettings };
+const syncTitleSettings = (settings = {}) => {
+    Object.assign(titleSettings, defaultSettings(), settings, { language: getLanguage() });
+    saveSettingsPreferences(titleSettings);
+};
+const showTitleScreen = () => {
+    // Notices belong to the session that emitted them. Do not carry recovery,
+    // combat, or dock feedback onto the title screen or into the next sortie.
+    ui.clearToasts();
+    ui.showTitle(Boolean(cachedSave), titleSave());
+};
 const devPreviewParams = new URLSearchParams(location.search);
 const vesperHoverPreview = devPreviewParams.get('vesper-hover') === '1';
 const devAutoStart = devPreviewParams.get('dev-autostart') === '1';
@@ -62,14 +82,18 @@ const requestTiltPermission = async () => {
 };
 const beginSession = (mode, arena) => {
     session?.dispose();
+    ui.clearToasts();
     const save = mode === 'new' || mode === 'arena' ? createNewSave() : loadGame();
     if (!save) {
         ui.showToast(t('No autosave was found.'), 'warning');
-        ui.showTitle(false);
+        ui.showTitle(false, titleSave());
         return;
     }
-    // The save's language wins over the pre-save localStorage choice; keep
-    // both mirrors in sync so the next boot and the settings UI agree.
+    // Controls, display, and audio are player preferences rather than
+    // career-specific progress. Apply the latest global record to new,
+    // resumed, and simulator sessions alike.
+    Object.assign(save.settings, titleSettings);
+    // Keep the language mirrors in sync so the next boot and settings UI agree.
     // The probe/dev key (`__VOID_PRIVATEER_PROBE_LANG__`) is single-shot: it
     // forces the boot language once, then clears itself — a value left behind
     // by a dev session used to override the player's saved choice forever.
@@ -99,6 +123,7 @@ const beginSession = (mode, arena) => {
     }
     if (mode === 'arena')
         save.arena = arena;
+    syncTitleSettings(save.settings);
     // The combat sim uses the same canonical factory hardpoints as a career.
     // Its disposable save still keeps the sortie consequence-free, while an
     // arena run can no longer bypass installed-only weapons through the old
@@ -108,7 +133,11 @@ const beginSession = (mode, arena) => {
     session = new GameSession(save, ui, () => {
         session = undefined;
         cachedSave = loadGame();
-        ui.showTitle(Boolean(cachedSave), cachedSave);
+        if (cachedSave) {
+            Object.assign(cachedSave.settings, titleSettings);
+            saveGame(cachedSave);
+        }
+        showTitleScreen();
     }, mode === 'arena' ? arena : null, tiltGranted);
     void session.enableAudio();
 };
@@ -136,6 +165,24 @@ const toggleFullscreen = async () => {
         return;
     }
     await enterFullscreen();
+};
+const assignSetting = (settings, key, value) => {
+    if (key === 'music' || key === 'effects' || key === 'touchScale' || key === 'tiltSensitivity') {
+        settings[key] = Number(value);
+    }
+    else if (key === 'steering') {
+        settings.steering = value === 'stick' ? 'stick' : 'tilt';
+    }
+    else if (key === 'tiltInvertPitch' || key === 'tiltInvertYaw' || key === 'flightAssist' || key === 'aimAssist' || key === 'vibration') {
+        settings[key] = Boolean(value);
+    }
+    else if (key === 'quality' && (value === 'auto' || value === 'low' || value === 'high')) {
+        settings.quality = value;
+    }
+    else {
+        return false;
+    }
+    return true;
 };
 const actions = {
     startNew: () => beginSession('new'),
@@ -174,10 +221,13 @@ const actions = {
         // through here, and the reload guarantees every surface (static HUD
         // included) renders in the new language.
         if (key === 'language') {
-            setLanguage(value === 'en' ? 'en' : 'de');
+            const language = value === 'en' ? 'en' : 'de';
+            setLanguage(language);
+            titleSettings.language = language;
+            saveSettingsPreferences(titleSettings);
             const save = session?.save ?? cachedSave ?? loadGame();
             if (save) {
-                save.settings.language = value === 'en' ? 'en' : 'de';
+                save.settings.language = language;
                 cachedSave = save;
                 saveGame(save);
             }
@@ -186,52 +236,58 @@ const actions = {
         }
         if (session) {
             session.setSetting(key, value);
+            syncTitleSettings(session.save.settings);
             return;
         }
-        // No session yet (title-screen options): write the setting straight
-        // into the cached save and persist it, so sound/flight/tilt choices
-        // made before a career starts carry into the next session.
+        // No session yet (including a true first run): update the global
+        // preference record and mirror it into an existing career if present.
+        if (!assignSetting(titleSettings, key, value))
+            return;
+        saveSettingsPreferences(titleSettings);
         const save = cachedSave ?? loadGame();
-        if (!save)
-            return;
-        if (key === 'music' || key === 'effects' || key === 'touchScale' || key === 'tiltSensitivity') {
-            save.settings[key] = Number(value);
+        if (save) {
+            assignSetting(save.settings, key, value);
+            cachedSave = save;
+            saveGame(save);
         }
-        else if (key === 'steering') {
-            save.settings.steering = value === 'stick' ? 'stick' : 'tilt';
-        }
-        else if (key === 'tiltInvertPitch' || key === 'tiltInvertYaw' || key === 'flightAssist' || key === 'aimAssist' || key === 'vibration') {
-            save.settings[key] = Boolean(value);
-        }
-        else if (key === 'quality' && (value === 'auto' || value === 'low' || value === 'high')) {
-            save.settings.quality = value;
-        }
-        cachedSave = save;
-        saveGame(save);
     },
     enableTilt: async () => {
         // In a session the InputManager owns tilt; on the title screen there is
         // no session yet, so request permission here and let the next session
         // inherit it (the constructor auto-enables when tiltGranted is set).
-        if (session)
-            return session.enableTilt();
+        if (session) {
+            const granted = await session.enableTilt();
+            if (granted)
+                syncTitleSettings(session.save.settings);
+            return granted;
+        }
         const granted = await requestTiltPermission();
         if (!granted)
             return false;
         tiltGranted = true;
+        titleSettings.steering = 'tilt';
+        saveSettingsPreferences(titleSettings);
         const save = cachedSave ?? loadGame();
         if (save) {
             save.settings.steering = 'tilt';
+            cachedSave = save;
             saveGame(save);
         }
         return true;
     },
     calibrateTilt: () => {
-        if (session)
-            return session.calibrateTilt();
+        if (session) {
+            const calibrated = session.calibrateTilt();
+            if (calibrated)
+                syncTitleSettings(session.save.settings);
+            return calibrated;
+        }
+        titleSettings.tiltNeutral = { beta: tiltBeta, gamma: tiltGamma, angle: tiltAngle };
+        saveSettingsPreferences(titleSettings);
         const save = cachedSave ?? loadGame();
         if (save) {
             save.settings.tiltNeutral = { beta: tiltBeta, gamma: tiltGamma, angle: tiltAngle };
+            cachedSave = save;
             saveGame(save);
         }
         return true;
@@ -239,14 +295,23 @@ const actions = {
 };
 ui.mugDemand = () => session?.activeMugDemand();
 ui.setActions(actions);
-ui.showTitle(hasSavedGame(), cachedSave);
+showTitleScreen();
 window.addEventListener('pagehide', () => {
     if (session)
         saveGame(session.save);
 });
+const pauseFlightOnFocusLoss = () => {
+    if (!session || session.save.player.dockedAt || ui.isModalOpen)
+        return false;
+    ui.showPause();
+    return true;
+};
+window.addEventListener('blur', pauseFlightOnFocusLoss);
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && session)
+    if (document.visibilityState === 'hidden' && session) {
+        pauseFlightOnFocusLoss();
         saveGame(session.save);
+    }
 });
 const isProductionBuild = import.meta.env?.PROD ?? location.protocol !== 'file:';
 if ('serviceWorker' in navigator && isProductionBuild) {

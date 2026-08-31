@@ -2,13 +2,17 @@ import assert from 'node:assert/strict';
 import { cargoMass, quoteCommodityTrade } from './economy.js';
 import {
     SAVE_KEY,
+    SETTINGS_KEY,
     SAVE_VERSION,
     createNewSave,
+    defaultSettings,
     deleteSave,
     hasSavedGame,
     hydrateSave,
     loadGame,
+    loadSettingsPreferences,
     saveGame,
+    saveSettingsPreferences,
 } from './save.js';
 
 const storage = new Map();
@@ -32,6 +36,40 @@ const canonicalPlayer = (overrides = {}) => ({
     rotation: [0, 0, 0, 1],
     ...overrides,
 });
+
+// Player preferences exist before and independently of a career autosave.
+storage.clear();
+const firstRunSettings = {
+    ...defaultSettings(),
+    music: 0,
+    effects: 0,
+    quality: 'low',
+    language: 'en',
+    tiltSensitivity: 1.6,
+};
+assert.equal(saveSettingsPreferences(firstRunSettings), true);
+assert.equal(hasSavedGame(), false);
+assert.equal(storage.has(SETTINGS_KEY), true);
+assert.deepEqual(loadSettingsPreferences(), firstRunSettings);
+
+// A current save preserves an intentional full mute; only legacy silent
+// defaults receive the one-time sound-on migration.
+const currentMuted = hydrateSave({
+    version: SAVE_VERSION,
+    player: canonicalPlayer(),
+    world: { seed: 119 },
+    settings: { music: 0, effects: 0 },
+});
+assert.equal(currentMuted.settings.music, 0);
+assert.equal(currentMuted.settings.effects, 0);
+const legacySilent = hydrateSave({
+    version: SAVE_VERSION - 1,
+    player: canonicalPlayer(),
+    world: { seed: 118 },
+    settings: { music: 0, effects: 0 },
+});
+assert.equal(legacySilent.settings.music, 0.34);
+assert.equal(legacySilent.settings.effects, 0.68);
 
 // Corrupted manifests are repaired at the save boundary and remain harmless
 // if an unsanitized runtime object reaches the economy helpers directly.

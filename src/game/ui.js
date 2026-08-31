@@ -445,6 +445,7 @@ export class GameUI {
     barPanel = 'people';
     barPersonId;
     titleVisible = true;
+    hasCareerSave = false;
     arenaEnv = 'open';
     arenaScenario = '1v1';
     arenaDifficulty = 'veteran';
@@ -911,7 +912,7 @@ export class GameUI {
                 this.actions?.resume();
                 break;
             case 'new':
-                if (!this.save || window.confirm('Start a new career and overwrite the local autosave?'))
+                if (!this.hasCareerSave || window.confirm('Start a new career and overwrite the local autosave?'))
                     this.actions?.startNew();
                 break;
             case 'fullscreen':
@@ -1025,6 +1026,7 @@ export class GameUI {
     }
     showTitle(hasSave, save) {
         this.save = save;
+        this.hasCareerSave = Boolean(hasSave);
         this.titleVisible = true;
         this.root.querySelector('#title-screen')?.classList.remove('is-hidden');
         this.root.querySelector('#hud')?.classList.add('is-hidden');
@@ -3037,6 +3039,9 @@ export class GameUI {
         }
         ctx.restore();
     }
+    clearToasts() {
+        this.root.querySelector('#toast-stack')?.replaceChildren();
+    }
     showToast(message, tone = 'info', duration = 3400) {
         const stack = this.root.querySelector('#toast-stack');
         if (!stack)
@@ -3446,11 +3451,15 @@ export class GameUI {
         this.updateOrientationNotice();
     }
     hideOptions() {
-        this.root.querySelector('#pause-panel')?.classList.add('is-hidden');
+        const panel = this.root.querySelector('#pause-panel');
+        panel?.classList.add('is-hidden');
+        panel?.replaceChildren();
         this.updateOrientationNotice();
     }
     hidePause() {
-        this.root.querySelector('#pause-panel')?.classList.add('is-hidden');
+        const panel = this.root.querySelector('#pause-panel');
+        panel?.classList.add('is-hidden');
+        panel?.replaceChildren();
         this.updateOrientationNotice();
     }
     showArena() {

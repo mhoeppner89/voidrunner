@@ -35,6 +35,7 @@ export class InputManager {
     joystickKnob;
     throttleSet;
     activeThrottlePointer;
+    touchBindings = [];
     gamepadButtons = new Map();
     gamepadConnected = false;
     tiltSupported = false;
@@ -63,6 +64,10 @@ export class InputManager {
         window.removeEventListener('keyup', this.onKeyUp);
         window.removeEventListener('blur', this.onBlur);
         window.removeEventListener('deviceorientation', this.onDeviceOrientation);
+        for (const [target, type, listener, options] of this.touchBindings)
+            target.removeEventListener(type, listener, options);
+        this.touchBindings.length = 0;
+        this.onBlur();
     }
     onKeyDown = (event) => {
         const code = event.code;
@@ -226,6 +231,10 @@ export class InputManager {
     get tiltActive() {
         return this.tiltSupported && this.tiltEnabled && this.tiltSeen && this.tiltCalibrated;
     }
+    addTouchListener(target, type, listener, options) {
+        target.addEventListener(type, listener, options);
+        this.touchBindings.push([target, type, listener, options]);
+    }
     bindTouchControls() {
         const throttle = this.root.querySelector('[data-touch-throttle]');
         const thumb = this.root.querySelector('[data-touch-throttle-thumb]');
@@ -236,12 +245,12 @@ export class InputManager {
                 this.throttleSet = value;
                 thumb.style.bottom = `${value * 100}%`;
             };
-            throttle.addEventListener('pointerdown', (event) => {
+            this.addTouchListener(throttle, 'pointerdown', (event) => {
                 this.activeThrottlePointer = event.pointerId;
                 throttle.setPointerCapture(event.pointerId);
                 update(event);
             });
-            throttle.addEventListener('pointermove', (event) => {
+            this.addTouchListener(throttle, 'pointermove', (event) => {
                 if (event.pointerId === this.activeThrottlePointer)
                     update(event);
             });
@@ -249,8 +258,8 @@ export class InputManager {
                 if (event.pointerId === this.activeThrottlePointer)
                     this.activeThrottlePointer = undefined;
             };
-            throttle.addEventListener('pointerup', release);
-            throttle.addEventListener('pointercancel', release);
+            this.addTouchListener(throttle, 'pointerup', release);
+            this.addTouchListener(throttle, 'pointercancel', release);
         }
         this.root.querySelectorAll('[data-touch-action]').forEach((button) => {
             const press = (event) => {
@@ -267,7 +276,7 @@ export class InputManager {
                 else {
                     this.touchEdges.add(action);
                 }
-                if (navigator.vibrate)
+                if (navigator.vibrate && (navigator.userActivation?.hasBeenActive ?? true))
                     navigator.vibrate(8);
             };
             const release = (event) => {
@@ -278,10 +287,10 @@ export class InputManager {
                     this.touchHeld.delete(action);
                 delete button._activeTouchAction;
             };
-            button.addEventListener('pointerdown', press);
-            button.addEventListener('pointerup', release);
-            button.addEventListener('pointercancel', release);
-            button.addEventListener('pointerleave', (event) => {
+            this.addTouchListener(button, 'pointerdown', press);
+            this.addTouchListener(button, 'pointerup', release);
+            this.addTouchListener(button, 'pointercancel', release);
+            this.addTouchListener(button, 'pointerleave', (event) => {
                 if (event.buttons === 0)
                     release(event);
             });
@@ -311,12 +320,12 @@ export class InputManager {
                 knob.style.left = `calc(50% + ${dx}px)`;
                 knob.style.top = `calc(50% + ${dy}px)`;
             };
-            stick.addEventListener('pointerdown', (event) => {
+            this.addTouchListener(stick, 'pointerdown', (event) => {
                 stickPointer = event.pointerId;
                 stick.setPointerCapture(event.pointerId);
                 moveStick(event);
             });
-            stick.addEventListener('pointermove', (event) => {
+            this.addTouchListener(stick, 'pointermove', (event) => {
                 if (event.pointerId === stickPointer)
                     moveStick(event);
             });
@@ -324,8 +333,8 @@ export class InputManager {
                 if (event.pointerId === stickPointer)
                     centerStick();
             };
-            stick.addEventListener('pointerup', releaseStick);
-            stick.addEventListener('pointercancel', releaseStick);
+            this.addTouchListener(stick, 'pointerup', releaseStick);
+            this.addTouchListener(stick, 'pointercancel', releaseStick);
         }
     }
     keyAxis(positive, negative) {

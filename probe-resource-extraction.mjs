@@ -627,10 +627,12 @@ const main = async () => {
       runtime.renderer.updateWreckNodeInstances(1 / 60);
       runtime.obstacleGridBuiltAt = -Infinity;
       runtime.selectTarget('wreck', target.id);
+      const hudTarget = runtime.buildHudModel().target;
       return {
         offer: { id: offer.id, kind: offer.kind, targetNodeId: offer.targetNodeId, quantity: offer.quantity, destination: offer.destination },
         mission: { id: mission.id, targetNodeId: mission.targetNodeId, targetRemaining: mission.targetRemaining, quantity: mission.quantity, salvaged: mission.salvaged },
         target: { id: target.id, remaining: target.remaining },
+        hudTarget: hudTarget ? { subtitle: hudTarget.subtitle, readout: hudTarget.readout } : null,
       };
     });
     check('mission board posts a generated salvage recovery offer', contractSetup.offer?.kind === 'salvage', JSON.stringify(contractSetup));
@@ -639,6 +641,10 @@ const main = async () => {
       && contractSetup.mission?.targetNodeId === contractSetup.offer?.targetNodeId
       && contractSetup.target?.id === contractSetup.mission?.targetNodeId,
       JSON.stringify(contractSetup));
+    check('claimed wreck cockpit readout shows recovery progress',
+      /SALVAGE CLAIM|BERGUNGSRECHT/i.test(contractSetup.hudTarget?.subtitle ?? '')
+      && String(contractSetup.hudTarget?.readout ?? '').includes(`0/${contractSetup.mission?.quantity}`),
+      JSON.stringify(contractSetup.hudTarget));
     if (contractSetup.mission && contractSetup.target) {
       await step(420, { utility: true });
       const contractProgress = await page.evaluate((missionId) => {
