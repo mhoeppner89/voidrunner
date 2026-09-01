@@ -3,7 +3,7 @@ import { JUMP_ROUTES, SYSTEMS } from './galaxy.js';
 import { bestKnownTradeRoute, cargoCapacity, cargoMass, currentProfitableRoutes, denPrice, knownMarketQuotes, quoteCommodityTrade, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { formatCredits, formatDuration, formatNumber } from './random.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
-import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, weaponOwned } from './weapons.js';
+import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, launcherMagazineEntries, weaponOwned } from './weapons.js';
 import { TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 import { shipTopDownProfile } from './shipTopDownProfile.js';
 import { defaultSettings } from './save.js';
@@ -290,7 +290,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.7.33';
+const GAME_VERSION = '0.7.34';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -580,7 +580,7 @@ export class GameUI {
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="${t('Own ship status display; tap to open ship menu')}">
             <div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
             <div class="screen-race-strip" id="screen-race-strip"><span id="screen-race-label"></span><b id="screen-race-value"></b></div>
-            <div class="screen-ship-layout"><div class="screen-flight"><div><span>${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div><div><span>${t('HOLD')}</span><b id="screen-own-cargo">0.0</b><small id="screen-own-cargo-cap">/32</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i><em id="screen-own-energy-value">72</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">185</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
+            <div class="screen-ship-layout"><div class="screen-flight"><div><span>${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div><div><span>${t('HOLD')}</span><b id="screen-own-cargo">0.0</b><small id="screen-own-cargo-cap">/32</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em><small id="screen-own-launcher"></small></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i><em id="screen-own-energy-value">72</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">185</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="${t('Radar display; tap to open navigation map')}">
             <div class="screen-heading radar-heading" id="screen-radar-transponder" data-touch-action="transponder" role="button" tabindex="0" title="${t('Transponder — press B')}">${t('TRANSPONDER ON')}</div>
@@ -612,7 +612,7 @@ export class GameUI {
             <div class="touch-right">
               <button class="touch-boost touch-boost-right" data-touch-action="afterburner" aria-label="${t('Afterburner — hold')}"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" fill-rule="evenodd"><path d="M12 2.2C7.9 7.5 5.4 10.3 5.4 14a6.6 6.6 0 0 0 13.2 0c0-3.7-2.5-6.5-6.6-11.8Zm0 7c-2 2.6-2.8 3.8-2.8 5.3a2.8 2.8 0 0 0 5.6 0c0-1.5-.8-2.7-2.8-5.3Z"/></svg></button>
               <button id="touch-fire" class="touch-fire" data-touch-action="fire" aria-label="${t('Fire — hold')}"><svg data-icon="fire" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.6"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg></button>
-              <button id="touch-missile" class="touch-missile" data-touch-action="missile" aria-label="${t('Missile')}"><svg data-icon="missile" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.4 9.3 8.8h5.4Z"/><path d="M9.3 8.8h5.4v6.4H9.3Z"/><path d="M9.3 15.2 6.8 21M14.7 15.2l2.5 5.8"/></svg><svg data-icon="scan" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="is-hidden"><circle cx="12" cy="12" r="6.2"/><path d="M12 5.8V12l4.2 2.4"/><path d="M4.8 4.8 3.4 3.4M19.2 4.8l1.4-1.4M4.8 19.2l-1.4 1.4M19.2 19.2l1.4 1.4"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg><svg data-icon="capture" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M8 3.6h8l1.8 3H6.2Z"/><path d="M9.2 6.6v2.1M14.8 6.6v2.1"/><path d="M7 11.5h10M8.1 14.5h7.8M9.3 17.5h5.4M10.6 20.5h2.8"/></svg></button>
+              <div class="touch-secondary-row"><button type="button" id="touch-launcher-cycle" class="touch-launcher-cycle" data-touch-action="launcherCycle" aria-label="${t('Cycle launcher — press L or tap')}"><span id="touch-launcher-code">SKR</span><b id="touch-missile-count">0</b></button><button id="touch-missile" class="touch-missile" data-touch-action="missile" aria-label="${t('Missile')}"><svg data-icon="missile" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.4 9.3 8.8h5.4Z"/><path d="M9.3 8.8h5.4v6.4H9.3Z"/><path d="M9.3 15.2 6.8 21M14.7 15.2l2.5 5.8"/></svg><svg data-icon="scan" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="is-hidden"><circle cx="12" cy="12" r="6.2"/><path d="M12 5.8V12l4.2 2.4"/><path d="M4.8 4.8 3.4 3.4M19.2 4.8l1.4-1.4M4.8 19.2l-1.4 1.4M19.2 19.2l1.4 1.4"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg><svg data-icon="capture" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M8 3.6h8l1.8 3H6.2Z"/><path d="M9.2 6.6v2.1M14.8 6.6v2.1"/><path d="M7 11.5h10M8.1 14.5h7.8M9.3 17.5h5.4M10.6 20.5h2.8"/></svg></button></div>
             </div>
           </div>
           <div class="hud-corner-buttons">
@@ -892,6 +892,13 @@ export class GameUI {
             event.preventDefault();
             event.stopPropagation();
             this.actions?.weaponCycle?.();
+        });
+        const launcherCycle = this.root.querySelector('#touch-launcher-cycle');
+        launcherCycle?.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ')
+                return;
+            event.preventDefault();
+            this.actions?.launcherCycle?.();
         });
         ownScreen?.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter' && event.key !== ' ')
@@ -1733,10 +1740,13 @@ export class GameUI {
         const refill = refillCost(this.save.player);
         const repairBay = hasLocationService(this.dockLocation, 'repair');
         const fuelDepot = hasLocationService(this.dockLocation, 'fuel');
+        const ordnanceBars = launcherMagazineEntries(this.save.player).map((entry) => (
+            `<label>${escapeHtml(t(entry.launcher.ordnanceNameKey))} · ${escapeHtml(t('MOUNT {number}', { number: entry.index + 1 }))} <i><b style="width:${percent(entry.rounds, entry.capacity)}%"></b></i><em>${entry.rounds}/${entry.capacity}</em></label>`
+        )).join('') || `<label>${t('MISSILES')} <i><b style="width:0%"></b></i><em>0/0</em></label>`;
         return `
       <div class="service-grid">
         ${repairBay ? `<article class="service-card"><span class="eyebrow">${t('HULL INTEGRITY')}</span><h3>${t('Repair bay')}</h3><div class="service-bars"><label>${t('HULL INTEGRITY')} <i><b style="width:${percent(this.save.player.hull, stats.hull)}%"></b></i><em>${Math.ceil(this.save.player.hull)}/${stats.hull}</em></label></div><p>${t('Replace ablative plate, patch pressure structure, and clear combat faults.')}</p><button class="primary" data-ui-command="repair" ${repairs <= 0 ? 'disabled' : ''}>${t('REPAIR')} · ${formatCredits(repairs)}</button></article>` : ''}
-        ${fuelDepot ? `<article class="service-card"><span class="eyebrow">${t('CONSUMABLES')}</span><h3>${t('Fuel and ordnance')}</h3><div class="service-bars"><label>${t('FUEL')} <i><b style="width:${percent(this.save.player.fuel, stats.fuel)}%"></b></i><em>${Math.ceil(this.save.player.fuel)}/${stats.fuel}</em></label><label>${t('MISSILES')} <i><b style="width:${percent(this.save.player.missiles, stats.missileCapacity)}%"></b></i><em>${this.save.player.missiles}/${stats.missileCapacity}</em></label></div><p>${t('Refill afterburner propellant, mounted-rack ordnance, and installed gun magazines.')}</p><button class="primary" data-ui-command="refuel" ${refill <= 0 ? 'disabled' : ''}>${t('REFILL')} · ${formatCredits(refill)}</button></article>` : ''}
+        ${fuelDepot ? `<article class="service-card"><span class="eyebrow">${t('CONSUMABLES')}</span><h3>${t('Fuel and ordnance')}</h3><div class="service-bars"><label>${t('FUEL')} <i><b style="width:${percent(this.save.player.fuel, stats.fuel)}%"></b></i><em>${Math.ceil(this.save.player.fuel)}/${stats.fuel}</em></label>${ordnanceBars}</div><p>${t('Refill afterburner propellant, mounted-rack ordnance, and installed gun magazines.')}</p><button class="primary" data-ui-command="refuel" ${refill <= 0 ? 'disabled' : ''}>${t('REFILL')} · ${formatCredits(refill)}</button></article>` : ''}
         <article class="service-card danger-service"><span class="eyebrow">${t('INSURANCE NOTE')}</span><h3>${t('Emergency recovery')}</h3><p>${t('A destroyed ship is towed to the last safe dock. The service retains cargo, mission bonds, and a percentage of liquid credit.')}</p><b>${t('FLY WITH A RESERVE.')}</b></article>
       </div>
     `;
@@ -2322,8 +2332,9 @@ export class GameUI {
                     timer.textContent = String(model.patrolReply.seconds);
             }
         }
-        // Weapon readout on the own-ship monitor: mounted gun name plus its
-        // ammo pool (∞ for energy/heat weapons), amber while the PDC vents.
+        // Weapon readout on the own-ship monitor: mounted gun name and ammo,
+        // plus the selected launcher magazine on desktop. Phones carry that
+        // launcher readout in the separate ordnance selector beside MISSILE.
         const weaponReadout = this.el('#screen-own-weapon');
         if (weaponReadout) {
             const weapon = model.weapon;
@@ -2337,10 +2348,14 @@ export class GameUI {
                 setText('#screen-own-weapon-ammo', weapon.ammo
                     ? `${weapon.ammo.current}/${weapon.ammo.capacity}`
                     : weapon.venting ? t('VENTING') : '∞');
-                weaponReadout.title = `${t('Switch fire group — press X or tap')} · ${weapon.fullName ?? weapon.name}`;
+                const launcher = model.launcher;
+                setText('#screen-own-launcher', launcher ? `${launcher.displayCode ?? launcher.shortCode} ${launcher.current}/${launcher.capacity}` : '');
+                weaponReadout.title = `${t('Switch fire group — press X or tap')} · ${weapon.fullName ?? weapon.name}${launcher ? ` · ${launcher.name} ${launcher.current}/${launcher.capacity} · ${t('Cycle launcher — press L or tap')}` : ''}`;
             }
-            else
+            else {
+                setText('#screen-own-launcher', '');
                 weaponReadout.title = t('Switch fire group — press X or tap');
+            }
         }
         // Race strip: compact circuit telemetry on the own-ship monitor while
         // an entry is on the grid or running. The travel leg hides the strip —
@@ -2540,11 +2555,16 @@ export class GameUI {
         const utility = mining || salvage;
         const surrendered = kind === 'ship' && Boolean(target.surrendered) && !target.captured;
         const capture = surrendered && Boolean(target.captureAvailable);
+        const launcher = this.lastHud?.launcher;
+        const missileCurrent = Math.max(0, Math.floor(Number(launcher?.current) || 0));
+        const missileCapacity = Math.max(0, Math.floor(Number(launcher?.capacity) || 0));
+        const missileAction = !utility && !surrendered;
         fire.classList.toggle('is-mining', mining);
         fire.classList.toggle('is-salvage', salvage);
         fire.classList.toggle('is-surrendered', surrendered);
         missile.classList.toggle('is-scan', utility);
         missile.classList.toggle('is-capture', surrendered);
+        missile.classList.toggle('is-empty', missileAction && missileCurrent <= 0);
         fire.dataset.touchAction = utility ? 'utility' : 'fire';
         missile.dataset.touchAction = utility ? 'scan' : surrendered ? 'capture' : 'missile';
         // FIRE becomes the held mining/salvage beam for resource contacts. The
@@ -2557,6 +2577,26 @@ export class GameUI {
         };
         showIcon(fire, mining ? 'mine' : salvage ? 'salvage' : 'fire');
         showIcon(missile, utility ? 'scan' : capture || surrendered ? 'capture' : 'missile');
+        const launcherCycle = this.el('#touch-launcher-cycle');
+        const missileCount = this.el('#touch-missile-count');
+        const launcherCode = this.el('#touch-launcher-code');
+        if (launcherCycle) {
+            launcherCycle.classList.toggle('is-hidden', !missileAction);
+            launcherCycle.classList.toggle('is-empty', missileCurrent <= 0);
+            launcherCycle.disabled = (launcher?.count ?? 0) <= 1;
+            launcherCycle.setAttribute('aria-label', launcher
+                ? t('Selected launcher: {name}, {current}/{capacity}. Cycle launcher — press L or tap.', {
+                    name: `${launcher.name}${launcher.count > 1 ? ` · ${t('MOUNT {number}', { number: launcher.index + 1 })}` : ''}`,
+                    current: missileCurrent,
+                    capacity: missileCapacity,
+                })
+                : t('No launcher installed.'));
+        }
+        if (missileCount) {
+            missileCount.textContent = String(missileCurrent);
+        }
+        if (launcherCode)
+            launcherCode.textContent = launcher?.displayCode ?? launcher?.shortCode ?? '—';
         fire.setAttribute('aria-label', mining ? t('Mine — hold') : salvage ? t('Salvage — hold') : t('Fire — hold'));
         missile.setAttribute('aria-label', utility
             ? t('Scan — tap')
@@ -2564,7 +2604,9 @@ export class GameUI {
                     ? t('Capture surrendered pilot')
                     : surrendered
                     ? target.captureClaimable === false ? t('Capture unavailable — no claim') : t('Capture unavailable — approach target')
-                    : t('Missile'));
+                    : launcher
+                        ? `${t('Missile')} · ${launcher.name} · ${missileCurrent}/${missileCapacity}`
+                        : t('No launcher installed.'));
     }
     setTargetScreenValue(target) {
         const setText = (selector, value) => {
@@ -3430,13 +3472,16 @@ export class GameUI {
             const state = owned ? ammo : `${t('NOT INSTALLED')} · ${formatCredits(price ?? 0)}`;
             return `<div class="weapon-row${active ? ' is-active' : ''}${owned ? '' : ' is-locked'}"><span>${active ? '▸ ' : ''}${escapeHtml(t(weapon.nameKey))}</span><small>${escapeHtml(envelope)}</small><em>${state}</em></div>`;
         }).join('');
+        const launcherRows = launcherMagazineEntries(player).map((entry) => (
+            `<div class="weapon-row launcher-row${entry.selected ? ' is-active' : ''}"><span>${entry.selected ? '▸ ' : ''}${escapeHtml(t(entry.launcher.nameKey))}</span><small>${escapeHtml(t(entry.launcher.ordnanceNameKey))} · ${t('MOUNT {number}', { number: entry.index + 1 })}</small><em>${entry.rounds}/${entry.capacity}</em></div>`
+        )).join('') || `<div class="weapon-row is-locked"><span>${t('LAUNCHER')}</span><small>${t('NOT INSTALLED')}</small><em>0/0</em></div>`;
         panel.innerHTML = `
       <div class="modal-card ship-card">
         <header><div><span class="eyebrow">${t('SHIP STATUS / PAUSED')}</span><h2>${escapeHtml(ship?.name ?? 'VOIDRUNNER')}</h2></div><button data-ui-command="close-ship">${t('CLOSE')}</button></header>
         <div class="pause-grid ship-menu-grid">
           <section class="ship-menu-missions"><h3>${t('ACTIVE CONTRACTS · {count}/6', { count: missions.length })}</h3>${missionRows}</section>
           <section class="ship-menu-cargo"><h3>${t('CARGO HOLD · {mass}/{capacity} MASS ({percent}%)', { mass: mass.toFixed(1), capacity, percent: loadPercent })}</h3>${cargoRows}</section>
-          <section class="ship-menu-weapons"><h3>${t('WEAPON SYSTEMS')}</h3>${weaponRows}</section>
+          <section class="ship-menu-weapons"><h3>${t('WEAPON SYSTEMS')}</h3>${weaponRows}${launcherRows}</section>
           <section class="ship-menu-account"><h3>${t('ACCOUNT')}</h3>
             <div class="ship-account-row"><span>${t('AVAILABLE CREDIT')}</span><b>${formatCredits(player.credits)}</b></div>
             ${mug?.kind === 'credits' ? `<div class="ship-account-row"><span>${t('STANDOFF TOLL')}</span><button data-pay-mug="1">${t('PAY')} ${formatCredits(mug.amount)}</button></div>` : ''}
@@ -3467,7 +3512,7 @@ export class GameUI {
           <section><h3>${t('AUDIO')}</h3><label><span>${t('Music')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.music}" data-setting="music"></label><label><span>${t('Effects')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.effects}" data-setting="effects"></label><label><span>${t('Haptics')}</span><input type="checkbox" data-setting="vibration" ${settings.vibration ? 'checked' : ''}></label></section>
           <section><h3>${t('DISPLAY')}</h3><label><span>${t('Visuals')}</span><output>${t('High fidelity')}</output></label><label><span>${t('Fullscreen')}</span><button type="button" class="fullscreen-switch" data-ui-command="toggle-fullscreen" role="switch" aria-label="${t('Toggle fullscreen')}" aria-checked="false">⛶</button></label></section>
           <section><h3>${t('LANGUAGE')}</h3><label><span>${t('Language')}</span><select data-setting="language"><option value="de" ${settings.language !== 'en' ? 'selected' : ''}>Deutsch</option><option value="en" ${settings.language === 'en' ? 'selected' : ''}>English</option></select></label></section>
-          <section class="controls-reference"><h3>${t('KEYBOARD / CONTROLLER')}</h3><p>${t('W/S pitch · A/D yaw · Q/E roll · R/F throttle · Shift afterburn · Space fire · X fire group · hold M secondary tool / tap missile or capture · T target · C mode · N nav · J hyperdrive · K map · B transponder')}</p><p>${t('Gamepad: left stick steer · right stick roll/throttle · RT fire · hold RB secondary tool / tap missile or capture · LB afterburn · face buttons target/mode/fire group/hyperdrive · left stick click transponder · D-pad capture/hostile/nav.')}</p></section>
+          <section class="controls-reference"><h3>${t('KEYBOARD / CONTROLLER')}</h3><p>${t('W/S pitch · A/D yaw · Q/E roll · R/F throttle · Shift afterburn · Space fire · X fire group · L launcher · hold M secondary tool / tap missile or capture · T target · C mode · N nav · J hyperdrive · K map · B transponder')}</p><p>${t('Gamepad: left stick steer · right stick roll/throttle · RT fire · hold RB secondary tool / tap missile or capture · LB afterburn · face buttons target/mode/fire group/hyperdrive · left stick click transponder · D-pad launcher/capture/hostile/nav.')}</p></section>
         </div>`;
     }
     showPause() {

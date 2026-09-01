@@ -1,6 +1,6 @@
 import { EQUIPMENT, SHIPS } from './data.js';
 import { HULL_HARDPOINTS, OUTFIT_ITEMS, installedItemIds, loadoutFor } from './outfitting.js';
-import { AMMO_CAPACITY, AMMO_UNIT_COST, WEAPON_ORDER, WEAPONS, missileCapacityForPlayer, weaponIdForOutfit } from './weapons.js';
+import { AMMO_CAPACITY, AMMO_UNIT_COST, WEAPON_ORDER, WEAPONS, launcherMagazineEntries, missileCapacityForPlayer, weaponIdForOutfit } from './weapons.js';
 export const getEffectiveShipStats = (player) => {
     const base = SHIPS[player.shipId];
     if (!base)
@@ -24,10 +24,10 @@ export const getEffectiveShipStats = (player) => {
     const cargoBonus = hasOutfitting
         ? installed.reduce((total, id) => total + (OUTFIT_ITEMS[id]?.effects?.cargoCapacity ?? 0), 0)
         : (has('cargo-pods') ? 18 : 0);
-    // Missile capacity is a property of installed racks, not the hull. A
-    // missing launcher deliberately produces zero, even on a legacy hull that
-    // advertised a base missile count.
-    const missileCapacity = hasOutfitting ? missileCapacityForPlayer(player) : base.missileCapacity;
+    // Missile capacity belongs entirely to fitted racks. Lightweight callers
+    // without an outfitting record therefore have no launcher and no storage;
+    // save/runtime boundaries migrate legacy careers before resolving stats.
+    const missileCapacity = missileCapacityForPlayer(player);
     const miningRate = has('mining-mk2') ? effect('mining-mk2', 'miningRate', 1.7) : 1;
     const salvageRate = has('salvage-mk2') ? effect('salvage-mk2', 'salvageRate', 1.7) : 1;
     const salvageRange = has('salvage-mk2') ? effect('salvage-mk2', 'salvageRange', 170) : 100;
@@ -66,7 +66,9 @@ export const repairCost = (player) => {
 export const refillCost = (player) => {
     const stats = getEffectiveShipStats(player);
     const fuel = Math.max(0, stats.fuel - player.fuel) * 6;
-    const missiles = Math.max(0, stats.missileCapacity - player.missiles) * 240;
+    const missiles = launcherMagazineEntries(player).reduce((total, entry) => (
+        total + Math.max(0, entry.capacity - entry.rounds) * (entry.launcher.unitCost ?? 240)
+    ), 0);
     // Weapon ammo restocks through the same REFILL service as ordnance, priced
     // per unit from the weapon registry. Only ammo-fed guns currently mounted
     // on this hull need a refill; a gun in the locker should not charge the

@@ -182,9 +182,9 @@ export const WEAPONS = {
     },
 };
 // Launcher records are kept beside guns because they share target and
-// projectile plumbing, but they are not part of the primary weapon cycle.
-// One trigger pull consumes one missile from each fitted rack; swarm racks
-// turn that single round into four micro-warheads.
+// projectile plumbing, but they use ship-local magazines and their own
+// selection cycle. A swarm canister is one magazine round that opens into
+// four micro-warheads after launch.
 export const LAUNCHERS = {
     seeker: {
         id: 'seeker',
@@ -197,6 +197,10 @@ export const LAUNCHERS = {
         life: 8,
         cooldown: 1.1,
         capacity: 4,
+        ordnanceId: 'seeker-missile',
+        ordnanceNameKey: 'SEEKER MISSILE',
+        shortCode: 'SKR',
+        unitCost: 240,
         volley: 1,
         spreadRad: 0,
         audioKey: 'missile',
@@ -212,6 +216,10 @@ export const LAUNCHERS = {
         life: 6.4,
         cooldown: 1.3,
         capacity: 12,
+        ordnanceId: 'swarm-canister',
+        ordnanceNameKey: 'SWARM CANISTER',
+        shortCode: 'SWM',
+        unitCost: 240,
         volley: 4,
         spreadRad: 0.07,
         audioKey: 'missile',
@@ -227,6 +235,10 @@ export const LAUNCHERS = {
         life: 10,
         cooldown: 2.6,
         capacity: 2,
+        ordnanceId: 'heavy-torpedo',
+        ordnanceNameKey: 'HEAVY TORPEDO',
+        shortCode: 'TOR',
+        unitCost: 240,
         volley: 1,
         spreadRad: 0,
         splashRadius: 20,
@@ -350,6 +362,108 @@ export const mountedLauncherEntries = (player, shipId = player?.shipId) => {
 };
 
 export const missileCapacityForPlayer = (player, shipId = player?.shipId) => mountedLauncherEntries(player, shipId).reduce((total, entry) => total + entry.launcher.capacity, 0);
+
+const magazineRecords = (player) => player?.launcherMagazines
+    && typeof player.launcherMagazines === 'object'
+    && !Array.isArray(player.launcherMagazines)
+    ? player.launcherMagazines
+    : {};
+const magazineRounds = (value, capacity) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.max(0, Math.min(capacity, Math.floor(number))) : 0;
+};
+
+/** Read every fitted rack together with its own typed magazine. Careers from
+ * before save schema 10 have only the aggregate `player.missiles` field; until
+ * hydration migrates them, that pool is distributed across mounts in order. */
+export const launcherMagazineEntries = (player, shipId = player?.shipId) => {
+    const mounted = mountedLauncherEntries(player, shipId);
+    const records = magazineRecords(player);
+    const hasCanonicalMagazine = mounted.some((entry) => records[entry.mount.id]?.launcherId === entry.launcherId);
+    let legacyRemaining = hasCanonicalMagazine ? 0 : magazineRounds(player?.missiles, missileCapacityForPlayer(player, shipId));
+    const selectedMountId = mounted.some((entry) => entry.mount.id === player?.activeLauncherMountId)
+        ? player.activeLauncherMountId
+        : mounted[0]?.mount.id;
+    return mounted.map((entry) => {
+        const record = records[entry.mount.id];
+        let rounds = 0;
+        if (record?.launcherId === entry.launcherId)
+            rounds = magazineRounds(record.rounds, entry.launcher.capacity);
+        else if (!hasCanonicalMagazine) {
+            rounds = Math.min(entry.launcher.capacity, legacyRemaining);
+            legacyRemaining -= rounds;
+        }
+        return {
+            ...entry,
+            magazineId: entry.mount.id,
+            ordnanceId: entry.launcher.ordnanceId,
+            rounds,
+            capacity: entry.launcher.capacity,
+            selected: entry.mount.id === selectedMountId,
+        };
+    });
+};
+
+/** Reconcile persistent magazines with the current hardpoints. Matching racks
+ * retain their rounds. A newly installed/different rack starts empty unless
+ * this is a new commission (`fill`) or an old shared pool is being migrated. */
+export const normalizeLauncherMagazines = (player, { legacyMissiles, fill = false } = {}) => {
+    if (!player || typeof player !== 'object')
+        return [];
+    const mounted = mountedLauncherEntries(player);
+    const records = magazineRecords(player);
+    const hasCanonicalMagazine = mounted.some((entry) => records[entry.mount.id]?.launcherId === entry.launcherId);
+    const hasLegacyPool = !hasCanonicalMagazine && legacyMissiles !== undefined;
+    let legacyRemaining = hasLegacyPool ? magazineRounds(legacyMissiles, missileCapacityForPlayer(player)) : 0;
+    const next = {};
+    for (const entry of mounted) {
+        const record = records[entry.mount.id];
+        let rounds = 0;
+        if (record?.launcherId === entry.launcherId)
+            rounds = magazineRounds(record.rounds, entry.launcher.capacity);
+        else if (hasLegacyPool) {
+            rounds = Math.min(entry.launcher.capacity, legacyRemaining);
+            legacyRemaining -= rounds;
+        }
+        else if (fill)
+            rounds = entry.launcher.capacity;
+        next[entry.mount.id] = {
+            launcherId: entry.launcherId,
+            ordnanceId: entry.launcher.ordnanceId,
+            rounds,
+        };
+    }
+    player.launcherMagazines = next;
+    const selectedStillMounted = mounted.some((entry) => entry.mount.id === player.activeLauncherMountId);
+    if (!selectedStillMounted)
+        player.activeLauncherMountId = mounted.find((entry) => next[entry.mount.id]?.rounds > 0)?.mount.id ?? mounted[0]?.mount.id ?? null;
+    player.missiles = Object.values(next).reduce((total, record) => total + record.rounds, 0);
+    return launcherMagazineEntries(player);
+};
+
+export const fillLauncherMagazines = (player) => {
+    const entries = normalizeLauncherMagazines(player);
+    for (const entry of entries)
+        player.launcherMagazines[entry.mount.id].rounds = entry.launcher.capacity;
+    player.missiles = missileCapacityForPlayer(player);
+    return launcherMagazineEntries(player);
+};
+
+export const clearLauncherMagazines = (player) => {
+    const entries = normalizeLauncherMagazines(player);
+    for (const entry of entries)
+        player.launcherMagazines[entry.mount.id].rounds = 0;
+    player.missiles = 0;
+    return launcherMagazineEntries(player);
+};
+
+export const activeLauncherMagazine = (player) => launcherMagazineEntries(player).find((entry) => entry.selected);
+
+export const syncLauncherMissileTotal = (player) => {
+    const total = launcherMagazineEntries(player).reduce((sum, entry) => sum + entry.rounds, 0);
+    player.missiles = total;
+    return total;
+};
 // Guns are GAINED, not granted (bar pattern: acquisition economy). New hulls
 // receive their factory pulse/gauss mounts through outfitting state. The
 // fallback list remains solely for old tests/imported saves at the boundary.

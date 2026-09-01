@@ -664,7 +664,6 @@ export const SHIPS = {
         energyCapacity: 72,
         cargo: 32,
         fuel: 100,
-        missileCapacity: 4,
         gunDamage: 10,
     },
     vanguard: {
@@ -686,7 +685,6 @@ export const SHIPS = {
         energyCapacity: 108,
         cargo: 58,
         fuel: 130,
-        missileCapacity: 8,
         gunDamage: 15,
     },
     talon: {
@@ -708,7 +706,6 @@ export const SHIPS = {
         energyCapacity: 58,
         cargo: 16,
         fuel: 85,
-        missileCapacity: 4,
         gunDamage: 12,
     },
     prospector: {
@@ -730,7 +727,6 @@ export const SHIPS = {
         energyCapacity: 92,
         cargo: 96,
         fuel: 150,
-        missileCapacity: 2,
         gunDamage: 8,
     },
     lancer: {
@@ -752,7 +748,6 @@ export const SHIPS = {
         energyCapacity: 96,
         cargo: 30,
         fuel: 120,
-        missileCapacity: 10,
         gunDamage: 19,
     },
     atlas: {
@@ -774,7 +769,6 @@ export const SHIPS = {
         energyCapacity: 124,
         cargo: 160,
         fuel: 200,
-        missileCapacity: 4,
         gunDamage: 9,
     },
 };

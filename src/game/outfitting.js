@@ -91,21 +91,21 @@ const itemRecords = [
         // Factory fit: every hull can launch the existing missile stock on a
         // new career without buying a launcher first.
         price: 1800, mass: 2, weaponId: 'seeker', factoryFit: true,
-        description: 'A compact guided rack that gives a new pilot a forgiving first missile lock.', stat: 'High tracking · standard missile rack',
+        description: 'A compact guided rack that gives a new pilot a forgiving first missile lock.', stat: '4 seeker missiles · high tracking',
         effects: { weaponId: 'seeker', tracking: 'high', ammoId: 'missiles' }, availability: ['helix', 'rook', 'vesper', 'azure'],
         art: './art/outfitting/seeker-launcher.webp',
     },
     {
         id: 'swarm-launcher', name: 'Swarm Missile Rack', category: 'launcher', size: 'M', sizes: ['M'],
         price: 6200, mass: 4, weaponId: 'swarm',
-        description: 'A medium rack that fills the approach with several fast, imperfectly tracking warheads.', stat: '4-warhead volley · medium tracking',
+        description: 'A medium rack that fills the approach with several fast, imperfectly tracking warheads.', stat: '12 swarm canisters · 4-warhead volley',
         effects: { weaponId: 'swarm', volley: 4, tracking: 'medium', ammoId: 'missiles' }, availability: ['rook', 'azure'],
         art: './art/outfitting/swarm-launcher.webp',
     },
     {
         id: 'torpedo-launcher', name: 'Torpedo Tube', category: 'launcher', size: 'M', sizes: ['M'],
         price: 9800, mass: 6, weaponId: 'torpedo',
-        description: 'A heavy tube for deliberate shots against large, slow or already-disabled targets.', stat: 'Heavy warhead · splash r=20',
+        description: 'A heavy tube for deliberate shots against large, slow or already-disabled targets.', stat: '2 heavy torpedoes · splash r=20',
         effects: { weaponId: 'torpedo', tracking: 'low', splashRadius: 20, ammoId: 'missiles' }, availability: ['rook'],
         art: './art/outfitting/torpedo-launcher.webp',
     },

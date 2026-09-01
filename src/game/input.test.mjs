@@ -121,15 +121,17 @@ const makeTouchRoot = () => {
     const throttleThumb = new FakeElement();
     const fire = new FakeElement({ dataset: { touchAction: 'fire' } });
     const missile = new FakeElement({ dataset: { touchAction: 'missile' } });
+    const launcher = new FakeElement({ dataset: { touchAction: 'launcherCycle' } });
     const scan = new FakeElement({ dataset: { touchAction: 'scan' } });
     const stick = new FakeElement({ rect: { left: 0, top: 0, width: 100, height: 100 }, offsetWidth: 100 });
     const stickKnob = new FakeElement({ offsetWidth: 20 });
     return {
-        root: new FakeRoot({ throttle, throttleThumb, stick, stickKnob, touchButtons: [fire, missile, scan] }),
+        root: new FakeRoot({ throttle, throttleThumb, stick, stickKnob, touchButtons: [fire, missile, launcher, scan] }),
         throttle,
         throttleThumb,
         fire,
         missile,
+        launcher,
         scan,
         stick,
         stickKnob,
@@ -197,7 +199,7 @@ test('keyboard axes, holds, edge actions, and browser-default prevention', () =>
     assert.equal(input.getActions().utility, false);
 
     const edges = [
-        ['KeyX', 'weaponCycle'], ['KeyT', 'targetNext'], ['KeyH', 'targetNearestHostile'],
+        ['KeyX', 'weaponCycle'], ['KeyL', 'launcherCycle'], ['KeyT', 'targetNext'], ['KeyH', 'targetNearestHostile'],
         ['KeyC', 'cycleMode'], ['KeyN', 'navNext'], ['KeyJ', 'autopilot'], ['KeyB', 'transponder'],
         ['KeyG', 'jettison'], ['Escape', 'pause'], ['KeyK', 'map'],
     ];
@@ -236,6 +238,10 @@ test('touch holds, touch edges, throttle slider, joystick, and vibration', () =>
     assert.equal(input.getActions().missile, true);
     assert.equal(input.getActions().missile, false);
     controls.missile.emit('pointerup', event({ pointerId: 2 }));
+    controls.launcher.emit('pointerdown', event({ pointerId: 5 }));
+    assert.equal(input.getActions().launcherCycle, true);
+    assert.equal(input.getActions().launcherCycle, false, 'launcher selector is an edge');
+    controls.launcher.emit('pointerup', event({ pointerId: 5 }));
     controls.scan.emit('pointerdown', event({ pointerId: 3 }));
     assert.equal(input.getActions().scan, true);
     assert.equal(input.getActions().scan, false);
@@ -295,7 +301,7 @@ test('gamepad axes, deadzones, held buttons, and edge buttons', () => {
     const input = createInput(new FakeRoot());
     gamepads = [null, makePad({
         axes: [0.12, -0.12, 0.13, -1],
-        pressed: [0, 1, 2, 3, 5, 7, 8, 9, 10, 12, 13, 15],
+        pressed: [0, 1, 2, 3, 5, 7, 8, 9, 10, 12, 13, 14, 15],
     })];
     const first = input.getActions();
     assert.equal(input.usingGamepad, true);
@@ -306,6 +312,7 @@ test('gamepad axes, deadzones, held buttons, and edge buttons', () => {
     assert.equal(first.fire, true);
     assert.equal(first.missile, true);
     assert.equal(first.weaponCycle, true);
+    assert.equal(first.launcherCycle, true);
     assert.equal(first.targetNext, true);
     assert.equal(first.cycleMode, true);
     assert.equal(first.autopilot, true);

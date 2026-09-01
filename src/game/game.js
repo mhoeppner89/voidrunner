@@ -12,7 +12,7 @@ import { NPC_SHIP_SCALE, SpaceRenderer } from './render.js';
 import { saveGame } from './save.js';
 import { getQuest, setFlag, setStep, startQuest } from './quests.js';
 import { getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
-import { ammoCapacity, AMMO_CAPACITY, LAUNCHERS, WEAPON_ORDER, WEAPONS, launcherIdForOutfit, weaponForSlot, weaponIdForOutfit, weaponOwned } from './weapons.js';
+import { ammoCapacity, AMMO_CAPACITY, clearLauncherMagazines, fillLauncherMagazines, launcherMagazineEntries, normalizeLauncherMagazines, syncLauncherMissileTotal, WEAPON_ORDER, WEAPONS, weaponForSlot, weaponIdForOutfit, weaponOwned } from './weapons.js';
 import { HULL_HARDPOINTS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, canonicalOutfitId, collapseOutfittingToSingleShip, commitOutfitting, itemFitsMount, loadoutFor, normalizeOutfitting, outfitItem, projectLegacyEquipment, quoteOutfitting, outfittingUsage } from './outfitting.js';
 import { combinedHullIntegrity, normalizeEnergy, regenerateCombatResources, spendEnergy } from './combatResources.js';
 import { commitShipTrade, quoteShipTrade } from './shipTrade.js';
@@ -1270,6 +1270,10 @@ export class GameSession {
         this.save.player.ownedShips = [activeShipId];
         delete this.save.player.shipStates;
         normalizeOutfitting(this.save.player);
+        // Direct debug/probe sessions can bypass hydrateSave. Convert their
+        // old aggregate count once at the runtime boundary; canonical careers
+        // retain matching per-rack magazines unchanged.
+        normalizeLauncherMagazines(this.save.player, { legacyMissiles: this.save.player.missiles });
         this.save.player.equipment = projectLegacyEquipment(this.save.player, this.save.player.outfitting);
         const initialStats = getEffectiveShipStats(this.save.player);
         if (Number.isFinite(Number(this.save.player.armor)))
@@ -1418,7 +1422,7 @@ export class GameSession {
         player.hull = stats.hull;
         player.energy = stats.energyCapacity;
         player.fuel = stats.fuel;
-        player.missiles = stats.missileCapacity;
+        fillLauncherMagazines(player);
         player.ammo = Object.fromEntries(Object.entries(AMMO_CAPACITY).map(([ammoId, capacity]) => [ammoId, capacity]));
     }
     configureArenaImpulseFit() {
@@ -1447,6 +1451,7 @@ export class GameSession {
         player.ammo ??= {};
         for (const [ammoId, capacity] of Object.entries(AMMO_CAPACITY))
             player.ammo[ammoId] = capacity;
+        fillLauncherMagazines(player);
         this.gunCooldown = 0;
         this.missileCooldown = 0;
         this.pdcHeat = 0;
@@ -1519,7 +1524,7 @@ export class GameSession {
         player.shield = stats.shield;
         player.hull = stats.hull;
         player.energy = stats.energyCapacity;
-        player.missiles = stats.missileCapacity;
+        fillLauncherMagazines(player);
         player.navTargetId = environment === 'asteroid-field' ? 'shardbelt' : environment === 'debris-field' ? 'mourning-line' : 'helix';
         this.resetPlayerInterpolation(true);
         if (!freeFlight) {
@@ -1984,6 +1989,8 @@ export class GameSession {
             this.switchWeapon(actions.weaponSelect);
         if (actions.weaponCycle)
             this.cycleWeapon();
+        if (actions.launcherCycle)
+            this.cycleLauncher();
         if (actions.missile) {
             const target = this.getTargetRef(false);
             const ship = target?.kind === 'ship' ? this.ships.find((entry) => entry.id === target.id) : undefined;
@@ -3359,6 +3366,25 @@ export class GameSession {
         const index = WEAPON_ORDER.indexOf(this.save.player.weaponId);
         this.switchWeapon(WEAPON_ORDER[(index + 1) % WEAPON_ORDER.length]);
     }
+    cycleLauncher() {
+        const player = this.save.player;
+        const entries = normalizeLauncherMagazines(player, { legacyMissiles: player.missiles });
+        if (!entries.length) {
+            this.setOwnMonitorStatus(t('NO MISSILE RACK INSTALLED'));
+            return;
+        }
+        const currentIndex = Math.max(0, entries.findIndex((entry) => entry.selected));
+        const next = entries[(currentIndex + 1) % entries.length];
+        player.activeLauncherMountId = next.mount.id;
+        const message = t('LAUNCHER · {name} · {rounds}/{capacity}', {
+            name: `${t(next.launcher.nameKey)} · ${t('MOUNT {number}', { number: next.index + 1 })}`,
+            rounds: next.rounds,
+            capacity: next.capacity,
+        });
+        this.setOwnMonitorStatus(message, 2200);
+        this.ui.pushEvent(message, next.rounds > 0 ? 'info' : 'warning', 3600);
+        this.audio.play('ui', 0.7);
+    }
     // 2D cone spread with a gaussian-clumped center: the old single-axis tilt
     // fanned pellets vertically only (the roll around the direction axis was
     // a no-op — a vector rotated about itself is itself). The offset now
@@ -3594,9 +3620,8 @@ export class GameSession {
         }
         if (this.missileCooldown > 0)
             return;
-        const loadout = player.outfitting?.loadouts?.[player.shipId];
-        const spec = HULL_HARDPOINTS[player.shipId];
-        if (!loadout || !spec || !spec.launchers.length) {
+        const magazines = normalizeLauncherMagazines(player, { legacyMissiles: player.missiles });
+        if (!magazines.length) {
             this.setMonitorStatus(t('NO MISSILE RACK INSTALLED'));
             return;
         }
@@ -3608,8 +3633,9 @@ export class GameSession {
         const ship = this.ships.find((entry) => entry.id === target.id);
         if (!ship || ship.hull <= 0)
             return;
-        if (player.missiles <= 0) {
-            this.setMonitorStatus(t('MISSILE RACK EMPTY'));
+        const selected = magazines.find((entry) => entry.selected) ?? magazines[0];
+        if (selected.rounds <= 0) {
+            this.setMonitorStatus(t('{name} MAGAZINE EMPTY', { name: t(selected.launcher.nameKey) }));
             return;
         }
         const position = vec(player.position, this.tmpP1);
@@ -3617,64 +3643,53 @@ export class GameSession {
         const baseDirection = this.tmpP2.copy(FORWARD).applyQuaternion(orientation).normalize();
         const right = this.tmpP5.copy(RIGHT).applyQuaternion(orientation).normalize();
         const velocity = player.velocity;
-        let fired = false;
-        let slowestCooldown = 0;
-        for (const [index, mount] of spec.launchers.entries()) {
-            if (player.missiles <= 0)
-                break;
-            const launcherId = launcherIdForOutfit(loadout.launchers?.[index]);
-            const launcher = launcherId ? LAUNCHERS[launcherId] : undefined;
-            if (!launcher)
-                continue;
-            const localAnchor = SHIP_MOUNT_ANCHORS[player.shipId]?.launchers?.[index] ?? [0, -0.6, -1.8];
-            const anchorWorld = this.tmpP0.set(localAnchor[0], localAnchor[1], localAnchor[2]).applyQuaternion(orientation).add(position);
-            const anchorX = anchorWorld.x;
-            const anchorY = anchorWorld.y;
-            const anchorZ = anchorWorld.z;
-            const rng = seededRandom(`${this.save.world.seed}:launcher:${Math.floor(this.save.world.time * 1000)}:${this.projectileCounter}:${mount.id}`);
-            const volley = Math.max(1, launcher.volley ?? 1);
-            for (let micro = 0; micro < volley; micro += 1) {
-                let direction = this.tmpP6.copy(baseDirection);
-                if (launcher.spreadRad) {
-                    const up = this.tmpP3.copy(UP).applyQuaternion(orientation);
-                    direction = this.spreadDirection(direction, right, up, launcher.spreadRad, rng, this.tmpP0);
-                }
-                const slot = this.projStore.alloc();
-                const muzzleX = anchorX + direction.x * 0.45;
-                const muzzleY = anchorY + direction.y * 0.45;
-                const muzzleZ = anchorZ + direction.z * 0.45;
-                this.projStore.setPos(slot, muzzleX, muzzleY, muzzleZ);
-                const missileVelocity = this.tmpP4.copy(direction).multiplyScalar(launcher.speed).add(this.tmpP3.set(velocity[0], velocity[1], velocity[2]));
-                this.projStore.setVel(slot, missileVelocity.x, missileVelocity.y, missileVelocity.z);
-                this.projectiles.push({
-                    id: `p-${++this.projectileCounter}`,
-                    kind: 'missile',
-                    ownerId: 'player',
-                    slot,
-                    damage: launcher.damage,
-                    life: launcher.life,
-                    targetId: ship.id,
-                    faction: 'player',
-                    weaponId: launcher.id,
-                    launcherId: launcher.id,
-                    mountId: mount.id,
-                    homingSpeed: launcher.homingSpeed,
-                    homingTurn: launcher.homingTurn,
-                    volleyIndex: micro,
-                    splashRadius: launcher.splashRadius,
-                    splashMin: launcher.splashMin,
-                });
+        const { index, mount, launcher } = selected;
+        const localAnchor = SHIP_MOUNT_ANCHORS[player.shipId]?.launchers?.[index] ?? [0, -0.6, -1.8];
+        const anchorWorld = this.tmpP0.set(localAnchor[0], localAnchor[1], localAnchor[2]).applyQuaternion(orientation).add(position);
+        const anchorX = anchorWorld.x;
+        const anchorY = anchorWorld.y;
+        const anchorZ = anchorWorld.z;
+        const rng = seededRandom(`${this.save.world.seed}:launcher:${Math.floor(this.save.world.time * 1000)}:${this.projectileCounter}:${mount.id}`);
+        const volley = Math.max(1, launcher.volley ?? 1);
+        for (let micro = 0; micro < volley; micro += 1) {
+            let direction = this.tmpP6.copy(baseDirection);
+            if (launcher.spreadRad) {
+                const up = this.tmpP3.copy(UP).applyQuaternion(orientation);
+                direction = this.spreadDirection(direction, right, up, launcher.spreadRad, rng, this.tmpP0);
             }
-            // One ammunition unit represents one rack firing cycle. A swarm
-            // rack's four micro-warheads are a single expensive round.
-            player.missiles = Math.max(0, player.missiles - 1);
-            fired = true;
-            slowestCooldown = Math.max(slowestCooldown, launcher.cooldown);
-            this.renderer.spawnMuzzleFlash(anchorX, anchorY, anchorZ, launcher.id === 'torpedo' ? 0xffa65e : 0xff7a42);
+            const slot = this.projStore.alloc();
+            const muzzleX = anchorX + direction.x * 0.45;
+            const muzzleY = anchorY + direction.y * 0.45;
+            const muzzleZ = anchorZ + direction.z * 0.45;
+            this.projStore.setPos(slot, muzzleX, muzzleY, muzzleZ);
+            const missileVelocity = this.tmpP4.copy(direction).multiplyScalar(launcher.speed).add(this.tmpP3.set(velocity[0], velocity[1], velocity[2]));
+            this.projStore.setVel(slot, missileVelocity.x, missileVelocity.y, missileVelocity.z);
+            this.projectiles.push({
+                id: `p-${++this.projectileCounter}`,
+                kind: 'missile',
+                ownerId: 'player',
+                slot,
+                damage: launcher.damage,
+                life: launcher.life,
+                targetId: ship.id,
+                faction: 'player',
+                weaponId: launcher.id,
+                launcherId: launcher.id,
+                ordnanceId: launcher.ordnanceId,
+                mountId: mount.id,
+                homingSpeed: launcher.homingSpeed,
+                homingTurn: launcher.homingTurn,
+                volleyIndex: micro,
+                splashRadius: launcher.splashRadius,
+                splashMin: launcher.splashMin,
+            });
         }
-        if (!fired)
-            return;
-        this.missileCooldown = slowestCooldown;
+        // Only the selected physical rack spends a round. Other fitted
+        // magazines stay untouched until the pilot selects them.
+        player.launcherMagazines[mount.id].rounds = Math.max(0, selected.rounds - 1);
+        syncLauncherMissileTotal(player);
+        this.missileCooldown = launcher.cooldown;
+        this.renderer.spawnMuzzleFlash(anchorX, anchorY, anchorZ, launcher.id === 'torpedo' ? 0xffa65e : 0xff7a42);
         this.audio.play('missile');
     }
     updateUtilityTool(dt, active) {
@@ -7517,7 +7532,7 @@ export class GameSession {
         this.save.player.hull = stats.hull * 0.35;
         this.save.player.energy = stats.energyCapacity * 0.35;
         this.save.player.fuel = stats.fuel * 0.35;
-        this.save.player.missiles = 0;
+        clearLauncherMagazines(this.save.player);
         this.save.player.dockedAt = dock;
         this.save.player.systemId = location.systemId;
         this.renderer.setSystem?.(location.systemId);
@@ -9709,7 +9724,7 @@ export class GameSession {
         const stats = this.playerStats();
         this.save.player.credits -= cost;
         this.save.player.fuel = stats.fuel;
-        this.save.player.missiles = stats.missileCapacity;
+        fillLauncherMagazines(this.save.player);
         // Weapon ammo pools top up with the ordnance (pricing in shipStats.refillCost).
         // Only ammo-fed guns installed on this hull get refilled; locker stock
         // is not a reason to charge the pilot at the service desk.
@@ -9779,6 +9794,9 @@ export class GameSession {
             return { ...result, quote };
         }
         this._statsDirty = true;
+        // Matching racks keep their magazine. A newly fitted ordnance type is
+        // deliberately empty until the separate refill service loads it.
+        normalizeLauncherMagazines(this.save.player);
         const afterStats = targetShipId === this.save.player.shipId ? this.playerStats() : undefined;
         if (beforeStats && afterStats) {
             // A refit changes the ceiling, not the live condition. Preserve
@@ -9788,7 +9806,6 @@ export class GameSession {
             this.save.player.shield = clamp(this.save.player.shield, 0, afterStats.shield);
             this.save.player.hull = clamp(this.save.player.hull, 0, afterStats.hull);
             this.save.player.energy = clamp(this.save.player.energy, 0, afterStats.energyCapacity);
-            this.save.player.missiles = clamp(this.save.player.missiles, 0, afterStats.missileCapacity);
             this.syncActiveShipState();
             this.syncWeaponProjection();
         }
@@ -10072,6 +10089,8 @@ export class GameSession {
         const speed = Math.hypot(vv[0], vv[1], vv[2]);
         const nav = LOCATIONS[this.save.player.navTargetId];
         const target = this.getTargetRef();
+        const launcherMagazines = launcherMagazineEntries(this.save.player);
+        const selectedLauncher = launcherMagazines.find((entry) => entry.selected);
         let hudTarget;
         if (target) {
             // Project the exact rendered transform. Moving contacts are drawn
@@ -10245,6 +10264,28 @@ export class GameSession {
             maxEnergy: stats.energyCapacity,
             missiles: this.save.player.missiles,
             maxMissiles: stats.missileCapacity,
+            launcher: selectedLauncher ? {
+                mountId: selectedLauncher.mount.id,
+                index: selectedLauncher.index,
+                count: launcherMagazines.length,
+                id: selectedLauncher.launcherId,
+                name: t(selectedLauncher.launcher.nameKey),
+                ordnanceId: selectedLauncher.ordnanceId,
+                ordnanceName: t(selectedLauncher.launcher.ordnanceNameKey),
+                shortCode: selectedLauncher.launcher.shortCode,
+                displayCode: `${selectedLauncher.launcher.shortCode}${launcherMagazines.length > 1 ? ` ${selectedLauncher.index + 1}` : ''}`,
+                current: selectedLauncher.rounds,
+                capacity: selectedLauncher.capacity,
+            } : undefined,
+            launcherMagazines: launcherMagazines.map((entry) => ({
+                mountId: entry.mount.id,
+                index: entry.index,
+                id: entry.launcherId,
+                ordnanceId: entry.ordnanceId,
+                current: entry.rounds,
+                capacity: entry.capacity,
+                selected: entry.selected,
+            })),
             weaponRoster: WEAPON_ORDER.map((id) => ({
                 id,
                 name: t(WEAPONS[id].nameKey),

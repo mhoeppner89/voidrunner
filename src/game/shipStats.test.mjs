@@ -2,6 +2,12 @@ import { SHIPS } from './data.js';
 import { getEffectiveShipStats, repairCost, refillCost, equipmentUnlocked } from './shipStats.js';
 import { createNewSave, hydrateSave, STARTING_CREDITS } from './save.js';
 import { createOutfittingState } from './outfitting.js';
+import {
+    clearLauncherMagazines,
+    fillLauncherMagazines,
+    launcherMagazineEntries,
+    normalizeLauncherMagazines,
+} from './weapons.js';
 let failures = 0;
 const check = (label, actual, expected) => {
     const ok = typeof expected === 'number' ? Math.abs(actual - expected) < 1e-9 : actual === expected;
@@ -41,7 +47,7 @@ check('wayfarer base energy capacity', base.energyCapacity, 72);
 check('wayfarer base cargo', base.cargo, 32);
 check('wayfarer base fuel', base.fuel, 100);
 check('wayfarer base gun damage', base.gunDamage, 10);
-check('wayfarer base missile capacity', base.missileCapacity, 4);
+check('unfitted player has no missile capacity', base.missileCapacity, 0);
 check('wayfarer base max speed', base.maxSpeed, 50);
 check('wayfarer base afterburn speed', base.afterburnSpeed, 75);
 check('wayfarer base acceleration', base.acceleration, 21);
@@ -71,6 +77,51 @@ const canonicalPulseFit = createOutfittingState(['wayfarer']);
 canonicalPulseFit.loadouts.wayfarer.guns[2] = 'pulse-mk2';
 const canonicalPulsePlayer = playerWith([], { outfitting: canonicalPulseFit });
 check('canonical pulse-mk2 keeps base hull damage', getEffectiveShipStats(canonicalPulsePlayer).gunDamage, 10);
+const canonicalSeekerFit = createOutfittingState(['wayfarer']);
+check('factory seeker rack supplies four missiles', getEffectiveShipStats(playerWith([], { outfitting: canonicalSeekerFit })).missileCapacity, 4);
+const mixedLauncherFit = createOutfittingState(['lancer']);
+mixedLauncherFit.loadouts.lancer.launchers = ['swarm-launcher', 'torpedo-launcher'];
+check('installed launcher capacities add together', getEffectiveShipStats(playerWith([], { shipId: 'lancer', outfitting: mixedLauncherFit })).missileCapacity, 14);
+mixedLauncherFit.loadouts.lancer.launchers = [null, null];
+check('empty launcher bays provide no missile capacity', getEffectiveShipStats(playerWith([], { shipId: 'lancer', outfitting: mixedLauncherFit })).missileCapacity, 0);
+
+// Every installed launcher owns its ammunition. Legacy shared rounds fill
+// mounts in order, matching racks retain their rounds, and replacement racks
+// begin empty rather than converting one ordnance type into another.
+const magazineFit = createOutfittingState(['lancer']);
+magazineFit.loadouts.lancer.launchers = ['swarm-launcher', 'torpedo-launcher'];
+const magazinePilot = playerWith([], {
+    shipId: 'lancer',
+    outfitting: magazineFit,
+    missiles: 7,
+    launcherMagazines: undefined,
+    activeLauncherMountId: null,
+});
+normalizeLauncherMagazines(magazinePilot, { legacyMissiles: 7 });
+let magazines = launcherMagazineEntries(magazinePilot);
+check('legacy rounds enter the first launcher magazine', magazines[0].rounds, 7);
+check('legacy migration does not invent torpedoes', magazines[1].rounds, 0);
+check('first fitted launcher becomes selected', magazines[0].selected, true);
+check('aggregate missile projection follows magazines', magazinePilot.missiles, 7);
+magazinePilot.launcherMagazines[magazines[0].mount.id].rounds = 3;
+magazinePilot.launcherMagazines[magazines[1].mount.id].rounds = 1;
+magazinePilot.activeLauncherMountId = magazines[1].mount.id;
+normalizeLauncherMagazines(magazinePilot);
+magazines = launcherMagazineEntries(magazinePilot);
+check('matching swarm magazine retains rounds', magazines[0].rounds, 3);
+check('matching torpedo magazine retains rounds', magazines[1].rounds, 1);
+check('launcher selection survives normalization', magazines[1].selected, true);
+magazineFit.loadouts.lancer.launchers[1] = 'swarm-launcher';
+normalizeLauncherMagazines(magazinePilot);
+magazines = launcherMagazineEntries(magazinePilot);
+check('replacement launcher starts empty', magazines[1].rounds, 0);
+check('replacement magazine has the installed ordnance type', magazines[1].ordnanceId, 'swarm-canister');
+fillLauncherMagazines(magazinePilot);
+const filledRefillCost = refillCost(magazinePilot);
+check('refill fills both launcher magazines', magazinePilot.missiles, 24);
+clearLauncherMagazines(magazinePilot);
+check('clearing ordnance empties every magazine', magazinePilot.missiles, 0);
+check('typed ordnance refill charges for every missing round', refillCost(magazinePilot) - filledRefillCost, 24 * 240);
 const cargoFit = getEffectiveShipStats(playerWith(['cargo-pods']));
 check('cargo-pods capacity', cargoFit.cargo, 50);
 const radarFit = getEffectiveShipStats(playerWith(['radar-mk2']));
@@ -111,6 +162,10 @@ check('fresh save starting credits', fresh.player.credits, STARTING_CREDITS);
 check('fresh save resolves wayfarer stats', getEffectiveShipStats(fresh.player).cargo, 32);
 check('fresh save resolves wayfarer shield', getEffectiveShipStats(fresh.player).shield, 90);
 check('fresh save starts at full energy', fresh.player.energy, 72);
+const freshMagazines = launcherMagazineEntries(fresh.player);
+check('fresh save has one explicit launcher magazine', freshMagazines.length, 1);
+check('fresh launcher starts full', freshMagazines[0].rounds, 4);
+check('fresh launcher is selected', freshMagazines[0].selected, true);
 
 // Legacy saves carry their flat equipment array through hydration, and the
 // fitted gear applies once stats are resolved.
@@ -140,9 +195,11 @@ check('legacy armor field is removed', Object.hasOwn(migrated.player, 'armor'), 
 check('legacy save receives full capacitor', migrated.player.energy, 72);
 
 // Repair and refill costs scale with what is actually missing.
-const banged = playerWith([], { hull: 70, fuel: 30, missiles: 0 });
-checkTrue('damaged hull costs more to repair', repairCost(banged) > repairCost(playerWith([])));
-checkTrue('empty missiles cost more to refill', refillCost(banged) > refillCost(playerWith([])));
+const serviceFit = createOutfittingState(['wayfarer']);
+const serviced = playerWith([], { outfitting: serviceFit });
+const banged = playerWith([], { outfitting: serviceFit, hull: 70, fuel: 30, missiles: 0 });
+checkTrue('damaged hull costs more to repair', repairCost(banged) > repairCost(serviced));
+checkTrue('empty missiles cost more to refill', refillCost(banged) > refillCost(serviced));
 check('refill cost is whole credits', Number.isInteger(refillCost(banged)), true);
 
 if (failures > 0) {

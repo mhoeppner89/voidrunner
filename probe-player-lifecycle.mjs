@@ -165,15 +165,18 @@ try {
         const fired = await page.evaluate(async ({ itemId: launcherItem, splash: splashTest }) => {
             const runtime = window.__VOID_PRIVATEER__.getRuntime();
             const { createOutfittingState } = await import('/src/game/outfitting.js');
+            const { normalizeLauncherMagazines } = await import('/src/game/weapons.js');
             const player = runtime.save.player;
             player.shipId = 'vanguard';
             player.outfitting = createOutfittingState(['vanguard']);
             player.outfitting.loadouts.vanguard.launchers[0] = launcherItem;
+            player.launcherMagazines = {};
+            player.activeLauncherMountId = null;
+            normalizeLauncherMagazines(player, { legacyMissiles: 12 });
             player.mode = 'combat';
             player.position = [0, 0, 0];
             player.velocity = [0, 0, 0];
             player.rotation = [0, 0, 0, 1];
-            player.missiles = 12;
             runtime.missileCooldown = 0;
             const [target, nearby] = runtime.ships;
             target.position = [0, 0, -48];
@@ -240,6 +243,67 @@ try {
         if (scenario.splash)
             check('torpedo splash damages a nearby second hull', result.impact.nearbyAfter < result.fired.before.nearby, JSON.stringify(result.impact));
     }
+
+    // A mixed Lancer fit must fire only the selected physical rack. Cycling
+    // changes the ordnance; it must not spend or convert the other magazine.
+    await page.evaluate(() => window.__VOID_PRIVATEER__.startArena('open', '1v2', 'rookie'));
+    await page.waitForFunction(() => window.__VOID_PRIVATEER__.getRuntime()?.ships?.length === 2, undefined, { timeout: 15000 });
+    const selectedLaunchers = await page.evaluate(async () => {
+        const runtime = window.__VOID_PRIVATEER__.getRuntime();
+        const { createOutfittingState } = await import('/src/game/outfitting.js');
+        const { launcherMagazineEntries, normalizeLauncherMagazines } = await import('/src/game/weapons.js');
+        const player = runtime.save.player;
+        player.shipId = 'lancer';
+        player.outfitting = createOutfittingState(['lancer']);
+        player.outfitting.loadouts.lancer.launchers = ['swarm-launcher', 'torpedo-launcher'];
+        player.launcherMagazines = {};
+        player.activeLauncherMountId = null;
+        normalizeLauncherMagazines(player, { fill: true });
+        player.mode = 'combat';
+        player.position = [0, 0, 0];
+        player.velocity = [0, 0, 0];
+        player.rotation = [0, 0, 0, 1];
+        const target = runtime.ships[0];
+        target.position = [0, 0, -80];
+        target.velocity = [0, 0, 0];
+        target.hull = 240;
+        player.currentTargetId = target.id;
+        runtime.missileCooldown = 0;
+        const projectileStart = runtime.projectiles.length;
+        runtime.fireMissile();
+        const firstVolley = runtime.projectiles.slice(projectileStart).map((projectile) => ({
+            launcherId: projectile.launcherId,
+            ordnanceId: projectile.ordnanceId,
+            mountId: projectile.mountId,
+        }));
+        const afterFirst = launcherMagazineEntries(player).map((entry) => ({
+            launcherId: entry.launcherId, rounds: entry.rounds, selected: entry.selected,
+        }));
+        runtime.missileCooldown = 0;
+        runtime.cycleLauncher();
+        const secondStart = runtime.projectiles.length;
+        runtime.fireMissile();
+        const secondVolley = runtime.projectiles.slice(secondStart).map((projectile) => ({
+            launcherId: projectile.launcherId,
+            ordnanceId: projectile.ordnanceId,
+            mountId: projectile.mountId,
+        }));
+        const afterSecond = launcherMagazineEntries(player).map((entry) => ({
+            launcherId: entry.launcherId, rounds: entry.rounds, selected: entry.selected,
+        }));
+        return { firstVolley, afterFirst, secondVolley, afterSecond, total: player.missiles };
+    });
+    check('selected swarm rack fires alone', selectedLaunchers.firstVolley.length === 4
+        && selectedLaunchers.firstVolley.every((round) => round.launcherId === 'swarm' && round.ordnanceId === 'swarm-canister')
+        && selectedLaunchers.afterFirst[0].rounds === 11
+        && selectedLaunchers.afterFirst[1].rounds === 2, JSON.stringify(selectedLaunchers));
+    check('launcher cycle selects and spends only the torpedo magazine', selectedLaunchers.secondVolley.length === 1
+        && selectedLaunchers.secondVolley[0].launcherId === 'torpedo'
+        && selectedLaunchers.secondVolley[0].ordnanceId === 'heavy-torpedo'
+        && selectedLaunchers.afterSecond[0].rounds === 11
+        && selectedLaunchers.afterSecond[1].rounds === 1
+        && selectedLaunchers.afterSecond[1].selected
+        && selectedLaunchers.total === 12, JSON.stringify(selectedLaunchers));
 
     check('browser console remains clean', errors.length === 0, errors.join(' | '));
 }

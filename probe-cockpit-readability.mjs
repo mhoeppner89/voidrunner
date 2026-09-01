@@ -75,6 +75,10 @@ const VIEWPORTS = [
     { name: 'tablet-1024x768', width: 1024, height: 768, mobile: true, language: 'en' },
     { name: 'phone-844x390', width: 844, height: 390, mobile: true, language: 'de' },
 ];
+const requestedViewport = process.argv.find((arg) => arg.startsWith('--viewport='))?.slice('--viewport='.length);
+const activeViewports = requestedViewport ? VIEWPORTS.filter((viewport) => viewport.name === requestedViewport) : VIEWPORTS;
+if (!activeViewports.length)
+    throw new Error(`Unknown cockpit viewport: ${requestedViewport}`);
 
 const STATES = ['target', 'race', 'warning'];
 
@@ -86,12 +90,22 @@ const setViewport = (viewport) => send('Emulation.setDeviceMetricsOverride', {
     screenOrientation: { angle: 90, type: 'landscapePrimary' },
 });
 
+const navigate = async (url) => {
+    // A service-worker takeover can occasionally leave Chrome's Page.navigate
+    // response pending even though the requested document is already live.
+    // Continue to the explicit readiness checks after a short grace period.
+    await Promise.race([
+        send('Page.navigate', { url }),
+        pause(5000),
+    ]);
+};
+
 const prepareFlight = async (viewport) => {
     await setViewport(viewport);
-    await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/?cockpit-readability=${Date.now()}` });
+    await navigate(`http://127.0.0.1:${PORT}/?cockpit-readability=${Date.now()}`);
     await waitFor('Boolean(window.__VOID_PRIVATEER__)', 'game hooks');
     await evaluate(`localStorage.setItem('voidrunner-lang', ${JSON.stringify(viewport.language)}); localStorage.setItem('__VOID_PRIVATEER_PROBE_LANG__', ${JSON.stringify(viewport.language)})`);
-    await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/?cockpit-language=${viewport.language}&reload=${Date.now()}` });
+    await navigate(`http://127.0.0.1:${PORT}/?cockpit-language=${viewport.language}&reload=${Date.now()}`);
     await waitFor('Boolean(window.__VOID_PRIVATEER__)', 'reloaded game hooks');
     await waitFor(`document.documentElement.lang === ${JSON.stringify(viewport.language)}`, 'requested language');
     await evaluate('window.__VOID_PRIVATEER__.newGame()');
@@ -125,6 +139,15 @@ const rigState = (state) => evaluate(`(() => {
         ammo: { current: 48, capacity: 120 },
         venting: false,
     };
+    model.launcher = {
+        mountId: 'probe-launcher-0', index: 0, count: 2, id: 'seeker',
+        name: de ? 'Suchraketenmagazin' : 'Seeker Missile Rack',
+        ordnanceId: 'seeker-missile',
+        ordnanceName: de ? 'Suchrakete' : 'Seeker Missile',
+        shortCode: 'SKR', displayCode: 'SKR 1', current: 3, capacity: 4,
+    };
+    model.missiles = 4;
+    model.maxMissiles = 6;
     model.target = {
         kind: 'ship',
         name: de ? 'Kapitänin Maximiliane Schwarzschild' : 'Captain Maximiliane Schwarzschild',
@@ -245,6 +268,7 @@ const scanCockpit = () => evaluate(`(() => {
         return { className: monitor.className, rect: [rect.x, rect.y, rect.width, rect.height], escaped };
     });
     const own = root.querySelector('.cockpit-screen-own');
+    const ownLauncher = root.querySelector('#screen-own-launcher');
     const ownBars = own.querySelector('.screen-bars').getBoundingClientRect();
     const race = own.querySelector('.screen-race-strip');
     const standoff = own.querySelector('.screen-standoff');
@@ -252,6 +276,12 @@ const scanCockpit = () => evaluate(`(() => {
     const stripRect = activeStrip?.getBoundingClientRect();
     const hyperdrive = root.querySelector('#hyperdrive-card');
     const hyperdriveRect = hyperdrive.getBoundingClientRect();
+    const touchMissile = root.querySelector('#touch-missile');
+    const touchMissileRect = touchMissile.getBoundingClientRect();
+    const touchLauncher = root.querySelector('#touch-launcher-cycle');
+    const touchLauncherRect = touchLauncher.getBoundingClientRect();
+    const touchMissileCount = root.querySelector('#touch-missile-count');
+    const touchLauncherCode = root.querySelector('#touch-launcher-code');
     const targetName = root.querySelector('#screen-target-name');
     const transponder = root.querySelector('#screen-radar-transponder');
     const telemetryClipped = [...root.querySelectorAll('.screen-flight span, .screen-flight b, .screen-flight small')]
@@ -286,10 +316,29 @@ const scanCockpit = () => evaluate(`(() => {
             text: transponder.textContent,
         },
         telemetryClipped,
+        ownLauncher: {
+            visible: visible(ownLauncher),
+            text: ownLauncher?.textContent ?? '',
+        },
         stripOverlap: stripRect ? ownBars.bottom - stripRect.top : 0,
         buttons,
         radarFont: Number.parseFloat(root.querySelector('#radar').getContext('2d').font),
         hyperdrive: { width: hyperdriveRect.width, height: hyperdriveRect.height },
+        touchLauncher: {
+            visible: visible(touchLauncher),
+            countVisible: visible(touchMissileCount),
+            count: touchMissileCount?.textContent ?? '',
+            expectedCount: String(window.__VOID_PRIVATEER__.getRuntime()?.ui?.lastHud?.launcher?.current ?? ''),
+            code: touchLauncherCode?.textContent ?? '',
+            expectedCode: window.__VOID_PRIVATEER__.getRuntime()?.ui?.lastHud?.launcher?.displayCode
+                ?? window.__VOID_PRIVATEER__.getRuntime()?.ui?.lastHud?.launcher?.shortCode ?? '',
+            aria: touchLauncher?.getAttribute('aria-label') ?? '',
+            disabled: touchLauncher?.disabled ?? true,
+            width: touchLauncherRect.width,
+            height: touchLauncherRect.height,
+            overlapsMissile: !(touchLauncherRect.right <= touchMissileRect.left || touchMissileRect.right <= touchLauncherRect.left
+                || touchLauncherRect.bottom <= touchMissileRect.top || touchMissileRect.bottom <= touchLauncherRect.top),
+        },
     };
 })()`);
 
@@ -337,7 +386,7 @@ try {
     await send('Page.enable');
     await send('Runtime.enable');
 
-    for (const viewport of VIEWPORTS) {
+    for (const viewport of activeViewports) {
         await prepareFlight(viewport);
         for (const state of STATES) {
             await rigState(state);
@@ -355,11 +404,41 @@ try {
             check(`${prefix}: radar distance text is at least 10px`, result.radarFont >= 9.9, `${result.radarFont}px`);
             check(`${prefix}: race/warning strip clears the status bars`, result.stripOverlap <= 1, `${result.stripOverlap.toFixed(1)}px`);
             check(`${prefix}: cockpit buttons do not clip their text`, result.buttons.every((entry) => !entry.overflow), JSON.stringify(result.buttons));
-            if (viewport.mobile)
+            if (!viewport.mobile)
+                check(`${prefix}: own monitor shows the selected launcher`, result.ownLauncher.visible && result.ownLauncher.text === 'SKR 1 3/4', JSON.stringify(result.ownLauncher));
+            if (viewport.mobile) {
                 check(`${prefix}: cockpit text buttons are 44px touch targets`, result.buttons.every((entry) => entry.height >= 43.5), JSON.stringify(result.buttons));
+                check(`${prefix}: hyperdrive control fits its phone content`, result.hyperdrive.width <= 180, `${result.hyperdrive.width.toFixed(1)}px`);
+                check(`${prefix}: launcher selector carries typed live ordnance`, result.touchLauncher.visible
+                    && result.touchLauncher.countVisible
+                    && result.touchLauncher.count === result.touchLauncher.expectedCount
+                    && result.touchLauncher.code === result.touchLauncher.expectedCode
+                    && result.touchLauncher.aria.includes('/')
+                    && !result.touchLauncher.disabled, JSON.stringify(result.touchLauncher));
+                check(`${prefix}: launcher selector is a separate 48px touch target`, result.touchLauncher.width >= 47.5
+                    && result.touchLauncher.height >= 47.5
+                    && !result.touchLauncher.overlapsMissile, JSON.stringify(result.touchLauncher));
+            }
             await capture(`/private/tmp/voidrunner-cockpit-${viewport.name}-${viewport.language}-${state}.png`);
         }
     }
+
+    // The secondary phone pad is contextual. Hide its launcher selector when
+    // that pad becomes SCAN or CAPTURE, otherwise its count appears to belong
+    // to the wrong action.
+    const contextualLauncherSelector = await evaluate(`(() => {
+        const rt = window.__VOID_PRIVATEER__.getRuntime();
+        const selector = document.querySelector('#touch-launcher-cycle');
+        rt.ui.updateWeaponButtons({ kind: 'asteroid' }, 'mining');
+        const hiddenForScan = selector.classList.contains('is-hidden');
+        rt.ui.updateWeaponButtons({
+            kind: 'ship', surrendered: true, captured: false,
+            captureAvailable: true, captureClaimable: true,
+        }, 'combat');
+        const hiddenForCapture = selector.classList.contains('is-hidden');
+        return { hiddenForScan, hiddenForCapture };
+    })()`);
+    check('phone launcher selector hides when the pad becomes SCAN or CAPTURE', contextualLauncherSelector.hiddenForScan && contextualLauncherSelector.hiddenForCapture, JSON.stringify(contextualLauncherSelector));
 
     check('cockpit run has no browser errors', pageErrors.length === 0, JSON.stringify(pageErrors.slice(0, 8)));
     console.log(`\nCockpit readability: ${checks.length - failures.length}/${checks.length} checks passed.`);

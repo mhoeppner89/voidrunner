@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { cargoMass, quoteCommodityTrade } from './economy.js';
+import { createOutfittingState } from './outfitting.js';
+import { launcherMagazineEntries } from './weapons.js';
 import {
     SAVE_KEY,
     SETTINGS_KEY,
@@ -63,13 +65,36 @@ const currentMuted = hydrateSave({
 assert.equal(currentMuted.settings.music, 0);
 assert.equal(currentMuted.settings.effects, 0);
 const legacySilent = hydrateSave({
-    version: SAVE_VERSION - 1,
+    version: 8,
     player: canonicalPlayer(),
     world: { seed: 118 },
     settings: { music: 0, effects: 0 },
 });
 assert.equal(legacySilent.settings.music, 0.34);
 assert.equal(legacySilent.settings.effects, 0.68);
+
+// Schema 9 stored one hull-wide missile count. Schema 10 preserves those
+// rounds by loading the fitted magazines in mount order without inventing a
+// second ordnance type.
+const legacyLauncherFit = createOutfittingState(['lancer']);
+legacyLauncherFit.loadouts.lancer.launchers = ['swarm-launcher', 'torpedo-launcher'];
+const legacyOrdnance = hydrateSave({
+    version: 9,
+    player: canonicalPlayer({
+        shipId: 'lancer',
+        ownedShips: ['lancer'],
+        outfitting: legacyLauncherFit,
+        missiles: 9,
+        dockedAt: undefined,
+    }),
+    world: { seed: 117 },
+});
+const migratedMagazines = launcherMagazineEntries(legacyOrdnance.player);
+assert.equal(migratedMagazines[0].launcherId, 'swarm');
+assert.equal(migratedMagazines[0].rounds, 9);
+assert.equal(migratedMagazines[1].launcherId, 'torpedo');
+assert.equal(migratedMagazines[1].rounds, 0);
+assert.equal(legacyOrdnance.player.missiles, 9);
 
 // Corrupted manifests are repaired at the save boundary and remain harmless
 // if an unsanitized runtime object reaches the economy helpers directly.
@@ -153,6 +178,8 @@ const roundTrip = createNewSave(125);
 roundTrip.player.dockedAt = undefined;
 roundTrip.player.position = [1234, -56, 7890];
 roundTrip.player.velocity = [4, 5, 6];
+roundTrip.player.launcherMagazines['wayfarer-launcher-0'].rounds = 2;
+roundTrip.player.missiles = 2;
 roundTrip.player.prevPosition = new Float64Array([1, 2, 3]);
 roundTrip.player.prevRotation = new Float64Array([0, 0, 0, 1]);
 roundTrip.settings.quality = 'low';
@@ -167,6 +194,8 @@ assert.equal('prevRotation' in persistedRaw.player, false);
 const loaded = loadGame();
 assert.deepEqual(loaded.player.position, [1234, -56, 7890]);
 assert.deepEqual(loaded.player.velocity, [4, 5, 6]);
+assert.equal(launcherMagazineEntries(loaded.player)[0].rounds, 2);
+assert.equal(loaded.player.activeLauncherMountId, 'wayfarer-launcher-0');
 assert.equal(loaded.player.dockedAt, undefined);
 assert.equal(loaded.settings.quality, 'high');
 assert.equal(loaded.activeMissions[0].id, 'round-trip-mission');

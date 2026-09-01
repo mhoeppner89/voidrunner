@@ -5,12 +5,12 @@ import { refreshMissionOffers } from './missions.js';
 import { normalizeRaceRecord } from './racing.js';
 import { clamp } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
-import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS } from './weapons.js';
+import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, normalizeLauncherMagazines } from './weapons.js';
 import { collapseOutfittingToSingleShip, createOutfittingState, normalizeOutfitting, projectLegacyEquipment, projectLegacyWeaponId } from './outfitting.js';
 import { combinedHullIntegrity, normalizeEnergy } from './combatResources.js';
 export const SAVE_KEY = 'void-privateer-save-v1';
 export const SETTINGS_KEY = 'void-privateer-settings-v1';
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 // Test-funds build: a fresh career starts with enough credits to try any ship,
 // outfitting module or trade route without grinding first.
 export const STARTING_CREDITS = 500000;
@@ -68,6 +68,8 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             hull: 185,
             energy: 72,
             missiles: 4,
+            launcherMagazines: {},
+            activeLauncherMountId: null,
             // Active primary weapon + per-weapon ammo pools. hydrateSave
             // default-fills both for careers written before the weapon roster
             // shipped, so old saves load straight into the pulse laser.
@@ -154,6 +156,7 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
         quests: [],
         settings: defaultSettings(),
     };
+    normalizeLauncherMagazines(save.player, { fill: true });
     refreshMissionOffers(save, true);
     return save;
 };
@@ -387,6 +390,12 @@ export const hydrateSave = (candidate) => {
             // Weapon ammo pools merge per-key like cargo so a save written
             // before a weapon shipped still receives the new pool's default.
             ammo: { ...fallback.player.ammo, ...(candidate.player?.ammo ?? {}) },
+            // Schema 10 gives every fitted rack a typed magazine. Do not let
+            // the fallback Wayfarer magazine mask an older shared missile pool.
+            launcherMagazines: candidate.player?.launcherMagazines ?? undefined,
+            activeLauncherMountId: typeof candidate.player?.activeLauncherMountId === 'string'
+                ? candidate.player.activeLauncherMountId
+                : null,
             // The schema-6 field was always an array. Treat hand-edited or
             // corrupted values as empty instead of letting later compatibility
             // projections call .includes/.push on a string or object.
@@ -549,7 +558,14 @@ export const hydrateSave = (candidate) => {
     save.player.hull = clamp(currentResource(save.player.hull, stats.hull), 1, stats.hull);
     save.player.energy = normalizeEnergy(save.player.energy, stats.energyCapacity);
     delete save.player.armor;
-    save.player.missiles = clamp(currentResource(save.player.missiles, stats.missileCapacity), 0, stats.missileCapacity);
+    // Schema 9 and older had one hull-wide count. Preserve every remaining
+    // round by distributing it across fitted racks in mount order; current
+    // saves instead trust their typed per-rack records.
+    normalizeLauncherMagazines(save.player, {
+        legacyMissiles: sourceVersion < 10
+            ? currentResource(candidate.player?.missiles, stats.missileCapacity)
+            : undefined,
+    });
     // Weapon state hygiene: an unknown weaponId (registry change, corrupted
     // save) falls back to the pulse laser, and every ammo pool clamps to its
     // capacity so imported/hand-edited saves cannot carry negative or

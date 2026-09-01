@@ -385,6 +385,7 @@ export class InputManager {
             fire: button(7),
             missile: this.gamepadEdge(5, button(5)),
             weaponCycle: this.gamepadEdge(2, button(2)),
+            launcherCycle: this.gamepadEdge(14, button(14)),
             afterburner: button(4),
             utility: button(5),
             targetNext: this.gamepadEdge(0, button(0)),
@@ -423,6 +424,7 @@ export class InputManager {
                 + (this.consumePressed('Digit5') ? 5 : 0) + (this.consumePressed('Digit6') ? 6 : 0)
                 + (this.consumeTouch('weapon-1') ? 1 : 0) + (this.consumeTouch('weapon-2') ? 2 : 0),
             weaponCycle: this.consumePressed('KeyX') || this.consumeTouch('weaponCycle') || Boolean(gamepad.weaponCycle),
+            launcherCycle: this.consumePressed('KeyL') || this.consumeTouch('launcherCycle') || Boolean(gamepad.launcherCycle),
             missile: this.consumePressed('KeyM') || this.consumeTouch('missile') || Boolean(gamepad.missile),
             scan: this.consumeTouch('scan'),
             utility: this.keys.has('KeyM') || this.touchHeld.has('utility') || Boolean(gamepad.utility),
