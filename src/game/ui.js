@@ -5,10 +5,9 @@ import { formatCredits, formatDuration, formatNumber } from './random.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
 import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, weaponOwned } from './weapons.js';
 import { TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
-import { shipTopDownProfile } from './voxelModels.js';
+import { shipTopDownProfile } from './shipTopDownProfile.js';
 import { defaultSettings } from './save.js';
 import { getLanguage, t } from './i18n.js';
-import { ShipPreview } from './shipPreview.js';
 import { HULL_TRADE_IN_RATE } from './shipTrade.js';
 import { HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RATE, itemAvailable, itemFitsMount, loadoutFor, outfittingUsage, quoteOutfitting } from './outfitting.js';
 const escapeHtml = (value) => value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
@@ -291,7 +290,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.7.31';
+const GAME_VERSION = '0.7.32';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -455,6 +454,7 @@ export class GameUI {
     // the document dozens of times per frame.
     elementCache = new Map();
     shipPreviews = [];
+    shipPreviewGeneration = 0;
     toastId = 0;
     // Monitor surfaces replace the in-flight toast stack: recentEvents feeds
     // the own-ship flight-recorder ticker + the ship-menu history, sensorLog
@@ -620,9 +620,11 @@ export class GameUI {
           <div class="title-stars"></div>
           <div class="title-cockpit-frame" aria-hidden="true"></div>
           <div class="title-card">
-            <button class="title-fullscreen-button" data-ui-command="toggle-fullscreen" aria-label="${t('Toggle fullscreen')}">⛶</button>
-            <button class="title-lang-button" data-ui-command="toggle-language" aria-label="${t('Switch language')}" title="${getLanguage() === 'de' ? 'English' : 'Deutsch'}">${getLanguage() === 'de' ? '🇬🇧' : '🇩🇪'}</button>
-            <span class="title-version">BUILD ${GAME_VERSION}</span>
+            <div class="title-utilities" role="group">
+              <span class="title-version">BUILD ${GAME_VERSION}</span>
+              <button class="title-lang-button" data-ui-command="toggle-language" aria-label="${t('Switch language')}" title="${getLanguage() === 'de' ? 'English' : 'Deutsch'}">${getLanguage() === 'de' ? '🇬🇧' : '🇩🇪'}</button>
+              <button class="title-fullscreen-button" data-ui-command="toggle-fullscreen" aria-label="${t('Toggle fullscreen')}">⛶</button>
+            </div>
             <h1>VOID<br><b>RUNNER</b></h1>
             <p>${t('Make your name.')}</p>
             <div class="title-actions">
@@ -632,8 +634,8 @@ export class GameUI {
               <button data-ui-command="options">${t('OPTIONS')}</button>
             </div>
             <div class="title-controls">
-              <span>${t('TOUCH: tilt to steer · THRUST · AFTERBURN · FIRE · SECONDARY TOOL')}</span>
-              <span>${t('KEYBOARD: WASD · Q/E · R/F · Space · T · J')}</span>
+              <span class="title-control-touch">${t('TOUCH: tilt to steer · THRUST · AFTERBURN · FIRE · SECONDARY TOOL')}</span>
+              <span class="title-control-keyboard">${t('KEYBOARD: WASD · Q/E · R/F · Space · T · J')}</span>
             </div>
             <div class="title-tilt">
               <button data-ui-command="enable-tilt">${t('ENABLE TILT STEER')}</button>
@@ -655,6 +657,13 @@ export class GameUI {
           <strong>${t('FLIP TO LANDSCAPE')}</strong>
           <span>${t('Voidrunner is built for horizontal play.')}<br>${t('Rotate your device — or widen the window — to continue.')}</span>
           <button type="button" data-ui-command="fullscreen">${t('GO FULLSCREEN')}</button>
+        </div>
+        <div id="loading-screen" class="loading-screen is-hidden" role="status" aria-live="polite" aria-busy="true">
+          <div class="loading-panel">
+            <span>VOIDRUNNER</span>
+            <strong id="loading-screen-label">${t('LOADING CAREER')}</strong>
+            <i aria-hidden="true"></i>
+          </div>
         </div>
       </main>
     `;
@@ -1053,6 +1062,14 @@ export class GameUI {
     }
     hideHud() {
         this.root.querySelector('#hud')?.classList.add('is-hidden');
+    }
+    setLoading(active, message = t('LOADING CAREER')) {
+        const screen = this.root.querySelector('#loading-screen');
+        const label = this.root.querySelector('#loading-screen-label');
+        if (label)
+            label.textContent = message;
+        screen?.classList.toggle('is-hidden', !active);
+        this.root.querySelector('#game-shell')?.setAttribute('aria-busy', String(Boolean(active)));
     }
     showDock(save, locationId) {
         this.cancelVesperLaunchTransition();
@@ -2122,15 +2139,34 @@ export class GameUI {
         const label = rounded > 0 ? `+${rounded}` : rounded < 0 ? `−${Math.abs(rounded)}` : '0';
         return `<b class="stat-delta ${cls}">${label}</b>`;
     }
-    mountShipPreviews() {
-        this.root.querySelectorAll('.ship-silhouette[data-variant]').forEach((container) => {
-            if (container.querySelector('.ship-preview-canvas'))
+    async mountShipPreviews() {
+        const generation = ++this.shipPreviewGeneration;
+        const containers = [...this.root.querySelectorAll('.ship-silhouette[data-variant]')]
+            .filter((container) => !container.querySelector('.ship-preview-canvas'));
+        if (!containers.length)
+            return;
+        // Keep Three.js, the GLB loader, and the flight renderer out of the
+        // title/dock startup path. The showroom renderer is only needed after
+        // the player deliberately opens a shipyard.
+        let ShipPreview;
+        try {
+            ({ ShipPreview } = await import('./shipPreview.js'));
+        }
+        catch (error) {
+            console.warn('Shipyard preview could not be loaded.', error);
+            return;
+        }
+        if (generation !== this.shipPreviewGeneration)
+            return;
+        containers.forEach((container) => {
+            if (!container.isConnected || container.querySelector('.ship-preview-canvas'))
                 return;
             const variant = container.dataset.variant;
             this.shipPreviews.push(new ShipPreview(container, variant));
         });
     }
     disposeShipPreviews() {
+        this.shipPreviewGeneration += 1;
         this.shipPreviews.forEach((preview) => preview.dispose());
         this.shipPreviews.length = 0;
     }

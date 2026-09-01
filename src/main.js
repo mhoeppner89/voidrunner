@@ -1,4 +1,4 @@
-import { GameSession } from './game/game.js';
+import { AudioManager } from './game/audio.js';
 import { createNewSave, defaultSettings, loadGame, loadSettingsPreferences, saveGame, saveSettingsPreferences } from './game/save.js';
 import { DOCK_LOCATION_IDS, LOCATIONS, SHIPS } from './game/data.js';
 import { getLanguage, setLanguage, t } from './game/i18n.js';
@@ -8,7 +8,14 @@ if (!host)
     throw new Error('Missing #app host element.');
 const ui = new GameUI(host);
 let session;
+let sessionStarting;
+let gameSessionModulePromise;
 let cachedSave = loadGame();
+const loadGameSession = () => {
+    gameSessionModulePromise ??= import('./game/game.js');
+    return gameSessionModulePromise;
+};
+const nextPaint = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
 // Title options must work before the first career save exists. Preferences
 // override the factory defaults (and an older career mirror), while language
 // remains anchored to i18n's dedicated boot key so the static shell agrees.
@@ -37,6 +44,54 @@ const devPreviewLocationParam = devPreviewParams.get('dev-dock');
 const devPreviewLocation = DOCK_LOCATION_IDS.includes(devPreviewLocationParam) ? devPreviewLocationParam : undefined;
 const devPreviewShipParam = devPreviewParams.get('dev-ship');
 const devPreviewShip = SHIPS[devPreviewShipParam] ? devPreviewShipParam : undefined;
+const SHIP_WARM_ASSETS = Object.freeze({
+    wayfarer: ['./assets/models/ships/wayfarer.glb', './assets/remaster/cockpit-frame.webp'],
+    vanguard: ['./assets/models/ships/vanguard.glb', './assets/remaster/cockpit-vanguard.webp'],
+    talon: ['./assets/models/ships/talon.glb', './assets/remaster/cockpit-talon.webp'],
+    prospector: ['./assets/models/ships/prospector.glb', './assets/remaster/cockpit-prospector.webp'],
+    lancer: ['./assets/models/ships/lancer.glb', './assets/remaster/cockpit-lancer.webp'],
+    atlas: ['./assets/models/ships/atlas.glb', './assets/remaster/cockpit-atlas.webp'],
+});
+const warmedImages = [];
+const warmBinary = async (url) => {
+    const response = await fetch(url, { cache: 'force-cache', priority: 'low' });
+    if (response.ok)
+        await response.arrayBuffer();
+};
+const warmImage = async (url) => {
+    const image = new Image();
+    image.decoding = 'async';
+    image.src = url;
+    warmedImages.push(image);
+    try {
+        await image.decode();
+    }
+    catch { /* A normal later request remains the fallback. */ }
+};
+const warmLikelyFlightAssets = async () => {
+    const connection = navigator.connection ?? navigator.mozConnection ?? navigator.webkitConnection;
+    if (sessionStarting || session?.renderer || connection?.saveData || /(^|-)2g$/.test(connection?.effectiveType ?? '') || document.visibilityState !== 'visible')
+        return;
+    const shipId = cachedSave?.player?.shipId && SHIP_WARM_ASSETS[cachedSave.player.shipId] ? cachedSave.player.shipId : 'wayfarer';
+    const [model, cockpit] = SHIP_WARM_ASSETS[shipId];
+    await Promise.allSettled([
+        warmBinary(model),
+        warmImage(cockpit),
+        warmImage('./art/sky/milky-way-wide-alpha-v3.webp'),
+    ]);
+};
+const scheduleLikelyFlightWarmup = () => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        // Protect first paint and the first tap from decode/network work. The
+        // warm-up begins only after the title has been stable for a moment.
+        window.setTimeout(() => {
+            if (typeof requestIdleCallback === 'function')
+                requestIdleCallback(() => void warmLikelyFlightAssets(), { timeout: 2600 });
+            else
+                void warmLikelyFlightAssets();
+        }, 900);
+    }));
+};
 // Tilt state shared with the title screen, where no session (and no
 // InputManager) exists yet. The gyro listener keeps live readings so
 // ENABLE TILT STEER and SET NEUTRAL work before a career starts.
@@ -81,13 +136,17 @@ const requestTiltPermission = async () => {
     }
 };
 const beginSession = (mode, arena) => {
-    session?.dispose();
+    if (sessionStarting)
+        return sessionStarting;
+    const previousSession = session;
+    session = undefined;
+    previousSession?.dispose();
     ui.clearToasts();
     const save = mode === 'new' || mode === 'arena' ? createNewSave() : loadGame();
     if (!save) {
         ui.showToast(t('No autosave was found.'), 'warning');
         ui.showTitle(false, titleSave());
-        return;
+        return Promise.resolve(undefined);
     }
     // Controls, display, and audio are player preferences rather than
     // career-specific progress. Apply the latest global record to new,
@@ -130,17 +189,47 @@ const beginSession = (mode, arena) => {
     // flat equipment list.
     cachedSave = save;
     saveGame(save);
-    session = new GameSession(save, ui, () => {
+    // Create and resume the audio context inside the original tap/click task;
+    // the heavier game module arrives asynchronously afterwards. This keeps
+    // sound working on mobile browsers without making the title load the full
+    // flight runtime up front.
+    const audioManager = new AudioManager();
+    void audioManager.enable();
+    ui.setLoading(true, t(mode === 'arena' ? 'PREPARING FLIGHT' : 'LOADING CAREER'));
+    const starting = (async () => {
+        await nextPaint();
+        const { GameSession } = await loadGameSession();
+        const nextSession = new GameSession(save, ui, () => {
+            session = undefined;
+            cachedSave = loadGame();
+            if (cachedSave) {
+                Object.assign(cachedSave.settings, titleSettings);
+                saveGame(cachedSave);
+            }
+            showTitleScreen();
+        }, mode === 'arena' ? arena : null, tiltGranted, audioManager);
+        session = nextSession;
+        if (nextSession.renderer)
+            await nextSession.prepareFlightScene();
+        return nextSession;
+    })().catch((error) => {
+        console.error('Session startup failed.', error);
+        audioManager.dispose();
         session = undefined;
-        cachedSave = loadGame();
-        if (cachedSave) {
-            Object.assign(cachedSave.settings, titleSettings);
-            saveGame(cachedSave);
-        }
         showTitleScreen();
-    }, mode === 'arena' ? arena : null, tiltGranted);
-    void session.enableAudio();
+        ui.showToast(t('Flight systems could not be loaded. Reload and try again.'), 'danger', 5200);
+        return undefined;
+    }).finally(() => {
+        ui.setLoading(false);
+        if (sessionStarting === starting)
+            sessionStarting = undefined;
+    });
+    sessionStarting = starting;
+    return starting;
 };
+const withSession = (callback) => session
+    ? callback(session)
+    : sessionStarting?.then((ready) => ready ? callback(ready) : undefined);
 // Standard plus the webkit-prefixed element (older Safari/Edge), so the
 // switch's enter/exit decision matches what the browser actually reports.
 const fullscreenElement = () => document.fullscreenElement ?? document.webkitFullscreenElement ?? null;
@@ -191,8 +280,10 @@ const actions = {
     requestFullscreen: () => void enterFullscreen(),
     toggleFullscreen: () => void toggleFullscreen(),
     launch: () => {
-        void session?.enableAudio();
-        session?.launch();
+        void withSession(async (ready) => {
+            await ready.enableAudio();
+            return ready.launch();
+        });
     },
     setNav: (locationId) => session?.setNav(locationId),
     openMap: () => session?.openMap(),
@@ -296,6 +387,7 @@ const actions = {
 ui.mugDemand = () => session?.activeMugDemand();
 ui.setActions(actions);
 showTitleScreen();
+scheduleLikelyFlightWarmup();
 window.addEventListener('pagehide', () => {
     if (session)
         saveGame(session.save);
@@ -332,7 +424,7 @@ window.__VOID_PRIVATEER__ = {
     debugShips: () => session?.ships,
     pickTarget: (x, y) => session?.renderer?.pickTarget(x, y),
     projectToScreen: (position) => session?.renderer?.projectToScreen(position),
-    launch: () => session?.launch(),
+    launch: () => withSession((ready) => ready.launch()),
     restartArena: () => session?.arena && session.restartArena(),
     jumpToSystem: (systemId) => session?.debugJumpToSystem(systemId),
     saveNow: () => session?.saveNow(),

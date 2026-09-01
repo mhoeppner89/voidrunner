@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { SHIPS } from './data.js';
-import { GLB_TOP_DOWN_PROFILES } from './shipProfiles.js';
+export { shipTopDownProfile } from './shipTopDownProfile.js';
 const keyOf = (x, y, z) => `${x},${y},${z}`;
 const FACE_DEFS = [
     {
@@ -512,131 +512,6 @@ export const shipVariantForRole = (role) => {
 // The player's purchasable hulls map onto the shared voxel builders so the
 // cockpit schematic can draw the same silhouette the hangar renders in 3D.
 export const playerShipVariant = (shipId) => SHIPS[shipId]?.variant ?? 'kestrel';
-const profileCache = new Map();
-const capitalMonitorProfile = (variant) => {
-    if (variant !== 'concord-carrier' && variant !== 'concord-cruiser')
-        return undefined;
-    const filled = new Set();
-    const cells = [];
-    const rows = 44;
-    for (let z = 0; z < rows; z += 1) {
-        let halfWidth;
-        if (variant === 'concord-carrier') {
-            // Pointed bow, broad parallel flight deck, then a slightly pinched
-            // engine block: the monitor reads "carrier" even at phone size.
-            halfWidth = z < 6 ? 2 + Math.floor(z / 2)
-                : z < 13 ? 5 + Math.floor((z - 6) / 2)
-                    : z < 34 ? 11
-                        : z < 40 ? 10
-                            : 8;
-        }
-        else {
-            // Long narrow prow, command shoulders, and a wide four-drive stern.
-            halfWidth = z < 8 ? 1 + Math.floor(z / 3)
-                : z < 24 ? 4
-                    : z < 36 ? 5
-                        : 7;
-        }
-        for (let x = -halfWidth; x <= halfWidth; x += 1) {
-            filled.add(`${x},${z}`);
-            cells.push([x, z]);
-        }
-    }
-    const edges = [];
-    const has = (x, z) => filled.has(`${x},${z}`);
-    for (const [x, z] of cells) {
-        if (!has(x + 1, z))
-            edges.push([x + 1, z, x + 1, z + 1]);
-        if (!has(x - 1, z))
-            edges.push([x, z, x, z + 1]);
-        if (!has(x, z + 1))
-            edges.push([x, z + 1, x + 1, z + 1]);
-        if (!has(x, z - 1))
-            edges.push([x, z, x + 1, z]);
-    }
-    const maxX = variant === 'concord-carrier' ? 11 : 7;
-    return { minX: -maxX, maxX, minZ: 0, maxZ: rows - 1, edges, cells };
-};
-// A top-down hull schematic for the cockpit monitors: the ship's voxel footprint
-// projected onto its XZ plane, returned as the set of filled columns plus the
-// boundary edge segments between filled and empty columns.
-export const shipTopDownProfile = (variant) => {
-    if (profileCache.has(variant))
-        return profileCache.get(variant);
-    // Prefer the silhouette baked from the GLB hull (the model the game
-    // actually flies); fall back to the voxel footprint for anything without
-    // a GLB.
-    const glb = GLB_TOP_DOWN_PROFILES[variant];
-    if (glb) {
-        const glbProfile = {
-            minX: 0,
-            maxX: glb.cols - 1,
-            minZ: 0,
-            maxZ: glb.rows - 1,
-            edges: glb.edges,
-            cells: glb.cells,
-        };
-        profileCache.set(variant, glbProfile);
-        return glbProfile;
-    }
-    const capitalProfile = capitalMonitorProfile(variant);
-    if (capitalProfile) {
-        profileCache.set(variant, capitalProfile);
-        return capitalProfile;
-    }
-    const builder = SHIP_BUILDERS[variant] ?? SHIP_BUILDERS.kestrel;
-    const { grid } = builder();
-    const filled = new Set();
-    let minX = Infinity;
-    let maxX = -Infinity;
-    let minZ = Infinity;
-    let maxZ = -Infinity;
-    for (const key of grid.cells.keys()) {
-        const parts = key.split(',');
-        const x = Number(parts[0]);
-        const z = Number(parts[2]);
-        const column = `${x},${z}`;
-        if (filled.has(column))
-            continue;
-        filled.add(column);
-        if (x < minX)
-            minX = x;
-        if (x > maxX)
-            maxX = x;
-        if (z < minZ)
-            minZ = z;
-        if (z > maxZ)
-            maxZ = z;
-    }
-    const edges = [];
-    const isFilled = (x, z) => filled.has(`${x},${z}`);
-    for (const column of filled) {
-        const parts = column.split(',');
-        const x = Number(parts[0]);
-        const z = Number(parts[1]);
-        if (!isFilled(x + 1, z))
-            edges.push([x + 1, z, x + 1, z + 1]);
-        if (!isFilled(x - 1, z))
-            edges.push([x, z, x, z + 1]);
-        if (!isFilled(x, z + 1))
-            edges.push([x, z + 1, x + 1, z + 1]);
-        if (!isFilled(x, z - 1))
-            edges.push([x, z, x + 1, z]);
-    }
-    const profile = {
-        minX,
-        maxX,
-        minZ,
-        maxZ,
-        edges,
-        cells: Array.from(filled, (column) => {
-            const parts = column.split(',');
-            return [Number(parts[0]), Number(parts[1])];
-        }),
-    };
-    profileCache.set(variant, profile);
-    return profile;
-};
 export const paletteForFaction = (faction, hostile) => {
     if (hostile) {
         return {

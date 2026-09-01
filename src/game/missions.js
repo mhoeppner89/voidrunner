@@ -1,5 +1,5 @@
 import { COMMODITIES, DOCK_LOCATION_IDS, GUILD_RANK_NAMES, LOCATIONS, MISSION_LOCATION_IDS, commodityIds, routeDistanceBetween } from './data.js';
-import { generateWreckNodes, miningClaimCandidates, miningClaimName } from './worldData.js';
+import { generateWreckNodes, miningClaimCandidates, miningClaimName } from './missionWorldData.js';
 import { cargoFree, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { clamp, formatNumber, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
 import { rollPilot, TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';

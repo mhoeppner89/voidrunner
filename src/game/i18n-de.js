@@ -12,6 +12,9 @@
 // Player address is informal "du" throughout, matching the frontier voice of
 // the English lines. Values are plain text — never HTML.
 export const DE_CATALOG = {
+    'LOADING CAREER': 'KARRIERE WIRD GELADEN',
+    'PREPARING FLIGHT': 'FLUG WIRD VORBEREITET',
+    'Flight systems could not be loaded. Reload and try again.': 'Die Flugsysteme konnten nicht geladen werden. Lade die Seite neu und versuche es noch einmal.',
     // ── Title screen ──────────────────────────────────────────────────────
     'Make your name.': 'Mach dir einen Namen.',
     'RESUME FLIGHT': 'FLUG FORTSETZEN',

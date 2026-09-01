@@ -314,7 +314,7 @@ export class SpaceRenderer {
     fillLight;
     sunLight;
     rimLight;
-    constructor(container, seed, asteroids, graveyard, wreckNodes, quality, systemId = 'helios-verge', regionalFields = new Map()) {
+    constructor(container, seed, asteroids, graveyard, wreckNodes, quality, systemId = 'helios-verge', regionalFields = new Map(), initialShipVariants = []) {
         this.container = container;
         this.asteroids = asteroids;
         this.regionalFields = regionalFields;
@@ -390,9 +390,10 @@ export class SpaceRenderer {
         this.renderer.domElement.addEventListener('webglcontextrestored', this.onContextRestored);
         this.resize();
         this.createBloomPipeline();
-        // Fire the GLB hull fetches up front so the first ship you see is
-        // already the real model, not a voxel placeholder.
-        this.preloadGlbShips();
+        // Warm only the player's current hull. Traffic variants load when an
+        // actual ship enters the scene, avoiding six multi-megabyte requests
+        // on every career start.
+        this.preloadGlbShips(initialShipVariants);
     }
     createLighting() {
         // Lighting now mimics Rebel Galaxy Outlaw's two-tone dusk: a warm sodium-
@@ -3112,10 +3113,12 @@ export class SpaceRenderer {
     // --- GLB hulls ----------------------------------------------------------
     // Start the per-variant fetches; ships spawn with the voxel placeholder
     // until a variant's model resolves (see swapShipMesh).
-    preloadGlbShips() {
-        for (const [variant, config] of Object.entries(GLB_SHIP_CONFIG))
-            if (config.preload !== false)
+    preloadGlbShips(variants = []) {
+        for (const variant of new Set(variants)) {
+            const config = GLB_SHIP_CONFIG[variant];
+            if (config && config.preload !== false)
                 this.ensureGlbShipModel(variant);
+        }
     }
     ensureGlbShipModel(variant) {
         if (this.glbShipModels.has(variant) || this.glbShipLoading.has(variant))
@@ -4505,6 +4508,21 @@ export class SpaceRenderer {
             return false;
         }
         return true;
+    }
+    async prepareActiveScene() {
+        if (this.contextLost)
+            return;
+        try {
+            if (typeof this.renderer.compileAsync === 'function')
+                await this.renderer.compileAsync(this.scene, this.camera);
+            else
+                this.renderer.compile(this.scene, this.camera);
+        }
+        catch (error) {
+            // Shader compilation can be interrupted by a context reset. The
+            // normal first render remains a safe fallback and must still run.
+            console.warn('Flight-scene shader warm-up was interrupted.', error);
+        }
     }
     render() {
         if (this.contextLost)

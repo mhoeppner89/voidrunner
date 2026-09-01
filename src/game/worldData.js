@@ -4,6 +4,11 @@ import { pick, randomBetween, randomInt, seededRandom } from './random.js';
 import { t } from './i18n.js';
 import { RACE_COURSES } from './racing.js';
 import { GRAVEYARD_COLLISION_PROFILES } from './graveyardCollisionProfiles.js';
+import { GRAVEYARD_MODEL_WRECKS, generateWreckNodes, miningClaimCandidates, miningClaimName } from './missionWorldData.js';
+
+// Keep the historical worldData exports stable for game/render callers while
+// missions imports the lightweight generator directly.
+export { GRAVEYARD_MODEL_WRECKS, generateWreckNodes, miningClaimCandidates, miningClaimName };
 
 // Fixed race courses need fixed flyable corridors. The surrounding fields may
 // still vary by seed, but random rocks, fragments, and salvage nodes are never
@@ -207,33 +212,6 @@ export const GRAVEYARD_GEOMETRY_HALF_EXTENTS = {
     // Loose hull fragments use a faceted chunk rather than an aligned cube.
     hull: [0.68, 0.68, 0.68],
 };
-const WRECK_INTERIORS = Object.freeze({
-    // Runtime/glTF axes are X=length, Y=height, Z=-Blender-side. The values
-    // below deliberately match the shipped GLB frame, not Blender's Z-up view.
-    battleship: Object.freeze({ sectionName: 'Battleship wreck midsection', center: Object.freeze([0.072063, 0.065, 0.05]), halfLength: 0.356085, halfWidth: 0.19, halfHeight: 0.14, hotspotCount: 10 }),
-    carrier: Object.freeze({ sectionName: 'Carrier wreck flight deck', center: Object.freeze([0.087386, 0.015, -0.07]), halfLength: 0.382288, halfWidth: 0.205, halfHeight: 0.145, hotspotCount: 10 }),
-    cruiser: Object.freeze({ sectionName: 'Cruiser wreck command hull', center: Object.freeze([0.033398, 0.19, 0.04]), halfLength: 0.421548, halfWidth: 0.13, halfHeight: 0.12, hotspotCount: 6 }),
-});
-// High-detail wreck landmarks rendered from the same hulls that fly in live
-// space. The three capital midsections have naturally torn, end-to-end
-// openings; there are no freestanding liner boxes. Repeated cruiser and
-// frigate files load once and clone across their casualties.
-export const GRAVEYARD_MODEL_WRECKS = Object.freeze([
-    Object.freeze({ id: 'concord-battleship-wreck', class: 'battleship', file: 'assets/models/wrecks/concord-battleship-wreck-v4.glb', local: [350, -700, 1900], rotation: [0.04, -0.12, 0.05], scale: 1130, clearanceRadius: 1460, interior: WRECK_INTERIORS.battleship }),
-    Object.freeze({ id: 'concord-carrier-wreck', class: 'carrier', file: 'assets/models/wrecks/concord-carrier-wreck-v4.glb', local: [-650, 850, -1850], rotation: [0.04, -1.21, 0.05], scale: 902.5508, clearanceRadius: 1250, interior: WRECK_INTERIORS.carrier }),
-    Object.freeze({ id: 'concord-cruiser-alpha-wreck', class: 'cruiser', file: 'assets/models/wrecks/concord-cruiser-wreck-v4.glb', local: [2850, 850, -1500], rotation: [-0.08, -0.42, 0.16], scale: 564.0943, clearanceRadius: 900, interior: WRECK_INTERIORS.cruiser }),
-    Object.freeze({ id: 'concord-cruiser-beta-wreck', class: 'cruiser', file: 'assets/models/wrecks/concord-cruiser-wreck-v4.glb', local: [-3000, -650, 1200], rotation: [0.12, 0.82, -0.18], scale: 564.0943, clearanceRadius: 900, interior: WRECK_INTERIORS.cruiser }),
-    Object.freeze({ id: 'concord-frigate-alpha-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-2200, 1300, -850], rotation: [0.16, -1.91, 0.12], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-beta-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [1900, -1400, 100], rotation: [-0.2, -1.11, -0.14], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-gamma-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-3600, 1100, -2600], rotation: [0.12, -0.45, 0.21], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-delta-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [3500, -1200, -2500], rotation: [-0.16, 0.52, -0.1], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-epsilon-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-4300, -300, -100], rotation: [0.25, -2.35, 0.08], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-zeta-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [4200, 500, 600], rotation: [-0.1, 1.22, -0.2], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-eta-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-2700, 300, 3300], rotation: [0.18, -0.78, 0.14], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-theta-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [2600, -200, 3600], rotation: [-0.22, 0.34, -0.12], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'wayfarer-fighter-wreck', class: 'wayfarer', file: 'assets/models/wrecks/wayfarer-wreck.glb', local: [1100, 900, 3200], rotation: [0.34, -0.88, 0.28], scale: 18, clearanceRadius: 62 }),
-    Object.freeze({ id: 'talon-fighter-wreck', class: 'talon', file: 'assets/models/wrecks/talon-wreck.glb', local: [-1650, -1050, -3250], rotation: [-0.26, 0.64, -0.31], scale: 18, clearanceRadius: 62 }),
-]);
 // Loose procedural wreckage stays outside the authored hull envelopes. Most
 // salvage does too; the explicitly marked capital-belly hotspots are the sole
 // exception. Clearances are placement envelopes, not collision surfaces.
@@ -832,25 +810,6 @@ export const asteroidEnvelopeReach = (node) => {
 // Broad-phase queries use the exact rendered chunk mesh's farthest vertex.
 // Hard collision and weapon hits use the triangles themselves below.
 export const wreckNodeCollisionRadius = (node) => wreckNodeCollisionMesh(node).radius;
-// A mining claim needs a specific, still-rich rock: contracts stake one of the
-// monoliths (a big, landmark body) with enough ore left to be worth a trip.
-// Replaying the field generation keeps the claim's ore exactly in sync with
-// what the player finds on arrival, depletion included.
-export const miningClaimCandidates = (seed, depleted, scanned = []) => {
-    const field = generateAsteroidField(seed, depleted, scanned);
-    const monoliths = field.filter((node) => node.id.startsWith('asteroid-monolith-') && node.remaining >= 4);
-    // If every monolith is worked out, fall back to any solid static body with
-    // a worthwhile seam (skip the tiny drifting fragments and the rock crown,
-    // which is a landmark rather than a stakable claim).
-    if (monoliths.length)
-        return monoliths;
-    return field.filter((node) => node.id.startsWith('asteroid-static-') && node.remaining >= 4);
-};
-export const miningClaimName = (nodeId) => {
-    const parts = nodeId.split('-');
-    const number = Number(parts[parts.length - 1]) + 1;
-    return parts[1] === 'monolith' ? t('Monolith {number}', { number }) : t('Rock {number}', { number });
-};
 export const generateGraveyardPieces = (seed) => {
     const rng = seededRandom(`${seed}:graveyard-pieces`);
     const center = LOCATIONS['mourning-line'].position;
@@ -1234,148 +1193,6 @@ export const generateGraveyardPieces = (seed) => {
         }
     }
     return pieces;
-};
-export const generateWreckNodes = (seed, depleted, scanned = []) => {
-    const rng = seededRandom(`${seed}:wreck-nodes`);
-    const center = LOCATIONS['mourning-line'].position;
-    const salvageTypes = ['scrap', 'electronics', 'machinery', 'arms'];
-    const hotspotSalvageTypes = ['electronics', 'machinery', 'arms', 'electronics', 'machinery'];
-    const names = ['Armor plate', 'Avionics bay', 'Drive spindle', 'Lifeboat rack', 'Reactor shroud', 'Sensor core', 'Gun mount', 'Coolant manifold'];
-    const nodes = [];
-    const salvageSites = GRAVEYARD_MODEL_WRECKS.map((wreck) => {
-        const suffix = wreck.id.replace(/^concord-/, '').replace(/-wreck$/, '').split('-').map((part) => `${part[0].toUpperCase()}${part.slice(1)}`).join(' ');
-        const isAlpha = wreck.id.includes('frigate-alpha');
-        const isBeta = wreck.id.includes('frigate-beta');
-        return {
-            wreck,
-            label: suffix,
-            count: wreck.class === 'battleship' ? 16 : wreck.class === 'carrier' ? 14 : wreck.class === 'cruiser' ? 10 : 5,
-            interiorCount: wreck.interior?.hotspotCount ?? 0,
-            zone: wreck.class === 'carrier'
-                ? 'carrier-hangar'
-                : wreck.class === 'battleship'
-                    ? 'battleship-breach'
-                    : wreck.id.includes('cruiser-alpha')
-                        ? 'cruiser-alpha'
-                        : wreck.id.includes('cruiser-beta')
-                            ? 'cruiser-beta'
-                            : isAlpha
-                                ? 'frigate-alpha'
-                                : isBeta
-                                    ? 'frigate-beta'
-                                    : 'outer-wake',
-            route: wreck.class === 'carrier' ? 'upper-hangar-run' : wreck.class === 'battleship' ? 'lower-breach-crossing' : isAlpha ? 'port-frigate-tunnel' : isBeta ? 'starboard-frigate-tunnel' : undefined,
-        };
-    });
-    let index = 0;
-    const overlapsNode = (node, extra = 4) => nodes.some((placed) => {
-        const reach = wreckNodeCollisionRadius(node) + wreckNodeCollisionRadius(placed) + extra;
-        const dx = node.position[0] - placed.position[0];
-        const dy = node.position[1] - placed.position[1];
-        const dz = node.position[2] - placed.position[2];
-        return dx * dx + dy * dy + dz * dz < reach * reach;
-    });
-    const createNode = (site, hotspot) => {
-        const candidateIndex = index;
-        index += 1;
-        const shape = candidateIndex % 4;
-        const radius = randomBetween(rng, 2.6, 7.2);
-        const salvage = pick(rng, hotspot ? hotspotSalvageTypes : salvageTypes);
-        const id = `salvage-node-${candidateIndex}`;
-        return {
-            id,
-            name: `${t(site.label)} · ${t(pick(rng, names))} ${String.fromCharCode(65 + randomInt(rng, 0, 18))}-${randomInt(rng, 10, 99)}`,
-            position: [0, 0, 0],
-            radius,
-            shape,
-            rotation: [
-                (candidateIndex * 0.73) % Math.PI,
-                (candidateIndex * 1.17) % Math.PI,
-                (candidateIndex * 0.41) % Math.PI,
-            ],
-            salvage,
-            remaining: depletedOrRoll(rng, depleted, id, hotspot ? 1.6 : 0.9, hotspot ? 5.4 : 4.2),
-            scanned: scanned.includes(id),
-            zone: site.zone,
-            route: site.route,
-            hotspot: hotspot ? `${site.wreck.id}:belly` : undefined,
-            insideWreckId: hotspot ? site.wreck.id : undefined,
-        };
-    };
-    const wreckQuaternion = new THREE.Quaternion();
-    const wreckOffset = new THREE.Vector3();
-    const wreckEuler = new THREE.Euler();
-    const fieldLocalFromModel = (wreck, modelLocal) => {
-        wreckEuler.set(...wreck.rotation, 'XYZ');
-        wreckQuaternion.setFromEuler(wreckEuler);
-        wreckOffset.set(...modelLocal).multiplyScalar(wreck.scale).applyQuaternion(wreckQuaternion);
-        return [
-            wreck.local[0] + wreckOffset.x,
-            wreck.local[1] + wreckOffset.y,
-            wreck.local[2] + wreckOffset.z,
-        ];
-    };
-    for (const site of salvageSites) {
-        // The carrier, battleship and both cruisers are the purposeful reward
-        // spaces: valuable salvage sits in side pockets while the middle half
-        // of each torn belly stays open for flight, combat and racing.
-        let interiorAccepted = 0;
-        let interiorAttempts = 0;
-        while (interiorAccepted < site.interiorCount && interiorAttempts < site.interiorCount * 48) {
-            interiorAttempts += 1;
-            const node = createNode(site, true);
-            const bay = site.wreck.interior;
-            const reach = wreckNodeCollisionRadius(node);
-            const modelPadding = reach / site.wreck.scale;
-            const pairIndex = Math.floor(interiorAccepted / 2);
-            const pairCount = Math.ceil(site.interiorCount / 2);
-            const side = interiorAccepted % 2 === 0 ? -1 : 1;
-            const xFraction = -0.72 + (pairIndex / Math.max(1, pairCount - 1)) * 1.44;
-            const modelLocal = [
-                bay.center[0] + bay.halfLength * xFraction + randomBetween(rng, -0.018, 0.018),
-                bay.center[1] - bay.halfHeight * randomBetween(rng, 0.08, 0.28),
-                bay.center[2] + side * (bay.halfWidth * randomBetween(rng, 0.69, 0.8)),
-            ];
-            // Keep the salvage's full collision envelope within the cavity.
-            modelLocal[0] = Math.max(bay.center[0] - bay.halfLength + modelPadding, Math.min(bay.center[0] + bay.halfLength - modelPadding, modelLocal[0]));
-            modelLocal[1] = Math.max(bay.center[1] - bay.halfHeight + modelPadding, Math.min(bay.center[1] + bay.halfHeight - modelPadding, modelLocal[1]));
-            modelLocal[2] = Math.max(bay.center[2] - bay.halfWidth + modelPadding, Math.min(bay.center[2] + bay.halfWidth - modelPadding, modelLocal[2]));
-            const local = fieldLocalFromModel(site.wreck, modelLocal);
-            node.position = add(center, local);
-            if (intersectsRaceCorridor('mourning-line', local, reach)
-                || graveyardWreckInteriorAt(local, reach) !== site.wreck.id
-                || overlapsNode(node, 8))
-                continue;
-            nodes.push(node);
-            interiorAccepted += 1;
-        }
-
-        let accepted = 0;
-        let attempts = 0;
-        const exteriorCount = site.count - interiorAccepted;
-        while (accepted < exteriorCount && attempts < Math.max(1, exteriorCount) * 96) {
-            attempts += 1;
-            const node = createNode(site, false);
-            const nodeReach = wreckNodeCollisionRadius(node);
-            const theta = rng() * Math.PI * 2;
-            const vertical = randomBetween(rng, -0.68, 0.68);
-            const planar = Math.sqrt(1 - vertical * vertical);
-            const radial = site.wreck.clearanceRadius + nodeReach + randomBetween(rng, 70, site.wreck.class === 'frigate' ? 240 : 380);
-            const local = [
-                site.wreck.local[0] + Math.cos(theta) * planar * radial,
-                site.wreck.local[1] + vertical * radial,
-                site.wreck.local[2] + Math.sin(theta) * planar * radial,
-            ];
-            node.position = add(center, local);
-            if (Math.hypot(...local) > 5300 || intersectsRaceCorridor('mourning-line', local, nodeReach) || overlapsGraveyardModelWreck(local, nodeReach))
-                continue;
-            if (overlapsNode(node))
-                continue;
-            nodes.push(node);
-            accepted += 1;
-        }
-    }
-    return nodes;
 };
 export const buildStaticObstacles = (asteroids, graveyard) => {
     const obstacles = [];

@@ -529,16 +529,14 @@ button.compact {
   border-color: rgba(238, 184, 96, 0.6);
 }
 
-/* Title-screen fullscreen: a small icon switch floating in the card's top-
-   right corner, below the build tag and clear of the start-option buttons —
-   ⛶ to enter fullscreen, ⤡ to leave, glowing gold when active. */
+/* Title-screen utility controls stay in the card flow so they cannot cover a
+   start option on short touch screens. */
 .title-fullscreen-button {
-  position: absolute;
-  top: 2.1rem;
-  right: 1.15rem;
+  position: static;
+  flex: 0 0 44px;
   display: flex;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -563,17 +561,15 @@ button.compact {
   border-color: rgba(238, 184, 96, 0.6);
 }
 
-/* Title-screen language switch: a flag button floating beside the fullscreen
-   switch — German by default (🇩🇪), English (🇬🇧) as the secondary language.
-   It shows the CURRENT language's flag; tapping toggles to the other and
-   reloads the game in that language. */
+/* Title-screen language switch: German by default (🇩🇪), English (🇬🇧) as the
+   secondary language. It shows the current language's flag and toggles to the
+   other language. */
 .title-lang-button {
-  position: absolute;
-  top: 2.1rem;
-  right: 3.55rem;
+  position: static;
+  flex: 0 0 44px;
   display: flex;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -985,6 +981,99 @@ button.compact {
   min-width: 150px;
 }
 
+.title-utilities {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  min-width: 0;
+  min-height: 44px;
+  margin-bottom: 0.55rem;
+}
+
+.title-utilities .title-version {
+  position: static;
+  min-width: 0;
+  margin-right: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title-utilities button {
+  flex: 0 0 44px;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+}
+
+.loading-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 180;
+  display: grid;
+  place-items: center;
+  padding: max(1rem, var(--safe-top)) max(1rem, var(--safe-right)) max(1rem, var(--safe-bottom)) max(1rem, var(--safe-left));
+  background: rgba(2, 11, 34, 0.9);
+}
+
+.loading-panel {
+  display: grid;
+  width: min(420px, 82vw);
+  gap: 0.65rem;
+  padding: 1.2rem 1.35rem;
+  color: var(--void-cream);
+  background: linear-gradient(180deg, rgba(8, 41, 93, 0.98), rgba(3, 18, 53, 0.98));
+  border: 1px solid var(--void-cyan);
+  border-left: 5px solid var(--void-gold);
+  box-shadow: var(--void-shadow);
+  font-family: var(--pixel-font);
+  text-align: center;
+}
+
+.loading-panel span {
+  color: var(--void-cyan);
+  font-size: 0.55rem;
+  letter-spacing: 0.2em;
+}
+
+.loading-panel strong {
+  font-size: clamp(0.7rem, 2.5vw, 0.95rem);
+  letter-spacing: 0.08em;
+}
+
+.loading-panel i {
+  position: relative;
+  display: block;
+  height: 5px;
+  overflow: hidden;
+  background: rgba(83, 208, 245, 0.16);
+  border: 1px solid rgba(83, 208, 245, 0.45);
+}
+
+.loading-panel i::after {
+  position: absolute;
+  inset: 0 auto 0 -34%;
+  width: 34%;
+  content: "";
+  background: linear-gradient(90deg, transparent, var(--void-gold), var(--void-cyan), transparent);
+  animation: loading-sweep 1.05s linear infinite;
+}
+
+@keyframes loading-sweep {
+  to { transform: translateX(400%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-panel i::after {
+    inset-inline: 0;
+    width: 100%;
+    animation: none;
+  }
+}
+
 .title-controls {
   display: flex;
   flex-wrap: wrap;
@@ -993,6 +1082,11 @@ button.compact {
   color: #69736f;
   font-family: "Courier New", ui-monospace, monospace;
   font-size: clamp(0.53rem, 0.85vw, 0.66rem);
+}
+
+.title-controls span {
+  min-width: 0;
+  line-height: 1.35;
 }
 
 .title-tilt,
@@ -4567,10 +4661,13 @@ button.primary,
   .global-crt-overlay { opacity: 0.22; }
   .title-screen { align-items: center; padding: max(0.7rem, var(--safe-top)) max(0.7rem, var(--safe-right)) max(0.7rem, var(--safe-bottom)) max(0.7rem, var(--safe-left)); }
   .title-screen::before { background-position: center; }
-  .title-card { width: min(640px, 92vw); max-height: calc(100vh - 1.6rem); margin: 0; padding: 0.95rem; overflow: auto; }
+  .title-card { width: min(640px, 92vw); min-width: 0; max-height: calc(100vh - 1.6rem); margin: 0; padding: 0.95rem; overflow: hidden; }
   .title-card h1 { font-size: clamp(2.4rem, 10vw, 4.7rem); }
   .title-actions { grid-template-columns: 1fr 1fr; }
   .title-actions button { min-height: 46px; }
+  .title-control-keyboard { display: none; }
+  .title-control-touch { display: block; max-width: 100%; }
+  .title-controls { max-width: 100%; }
   .objective-chip { min-height: 58px; border-width: 1px; }
   .person-card { min-height: 224px; }
   .person-card .avatar { height: 154px; }
@@ -4580,10 +4677,10 @@ button.primary,
   .ship-silhouette { height: 118px; }
 }
 
-/* Landscape phones: the viewport is wide but short, so the title card switches
-   from a tall scrollable stack to a two-column layout — title left, actions
-   right — sized by the short axis (vh). Height-based so it also catches modern
-   phones that are >720px wide in landscape (e.g. iPhone 12 at 844px). */
+/* Landscape phones: the viewport is wide but short, so the title card uses a
+   compact two-column layout. Utilities and actions have their own grid areas;
+   nothing is positioned over the start controls. Height-based so this also
+   catches modern phones that are >720px wide in landscape. */
 @media (orientation: landscape) and (max-height: 520px) {
   .title-screen {
     padding: max(0.4rem, var(--safe-top)) max(0.7rem, var(--safe-right)) max(0.4rem, var(--safe-bottom)) max(0.7rem, var(--safe-left));
@@ -4594,11 +4691,11 @@ button.primary,
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
     grid-template-rows: auto auto auto auto auto;
     grid-template-areas:
-      "kicker actions"
+      "utilities actions"
       "title actions"
       "tagline actions"
-      "version tilt"
-      "controls controls";
+      "controls controls"
+      "tilt tilt";
     align-content: start;
     align-items: start;
     column-gap: clamp(1rem, 4vw, 2.2rem);
@@ -4606,12 +4703,15 @@ button.primary,
     width: min(1100px, 96vw);
     max-height: calc(100vh - 1.1rem);
     padding: clamp(0.5rem, 2vh, 1rem) clamp(0.8rem, 3vw, 1.5rem);
-    overflow: auto;
+    overflow: hidden;
   }
 
-  .title-kicker {
-    grid-area: kicker;
-    font-size: clamp(0.5rem, 1.7vh, 0.68rem);
+  .title-utilities {
+    grid-area: utilities;
+    justify-content: flex-start;
+    gap: 0.35rem;
+    width: 100%;
+    margin: 0;
   }
 
   .title-card h1 {
@@ -4620,15 +4720,9 @@ button.primary,
     font-size: clamp(1.9rem, 8.5vh, 3.4rem);
   }
 
-  .title-version {
-    position: static;
-    grid-area: version;
-    justify-self: start;
-    margin-top: 0.1rem;
-  }
-
   .title-card > p {
     grid-area: tagline;
+    min-width: 0;
     margin: 0;
     font-size: clamp(0.55rem, 1.7vh, 0.72rem);
     line-height: 1.4;
@@ -4636,42 +4730,55 @@ button.primary,
 
   .title-actions {
     grid-area: actions;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     align-self: center;
     gap: 0.4rem;
+    width: 100%;
+    min-width: 0;
     margin: 0;
   }
 
   .title-actions button {
-    min-width: 118px;
-    min-height: clamp(34px, 10vh, 44px);
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
     padding: 0.45rem 0.6rem;
     font-size: clamp(0.54rem, 1.9vh, 0.7rem);
   }
 
   .title-tilt {
     grid-area: tilt;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.4rem;
-    margin: 0.15rem 0 0;
+    width: 100%;
+    min-width: 0;
+    margin: 0.1rem 0 0;
   }
 
   .title-tilt button {
-    min-height: 30px;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
     padding: 0.32rem 0.65rem;
     font-size: clamp(0.5rem, 1.6vh, 0.62rem);
   }
 
   .title-controls {
     grid-area: controls;
-    justify-content: center;
-    gap: 0.2rem 1.2rem;
-    margin: 0.45rem 0 0;
+    justify-content: flex-start;
+    gap: 0.2rem 1rem;
+    width: 100%;
+    margin: 0.2rem 0 0;
     font-size: clamp(0.58rem, 1.6vh, 0.66rem);
   }
 
   .title-controls span {
-    white-space: nowrap;
+    white-space: normal;
   }
+
+  .title-control-keyboard { display: none; }
 
   .copyright-note {
     display: none;
@@ -8985,9 +9092,8 @@ button.primary,
 
 /* Build version tag + combat simulator (dogfight arena). */
 .title-version {
-  position: absolute;
-  top: 0.7rem;
-  right: 1.15rem;
+  position: static;
+  display: block;
   color: var(--retro-green, #7db7ab);
   font-family: var(--pixel-font, "Courier New", monospace);
   font-size: 0.62rem;
@@ -9048,6 +9154,73 @@ button.primary,
 
 @media (max-width: 600px) {
   .arena-grid { grid-template-columns: 1fr; }
+}
+
+/* Short landscape phones need a fixed arena frame: the options can scroll
+   between the controls, while CLOSE and LAUNCH stay in their own reachable
+   rows. Keep this width-scoped so the established three-column tablet layout
+   remains untouched at 844×390. */
+@media (max-width: 680px) and (orientation: landscape) and (max-height: 520px) {
+  .arena-card {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    height: min(94vh, calc(100vh - 0.5rem));
+    max-height: none;
+    overflow: hidden;
+  }
+
+  .arena-card > header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    min-height: 44px;
+    padding: 0.45rem 0.6rem;
+  }
+
+  .arena-card > header .eyebrow {
+    font-size: 0.5rem;
+  }
+
+  .arena-card > header h2 {
+    font-size: 1rem;
+  }
+
+  .arena-card > header button,
+  .arena-card > footer button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .arena-grid {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    gap: 0.7rem;
+    padding: 0.7rem 0.75rem;
+  }
+
+  .arena-options {
+    gap: 0.35rem;
+  }
+
+  .arena-options button {
+    min-height: 44px;
+    padding: 0.45rem 0.55rem;
+  }
+
+  .arena-card > footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    min-height: 52px;
+    padding: 0.45rem 0.6rem;
+    gap: 0.5rem;
+  }
+
+  .arena-card > footer span {
+    min-width: 0;
+    font-size: 0.52rem;
+  }
 }
 
 /* Concourse ship overlay. GameUI calculates these anchors from the rendered

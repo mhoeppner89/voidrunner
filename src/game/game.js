@@ -1030,7 +1030,7 @@ export class GameSession {
     save;
     renderer;
     input;
-    audio = new AudioManager();
+    audio;
     asteroids;
     graveyard;
     wreckNodes;
@@ -1161,6 +1161,9 @@ export class GameSession {
     lastFrame = performance.now();
     simAccumulator = 0;
     active = true;
+    initialTrafficSpawned = false;
+    activeRaceRestored = false;
+    launchPreparing = false;
     autopilot = false;
     galaxyJump = null;
     armedJumpPointId = null;
@@ -1248,11 +1251,12 @@ export class GameSession {
     // live game — headless combat probes build sessions via Object.create and
     // never set this, so their pirates always fight straight (see shipAI.js).
     emergentMugs = true;
-    constructor(save, ui, onQuit, arena = null, tiltGranted = false) {
+    constructor(save, ui, onQuit, arena = null, tiltGranted = false, audioManager = undefined) {
         this.arena = arena;
         this.ui = ui;
         this.onQuit = onQuit;
         this.save = save;
+        this.audio = audioManager ?? new AudioManager();
         if (!hasSystem(this.save.player.systemId))
             this.save.player.systemId = LOCATIONS[this.save.player.dockedAt]?.systemId ?? 'helios-verge';
         // GameSession is also constructed directly by lightweight probes and
@@ -1286,11 +1290,6 @@ export class GameSession {
         this.regionalFields = new Map(REGIONAL_ASTEROID_FIELD_IDS.map((id) => [id, generateRegionalAsteroidField(save.world.seed, id)]));
         this.graveyard = generateGraveyardPieces(save.world.seed);
         this.wreckNodes = generateWreckNodes(save.world.seed, save.world.depletedWrecks, save.world.scannedNodes);
-        this.renderer = new SpaceRenderer(ui.viewport, save.world.seed, this.asteroids, this.graveyard, this.wreckNodes, save.settings.quality, save.player.systemId, this.regionalFields);
-        this.renderer.setSystem?.(save.player.systemId);
-        this.renderer.canvas.addEventListener('pointerdown', this.onSpacePointerDown, { passive: true });
-        this.renderer.canvas.addEventListener('pointerup', this.onSpacePointerUp);
-        this.renderer.canvas.addEventListener('pointercancel', this.onSpacePointerCancel);
         this.input = new InputManager(ui.root);
         this.input.configureTilt(save.settings);
         // Tilt steering auto-enables for players who asked for it — returning
@@ -1335,17 +1334,61 @@ export class GameSession {
         this.audio.setStationMode(Boolean(save.player.dockedAt));
         this.ui.setTouchScale(save.settings.touchScale);
         this.nextEncounterAt = save.world.time + 12 + seededRandom(`${save.world.seed}:next-encounter:${Math.floor(save.world.time)}`)() * 14;
+        // A docked career does not need a WebGL context, thousands of meshes,
+        // or ship-model fetches yet. Keep the station usable immediately and
+        // build the flight scene behind a visible loading veil on departure.
+        const needsFlightRuntime = Boolean(arena || !save.player.dockedAt || save.world.pendingJump);
+        if (needsFlightRuntime)
+            this.initializeFlightRuntime();
         if (!arena && save.world.pendingJump)
             this.finishGalaxyJump(save.world.pendingJump, false, false);
         if (arena)
             this.setupArena(arena);
-        else {
-            this.spawnInitialTraffic();
-        }
-        this.updateActiveInstance(true);
+        else if (needsFlightRuntime)
+            this.ensureInitialTraffic();
+        if (this.renderer)
+            this.updateActiveInstance(true);
         this.restoreViewState();
-        this.restoreActiveRace();
+        if (this.renderer && !arena)
+            this.ensureActiveRaceRestored();
         this.frameId = requestAnimationFrame(this.frame);
+    }
+    initializeFlightRuntime() {
+        if (this.renderer)
+            return this.renderer;
+        const initialVariant = playerShipVariant(this.save.player.shipId);
+        this.renderer = new SpaceRenderer(this.ui.viewport, this.save.world.seed, this.asteroids, this.graveyard, this.wreckNodes, this.save.settings.quality, this.save.player.systemId, this.regionalFields, [initialVariant]);
+        this.renderer.setSystem?.(this.save.player.systemId);
+        if (this.qualityScale !== 1)
+            this.renderer.setQualityScale(this.qualityScale);
+        this.renderer.canvas.addEventListener('pointerdown', this.onSpacePointerDown, { passive: true });
+        this.renderer.canvas.addEventListener('pointerup', this.onSpacePointerUp);
+        this.renderer.canvas.addEventListener('pointercancel', this.onSpacePointerCancel);
+        return this.renderer;
+    }
+    ensureInitialTraffic() {
+        if (this.initialTrafficSpawned || this.arena)
+            return;
+        this.initialTrafficSpawned = true;
+        this.spawnInitialTraffic();
+    }
+    ensureActiveRaceRestored() {
+        if (this.activeRaceRestored || this.arena)
+            return;
+        this.activeRaceRestored = true;
+        this.restoreActiveRace();
+    }
+    async prepareFlightScene() {
+        if (!this.renderer)
+            return;
+        // Populate the visible scene before compiling so the warm-up includes
+        // the actual traffic variants and the current local environment.
+        this.renderer.syncShips(this.ships);
+        this.renderer.syncProjectiles(this.projectiles, this.projStore);
+        this.renderer.syncPickups(this.pickups, this.pickupStore);
+        this.renderer.updateCamera(this.save.player.position, this.save.player.prevPosition, this.save.player.rotation, this.save.player.prevRotation, this.save.player.angularVelocity, 0, false, 0, 0);
+        await this.renderer.prepareActiveScene?.();
+        this.renderer.render();
     }
     currentNavLocationIds() {
         return navLocationIdsForSystem(this.save.player.systemId);
@@ -1627,7 +1670,7 @@ export class GameSession {
     }
     restoreViewState() {
         if (this.save.player.dockedAt) {
-            this.renderer.setCockpitVisible(false);
+            this.renderer?.setCockpitVisible(false);
             const messages = completeMissionsAtDock(this.save, this.save.player.dockedAt);
             refreshMissionOffers(this.save);
             recordMarketVisit(this.save.world, this.save.player.dockedAt);
@@ -1664,11 +1707,11 @@ export class GameSession {
         this.active = false;
         cancelAnimationFrame(this.frameId);
         this.persistSave();
-        this.renderer.canvas.removeEventListener('pointerdown', this.onSpacePointerDown);
-        this.renderer.canvas.removeEventListener('pointerup', this.onSpacePointerUp);
-        this.renderer.canvas.removeEventListener('pointercancel', this.onSpacePointerCancel);
+        this.renderer?.canvas.removeEventListener('pointerdown', this.onSpacePointerDown);
+        this.renderer?.canvas.removeEventListener('pointerup', this.onSpacePointerUp);
+        this.renderer?.canvas.removeEventListener('pointercancel', this.onSpacePointerCancel);
         this.input.dispose();
-        this.renderer.dispose();
+        this.renderer?.dispose();
         this.audio.dispose();
     }
     // The rAF entry point. A throw anywhere in the frame body must never kill
@@ -1802,7 +1845,8 @@ export class GameSession {
             }
         }
         this.audio.update(dt, throttle, flying && this.afterburning, damage, nearbyEnemies, musicContext);
-        this.syncRender(dt, now);
+        if (this.renderer)
+            this.syncRender(dt, now);
     };
     // Copy current entity transforms into prev* slots so the renderer can
     // interpolate. Zero-allocation: the slots are preallocated per entity.
@@ -9343,10 +9387,42 @@ export class GameSession {
         this.ui.showDock(this.save, locationId);
         this.persistSave();
     }
-    launch() {
+    async prepareDockedFlightRuntime() {
+        this.ui.setLoading?.(true, t('PREPARING FLIGHT'));
+        try {
+            // Let the loading veil reach the screen before WebGL allocates the
+            // scene. This turns an unavoidable first-flight setup pause into a
+            // clear transition instead of a frozen station button.
+            await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+            if (!this.active)
+                return false;
+            this.initializeFlightRuntime();
+            this.ensureInitialTraffic();
+            this.updateActiveInstance(true);
+            this.ensureActiveRaceRestored();
+            this.renderer.setCockpitVisible(true);
+            await this.prepareFlightScene();
+            return true;
+        }
+        catch (error) {
+            console.error('Flight preparation failed.', error);
+            this.ui.showToast(t('Flight systems could not be loaded. Reload and try again.'), 'danger', 5200);
+            return false;
+        }
+        finally {
+            this.ui.setLoading?.(false);
+        }
+    }
+    async launch() {
         const locationId = this.save.player.dockedAt;
-        if (!locationId)
-            return;
+        if (!locationId || this.launchPreparing)
+            return false;
+        const needsFlightRuntime = !this.renderer;
+        this.launchPreparing = true;
+        if (needsFlightRuntime && !await this.prepareDockedFlightRuntime()) {
+            this.launchPreparing = false;
+            return false;
+        }
         const location = LOCATIONS[locationId];
         const center = vec(location.position);
         const launchDistance = (location.dockRadius ?? location.radius * 1.7) + 8;
@@ -9399,6 +9475,8 @@ export class GameSession {
         this.ui.pushEvent(t('Cleared for departure from {name}.', { name: location.name }), 'success');
         this.updateActiveInstance(true);
         this.persistSave();
+        this.launchPreparing = false;
+        return true;
     }
     setNav(locationId, options = {}) {
         if (!LOCATIONS[locationId] || LOCATIONS[locationId].systemId !== this.save.player.systemId)
@@ -9855,9 +9933,9 @@ export class GameSession {
             this.save.settings.quality = value;
             // Apply the tier (640/720/1280 base) as well as the scale; 'auto'
             // restores the full resolution and lets the governor manage it.
-            this.renderer.setQualityMode(value);
+            this.renderer?.setQualityMode(value);
             this.qualityScale = value === 'low' ? 0.72 : 1;
-            this.renderer.setQualityScale(this.qualityScale);
+            this.renderer?.setQualityScale(this.qualityScale);
         }
         else if (key === 'language' && (value === 'de' || value === 'en')) {
             this.save.settings.language = value;
