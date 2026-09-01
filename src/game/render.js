@@ -20,12 +20,16 @@ const cssHex = (value) => `#${value.toString(16).padStart(6, '0')}`;
 // Cockpit sprite scale: idle is held slightly zoomed-in so the frame still
 // fills the view when it relaxes to COCKPIT_ZOOM_BURN under afterburner.
 const COCKPIT_ZOOM_IDLE = 1.018;
-// Activity-field visibility cutoff: nearby hubs can see their neighboring
-// field on the horizon (Helix/Shardbelt and Cairn/Mourning). Graveyard pieces
-// beyond this range are also zero-scaled. Both fields remain instanced, so the
-// distant silhouettes do not multiply draw calls.
-const DEBRIS_CULL_RANGE = 25000;
-const DEBRIS_CULL_RANGE_SQ = DEBRIS_CULL_RANGE * DEBRIS_CULL_RANGE;
+// Keep the asteroid field's established horizon, but let every kind of wreck
+// remain visible for 40,000 km. The Mourning root stays awake slightly beyond
+// that range so an offset wreck is not hidden by the field-centre cull before
+// its own exact 40,000 km check runs.
+const FIELD_CULL_RANGE = 25000;
+const FIELD_CULL_RANGE_SQ = FIELD_CULL_RANGE * FIELD_CULL_RANGE;
+export const WRECK_RENDER_DISTANCE = 40000;
+const WRECK_RENDER_DISTANCE_SQ = WRECK_RENDER_DISTANCE * WRECK_RENDER_DISTANCE;
+const MOURNING_ROOT_VISIBILITY_RANGE = WRECK_RENDER_DISTANCE + 6000;
+const MOURNING_ROOT_VISIBILITY_RANGE_SQ = MOURNING_ROOT_VISIBILITY_RANGE * MOURNING_ROOT_VISIBILITY_RANGE;
 const HIDDEN_SCALE = [0.0001, 0.0001, 0.0001];
 const SYSTEM_RENDER_STYLE = Object.freeze({
     'helios-verge': { clear: 0x0a1735, fog: 0x2a1e44, density: 0.000115, stars: 0xfff1df, band: 0xffffff, bandOpacity: 0.72, nebula: 0xd8a38c, nebulaOpacity: 0.72 },
@@ -2556,7 +2560,7 @@ export class SpaceRenderer {
             const dx = wreck.position.x - cam.x;
             const dy = wreck.position.y - cam.y;
             const dz = wreck.position.z - cam.z;
-            wreck.visible = rootVisible && dx * dx + dy * dy + dz * dz <= DEBRIS_CULL_RANGE_SQ;
+            wreck.visible = rootVisible && dx * dx + dy * dy + dz * dz <= WRECK_RENDER_DISTANCE_SQ;
         }
     }
     updateGraveyardInstances(movingOnly = false) {
@@ -2567,7 +2571,7 @@ export class SpaceRenderer {
                 const dx = piece.position[0] - cam.x;
                 const dy = piece.position[1] - cam.y;
                 const dz = piece.position[2] - cam.z;
-                const culled = dx * dx + dy * dy + dz * dz > DEBRIS_CULL_RANGE_SQ;
+                const culled = dx * dx + dy * dy + dz * dz > WRECK_RENDER_DISTANCE_SQ;
                 const stateChanged = piece._culled !== culled;
                 // Full pass rewrites only pieces whose cull state flipped;
                 // the moving pass additionally rewrites visible drifting pieces.
@@ -2670,7 +2674,7 @@ export class SpaceRenderer {
                 const dx = node.position[0] - cam.x;
                 const dy = node.position[1] - cam.y;
                 const dz = node.position[2] - cam.z;
-                const culled = dx * dx + dy * dy + dz * dz > DEBRIS_CULL_RANGE_SQ && node.id !== this.selectedWreckId;
+                const culled = dx * dx + dy * dy + dz * dz > WRECK_RENDER_DISTANCE_SQ && node.id !== this.selectedWreckId;
                 const depleted = node.remaining <= 0;
                 const hidden = culled || depleted;
                 const stateChanged = entry.hidden !== hidden;
@@ -3936,7 +3940,10 @@ export class SpaceRenderer {
             const dx = this.camera.position.x - center[0];
             const dy = this.camera.position.y - center[1];
             const dz = this.camera.position.z - center[2];
-            root.visible = dx * dx + dy * dy + dz * dz <= DEBRIS_CULL_RANGE_SQ;
+            const visibilityRangeSq = id === 'mourning-line'
+                ? MOURNING_ROOT_VISIBILITY_RANGE_SQ
+                : FIELD_CULL_RANGE_SQ;
+            root.visible = dx * dx + dy * dy + dz * dz <= visibilityRangeSq;
             if (id === 'mourning-line' && root.visible)
                 void this.ensureGraveyardModels();
         }

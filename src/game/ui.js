@@ -867,7 +867,10 @@ export class GameUI {
         weaponReadout?.addEventListener('pointerup', (event) => {
             event.preventDefault();
             event.stopPropagation();
-            this.actions?.weaponCycle?.();
+            // InputManager owns the data-touch-action edge raised on
+            // pointerdown. Calling the action again here made a phone tap
+            // switch A→B and then immediately B→A in the same gesture. This
+            // listener only keeps the parent ship-menu tap from firing.
         });
         weaponReadout?.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter' && event.key !== ' ')

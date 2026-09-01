@@ -64,6 +64,14 @@ const ARENA_FIELD_START_OFFSETS = [
     [120, -120, -120],
     [-120, -120, 120],
 ];
+// Mourning arrivals should reveal the battlefield immediately. Stage the ship
+// on the approach-facing side of the battleship and walk outward only until a
+// 320 km collision-safe point is found. The conservative authored clearance
+// sphere bounds the search without forcing the old multi-thousand-kilometre
+// perimeter dropout.
+const MOURNING_ARRIVAL_WRECK_ID = 'concord-battleship-wreck';
+const MOURNING_ARRIVAL_STEP = 80;
+const MOURNING_ARRIVAL_STEPS = 24;
 // The widest rendered field obstacle (a scaled monolith ≈ 130u × 1.6) exceeds
 // the old 140u collision margin, so grid queries must pad by this much to catch
 // the surface of the biggest rocks before the ship is inside them.
@@ -1370,6 +1378,26 @@ export class GameSession {
         player.missiles = stats.missileCapacity;
         player.ammo = Object.fromEntries(Object.entries(AMMO_CAPACITY).map(([ammoId, capacity]) => [ammoId, capacity]));
     }
+    configureArenaImpulseFit() {
+        const player = this.save.player;
+        const spec = HULL_HARDPOINTS[player.shipId];
+        const loadout = player.outfitting?.loadouts?.[player.shipId];
+        if (!spec || !loadout)
+            return 0;
+        // The simulator is a disposable weapons-free sandbox. Give its
+        // standard Wayfarer three matched impulse cannons on one trigger;
+        // career fittings and the career locker are never touched.
+        loadout.guns = spec.guns.map((_, index) => index < 3 ? 'pulse-cannon' : null);
+        loadout.fireGroups = { activeGroup: 'A', assignments: {} };
+        for (const [index, mount] of spec.guns.entries()) {
+            if (loadout.guns[index])
+                loadout.fireGroups.assignments[mount.id] = 'A';
+        }
+        player.equipment = projectLegacyEquipment(player, player.outfitting);
+        this.ensureRuntimeFireGroups();
+        this.syncWeaponProjection();
+        return loadout.guns.filter((itemId) => itemId === 'pulse-cannon').length;
+    }
     resetArenaWeaponState() {
         const player = this.save.player;
         player.energy = this.playerStats().energyCapacity;
@@ -1395,6 +1423,7 @@ export class GameSession {
         // clear session-only heat/cooldowns before spawning the player or
         // hostiles. Career snapshots are untouched because arena saves are
         // disposable.
+        this.configureArenaImpulseFit();
         this.resetArenaWeaponState();
         const environment = config.environment ?? 'open';
         const scenario = config.scenario ?? '1v1';
@@ -1408,9 +1437,9 @@ export class GameSession {
         const instanceId = environment === 'asteroid-field' ? 'shardbelt' : environment === 'debris-field' ? 'mourning-line' : undefined;
         const center = centers[environment]?.clone() ?? centers.open.clone();
         // Field combat sims begin in a protected pocket inside the cloud so
-        // the player sees the relict scene immediately. Hyperdrive arrivals
-        // still use the outer edge path below; this exception is only for the
-        // deliberate arena staging start.
+        // the player sees the relict scene immediately. Mourning hyperdrive
+        // arrivals use their own approach-facing battleship pocket; the
+        // asteroid field retains its edge entry below.
         let stagedForward;
         if (instanceId) {
             if (debrisCollisionTest)
@@ -8584,6 +8613,9 @@ export class GameSession {
         const location = LOCATIONS[instanceId];
         if (!location)
             return false;
+        if (instanceId === 'mourning-line') {
+            return this.setMourningEntryPosition(position, preferredDirection);
+        }
         const direction = this.tmpEntryPreferredDirection.copy(preferredDirection ?? FORWARD);
         if (direction.lengthSq() < 1e-8)
             direction.copy(FORWARD);
@@ -8612,6 +8644,36 @@ export class GameSession {
         // case a field generator ever produces geometry outside its bounds.
         this.ensurePlayerEntryClearance(position, instanceId, direction);
         return true;
+    }
+    setMourningEntryPosition(position, preferredDirection = FORWARD) {
+        const location = LOCATIONS['mourning-line'];
+        const landmark = GRAVEYARD_MODEL_WRECKS.find((wreck) => wreck.id === MOURNING_ARRIVAL_WRECK_ID);
+        if (!location || !landmark)
+            return this.setFieldArenaPosition(position, 'mourning-line');
+        const outward = this.tmpEntryPreferredDirection.copy(preferredDirection ?? FORWARD);
+        if (outward.lengthSq() < 1e-8)
+            outward.copy(FORWARD);
+        outward.normalize();
+        const obstacles = this.activeFieldObstacles('mourning-line');
+        this.tmpEntryAnchor.set(
+            location.position[0] + landmark.local[0],
+            location.position[1] + landmark.local[1],
+            location.position[2] + landmark.local[2],
+        );
+        // Start just inside the conservative model envelope. Exact oriented
+        // section boxes remain the authority, so short-side approaches can sit
+        // closer while long-side approaches move outward only as far as needed.
+        const firstDistance = landmark.clearanceRadius * 0.85;
+        for (let step = 0; step <= MOURNING_ARRIVAL_STEPS; step += 1) {
+            this.tmpEntryCandidate.copy(this.tmpEntryAnchor).addScaledVector(outward, firstDistance + step * MOURNING_ARRIVAL_STEP);
+            if (this.entryPositionClear(this.tmpEntryCandidate, obstacles, ARENA_FIELD_SAFE_CLEARANCE)) {
+                position.copy(this.tmpEntryCandidate);
+                return true;
+            }
+        }
+        // A future debris layout may block the complete approach ray. Keep the
+        // central protected pocket as a deterministic last resort.
+        return this.setFieldArenaPosition(position, 'mourning-line');
     }
     setFieldArenaPosition(position, instanceId) {
         const location = LOCATIONS[instanceId];

@@ -790,12 +790,10 @@ export const displaySpeed = (unitsPerSecond) => unitsPerSecond * 2;
 // NPC spawns stay well outside the cloud (their ships drift while the player
 // engages); the player's own hyperdrive arrival uses FIELD_ARRIVAL_MARGIN.
 const FIELD_ENTRY_MARGIN = 250;
-// The player drops right at the cloud's rock shell instead of 250 units
-// outside it. The base sits just inside the nominal radius on purpose:
-// setFieldEntryPosition extends the entry out past the outermost live
-// obstacle (obstacle edge + ship clearance) so the drop is always clear of
-// rock, but the ship regains control with the field filling the view (user
-// request: get way closer, just not on an asteroid).
+// The player drops right at an ordinary field's rock shell instead of 250
+// units outside it. Mourning Line uses this as its predictive drop trigger,
+// then resolves the final position into an approach-facing, collision-safe
+// capital-wreck pocket; see GameSession.setFieldEntryPosition.
 const FIELD_ARRIVAL_MARGIN = -60;
 // A system jump is a close-range interaction with the physical gate. Local
 // hyperdrive can carry the player to this boundary, but the actual inter-system
