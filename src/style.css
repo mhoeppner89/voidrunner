@@ -2148,6 +2148,11 @@ button.compact {
   padding: 0.35rem;
 }
 
+.pause-grid output {
+  color: #d7d0bd;
+  text-align: right;
+}
+
 .controls-reference {
   grid-column: 1 / -1;
 }

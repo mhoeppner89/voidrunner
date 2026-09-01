@@ -42,12 +42,20 @@ export const proceduralCallsign = (rng) => `${proceduralPersonName(rng)} “${pi
 // Locale-aware grouping: the German UI reads "3.200 cr", English "3,200 cr".
 // Non-finite values (corrupted save, upstream NaN) render as 0 instead of
 // "NaN cr"; negatives clamp to 0 so a bookkeeping bug can't show phantom debt.
+// Keep the two formatters alive: Number#toLocaleString repeatedly resolves the
+// locale and was the hottest JavaScript function in a live debris-field CPU
+// profile because changing target distances redraw several times per second.
+const integerFormatters = Object.freeze({
+    de: new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 }),
+    en: new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }),
+});
+const integerFormatter = () => integerFormatters[getLanguage() === 'de' ? 'de' : 'en'];
 export const formatNumber = (value) => {
     if (!Number.isFinite(value))
         return '0';
-    return Math.round(value).toLocaleString(getLanguage() === 'de' ? 'de-DE' : 'en-US');
+    return integerFormatter().format(Math.round(value));
 };
-export const formatCredits = (value) => `${Number.isFinite(value) ? Math.max(0, Math.floor(value)).toLocaleString(getLanguage() === 'de' ? 'de-DE' : 'en-US') : '0'} cr`;
+export const formatCredits = (value) => `${Number.isFinite(value) ? integerFormatter().format(Math.max(0, Math.floor(value))) : '0'} cr`;
 export const formatDuration = (seconds) => {
     const clamped = Math.max(0, Math.ceil(seconds));
     const minutes = Math.floor(clamped / 60);

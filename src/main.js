@@ -280,8 +280,11 @@ const actions = {
     requestFullscreen: () => void enterFullscreen(),
     toggleFullscreen: () => void toggleFullscreen(),
     launch: () => {
-        void withSession(async (ready) => {
-            await ready.enableAudio();
+        void withSession((ready) => {
+            // Audio resume is best-effort and can remain pending in browsers
+            // that decline or defer the gesture. It must never hold up the
+            // staged WebGL preparation or keep the player trapped at the dock.
+            void ready.enableAudio();
             return ready.launch();
         });
     },

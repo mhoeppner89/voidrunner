@@ -50,7 +50,7 @@ const firstRunSettings = {
 assert.equal(saveSettingsPreferences(firstRunSettings), true);
 assert.equal(hasSavedGame(), false);
 assert.equal(storage.has(SETTINGS_KEY), true);
-assert.deepEqual(loadSettingsPreferences(), firstRunSettings);
+assert.deepEqual(loadSettingsPreferences(), { ...firstRunSettings, quality: 'high' });
 
 // A current save preserves an intentional full mute; only legacy silent
 // defaults receive the one-time sound-on migration.
@@ -168,7 +168,7 @@ const loaded = loadGame();
 assert.deepEqual(loaded.player.position, [1234, -56, 7890]);
 assert.deepEqual(loaded.player.velocity, [4, 5, 6]);
 assert.equal(loaded.player.dockedAt, undefined);
-assert.equal(loaded.settings.quality, 'low');
+assert.equal(loaded.settings.quality, 'high');
 assert.equal(loaded.activeMissions[0].id, 'round-trip-mission');
 assert.equal(loaded.world.raceRecords['shard-gauntlet'].bestTime, 73.5);
 assert.equal(loaded.world.pendingJump?.routeId, 'verge-meridian');

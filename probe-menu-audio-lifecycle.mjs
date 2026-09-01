@@ -122,6 +122,30 @@ const setValue = async (selector, value) => evalSafe(`(() => {
     return true;
 })()`, false);
 
+// Language changes reload the document. Waiting merely for the title/hook can
+// succeed against the outgoing page before navigation starts, so stamp that
+// document and require a fresh one before the probe continues.
+const setLanguageAndWaitForReload = async (language) => {
+    const marker = `language-reload-${Date.now()}-${Math.random()}`;
+    await evaluate(`window.__VOIDRUNNER_PROBE_DOCUMENT__ = ${JSON.stringify(marker)}; true`);
+    if (!await setValue('#pause-panel [data-setting="language"]', language))
+        return false;
+    return Boolean(await waitFor(`window.__VOIDRUNNER_PROBE_DOCUMENT__ !== ${JSON.stringify(marker)}
+        && document.documentElement.lang === ${JSON.stringify(language)}
+        && Boolean(window.__VOID_PRIVATEER__)
+        && Boolean(document.querySelector('#title-screen'))`, Boolean, 20000));
+};
+
+// Headless Chrome can leave requestAnimationFrame suspended after repeated
+// reloads even though the single page target reports itself visible. Session
+// and first-flight staging intentionally yield to one paint; asking CDP for a
+// frame mirrors the real browser's visible paint and keeps this lifecycle probe
+// from mistaking a headless scheduling quirk for a game failure.
+const wakeHeadlessPaint = async () => {
+    await send('Page.bringToFront');
+    await send('Page.captureScreenshot', { format: 'jpeg', quality: 1, fromSurface: true });
+};
+
 const press = async (code, key = code, release = true) => evaluate(`(() => {
     const init = { code: ${JSON.stringify(code)}, key: ${JSON.stringify(key)}, bubbles: true, cancelable: true };
     window.dispatchEvent(new KeyboardEvent('keydown', init));
@@ -272,14 +296,14 @@ const main = async () => {
     await capture('01-title-desktop.png');
 
     check('title options opens', await click('[data-ui-command="options"]') && await waitFor('Boolean(document.querySelector("#pause-panel") && !document.querySelector("#pause-panel").classList.contains("is-hidden"))'));
-    check('title options renders audio, quality, and language controls', await evalSafe('document.querySelectorAll("#pause-panel [data-setting]").length >= 8', false), String(await evalSafe('document.querySelectorAll("#pause-panel [data-setting]").length', 0)));
+    check('title options renders audio, controls, language, and the high-fidelity status', await evalSafe(`document.querySelectorAll('#pause-panel [data-setting]').length >= 8
+        && !document.querySelector('#pause-panel [data-setting="quality"]')
+        && Boolean(document.querySelector('#pause-panel output'))`, false), String(await evalSafe('document.querySelectorAll("#pause-panel [data-setting]").length', 0)));
     // This is intentionally asserted on a truly empty profile. The comments in
     // main.js promise that these title choices survive into the first career.
     await setValue('#pause-panel [data-setting="music"]', 0.15);
     await setValue('#pause-panel [data-setting="effects"]', 0.25);
-    await setValue('#pause-panel [data-setting="quality"]', 'low');
-    await setValue('#pause-panel [data-setting="language"]', 'en');
-    await waitFor('Boolean(window.__VOID_PRIVATEER__ && document.querySelector("#title-screen"))', Boolean, 15000);
+    await setLanguageAndWaitForReload('en');
     await wait(500);
     const titleAfterLanguageReload = await snapshot();
     check('first-run language choice survives title reload', titleAfterLanguageReload.language === 'en', JSON.stringify(titleAfterLanguageReload));
@@ -290,16 +314,16 @@ const main = async () => {
     await waitFor('Boolean(document.querySelector("#pause-panel") && !document.querySelector("#pause-panel").classList.contains("is-hidden"))');
     await setValue('#pause-panel [data-setting="music"]', 0.15);
     await setValue('#pause-panel [data-setting="effects"]', 0.25);
-    await setValue('#pause-panel [data-setting="quality"]', 'low');
     await capture('02-title-options-en.png');
     const titleChoice = await evalSafe(`(() => ({
         music: Number(document.querySelector('#pause-panel [data-setting="music"]')?.value),
         effects: Number(document.querySelector('#pause-panel [data-setting="effects"]')?.value),
-        quality: document.querySelector('#pause-panel [data-setting="quality"]')?.value,
+        fidelity: document.querySelector('#pause-panel output')?.textContent?.trim(),
+        hasQualitySelector: Boolean(document.querySelector('#pause-panel [data-setting="quality"]')),
         language: document.documentElement.lang,
         save: Boolean(window.__VOID_PRIVATEER__.getState()),
     }))()`, {});
-    check('first-run options visibly hold the selected values before NEW CAREER', titleChoice.music === 0.15 && titleChoice.effects === 0.25 && titleChoice.quality === 'low' && titleChoice.language === 'en', JSON.stringify(titleChoice));
+    check('first-run options visibly hold the selected values before NEW CAREER', titleChoice.music === 0.15 && titleChoice.effects === 0.25 && titleChoice.fidelity === 'High fidelity' && !titleChoice.hasQualitySelector && titleChoice.language === 'en', JSON.stringify(titleChoice));
 
     const fullscreenBefore = pageErrors.length;
     await click('[data-ui-command="close-options"]');
@@ -315,27 +339,26 @@ const main = async () => {
     // Start through the title button, not the debug hook, so the confirm/new
     // flow and title-to-dock surface transition are covered.
     check('NEW CAREER button is actionable', await click('[data-ui-command="new"]'));
+    await wakeHeadlessPaint();
     await waitFor('window.__VOID_PRIVATEER__.getState()?.player?.dockedAt === "helix"', Boolean, 25000);
     await wait(700);
     const freshCareer = await snapshot();
     check('new career reaches the Helix dock', freshCareer.hasRuntime && freshCareer.dockedAt === 'helix' && freshCareer.dockVisible && !freshCareer.titleVisible, JSON.stringify(freshCareer));
     check('new career has no duplicate top-level surfaces', (await visibleSurfaces()).filter((id) => ['title-screen', 'dock-screen', 'hud'].includes(id)).length === 1, JSON.stringify(await visibleSurfaces()));
-    check('first-run audio/display choices survive NEW CAREER', freshCareer.settings?.music === 0.15 && freshCareer.settings?.effects === 0.25 && freshCareer.settings?.quality === 'low' && freshCareer.settings?.language === 'en', JSON.stringify(freshCareer.settings));
+    check('first-run audio/display choices survive NEW CAREER', freshCareer.settings?.music === 0.15 && freshCareer.settings?.effects === 0.25 && freshCareer.settings?.quality === 'high' && freshCareer.settings?.language === 'en', JSON.stringify(freshCareer.settings));
 
     // ---- dock options and persistence through EN/DE reloads ----
     check('dock options opens', await click('#dock-screen .dock-options-button') && await waitFor('Boolean(document.querySelector("#pause-panel") && !document.querySelector("#pause-panel").classList.contains("is-hidden"))'));
-    await setValue('#pause-panel [data-setting="quality"]', 'low');
     await setValue('#pause-panel [data-setting="music"]', 0);
     await setValue('#pause-panel [data-setting="effects"]', 0);
     const muted = await snapshot();
     check('music and effects sliders mute the live audio buses', muted.settings?.music === 0 && muted.settings?.effects === 0 && muted.audio?.music === 0 && muted.audio?.effects === 0, JSON.stringify(muted));
-    await setValue('#pause-panel [data-setting="quality"]', 'high');
     await setValue('#pause-panel [data-setting="music"]', 0.30);
     await setValue('#pause-panel [data-setting="effects"]', 0.40);
     const tuned = await snapshot();
-    check('quality/music/effects changes apply to the live session', tuned.settings?.quality === 'high' && tuned.settings?.music === 0.3 && tuned.settings?.effects === 0.4 && tuned.audio?.music === 0.3 && tuned.audio?.effects === 0.4 && tuned.hasRuntime, JSON.stringify(tuned));
-    const rendererQuality = await evalSafe('window.__VOID_PRIVATEER__.getRuntime()?.renderer?.qualityMode', null);
-    check('quality selector updates renderer quality mode', rendererQuality === 'high', String(rendererQuality));
+    check('high-fidelity/music/effects choices apply to the live session', tuned.settings?.quality === 'high' && tuned.settings?.music === 0.3 && tuned.settings?.effects === 0.4 && tuned.audio?.music === 0.3 && tuned.audio?.effects === 0.4 && tuned.hasRuntime, JSON.stringify(tuned));
+    const dockRenderer = await evalSafe('window.__VOID_PRIVATEER__.getRuntime()?.renderer ?? null', null);
+    check('docked career keeps the flight renderer staged out', dockRenderer === null, String(dockRenderer));
     const persistedSettings = await evalSafe(`(() => {
         const raw = localStorage.getItem('void-privateer-save-v1');
         const player = raw ? JSON.parse(raw)?.settings : null;
@@ -346,34 +369,42 @@ const main = async () => {
 
     // Session language changes intentionally reload the static shell. Verify
     // both directions and then resume the saved dock state.
-    await setValue('#pause-panel [data-setting="language"]', 'de');
-    await waitFor('Boolean(window.__VOID_PRIVATEER__ && document.querySelector("#title-screen"))', Boolean, 20000);
+    await setLanguageAndWaitForReload('de');
     await wait(450);
     const germanTitle = await snapshot();
     check('EN to DE switch reloads the saved title in German', germanTitle.language === 'de' && germanTitle.settings?.language === 'de' && germanTitle.titleVisible, JSON.stringify(germanTitle));
     check('German title keeps resume enabled', !(await evalSafe('Boolean(document.querySelector("[data-ui-command=resume]")?.disabled)', true)));
     await click('[data-ui-command="resume"]');
-    await waitFor('window.__VOID_PRIVATEER__.getState()?.player?.dockedAt === "helix"', Boolean, 20000);
+    await wakeHeadlessPaint();
+    await waitFor('window.__VOID_PRIVATEER__.getRuntime()?.save?.player?.dockedAt === "helix" && Boolean(document.querySelector("#dock-screen") && !document.querySelector("#dock-screen").classList.contains("is-hidden"))', Boolean, 60000);
     check('resume restores the saved dock career', (await snapshot()).dockedAt === 'helix' && (await visibleSurfaces()).includes('dock-screen'));
     await click('#dock-screen .dock-options-button');
     await waitFor('Boolean(document.querySelector("#pause-panel") && !document.querySelector("#pause-panel").classList.contains("is-hidden"))');
-    await setValue('#pause-panel [data-setting="language"]', 'en');
-    await waitFor('Boolean(window.__VOID_PRIVATEER__ && document.querySelector("#title-screen"))', Boolean, 20000);
+    await setLanguageAndWaitForReload('en');
     await wait(450);
     const englishTitle = await snapshot();
     check('DE to EN switch reloads the saved title in English', englishTitle.language === 'en' && englishTitle.settings?.language === 'en' && englishTitle.titleVisible, JSON.stringify(englishTitle));
     check('English title keeps resume enabled', !(await evalSafe('Boolean(document.querySelector("[data-ui-command=resume]")?.disabled)', true)));
     await click('[data-ui-command="resume"]');
-    await waitFor('window.__VOID_PRIVATEER__.getState()?.player?.dockedAt === "helix"', Boolean, 20000);
+    await wakeHeadlessPaint();
+    await waitFor('window.__VOID_PRIVATEER__.getRuntime()?.save?.player?.dockedAt === "helix" && Boolean(document.querySelector("#dock-screen") && !document.querySelector("#dock-screen").classList.contains("is-hidden"))', Boolean, 60000);
     await wait(350);
 
     // ---- launch, pause/resume, map views, audio context, and focus/blur ----
     const launchClicked = await click('#dock-screen .concourse-hover-ship');
     check('dock ship launch control is present', launchClicked);
-    await waitFor('Boolean(window.__VOID_PRIVATEER__.getState() && !window.__VOID_PRIVATEER__.getState().player.dockedAt)', Boolean, 8000);
+    await wakeHeadlessPaint();
+    // The visible ship departure animation hands off to WebGL after 1.08 s;
+    // pulse once more after that handoff so its deliberate pre-allocation paint
+    // is not throttled by headless Chrome.
+    await wait(1300);
+    await wakeHeadlessPaint();
+    await waitFor('Boolean(window.__VOID_PRIVATEER__.getRuntime()?.renderer && !window.__VOID_PRIVATEER__.getRuntime()?.save?.player?.dockedAt)', Boolean, 60000);
     await wait(1200);
     const flight = await snapshot();
     check('launch returns to the flight HUD', flight.hasRuntime && flight.hudVisible && flight.dockedAt === null && !flight.dockVisible, JSON.stringify(flight));
+    const rendererQuality = await evalSafe('window.__VOID_PRIVATEER__.getRuntime()?.renderer?.qualityMode', null);
+    check('flight renderer starts in high-fidelity mode', rendererQuality === 'high', String(rendererQuality));
     check('flight starts with no duplicate modal overlays', (await modalIds()).length === 0, JSON.stringify(await modalIds()));
 
     // Focus/visibility loss must be safe for an active flight too. Use the
@@ -558,7 +589,8 @@ const main = async () => {
     check('QUIT TO TITLE disposes flight and enables resume', quitTitle.titleVisible && !quitTitle.hasRuntime && quitTitle.settings?.language === 'en' && !(await evalSafe('Boolean(document.querySelector("[data-ui-command=resume]")?.disabled)', true)), JSON.stringify(quitTitle));
     await capture('09-title-resume-touch.png');
     await click('[data-ui-command="resume"]');
-    await waitFor('Boolean(window.__VOID_PRIVATEER__.getRuntime() && !window.__VOID_PRIVATEER__.getState()?.player?.dockedAt)', Boolean, 20000);
+    await wakeHeadlessPaint();
+    await waitFor('Boolean(window.__VOID_PRIVATEER__.getRuntime()?.renderer && !window.__VOID_PRIVATEER__.getRuntime()?.save?.player?.dockedAt)', Boolean, 60000);
     await wait(450);
     const resumedFlight = await snapshot();
     check('RESUME restores the undocked flight career', resumedFlight.hasRuntime && resumedFlight.hudVisible && resumedFlight.dockedAt === null && (await modalIds()).length === 0, JSON.stringify(resumedFlight));

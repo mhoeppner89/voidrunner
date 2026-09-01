@@ -513,6 +513,8 @@ export const DE_CATALOG = {
     'Auto': 'Auto',
     'Low': 'Niedrig',
     'High': 'Hoch',
+    'Visuals': 'Grafik',
+    'High fidelity': 'Hohe Detailtreue',
     'Touch scale': 'Touch-Skalierung',
     'TILT STEER': 'NEIGUNGSSTEUERUNG',
     'Steering': 'Steuerung',

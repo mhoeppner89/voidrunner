@@ -30,7 +30,9 @@ export const defaultSettings = () => ({
     effects: 0.68,
     flightAssist: true,
     aimAssist: true,
-    quality: 'auto',
+    // High fidelity is the single shipping presentation. The retired Auto and
+    // Low modes traded away too much resolution for inconsistent gains.
+    quality: 'high',
     touchScale: 1,
     vibration: true,
     steering: 'tilt',
@@ -176,7 +178,9 @@ const normalizeSettings = (candidate) => {
         effects: numberInRange('effects', 0, 1),
         flightAssist: boolean('flightAssist'),
         aimAssist: boolean('aimAssist'),
-        quality: ['auto', 'low', 'high'].includes(source.quality) ? source.quality : defaults.quality,
+        // Migrate every legacy Auto/Low preference to the high-fidelity
+        // baseline. Keeping the field preserves save compatibility.
+        quality: 'high',
         touchScale: numberInRange('touchScale', 0.8, 1.3),
         vibration: boolean('vibration'),
         steering: source.steering === 'stick' ? 'stick' : 'tilt',

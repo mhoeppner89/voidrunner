@@ -290,7 +290,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.7.32';
+const GAME_VERSION = '0.7.33';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -449,6 +449,10 @@ export class GameUI {
     arenaScenario = '1v1';
     arenaDifficulty = 'veteran';
     radarContext;
+    radarLayoutDirty = true;
+    radarCssWidth = 0;
+    radarCssHeight = 0;
+    radarPixelRatio = 0;
     // DOM cache: the cockpit HUD is built once and never re-rendered, so the
     // per-frame updateHud path reads nodes from this map instead of re-querying
     // the document dozens of times per frame.
@@ -499,6 +503,7 @@ export class GameUI {
         }
         this.updateOrientationNotice();
         window.addEventListener('resize', () => {
+            this.radarLayoutDirty = true;
             this.updateOrientationNotice();
             this.syncConcourseOverlay();
         });
@@ -2835,10 +2840,20 @@ export class GameUI {
     }
     drawRadar(contacts, rings, searchRings = [], warpCombat = 0.2) {
         const canvas = this.radarContext.canvas;
-        const rect = canvas.getBoundingClientRect();
         const ratio = Math.min(2, window.devicePixelRatio || 1);
-        const width = Math.max(150, Math.floor(rect.width * ratio));
-        const height = Math.max(150, Math.floor(rect.height * ratio));
+        if (ratio !== this.radarPixelRatio)
+            this.radarLayoutDirty = true;
+        if (this.radarLayoutDirty || this.radarCssWidth <= 0 || this.radarCssHeight <= 0) {
+            const rect = canvas.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+                this.radarCssWidth = rect.width;
+                this.radarCssHeight = rect.height;
+                this.radarPixelRatio = ratio;
+                this.radarLayoutDirty = false;
+            }
+        }
+        const width = Math.max(150, Math.floor((this.radarCssWidth || 150) * ratio));
+        const height = Math.max(150, Math.floor((this.radarCssHeight || 150) * ratio));
         if (canvas.width !== width || canvas.height !== height) {
             canvas.width = width;
             canvas.height = height;
@@ -3447,10 +3462,10 @@ export class GameUI {
     settingsSections(settings) {
         return `
         <div class="pause-grid">
-          <section><h3>${t('FLIGHT')}</h3><label><span>${t('Flight assist')}</span><input type="checkbox" data-setting="flightAssist" ${settings.flightAssist ? 'checked' : ''}></label><label><span>${t('Aim assistance')}</span><input type="checkbox" data-setting="aimAssist" ${settings.aimAssist ? 'checked' : ''}></label><label><span>${t('Quality')}</span><select data-setting="quality"><option value="auto" ${settings.quality === 'auto' ? 'selected' : ''}>${t('Auto')}</option><option value="low" ${settings.quality === 'low' ? 'selected' : ''}>${t('Low')}</option><option value="high" ${settings.quality === 'high' ? 'selected' : ''}>${t('High')}</option></select></label><label><span>${t('Touch scale')}</span><input type="range" min="0.8" max="1.3" step="0.05" value="${settings.touchScale}" data-setting="touchScale"></label></section>
+          <section><h3>${t('FLIGHT')}</h3><label><span>${t('Flight assist')}</span><input type="checkbox" data-setting="flightAssist" ${settings.flightAssist ? 'checked' : ''}></label><label><span>${t('Aim assistance')}</span><input type="checkbox" data-setting="aimAssist" ${settings.aimAssist ? 'checked' : ''}></label><label><span>${t('Touch scale')}</span><input type="range" min="0.8" max="1.3" step="0.05" value="${settings.touchScale}" data-setting="touchScale"></label></section>
           <section><h3>${t('TILT STEER')}</h3><label><span>${t('Steering')}</span><select data-setting="steering"><option value="tilt" ${settings.steering !== 'stick' ? 'selected' : ''}>${t('Tilt')}</option><option value="stick" ${settings.steering === 'stick' ? 'selected' : ''}>${t('Stick')}</option></select></label><label><span>${t('Sensitivity')}</span><input type="range" min="0.4" max="1.8" step="0.05" value="${settings.tiltSensitivity}" data-setting="tiltSensitivity"></label><label><span>${t('Invert pitch')}</span><input type="checkbox" data-setting="tiltInvertPitch" ${settings.tiltInvertPitch ? 'checked' : ''}></label><label><span>${t('Invert yaw')}</span><input type="checkbox" data-setting="tiltInvertYaw" ${settings.tiltInvertYaw ? 'checked' : ''}></label><div class="tilt-actions"><button data-ui-command="enable-tilt">${t('ENABLE')}</button><button data-ui-command="calibrate-tilt">${t('SET NEUTRAL')}</button></div></section>
           <section><h3>${t('AUDIO')}</h3><label><span>${t('Music')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.music}" data-setting="music"></label><label><span>${t('Effects')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.effects}" data-setting="effects"></label><label><span>${t('Haptics')}</span><input type="checkbox" data-setting="vibration" ${settings.vibration ? 'checked' : ''}></label></section>
-          <section><h3>${t('DISPLAY')}</h3><label><span>${t('Fullscreen')}</span><button type="button" class="fullscreen-switch" data-ui-command="toggle-fullscreen" role="switch" aria-label="${t('Toggle fullscreen')}" aria-checked="false">⛶</button></label></section>
+          <section><h3>${t('DISPLAY')}</h3><label><span>${t('Visuals')}</span><output>${t('High fidelity')}</output></label><label><span>${t('Fullscreen')}</span><button type="button" class="fullscreen-switch" data-ui-command="toggle-fullscreen" role="switch" aria-label="${t('Toggle fullscreen')}" aria-checked="false">⛶</button></label></section>
           <section><h3>${t('LANGUAGE')}</h3><label><span>${t('Language')}</span><select data-setting="language"><option value="de" ${settings.language !== 'en' ? 'selected' : ''}>Deutsch</option><option value="en" ${settings.language === 'en' ? 'selected' : ''}>English</option></select></label></section>
           <section class="controls-reference"><h3>${t('KEYBOARD / CONTROLLER')}</h3><p>${t('W/S pitch · A/D yaw · Q/E roll · R/F throttle · Shift afterburn · Space fire · X fire group · hold M secondary tool / tap missile or capture · T target · C mode · N nav · J hyperdrive · K map · B transponder')}</p><p>${t('Gamepad: left stick steer · right stick roll/throttle · RT fire · hold RB secondary tool / tap missile or capture · LB afterburn · face buttons target/mode/fire group/hyperdrive · left stick click transponder · D-pad capture/hostile/nav.')}</p></section>
         </div>`;

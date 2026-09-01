@@ -31,6 +31,11 @@ const WRECK_RENDER_DISTANCE_SQ = WRECK_RENDER_DISTANCE * WRECK_RENDER_DISTANCE;
 const MOURNING_ROOT_VISIBILITY_RANGE = WRECK_RENDER_DISTANCE + 6000;
 const MOURNING_ROOT_VISIBILITY_RANGE_SQ = MOURNING_ROOT_VISIBILITY_RANGE * MOURNING_ROOT_VISIBILITY_RANGE;
 const HIDDEN_SCALE = [0.0001, 0.0001, 0.0001];
+// Bloom is deliberately low-frequency. Keeping the main scene at the full
+// high-fidelity resolution while extracting and blurring glow at quarter
+// resolution cuts most of the post-process fill cost without softening hulls,
+// cockpit edges, text, or the galactic sky.
+const BLOOM_DOWNSAMPLE = 4;
 const SYSTEM_RENDER_STYLE = Object.freeze({
     'helios-verge': { clear: 0x0a1735, fog: 0x2a1e44, density: 0.000115, stars: 0xfff1df, band: 0xffffff, bandOpacity: 0.72, nebula: 0xd8a38c, nebulaOpacity: 0.72 },
     meridian: { clear: 0x0d2032, fog: 0x284358, density: 0.000105, stars: 0xe4f4ff, band: 0xffffff, bandOpacity: 0.68, nebula: 0x91b5c3, nebulaOpacity: 0.68 },
@@ -202,6 +207,7 @@ export class SpaceRenderer {
     camera = new THREE.PerspectiveCamera(74, 1, 0.08, 2000000);
     renderer;
     shell;
+    shellStyleValues = new Map();
     dynamicRoot = new THREE.Group();
     skyRoot = new THREE.Group();
     starMaterials = [];
@@ -394,6 +400,12 @@ export class SpaceRenderer {
         // actual ship enters the scene, avoiding six multi-megabyte requests
         // on every career start.
         this.preloadGlbShips(initialShipVariants);
+    }
+    setShellStyle(name, value) {
+        if (!this.shell || this.shellStyleValues.get(name) === value)
+            return;
+        this.shellStyleValues.set(name, value);
+        this.shell.style.setProperty(name, value);
     }
     createLighting() {
         // Lighting now mimics Rebel Galaxy Outlaw's two-tone dusk: a warm sodium-
@@ -1983,6 +1995,22 @@ export class SpaceRenderer {
         const group = new THREE.Group();
         group.position.set(...location.position);
         group.name = `planet-${id}`;
+        // A planet that is tens of radii away occupies only a few dozen pixels,
+        // yet the old path still submitted the same 75k-triangle surface and
+        // atmosphere used during landing. Three geometric LODs preserve the
+        // exact close-up mesh while shedding invisible vertex work at travel
+        // distances. Materials and textures stay identical across all levels.
+        const sphereLod = (name, radiiAndSegments, material) => {
+            const lod = new THREE.LOD();
+            lod.name = name;
+            for (const [distance, radius, widthSegments, heightSegments] of radiiAndSegments) {
+                const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, widthSegments, heightSegments), material);
+                mesh.name = `${name}-${widthSegments}x${heightSegments}`;
+                lod.addLevel(mesh, distance, 0.12);
+            }
+            return lod;
+        };
+        const lodDistances = [0, location.radius * 6, location.radius * 20];
         const surfaceTexture = this.createPixelPanelTexture(`${id}-surface`, color, atmosphere, 'planet', 1024, id === 'azure');
         surfaceTexture.repeat.set(1, 1);
         surfaceTexture.magFilter = THREE.LinearFilter;
@@ -2005,7 +2033,7 @@ export class SpaceRenderer {
             bumpMap.wrapS = THREE.RepeatWrapping;
             bumpMap.wrapT = THREE.RepeatWrapping;
         }
-        const surface = new THREE.Mesh(new THREE.SphereGeometry(location.radius, 192, 128), new THREE.MeshStandardMaterial({
+        const surfaceMaterial = new THREE.MeshStandardMaterial({
             color: 0xffffff,
             map: surfaceTexture,
             // Water reads smoother and slightly specular; land-heavy worlds
@@ -2018,8 +2046,12 @@ export class SpaceRenderer {
             bumpScale: id === 'azure' ? 2.2 : 18,
             flatShading: false,
             fog: false,
-        }));
-        surface.name = 'surface';
+        });
+        const surface = sphereLod('surface', [
+            [lodDistances[0], location.radius, 192, 128],
+            [lodDistances[1], location.radius, 96, 64],
+            [lodDistances[2], location.radius, 48, 32],
+        ], surfaceMaterial);
         group.add(surface);
         // Cloud decks scrapped (0.7.7b): Azure's two layers rendered at 0.11/0.13
         // opacity — invisible at play distances — and the dry worlds' 0.40 deck
@@ -2039,10 +2071,17 @@ export class SpaceRenderer {
         // bubble floating kilometres off the disc.
         const haloMaterial = this.createAtmosphereMaterial(atmosphere, location.radius * 1.06, 0.45, 0.05, 1.0, location.position);
         const hazeMaterial = this.createAtmosphereMaterial(atmosphere, location.radius * 1.02, id === 'azure' ? 0.047 : 0.076, 0.0, 0.0, location.position);
-        const haze = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.02, 112, 68), hazeMaterial);
-        haze.name = 'haze';
+        const haze = sphereLod('haze', [
+            [lodDistances[0], location.radius * 1.02, 112, 68],
+            [lodDistances[1], location.radius * 1.02, 64, 40],
+            [lodDistances[2], location.radius * 1.02, 32, 20],
+        ], hazeMaterial);
         group.add(haze);
-        const halo = new THREE.Mesh(new THREE.SphereGeometry(location.radius * 1.06, 96, 56), haloMaterial);
+        const halo = sphereLod('halo', [
+            [lodDistances[0], location.radius * 1.06, 96, 56],
+            [lodDistances[1], location.radius * 1.06, 56, 32],
+            [lodDistances[2], location.radius * 1.06, 28, 16],
+        ], haloMaterial);
         group.add(halo);
         if (ringed) {
             // Gauntlet ring overhaul: one shader-driven ring instead of three
@@ -2068,8 +2107,8 @@ export class SpaceRenderer {
         // after departure). If they stay raycastable they win every tap, so the
         // player could never select another target after leaving a planet. Only the
         // solid surface may be picked; the shells are render-only.
-        halo.raycast = () => undefined;
-        haze.raycast = () => undefined;
+        halo.traverse((object) => { object.raycast = () => undefined; });
+        haze.traverse((object) => { object.raycast = () => undefined; });
         this.tagTargetable(surface, 'location', id);
         this.locationRoot.add(group);
         this.locationMeshes.set(id, group);
@@ -4005,7 +4044,7 @@ export class SpaceRenderer {
     }
     setDamageWarning(level) {
         const normalized = clamp(level, 0, 1);
-        this.shell?.style.setProperty('--damage-warning', normalized.toFixed(3));
+        this.setShellStyle('--damage-warning', normalized.toFixed(3));
         const material = this.cockpitWarning?.material;
         if (material instanceof THREE.MeshBasicMaterial) {
             material.opacity = 0;
@@ -4021,7 +4060,7 @@ export class SpaceRenderer {
         }
         this.hyperdriveFxState = state;
         this.hyperdriveFxProgress = clamp(progress, 0, 1);
-        if (this.shell)
+        if (this.shell && this.shell.dataset.hyperdriveFx !== state)
             this.shell.dataset.hyperdriveFx = state;
     }
     updateCamera(position, prevPosition, rotation, prevRotation, angularVelocity, speedRatio, afterburner, dt, alpha = 0) {
@@ -4048,7 +4087,7 @@ export class SpaceRenderer {
         // --cockpit-zoom, consumed as a scale by the frame/vignette overlays.
         const cockpitZoomTarget = afterburner ? COCKPIT_ZOOM_BURN : COCKPIT_ZOOM_IDLE;
         this.cockpitZoom += (cockpitZoomTarget - this.cockpitZoom) * (1 - Math.exp(-8 * dt));
-        this.shell?.style.setProperty('--cockpit-zoom', this.cockpitZoom.toFixed(4));
+        this.setShellStyle('--cockpit-zoom', this.cockpitZoom.toFixed(4));
         // The grime plane is a camera-space overlay, so widening the FOV
         // recedes it exactly as far as the starfield — the dirt reads as part
         // of the sky instead of sitting on the glass. Counter three quarters
@@ -4068,9 +4107,9 @@ export class SpaceRenderer {
         const shiftX = clamp(-angularVelocity[1] * 2.4, -7, 7);
         const shiftY = clamp(angularVelocity[0] * 1.8 - speedRatio * 1.4, -5, 4);
         const roll = clamp(-angularVelocity[2] * 0.30, -1.2, 1.2);
-        this.shell?.style.setProperty('--cockpit-shift-x', `${shiftX.toFixed(2)}px`);
-        this.shell?.style.setProperty('--cockpit-shift-y', `${shiftY.toFixed(2)}px`);
-        this.shell?.style.setProperty('--cockpit-roll', `${roll.toFixed(2)}deg`);
+        this.setShellStyle('--cockpit-shift-x', `${shiftX.toFixed(2)}px`);
+        this.setShellStyle('--cockpit-shift-y', `${shiftY.toFixed(2)}px`);
+        this.setShellStyle('--cockpit-roll', `${roll.toFixed(2)}deg`);
     }
     setUtilityBeam(active, mode, start, end) {
         if (!active || !end) {
@@ -4083,7 +4122,7 @@ export class SpaceRenderer {
         const distance = a.distanceTo(b);
         this.utilityBeam.position.copy(a).lerp(b, 0.5);
         this.utilityBeam.scale.set(mode === 'mining' ? 0.62 : 1.05, distance, mode === 'mining' ? 0.62 : 1.05);
-        this.utilityBeam.quaternion.setFromUnitVectors(UP_AXIS, b.clone().sub(a).normalize());
+        this.utilityBeam.quaternion.setFromUnitVectors(UP_AXIS, this.tmpScale.copy(b).sub(a).normalize());
         this.utilityBeamMaterial.color.setHex(mode === 'mining' ? 0xe2b45e : 0x74d5c4);
         this.utilityBeamMaterial.opacity = 0.54 + Math.sin(performance.now() * 0.03) * 0.18;
         this.utilityBeam.visible = true;
@@ -4241,38 +4280,44 @@ export class SpaceRenderer {
                 beacon.scale.setScalar(radius * (0.14 + beaconPulse * 0.07));
             });
         }
-        this.asteroids.forEach((node) => {
-            if (!node.moving)
-                return;
-            node.position[0] += node.velocity[0] * dt;
-            node.position[1] += node.velocity[1] * dt;
-            node.position[2] += node.velocity[2] * dt;
-            node.rotation[0] += node.rotationSpeed[0] * dt;
-            node.rotation[1] += node.rotationSpeed[1] * dt;
-            node.rotation[2] += node.rotationSpeed[2] * dt;
-            const center = LOCATIONS.shardbelt.position;
-            const dx = node.position[0] - center[0];
-            const dy = node.position[1] - center[1];
-            const dz = node.position[2] - center[2];
-            if (Math.hypot(dx, dy, dz) > LOCATIONS.shardbelt.radius + 55) {
-                node.position[0] = center[0] - dx * 0.82;
-                node.position[1] = center[1] - dy * 0.82;
-                node.position[2] = center[2] - dz * 0.82;
+        const shardbeltVisible = Boolean(this.instanceRoots.get('shardbelt')?.visible);
+        if (shardbeltVisible) {
+            for (const node of this.asteroids) {
+                if (!node.moving)
+                    continue;
+                node.position[0] += node.velocity[0] * dt;
+                node.position[1] += node.velocity[1] * dt;
+                node.position[2] += node.velocity[2] * dt;
+                node.rotation[0] += node.rotationSpeed[0] * dt;
+                node.rotation[1] += node.rotationSpeed[1] * dt;
+                node.rotation[2] += node.rotationSpeed[2] * dt;
+                const center = LOCATIONS.shardbelt.position;
+                const dx = node.position[0] - center[0];
+                const dy = node.position[1] - center[1];
+                const dz = node.position[2] - center[2];
+                if (Math.hypot(dx, dy, dz) > LOCATIONS.shardbelt.radius + 55) {
+                    node.position[0] = center[0] - dx * 0.82;
+                    node.position[1] = center[1] - dy * 0.82;
+                    node.position[2] = center[2] - dz * 0.82;
+                }
             }
-        });
+        }
         if (this.activeInstanceId === 'shardbelt')
             this.updateAsteroidInstances(true);
-        this.graveyard.forEach((piece) => {
-            if (!piece.moving)
-                return;
-            piece.position[0] += piece.drift[0] * dt;
-            piece.position[1] += piece.drift[1] * dt;
-            piece.position[2] += piece.drift[2] * dt;
-            piece.rotation[0] += piece.spin[0] * dt;
-            piece.rotation[1] += piece.spin[1] * dt;
-            piece.rotation[2] += piece.spin[2] * dt;
-        });
-        if (this.instanceRoots.get('mourning-line')?.visible)
+        const mourningVisible = Boolean(this.instanceRoots.get('mourning-line')?.visible);
+        if (mourningVisible) {
+            for (const piece of this.graveyard) {
+                if (!piece.moving)
+                    continue;
+                piece.position[0] += piece.drift[0] * dt;
+                piece.position[1] += piece.drift[1] * dt;
+                piece.position[2] += piece.drift[2] * dt;
+                piece.rotation[0] += piece.spin[0] * dt;
+                piece.rotation[1] += piece.spin[1] * dt;
+                piece.rotation[2] += piece.spin[2] * dt;
+            }
+        }
+        if (mourningVisible)
             this.updateGraveyardInstances(true);
         const helixRotor = this.locationMeshes.get('helix')?.getObjectByName('rotor');
         if (helixRotor)
@@ -4347,13 +4392,13 @@ export class SpaceRenderer {
             if (surface)
                 surface.rotation.y += dt * 0.009;
         }
-        if (this.instanceRoots.get('mourning-line')?.visible)
+        if (mourningVisible)
             this.updateWreckNodeInstances(dt);
         this.updateEffects(dt);
     }
     createBloomPipeline() {
         // Lightweight HDR bloom: render the scene to a float target, threshold the
-        // bright parts, blur them at half resolution, and add them back. This is the
+        // bright parts, blur them at quarter resolution, and add them back. This is the
         // glow that makes neon rims, engine flares and specular highlights read as
         // "lit" rather than flat — the core of the Rebel Galaxy Outlaw look.
         const vertexShader = `
@@ -4465,8 +4510,10 @@ export class SpaceRenderer {
         this.resizeBloomTargets();
     }
     resizeBloomTargets() {
-        const width = Math.max(2, Math.floor(this.renderer.domElement.width / 2));
-        const height = Math.max(2, Math.floor(this.renderer.domElement.height / 2));
+        const sceneWidth = Math.max(2, this.renderer.domElement.width);
+        const sceneHeight = Math.max(2, this.renderer.domElement.height);
+        const width = Math.max(2, Math.floor(sceneWidth / BLOOM_DOWNSAMPLE));
+        const height = Math.max(2, Math.floor(sceneHeight / BLOOM_DOWNSAMPLE));
         const makeTarget = () => new THREE.WebGLRenderTarget(width, height, {
             type: THREE.HalfFloatType,
             minFilter: THREE.LinearFilter,
@@ -4477,7 +4524,7 @@ export class SpaceRenderer {
         });
         if (this.bloomSceneTarget)
             this.bloomSceneTarget.dispose();
-        this.bloomSceneTarget = new THREE.WebGLRenderTarget(width * 2, height * 2, {
+        this.bloomSceneTarget = new THREE.WebGLRenderTarget(sceneWidth, sceneHeight, {
             type: THREE.HalfFloatType,
             minFilter: THREE.LinearFilter,
             magFilter: THREE.LinearFilter,
@@ -4488,7 +4535,9 @@ export class SpaceRenderer {
         for (const target of this.bloomBlurTargets)
             target.dispose();
         this.bloomBlurTargets = [makeTarget(), makeTarget()];
-        this.bloomBlurMaterial.uniforms.uResolution.value.set(width, height);
+        // The shader sees the old half-resolution texel spacing, retaining the
+        // established glow radius even though the storage target is smaller.
+        this.bloomBlurMaterial.uniforms.uResolution.value.set(width * 2, height * 2);
     }
     // Bloom costs three extra full-screen passes every frame, which is most of
     // the GPU bill on a weak chip. The Low quality tier and the auto governor's
