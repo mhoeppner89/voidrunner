@@ -422,6 +422,16 @@ const AUTO_DOCK_SPEED = 8;
 const DOCK_SAFE_RADIUS = 320;
 const COMBAT_CALM_SECONDS = 40;
 const HYPERDRIVE_ALIGNMENT = 0.88;
+// Manual flight is deliberately neither an aircraft rail nor full six-axis
+// Newtonian simulation. With assistance, manoeuvring thrusters take about a
+// second to pull an old velocity vector onto the nose and braking is limited
+// by counter-thrust. Without assistance, cutting or lowering the throttle does
+// not erase momentum: the pilot must point thrust against the existing vector.
+const FLIGHT_ASSIST_LATERAL_DAMPING = 0.72;
+const FLIGHT_ASSIST_BURN_LATERAL_DAMPING = 0.48;
+const FLIGHT_ASSIST_BRAKE_MULTIPLIER = 1.25;
+const INERTIAL_OVERSPEED_MARGIN = 1.06;
+const INERTIAL_OVERSPEED_BRAKE_MULTIPLIER = 0.45;
 // The dark (transponder-off) visibility band, Star-Sector style: a ship
 // running dark is only visible between the floor (200 km — reached at half
 // max speed or slower) and the ceiling (400 km — at full throttle). Speed is
@@ -2935,17 +2945,22 @@ export class GameSession {
             orientation.multiply(deltaRotation).normalize();
         }
         const forward = this.tmpD.copy(FORWARD).applyQuaternion(orientation).normalize();
-        let targetSpeed = this.save.player.throttle * stats.maxSpeed;
+        let speedCeiling = stats.maxSpeed;
+        let targetSpeed = this.save.player.throttle * speedCeiling;
         // Speed gate: below 90% of max speed the burn holds the current cruise
         // ceiling (turn move); past it the ceiling rises to afterburnSpeed and
         // the damped acceleration below ramps the boost in smoothly.
-        if (this.afterburning && velocity.length() >= 0.9 * stats.maxSpeed)
-            targetSpeed = this.save.player.throttle * stats.afterburnSpeed;
+        if (this.afterburning && velocity.length() >= 0.9 * stats.maxSpeed) {
+            speedCeiling = stats.afterburnSpeed;
+            targetSpeed = this.save.player.throttle * speedCeiling;
+        }
         // Apply the wake after selecting the normal/afterburn ceiling so the
         // player gets a readable slingshot in either mode. The small overrun is
         // transient and cannot modify the hull's published ship stats.
-        if (draftStrength > 0)
+        if (draftStrength > 0) {
             targetSpeed = Math.min(stats.afterburnSpeed * 1.06, targetSpeed * (1 + draftStrength * 0.06));
+            speedCeiling = Math.min(stats.afterburnSpeed * 1.06, speedCeiling * (1 + draftStrength * 0.06));
+        }
         if (this.autopilot) {
             // Charge-up hold: the ship stays put (steering only) while the drive spools,
             // then snaps to full cruise the moment the charge completes. This is the fix
@@ -2955,16 +2970,46 @@ export class GameSession {
         }
         const forwardSpeed = velocity.dot(forward);
         const lateral = this.tmpE.copy(velocity).addScaledVector(forward, -forwardSpeed);
-        const accelerationResponse = acceleration / Math.max(12, stats.maxSpeed);
-        // Hyperdrive engages and drops out at full cruise/approach speed instantly.
-        const nextForwardSpeed = this.autopilot ? targetSpeed : damp(forwardSpeed, targetSpeed, accelerationResponse * 2.2, dt);
         if (this.autopilot) {
             // Cruise keeps the ship locked on its vector; lateral drift is a manual-flight term.
-            velocity.copy(forward).multiplyScalar(nextForwardSpeed);
+            velocity.copy(forward).multiplyScalar(targetSpeed);
+        }
+        else if (this.save.settings.flightAssist) {
+            // The assisted controller still treats the throttle as a requested
+            // cruise speed, but the drive can only add or remove a finite amount
+            // of forward velocity each step. An old movement vector therefore
+            // trails the nose through a turn instead of rotating with the hull.
+            const speedDelta = targetSpeed - forwardSpeed;
+            const thrust = acceleration * (speedDelta < 0 ? FLIGHT_ASSIST_BRAKE_MULTIPLIER : 1) * dt;
+            const nextForwardSpeed = forwardSpeed + clamp(speedDelta, -thrust, thrust);
+            // A burn is a committed pass: retain more of the entry vector while
+            // the pilot yaws, then let the manoeuvring thrusters settle it.
+            const lateralDamping = this.afterburning
+                ? FLIGHT_ASSIST_BURN_LATERAL_DAMPING
+                : FLIGHT_ASSIST_LATERAL_DAMPING;
+            lateral.multiplyScalar(Math.exp(-lateralDamping * dt));
+            velocity.copy(forward).multiplyScalar(nextForwardSpeed).add(lateral);
         }
         else {
-            lateral.multiplyScalar(Math.exp(-(this.save.settings.flightAssist ? 1.45 : 0.16) * dt));
+            // Assistance off is propulsion-only. Raising the throttle adds
+            // forward velocity until the selected ceiling is reached; lowering
+            // it never manufactures reverse thrust or deletes lateral drift.
+            // To brake, turn into the existing vector and apply thrust.
+            let nextForwardSpeed = forwardSpeed;
+            if (this.save.player.throttle > 0 && targetSpeed > forwardSpeed)
+                nextForwardSpeed += Math.min(targetSpeed - forwardSpeed, acceleration * dt);
             velocity.copy(forward).multiplyScalar(nextForwardSpeed).add(lateral);
+
+            // Keep the combat model bounded. Ordinary vector addition may carry
+            // a small amount of turn momentum above the drive ceiling; larger
+            // overspeed (including a released afterburn) bleeds away gradually
+            // rather than snapping the ship back to max speed.
+            const speed = velocity.length();
+            const overspeedLimit = speedCeiling * INERTIAL_OVERSPEED_MARGIN;
+            if (speed > overspeedLimit) {
+                const correctedSpeed = Math.max(overspeedLimit, speed - acceleration * INERTIAL_OVERSPEED_BRAKE_MULTIPLIER * dt);
+                velocity.multiplyScalar(correctedSpeed / speed);
+            }
         }
         // Fuel is afterburner propellant and nothing else: normal flight and
         // the hyperdrive cruise never touch it. Running dry only kills the burn.
