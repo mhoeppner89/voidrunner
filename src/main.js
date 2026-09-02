@@ -52,53 +52,52 @@ const SHIP_WARM_ASSETS = Object.freeze({
     lancer: ['./assets/models/ships/lancer.glb', './assets/remaster/cockpit-lancer.webp'],
     atlas: ['./assets/models/ships/atlas.glb', './assets/remaster/cockpit-atlas.webp'],
 });
-const warmedImages = [];
-const warmBinary = async (url) => {
-    const response = await fetch(url, { cache: 'force-cache', priority: 'low' });
-    if (response.ok)
-        await response.arrayBuffer();
-};
-const warmImage = async (url) => {
-    const image = new Image();
-    image.decoding = 'async';
-    image.src = url;
-    warmedImages.push(image);
-    try {
-        await image.decode();
+const warmedBinaries = new Map();
+const warmBinary = (url, priority = 'low') => {
+    let pending = warmedBinaries.get(url);
+    if (!pending) {
+        pending = fetch(url, { cache: 'force-cache', priority })
+            .then(async (response) => {
+                if (response.ok)
+                    await response.arrayBuffer();
+            });
+        warmedBinaries.set(url, pending);
     }
-    catch { /* A normal later request remains the fallback. */ }
+    return pending;
 };
 const warmLikelyFlightAssets = async () => {
     const connection = navigator.connection ?? navigator.mozConnection ?? navigator.webkitConnection;
     if (sessionStarting || session?.renderer || connection?.saveData || /(^|-)2g$/.test(connection?.effectiveType ?? '') || document.visibilityState !== 'visible')
         return;
-    const shipId = cachedSave?.player?.shipId && SHIP_WARM_ASSETS[cachedSave.player.shipId] ? cachedSave.player.shipId : 'wayfarer';
-    const [model, cockpit] = SHIP_WARM_ASSETS[shipId];
+    const warmSave = cachedSave ?? { player: { shipId: 'wayfarer', dockedAt: 'helix', navTargetId: 'shardbelt' } };
+    const shipId = warmSave.player?.shipId && SHIP_WARM_ASSETS[warmSave.player.shipId] ? warmSave.player.shipId : 'wayfarer';
+    const [model] = SHIP_WARM_ASSETS[shipId];
     await Promise.allSettled([
         warmBinary(model),
-        warmImage(cockpit),
-        warmImage('./art/sky/milky-way-wide-alpha-v3.webp'),
+        ui.preloadSessionAssets(warmSave, { priority: 'low' }),
+        loadGameSession(),
     ]);
 };
 const scheduleLikelyFlightWarmup = () => {
     requestAnimationFrame(() => requestAnimationFrame(() => {
-        // Protect first paint and the first tap from decode/network work. The
-        // warm-up begins only after the title has been stable for a moment.
-        window.setTimeout(() => {
-            if (typeof requestIdleCallback === 'function')
-                requestIdleCallback(() => void warmLikelyFlightAssets(), { timeout: 2600 });
-            else
-                void warmLikelyFlightAssets();
-        }, 900);
+        // Protect the title's first paint, then start low-priority work as soon
+        // as the browser has an idle slice. A short timeout prevents a busy
+        // title animation from postponing the warm-up until after Start.
+        if (typeof requestIdleCallback === 'function')
+            requestIdleCallback(() => void warmLikelyFlightAssets(), { timeout: 750 });
+        else
+            window.setTimeout(() => void warmLikelyFlightAssets(), 80);
     }));
 };
 // Tilt state shared with the title screen, where no session (and no
 // InputManager) exists yet. The gyro listener keeps live readings so
 // ENABLE TILT STEER and SET NEUTRAL work before a career starts.
 let tiltGranted = false;
+let tiltSeen = false;
 let tiltBeta = 0;
 let tiltGamma = 0;
 let tiltAngle = 0;
+const tiltSampleWaiters = new Set();
 const normalizeTiltAngle = (value) => {
     let angle = Number(value);
     if (!Number.isFinite(angle))
@@ -111,17 +110,36 @@ const normalizeTiltAngle = (value) => {
 };
 if (typeof DeviceOrientationEvent !== 'undefined') {
     window.addEventListener('deviceorientation', (event) => {
-        if (event.beta == null || event.gamma == null)
+        const rawBeta = Number(event.beta);
+        const rawGamma = Number(event.gamma);
+        if (!Number.isFinite(rawBeta) || !Number.isFinite(rawGamma))
             return;
         // Same screen-frame rotation the InputManager applies (see input.js).
         tiltAngle = normalizeTiltAngle(globalThis.screen?.orientation?.angle ?? globalThis.window?.orientation ?? 0);
         const radians = (tiltAngle * Math.PI) / 180;
         const cos = Math.cos(radians);
         const sin = Math.sin(radians);
-        tiltBeta = event.beta * cos + event.gamma * sin;
-        tiltGamma = -event.beta * sin + event.gamma * cos;
+        tiltBeta = rawBeta * cos + rawGamma * sin;
+        tiltGamma = -rawBeta * sin + rawGamma * cos;
+        tiltSeen = true;
+        for (const resolve of tiltSampleWaiters)
+            resolve(true);
+        tiltSampleWaiters.clear();
     }, { passive: true });
 }
+const waitForTitleTiltSample = (timeoutMs = 1800) => {
+    if (tiltSeen)
+        return Promise.resolve(true);
+    return new Promise((resolve) => {
+        const finish = (seen) => {
+            clearTimeout(timeoutId);
+            tiltSampleWaiters.delete(finish);
+            resolve(seen);
+        };
+        const timeoutId = setTimeout(() => finish(false), timeoutMs);
+        tiltSampleWaiters.add(finish);
+    });
+};
 const requestTiltPermission = async () => {
     if (typeof DeviceOrientationEvent === 'undefined')
         return false;
@@ -152,6 +170,16 @@ const beginSession = (mode, arena) => {
     // career-specific progress. Apply the latest global record to new,
     // resumed, and simulator sessions alike.
     Object.assign(save.settings, titleSettings);
+    // iOS only accepts the orientation permission request in the original
+    // tap/click task. Start it here, before the deferred game module and scene
+    // work, then hand the resolved state to the InputManager. Previously a new
+    // session tried too late and silently changed tilt back to stick steering.
+    const touchDevice = Number(navigator.maxTouchPoints ?? 0) > 0
+        || Boolean(globalThis.matchMedia?.('(any-pointer: coarse)').matches);
+    const shouldStartTilt = save.settings.steering !== 'stick' && (touchDevice || tiltGranted);
+    const tiltPermissionRequest = shouldStartTilt
+        ? (tiltGranted ? Promise.resolve(true) : requestTiltPermission())
+        : Promise.resolve(false);
     // Keep the language mirrors in sync so the next boot and settings UI agree.
     // The probe/dev key (`__VOID_PRIVATEER_PROBE_LANG__`) is single-shot: it
     // forces the boot language once, then clears itself — a value left behind
@@ -198,7 +226,18 @@ const beginSession = (mode, arena) => {
     ui.setLoading(true, t(mode === 'arena' ? 'PREPARING FLIGHT' : 'LOADING CAREER'));
     const starting = (async () => {
         await nextPaint();
-        const { GameSession } = await loadGameSession();
+        const shipId = SHIP_WARM_ASSETS[save.player.shipId] ? save.player.shipId : 'wayfarer';
+        const [tiltPermission, gameModule] = await Promise.all([
+            tiltPermissionRequest,
+            loadGameSession(),
+            Promise.allSettled([
+                warmBinary(SHIP_WARM_ASSETS[shipId][0], 'high'),
+                ui.preloadSessionAssets(save, { priority: 'high', includeLocation: mode !== 'arena' }),
+            ]),
+        ]);
+        if (tiltPermission === true)
+            tiltGranted = true;
+        const { GameSession } = gameModule;
         const nextSession = new GameSession(save, ui, () => {
             session = undefined;
             cachedSave = loadGame();
@@ -207,9 +246,11 @@ const beginSession = (mode, arena) => {
                 saveGame(cachedSave);
             }
             showTitleScreen();
-        }, mode === 'arena' ? arena : null, tiltGranted, audioManager);
+        }, mode === 'arena' ? arena : null, tiltPermission, audioManager);
         session = nextSession;
-        if (nextSession.renderer)
+        if (!arena && save.player.dockedAt)
+            await nextSession.prepareDockedFlightRuntime({ showLoading: false });
+        else if (nextSession.renderer)
             await nextSession.prepareFlightScene();
         return nextSession;
     })().catch((error) => {
@@ -360,6 +401,8 @@ const actions = {
         if (!granted)
             return false;
         tiltGranted = true;
+        if (!await waitForTitleTiltSample())
+            return false;
         titleSettings.steering = 'tilt';
         saveSettingsPreferences(titleSettings);
         const save = cachedSave ?? loadGame();
@@ -377,6 +420,8 @@ const actions = {
                 syncTitleSettings(session.save.settings);
             return calibrated;
         }
+        if (!tiltSeen)
+            return false;
         titleSettings.tiltNeutral = { beta: tiltBeta, gamma: tiltGamma, angle: tiltAngle };
         saveSettingsPreferences(titleSettings);
         const save = cachedSave ?? loadGame();

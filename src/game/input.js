@@ -51,6 +51,7 @@ export class InputManager {
     tiltSensitivity = 1.35;
     tiltInvertPitch = false;
     tiltInvertYaw = false;
+    tiltSampleWaiters = new Set();
     constructor(root) {
         this.root = root;
         window.addEventListener('keydown', this.onKeyDown, { passive: false });
@@ -67,6 +68,7 @@ export class InputManager {
         for (const [target, type, listener, options] of this.touchBindings)
             target.removeEventListener(type, listener, options);
         this.touchBindings.length = 0;
+        this.resolveTiltSampleWaiters(false);
         this.onBlur();
     }
     onKeyDown = (event) => {
@@ -127,7 +129,7 @@ export class InputManager {
         const rawGamma = Number(event.gamma);
         if (!Number.isFinite(rawBeta) || !Number.isFinite(rawGamma))
             return;
-        this.tiltSeen = true;
+        const firstSample = !this.tiltSeen;
         // Rotate the device-frame tilt into the screen frame so steering feels
         // identical in portrait, landscape-primary and landscape-secondary.
         // Without this, holding the phone sideways (the game locks landscape)
@@ -140,9 +142,40 @@ export class InputManager {
         const sin = Math.sin(radians);
         const beta = rawBeta * cos + rawGamma * sin;
         const gamma = -rawBeta * sin + rawGamma * cos;
-        this.tiltBeta += (beta - this.tiltBeta) * 0.35;
-        this.tiltGamma += (gamma - this.tiltGamma) * 0.35;
+        // Do not ease from the constructor's zeroes into the first physical
+        // reading. That produced a large false steering delta against a saved
+        // neutral for several frames whenever a flight started or resumed.
+        if (firstSample) {
+            this.tiltBeta = beta;
+            this.tiltGamma = gamma;
+        }
+        else {
+            this.tiltBeta += (beta - this.tiltBeta) * 0.35;
+            this.tiltGamma += (gamma - this.tiltGamma) * 0.35;
+        }
+        this.tiltSeen = true;
+        this.resolveTiltSampleWaiters(true);
     };
+    resolveTiltSampleWaiters(seen) {
+        for (const resolve of this.tiltSampleWaiters)
+            resolve(seen);
+        this.tiltSampleWaiters.clear();
+    }
+    waitForTiltSample(timeoutMs = 1800) {
+        if (this.tiltSeen)
+            return Promise.resolve(true);
+        if (!this.tiltSupported || !this.tiltEnabled)
+            return Promise.resolve(false);
+        return new Promise((resolve) => {
+            const finish = (seen) => {
+                clearTimeout(timeoutId);
+                this.tiltSampleWaiters.delete(finish);
+                resolve(seen);
+            };
+            const timeoutId = setTimeout(() => finish(false), timeoutMs);
+            this.tiltSampleWaiters.add(finish);
+        });
+    }
     // alreadyGranted: the player granted gyroscope permission from the title
     // screen this session, so skip the (user-gesture-gated) re-request — the
     // permission call would otherwise fail outside a tap, e.g. at session start.
@@ -174,6 +207,11 @@ export class InputManager {
         this.tiltEnabled = false;
     }
     calibrateTilt() {
+        // Permission may resolve before the browser delivers its first sensor
+        // event. Capturing at that point would store {0, 0} as neutral and make
+        // the ship lurch as soon as the real reading arrives.
+        if (!this.tiltSeen)
+            return undefined;
         this.rebaseTiltFrame(this.screenOrientationAngle());
         this.tiltNeutralBeta = this.tiltBeta;
         this.tiltNeutralGamma = this.tiltGamma;

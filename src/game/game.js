@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { AudioManager } from './audio.js';
-import { COMMODITIES, DEFAULT_NAV_LOCATION_BY_SYSTEM, EQUIPMENT, GUILD_RANK_NAMES, LOCATIONS, MARKET_LOCATION_IDS, SHIPS, activityLocationIdsForSystem, displaySpeed, dockLocationIdsForSystem, hyperdriveArrivalRadius, locationInstanceRadius, navLocationIdsForSystem, sectorEncounterChance, spawnClearance } from './data.js';
+import { COMMODITIES, DEFAULT_NAV_LOCATION_BY_SYSTEM, DOCK_LOCATION_IDS, EQUIPMENT, GUILD_RANK_NAMES, LOCATIONS, MARKET_LOCATION_IDS, SHIPS, activityLocationIdsForSystem, displaySpeed, dockLocationIdsForSystem, hyperdriveArrivalRadius, locationInstanceRadius, navLocationIdsForSystem, sectorEncounterChance, spawnClearance } from './data.js';
 import { SYSTEMS, getRoute, hasSystem, jumpPiracyRisk, planRoute } from './galaxy.js';
 import { buyCommodity, cargoCapacity, cargoFree, cargoMass, denPrice, recordMarketVisit, refreshAllPrices, sellCommodity, SYNDICATE_DEN_FAVOR, tickEconomy } from './economy.js';
 import { InputManager } from './input.js';
@@ -107,6 +107,7 @@ const ENTRY_SEARCH_DIRECTIONS = [
 ];
 const HYPERDRIVE_THREAT_RADIUS = 360;
 const HYPERDRIVE_CRUISE_SPEED = 50000;
+const DOCK_ASSET_PRELOAD_RADIUS = 80000;
 const HYPERDRIVE_DISPLAY_SPEED = 1000;
 const HYPERDRIVE_SPOOL_SECONDS = 2;
 const HYPERDRIVE_FX_DURATION = 0.9;
@@ -1164,6 +1165,10 @@ export class GameSession {
     initialTrafficSpawned = false;
     activeRaceRestored = false;
     launchPreparing = false;
+    flightPrepared = false;
+    flightPreparationPromise;
+    predictedDockLocationId;
+    nextAssetWarmupAt = 0;
     autopilot = false;
     galaxyJump = null;
     armedJumpPointId = null;
@@ -1251,7 +1256,7 @@ export class GameSession {
     // live game — headless combat probes build sessions via Object.create and
     // never set this, so their pirates always fight straight (see shipAI.js).
     emergentMugs = true;
-    constructor(save, ui, onQuit, arena = null, tiltGranted = false, audioManager = undefined) {
+    constructor(save, ui, onQuit, arena = null, tiltPermission = undefined, audioManager = undefined) {
         this.arena = arena;
         this.ui = ui;
         this.onQuit = onQuit;
@@ -1296,38 +1301,22 @@ export class GameSession {
         this.wreckNodes = generateWreckNodes(save.world.seed, save.world.depletedWrecks, save.world.scannedNodes);
         this.input = new InputManager(ui.root);
         this.input.configureTilt(save.settings);
-        // Tilt steering auto-enables for players who asked for it — returning
-        // players with a saved neutral, or anyone who granted gyroscope permission
-        // from the title screen this session. New players fall back to the stick
-        // until they tap ENABLE TILT STEER (which also calibrates neutral).
-        if (save.settings.steering !== 'stick' && (save.settings.tiltNeutral || tiltGranted)) {
-            void this.input.enableTilt(tiltGranted).then((active) => {
-                if (active) {
-                    if (!save.settings.tiltNeutral) {
-                        save.settings.tiltNeutral = this.input.calibrateTilt();
-                    }
-                    save.settings.steering = 'tilt';
-                    this.syncActiveShipState();
-                    saveGame(save);
-                    this.ui.setTouchSteering('tilt');
-                }
-                else {
-                    // Permission refused (or revoked since the last session):
-                    // correct the persisted setting too, so the pause menu's
-                    // steering select doesn't claim Tilt while the stick is
-                    // actually driving the ship.
-                    save.settings.steering = 'stick';
-                    this.syncActiveShipState();
-                    saveGame(save);
-                    this.ui.setTouchSteering('stick');
-                }
+        // Permission and the first physical gyro sample are separate events.
+        // Keep stick as the safe runtime fallback until both have arrived, then
+        // calibrate from the real sample (never the constructor's zeroes).
+        const wantsTilt = save.settings.steering !== 'stick';
+        const needsGesturePermission = typeof globalThis.DeviceOrientationEvent?.requestPermission === 'function';
+        const canEnableTilt = tiltPermission === true
+            || (tiltPermission === undefined && !needsGesturePermission);
+        if (wantsTilt && canEnableTilt) {
+            this.ui.setTouchSteering('stick');
+            void this.activateTiltSteering({
+                alreadyGranted: tiltPermission === true,
+                recalibrate: !save.settings.tiltNeutral,
             });
         }
         else {
-            // No saved neutral and no fresh grant: tilt can't engage, so run
-            // the stick and keep the persisted setting honest — otherwise the
-            // pause menu shows Tilt selected while the stick steers.
-            if (save.settings.steering !== 'stick') {
+            if (wantsTilt) {
                 save.settings.steering = 'stick';
                 this.syncActiveShipState();
                 saveGame(save);
@@ -1338,9 +1327,9 @@ export class GameSession {
         this.audio.setStationMode(Boolean(save.player.dockedAt));
         this.ui.setTouchScale(save.settings.touchScale);
         this.nextEncounterAt = save.world.time + 12 + seededRandom(`${save.world.seed}:next-encounter:${Math.floor(save.world.time)}`)() * 14;
-        // A docked career does not need a WebGL context, thousands of meshes,
-        // or ship-model fetches yet. Keep the station usable immediately and
-        // build the flight scene behind a visible loading veil on departure.
+        // Docked sessions are constructed before their flight runtime. The
+        // career-start gate prepares that runtime once all current station art
+        // is decoded, so Launch itself never needs a second loading screen.
         const needsFlightRuntime = Boolean(arena || !save.player.dockedAt || save.world.pendingJump);
         if (needsFlightRuntime)
             this.initializeFlightRuntime();
@@ -1355,6 +1344,8 @@ export class GameSession {
         this.restoreViewState();
         if (this.renderer && !arena)
             this.ensureActiveRaceRestored();
+        if (!save.player.dockedAt)
+            this.updateAssetWarmup(true);
         this.frameId = requestAnimationFrame(this.frame);
     }
     initializeFlightRuntime() {
@@ -1393,6 +1384,7 @@ export class GameSession {
         this.renderer.updateCamera(this.save.player.position, this.save.player.prevPosition, this.save.player.rotation, this.save.player.prevRotation, this.save.player.angularVelocity, 0, false, 0, 0);
         await this.renderer.prepareActiveScene?.();
         this.renderer.render();
+        this.flightPrepared = true;
     }
     currentNavLocationIds() {
         return navLocationIdsForSystem(this.save.player.systemId);
@@ -1673,6 +1665,46 @@ export class GameSession {
         if (current?.kind === 'wreck' && next !== 'mourning-line')
             this.clearTarget();
     }
+    warmApproachAssets(locationId) {
+        const next = DOCK_LOCATION_IDS.includes(locationId) ? locationId : undefined;
+        if (next === this.predictedDockLocationId)
+            return;
+        this.predictedDockLocationId = next;
+        if (next)
+            void this.ui.predictLocationAssets?.(next, this.save.player.shipId);
+        else
+            this.ui.clearWarmImageSlot?.('location-next');
+    }
+    updateAssetWarmup(force = false) {
+        if (this.save.player.dockedAt)
+            return;
+        if (!force && this.save.world.time < this.nextAssetWarmupAt)
+            return;
+        this.nextAssetWarmupAt = this.save.world.time + 0.8;
+        const planned = this.save.world.plannedDestinationId;
+        const nav = this.save.player.navTargetId;
+        let candidate = DOCK_LOCATION_IDS.includes(planned)
+            ? planned
+            : DOCK_LOCATION_IDS.includes(nav)
+                ? nav
+                : undefined;
+        if (!candidate) {
+            const pp = this.save.player.position;
+            let nearestSq = DOCK_ASSET_PRELOAD_RADIUS * DOCK_ASSET_PRELOAD_RADIUS;
+            for (const id of this.currentDockLocationIds()) {
+                const lp = LOCATIONS[id].position;
+                const dx = pp[0] - lp[0];
+                const dy = pp[1] - lp[1];
+                const dz = pp[2] - lp[2];
+                const distanceSq = dx * dx + dy * dy + dz * dz;
+                if (distanceSq < nearestSq) {
+                    nearestSq = distanceSq;
+                    candidate = id;
+                }
+            }
+        }
+        this.warmApproachAssets(candidate);
+    }
     restoreViewState() {
         if (this.save.player.dockedAt) {
             this.renderer?.setCockpitVisible(false);
@@ -1850,7 +1882,10 @@ export class GameSession {
             }
         }
         this.audio.update(dt, throttle, flying && this.afterburning, damage, nearbyEnemies, musicContext);
-        if (this.renderer)
+        // A renderer prepared behind the initial career gate must stay idle at
+        // the dock. It exists solely to make Launch instant, not to burn GPU
+        // time underneath opaque station screens.
+        if (this.renderer && flying)
             this.syncRender(dt, now);
     };
     // Copy current entity transforms into prev* slots so the renderer can
@@ -1934,6 +1969,7 @@ export class GameSession {
         this.maintainTargetLock();
         this.autoDockCheck();
         this.updateActiveInstance();
+        this.updateAssetWarmup();
         this.updateBountySpawns();
         this.updateDynamicEncounters();
         this.updateRace(dt);
@@ -4217,6 +4253,7 @@ export class GameSession {
             }
             this.save.player.navTargetId = next.id;
             this.autopilot = false;
+            this.updateAssetWarmup(true);
         }
         this.applyTarget(next);
     }
@@ -4408,6 +4445,9 @@ export class GameSession {
         if (!jumpPoint)
             return false;
         this.setNav(jumpPoint.id, { preservePlan: true });
+        // setNav sees the local jump point. Re-run after the route is fully
+        // formed so the final dock, not the gate, is decoded during travel.
+        this.updateAssetWarmup(true);
         this.applyTarget({ kind: 'location', id: jumpPoint.id, position: jumpPoint.position, name: jumpPoint.name });
         this.ui.pushSensor(t('Route plotted: {system} · {hops} jump(s) · no travel cost.', {
             system: SYSTEMS[systemId].name,
@@ -4434,6 +4474,7 @@ export class GameSession {
             this.save.world.plannedDestinationId = null;
             this.save.player.navTargetId = locationId;
             this.autopilot = false;
+            this.updateAssetWarmup(true);
             target = { kind, id: locationId, position: location.position, name: location.name };
         }
         else if (kind === 'ship') {
@@ -4839,6 +4880,7 @@ export class GameSession {
         this.renderer.setArmedJumpPoint?.();
         this.renderer.setTarget(undefined, undefined, undefined, player.navTargetId);
         this.updateActiveInstance(true);
+        this.updateAssetWarmup(true);
         this.resetPlayerInterpolation(true);
         this.nextEncounterAt = this.save.world.time + 16;
         if (spawnTraffic)
@@ -9385,6 +9427,7 @@ export class GameSession {
         this.save.player.velocity = [0, 0, 0];
         this.save.player.angularVelocity = [0, 0, 0];
         this.save.player.throttle = 0;
+        this.predictedDockLocationId = undefined;
         const stats = this.playerStats();
         this.save.player.shield = stats.shield;
         // An unlicensed (transponder-off) arrival owes the syndicate berth: the
@@ -9402,39 +9445,56 @@ export class GameSession {
         this.ui.showDock(this.save, locationId);
         this.persistSave();
     }
-    async prepareDockedFlightRuntime() {
-        this.ui.setLoading?.(true, t('PREPARING FLIGHT'));
-        try {
-            // Let the loading veil reach the screen before WebGL allocates the
-            // scene. This turns an unavoidable first-flight setup pause into a
-            // clear transition instead of a frozen station button.
-            await new Promise((resolve) => requestAnimationFrame(() => resolve()));
-            if (!this.active)
-                return false;
-            this.initializeFlightRuntime();
-            this.ensureInitialTraffic();
-            this.updateActiveInstance(true);
-            this.ensureActiveRaceRestored();
-            this.renderer.setCockpitVisible(true);
-            await this.prepareFlightScene();
+    async prepareDockedFlightRuntime({ showLoading = true } = {}) {
+        if (this.flightPrepared)
             return true;
-        }
-        catch (error) {
-            console.error('Flight preparation failed.', error);
-            this.ui.showToast(t('Flight systems could not be loaded. Reload and try again.'), 'danger', 5200);
-            return false;
+        if (this.flightPreparationPromise)
+            return this.flightPreparationPromise;
+        if (showLoading)
+            this.ui.setLoading?.(true, t('PREPARING FLIGHT'));
+        const preparation = (async () => {
+            try {
+                // Give the existing career-start veil one paint before WebGL
+                // allocates and compiles. The station appears only after this
+                // completes, so later Launch presses are immediate.
+                await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+                if (!this.active)
+                    return false;
+                this.initializeFlightRuntime();
+                this.ensureInitialTraffic();
+                this.updateActiveInstance(true);
+                this.ensureActiveRaceRestored();
+                this.renderer.setCockpitVisible(true);
+                await this.prepareFlightScene();
+                if (this.save.player.dockedAt)
+                    this.renderer.setCockpitVisible(false);
+                return true;
+            }
+            catch (error) {
+                console.error('Flight preparation failed.', error);
+                this.ui.showToast(t('Flight systems could not be loaded. Reload and try again.'), 'danger', 5200);
+                return false;
+            }
+            finally {
+                if (showLoading)
+                    this.ui.setLoading?.(false);
+            }
+        })();
+        this.flightPreparationPromise = preparation;
+        try {
+            return await preparation;
         }
         finally {
-            this.ui.setLoading?.(false);
+            if (this.flightPreparationPromise === preparation)
+                this.flightPreparationPromise = undefined;
         }
     }
     async launch() {
         const locationId = this.save.player.dockedAt;
         if (!locationId || this.launchPreparing)
             return false;
-        const needsFlightRuntime = !this.renderer;
         this.launchPreparing = true;
-        if (needsFlightRuntime && !await this.prepareDockedFlightRuntime()) {
+        if (!this.flightPrepared && !await this.prepareDockedFlightRuntime({ showLoading: false })) {
             this.launchPreparing = false;
             return false;
         }
@@ -9489,6 +9549,7 @@ export class GameSession {
         this.ui.showHud();
         this.ui.pushEvent(t('Cleared for departure from {name}.', { name: location.name }), 'success');
         this.updateActiveInstance(true);
+        this.updateAssetWarmup(true);
         this.persistSave();
         this.launchPreparing = false;
         return true;
@@ -9502,6 +9563,7 @@ export class GameSession {
         }
         this.save.player.navTargetId = locationId;
         this.autopilot = false;
+        this.updateAssetWarmup(true);
         this.ui.pushSensor(t('NAV set: {name}.', { name: LOCATIONS[locationId].name }), 'info');
         this.audio.play('ui');
         return true;
@@ -9969,22 +10031,7 @@ export class GameSession {
     }
     syncTiltSteering(useTilt) {
         if (useTilt) {
-            void this.input.enableTilt().then((active) => {
-                if (active) {
-                    const neutral = this.input.calibrateTilt();
-                    // Persist the neutral alongside the mode (mirroring
-                    // enableTilt) so a reload keeps tilt instead of falling
-                    // back to the stick with no saved neutral.
-                    this.save.settings.tiltNeutral = neutral;
-                }
-                // If permission was refused (or there is no gyro), fall back to
-                // the stick and keep the persisted setting honest instead of
-                // leaving the pause menu showing a tilt mode that never engaged.
-                const mode = this.input.tiltActive ? 'tilt' : 'stick';
-                this.save.settings.steering = mode;
-                this.ui.setTouchSteering(mode);
-                this.persistSave();
-            });
+            void this.activateTiltSteering({ recalibrate: true });
         }
         else {
             // Actually switch off tilt input, not just the touch layout — the
@@ -9994,19 +10041,35 @@ export class GameSession {
             this.ui.setTouchSteering('stick');
         }
     }
-    enableTilt() {
-        return this.input.enableTilt().then((active) => {
-            const neutral = active ? this.input.calibrateTilt() : undefined;
-            this.save.settings.steering = this.input.tiltActive ? 'tilt' : 'stick';
-            if (active)
+    async activateTiltSteering({ alreadyGranted = false, recalibrate = false } = {}) {
+        const permitted = await this.input.enableTilt(alreadyGranted);
+        const sampled = permitted ? await this.input.waitForTiltSample() : false;
+        if (!this.active)
+            return false;
+        let neutral;
+        if (sampled && (recalibrate || !this.input.tiltCalibrated))
+            neutral = this.input.calibrateTilt();
+        const active = Boolean(sampled && this.input.tiltActive);
+        if (active) {
+            if (neutral)
                 this.save.settings.tiltNeutral = neutral;
-            this.ui.setTouchSteering(this.input.tiltActive ? 'tilt' : 'stick');
-            this.persistSave();
-            return this.input.tiltActive;
-        });
+            this.save.settings.steering = 'tilt';
+        }
+        else {
+            this.input.disableTilt();
+            this.save.settings.steering = 'stick';
+        }
+        this.ui.setTouchSteering(active ? 'tilt' : 'stick');
+        this.persistSave();
+        return active;
+    }
+    enableTilt() {
+        return this.activateTiltSteering({ recalibrate: true });
     }
     calibrateTilt() {
         const neutral = this.input.calibrateTilt();
+        if (!neutral)
+            return undefined;
         this.save.settings.tiltNeutral = neutral;
         this.persistSave();
         return neutral;

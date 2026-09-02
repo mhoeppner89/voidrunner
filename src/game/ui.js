@@ -290,7 +290,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.7.34';
+const GAME_VERSION = '0.7.35';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -421,6 +421,11 @@ const COCKPIT_ART_BY_SHIP = Object.freeze({
     lancer: './assets/remaster/cockpit-lancer.webp',
     atlas: './assets/remaster/cockpit-atlas.webp',
 });
+const FLIGHT_SCREEN_ART = Object.freeze(['./art/sky/milky-way-wide-alpha-v3.webp']);
+const OUTFITTING_SCREEN_ART = Object.freeze([
+    './art/outfitting/v2/dealer-workshop-backdrop-v2.png',
+    './art/outfitting/v2/dealer-mechanic-portrait-v2.png',
+]);
 const OUTFIT_CATEGORY_KEYS = Object.freeze({ guns: 'GUNS', launchers: 'LAUNCHER', drive: 'DRIVE', defense: 'DEFENSE', utility: 'UTILITY' });
 const OUTFIT_CATEGORY_TO_KEY = Object.freeze({ gun: 'guns', launcher: 'launchers', drive: 'drive', defense: 'defense', utility: 'utility' });
 const OUTFIT_DEALER_CATEGORIES = Object.freeze({
@@ -482,6 +487,12 @@ export class GameUI {
     outfittingMountId;
     outfittingCategory = 'guns';
     outfittingNotice;
+    // Keep decoded images only for the active cockpit, the current dock, and
+    // one predicted dock. Network responses remain in the service-worker cache,
+    // while this small retained set prevents a second decode during screen
+    // changes without growing to every multi-megabyte station plate visited.
+    warmImageRecords = new Map();
+    warmImageSlots = new Map();
     constructor(host) {
         host.innerHTML = this.shellMarkup();
         this.root = host.querySelector('#game-shell');
@@ -525,6 +536,7 @@ export class GameUI {
     }
     setCockpitShip(shipId = 'wayfarer') {
         const nextId = COCKPIT_ART_BY_SHIP[shipId] ? shipId : 'wayfarer';
+        void this.preloadImageSet('flight-core', [COCKPIT_ART_BY_SHIP[nextId], ...FLIGHT_SCREEN_ART], { priority: 'high' });
         if (this.cockpitShipId === nextId && this.root.dataset.cockpitShip === nextId)
             return;
         this.cockpitShipId = nextId;
@@ -532,6 +544,152 @@ export class GameUI {
         const art = this.el('.cockpit-art');
         if (art)
             art.style.backgroundImage = `url("${COCKPIT_ART_BY_SHIP[nextId]}")`;
+    }
+    warmImage(url, priority = 'low') {
+        let record = this.warmImageRecords.get(url);
+        if (record) {
+            if (priority === 'high')
+                record.image.fetchPriority = 'high';
+            return record;
+        }
+        const image = new Image();
+        image.decoding = 'async';
+        image.fetchPriority = priority;
+        const loaded = new Promise((resolve) => {
+            image.addEventListener('load', () => resolve(true), { once: true });
+            image.addEventListener('error', () => resolve(false), { once: true });
+        });
+        image.src = url;
+        record = { image, refs: 0, ready: false, failed: false, promise: undefined };
+        record.promise = (async () => {
+            let ok = false;
+            try {
+                if (typeof image.decode === 'function')
+                    await image.decode();
+                else
+                    ok = await loaded;
+                ok = ok || image.naturalWidth > 0;
+            }
+            catch {
+                ok = await loaded;
+            }
+            record.ready = Boolean(ok && image.naturalWidth > 0);
+            record.failed = !record.ready;
+            return record.ready;
+        })();
+        this.warmImageRecords.set(url, record);
+        return record;
+    }
+    releaseWarmImage(url) {
+        const record = this.warmImageRecords.get(url);
+        if (!record)
+            return;
+        record.refs = Math.max(0, record.refs - 1);
+        if (record.refs === 0) {
+            void record.promise.finally(() => {
+                if (record.refs === 0 && this.warmImageRecords.get(url) === record)
+                    this.warmImageRecords.delete(url);
+            });
+        }
+    }
+    clearWarmImageSlot(slot) {
+        const urls = this.warmImageSlots.get(slot);
+        if (!urls)
+            return;
+        this.warmImageSlots.delete(slot);
+        for (const url of urls)
+            this.releaseWarmImage(url);
+    }
+    preloadImageSet(slot, urls, { priority = 'low' } = {}) {
+        const next = new Set(urls.filter(Boolean));
+        const previous = this.warmImageSlots.get(slot) ?? new Set();
+        for (const url of previous) {
+            if (!next.has(url))
+                this.releaseWarmImage(url);
+        }
+        for (const url of next) {
+            if (!previous.has(url)) {
+                const record = this.warmImage(url, priority);
+                record.refs += 1;
+            }
+            else if (priority === 'high') {
+                this.warmImage(url, priority);
+            }
+        }
+        this.warmImageSlots.set(slot, next);
+        return Promise.all([...next].map((url) => this.warmImage(url, priority).promise))
+            .then((results) => results.every(Boolean));
+    }
+    locationAssetUrls(locationId, shipId = this.save?.player?.shipId ?? 'wayfarer') {
+        const location = LOCATIONS[locationId];
+        const art = DOCK_ART_BY_LOCATION[locationId];
+        if (!location || !art)
+            return [];
+        const urls = [...Object.values(art)];
+        const shipArt = VESPER_SHIP_PROFILES[shipId]?.art;
+        if (shipArt)
+            urls.push(shipArt);
+        // A shipyard can replace the active hull while the player remains on
+        // this screen. Warm the hulls sold here as part of the dock bundle so
+        // the newly commissioned ship portrait does not introduce a fresh
+        // image request after the purchase. setCockpitShip warms its cockpit.
+        for (const candidateId of location.shipsForSale ?? []) {
+            const candidateArt = VESPER_SHIP_PROFILES[candidateId]?.art;
+            if (candidateArt)
+                urls.push(candidateArt);
+        }
+        for (const person of location.people ?? []) {
+            const portrait = NPC_PORTRAIT_BY_ID[person.id];
+            if (portrait)
+                urls.push(portrait);
+        }
+        if (hasLocationService(locationId, 'market'))
+            urls.push(...Object.values(COMMODITIES).map((commodity) => commodity.image));
+        if (hasLocationService(locationId, 'outfitting')) {
+            urls.push(...OUTFITTING_SCREEN_ART);
+            urls.push(...OUTFIT_ITEM_IDS.map((id) => OUTFIT_ITEMS[id]?.artPath ?? OUTFIT_ITEMS[id]?.art));
+        }
+        return [...new Set(urls.filter(Boolean))];
+    }
+    preloadLocationAssets(locationId, { slot = 'location-next', priority = 'low', shipId = this.save?.player?.shipId } = {}) {
+        if (!DOCK_LOCATION_IDS.includes(locationId)) {
+            this.clearWarmImageSlot(slot);
+            return Promise.resolve(false);
+        }
+        return this.preloadImageSet(slot, this.locationAssetUrls(locationId, shipId), { priority });
+    }
+    activateLocationAssets(locationId, shipId = this.save?.player?.shipId, priority = 'high') {
+        const ready = this.preloadLocationAssets(locationId, { slot: 'location-current', priority, shipId });
+        this.clearWarmImageSlot('location-next');
+        return ready;
+    }
+    predictLocationAssets(locationId, shipId = this.save?.player?.shipId) {
+        return this.preloadLocationAssets(locationId, { slot: 'location-next', priority: 'low', shipId });
+    }
+    preloadSessionAssets(save, { priority = 'high', includeLocation = true } = {}) {
+        const shipId = COCKPIT_ART_BY_SHIP[save?.player?.shipId] ? save.player.shipId : 'wayfarer';
+        const jobs = [this.preloadImageSet('flight-core', [COCKPIT_ART_BY_SHIP[shipId], ...FLIGHT_SCREEN_ART], { priority })];
+        if (!includeLocation) {
+            this.clearWarmImageSlot('location-current');
+            this.clearWarmImageSlot('location-next');
+        }
+        if (includeLocation && save?.player?.dockedAt)
+            jobs.push(this.activateLocationAssets(save.player.dockedAt, shipId, priority));
+        else if (includeLocation && DOCK_LOCATION_IDS.includes(save?.player?.navTargetId))
+            jobs.push(this.predictLocationAssets(save.player.navTargetId, shipId));
+        return Promise.all(jobs).then((results) => results.every(Boolean));
+    }
+    assetWarmSnapshot() {
+        const slots = {};
+        for (const [slot, urls] of this.warmImageSlots) {
+            const records = [...urls].map((url) => this.warmImageRecords.get(url));
+            slots[slot] = {
+                count: urls.size,
+                ready: records.filter((record) => record?.ready).length,
+                failed: records.filter((record) => record?.failed).length,
+            };
+        }
+        return { retained: this.warmImageRecords.size, slots };
     }
     getVesperShipId(shipId = this.save?.player?.shipId) {
         if (PREVIEW_MODE && VESPER_SHIP_PROFILES[this.vesperPreviewShipId])
@@ -1087,6 +1245,9 @@ export class GameUI {
         this.cancelVesperLaunchTransition();
         this.save = save;
         this.dockLocation = locationId;
+        // Promote a decoded approach bundle before inserting the first dock
+        // image. Direct/debug arrivals start the same warmup as a fallback.
+        void this.activateLocationAssets(locationId, save?.player?.shipId);
         this.dockTab = 'concourse';
         this.dockTerminal = 'concourse';
         this.marketPoint = '';

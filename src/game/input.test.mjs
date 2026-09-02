@@ -367,11 +367,16 @@ test('tilt permission, rotation, calibration, sensitivity, inversion, and malfor
     assert.equal(input.tiltSupported, true);
     assert.equal(input.tiltActive, false);
     assert.equal(await input.enableTilt(), true);
+    assert.equal(input.calibrateTilt(), undefined, 'neutral cannot be captured before the first real sensor sample');
     windowFake.emit('deviceorientation', { beta: Infinity, gamma: 2 });
     windowFake.emit('deviceorientation', { beta: 2, gamma: undefined });
     assert.equal(input.tiltSeen, false, 'non-finite device readings are ignored');
+    const firstSample = input.waitForTiltSample(50);
     windowFake.emit('deviceorientation', { beta: 8, gamma: -4 });
+    assert.equal(await firstSample, true, 'activation can wait for the first usable sensor sample');
     assert.equal(input.tiltSeen, true);
+    assert.equal(input.tiltBeta, 8, 'the first beta sample is used directly instead of smoothing from zero');
+    assert.equal(input.tiltGamma, -4, 'the first gamma sample is used directly instead of smoothing from zero');
     assert.equal(input.tiltActive, false, 'tilt needs calibration before steering');
     const neutral = input.calibrateTilt();
     assert.equal(input.tiltActive, true);
