@@ -162,10 +162,19 @@ export const GLB_SHIP_CONFIG = {
         flareSize: 8, flareOpacity: 0.19, trailLength: 56, trailWidth: 4.1, trailOpacity: 0.46,
     },
 };
-// In-flight traffic is intentionally larger than the legacy presentation.
-// Keep the source GLB calibration unchanged so shipyard previews retain their
-// framing; only world-space hulls and their voxel loading placeholders grow.
-export const NPC_SHIP_SCALE = 2;
+// In-flight hull scaling stays separate from the source GLB calibration so
+// shipyard previews retain their framing. Combat fighters are 80% of the first
+// enlarged pass (1.6x legacy); civilian traffic, Concord frigates/capitals, and
+// their separately-authored wrecks keep the full 2x scale.
+export const NPC_FIGHTER_SCALE = 1.6;
+export const NPC_CAPITAL_SCALE = 2;
+const NPC_FIGHTER_VARIANTS = new Set([
+    'kestrel',
+    'talon',
+    'lancer',
+    'warden',
+]);
+export const npcShipScaleForVariant = (variant) => NPC_FIGHTER_VARIANTS.has(variant) ? NPC_FIGHTER_SCALE : NPC_CAPITAL_SCALE;
 // Race entities carry their own hull variant so the starting grid can show
 // the actual ships that are about to race. Ordinary traffic still only has a
 // role, so retain the role mapping as the fallback for every other ship.
@@ -3087,7 +3096,7 @@ export class SpaceRenderer {
         const model = createVoxelShipModel(voxelVariant, palette);
         const group = model.group;
         const placeholderScale = config?.placeholderScale ?? 1;
-        const baseScale = (variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1) * placeholderScale * NPC_SHIP_SCALE;
+        const baseScale = (variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1) * placeholderScale * npcShipScaleForVariant(variant);
         const engineColor = palette.engine;
         const engineFlareTexture = this.radialTexture(cssHex(engineColor), cssHex(engineColor));
         const flameTex = this.engineFlameTexture();
@@ -3167,7 +3176,7 @@ export class SpaceRenderer {
             return;
         const promise = loadGlb(config.path ?? `assets/models/ships/${config.file}`)
             .then((model) => {
-                const ready = this.prepareGlbShip(model, config);
+                const ready = this.prepareGlbShip(model, config, variant);
                 this.glbShipModels.set(variant, ready);
                 return ready;
             })
@@ -3180,9 +3189,9 @@ export class SpaceRenderer {
     }
     // Bake the per-variant yaw + scale into the shared model so every clone
     // inherits the same flight orientation and world size.
-    prepareGlbShip(model, config) {
+    prepareGlbShip(model, config, variant) {
         model.rotation.y = config.yaw;
-        model.scale.setScalar(config.scale * NPC_SHIP_SCALE);
+        model.scale.setScalar(config.scale * npcShipScaleForVariant(variant));
         return model;
     }
     // A GLB ship with per-ship material tints (faction livery), engine flares

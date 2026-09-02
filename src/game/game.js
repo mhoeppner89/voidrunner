@@ -8,7 +8,7 @@ import { acceptMission, awardCareerProgress, completeBountyMission, completeMiss
 import { RACE_QUEST_ID, createRaceRacers, crossedRaceGate, generateRaceCourse, normalizeRaceRecord, raceCourseUnlocked, racePayout, raceRankLabel, raceRacerTarget, recordRaceResult, stageRaceRacers, updateRaceRacer } from './racing.js';
 import { clamp, damp, formatCredits, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
 import { EntityStore } from './entityStore.js';
-import { NPC_SHIP_SCALE, SpaceRenderer } from './render.js';
+import { NPC_FIGHTER_SCALE, SpaceRenderer, npcShipScaleForVariant } from './render.js';
 import { saveGame } from './save.js';
 import { getQuest, setFlag, setStep, startQuest } from './quests.js';
 import { getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
@@ -427,8 +427,8 @@ const HYPERDRIVE_ALIGNMENT = 0.88;
 // second to pull an old velocity vector onto the nose and braking is limited
 // by counter-thrust. Without assistance, cutting or lowering the throttle does
 // not erase momentum: the pilot must point thrust against the existing vector.
-const FLIGHT_ASSIST_LATERAL_DAMPING = 0.72;
-const FLIGHT_ASSIST_BURN_LATERAL_DAMPING = 0.48;
+const FLIGHT_ASSIST_LATERAL_DAMPING = 0.9;
+const FLIGHT_ASSIST_BURN_LATERAL_DAMPING = 0.62;
 const FLIGHT_ASSIST_BRAKE_MULTIPLIER = 1.25;
 const INERTIAL_OVERSPEED_MARGIN = 1.06;
 const INERTIAL_OVERSPEED_BRAKE_MULTIPLIER = 0.45;
@@ -629,17 +629,18 @@ const CAPITAL_SHIP_STATS = Object.freeze({
         approachOutward: 1700, approachTangent: 1700, approachUp: 500,
     }),
 });
-// Rendering doubles every NPC hull in flight. Precompute the matching physical
-// profiles once at module load so collision and avoidance remain allocation-
-// free in the per-ship hot paths. Player collision stays at cockpit scale.
+// Precompute physical profiles at the same per-variant scale used by rendering
+// so collision and avoidance remain exact and allocation-free in the hot path.
+// Player collision stays at cockpit scale; combat fighters use the reduced
+// 1.6x presentation while civilian traffic and capital hulls remain at 2x.
 const NPC_HULL_FLIGHT_STATS = Object.freeze(Object.fromEntries(Object.entries(HULL_FLIGHT_STATS).map(([variant, stats]) => [variant, Object.freeze({
     ...stats,
-    collisionRadius: stats.collisionRadius * NPC_SHIP_SCALE,
-    hullHalfExtents: Object.freeze(stats.hullHalfExtents.map((extent) => extent * NPC_SHIP_SCALE)),
+    collisionRadius: stats.collisionRadius * npcShipScaleForVariant(variant),
+    hullHalfExtents: Object.freeze(stats.hullHalfExtents.map((extent) => extent * npcShipScaleForVariant(variant))),
 })])));
 const npcFlightVariant = (ship) => NPC_HULL_FLIGHT_STATS[ship?.variant] ? ship.variant : shipVariantForRole(ship?.role);
-const npcCollisionRadius = (ship) => NPC_HULL_FLIGHT_STATS[npcFlightVariant(ship)]?.collisionRadius ?? NPC_SHIP_RADIUS * NPC_SHIP_SCALE;
-const ATTACK_RESET_RANGE = 175;
+const npcCollisionRadius = (ship) => NPC_HULL_FLIGHT_STATS[npcFlightVariant(ship)]?.collisionRadius ?? NPC_SHIP_RADIUS * NPC_FIGHTER_SCALE;
+const ATTACK_RESET_RANGE = 260;
 const ATTACK_SEPARATION = 44;
 const ATTACK_FIRE_RANGE = 140;
 // Lateral aim offset so a strafing pass is a near-miss beside the target
@@ -6198,10 +6199,11 @@ export class GameSession {
         // Aggressive pilots back their threats with action: while the press
         // window from a landed-hit threat lasts, the next pass commits deeper
         // (tighter standoff, 0.65x pass range) and the extend is abbreviated
-        // (0.6x reset range), so the ship turns back and closes again sooner.
+        // (0.7x reset range), so it still turns back sooner than other pilots
+        // without collapsing into the old short orbit around the player.
         const pressing = ship.pilot?.temperament === 'aggressive' && this.save.world.time < (ship.pressingUntil ?? 0);
         const effectivePassRange = pressing ? passRange * 0.65 : passRange;
-        const effectiveResetRange = pressing ? resetRange * 0.6 : resetRange;
+        const effectiveResetRange = pressing ? resetRange * 0.7 : resetRange;
         if (!ship.attackPhase)
             ship.attackPhase = 'approach';
         if (ship.attackPhase === 'approach' && distance < effectivePassRange)
@@ -6813,7 +6815,7 @@ export class GameSession {
             aimDir = this.tmpP4.copy(direction).applyAxisAngle(axis, (ship.aiRng() - 0.5) * 2 * spread).normalize();
         }
         const hull = this.npcHullExtents(ship);
-        const muzzleOffset = ship.muzzleOffset ?? Math.max(2.4 * NPC_SHIP_SCALE, hull[2] * 0.9);
+        const muzzleOffset = ship.muzzleOffset ?? Math.max(2.4 * npcShipScaleForVariant(npcFlightVariant(ship)), hull[2] * 0.9);
         const position = vec(ship.position).addScaledVector(aimDir, muzzleOffset);
         const slot = this.projStore.alloc();
         this.projStore.setPos(slot, position.x, position.y, position.z);
@@ -7511,7 +7513,7 @@ export class GameSession {
     destroyShip(ship, attackerId, position = ship.position) {
         ship.hull = 0;
         this.resolveHyperdriveIntercept(ship);
-        const explosionScale = (CAPITAL_SHIP_STATS[ship.capitalClass]?.explosionScale ?? (ship.role === 'trader' ? 1.5 : 1)) * NPC_SHIP_SCALE;
+        const explosionScale = (CAPITAL_SHIP_STATS[ship.capitalClass]?.explosionScale ?? (ship.role === 'trader' ? 1.5 : 1)) * npcShipScaleForVariant(npcFlightVariant(ship));
         this.renderer.spawnExplosion(ship.position, ship.hostile, explosionScale);
         this.audio.play('explosion', 1.1);
         if (ship.hostile && attackerId === 'player') {
@@ -8173,7 +8175,7 @@ export class GameSession {
             // Pass/reset range come from the pilot's temperament (timid keeps
             // distance, aggressive presses in) on top of the per-ship variance.
             passRange: (48 + rng() * 20) * pilot.passRangeMul,
-            resetRange: (170 + rng() * 50) * pilot.resetRangeMul,
+            resetRange: (260 + rng() * 60) * pilot.resetRangeMul,
             passPhase: rng() * Math.PI * 2,
             pilot,
             aiRng,
