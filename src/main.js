@@ -534,6 +534,15 @@ window.render_game_to_text = () => {
                 .map(([commodityId, quantity]) => ({ commodityId, quantity: Math.floor(Number(quantity)) })),
             sealedCargoUnits: (save.player.sealedCargo ?? []).reduce((sum, entry) => sum + Math.max(0, Number(entry?.units) || 0), 0),
         } : null,
+        shipyard: save.player.dockedAt && runtime?.ui?.marketPoint === 'shipyard' ? {
+            selectedShipId: runtime.ui.shipDetailId ?? null,
+            currentShipId: save.player.shipId,
+            shipsForSale: (LOCATIONS[save.player.dockedAt]?.shipsForSale ?? []).map((shipId) => ({
+                shipId,
+                name: SHIPS[shipId]?.name ?? shipId,
+                selected: shipId === runtime.ui.shipDetailId,
+            })),
+        } : null,
         race: race ? {
             courseId: race.course.id,
             state: race.state,

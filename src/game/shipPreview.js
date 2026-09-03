@@ -10,21 +10,21 @@ import { GLB_SHIP_CONFIG } from './render.js';
 // the titan it is. Tuned against the reference renders; kept away from the
 // clipping edge of the rotating hull.
 const PREVIEW_FRAME_ZOOM = {
-    'atlas-freighter': 0.74,
+    'atlas-freighter': 0.58,
 };
+const DEFAULT_PREVIEW_FRAME_ZOOM = 0.54;
 
-// A lightweight turntable renderer for the shipyard cards. Each card gets its
-// own WebGL context (a dock sells at most two hulls at once), so the models can
-// spin independently and are disposed cleanly when the market re-renders or the
-// player launches. The voxel hull renders immediately, then the real GLB model
-// (the same hull the flight scene flies) swaps in when its fetch resolves.
+// A lightweight turntable renderer for the selected showroom hull. The old
+// card grid created several small WebGL contexts; the broker now keeps one
+// large preview alive and disposes it when the market re-renders or the player
+// launches. A voxel hull renders immediately, then the flight GLB swaps in.
 export class ShipPreview {
     constructor(container, variant) {
         this.container = container;
         this.variant = variant;
         this.disposed = false;
         this.renderer = new THREE.WebGLRenderer({
-            antialias: false,
+            antialias: true,
             alpha: true,
             powerPreference: 'high-performance',
             depth: true,
@@ -33,12 +33,12 @@ export class ShipPreview {
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderer.toneMapping = THREE.NeutralToneMapping;
         this.renderer.toneMappingExposure = 1.18;
-        this.renderer.setPixelRatio(1);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
         this.renderer.setClearColor(0x000000, 0);
         this.renderer.domElement.className = 'ship-preview-canvas';
         this.renderer.domElement.style.width = '100%';
         this.renderer.domElement.style.height = '100%';
-        this.renderer.domElement.style.imageRendering = 'pixelated';
+        this.renderer.domElement.style.imageRendering = 'auto';
         this.renderer.domElement.setAttribute('aria-hidden', 'true');
         container.appendChild(this.renderer.domElement);
 
@@ -126,7 +126,7 @@ export class ShipPreview {
         const tanHalf = Math.tan(fovHalf);
         const aspect = this.container.clientWidth / Math.max(1, this.container.clientHeight);
         const fit = Math.min(tanHalf, tanHalf * aspect);
-        const zoom = PREVIEW_FRAME_ZOOM[this.variant] ?? 1;
+        const zoom = PREVIEW_FRAME_ZOOM[this.variant] ?? DEFAULT_PREVIEW_FRAME_ZOOM;
         const distance = (radius / Math.max(fit, 0.0001)) * 1.06 * zoom;
         const azimuth = Math.PI / 3;
         const elevation = Math.PI / 6;

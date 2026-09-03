@@ -8,7 +8,7 @@ import { TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 import { shipTopDownProfile } from './shipTopDownProfile.js';
 import { defaultSettings } from './save.js';
 import { getLanguage, t } from './i18n.js';
-import { HULL_TRADE_IN_RATE } from './shipTrade.js';
+import { HULL_TRADE_IN_RATE, quoteShipTrade } from './shipTrade.js';
 import { HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RATE, itemAvailable, itemFitsMount, loadoutFor, outfittingUsage, quoteOutfitting } from './outfitting.js';
 const escapeHtml = (value) => value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const percent = (value, max) => (max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100)));
@@ -290,7 +290,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.7.38';
+const GAME_VERSION = '0.7.39';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -832,15 +832,46 @@ export class GameUI {
     `;
     }
     bindStaticEvents() {
-        const mapTargetFromEvent = (event) => event.target.closest('[data-map-target-kind][data-map-target-id]');
+        const delegatedActionSelector = '[data-ui-command], [data-map-view], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-commodity-id], [data-market-qty], [data-bar-panel], [data-nav-id], [data-trade], [data-jettison], [data-mission-id], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action], [data-equipment-id], [data-ship-id], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty], [data-pay-mug]';
+        const directPointerElement = (event) => {
+            const correctedSceneControl = event.pointerType !== 'mouse' && event.target instanceof Element
+                ? event.target.closest('.scene-pointer')
+                : undefined;
+            if (!correctedSceneControl)
+                return document.elementFromPoint(event.clientX, event.clientY);
+            // A corrected touch target enters :hover before pointerdown reaches
+            // this listener. Scene pointers grow by 3% on hover, which can make
+            // a nearby blank tap appear to be a literal hit after Chrome has
+            // already retargeted it. Remove that visual transform for this one
+            // hit test, then restore the authored presentation immediately.
+            const previousTransform = correctedSceneControl.style.transform;
+            const previousTransition = correctedSceneControl.style.transition;
+            correctedSceneControl.style.transform = 'none';
+            correctedSceneControl.style.transition = 'none';
+            const direct = document.elementFromPoint(event.clientX, event.clientY);
+            correctedSceneControl.style.transform = previousTransform;
+            correctedSceneControl.style.transition = previousTransition;
+            return direct;
+        };
+        const mapTargetFromEvent = (event) => directPointerElement(event)?.closest('[data-map-target-kind][data-map-target-id]');
         const mapTargetKey = (target) => `${target.dataset.mapTargetKind}:${target.dataset.mapTargetId}`;
         const selectMapTarget = (target) => {
             this.actions?.selectTarget(target.dataset.mapTargetKind, target.dataset.mapTargetId);
             this.hideMap();
         };
+        let touchActionStart;
         this.root.addEventListener('pointerdown', (event) => {
             if (event.pointerType === 'mouse')
                 return;
+            // Mobile Chrome expands small touch targets by retargeting a tap
+            // from nearby empty space onto a control. Record the literal hit
+            // under the finger so a compatibility click is accepted only when
+            // the gesture really began on that control.
+            touchActionStart = {
+                pointerId: event.pointerId,
+                target: directPointerElement(event)?.closest(delegatedActionSelector),
+                at: performance.now(),
+            };
             const target = mapTargetFromEvent(event);
             if (!target)
                 return;
@@ -867,6 +898,8 @@ export class GameUI {
         this.root.addEventListener('pointercancel', (event) => {
             if (this.mapPointer?.pointerId === event.pointerId)
                 this.mapPointer = undefined;
+            if (touchActionStart?.pointerId === event.pointerId)
+                touchActionStart = undefined;
         });
         this.root.addEventListener('click', (event) => {
             const previewShip = event.target.closest('[data-vesper-preview-ship]');
@@ -879,8 +912,18 @@ export class GameUI {
                 this.startVesperLaunchTransition();
                 return;
             }
-            const target = event.target.closest('[data-ui-command], [data-map-view], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-commodity-id], [data-market-qty], [data-bar-panel], [data-nav-id], [data-trade], [data-jettison], [data-mission-id], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action], [data-equipment-id], [data-ship-id], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty], [data-pay-mug]');
-            if (!target)
+            const target = event.target.closest(delegatedActionSelector);
+            // Delegated action attributes belong only on actual controls. Dock
+            // state is also mirrored into data attributes for styling and
+            // scroll restoration; never let a future state attribute turn an
+            // otherwise inert part of a location screen into a click target.
+            if (!target || !target.matches('button, [role="button"], [role="option"]'))
+                return;
+            const touchOrigin = touchActionStart && performance.now() - touchActionStart.at < 1200
+                ? touchActionStart
+                : undefined;
+            touchActionStart = undefined;
+            if (touchOrigin && touchOrigin.target !== target)
                 return;
             if (target.dataset.uiCommand)
                 this.handleCommand(target.dataset.uiCommand, target);
@@ -1330,18 +1373,18 @@ export class GameUI {
         // scroll position; only actual navigation resets it to the top.
         const prevTab = dock.dataset.tab;
         const prevTerminal = dock.dataset.terminal;
-        const prevMarketPoint = dock.dataset.marketPoint ?? '';
-        const prevBarPanel = dock.dataset.barPanel ?? '';
-        const prevBarPerson = dock.dataset.barPerson ?? '';
+        const prevMarketPoint = dock.dataset.currentMarketPoint ?? '';
+        const prevBarPanel = dock.dataset.currentBarPanel ?? '';
+        const prevBarPerson = dock.dataset.currentBarPerson ?? '';
         const prevScroll = dock.querySelector('.dock-content')?.scrollTop ?? 0;
         dock.style.setProperty('--dock-accent', location.accent);
         dock.style.setProperty('--dock-secondary', location.secondary);
         dock.dataset.location = this.dockLocation;
         dock.dataset.tab = this.dockTab;
         dock.dataset.terminal = this.dockTerminal;
-        dock.dataset.marketPoint = this.marketPoint ?? '';
-        dock.dataset.barPanel = this.barPanel ?? '';
-        dock.dataset.barPerson = this.barPersonId ?? '';
+        dock.dataset.currentMarketPoint = this.marketPoint ?? '';
+        dock.dataset.currentBarPanel = this.barPanel ?? '';
+        dock.dataset.currentBarPerson = this.barPersonId ?? '';
         const illustrationScreen = this.dockTerminal === 'bar'
             ? 'bar'
             : this.dockTerminal === 'market'
@@ -2301,57 +2344,86 @@ export class GameUI {
     }
     renderShipyard() {
         const stockIds = LOCATIONS[this.dockLocation].shipsForSale ?? [];
-        if (this.shipDetailId && stockIds.includes(this.shipDetailId))
-            return this.renderShipDetail(this.shipDetailId);
-        this.shipDetailId = undefined;
         if (!stockIds.length)
             return `<div class="shipyard-grid"><p class="market-empty">${t('No hulls for sale at this port.')}</p></div>`;
-        return `<div class="shipyard-grid">${stockIds.map((shipId) => this.renderShipOverview(shipId)).join('')}</div>`;
-    }
-    renderShipOverview(saleId) {
-        const ship = SHIPS[saleId];
-        const active = this.save.player.shipId === saleId;
+        const selectedId = stockIds.includes(this.shipDetailId) ? this.shipDetailId : stockIds[0];
         const current = SHIPS[this.save.player.shipId] ?? SHIPS.wayfarer;
         const tradeIn = Math.round(current.price * HULL_TRADE_IN_RATE);
-        const due = ship.price - tradeIn;
-        return `
-      <article class="ship-card ship-overview ${active ? 'active' : ''}" data-ship-detail="${saleId}" role="button" tabindex="0" aria-label="${t('View {name} details', { name: ship.name })}">
-        <div class="ship-silhouette ${saleId}" data-variant="${ship.variant}"></div>
-        <header><span>${escapeHtml(t(ship.className))}</span><b>${active ? t('CURRENT HULL') : due >= 0 ? formatCredits(due) : `+${formatCredits(Math.abs(due))}`}</b></header>
-        <h3>${escapeHtml(ship.name)}</h3>
-        <p class="ship-personality">${escapeHtml(t(ship.personality ?? ''))}</p>
-        <div class="ship-overview-meta"><span>${active ? t('YOUR ONLY SHIP') : t('AFTER 50% TRADE-IN')}</span><b>${t('DETAILS')} ▸</b></div>
-      </article>
-    `;
+        this.shipDetailId = selectedId;
+        return `<div class="ship-broker" data-selected-ship="${selectedId}">
+          <header class="ship-broker-header">
+            <div><span class="eyebrow">${t('SHIP BROKER')}</span><h3>${escapeHtml(t('HULLS AT {location}', { location: LOCATIONS[this.dockLocation].name }))}</h3></div>
+            <div class="ship-broker-current"><span>${t('CURRENT SHIP')}</span><b>${escapeHtml(current.name)}</b><small>${t('TRADE-IN VALUE')} · ${formatCredits(tradeIn)}</small></div>
+          </header>
+          <nav class="ship-stock-list" aria-label="${t('Hulls for sale')}">
+            ${stockIds.map((shipId) => this.renderShipSelector(shipId, selectedId)).join('')}
+          </nav>
+          ${this.renderShipCard(selectedId)}
+        </div>`;
     }
-    renderShipDetail(saleId) {
-        return `
-      <div class="shipyard-detail">
-        <button class="ship-detail-back" data-ship-detail-back="1">◀ ${t('ALL HULLS')}</button>
-        ${this.renderShipCard(saleId)}
-      </div>
-    `;
+    renderShipSelector(saleId, selectedId) {
+        const ship = SHIPS[saleId];
+        const active = this.save.player.shipId === saleId;
+        const selected = selectedId === saleId;
+        return `<button type="button" class="ship-stock-option ${selected ? 'is-selected' : ''} ${active ? 'is-current' : ''}" data-ship-detail="${saleId}" aria-pressed="${selected}">
+          <span><b>${escapeHtml(ship.name)}</b><small>${escapeHtml(t(ship.personality ?? ''))}</small></span>
+          <strong>${active ? t('CURRENT SHIP') : formatCredits(ship.price)}</strong>
+        </button>`;
     }
     renderShipCard(saleId) {
         const ship = SHIPS[saleId];
         const current = SHIPS[this.save.player.shipId] ?? SHIPS.wayfarer;
         const active = this.save.player.shipId === saleId;
-        const speedDelta = displaySpeed(ship.maxSpeed) - displaySpeed(current.maxSpeed);
-        const turnDelta = ship.angularAcceleration - current.angularAcceleration;
         const tradeIn = Math.round(current.price * HULL_TRADE_IN_RATE);
         const amountDue = ship.price - tradeIn;
-        return `
-      <article class="ship-card ship-detail ${active ? 'active' : ''}">
-        <div class="ship-silhouette ship-silhouette-large ${saleId}" data-variant="${ship.variant}" aria-label="${t('Rotating 3D preview of the {name}', { name: ship.name })}"></div>
-        <header><span>${escapeHtml(t(ship.className))}</span><b>${formatCredits(ship.price)}</b></header>
-        <h3>${escapeHtml(ship.name)}</h3>
-        <p class="ship-personality">${escapeHtml(t(ship.personality ?? ''))}</p>
-        <p>${escapeHtml(t(ship.description))}</p>
-        <dl><div><dt>${t('SPEED')}</dt><dd>${displaySpeed(ship.maxSpeed)} ${this.statDelta(speedDelta)}</dd></div><div><dt>${t('SHIELD')}</dt><dd>${ship.shield} ${this.statDelta(ship.shield - current.shield)}</dd></div><div><dt>${t('HULL INTEGRITY')}</dt><dd>${ship.hull} ${this.statDelta(ship.hull - current.hull)}</dd></div><div><dt>${t('REACTOR')}</dt><dd>${ship.reactorOutput} ${this.statDelta(ship.reactorOutput - current.reactorOutput)}</dd></div><div><dt>${t('CAPACITOR')}</dt><dd>${ship.energyCapacity} ${this.statDelta(ship.energyCapacity - current.energyCapacity)}</dd></div><div><dt>${t('CARGO')}</dt><dd>${ship.cargo} ${this.statDelta(ship.cargo - current.cargo)}</dd></div><div><dt>${t('TURN')}</dt><dd>${ship.angularAcceleration.toFixed(2)} ${this.statDelta(turnDelta, 2)}</dd></div><div><dt>${t('ACCL')}</dt><dd>${ship.acceleration} ${this.statDelta(ship.acceleration - current.acceleration)}</dd></div></dl>
-        <p class="ship-handling-note">${t('Handling falls up to 24% as the cargo hold fills.')}</p>
-        ${active ? `<button disabled>${t('THIS IS YOUR CURRENT SHIP')}</button>` : `<div class="ship-trade-quote"><span>${t('NEW HULL')} <b>${formatCredits(ship.price)}</b></span><span>${t('YOUR 50% TRADE-IN')} <b>−${formatCredits(tradeIn)}</b></span><strong>${amountDue >= 0 ? t('YOU PAY') : t('YARD PAYS YOU')} <b>${formatCredits(Math.abs(amountDue))}</b></strong><small>${t('Purchased modules move to your locker. Factory equipment leaves with the old hull.')}</small></div><button class="primary" data-ship-id="${saleId}" ${amountDue > this.save.player.credits ? 'disabled' : ''}>${amountDue >= 0 ? t('TRADE SHIP') : t('TRADE AND COLLECT')} · ${formatCredits(Math.abs(amountDue))}</button>`}
-      </article>
-    `;
+        const hardpoints = HARDPOINT_SPECS[saleId] ?? { guns: [], launchers: [], utility: [] };
+        const carriedMass = cargoMass(this.save.player);
+        const quote = active ? { ok: false, code: 'already-owned' } : quoteShipTrade(this.save.player, saleId, { cargoMass: carriedMass });
+        const capacity = quote.cargoCapacity ?? ship.cargo;
+        const stats = [
+            ['CRUISE SPEED', displaySpeed(ship.maxSpeed), displaySpeed(ship.maxSpeed) - displaySpeed(current.maxSpeed)],
+            ['AFTERBURNER', displaySpeed(ship.afterburnSpeed), displaySpeed(ship.afterburnSpeed) - displaySpeed(current.afterburnSpeed)],
+            ['ACCELERATION', ship.acceleration, ship.acceleration - current.acceleration],
+            ['TURN RATE', ship.angularAcceleration.toFixed(2), ship.angularAcceleration - current.angularAcceleration, 2],
+            ['SHIELD', ship.shield, ship.shield - current.shield],
+            ['HULL INTEGRITY', ship.hull, ship.hull - current.hull],
+            ['CARGO', capacity, capacity - current.cargo],
+            ['FUEL', ship.fuel, ship.fuel - current.fuel],
+        ];
+        const missingCredits = Math.max(0, amountDue - Number(this.save.player.credits ?? 0));
+        const excessCargo = Math.max(0, carriedMass - capacity);
+        const blockedMessage = quote.code === 'insufficient-credits'
+            ? t('{credits} MORE NEEDED', { credits: formatCredits(missingCredits) })
+            : quote.code === 'cargo-over-capacity'
+                ? t('UNLOAD {mass} CARGO MASS', { mass: formatNumber(excessCargo) })
+                : !quote.ok && !active
+                    ? t('TRADE UNAVAILABLE')
+                    : '';
+        const actionLabel = amountDue >= 0
+            ? t('TRADE FOR {name}', { name: ship.name })
+            : t('TRADE FOR {name} · RECEIVE {credits}', { name: ship.name, credits: formatCredits(Math.abs(amountDue)) });
+        return `<article class="ship-showroom ${active ? 'is-current' : ''}">
+          <section class="ship-showroom-stage" aria-labelledby="ship-showroom-name">
+            <div class="ship-stage-heading"><span>${active ? t('CURRENT SHIP') : t('FOR SALE')}</span><b>${escapeHtml(t(ship.className))}</b></div>
+            <div class="ship-silhouette ship-silhouette-large ${saleId}" data-variant="${ship.variant}" role="img" aria-label="${t('{name} ship preview', { name: ship.name })}"></div>
+            <div class="ship-stage-title"><div><h3 id="ship-showroom-name">${escapeHtml(ship.name)}</h3><p>${escapeHtml(t(ship.personality ?? ''))}</p></div><strong>${formatCredits(ship.price)}</strong></div>
+          </section>
+          <section class="ship-showroom-sheet">
+            <p class="ship-description">${escapeHtml(t(ship.description))}</p>
+            <div class="ship-spec-grid">${stats.map(([label, value, delta, digits = 0]) => `<div><span>${t(label)}</span><b>${value}</b>${this.statDelta(delta, digits)}</div>`).join('')}</div>
+            <div class="ship-hardpoints">
+              <div><span>${t('GUN MOUNTS')}</span><b>${hardpoints.guns.length}</b></div>
+              <div><span>${t('MISSILE MOUNTS')}</span><b>${hardpoints.launchers.length}</b></div>
+              <div><span>${t('UTILITY BAYS')}</span><b>${hardpoints.utility.length}</b></div>
+            </div>
+            <p class="ship-handling-note">${t('Handling falls up to 24% as the cargo hold fills.')}</p>
+            ${active ? `<button class="ship-current-button" type="button" disabled>${t('THIS IS YOUR CURRENT SHIP')}</button>` : `<div class="ship-trade-panel">
+              <div class="ship-trade-numbers"><span><small>${t('LIST PRICE')}</small><b>${formatCredits(ship.price)}</b></span><span><small>${t('TRADE-IN · {name}', { name: current.name })}</small><b>${tradeIn > 0 ? '−' : ''}${formatCredits(tradeIn)}</b></span><strong><small>${amountDue >= 0 ? t('BALANCE TO PAY') : t('CREDIT TO YOU')}</small><b>${formatCredits(Math.abs(amountDue))}</b></strong></div>
+              <p>${t('Your purchased modules move to the locker. Factory-fitted parts stay with the traded hull.')}</p>
+              <button type="button" class="primary ship-trade-button" data-ship-id="${saleId}" ${quote.ok ? '' : 'disabled'}><span>${actionLabel}</span>${blockedMessage ? `<small>${escapeHtml(blockedMessage)}</small>` : ''}</button>
+            </div>`}
+          </section>
+        </article>`;
     }
     statDelta(delta, digits = 0) {
         const rounded = Number(delta.toFixed(digits));
