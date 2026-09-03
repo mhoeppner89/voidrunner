@@ -290,7 +290,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.7.39';
+const GAME_VERSION = '0.7.40';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -742,7 +742,7 @@ export class GameUI {
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="${t('Radar display; tap to open navigation map')}">
             <div class="screen-heading radar-heading" id="screen-radar-transponder" data-touch-action="transponder" role="button" tabindex="0" title="${t('Transponder — press B')}">${t('TRANSPONDER ON')}</div>
-            <div class="radar-screen-wrap"><canvas id="radar" width="220" height="220" role="button" tabindex="0" aria-label="${t('Open navigation map')}"></canvas></div>
+            <div class="radar-screen-wrap"><canvas id="radar" width="220" height="220" role="button" tabindex="0" aria-label="${t('Open navigation map')}"></canvas><div id="screen-radar-status" class="screen-radar-status" data-tone="clear">${t('NO ACTIVE TRACKS')}</div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-target" data-touch-action="targetNext" aria-label="${t('Target status display; tap to cycle targets')}">
             <div class="screen-heading"><span>${t('TARGET STATUS')}</span><b id="screen-target-name">${t('NO LOCK')}</b></div>
@@ -2727,14 +2727,20 @@ export class GameUI {
         this.drawRadar(model.contacts, model.radarRings, model.searchRings, model.radarWarp);
         const transponderChip = this.el('#screen-radar-transponder');
         if (transponderChip) {
-            // The radar heading is the transponder toggle: it reads its own
-            // state — broadcasting (transponder ON, or a dark ship lit up by
-            // its own extraction beam) vs dark — and is the mobile tap target.
-            transponderChip.textContent = model.broadcasting ? t('TRANSPONDER ON') : t('TRANSPONDER OFF');
-            transponderChip.classList.toggle('is-dark', !model.broadcasting);
-            transponderChip.title = model.broadcasting
-                ? t('Visible to sensors at full range{note}', { note: model.transponder ? t(' · press B to go dark') : t(' · the extraction beam is broadcasting') })
-                : t('Dark to sensors beyond 200 km · press B to transmit');
+            const band = t(String(model.signatureBand ?? 'low').toUpperCase());
+            transponderChip.textContent = model.transponder
+                ? t('ID LIVE · SIG {band}', { band })
+                : t('ID DARK · SIG {band}', { band });
+            transponderChip.classList.toggle('is-dark', !model.transponder);
+            transponderChip.dataset.signature = model.signatureBand ?? 'low';
+            transponderChip.title = model.transponder
+                ? t('Identity broadcasting · physical signature {range} km · press B to go dark', { range: Math.round(model.signatureRange ?? 0) })
+                : t('Identity hidden · physical signature {range} km · press B to transmit', { range: Math.round(model.signatureRange ?? 0) });
+        }
+        const radarStatus = this.el('#screen-radar-status');
+        if (radarStatus) {
+            radarStatus.textContent = model.stealthStatus?.label ?? t('NO ACTIVE TRACKS');
+            radarStatus.dataset.tone = model.stealthStatus?.tone ?? 'clear';
         }
         setText('#screen-own-shield-value', Math.ceil(model.shield).toString());
         setText('#screen-own-energy-value', Math.ceil(model.energy).toString());
@@ -3384,6 +3390,16 @@ export class GameUI {
             ctx.globalAlpha = contact.altitude > 0 ? 1 : 0.62;
             if (contact.type === 'location') {
                 ctx.strokeRect(x - size, y - size, size * 2, size * 2);
+            }
+            else if (contact.faint) {
+                // A weak return has position but no firing-quality track yet:
+                // hollow and gently pulsing instead of pretending it is a
+                // resolved solid contact.
+                ctx.globalAlpha = 0.34 + 0.28 * (0.5 + 0.5 * Math.sin(now / 220));
+                ctx.lineWidth = Math.max(1.2, 1.35 * ratio);
+                ctx.beginPath();
+                ctx.arc(x, y, size * 1.25, 0, Math.PI * 2);
+                ctx.stroke();
             }
             else {
                 ctx.beginPath();

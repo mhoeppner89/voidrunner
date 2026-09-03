@@ -492,6 +492,7 @@ window.render_game_to_text = () => {
     if (!save)
         return JSON.stringify({ mode: 'title', coordinates: 'world [x,y,z]; +y is up; ship forward is local -z' });
     const race = runtime?.activeRace;
+    const physicalSignatureRange = runtime?.playerPhysicalSignatureRange?.();
     return JSON.stringify({
         mode: save.player.dockedAt ? 'docked' : race?.state ? `race-${race.state}` : 'flight',
         testMode: runtime?.arena?.testMode ?? null,
@@ -522,6 +523,20 @@ window.render_game_to_text = () => {
             plannedDestinationId: save.world.plannedDestinationId ?? null,
             pendingJump: save.world.pendingJump ?? null,
         },
+        stealth: runtime ? {
+            identityBroadcasting: runtime.playerIdentityBroadcasting(),
+            physicalSignatureRange: Math.round(physicalSignatureRange),
+            exposureRange: Math.round(runtime.playerExposureRange()),
+            signatureBand: physicalSignatureRange < 280 ? 'low'
+                : physicalSignatureRange < 620 ? 'medium' : 'high',
+            status: runtime.stealthHudStatus?.().label ?? null,
+            maxObserverAwareness: Math.round((runtime.ships.reduce((best, ship) => Math.max(best, ship.playerAwareness ?? 0), 0)) * 100) / 100,
+            inspection: runtime.playerInspectionPatrol?.()?.inspection ? {
+                patrolId: runtime.playerInspectionPatrol().id,
+                phase: runtime.playerInspectionPatrol().inspection.phase,
+                scanProgress: Math.round((runtime.playerInspectionPatrol().inspection.scanProgress ?? 0) * 100) / 100,
+            } : null,
+        } : null,
         market: save.player.dockedAt ? {
             locationId: save.player.dockedAt,
             terminal: runtime?.ui?.dockTerminal ?? null,

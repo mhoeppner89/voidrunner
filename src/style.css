@@ -2835,10 +2835,9 @@ button.compact {
   white-space: nowrap;
 }
 
-/* The radar heading is the transponder toggle: it reads its own state —
-   "TRANSPONDER ON/OFF" — color-coded so the sensor signature reads at a
-   glance (green when lit / visible at full range, amber when dark), and it
-   is the mobile tap target (B on desktop). */
+/* The radar heading is the transponder toggle. Identity and physical
+   signature share one concise line (ID DARK · SIG HIGH) without conflating
+   a hot drive or extraction beam with an identity broadcast. */
 .screen-heading.radar-heading {
   justify-content: flex-start;
   align-items: center;
@@ -2854,8 +2853,13 @@ button.compact {
 }
 
 .screen-heading.radar-heading.is-dark {
-  color: #ff7a66;
-  text-shadow: 0 0 6px rgba(255, 122, 102, 0.55);
+  color: #e0ba68;
+  text-shadow: 0 0 6px rgba(224, 186, 104, 0.5);
+}
+
+.screen-heading.radar-heading[data-signature="high"] {
+  color: #ff816e;
+  text-shadow: 0 0 7px rgba(255, 96, 72, 0.62);
 }
 
 .screen-heading.radar-heading.is-active {
@@ -3723,6 +3727,36 @@ html[lang="de"] .comms-bar.story::after {
      2× CSS size (dpr cap), and nearest-neighbor downscaling dropped pixel
      rows through the distance labels — the "distorted" text on the radar
      (user report). Smooth downscale keeps the disc crisp and text legible. */
+}
+
+.screen-radar-status {
+  position: absolute;
+  z-index: 2;
+  left: 4%;
+  right: 4%;
+  bottom: 1%;
+  overflow: hidden;
+  padding: 0.08rem 0.18rem;
+  color: #91c6bd;
+  background: rgba(2, 9, 18, 0.78);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: clamp(10px, 0.68vw, 11px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.15;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 0 5px rgba(2, 8, 20, 0.95);
+}
+
+.screen-radar-status[data-tone="warning"] {
+  color: #e0ba68;
+}
+
+.screen-radar-status[data-tone="danger"] {
+  color: #ff816e;
 }
 
 /* Monitor tickers: thin single-line event feeds that replace the in-flight

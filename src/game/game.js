@@ -24,6 +24,7 @@ import { PILOT_LINES, pilotMod, rollPilot, TIER_LABELS } from './pilots.js';
 import { setLanguage, t } from './i18n.js';
 import { MUG_CHANCE, SMUGGLE_CHANCE, createSmuggleTask, createTask, rebasePatrolTask, rollNpcCargo, updateShipAI } from './shipAI.js';
 import { paletteForFaction, playerShipVariant, shipVariantForRole } from './voxelModels.js';
+import { SENSOR_CLOSE_VISUAL_RANGE, SENSOR_CONTACT_THRESHOLD, SENSOR_HORIZON, SENSOR_IDENTIFY_THRESHOLD, SENSOR_TRACK_THRESHOLD, addEmissionHeat, awarenessState, npcPhysicalSignatureRangeValues, physicalSignatureRangeValues, signatureBand, stepDriveHeat, stepEmissionHeat, stepSensorAwareness } from './sensors.js';
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const UP = new THREE.Vector3(0, 1, 0);
 const RIGHT = new THREE.Vector3(1, 0, 0);
@@ -301,8 +302,6 @@ const PATROL_REPLY_LINES = [
 // for a timed window before giving up for a cooldown. Being caught running
 // dark dings Concord standing once per catch; re-resolving a searched contact
 // closes the search with a hail (patrol) or an engagement (hostile).
-const PATROL_CATCH_REP = -2;
-const PATROL_CATCH_REPEAT = 12;
 const SEARCH_RADIUS = 100;
 const SEARCH_SWEEP_SECONDS = 12;
 // How long the approach may take before the sweep starts anyway: a last-known
@@ -311,6 +310,15 @@ const SEARCH_SWEEP_SECONDS = 12;
 // from the nearest reachable point instead.
 const SEARCH_APPROACH_TIMEOUT = 20;
 const SEARCH_COOLDOWN = 28;
+// Patrols now run a readable challenge instead of applying an instant fine.
+// The pilot has time to transmit identity and slow down; only a completed scan
+// can seize contraband, and refusing is only tied to the pilot when Concord
+// actually resolved their identity.
+const PATROL_INSPECTION_REPLY_SECONDS = 10;
+const PATROL_INSPECTION_SCAN_SECONDS = 4;
+const PATROL_INSPECTION_RANGE = 420;
+const PATROL_INSPECTION_SPEED = 15;
+const PATROL_REFUSAL_REP = -3;
 // The approach pass pushes harder than the patrol cruise (0.5x) but stays
 // slower than any lit hull at full throttle (0.85 * 36 patrol = 30.6 vs the
 // slowest player hull at 34), so a dark pilot who commits to running bleeds
@@ -338,6 +346,21 @@ const PATROL_SEARCH_LINES = {
         t('Signal dropped. Sweeping the last-known position.'),
         t('Contact lost. Fanning out — there is no cover out here.'),
         t('Lost the signature. Sweeping the sector.'),
+    ],
+};
+const PATROL_INSPECTION_LINES = {
+    hail: [
+        t('{name} to unidentified vessel: transmit ID, slow below {speed}, and hold for inspection.'),
+        t('Concord patrol: bring your transponder online and reduce speed for a cargo scan.'),
+        t('Unidentified contact, hold course. Transmit identity and prepare for inspection.'),
+    ],
+    clear: [
+        t('Inspection complete. Manifest is clean — carry on.'),
+        t('Cargo scan clear. Thank you for cooperating, pilot.'),
+    ],
+    refusal: [
+        t('Inspection refused. Logging the contact and pursuing.'),
+        t('You were ordered to hold. Concord is marking this as a refusal.'),
     ],
 };
 // A hostile that loses the resolve voices the same beat: it knows the pilot
@@ -432,23 +455,14 @@ const FLIGHT_ASSIST_BURN_LATERAL_DAMPING = 0.62;
 const FLIGHT_ASSIST_BRAKE_MULTIPLIER = 1.25;
 const INERTIAL_OVERSPEED_MARGIN = 1.06;
 const INERTIAL_OVERSPEED_BRAKE_MULTIPLIER = 0.45;
-// The dark (transponder-off) visibility band, Star-Sector style: a ship
-// running dark is only visible between the floor (200 km — reached at half
-// max speed or slower) and the ceiling (400 km — at full throttle). Speed is
-// the giveaway: a dark hull coasting slow is nearly invisible, one burning
-// hard glows to the whole horizon. The radar's inner ring tracks the pilot's
-// own place in that band (see playerVisibilityFraction).
-const DARK_VIS_MIN = 200;
-const DARK_VIS_MAX = 400;
-const DARK_SPEED_FLOOR = 0.5;
 // The radar's inner-disc expansion anchor: almost all combat happens inside
 // this range (the guns' effective range sits around 140 km), a thin sliver of
 // the 1000 km horizon — so drawRadar gives everything inside it extra space
 // while the scan ring (500 km) and beyond stay on the linear scale.
 const RADAR_COMBAT_RANGE = 200;
-// NPCs carry the base sensor fit (no mk2): they resolve a broadcasting ship at
-// this range and a dark one only inside its speed-scaled dark band.
-const NPC_SENSOR_RANGE = 1000;
+// NPCs carry the base sensor fit (no mk2). Identity broadcasts reach this
+// horizon; a dark ship is detected only inside its physical-signature range.
+const NPC_SENSOR_RANGE = SENSOR_HORIZON;
 // The visual lock, Star-Sector style: a target the pilot has locked stays
 // tracked to this range no matter how dark it runs, and only breaks when
 // debris or an asteroid blocks the line of sight for this long. Both apply to
@@ -468,26 +482,22 @@ const LOST_CONTACT_LIFETIME = LOST_CONTACT_HOLD_SECONDS + LOST_CONTACT_FADE_SECO
 // a one-frame flicker, Star-Sector style. Only occlusion earns the grace; a
 // signature that simply vanishes (range) opens the search immediately.
 const OCCLUSION_TRACK_SECONDS = 2.5;
-// A dark (transponder-off) pilot is far harder to ambush: the pirate tail of
-// the encounter table and hyperdrive intercept odds shrink to this fraction
-// of their lit value, because nobody sees the ship jump or loiter.
+// A quiet dark pilot is far harder to ambush: encounter and intercept odds
+// retain this small floor, then rise continuously with physical exposure.
 const DARK_ENCOUNTER_MULT = 0.35;
-// The threat-awareness multipliers: a hostile contact's broadcast can be
-// resolved for targeting at 2.2x the radar horizon (nearest-hostile lock at
-// 2.4x) — early warning the pilot can act on. Dark contacts bypass both and
-// are only ever resolved inside their speed-scaled dark band (see
-// playerSeesShip), unless the pilot holds a visual lock on them.
+// The threat-awareness multipliers: a hostile identity broadcast can be
+// resolved beyond the ordinary radar horizon, giving the pilot actionable
+// early warning. Dark contacts receive no multiplier and must build a track
+// inside their own physical-signature range.
 const THREAT_TARGET_MULT = 2.2;
 const THREAT_NEAREST_MULT = 2.4;
-// The syndicate berth: an unlicensed (transponder-off) ship cannot use the
-// official dock, so it pays a flat handling fee plus a cut of everything in
-// the hold. The fee is shown on the syndicate chip before committing.
+// The syndicate berth: a participating port admits an unlicensed dark ship for
+// a flat handling fee plus a cut of the hold. Concord ports deny clearance;
+// frontier ports remain open.
 const SYNDICATE_FEE_FLAT = 150;
 const SYNDICATE_FEE_RATE = 0.12;
-// The extraction beam broadcasts a working signature (see playerBroadcasting):
-// while it actually runs in the asteroid field, pirates on the fringes
-// converge on the work on this throttled seeded roll — a dark miner is lit by
-// their own beam the whole time they cut.
+// The extraction beam creates a large physical signature without revealing
+// identity. Pirates on the fringes can converge on that signal while it runs.
 const BEAM_AMBUSH_CHANCE = 0.3;
 const BEAM_AMBUSH_MIN = 9;
 const BEAM_AMBUSH_MAX = 15;
@@ -1186,6 +1196,13 @@ export class GameSession {
     armedJumpPointSide = 0;
     afterburning = false;
     utilityActive = false;
+    // Physical emissions are independent of the identity transponder. Drive
+    // heat follows recent thrust demand; weapons/damage add short-lived spikes.
+    // Both are transient flight state and intentionally stay out of saves.
+    playerDriveHeat = 0;
+    playerEmissionHeat = 0;
+    localSecurityAlertUntil = 0;
+    localSecurityAlertSystemId = undefined;
     utilityReadout = '';
     monitorStatus = '';
     monitorStatusUntil = 0;
@@ -1976,6 +1993,7 @@ export class GameSession {
         // ship-class stats returned by playerStats().
         this.updateRaceSlipstreamState(dt);
         this.updatePlayer(dt, actions);
+        this.updatePlayerSignature(dt);
         this.autoScanTarget();
         this.maintainTargetLock();
         this.autoDockCheck();
@@ -3083,6 +3101,8 @@ export class GameSession {
             this.hyperdriveEncounterAt = null;
             this.hyperdriveFx = 'drop';
             this.hyperdriveFxUntil = this.save.world.time + HYPERDRIVE_FX_DURATION;
+            this.playerDriveHeat = 430;
+            this.playerEmissionHeat = Math.max(this.playerEmissionHeat, 260);
             this.save.player.throttle = clamp(this.hyperdriveReturnThrottle, 0, 1);
             this.save.player.velocity = tuple(FORWARD.clone().applyQuaternion(orientation).multiplyScalar(10));
             this.resetPlayerInterpolation();
@@ -3594,6 +3614,7 @@ export class GameSession {
             if (weapon.ammoId)
                 player.ammo[weapon.ammoId] -= 1;
             this.gunCooldown = weapon.cooldown;
+            this.addPlayerEmission(weapon.kind === 'mortar' ? 190 : 95);
             this.audio.play(weapon.audioKey, weapon.kind === 'gauss' ? 0.85 : 0.72);
             return;
         }
@@ -3668,6 +3689,7 @@ export class GameSession {
             return;
         }
         this.gunCooldown = slowestCooldown;
+        this.addPlayerEmission(firstWeapon?.kind === 'mortar' ? 190 : firstWeapon?.kind === 'pdc' ? 70 : 105);
         if (firstWeapon)
             this.audio.play(firstWeapon.audioKey, firstWeapon.kind === 'gauss' ? 0.85 : firstWeapon.kind === 'mortar' ? 0.95 : 0.72);
     }
@@ -3771,6 +3793,7 @@ export class GameSession {
         player.launcherMagazines[mount.id].rounds = Math.max(0, selected.rounds - 1);
         syncLauncherMissileTotal(player);
         this.missileCooldown = launcher.cooldown;
+        this.addPlayerEmission(launcher.id === 'torpedo' ? 320 : 250);
         this.renderer.spawnMuzzleFlash(anchorX, anchorY, anchorZ, launcher.id === 'torpedo' ? 0xffa65e : 0xff7a42);
         this.audio.play('missile');
     }
@@ -3804,6 +3827,7 @@ export class GameSession {
                 return;
             }
             this.utilityActive = true;
+            this.playerEmissionHeat = Math.max(this.playerEmissionHeat, 180);
             this.renderer.setUtilityBeam(true, mode, this.save.player.position, node.position);
             this.extractAsteroid(node, dt, stats.miningRate);
             if (this.utilitySoundCooldown <= 0) {
@@ -3820,6 +3844,7 @@ export class GameSession {
                 return;
             }
             this.utilityActive = true;
+            this.playerEmissionHeat = Math.max(this.playerEmissionHeat, 180);
             this.renderer.setUtilityBeam(true, mode, this.save.player.position, node.position);
             this.extractWreck(node, dt, stats.salvageRate);
             if (this.utilitySoundCooldown <= 0) {
@@ -3993,8 +4018,9 @@ export class GameSession {
         const spawnPosition = node ? this.claimDisputePosition(node, rng) : this.encounterPosition(rng, 150);
         const rival = this.spawnShip('miner', spawnPosition);
         rival.hostile = true;
-        rival.targetId = 'player';
+        rival.authorizedTarget = true;
         rival.bountyValue = 0;
+        this.stageHunterGroup(rival, [], { forceTrack: true });
         this.sayPilotLine(rival, CLAIM_DISPUTE_LINES[Math.floor(rng() * CLAIM_DISPUTE_LINES.length)]);
         this.ui.pushEvent(t('Claim dispute: a rival prospector contests {claim}.', { claim: mission?.claimName ?? t('your staked rock') }), 'warning', 5600);
         this.audio.play('warning');
@@ -4049,7 +4075,6 @@ export class GameSession {
         this.salvageAmbushTriggered.add(node.id);
         const player = vec(this.save.player.position);
         const lead = this.spawnShip('pirate', tuple(player.clone().add(new THREE.Vector3(90, 20, -75))));
-        lead.targetId = 'player';
         const escorts = [];
         // The richest holds rate a two-ship team: the second pirate's odds
         // ramp across the escort worth band instead of cutting in at a hard
@@ -4058,9 +4083,9 @@ export class GameSession {
         const escortChance = clamp((worth - SALVAGE_AMBUSH_ESCORT_MIN_WORTH) / escortSpan, 0, 1);
         if (rng() < escortChance) {
             const escort = this.spawnShip('escort', tuple(player.clone().add(new THREE.Vector3(-75, -15, -95))));
-            escort.targetId = 'player';
             escorts.push(escort);
         }
+        this.stageHunterGroup(lead, escorts, { forceTrack: true });
         // Claim-jumpers want the salvage, not a fight: if the pilot has already
         // pulled cargo from the wreck they open with a demand for it; otherwise
         // there is nothing to shake down and they attack immediately.
@@ -4231,6 +4256,7 @@ export class GameSession {
             // the pilot profile once ship.scanned is set. Surrendered pilots
             // keep the claim decision separate instead.
             ship.scanned = true;
+            ship.identifiedByPlayer = true;
             if (!ship.surrendered && this.deferentialPilot(ship)) {
                 // First scan of a spared pilot may pay a favor (wreck tip or
                 // market contact); re-scans never re-roll. The ✦ marker already
@@ -4304,9 +4330,9 @@ export class GameSession {
         this.applyTarget(next);
     }
     targetNearestHostile() {
-        // The nearest-hostile lock rides the wider threat multiplier for lit
-        // contacts; dark ones are only ever resolved inside the dark-detection
-        // line, so stealth is never leaked through the targeting UI.
+        // The nearest-hostile lock rides the wider threat multiplier for live
+        // identity broadcasts. Dark contacts require a stable physical track,
+        // so target selection cannot leak hidden ships.
         const nearest = this.ships
             .filter((entry) => entry.hostile && entry.hull > 0 && this.playerSeesShip(entry, THREAT_NEAREST_MULT))
             .sort((a, b) => vec(a.position).distanceToSquared(vec(this.save.player.position)) - vec(b.position).distanceToSquared(vec(this.save.player.position)))[0];
@@ -4345,11 +4371,10 @@ export class GameSession {
         const player = vec(this.save.player.position);
         const stats = this.playerStats();
         const byDistance = (a, b) => player.distanceToSquared(vec(a.position)) - player.distanceToSquared(vec(b.position));
-        // Ships resolve through the sensor visibility gate: lit contacts at the
-        // threat-aware multiplier (2.2x, see THREAT_TARGET_MULT), dark ones only
-        // inside the dark-detection line — stealth is never leaked through the
-        // targeting UI. A locked ship the pilot can no longer resolve stays in
-        // the cycle as a hold so the lock isn't silently dropped mid-fight.
+        // Ships resolve through the staged sensor gate: live identities gain
+        // threat-aware early warning, while dark ships need a stable signature
+        // track. A current lock remains in the cycle during its short cover
+        // grace so it is not silently replaced mid-fight.
         const shipSeen = (entry) => this.playerSeesShip(entry, THREAT_TARGET_MULT) || entry.id === this.save.player.currentTargetId;
         // Tier 1 — opponents: hostile ships the pilot can resolve, closest first.
         const opponents = this.ships
@@ -4525,9 +4550,13 @@ export class GameSession {
         }
         else if (kind === 'ship') {
             const ship = this.ships.find((entry) => entry.id === id && !entry.claimed && !entry.captured && entry.hull > 0);
-            if (ship) {
+            if (ship && this.playerSeesShip(ship, 1)) {
                 this.save.player.mode = 'combat';
                 target = { kind, id, position: ship.position, name: ship.name };
+            }
+            else if (ship) {
+                this.setMonitorStatus(t('CONTACT TOO WEAK TO LOCK'));
+                return;
             }
         }
         else if (kind === 'pickup') {
@@ -4581,6 +4610,11 @@ export class GameSession {
     }
     applyTarget(target) {
         this.save.player.currentTargetId = target.id;
+        if (target.kind === 'ship') {
+            const ship = this.ships.find((entry) => entry.id === target.id);
+            if (ship)
+                ship.playerLockOccludedUntil = undefined;
+        }
         // A fresh lock supersedes the previous target's transient readout
         // (DEPOSIT EXHAUSTED / WRECK STRIPPED) instead of letting it linger
         // over the new target for its full display window.
@@ -4597,13 +4631,9 @@ export class GameSession {
         this.save.player.currentTargetId = undefined;
         this.renderer.setTarget();
     }
-    // A locked ship is a visual lock: it survives until the target leaves its
-    // tracked range (lockTrackedRange — the visual-lock 1000 km for dark
-    // ships, the disc horizon for lit ones). Occlusion never breaks a lock —
-    // rocks don't blind the pilot's eye, only distance does — so a target that
-    // ducks behind debris stays tracked until it truly outruns the dish.
-    // Losing it drops the target; the radar keeps the lost-contact cross at
-    // the last known position on its own.
+    // A firing lock tolerates a brief obstruction, then breaks to the existing
+    // last-known contact. Cover therefore matters in a fight without making a
+    // one-frame pebble flicker the target on and off.
     maintainTargetLock() {
         const id = this.save.player.currentTargetId;
         if (!id)
@@ -4612,9 +4642,21 @@ export class GameSession {
         const player = vec(this.save.player.position);
         const ship = this.ships.find((entry) => entry.id === id && entry.hull > 0);
         if (ship) {
-            const distance = player.distanceTo(vec(ship.position));
-            if (distance > this.lockTrackedRange(ship))
+            const shipPosition = vec(ship.position, this.tmpRadarPos);
+            const distance = player.distanceTo(shipPosition);
+            if (distance > this.lockTrackedRange(ship)) {
                 this.dropTargetLock(ship);
+                return;
+            }
+            if (this.lineBlocked(player, shipPosition, ship.id)) {
+                if (ship.playerLockOccludedUntil === undefined)
+                    ship.playerLockOccludedUntil = this.save.world.time + OCCLUSION_TRACK_SECONDS;
+                if (this.save.world.time >= ship.playerLockOccludedUntil)
+                    this.dropTargetLock(ship);
+            }
+            else {
+                ship.playerLockOccludedUntil = undefined;
+            }
             return;
         }
         // Anchored targets (deposits, wrecks, pickups) hold only while they're
@@ -4854,12 +4896,12 @@ export class GameSession {
                 .normalize()
                 .multiplyScalar(125 + index * 42 + rng() * 70);
             const pirate = this.spawnShip(index === 0 ? 'pirate' : 'escort', tuple(player.clone().add(offset)));
-            pirate.targetId = 'player';
             if (index === 0)
                 lead = pirate;
             else
                 escorts.push(pirate);
         }
+        this.stageHunterGroup(lead, escorts, { forceTrack: true });
         if (lead && this.holdWorth() > 0)
             this.openMug(lead, escorts, {
                 sensor: t('Raiders are waiting at the jump point — they scanned your cargo.'),
@@ -4921,6 +4963,10 @@ export class GameSession {
         this.autopilot = false;
         this.hyperdriveFx = 'none';
         this.hyperdriveFxUntil = 0;
+        // A gate exit leaves a bright wake even if the identity transmitter is
+        // dark. The wake cools through the normal emission model after arrival.
+        this.playerDriveHeat = 430;
+        this.playerEmissionHeat = Math.max(this.playerEmissionHeat, 300);
         this.activeInstanceId = undefined;
         this.renderer.setSystem?.(player.systemId);
         this.renderer.setArmedJumpPoint?.();
@@ -5007,9 +5053,11 @@ export class GameSession {
         const rng = seededRandom(`${this.save.world.seed}:jump:${++this.jumpCounter}:${Math.floor(this.save.world.time)}`);
         // The calm window after a resolved intercept suppresses new ambushes
         // without touching the drive: jump away freely, just no immediate re-hit.
-        // A dark pilot is far harder to intercept: nobody sees the jump, so the
-        // odds shrink to the DARK_ENCOUNTER_MULT fraction.
-        const broadcastMultiplier = this.playerBroadcasting() ? 1 : DARK_ENCOUNTER_MULT;
+        // Intercept risk follows the actual exposure envelope. A quiet dark
+        // hull gets the minimum tail; a hot drive or live identity approaches
+        // the full chance smoothly.
+        const broadcastMultiplier = DARK_ENCOUNTER_MULT
+            + (1 - DARK_ENCOUNTER_MULT) * clamp(this.playerExposureRange() / NPC_SENSOR_RANGE, 0, 1);
         const sectorRisk = sectorEncounterChance(nav.id) * this.combatEncounterScale() * broadcastMultiplier;
         const cargoRisk = nav.kind === 'jump-point'
             ? jumpPiracyRisk(nav.routeId, this.holdWorth(), { atJumpPoint: false }) * broadcastMultiplier
@@ -5091,13 +5139,13 @@ export class GameSession {
             const spawnRange = index === 0 ? 100 + rng() * 95 : 140 + rng() * 160;
             const offset = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.5, rng() - 0.5).normalize().multiplyScalar(spawnRange);
             const pirate = this.spawnShip(index === 0 ? 'pirate' : 'escort', tuple(player.clone().add(offset)));
-            pirate.targetId = 'player';
             this.hyperdriveInterceptIds.add(pirate.id);
             if (index === 0)
                 lead = pirate;
             else
                 escorts.push(pirate);
         }
+        this.stageHunterGroup(lead, escorts, { forceTrack: true });
         // A jump ambush opens with the same standoff as ambient pirate traffic:
         // the crew wants cargo (or a hull-and-outfit toll), not necessarily a
         // wreck. The killer minority still jumps straight to weapons-free.
@@ -5173,11 +5221,7 @@ export class GameSession {
         // travel) now lives there as updateShipAI, with the task layer feeding
         // travel waypoints and the interaction layer running emergent mugs.
         updateShipAI(this, ship, dt);
-        // Interaction: a patrol that resolves the pilot while they carry
-        // syndicate cargo busts them (seizure + fine + Concord hit).
-        if (ship.role === 'patrol')
-            this.checkSmugglerBust(ship);
-        this.resolveNpcCollisions(ship);
+            this.resolveNpcCollisions(ship);
         const position = vec(ship.position, this.tmpShipPos);
         // Priority order for the one-voice slot: the one-shot recognition
         // line lands first (a wary re-encounter shouldn't lose it to generic
@@ -5308,7 +5352,7 @@ export class GameSession {
             return;
         // Combat chatter still needs eyes on the target: a hostile can't taunt a
         // dark pilot it can't resolve (or a ship hiding behind a rock).
-        if (!this.canSee(position, playerPosition, !this.playerBroadcasting(), ...this.playerSensorArgs()))
+        if (!this.shipTracksPlayer(ship))
             return;
         const engaged = ship.targetId === 'player' || ship.fleeing;
         if (!engaged)
@@ -5376,7 +5420,7 @@ export class GameSession {
         if (ship.captured)
             return;
         if (ship.surrendered) {
-            if (!ship.saidSurrenderPlead && playerPosition.distanceTo(position) <= PROXIMITY_RANGE && this.canSee(position, playerPosition, !this.playerBroadcasting(), ...this.playerSensorArgs()) && this.chatterOpen()) {
+            if (!ship.saidSurrenderPlead && playerPosition.distanceTo(position) <= PROXIMITY_RANGE && this.shipTracksPlayer(ship) && this.chatterOpen()) {
                 ship.saidSurrenderPlead = true;
                 const pool = ship.pilot ? PILOT_LINES[ship.pilot.temperament]?.plead : undefined;
                 if (pool?.length) {
@@ -5393,7 +5437,7 @@ export class GameSession {
         // the flag eating the approach edge before it may speak. The pilot must
         // also be able to see the player: no mutter for a dark or occluded ship.
         const tracking = this.save.world.time >= ship.spawnTime + 2;
-        const within = tracking && this.canSee(position, playerPosition, !this.playerBroadcasting(), ...this.playerSensorArgs()) && playerPosition.distanceTo(position) <= PROXIMITY_RANGE;
+        const within = tracking && this.shipTracksPlayer(ship) && playerPosition.distanceTo(position) <= PROXIMITY_RANGE;
         const pool = ship.pilot ? PILOT_LINES[ship.pilot.temperament] : undefined;
         // Hostile ships mutter their wary proximity lines; neutral and friendly
         // traffic say a passing line instead (see maybeNeutralChatter).
@@ -5416,12 +5460,12 @@ export class GameSession {
     maybeNeutralChatter(ship, position, playerPosition) {
         if (this.storyLineActive() || !this.chatterOpen())
             return;
-        if (ship.hostile || ship.surrendered || ship.captured || ship.standingDown || this.deferentialPilot(ship) || ship.search)
+        if (ship.hostile || ship.surrendered || ship.captured || ship.standingDown || this.deferentialPilot(ship) || ship.search || ship.inspection)
             return;
         const tracking = this.save.world.time >= ship.spawnTime + 2;
         // The greet only lands if the ship can actually see the pilot — a dark
         // or occluded player gets no hail until they're eyeball-close.
-        const within = tracking && this.canSee(position, playerPosition, !this.playerBroadcasting(), ...this.playerSensorArgs()) && playerPosition.distanceTo(position) <= NEUTRAL_CHAT_RANGE;
+        const within = tracking && this.shipTracksPlayer(ship) && playerPosition.distanceTo(position) <= NEUTRAL_CHAT_RANGE;
         if (within && !ship.nearNeutral && this.save.world.time >= (ship.nextNeutralChatAt ?? 0)) {
             ship.nextNeutralChatAt = this.save.world.time + 40 + ship.proxRng() * 30;
             const banter = ship.role !== 'patrol' && ship.stationTraffic && ship.proxRng() < MARKET_BANTER_CHANCE
@@ -5510,7 +5554,7 @@ export class GameSession {
             return;
         // Recognition needs eyes too: a dark pilot is just another blip until
         // the ship can resolve them.
-        if (!this.canSee(position, playerPosition, !this.playerBroadcasting(), ...this.playerSensorArgs()))
+        if (!ship.playerIdentified || !this.shipTracksPlayer(ship))
             return;
         ship.saidRecognition = true;
         const pool = ship.pilot ? PILOT_LINES[ship.pilot.temperament]?.[this.deferentialPilot(ship) ? 'deference' : 'wary'] : undefined;
@@ -5614,6 +5658,78 @@ export class GameSession {
         // just a sharper moment to speak up.
         this.sayPilotLine(ship, line);
     }
+    npcSignatureRange(ship) {
+        return npcPhysicalSignatureRangeValues(
+            npcFlightVariant(ship),
+            Math.hypot(ship.velocity[0], ship.velocity[1], ship.velocity[2]),
+            ship.speed,
+            ship.emissionHeat ?? 0,
+            Boolean(ship.burning || ship.burn),
+            this.playerStats().radarRange,
+        );
+    }
+    // Advance both sides of the sensor picture before AI chooses a target.
+    // The NPC's awareness of the player and the player's awareness of the NPC
+    // are deliberately independent: either side can have only a vague contact.
+    updateSensorAwareness(ship, dt) {
+        ship.emissionHeat = stepEmissionHeat(ship.emissionHeat ?? 0, dt);
+        if (this.arena) {
+            ship.playerAwareness = 1;
+            ship.playerSensorAwareness = 1;
+            ship.playerIdentified = true;
+            ship.identifiedByPlayer = true;
+            return;
+        }
+        const player = this.tmpA.set(this.save.player.position[0], this.save.player.position[1], this.save.player.position[2]);
+        const position = this.tmpB.set(ship.position[0], ship.position[1], ship.position[2]);
+        const distance = position.distanceTo(player);
+        const playerExposureRange = this.playerExposureRange();
+        const playerSensorRange = ship.dark
+            ? this.npcSignatureRange(ship)
+            : this.playerStats().radarRange * (ship.hostile ? THREAT_NEAREST_MULT : 1.45);
+        // A ship outside both sensor envelopes is decaying by range alone. Do
+        // not cast a potentially long obstacle ray that cannot change either
+        // result; dense fields may carry many ambient ships.
+        const sensorRelevant = distance <= Math.max(playerExposureRange, playerSensorRange, SENSOR_CLOSE_VISUAL_RANGE);
+        const occluded = sensorRelevant && this.lineBlocked(position, player);
+
+        ship.playerAwareness = stepSensorAwareness(
+            ship.playerAwareness ?? 0,
+            distance,
+            playerExposureRange,
+            occluded,
+            this.playerIdentityBroadcasting(),
+            dt,
+        );
+        if (this.playerIdentityBroadcasting() && ship.playerAwareness >= SENSOR_CONTACT_THRESHOLD)
+            ship.playerIdentified = true;
+        if (ship.playerAwareness >= SENSOR_TRACK_THRESHOLD) {
+            const last = ship.lastResolvedPlayer ?? (ship.lastResolvedPlayer = [0, 0, 0]);
+            last[0] = player.x;
+            last[1] = player.y;
+            last[2] = player.z;
+        }
+
+        ship.playerSensorAwareness = stepSensorAwareness(
+            ship.playerSensorAwareness ?? 0,
+            distance,
+            playerSensorRange,
+            occluded,
+            !ship.dark,
+            dt,
+        );
+        if ((!ship.dark && ship.playerSensorAwareness >= SENSOR_CONTACT_THRESHOLD)
+            || ship.scanned
+            || ship.playerSensorAwareness >= SENSOR_IDENTIFY_THRESHOLD)
+            ship.identifiedByPlayer = true;
+        if (ship.playerSensorAwareness >= SENSOR_CONTACT_THRESHOLD) {
+            const last = ship.lastSeenPosition ?? (ship.lastSeenPosition = [0, 0, 0]);
+            last[0] = ship.position[0];
+            last[1] = ship.position[1];
+            last[2] = ship.position[2];
+            ship.lastSeenAt = this.save.world.time;
+        }
+    }
     // Search AI. Only a ship that already had the player resolved and then lost
     // the signal opens a search: a patrol that watched a dark contact vanish
     // (the blue sweep ring) or a hostile actually targeting the player that
@@ -5634,49 +5750,42 @@ export class GameSession {
         const huntingPlayer = (ship.hostile || ship.role === 'pirate' || ship.role === 'bounty' || ship.role === 'escort') && ship.targetId === 'player';
         if (!isPatrol && !huntingPlayer)
             return false;
-        // Allocation-free (BUG-25): this runs per searching ship per step, so
-        // player/position/anchor ride the session scratches (tmpA..tmpD — none
-        // of the callees below touch them; beginSearch tuples its anchor on
-        // entry). Only STORED tuples (lastResolvedPlayer, fanPoint) allocate.
+        // Allocation-free: awareness was advanced immediately before this
+        // dispatch. Search consumes the staged track and its stored last-known
+        // tuple; it never asks for the player's live position after contact is
+        // lost.
         const player = this.tmpA.set(this.save.player.position[0], this.save.player.position[1], this.save.player.position[2]);
         const position = this.tmpB.set(ship.position[0], ship.position[1], ship.position[2]);
-        const broadcasting = this.playerBroadcasting();
-        const dark = !broadcasting;
-        const [playerSpeed, playerMax] = this.playerSensorArgs();
-        const withinRange = player.distanceTo(position) <= (dark ? this.darkVisibilityRange(playerSpeed, playerMax) : NPC_SENSOR_RANGE);
-        const occluded = this.lineBlocked(position, player);
-        let resolvedNow = withinRange && !occluded;
-        if (!resolvedNow && ship.resolvedPlayerLast && withinRange && occluded) {
-            // The pilot ducked behind a rock while still inside sensor range: a
-            // ship that just had eyes on them keeps the resolve for a short
-            // grace while the rock stays in the way — breaking visual contact
-            // is a maneuver (hold the line for a couple of seconds), not a
-            // one-frame flicker. Only occlusion earns the grace; a signature
-            // that simply vanishes (range) opens the search immediately.
-            if (ship.occludedUntil === undefined)
-                ship.occludedUntil = this.save.world.time + OCCLUSION_TRACK_SECONDS;
-            if (this.save.world.time < ship.occludedUntil)
-                resolvedNow = true;
-        }
-        else {
-            ship.occludedUntil = undefined;
-        }
-        if (resolvedNow)
-            ship.lastResolvedPlayer = tuple(player);
+        const identityLive = this.playerIdentityBroadcasting();
+        const dark = !identityLive;
+        const resolvedNow = this.shipTracksPlayer(ship);
+        const wasResolved = Boolean(ship.resolvedPlayerLast);
         if (isPatrol) {
-            // A dark contact the patrol can resolve is a catch, not a search:
-            // warn and ding Concord standing, then hold. The sweep only opens
-            // once the patrol loses a contact it had resolved (below).
-            if (!ship.search && resolvedNow && dark && this.save.world.time >= (ship.catchCooldownUntil ?? 0))
-                this.catchDarkPatrol(ship);
-            // Vanished signal: the patrol that already saw the player
-            // investigates the last-known position.
-            if (!ship.search && ship.resolvedPlayerLast && !resolvedNow && dark && this.save.world.time >= (ship.searchCooldownUntil ?? 0)) {
+            const distance = position.distanceTo(player);
+            const localAlert = this.localSecurityAlertActive();
+            const routineCheck = ship.routineInspectionDue && !ship.routineInspectionDone && distance <= PATROL_INSPECTION_RANGE;
+            // Cargo itself is not knowable before the scan. Patrols challenge
+            // ships because they are dark, match a local alert, or were picked
+            // for a seeded routine inspection — never because the code has
+            // secretly looked inside the player's hold.
+            if (!ship.inspection && !ship.search && resolvedNow && (dark || localAlert || routineCheck) && this.save.world.time >= (ship.catchCooldownUntil ?? 0))
+                this.beginPatrolInspection(ship);
+            // Reacquiring a challenged vessel closes the sweep and resumes the
+            // same inspection; switching the transponder on never erases it.
+            if (ship.inspection && resolvedNow && ship.search)
+                this.endSearch(ship, 'found');
+            if (ship.inspection && this.updatePatrolInspection(ship, dt, resolvedNow)) {
+                ship.resolvedPlayerLast = resolvedNow;
+                return true;
+            }
+            // A challenged contact that vanishes is pursued at the last-known
+            // position. Unchallenged clean traffic is left alone.
+            if (!ship.search && wasResolved && !resolvedNow && ship.inspection && this.save.world.time >= (ship.searchCooldownUntil ?? 0)) {
                 this.beginSearch(ship, ship.lastResolvedPlayer ?? player, 'patrol');
                 this.announceSearchStart(ship, 'patrol');
             }
         }
-        else if (!ship.search && ship.resolvedPlayerLast && !resolvedNow && this.save.world.time >= (ship.searchCooldownUntil ?? 0)) {
+        else if (!ship.search && wasResolved && !resolvedNow && this.save.world.time >= (ship.searchCooldownUntil ?? 0)) {
             // A hostile actually targeting the player that lost the resolve
             // sweeps the last-known spot instead of flying at the live chase.
             this.beginSearch(ship, ship.lastResolvedPlayer ?? player, 'hostile');
@@ -5686,12 +5795,6 @@ export class GameSession {
         if (!ship.search)
             return false;
         const search = ship.search;
-        // The pilot went lit mid-search: they are ordinary traffic again, so the
-        // investigation closes quietly (the dark-contact rules no longer apply).
-        if (isPatrol && broadcasting) {
-            this.endSearch(ship, 'clear');
-            return false;
-        }
         // Found again: the search is over — a patrol hails a firm contact, a
         // hostile re-engages (the attack AI takes over this same frame).
         if (resolvedNow) {
@@ -5786,47 +5889,133 @@ export class GameSession {
         }
         return true;
     }
-    // A patrol resolving a dark contact catches the pilot: warning, one Concord
-    // rep ding, and a hail — but no sweep. The search only opens once the
-    // patrol loses the contact (see updateSearchAI), and a fresh catch can't
-    // re-ding faster than PATROL_CATCH_REPEAT seconds. A pilot actually
-    // carrying syndicate cargo gets the full bust instead — the crate, the
-    // fine, and the standing hit.
-    catchDarkPatrol(ship) {
-        if (this.holdingSmuggleCargo()) {
-            this.bustSmuggler(ship);
-            return;
-        }
-        this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + PATROL_CATCH_REP, -100, 100);
-        ship.catchCooldownUntil = this.save.world.time + PATROL_CATCH_REPEAT;
-        this.ui.pushSensor(t('{name} flagged your dark transponder. Concord standing {rep}.', { name: ship.name, rep: PATROL_CATCH_REP }), 'warning', 5200);
-        this.ui.pushEvent(t('Caught running dark by {name}. Concord reputation {rep}.', { name: ship.name, rep: PATROL_CATCH_REP }), 'danger', 4200);
+    playerInspectionPatrol() {
+        return this.ships.find((entry) => entry.hull > 0 && entry.role === 'patrol' && entry.inspection);
+    }
+    beginPatrolInspection(ship) {
+        if (ship.inspection)
+            return false;
+        const active = this.playerInspectionPatrol();
+        if (active && active.id !== ship.id)
+            return false;
+        ship.inspection = {
+            phase: 'hail',
+            startedAt: this.save.world.time,
+            replyUntil: this.save.world.time + PATROL_INSPECTION_REPLY_SECONDS,
+            pursuitUntil: 0,
+            scanProgress: 0,
+            refusalLogged: false,
+            holdPoint: [...ship.position],
+        };
+        ship.routineInspectionDone = true;
+        ship.searchHold = true;
+        const line = PATROL_INSPECTION_LINES.hail[Math.floor(ship.proxRng() * PATROL_INSPECTION_LINES.hail.length)];
+        this.sayPilotLine(ship, t(line, { name: ship.name, speed: PATROL_INSPECTION_SPEED }));
+        this.ui.pushSensor(t('PATROL HAIL · TRANSMIT ID · SLOW BELOW {speed}', { speed: PATROL_INSPECTION_SPEED }), 'warning', 5200);
         this.audio.play('warning');
-        const lines = PATROL_SEARCH_LINES.catch;
-        this.sayPilotLine(ship, lines[Math.floor(ship.proxRng() * lines.length)]);
+        return true;
+    }
+    clearPatrolInspection(ship, cooldown = SEARCH_COOLDOWN) {
+        ship.inspection = undefined;
+        ship.searchHold = false;
+        ship.destination = undefined;
+        ship.catchCooldownUntil = this.save.world.time + cooldown;
+    }
+    updatePatrolInspection(ship, dt, resolvedNow) {
+        const inspection = ship.inspection;
+        if (!inspection)
+            return false;
+        if (ship.hostile || ship.hull <= 0) {
+            this.clearPatrolInspection(ship);
+            return false;
+        }
+        if (!resolvedNow) {
+            inspection.phase = 'pursuit';
+            inspection.scanProgress = Math.max(0, inspection.scanProgress - dt * 0.8);
+            return false;
+        }
+
+        const dx = ship.position[0] - this.save.player.position[0];
+        const dy = ship.position[1] - this.save.player.position[1];
+        const dz = ship.position[2] - this.save.player.position[2];
+        const distance = Math.hypot(dx, dy, dz);
+        const speed = Math.hypot(this.save.player.velocity[0], this.save.player.velocity[1], this.save.player.velocity[2]);
+        const compliant = this.playerIdentityBroadcasting()
+            && speed <= PATROL_INSPECTION_SPEED
+            && this.save.player.throttle <= 0.25
+            && distance <= PATROL_INSPECTION_RANGE;
+
+        // Hold a safe inspection standoff. The point updates in place so the
+        // hot path does not allocate a destination tuple every fixed step.
+        const hold = inspection.holdPoint;
+        const standOff = inspection.phase === 'scan' ? 150 : 105;
+        if (distance > standOff + 30) {
+            const inv = distance > 0.001 ? 1 / distance : 0;
+            hold[0] = this.save.player.position[0] + dx * inv * standOff;
+            hold[1] = this.save.player.position[1] + dy * inv * standOff;
+            hold[2] = this.save.player.position[2] + dz * inv * standOff;
+        }
+        else {
+            hold[0] = ship.position[0];
+            hold[1] = ship.position[1];
+            hold[2] = ship.position[2];
+        }
+        ship.destination = hold;
+        ship.searchHold = true;
+
+        if (compliant) {
+            inspection.phase = 'scan';
+            inspection.scanProgress = Math.min(PATROL_INSPECTION_SCAN_SECONDS, inspection.scanProgress + dt);
+            if (inspection.scanProgress >= PATROL_INSPECTION_SCAN_SECONDS) {
+                if (this.holdingSmuggleCargo()) {
+                    this.clearPatrolInspection(ship, 45);
+                    this.bustSmuggler(ship);
+                }
+                else {
+                    const lines = PATROL_INSPECTION_LINES.clear;
+                    this.sayPilotLine(ship, lines[Math.floor(ship.proxRng() * lines.length)]);
+                    this.ui.pushSensor(t('INSPECTION COMPLETE · MANIFEST CLEAR'), 'success', 4200);
+                    this.clearPatrolInspection(ship);
+                    this.audio.play('success');
+                }
+                return false;
+            }
+            return true;
+        }
+
+        inspection.scanProgress = Math.max(0, inspection.scanProgress - dt * 0.65);
+        if (inspection.phase === 'scan')
+            inspection.phase = inspection.refusalLogged ? 'pursuit' : 'hail';
+        if (!inspection.refusalLogged && this.save.world.time >= inspection.replyUntil) {
+            inspection.refusalLogged = true;
+            inspection.phase = 'pursuit';
+            inspection.pursuitUntil = this.save.world.time + 20;
+            const identified = Boolean(ship.playerIdentified);
+            if (identified) {
+                this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + PATROL_REFUSAL_REP, -100, 100);
+                this.ui.pushEvent(t('Inspection refused. Concord standing {rep}.', { rep: PATROL_REFUSAL_REP }), 'danger', 4400);
+            }
+            else {
+                this.raiseLocalSecurityAlert(90);
+                this.ui.pushEvent(t('Unidentified vessel escaped inspection. Local patrols are alert.'), 'warning', 4400);
+            }
+            const lines = PATROL_INSPECTION_LINES.refusal;
+            this.sayPilotLine(ship, lines[Math.floor(ship.proxRng() * lines.length)]);
+        }
+        if (inspection.refusalLogged && this.save.world.time >= inspection.pursuitUntil) {
+            this.clearPatrolInspection(ship);
+            return false;
+        }
+        return true;
+    }
+    // Compatibility entry point used by older probes: a dark catch now starts
+    // a challenge and never changes reputation or cargo immediately.
+    catchDarkPatrol(ship) {
+        return this.beginPatrolInspection(ship);
     }
     // Whether the hold currently carries any syndicate-sealed cargo.
     holdingSmuggleCargo() {
         return (this.save.player.sealedCargo ?? []).some((cargo) => cargo.smuggled);
-    }
-    // A patrol resolving the player while they carry smuggled cargo busts them:
-    // every crate is seized, the smuggle contracts fail, a fine is levied, and
-    // Concord standing takes a hit far heavier than a plain dark catch. Gated
-    // on a session cooldown so a resolved smuggler is busted once, not per frame.
-    checkSmugglerBust(patrol) {
-        if (!this.emergentMugs || this.arena || patrol.hostile || !this.holdingSmuggleCargo())
-            return;
-        if (this.save.world.time < (this.smugglerBustCooldownUntil ?? 0))
-            return;
-        const player = vec(this.save.player.position);
-        if (vec(patrol.position).distanceTo(player) > NPC_SENSOR_RANGE)
-            return;
-        // A lit runner is resolved at the full sensor horizon; a dark one only
-        // inside the dark-detection line — running dark genuinely hides the
-        // crate, exactly like the stealth rules everywhere else.
-        if (!this.canSee(patrol.position, player, !this.playerBroadcasting(), ...this.playerSensorArgs()))
-            return;
-        this.bustSmuggler(patrol);
     }
     bustSmuggler(patrol) {
         this.smugglerBustCooldownUntil = this.save.world.time + 45;
@@ -5907,7 +6096,8 @@ export class GameSession {
         if (kind === 'patrol') {
             if (outcome === 'found')
                 this.sayPilotLine(ship, PATROL_SEARCH_LINES.firm[Math.floor(ship.proxRng() * PATROL_SEARCH_LINES.firm.length)]);
-            // 'clear' ends quietly — the pilot went lit, so there is nothing to log.
+            if (outcome === 'giveup' && ship.inspection)
+                this.clearPatrolInspection(ship);
         }
         // A hostile 'found' ends quietly — the re-engaged fight speaks for itself.
     }
@@ -6094,7 +6284,6 @@ export class GameSession {
             ship.targetId = victim && bestDistSq < 150 * 150 && distSqTo(ship.position, this.save.player.position) > 100 * 100 ? victim.id : 'player';
         }
         if (ship.role === 'patrol') {
-            const playerPos = vec(this.save.player.position);
             // Patrols engage hostiles they can actually see: lit hostiles at the
             // standard sensor range, dark ones only inside the dark-detection
             // line, rocks blocking the view either way. If the player is under
@@ -6103,8 +6292,6 @@ export class GameSession {
             // costs a dark player their safety net. Nearest satisfying hostile
             // in a single pass (same pick as filter+sort+find); the player's
             // sensor args are hoisted out of the candidate loop.
-            const playerBroadcasting = this.playerBroadcasting();
-            const [playerSpeed, playerMax] = this.playerSensorArgs();
             let hostile;
             let bestDistSq = Infinity;
             for (const entry of this.ships) {
@@ -6114,7 +6301,7 @@ export class GameSession {
                 if (d >= bestDistSq)
                     continue;
                 if (this.canSee(ship.position, entry.position, entry.dark, vec(entry.velocity).length(), entry.speed)
-                    || (entry.targetId === 'player' && this.canSee(ship.position, playerPos, !playerBroadcasting, playerSpeed, playerMax))) {
+                    || (entry.targetId === 'player' && this.shipTracksPlayer(ship))) {
                     bestDistSq = d;
                     hostile = entry;
                 }
@@ -6123,8 +6310,14 @@ export class GameSession {
         }
         if (!ship.targetId)
             return undefined;
-        if (ship.targetId === 'player')
+        if (ship.targetId === 'player') {
+            // Intent is not a sensor lock. Until the hunter resolves the
+            // player, its hunt task stays on the fixed spawn/intelligence
+            // anchor and never receives the live player vector.
+            if (!this.shipTracksPlayer(ship))
+                return undefined;
             return { position: playerPosition, velocity: vec(this.save.player.velocity) };
+        }
         const target = this.ships.find((entry) => entry.id === ship.targetId && entry.hull > 0);
         if (!target) {
             ship.targetId = undefined;
@@ -6835,6 +7028,7 @@ export class GameSession {
             faction: ship.faction,
             visualScale: ship.projectileVisualScale,
         });
+        ship.emissionHeat = addEmissionHeat(ship.emissionHeat ?? 0, ship.capitalClass ? 180 : 90);
         // Fire rate scales with aim: aces keep the trigger down, novices wait.
         ship.fireCooldown = (ship.fireInterval ?? (ship.role === 'bounty' ? 0.28 : ship.role === 'pirate' ? 0.38 : 0.46)) * (1 + (1 - aim) * 0.7);
     }
@@ -7022,6 +7216,29 @@ export class GameSession {
             return true;
         return false;
     }
+    crimeIdentified(victim, position = victim.position) {
+        if (victim.playerIdentified)
+            return true;
+        if (this.playerIdentityBroadcasting()) {
+            const observer = vec(victim.position, this.tmpRadarPlayer);
+            const player = vec(this.save.player.position, this.tmpRadarPos);
+            if (observer.distanceTo(player) <= NPC_SENSOR_RANGE && !this.lineBlocked(observer, player))
+                return true;
+        }
+        for (const patrol of this.ships) {
+            if (patrol.hull <= 0 || patrol.role !== 'patrol' || !patrol.playerIdentified)
+                continue;
+            const witnessRange = CAPITAL_SHIP_STATS[patrol.capitalClass]?.witnessRange ?? 320;
+            const dx = patrol.position[0] - position[0];
+            const dy = patrol.position[1] - position[1];
+            const dz = patrol.position[2] - position[2];
+            if (dx * dx + dy * dy + dz * dz > witnessRange * witnessRange)
+                continue;
+            if (!this.lineBlocked(vec(patrol.position, this.tmpRadarPlayer), vec(position, this.tmpRadarPos)))
+                return true;
+        }
+        return false;
+    }
     damageShip(ship, amount, attackerId, position) {
         // A captured hull is still a hull: it takes damage like any other
         // ship. It stays inert — no AI, no retaliation, no comms (the pilot is
@@ -7039,6 +7256,15 @@ export class GameSession {
             ship.hull -= remaining;
         const hullDamaged = remaining > 0;
         ship.shieldDelay = 4.5;
+        if (attackerId === 'player') {
+            ship.playerAwareness = 1;
+            const last = ship.lastResolvedPlayer ?? (ship.lastResolvedPlayer = [0, 0, 0]);
+            last[0] = this.save.player.position[0];
+            last[1] = this.save.player.position[1];
+            last[2] = this.save.player.position[2];
+            if (this.playerIdentityBroadcasting())
+                ship.playerIdentified = true;
+        }
         // An NPC attack on a civilian raises a distress beacon: the ship pings
         // its position on the radar rim and the nav map even beyond the normal
         // sensor horizon, and the player gets one MAYDAY callout with the
@@ -7064,6 +7290,10 @@ export class GameSession {
             }
         }
         if (attackerId === 'player' && ship.hull > 0 && !ship.poweredDown && !ship.captured) {
+            // A staged mug has not opened its demand yet. Shooting any member
+            // is an unambiguous refusal: cancel the pending hail for the whole
+            // group and let every escort return fire immediately.
+            this.cancelPendingMug(ship);
             // A hostile mid-attack on another ship turns to defend itself: the
             // player engaging it draws its fire away from the victim. This is
             // self-defense — no unauthorized-attack penalty — and it frees the
@@ -7072,6 +7302,9 @@ export class GameSession {
             if (hostileFighter && ship.targetId && ship.targetId !== 'player') {
                 ship.hostile = true;
                 ship.targetId = 'player';
+                ship.playerAwareness = 1;
+                if (this.playerIdentityBroadcasting())
+                    ship.playerIdentified = true;
                 ship.pursuitHoldFire = false;
                 ship.pursuitUntil = 0;
             }
@@ -7148,10 +7381,20 @@ export class GameSession {
                 }
             }
             else {
+                const identified = this.crimeIdentified(ship, ship.position);
                 ship.hostile = true;
                 ship.targetId = 'player';
-                this.save.player.reputation[ship.faction] = clamp(this.save.player.reputation[ship.faction] - (ship.role === 'patrol' ? 16 : 9), -100, 100);
-                this.ui.pushEvent(t('Unauthorized attack: {faction} reputation damaged.', { faction: t(FACTION_LABEL(ship.faction)) }), 'danger', 4500);
+                ship.playerAwareness = 1;
+                ship.playerCrimeIdentified = identified;
+                ship.crimeVictim = true;
+                if (identified) {
+                    this.save.player.reputation[ship.faction] = clamp(this.save.player.reputation[ship.faction] - (ship.role === 'patrol' ? 16 : 9), -100, 100);
+                    this.ui.pushEvent(t('Unauthorized attack identified: {faction} reputation damaged.', { faction: t(FACTION_LABEL(ship.faction)) }), 'danger', 4500);
+                }
+                else {
+                    this.raiseLocalSecurityAlert(120);
+                    this.ui.pushEvent(t('Unidentified attack reported. No identity trace; local patrols alerted.'), 'warning', 4600);
+                }
                 this.alertPatrols(ship.position);
             }
         }
@@ -7309,6 +7552,78 @@ export class GameSession {
         if (held <= 0)
             return undefined;
         return { kind: 'cargo', commodity: node.salvage, quantity: Math.max(1, Math.ceil(held * share)) };
+    }
+    // Stage hunters on a fixed intelligence point. They know where a report or
+    // drive flare was seen, not the player's continuously updated position.
+    // Scripted close ambushes can opt into a firm initial track; ordinary
+    // ambient hunters must build one through the sensor model.
+    stageHunterGroup(lead, escorts = [], { forceTrack = false, demand, mugOptions } = {}) {
+        if (!lead)
+            return;
+        const intel = [...this.save.player.position];
+        const group = [lead, ...escorts].filter(Boolean);
+        for (const ship of group) {
+            ship.targetId = 'player';
+            ship.playerIntelPosition = intel;
+            if (ship.task?.kind === 'hunt') {
+                ship.task.anchor = intel;
+                ship.destination = intel;
+            }
+            if (forceTrack) {
+                ship.playerAwareness = 1;
+                ship.playerSensorAwareness = Math.max(ship.playerSensorAwareness ?? 0, SENSOR_TRACK_THRESHOLD);
+                ship.lastResolvedPlayer = [...intel];
+                if (this.playerIdentityBroadcasting())
+                    ship.playerIdentified = true;
+            }
+        }
+        if (demand !== undefined || mugOptions !== undefined) {
+            lead.pendingMug = { escortIds: escorts.map((entry) => entry.id), demand, options: mugOptions ?? {} };
+            lead.pendingMugLeaderId = lead.id;
+            for (const escort of escorts)
+                escort.pendingMugLeaderId = lead.id;
+            for (const ship of group) {
+                ship.holdFire = true;
+                ship.demandUntil = Infinity;
+            }
+        }
+    }
+    activatePendingMug(lead) {
+        const pending = lead.pendingMug;
+        if (!pending)
+            return false;
+        const escorts = pending.escortIds
+            .map((id) => this.ships.find((entry) => entry.id === id && entry.hull > 0))
+            .filter(Boolean);
+        for (const ship of [lead, ...escorts]) {
+            ship.pendingMug = undefined;
+            ship.pendingMugLeaderId = undefined;
+            ship.holdFire = false;
+            ship.demandUntil = 0;
+        }
+        if (pending.demand)
+            this.beginMug(lead, escorts, pending.demand, pending.options);
+        else
+            this.openMug(lead, escorts, pending.options);
+        return true;
+    }
+    cancelPendingMug(member) {
+        const leaderId = member.pendingMug ? member.id : member.pendingMugLeaderId;
+        if (!leaderId)
+            return false;
+        const leader = this.ships.find((entry) => entry.id === leaderId);
+        const escortIds = leader?.pendingMug?.escortIds ?? [];
+        let cleared = false;
+        for (const ship of this.ships) {
+            if (ship.id !== leaderId && ship.pendingMugLeaderId !== leaderId && !escortIds.includes(ship.id))
+                continue;
+            ship.pendingMug = undefined;
+            ship.pendingMugLeaderId = undefined;
+            ship.holdFire = false;
+            ship.demandUntil = 0;
+            cleared = true;
+        }
+        return cleared;
     }
     // Open a standoff: the lead hails a demand and the whole group holds fire
     // for the window. `demand` may be forced (gold-heat) or built from the hold.
@@ -7511,6 +7826,7 @@ export class GameSession {
     // to hand `undefined` to spawnPickup's vec() — a TypeError inside the frame
     // guard that silently ate the combat drop and aborted the sim step.
     destroyShip(ship, attackerId, position = ship.position) {
+        this.cancelPendingMug(ship);
         ship.hull = 0;
         this.resolveHyperdriveIntercept(ship);
         const explosionScale = (CAPITAL_SHIP_STATS[ship.capitalClass]?.explosionScale ?? (ship.role === 'trader' ? 1.5 : 1)) * npcShipScaleForVariant(npcFlightVariant(ship));
@@ -7527,15 +7843,22 @@ export class GameSession {
                 this.save.player.stats.kills += 1;
             // The capture already paid the bounty (see claimSurrendered); a
             // hull destroyed after the fact is scrap, not a second paycheck.
-            if (!ship.captured && (ship.hostile || ship.faction === 'red-talons')) {
+            if (!ship.captured && (ship.authorizedTarget || (ship.faction === 'red-talons' && !ship.crimeVictim))) {
                 const payment = ship.bountyValue;
                 this.save.player.credits += payment;
                 this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + 1, -100, 100);
                 this.ui.pushEvent(t('Hostile destroyed: +{credits} bounty.', { credits: formatCredits(payment) }), 'success', 4200);
             }
             else if (!ship.captured) {
-                this.save.player.reputation[ship.faction] = clamp(this.save.player.reputation[ship.faction] - 18, -100, 100);
-                this.ui.pushEvent(t('Civilian loss. {faction} standing severely reduced.'), 'danger', 5200);
+                const identified = ship.playerCrimeIdentified || this.crimeIdentified(ship, position);
+                if (identified) {
+                    this.save.player.reputation[ship.faction] = clamp(this.save.player.reputation[ship.faction] - 18, -100, 100);
+                    this.ui.pushEvent(t('Civilian loss identified. {faction} standing severely reduced.', { faction: t(FACTION_LABEL(ship.faction)) }), 'danger', 5200);
+                }
+                else {
+                    this.raiseLocalSecurityAlert(150);
+                    this.ui.pushEvent(t('Unidentified vessel destroyed. Local security alert raised; no identity trace.'), 'warning', 5200);
+                }
             }
             if (ship.missionId && !ship.captured) {
                 const result = completeBountyMission(this.save, ship.missionId);
@@ -7566,6 +7889,7 @@ export class GameSession {
         }
         if (remaining > 0)
             this.save.player.hull -= remaining;
+        this.addPlayerEmission(Math.min(180, 22 + amount * 3.2));
         this.playerShieldDelay = 5.2;
         this.autopilot = false;
         this.snapToCombatSpeed();
@@ -7660,11 +7984,15 @@ export class GameSession {
             // roll so the callsign is still stable.
             const pinnedPilot = mission.pilot ?? (mission.targetName ? rollPilot(seededRandom(`${mission.targetName}:pilot`), this.spawnThreat(spawnPosition, mission.id), 'red-talons') : undefined);
             const target = this.spawnShip('bounty', tuple(spawnPosition), mission.id, mission.targetName, pinnedPilot);
-            target.targetId = 'player';
+            const escorts = [];
             if (this.save.player.guildRank.bounty >= 1 || mission.reward > 6500) {
                 const escort = this.spawnShip('escort', tuple(vec(target.position).add(new THREE.Vector3(12, 7, -14))));
-                escort.targetId = 'player';
+                escorts.push(escort);
             }
+            this.stageHunterGroup(target, escorts, { forceTrack: true });
+            target.playerIdentified = true;
+            for (const escort of escorts)
+                escort.playerIdentified = true;
             this.threatAcquireTarget();
             this.ui.pushEvent(t('Warrant target detected: {name}', { name: mission.targetName }), 'danger', 5600);
             this.audio.play('warning');
@@ -7718,11 +8046,8 @@ export class GameSession {
         // lanes and the pirate window shrinks toward nothing; far from
         // civilization the zone defaults stand.
         const police = this.policePresence(player);
-        // Broadcast state drives both halves of the stealth trade: a lit ship
-        // (transponder on, or the beam running) is a visible target for
-        // opportunists and keeps the full pirate window; a dark idle ship is
-        // nobody to ambush, so the pirate tail shrinks to a fraction.
-        const broadcasting = this.playerBroadcasting();
+        const exposureFraction = clamp(this.playerExposureRange() / NPC_SENSOR_RANGE, 0, 1);
+        const exposed = this.utilityActive || exposureFraction >= 0.55;
         // The extraction beam broadcasts a working signature: while it actually
         // runs in the asteroid field, pirates on the fringes converge on the
         // work. A throttled seeded roll keeps a dark miner lit by their own
@@ -7744,12 +8069,12 @@ export class GameSession {
                 let lead;
                 for (let i = 0; i < count; i += 1) {
                     const pirate = this.spawnShip(i === 0 ? 'pirate' : 'escort', this.encounterPosition(rng, 158 + i * 27));
-                    pirate.targetId = 'player';
                     if (i === 0)
                         lead = pirate;
                     else
                         escorts.push(pirate);
                 }
+                this.stageHunterGroup(lead, escorts, { forceTrack: true });
                 const demand = lead ? this.mugDemand(this.mugShare(lead.pilot?.temperament)) : undefined;
                 if (lead && demand) {
                     this.beginMug(lead, escorts, demand, {
@@ -7781,18 +8106,18 @@ export class GameSession {
         const recentlyWorking = this.save.world.time - (this.lastExtractionAt ?? Number.NEGATIVE_INFINITY) < OPPORTUNITY_RECENT_SECONDS;
         const haulWorth = this.holdWorth();
         const opportunity = (recentlyWorking ? 1 : 0) + (haulWorth >= OPPORTUNITY_HOLD_WORTH ? 1 : 0);
-        if (broadcasting && opportunity > 0 && police < OPPORTUNITY_MAX_POLICE && rng() < OPPORTUNITY_CHANCE * (opportunity / 2) * (1 - police)) {
+        if (exposed && opportunity > 0 && police < OPPORTUNITY_MAX_POLICE && rng() < OPPORTUNITY_CHANCE * (opportunity / 2) * (1 - police)) {
             const count = randomInt(rng, 1, 2);
             const escorts = [];
             let lead;
             for (let i = 0; i < count; i += 1) {
                 const pirate = this.spawnShip(i === 0 ? 'pirate' : 'escort', this.encounterPosition(rng, 158 + i * 27));
-                pirate.targetId = 'player';
                 if (i === 0)
                     lead = pirate;
                 else
                     escorts.push(pirate);
             }
+            this.stageHunterGroup(lead, escorts, { forceTrack: true });
             const demand = lead ? this.mugDemand(this.mugShare(lead.pilot?.temperament)) : undefined;
             if (lead && demand) {
                 this.beginMug(lead, escorts, demand, {
@@ -7831,7 +8156,8 @@ export class GameSession {
         // a dark pilot shrinks it further (nobody sees them to ambush). The gap
         // between the pirate cutoff and 1 becomes a quiet lane: nothing spawns.
         const patrolCutoffAdjusted = patrolCutoff + police * (1 - patrolCutoff) * 0.9;
-        const pirateCutoff = patrolCutoffAdjusted + (1 - patrolCutoffAdjusted) * (broadcasting ? 1 : DARK_ENCOUNTER_MULT);
+        const pirateVisibility = DARK_ENCOUNTER_MULT + (1 - DARK_ENCOUNTER_MULT) * exposureFraction;
+        const pirateCutoff = patrolCutoffAdjusted + (1 - patrolCutoffAdjusted) * pirateVisibility;
         if (bucket < minerCutoff) {
             const miner = this.spawnShip('miner', this.encounterPosition(rng, 180));
             const zone = LOCATIONS[this.currentActivityLocationIds()[0] ?? 'shardbelt'];
@@ -7857,29 +8183,28 @@ export class GameSession {
             const escorts = [];
             let lead;
             for (let i = 0; i < count; i += 1) {
-                const pirate = this.spawnShip(i === 0 ? 'pirate' : 'escort', this.encounterPosition(rng, 158 + i * 27));
-                pirate.targetId = 'player';
+                const pirate = this.spawnShip(i === 0 ? 'pirate' : 'escort', this.encounterPosition(rng, 650 + i * 90 + rng() * 140));
                 if (i === 0)
                     lead = pirate;
                 else
                     escorts.push(pirate);
             }
             if (goldHeat && lead) {
-                // Gold-heat keeps its syndicate flavor: a demand for every gram
-                // of gold aboard, with the board-tip lines and messages.
-                this.beginMug(lead, escorts, { kind: 'cargo', commodity: 'gold', quantity: Math.max(1, this.save.player.cargo.gold ?? 0) }, {
-                    lines: GOLD_DEMAND_LINES,
-                    sensor: t('Gold-hunters inbound — they are hailing you.'),
-                    event: t('Standoff: jettison gold from the hold before they fire.'),
+                this.stageHunterGroup(lead, escorts, {
+                    demand: { kind: 'cargo', commodity: 'gold', quantity: Math.max(1, this.save.player.cargo.gold ?? 0) },
+                    mugOptions: {
+                        lines: GOLD_DEMAND_LINES,
+                        sensor: t('Gold-hunters have acquired you — they are hailing.'),
+                        event: t('Standoff: jettison gold from the hold before they fire.'),
+                    },
                 });
             }
             else if (lead && rng() < MUG_CHANCE) {
-                this.openMug(lead, escorts);
+                this.stageHunterGroup(lead, escorts, { mugOptions: {} });
             }
             else {
-                this.ui.pushSensor(t('Pirate intercept. Weapons free.'), 'danger', 4800);
+                this.stageHunterGroup(lead, escorts);
             }
-            this.audio.play('warning');
         }
         else {
             // Quiet lane: a dark ship nobody noticed, or simply an empty stretch.
@@ -8143,6 +8468,9 @@ export class GameSession {
             turnRate: hullFlight.turnRate,
             gunDamage: role === 'bounty' ? 10 : role === 'pirate' ? 7.5 : role === 'escort' ? 6.5 : role === 'patrol' ? 7 : 4,
             hostile: isHostile,
+            // Reputation/bounty legality is the spawn's original status, not
+            // the mutable hostile flag a civilian gains when defending itself.
+            authorizedTarget: isHostile,
             // Transponder state: pirates and their escorts run dark (invisible
             // beyond the dark-detection line) — that's why they can surprise the
             // pilot from behind a rock. Warrants stay lit: a burned callsign can't
@@ -8209,6 +8537,21 @@ export class GameSession {
             catchCooldownUntil: 0,
             resolvedPlayerLast: false,
             searchHold: false,
+            // Sensor awareness is staged and directional: this ship may know
+            // about the player before the player resolves it, or vice versa.
+            playerAwareness: this.arena ? 1 : 0,
+            playerSensorAwareness: this.arena ? 1 : 0,
+            playerIdentified: Boolean(this.arena),
+            identifiedByPlayer: Boolean(this.arena),
+            emissionHeat: 0,
+            playerLockOccludedUntil: undefined,
+            inspection: undefined,
+            // A stable per-ship roll gives clean, identified traffic a small
+            // chance of a routine check. It is independent of actual cargo,
+            // so patrols never gain supernatural contraband knowledge.
+            routineInspectionDue: role === 'patrol'
+                && seededRandom(`${this.save.world.seed}:routine-inspection:${index}`)() < 0.22,
+            routineInspectionDone: false,
         };
         // Task layer: what this ship wants (trade, patrol, mine, salvage, hunt).
         // The dead aiState field this replaces was never read — the hierarchy
@@ -8276,6 +8619,11 @@ export class GameSession {
             if (vec(patrol.position).distanceTo(vec(position)) < witnessRange && this.canSee(patrol.position, position, false)) {
                 patrol.hostile = true;
                 patrol.targetId = 'player';
+                patrol.playerAwareness = 1;
+                patrol.lastResolvedPlayer = [...this.save.player.position];
+                if (this.playerIdentityBroadcasting())
+                    patrol.playerIdentified = true;
+                this.clearPatrolInspection(patrol, 0);
             }
         }
     }
@@ -8337,32 +8685,102 @@ export class GameSession {
     hostilesVisibleNear(position, radius) {
         return this.ships.some((ship) => ship.hostile && ship.hull > 0 && position.distanceTo(vec(ship.position)) < radius && this.playerSeesShip(ship, 1));
     }
-    // The player's ship is visible to sensors when the transponder is ON or the
-    // extraction beam is running — the work broadcasts its own signature, so a
-    // dark miner/salvager is lit up the whole time the beam is active.
-    playerBroadcasting() {
-        return Boolean(this.save.player.transponder !== false || this.utilityActive);
+    // Identity and emissions are deliberately separate. A beam, hot drive, or
+    // gun burst can reveal where a dark ship is without telling the observer
+    // who owns it.
+    playerIdentityBroadcasting() {
+        return this.save.player.transponder !== false;
     }
-    // The player's own visibility as a fraction of the radar horizon, for the
-    // radar's inner ring: full range while broadcasting, and the speed-scaled
-    // dark band otherwise — the ring visibly shrinks as the pilot goes dark
-    // and slows, and swells back toward 400 km at full throttle.
+    // Kept as a compatibility seam for older probes/callers. "Broadcasting"
+    // now means identity broadcast only; physical detection uses the signature
+    // methods below.
+    playerBroadcasting() {
+        return this.playerIdentityBroadcasting();
+    }
+    updatePlayerSignature(dt) {
+        this.playerDriveHeat = stepDriveHeat(this.playerDriveHeat, this.save.player.throttle, this.afterburning || this.autopilot, dt);
+        this.playerEmissionHeat = stepEmissionHeat(this.playerEmissionHeat, dt);
+    }
+    addPlayerEmission(amount) {
+        this.playerEmissionHeat = addEmissionHeat(this.playerEmissionHeat, amount);
+    }
+    playerPhysicalSignatureRange() {
+        const stats = this.playerStats();
+        const hullDamage = stats.hull > 0 ? 1 - clamp(this.save.player.hull / stats.hull, 0, 1) : 0;
+        const active = LOCATIONS[this.activeInstanceId];
+        const player = this.save.player.position;
+        let environmentMask = 1;
+        if (active?.kind === 'field' || active?.kind === 'rings' || active?.kind === 'graveyard') {
+            const dx = player[0] - active.position[0];
+            const dy = player[1] - active.position[1];
+            const dz = player[2] - active.position[2];
+            if (dx * dx + dy * dy + dz * dz < active.radius * active.radius)
+                environmentMask = 0.84;
+        }
+        return physicalSignatureRangeValues(
+            playerShipVariant(this.save.player.shipId),
+            this.playerDriveHeat,
+            this.playerEmissionHeat,
+            this.utilityActive,
+            this.autopilot || Boolean(this.galaxyJump),
+            hullDamage,
+            environmentMask,
+            NPC_SENSOR_RANGE,
+        );
+    }
+    playerExposureRange() {
+        return this.playerIdentityBroadcasting() ? NPC_SENSOR_RANGE : this.playerPhysicalSignatureRange();
+    }
+    raiseLocalSecurityAlert(seconds) {
+        const systemId = this.save.player.systemId;
+        if (this.localSecurityAlertSystemId !== systemId) {
+            this.localSecurityAlertSystemId = systemId;
+            this.localSecurityAlertUntil = 0;
+        }
+        this.localSecurityAlertUntil = Math.max(this.localSecurityAlertUntil, this.save.world.time + Math.max(0, seconds));
+    }
+    localSecurityAlertActive() {
+        return this.localSecurityAlertSystemId === this.save.player.systemId
+            && this.save.world.time < this.localSecurityAlertUntil;
+    }
+    stealthHudStatus() {
+        const patrol = this.playerInspectionPatrol();
+        if (patrol?.inspection) {
+            const inspection = patrol.inspection;
+            if (inspection.phase === 'scan') {
+                const percent = Math.round(clamp(inspection.scanProgress / PATROL_INSPECTION_SCAN_SECONDS, 0, 1) * 100);
+                return { label: t('INSPECTION · {percent}%', { percent }), tone: 'warning' };
+            }
+            if (inspection.phase === 'pursuit')
+                return { label: t('PURSUIT · EVADE'), tone: 'danger' };
+            return { label: t('PATROL · ID + SLOW'), tone: 'warning' };
+        }
+        let awareness = 0;
+        let identified = false;
+        for (const ship of this.ships) {
+            if (ship.hull <= 0)
+                continue;
+            if ((ship.playerAwareness ?? 0) > awareness) {
+                awareness = ship.playerAwareness ?? 0;
+                identified = Boolean(ship.playerIdentified);
+            }
+        }
+        const state = awarenessState(awareness);
+        if (state === 'identified' || state === 'tracked')
+            return { label: identified ? t('TRACKED · KNOWN') : t('TRACKED · UNKNOWN'), tone: 'danger' };
+        if (state === 'contact')
+            return { label: t('WEAK SIGNAL'), tone: 'warning' };
+        if (this.localSecurityAlertActive())
+            return { label: t('LOCAL ALERT'), tone: 'warning' };
+        return { label: t('NO ACTIVE TRACKS'), tone: 'clear' };
+    }
     playerVisibilityFraction() {
         const stats = this.playerStats();
-        if (this.playerBroadcasting())
-            return 1;
-        const visible = this.darkVisibilityRange(vec(this.save.player.velocity).length(), stats.maxSpeed);
-        return clamp(visible / stats.radarRange, 0.05, 1);
+        return clamp(this.playerExposureRange() / stats.radarRange, 0.05, 1);
     }
-    // How far a dark (transponder-off) ship's signature carries at a given
-    // speed: DARK_VIS_MIN at half max speed or slower, scaling up to
-    // DARK_VIS_MAX at full throttle. Above max it clamps at the ceiling.
+    // Generic dark NPC fallback for legacy NPC-to-NPC sight checks.
     darkVisibilityRange(speed, maxSpeed) {
-        const frac = maxSpeed > 0 ? clamp(speed / maxSpeed, 0, 1) : 0;
-        if (frac <= DARK_SPEED_FLOOR)
-            return DARK_VIS_MIN;
-        const t = clamp((frac - DARK_SPEED_FLOOR) / (1 - DARK_SPEED_FLOOR), 0, 1);
-        return DARK_VIS_MIN + (DARK_VIS_MAX - DARK_VIS_MIN) * t;
+        return npcPhysicalSignatureRangeValues('talon', speed, maxSpeed, 0, false, NPC_SENSOR_RANGE);
     }
     // Can an observer's sensors resolve a target? A broadcasting target is
     // visible at the observer's standard sensor range (NPC_SENSOR_RANGE for
@@ -8381,7 +8799,8 @@ export class GameSession {
             return false;
         return !this.lineBlocked(observer, target);
     }
-    // Speed + max speed for the player's own dark signature, for canSee gates.
+    // Compatibility values for older debug probes. Player detection itself is
+    // awareness/signature based and never derives heat from coasting speed.
     playerSensorArgs() {
         const v = this.save.player.velocity;
         return [Math.hypot(v[0], v[1], v[2]), this.playerStats().maxSpeed];
@@ -8397,27 +8816,29 @@ export class GameSession {
             return VISUAL_LOCK_RANGE;
         return Math.max(this.playerStats().radarRange * 1.45, VISUAL_LOCK_RANGE);
     }
-    // The player's sensor resolves a ship. Dark contacts exist inside their
-    // speed-scaled dark band; lit contacts are resolved at the sensor horizon,
-    // optionally boosted by a threat-awareness multiplier for hostile locks. A
-    // locked ship is a visual lock instead: tracked to lockTrackedRange no
-    // matter how dark it runs, and occlusion only breaks it after
-    // occlusion never breaks a lock — only range does.
+    shipTracksPlayer(ship) {
+        return Boolean(this.arena || (ship.playerAwareness ?? 0) >= SENSOR_TRACK_THRESHOLD);
+    }
+    shipContactsPlayer(ship) {
+        return Boolean(this.arena || (ship.playerAwareness ?? 0) >= SENSOR_CONTACT_THRESHOLD);
+    }
+    playerTracksShip(ship) {
+        return Boolean(this.arena || ship.id === this.save.player.currentTargetId || (ship.playerSensorAwareness ?? 0) >= SENSOR_TRACK_THRESHOLD);
+    }
+    // The player's sensor resolves a ship once its staged awareness reaches a
+    // firing-quality track. Threat multipliers still extend lit early warning;
+    // dark signatures cannot be multiplied into magical long-range contacts.
     playerSeesShip(ship, threatMult = 1) {
         const player = vec(this.save.player.position, this.tmpRadarPlayer);
         const locked = ship.id === this.save.player.currentTargetId;
         const shipPos = this.tmpRadarPos.set(ship.position[0], ship.position[1], ship.position[2]);
         const distance = player.distanceTo(shipPos);
-        const range = locked ? this.lockTrackedRange(ship) : (ship.dark
-            ? this.darkVisibilityRange(Math.hypot(ship.velocity[0], ship.velocity[1], ship.velocity[2]), ship.speed)
-            : this.playerStats().radarRange * threatMult);
+        const range = locked ? this.lockTrackedRange(ship) : this.playerStats().radarRange * (ship.dark ? 1 : threatMult);
         if (distance > range)
             return false;
-        // You must SEE a ship to acquire it, but a lock is the pilot's own eye:
-        // once locked, occlusion never breaks it — only range does.
         if (locked)
-            return true;
-        return !this.lineBlocked(player, shipPos);
+            return this.save.world.time < (ship.playerLockOccludedUntil ?? Infinity);
+        return this.playerTracksShip(ship) && !this.lineBlocked(player, shipPos);
     }
     // Returns cached effective ship stats. Equipment and shipId only change
     // at dock, so the cache is valid for the entire flight. Replaces ~10
@@ -8463,7 +8884,19 @@ export class GameSession {
             return;
         if (this.hostilesNear(vec(this.save.player.position), DOCK_SAFE_RADIUS))
             return;
+        if (this.save.player.transponder === false && this.darkDockPolicy(candidate) === 'deny') {
+            this.setMonitorStatus(t('DOCKING DENIED · TRANSPONDER REQUIRED'), 1200);
+            return;
+        }
         this.dockAt(candidate);
+    }
+    darkDockPolicy(locationId) {
+        const faction = LOCATIONS[locationId]?.faction;
+        if (faction === 'concord')
+            return 'deny';
+        if (faction === 'free-merchants' || faction === 'red-talons')
+            return 'syndicate';
+        return 'open';
     }
     // An unlicensed arrival: the station lets the dark ship land, then the
     // concourse opens on a payment card — the pilot either pays the berth fee
@@ -9474,12 +9907,17 @@ export class GameSession {
         this.save.player.velocity = [0, 0, 0];
         this.save.player.angularVelocity = [0, 0, 0];
         this.save.player.throttle = 0;
+        // Dock services shut the drive down and sink residual heat. A ship that
+        // spent time at a station must not relaunch with a frozen-in signature
+        // from the approach or its last gun burst.
+        this.playerDriveHeat = 0;
+        this.playerEmissionHeat = 0;
         this.predictedDockLocationId = undefined;
         const stats = this.playerStats();
         this.save.player.shield = stats.shield;
         // An unlicensed (transponder-off) arrival owes the syndicate berth: the
         // concourse opens on a payment card (pay or launch back out).
-        if (this.save.player.transponder === false)
+        if (this.save.player.transponder === false && this.darkDockPolicy(locationId) === 'syndicate')
             this.beginDarkArrival(locationId);
         completeMissionsAtDock(this.save, locationId).forEach((message) => this.ui.showToast(message, 'success', 6000));
         refreshMissionOffers(this.save);
@@ -10012,7 +10450,9 @@ export class GameSession {
             return;
         const dark = this.save.player.transponder !== false;
         this.save.player.transponder = !dark;
-        this.ui.pushSensor(dark ? t('Transponder offline — dark to sensors. Slow to half speed to hide best.') : t('Transponder online — full sensor signature.'), dark ? 'warning' : 'success', 4200);
+        this.ui.pushSensor(dark
+            ? t('Identity offline. Cut thrust and avoid weapons or beams to cool your signature.')
+            : t('Identity online. Sensors can resolve your ship at full range.'), dark ? 'warning' : 'success', 4200);
         this.audio.play('ui');
         this.persistSave();
     }
@@ -10225,9 +10665,10 @@ export class GameSession {
                             ? t('SURRENDERED · CLAIM READY')
                             : t('SURRENDERED · APPROACH TO CLAIM')
                         : t('SURRENDERED · NO CLAIM');
+                const identified = Boolean(ship.identifiedByPlayer || ship.scanned);
                 hudTarget = {
                     kind: 'ship',
-                    name: ship.name,
+                    name: identified ? ship.name : t('UNRESOLVED CONTACT'),
                     hostile: ship.hostile,
                     surrendered: ship.surrendered,
                     captured: ship.captured,
@@ -10235,7 +10676,9 @@ export class GameSession {
                     captureAvailable,
                     variant: ship.variant ?? shipVariantForRole(ship.role),
                     heading,
-                    subtitle: `${this.shipRoleLabel(ship)} · ${ship.surrendered ? t('SURRENDERED') : ship.hostile ? t('HOSTILE') : t(FACTION_LABEL(ship.faction))}${this.save.world.time < (ship.distressUntil ?? 0) ? ` · ${t('DISTRESS')}` : ''}`,
+                    subtitle: identified
+                        ? `${this.shipRoleLabel(ship)} · ${ship.surrendered ? t('SURRENDERED') : ship.hostile ? t('HOSTILE') : t(FACTION_LABEL(ship.faction))}${this.save.world.time < (ship.distressUntil ?? 0) ? ` · ${t('DISTRESS')}` : ''}`
+                        : `${t('UNKNOWN VESSEL')} · ${t('NO ID')}`,
                     // The monitor's readout line carries the pilot profile so a
                     // locked target's habits are visible at a glance — job and
                     // skill tier, prefixed with the recognition marker when the
@@ -10243,6 +10686,10 @@ export class GameSession {
                     // stays off the HUD: it reads through behavior and comms.
                     readout: ship.captured || ship.surrendered
                         ? surrenderReadout
+                        : !identified
+                            ? distance > stats.scanRange
+                                ? t('TRACK STABLE · CLOSE TO IDENTIFY')
+                                : t('IDENTIFYING…')
                         : ship.scanned
                             ? `${this.shipTaskLabel(ship)}${ship.pilot ? ` · ${ship.recognizesPlayer ? `${SPARED_MARK} ` : ''}${t(TIER_LABELS[ship.pilot.tier] ?? ship.pilot.tier)}` : ''}`
                             : distance > stats.scanRange
@@ -10346,6 +10793,9 @@ export class GameSession {
                 ? t('LOCK {location} · LAND', { location: LOCATIONS[dock].shortName })
                 : t('LOCK {location} · DOCK', { location: LOCATIONS[dock].shortName });
         }
+        else if (dockTargeted && this.save.player.transponder === false && this.darkDockPolicy(dock) === 'deny') {
+            dockPrompt = t('TRANSMIT ID TO DOCK');
+        }
         else if (dockTargeted && speed > AUTO_DOCK_SPEED) {
             dockPrompt = LOCATIONS[dock].kind === 'planet'
                 ? t('SLOW TO LAND')
@@ -10437,20 +10887,22 @@ export class GameSession {
             race: this.raceHud(),
             weapon: this.weaponHud(),
             // Radar ring calibration as fractions of the outer (radarRange) ring:
-            // [dark-visibility, scan range, full horizon]. The inner ring tracks
-            // the pilot's own signature — full range while broadcasting, and the
-            // speed-scaled dark band (200–400 km) while dark, so it visibly
-            // shrinks as the pilot slows to hide. mk2 grows the outer and mid
-            // rings.
+            // [exposure, scan range, full horizon]. The inner ring shows how far
+            // NPC sensors can currently resolve the player: their full horizon
+            // with identity live, or the changing physical signature while dark.
+            // mk2 grows the player's outer and scan rings, not NPC sensor reach.
             radarRings: [this.playerVisibilityFraction(), stats.scanRange / stats.radarRange, 1],
             // Combat-range anchor for the radar's non-linear radial scale, as
             // a fraction of the horizon (200 km on a 1000 km radar): the inner
             // disc is expanded up to this fraction (see drawRadar).
             radarWarp: RADAR_COMBAT_RANGE / stats.radarRange,
-            // Transponder state for the radar chip: broadcasting is the actual
-            // sensor signature (transponder ON or the extraction beam running).
+            // Identity and physical signature are shown separately: using a
+            // beam or hot drive while dark raises SIG without changing ID.
             transponder: this.save.player.transponder !== false,
-            broadcasting: this.playerBroadcasting(),
+            broadcasting: this.playerIdentityBroadcasting(),
+            signatureRange: this.playerPhysicalSignatureRange(),
+            signatureBand: signatureBand(this.playerPhysicalSignatureRange(), NPC_SENSOR_RANGE),
+            stealthStatus: this.stealthHudStatus(),
             contacts: this.radarContacts(),
             // Active search sweeps (see searchRings): colored rings at
             // last-known-position anchors so a hunt near the pilot shows on the
@@ -10499,21 +10951,16 @@ export class GameSession {
         for (const ship of this.ships) {
             if (ship.hull <= 0)
                 continue;
-            // Mirror the radar: dark ships exist inside their speed-scaled dark
-            // band, a locked ship is a visual lock (VISUAL_LOCK_RANGE, with a
-            // a locked ship is tracked through occlusion — never broken by a
-            // rock, only by range — and a signal the dish
-            // just lost stays as a lost-contact cross at its last known
-            // position instead of a dashed circle.
+            // Mirror the radar's staged contact: a faint return can be plotted
+            // before it is stable enough to lock or identify.
             const shipPos = vec(ship.position);
             const distance = player.distanceTo(shipPos);
             const occluded = this.lineBlocked(player, shipPos);
-            const darkVis = ship.dark ? this.darkVisibilityRange(vec(ship.velocity).length(), ship.speed) : shipRange;
-            const seen = !occluded && distance <= darkVis;
+            const awareness = ship.playerSensorAwareness ?? 0;
+            const seen = !occluded && awareness >= SENSOR_CONTACT_THRESHOLD;
             const selected = ship.id === this.save.player.currentTargetId;
-            // A locked ship is a visual lock: tracked through occlusion all
-            // the way out to lockTrackedRange (see radarContacts).
-            const tracked = selected && distance <= this.lockTrackedRange(ship);
+            const tracked = selected && distance <= this.lockTrackedRange(ship)
+                && this.save.world.time < (ship.playerLockOccludedUntil ?? Infinity);
             const ghost = !seen && !tracked && distance <= shipRange * 2.2 && this.save.world.time < (ship.lastSeenAt ?? 0) + LOST_CONTACT_LIFETIME;
             // A distress beacon surfaces the source even beyond the normal
             // horizon: the nav map shows it at its true position (clamped to
@@ -10531,10 +10978,16 @@ export class GameSession {
                 }
                 continue;
             }
-            const subtitle = `${this.shipRoleLabel(ship)} · ${ship.hostile ? t('HOSTILE') : t(FACTION_LABEL(ship.faction))}${ghost ? ` · ${t('CONTACT LOST')}` : ''}${distressActive ? ` · ${t('DISTRESS CALL')}` : ''}`;
-            const contact = buildContact('ship', ship.id, ship.name, subtitle, ghost ? (ship.lastSeenPosition ?? ship.position) : ship.position, shipRange, ship.hostile, false, ghost);
+            const identified = Boolean(ship.identifiedByPlayer);
+            const faint = !tracked && awareness < SENSOR_TRACK_THRESHOLD;
+            const name = identified ? ship.name : t('UNRESOLVED CONTACT');
+            const subtitle = faint
+                ? t('FAINT SENSOR RETURN')
+                : `${identified ? this.shipRoleLabel(ship) : t('UNKNOWN VESSEL')} · ${identified ? (ship.hostile ? t('HOSTILE') : t(FACTION_LABEL(ship.faction))) : t('NO ID')}${ghost ? ` · ${t('CONTACT LOST')}` : ''}${distressActive ? ` · ${t('DISTRESS CALL')}` : ''}`;
+            const contact = buildContact('ship', ship.id, name, subtitle, ghost ? (ship.lastSeenPosition ?? ship.position) : ship.position, shipRange, ship.hostile, false, ghost);
             if (contact) {
                 contact.ghost = ghost;
+                contact.faint = faint;
                 contact.race = Boolean(ship.race);
                 contact.racer = Boolean(ship.race);
                 if (ship.race)
@@ -10705,7 +11158,7 @@ export class GameSession {
         // outer ring is exactly the radarRange ring and the inner rings can be
         // calibrated against it (see radarRings in buildHudModel).
         const range = this.playerStats().radarRange;
-        const add = (position, type, selected, surfaceOffset = 0, ghost = false, lostAlpha = 0, race = false) => {
+        const add = (position, type, selected, surfaceOffset = 0, ghost = false, lostAlpha = 0, race = false, faint = false) => {
             const relative = this.tmpRadarRel.set(position[0], position[1], position[2]).sub(player).applyQuaternion(inverse);
             const distance = Math.hypot(relative.x, relative.z) - surfaceOffset;
             if (!ghost && distance > range * 1.45)
@@ -10722,34 +11175,29 @@ export class GameSession {
             // km reads as a shallow climb, while the same offset next to you
             // reads as a steep one. It is bounded (sin of the angle) and the
             // drawer clamps it anyway.
-            contacts.push({ x: clamp(relative.x / scale, -1, 1), y: clamp(relative.z / scale, -1, 1), type, selected, altitude: relative.y / Math.max(relative.length(), 1), ghost, lostAlpha, race, racer: race });
+            contacts.push({ x: clamp(relative.x / scale, -1, 1), y: clamp(relative.z / scale, -1, 1), type, selected, altitude: relative.y / Math.max(relative.length(), 1), ghost, lostAlpha, race, racer: race, faint });
         };
         for (const ship of this.ships) {
             if (ship.hull <= 0)
                 continue;
-            // A dark ship exists inside its speed-scaled dark band (200 km at
-            // half speed, 400 at full); lit ships ride the full radar horizon.
-            // A locked ship is a visual lock: tracked to VISUAL_LOCK_RANGE
-            // occlusion never breaks a lock — only range does.
-            // Anything the dish just stopped resolving becomes a lost-contact
-            // cross at its last known position — solid, then fading — instead
-            // of a dashed circle (see drawRadar).
+            // A staged dark return first appears as a hollow, pulsing contact;
+            // sustained exposure resolves it into the normal solid blip.
             const shipPos = this.tmpRadarPos.set(ship.position[0], ship.position[1], ship.position[2]);
             const distance = player.distanceTo(shipPos);
             const occluded = this.lineBlocked(player, shipPos);
             const selected = ship.id === this.save.player.currentTargetId;
-            const darkVis = ship.dark ? this.darkVisibilityRange(Math.hypot(ship.velocity[0], ship.velocity[1], ship.velocity[2]), ship.speed) : range * 1.45;
-            const seen = !occluded && distance <= darkVis;
-            // A locked ship is a visual lock: tracked through occlusion (rocks
-            // don't blind the eye) all the way out to lockTrackedRange.
-            const tracked = selected && distance <= this.lockTrackedRange(ship);
+            const awareness = ship.playerSensorAwareness ?? 0;
+            const seen = !occluded && awareness >= SENSOR_CONTACT_THRESHOLD;
+            const tracked = selected && distance <= this.lockTrackedRange(ship)
+                && this.save.world.time < (ship.playerLockOccludedUntil ?? Infinity);
             const type = ship.hostile ? 'hostile' : ship.role === 'patrol' ? 'friendly' : 'neutral';
             if (seen || tracked) {
-                // tuple() reads .x/.y/.z, so convert the raw array first — a
-                // NaN last-known position would draw the lost cross nowhere.
-                ship.lastSeenPosition = [...ship.position];
+                const last = ship.lastSeenPosition ?? (ship.lastSeenPosition = [0, 0, 0]);
+                last[0] = ship.position[0];
+                last[1] = ship.position[1];
+                last[2] = ship.position[2];
                 ship.lastSeenAt = this.save.world.time;
-                add(ship.position, type, selected, 0, false, 0, Boolean(ship.race));
+                add(ship.position, type, selected, 0, false, 0, Boolean(ship.race), !tracked && awareness < SENSOR_TRACK_THRESHOLD);
             }
             else if (this.save.world.time < (ship.lastSeenAt ?? 0) + LOST_CONTACT_LIFETIME) {
                 // Lost contact: the cross rides the last known position and

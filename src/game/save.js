@@ -60,9 +60,9 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             throttle: 0,
             credits: STARTING_CREDITS,
             fuel: 100,
-            // Transponder state: ON squawks a full sensor signature (visible at
-            // standard radar range), OFF hides the ship from sensors beyond the
-            // dark-detection line — at the cost of being an unlicensed squawk.
+            // Identity transponder only. Turning it off hides the callsign, not
+            // the hull: drive heat, weapons, damage, and utility emissions still
+            // create a physical sensor contact in flight.
             transponder: true,
             shield: 90,
             hull: 185,

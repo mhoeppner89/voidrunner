@@ -202,33 +202,40 @@ export function updateShipAI(session, ship, dt) {
     if (ship.captured || ship.poweredDown) {
         session.updateTravelAI(ship, dt);
         return;
-    }        const target = session.resolveShipTarget(ship);
-        const deferring = session.deferentialPilot(ship);
-        // Hunt-task pursuit: when a hunter acquires a fresh non-hostile ship
-        // victim (a trader or miner — never another fighter) it hails and
-        // closes on the run before the guns come up; the victim bolts, so the
-        // beat reads as a chase (see attackAI's pursuitHoldFire gate).
-        const freshVictim = ship.targetId && ship.targetId !== 'player' && ship.targetId !== ship.prevTargetId
-            ? session.ships.find((entry) => entry.id === ship.targetId) : undefined;
-        if (target && !deferring && freshVictim && !freshVictim.hostile && ship.task?.kind === 'hunt') {
-            ship.pursuitHoldFire = true;
-            ship.pursuitUntil = session.save.world.time + 6 + ship.aiRng() * 5;
-            session.hailHuntChase?.(ship);
-        }
-        ship.prevTargetId = ship.targetId;
-        // A patrol that engages (or is provoked) drops any open search — the fight
-        // takes over, and the sweep bookkeeping restarts clean.
-        if (target && !deferring && ship.role === 'patrol') {
-        session.clearSearch(ship);
-        session.updateAttackAI(ship, target.position, target.velocity, dt);
-        return;
     }
-    // Search AI runs first: a searching ship moves on its sweep point (travel),
-    // not on a live chase — a hostile that lost the resolve must sweep the
-    // last-known spot instead of flying at the player's current position.
+
+    // Sensors advance before target resolution. A hunter may want the player,
+    // but it cannot receive the player's live position until it has built a
+    // firing-quality track; otherwise it follows its fixed intelligence point.
+    session.updateSensorAwareness?.(ship, dt);
+
+    // Search/inspection runs before live target resolution. That prevents the
+    // unconditional player target from leaking the current position into a
+    // ship that should only know the last observed point.
     const searching = session.updateSearchAI(ship, dt);
     if (searching) {
         session.updateTravelAI(ship, dt);
+        return;
+    }
+
+    const target = session.resolveShipTarget(ship);
+    const deferring = session.deferentialPilot(ship);
+    // Hunt-task pursuit: when a hunter acquires a fresh non-hostile ship
+    // victim (a trader or miner — never another fighter) it hails and closes
+    // before the guns come up; the victim bolts, so the beat reads as a chase.
+    const freshVictim = ship.targetId && ship.targetId !== 'player' && ship.targetId !== ship.prevTargetId
+        ? session.ships.find((entry) => entry.id === ship.targetId) : undefined;
+    if (target && !deferring && freshVictim && !freshVictim.hostile && ship.task?.kind === 'hunt') {
+        ship.pursuitHoldFire = true;
+        ship.pursuitUntil = session.save.world.time + 6 + ship.aiRng() * 5;
+        session.hailHuntChase?.(ship);
+    }
+    ship.prevTargetId = ship.targetId;
+    // A patrol that engages (or is provoked) drops any open search — the fight
+    // takes over, and the sweep bookkeeping restarts clean.
+    if (target && !deferring && ship.role === 'patrol') {
+        session.clearSearch(ship);
+        session.updateAttackAI(ship, target.position, target.velocity, dt);
         return;
     }
     if (target && !deferring) {
@@ -282,8 +289,22 @@ const tryEmergentMug = (session, ship) => {
         return false;
     // No mugging what you cannot see — a dark pilot gets searched, not shaken
     // down.
-    if (!session.canSee(ship.position, session.save.player.position, !session.playerBroadcasting()))
+    if (!session.shipTracksPlayer?.(ship))
         return false;
+    if (ship.pendingMug) {
+        session.activatePendingMug?.(ship);
+        return true;
+    }
+    // Escorts waiting on a lead's hail keep manoeuvring but hold their fire.
+    if (ship.pendingMugLeaderId && ship.pendingMugLeaderId !== ship.id) {
+        const leader = session.ships.find((entry) => entry.id === ship.pendingMugLeaderId && entry.hull > 0 && entry.pendingMug);
+        if (!leader) {
+            ship.pendingMugLeaderId = undefined;
+            ship.holdFire = false;
+            ship.demandUntil = 0;
+        }
+        return false;
+    }
     if (ship.aiRng() >= MUG_CHANCE)
         return false;
     ship.nextMugAt = session.save.world.time + 40 + ship.aiRng() * 40;
