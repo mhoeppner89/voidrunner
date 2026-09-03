@@ -529,6 +529,10 @@ window.render_game_to_text = () => {
             selectedCommodityId: runtime?.ui?.marketCommodityId ?? null,
             quantity: runtime?.ui?.marketQuantity ?? 1,
             credits: save.player.credits,
+            loadedCargo: Object.entries(save.player.cargo ?? {})
+                .filter(([, quantity]) => Number(quantity) > 0)
+                .map(([commodityId, quantity]) => ({ commodityId, quantity: Math.floor(Number(quantity)) })),
+            sealedCargoUnits: (save.player.sealedCargo ?? []).reduce((sum, entry) => sum + Math.max(0, Number(entry?.units) || 0), 0),
         } : null,
         race: race ? {
             courseId: race.course.id,

@@ -290,7 +290,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.7.37';
+const GAME_VERSION = '0.7.38';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -1655,10 +1655,18 @@ export class GameUI {
         this.marketPoint = point;
         this.dockTab = 'market';
         this.dockTerminal = 'market';
-        if (point === 'commodities' && !COMMODITIES[this.marketCommodityId])
-            this.marketCommodityId = commodityIds[0];
-        if (point === 'den')
-            this.marketCommodityId = commodityIds.find((id) => !COMMODITIES[id].legal) ?? commodityIds[0];
+        if (point === 'commodities') {
+            const firstCarried = commodityIds.find((id) => (this.save.player.cargo[id] ?? 0) > 0);
+            if (firstCarried)
+                this.marketCommodityId = firstCarried;
+            else if (!COMMODITIES[this.marketCommodityId])
+                this.marketCommodityId = commodityIds[0];
+        }
+        if (point === 'den') {
+            const restrictedIds = commodityIds.filter((id) => !COMMODITIES[id].legal);
+            this.marketCommodityId = restrictedIds.find((id) => (this.save.player.cargo[id] ?? 0) > 0) ?? restrictedIds[0] ?? commodityIds[0];
+        }
+        this.marketQuantity = 1;
         this.renderDock();
     }
     selectMarketCommodity(commodityId) {
@@ -1756,17 +1764,48 @@ export class GameUI {
         const quoteLine = (quote) => quote.quantity > 0
             ? t('{quantity} units · {total} · {mass} mass', { quantity: quote.quantity, total: formatCredits(quote.total), mass: Math.abs(quote.massDelta ?? commodity.mass * quote.quantity).toFixed(1) })
             : this.tradeFailureLabel(quote.reason);
-        const catalog = ids.map((id) => {
+        const marketPriceFor = (id) => den ? denPrice(this.dockLocation, id, market[id], this.save.world.seed, this.save.world.economyClock) ?? 0 : market[id].lastPrice;
+        const carried = ids.map((id) => {
+            const quantity = Math.max(0, Math.floor(this.save.player.cargo[id] ?? 0));
+            const entry = COMMODITIES[id];
+            const entryPrice = marketPriceFor(id);
+            const quote = quoteCommodityTrade(this.save, this.dockLocation, id, den ? 'den-sell' : 'sell', 999, entryPrice);
+            return { id, entry, quantity, entryPrice, quote, mass: quantity * entry.mass };
+        }).filter((entry) => entry.quantity > 0 && entry.quote.quantity > 0);
+        const carriedIds = new Set(carried.map((entry) => entry.id));
+        const carriedUnits = carried.reduce((sum, entry) => sum + entry.quantity, 0);
+        const carriedMass = carried.reduce((sum, entry) => sum + entry.mass, 0);
+        const carriedValue = carried.reduce((sum, entry) => sum + entry.quote.total, 0);
+        const carriedTypeLabel = carried.length === 1 ? t('1 TYPE') : t('{count} TYPES', { count: carried.length });
+        const carriedUnitLabel = carriedUnits === 1 ? t('1 UNIT') : t('{quantity} UNITS', { quantity: carriedUnits });
+        const otherCargoMass = Math.max(0, cargoMass(this.save.player) - carriedMass);
+        const cargoManifest = carried.length ? `
+          <div class="cargo-sale-grid">
+            ${carried.map(({ id, entry, quantity: carriedQuantity, entryPrice, quote }) => {
+                const quantityLabel = carriedQuantity === 1 ? t('1 UNIT') : t('{quantity} UNITS', { quantity: carriedQuantity });
+                const saleLabel = carriedQuantity === 1
+                    ? t('Sell {commodity} for {total}', { commodity: t(entry.name), total: formatCredits(quote.total) })
+                    : t('Sell all {quantity} {commodity} for {total}', { quantity: carriedQuantity, commodity: t(entry.name), total: formatCredits(quote.total) });
+                return `<article class="cargo-sale-item ${id === commodityId ? 'selected' : ''}" style="--commodity-accent:${entry.accent}">
+              <button type="button" class="cargo-sale-select" data-commodity-id="${id}" aria-label="${escapeHtml(t('Select {commodity} from your cargo', { commodity: t(entry.name) }))}">
+                <i aria-hidden="true"></i><span><b>${escapeHtml(t(entry.name))}</b><small>${quantityLabel} · ${(carriedQuantity * entry.mass).toFixed(1)} ${t('MASS')}</small></span><em>${formatCredits(entryPrice)} / ${t('UNIT')}</em>
+              </button>
+              <button type="button" class="cargo-sale-action" data-trade="${den ? 'den-sell' : 'sell'}:${id}:999" aria-label="${escapeHtml(saleLabel)}"><span>${t('SELL ALL')}</span><b>${formatCredits(quote.total)}</b></button>
+            </article>`;
+            }).join('')}
+          </div>` : `<p class="cargo-sale-empty"><b>${t(den ? 'NO RESTRICTED CARGO LOADED' : 'NO LOOSE CARGO LOADED')}</b><span>${t(den ? 'Restricted goods in your hold will appear here.' : 'Bought, mined, and salvaged goods will appear here.')}</span></p>`;
+        const catalogIds = [...ids].sort((a, b) => Number(carriedIds.has(b)) - Number(carriedIds.has(a)));
+        const catalog = catalogIds.map((id) => {
             const entry = COMMODITIES[id];
             const stock = market[id];
-            const entryPrice = den ? denPrice(this.dockLocation, id, stock, this.save.world.seed, this.save.world.economyClock) ?? 0 : stock.lastPrice;
+            const entryPrice = marketPriceFor(id);
             const entryBand = this.marketPriceBand(entryPrice, entry);
             const entryCondition = this.marketCondition(stock);
             const entryOwned = this.save.player.cargo[id] ?? 0;
-            return `<button type="button" class="commodity-card ${id === commodityId ? 'selected' : ''} ${entry.legal ? '' : 'restricted'}" data-commodity-id="${id}" role="option" aria-selected="${id === commodityId}" style="--commodity-accent:${entry.accent}">
+            return `<button type="button" class="commodity-card ${id === commodityId ? 'selected' : ''} ${entryOwned > 0 ? 'has-cargo' : ''} ${entry.legal ? '' : 'restricted'}" data-commodity-id="${id}" role="option" aria-selected="${id === commodityId}" style="--commodity-accent:${entry.accent}">
               ${this.commodityArt(entry)}
               <span class="commodity-card-copy"><b>${escapeHtml(t(entry.name))}</b><small>${escapeHtml(t(entry.packaging))} · ${entry.mass} ${t('MASS')}</small><em class="market-condition ${entryCondition.className}">${entryCondition.label}</em></span>
-              <span class="commodity-card-price"><b>${formatCredits(entryPrice)}</b><small class="price-${entryBand.className}">${entryBand.label}</small><em>${t('HOLD')} ${entryOwned}</em></span>
+              <span class="commodity-card-price"><b>${formatCredits(entryPrice)}</b><small class="price-${entryBand.className}">${entryBand.label}</small>${entryOwned > 0 ? `<em class="commodity-hold-badge">${t('HOLD')} ${entryOwned}</em>` : ''}</span>
             </button>`;
         }).join('');
         const quoteRows = remoteQuotes.length ? remoteQuotes.slice(0, 4).map((quote) => {
@@ -1779,6 +1818,11 @@ export class GameUI {
         return `
         <div class="market-layout commodity-exchange ${den ? 'is-den' : ''}">
           <div class="table-title commodity-market-title"><div><span class="eyebrow">${den ? t('UNLICENSED EXCHANGE') : t('COMMODITY EXCHANGE')}</span><h3>${den ? t('Smuggler\'s den') : t('Cargo catalog')}</h3></div><div><span>${t('HOLD')}</span><b>${cargoMass(this.save.player).toFixed(1)} / ${cargoCapacity(this.save.player)} ${t('MASS')}</b></div></div>
+          <section class="cargo-sale-manifest ${carried.length ? '' : 'is-empty'}" aria-label="${t('CARGO TO SELL')}">
+            <header><div><span class="eyebrow">${t('YOUR HOLD')}</span><h3>${t('CARGO TO SELL')}</h3></div>${carried.length ? `<div><span>${carriedTypeLabel} · ${carriedUnitLabel}</span><b>${formatCredits(carriedValue)}</b><small>${t('AT CURRENT PRICES')}</small></div>` : ''}</header>
+            ${cargoManifest}
+            ${otherCargoMass > 0.01 ? `<small class="cargo-sale-other">${t('OTHER CARGO · {mass} MASS IS NOT TRADED HERE', { mass: otherCargoMass.toFixed(1) })}</small>` : ''}
+          </section>
           ${den ? '' : `<div class="market-opportunity-strip"><span><small>${t('BEST LOCAL BUY')}</small><b>${escapeHtml(t(COMMODITIES[bestLocalBuy].name))} · ${formatCredits(market[bestLocalBuy].lastPrice)}</b></span><span><small>${t('STRONGEST LOCAL DEMAND')}</small><b>${escapeHtml(t(COMMODITIES[strongestDemand].name))}</b></span><em>${t('Remote quotes are last-known, not live.')}</em></div>`}
           <div class="commodity-market-shell">
             <div class="commodity-catalog" role="listbox" aria-label="${t('Commodities')}">${catalog}</div>
