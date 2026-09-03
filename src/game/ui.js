@@ -1,5 +1,5 @@
-import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, LOCATIONS, SHIPS, SYSTEM_MAP_EXTENT, commodityIds, displaySpeed } from './data.js';
-import { JUMP_ROUTES, SYSTEMS } from './galaxy.js';
+import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, LOCATIONS, SHIPS, SYSTEM_MAP_EXTENT, commodityIds, displaySpeed, routeDistanceBetween } from './data.js';
+import { JUMP_ROUTES, SYSTEMS, planRoute } from './galaxy.js';
 import { bestKnownTradeRoute, cargoCapacity, cargoMass, currentProfitableRoutes, denPrice, knownMarketQuotes, quoteCommodityTrade, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { formatCredits, formatDuration, formatNumber } from './random.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
@@ -10,6 +10,7 @@ import { defaultSettings } from './save.js';
 import { getLanguage, t } from './i18n.js';
 import { HULL_TRADE_IN_RATE, quoteShipTrade } from './shipTrade.js';
 import { HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RATE, itemAvailable, itemFitsMount, loadoutFor, outfittingUsage, quoteOutfitting } from './outfitting.js';
+import { guildJoinCost, missionBriefing, missionTitle } from './missions.js';
 const escapeHtml = (value) => value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const percent = (value, max) => (max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100)));
 // Every dock screen resolves through one explicit art record. This keeps minor
@@ -121,6 +122,26 @@ const FULL_DOCK_SERVICES = Object.freeze({ fuel: true, repair: true, market: tru
 const locationServices = (locationId) => LOCATIONS[locationId]?.services ?? FULL_DOCK_SERVICES;
 const hasLocationService = (locationId, service) => Boolean(locationServices(locationId)?.[service]);
 const hasAnyLocationService = (locationId, services) => services.some((service) => hasLocationService(locationId, service));
+const GUILD_REPRESENTATIVE_BY_LOCATION = Object.freeze({
+    helix: Object.freeze({ merchant: 'oskar-brill' }),
+    rook: Object.freeze({ bounty: 'tovik', merchant: 'yara-tan' }),
+    vesper: Object.freeze({ mining: 'ren-iverson' }),
+    azure: Object.freeze({ merchant: 'ivo-senn' }),
+    cairn: Object.freeze({ salvage: 'merrit-voss' }),
+    'meridian-prime': Object.freeze({ merchant: 'leon-vale', bounty: 'sela-orrin' }),
+    argent: Object.freeze({ merchant: 'mira-kest' }),
+    blackglass: Object.freeze({ syndicate: 'vesh-orr', merchant: 'nara-quill' }),
+    cinder: Object.freeze({ merchant: 'rhea-sol' }),
+    nacre: Object.freeze({ mining: 'pavel-orn' }),
+    boreal: Object.freeze({ mining: 'soren-vek', merchant: 'halden-ree' }),
+});
+const GUILD_BENEFIT_KEYS = Object.freeze({
+    merchant: Object.freeze(['Standard freight contracts', 'Larger loads and better route intelligence', 'Specialist cargo equipment', 'Highest-value commercial work']),
+    bounty: Object.freeze(['Civilian warrants', 'Veteran target dossiers', 'Ace authentication and combat equipment', 'Marshal-grade warrants']),
+    mining: Object.freeze(['Public mineral claims', 'Richer deposit intelligence', 'Advanced extraction equipment', 'Deep-core claims']),
+    salvage: Object.freeze(['Public recovery claims', 'Priority wreck coordinates', 'Long-range recovery equipment', 'Relic-grade claims']),
+    syndicate: Object.freeze(['Low-level dark runs', 'Restricted cargo contacts', 'Specialist covert equipment', 'Syndicate priority work']),
+});
 // The regional chart follows the real four-system corridor, but bends it into
 // a broad zig-zag so the route has rhythm and room for full labels.
 const REGIONAL_SYSTEM_LAYOUT = Object.freeze({
@@ -290,7 +311,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.7.40';
+const GAME_VERSION = '0.7.50';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -448,6 +469,10 @@ export class GameUI {
     shipDetailId;
     barPanel = 'people';
     barPersonId;
+    dialogueTopic = 'greeting';
+    missionBoardTab = 'available';
+    missionSelectedId;
+    missionMobileDetail = false;
     titleVisible = true;
     hasCareerSave = false;
     arenaEnv = 'open';
@@ -475,7 +500,6 @@ export class GameUI {
     lastMapPointerSelection;
     mapView = 'sector';
     lastHud;
-    npcLineIndex = new Map();
     cockpitShipId = 'wayfarer';
     vesperPreviewShipId = INITIAL_PREVIEW_SHIP_ID;
     vesperLaunchTransition = false;
@@ -832,7 +856,7 @@ export class GameUI {
     `;
     }
     bindStaticEvents() {
-        const delegatedActionSelector = '[data-ui-command], [data-map-view], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-commodity-id], [data-market-qty], [data-bar-panel], [data-nav-id], [data-trade], [data-jettison], [data-mission-id], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action], [data-equipment-id], [data-ship-id], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty], [data-pay-mug]';
+        const delegatedActionSelector = '[data-ui-command], [data-map-view], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-commodity-id], [data-market-qty], [data-bar-panel], [data-dialogue-topic], [data-dialogue-action], [data-mission-board-tab], [data-mission-select], [data-mission-course], [data-nav-id], [data-trade], [data-jettison], [data-mission-id], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action], [data-equipment-id], [data-ship-id], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty], [data-pay-mug]';
         const directPointerElement = (event) => {
             const correctedSceneControl = event.pointerType !== 'mouse' && event.target instanceof Element
                 ? event.target.closest('.scene-pointer')
@@ -953,6 +977,19 @@ export class GameUI {
                 if (panel === 'people' || panel === 'missions' || panel === 'guilds')
                     this.switchToTerminal('bar', panel);
             }
+            else if (target.dataset.dialogueTopic)
+                this.selectDialogueTopic(target.dataset.dialogueTopic);
+            else if (target.dataset.dialogueAction)
+                this.handleDialogueAction(target.dataset.dialogueAction, target.dataset.destinationId);
+            else if (target.dataset.missionBoardTab)
+                this.setMissionBoardTab(target.dataset.missionBoardTab);
+            else if (target.dataset.missionSelect)
+                this.selectMission(target.dataset.missionSelect);
+            else if (target.dataset.missionCourse) {
+                const destinationId = target.dataset.missionCourse;
+                if (this.actions?.setDestination?.(destinationId))
+                    this.showToast(t('Course set for {destination}.', { destination: LOCATIONS[destinationId]?.name ?? destinationId }), 'success', 2600);
+            }
             else if (target.dataset.dockTab) {
                 const tab = target.dataset.dockTab;
                 if (tab === 'concourse' || tab === 'bar' || tab === 'market')
@@ -1014,7 +1051,14 @@ export class GameUI {
                 this.showShipMenu();
             }
             else if (target.dataset.missionId) {
-                this.actions?.acceptMission(target.dataset.missionId);
+                const missionId = target.dataset.missionId;
+                const result = this.actions?.acceptMission(missionId);
+                if (result?.ok) {
+                    this.missionBoardTab = 'active';
+                    this.missionSelectedId = missionId;
+                    this.missionMobileDetail = true;
+                    this.renderDock();
+                }
             }
             else if (target.dataset.equipmentId) {
                 this.actions?.buyEquipment(target.dataset.equipmentId);
@@ -1124,7 +1168,7 @@ export class GameUI {
         this.root.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter' && event.key !== ' ')
                 return;
-            const target = event.target.closest('[data-ui-command], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-person-id], [data-ship-detail], [data-ship-detail-back], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action]');
+            const target = event.target.closest('[data-ui-command], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-dialogue-topic], [data-dialogue-action], [data-mission-board-tab], [data-mission-select], [data-mission-course], [data-mission-id], [data-guild-id], [data-person-id], [data-ship-detail], [data-ship-detail-back], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action]');
             if (!target)
                 return;
             event.preventDefault();
@@ -1202,6 +1246,9 @@ export class GameUI {
             case 'syndicate-pay':
                 this.actions?.paySyndicateBerth?.();
                 break;
+            case 'dismiss-mission-settlements':
+                this.actions?.acknowledgeMissionSettlements?.();
+                break;
             case 'dismiss-story':
                 this.dismissStory();
                 break;
@@ -1230,6 +1277,7 @@ export class GameUI {
                 this.marketPoint = '';
                 this.barPanel = 'people';
                 this.barPersonId = undefined;
+                this.dialogueTopic = 'greeting';
                 this.renderDock();
                 break;
             case 'bar-scene':
@@ -1237,6 +1285,11 @@ export class GameUI {
                 this.dockTerminal = 'bar';
                 this.barPanel = 'people';
                 this.barPersonId = undefined;
+                this.dialogueTopic = 'greeting';
+                this.renderDock();
+                break;
+            case 'mission-list':
+                this.missionMobileDetail = false;
                 this.renderDock();
                 break;
             case 'market-overview':
@@ -1297,6 +1350,10 @@ export class GameUI {
         this.resetOutfittingDrafts();
         this.barPanel = 'people';
         this.barPersonId = undefined;
+        this.dialogueTopic = 'greeting';
+        this.missionBoardTab = 'available';
+        this.missionSelectedId = undefined;
+        this.missionMobileDetail = false;
         this.hideTitle();
         this.hideHud();
         this.root.querySelector('#dock-screen')?.classList.remove('is-hidden');
@@ -1401,6 +1458,7 @@ export class GameUI {
       ${this.renderDockNotice()}
       <div class="dock-content">${terminal}</div>
       ${this.renderSyndicateCard()}
+      ${this.renderMissionSettlements()}
     `;
         const content = dock.querySelector('.dock-content');
         const preserveScroll = prevTab === this.dockTab
@@ -1462,6 +1520,39 @@ export class GameUI {
             <button type="button" data-ui-command="syndicate-pay" ${affordable ? '' : 'disabled'} aria-label="${t('Pay the syndicate berth fee')}">${t('PAY')} ${formatCredits(pending.fee)}</button>
             <button type="button" data-ui-command="launch" aria-label="${t('Launch back into space without paying')}">${t('LAUNCH BACK')}</button>
           </div>
+        </div>
+      </div>`;
+    }
+    renderMissionSettlements() {
+        if (this.save?.world?.syndicatePending)
+            return '';
+        const settlements = Array.isArray(this.save?.world?.missionSettlements)
+            ? this.save.world.missionSettlements
+            : [];
+        if (!settlements.length)
+            return '';
+        const paid = settlements.reduce((sum, entry) => sum + Math.max(0, Number(entry.total) || 0), 0);
+        const completed = settlements.filter((entry) => entry.outcome === 'completed').length;
+        const failed = settlements.length - completed;
+        return `
+      <div class="mission-settlement" role="dialog" aria-modal="true" aria-label="${t('Contract settlement')}">
+        <div class="mission-settlement-panel">
+          <span class="eyebrow">${t('DOCKSIDE ACCOUNTING')}</span>
+          <header><div><h3>${t('Contract settlement')}</h3><p>${t('{completed} completed · {failed} failed', { completed, failed })}</p></div><strong>${formatCredits(paid)}</strong></header>
+          <div class="mission-settlement-list">
+            ${settlements.map((entry) => `
+              <article class="${entry.outcome === 'failed' ? 'is-failed' : 'is-complete'}">
+                <div><span>${entry.outcome === 'failed' ? t('CONTRACT FAILED') : t('CONTRACT COMPLETE')}</span><b>${escapeHtml(missionTitle(entry))}</b><small>${escapeHtml(entry.authored && entry.chainLabel && entry.stageLabel
+                    ? `${t(entry.chainLabel)} · ${t(entry.stageLabel)} · ${t(entry.issuer ?? GUILD_NAMES[entry.guild] ?? 'Local contract desk')}`
+                    : t(entry.issuer ?? GUILD_NAMES[entry.guild] ?? 'Local contract desk'))}</small></div>
+                <dl>
+                  ${entry.outcome === 'completed' ? `<div><dt>${t('PAYMENT')}</dt><dd>${formatCredits(entry.reward)}</dd></div><div><dt>${t('BOND RETURNED')}</dt><dd>${formatCredits(entry.bond)}</dd></div>${entry.bonus > 0 ? `<div class="is-bonus"><dt>${t('BONUS')}</dt><dd>+${formatCredits(entry.bonus)}</dd></div>` : ''}` : `<div class="is-loss"><dt>${t('BOND LOST')}</dt><dd>${formatCredits(Math.abs(entry.bond))}</dd></div>`}
+                  <div><dt>${t('GUILD REP')}</dt><dd>${entry.repDelta > 0 ? '+' : ''}${entry.repDelta}</dd></div>
+                </dl>
+                ${entry.rankedUp && entry.rankName ? `<p class="settlement-rank">${t('NEW RANK')} · ${escapeHtml(t(entry.rankName))}</p>` : ''}
+              </article>`).join('')}
+          </div>
+          <button type="button" class="primary" data-ui-command="dismiss-mission-settlements">${t('ACKNOWLEDGE')}</button>
         </div>
       </div>`;
     }
@@ -1601,7 +1692,7 @@ export class GameUI {
     renderBar() {
         const people = LOCATIONS[this.dockLocation].people ?? [];
         const missionDesk = hasAnyLocationService(this.dockLocation, ['missions', 'race']);
-        const guildDesk = hasLocationService(this.dockLocation, 'missions');
+        const guildDesk = this.localGuildIds().length > 0;
         if (this.barPanel === 'missions')
             return this.renderMissions();
         if (this.barPanel === 'guilds')
@@ -1612,9 +1703,9 @@ export class GameUI {
       <div class="bar-scene station-scene" aria-label="${t('Bar points of interest')}">
         <div class="scene-pointers" aria-label="${t('Bar actions')}">
           ${missionDesk ? `<div class="scene-pointer bar-pointer-missions" data-bar-panel="missions" role="button" tabindex="0" aria-label="${t('Open the mission board')}"><i>✦</i><b>${hasLocationService(this.dockLocation, 'race') && !hasLocationService(this.dockLocation, 'missions') ? t('RACE BOARD') : t('MISSION BOARD')}</b><small>${hasLocationService(this.dockLocation, 'race') ? t('Enter a course') : t('Find work')}</small></div>` : ''}
-          ${guildDesk ? `<div class="scene-pointer bar-pointer-guilds" data-bar-panel="guilds" role="button" tabindex="0" aria-label="${t('Open guilds')}"><i>◇</i><b>${t('GUILDS')}</b><small>${t('Find allies')}</small></div>` : ''}
+          ${guildDesk ? `<div class="scene-pointer bar-pointer-guilds" data-bar-panel="guilds" role="button" tabindex="0" aria-label="${t('Open guilds')}"><i>◇</i><b>${t('LOCAL GUILDS')}</b><small>${t('{count} represented here', { count: this.localGuildIds().length })}</small></div>` : ''}
           ${people.map((person, index) => `
-            <div class="scene-pointer bar-person-pointer bar-person-${index}" data-person-id="${person.id}" role="button" tabindex="0" aria-label="${t('Talk to {name}', { name: person.name })}"><i>●</i><b>${escapeHtml(person.name)}</b><small>${escapeHtml(t(person.role))}</small></div>
+            <div class="scene-pointer bar-person-pointer bar-person-${index} ${(this.save.world.npcMemory?.[person.id]?.met) ? 'is-known' : 'is-new'}" data-person-id="${person.id}" role="button" tabindex="0" aria-label="${t('Talk to {name}', { name: person.name })}"><i>●</i><b>${escapeHtml(person.name)}</b><small>${escapeHtml(t(person.role))}</small>${this.save.world.npcMemory?.[person.id]?.met ? '' : `<em>${t('NEW CONTACT')}</em>`}</div>
           `).join('')}
         </div>
       </div>
@@ -1624,41 +1715,158 @@ export class GameUI {
         const person = LOCATIONS[this.dockLocation].people?.find((entry) => entry.id === personId);
         if (!person)
             return;
-        const index = this.npcLineIndex.get(personId) ?? 0;
-        this.npcLineIndex.set(personId, index + 1);
+        this.actions?.talkToNpc?.(personId, 'greeting');
         this.barPanel = 'people';
         this.barPersonId = personId;
+        this.dialogueTopic = 'greeting';
         this.renderDock();
+    }
+    localGuildIds(locationId = this.dockLocation) {
+        return (LOCATIONS[locationId]?.guilds ?? []).filter((id) => GUILD_NAMES[id]);
+    }
+    guildRepresentativeId(guildId, locationId = this.dockLocation) {
+        return GUILD_REPRESENTATIVE_BY_LOCATION[locationId]?.[guildId];
+    }
+    guildRepresentative(guildId, locationId = this.dockLocation) {
+        const personId = this.guildRepresentativeId(guildId, locationId);
+        return LOCATIONS[locationId]?.people?.find((person) => person.id === personId);
+    }
+    personGuildId(personId) {
+        return Object.entries(GUILD_REPRESENTATIVE_BY_LOCATION[this.dockLocation] ?? {})
+            .find(([, representativeId]) => representativeId === personId)?.[0];
+    }
+    dialogueTopics(person) {
+        const topics = [];
+        if (hasAnyLocationService(this.dockLocation, ['missions', 'race']))
+            topics.push({ id: 'work', label: t('WORK') });
+        if (person.marketTipster)
+            topics.push({ id: 'market', label: t('TRADE TIP') });
+        if (this.personGuildId(person.id))
+            topics.push({ id: 'guild', label: t('GUILD') });
+        topics.push({ id: 'local', label: t('LOCAL NEWS') });
+        if (topics.length < 4)
+            topics.push({ id: 'advice', label: t('ADVICE') });
+        return topics.slice(0, 4);
+    }
+    dialogueMission(person) {
+        const guildId = this.personGuildId(person.id);
+        return this.save.activeMissions.find((mission) => guildId && mission.guild === guildId)
+            ?? this.save.activeMissions.find((mission) => mission.origin === this.dockLocation || mission.destination === this.dockLocation);
+    }
+    dialogueResponse(person, topicId) {
+        const memory = this.save.world.npcMemory?.[person.id] ?? { topics: {}, talks: 0 };
+        const count = Math.max(0, (memory.topics?.[topicId] ?? 1) - 1);
+        const lines = (person.lines ?? []).map((line) => t(line));
+        const activeMission = this.dialogueMission(person);
+        if (topicId === 'work') {
+            if (activeMission) {
+                return {
+                    text: t('You still have {title} on your slate. Check the contract for the next step before you launch.', { title: missionTitle(activeMission) }),
+                    action: 'missions',
+                    actionLabel: t('OPEN ACTIVE CONTRACT'),
+                };
+            }
+            const offers = this.save.world.offers?.[this.dockLocation] ?? [];
+            return {
+                text: offers.length
+                    ? t('There are {count} live postings on the local board. Read the route and risks before you put down a bond.', { count: offers.length })
+                    : t('Nothing fresh is posted right now. Check back after the board turns over.'),
+                action: 'missions',
+                actionLabel: t('OPEN MISSION BOARD'),
+            };
+        }
+        if (topicId === 'market') {
+            const routes = currentProfitableRoutes(this.save.world, this.dockLocation, 3);
+            const route = routes.length ? routes[count % routes.length] : undefined;
+            if (!route)
+                return { text: t('No clean margin stands out on the prices we know. Visit another port and bring back a fresh quote.') };
+            return {
+                text: t('{commodity} is {buyPrice} here. {destination} last paid {sellPrice}; that leaves about {profit} per unit before trouble.', {
+                    commodity: t(COMMODITIES[route.commodityId].name),
+                    buyPrice: formatCredits(route.buyPrice),
+                    destination: LOCATIONS[route.destinationId].name,
+                    sellPrice: formatCredits(route.sellPrice),
+                    profit: formatCredits(route.profitPerUnit),
+                }),
+                action: 'route',
+                actionLabel: t('SET DESTINATION'),
+                destinationId: route.destinationId,
+            };
+        }
+        if (topicId === 'guild') {
+            const guildId = this.personGuildId(person.id);
+            const joined = guildId && (this.save.player.guildRep[guildId] ?? 0) > 0;
+            return {
+                text: joined
+                    ? t('Your {guild} standing is {rep} reputation. The local desk can show what the next rank actually unlocks.', { guild: t(GUILD_NAMES[guildId]), rep: this.save.player.guildRep[guildId] })
+                    : t('I can register you with the {guild} here. The entry fee is {credits}; read the terms before you sign.', { guild: t(GUILD_NAMES[guildId]), credits: formatCredits(guildJoinCost(guildId)) }),
+                action: 'guilds',
+                actionLabel: t('VIEW GUILD DESK'),
+            };
+        }
+        if (topicId === 'greeting') {
+            const damaged = this.save.player.hull < getEffectiveShipStats(this.save.player).hull * 0.55;
+            if (damaged && /mechanic|shipwright|engineer/i.test(person.role))
+                return { text: t('That hull has had a hard run. I would inspect the pressure structure before taking another contract.') };
+            if (this.save.player.transponder === false && /customs|fixer|broker|marshal/i.test(person.role))
+                return { text: t('You came in without broadcasting a name. Around here, people notice that even when the official log does not.') };
+            if ((memory.topics?.greeting ?? 0) > 1 && activeMission)
+                return { text: t('Back already? Your contract is still active. If the situation changed, the board has the current details.') };
+            return { text: lines[0] ?? t('What do you need?') };
+        }
+        // Each authored contact line has a fixed purpose: greeting, advice,
+        // then local news. Repeatedly opening one topic should never rotate
+        // into a greeting or a different topic just because its counter rose.
+        const lineIndex = topicId === 'advice' ? 1 : 2;
+        return { text: lines[lineIndex] ?? lines[0] ?? t('Nothing useful comes to mind.') };
+    }
+    selectDialogueTopic(topicId) {
+        const person = LOCATIONS[this.dockLocation]?.people?.find((entry) => entry.id === this.barPersonId);
+        if (!person || !this.dialogueTopics(person).some((topic) => topic.id === topicId))
+            return;
+        this.actions?.talkToNpc?.(person.id, topicId);
+        this.dialogueTopic = topicId;
+        this.renderDock();
+    }
+    handleDialogueAction(action, destinationId) {
+        if (action === 'missions') {
+            this.barPanel = 'missions';
+            this.missionBoardTab = this.save.activeMissions.length ? 'active' : 'available';
+            this.missionSelectedId = undefined;
+            this.missionMobileDetail = false;
+            this.renderDock();
+        }
+        else if (action === 'guilds') {
+            this.barPanel = 'guilds';
+            this.renderDock();
+        }
+        else if (action === 'route' && LOCATIONS[destinationId]) {
+            if (this.actions?.setDestination?.(destinationId))
+                this.showToast(t('Course set for {destination}.', { destination: LOCATIONS[destinationId].name }), 'success', 2600);
+            this.renderDock();
+        }
     }
     renderBarDialogue(personId) {
         const person = LOCATIONS[this.dockLocation].people?.find((entry) => entry.id === personId);
         if (!person)
             return this.renderBar();
-        const lineIndex = Math.max(0, (this.npcLineIndex.get(personId) ?? 1) - 1);
-        const routes = person.marketTipster ? currentProfitableRoutes(this.save.world, this.dockLocation, 3) : [];
-        const route = routes.length ? routes[lineIndex % routes.length] : undefined;
-        const marketTip = route
-            ? t('Load {commodity} here at {buyPrice}. {destination} is paying {sellPrice} — about {profit} per unit if the board holds.', {
-                commodity: t(COMMODITIES[route.commodityId].name),
-                buyPrice: formatCredits(route.buyPrice),
-                destination: LOCATIONS[route.destinationId].name,
-                sellPrice: formatCredits(route.sellPrice),
-                profit: formatCredits(route.profitPerUnit),
-            })
-            : undefined;
-        // The first line from each port's market-connected regular is always a
-        // live, truthful outbound route. Their authored conversation follows,
-        // then the current board tip cycles back in on the next round.
-        const lines = marketTip ? [marketTip, ...person.lines] : person.lines;
-        const activeLine = lineIndex % lines.length;
-        const line = lines[activeLine];
-        const liveTip = Boolean(marketTip) && activeLine === 0;
+        const response = this.dialogueResponse(person, this.dialogueTopic);
+        const memory = this.save.world.npcMemory?.[person.id] ?? { talks: 1 };
         return `
       <div class="bar-dialogue-screen station-scene" aria-label="${t('Conversation with {name}', { name: person.name })}">
         <div class="scene-pointer scene-return-pointer" data-ui-command="bar-scene" role="button" tabindex="0" aria-label="${t('Return to the bar')}"><i>◀</i><b>${t('BAR FLOOR')}</b><small>${t('Back to the room')}</small></div>
-        <section class="bar-dialogue-card" data-person-id="${person.id}" role="button" tabindex="0" aria-label="${t('Continue talking to {name}', { name: person.name })}">
+        <section class="bar-dialogue-card" aria-live="polite">
           ${this.portraitImage(person.id, person.name)}
-          <div><span class="eyebrow">${escapeHtml(person.name)} / ${escapeHtml(t(person.affiliation))}</span><h3>${escapeHtml(t(person.role))}</h3>${liveTip ? `<b class="live-route-tip">${t('LIVE ROUTE TIP · CURRENT BOARD')}</b>` : ''}<p>“${escapeHtml(t(line))}”</p></div>
+          <div class="bar-dialogue-copy">
+            <span class="eyebrow">${escapeHtml(person.name)} / ${escapeHtml(t(person.affiliation))}</span>
+            <h3>${escapeHtml(t(person.role))}</h3>
+            <p>“${escapeHtml(response.text)}”</p>
+            <small>${t('KNOWN CONTACT')} · ${t('{count} exchanges', { count: memory.talks ?? 1 })}</small>
+            <nav class="dialogue-topics" aria-label="${t('Conversation topics')}">
+              ${this.dialogueTopics(person).map((topic) => `<button type="button" class="${topic.id === this.dialogueTopic ? 'is-active' : ''}" data-dialogue-topic="${topic.id}">${topic.label}</button>`).join('')}
+            </nav>
+            ${response.action ? `<button type="button" class="dialogue-action" data-dialogue-action="${response.action}" ${response.destinationId ? `data-destination-id="${response.destinationId}"` : ''}>${response.actionLabel}</button>` : ''}
+          </div>
         </section>
       </div>
     `;
@@ -1935,52 +2143,195 @@ export class GameUI {
         }
     }
     missionBadge(mission) {
-        return mission.kind === 'bounty' ? t('WARRANT') : mission.kind === 'transport' ? t('EXPRESS') : mission.kind === 'smuggle' ? t('DARK RUN') : t(mission.kind.toUpperCase());
+        return mission.authored ? t('STORY CONTRACT') : mission.kind === 'bounty' ? t('WARRANT') : mission.kind === 'transport' ? t('EXPRESS') : mission.kind === 'smuggle' ? t('DARK RUN') : t(mission.kind.toUpperCase());
     }
     deadlineLabel(mission) {
+        if (mission.authored && mission.status === 'offered' && Number.isFinite(Number(mission.deadlineSeconds)))
+            return t('{time} AFTER ACCEPTANCE', { time: formatDuration(mission.deadlineSeconds) });
         return Number.isFinite(mission.deadline) ? formatDuration(mission.deadline - this.save.world.time) : t('NO DEADLINE');
     }
+    missionTargetId(mission) {
+        if (mission.kind === 'mining' && mission.claimNodeId)
+            return 'shardbelt';
+        if (mission.kind === 'salvage')
+            return mission.targetZone ?? 'mourning-line';
+        if (mission.kind === 'bounty')
+            return mission.targetZone;
+        return mission.destination;
+    }
+    missionRequiredMass(mission) {
+        if (!['delivery', 'transport', 'smuggle'].includes(mission.kind))
+            return 0;
+        const units = Number(mission.quantity) || 0;
+        const massPerUnit = mission.kind === 'transport' ? 1.2 : (COMMODITIES[mission.commodity]?.mass ?? 0);
+        return units * massPerUnit;
+    }
+    missionRisk(mission) {
+        if (mission.kind === 'smuggle')
+            return { label: t('ILLEGAL'), tone: 'illegal' };
+        const danger = Number(mission.danger) || 0;
+        if (danger >= 2.5)
+            return { label: t('EXTREME'), tone: 'extreme' };
+        if (danger >= 1.65)
+            return { label: t('HIGH'), tone: 'high' };
+        if (danger >= 1)
+            return { label: t('GUARDED'), tone: 'guarded' };
+        return { label: t('ROUTINE'), tone: 'routine' };
+    }
+    missionRoute(mission) {
+        const targetId = this.missionTargetId(mission);
+        const target = LOCATIONS[targetId];
+        if (!target)
+            return { targetId, originId: mission.origin ?? this.dockLocation, targetName: t('Unknown destination'), hops: 0, distance: 0 };
+        const raceCourseId = mission.kind === 'race' ? mission.courseId ?? mission.id?.replace(/^race-/, '') : undefined;
+        const active = mission.status === 'active'
+            || (raceCourseId && this.save.world.raceRecords?.[raceCourseId]?.active === true);
+        const originId = active ? this.dockLocation : (mission.origin ?? this.dockLocation);
+        const originSystemId = LOCATIONS[originId]?.systemId ?? this.save.player.systemId;
+        const plan = planRoute(originSystemId, targetId);
+        const hops = plan?.ok ? plan.hopCount : 0;
+        return {
+            targetId,
+            originId,
+            targetName: target.name,
+            systemName: SYSTEMS[target.systemId]?.name ?? target.systemId,
+            hops,
+            distance: routeDistanceBetween(originId, targetId),
+        };
+    }
+    jumpCountLabel(count, uppercase = false) {
+        if (count === 1)
+            return t(uppercase ? '1 JUMP' : '1 jump');
+        return t(uppercase ? '{count} JUMPS' : '{count} jumps', { count });
+    }
+    missionProgress(mission) {
+        if (mission.kind === 'mining')
+            return t('{done}/{total} units mined', { done: Math.min(mission.quantity, mission.mined ?? 0), total: mission.quantity });
+        if (mission.kind === 'salvage')
+            return t('{done}/{total} units recovered', { done: Math.min(mission.quantity, mission.salvaged ?? 0), total: mission.quantity });
+        if (mission.kind === 'bounty')
+            return t('Locate and identify {target}', { target: mission.targetName ?? t('the warrant target') });
+        if (mission.kind === 'race') {
+            const courseId = mission.courseId ?? mission.id?.replace(/^race-/, '');
+            const entryFiled = mission.active || this.save.world.raceRecords?.[courseId]?.active === true;
+            return entryFiled ? t('Entry filed · launch for the start gate') : t('Course entry available');
+        }
+        if (mission.kind === 'smuggle')
+            return t('Sealed dark cargo aboard · avoid identification');
+        if (mission.kind === 'transport')
+            return t('Priority passenger package aboard');
+        return t('Sealed cargo aboard');
+    }
+    missionEligibility(mission) {
+        const issues = [];
+        if (mission.locked)
+            issues.push(t(mission.unlockLabel ?? 'Course requirements not met.'));
+        if (mission.active || this.save.activeMissions.some((entry) => entry.id === mission.id))
+            issues.push(t('This contract is already active.'));
+        if (!mission.active && this.save.activeMissions.length >= 6)
+            issues.push(t('Active-contract limit reached.'));
+        if (!mission.active && this.save.player.credits < (mission.deposit ?? 0))
+            issues.push(t('You need {credits} for the bond.', { credits: formatCredits(mission.deposit) }));
+        const requiredMass = this.missionRequiredMass(mission);
+        const freeMass = cargoCapacity(this.save.player) - cargoMass(this.save.player);
+        if (!mission.active && requiredMass > freeMass + 0.001)
+            issues.push(t('Free {mass} cargo mass before accepting.', { mass: requiredMass.toFixed(1) }));
+        return { ok: issues.length === 0, issues, requiredMass, freeMass };
+    }
+    setMissionBoardTab(tab) {
+        if (tab !== 'available' && tab !== 'active')
+            return;
+        this.missionBoardTab = tab;
+        this.missionSelectedId = undefined;
+        this.missionMobileDetail = false;
+        this.renderDock();
+    }
+    selectMission(missionId) {
+        const source = this.missionBoardSource(this.missionBoardTab);
+        if (!source.some((mission) => mission.id === missionId))
+            return;
+        this.missionSelectedId = missionId;
+        this.missionMobileDetail = true;
+        this.renderDock();
+    }
+    renderMissionListRow(mission, selected) {
+        const route = this.missionRoute(mission);
+        const risk = this.missionRisk(mission);
+        const active = this.missionBoardTab === 'active' || mission.active;
+        return `<button type="button" class="mission-row ${mission.kind} risk-${risk.tone} ${mission.authored ? 'is-authored' : ''} ${selected ? 'is-selected' : ''} ${mission.locked ? 'is-locked' : ''}" data-mission-select="${mission.id}" aria-pressed="${selected}">
+          <i aria-hidden="true"></i>
+          <span class="mission-row-copy"><small>${this.missionBadge(mission)} · ${risk.label}</small><b>${escapeHtml(missionTitle(mission))}</b><em>${escapeHtml(route.targetName)} · ${route.hops ? this.jumpCountLabel(route.hops) : t('LOCAL')}</em></span>
+          <span class="mission-row-value"><strong>${formatCredits(mission.reward + (mission.complication?.bonus ?? 0))}</strong><small>${active ? this.missionProgress(mission) : this.deadlineLabel(mission)}</small></span>
+        </button>`;
+    }
+    renderMissionDossier(mission) {
+        if (!mission)
+            return `<div class="mission-dossier-empty"><b>${t('SELECT A CONTRACT')}</b><p>${t('Choose a posting to inspect its route, risks, and terms.')}</p></div>`;
+        const route = this.missionRoute(mission);
+        const risk = this.missionRisk(mission);
+        const eligibility = this.missionEligibility(mission);
+        const active = this.missionBoardTab === 'active' || mission.active;
+        const complication = mission.complication;
+        const complicationLost = complication?.kind === 'fragile' && complication.intact === false;
+        const complicationTime = complication?.kind === 'early' ? formatDuration(complication.bonusDeadline - this.save.world.time) : undefined;
+        const raceBest = Number.isFinite(mission.bestTime ?? mission.record?.bestTime)
+            ? `${(mission.bestTime ?? mission.record.bestTime).toFixed(1)}s`
+            : '—';
+        return `<article class="mission-dossier ${mission.kind} risk-${risk.tone}">
+          <button type="button" class="mission-list-back" data-ui-command="mission-list">${t('◀ ALL CONTRACTS')}</button>
+          <header class="mission-dossier-header"><div><span>${this.missionBadge(mission)} · ${risk.label}</span><h3>${escapeHtml(missionTitle(mission))}</h3><small>${t('ISSUED BY')} ${escapeHtml(t(mission.issuer))}</small></div><strong>${formatCredits(mission.reward)}</strong></header>
+          <p class="mission-briefing">${escapeHtml(missionBriefing(mission))}</p>
+          ${mission.authored ? `<div class="mission-chain-mark"><span>${t('LOCAL STORY')}</span><b>${escapeHtml(t(mission.chainLabel))}</b><small>${escapeHtml(t(mission.stageLabel))}</small></div>` : ''}
+          <div class="mission-route-strip"><span><small>${t('FROM')}</small><b>${escapeHtml(LOCATIONS[route.originId]?.shortName ?? this.dockLocation.toUpperCase())}</b></span><i></i><em>${route.hops ? this.jumpCountLabel(route.hops, true) : t('{distance}u LOCAL', { distance: Math.max(1, Math.round(route.distance)) })}</em><i></i><span><small>${t('TO')}</small><b>${escapeHtml(LOCATIONS[route.targetId]?.shortName ?? route.targetName)}</b></span></div>
+          <dl class="mission-terms">
+            <div><dt>${t('DEADLINE')}</dt><dd>${this.deadlineLabel(mission)}</dd></div>
+            <div><dt>${t('BOND')}</dt><dd>${formatCredits(mission.deposit ?? 0)}</dd></div>
+            <div><dt>${t('CARGO')}</dt><dd>${eligibility.requiredMass > 0 ? `${eligibility.requiredMass.toFixed(1)} ${t('MASS')}` : t('NONE')}</dd></div>
+            <div><dt>${t('GUILD REP')}</dt><dd>+${mission.guildRep ?? 0}</dd></div>
+            ${mission.kind === 'race' ? `<div><dt>${t('TIER')}</dt><dd>${mission.tier ?? 1}</dd></div><div><dt>${t('PERSONAL BEST')}</dt><dd>${raceBest}</dd></div>` : ''}
+          </dl>
+          ${complication ? `<section class="mission-complication ${complicationLost ? 'is-lost' : ''}"><span>${complication.kind === 'fragile' ? t('FRAGILE LOAD') : t('EARLY DELIVERY BONUS')}</span><b>${complicationLost ? t('BONUS LOST') : `+${formatCredits(complication.bonus)}`}</b><p>${complication.kind === 'fragile' ? t('Keep structural damage at zero after acceptance.') : t('Deliver within {time} to earn the bonus.', { time: complicationTime })}</p></section>` : ''}
+          <section class="mission-objective"><span>${active ? t('CURRENT OBJECTIVE') : t('CONTRACT SUMMARY')}</span><b>${escapeHtml(this.missionProgress(mission))}</b></section>
+          ${!active && eligibility.issues.length ? `<ul class="mission-blockers">${eligibility.issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join('')}</ul>` : ''}
+          <footer class="mission-dossier-actions">
+            ${active ? `<button type="button" class="primary" data-mission-course="${route.targetId}" ${route.targetId ? '' : 'disabled'}>${t('SET COURSE')}</button>` : `<button type="button" class="primary" data-mission-id="${mission.id}" ${eligibility.ok ? '' : 'disabled'}>${mission.locked ? t('COURSE LOCKED') : t('ACCEPT & SET COURSE')}</button>`}
+            <small>${active ? t('Navigation will follow the next required destination.') : t('Acceptance reserves the bond and any sealed cargo space.')}</small>
+          </footer>
+        </article>`;
+    }
     renderMissions() {
-        const offers = this.save.world.offers[this.dockLocation] ?? [];
-        const active = this.save.activeMissions;
-        const raceClock = (seconds) => {
-            if (!Number.isFinite(seconds))
-                return t('NO TIME');
-            const whole = Math.max(0, Math.floor(seconds));
-            const tenths = Math.floor((seconds - whole) * 10);
-            return `${String(Math.floor(whole / 60)).padStart(2, '0')}:${String(whole % 60).padStart(2, '0')}.${tenths}`;
-        };
-        const missionCard = (mission) => {
-            const locked = Boolean(mission.locked);
-            const bestTime = mission.bestTime ?? mission.record?.bestTime;
-            const bestRank = mission.bestRank ?? mission.record?.bestRank;
-            const bestRankLabel = Number.isFinite(bestRank) ? t(['1ST', '2ND', '3RD', '4TH'][bestRank - 1] ?? `${bestRank}TH`) : '—';
-            const recommended = mission.recommendedShipText ?? mission.recommendedShip ?? mission.recommendedShipId;
-            const raceMeta = mission.kind === 'race'
-                ? `<div class="race-course-meta"><span>${t('TIER {tier}', { tier: mission.tier ?? 1 })}</span><span>${recommended ? t('RECOMMENDED: {ship}', { ship: t(recommended).toUpperCase() }) : t('FIXED TRACK PACE')}</span><span>${Number.isFinite(bestTime) ? t('PERSONAL BEST: {time} · {rank}', { time: raceClock(bestTime), rank: bestRankLabel }) : t('PERSONAL BEST: —')}</span></div>`
-                : '';
-            const buttonLabel = locked ? t('COURSE LOCKED') : mission.active ? t('ENTRY ACTIVE') : t('ACCEPT CONTRACT');
-            return `<article class="mission-card ${mission.kind}${locked ? ' is-locked' : ''}">
-              <header><span>${this.missionBadge(mission)}</span><b>${formatCredits(mission.reward)}</b></header>
-              <h4>${escapeHtml(t(mission.title))}</h4>
-              <p>${escapeHtml(t(mission.briefing))}</p>
-              ${raceMeta}
-              <dl><div><dt>${t('ISSUER')}</dt><dd>${escapeHtml(t(mission.issuer))}</dd></div><div><dt>${t('DEADLINE')}</dt><dd>${this.deadlineLabel(mission)}</dd></div><div><dt>${t('BOND')}</dt><dd>${formatCredits(mission.deposit)}</dd></div><div><dt>${t('GUILD REP')}</dt><dd>+${mission.guildRep}</dd></div></dl>
-              ${locked && mission.unlockLabel ? `<small class="race-unlock-note">${escapeHtml(t(mission.unlockLabel))}</small>` : ''}
-              <button class="primary compact" data-mission-id="${mission.id}" ${locked || mission.active ? 'disabled' : ''}>${buttonLabel}</button>
-            </article>`;
-        };
+        const posted = this.save.world.offers[this.dockLocation] ?? [];
+        const raceActive = (mission) => mission.kind === 'race'
+            && this.save.world.raceRecords?.[mission.id.slice(5)]?.active === true;
+        const offers = posted.filter((mission) => !raceActive(mission));
+        const active = [...this.save.activeMissions, ...posted.filter(raceActive)];
+        const source = this.missionBoardTab === 'active' ? active : offers;
+        const selected = source.find((mission) => mission.id === this.missionSelectedId) ?? source[0];
+        if (selected)
+            this.missionSelectedId = selected.id;
         return `
-      <div class="mission-layout">
-        <section>
-          <div class="table-title"><div><span class="eyebrow">${t('CONTRACT TERMINAL')}</span><h3>${t('Available work')}</h3></div><small>${t('Maximum 6 active')}</small></div>
-          <div class="mission-grid">
-            ${offers.length ? offers.map(missionCard).join('') : `<p>${t('No fresh contracts. Launch, trade, or return after the board cycles.')}</p>`}
-          </div>
-        </section>
-        <aside class="active-list"><span class="eyebrow">${t('ACTIVE')}</span>${active.length ? active.map((mission) => `<article><b>${escapeHtml(t(mission.title))}</b><small>${this.deadlineLabel(mission)} · ${formatCredits(mission.reward)}</small></article>`).join('') : `<p>${t('None.')}</p>`}</aside>
+      <div class="mission-terminal ${this.missionMobileDetail ? 'is-detail-open' : ''}">
+        <header class="mission-terminal-header">
+          <button type="button" data-ui-command="bar-scene">${t('◀ BAR')}</button>
+          <div><span class="eyebrow">${t('CONTRACT TERMINAL')}</span><h3>${t('Local work')}</h3></div>
+          <nav aria-label="${t('Mission board sections')}"><button type="button" class="${this.missionBoardTab === 'available' ? 'is-active' : ''}" data-mission-board-tab="available">${t('AVAILABLE')} <b>${offers.length}</b></button><button type="button" class="${this.missionBoardTab === 'active' ? 'is-active' : ''}" data-mission-board-tab="active">${t('ACTIVE')} <b>${active.length}</b></button></nav>
+        </header>
+        <div class="mission-terminal-body">
+          <aside class="mission-browser" aria-label="${t('Contract list')}">
+            ${source.length ? source.map((mission) => this.renderMissionListRow(mission, mission.id === selected?.id)).join('') : `<div class="mission-list-empty"><b>${this.missionBoardTab === 'active' ? t('NO ACTIVE CONTRACTS') : t('NO FRESH CONTRACTS')}</b><p>${this.missionBoardTab === 'active' ? t('Accepted work and live progress will appear here.') : t('Launch, trade, or return after the board cycles.')}</p></div>`}
+          </aside>
+          <section class="mission-dossier-wrap">${this.renderMissionDossier(selected)}</section>
+        </div>
       </div>
     `;
+    }
+    missionBoardSource(tab = this.missionBoardTab) {
+        const posted = this.save.world.offers[this.dockLocation] ?? [];
+        const activeRaces = posted.filter((mission) => mission.kind === 'race'
+            && this.save.world.raceRecords?.[mission.id.slice(5)]?.active === true);
+        return tab === 'active'
+            ? [...this.save.activeMissions, ...activeRaces]
+            : posted.filter((mission) => !activeRaces.includes(mission));
     }
     renderServices() {
         const stats = getEffectiveShipStats(this.save.player);
@@ -2463,22 +2814,37 @@ export class GameUI {
         this.shipPreviews.length = 0;
     }
     renderGuilds() {
+        const guildIds = this.localGuildIds();
         return `
-      <div class="guild-grid">
-        ${Object.keys(GUILD_NAMES).map((id) => {
+      <div class="guild-terminal">
+        <header class="guild-terminal-header"><button type="button" data-ui-command="bar-scene">${t('◀ BAR')}</button><div><span class="eyebrow">${t('LOCAL REPRESENTATIVES')}</span><h3>${t('Guild desks')}</h3></div><small>${escapeHtml(LOCATIONS[this.dockLocation].name)}</small></header>
+        <div class="guild-grid">
+        ${guildIds.map((id) => {
             const rep = this.save.player.guildRep[id];
             const rank = this.save.player.guildRank[id];
             const joined = rep > 0;
-            const nextThreshold = [20, 65, 145, 145][rank];
+            const thresholds = [0, 20, 65, 145];
+            const nextThreshold = thresholds[Math.min(3, rank + 1)];
+            const currentThreshold = thresholds[rank] ?? 0;
+            const progress = rank >= 3 ? 100 : Math.max(0, Math.min(100, ((rep - currentThreshold) / Math.max(1, nextThreshold - currentThreshold)) * 100));
+            const representative = this.guildRepresentative(id);
+            const cost = guildJoinCost(id);
+            const affordable = this.save.player.credits >= cost;
+            const nextItems = Object.values(OUTFIT_ITEMS).filter((item) => item.requiredGuild === id && item.requiredRank === rank + 1).map((item) => t(item.name));
+            const benefits = GUILD_BENEFIT_KEYS[id] ?? [];
             return `<article class="guild-card guild-${id}">
-            <span class="eyebrow">${escapeHtml(t(GUILD_NAMES[id]))}</span>
-            <h3>${t(GUILD_RANK_NAMES[id][rank])}</h3>
-            <div class="guild-meter"><i><b style="width:${rank >= 3 ? 100 : Math.min(100, (rep / nextThreshold) * 100)}%"></b></i><em>${rep} REP</em></div>
-            <p>${id === 'merchant' ? t('Better route intelligence, cargo contracts, and external hold equipment.') : id === 'bounty' ? t('Higher-value warrants, combat equipment, and recognized kill authentication.') : id === 'mining' ? t('Survey claims, rich deposit data, and advanced extraction lances.') : id === 'syndicate' ? t('Dark-goods contracts, untraceable den prices, and the local fixer\'s favor.') : t('Protected recovery claims, rare wreck data, and long-range tractor systems.')}</p>
-            <button data-guild-id="${id}" ${joined ? 'disabled' : ''}>${joined ? t('MEMBERSHIP ACTIVE') : t('REGISTER')}</button>
+            <header class="guild-card-head">${representative ? this.portraitImage(representative.id, representative.name) : '<span class="guild-terminal-avatar">◇</span>'}<div><span class="eyebrow">${escapeHtml(t(GUILD_NAMES[id]))}</span><h3>${joined ? t(GUILD_RANK_NAMES[id][rank]) : t('NOT REGISTERED')}</h3><small>${representative ? `${escapeHtml(representative.name)} · ${escapeHtml(t(representative.role))}` : t('AUTOMATED DESK')}</small></div></header>
+            <div class="guild-meter"><i><b style="width:${progress}%"></b></i><em>${rep} ${t('REPUTATION')}</em></div>
+            <div class="guild-benefits"><span>${t(joined ? 'CURRENT ACCESS' : 'PUBLIC ACCESS')}</span><b>${escapeHtml(t(benefits[rank] ?? benefits[0] ?? 'Local contracts'))}</b></div>
+            ${!joined
+                ? `<div class="guild-next"><span>${t('ENTRY RANK')} · ${escapeHtml(t(GUILD_RANK_NAMES[id][0]))}</span><p>${t('Register at this desk to begin earning formal standing and rank access.')}</p></div>`
+                : rank < 3 ? `<div class="guild-next"><span>${t('NEXT RANK')} · ${escapeHtml(t(GUILD_RANK_NAMES[id][rank + 1]))} · ${nextThreshold} ${t('REPUTATION')}</span><p>${escapeHtml(t(benefits[rank + 1] ?? 'Higher-value contracts'))}${nextItems.length ? ` · ${t('UNLOCKS')}: ${escapeHtml(nextItems.join(', '))}` : ''}</p></div>` : `<div class="guild-next is-max"><span>${t('MAXIMUM STANDING')}</span><p>${t('All published guild privileges are active.')}</p></div>`}
+            <button data-guild-id="${id}" ${joined || !affordable ? 'disabled' : ''}>${joined ? t('MEMBERSHIP ACTIVE') : `${t('JOIN')} · ${formatCredits(cost)}`}</button>
+            ${!joined && !affordable ? `<small class="guild-cost-warning">${t('You need {credits} more.', { credits: formatCredits(cost - this.save.player.credits) })}</small>` : ''}
             ${id === 'bounty' ? this.renderBountyRegistry() : ''}
           </article>`;
-        }).join('')}
+        }).join('') || `<div class="guild-empty"><b>${t('NO LOCAL GUILD DESK')}</b><p>${t('This port relays contracts but does not register new members.')}</p></div>`}
+        </div>
       </div>
     `;
     }
@@ -3715,10 +4081,15 @@ export class GameUI {
                 const commodity = COMMODITIES[id];
                 return { id, name: commodity?.name ?? id, qty, mass: (commodity?.mass ?? 0) * qty };
             });
-        const sealed = (player.sealedCargo ?? []).map((entry) => ({ name: entry.label, qty: entry.units, mass: entry.mass }));
+        const sealed = (player.sealedCargo ?? []).map((entry) => ({
+            name: entry.label,
+            qty: entry.units,
+            mass: entry.mass,
+            smuggled: entry.smuggled === true,
+        }));
         const allCargo = [...cargoEntries, ...sealed];
         const cargoRows = allCargo.length
-            ? allCargo.map((entry) => `<div class="cargo-row"><span><b>${escapeHtml(t(entry.name))}</b><small>${entry.qty} ${t('UNITS')}</small></span>${entry.id === 'gold' || (mug?.kind === 'cargo' && mug.commodity === entry.id) ? `<button data-jettison="${entry.id}">${t('JETTISON')}</button>` : ''}<em>${entry.mass.toFixed(1)} ${t('MASS')}</em></div>`).join('')
+            ? allCargo.map((entry) => `<div class="cargo-row"><span><b>${escapeHtml(entry.smuggled ? t('{commodity} (syndicate)', { commodity: t(entry.name) }) : t(entry.name))}</b><small>${entry.qty} ${t('UNITS')}</small></span>${entry.id === 'gold' || (mug?.kind === 'cargo' && mug.commodity === entry.id) ? `<button data-jettison="${entry.id}">${t('JETTISON')}</button>` : ''}<em>${entry.mass.toFixed(1)} ${t('MASS')}</em></div>`).join('')
             : `<p class="ship-menu-empty">${t('Hold empty. The market is one jump away.')}</p>`;
         const missions = this.save.activeMissions;
         const missionRows = missions.length
@@ -3743,7 +4114,7 @@ export class GameUI {
                         : '';
                 return `<article class="mission-card ${mission.kind} ship-mission-card">
                 <header><span>${this.missionBadge(mission)}</span><b>${formatCredits(mission.reward)}</b></header>
-                <h4>${escapeHtml(mission.title)}</h4>
+                <h4>${escapeHtml(missionTitle(mission))}</h4>
                 <dl><div><dt>VECTOR</dt><dd>${escapeHtml(where)}</dd></div>${progress}<div><dt>DEADLINE</dt><dd>${this.deadlineLabel(mission)}</dd></div></dl>
               </article>`;
             }).join('')

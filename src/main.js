@@ -330,6 +330,7 @@ const actions = {
         });
     },
     setNav: (locationId) => session?.setNav(locationId),
+    setDestination: (locationId) => session?.setDestination(locationId),
     openMap: () => session?.openMap(),
     openShipMenu: () => session?.openShipMenu(),
     weaponCycle: () => session?.cycleWeapon(),
@@ -341,6 +342,8 @@ const actions = {
     patrolReply: () => session?.patrolReply(),
     paySyndicateBerth: () => session?.paySyndicateBerth(),
     acceptMission: (missionId) => session?.acceptMission(missionId),
+    talkToNpc: (personId, topicId) => session?.talkToNpc(personId, topicId),
+    acknowledgeMissionSettlements: () => session?.acknowledgeMissionSettlements(),
     repair: () => session?.repair(),
     refuel: () => session?.refuel(),
     buyEquipment: (equipmentId) => session?.buyEquipment(equipmentId),
@@ -548,6 +551,20 @@ window.render_game_to_text = () => {
                 .filter(([, quantity]) => Number(quantity) > 0)
                 .map(([commodityId, quantity]) => ({ commodityId, quantity: Math.floor(Number(quantity)) })),
             sealedCargoUnits: (save.player.sealedCargo ?? []).reduce((sum, entry) => sum + Math.max(0, Number(entry?.units) || 0), 0),
+        } : null,
+        bar: save.player.dockedAt ? {
+            panel: runtime?.ui?.barPanel ?? null,
+            personId: runtime?.ui?.barPersonId ?? null,
+            dialogueTopic: runtime?.ui?.dialogueTopic ?? null,
+            missionTab: runtime?.ui?.missionBoardTab ?? null,
+            selectedMissionId: runtime?.ui?.missionSelectedId ?? null,
+            mobileDetail: Boolean(runtime?.ui?.missionMobileDetail),
+            localGuildIds: LOCATIONS[save.player.dockedAt]?.guilds ?? [],
+            npcMemory: runtime?.ui?.barPersonId ? save.world.npcMemory?.[runtime.ui.barPersonId] ?? null : null,
+            pendingSettlements: save.world.missionSettlements?.length ?? 0,
+            availableMissionIds: runtime?.ui?.missionBoardSource?.('available').map((mission) => mission.id) ?? [],
+            activeMissionIds: runtime?.ui?.missionBoardSource?.('active').map((mission) => mission.id) ?? [],
+            localContractProgress: save.world.localContractProgress ?? {},
         } : null,
         shipyard: save.player.dockedAt && runtime?.ui?.marketPoint === 'shipyard' ? {
             selectedShipId: runtime.ui.shipDetailId ?? null,

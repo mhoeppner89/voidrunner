@@ -12,6 +12,7 @@ import {
 } from './missions.js';
 import { cargoMass, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { LOCATIONS } from './data.js';
+import { LOCAL_CONTRACT_CATALOG, LOCAL_CONTRACT_CHAIN_IDS } from './localContracts.js';
 import { createNewSave, hydrateSave } from './save.js';
 
 const fresh = (seed = 0x51a7e) => createNewSave(seed);
@@ -43,6 +44,9 @@ const postOffer = (save, locationId, offer) => {
     save.world.offers[locationId] = [offer];
     return offer;
 };
+
+const authoredOffers = (save) => Object.values(save.world.offers)
+    .flatMap((offers) => offers.filter((offer) => offer.authored));
 
 const projection = (offers) => offers.map((offer) => ({
     id: offer.id,
@@ -97,6 +101,63 @@ const projection = (offers) => offers.map((offer) => ({
     first.world.time = 150;
     refreshMissionOffers(first);
     assert.ok(first.world.offers.helix.some((offer) => offer.id.includes('-1-')), 'a new cycle replaces ordinary offers');
+}
+
+// Each authored chain posts exactly its next stage at that stage's origin.
+// Completing a stage unlocks the following posting; expiry leaves progress
+// untouched and re-posts the same stage instead.
+{
+    const freshBoard = fresh(130);
+    const firstStages = LOCAL_CONTRACT_CHAIN_IDS.map((chainId) => LOCAL_CONTRACT_CATALOG
+        .find((stage) => stage.chainId === chainId && stage.stageIndex === 1));
+    const authored = authoredOffers(freshBoard);
+    assert.equal(authored.length, LOCAL_CONTRACT_CHAIN_IDS.length);
+    assert.deepEqual(authored.map((offer) => offer.id).sort(), firstStages.map((stage) => stage.id).sort());
+    for (const offer of authored) {
+        const stage = firstStages.find((entry) => entry.id === offer.id);
+        assert.equal(offer.origin, stage.origin);
+        assert.equal(offer.stageIndex, 1);
+        assert.equal(offer.deadline, freshBoard.world.time + stage.deadlineSeconds);
+    }
+    const advancedBoard = fresh(1301);
+    advancedBoard.world.localContractProgress = Object.fromEntries(LOCAL_CONTRACT_CHAIN_IDS.map((chainId) => [chainId, 1]));
+    refreshMissionOffers(advancedBoard, true);
+    const secondStages = LOCAL_CONTRACT_CHAIN_IDS.map((chainId) => LOCAL_CONTRACT_CATALOG
+        .find((stage) => stage.chainId === chainId && stage.stageIndex === 2));
+    const advancedAuthored = authoredOffers(advancedBoard);
+    assert.deepEqual(advancedAuthored.map((offer) => offer.id).sort(), secondStages.map((stage) => stage.id).sort());
+    for (const offer of advancedAuthored) {
+        const stage = secondStages.find((entry) => entry.id === offer.id);
+        assert.equal(offer.origin, stage.origin);
+        assert.equal(offer.stageIndex, 2);
+    }
+
+    const progressed = fresh(131);
+    const first = LOCAL_CONTRACT_CATALOG.find((stage) => stage.chainId === 'mourning-ledger' && stage.stageIndex === 1);
+    progressed.world.time = 73;
+    const offer = progressed.world.offers[first.origin].find((entry) => entry.id === first.id);
+    assert.ok(offer);
+    assert.equal(acceptMission(progressed, first.origin, first.id).ok, true);
+    assert.equal(progressed.activeMissions[0].deadline, progressed.world.time + first.deadlineSeconds, 'authored deadline resets relative to acceptance');
+    assert.equal(progressed.player.sealedCargo[0].label, first.cargo, 'authored transport keeps its cargo label');
+    assert.equal(progressed.activeMissions[0].cargoLabel, first.cargo);
+    assert.equal(completeMissionsAtDock(progressed, first.destination).length, 1);
+    assert.equal(progressed.world.localContractProgress[first.chainId], first.stageIndex);
+    refreshMissionOffers(progressed);
+    const next = LOCAL_CONTRACT_CATALOG.find((stage) => stage.chainId === first.chainId && stage.stageIndex === 2);
+    assert.ok(progressed.world.offers[next.origin].some((entry) => entry.id === next.id), 'completion exposes the next authored stage at its origin');
+    assert.equal(authoredOffers(progressed).some((entry) => entry.id === first.id), false);
+
+    const failed = fresh(132);
+    const failedFirst = LOCAL_CONTRACT_CATALOG.find((stage) => stage.chainId === 'mourning-ledger' && stage.stageIndex === 1);
+    const failedOffer = failed.world.offers[failedFirst.origin].find((entry) => entry.id === failedFirst.id);
+    assert.equal(acceptMission(failed, failedFirst.origin, failedFirst.id).ok, true);
+    failed.world.time = failedOffer.deadline + 1;
+    assert.equal(failExpiredMissions(failed).length, 1);
+    assert.equal(failed.world.localContractProgress[failedFirst.chainId], undefined, 'failure does not advance authored progress');
+    refreshMissionOffers(failed);
+    assert.ok(failed.world.offers[failedFirst.origin].some((entry) => entry.id === failedFirst.id), 'failure keeps the same authored stage available');
+    assert.equal(authoredOffers(failed).some((entry) => entry.id === `${failedFirst.chainId}-2`), false);
 }
 
 // Acceptance rejects stale/missing offers, an active-contract overflow, an
@@ -200,6 +261,24 @@ const projection = (offers) => offers.map((offer) => ({
         assert.equal(save.player.stats.contracts, 1);
         assert.equal(save.player.guildRep.merchant, fields.guildRep);
         assert.equal(save.player.reputation['free-merchants'], 4 + Math.max(1, Math.floor(fields.guildRep / 3)));
+        const settlement = save.world.missionSettlements.at(-1);
+        assert.deepEqual({
+            id: settlement?.id,
+            outcome: settlement?.outcome,
+            reward: settlement?.reward,
+            bond: settlement?.bond,
+            bonus: settlement?.bonus,
+            total: settlement?.total,
+        }, {
+            id: fields.id,
+            outcome: 'completed',
+            reward: fields.reward,
+            bond: fields.deposit,
+            bonus: 0,
+            total: fields.reward + fields.deposit,
+        }, `${fields.kind} queues one settlement docket`);
+        assert.deepEqual(completeMissionsAtDock(save, fields.destination), [], `${fields.kind} cannot settle twice`);
+        assert.equal(save.world.missionSettlements.length, 1, `${fields.kind} queues only once`);
         if (fields.kind === 'delivery')
             assert.equal(save.player.guildRank.merchant, 1, '20 merchant rep reaches Factor');
     }
@@ -311,7 +390,9 @@ const projection = (offers) => offers.map((offer) => ({
     const startingCredits = save.player.credits;
     assert.equal(acceptMission(save, 'helix', offer.id).ok, true);
     assert.equal(save.player.credits, startingCredits - offer.deposit);
-    assert.deepEqual(completeBountyMission(save, 'missing-warrant'), { ok: false, message: 'No matching active warrant.' });
+    const missingWarrant = completeBountyMission(save, 'missing-warrant');
+    assert.equal(missingWarrant.ok, false);
+    assert.equal(typeof missingWarrant.message, 'string');
     const result = completeBountyMission(save, offer.id);
     assert.equal(result.ok, true);
     assert.equal(save.player.credits, startingCredits + offer.reward);
@@ -355,7 +436,25 @@ const projection = (offers) => offers.map((offer) => ({
     assert.equal(save.player.guildRep.merchant, 0, 'failure standing is clamped at zero');
     assert.equal(save.player.reputation['free-merchants'], 1);
     assert.equal(save.player.stats.contracts, 0);
+    assert.deepEqual(save.world.missionSettlements.map(({ id, title, issuer, outcome, guild, faction, reward, bond, bonus, total, repDelta, factionDelta, at }) => ({
+        id, title, issuer, outcome, guild, faction, reward, bond, bonus, total, repDelta, factionDelta, at,
+    })), [{
+        id: offer.id,
+        title: offer.title,
+        issuer: offer.issuer,
+        outcome: 'failed',
+        guild: offer.guild,
+        faction: offer.faction,
+        reward: 0,
+        bond: -offer.deposit,
+        bonus: 0,
+        total: 0,
+        repDelta: -10,
+        factionDelta: -3,
+        at: save.world.time,
+    }]);
     assert.deepEqual(failExpiredMissions(save), [], 'a failed contract is not failed twice');
+    assert.equal(save.world.missionSettlements.length, 1, 'an expired contract queues only once');
 
     const retained = fresh(261);
     retained.activeMissions = [
@@ -386,6 +485,23 @@ const projection = (offers) => offers.map((offer) => ({
     assert.equal(joinGuild(poor, 'bounty').ok, false);
     assert.equal(poor.player.guildRep.bounty, 0);
     assert.equal(poor.player.credits, 899);
+
+    const unknown = fresh(269);
+    const unknownCredits = unknown.player.credits;
+    assert.equal(joinGuild(unknown, 'not-a-guild', 'helix').ok, false);
+    assert.equal(unknown.player.credits, unknownCredits, 'unknown guild does not charge an entry fee');
+
+    const absent = fresh(2691);
+    absent.player.credits = guildJoinCost('bounty');
+    assert.equal(joinGuild(absent, 'bounty', 'helix').ok, false, 'a guild without a local representative cannot be joined');
+    assert.equal(absent.player.credits, guildJoinCost('bounty'));
+    assert.equal(absent.player.guildRep.bounty, 0);
+
+    const represented = fresh(2692);
+    represented.player.credits = guildJoinCost('bounty');
+    assert.equal(joinGuild(represented, 'bounty', 'rook').ok, true, 'a guild can be joined where it is represented');
+    assert.equal(represented.player.credits, 0);
+    assert.equal(represented.player.guildRep.bounty, 1);
 
     const member = fresh(271);
     member.player.credits = guildJoinCost('merchant');
@@ -482,6 +598,41 @@ const projection = (offers) => offers.map((offer) => ({
     assert.equal(completeMissionsAtDock(fractional, 'rook').length, 1, 'cutting the fractional final unit completes its recovery contract');
 }
 
+// Optional fragile cargo pays its bonus only when the sealed load remains
+// intact. Acceptance resets the authored default to intact, while a damaged
+// active mission still settles for its base reward and returned bond.
+{
+    const intact = fresh(275);
+    const intactOffer = postOffer(intact, 'helix', fixture({
+        id: 'helix-0-0-fragile-intact',
+        destination: 'rook',
+        reward: 1000,
+        deposit: 100,
+        complication: { kind: 'fragile', bonus: 333, intact: false },
+    }));
+    const intactStartingCredits = intact.player.credits;
+    assert.equal(acceptMission(intact, 'helix', intactOffer.id).ok, true);
+    assert.equal(intact.activeMissions[0].complication.intact, true, 'fragile cargo starts intact after acceptance');
+    assert.equal(completeMissionsAtDock(intact, 'rook').length, 1);
+    assert.equal(intact.player.credits, intactStartingCredits + intactOffer.reward + 333);
+    assert.equal(intact.world.missionSettlements[0].bonus, 333);
+
+    const damaged = fresh(276);
+    const damagedOffer = postOffer(damaged, 'helix', fixture({
+        id: 'helix-0-0-fragile-damaged',
+        destination: 'rook',
+        reward: 1000,
+        deposit: 100,
+        complication: { kind: 'fragile', bonus: 333 },
+    }));
+    const damagedStartingCredits = damaged.player.credits;
+    assert.equal(acceptMission(damaged, 'helix', damagedOffer.id).ok, true);
+    damaged.activeMissions[0].complication.intact = false;
+    assert.equal(completeMissionsAtDock(damaged, 'rook').length, 1);
+    assert.equal(damaged.player.credits, damagedStartingCredits + damagedOffer.reward, 'damaged fragile cargo loses only the optional bonus');
+    assert.equal(damaged.world.missionSettlements[0].bonus, 0);
+}
+
 // A JSON save/reload round trip keeps an accepted procedural mission, its
 // sealed cargo, and completed/failed mission ledgers. `hydrateSave` also
 // refreshes prices/offers, so only durable mission state is compared here.
@@ -490,12 +641,14 @@ const projection = (offers) => offers.map((offer) => ({
     const offer = save.world.offers.helix.find((entry) => entry.kind === 'delivery');
     assert.ok(offer);
     assert.equal(acceptMission(save, 'helix', offer.id).ok, true);
+    save.activeMissions[0].complication = { kind: 'early', bonus: 444, bonusDeadline: 120 };
     save.world.time = 37;
     save.world.completedMissionIds.push('historic-completion');
     save.world.failedMissionIds.push('historic-failure');
     const restored = hydrateSave(JSON.parse(JSON.stringify(save)));
     assert.deepEqual(restored.activeMissions, save.activeMissions);
     assert.deepEqual(restored.player.sealedCargo, save.player.sealedCargo);
+    assert.deepEqual(restored.activeMissions[0].complication, save.activeMissions[0].complication, 'optional complications survive JSON round-trip');
     assert.deepEqual(restored.world.completedMissionIds, ['historic-completion']);
     assert.deepEqual(restored.world.failedMissionIds, ['historic-failure']);
     assert.equal(restored.world.time, 37);

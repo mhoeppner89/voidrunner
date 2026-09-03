@@ -5,6 +5,7 @@ import { clamp, formatNumber, pick, proceduralCallsign, randomBetween, randomInt
 import { rollPilot, TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 import { t } from './i18n.js';
 import { RACE_COURSES, raceBriefingLine, raceOffersForLocation, raceCourseUnlocked, normalizeRaceRecord } from './racing.js';
+import { LOCAL_CONTRACT_CHAIN_IDS, findNextLocalContractStage, localContractToMissionOffer } from './localContracts.js';
 const GUILD_NAMES_FALLBACK = (guild) => guild === 'merchant' ? 'Merchant Guild' : guild === 'bounty' ? 'Bounty Registry' : guild === 'mining' ? 'Prospectors Guild' : guild === 'syndicate' ? 'Red Talon Syndicate' : 'Salvage Union';
 const merchantIssuers = ['Kestrel Freight', 'Orison Combine', 'Free Haulers Desk', 'Sable Route Logistics', 'Guild Dispatch'];
 const bountyIssuers = ['Concord Warrant Desk', 'Frontier Security Office', 'Bounty Hunters Registry', 'Civil Claims Bureau'];
@@ -38,12 +39,118 @@ const bountyReward = (danger, rank, zone) => {
     return Math.round((2600 + danger * 1650 + rank * 950) * zoneFactor);
 };
 const salvageReward = (quantity, commodity, danger, rank) => Math.round(1200 + quantity * COMMODITIES[commodity].basePrice * 1.65 + danger * 520 + rank * 420);
+const optionalComplication = (missionId, kind, reward, acceptedBy, deadline) => {
+    const roll = seededRandom(`${missionId}:complication`)();
+    if (kind === 'delivery' && roll < 0.34) {
+        return {
+            kind: 'fragile',
+            bonus: Math.max(300, Math.round(reward * 0.18)),
+            intact: true,
+        };
+    }
+    if (kind === 'transport' && roll < 0.38 && Number.isFinite(deadline)) {
+        return {
+            kind: 'early',
+            bonus: Math.max(350, Math.round(reward * 0.2)),
+            bonusDeadline: acceptedBy + Math.max(70, Math.round((deadline - acceptedBy) * 0.58)),
+        };
+    }
+    return undefined;
+};
+const raceCourseForMission = (mission) => {
+    const courseId = mission.courseId ?? (mission.id?.startsWith?.('race-') ? mission.id.slice(5) : undefined);
+    return courseId ? RACE_COURSES[courseId] : undefined;
+};
+// Offers are saved between visits. Rebuild their player-facing copy from
+// stable mission fields so changing language never leaves old German text on
+// an English board (or vice versa). Authored contracts may supply canonical
+// English keys directly; old saves still fall back to their stored strings.
+export const missionTitle = (mission) => {
+    if (!mission)
+        return '';
+    if (mission.titleKey)
+        return t(mission.titleKey, mission.titleParams);
+    if (mission.authored)
+        return t(mission.title ?? 'Local contract');
+    if (mission.kind === 'race')
+        return t('Race: {course}', { course: raceCourseForMission(mission)?.title ?? mission.title });
+    if (mission.kind === 'bounty')
+        return t('Warrant: {name}', { name: mission.targetName ?? mission.title });
+    if (mission.kind === 'smuggle')
+        return t('Dark run: {quantity} {commodity}', { quantity: mission.quantity, commodity: t(COMMODITIES[mission.commodity]?.name ?? mission.commodity ?? '') });
+    if (mission.kind === 'mining')
+        return t('Mine the {claim} claim', { claim: t(mission.claimName ?? mission.title) });
+    if (mission.kind === 'salvage')
+        return t('Recover {quantity} {commodity}', { quantity: mission.quantity, commodity: t(COMMODITIES[mission.commodity]?.name ?? mission.commodity ?? '') });
+    if (mission.kind === 'delivery')
+        return t('Deliver {quantity} {commodity}', { quantity: mission.quantity, commodity: t(COMMODITIES[mission.commodity]?.name ?? mission.commodity ?? '') });
+    if (mission.kind === 'transport')
+        return t('Express transport to {station}', { station: LOCATIONS[mission.destination]?.shortName ?? mission.destination ?? mission.title });
+    return t(mission.title ?? 'Local contract');
+};
+export const missionBriefing = (mission) => {
+    if (!mission)
+        return '';
+    if (mission.briefingKey)
+        return t(mission.briefingKey, mission.briefingParams);
+    if (mission.authored)
+        return t(mission.briefing ?? 'Review the route and contract terms before accepting.');
+    if (mission.kind === 'race') {
+        const raceCourse = raceCourseForMission(mission);
+        if (!raceCourse)
+            return t(mission.briefing ?? 'Race the marked course and beat the rival pilots.');
+        const ranks = raceCourse.payouts.map((amount, index) => t('{rank}: {amount}{loss}', {
+            rank: index + 1,
+            amount: formatNumber(Math.abs(amount)),
+            loss: amount < 0 ? t(' (pay-in)') : '',
+        })).join(', ');
+        return `${raceBriefingLine(raceCourse)} ${t('Entry is {fee} cr. Payouts by rank: {ranks}.', { fee: formatNumber(raceCourse.entryFee), ranks })} ${t(raceCourse.targetText)} · ${t(raceCourse.recommendedShipText)}`;
+    }
+    if (mission.kind === 'bounty') {
+        const pilotProfile = mission.pilot
+            ? t(' Pilot profile: {tier} {temperament}{note}.', {
+                tier: t(TIER_LABELS[mission.pilot.tier]),
+                temperament: t(TEMPERAMENT_LABELS[mission.pilot.temperament]),
+                note: mission.pilot.tier === 'ace' ? t(' — expect relentless pursuit.') : '',
+            })
+            : '';
+        return t('{name} has been positively identified near {station}. Locate the ship, confirm identity, and destroy it. Expect armed resistance{escorts}.{profile}', {
+            name: mission.targetName,
+            station: LOCATIONS[mission.targetZone]?.name ?? mission.targetZone,
+            escorts: Number(mission.danger) > 2 ? t(' and possible escorts') : '',
+            profile: pilotProfile,
+        });
+    }
+    if (mission.kind === 'smuggle')
+        return t('{quantity} units of {commodity} that the manifest cannot show. Collect the sealed crate, run dark, and deliver to {station}. A patrol that resolves you seizes the crate and fines you — stay off the cordon.', { quantity: mission.quantity, commodity: t(COMMODITIES[mission.commodity]?.name ?? mission.commodity), station: LOCATIONS[mission.destination]?.name ?? mission.destination });
+    if (mission.kind === 'mining')
+        return t('{station} holds the papers on the {claim} in the Shardbelt. Cut the whole seam — {quantity} units — and deliver it back. No deadline: the claim is yours until it runs dry. Bought ore won\'t clear the manifest.', { station: LOCATIONS[mission.origin]?.name ?? mission.origin, claim: t(mission.claimName), quantity: mission.quantity });
+    if (mission.kind === 'salvage')
+        return t('Recover {quantity} units of {commodity} from {wreck} in the Mourning Line and bring them back to {station}. Only components cut from that deposit count; market cargo cannot clear the claim.', { quantity: mission.quantity, commodity: t(COMMODITIES[mission.commodity]?.name ?? mission.commodity), wreck: mission.targetName, station: LOCATIONS[mission.origin]?.name ?? mission.origin });
+    if (mission.kind === 'delivery')
+        return t('{quantity} units of {commodity} are sealed and waiting. Deliver them intact to {station}. Cargo mass is reserved on acceptance.', { quantity: mission.quantity, commodity: t(COMMODITIES[mission.commodity]?.name ?? mission.commodity), station: LOCATIONS[mission.destination]?.name ?? mission.destination });
+    if (mission.kind === 'transport' && mission.cargoLabel)
+        return t('Carry a {cargo} to {station}. The case occupies {mass} cargo mass and the client values punctuality above discretion.', { cargo: t(mission.cargoLabel), station: LOCATIONS[mission.destination]?.name ?? mission.destination, mass: (Number(mission.quantity) * 1.2).toFixed(1) });
+    return t(mission.briefing ?? 'Review the route and contract terms before accepting.');
+};
 // Wreck deposits can hold a fractional final unit, but the cutter awards one
 // whole cargo unit whenever it consumes that remainder. Mission progress must
 // therefore count extraction cycles, not raw remaining mass.
 const salvageUnitsRemaining = (remaining) => Math.ceil(Math.max(0, Number(remaining) || 0));
 const wreckNodeForSave = (save, nodeId) => generateWreckNodes(save.world.seed, save.world.depletedWrecks, save.world.scannedNodes)
     .find((node) => node.id === nodeId);
+const withAuthoredLocalOffer = (offers, locationId, save) => {
+    const ordinaryOffers = offers.filter((offer) => !offer.authored);
+    const activeIds = new Set(save.activeMissions.map((mission) => mission.id));
+    const localOffers = LOCAL_CONTRACT_CHAIN_IDS.flatMap((chainId) => {
+        const stage = findNextLocalContractStage(chainId, save.world.localContractProgress);
+        if (!stage || stage.origin !== locationId || activeIds.has(stage.id))
+            return [];
+        const existing = offers.find((offer) => offer.authored && offer.id === stage.id);
+        return [existing ?? localContractToMissionOffer(stage, save.world.time)];
+    });
+    return [...localOffers, ...ordinaryOffers];
+};
 export const generateMissionOffers = (locationId, save, count = 7) => {
     const cycle = missionCycle(save.world.time);
     const rng = seededRandom(`${save.world.seed}:missions:${cycle}:${locationId}`);
@@ -115,7 +222,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
         });
     }
     if (!LOCATIONS[locationId].services?.missions)
-        return offers;
+        return withAuthoredLocalOffer(offers, locationId, save);
     const dangerBase = clamp(save.world.danger, 0.2, 3.5);
     const claimedNodeIds = new Set();
     const postedSalvageNodeIds = new Set();
@@ -269,6 +376,10 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             ? t('Deliver {quantity} {commodity}', { quantity, commodity: t(COMMODITIES[commodity].name) })
             : t('Express transport to {station}', { station: LOCATIONS[destination].shortName });
         const cargoLabel = pick(rng, VALUABLE_CARGO_LABELS);
+        const deadline = save.world.time + (kind === 'transport'
+            ? Math.max(150, Math.round((150 + distance * 0.4 + randomBetween(rng, 75, 190)) * 0.6))
+            : Math.round(150 + distance * 0.4 + randomBetween(rng, 75, 190)));
+        const complication = optionalComplication(id, kind, reward, save.world.time, deadline);
         offers.push({
             id,
             kind,
@@ -277,6 +388,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             origin: locationId,
             destination,
             commodity,
+            cargoLabel,
             quantity,
             reward: Math.round(reward),
             deposit,
@@ -285,9 +397,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             // so accepting one means committing to the destination. The floor
             // keeps a freshly posted express from reading as already expired
             // before the board cycles.
-            deadline: save.world.time + (kind === 'transport'
-                ? Math.max(150, Math.round((150 + distance * 0.4 + randomBetween(rng, 75, 190)) * 0.6))
-                : Math.round(150 + distance * 0.4 + randomBetween(rng, 75, 190))),
+            deadline,
             status: 'offered',
             guild: 'merchant',
             guildRep: 5 + Math.floor(distance / 170) + (kind === 'transport' ? 3 : 0),
@@ -295,6 +405,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             briefing: kind === 'delivery'
                 ? t('{quantity} units of {commodity} are sealed and waiting. Deliver them intact to {station}. Cargo mass is reserved on acceptance.', { quantity, commodity: t(COMMODITIES[commodity].name), station: LOCATIONS[destination].name })
                 : t('Carry a {cargo} to {station}. The case occupies {mass} cargo mass and the client values punctuality above discretion.', { cargo: t(cargoLabel), station: LOCATIONS[destination].name, mass: (quantity * 1.2).toFixed(1) }),
+            ...(complication ? { complication } : {}),
         });
     }
     // Keep the existing ordinary board intact and add one concrete Salvage
@@ -340,10 +451,11 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             });
         }
     }
-    return offers;
+    return withAuthoredLocalOffer(offers, locationId, save);
 };
 export const refreshMissionOffers = (save, force = false) => {
     const cycle = missionCycle(save.world.time);
+    const syncAuthored = save.world.localContractOffersDirty === true;
     for (const locationId of MISSION_LOCATION_IDS) {
         const existing = save.world.offers[locationId] ?? [];
         // The cycle lives in the second dash segment of mission ids
@@ -357,7 +469,15 @@ export const refreshMissionOffers = (save, force = false) => {
         if (force || existing.length === 0 || Number(existingCycle) !== cycle) {
             save.world.offers[locationId] = generateMissionOffers(locationId, save);
         }
+        else if (syncAuthored) {
+            // Story progress can advance without the procedural board cycle.
+            // Synchronize just the one authored slot while preserving every
+            // ordinary posting and its original deadline.
+            save.world.offers[locationId] = withAuthoredLocalOffer(existing, locationId, save);
+        }
     }
+    if (syncAuthored)
+        delete save.world.localContractOffersDirty;
 };
 export const acceptMission = (save, locationId, missionId) => {
     const offered = save.world.offers[locationId]?.find((mission) => mission.id === missionId);
@@ -367,6 +487,8 @@ export const acceptMission = (save, locationId, missionId) => {
         return { ok: false, message: t('Mission computer has reached its active-contract limit.') };
     if (save.player.credits < offered.deposit)
         return { ok: false, message: t('A {credits} credit bond is required.', { credits: offered.deposit }) };
+    if (offered.authored && Number.isFinite(Number(offered.deadlineSeconds)))
+        offered.deadline = save.world.time + Math.max(1, Number(offered.deadlineSeconds));
     if (offered.kind === 'salvage') {
         const target = wreckNodeForSave(save, offered.targetNodeId);
         const quantity = Number(offered.quantity);
@@ -389,20 +511,26 @@ export const acceptMission = (save, locationId, missionId) => {
         const smuggled = offered.kind === 'smuggle';
         save.player.sealedCargo.push({
             missionId: offered.id,
-            label: smuggled
-                ? t('{commodity} (syndicate)', { commodity: t(COMMODITIES[offered.commodity].name) })
-                : offered.kind === 'delivery' ? t(COMMODITIES[offered.commodity].name) : t('Priority sealed package'),
+            // Keep the canonical English key in the save. Cargo screens apply
+            // the active locale when they render, so a language switch cannot
+            // strand a German label inside an English career (or vice versa).
+            label: offered.kind === 'delivery' || smuggled
+                ? COMMODITIES[offered.commodity].name
+                : (offered.cargoLabel ?? 'Priority sealed package'),
+            ...(offered.commodity ? { commodity: offered.commodity } : {}),
             units,
             mass: massPerUnit,
             ...(smuggled ? { smuggled: true } : {}),
         });
     }
     save.player.credits -= offered.deposit;
+    if (offered.complication?.kind === 'fragile')
+        offered.complication = { ...offered.complication, intact: true };
     offered.status = 'active';
     offered.acceptedAt = save.world.time;
     save.activeMissions.push({ ...offered });
     save.world.offers[locationId] = save.world.offers[locationId].filter((mission) => mission.id !== offered.id);
-    return { ok: true, message: t('Accepted: {title}', { title: offered.title }), mission: offered };
+    return { ok: true, message: t('Accepted: {title}', { title: missionTitle(offered) }), mission: offered };
 };
 const consumeProcurementCargo = (player, commodity, quantity) => {
     const owned = player.cargo[commodity] ?? 0;
@@ -422,16 +550,79 @@ const updateGuildRank = (player, guild) => {
     player.guildRank[guild] = Math.min(nextRank, GUILD_RANK_NAMES[guild].length - 1);
     return { rankedUp: player.guildRank[guild] > oldRank, name: GUILD_RANK_NAMES[guild][player.guildRank[guild]] };
 };
+const queueMissionSettlement = (save, settlement) => {
+    if (!Array.isArray(save.world.missionSettlements))
+        save.world.missionSettlements = [];
+    save.world.missionSettlements.push(settlement);
+    if (save.world.missionSettlements.length > 12)
+        save.world.missionSettlements.splice(0, save.world.missionSettlements.length - 12);
+};
+const missionCompletionBonus = (save, mission) => {
+    const complication = mission.complication;
+    if (!complication || !Number.isFinite(Number(complication.bonus)))
+        return 0;
+    if (complication.kind === 'fragile')
+        return complication.intact === false ? 0 : Math.max(0, Math.round(Number(complication.bonus)));
+    if (complication.kind === 'early')
+        return save.world.time <= Number(complication.bonusDeadline) ? Math.max(0, Math.round(Number(complication.bonus))) : 0;
+    return 0;
+};
 const awardMission = (save, mission) => {
     mission.status = 'completed';
-    save.player.credits += mission.reward + mission.deposit;
+    const bonus = missionCompletionBonus(save, mission);
+    const factionDelta = Math.max(1, Math.floor(mission.guildRep / 3));
+    const total = mission.reward + mission.deposit + bonus;
+    if (mission.authored && mission.chainId && Number.isFinite(Number(mission.stageIndex))) {
+        save.world.localContractProgress ??= {};
+        save.world.localContractProgress[mission.chainId] = Math.max(
+            Number(save.world.localContractProgress[mission.chainId]) || 0,
+            Math.floor(Number(mission.stageIndex)),
+        );
+        save.world.localContractOffersDirty = true;
+    }
+    save.player.credits += total;
     save.player.guildRep[mission.guild] = (save.player.guildRep[mission.guild] ?? 0) + mission.guildRep;
-    save.player.reputation[mission.faction] = clamp(save.player.reputation[mission.faction] + Math.max(1, Math.floor(mission.guildRep / 3)), -100, 100);
+    save.player.reputation[mission.faction] = clamp(save.player.reputation[mission.faction] + factionDelta, -100, 100);
     save.player.stats.contracts += 1;
     save.world.completedMissionIds.push(mission.id);
     save.activeMissions = save.activeMissions.filter((entry) => entry.id !== mission.id);
     const rank = updateGuildRank(save.player, mission.guild);
-    return t('{title} complete. {credits} credits transferred.{note}', { title: mission.title, credits: mission.reward + mission.deposit, note: rank.rankedUp ? t(' Rank advanced: {rank}.', { rank: t(rank.name) }) : '' });
+    queueMissionSettlement(save, {
+        id: mission.id,
+        title: mission.title,
+        kind: mission.kind,
+        targetName: mission.targetName,
+        quantity: mission.quantity,
+        commodity: mission.commodity,
+        claimName: mission.claimName,
+        courseId: mission.courseId,
+        titleKey: mission.titleKey,
+        titleParams: mission.titleParams,
+        authored: mission.authored === true,
+        chainId: mission.chainId,
+        chainLabel: mission.chainLabel,
+        stageLabel: mission.stageLabel,
+        stageIndex: mission.stageIndex,
+        issuer: mission.issuer,
+        outcome: 'completed',
+        guild: mission.guild,
+        faction: mission.faction,
+        reward: mission.reward,
+        bond: mission.deposit,
+        bonus,
+        total,
+        repDelta: mission.guildRep,
+        factionDelta,
+        at: save.world.time,
+        rankedUp: rank.rankedUp,
+        rankName: rank.rankedUp ? rank.name : undefined,
+    });
+    return t('{title} complete. {credits} credits transferred.{bonus}{note}', {
+        title: missionTitle(mission),
+        credits: total,
+        bonus: bonus > 0 ? t(' Optional bonus: {credits}.', { credits: bonus }) : '',
+        note: rank.rankedUp ? t(' Rank advanced: {rank}.', { rank: t(rank.name) }) : '',
+    });
 };
 export const completeMissionsAtDock = (save, locationId) => {
     const messages = [];
@@ -494,7 +685,7 @@ export const completeMissionsAtDock = (save, locationId) => {
 export const completeBountyMission = (save, missionId) => {
     const mission = save.activeMissions.find((entry) => entry.id === missionId && entry.kind === 'bounty');
     if (!mission)
-        return { ok: false, message: 'No matching active warrant.' };
+        return { ok: false, message: t('No matching active warrant.') };
     const callsign = mission.targetName ?? mission.id;
     save.world.bountyKills.push(callsign);
     // Registry: remember every cleared callsign with the pinned profile, so the
@@ -528,6 +719,51 @@ export const completeBountyMission = (save, missionId) => {
         mission,
     };
 };
+export const failMission = (save, mission) => {
+    const active = save.activeMissions.some((entry) => entry.id === mission?.id);
+    if (!mission || !active)
+        return undefined;
+    const repDelta = -Math.max(2, Math.floor(mission.guildRep / 2));
+    const factionDelta = -3;
+    mission.status = 'failed';
+    if (!save.world.failedMissionIds.includes(mission.id))
+        save.world.failedMissionIds.push(mission.id);
+    save.activeMissions = save.activeMissions.filter((entry) => entry.id !== mission.id);
+    save.player.sealedCargo = save.player.sealedCargo.filter((cargo) => cargo.missionId !== mission.id);
+    save.player.guildRep[mission.guild] = Math.max(0, (save.player.guildRep[mission.guild] ?? 0) + repDelta);
+    save.player.reputation[mission.faction] = clamp((save.player.reputation[mission.faction] ?? 0) + factionDelta, -100, 100);
+    if (mission.authored)
+        save.world.localContractOffersDirty = true;
+    queueMissionSettlement(save, {
+        id: mission.id,
+        title: mission.title,
+        kind: mission.kind,
+        targetName: mission.targetName,
+        quantity: mission.quantity,
+        commodity: mission.commodity,
+        claimName: mission.claimName,
+        courseId: mission.courseId,
+        titleKey: mission.titleKey,
+        titleParams: mission.titleParams,
+        authored: mission.authored === true,
+        chainId: mission.chainId,
+        chainLabel: mission.chainLabel,
+        stageLabel: mission.stageLabel,
+        stageIndex: mission.stageIndex,
+        issuer: mission.issuer,
+        outcome: 'failed',
+        guild: mission.guild,
+        faction: mission.faction,
+        reward: 0,
+        bond: -Math.max(0, Number(mission.deposit) || 0),
+        bonus: 0,
+        total: 0,
+        repDelta,
+        factionDelta,
+        at: save.world.time,
+    });
+    return t('Contract failed: {title}', { title: missionTitle(mission) });
+};
 export const failExpiredMissions = (save) => {
     const messages = [];
     for (const mission of [...save.activeMissions]) {
@@ -535,18 +771,18 @@ export const failExpiredMissions = (save) => {
         // expires. Legacy saves may also carry null from an Infinity round-trip.
         if (mission.deadline == null || save.world.time <= mission.deadline)
             continue;
-        mission.status = 'failed';
-        save.world.failedMissionIds.push(mission.id);
-        save.activeMissions = save.activeMissions.filter((entry) => entry.id !== mission.id);
-        save.player.sealedCargo = save.player.sealedCargo.filter((cargo) => cargo.missionId !== mission.id);
-        save.player.guildRep[mission.guild] = Math.max(0, save.player.guildRep[mission.guild] - Math.max(2, Math.floor(mission.guildRep / 2)));
-        save.player.reputation[mission.faction] = clamp(save.player.reputation[mission.faction] - 3, -100, 100);
-        messages.push(t('Contract failed: {title}', { title: mission.title }));
+        const message = failMission(save, mission);
+        if (message)
+            messages.push(message);
     }
     return messages;
 };
 export const guildJoinCost = (guild) => (guild === 'merchant' ? 500 : guild === 'bounty' ? 900 : 650);
-export const joinGuild = (save, guild) => {
+export const joinGuild = (save, guild, locationId) => {
+    if (!Object.prototype.hasOwnProperty.call(GUILD_RANK_NAMES, guild))
+        return { ok: false, message: t('Unknown guild.') };
+    if (locationId && !(LOCATIONS[locationId]?.guilds ?? []).includes(guild))
+        return { ok: false, message: t('That guild has no representative at this dock.') };
     if (save.player.guildRep[guild] > 0)
         return { ok: false, message: t('Guild membership already active.') };
     const cost = guildJoinCost(guild);

@@ -10,7 +10,7 @@ import { collapseOutfittingToSingleShip, createOutfittingState, normalizeOutfitt
 import { combinedHullIntegrity, normalizeEnergy } from './combatResources.js';
 export const SAVE_KEY = 'void-privateer-save-v1';
 export const SETTINGS_KEY = 'void-privateer-settings-v1';
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 // Test-funds build: a fresh career starts with enough credits to try any ship,
 // outfitting module or trade route without grinding first.
 export const STARTING_CREDITS = 500000;
@@ -141,6 +141,18 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             // count, clearedAt }. The bounty board reads this to remember which
             // named pilots the player has taken down (ace kills pay bonus rep).
             registry: {},
+            // Lightweight social memory. Each NPC remembers when the pilot was
+            // first met and how often individual conversation topics were
+            // discussed; authored dialogue stays in the location catalogue.
+            npcMemory: {},
+            // Mission results wait here until the next dock screen can present
+            // a proper settlement docket. Entries are acknowledged and removed
+            // by the player, so this queue stays short in normal play.
+            missionSettlements: [],
+            // Highest completed stage in each authored local contract chain.
+            // Active work remains in activeMissions; this only unlocks the
+            // next posting when a stage settles.
+            localContractProgress: {},
             // Pilots who surrendered to the player, callsign → 'captured' (they
             // powered down in place) or 'fled' (they ran after surrendering): a
             // later spawn of the same name recognizes the player — captured
@@ -355,9 +367,87 @@ const normalizeSealedCargo = (candidate) => {
         const label = typeof item.label === 'string' && item.label.trim()
             ? item.label.trim()
             : 'Sealed cargo';
-        result.push({ missionId, label, units, mass, ...(item.smuggled ? { smuggled: true } : {}) });
+        result.push({
+            missionId,
+            label,
+            units,
+            mass,
+            ...(typeof item.commodity === 'string' && commodityIds.includes(item.commodity) ? { commodity: item.commodity } : {}),
+            ...(item.smuggled ? { smuggled: true } : {}),
+        });
     }
     return result;
+};
+const normalizeNpcMemory = (candidate) => {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate))
+        return {};
+    const result = {};
+    for (const [personId, memory] of Object.entries(candidate)) {
+        if (!personId || !memory || typeof memory !== 'object' || Array.isArray(memory))
+            continue;
+        const topics = memory.topics && typeof memory.topics === 'object' && !Array.isArray(memory.topics)
+            ? Object.fromEntries(Object.entries(memory.topics)
+                .filter(([topicId, count]) => topicId && Number.isFinite(Number(count)) && Number(count) > 0)
+                .map(([topicId, count]) => [topicId, Math.min(9999, Math.floor(Number(count)))]))
+            : {};
+        const hasMetAt = memory.metAt !== null && memory.metAt !== undefined && Number.isFinite(Number(memory.metAt));
+        const hasLastTalkedAt = memory.lastTalkedAt !== null && memory.lastTalkedAt !== undefined && Number.isFinite(Number(memory.lastTalkedAt));
+        result[personId] = {
+            met: memory.met === true || hasMetAt,
+            metAt: hasMetAt ? Math.max(0, Number(memory.metAt)) : 0,
+            lastTalkedAt: hasLastTalkedAt ? Math.max(0, Number(memory.lastTalkedAt)) : 0,
+            talks: Number.isFinite(Number(memory.talks)) ? Math.min(9999, Math.max(0, Math.floor(Number(memory.talks)))) : 0,
+            topics,
+            ...(typeof memory.lastTopic === 'string' && memory.lastTopic ? { lastTopic: memory.lastTopic } : {}),
+        };
+    }
+    return result;
+};
+const normalizeMissionSettlements = (candidate) => {
+    if (!Array.isArray(candidate))
+        return [];
+    return candidate.slice(-12).flatMap((entry) => {
+        if (!entry || typeof entry !== 'object' || typeof entry.id !== 'string' || typeof entry.title !== 'string')
+            return [];
+        const number = (key) => Number.isFinite(Number(entry[key])) ? Number(entry[key]) : 0;
+        return [{
+            id: entry.id,
+            title: entry.title,
+            ...(typeof entry.kind === 'string' && entry.kind ? { kind: entry.kind } : {}),
+            ...(typeof entry.targetName === 'string' && entry.targetName ? { targetName: entry.targetName } : {}),
+            ...(Number.isFinite(Number(entry.quantity)) ? { quantity: Number(entry.quantity) } : {}),
+            ...(typeof entry.commodity === 'string' && entry.commodity ? { commodity: entry.commodity } : {}),
+            ...(typeof entry.claimName === 'string' && entry.claimName ? { claimName: entry.claimName } : {}),
+            ...(typeof entry.courseId === 'string' && entry.courseId ? { courseId: entry.courseId } : {}),
+            ...(typeof entry.titleKey === 'string' && entry.titleKey ? { titleKey: entry.titleKey } : {}),
+            ...(entry.titleParams && typeof entry.titleParams === 'object' && !Array.isArray(entry.titleParams) ? { titleParams: entry.titleParams } : {}),
+            ...(entry.authored === true ? { authored: true } : {}),
+            ...(typeof entry.chainId === 'string' && entry.chainId ? { chainId: entry.chainId } : {}),
+            ...(typeof entry.chainLabel === 'string' && entry.chainLabel ? { chainLabel: entry.chainLabel } : {}),
+            ...(typeof entry.stageLabel === 'string' && entry.stageLabel ? { stageLabel: entry.stageLabel } : {}),
+            ...(Number.isFinite(Number(entry.stageIndex)) ? { stageIndex: Math.max(1, Math.floor(Number(entry.stageIndex))) } : {}),
+            outcome: entry.outcome === 'failed' ? 'failed' : 'completed',
+            guild: typeof entry.guild === 'string' ? entry.guild : 'merchant',
+            faction: typeof entry.faction === 'string' ? entry.faction : 'free-merchants',
+            reward: number('reward'),
+            bond: number('bond'),
+            bonus: number('bonus'),
+            total: number('total'),
+            repDelta: number('repDelta'),
+            factionDelta: number('factionDelta'),
+            at: Math.max(0, number('at')),
+            ...(entry.rankedUp === true ? { rankedUp: true } : {}),
+            ...(typeof entry.rankName === 'string' && entry.rankName ? { rankName: entry.rankName } : {}),
+            ...(typeof entry.issuer === 'string' && entry.issuer ? { issuer: entry.issuer } : {}),
+        }];
+    });
+};
+const normalizeLocalContractProgress = (candidate) => {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate))
+        return {};
+    return Object.fromEntries(Object.entries(candidate)
+        .filter(([chainId, stageIndex]) => chainId && Number.isFinite(Number(stageIndex)))
+        .map(([chainId, stageIndex]) => [chainId, Math.min(99, Math.max(0, Math.floor(Number(stageIndex))))]));
 };
 export const hydrateSave = (candidate) => {
     candidate = candidate && typeof candidate === 'object' && !Array.isArray(candidate) ? candidate : {};
@@ -422,6 +512,9 @@ export const hydrateSave = (candidate) => {
             failedMissionIds: candidate.world?.failedMissionIds ?? [],
             bountyKills: candidate.world?.bountyKills ?? [],
             registry: candidate.world?.registry ?? {},
+            npcMemory: normalizeNpcMemory(candidate.world?.npcMemory),
+            missionSettlements: normalizeMissionSettlements(candidate.world?.missionSettlements),
+            localContractProgress: normalizeLocalContractProgress(candidate.world?.localContractProgress),
             // Upgrade legacy rank/time entries into the persistent PB/split
             // shape and deliberately discard any old replay/ghost payloads.
             raceRecords: normalizeRaceRecords(candidate.world?.raceRecords),
@@ -584,6 +677,11 @@ export const hydrateSave = (candidate) => {
     // balance pass (e.g. ore/salvage revaluation) lands immediately instead of
     // waiting for the next 45s economy tick.
     refreshAllPrices(save.world.market, save.world.seed, save.world.economyClock);
+    // Authored local contracts were added after procedural boards already
+    // existed in many careers. Reconcile their single story slot on every
+    // load so an upgraded save sees the next stage immediately instead of
+    // waiting for the board's timed refresh.
+    save.world.localContractOffersDirty = true;
     refreshMissionOffers(save);
     return save;
 };

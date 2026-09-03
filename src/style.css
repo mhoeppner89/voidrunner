@@ -13681,3 +13681,429 @@ button.primary,
     min-height: 260px;
   }
 }
+
+/* 0.7.50 — bar, contract terminal, and guild desk. These are deliberate
+   terminal surfaces over the station art: concise lists first, detail only
+   after selection, and a separate phone detail state instead of squeezed
+   desktop cards. */
+#dock-screen .mission-terminal,
+#dock-screen .guild-terminal {
+  position: relative;
+  z-index: 4;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 12px 16px 16px;
+  color: var(--void-cream);
+  background: linear-gradient(135deg, rgba(2, 12, 31, 0.9), rgba(3, 16, 37, 0.76));
+  box-sizing: border-box;
+}
+
+#dock-screen .mission-terminal-header,
+#dock-screen .guild-terminal-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  min-height: 68px;
+  padding: 8px 10px;
+  border: 1px solid rgba(83, 188, 225, 0.5);
+  border-left: 4px solid var(--dock-accent);
+  background: rgba(2, 12, 28, 0.9);
+}
+
+#dock-screen .mission-terminal-header > button,
+#dock-screen .guild-terminal-header > button,
+#dock-screen .mission-list-back {
+  min-height: 42px;
+  padding: 7px 11px;
+  color: #83e8f2;
+  background: rgba(5, 33, 63, 0.78);
+  border: 1px solid rgba(73, 184, 220, 0.55);
+  font-family: var(--pixel-font);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+#dock-screen .mission-terminal-header h3,
+#dock-screen .guild-terminal-header h3 {
+  margin: 2px 0 0;
+  color: var(--void-cream);
+  font-family: var(--pixel-font);
+  font-size: clamp(18px, 2.4vw, 29px);
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+#dock-screen .mission-terminal-header nav {
+  display: flex;
+  gap: 6px;
+}
+
+#dock-screen .mission-terminal-header nav button {
+  min-height: 44px;
+  padding: 7px 12px;
+  color: #8fa8b7;
+  background: rgba(3, 18, 37, 0.75);
+  border: 1px solid rgba(83, 152, 178, 0.36);
+  font-family: var(--pixel-font);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+#dock-screen .mission-terminal-header nav button.is-active {
+  color: #06152a;
+  background: var(--void-gold);
+  border-color: #fff2b2;
+}
+
+#dock-screen .mission-terminal-header nav b {
+  margin-left: 5px;
+}
+
+#dock-screen .mission-terminal-body {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: minmax(300px, 0.42fr) minmax(0, 1fr);
+  gap: 10px;
+  padding-top: 10px;
+}
+
+#dock-screen .mission-browser,
+#dock-screen .mission-dossier-wrap {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(85, 201, 231, 0.55) rgba(2, 11, 24, 0.5);
+}
+
+#dock-screen .mission-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-right: 4px;
+}
+
+#dock-screen .mission-row {
+  --mission-accent: #5caaa8;
+  display: grid;
+  grid-template-columns: 4px minmax(0, 1fr) minmax(105px, auto);
+  gap: 9px;
+  align-items: stretch;
+  flex: 0 0 auto;
+  min-height: 72px;
+  padding: 0;
+  overflow: hidden;
+  color: #bdccd2;
+  background: linear-gradient(110deg, rgba(4, 19, 34, 0.96), rgba(5, 27, 42, 0.82));
+  border: 1px solid rgba(87, 148, 169, 0.32);
+  text-align: left;
+}
+
+#dock-screen .mission-row.bounty { --mission-accent: #dc6e58; }
+#dock-screen .mission-row.mining { --mission-accent: #e1b04b; }
+#dock-screen .mission-row.salvage { --mission-accent: #73d5ca; }
+#dock-screen .mission-row.smuggle { --mission-accent: #c675a9; }
+#dock-screen .mission-row.race { --mission-accent: var(--void-gold); }
+#dock-screen .mission-row.is-authored { --mission-accent: #f0c85b; }
+#dock-screen .mission-row > i { width: 4px; background: var(--mission-accent); }
+
+#dock-screen .mission-row:hover,
+#dock-screen .mission-row:focus-visible,
+#dock-screen .mission-row.is-selected {
+  color: #e8f5f5;
+  background: linear-gradient(110deg, rgba(7, 37, 59, 0.98), rgba(9, 48, 65, 0.9));
+  border-color: color-mix(in srgb, var(--mission-accent), #9deaff 40%);
+}
+
+#dock-screen .mission-row.is-selected {
+  box-shadow: inset 0 0 0 1px var(--mission-accent), 0 0 14px rgba(21, 146, 190, 0.13);
+}
+
+#dock-screen .mission-row.is-locked { filter: saturate(0.45); opacity: 0.7; }
+#dock-screen .mission-row-copy,
+#dock-screen .mission-row-value { padding: 9px 0; min-width: 0; }
+#dock-screen .mission-row-copy small,
+#dock-screen .mission-row-copy b,
+#dock-screen .mission-row-copy em,
+#dock-screen .mission-row-value strong,
+#dock-screen .mission-row-value small { display: block; }
+#dock-screen .mission-row-copy small { color: var(--mission-accent); font-size: 9px; letter-spacing: 0.08em; }
+#dock-screen .mission-row-copy b { margin-top: 4px; overflow: hidden; color: inherit; font-size: 13px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+#dock-screen .mission-row-copy em { margin-top: 5px; overflow: hidden; color: #78909e; font-size: 10px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+#dock-screen .mission-row-value { padding-right: 10px; text-align: right; }
+#dock-screen .mission-row-value strong { color: var(--void-gold); font-family: var(--pixel-font); font-size: 13px; }
+#dock-screen .mission-row-value small { margin-top: 10px; color: #94a7af; font-size: 9px; line-height: 1.25; }
+
+#dock-screen .mission-dossier,
+#dock-screen .mission-dossier-empty {
+  --mission-accent: #5caaa8;
+  min-height: 100%;
+  padding: 17px 20px;
+  color: #c5d4da;
+  background: linear-gradient(145deg, rgba(3, 17, 34, 0.97), rgba(7, 27, 40, 0.9));
+  border: 1px solid rgba(88, 161, 183, 0.4);
+  border-top: 3px solid var(--mission-accent);
+  box-sizing: border-box;
+}
+
+#dock-screen .mission-dossier.bounty { --mission-accent: #dc6e58; }
+#dock-screen .mission-dossier.mining { --mission-accent: #e1b04b; }
+#dock-screen .mission-dossier.salvage { --mission-accent: #73d5ca; }
+#dock-screen .mission-dossier.smuggle { --mission-accent: #c675a9; }
+#dock-screen .mission-dossier.race { --mission-accent: var(--void-gold); }
+
+#dock-screen .mission-list-back { display: none; margin-bottom: 8px; }
+#dock-screen .mission-dossier-header { display: flex; gap: 14px; justify-content: space-between; align-items: flex-start; }
+#dock-screen .mission-dossier-header span { color: var(--mission-accent); font-size: 10px; letter-spacing: 0.1em; }
+#dock-screen .mission-dossier-header h3 { margin: 5px 0; color: var(--void-cream); font-family: var(--pixel-font); font-size: clamp(20px, 2.5vw, 31px); line-height: 1.12; }
+#dock-screen .mission-dossier-header small { color: #8195a1; font-size: 10px; }
+#dock-screen .mission-dossier-header > strong { flex: 0 0 auto; color: var(--void-gold); font-family: var(--pixel-font); font-size: clamp(18px, 2.2vw, 27px); }
+#dock-screen .mission-briefing { margin: 16px 0; max-width: 75ch; color: #c6d0d2; font-size: 13px; line-height: 1.55; }
+
+#dock-screen .mission-chain-mark {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin: -7px 0 12px;
+  padding: 7px 9px;
+  color: #796a3e;
+  background: rgba(58, 43, 11, 0.34);
+  border: 1px solid rgba(222, 180, 68, 0.34);
+}
+#dock-screen .mission-chain-mark span,
+#dock-screen .mission-chain-mark small { color: #b89c4e; font-size: 9px; letter-spacing: .07em; }
+#dock-screen .mission-chain-mark b { overflow: hidden; color: #f0d17a; font-family: var(--pixel-font); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+
+#dock-screen .mission-route-strip {
+  display: grid;
+  grid-template-columns: minmax(90px, auto) minmax(24px, 1fr) auto minmax(24px, 1fr) minmax(90px, auto);
+  gap: 9px;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(1, 10, 22, 0.78);
+  border: 1px solid rgba(76, 145, 169, 0.32);
+}
+#dock-screen .mission-route-strip span:last-child { text-align: right; }
+#dock-screen .mission-route-strip small,
+#dock-screen .mission-route-strip b { display: block; }
+#dock-screen .mission-route-strip small { color: #5e7785; font-size: 9px; }
+#dock-screen .mission-route-strip b { margin-top: 2px; color: #cfeff0; font-family: var(--pixel-font); font-size: 12px; }
+#dock-screen .mission-route-strip i { height: 1px; background: linear-gradient(90deg, transparent, var(--mission-accent), transparent); }
+#dock-screen .mission-route-strip em { color: var(--mission-accent); font-size: 9px; font-style: normal; letter-spacing: 0.08em; white-space: nowrap; }
+
+#dock-screen .mission-terms {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 10px 0;
+}
+#dock-screen .mission-terms > div { padding: 8px; background: rgba(3, 14, 27, 0.72); border-left: 2px solid rgba(84, 160, 183, 0.42); }
+#dock-screen .mission-terms dt { color: #607b89; font-size: 9px; letter-spacing: 0.08em; }
+#dock-screen .mission-terms dd { margin: 4px 0 0; color: #e1e4d7; font-family: var(--pixel-font); font-size: 11px; }
+
+#dock-screen .mission-complication,
+#dock-screen .mission-objective {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px 12px;
+  margin-top: 9px;
+  padding: 9px 11px;
+  background: rgba(8, 34, 42, 0.72);
+  border-left: 3px solid #65dfc8;
+}
+#dock-screen .mission-complication span,
+#dock-screen .mission-objective span { color: #70d8cb; font-size: 9px; letter-spacing: 0.09em; }
+#dock-screen .mission-complication b,
+#dock-screen .mission-objective b { color: #f1d272; font-family: var(--pixel-font); font-size: 11px; }
+#dock-screen .mission-objective b { grid-column: 1 / -1; color: #d7e7e7; }
+#dock-screen .mission-complication p { grid-column: 1 / -1; margin: 0; color: #91aeb1; font-size: 10px; }
+#dock-screen .mission-complication.is-lost { border-left-color: #bb6158; }
+#dock-screen .mission-complication.is-lost span,
+#dock-screen .mission-complication.is-lost b { color: #e48676; }
+#dock-screen .mission-blockers { margin: 10px 0 0; padding: 8px 10px 8px 27px; color: #ed9d86; background: rgba(64, 16, 18, 0.52); border: 1px solid rgba(207, 86, 70, 0.45); font-size: 10px; }
+#dock-screen .mission-blockers li + li { margin-top: 3px; }
+#dock-screen .mission-dossier-actions { display: grid; grid-template-columns: minmax(180px, 0.45fr) minmax(0, 1fr); gap: 11px; align-items: center; margin-top: 13px; }
+#dock-screen .mission-dossier-actions button { min-height: 46px; }
+#dock-screen .mission-dossier-actions small { color: #718995; font-size: 10px; line-height: 1.35; }
+#dock-screen .mission-dossier-empty { display: grid; place-content: center; text-align: center; }
+#dock-screen .mission-dossier-empty b { color: var(--void-gold); font-family: var(--pixel-font); font-size: 17px; }
+#dock-screen .mission-dossier-empty p,
+#dock-screen .mission-list-empty p { color: #81939c; font-size: 11px; }
+#dock-screen .mission-list-empty { padding: 24px 16px; color: var(--void-cream); text-align: center; border: 1px dashed rgba(91, 160, 181, 0.4); }
+
+#dock-screen .bar-person-pointer.is-new em {
+  display: block;
+  margin-top: 3px;
+  color: #65efcf;
+  font-family: var(--pixel-font);
+  font-size: 8px;
+  font-style: normal;
+  letter-spacing: 0.08em;
+}
+
+#dock-screen .bar-dialogue-card {
+  width: min(760px, 67vw);
+  grid-template-columns: 132px minmax(0, 1fr);
+  align-items: stretch;
+  padding: 11px 13px;
+}
+#dock-screen .bar-dialogue-card .avatar { align-self: start; width: 132px; height: 157px; }
+#dock-screen .bar-dialogue-copy { display: flex; min-width: 0; flex-direction: column; }
+#dock-screen .bar-dialogue-card h3 { margin-bottom: 6px; }
+#dock-screen .bar-dialogue-card p { min-height: 43px; margin: 0 0 5px; color: #e0eced; font-size: 13px; line-height: 1.45; }
+#dock-screen .bar-dialogue-card small { color: #72a9b7; font-size: 9px; }
+#dock-screen .dialogue-topics { display: flex; flex-wrap: wrap; gap: 5px; margin-top: auto; padding-top: 8px; }
+#dock-screen .dialogue-topics button,
+#dock-screen .dialogue-action {
+  min-height: 38px;
+  padding: 7px 10px;
+  color: #a8c7d2;
+  background: rgba(4, 25, 48, 0.9);
+  border: 1px solid rgba(73, 165, 195, 0.46);
+  font-family: var(--pixel-font);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+}
+#dock-screen .dialogue-topics button.is-active { color: #06162a; background: #75d7dd; border-color: #bff8f0; }
+#dock-screen .dialogue-action { align-self: flex-start; margin-top: 6px; color: #141d28; background: var(--void-gold); border-color: #fff0aa; }
+
+#dock-screen .guild-terminal-header > small { color: #85a7b4; font-size: 10px; }
+#dock-screen .guild-grid { align-content: start; min-height: 0; padding-top: 10px; overflow-y: auto; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+#dock-screen .guild-card { display: flex; min-height: 0; flex-direction: column; gap: 9px; padding: 13px; background: linear-gradient(145deg, rgba(3, 17, 34, 0.96), rgba(8, 29, 39, 0.88)); border-top: 3px solid var(--dock-accent); }
+#dock-screen .guild-card-head { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 11px; align-items: center; }
+#dock-screen .guild-card-head .avatar,
+#dock-screen .guild-terminal-avatar { width: 70px; height: 84px; object-fit: cover; image-rendering: auto; border: 1px solid rgba(91, 190, 216, 0.52); }
+#dock-screen .guild-terminal-avatar { display: grid; place-items: center; color: var(--void-gold); font-size: 30px; }
+#dock-screen .guild-card-head h3 { margin: 4px 0; }
+#dock-screen .guild-card-head small { color: #8297a1; font-size: 9px; }
+#dock-screen .guild-meter { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+#dock-screen .guild-meter i { height: 7px; overflow: hidden; background: rgba(2, 10, 20, 0.86); border: 1px solid rgba(73, 150, 174, 0.42); }
+#dock-screen .guild-meter i b { display: block; height: 100%; background: linear-gradient(90deg, #36b8b9, var(--void-gold)); }
+#dock-screen .guild-meter em { color: #8bb4bd; font-size: 9px; font-style: normal; }
+#dock-screen .guild-benefits,
+#dock-screen .guild-next { padding: 9px 10px; background: rgba(2, 13, 27, 0.7); border-left: 2px solid rgba(69, 189, 192, 0.55); }
+#dock-screen .guild-benefits span,
+#dock-screen .guild-next span { display: block; color: #67cfd2; font-size: 9px; letter-spacing: 0.08em; }
+#dock-screen .guild-benefits b { display: block; margin-top: 4px; color: #e0e5d8; font-size: 12px; }
+#dock-screen .guild-next p { margin: 5px 0 0; color: #8fa1a7; font-size: 10px; line-height: 1.35; }
+#dock-screen .guild-card > button { min-height: 44px; margin-top: auto; }
+#dock-screen .guild-cost-warning { margin-top: -4px; color: #e18a72; font-size: 9px; }
+#dock-screen .guild-empty { padding: 28px; color: var(--void-cream); border: 1px dashed rgba(91, 160, 181, 0.4); text-align: center; }
+
+#dock-screen .mission-settlement {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 5, 14, 0.78);
+  backdrop-filter: blur(3px);
+}
+#dock-screen .mission-settlement-panel { width: min(780px, 94vw); max-height: min(82vh, 620px); padding: 18px; overflow-y: auto; color: var(--void-cream); background: linear-gradient(145deg, #06152c, #082838); border: 1px solid #6bc3d6; border-left: 5px solid var(--void-gold); box-shadow: 0 18px 60px rgba(0,0,0,.6); }
+#dock-screen .mission-settlement-panel > header { display: flex; justify-content: space-between; gap: 15px; align-items: end; margin: 5px 0 13px; }
+#dock-screen .mission-settlement-panel h3 { margin: 0; font-family: var(--pixel-font); font-size: clamp(21px, 3vw, 31px); text-transform: uppercase; }
+#dock-screen .mission-settlement-panel header p { margin: 4px 0 0; color: #8fa5af; font-size: 10px; }
+#dock-screen .mission-settlement-panel header > strong { color: var(--void-gold); font-family: var(--pixel-font); font-size: 23px; }
+#dock-screen .mission-settlement-list { display: grid; gap: 7px; }
+#dock-screen .mission-settlement-list article { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(280px, 1.2fr); gap: 12px; padding: 10px; background: rgba(2, 12, 25, 0.78); border-left: 3px solid #55cbbd; }
+#dock-screen .mission-settlement-list article.is-failed { border-left-color: #d26454; }
+#dock-screen .mission-settlement-list span,
+#dock-screen .mission-settlement-list b,
+#dock-screen .mission-settlement-list small { display: block; }
+#dock-screen .mission-settlement-list span { color: #63d9ca; font-size: 9px; letter-spacing: .08em; }
+#dock-screen .mission-settlement-list article.is-failed span { color: #e27d68; }
+#dock-screen .mission-settlement-list b { margin-top: 3px; font-size: 13px; }
+#dock-screen .mission-settlement-list small { margin-top: 3px; color: #768f9a; font-size: 9px; }
+#dock-screen .mission-settlement-list dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin: 0; }
+#dock-screen .mission-settlement-list dl div { padding: 6px; background: rgba(4, 25, 38, 0.82); }
+#dock-screen .mission-settlement-list dt { color: #688894; font-size: 8px; }
+#dock-screen .mission-settlement-list dd { margin: 3px 0 0; color: #dfe6d9; font-family: var(--pixel-font); font-size: 10px; }
+#dock-screen .mission-settlement-list .is-bonus dd { color: #f0ce67; }
+#dock-screen .mission-settlement-list .is-loss dd { color: #e27d68; }
+#dock-screen .settlement-rank { grid-column: 1 / -1; margin: 0; padding: 6px 8px; color: #f2d16f; background: rgba(67, 48, 10, 0.35); font-family: var(--pixel-font); font-size: 10px; }
+#dock-screen .mission-settlement-panel > button { min-width: 210px; min-height: 46px; margin-top: 13px; }
+
+@media (max-width: 900px), (pointer: coarse) {
+  #dock-screen .mission-terminal,
+  #dock-screen .guild-terminal { padding: 6px 8px 8px; }
+  #dock-screen .mission-terminal-header,
+  #dock-screen .guild-terminal-header { min-height: 54px; gap: 7px; padding: 5px 7px; }
+  #dock-screen .mission-terminal-header > div .eyebrow,
+  #dock-screen .guild-terminal-header > div .eyebrow,
+  #dock-screen .guild-terminal-header > small { display: none; }
+  #dock-screen .mission-terminal-header h3,
+  #dock-screen .guild-terminal-header h3 { font-size: 17px; }
+  #dock-screen .mission-terminal-header > button,
+  #dock-screen .guild-terminal-header > button { min-height: 44px; padding: 5px 8px; font-size: 9px; }
+  #dock-screen .mission-terminal-header nav button { min-height: 44px; padding: 5px 8px; font-size: 9px; }
+  #dock-screen .mission-terminal-body { display: block; padding-top: 6px; }
+  #dock-screen .mission-browser,
+  #dock-screen .mission-dossier-wrap { height: 100%; }
+  #dock-screen .mission-terminal .mission-dossier-wrap { display: none; }
+  #dock-screen .mission-terminal.is-detail-open .mission-browser { display: none; }
+  #dock-screen .mission-terminal.is-detail-open .mission-dossier-wrap { display: block; }
+  #dock-screen .mission-row { min-height: 61px; grid-template-columns: 4px minmax(0, 1fr) minmax(92px, auto); }
+  #dock-screen .mission-row-copy,
+  #dock-screen .mission-row-value { padding-block: 6px; }
+  #dock-screen .mission-row-copy b { font-size: 12px; }
+  #dock-screen .mission-row-copy em { margin-top: 3px; }
+  #dock-screen .mission-row-value strong { font-size: 11px; }
+  #dock-screen .mission-row-value small { margin-top: 6px; }
+  #dock-screen .mission-list-back { display: inline-block; min-height: 38px; }
+  #dock-screen .mission-dossier { padding: 9px 11px 13px; }
+  #dock-screen .mission-dossier-header h3 { font-size: 18px; }
+  #dock-screen .mission-dossier-header > strong { font-size: 16px; }
+  #dock-screen .mission-briefing { margin: 8px 0; font-size: 11px; line-height: 1.35; }
+  #dock-screen .mission-route-strip { padding: 6px 8px; }
+  #dock-screen .mission-terms { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 6px 0; }
+  #dock-screen .mission-terms > div { padding: 5px; }
+  #dock-screen .mission-complication,
+  #dock-screen .mission-objective { margin-top: 5px; padding: 6px 8px; }
+  #dock-screen .mission-dossier-actions { margin-top: 6px; }
+  #dock-screen .mission-dossier-actions button { min-height: 44px; }
+  #dock-screen .bar-dialogue-card { left: 8px; right: auto; bottom: 8px; width: min(690px, calc(100vw - 16px)); max-height: calc(100% - 16px); grid-template-columns: 86px minmax(0, 1fr); gap: 8px; padding: 8px; overflow-y: auto; box-sizing: border-box; }
+  #dock-screen .bar-dialogue-card .avatar { width: 86px; height: 104px; }
+  #dock-screen .bar-dialogue-card h3 { font-size: 12px; }
+  #dock-screen .bar-dialogue-card p { min-height: 0; font-size: 11px; line-height: 1.32; }
+  #dock-screen .dialogue-topics { gap: 4px; padding-top: 5px; }
+  #dock-screen .dialogue-topics button,
+  #dock-screen .dialogue-action { min-height: 36px; padding: 5px 7px; font-size: 8px; }
+  #dock-screen .guild-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 6px; padding-top: 6px; }
+  #dock-screen .guild-card { gap: 6px; padding: 8px; }
+  #dock-screen .guild-card-head { grid-template-columns: 52px minmax(0, 1fr); gap: 7px; }
+  #dock-screen .guild-card-head .avatar,
+  #dock-screen .guild-terminal-avatar { width: 52px; height: 62px; }
+  #dock-screen .guild-card-head h3 { font-size: 15px; }
+  #dock-screen .guild-benefits,
+  #dock-screen .guild-next { padding: 6px 7px; }
+  #dock-screen .mission-settlement { padding: 8px; }
+  #dock-screen .mission-settlement-panel { width: min(740px, 97vw); max-height: 92vh; padding: 10px; }
+  #dock-screen .mission-settlement-panel > header { margin-bottom: 7px; }
+  #dock-screen .mission-settlement-panel h3 { font-size: 17px; }
+  #dock-screen .mission-settlement-panel header > strong { font-size: 16px; }
+  #dock-screen .mission-settlement-list article { grid-template-columns: minmax(150px, .8fr) minmax(260px, 1.2fr); padding: 7px; }
+  #dock-screen .mission-settlement-panel > button { min-height: 44px; margin-top: 7px; }
+}
+
+@media (max-width: 560px), (orientation: portrait) {
+  #dock-screen .mission-terminal-header,
+  #dock-screen .guild-terminal-header { grid-template-columns: auto minmax(0, 1fr); }
+  #dock-screen .mission-terminal-header nav { grid-column: 1 / -1; }
+  #dock-screen .mission-terminal-header nav button { flex: 1; }
+  #dock-screen .mission-terms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #dock-screen .mission-route-strip { grid-template-columns: minmax(70px, auto) 1fr minmax(70px, auto); }
+  #dock-screen .mission-route-strip i:first-of-type { display: none; }
+  #dock-screen .mission-route-strip em { display: none; }
+  #dock-screen .mission-dossier-actions { grid-template-columns: 1fr; }
+  #dock-screen .bar-dialogue-card { grid-template-columns: 64px minmax(0, 1fr); }
+  #dock-screen .bar-dialogue-card .avatar { width: 64px; height: 78px; }
+  #dock-screen .guild-grid { grid-template-columns: 1fr; }
+  #dock-screen .mission-settlement-list article { grid-template-columns: 1fr; }
+  #dock-screen .mission-settlement-list dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

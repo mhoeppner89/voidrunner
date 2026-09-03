@@ -121,6 +121,127 @@ assert.equal(Number.isFinite(cargoMass({ cargo: { water: 'NaN', food: -4 }, seal
 const tradeQuote = quoteCommodityTrade(cargoSave, 'helix', 'water', 'buy', 1);
 assert.equal(Number.isFinite(tradeQuote.postCargoMass ?? 0), true, 'trade quote never exposes NaN cargo mass');
 
+// Social memory and mission settlement queues are durable JSON records, but
+// malformed hand-edited values must be discarded at the save boundary.
+const malformedCollections = hydrateSave({
+    version: SAVE_VERSION,
+    player: canonicalPlayer(),
+    world: {
+        seed: 1201,
+        npcMemory: ['not-a-memory-record', null],
+        missionSettlements: { not: 'an-array' },
+        localContractProgress: ['not-a-progress-map'],
+    },
+});
+assert.deepEqual(malformedCollections.world.npcMemory, {});
+assert.deepEqual(malformedCollections.world.missionSettlements, []);
+assert.deepEqual(malformedCollections.world.localContractProgress, {});
+
+const normalizedCollections = hydrateSave({
+    version: SAVE_VERSION,
+    player: canonicalPlayer(),
+    world: {
+        seed: 1202,
+        npcMemory: {
+            'mara-vek': {
+                met: true,
+                metAt: '42',
+                lastTalkedAt: 'not-a-time',
+                talks: '3.9',
+                topics: {
+                    routes: '2.9',
+                    broken: 'NaN',
+                    zero: 0,
+                    negative: -1,
+                },
+                lastTopic: 'routes',
+            },
+            discardedNull: null,
+            discardedArray: [],
+            discardedScalar: 'not-a-record',
+        },
+        missionSettlements: [
+            null,
+            'not-a-settlement',
+            { title: 'missing id' },
+            { id: 'missing-title' },
+            {
+                id: 'normalized-settlement',
+                title: 'Normalized settlement',
+                outcome: 'unexpected-value',
+                guild: 12,
+                faction: null,
+                reward: '1200',
+                bond: '-100',
+                bonus: Infinity,
+                total: '1100',
+                repDelta: '-4',
+                factionDelta: 'bad',
+                at: '-8',
+                stageIndex: '2.9',
+                rankedUp: 'yes',
+                rankName: 12,
+                issuer: 'Settlement desk',
+            },
+        ],
+        localContractProgress: {
+            'mourning-ledger': '2.9',
+            'foundry-audit': -4,
+            'quiet-signal': 150,
+            invalid: 'not-a-number',
+            alsoInvalid: {},
+        },
+    },
+});
+assert.deepEqual(normalizedCollections.world.npcMemory, {
+    'mara-vek': {
+        met: true,
+        metAt: 42,
+        lastTalkedAt: 0,
+        talks: 3,
+        topics: { routes: 2 },
+        lastTopic: 'routes',
+    },
+});
+assert.deepEqual(normalizedCollections.world.missionSettlements, [{
+    id: 'normalized-settlement',
+    title: 'Normalized settlement',
+    outcome: 'completed',
+    guild: 'merchant',
+    faction: 'free-merchants',
+    reward: 1200,
+    bond: -100,
+    bonus: 0,
+    total: 1100,
+    repDelta: -4,
+    factionDelta: 0,
+    at: 0,
+    stageIndex: 2,
+    issuer: 'Settlement desk',
+}]);
+assert.deepEqual(normalizedCollections.world.localContractProgress, {
+    'mourning-ledger': 2,
+    'foundry-audit': 0,
+    'quiet-signal': 99,
+});
+
+// Existing careers can already have a fresh procedural board for the current
+// cycle. Hydration still inserts the first authored local story immediately;
+// it must not make the player wait for the next timed board refresh.
+const upgradedMissionBoard = hydrateSave({
+    version: 10,
+    player: canonicalPlayer({ dockedAt: 'cairn', lastDockedAt: 'cairn' }),
+    world: {
+        seed: 1203,
+        time: 0,
+        offers: {
+            cairn: [{ id: 'cairn-0-0-existing', title: 'Existing posting', status: 'offered' }],
+        },
+    },
+});
+assert.equal(upgradedMissionBoard.world.offers.cairn[0].id, 'mourning-ledger-1');
+assert.ok(upgradedMissionBoard.world.offers.cairn.some((entry) => entry.id === 'cairn-0-0-existing'));
+
 // A valid dock is the authoritative system anchor.
 const dockMismatch = hydrateSave({
     version: SAVE_VERSION,
@@ -183,7 +304,38 @@ roundTrip.player.missiles = 2;
 roundTrip.player.prevPosition = new Float64Array([1, 2, 3]);
 roundTrip.player.prevRotation = new Float64Array([0, 0, 0, 1]);
 roundTrip.settings.quality = 'low';
-roundTrip.activeMissions = [{ id: 'round-trip-mission', kind: 'delivery', status: 'active' }];
+roundTrip.activeMissions = [{
+    id: 'round-trip-mission',
+    kind: 'delivery',
+    status: 'active',
+    complication: { kind: 'fragile', bonus: 210, intact: true },
+}];
+roundTrip.world.npcMemory = {
+    'mara-vek': {
+        met: true,
+        metAt: 12,
+        lastTalkedAt: 21,
+        talks: 2,
+        topics: { routes: 1 },
+        lastTopic: 'routes',
+    },
+};
+roundTrip.world.missionSettlements = [{
+    id: 'round-trip-settlement',
+    title: 'Round-trip settlement',
+    outcome: 'completed',
+    guild: 'merchant',
+    faction: 'free-merchants',
+    reward: 100,
+    bond: 20,
+    bonus: 5,
+    total: 125,
+    repDelta: 3,
+    factionDelta: 1,
+    at: 33,
+    issuer: 'Test desk',
+}];
+roundTrip.world.localContractProgress = { 'mourning-ledger': 1 };
 roundTrip.world.raceRecords = { 'shard-gauntlet': { bestTime: 73.5, bestRank: 2, bestSplits: [10, 20] } };
 roundTrip.world.pendingJump = validPendingJump;
 assert.equal(saveGame(roundTrip), true);
@@ -199,6 +351,10 @@ assert.equal(loaded.player.activeLauncherMountId, 'wayfarer-launcher-0');
 assert.equal(loaded.player.dockedAt, undefined);
 assert.equal(loaded.settings.quality, 'high');
 assert.equal(loaded.activeMissions[0].id, 'round-trip-mission');
+assert.deepEqual(loaded.activeMissions[0].complication, roundTrip.activeMissions[0].complication);
+assert.deepEqual(loaded.world.npcMemory, roundTrip.world.npcMemory);
+assert.deepEqual(loaded.world.missionSettlements, roundTrip.world.missionSettlements);
+assert.deepEqual(loaded.world.localContractProgress, roundTrip.world.localContractProgress);
 assert.equal(loaded.world.raceRecords['shard-gauntlet'].bestTime, 73.5);
 assert.equal(loaded.world.pendingJump?.routeId, 'verge-meridian');
 

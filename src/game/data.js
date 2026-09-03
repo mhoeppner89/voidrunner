@@ -163,9 +163,9 @@ const helixPeople = [
         affiliation: 'Independent',
         portraitSeed: 12,
         lines: [
-            'The Shardbelt is rich this cycle. Rich enough that three crews are lying about the same claim.',
-            'A trader who flies predictable lanes is a trader who buys pirates dinner.',
-            'Rookhaven pays well for medicine, but their inspectors count every seal twice.',
+            'You made it to Helix. What are you looking for: a drink, a lead, or a quiet berth?',
+            'Keep your transponder on near Rookhaven unless you have a reason to invite an inspection.',
+            'Three crews are claiming the same Shardbelt rock, and pirates are already watching the approach.',
         ],
     },
     {
@@ -175,9 +175,9 @@ const helixPeople = [
         affiliation: 'Merchant Guild',
         portraitSeed: 31,
         lines: [
-            'Margins are made before launch. Know who is desperate, then let the hold do the work.',
-            'Azure Reach floods this station with food. Vesper still pays for every crate it can get.',
-            'Guild rank buys information before it buys privilege.',
+            'Welcome to Helix; if your hold is empty, I can show you what the next ports are paying for.',
+            'Check the buy and sell quotes before you load; cargo mass turns a cheap run into a slow one.',
+            'Azure Reach has surplus food again, while Vesper is paying more for every crate that arrives.',
         ],
     },
     {
@@ -187,9 +187,9 @@ const helixPeople = [
         affiliation: 'Helix Freeport',
         portraitSeed: 53,
         lines: [
-            'Your Wayfarer will forgive one bad decision. The second one goes on my invoice.',
-            'Afterburners drink fuel and cook seals. Use them to end a fight, not start a commute.',
-            'A clean radar is worth more than a bigger gun in the graveyard.',
+            'Bring me the damage report and I’ll tell you what Helix can fix before launch.',
+            'Use afterburner in short bursts; it burns fuel quickly and heats the drive during a long crossing.',
+            'If you run the Mourning Line dark, cool the drive before anyone gets close; a hot ship still shows up.',
         ],
     },
 ];
@@ -201,9 +201,9 @@ const rookPeople = [
         affiliation: 'Concord Patrol',
         portraitSeed: 72,
         lines: [
-            'A warrant pays for proof, not enthusiasm. Confirm the hull, record the kill, return alive.',
-            'Red Talon traffic has shifted toward Mourning Line. They think the wrecks make them invisible.',
-            'Civilian fire inside the traffic cordon will cost you every favor you have here.',
+            'Captain Dorne, Concord Patrol. Tell me what you need before you leave my dock.',
+            'On a warrant, confirm the target and keep civilian traffic out of your firing line.',
+            'Red Talon traffic has moved toward Mourning Line, where the wrecks make identification difficult.',
         ],
     },
     {
@@ -214,9 +214,9 @@ const rookPeople = [
         affiliation: 'Free Merchants Compact',
         portraitSeed: 87,
         lines: [
-            'The Vanguard is expensive because it survives the jobs that pay for a Vanguard.',
-            'Bring a clean title, enough credits, and no active warrants. I will handle the rest.',
-            'Armor keeps the shape of a ship. Shields keep its options.',
+            'If you’re shopping for a hull, tell me the job first; the cheapest ship is rarely the cheapest run.',
+            'Compare cargo capacity with the modules you want to fit before you sign the trade.',
+            'Vanguard demand is up because more pilots are taking contracts through the Shardbelt.',
         ],
     },
     {
@@ -226,9 +226,9 @@ const rookPeople = [
         affiliation: 'Bounty Hunters Registry',
         portraitSeed: 103,
         lines: [
-            'Never chase through the center of a debris lane. Make the target choose between you and the metal.',
-            'Named targets keep escorts. Procedural targets keep surprises.',
-            'Missiles are for commitments. Guns are for questions.',
+            'Tovik Raal, Registry pilot. I can help you read a warrant before you chase it.',
+            'In debris, make the target turn around the rocks; a straight chase gives pirates the easy line.',
+            'The Registry has posted more named targets near Mourning Line, and several have escorts.',
         ],
     },
 ];
@@ -241,10 +241,9 @@ const vesperPeople = [
         affiliation: 'Frontier Miners Cooperative',
         portraitSeed: 121,
         lines: [
-            'Scan before you cut. Most rocks are ballast; a few are retirement.',
-            'Slow fragments drift into fast ships. The field keeps its own schedule.',
-            'Ore is cheap here. Machinery is not. That is the whole colony in one sentence.',
-            'Gold doesn\'t register on a surface scan. Run the seam dry and the pocket shows itself — one rock in a dozen pays for the whole contract.',
+            'You’re at Vesper; show me your scanner before you point a mining laser at anything.',
+            'Scan the asteroid first, then cut only when the deposit marker is clear.',
+            'Ore prices are soft here, but machinery shipments from Meridian are late again.',
         ],
     },
     {
@@ -254,10 +253,9 @@ const vesperPeople = [
         affiliation: 'Prospectors Guild',
         portraitSeed: 138,
         lines: [
-            'Deep signatures fluoresce after a full scan. Partial scans sell people false confidence.',
-            'The old tunnel marker still transmits. Fly through the rock crown and listen for the harmonic.',
-            'Prospector rank opens claims that independent cutters never see.',
-            'Gold hides in the last meter of a cut. Most crews clear the crust and move on; the crews that finish the seam are the ones who retire.',
+            'Ren Iverson, Prospector survey. I can mark a claim if your scan has enough detail.',
+            'Run a full scan over the rock; a partial pass will not reveal deep signatures.',
+            'A harmonic marker from the old Shardbelt tunnel is active again, near the rock crown.',
         ],
     },
     {
@@ -267,10 +265,9 @@ const vesperPeople = [
         affiliation: 'Frontier Miners Cooperative',
         portraitSeed: 147,
         lines: [
-            'Pirates call it tax. We call it theft. The distinction comes with gunfire.',
-            'A miner with an escort returns with ore. A miner without one returns as salvage.',
-            'The Cooperative remembers who answers distress calls.',
-            'The Shardbelt gold is why the lanes are watched. Cut quiet, sell far from the board, and never say what your hold is worth.',
+            'Sit down. I’m Kes Ali, and I keep the Cooperative’s people from being treated as easy salvage.',
+            'If pirates are near a claim, call for help before you start cutting; an escort is cheaper than a lost hold.',
+            'The Cooperative has logged more gold in the Shardbelt, which is why the pirate patrols are thicker.',
         ],
     },
 ];
@@ -283,9 +280,9 @@ const azurePeople = [
         affiliation: 'Azure Reach Cooperative',
         portraitSeed: 166,
         lines: [
-            'Our harvest is predictable. The transport lanes are not.',
-            'Medicine moves fastest after a storm warning. Panic is a market signal with casualties.',
-            'We trade food for machines, and machines for one more season of food.',
+            'Welcome to Azure Reach. We have food to move and too few pilots willing to take the long route.',
+            'Leave room for the return cargo; food is light, but a full hold still limits your options.',
+            'The latest harvest came in early, and Vesper’s clinics are already asking for more medicine.',
         ],
     },
     {
@@ -295,9 +292,9 @@ const azurePeople = [
         affiliation: 'Merchant Guild',
         portraitSeed: 179,
         lines: [
-            'Timed contracts pay for speed and punish improvisation.',
-            'Hyperdrive is a tool. The second it says HOSTILES, you are the pilot again.',
-            'Helix buys our protein packs by the pallet. Vesper buys them by the emergency.',
+            'Ivo Senn, courier desk. If the deadline matters, I’ll show you the route before you accept.',
+            'Express contracts pay more, but check the clock against your jump plan before you take one.',
+            'Helix is buying protein packs by the pallet, while Vesper is paying emergency prices.',
         ],
     },
     {
@@ -307,9 +304,9 @@ const azurePeople = [
         affiliation: 'Civilian Medical Service',
         portraitSeed: 191,
         lines: [
-            'A damaged freighter is a delayed shipment. A delayed medicine shipment is a body count.',
-            'The graveyard wrecks are never unclaimed. Salvage crews underestimate how many guns are watching.',
-            'Bring us recovered medical cores intact and the clinic will pay above scrap value.',
+            'I’m Dr. Soraya Ames. If you’re carrying medicine, tell me how long it has been out of the cold.',
+            'Keep medical cargo sealed and avoid unnecessary fights; a hull hit can cost the fragile-load bonus.',
+            'The clinics around Mourning Line are short on intact medical cores after the last salvage run.',
         ],
     },
 ];
@@ -325,6 +322,7 @@ const HELIOS_LOCATIONS = {
         radius: 880,
         dockRadius: 1420,
         faction: 'free-merchants',
+        guilds: ['merchant'],
         accent: '#d89a43',
         secondary: '#623b24',
         description: 'A rotating freeport built around a refinery spindle. Busy, loud, and commercially neutral.',
@@ -342,6 +340,7 @@ const HELIOS_LOCATIONS = {
         radius: 960,
         dockRadius: 1540,
         faction: 'concord',
+        guilds: ['bounty', 'merchant'],
         accent: '#7fb7ca',
         secondary: '#24444f',
         description: 'A fortified patrol station and warrant exchange guarding the outer traffic lanes.',
@@ -361,6 +360,7 @@ const HELIOS_LOCATIONS = {
         // never seen at close range.
         dockRadius: 20250,
         faction: 'frontier-miners',
+        guilds: ['mining'],
         accent: '#d77742',
         secondary: '#4f281f',
         description: 'A dry mining world of open pits, pressure domes, and hard-won industrial settlements.',
@@ -380,6 +380,7 @@ const HELIOS_LOCATIONS = {
         // never seen at close range.
         dockRadius: 22400,
         faction: 'free-merchants',
+        guilds: ['merchant'],
         accent: '#65c5b8',
         secondary: '#173d42',
         description: 'An oceanic agricultural world exporting food, biochemicals, and high-value cultured goods.',

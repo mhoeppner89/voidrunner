@@ -4,7 +4,7 @@ import { COMMODITIES, DEFAULT_NAV_LOCATION_BY_SYSTEM, DOCK_LOCATION_IDS, EQUIPME
 import { SYSTEMS, getRoute, hasSystem, jumpPiracyRisk, planRoute } from './galaxy.js';
 import { buyCommodity, cargoCapacity, cargoFree, cargoMass, denPrice, recordMarketVisit, refreshAllPrices, sellCommodity, SYNDICATE_DEN_FAVOR, tickEconomy } from './economy.js';
 import { InputManager } from './input.js';
-import { acceptMission, awardCareerProgress, completeBountyMission, completeMissionsAtDock, failExpiredMissions, joinGuild, refreshMissionOffers, VALUABLE_CARGO_LABELS, } from './missions.js';
+import { acceptMission, awardCareerProgress, completeBountyMission, completeMissionsAtDock, failExpiredMissions, failMission, joinGuild, missionTitle, refreshMissionOffers, VALUABLE_CARGO_LABELS, } from './missions.js';
 import { RACE_QUEST_ID, createRaceRacers, crossedRaceGate, generateRaceCourse, normalizeRaceRecord, raceCourseUnlocked, racePayout, raceRankLabel, raceRacerTarget, recordRaceResult, stageRaceRacers, updateRaceRacer } from './racing.js';
 import { clamp, damp, formatCredits, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
 import { EntityStore } from './entityStore.js';
@@ -6026,11 +6026,8 @@ export class GameSession {
         for (const mission of [...this.save.activeMissions]) {
             if (mission.kind !== 'smuggle')
                 continue;
-            mission.status = 'failed';
-            this.save.world.failedMissionIds.push(mission.id);
-            this.save.activeMissions = this.save.activeMissions.filter((entry) => entry.id !== mission.id);
-            this.save.player.guildRep.syndicate = Math.max(0, (this.save.player.guildRep.syndicate ?? 0) - Math.max(2, Math.floor(mission.guildRep / 2)));
-            failed.push(mission.title);
+            if (failMission(this.save, mission))
+                failed.push(missionTitle(mission));
         }
         const units = seized.reduce((sum, cargo) => sum + cargo.units, 0);
         const fine = SMUGGLE_BUST_FINE + units * SMUGGLE_BUST_PER_UNIT;
@@ -7887,8 +7884,16 @@ export class GameSession {
             this.save.player.shield -= absorbed;
             remaining -= absorbed;
         }
-        if (remaining > 0)
+        if (remaining > 0) {
             this.save.player.hull -= remaining;
+            // Fragile-cargo bonuses care about actual structural damage, not a
+            // shield hit. Record the failure on the active contract itself so
+            // an intermediate repair cannot erase what happened in transit.
+            for (const mission of this.save.activeMissions) {
+                if (mission.complication?.kind === 'fragile')
+                    mission.complication.intact = false;
+            }
+        }
         this.addPlayerEmission(Math.min(180, 22 + amount * 3.2));
         this.playerShieldDelay = 5.2;
         this.autopilot = false;
@@ -7927,11 +7932,8 @@ export class GameSession {
         for (const id of Object.keys(this.save.player.cargo)) {
             this.save.player.cargo[id] = Math.floor((this.save.player.cargo[id] ?? 0) * 0.35);
         }
-        for (const mission of this.save.activeMissions) {
-            mission.status = 'failed';
-            this.save.world.failedMissionIds.push(mission.id);
-        }
-        this.save.activeMissions = [];
+        for (const mission of [...this.save.activeMissions])
+            failMission(this.save, mission);
         this.save.player.sealedCargo = [];
         const dock = this.save.player.lastDockedAt;
         const location = LOCATIONS[dock];
@@ -7953,6 +7955,7 @@ export class GameSession {
         this.audio.setStationMode(true);
         this.ui.hideHud();
         recordMarketVisit(this.save.world, dock);
+        refreshMissionOffers(this.save);
         this.ui.showDock(this.save, dock);
         this.ui.showToast(t('Emergency tow complete. Recovery fee: {credits}.', { credits: formatCredits(loss) }), 'danger', 6500);
         this.persistSave();
@@ -10090,39 +10093,67 @@ export class GameSession {
     acceptMission(missionId) {
         const dock = this.save.player.dockedAt;
         if (!dock)
-            return;
+            return { ok: false, message: t('Dock before accepting a contract.') };
         if (missionId?.startsWith?.('race-'))
             return this.acceptRace(missionId.slice(5));
         const result = acceptMission(this.save, dock, missionId);
+        if (result.ok)
+            this.setMissionNavigation(result.mission);
         this.ui.showToast(result.message, result.ok ? 'success' : 'warning', result.ok ? 4300 : 3200);
         this.audio.play(result.ok ? 'success' : 'warning', 0.7);
         this.ui.refreshDock(this.save);
         this.persistSave();
+        return result;
+    }
+    setMissionNavigation(mission) {
+        const targetId = mission?.kind === 'mining' && mission.claimNodeId
+            ? 'shardbelt'
+            : mission?.kind === 'salvage'
+                ? (mission.targetZone ?? 'mourning-line')
+                : mission?.kind === 'bounty'
+                    ? mission.targetZone
+                    : mission?.destination;
+        return this.setDestination(targetId);
+    }
+    setDestination(targetId) {
+        const target = LOCATIONS[targetId];
+        if (!target)
+            return false;
+        if (target.systemId === this.save.player.systemId)
+            return this.setNav(targetId);
+        return this.plotSystemRoute(target.systemId, targetId);
     }
     acceptRace(courseId) {
         if (this.activeRace && this.activeRace.state !== 'finished' && this.activeRace.state !== 'failed') {
-            this.ui.showToast(t('You already have a race entry on the books.'), 'warning');
-            return;
+            const message = t('You already have a race entry on the books.');
+            this.ui.showToast(message, 'warning');
+            return { ok: false, message };
         }
         if (this.activeRace)
             this.endRaceField();
         const course = generateRaceCourse(courseId, this.save.world.seed);
-        if (!course)
-            return;
+        if (!course) {
+            const message = t('That race course is not available.');
+            this.ui.showToast(message, 'warning');
+            return { ok: false, message };
+        }
         const expectedOrigin = typeof course.origin === 'string'
             ? course.origin
             : course.origin?.id ?? (course.zone === 'shardbelt' ? 'helix' : course.zone === 'mourning-line' ? 'rook' : undefined);
         if (expectedOrigin && this.save.player.dockedAt !== expectedOrigin) {
-            this.ui.showToast(t('Race entries are accepted only at {origin}.', { origin: LOCATIONS[expectedOrigin]?.name ?? expectedOrigin.toUpperCase() }), 'warning');
-            return;
+            const message = t('Race entries are accepted only at {origin}.', { origin: LOCATIONS[expectedOrigin]?.name ?? expectedOrigin.toUpperCase() });
+            this.ui.showToast(message, 'warning');
+            return { ok: false, message };
         }
         if (typeof raceCourseUnlocked === 'function' && !raceCourseUnlocked(courseId, this.save.world.raceRecords ?? {})) {
-            this.ui.showToast(t('That course is still locked. Finish the earlier circuit first.'), 'warning');
-            return;
+            const message = t('That course is still locked. Finish the earlier circuit first.');
+            this.ui.showToast(message, 'warning');
+            return { ok: false, message };
         }
         if (this.save.player.credits < course.entryFee) {
-            this.ui.showToast(t('Not enough credits for the race entry.'), 'warning');
-            return;
+            const message = t('Not enough credits for the race entry.');
+            this.ui.showToast(message, 'warning');
+            return { ok: false, message };
         }
         const now = this.save.world.time;
         this.save.player.credits -= course.entryFee;
@@ -10155,11 +10186,18 @@ export class GameSession {
         this.renderer.clearRaceGates();
         this.renderer.syncRaceStart?.(this.raceGathering(course), 'travel');
         this.save.player.currentTargetId = this.raceGathering(course).id;
-        this.ui.showToast(t('{course} entry paid. Fly to the {zone} gathering marker.', { course: course.title, zone: LOCATIONS[course.zone].name.toUpperCase() }), 'success', 6200);
+        const message = t('{course} entry paid. Fly to the {zone} gathering marker.', { course: course.title, zone: LOCATIONS[course.zone].name.toUpperCase() });
+        this.ui.showToast(message, 'success', 6200);
         if (LOCATIONS[course.zone])
             this.save.player.navTargetId = course.zone;
         this.ui.refreshDock(this.save);
         this.persistSave();
+        return {
+            ok: true,
+            message,
+            mission: this.save.world.offers?.[this.save.player.dockedAt]?.find((offer) => offer.id === `race-${courseId}`)
+                ?? { id: `race-${courseId}`, kind: 'race', origin: expectedOrigin, destination: course.zone },
+        };
     }
     // Grid start: reuse the three racers staged at acceptance, place the player
     // in the authored gathering slot, then reveal the fixed course.
@@ -10434,11 +10472,42 @@ export class GameSession {
         return player.shipId === shipId && player.ownedShips?.length === 1;
     }
     joinGuild(guildId) {
-        const result = joinGuild(this.save, guildId);
+        const result = joinGuild(this.save, guildId, this.save.player.dockedAt);
         this.ui.showToast(result.message, result.ok ? 'success' : 'warning');
         this.audio.play(result.ok ? 'success' : 'warning', 0.7);
         this.ui.refreshDock(this.save);
         this.persistSave();
+        return result;
+    }
+    talkToNpc(personId, topicId = 'greeting') {
+        const dock = this.save.player.dockedAt;
+        const person = LOCATIONS[dock]?.people?.find((entry) => entry.id === personId);
+        if (!person)
+            return { ok: false };
+        const topic = typeof topicId === 'string' && /^[a-z-]{1,32}$/.test(topicId) ? topicId : 'greeting';
+        if (!this.save.world.npcMemory || typeof this.save.world.npcMemory !== 'object')
+            this.save.world.npcMemory = {};
+        const memory = this.save.world.npcMemory[personId] ?? { met: false, metAt: this.save.world.time, lastTalkedAt: this.save.world.time, talks: 0, topics: {} };
+        if (!memory.met) {
+            memory.met = true;
+            memory.metAt = this.save.world.time;
+        }
+        memory.lastTalkedAt = this.save.world.time;
+        memory.talks = Math.max(0, Number(memory.talks) || 0) + 1;
+        memory.topics = memory.topics && typeof memory.topics === 'object' ? memory.topics : {};
+        memory.topics[topic] = Math.max(0, Number(memory.topics[topic]) || 0) + 1;
+        memory.lastTopic = topic;
+        this.save.world.npcMemory[personId] = memory;
+        this.persistSave();
+        return { ok: true, memory };
+    }
+    acknowledgeMissionSettlements() {
+        if (!Array.isArray(this.save.world.missionSettlements) || this.save.world.missionSettlements.length === 0)
+            return false;
+        this.save.world.missionSettlements = [];
+        this.ui.refreshDock(this.save);
+        this.persistSave();
+        return true;
     }
     openMap() {
         if (this.save.player.dockedAt)
