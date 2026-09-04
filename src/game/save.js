@@ -8,9 +8,11 @@ import { getEffectiveShipStats } from './shipStats.js';
 import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, normalizeLauncherMagazines } from './weapons.js';
 import { collapseOutfittingToSingleShip, createOutfittingState, normalizeOutfitting, projectLegacyEquipment, projectLegacyWeaponId } from './outfitting.js';
 import { combinedHullIntegrity, normalizeEnergy } from './combatResources.js';
+import { normalizeQuestStates } from './quests.js';
+import { startTutorialCampaign } from './tutorialCampaign.js';
 export const SAVE_KEY = 'void-privateer-save-v1';
 export const SETTINGS_KEY = 'void-privateer-settings-v1';
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 // Test-funds build: a fresh career starts with enough credits to try any ship,
 // outfitting module or trade route without grinding first.
 export const STARTING_CREDITS = 500000;
@@ -45,7 +47,7 @@ export const defaultSettings = () => ({
     // careers migrate to German automatically.
     language: 'de',
 });
-export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0) => {
+export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0, options = {}) => {
     const now = Date.now();
     const save = {
         version: SAVE_VERSION,
@@ -169,6 +171,8 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
         settings: defaultSettings(),
     };
     normalizeLauncherMagazines(save.player, { fill: true });
+    if (options.tutorial === true)
+        startTutorialCampaign(save, save.world.time);
     refreshMissionOffers(save, true);
     return save;
 };
@@ -427,6 +431,7 @@ const normalizeMissionSettlements = (candidate) => {
             ...(typeof entry.stageLabel === 'string' && entry.stageLabel ? { stageLabel: entry.stageLabel } : {}),
             ...(Number.isFinite(Number(entry.stageIndex)) ? { stageIndex: Math.max(1, Math.floor(Number(entry.stageIndex))) } : {}),
             outcome: entry.outcome === 'failed' ? 'failed' : 'completed',
+            ...(entry.outcome === 'failed' && entry.reason === 'discarded' ? { reason: 'discarded' } : {}),
             guild: typeof entry.guild === 'string' ? entry.guild : 'merchant',
             faction: typeof entry.faction === 'string' ? entry.faction : 'free-merchants',
             reward: number('reward'),
@@ -525,7 +530,7 @@ export const hydrateSave = (candidate) => {
             scannedNodes: candidate.world?.scannedNodes ?? [],
         },
         activeMissions: candidate.activeMissions ?? [],
-        quests: candidate.quests ?? [],
+        quests: normalizeQuestStates(candidate.quests),
     };
     // Optional fields are omitted by JSON.stringify. Preserve an undocked flight
     // state instead of inheriting the fallback save's starting dock.

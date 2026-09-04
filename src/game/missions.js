@@ -6,6 +6,7 @@ import { rollPilot, TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 import { t } from './i18n.js';
 import { RACE_COURSES, raceBriefingLine, raceOffersForLocation, raceCourseUnlocked, normalizeRaceRecord } from './racing.js';
 import { LOCAL_CONTRACT_CHAIN_IDS, findNextLocalContractStage, localContractToMissionOffer } from './localContracts.js';
+import { tutorialContentUnlocked } from './tutorialCampaign.js';
 const GUILD_NAMES_FALLBACK = (guild) => guild === 'merchant' ? 'Merchant Guild' : guild === 'bounty' ? 'Bounty Registry' : guild === 'mining' ? 'Prospectors Guild' : guild === 'syndicate' ? 'Red Talon Syndicate' : 'Salvage Union';
 const merchantIssuers = ['Kestrel Freight', 'Orison Combine', 'Free Haulers Desk', 'Sable Route Logistics', 'Guild Dispatch'];
 const bountyIssuers = ['Concord Warrant Desk', 'Frontier Security Office', 'Bounty Hunters Registry', 'Civil Claims Bureau'];
@@ -141,6 +142,8 @@ const wreckNodeForSave = (save, nodeId) => generateWreckNodes(save.world.seed, s
     .find((node) => node.id === nodeId);
 const withAuthoredLocalOffer = (offers, locationId, save) => {
     const ordinaryOffers = offers.filter((offer) => !offer.authored);
+    if (!tutorialContentUnlocked(save))
+        return ordinaryOffers;
     const activeIds = new Set(save.activeMissions.map((mission) => mission.id));
     const localOffers = LOCAL_CONTRACT_CHAIN_IDS.flatMap((chainId) => {
         const stage = findNextLocalContractStage(chainId, save.world.localContractProgress);
@@ -719,7 +722,7 @@ export const completeBountyMission = (save, missionId) => {
         mission,
     };
 };
-export const failMission = (save, mission) => {
+export const failMission = (save, mission, options = {}) => {
     const active = save.activeMissions.some((entry) => entry.id === mission?.id);
     if (!mission || !active)
         return undefined;
@@ -752,6 +755,7 @@ export const failMission = (save, mission) => {
         stageIndex: mission.stageIndex,
         issuer: mission.issuer,
         outcome: 'failed',
+        ...(options.reason === 'discarded' ? { reason: 'discarded' } : {}),
         guild: mission.guild,
         faction: mission.faction,
         reward: 0,
@@ -763,6 +767,22 @@ export const failMission = (save, mission) => {
         at: save.world.time,
     });
     return t('Contract failed: {title}', { title: missionTitle(mission) });
+};
+export const discardMission = (save, missionId) => {
+    const mission = save.activeMissions.find((entry) => entry.id === missionId);
+    if (!mission)
+        return { ok: false, message: t('That active contract could not be found.') };
+    if (mission.authored || mission.chainId)
+        return { ok: false, message: t('Story contracts cannot be discarded.') };
+    if (mission.kind === 'race')
+        return { ok: false, message: t('Race entries cannot be discarded here.') };
+    if (!failMission(save, mission, { reason: 'discarded' }))
+        return { ok: false, message: t('That active contract could not be found.') };
+    return {
+        ok: true,
+        message: t('Contract discarded: {title}. The bond is lost and standing falls.', { title: missionTitle(mission) }),
+        mission,
+    };
 };
 export const failExpiredMissions = (save) => {
     const messages = [];

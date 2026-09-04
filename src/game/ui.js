@@ -11,6 +11,7 @@ import { getLanguage, t } from './i18n.js';
 import { HULL_TRADE_IN_RATE, quoteShipTrade } from './shipTrade.js';
 import { HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RATE, itemAvailable, itemFitsMount, loadoutFor, outfittingUsage, quoteOutfitting } from './outfitting.js';
 import { guildJoinCost, missionBriefing, missionTitle } from './missions.js';
+import { tutorialCampaignSummary, tutorialDialogue } from './tutorialCampaign.js';
 const escapeHtml = (value) => value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const percent = (value, max) => (max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100)));
 // Every dock screen resolves through one explicit art record. This keeps minor
@@ -115,6 +116,7 @@ const NPC_PORTRAIT_BY_ID = Object.freeze({
     'pavel-orn': './art/portraits/v3/pavel-orn-hd-v1.webp',
     'tessa-rye': './art/portraits/v3/tessa-rye-hd-v1.webp',
     'soren-vek': './art/portraits/v3/soren-vek-hd-v1.webp',
+    'rin-vek': './art/portraits/v3/rin-vek-hd-v1.webp',
     'aya-north': './art/portraits/v3/aya-north-hd-v1.webp',
     'halden-ree': './art/portraits/v3/halden-ree-hd-v1.webp',
 });
@@ -311,7 +313,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.7.50';
+const GAME_VERSION = '0.8.0';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -472,6 +474,8 @@ export class GameUI {
     dialogueTopic = 'greeting';
     missionBoardTab = 'available';
     missionSelectedId;
+    missionDiscardId;
+    tutorialSkipConfirm = false;
     missionMobileDetail = false;
     titleVisible = true;
     hasCareerSave = false;
@@ -667,6 +671,8 @@ export class GameUI {
             if (portrait)
                 urls.push(portrait);
         }
+        if (tutorialCampaignSummary(this.save)?.active)
+            urls.push(NPC_PORTRAIT_BY_ID['rin-vek']);
         if (hasLocationService(locationId, 'market'))
             urls.push(...Object.values(COMMODITIES).map((commodity) => commodity.image));
         if (hasLocationService(locationId, 'outfitting')) {
@@ -856,7 +862,7 @@ export class GameUI {
     `;
     }
     bindStaticEvents() {
-        const delegatedActionSelector = '[data-ui-command], [data-map-view], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-commodity-id], [data-market-qty], [data-bar-panel], [data-dialogue-topic], [data-dialogue-action], [data-mission-board-tab], [data-mission-select], [data-mission-course], [data-nav-id], [data-trade], [data-jettison], [data-mission-id], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action], [data-equipment-id], [data-ship-id], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty], [data-pay-mug]';
+        const delegatedActionSelector = '[data-ui-command], [data-tutorial-action], [data-tutorial-choice], [data-map-view], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-commodity-id], [data-market-qty], [data-bar-panel], [data-dialogue-topic], [data-dialogue-action], [data-mission-board-tab], [data-mission-select], [data-mission-course], [data-mission-discard], [data-mission-discard-confirm], [data-nav-id], [data-trade], [data-jettison], [data-mission-id], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action], [data-equipment-id], [data-ship-id], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty], [data-pay-mug]';
         const directPointerElement = (event) => {
             const correctedSceneControl = event.pointerType !== 'mouse' && event.target instanceof Element
                 ? event.target.closest('.scene-pointer')
@@ -951,6 +957,13 @@ export class GameUI {
                 return;
             if (target.dataset.uiCommand)
                 this.handleCommand(target.dataset.uiCommand, target);
+            else if (target.dataset.tutorialAction)
+                this.handleTutorialAction(target.dataset.tutorialAction);
+            else if (target.dataset.tutorialChoice) {
+                const result = this.actions?.chooseTutorial?.(target.dataset.tutorialChoice);
+                if (result?.changed)
+                    this.renderDock();
+            }
             else if (target.dataset.mapView)
                 this.setMapView(target.dataset.mapView);
             else if (target.dataset.arenaEnv) {
@@ -985,6 +998,24 @@ export class GameUI {
                 this.setMissionBoardTab(target.dataset.missionBoardTab);
             else if (target.dataset.missionSelect)
                 this.selectMission(target.dataset.missionSelect);
+            else if (target.dataset.missionDiscardConfirm) {
+                const missionId = target.dataset.missionDiscardConfirm;
+                this.missionDiscardId = undefined;
+                this.missionSelectedId = undefined;
+                this.missionMobileDetail = false;
+                const result = this.actions?.discardMission?.(missionId);
+                if (!result?.ok)
+                    this.renderDock();
+            }
+            else if (target.dataset.missionDiscard) {
+                const missionId = target.dataset.missionDiscard;
+                const mission = this.save.activeMissions.find((entry) => entry.id === missionId);
+                if (!mission || mission.authored || mission.chainId || mission.kind === 'race')
+                    return;
+                this.missionDiscardId = missionId;
+                this.renderDock();
+                this.root.querySelector('[data-ui-command="mission-discard-cancel"]')?.focus();
+            }
             else if (target.dataset.missionCourse) {
                 const destinationId = target.dataset.missionCourse;
                 if (this.actions?.setDestination?.(destinationId))
@@ -1168,12 +1199,30 @@ export class GameUI {
         this.root.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter' && event.key !== ' ')
                 return;
-            const target = event.target.closest('[data-ui-command], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-dialogue-topic], [data-dialogue-action], [data-mission-board-tab], [data-mission-select], [data-mission-course], [data-mission-id], [data-guild-id], [data-person-id], [data-ship-detail], [data-ship-detail-back], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action]');
+            const target = event.target.closest('[data-ui-command], [data-tutorial-action], [data-tutorial-choice], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-dialogue-topic], [data-dialogue-action], [data-mission-board-tab], [data-mission-select], [data-mission-course], [data-mission-discard], [data-mission-discard-confirm], [data-mission-id], [data-guild-id], [data-person-id], [data-ship-detail], [data-ship-detail-back], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action]');
             if (!target)
                 return;
             event.preventDefault();
             target.click();
         });
+    }
+    handleTutorialAction(action) {
+        if (action === 'skip') {
+            this.tutorialSkipConfirm = true;
+        }
+        else if (action === 'cancel-skip') {
+            this.tutorialSkipConfirm = false;
+        }
+        else if (action === 'confirm-skip') {
+            this.tutorialSkipConfirm = false;
+            this.actions?.skipTutorial?.();
+        }
+        if (this.dockLocation)
+            this.renderDock();
+        else if (!this.root.querySelector('#ship-panel')?.classList.contains('is-hidden'))
+            this.showShipMenu();
+        if (action === 'skip')
+            this.root.querySelector('[data-tutorial-action="cancel-skip"]')?.focus();
     }
     handleCommand(command, element) {
         switch (command) {
@@ -1278,6 +1327,7 @@ export class GameUI {
                 this.barPanel = 'people';
                 this.barPersonId = undefined;
                 this.dialogueTopic = 'greeting';
+                this.missionDiscardId = undefined;
                 this.renderDock();
                 break;
             case 'bar-scene':
@@ -1286,11 +1336,22 @@ export class GameUI {
                 this.barPanel = 'people';
                 this.barPersonId = undefined;
                 this.dialogueTopic = 'greeting';
+                this.missionDiscardId = undefined;
                 this.renderDock();
                 break;
             case 'mission-list':
+                this.missionDiscardId = undefined;
                 this.missionMobileDetail = false;
                 this.renderDock();
+                break;
+            case 'mission-discard-cancel':
+                {
+                    const missionId = this.missionDiscardId;
+                    this.missionDiscardId = undefined;
+                    this.renderDock();
+                    if (missionId)
+                        this.root.querySelector(`[data-mission-discard="${missionId}"]`)?.focus();
+                }
                 break;
             case 'market-overview':
                 this.dockTab = 'market';
@@ -1353,6 +1414,8 @@ export class GameUI {
         this.dialogueTopic = 'greeting';
         this.missionBoardTab = 'available';
         this.missionSelectedId = undefined;
+        this.missionDiscardId = undefined;
+        this.tutorialSkipConfirm = false;
         this.missionMobileDetail = false;
         this.hideTitle();
         this.hideHud();
@@ -1448,6 +1511,7 @@ export class GameUI {
                 ? 'market'
                 : 'concourse';
         const terminal = this.dockTerminal ? this.renderDockTab(this.dockTerminal) : '';
+        const notices = `${this.renderDockNotice()}${this.renderTutorialNotice()}`;
         dock.innerHTML = `
       <div class="dock-backdrop">${this.locationIllustration(this.dockLocation, illustrationScreen)}</div>
       <div class="dock-scanlines" aria-hidden="true"></div>        <header class="dock-header">
@@ -1455,10 +1519,11 @@ export class GameUI {
         ${this.dockTerminal !== 'concourse' ? `<div class="dock-back-button dock-pointer" data-ui-command="dock-concourse" role="button" tabindex="0" aria-label="${t('Return to the concourse')}">${t('◀ CONCOURSE')}</div>` : ''}
         <div class="dock-wallet-unit"><div class="dock-wallet"><span>${t('AVAILABLE CREDIT')}</span><strong>${formatCredits(this.save.player.credits)}</strong><small>${SHIPS[this.save.player.shipId].name} · ${cargoMass(this.save.player).toFixed(1)}/${cargoCapacity(this.save.player)} mass</small></div><button class="dock-options-button dock-pointer" data-ui-command="options" role="button" tabindex="0" aria-label="${t('Options')}">⚙</button></div>
       </header>
-      ${this.renderDockNotice()}
+      ${notices ? `<div class="dock-notice-stack">${notices}</div>` : ''}
       <div class="dock-content">${terminal}</div>
       ${this.renderSyndicateCard()}
       ${this.renderMissionSettlements()}
+      ${this.renderTutorialChoice()}
     `;
         const content = dock.querySelector('.dock-content');
         const preserveScroll = prevTab === this.dockTab
@@ -1492,6 +1557,59 @@ export class GameUI {
       <div class="dock-notice syndicate-notice">
         <b>${t('SYNDICATE BERTH · {credits} PAID', { credits: formatCredits(arrival.fee) })}</b>
         <span>${t('This dock did not report your arrival. Ledger: {credits} paid to date', { credits: formatCredits(paidHere) })}${denReady ? t(' — the smuggler\'s den is open to you.') : t(' — {credits} more buys the den.', { credits: formatCredits(SYNDICATE_DEN_FAVOR - paidHere) })}</span>
+      </div>`;
+    }
+    tutorialSkipControl() {
+        if (!this.tutorialSkipConfirm)
+            return `<button type="button" class="tutorial-skip" data-tutorial-action="skip">${t('SKIP TUTORIAL')}</button>`;
+        return `<div class="tutorial-skip-confirm" role="alert"><span>${t('Skip the family prologue? You can continue the career, but this story cannot be replayed in the current save.')}</span><button type="button" data-tutorial-action="cancel-skip">${t('KEEP PLAYING')}</button><button type="button" class="is-danger" data-tutorial-action="confirm-skip">${t('SKIP PROLOGUE')}</button></div>`;
+    }
+    renderTutorialNotice() {
+        const campaign = tutorialCampaignSummary(this.save);
+        if (!campaign?.active)
+            return '';
+        let action = '';
+        if (campaign.stepId === 'meet-family' && this.dockLocation === 'helix')
+            action = `<button type="button" data-dock-hotspot="bar">${t('OPEN BAR')}</button>`;
+        else if ((campaign.stepId === 'buy-supplies' && this.dockLocation === 'helix')
+            || (campaign.stepId === 'sell-supplies' && this.dockLocation === 'vesper'))
+            action = `<button type="button" data-market-point="commodities">${t('OPEN MARKET')}</button>`;
+        else if (campaign.stepId !== 'family-choice')
+            action = `<button type="button" data-ui-command="launch">${t('LAUNCH')}</button>`;
+        return `
+      <aside class="tutorial-dock-notice" aria-label="${t('Family prologue objective')}">
+        ${this.portraitImage('rin-vek', 'Rin Vek')}
+        <div class="tutorial-notice-copy">
+          <span>${t(campaign.label)} · ${t('CHAPTER {chapter}/{count}', { chapter: campaign.chapter, count: campaign.chapterCount })}</span>
+          <b>${escapeHtml(t(campaign.chapterTitle))}</b>
+          <p>${escapeHtml(t(campaign.objective))}${campaign.progress ? ` <em>${escapeHtml(campaign.progress)}</em>` : ''}</p>
+        </div>
+        ${this.tutorialSkipConfirm ? this.tutorialSkipControl() : `<div class="tutorial-notice-actions">${action}${this.tutorialSkipControl()}</div>`}
+      </aside>`;
+    }
+    renderTutorialChoice() {
+        const campaign = tutorialCampaignSummary(this.save);
+        if (!campaign?.active || campaign.stepId !== 'family-choice' || this.dockLocation !== 'cairn')
+            return '';
+        const choices = [
+            ['tell-mara', 'Mara gets the truth.', 'No more family secrets. You and Rin tell her together.'],
+            ['trust-rin', 'I trust you—for now.', 'Keep the recorder between you until Meridian gives you proof.'],
+            ['keep-recorder', 'I keep the recorder.', 'You carry the evidence and decide what happens after Meridian.'],
+        ];
+        return `
+      <div class="tutorial-choice" role="dialog" aria-modal="true" aria-label="${t('A family decision')}">
+        <section class="tutorial-choice-panel">
+          ${this.portraitImage('rin-vek', 'Rin Vek')}
+          <div class="tutorial-choice-copy">
+            <span>${t('CAIRN YARD · FAMILY CHANNEL')}</span>
+            <h3>${t('What the wreck kept')}</h3>
+            <p>“${t('Our mother broke formation to pull me out. The carrier behind us never reached the gate. They changed the evacuation ledger. I let Mara believe it because I was afraid she would blame me.')}”</p>
+            <small>${t('This changes how your family responds later. It does not label the choice as right or wrong.')}</small>
+          </div>
+          <div class="tutorial-choice-actions">
+            ${choices.map(([id, label, detail]) => `<button type="button" data-tutorial-choice="${id}"><b>${t(label)}</b><span>${t(detail)}</span></button>`).join('')}
+          </div>
+        </section>
       </div>`;
     }
     // The local syndicate's ledger at this dock has crossed the favor line:
@@ -1533,16 +1651,20 @@ export class GameUI {
             return '';
         const paid = settlements.reduce((sum, entry) => sum + Math.max(0, Number(entry.total) || 0), 0);
         const completed = settlements.filter((entry) => entry.outcome === 'completed').length;
-        const failed = settlements.length - completed;
+        const discarded = settlements.filter((entry) => entry.reason === 'discarded').length;
+        const failed = settlements.length - completed - discarded;
+        const settlementSummary = discarded
+            ? t('{completed} completed · {failed} failed · {discarded} discarded', { completed, failed, discarded })
+            : t('{completed} completed · {failed} failed', { completed, failed });
         return `
       <div class="mission-settlement" role="dialog" aria-modal="true" aria-label="${t('Contract settlement')}">
         <div class="mission-settlement-panel">
           <span class="eyebrow">${t('DOCKSIDE ACCOUNTING')}</span>
-          <header><div><h3>${t('Contract settlement')}</h3><p>${t('{completed} completed · {failed} failed', { completed, failed })}</p></div><strong>${formatCredits(paid)}</strong></header>
+          <header><div><h3>${t('Contract settlement')}</h3><p>${settlementSummary}</p></div><strong>${formatCredits(paid)}</strong></header>
           <div class="mission-settlement-list">
             ${settlements.map((entry) => `
               <article class="${entry.outcome === 'failed' ? 'is-failed' : 'is-complete'}">
-                <div><span>${entry.outcome === 'failed' ? t('CONTRACT FAILED') : t('CONTRACT COMPLETE')}</span><b>${escapeHtml(missionTitle(entry))}</b><small>${escapeHtml(entry.authored && entry.chainLabel && entry.stageLabel
+                <div><span>${entry.reason === 'discarded' ? t('CONTRACT DISCARDED') : entry.outcome === 'failed' ? t('CONTRACT FAILED') : t('CONTRACT COMPLETE')}</span><b>${escapeHtml(missionTitle(entry))}</b><small>${escapeHtml(entry.authored && entry.chainLabel && entry.stageLabel
                     ? `${t(entry.chainLabel)} · ${t(entry.stageLabel)} · ${t(entry.issuer ?? GUILD_NAMES[entry.guild] ?? 'Local contract desk')}`
                     : t(entry.issuer ?? GUILD_NAMES[entry.guild] ?? 'Local contract desk'))}</small></div>
                 <dl>
@@ -1677,6 +1799,7 @@ export class GameUI {
     switchToTerminal(tab, panel = 'people') {
         this.dockTab = tab;
         this.dockTerminal = tab;
+        this.missionDiscardId = undefined;
         if (tab === 'bar') {
             this.barPanel = panel;
             this.barPersonId = undefined;
@@ -1805,6 +1928,9 @@ export class GameUI {
             };
         }
         if (topicId === 'greeting') {
+            const campaignLine = tutorialDialogue(this.save, person.id);
+            if (campaignLine)
+                return { text: t(campaignLine) };
             const damaged = this.save.player.hull < getEffectiveShipStats(this.save.player).hull * 0.55;
             if (damaged && /mechanic|shipwright|engineer/i.test(person.role))
                 return { text: t('That hull has had a hard run. I would inspect the pressure structure before taking another contract.') };
@@ -1833,6 +1959,7 @@ export class GameUI {
             this.barPanel = 'missions';
             this.missionBoardTab = this.save.activeMissions.length ? 'active' : 'available';
             this.missionSelectedId = undefined;
+            this.missionDiscardId = undefined;
             this.missionMobileDetail = false;
             this.renderDock();
         }
@@ -2243,6 +2370,7 @@ export class GameUI {
             return;
         this.missionBoardTab = tab;
         this.missionSelectedId = undefined;
+        this.missionDiscardId = undefined;
         this.missionMobileDetail = false;
         this.renderDock();
     }
@@ -2251,6 +2379,7 @@ export class GameUI {
         if (!source.some((mission) => mission.id === missionId))
             return;
         this.missionSelectedId = missionId;
+        this.missionDiscardId = undefined;
         this.missionMobileDetail = true;
         this.renderDock();
     }
@@ -2271,6 +2400,12 @@ export class GameUI {
         const risk = this.missionRisk(mission);
         const eligibility = this.missionEligibility(mission);
         const active = this.missionBoardTab === 'active' || mission.active;
+        const discardable = active
+            && !mission.authored
+            && !mission.chainId
+            && mission.kind !== 'race'
+            && this.save.activeMissions.some((entry) => entry.id === mission.id);
+        const confirmingDiscard = discardable && this.missionDiscardId === mission.id;
         const complication = mission.complication;
         const complicationLost = complication?.kind === 'fragile' && complication.intact === false;
         const complicationTime = complication?.kind === 'early' ? formatDuration(complication.bonusDeadline - this.save.world.time) : undefined;
@@ -2293,9 +2428,11 @@ export class GameUI {
           ${complication ? `<section class="mission-complication ${complicationLost ? 'is-lost' : ''}"><span>${complication.kind === 'fragile' ? t('FRAGILE LOAD') : t('EARLY DELIVERY BONUS')}</span><b>${complicationLost ? t('BONUS LOST') : `+${formatCredits(complication.bonus)}`}</b><p>${complication.kind === 'fragile' ? t('Keep structural damage at zero after acceptance.') : t('Deliver within {time} to earn the bonus.', { time: complicationTime })}</p></section>` : ''}
           <section class="mission-objective"><span>${active ? t('CURRENT OBJECTIVE') : t('CONTRACT SUMMARY')}</span><b>${escapeHtml(this.missionProgress(mission))}</b></section>
           ${!active && eligibility.issues.length ? `<ul class="mission-blockers">${eligibility.issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join('')}</ul>` : ''}
-          <footer class="mission-dossier-actions">
+          <footer class="mission-dossier-actions ${discardable ? 'has-discard' : ''}">
             ${active ? `<button type="button" class="primary" data-mission-course="${route.targetId}" ${route.targetId ? '' : 'disabled'}>${t('SET COURSE')}</button>` : `<button type="button" class="primary" data-mission-id="${mission.id}" ${eligibility.ok ? '' : 'disabled'}>${mission.locked ? t('COURSE LOCKED') : t('ACCEPT & SET COURSE')}</button>`}
+            ${discardable ? `<button type="button" class="mission-discard-action" data-mission-discard="${mission.id}" aria-expanded="${confirmingDiscard}">${t('DISCARD CONTRACT')}</button>` : ''}
             <small>${active ? t('Navigation will follow the next required destination.') : t('Acceptance reserves the bond and any sealed cargo space.')}</small>
+            ${confirmingDiscard ? `<div class="mission-discard-confirm" role="alert"><p>${t('Discard this contract? The bond stays lost, reserved mission cargo is removed, and guild and faction standing fall.')}</p><button type="button" data-ui-command="mission-discard-cancel">${t('KEEP CONTRACT')}</button><button type="button" class="mission-discard-final" data-mission-discard-confirm="${mission.id}">${t('CONFIRM DISCARD')}</button></div>` : ''}
           </footer>
         </article>`;
     }
@@ -4065,6 +4202,23 @@ export class GameUI {
         this.root.querySelector('#map-panel')?.classList.add('is-hidden');
         this.updateOrientationNotice();
     }
+    renderShipTutorial() {
+        const campaign = tutorialCampaignSummary(this.save);
+        if (!campaign?.active)
+            return '';
+        const chapters = Array.from({ length: campaign.chapterCount }, (_, index) => {
+            const chapter = index + 1;
+            return `<i class="${chapter < campaign.chapter ? 'is-done' : chapter === campaign.chapter ? 'is-current' : ''}" aria-label="${t('Chapter {chapter}', { chapter })}">${String(chapter).padStart(2, '0')}</i>`;
+        }).join('');
+        return `
+          <section class="ship-menu-tutorial">
+            <header><div><span>${t(campaign.label)}</span><h3>${escapeHtml(t(campaign.chapterTitle))}</h3></div><b>${t('CHAPTER {chapter}/{count}', { chapter: campaign.chapter, count: campaign.chapterCount })}</b></header>
+            <div class="tutorial-chapter-track">${chapters}</div>
+            <strong>${escapeHtml(t(campaign.objective))}${campaign.progress ? ` · ${escapeHtml(campaign.progress)}` : ''}</strong>
+            <p>${escapeHtml(t(campaign.detail))}</p>
+            ${this.tutorialSkipControl()}
+          </section>`;
+    }
     showShipMenu() {
         if (!this.save)
             return;
@@ -4139,10 +4293,12 @@ export class GameUI {
         const launcherRows = launcherMagazineEntries(player).map((entry) => (
             `<div class="weapon-row launcher-row${entry.selected ? ' is-active' : ''}"><span>${entry.selected ? '▸ ' : ''}${escapeHtml(t(entry.launcher.nameKey))}</span><small>${escapeHtml(t(entry.launcher.ordnanceNameKey))} · ${t('MOUNT {number}', { number: entry.index + 1 })}</small><em>${entry.rounds}/${entry.capacity}</em></div>`
         )).join('') || `<div class="weapon-row is-locked"><span>${t('LAUNCHER')}</span><small>${t('NOT INSTALLED')}</small><em>0/0</em></div>`;
+        const tutorialSection = this.renderShipTutorial();
         panel.innerHTML = `
       <div class="modal-card ship-card">
         <header><div><span class="eyebrow">${t('SHIP STATUS / PAUSED')}</span><h2>${escapeHtml(ship?.name ?? 'VOIDRUNNER')}</h2></div><button data-ui-command="close-ship">${t('CLOSE')}</button></header>
         <div class="pause-grid ship-menu-grid">
+          ${tutorialSection}
           <section class="ship-menu-missions"><h3>${t('ACTIVE CONTRACTS · {count}/6', { count: missions.length })}</h3>${missionRows}</section>
           <section class="ship-menu-cargo"><h3>${t('CARGO HOLD · {mass}/{capacity} MASS ({percent}%)', { mass: mass.toFixed(1), capacity, percent: loadPercent })}</h3>${cargoRows}</section>
           <section class="ship-menu-weapons"><h3>${t('WEAPON SYSTEMS')}</h3>${weaponRows}${launcherRows}</section>

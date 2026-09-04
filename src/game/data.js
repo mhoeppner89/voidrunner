@@ -160,12 +160,24 @@ const helixPeople = [
         name: 'Mara Vek',
         role: 'Bartender and rumor broker',
         marketTipster: true,
-        affiliation: 'Independent',
+        affiliation: 'Vek family',
         portraitSeed: 12,
         lines: [
             'You made it to Helix. What are you looking for: a drink, a lead, or a quiet berth?',
             'Keep your transponder on near Rookhaven unless you have a reason to invite an inspection.',
             'Three crews are claiming the same Shardbelt rock, and pirates are already watching the approach.',
+        ],
+    },
+    {
+        id: 'rin-vek',
+        name: 'Rin Vek',
+        role: 'Independent pilot',
+        affiliation: 'Vek family',
+        portraitSeed: 18,
+        lines: [
+            'You finally have the spare key. I will take the Second Light and stay close until the Wayfarer feels like yours.',
+            'Use the target monitor for the next contact and the navigation map for the route. I will keep off your firing line.',
+            'Mara calls this a delivery run. She is not wrong, but she is not telling you why I chose the route.',
         ],
     },
     {

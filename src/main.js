@@ -3,6 +3,7 @@ import { createNewSave, defaultSettings, loadGame, loadSettingsPreferences, save
 import { DOCK_LOCATION_IDS, LOCATIONS, SHIPS } from './game/data.js';
 import { getLanguage, setLanguage, t } from './game/i18n.js';
 import { GameUI } from './game/ui.js';
+import { tutorialCampaignSummary } from './game/tutorialCampaign.js';
 const host = document.querySelector('#app');
 if (!host)
     throw new Error('Missing #app host element.');
@@ -37,6 +38,7 @@ const showTitleScreen = () => {
     ui.showTitle(Boolean(cachedSave), titleSave());
 };
 const devPreviewParams = new URLSearchParams(location.search);
+const startupProbe = devPreviewParams.has('startup-probe');
 const vesperHoverPreview = devPreviewParams.get('vesper-hover') === '1';
 const devAutoStart = devPreviewParams.get('dev-autostart') === '1';
 const debrisCollisionTest = devPreviewParams.get('test') === 'debris-collision';
@@ -72,21 +74,26 @@ const warmLikelyFlightAssets = async () => {
     const warmSave = cachedSave ?? { player: { shipId: 'wayfarer', dockedAt: 'helix', navTargetId: 'shardbelt' } };
     const shipId = warmSave.player?.shipId && SHIP_WARM_ASSETS[warmSave.player.shipId] ? warmSave.player.shipId : 'wayfarer';
     const [model] = SHIP_WARM_ASSETS[shipId];
+    // Warm only what the next screen can display. Importing the flight runtime
+    // here also parses the multi-megabyte graveyard collision profile while
+    // the player is still on the title screen.
     await Promise.allSettled([
         warmBinary(model),
         ui.preloadSessionAssets(warmSave, { priority: 'low' }),
-        loadGameSession(),
     ]);
 };
 const scheduleLikelyFlightWarmup = () => {
     requestAnimationFrame(() => requestAnimationFrame(() => {
-        // Protect the title's first paint, then start low-priority work as soon
-        // as the browser has an idle slice. A short timeout prevents a busy
-        // title animation from postponing the warm-up until after Start.
-        if (typeof requestIdleCallback === 'function')
-            requestIdleCallback(() => void warmLikelyFlightAssets(), { timeout: 750 });
-        else
-            window.setTimeout(() => void warmLikelyFlightAssets(), 80);
+        // Give the title and its controls the network for their first half
+        // second, then use an idle slice for the larger station-art bundle.
+        // A human still gets predictive loading almost immediately, while a
+        // quick reload or immediate Start cannot strand dozens of image reads.
+        window.setTimeout(() => {
+            if (typeof requestIdleCallback === 'function')
+                requestIdleCallback(() => void warmLikelyFlightAssets(), { timeout: 750 });
+            else
+                void warmLikelyFlightAssets();
+        }, 600);
     }));
 };
 // Tilt state shared with the title screen, where no session (and no
@@ -160,7 +167,7 @@ const beginSession = (mode, arena) => {
     session = undefined;
     previousSession?.dispose();
     ui.clearToasts();
-    const save = mode === 'new' || mode === 'arena' ? createNewSave() : loadGame();
+    const save = mode === 'new' || mode === 'arena' ? createNewSave(undefined, { tutorial: mode === 'new' }) : loadGame();
     if (!save) {
         ui.showToast(t('No autosave was found.'), 'warning');
         ui.showTitle(false, titleSave());
@@ -342,6 +349,9 @@ const actions = {
     patrolReply: () => session?.patrolReply(),
     paySyndicateBerth: () => session?.paySyndicateBerth(),
     acceptMission: (missionId) => session?.acceptMission(missionId),
+    discardMission: (missionId) => session?.discardMission(missionId),
+    skipTutorial: () => session?.skipTutorial(),
+    chooseTutorial: (choiceId) => session?.chooseTutorial(choiceId),
     talkToNpc: (personId, topicId) => session?.talkToNpc(personId, topicId),
     acknowledgeMissionSettlements: () => session?.acknowledgeMissionSettlements(),
     repair: () => session?.repair(),
@@ -458,7 +468,10 @@ document.addEventListener('visibilitychange', () => {
     }
 });
 const isProductionBuild = import.meta.env?.PROD ?? location.protocol !== 'file:';
-if ('serviceWorker' in navigator && isProductionBuild) {
+// The startup matrix performs several deliberate full navigations in one
+// fresh profile. Do not let a background first-install cache race those page
+// loads; ordinary development and production URLs still register normally.
+if ('serviceWorker' in navigator && isProductionBuild && !startupProbe) {
     // Register the worker for offline/asset caching. A new deploy's worker
     // takes over on the NEXT full page load (skipWaiting + clients.claim),
     // never by force-reloading the running page — that surprise reload was
@@ -483,6 +496,7 @@ window.__VOID_PRIVATEER__ = {
     // Mock story-mission line: pins the comms bar in amber, mutes all chatter
     // until dismissed (tap the CONTINUE bar) or the duration elapses.
     playStoryLine: (name, text) => session?.playStoryLine(name, text),
+    tutorialEvent: (type, payload = {}) => session?.handleTutorialEvent(type, payload),
 };
 
 // Small, stable browser-game hooks for the shared Playwright development
@@ -501,6 +515,7 @@ window.render_game_to_text = () => {
         testMode: runtime?.arena?.testMode ?? null,
         coordinates: 'world [x,y,z]; +y is up; ship forward is local -z',
         player: {
+            credits: save.player.credits,
             systemId: save.player.systemId,
             position: save.player.position.map((value) => Math.round(value * 10) / 10),
             velocity: save.player.velocity.map((value) => Math.round(value * 10) / 10),
@@ -526,6 +541,7 @@ window.render_game_to_text = () => {
             plannedDestinationId: save.world.plannedDestinationId ?? null,
             pendingJump: save.world.pendingJump ?? null,
         },
+        tutorial: tutorialCampaignSummary(save) ?? null,
         stealth: runtime ? {
             identityBroadcasting: runtime.playerIdentityBroadcasting(),
             physicalSignatureRange: Math.round(physicalSignatureRange),
@@ -558,6 +574,7 @@ window.render_game_to_text = () => {
             dialogueTopic: runtime?.ui?.dialogueTopic ?? null,
             missionTab: runtime?.ui?.missionBoardTab ?? null,
             selectedMissionId: runtime?.ui?.missionSelectedId ?? null,
+            discardConfirmationId: runtime?.ui?.missionDiscardId ?? null,
             mobileDetail: Boolean(runtime?.ui?.missionMobileDetail),
             localGuildIds: LOCATIONS[save.player.dockedAt]?.guilds ?? [],
             npcMemory: runtime?.ui?.barPersonId ? save.world.npcMemory?.[runtime.ui.barPersonId] ?? null : null,

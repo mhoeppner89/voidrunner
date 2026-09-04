@@ -225,6 +225,37 @@ assert.deepEqual(normalizedCollections.world.localContractProgress, {
     'quiet-signal': 99,
 });
 
+// Quest hydration keeps the existing race split array as well as tutorial
+// flags, while dropping malformed nested payloads and duplicate ids.
+const normalizedQuests = hydrateSave({
+    version: SAVE_VERSION,
+    player: canonicalPlayer(),
+    world: { seed: 12021 },
+    quests: [
+        {
+            id: 'trial-by-fire',
+            stepId: 'complete',
+            flags: { finishTime: 52.4, rank: 2, splits: [12.1, 28.6, 52.4], invalid: { nested: true } },
+            choices: {},
+            startedAt: 2,
+            completedAt: 55,
+        },
+        {
+            id: 'the-spare-key',
+            stepId: 'buy-supplies',
+            flags: { metMara: true, metRin: true, suppliesBought: 1 },
+            choices: { recorder: 'trust-rin', invalid: 4 },
+            startedAt: 0,
+        },
+        { id: 'the-spare-key', stepId: 'duplicate', flags: {}, choices: {}, startedAt: 9 },
+        { id: 'INVALID ID', stepId: 'intro', flags: {}, choices: {}, startedAt: 0 },
+    ],
+}).quests;
+assert.deepEqual(normalizedQuests[0].flags, { finishTime: 52.4, rank: 2, splits: [12.1, 28.6, 52.4] });
+assert.deepEqual(normalizedQuests[1].flags, { metMara: true, metRin: true, suppliesBought: 1 });
+assert.deepEqual(normalizedQuests[1].choices, { recorder: 'trust-rin' });
+assert.equal(normalizedQuests.length, 2);
+
 // Existing careers can already have a fresh procedural board for the current
 // cycle. Hydration still inserts the first authored local story immediately;
 // it must not make the player wait for the next timed board refresh.

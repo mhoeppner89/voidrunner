@@ -4,6 +4,7 @@ import {
     awardCareerProgress,
     completeBountyMission,
     completeMissionsAtDock,
+    discardMission,
     failExpiredMissions,
     generateMissionOffers,
     guildJoinCost,
@@ -158,6 +159,50 @@ const projection = (offers) => offers.map((offer) => ({
     refreshMissionOffers(failed);
     assert.ok(failed.world.offers[failedFirst.origin].some((entry) => entry.id === failedFirst.id), 'failure keeps the same authored stage available');
     assert.equal(authoredOffers(failed).some((entry) => entry.id === `${failedFirst.chainId}-2`), false);
+}
+
+// Ordinary active contracts can be discarded, but the action is a real
+// failure: the bond stays spent, reserved cargo is removed, and both standing
+// ledgers take the normal failure penalty. Authored story contracts are
+// protected even if a caller bypasses the UI.
+{
+    const save = fresh(206);
+    const offer = postOffer(save, 'helix', fixture({ id: 'helix-0-0-discard' }));
+    save.player.guildRep.merchant = 12;
+    save.player.reputation['free-merchants'] = 20;
+    const startingCredits = save.player.credits;
+    assert.equal(acceptMission(save, 'helix', offer.id).ok, true);
+    assert.equal(save.player.sealedCargo.some((cargo) => cargo.missionId === offer.id), true);
+    const creditsAfterBond = save.player.credits;
+    assert.equal(creditsAfterBond, startingCredits - offer.deposit);
+
+    const result = discardMission(save, offer.id);
+    assert.equal(result.ok, true);
+    assert.equal(save.activeMissions.some((mission) => mission.id === offer.id), false);
+    assert.equal(save.player.sealedCargo.some((cargo) => cargo.missionId === offer.id), false);
+    assert.equal(save.player.credits, creditsAfterBond, 'discarding does not return or charge the bond again');
+    assert.equal(save.player.guildRep.merchant, 9);
+    assert.equal(save.player.reputation['free-merchants'], 17);
+    assert.equal(save.world.failedMissionIds.includes(offer.id), true);
+    const settlement = save.world.missionSettlements.at(-1);
+    assert.equal(settlement.id, offer.id);
+    assert.equal(settlement.outcome, 'failed');
+    assert.equal(settlement.reason, 'discarded');
+    assert.equal(settlement.bond, -offer.deposit);
+    assert.equal(settlement.repDelta, -3);
+    assert.equal(settlement.factionDelta, -3);
+    assert.equal(hydrateSave(JSON.parse(JSON.stringify(save))).world.missionSettlements.at(-1).reason, 'discarded');
+    const discardedState = JSON.stringify(save);
+    assert.equal(discardMission(save, offer.id).ok, false);
+    assert.equal(JSON.stringify(save), discardedState, 'discard is idempotent once the contract is gone');
+
+    const story = fresh(207);
+    const storyOffer = authoredOffers(story)[0];
+    assert.ok(storyOffer);
+    assert.equal(acceptMission(story, storyOffer.origin, storyOffer.id).ok, true);
+    const storyState = JSON.stringify(story);
+    assert.equal(discardMission(story, storyOffer.id).ok, false);
+    assert.equal(JSON.stringify(story), storyState, 'a forged discard cannot remove a story contract');
 }
 
 // Acceptance rejects stale/missing offers, an active-contract overflow, an
