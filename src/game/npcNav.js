@@ -316,7 +316,17 @@ const rayObstacleClearance = (px, py, pz, cx, cy, cz, obstacle, lookahead, shipC
         return best;
     }
     if (obstacle.shape === 'engine' || stretchedBox(obstacle)) {
-        if (rayBoxHit(px, py, pz, cx, cy, cz, obstacle, shipClearance, scratch) !== undefined)
+        const hit = rayBoxHit(px, py, pz, cx, cy, cz, obstacle, shipClearance, scratch);
+        if (hit === 0) {
+            // An inflated box can already contain the ship's centre. Permit
+            // motion that immediately increases clearance so every escape
+            // direction is not rejected as another collision at t=0.
+            const here=obstacleClearanceAt(px,py,pz,obstacle,shipClearance,scratch);
+            const step=Math.min(2,lookahead);
+            const next=obstacleClearanceAt(px+cx*step,py+cy*step,pz+cz*step,obstacle,shipClearance,scratch);
+            if(next>here+1e-5)return Infinity;
+        }
+        if (hit !== undefined && hit <= lookahead)
             return -10;
         let best = Infinity;
         for (const f of PATH_SAMPLES) {
@@ -360,7 +370,9 @@ const scoreCandidate = (cx, cy, cz, gx, gy, gz, fx, fy, fz, px, py, pz, lookahea
     let penalty = 0;
     if (minClear < safeClearance)
         penalty = (1 - minClear / safeClearance) * 0.9;
-    return { score: goalWeight * goalScore + smoothWeight * smoothScore - penalty, minClear };
+    // Prefer a path the ship can actually fly over a goal-aligned full stop.
+    const progress = clamp(minClear / BRAKE_WINDOW, 0, 1);
+    return { score: goalWeight * (goalScore > 0 ? goalScore * progress : goalScore) + smoothWeight * smoothScore - penalty, minClear };
 };
 // Min clearance at a world point over obstacles in a box around it.
 const clearanceAtPoint = (px, py, pz, session, shipClearance, scratch) => {
@@ -1183,6 +1195,12 @@ export function steerToward(session, ship, goalPos, options, out) {
     for (const a of VERTICAL_ANGLES) {
         const c = rotateAround(gx, gy, gz, rxn, ryn, rzn, a, scratch.candidate);
         consider(c.x, c.y, c.z);
+    }
+    // Tight spaces need sideways routes too: the goal-centred fan can choose
+    // a zero-clearance heading that brakes forever beside a long wreck.
+    if (bestClear < BRAKE_WINDOW) {
+        consider(rxn, ryn, rzn);consider(-rxn, -ryn, -rzn);
+        consider(ux, uy, uz);consider(-ux, -uy, -uz);
     }
     // Emergency escape: when the ship is close to an obstacle, the direct away
     // direction is a candidate so a trapped ship can always back out instead

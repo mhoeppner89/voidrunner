@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
     TUTORIAL_QUEST_ID,
+    TUTORIAL_FLIGHT_LESSONS,
     TUTORIAL_STARTING_CREDITS,
     advanceTutorialCampaign,
     getTutorialQuest,
@@ -43,9 +44,16 @@ const advance = (save, type, payload = {}) => advanceTutorialCampaign(save, { ty
     assert.equal(advance(save, 'traded', { locationId: 'helix', kind: 'buy', commodityId: 'food', cargoAfter: 1 }).changed, true);
     assert.equal(advance(save, 'traded', { locationId: 'helix', kind: 'buy', commodityId: 'food', cargoAfter: 1 }).changed, false);
     advance(save, 'traded', { locationId: 'helix', kind: 'buy', commodityId: 'food', cargoAfter: 2 });
+    assert.equal(quest.stepId, 'fit-upgrade');
+    advance(save, 'outfitted', { locationId:'helix', radarInstalled:true });
     assert.equal(quest.stepId, 'launch-helix');
 
     advance(save, 'launched', { fromLocationId: 'helix' });
+    assert.equal(quest.stepId, 'plot-vesper');
+    assert.equal(advance(save, 'map-selected', {kind:'location',id:'azure'}).changed, false);
+    advance(save, 'map-selected', {kind:'location',id:'vesper'});
+    assert.equal(quest.stepId, 'flight-checks');
+    for(const lesson of TUTORIAL_FLIGHT_LESSONS) advance(save, 'flight-lesson', {id:lesson.id});
     assert.equal(quest.stepId, 'fly-vesper');
     advance(save, 'docked', { locationId: 'vesper', foodCargo: 2 });
     assert.equal(quest.stepId, 'sell-supplies');
@@ -55,13 +63,23 @@ const advance = (save, type, payload = {}) => advanceTutorialCampaign(save, { ty
     assert.equal(quest.flags.suppliesSold, 1);
     assert.equal(advance(save, 'traded', { locationId: 'vesper', kind: 'sell', commodityId: 'food', quantity: 1, cargoAfter: 1 }).changed, false);
     advance(save, 'traded', { locationId: 'vesper', kind: 'sell', commodityId: 'food', quantity: 1, cargoAfter: 0 });
+    assert.equal(quest.stepId, 'service-ship');
+    assert.equal(advance(save,'serviced',{locationId:'vesper',ready:false}).changed,false);
+    advance(save,'serviced',{locationId:'vesper',ready:true});
     assert.equal(quest.stepId, 'mine-shardbelt');
 
     getTutorialQuest(save).flags.oreTargetId = 'ore-1';
     assert.equal(advance(save, 'extracted', { source: 'mining', instanceId: 'shardbelt', nodeId: 'wrong-ore', amount: 1 }).changed, false);
     advance(save, 'extracted', { source: 'mining', instanceId: 'shardbelt', nodeId: 'ore-1', amount: 1 });
     assert.equal(quest.stepId, 'defeat-raider');
+    advance(save,'weapon-switched',{group:'B'});
+    assert.equal(quest.stepId,'defeat-raider');
+    advance(save,'weapon-switched',{group:'A'});
+    assert.equal(quest.stepId, 'defeat-raider');
     advance(save, 'ship-defeated', { tutorialEnemy: true, shipId: 'ash-moth' });
+    assert.equal(quest.stepId, 'collect-cargo');
+    assert.equal(advance(save,'cargo-collected',{tutorialCargo:false}).changed,false);
+    advance(save,'cargo-collected',{tutorialCargo:true});
     assert.equal(quest.stepId, 'salvage-black-box');
 
     quest.flags.blackBoxTargetId = 'recorder-1';
@@ -74,6 +92,8 @@ const advance = (save, type, payload = {}) => advanceTutorialCampaign(save, { ty
     const choiceSave = structuredClone(save);
     advance(choiceSave, 'choice', { choiceId: 'trust-rin' });
     assert.equal(getTutorialQuest(choiceSave).choices.recorder, 'trust-rin');
+    assert.equal(getTutorialQuest(choiceSave).stepId, 'plot-meridian');
+    advance(choiceSave,'map-selected',{kind:'system',id:'meridian'});
     assert.equal(getTutorialQuest(choiceSave).stepId, 'cross-meridian-gate');
     advance(choiceSave, 'system-arrived', { systemId: 'meridian', at: 42 });
     assert.equal(getTutorialQuest(choiceSave).stepId, 'complete');
@@ -86,7 +106,7 @@ const advance = (save, type, payload = {}) => advanceTutorialCampaign(save, { ty
         const branch = structuredClone(save);
         advance(branch, 'choice', { choiceId });
         assert.equal(getTutorialQuest(branch).choices.recorder, choiceId);
-        assert.equal(getTutorialQuest(branch).stepId, 'cross-meridian-gate');
+        assert.equal(getTutorialQuest(branch).stepId, 'plot-meridian');
     }
 }
 
@@ -96,7 +116,7 @@ const advance = (save, type, payload = {}) => advanceTutorialCampaign(save, { ty
     startTutorialCampaign(save);
     advance(save, 'talked', { personId: 'mara-vek' });
     advance(save, 'talked', { personId: 'rin-vek' });
-    assert.equal(getTutorialQuest(save).stepId, 'launch-helix', 'food bought before the bar conversations still satisfies the market lesson');
+    assert.equal(getTutorialQuest(save).stepId, 'fit-upgrade', 'food bought before the bar conversations still satisfies the market lesson');
     assert.equal(getTutorialQuest(save).flags.suppliesBought, 2);
 }
 

@@ -129,7 +129,7 @@ export const rollPilot = (rng, threat, faction, override) => {
     if (override) {
         if (override.aim !== undefined)
             return override;
-        const tier = override.tier ?? 'veteran';
+        const tier = override.tier === 'rookie' ? 'novice' : (TIERS[override.tier] ? override.tier : 'veteran');
         const temperament = override.temperament ?? weightedPick(rng, TEMPERAMENT_WEIGHTS[faction] ?? TEMPERAMENT_WEIGHTS['free-merchants']);
         return { tier, temperament, ...TIERS[tier], ...TEMPERAMENTS[temperament] };
     }

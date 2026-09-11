@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { createRingVolume } from './ringVolume.js';
+import { createRingParticles } from './ringParticles.js';
 import { LOCATIONS, SUN_POSITION, sunPositionForSystem } from './data.js';
 import { createVoxelShipModel, createVoxelStationModel, paletteForFaction, shipVariantForRole } from './voxelModels.js';
 import { clamp, seededRandom } from './random.js';
@@ -122,44 +124,44 @@ const factionColor = (faction) => {
 // .workbench/convert-glb.mjs). One config per voxel variant: the file to
 // load, the yaw that points the model's nose at -Z (the game's forward), the
 // scale that matches the voxel ship's length, engine ports in model-local
-// units (the models are ~±1 per axis), and the model-local rear axis for the
-// exhaust trails. Yaw/port values are tuned against the reference renders.
+// units (the models are ~±1 per axis). Yaw/port values are tuned against
+// the reference renders.
 // Exported so the shipyard's buy-ship preview (shipPreview.js) loads the same
 // hulls with the same orientation and world scale.
 export const GLB_SHIP_CONFIG = {
-    kestrel: { file: 'wayfarer.glb', yaw: Math.PI / 2, scale: 6.1, rearAxis: [-1, 0, 0], enginePorts: [[-0.85, 0, -0.06], [-0.85, 0, 0.06]] },
-    warden: { file: 'vanguard.glb', yaw: Math.PI / 2, scale: 5.9, rearAxis: [-1, 0, 0], enginePorts: [[-0.85, 0, -0.3], [-0.85, 0, 0.3]] },
-    talon: { file: 'talon.glb', yaw: Math.PI / 2, scale: 5.65, rearAxis: [-1, 0, 0], enginePorts: [[-0.85, 0, -0.12], [-0.85, 0, 0.12]] },
-    prospector: { file: 'prospector.glb', yaw: Math.PI / 2, scale: 6.7, rearAxis: [-1, 0, 0], enginePorts: [[-0.9, 0, -0.3], [-0.9, 0, 0.3]] },
-    lancer: { file: 'lancer.glb', yaw: Math.PI / 2, scale: 6.65, rearAxis: [-1, 0, 0], enginePorts: [[-0.85, 0, -0.22], [-0.85, 0, 0], [-0.85, 0, 0.22]] },
-    'atlas-freighter': { file: 'atlas.glb', yaw: Math.PI / 2, scale: 13.4, rearAxis: [-1, 0, 0], enginePorts: [[-0.9, 0, -0.25], [-0.9, 0, 0.25]] },
+    kestrel: { file: 'wayfarer.glb', yaw: Math.PI / 2, scale: 6.1, enginePorts: [[-0.85, 0, -0.06], [-0.85, 0, 0.06]] },
+    warden: { file: 'vanguard.glb', yaw: Math.PI / 2, scale: 5.9, enginePorts: [[-0.85, 0, -0.3], [-0.85, 0, 0.3]] },
+    talon: { file: 'talon.glb', yaw: Math.PI / 2, scale: 5.65, enginePorts: [[-0.85, 0, -0.12], [-0.85, 0, 0.12]] },
+    prospector: { file: 'prospector.glb', yaw: Math.PI / 2, scale: 6.7, enginePorts: [[-0.9, 0, -0.3], [-0.9, 0, 0.3]] },
+    lancer: { file: 'lancer.glb', yaw: Math.PI / 2, scale: 6.65, enginePorts: [[-0.85, 0, -0.22], [-0.85, 0, 0], [-0.85, 0, 0.22]] },
+    'atlas-freighter': { file: 'atlas.glb', yaw: Math.PI / 2, scale: 13.4, enginePorts: [[-0.9, 0, -0.25], [-0.9, 0, 0.25]] },
     // Capital hulls preserve their authored Concord paint and load only when
     // one actually enters the scene. Carrier and cruiser were normalized to a
     // two-unit longitudinal axis during export; their scales are measured from
     // the shipped battleship bounds for exact 0.8x and 0.5x visible lengths.
     'concord-frigate': {
         path: 'assets/models/capital/concord-frigate.glb', yaw: -Math.PI / 2, scale: 56.5,
-        rearAxis: [1, 0, 0], enginePorts: [[0.89, -0.07, -0.22], [0.9, -0.07, 0], [0.89, -0.07, 0.22]],
+        enginePorts: [[0.89, -0.07, -0.22], [0.9, -0.07, 0], [0.89, -0.07, 0.22]],
         preload: false, preserveColor: true, placeholderVariant: 'warden', placeholderScale: 10,
-        flareSize: 3.4, flareOpacity: 0.2, trailLength: 24, trailWidth: 1.8, trailOpacity: 0.54,
+        flareSize: 3.4, flareOpacity: 0.2,
     },
     'concord-battleship': {
         path: 'assets/models/capital/concord-battleship.glb', yaw: -Math.PI / 2, scale: 565,
-        rearAxis: [1, 0, 0], enginePorts: [[0.9, -0.14, -0.25], [0.9, 0.11, -0.25], [0.9, -0.14, 0.25], [0.9, 0.11, 0.25]],
+        enginePorts: [[0.9, -0.14, -0.25], [0.9, 0.11, -0.25], [0.9, -0.14, 0.25], [0.9, 0.11, 0.25]],
         preload: false, preserveColor: true, placeholderVariant: 'warden', placeholderScale: 100,
-        flareSize: 15, flareOpacity: 0.18, trailLength: 90, trailWidth: 7, trailOpacity: 0.42,
+        flareSize: 15, flareOpacity: 0.18,
     },
     'concord-carrier': {
         path: 'assets/models/capital/concord-carrier.glb', yaw: -Math.PI / 2, scale: 451.2754,
-        rearAxis: [1, 0, 0], enginePorts: [[0.92, -0.08, -0.34], [0.94, -0.08, 0], [0.92, -0.08, 0.34]],
+        enginePorts: [[0.92, -0.08, -0.34], [0.94, -0.08, 0], [0.92, -0.08, 0.34]],
         preload: false, preserveColor: true, placeholderVariant: 'warden', placeholderScale: 80,
-        flareSize: 13, flareOpacity: 0.18, trailLength: 82, trailWidth: 6.2, trailOpacity: 0.42,
+        flareSize: 13, flareOpacity: 0.18,
     },
     'concord-cruiser': {
         path: 'assets/models/capital/concord-cruiser.glb', yaw: -Math.PI / 2, scale: 282.0471,
-        rearAxis: [1, 0, 0], enginePorts: [[0.93, -0.27, -0.18], [0.93, 0.27, -0.18], [0.93, -0.27, 0.18], [0.93, 0.27, 0.18]],
+        enginePorts: [[0.93, -0.27, -0.18], [0.93, 0.27, -0.18], [0.93, -0.27, 0.18], [0.93, 0.27, 0.18]],
         preload: false, preserveColor: true, placeholderVariant: 'warden', placeholderScale: 50,
-        flareSize: 8, flareOpacity: 0.19, trailLength: 56, trailWidth: 4.1, trailOpacity: 0.46,
+        flareSize: 8, flareOpacity: 0.19,
     },
 };
 // In-flight hull scaling stays separate from the source GLB calibration so
@@ -199,7 +201,7 @@ const unitDirectionInto = (value, out) => {
 // talon's twin ports sit close together, so its two additive flares overlap
 // into one bright blob that reads hotter than any other ship.
 const ENGINE_GLOW_TUNING = {
-    talon: { flareScale: 0.8, flareOpacity: 0.7, trailOpacity: 0.65 },
+    talon: { flareScale: 0.8, flareOpacity: 0.7 },
 };
 // The near-field engine glow (the small additive sprite at each engine — NOT
 // the exhaust plume) is deliberately faint: a running-light read at a
@@ -241,16 +243,20 @@ export class SpaceRenderer {
     raceShortcutMeshes = [];
     raceStartRoot = null;
     raceActiveGate;
-    shipMeshCount = 0;
+    shipSyncRevision = 0;
     // GLB ship hulls: per-variant cached model (or null when the load failed),
     // plus the in-flight promises so concurrent spawns share one fetch.
     glbShipModels = new Map();
+    disposed = false;
     graveyardModelLoading = null;
     graveyardModelMeshes = [];
     glbShipLoading = new Map();
-    projectileMeshCount = 0;
-    pickupMeshCount = 0;
+    projectileSyncRevision = 0;
+    pickupSyncRevision = 0;
     graveyardBatches = [];
+    viewFrustum = new THREE.Frustum();
+    viewProjection = new THREE.Matrix4();
+    viewSphere = new THREE.Sphere();
     wreckBatches = [];
     wreckNodeMeshes = new Map();
     effects = [];
@@ -344,7 +350,7 @@ export class SpaceRenderer {
         this.renderer = new THREE.WebGLRenderer({
             antialias: false,
             alpha: false,
-            powerPreference: 'high-performance',
+            powerPreference: this.touchDevice ? 'low-power' : 'high-performance',
             depth: true,
             stencil: false,
         });
@@ -2108,6 +2114,10 @@ export class SpaceRenderer {
             // radial fade eat whole arcs of the ring.
             ring.material = this.createRingMaterial(location, new THREE.Vector3(0, 0, 1).applyQuaternion(ring.quaternion));
             group.add(ring);
+            this.azureRingSurface = ring;
+            this.ringVolume = createRingVolume(ring, location.radius, true);
+            this.ringVolumeEnabled = true;
+            this.ringParticles = createRingParticles(ring.material.uniforms.uRingMap.value);
             // Render-only: the ring must not swallow taps from behind the planet.
             ring.raycast = () => undefined;
         }
@@ -2414,7 +2424,10 @@ export class SpaceRenderer {
             mesh.userData.asteroidKind = kind;
             mesh.userData.nodeIndices = entries.map((entry) => entry.index);
             this.instanceRoots.get('shardbelt')?.add(mesh);
-            this.asteroidMeshes.push({ mesh, entries, kind });
+            mesh.geometry.computeBoundingSphere();
+            const bounds = mesh.geometry.boundingSphere;
+            this.asteroidMeshes.push({ mesh, entries, kind, renderedEntries: [],
+                originRadius: bounds.radius + bounds.center.length() });
         });
         // Stash the palette cache for updateAsteroidInstances so the per-instance
         // tint logic stays in one place.
@@ -2422,40 +2435,53 @@ export class SpaceRenderer {
         this.updateAsteroidInstances();
         return this.asteroidMeshes[0]?.mesh;
     }
-    updateAsteroidInstances(movingOnly = false) {
+    updateAsteroidInstances(frustum) {
         const color = this._asteroidColor ?? (this._asteroidColor = new THREE.Color());
         const palettes = this._asteroidPalettes;
-        for (const { mesh, entries, kind } of this.asteroidMeshes) {
+        for (const batch of this.asteroidMeshes) {
+            const { mesh, entries, kind } = batch;
             const palette = palettes[kind] ?? palettes.iron;
+            let count = 0;
             let changed = false;
-            entries.forEach(({ node }, instanceIndex) => {
-                if (movingOnly && !node.moving)
-                    return;
-                changed = true;
-                this.tmpEuler.set(...node.rotation);
-                this.tmpPosition.set(...node.position);
-                this.tmpQuaternion.setFromEuler(this.tmpEuler);
-                this.tmpScale.set(node.radius * node.scale[0], node.radius * node.scale[1], node.radius * node.scale[2]);
-                this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
-                mesh.setMatrixAt(instanceIndex, this.tmpMatrix);
-                if (movingOnly) {
-                    mesh.instanceMatrix.addUpdateRange(instanceIndex * 16, 16);
+            let colorChanged = false;
+            for (const entry of entries) {
+                const { node } = entry;
+                this.viewSphere.center.set(...node.position);
+                this.viewSphere.radius = batch.originRadius * node.radius * Math.max(
+                    Math.abs(node.scale[0]), Math.abs(node.scale[1]), Math.abs(node.scale[2])) + 1;
+                if (frustum && !frustum.intersectsSphere(this.viewSphere))
+                    continue;
+                const reassigned = batch.renderedEntries[count] !== entry;
+                if (reassigned || node.moving) {
+                    this.tmpEuler.set(...node.rotation);
+                    this.tmpPosition.set(...node.position);
+                    this.tmpQuaternion.setFromEuler(this.tmpEuler);
+                    this.tmpScale.set(node.radius * node.scale[0], node.radius * node.scale[1], node.radius * node.scale[2]);
+                    this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
+                    mesh.setMatrixAt(count, this.tmpMatrix);
+                    mesh.instanceMatrix.addUpdateRange(count * 16, 16);
+                    changed = true;
                 }
-                else {
-                    if (node.id === this.selectedAsteroidId)
-                        color.setHex(0xcfe884);
-                    else if (node.scanned)
-                        color.setHex(palette.scan);
-                    else
-                        color.setHex(palette.base);
-                    mesh.setColorAt(instanceIndex, color);
+                const tint = node.id === this.selectedAsteroidId ? 0xcfe884 : node.scanned ? palette.scan : palette.base;
+                if (reassigned || entry.renderTint !== tint) {
+                    color.setHex(tint);
+                    mesh.setColorAt(count, color);
+                    mesh.instanceColor.addUpdateRange(count * 3, 3);
+                    entry.renderTint = tint;
+                    colorChanged = true;
                 }
-            });
-            if (changed) {
-                mesh.instanceMatrix.needsUpdate = true;
-                if (!movingOnly && mesh.instanceColor)
-                    mesh.instanceColor.needsUpdate = true;
+                batch.renderedEntries[count] = entry;
+                mesh.userData.nodeIndices[count] = entry.index;
+                count++;
             }
+            if (changed || mesh.count !== count)
+                mesh.boundingSphere = null; // raycasting must use current instances
+            mesh.count = count;
+            mesh.visible = count > 0;
+            if (changed)
+                mesh.instanceMatrix.needsUpdate = true;
+            if (colorChanged)
+                mesh.instanceColor.needsUpdate = true;
         }
     }
     createGraveyard() {
@@ -2517,7 +2543,12 @@ export class SpaceRenderer {
             mesh.frustumCulled = false;
             mesh.name = `graveyard-${key}`;
             root?.add(mesh);
-            this.graveyardBatches.push({ mesh, pieces });
+            mesh.geometry.computeBoundingSphere();
+            // A sphere about the instance origin remains conservative under
+            // any rotation, even for geometry whose own bounds are off-center.
+            const bounds = mesh.geometry.boundingSphere;
+            this.graveyardBatches.push({ mesh, pieces, renderedPieces: [],
+                originRadius: bounds.radius + bounds.center.length() });
         });
         this.updateGraveyardInstances();
     }
@@ -2612,31 +2643,39 @@ export class SpaceRenderer {
             wreck.visible = rootVisible && dx * dx + dy * dy + dz * dz <= WRECK_RENDER_DISTANCE_SQ;
         }
     }
-    updateGraveyardInstances(movingOnly = false) {
+    updateGraveyardInstances(frustum) {
         const cam = this.camera.position;
         for (const batch of this.graveyardBatches) {
+            let count = 0;
             let changed = false;
-            batch.pieces.forEach((piece, index) => {
+            for (const piece of batch.pieces) {
                 const dx = piece.position[0] - cam.x;
                 const dy = piece.position[1] - cam.y;
                 const dz = piece.position[2] - cam.z;
-                const culled = dx * dx + dy * dy + dz * dz > WRECK_RENDER_DISTANCE_SQ;
-                const stateChanged = piece._culled !== culled;
-                // Full pass rewrites only pieces whose cull state flipped;
-                // the moving pass additionally rewrites visible drifting pieces.
-                // Culled pieces keep their hidden matrix until they drift back
-                // into range (the flip then rebuilds it from live state).
-                if (!stateChanged && (movingOnly ? !piece.moving || culled : true))
-                    return;
-                piece._culled = culled;
-                changed = true;
-                this.tmpPosition.set(...piece.position);
-                this.tmpEuler.set(...piece.rotation);
-                this.tmpQuaternion.setFromEuler(this.tmpEuler);
-                this.tmpScale.set(...(culled ? HIDDEN_SCALE : piece.scale));
-                this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
-                batch.mesh.setMatrixAt(index, this.tmpMatrix);
-            });
+                if (dx * dx + dy * dy + dz * dz > WRECK_RENDER_DISTANCE_SQ)
+                    continue;
+                this.viewSphere.center.set(...piece.position);
+                this.viewSphere.radius = batch.originRadius * Math.max(
+                    Math.abs(piece.scale[0]), Math.abs(piece.scale[1]), Math.abs(piece.scale[2])) + 1;
+                if (frustum && !frustum.intersectsSphere(this.viewSphere))
+                    continue;
+                // Compact surviving instances, instead of drawing hidden ones
+                // at tiny scale. Keep unchanged static matrices on the GPU.
+                if (batch.renderedPieces[count] !== piece || piece.moving) {
+                    this.tmpPosition.set(...piece.position);
+                    this.tmpEuler.set(...piece.rotation);
+                    this.tmpQuaternion.setFromEuler(this.tmpEuler);
+                    this.tmpScale.set(...piece.scale);
+                    this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
+                    batch.mesh.setMatrixAt(count, this.tmpMatrix);
+                    batch.mesh.instanceMatrix.addUpdateRange(count * 16, 16);
+                    batch.renderedPieces[count] = piece;
+                    changed = true;
+                }
+                count++;
+            }
+            batch.mesh.count = count;
+            batch.mesh.visible = count > 0;
             if (changed)
                 batch.mesh.instanceMatrix.needsUpdate = true;
         }
@@ -2743,6 +2782,7 @@ export class SpaceRenderer {
                 this.tmpScale.setScalar(hidden ? HIDDEN_SCALE[0] : wreckNodeVisualScale(node));
                 this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
                 batch.mesh.setMatrixAt(index, this.tmpMatrix);
+                batch.mesh.instanceMatrix.addUpdateRange(index * 16, 16);
             });
             if (changed)
                 batch.mesh.instanceMatrix.needsUpdate = true;
@@ -3058,36 +3098,6 @@ export class SpaceRenderer {
         geometry.computeVertexNormals();
         return geometry;
     }
-    engineFlameTexture() {
-        // A side-on radial gradient: hot white/yellow core fading to orange
-        // then red then transparent. Mapped on a stretched plane behind each
-        // engine port so ships get proper exhaust trails in chase views.
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 32;
-        const context = canvas.getContext('2d');
-        const gradient = context.createLinearGradient(0, 0, 256, 0);
-        gradient.addColorStop(0, 'rgba(255, 240, 200, 0)');
-        gradient.addColorStop(0.18, 'rgba(255, 200, 110, 0.5)');
-        gradient.addColorStop(0.36, 'rgba(255, 150, 70, 0.85)');
-        gradient.addColorStop(0.5, 'rgba(255, 100, 50, 0.65)');
-        gradient.addColorStop(0.78, 'rgba(200, 60, 40, 0.3)');
-        gradient.addColorStop(1, 'rgba(80, 20, 0, 0)');
-        context.fillStyle = gradient;
-        context.fillRect(0, 0, 256, 32);
-        // Vertical fade so the trail isn't a flat ribbon.
-        const vFade = context.createLinearGradient(0, 0, 0, 32);
-        vFade.addColorStop(0, 'rgba(0,0,0,1)');
-        vFade.addColorStop(0.5, 'rgba(0,0,0,0)');
-        vFade.addColorStop(1, 'rgba(0,0,0,1)');
-        context.globalCompositeOperation = 'destination-out';
-        context.fillStyle = vFade;
-        context.fillRect(0, 0, 256, 32);
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.colorSpace = THREE.SRGBColorSpace;
-        this.pixelTextures.add(texture);
-        return texture;
-    }
     createShipMesh(entity) {
         const variant = shipVariantForEntity(entity);
         const config = GLB_SHIP_CONFIG[variant];
@@ -3099,10 +3109,8 @@ export class SpaceRenderer {
         const baseScale = (variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1) * placeholderScale * npcShipScaleForVariant(variant);
         const engineColor = palette.engine;
         const engineFlareTexture = this.radialTexture(cssHex(engineColor), cssHex(engineColor));
-        const flameTex = this.engineFlameTexture();
         const flares = [];
         // Per-port near-field flare (small bright sprite at the engine).
-        const trail = [];
         for (const port of model.enginePorts) {
             const flare = new THREE.Sprite(new THREE.SpriteMaterial({
                 map: engineFlareTexture,
@@ -3118,27 +3126,6 @@ export class SpaceRenderer {
             flare.userData.baseOpacity = config?.flareOpacity ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_OPACITY_ATLAS : ENGINE_FLARE_OPACITY);
             flares.push(flare);
             group.add(flare);
-            // Long exhaust trail: a thin plane stretched along the ship's
-            // forward axis (z+ on the ship = behind the engine).
-            const trailMat = new THREE.MeshBasicMaterial({
-                map: flameTex,
-                color: engineColor,
-                transparent: true,
-                opacity: 0.78 * (ENGINE_GLOW_TUNING[variant]?.trailOpacity ?? 1),
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-                side: THREE.DoubleSide,
-                toneMapped: false,
-            });
-            const trailLen = (config?.trailLength ?? (variant === 'atlas-freighter' ? 9 : variant === 'kestrel' ? 6 : 7)) / placeholderScale;
-            const trailWidth = (config?.trailWidth ?? 0.45) / placeholderScale;
-            trailMat.opacity = 0.78 * (config?.trailOpacity ?? ENGINE_GLOW_TUNING[variant]?.trailOpacity ?? 1);
-            const trailMesh = new THREE.Mesh(new THREE.PlaneGeometry(trailWidth, trailLen), trailMat);
-            trailMesh.position.copy(port).add(new THREE.Vector3(0, 0, trailLen * 0.45));
-            trailMesh.rotation.x = Math.PI / 2;
-            trailMesh.userData.isTrail = true;
-            trail.push(trailMesh);
-            group.add(trailMesh);
         }
         this.tagTargetable(group, 'ship', entity.id);
         group.scale.setScalar(baseScale);
@@ -3147,7 +3134,6 @@ export class SpaceRenderer {
         group.userData.rimMaterial = model.rimMaterial;
         group.userData.variant = variant;
         group.userData.engineFlares = flares;
-        group.userData.engineTrails = trail;
         // Cache the emissive hull materials once so the per-frame sync does not
         // walk the whole ship graph looking for them.
         const emissiveMaterials = [];
@@ -3176,6 +3162,10 @@ export class SpaceRenderer {
             return;
         const promise = loadGlb(config.path ?? `assets/models/ships/${config.file}`)
             .then((model) => {
+                if (this.disposed) {
+                    this.disposeObject(model);
+                    return null;
+                }
                 const ready = this.prepareGlbShip(model, config, variant);
                 this.glbShipModels.set(variant, ready);
                 return ready;
@@ -3195,7 +3185,7 @@ export class SpaceRenderer {
         return model;
     }
     // A GLB ship with per-ship material tints (faction livery), engine flares
-    // and exhaust trails, and the same userData the voxel path feeds the
+    // and the same userData the voxel path feeds the
     // per-frame sync. The model clone (carrying the baked yaw + scale) hangs
     // inside a wrapper the sync transforms freely: syncShips overwrites the
     // mesh's quaternion and scale every frame, which would wipe the yaw and
@@ -3228,13 +3218,7 @@ export class SpaceRenderer {
         const baseScale = config.baseScale ?? (variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1);
         const engineColor = palette.engine;
         const engineFlareTexture = this.radialTexture(cssHex(engineColor), cssHex(engineColor));
-        const flameTex = this.engineFlameTexture();
         const flares = [];
-        const trail = [];
-        const rear = new THREE.Vector3(config.rearAxis[0], config.rearAxis[1], config.rearAxis[2]);
-        const up = new THREE.Vector3(0, 1, 0);
-        const trailLen = config.trailLength ?? (variant === 'atlas-freighter' ? 9 : variant === 'kestrel' ? 6 : 7);
-        const trailWidth = config.trailWidth ?? 0.45;
         for (const port of config.enginePorts) {
             const flareOpacity = config.flareOpacity ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_OPACITY_ATLAS : ENGINE_FLARE_OPACITY);
             const flareWorldSize = config.flareSize ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_SIZE_ATLAS : ENGINE_FLARE_SIZE);
@@ -3251,32 +3235,11 @@ export class SpaceRenderer {
             flare.userData.baseOpacity = flareOpacity;
             flares.push(flare);
             group.add(flare);
-            // Long exhaust trail: a thin plane stretched along the model's rear
-            // axis. Geometry sizes are divided by config.scale because the
-            // group carries the world scale (children of it are in model
-            // units).
-            const trailMat = new THREE.MeshBasicMaterial({
-                map: flameTex,
-                color: engineColor,
-                transparent: true,
-                opacity: 0.78 * (config.trailOpacity ?? ENGINE_GLOW_TUNING[variant]?.trailOpacity ?? 1),
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-                side: THREE.DoubleSide,
-                toneMapped: false,
-            });
-            const trailMesh = new THREE.Mesh(new THREE.PlaneGeometry(trailWidth / config.scale, trailLen / config.scale), trailMat);
-            trailMesh.quaternion.setFromUnitVectors(up, rear);
-            trailMesh.position.set(port[0], port[1], port[2]).addScaledVector(rear, (trailLen * 0.45) / config.scale);
-            trailMesh.userData.isTrail = true;
-            trail.push(trailMesh);
-            group.add(trailMesh);
         }
         this.tagTargetable(wrapper, 'ship', entity.id);
         wrapper.userData.baseScale = baseScale;
         wrapper.userData.variant = variant;
         wrapper.userData.engineFlares = flares;
-        wrapper.userData.engineTrails = trail;
         wrapper.userData.emissiveMaterials = emissiveMaterials;
         wrapper.userData.glb = true;
         return wrapper;
@@ -3293,9 +3256,12 @@ export class SpaceRenderer {
         this.shipMeshes.set(entity.id, glbMesh);
     }
     // GLB ship clones share geometry and textures with the cached model, so
-    // disposal only releases the per-ship material clones (and flare/trail
-    // materials). The shared resources die with the renderer.
+    // release per-ship materials and flare maps. Cached hull assets remain
+    // alive until renderer shutdown.
     disposeGlbShip(mesh) {
+        const flareTextures = new Set((mesh.userData.engineFlares ?? []).map(flare => flare.material.map));
+        for (const texture of flareTextures)
+            texture?.dispose();
         mesh.traverse((child) => {
             if (!(child instanceof THREE.Mesh || child instanceof THREE.Sprite))
                 return;
@@ -3305,22 +3271,7 @@ export class SpaceRenderer {
     }
     syncShips(entities, alpha = 0) {
         const now = performance.now();
-        // Reconcile mesh liveness only when the entity count changed (spawns and
-        // deaths) — steady state walks nothing and allocates nothing.
-        if (entities.length !== this.shipMeshCount) {
-            const live = new Set(entities.map((entity) => entity.id));
-            for (const [id, mesh] of this.shipMeshes) {
-                if (!live.has(id)) {
-                    this.dynamicRoot.remove(mesh);
-                    if (mesh.userData.glb)
-                        this.disposeGlbShip(mesh);
-                    else
-                        this.disposeObject(mesh);
-                    this.shipMeshes.delete(id);
-                }
-            }
-            this.shipMeshCount = entities.length;
-        }
+        const revision = ++this.shipSyncRevision;
         entities.forEach((entity) => {
             let mesh = this.shipMeshes.get(entity.id);
             const variant = shipVariantForEntity(entity);
@@ -3358,6 +3309,7 @@ export class SpaceRenderer {
                 this.dynamicRoot.add(mesh);
                 this.shipMeshes.set(entity.id, mesh);
             }
+            mesh.userData.syncRevision = revision;
             mesh.position.set(...entity.position);
             if (entity.prevPosition && alpha > 0) {
                 this.tmpPrevPos.set(entity.prevPosition[0], entity.prevPosition[1], entity.prevPosition[2]);
@@ -3400,26 +3352,32 @@ export class SpaceRenderer {
                 }
             }
         });
+        // Identity can change without a count change. Mark during the existing
+        // update pass, then retire unseen meshes without building live arrays.
+        for (const [key, mesh] of this.shipMeshes) {
+            if (mesh.userData.syncRevision !== revision) {
+                this.dynamicRoot.remove(mesh);
+                if (mesh.userData.glb)
+                    this.disposeGlbShip(mesh);
+                else
+                    this.disposeObject(mesh);
+                this.shipMeshes.delete(key);
+            }
+        }
     }
     syncProjectiles(projectiles, store, alpha = 0) {
-        // Meshes are keyed by flat-store slot; reconcile only when the live count
-        // changes so steady state allocates nothing per frame.
-        if (projectiles.length !== this.projectileMeshCount) {
-            const live = new Set(projectiles.map((entity) => entity.slot));
-            for (const [slot, mesh] of this.projectileMeshes) {
-                if (!live.has(slot)) {
-                    this.dynamicRoot.remove(mesh);
-                    this.disposeObject(mesh);
-                    this.projectileMeshes.delete(slot);
-                }
-            }
-            this.projectileMeshCount = projectiles.length;
-        }
+        const revision = ++this.projectileSyncRevision;
         const pos = store.pos;
         const vel = store.vel;
         const prevPos = store.prevPos;
         projectiles.forEach((projectile) => {
             let mesh = this.projectileMeshes.get(projectile.slot);
+            if (mesh && (mesh.userData.projectileKind !== projectile.kind || mesh.userData.projectileFaction !== projectile.faction)) {
+                this.dynamicRoot.remove(mesh);
+                this.disposeObject(mesh);
+                this.projectileMeshes.delete(projectile.slot);
+                mesh = undefined;
+            }
             if (!mesh) {
                 if (projectile.kind === 'laser') {
                     // Gauntlet overhaul: hot core + crossed additive glow pair
@@ -3434,7 +3392,7 @@ export class SpaceRenderer {
                     // owns reads at a glance, plus a cold additive glow at the head.
                     this.laserFx ??= new LaserFx(this.scene, this.effects);
                     mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 4.8, 3, 6), new THREE.MeshBasicMaterial({ color: 0xcfeeff }));
-                    mesh.rotation.x = Math.PI / 2;
+                    mesh.geometry.rotateX(Math.PI / 2);
                     const glow = new THREE.Sprite(new THREE.SpriteMaterial({
                         map: this.radialTexture('#eaffff', '#4fb8d8'),
                         transparent: true,
@@ -3448,10 +3406,10 @@ export class SpaceRenderer {
                     // Point-defense stub: a short COLD white-blue dart — kept
                     // far from the pulse laser's amber so the two streams
                     // never read as the same gun at combat distance.
-                    mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.34, 3, 6), new THREE.MeshBasicMaterial({
+                    mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.065, 3.2, 3, 6), new THREE.MeshBasicMaterial({
                         color: projectile.faction === 'player' ? 0xdce9ff : 0xff8a5b,
                     }));
-                    mesh.rotation.x = Math.PI / 2;
+                    mesh.geometry.rotateX(Math.PI / 2);
                 }
                 else if (projectile.kind === 'ripper') {
                     // Scattergun pellet: a small warm spark; seven per shell
@@ -3526,9 +3484,12 @@ export class SpaceRenderer {
                     mesh = group;
                 }
                 this.dynamicRoot.add(mesh);
+                mesh.userData.projectileKind = projectile.kind;
+                mesh.userData.projectileFaction = projectile.faction;
                 this.projectileMeshes.set(projectile.slot, mesh);
             }
             const i = projectile.slot * 3;
+            mesh.userData.syncRevision = revision;
             mesh.position.set(pos[i], pos[i + 1], pos[i + 2]);
             if (alpha > 0) {
                 this.tmpPrevPos.set(prevPos[i], prevPos[i + 1], prevPos[i + 2]);
@@ -3562,23 +3523,28 @@ export class SpaceRenderer {
                     plume.material.opacity = 0.72 + Math.sin(this.skyTime * 47 + projectile.slot * 3.3) * 0.26;
             }
         });
+        // Identity can change without a count change. Mark during the existing
+        // update pass, then retire unseen meshes without building live arrays.
+        for (const [key, mesh] of this.projectileMeshes) {
+            if (mesh.userData.syncRevision !== revision) {
+                this.dynamicRoot.remove(mesh);
+                this.disposeObject(mesh);
+                this.projectileMeshes.delete(key);
+            }
+        }
     }
     syncPickups(pickups, store, alpha = 0) {
-        if (pickups.length !== this.pickupMeshCount) {
-            const live = new Set(pickups.map((pickup) => pickup.slot));
-            for (const [slot, mesh] of this.pickupMeshes) {
-                if (!live.has(slot)) {
-                    this.dynamicRoot.remove(mesh);
-                    this.disposeObject(mesh);
-                    this.pickupMeshes.delete(slot);
-                }
-            }
-            this.pickupMeshCount = pickups.length;
-        }
+        const revision = ++this.pickupSyncRevision;
         const pos = store.pos;
         const prevPos = store.prevPos;
         pickups.forEach((pickup) => {
             let mesh = this.pickupMeshes.get(pickup.slot);
+            if (mesh && mesh.userData.pickupSource !== pickup.source) {
+                this.dynamicRoot.remove(mesh);
+                this.disposeObject(mesh);
+                this.pickupMeshes.delete(pickup.slot);
+                mesh = undefined;
+            }
             if (!mesh) {
                 const color = pickup.source === 'mining' ? 0xd7c07a : 0x80d1bf;
                 const group = new THREE.Group();
@@ -3591,13 +3557,14 @@ export class SpaceRenderer {
                 // The group carries its target identity so a raycast hit walks
                 // up to it (see pickTarget).
                 group.userData.targetKind = 'pickup';
-                group.userData.targetId = pickup.id;
+                group.userData.pickupSource = pickup.source;
                 this.dynamicRoot.add(mesh);
                 this.pickupMeshes.set(pickup.slot, mesh);
             }
             // A locked crate is a findable marker: the glow swells and
             // brightens while it's the current target, so the loot doesn't get
             // lost in the field.
+            mesh.userData.targetId = pickup.id;
             const selected = pickup.id === this.selectedPickupId;
             const glow = mesh.children[1];
             if (glow) {
@@ -3606,6 +3573,7 @@ export class SpaceRenderer {
                     glow.material.opacity = selected ? 0.6 : 0.3;
             }
             const i = pickup.slot * 3;
+            mesh.userData.syncRevision = revision;
             mesh.position.set(pos[i], pos[i + 1], pos[i + 2]);
             if (alpha > 0) {
                 this.tmpPrevPos.set(prevPos[i], prevPos[i + 1], prevPos[i + 2]);
@@ -3614,6 +3582,15 @@ export class SpaceRenderer {
             mesh.rotation.x += 0.018;
             mesh.rotation.y += 0.024;
         });
+        // Identity can change without a count change. Mark during the existing
+        // update pass, then retire unseen meshes without building live arrays.
+        for (const [key, mesh] of this.pickupMeshes) {
+            if (mesh.userData.syncRevision !== revision) {
+                this.dynamicRoot.remove(mesh);
+                this.disposeObject(mesh);
+                this.pickupMeshes.delete(key);
+            }
+        }
     }
     // Race presentation is deliberately render-only. None of these groups is
     // added to the dynamic entity store or tagged as a gameplay target, and
@@ -4073,6 +4050,7 @@ export class SpaceRenderer {
             this.shell.dataset.hyperdriveFx = state;
     }
     updateCamera(position, prevPosition, rotation, prevRotation, angularVelocity, speedRatio, afterburner, dt, alpha = 0) {
+        this.ringParticleDt = dt;
         this.camera.position.set(...position);
         if (prevPosition && alpha > 0) {
             this.tmpPrevPos.set(prevPosition[0], prevPosition[1], prevPosition[2]);
@@ -4180,6 +4158,69 @@ export class SpaceRenderer {
         this.laserFx ??= new LaserFx(this.scene, this.effects);
         this.laserFx.rockImpact(position, rockCenter);
     }
+    showTurret(id,position,direction,size) {
+        this.turretMeshes??=new Map();
+        let mesh=this.turretMeshes.get(id);
+        if(!mesh) {
+            if(this.turretMeshes.size>=32)return;
+            mesh=new THREE.Group();
+            const material=new THREE.MeshStandardMaterial({color:0x71848c,metalness:0.7,roughness:0.5});
+            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(size==='M'?0.55:0.35,8,6),material));
+            const barrel=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.13,0.9,6),material);
+            barrel.rotation.x=Math.PI/2;barrel.position.z=-0.55;mesh.add(barrel);
+            this.scene.add(mesh);this.turretMeshes.set(id,mesh);
+        }
+        mesh.position.copy(position);mesh.quaternion.setFromUnitVectors(NEG_Z,direction);
+        mesh.userData.life=0.25;mesh.visible=true;
+    }
+    showCombatBeam(id,start,end,color) {
+        this.combatBeams ??= new Map();
+        let beam=this.combatBeams.get(id);
+        if(!beam) {
+            if(this.combatBeams.size>=24) {
+                const expired=[...this.combatBeams].find(([,b])=>!b.visible);
+                if(!expired)return;
+                this.combatBeams.delete(expired[0]);beam=expired[1];
+            } else {
+                beam=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,1,4),new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.8,depthWrite:false}));
+                this.scene.add(beam);
+            }
+            this.combatBeams.set(id,beam);
+        }
+        beam.material.color.setHex(color);beam.visible=true;beam.userData.life=0.09;
+        beam.position.copy(start).lerp(end,0.5);beam.scale.y=start.distanceTo(end);
+        beam.quaternion.setFromUnitVectors(UP_AXIS,new THREE.Vector3().subVectors(end,start).normalize());
+    }
+    showPdcTracer(start,end,color) {
+        // Short moving streaks distinguish PDC rounds from tracking-laser beams.
+        // Damage is resolved by the shared ray cast; these are cosmetic only.
+        this.pdcTracers??=[];
+        let tracer=this.pdcTracers.find(mesh=>!mesh.visible);
+        if(!tracer){
+            if(this.pdcTracers.length>=64)return;
+            tracer=new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.055,1,4),new THREE.MeshBasicMaterial({color,depthWrite:false}));
+            tracer.userData.start=new THREE.Vector3();tracer.userData.end=new THREE.Vector3();
+            tracer.userData.direction=new THREE.Vector3();
+            this.scene.add(tracer);this.pdcTracers.push(tracer);
+        }
+        const data=tracer.userData;
+        data.start.copy(start);data.end.copy(end);data.distance=start.distanceTo(end);
+        data.duration=Math.max(0.06,data.distance/750);data.life=data.duration;
+        data.direction.subVectors(end,start).normalize();
+        tracer.material.color.setHex(color);tracer.visible=true;
+        tracer.scale.y=Math.min(8,data.distance);
+        tracer.position.copy(start).addScaledVector(data.direction,tracer.scale.y/2);
+        tracer.quaternion.setFromUnitVectors(UP_AXIS,data.direction);
+    }
+    updatePdcTracers(dt) {
+        for(const tracer of this.pdcTracers??[]){
+            if(!tracer.visible)continue;
+            const data=tracer.userData;data.life-=dt;
+            tracer.visible=data.life>0;
+            const progress=Math.min(1,1-data.life/data.duration);
+            tracer.position.copy(data.start).addScaledVector(data.direction,tracer.scale.y/2+(data.distance-tracer.scale.y)*progress);
+        }
+    }
     spawnMuzzleFlash(x, y, z, color = 0xffc35a) {
         // Brief additive flash at a gun port on fire (see laserFx.js).
         this.laserFx ??= new LaserFx(this.scene, this.effects);
@@ -4263,7 +4304,56 @@ export class SpaceRenderer {
         }
     }
     updateWorld(dt) {
+        // Collision geometry advances at the fixed simulation rate, regardless
+        // of the presentation budget. Cosmetic updates are batched per render.
         this.skyTime += dt;
+        this.pendingWorldVisualDt = (this.pendingWorldVisualDt ?? 0) + dt;
+        const shardbeltVisible = Boolean(this.instanceRoots.get('shardbelt')?.visible);
+        if (shardbeltVisible) {
+            for (const node of this.asteroids) {
+                if (!node.moving)
+                    continue;
+                node.position[0] += node.velocity[0] * dt;
+                node.position[1] += node.velocity[1] * dt;
+                node.position[2] += node.velocity[2] * dt;
+                node.rotation[0] += node.rotationSpeed[0] * dt;
+                node.rotation[1] += node.rotationSpeed[1] * dt;
+                node.rotation[2] += node.rotationSpeed[2] * dt;
+                const center = LOCATIONS.shardbelt.position;
+                const dx = node.position[0] - center[0];
+                const dy = node.position[1] - center[1];
+                const dz = node.position[2] - center[2];
+                if (Math.hypot(dx, dy, dz) > LOCATIONS.shardbelt.radius + 55) {
+                    node.position[0] = center[0] - dx * 0.82;
+                    node.position[1] = center[1] - dy * 0.82;
+                    node.position[2] = center[2] - dz * 0.82;
+                }
+            }
+        }
+        const mourningVisible = Boolean(this.instanceRoots.get('mourning-line')?.visible);
+        if (mourningVisible) {
+            for (const piece of this.graveyard) {
+                if (!piece.moving)
+                    continue;
+                piece.position[0] += piece.drift[0] * dt;
+                piece.position[1] += piece.drift[1] * dt;
+                piece.position[2] += piece.drift[2] * dt;
+                piece.rotation[0] += piece.spin[0] * dt;
+                piece.rotation[1] += piece.spin[1] * dt;
+                piece.rotation[2] += piece.spin[2] * dt;
+            }
+        }
+    }
+    updateWorldVisuals() {
+        const dt = this.pendingWorldVisualDt ?? 0;
+        this.pendingWorldVisualDt = 0;
+        if (dt <= 0) return;
+        this.updatePdcTracers(dt);
+        for(const beam of this.combatBeams?.values() ?? []) {beam.userData.life-=dt;beam.visible=beam.userData.life>0;}
+        for(const [id,mesh] of this.turretMeshes??[]) {
+            mesh.userData.life-=dt;
+            if(mesh.userData.life<=0){this.scene.remove(mesh);this.disposeObject(mesh);this.turretMeshes.delete(id);}
+        }
         this.updateHyperdriveFx(dt);
         if (this.starShimmer) {
             const baseOpacity = this.starShimmer.userData.baseOpacity ?? 0.3;
@@ -4289,48 +4379,13 @@ export class SpaceRenderer {
                 beacon.scale.setScalar(radius * (0.14 + beaconPulse * 0.07));
             });
         }
-        const shardbeltVisible = Boolean(this.instanceRoots.get('shardbelt')?.visible);
-        if (shardbeltVisible) {
-            for (const node of this.asteroids) {
-                if (!node.moving)
-                    continue;
-                node.position[0] += node.velocity[0] * dt;
-                node.position[1] += node.velocity[1] * dt;
-                node.position[2] += node.velocity[2] * dt;
-                node.rotation[0] += node.rotationSpeed[0] * dt;
-                node.rotation[1] += node.rotationSpeed[1] * dt;
-                node.rotation[2] += node.rotationSpeed[2] * dt;
-                const center = LOCATIONS.shardbelt.position;
-                const dx = node.position[0] - center[0];
-                const dy = node.position[1] - center[1];
-                const dz = node.position[2] - center[2];
-                if (Math.hypot(dx, dy, dz) > LOCATIONS.shardbelt.radius + 55) {
-                    node.position[0] = center[0] - dx * 0.82;
-                    node.position[1] = center[1] - dy * 0.82;
-                    node.position[2] = center[2] - dz * 0.82;
-                }
-            }
-        }
-        if (this.activeInstanceId === 'shardbelt')
-            this.updateAsteroidInstances(true);
         const mourningVisible = Boolean(this.instanceRoots.get('mourning-line')?.visible);
-        if (mourningVisible) {
-            for (const piece of this.graveyard) {
-                if (!piece.moving)
-                    continue;
-                piece.position[0] += piece.drift[0] * dt;
-                piece.position[1] += piece.drift[1] * dt;
-                piece.position[2] += piece.drift[2] * dt;
-                piece.rotation[0] += piece.spin[0] * dt;
-                piece.rotation[1] += piece.spin[1] * dt;
-                piece.rotation[2] += piece.spin[2] * dt;
-            }
+        const helix = this.locationMeshes.get('helix');
+        if (helix?.visible) {
+            this.helixRotor ??= helix.getObjectByName('rotor');
+            if (this.helixRotor)
+                this.helixRotor.rotation.x += dt * 0.16;
         }
-        if (mourningVisible)
-            this.updateGraveyardInstances(true);
-        const helixRotor = this.locationMeshes.get('helix')?.getObjectByName('rotor');
-        if (helixRotor)
-            helixRotor.rotation.x += dt * 0.16;
         // Race visuals are pooled. The active gate breathes, while a caller's
         // one-shot pulse is represented by a short scale/glow envelope stored
         // in userData (no effect object to clean up after a finish transition).
@@ -4390,16 +4445,16 @@ export class SpaceRenderer {
                 beacon.material.opacity = (this.raceStartRoot.userData.phase === 'travel' ? 0.42 : 0.62) * (0.92 + Math.sin(this.skyTime * 4.2) * 0.08);
         }
         const vesper = this.locationMeshes.get('vesper');
-        if (vesper) {
-            const surface = vesper.getObjectByName('surface');
-            if (surface)
-                surface.rotation.y += dt * 0.012;
+        if (vesper?.visible) {
+            this.vesperSurface ??= vesper.getObjectByName('surface');
+            if (this.vesperSurface)
+                this.vesperSurface.rotation.y += dt * 0.012;
         }
         const azure = this.locationMeshes.get('azure');
-        if (azure) {
-            const surface = azure.getObjectByName('surface');
-            if (surface)
-                surface.rotation.y += dt * 0.009;
+        if (azure?.visible) {
+            this.azureSurface ??= azure.getObjectByName('surface');
+            if (this.azureSurface)
+                this.azureSurface.rotation.y += dt * 0.009;
         }
         if (mourningVisible)
             this.updateWreckNodeInstances(dt);
@@ -4541,6 +4596,9 @@ export class SpaceRenderer {
             stencilBuffer: false,
             colorSpace: THREE.LinearSRGBColorSpace,
         });
+        this.bloomSceneTarget.depthTexture = new THREE.DepthTexture(sceneWidth, sceneHeight, THREE.UnsignedIntType);
+        this.ringVolumeTarget?.dispose();
+        this.ringVolumeTarget = null;
         for (const target of this.bloomBlurTargets)
             target.dispose();
         this.bloomBlurTargets = [makeTarget(), makeTarget()];
@@ -4585,6 +4643,7 @@ export class SpaceRenderer {
     render() {
         if (this.contextLost)
             return;
+        this.updateWorldVisuals();
         if (!this.bloomSceneTarget)
             this.resizeBloomTargets();
         // Keep the atmosphere shells' camera-distance uniform fresh so the
@@ -4593,13 +4652,50 @@ export class SpaceRenderer {
         for (const shell of this.atmosphereShells) {
             shell.material.uniforms.uCamDist.value = Math.hypot(cam.x - shell.center.x, cam.y - shell.center.y, cam.z - shell.center.z);
         }
+        this.camera.updateWorldMatrix(true, false);
+        this.viewProjection.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
+        this.viewFrustum.setFromProjectionMatrix(this.viewProjection);
+        if (this.instanceRoots.get('mourning-line')?.visible || this.instanceRoots.get('shardbelt')?.visible) {
+            if (this.instanceRoots.get('mourning-line')?.visible)
+                this.updateGraveyardInstances(this.viewFrustum);
+            if (this.instanceRoots.get('shardbelt')?.visible)
+                this.updateAsteroidInstances(this.viewFrustum);
+        }
+        const volumeActive = this.ringVolumeEnabled && this.locationMeshes.get('azure')?.visible
+            && this.viewFrustum.intersectsSphere(this.ringVolume.bounds);
+        if (this.ringVolumeEnabled && this.azureRingSurface) this.azureRingSurface.visible = false;
         const bloomOn = this.bloomEnabled();
         // Pass 1: the full scene into a float buffer.
         this.renderer.setRenderTarget(this.bloomSceneTarget);
         this.renderer.render(this.scene, this.camera);
+        let sceneTexture = this.bloomSceneTarget.texture;
+        if (volumeActive) {
+            this.ringVolumeTarget ??= new THREE.WebGLRenderTarget(this.bloomSceneTarget.width, this.bloomSceneTarget.height, {
+                type: THREE.HalfFloatType, depthBuffer: false, stencilBuffer: false,
+                minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+                colorSpace: THREE.LinearSRGBColorSpace,
+            });
+            this.ringVolume.update(cam, this.camera, this.bloomSceneTarget);
+            this.renderer.setRenderTarget(this.ringVolumeTarget);
+            this.renderer.render(this.ringVolume.mesh, this.bloomCamera);
+            const particlesVisible = this.ringParticles.update(this.camera,
+                this.ringVolume.mesh.material.uniforms.localCamera.value,
+                this.ringParticleDt ?? 0, !this.hyperdriveFxRoot.visible, this.bloomSceneTarget);
+            if (particlesVisible) {
+                const autoClear = this.renderer.autoClear;
+                this.renderer.autoClear = false;
+                try { this.renderer.render(this.ringParticles.mesh, this.camera); }
+                finally { this.renderer.autoClear = autoClear; }
+            }
+            sceneTexture = this.ringVolumeTarget.texture;
+        }
+        if (!volumeActive && this.ringParticles) {
+            this.ringParticles.update(this.camera, this.camera.position, 0, false, this.bloomSceneTarget);
+        }
+        this.ringParticleDt = 0;
         if (bloomOn) {
             // Pass 2: bright-only downsample into the first blur target.
-            this.bloomBrightMaterial.uniforms.tDiffuse.value = this.bloomSceneTarget.texture;
+            this.bloomBrightMaterial.uniforms.tDiffuse.value = sceneTexture;
             this.bloomQuad.material = this.bloomBrightMaterial;
             this.renderer.setRenderTarget(this.bloomBlurTargets[0]);
             this.renderer.render(this.bloomQuad, this.bloomCamera);
@@ -4617,7 +4713,7 @@ export class SpaceRenderer {
         // Pass 4: composite scene + bloom to the screen. With bloom off the
         // strength is zeroed, so the pass is a plain tone-mapped copy.
         this.bloomCompositeMaterial.uniforms.uExposure.value = this.renderer.toneMappingExposure;
-        this.bloomCompositeMaterial.uniforms.tScene.value = this.bloomSceneTarget.texture;
+        this.bloomCompositeMaterial.uniforms.tScene.value = sceneTexture;
         this.bloomCompositeMaterial.uniforms.tBloom.value = this.bloomBlurTargets[0].texture;
         this.bloomCompositeMaterial.uniforms.uStrength.value = bloomOn ? 0.6 : 0;
         this.bloomQuad.material = this.bloomCompositeMaterial;
@@ -4673,6 +4769,7 @@ export class SpaceRenderer {
         this.resize();
     }
     resize = () => {
+        this.renderRevision = (this.renderRevision ?? 0) + 1;
         const rect = this.container.getBoundingClientRect();
         this.viewportWidth = Math.max(1, rect.width);
         this.viewportHeight = Math.max(1, rect.height);
@@ -4727,10 +4824,44 @@ export class SpaceRenderer {
         });
     }
     dispose() {
+        this.disposed = true;
         window.removeEventListener('resize', this.resize);
         this.renderer.domElement.removeEventListener('webglcontextlost', this.onContextLost);
         this.renderer.domElement.removeEventListener('webglcontextrestored', this.onContextRestored);
+        // Separate GLB clones from their cached owners before disposing the
+        // scene, so shared hull resources are released by the cache alone.
+        for (const mesh of this.shipMeshes.values()) {
+            if (mesh.userData.glb) {
+                this.dynamicRoot.remove(mesh);
+                this.disposeGlbShip(mesh);
+            }
+        }
+        this.shipMeshes.clear();
         this.disposeObject(this.scene);
+        this.scene.environment?.dispose();
+        for (const model of this.glbShipModels.values()) {
+            if (model)
+                this.disposeObject(model);
+        }
+        this.glbShipModels.clear();
+        this.glbShipLoading.clear();
+        this.bloomSceneTarget?.dispose();
+        this.ringVolumeTarget?.dispose();
+        this.ringParticles?.dispose();
+        this.ringVolume?.mesh.geometry.dispose();
+        this.ringVolume?.mesh.material.dispose();
+        for (const target of this.bloomBlurTargets)
+            target.dispose();
+        this.bloomBrightMaterial?.dispose();
+        this.bloomBlurMaterial?.dispose();
+        this.bloomCompositeMaterial?.dispose();
+        this.bloomQuad?.geometry.dispose();
+        for(const beam of this.combatBeams?.values() ?? []) {this.scene.remove(beam);beam.geometry.dispose();beam.material.dispose();}
+        this.combatBeams?.clear();
+        for(const tracer of this.pdcTracers??[]) {this.scene.remove(tracer);tracer.geometry.dispose();tracer.material.dispose();}
+        this.pdcTracers=[];
+        for(const mesh of this.turretMeshes?.values()??[]) {this.scene.remove(mesh);this.disposeObject(mesh);}
+        this.turretMeshes?.clear();
         this.laserFx?.dispose();
         this.laserFx = null;
         this.pixelTextures.forEach((texture) => texture.dispose());

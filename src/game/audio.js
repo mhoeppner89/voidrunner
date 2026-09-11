@@ -274,6 +274,8 @@ export class AudioManager {
             this.engineGain?.gain.setTargetAtTime(0, now, 0.035);
             this.engineWashGain?.gain.cancelScheduledValues(now);
             this.engineWashGain?.gain.setTargetAtTime(0, now, 0.035);
+            this.engineTargets?.delete(this.engineGain?.gain);
+            this.engineTargets?.delete(this.engineWashGain?.gain);
         }
     }
 
@@ -301,16 +303,16 @@ export class AudioManager {
         const thrust = this.stationMode ? 0 : throttle;
         const burn = this.stationMode ? 0 : (afterburner ? 1 : 0);
         const engineBase = this.stationMode ? 0 : 0.04 + thrust * 0.06 + burn * 0.05;
-        this.engineGain?.gain.setTargetAtTime(engineBase, now, 0.11);
+        this.setEngineTarget(this.engineGain?.gain, engineBase, now, 0.11);
         const pitch = 41 + thrust * 30 + burn * 25 + damage * 7;
-        this.engineOscA?.frequency.setTargetAtTime(pitch, now, 0.1);
-        this.engineOscB?.frequency.setTargetAtTime(pitch * 1.047, now, 0.1);
-        this.engineSub?.frequency.setTargetAtTime(pitch * 0.49, now, 0.12);
-        this.engineFilter?.frequency.setTargetAtTime(190 + thrust * 330 + burn * 480, now, 0.1);
+        this.setEngineTarget(this.engineOscA?.frequency, pitch, now, 0.1);
+        this.setEngineTarget(this.engineOscB?.frequency, pitch * 1.047, now, 0.1);
+        this.setEngineTarget(this.engineSub?.frequency, pitch * 0.49, now, 0.12);
+        this.setEngineTarget(this.engineFilter?.frequency, 190 + thrust * 330 + burn * 480, now, 0.1);
         const wash = this.stationMode ? 0 : 0.008 + thrust * 0.038 + burn * 0.028;
-        this.engineWashGain?.gain.setTargetAtTime(wash, now, 0.12);
-        this.engineWashFilter?.frequency.setTargetAtTime(300 + thrust * 430 + burn * 680, now, 0.12);
-        this.stationGain?.gain.setTargetAtTime((this.stationMode ? 0.018 : 0) * this.effectsVolume, now, 0.35);
+        this.setEngineTarget(this.engineWashGain?.gain, wash, now, 0.12);
+        this.setEngineTarget(this.engineWashFilter?.frequency, 300 + thrust * 430 + burn * 680, now, 0.12);
+        this.setEngineTarget(this.stationGain?.gain, (this.stationMode ? 0.018 : 0) * this.effectsVolume, now, 0.35);
 
         if (nearbyEnemies > 0)
             this.dangerLevel = Math.min(1, 0.45 + nearbyEnemies * 0.15);
@@ -342,6 +344,13 @@ export class AudioManager {
 
     setMusicContext(context) {
         this.musicContext = context;
+    }
+    setEngineTarget(parameter, value, now, smoothing) {
+        if (!parameter) return;
+        this.engineTargets ??= new WeakMap();
+        if (this.engineTargets.get(parameter) === value) return;
+        this.engineTargets.set(parameter, value);
+        parameter.setTargetAtTime(value, now, smoothing);
     }
 
     // Discrete combat escalation (0/1/2) with hysteresis: the drums step up

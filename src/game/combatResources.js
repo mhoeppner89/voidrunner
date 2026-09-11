@@ -35,7 +35,7 @@ export const regenerateCombatResources = (player, stats, dt, shieldDelay = 0) =>
     let shieldRestored = 0;
     let shieldEnergySpent = 0;
     if (finite(shieldDelay) <= 0 && shield < shieldMax && energy > 0) {
-        const desired = Math.min(shieldMax - shield, SHIELD_RECHARGE_RATE * seconds);
+        const desired = Math.min(shieldMax - shield, SHIELD_RECHARGE_RATE * (stats.shieldRechargeMultiplier??1) * seconds);
         shieldRestored = Math.min(desired, energy / SHIELD_ENERGY_PER_POINT);
         shieldEnergySpent = shieldRestored * SHIELD_ENERGY_PER_POINT;
         shield += shieldRestored;

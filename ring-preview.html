@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Voidrunner · Ring study</title>
+<link rel="stylesheet" href="./src/ring-preview.css">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
+</head>
+<body>
+<main id="view"></main>
+<header><a href="./game.html">← Game</a><b>AZURE · RING STUDY 4</b><button id="fullscreen">Full screen</button></header>
+<section id="controls" aria-label="Preview controls">
+<label>View<select id="view-select"><option value="above">Above</option><option value="below">Below</option><option value="edge">Along the edge</option><option value="band">Cross a bright band</option><option value="horizontal">Cross looking horizontally</option><option value="gap">Cross the gap</option></select></label>
+<label class="check"><input id="effect" type="checkbox" checked> Ring volume</label>
+<button id="replay">Replay</button><button id="pause">Pause</button><button id="capture">Capture</button><button id="report">Save timings</button>
+<p id="status" role="status">Loading the game's renderer…</p>
+</section>
+<script type="module" src="./src/ring-preview.js"></script>
+</body></html>

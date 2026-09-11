@@ -1,3 +1,4 @@
+import {newArenaRun,readArenaRun,arenaRecord} from './game/arenaRun.js';
 import { AudioManager } from './game/audio.js';
 import { createNewSave, defaultSettings, loadGame, loadSettingsPreferences, saveGame, saveSettingsPreferences } from './game/save.js';
 import { DOCK_LOCATION_IDS, LOCATIONS, SHIPS } from './game/data.js';
@@ -167,7 +168,7 @@ const beginSession = (mode, arena) => {
     session = undefined;
     previousSession?.dispose();
     ui.clearToasts();
-    const save = mode === 'new' || mode === 'arena' ? createNewSave(undefined, { tutorial: mode === 'new' }) : loadGame();
+    const save = arena?.run ? (arena.resume?readArenaRun():newArenaRun(Boolean(arena.hard&&arenaRecord().unlockedHard))) : mode === 'new' || mode === 'arena' ? createNewSave(undefined, { tutorial: mode === 'new' }) : loadGame();
     if (!save) {
         ui.showToast(t('No autosave was found.'), 'warning');
         ui.showTitle(false, titleSave());
@@ -191,10 +192,14 @@ const beginSession = (mode, arena) => {
     // The probe/dev key (`__VOID_PRIVATEER_PROBE_LANG__`) is single-shot: it
     // forces the boot language once, then clears itself — a value left behind
     // by a dev session used to override the player's saved choice forever.
-    const probeLanguage = typeof localStorage !== 'undefined' ? localStorage.getItem('__VOID_PRIVATEER_PROBE_LANG__') : null;
+    let probeLanguage = null;
+    try {
+        probeLanguage = window.localStorage.getItem('__VOID_PRIVATEER_PROBE_LANG__');
+        if (probeLanguage)
+            window.localStorage.removeItem('__VOID_PRIVATEER_PROBE_LANG__');
+    }
+    catch { /* Storage may be unavailable; use the current language setting. */ }
     setLanguage(probeLanguage ?? save.settings?.language);
-    if (probeLanguage && typeof localStorage !== 'undefined')
-        localStorage.removeItem('__VOID_PRIVATEER_PROBE_LANG__');
     if (vesperHoverPreview && mode !== 'arena') {
         // Keep the visual preview reachable from either title-screen button
         // without changing the normal career flow when the flag is absent.
@@ -262,7 +267,10 @@ const beginSession = (mode, arena) => {
         return nextSession;
     })().catch((error) => {
         console.error('Session startup failed.', error);
-        audioManager.dispose();
+        if (session)
+            session.dispose();
+        else
+            audioManager.dispose();
         session = undefined;
         showTitleScreen();
         ui.showToast(t('Flight systems could not be loaded. Reload and try again.'), 'danger', 5200);
@@ -316,6 +324,9 @@ const assignSetting = (settings, key, value) => {
     else if (key === 'quality' && (value === 'auto' || value === 'low' || value === 'high')) {
         settings.quality = value;
     }
+    else if (key === 'powerMode' && ['auto','battery','performance'].includes(value)) {
+        settings.powerMode = value;
+    }
     else {
         return false;
     }
@@ -324,7 +335,10 @@ const assignSetting = (settings, key, value) => {
 const actions = {
     startNew: () => beginSession('new'),
     resume: () => beginSession('resume'),
-    startArena: (environment, scenario, difficulty) => beginSession('arena', { environment, scenario, difficulty }),
+    startArenaRun: (resume=false,hard=false) => beginSession('arena',{run:true,resume,hard}),
+    arenaRunAction: (...args) => session?.arenaRunAction(...args),
+    startRunWave: () => session?.startRunWave(),
+    startArena: (environment, scenario, difficulty, fit) => beginSession('arena', { environment, scenario, difficulty, fit }),
     requestFullscreen: () => void enterFullscreen(),
     toggleFullscreen: () => void toggleFullscreen(),
     launch: () => {
@@ -341,8 +355,10 @@ const actions = {
     openMap: () => session?.openMap(),
     openShipMenu: () => session?.openShipMenu(),
     weaponCycle: () => session?.cycleWeapon(),
+    toggleTurrets: () => session?.toggleTurrets(),
     launcherCycle: () => session?.cycleLauncher(),
-    selectTarget: (kind, id) => session?.selectTarget(kind, id),
+    selectTarget: (kind, id) => session?.selectTarget(kind, id, 'map'),
+    reviewServices: () => session?.checkTutorialServices(true),
     trade: (kind, commodityId, quantity) => session?.trade(kind, commodityId, quantity),
     jettison: (commodityId) => session?.jettisonCargo(commodityId),
     payOffMug: () => session?.payOffMug(),
@@ -352,6 +368,7 @@ const actions = {
     discardMission: (missionId) => session?.discardMission(missionId),
     skipTutorial: () => session?.skipTutorial(),
     chooseTutorial: (choiceId) => session?.chooseTutorial(choiceId),
+    finishTutorialBriefing: (id, completed) => session?.finishTutorialBriefing(id, completed),
     talkToNpc: (personId, topicId) => session?.talkToNpc(personId, topicId),
     acknowledgeMissionSettlements: () => session?.acknowledgeMissionSettlements(),
     repair: () => session?.repair(),
@@ -466,12 +483,13 @@ document.addEventListener('visibilitychange', () => {
         pauseFlightOnFocusLoss();
         saveGame(session.save);
     }
+    session?.setPageVisible(document.visibilityState !== 'hidden');
 });
 const isProductionBuild = import.meta.env?.PROD ?? location.protocol !== 'file:';
 // The startup matrix performs several deliberate full navigations in one
 // fresh profile. Do not let a background first-install cache race those page
 // loads; ordinary development and production URLs still register normally.
-if ('serviceWorker' in navigator && isProductionBuild && !startupProbe) {
+if ('serviceWorker' in navigator && isProductionBuild && !startupProbe && !document.documentElement.dataset.testBuild) {
     // Register the worker for offline/asset caching. A new deploy's worker
     // takes over on the NEXT full page load (skipWaiting + clients.claim),
     // never by force-reloading the running page — that surprise reload was
@@ -483,7 +501,10 @@ if ('serviceWorker' in navigator && isProductionBuild && !startupProbe) {
 window.__VOID_PRIVATEER__ = {
     newGame: () => beginSession('new'),
     resume: () => beginSession('resume'),
-    startArena: (environment, scenario, difficulty) => beginSession('arena', { environment, scenario, difficulty }),
+    startArenaRun: (resume=false,hard=false) => beginSession('arena',{run:true,resume,hard}),
+    arenaRunAction: (...args) => session?.arenaRunAction(...args),
+    startRunWave: () => session?.startRunWave(),
+    startArena: (environment, scenario, difficulty, fit) => beginSession('arena', { environment, scenario, difficulty, fit }),
     getState: () => session?.save ?? cachedSave,
     getRuntime: () => session,
     debugShips: () => session?.ships,

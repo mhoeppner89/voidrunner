@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en" class="benchmark-root">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#09121d">
+  <title>Voidrunner · Phone benchmark</title>
+  <link rel="icon" href="./favicon.svg">
+  <link rel="stylesheet" href="./src/style.css">
+  <link rel="stylesheet" href="./src/benchmark.css">
+  <script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
+</head>
+<body class="benchmark-page">
+  <div id="app" aria-hidden="true" inert></div>
+  <main id="benchmark-panel">
+    <a class="bench-brand" href="./">VOIDRUNNER <span>FLIGHT LAB</span></a>
+    <section id="setup">
+      <p><a class="bench-retry" href="./ring-preview.html">Open the separate ring study →</a></p>
+      <p><a class="bench-retry" href="./game.html">Play corrected game test →</a></p>
+      <p class="bench-eyebrow">ON-DEVICE PERFORMANCE</p>
+      <h1>How does your phone fly?</h1>
+      <p class="bench-intro">Three real game scenes. Automatic flying. A report you can send back.</p>
+      <ol class="bench-scenes"><li><b>01</b><span>Open-space flight<small>Turning, flight physics and the cockpit HUD</small></span></li><li><b>02</b><span>Asteroid combat<small>Three opponents, projectiles and collision checks</small></span></li><li><b>03</b><span>Debris-field combat<small>Wreck models and a five-ship fight</small></span></li></ol>
+      <div class="bench-fields">
+        <label>Phone model<input id="device-label" placeholder="e.g. Pixel 8a or iPhone 14" maxlength="80" autocomplete="off"></label>
+        <label>Run length<select id="run-length"><option value="1">About 3 minutes · first comparison</option><option value="5">About 15 minutes · sustained performance</option></select></label>
+      </div>
+      <p class="bench-note">Use landscape, unplug the charger, turn battery saver off, and keep brightness fixed. Start with a cool phone. Keep this tab visible and let the flight run without touching the controls. Asset loading adds time.</p>
+      <button id="start-benchmark" class="bench-primary" disabled>Loading flight systems…</button>
+      <p id="setup-status" role="status">Preparing the real game engine.</p>
+      <p class="bench-note">High graphics, normal sound and a fixed world seed. Your career save is not used or changed. Results stay on this device until you export them.</p>
+    </section>
+    <section id="results" hidden>
+      <p class="bench-eyebrow">FLIGHT REPORT</p><h1 id="result-title">Run complete</h1>
+      <p id="result-status"></p>
+      <div class="bench-table-wrap"><table><thead><tr><th>Scene / round</th><th>Avg FPS</th><th>95% of frames</th><th>Hitches &gt;50 ms</th></tr></thead><tbody id="result-rows"></tbody></table></div>
+      <p id="comparison-note" class="bench-note"></p>
+      <div class="bench-buttons"><button id="download-report" class="bench-primary">Download report</button><button id="share-report">Share report</button><button id="copy-summary">Copy summary</button></div>
+      <details><summary>Readable summary</summary><textarea id="report-summary" readonly aria-label="Benchmark summary"></textarea></details>
+      <p class="bench-note">Send the JSON report back in this chat. For comparisons, repeat the same run length, browser, orientation, brightness and power settings.</p>
+      <a class="bench-retry" href="./benchmark.html">Start a fresh run →</a>
+    </section>
+    <noscript>This benchmark needs JavaScript enabled.</noscript>
+  </main>
+  <aside id="benchmark-live" hidden><div><b id="live-scene">Preparing flight</b><span id="live-status" role="status"></span></div><button id="stop-benchmark">Stop</button></aside>
+  <script type="module" src="./src/benchmark.js"></script>
+</body>
+</html>

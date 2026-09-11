@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createVoxelShipModel, paletteForFaction } from './voxelModels.js';
 import { loadGlb } from './glbLoader.js';
 import { GLB_SHIP_CONFIG } from './render.js';
+import { FrameBudget } from './frameBudget.js';
 
 // Showroom presence: how much of its card each hull should fill. The fit-to-
 // frame camera would otherwise render every hull at the same on-screen scale,
@@ -23,17 +24,20 @@ export class ShipPreview {
         this.container = container;
         this.variant = variant;
         this.disposed = false;
+        this.visible = true;
+        this.frameBudget = new FrameBudget();
+        const touchDevice = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
         this.renderer = new THREE.WebGLRenderer({
             antialias: true,
             alpha: true,
-            powerPreference: 'high-performance',
+            powerPreference: touchDevice ? 'low-power' : 'default',
             depth: true,
             stencil: false,
         });
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderer.toneMapping = THREE.NeutralToneMapping;
         this.renderer.toneMappingExposure = 1.18;
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+        this.renderer.setPixelRatio(touchDevice ? 1 : Math.min(window.devicePixelRatio || 1, 1.5));
         this.renderer.setClearColor(0x000000, 0);
         this.renderer.domElement.className = 'ship-preview-canvas';
         this.renderer.domElement.style.width = '100%';
@@ -77,6 +81,13 @@ export class ShipPreview {
 
         this.resizeObserver = new ResizeObserver(() => this.resize());
         this.resizeObserver.observe(container);
+        if (typeof IntersectionObserver === 'function') {
+            this.visibilityObserver = new IntersectionObserver(entries => {
+                this.visible = entries.some(entry => entry.isIntersecting);
+                this.frameBudget.reset();
+            });
+            this.visibilityObserver.observe(container);
+        }
         this.resize();
 
         this.clock = new THREE.Clock();
@@ -146,11 +157,13 @@ export class ShipPreview {
         this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
     }
-    tick = () => {
+    tick = (now) => {
         if (this.disposed)
             return;
-        this.pivot.rotation.y = this.clock.getElapsedTime() * 0.5;
-        this.renderer.render(this.scene, this.camera);
+        if (this.visible && !document.hidden && this.frameBudget.take(now, 30) !== null) {
+            this.pivot.rotation.y = this.clock.getElapsedTime() * 0.5;
+            this.renderer.render(this.scene, this.camera);
+        }
         this.rafId = requestAnimationFrame(this.tick);
     };
     dispose() {
@@ -159,6 +172,7 @@ export class ShipPreview {
         this.disposed = true;
         cancelAnimationFrame(this.rafId);
         this.resizeObserver.disconnect();
+        this.visibilityObserver?.disconnect();
         disposeObject(this.pivot);
         this.scene.environment?.dispose?.();
         this.renderer.dispose();

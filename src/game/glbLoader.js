@@ -205,5 +205,15 @@ export async function buildGlbScene(arrayBuffer) {
     const scene = json.scenes?.[json.scene ?? 0] ?? json.scenes?.[0];
     for (const node of scene?.nodes ?? [0])
         buildNode(node, root);
+    // Imported hull parts never animate. Bake their local transforms once;
+    // world matrices still follow moving/rotating ship and preview roots.
+    // Preserve authored matrices (including shear) without recomposing them.
+    root.traverse((object) => {
+        if (object === root)
+            return;
+        if (object.matrixAutoUpdate)
+            object.updateMatrix();
+        object.matrixAutoUpdate = false;
+    });
     return root;
 }

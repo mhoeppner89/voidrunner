@@ -1,0 +1,18 @@
+{
+  "source": "mhoeppner89/voidrunner",
+  "distribution": "playable game and smartphone benchmark",
+  "protocol": "voidrunner-phone-v2",
+  "revision": "german-travel-phone-power-2026-09-08",
+  "changes": [
+    "423 existing German catalog entries revised; menu, tutorial and dialogue terms aligned",
+    "Salvage lesson arrival within 220–300 km of a marked reachable fragment",
+    "14 additional tutorial transmissions and 16 regional travel broadcasts",
+    "Phone Auto mode renders at 30 fps with unchanged 60 Hz simulation and scene resolution",
+    "Paused and hidden rendering stopped; offscreen ring composite culled",
+    "Cosmetic updates once per rendered frame; static phone CRT decorations",
+    "Shipyard previews at 30 fps, hidden previews idle, phone preview pixel ratio capped at 1",
+    "Unchanged audio targets are cached; background page audio suspended",
+    "Benchmark v2 measures rendered-frame cadence and accumulates CPU work between renders"
+  ],
+  "source_base_commit": "cf3d43a983b554444472c8e423fefa8fb29b92a5"
+}

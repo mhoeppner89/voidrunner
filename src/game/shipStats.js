@@ -16,9 +16,6 @@ export const getEffectiveShipStats = (player) => {
         const item = OUTFIT_ITEMS[id];
         return item?.effects?.[key] ?? fallback;
     };
-    const engineMultiplier = effect('engine-mk2', 'speedMultiplier', 1.18);
-    const accelerationMultiplier = effect('engine-mk2', 'accelerationMultiplier', 1.18);
-    const turnMultiplier = effect('thrusters-mk2', 'turnMultiplier', 1.22);
     const radarMultiplier = effect('radar-mk2', 'radarMultiplier', 1.25);
     const scanMultiplier = effect('radar-mk2', 'scanMultiplier', 1.5);
     const cargoBonus = hasOutfitting
@@ -31,16 +28,19 @@ export const getEffectiveShipStats = (player) => {
     const miningRate = has('mining-mk2') ? effect('mining-mk2', 'miningRate', 1.7) : 1;
     const salvageRate = has('salvage-mk2') ? effect('salvage-mk2', 'salvageRate', 1.7) : 1;
     const salvageRange = has('salvage-mk2') ? effect('salvage-mk2', 'salvageRange', 170) : 100;
+    const selectedEffects=installed.map(id=>OUTFIT_ITEMS[id]?.effects??{});
+    const product=(key)=>selectedEffects.reduce((value,e)=>value*(e[key]??1),1);
     return {
         ...base,
-        maxSpeed: base.maxSpeed * (has('engine-mk2') ? engineMultiplier : 1),
-        afterburnSpeed: base.afterburnSpeed * (has('engine-mk2') ? engineMultiplier : 1),
-        acceleration: base.acceleration * (has('engine-mk2') ? accelerationMultiplier : 1),
-        angularAcceleration: base.angularAcceleration * (has('thrusters-mk2') ? turnMultiplier : 1),
-        shield: base.shield + (has('shield-mk2') ? effect('shield-mk2', 'shieldCapacity', 45) : 0),
+        maxSpeed: base.maxSpeed * product('speedMultiplier'),
+        afterburnSpeed: base.afterburnSpeed * product('speedMultiplier'),
+        acceleration: base.acceleration * product('accelerationMultiplier'),
+        angularAcceleration: base.angularAcceleration * product('turnMultiplier'),
+        shield: (base.shield + (has('shield-mk2') ? effect('shield-mk2', 'shieldCapacity', 45) : 0))*product('shieldMultiplier'),
         hull: base.hull + (has('armor-mk2') ? effect('armor-mk2', 'hullCapacity', 40) : 0),
-        reactorOutput: base.reactorOutput + (has('engine-mk2') ? effect('engine-mk2', 'reactorOutput', 3) : 0),
-        energyCapacity: base.energyCapacity,
+        reactorOutput: base.reactorOutput * product('outputMultiplier'),
+        energyCapacity: base.energyCapacity * product('capacityMultiplier'),
+        burnFuelMultiplier:product('burnFuelMultiplier'),lateralMultiplier:product('lateralMultiplier'),shieldRechargeMultiplier:product('rechargeMultiplier'),
         cargo: base.cargo + cargoBonus,
         // Pulse Mk II's multiplier lives on its projectile definition. Keeping
         // the hull's base gunDamage untouched prevents an installed gun from

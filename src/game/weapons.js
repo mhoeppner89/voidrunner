@@ -13,174 +13,46 @@
 // two tables separate means a duplicated gun mount can share one projectile
 // definition without making the save format weapon-specific.
 import { HULL_HARDPOINTS, OUTFIT_ITEMS, canonicalOutfitId } from './outfitting.js';
+// A shared speed also means a shared lead solution. Values are km/s in the
+// simulation; firing-platform velocity is inherited by every physical round.
+export const PROJECTILE_SPEEDS=Object.freeze({normal:500,gauss:1200,plasma:300});
 export const WEAPONS = {
-    pulse: {
-        id: 'pulse',
-        nameKey: 'PULSE LASER',
-        hudNameKey: 'PULSE',
-        envelopeKey: 'ANY-RANGE REPEATER · REACH {range}U',
-        kind: 'laser',
-        slot: 1,
-        // Baseline energy repeater — byte-identical to the historical gun.
-        speed: 205,
-        cooldown: 0.17,
-        damageMul: 1,
-        life: 1.35,
-        audioKey: 'laser',
-        assist: 1,
-        ammoId: null,
-        energyCost: 3.2,
-        pierce: 0,
-        mountSize: 'S',
-    },
-    'pulse-mk2': {
-        id: 'pulse-mk2',
-        nameKey: 'PULSE CANNON MK II',
-        hudNameKey: 'PULSE MK II',
-        envelopeKey: 'ANY-RANGE REPEATER · REACH {range}U · OVERCHARGED',
-        kind: 'laser',
-        slot: 7,
-        equipmentId: 'pulse-mk2',
-        // This is a real medium pulse weapon, rather than a global ship buff.
-        // It therefore only contributes when a pulse-mk2 module occupies an
-        // active M gun mount.
-        speed: 218,
-        cooldown: 0.17,
-        damageMul: 1.35,
-        life: 1.35,
-        audioKey: 'laser',
-        assist: 1,
-        ammoId: null,
-        energyCost: 5,
-        pierce: 0,
-        mountSize: 'M',
-    },
-    gauss: {
-        id: 'gauss',
-        nameKey: 'MAGRAIL',
-        hudNameKey: 'MAGRAIL',
-        envelopeKey: 'DUELIST · WINS BEYOND 300U · PUNCHES THROUGH',
-        kind: 'gauss',
-        slot: 2,
-        // Long-range duelist: one hypervelocity slug, slow cadence, half the
-        // aim-assist cone (a skill weapon), and over-penetration — the slug
-        // punches through the first ship it hits and can strike one more.
-        speed: 620,
-        cooldown: 0.95,
-        damageMul: 3.2,
-        life: 1.6,
-        audioKey: 'gauss',
-        assist: 0.5,
-        ammoId: 'slugs',
-        energyCost: 6.5,
-        pierce: 1,
-        mountSize: 'M',
-    },
-    pdc: {
-        id: 'pdc',
-        nameKey: 'POINT-DEFENSE CLUSTER',
-        hudNameKey: 'PDC',
-        equipmentId: 'pdc-cluster',
-        envelopeKey: 'WINS INSIDE {range}U · SHREDS MISSILES',
-        kind: 'pdc',
-        slot: 3,
-        // Guardian: a buzz-saw spray of stubby bolts whose point-blank DPS
-        // beats the pulse INSIDE its 71u envelope (0.55 x 10 dmg at 0.06s),
-        // plus passive interception of hostile missiles within 60u even while
-        // aiming elsewhere. Heat-gated instead of ammo-fed: 3.5s of sustained
-        // fire forces a 1.6s vent (pressure lives on the session, not save).
-        // Beyond ~70u it loses to everything — that is the honest weakness.
-        speed: 170,
-        cooldown: 0.06,
-        damageMul: 0.55,
-        life: 0.42,
-        audioKey: 'pdc',
-        assist: 0.8,
-        ammoId: null,
-        energyCost: 0.8,
-        pierce: 0,
-        spreadRad: 0.07,
-        mountSize: 'S',
-    },
-    ripper: {
-        id: 'ripper',
-        nameKey: 'RIPPER SCATTERGUN',
-        hudNameKey: 'RIPPER',
-        equipmentId: 'ripper-scattergun',
-        envelopeKey: 'WINS INSIDE {range}U · USELESS BEYOND',
-        kind: 'ripper',
-        slot: 4,
-        // Brawler: seven pellets per shell across a ~6° gaussian-clumped
-        // cone; wins inside their turn circle, useless beyond ~55u. Pellet
-        // speeds jitter so the cloud arrives ragged, not as a ring. (Review
-        // passes: the original 11° single-axis fan sprayed half the sky, and
-        // the 0.5s reach let it snipe — both reined in.)
-        speed: 165,
-        cooldown: 0.78,
-        damageMul: 0.55,
-        life: 0.35,
-        audioKey: 'ripper',
-        assist: 1.1,
-        ammoId: 'shells',
-        energyCost: 5,
-        pierce: 0,
-        spreadRad: 0.11,
-        pellets: 7,
-        speedJitter: 35,
-        mountSize: 'S',
-    },
-    ion: {
-        id: 'ion',
-        nameKey: 'ION LANCE',
-        hudNameKey: 'ION LANCE',
-        equipmentId: 'ion-lance',
-        envelopeKey: 'CRACKS SHIELDS ×4 · JAMS GUNS · SOFT VS HULL',
-        kind: 'ion',
-        slot: 5,
-        // Shield-cracker: half hull damage but ×4 against shields, and every
-        // hit jams the target's guns briefly (NPC fireCooldown). The opener
-        // that makes any kinetic land harder.
-        speed: 240,
-        cooldown: 0.62,
-        damageMul: 0.5,
-        life: 1.3,
-        audioKey: 'ion',
-        assist: 0.9,
-        ammoId: 'cells',
-        energyCost: 9,
-        pierce: 0,
-        shieldMul: 4,
-        jamSeconds: 1.8,
-        mountSize: 'M',
-    },
-    mortar: {
-        id: 'mortar',
-        nameKey: 'SUNLANCE PLASMA MORTAR',
-        hudNameKey: 'PLASMA MORTAR',
-        equipmentId: 'sunlance-mortar',
-        envelopeKey: 'SIEGE · SPLASH + BURN · LOB AND WAIT',
-        kind: 'mortar',
-        slot: 6,
-        // Siege: a slow heavy orb. Flat direct damage, splash with falloff to
-        // everything nearby, and a burn that chews hull for seconds after.
-        // Orbiting bombardment, not dogfighting.
-        speed: 85,
-        cooldown: 2.2,
-        damageFlat: 30,
-        damageMul: 0,
-        life: 3.2,
-        audioKey: 'mortar',
-        assist: 0.35,
-        ammoId: 'pods',
-        energyCost: 14,
-        pierce: 0,
-        splashRadius: 26,
-        splashMin: 12,
-        burnDps: 6,
-        burnSeconds: 4,
-        mountSize: 'M',
-    },
+    pulse:{id:'pulse',nameKey:'PULSE LASER',hudNameKey:'PULSE',kind:'laser',slot:1,
+        speed:PROJECTILE_SPEEDS.normal,range:400,cooldown:.17,damageFlat:10,energyCost:3.2,assist:1,audioKey:'laser',mountSize:'S'},
+    beam:{id:'beam',nameKey:'BEAM EMITTER',hudNameKey:'BEAM',kind:'beam',slot:8,
+        speed:100000,range:300,cooldown:.4,damageFlat:8,energyCost:6,assist:1.4,audioKey:'ion',mountSize:'S'},
+    'pulse-mk2':{id:'pulse-mk2',nameKey:'PULSE CANNON MK II',hudNameKey:'PULSE MK II',kind:'laser',slot:7,equipmentId:'pulse-mk2',
+        speed:PROJECTILE_SPEEDS.normal,range:400,cooldown:.17,damageFlat:13.5,energyCost:5,assist:1,audioKey:'laser',mountSize:'M'},
+    gauss:{id:'gauss',nameKey:'MAGRAIL',hudNameKey:'MAGRAIL',kind:'gauss',slot:2,
+        speed:PROJECTILE_SPEEDS.gauss,range:600,cooldown:.95,damageFlat:40,energyCost:14,shieldBypass:.25,assist:.5,audioKey:'gauss',mountSize:'M'},
+    pdc:{id:'pdc',nameKey:'POINT-DEFENSE CLUSTER',hudNameKey:'PDC',kind:'pdc',slot:3,equipmentId:'pdc-cluster',
+        speed:PROJECTILE_SPEEDS.normal,range:300,cooldown:.07,damageFlat:.8,energyCost:.6,shieldMul:.15,assist:1,audioKey:'pdc',mountSize:'S',
+        burstSize:10,shotInterval:.07,burstPause:1,interceptInterval:.6,interceptEnergy:4},
+    ripper:{id:'ripper',nameKey:'RIPPER SCATTERGUN',hudNameKey:'RIPPER',kind:'ripper',slot:4,equipmentId:'ripper-scattergun',
+        speed:PROJECTILE_SPEEDS.normal,range:350,cooldown:.78,damageFlat:5.5,energyCost:9,hullMul:1.7,pellets:7,spreadRad:.035,assist:1,audioKey:'ripper',mountSize:'S'},
+    ion:{id:'ion',nameKey:'ION PROJECTOR',hudNameKey:'ION',kind:'ion',slot:5,equipmentId:'ion-lance',
+        speed:PROJECTILE_SPEEDS.normal,range:400,cooldown:.62,damageFlat:5,energyCost:9,shieldMul:4,jamSeconds:.8,assist:1,audioKey:'ion',mountSize:'M'},
+    mortar:{id:'mortar',nameKey:'SUNLANCE PLASMA MORTAR',hudNameKey:'PLASMA MORTAR',kind:'mortar',slot:6,equipmentId:'sunlance-mortar',
+        speed:PROJECTILE_SPEEDS.plasma,range:450,cooldown:1.5,damageFlat:180,energyCost:32,splashRadius:18,splashMin:4,splashDamage:24,assist:.35,audioKey:'mortar',mountSize:'M'},
 };
+const descriptions={
+    pulse:'Normal-speed fire. Shares its lead with pulse, ion and scatterguns. 400 km range.',
+    'pulse-mk2':'Stronger normal-speed pulse fire. Shares the standard lead; uses more energy. 400 km range.',
+    gauss:'Very fast precision shots bypass 25% of shields. Slow firing; 600 km range.',
+    ripper:'Normal-speed pellet spread deals extra hull damage. Shares the standard lead; 350 km range.',
+    ion:'Normal-speed shots strip shields and briefly disrupt exposed weapons. Shares the standard lead; 400 km range.',
+    mortar:'Slow plasma rewards accurate direct hits with high damage and energy efficiency. Small blast; 450 km range.',
+    pdc:'Missiles first. Ten-round bursts at selected hostiles; 15% shield damage. 300 km range against ships and missiles.',
+    beam:'Instant beam pulses make aiming easy. Lower damage and energy efficiency; 300 km range.',
+};
+for(const weapon of Object.values(WEAPONS)){
+    weapon.life=weapon.range/weapon.speed;
+    weapon.ammoId=null;weapon.pierce=0;
+    weapon.descriptionKey=weapon.envelopeKey=descriptions[weapon.id];
+}
+export const TRACKING_LASER=Object.freeze({id:'tracking-turret',kind:'beam',range:300,speed:100000,damageFlat:4,energyCost:4,cooldown:.7});
+export const weaponRange=weapon=>weapon.range??weapon.speed*weapon.life;
+export const weaponShotDamage=weapon=>weapon.damageFlat??0;
 // Launcher records are kept beside guns because they share target and
 // projectile plumbing, but they use ship-local magazines and their own
 // selection cycle. A swarm canister is one magazine round that opens into
@@ -190,9 +62,10 @@ export const LAUNCHERS = {
         id: 'seeker',
         nameKey: 'SEEKER MISSILE RACK',
         category: 'launcher',
-        speed: 104,
-        homingSpeed: 104,
-        homingTurn: 3.1,
+        speed: 260,
+        homingSpeed: 260,
+        homingTurn: 1.8,
+        acceleration: 520, lockRange: 800,
         damage: 42,
         life: 8,
         cooldown: 1.1,
@@ -209,9 +82,10 @@ export const LAUNCHERS = {
         id: 'swarm',
         nameKey: 'SWARM MISSILE RACK',
         category: 'launcher',
-        speed: 112,
-        homingSpeed: 112,
-        homingTurn: 3.8,
+        speed: 300,
+        homingSpeed: 300,
+        homingTurn: 2.4,
+        acceleration: 650, lockRange: 700,
         damage: 15,
         life: 6.4,
         cooldown: 1.3,
@@ -228,9 +102,10 @@ export const LAUNCHERS = {
         id: 'torpedo',
         nameKey: 'TORPEDO TUBE',
         category: 'launcher',
-        speed: 58,
-        homingSpeed: 58,
-        homingTurn: 1.45,
+        speed: 210,
+        homingSpeed: 210,
+        homingTurn: .8,
+        acceleration: 320, lockRange: 600,
         damage: 118,
         life: 10,
         cooldown: 2.6,
@@ -246,23 +121,14 @@ export const LAUNCHERS = {
         audioKey: 'missile',
     },
 };
-export const WEAPON_ORDER = ['pulse', 'gauss', 'pdc', 'ripper', 'ion', 'mortar', 'pulse-mk2'];
+export const WEAPON_ORDER = ['pulse', 'gauss', 'pdc', 'ripper', 'ion', 'mortar', 'pulse-mk2', 'beam'];
 export const LAUNCHER_ORDER = ['seeker', 'swarm', 'torpedo'];
 // Ammo pool capacities keyed by ammoId (null-ammo weapons are energy-pooled
 // or heat-gated and never run dry — pressure comes from cadence/heat).
-export const AMMO_CAPACITY = {
-    slugs: 48,
-    shells: 36,
-    cells: 60,
-    pods: 10,
-};
-// Station restock price per unit of ammo, charged by the REFILL service.
-export const AMMO_UNIT_COST = {
-    slugs: 26,
-    shells: 18,
-    cells: 22,
-    pods: 40,
-};
+export const AMMO_CAPACITY = Object.freeze({});
+export const AMMO_UNIT_COST = Object.freeze({});
+// Migration only: obsolete ammunition is exchanged once, at its former price.
+export const LEGACY_GUN_AMMO = Object.freeze({slugs: [48,26], shells: [36,18], cells: [60,22], pods: [10,40]});
 export const ammoCapacity = (ammoId) => (ammoId ? AMMO_CAPACITY[ammoId] ?? 0 : 0);
 export const weaponForSlot = (slot) => WEAPONS[WEAPON_ORDER[slot - 1]];
 export const launcherForId = (id) => LAUNCHERS[id];
@@ -284,6 +150,7 @@ export const weaponIdForOutfit = (itemOrId) => {
     if (id === 'pulse-mk2')
         return 'pulse-mk2';
     const item = OUTFIT_ITEMS[id];
+    if(item?.category==='turret')return undefined;
     const candidate = item?.weaponId ?? item?.effects?.weaponId;
     return candidate && WEAPONS[candidate] ? candidate : (WEAPONS[id] ? id : undefined);
 };
@@ -468,3 +335,5 @@ export const syncLauncherMissileTotal = (player) => {
 // receive their factory pulse/gauss mounts through outfitting state. The
 // fallback list remains solely for old tests/imported saves at the boundary.
 export const STANDARD_ISSUE = ['pulse', 'gauss'];
+
+export const weaponAssistCone = weapon => 0.18 * (weapon?.assist ?? 1);

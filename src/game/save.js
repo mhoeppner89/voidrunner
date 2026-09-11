@@ -5,14 +5,14 @@ import { refreshMissionOffers } from './missions.js';
 import { normalizeRaceRecord } from './racing.js';
 import { clamp } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
-import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, normalizeLauncherMagazines } from './weapons.js';
+import { AMMO_CAPACITY, LEGACY_GUN_AMMO, WEAPON_ORDER, WEAPONS, normalizeLauncherMagazines } from './weapons.js';
 import { collapseOutfittingToSingleShip, createOutfittingState, normalizeOutfitting, projectLegacyEquipment, projectLegacyWeaponId } from './outfitting.js';
 import { combinedHullIntegrity, normalizeEnergy } from './combatResources.js';
 import { normalizeQuestStates } from './quests.js';
 import { startTutorialCampaign } from './tutorialCampaign.js';
 export const SAVE_KEY = 'void-privateer-save-v1';
 export const SETTINGS_KEY = 'void-privateer-settings-v1';
-export const SAVE_VERSION = 12;
+export const SAVE_VERSION = 14;
 // Test-funds build: a fresh career starts with enough credits to try any ship,
 // outfitting module or trade route without grinding first.
 export const STARTING_CREDITS = 500000;
@@ -35,6 +35,7 @@ export const defaultSettings = () => ({
     // High fidelity is the single shipping presentation. The retired Auto and
     // Low modes traded away too much resolution for inconsistent gains.
     quality: 'high',
+    powerMode: 'auto',
     touchScale: 1,
     vibration: true,
     steering: 'tilt',
@@ -147,6 +148,7 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             // first met and how often individual conversation topics were
             // discussed; authored dialogue stays in the location catalogue.
             npcMemory: {},
+            travelRadioHeard: [],
             // Mission results wait here until the next dock screen can present
             // a proper settlement docket. Entries are acknowledged and removed
             // by the player, so this queue stays short in normal play.
@@ -176,7 +178,14 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
     refreshMissionOffers(save, true);
     return save;
 };
-const storageAvailable = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+const storageAvailable = () => {
+    try {
+        return typeof window !== 'undefined' && Boolean(window.localStorage);
+    }
+    catch {
+        return false;
+    }
+};
 const normalizeSettings = (candidate) => {
     const defaults = defaultSettings();
     const source = candidate && typeof candidate === 'object' && !Array.isArray(candidate) ? candidate : {};
@@ -200,6 +209,7 @@ const normalizeSettings = (candidate) => {
         // Migrate every legacy Auto/Low preference to the high-fidelity
         // baseline. Keeping the field preserves save compatibility.
         quality: 'high',
+        powerMode: ['auto','battery','performance'].includes(source.powerMode) ? source.powerMode : 'auto',
         touchScale: numberInRange('touchScale', 0.8, 1.3),
         vibration: boolean('vibration'),
         steering: source.steering === 'stick' ? 'stick' : 'tilt',
@@ -302,6 +312,7 @@ export const saveGame = (save) => {
         delete persist.player.prevPosition;
         delete persist.player.prevRotation;
         delete persist.player.shipStates;
+        delete persist.player.turretRuntime;
         window.localStorage.setItem(SAVE_KEY, JSON.stringify(persist));
         return true;
     }
@@ -518,6 +529,11 @@ export const hydrateSave = (candidate) => {
             bountyKills: candidate.world?.bountyKills ?? [],
             registry: candidate.world?.registry ?? {},
             npcMemory: normalizeNpcMemory(candidate.world?.npcMemory),
+            travelRadioHeard: [...new Set((Array.isArray(candidate.world?.travelRadioHeard) ? candidate.world.travelRadioHeard : [])
+                .filter(id => typeof id === 'string' && /^[a-z0-9-]{1,64}$/.test(id)))].slice(-64),
+            dialogueHistory: (Array.isArray(candidate.world?.dialogueHistory) ? candidate.world.dialogueHistory : [])
+                .filter(entry => entry && typeof entry.speaker === 'string' && typeof entry.text === 'string')
+                .slice(-160).map(entry => ({speaker:entry.speaker.slice(0,120),text:entry.text.slice(0,4000)})),
             missionSettlements: normalizeMissionSettlements(candidate.world?.missionSettlements),
             localContractProgress: normalizeLocalContractProgress(candidate.world?.localContractProgress),
             // Upgrade legacy rank/time entries into the persistent PB/split
@@ -635,6 +651,7 @@ export const hydrateSave = (candidate) => {
         save.player.equipment = projectLegacyEquipment(save.player, save.player.outfitting);
         save.player.weaponId = projectLegacyWeaponId(save.player, save.player.shipId, save.player.outfitting.loadouts?.[save.player.shipId]?.fireGroups?.activeGroup);
     }
+    delete save.player.turretRuntime;
     save.version = SAVE_VERSION;
     const stats = getEffectiveShipStats(save.player);
     if (sourceVersion < 9) {
@@ -688,6 +705,15 @@ export const hydrateSave = (candidate) => {
     // waiting for the board's timed refresh.
     save.world.localContractOffersDirty = true;
     refreshMissionOffers(save);
+    if ((candidate.version ?? 0) < 13) {
+        let refund = 0;
+        for (const [id, [cap, cost]] of Object.entries(LEGACY_GUN_AMMO)) {
+            const count = Number(candidate.player?.ammo?.[id]);
+            if (Number.isFinite(count)) refund += Math.floor(clamp(count, 0, cap)) * cost;
+        }
+        save.player.credits += refund;
+    }
+    save.player.ammo = {};
     return save;
 };
 export const loadGame = () => {
@@ -705,9 +731,21 @@ export const loadGame = () => {
         return undefined;
     }
 };
-export const hasSavedGame = () => storageAvailable() && Boolean(window.localStorage.getItem(SAVE_KEY));
+export const hasSavedGame = () => {
+    try {
+        return storageAvailable() && Boolean(window.localStorage.getItem(SAVE_KEY));
+    }
+    catch {
+        return false;
+    }
+};
 export const deleteSave = () => {
     if (!storageAvailable())
         return;
-    window.localStorage.removeItem(SAVE_KEY);
+    try {
+        window.localStorage.removeItem(SAVE_KEY);
+    }
+    catch (error) {
+        console.warn('Unable to delete save.', error);
+    }
 };

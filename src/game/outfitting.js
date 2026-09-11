@@ -1,3 +1,4 @@
+import { TURRET_LAYOUTS } from './turretLayouts.js';
 /*
  * Ship outfitting is deliberately kept independent from the dock UI and the
  * flight simulator.  A loadout is just a set of item ids in named hardpoint
@@ -10,10 +11,10 @@
  */
 import { LOCATIONS, SHIPS } from './data.js';
 
-export const OUTFIT_CATEGORIES = Object.freeze(['gun', 'launcher', 'drive', 'defense', 'utility']);
-export const LOADOUT_KEYS = Object.freeze(['guns', 'launchers', 'drive', 'defense', 'utility']);
+export const OUTFIT_CATEGORIES = Object.freeze(['gun', 'launcher', 'turret', 'power', 'drive', 'defense', 'utility']);
+export const LOADOUT_KEYS = Object.freeze(['guns', 'launchers', 'turrets', 'power', 'drive', 'defense', 'utility']);
 export const RESALE_RATE = 0.7;
-export const OUTFITTING_SCHEMA = 1;
+export const OUTFITTING_SCHEMA = 2;
 
 const freeze = (value) => Object.freeze(value);
 const freezeItem = (item) => {
@@ -37,53 +38,72 @@ const freezeItem = (item) => {
 // that replaced a historical id lets save migration and old UI callers keep
 // working without adding aliases to the 18-item shop roster.
 const itemRecords = [
+    { id:'tracking-turret', name:'Tracking Laser Turret', category:'turret', size:'S', sizes:['S','M'], price:4200, mass:3,
+      description:'Instant supporting fire at your selected hostile within 300 km. Reserves energy for forward guns; the hull limits its firing arc.', stat:'300 km · 4 damage · 4 energy · 0.7 s interval',
+      turretKind:'laser',effects:{turretKind:'laser'},availability:['helix','rook','vesper'],art:'./art/outfitting/pulse-cannon.webp' },
+    { id:'capacitor-bank', name:'Large Capacitor', category:'power', size:'M', sizes:['M'], price:3600, mass:4,
+      description:'Longer firing bursts, but slower energy recovery.',stat:'+50% capacity · −20% output',
+      effects:{capacityMultiplier:1.5,outputMultiplier:0.8},availability:['helix','rook','vesper'],art:'./art/outfitting/engine-mk2.webp' },
+    { id:'sustained-reactor', name:'High-Output Reactor', category:'power', size:'M', sizes:['M'], price:3600, mass:4,
+      description:'Supports sustained fire, with a smaller burst reserve.',stat:'+30% output · −25% capacity',
+      effects:{capacityMultiplier:0.75,outputMultiplier:1.3},availability:['helix','rook','vesper'],art:'./art/outfitting/engine-mk2.webp' },
+    { id:'recovery-shield', name:'Fast-Recovery Shield', category:'defense', size:'M', sizes:['M'], price:5800, mass:4,
+      description:'Recovers quickly after breaking contact, but absorbs less damage.',stat:'−25% capacity · +60% recovery',
+      effects:{shieldMultiplier:0.75,rechargeMultiplier:1.6},availability:['helix','rook','vesper'],art:'./art/outfitting/shield-mk2.webp' },
+    {
+        id: 'beam-emitter', name: 'Beam Emitter', category: 'gun', size: 'S', sizes: ['S', 'M'],
+        price: 2400, energyCost: 6, mass: 3, weaponId: 'beam', factoryFit: true,
+        description: "Instant beam pulses make aiming easy. Lower damage and energy efficiency; 300 km range.", stat: '300 km · 8 damage · 6 energy · 0.4 s interval',
+        effects: {weaponId: 'beam'}, availability: ['helix', 'rook', 'vesper'],
+        art: './art/outfitting/ion-blaster.webp',
+    },
     {
         id: 'pulse-cannon', name: 'Pulse Cannon', category: 'gun', size: 'S', sizes: ['S', 'M'],
         price: 1200, energyCost: 3.2, mass: 1, weaponId: 'pulse', factoryFit: true,
-        description: 'A dependable energy repeater fitted to every new hull.', stat: '3.2 energy / shot · no ammunition',
+        description: "Normal-speed fire. Shares its lead with pulse, ion and scatterguns. 400 km range.", stat: '400 km · 10 damage · 3.2 energy',
         effects: { weaponId: 'pulse', damageMultiplier: 1 }, availability: ['helix', 'rook', 'vesper', 'azure'],
         art: './art/outfitting/pulse-cannon.webp',
     },
     {
-        id: 'pulse-mk2', name: 'Pulse Cannon Mk II', category: 'gun', size: 'M', sizes: ['M'],
+        id: 'pulse-mk2', name: 'High-Output Pulse Cannon', category: 'gun', size: 'M', sizes: ['M'],
         price: 10200, energyCost: 5, mass: 3, weaponId: 'pulse',
-        description: 'A tighter, hotter pulse battery for pilots who want reliable damage at every range.', stat: '+35% pulse damage · 5 energy / shot',
+        description: "Stronger normal-speed pulse fire. Shares the standard lead; uses more energy. 400 km range.", stat: '400 km · 13.5 damage · 5 energy',
         effects: { weaponId: 'pulse', damageMultiplier: 1.35, upgradedFrom: 'pulse-cannon' }, availability: ['rook', 'vesper'],
         requiredGuild: 'bounty', requiredRank: 1, art: './art/outfitting/pulse-mk2.webp',
     },
     {
         id: 'gauss-cannon', name: 'Gauss Cannon', category: 'gun', size: 'M', sizes: ['M'],
-        price: 5200, energyCost: 6.5, mass: 4, weaponId: 'gauss', factoryFit: true,
-        description: 'A long-range magnetic slug thrower with a slow, decisive firing rhythm.', stat: '×3.2 damage · 6.5 energy / shot',
-        effects: { weaponId: 'gauss', damageMultiplier: 3.2, ammoId: 'slugs' }, availability: ['helix', 'rook'],
+        price: 5200, energyCost: 14, mass: 4, weaponId: 'gauss', factoryFit: true,
+        description: "Very fast precision shots bypass 25% of shields. Slow firing; 600 km range.", stat: '600 km · 40 damage · 25% shield bypass',
+        effects: { weaponId: 'gauss', damage: 40 }, availability: ['helix', 'rook'],
         art: './art/outfitting/gauss-cannon.webp',
     },
     {
-        id: 'pdc', name: 'Point-Defense Cluster', category: 'gun', size: 'S', sizes: ['S', 'M'],
-        price: 4400, energyCost: 0.8, mass: 2, weaponId: 'pdc',
-        description: 'A close-range defensive cluster that turns missiles and knife-fight attackers into scrap.', stat: 'Missile guard · 0.8 energy / burst',
-        effects: { weaponId: 'pdc', missileInterception: 60, heatGated: true }, availability: ['rook'],
+        id: 'pdc', name: 'Point-Defence Turret', category: 'turret', size: 'S', sizes: ['S', 'M'],
+        price: 3600, energyCost: 4, mass: 2, turretKind: 'pdc',
+        description: "Missiles first. Ten-round bursts at selected hostiles; 15% shield damage. 300 km range against ships and missiles.", stat: '300 km · 10-round bursts · 15% shield damage',
+        effects: { turretKind: 'pdc' }, availability: ['helix', 'rook', 'vesper'],
         legacyEquipmentId: 'pdc-cluster', art: './art/outfitting/pdc.webp',
     },
     {
         id: 'ripper', name: 'Ripper Scattergun', category: 'gun', size: 'S', sizes: ['S', 'M'],
-        price: 3600, energyCost: 5, mass: 3, weaponId: 'ripper',
-        description: 'Seven short-range pellets spread into a brutal shell cloud inside an opponent’s turn circle.', stat: '7 pellets · 5 energy / shell',
-        effects: { weaponId: 'ripper', pellets: 7, effectiveRange: 55 }, availability: ['helix', 'rook'],
+        price: 3600, energyCost: 9, mass: 3, weaponId: 'ripper',
+        description: "Normal-speed pellet spread deals extra hull damage. Shares the standard lead; 350 km range.", stat: '350 km · 7 pellets · 9 energy',
+        effects: { weaponId: 'ripper', pellets: 7, effectiveRange: 350 }, availability: ['helix', 'rook'],
         legacyEquipmentId: 'ripper-scattergun', art: './art/outfitting/ripper.webp',
     },
     {
-        id: 'ion-blaster', name: 'Ion Blaster', category: 'gun', size: 'M', sizes: ['M'],
+        id: 'ion-blaster', name: 'Ion Projector', category: 'gun', size: 'M', sizes: ['M'],
         price: 5600, energyCost: 9, mass: 5, weaponId: 'ion',
-        description: 'A shield-cracking discharge that jams hostile guns long enough to open the fight.', stat: '×4 vs shields · 9 energy / shot',
-        effects: { weaponId: 'ion', shieldMultiplier: 4, jamSeconds: 1.8 }, availability: ['rook', 'vesper'],
+        description: "Normal-speed shots strip shields and briefly disrupt exposed weapons. Shares the standard lead; 400 km range.", stat: '400 km · ×4 vs shields · 9 energy',
+        effects: { weaponId: 'ion', shieldMultiplier: 4, jamSeconds: 0.8 }, availability: ['rook', 'vesper'],
         legacyEquipmentId: 'ion-lance', art: './art/outfitting/ion-blaster.webp',
     },
     {
         id: 'mortar', name: 'Sunlance Plasma Mortar', category: 'gun', size: 'M', sizes: ['M'],
-        price: 7200, energyCost: 14, mass: 7, weaponId: 'mortar',
-        description: 'A slow plasma orb that rewards patience with splash damage and a lingering hull burn.', stat: 'Splash + burn · 14 energy / shot',
-        effects: { weaponId: 'mortar', splashRadius: 26, burnDps: 6, burnSeconds: 4 }, availability: ['rook'],
+        price: 7200, energyCost: 32, mass: 7, weaponId: 'mortar',
+        description: "Slow plasma rewards accurate direct hits with high damage and energy efficiency. Small blast; 450 km range.", stat: '450 km · 180 direct damage · 32 energy',
+        effects: { weaponId: 'mortar', splashRadius: 18 }, availability: ['rook'],
         legacyEquipmentId: 'sunlance-mortar', art: './art/outfitting/mortar.webp',
     },
     {
@@ -91,43 +111,43 @@ const itemRecords = [
         // Factory fit: every hull can launch the existing missile stock on a
         // new career without buying a launcher first.
         price: 1800, mass: 2, weaponId: 'seeker', factoryFit: true,
-        description: 'A compact guided rack that gives a new pilot a forgiving first missile lock.', stat: '4 seeker missiles · high tracking',
+        description: 'A compact guided rack that gives a new pilot a forgiving first missile lock.', stat: '4 seekers · 800 km lock · 260 km/s',
         effects: { weaponId: 'seeker', tracking: 'high', ammoId: 'missiles' }, availability: ['helix', 'rook', 'vesper', 'azure'],
         art: './art/outfitting/seeker-launcher.webp',
     },
     {
         id: 'swarm-launcher', name: 'Swarm Missile Rack', category: 'launcher', size: 'M', sizes: ['M'],
         price: 6200, mass: 4, weaponId: 'swarm',
-        description: 'A medium rack that fills the approach with several fast, imperfectly tracking warheads.', stat: '12 swarm canisters · 4-warhead volley',
+        description: 'A medium rack that fills the approach with several fast, imperfectly tracking warheads.', stat: '12 canisters · 4 warheads · 300 km/s',
         effects: { weaponId: 'swarm', volley: 4, tracking: 'medium', ammoId: 'missiles' }, availability: ['rook', 'azure'],
         art: './art/outfitting/swarm-launcher.webp',
     },
     {
         id: 'torpedo-launcher', name: 'Torpedo Tube', category: 'launcher', size: 'M', sizes: ['M'],
         price: 9800, mass: 6, weaponId: 'torpedo',
-        description: 'A heavy tube for deliberate shots against large, slow or already-disabled targets.', stat: '2 heavy torpedoes · splash r=20',
+        description: 'A heavy tube for deliberate shots against large, slow or already-disabled targets.', stat: '2 torpedoes · 600 km lock · 210 km/s',
         effects: { weaponId: 'torpedo', tracking: 'low', splashRadius: 20, ammoId: 'missiles' }, availability: ['rook'],
         art: './art/outfitting/torpedo-launcher.webp',
     },
     {
-        id: 'engine-mk2', name: 'Overburn Engine Core', category: 'drive', size: 'M', sizes: ['M'],
+        id: 'engine-mk2', name: 'Sprint Engine', category: 'drive', size: 'M', sizes: ['M'],
         price: 8400, mass: 6,
-        description: 'A hotter drive core with better thrust and a stronger feed to the ship capacitor.', stat: '+18% thrust · +3 reactor output',
-        effects: { speedMultiplier: 1.18, accelerationMultiplier: 1.18, reactorOutput: 3 }, availability: ['helix', 'vesper', 'azure'],
+        description: 'Higher speed for long passes, with weaker turning and greater boost fuel use.', stat: '+18% speed · −15% turning · +50% boost fuel',
+        effects: { speedMultiplier: 1.18, accelerationMultiplier: 1.1, turnMultiplier:0.85, burnFuelMultiplier:1.5 }, availability: ['helix', 'vesper', 'azure'],
         art: './art/outfitting/engine-mk2.webp',
     },
     {
-        id: 'thrusters-mk2', name: 'Vector Thruster Rack', category: 'drive', size: 'M', sizes: ['M'],
+        id: 'thrusters-mk2', name: 'Manoeuvring Thrusters', category: 'drive', size: 'M', sizes: ['M'],
         price: 7200, mass: 5,
-        description: 'Reinforced attitude jets that recover from hard turns faster and keep a light hull on the mark.', stat: '+22% turn authority',
-        effects: { turnMultiplier: 1.22 }, availability: ['rook', 'vesper'],
+        description: 'Stronger turning and drift correction, with a lower top speed.', stat: '+35% turning · −12% speed',
+        effects: { turnMultiplier: 1.35, speedMultiplier:0.88, lateralMultiplier:1.3 }, availability: ['rook', 'vesper'],
         art: './art/outfitting/thrusters-mk2.webp',
     },
     {
         id: 'shield-mk2', name: 'Dual-Layer Shield Grid', category: 'defense', size: 'M', sizes: ['M'],
         price: 9600, mass: 7,
-        description: 'A second shield layer that gives a pilot more time to disengage before hull integrity is exposed.', stat: '+45 shield capacity',
-        effects: { shieldCapacity: 45 }, availability: ['helix', 'rook'],
+        description: 'Absorbs more damage, but takes longer to recover after a fight.', stat: '+45 shield capacity · −35% recovery',
+        effects: { shieldCapacity: 45, rechargeMultiplier:0.65 }, availability: ['helix', 'rook'],
         art: './art/outfitting/shield-mk2.webp',
     },
     {
@@ -185,12 +205,15 @@ const makeMounts = (shipId, guns, launchers, utilitySizes, mass) => {
         mass,
         guns: guns.map(([size, index]) => mount(`${shipId}-gun-${index}`, 'gun', size)),
         launchers: launchers.map(([size, index]) => mount(`${shipId}-launcher-${index}`, 'launcher', size)),
+        turrets: (TURRET_LAYOUTS[shipId] ?? []).map((slot,index)=>({...mount(`${shipId}-turret-${index}`,'turret',slot.size),...slot})),
+        power: [mount(`${shipId}-power-0`,'power','M')],
         drive: [mount(`${shipId}-drive-0`, 'drive', 'M')],
         defense: [mount(`${shipId}-defense-0`, 'defense', 'M')],
         utility: utilitySizes.map((size, index) => mount(`${shipId}-utility-${index}`, 'utility', size)),
     };
     spec.mounts = {
         gun: spec.guns,
+        turret: spec.turrets, power:spec.power,
         launcher: spec.launchers,
         drive: spec.drive,
         defense: spec.defense,
@@ -198,6 +221,7 @@ const makeMounts = (shipId, guns, launchers, utilitySizes, mass) => {
     };
     spec.slotCounts = {
         gun: spec.guns.length,
+        turret:spec.turrets.length,power:1,
         launcher: spec.launchers.length,
         drive: spec.drive.length,
         defense: spec.defense.length,
@@ -205,6 +229,8 @@ const makeMounts = (shipId, guns, launchers, utilitySizes, mass) => {
     };
     spec.massBudget = mass;
     spec.hardpoints = {
+        turrets: { S: spec.turrets.filter(slot => slot.size === 'S').length, M: spec.turrets.filter(slot => slot.size === 'M').length },
+        power: spec.power.length,
         guns: { S: spec.guns.filter((slot) => slot.size === 'S').length, M: spec.guns.filter((slot) => slot.size === 'M').length },
         launchers: { S: spec.launchers.filter((slot) => slot.size === 'S').length, M: spec.launchers.filter((slot) => slot.size === 'M').length },
         drive: spec.drive.length,
@@ -219,18 +245,18 @@ const makeMounts = (shipId, guns, launchers, utilitySizes, mass) => {
 // never an installation gate: a demanding gun fit is legal, but it can drain
 // the capacitor faster than the hull replenishes it.
 export const HULL_HARDPOINTS = freeze({
-    wayfarer: makeMounts('wayfarer', [['S', 0], ['S', 1], ['M', 2]], [['S', 0]], ['M', 'S'], 34),
+    wayfarer: makeMounts('wayfarer', [['S', 0], ['S', 1]], [['S', 0]], ['M', 'S'], 34),
     talon: makeMounts('talon', [['S', 0], ['S', 1], ['M', 2]], [['S', 0]], ['S'], 28),
-    vanguard: makeMounts('vanguard', [['S', 0], ['S', 1], ['M', 2], ['M', 3]], [['M', 0]], ['M', 'S'], 52),
-    prospector: makeMounts('prospector', [['S', 0], ['M', 1]], [['S', 0]], ['M', 'M', 'S'], 70),
-    lancer: makeMounts('lancer', [['M', 0], ['M', 1], ['M', 2]], [['M', 0], ['M', 1]], ['S'], 44),
-    atlas: makeMounts('atlas', [['M', 0], ['M', 1]], [['M', 0]], ['M', 'M', 'S', 'S'], 120),
+    vanguard: makeMounts('vanguard', [['M', 0], ['M', 1]], [['M', 0]], ['M', 'S'], 52),
+    prospector: makeMounts('prospector', [['S', 0]], [['S', 0]], ['M', 'M', 'S'], 70),
+    lancer: makeMounts('lancer', [['M', 0], ['M', 1]], [['M', 0], ['M', 1]], ['S'], 44),
+    atlas: makeMounts('atlas', [['M', 0]], [['M', 0]], ['M', 'M', 'S', 'S'], 120),
 });
 export const HARDPOINT_SPECS = HULL_HARDPOINTS;
 export const UNIQUE_OUTFIT_IDS = freeze(['radar-mk2', 'mining-mk2', 'salvage-mk2']);
-const FACTORY_BASELINE_IDS = freeze(['pulse-cannon', 'gauss-cannon', 'seeker-launcher']);
+const FACTORY_BASELINE_IDS = freeze(['pulse-cannon', 'gauss-cannon', 'seeker-launcher', 'beam-emitter']);
 
-const categoryKey = (category) => category === 'gun' ? 'guns' : category === 'launcher' ? 'launchers' : category;
+const categoryKey = (category) => category === 'gun' ? 'guns' : category === 'launcher' ? 'launchers' : category === 'turret' ? 'turrets' : category;
 const canonicalId = (id) => LEGACY_OUTFIT_ID_MAP[id] ?? id;
 const itemFor = (itemOrId) => typeof itemOrId === 'string' ? OUTFIT_ITEMS[canonicalId(itemOrId)] : itemOrId?.id ? OUTFIT_ITEMS[canonicalId(itemOrId.id)] ?? itemOrId : undefined;
 const clone = (value) => JSON.parse(JSON.stringify(value));
@@ -275,7 +301,7 @@ export const outfitItem = (id) => OUTFIT_ITEMS[canonicalId(id)];
 // its old active-weapon id is still meaningful. Keep that distinction at the
 // migration boundary instead of letting a registry lookup collapse it back to
 // the ordinary pulse cannon.
-const outfitIdForWeapon = (weaponId) => weaponId === 'pulse-mk2'
+const outfitIdForWeapon = (weaponId) => weaponId === 'pdc' ? 'pdc' : weaponId === 'pulse-mk2'
     ? 'pulse-mk2'
     : Object.values(OUTFIT_ITEMS).find((item) => item.weaponId === weaponId)?.id;
 
@@ -293,9 +319,10 @@ const mountsFor = (shipId, category) => specFor(shipId)?.[categoryKey(category)]
 const emptyFactoryFlags = (shipId) => {
     const spec = specFor(shipId);
     if (!spec)
-        return { guns: [], launchers: [], drive: [], defense: [], utility: [] };
+        return { guns: [], launchers: [], turrets:[], power:[], drive: [], defense: [], utility: [] };
     return {
         guns: spec.guns.map(() => false),
+        turrets:spec.turrets.map(()=>false),power:[false],
         launchers: spec.launchers.map(() => false),
         drive: spec.drive.map(() => false),
         defense: spec.defense.map(() => false),
@@ -366,15 +393,16 @@ const normalizeFireGroups = (shipId, source) => {
             if (group === 'A' || group === 'B')
                 assignments[mountId] = group;
     }
-    return { activeGroup: raw.activeGroup === 'B' ? 'B' : 'A', assignments };
+    return { activeGroup: raw.activeGroup === 'ALL' ? 'ALL' : raw.activeGroup === 'B' ? 'B' : 'A', assignments };
 };
 
 const emptyLoadout = (shipId) => {
     const spec = specFor(shipId);
     if (!spec)
-        return { guns: [], launchers: [], drive: [], defense: [], utility: [] };
+        return { guns: [], launchers: [], turrets:[], power:[], drive: [], defense: [], utility: [] };
     return {
         guns: spec.guns.map(() => null),
+        turrets:spec.turrets.map(()=>null),power:[null],
         launchers: spec.launchers.map(() => null),
         drive: spec.drive.map(() => null),
         defense: spec.defense.map(() => null),
@@ -433,8 +461,8 @@ const standardFit = (shipId, loadout) => {
     // A pulse cannon is the universal baseline. Gauss occupies an M bay when
     // one exists and seeker preserves the existing missile control. Factory
     // copies are bundled in the hull state, not an infinite global stock.
-    place('pulse-cannon');
-    place('gauss-cannon');
+    if(shipId==='wayfarer'){place('beam-emitter');place('beam-emitter');}
+    else {place('pulse-cannon');place('gauss-cannon');}
     place('seeker-launcher', () => true, ['launchers']);
     // Alternate the guns that are actually installed, rather than alternating
     // every physical bay. Some hulls leave an empty S bay between their
@@ -448,6 +476,7 @@ const standardFit = (shipId, loadout) => {
         loadout.fireGroups.assignments[mountValue.id] = gunOrder % 2 === 0 ? 'A' : 'B';
         gunOrder += 1;
     }
+    if(shipId==='wayfarer'){loadout.fireGroups.activeGroup='ALL';for(const mount of spec.guns)loadout.fireGroups.assignments[mount.id]='A';}
     return loadout;
 };
 
@@ -536,7 +565,7 @@ const addPaidInstalled = (target, shipId, loadout, savedFlags) => {
 export const collapseOutfittingToSingleShip = (player = {}, shipId = player?.shipId) => {
     const targetId = SHIPS[shipId] && HULL_HARDPOINTS[shipId] ? shipId : 'wayfarer';
     const source = validCanonicalOutfitting(player.outfitting)
-        ? clone(player.outfitting)
+        ? (player.outfitting.schema===1 ? normalizeOutfitting({...player,outfitting:clone(player.outfitting)}) : clone(player.outfitting))
         : migrateLegacyOutfitting(player);
     const targetLoadout = normalizeLoadout(targetId, source.loadouts?.[targetId] ?? {});
     if (!source.loadouts?.[targetId])
@@ -556,7 +585,7 @@ export const collapseOutfittingToSingleShip = (player = {}, shipId = player?.shi
     const installedFactory = factoryCounts(targetId, targetLoadout, targetFactory);
     const factoryLocker = {};
     for (const id of FACTORY_BASELINE_IDS) {
-        const allowance = Math.max(0, 1 - (installedFactory[id] ?? 0));
+        const allowance = Math.max(0, (id==='beam-emitter' && targetId==='wayfarer'?2:1) - (installedFactory[id] ?? 0));
         const count = Math.min(allowance, sourceFactoryLocker[id] ?? 0);
         if (count > 0)
             factoryLocker[id] = count;
@@ -583,7 +612,7 @@ export const commissionOutfittingForShip = (player = {}, shipId) => {
     if (!targetId)
         return undefined;
     const source = validCanonicalOutfitting(player.outfitting)
-        ? clone(player.outfitting)
+        ? (player.outfitting.schema===1 ? normalizeOutfitting({...player,outfitting:clone(player.outfitting)}) : clone(player.outfitting))
         : migrateLegacyOutfitting(player);
     const locker = paidLockerCounts(source);
     const owned = new Set(ownedShipIds(player));
@@ -717,7 +746,7 @@ export const migrateLegacyOutfitting = (player = {}) => {
 };
 
 const validCanonicalOutfitting = (source) => {
-    if (!isRecord(source) || source.schema !== OUTFITTING_SCHEMA || !isRecord(source.locker) || !isRecord(source.loadouts))
+    if (!isRecord(source) || ![1,OUTFITTING_SCHEMA].includes(source.schema) || !isRecord(source.locker) || !isRecord(source.loadouts))
         return false;
     if (source.factoryLocker !== undefined && !isRecord(source.factoryLocker))
         return false;
@@ -746,6 +775,17 @@ export const normalizeOutfitting = (player = {}) => {
         if (!hasSavedLoadout)
             standardFit(shipId, state.loadouts[shipId]);
         state.factory[shipId] = conservativeFactoryFlags(shipId, state.loadouts[shipId], source.factory?.[shipId]);
+        // Preserve every displaced copy, including duplicates, exactly once.
+        if(source.schema<OUTFITTING_SCHEMA) for(const key of LOADOUT_KEYS) {
+            const used=new Set(),remaining={};for(const id of state.loadouts[shipId][key])if(id)remaining[id]=(remaining[id]??0)+1;
+            for(const [index,raw] of (source.loadouts?.[shipId]?.[key]??[]).entries()) {
+                const id=canonicalId(raw);if(!OUTFIT_ITEMS[id])continue;
+                if(remaining[id]>0){const kept=state.loadouts[shipId][key].findIndex((value,i)=>value===id && !used.has(i));used.add(kept);const flag=source.factory?.[shipId]?.[key]?.[index];if(typeof flag==='boolean')state.factory[shipId][key][kept]=flag && Boolean(OUTFIT_ITEMS[id].factoryFit);remaining[id]--;continue;}
+                state.locker[id]=(state.locker[id]??0)+1;
+                if(source.factory?.[shipId]?.[key]?.[index] && OUTFIT_ITEMS[id].factoryFit)state.factoryLocker[id]=(state.factoryLocker[id]??0)+1;
+            }
+        }
+
     }
     // A semantically damaged canonical record can still pass the shape check
     // while silently dropping a module that remains in the old compatibility
@@ -828,12 +868,12 @@ export const projectLegacyEquipment = (player, state = player?.outfitting) => {
  * still use this while it transitions to reading all assigned gun mounts. */
 export const projectLegacyWeaponId = (player, shipId = player?.shipId, group) => {
     const loadout = loadoutFor(player, shipId);
-    const active = group === 'A' || group === 'B'
+    const active = group === 'A' || group === 'B' || group === 'ALL'
         ? group
-        : loadout.fireGroups?.activeGroup === 'B' ? 'B' : 'A';
+        : loadout.fireGroups?.activeGroup === 'ALL' ? 'ALL' : loadout.fireGroups?.activeGroup === 'B' ? 'B' : 'A';
     const spec = specFor(shipId);
     for (const [index, mountValue] of (spec?.guns ?? []).entries()) {
-        if (loadout.fireGroups?.assignments?.[mountValue.id] !== active)
+        if (active!=='ALL' && loadout.fireGroups?.assignments?.[mountValue.id] !== active)
             continue;
         const itemId = canonicalId(loadout.guns[index]);
         const item = outfitItem(itemId);
@@ -1144,6 +1184,7 @@ export const quoteOutfitting = (player = {}, shipId = player.shipId, draft, opti
         shipId,
         loadout: requested,
         afterLoadout: requested,
+        beforeLoadout: current,
         usage: validation.usage,
         validation,
         lockerBefore,

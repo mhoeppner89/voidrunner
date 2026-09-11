@@ -1,17 +1,27 @@
+import {RUN_WAVES,readArenaRun,arenaRecord,runScore,runRewardPlan} from './arenaRun.js';
 import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, LOCATIONS, SHIPS, SYSTEM_MAP_EXTENT, commodityIds, displaySpeed, routeDistanceBetween } from './data.js';
 import { JUMP_ROUTES, SYSTEMS, planRoute } from './galaxy.js';
 import { bestKnownTradeRoute, cargoCapacity, cargoMass, currentProfitableRoutes, denPrice, knownMarketQuotes, quoteCommodityTrade, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { formatCredits, formatDuration, formatNumber } from './random.js';
 import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
-import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, launcherMagazineEntries, weaponOwned } from './weapons.js';
+import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, TRACKING_LASER, LAUNCHERS, weaponRange, weaponShotDamage, weaponIdForOutfit, launcherMagazineEntries, weaponOwned } from './weapons.js';
 import { TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 import { shipTopDownProfile } from './shipTopDownProfile.js';
-import { defaultSettings } from './save.js';
+import { defaultSettings, saveGame } from './save.js';
 import { getLanguage, t } from './i18n.js';
+import { ADVENTURE_DIALOGUES, dialogueText } from './adventureDialogues.js';
 import { HULL_TRADE_IN_RATE, quoteShipTrade } from './shipTrade.js';
-import { HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RATE, itemAvailable, itemFitsMount, loadoutFor, outfittingUsage, quoteOutfitting } from './outfitting.js';
+import { LOADOUT_KEYS, HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RATE, itemAvailable, itemFitsMount, loadoutFor, outfittingUsage, quoteOutfitting } from './outfitting.js';
 import { guildJoinCost, missionBriefing, missionTitle } from './missions.js';
 import { tutorialCampaignSummary, tutorialDialogue } from './tutorialCampaign.js';
+const loadoutGroupDemand=(loadout,mountId)=>{
+    const group=loadout.fireGroups?.assignments?.[mountId] ?? 'A';
+    const hull=Object.values(HARDPOINT_SPECS).find(spec=>spec.guns.some(m=>m.id===mountId));
+    return (hull?.guns ?? []).reduce((sum,m,i)=>{
+        const w=WEAPONS[weaponIdForOutfit(loadout.guns[i])];
+        return sum+(w && (loadout.fireGroups?.assignments?.[m.id] ?? 'A')===group?w.energyCost/w.cooldown:0);
+    },0);
+};
 const escapeHtml = (value) => value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const percent = (value, max) => (max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100)));
 // Every dock screen resolves through one explicit art record. This keeps minor
@@ -313,7 +323,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.8.0';
+const GAME_VERSION = '0.8.1';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -449,7 +459,7 @@ const OUTFITTING_SCREEN_ART = Object.freeze([
     './art/outfitting/v2/dealer-workshop-backdrop-v2.png',
     './art/outfitting/v2/dealer-mechanic-portrait-v2.png',
 ]);
-const OUTFIT_CATEGORY_KEYS = Object.freeze({ guns: 'GUNS', launchers: 'LAUNCHER', drive: 'DRIVE', defense: 'DEFENSE', utility: 'UTILITY' });
+const OUTFIT_CATEGORY_KEYS = Object.freeze({ turrets:'TURRETS',power:'POWER',guns: 'GUNS', launchers: 'LAUNCHER', drive: 'DRIVE', defense: 'DEFENSE', utility: 'UTILITY' });
 const OUTFIT_CATEGORY_TO_KEY = Object.freeze({ gun: 'guns', launcher: 'launchers', drive: 'drive', defense: 'defense', utility: 'utility' });
 const OUTFIT_DEALER_CATEGORIES = Object.freeze({
     guns: Object.freeze({ label: 'GUNS', accepts: ['gun'] }),
@@ -479,9 +489,11 @@ export class GameUI {
     missionMobileDetail = false;
     titleVisible = true;
     hasCareerSave = false;
+    newCareerConfirm = false;
     arenaEnv = 'open';
     arenaScenario = '1v1';
     arenaDifficulty = 'veteran';
+    arenaFit = 'balanced';
     radarContext;
     radarLayoutDirty = true;
     radarCssWidth = 0;
@@ -514,6 +526,7 @@ export class GameUI {
     outfittingItemId;
     outfittingMountId;
     outfittingCategory = 'guns';
+    outfittingStage = 'overview';
     outfittingNotice;
     // Keep decoded images only for the active cockpit, the current dock, and
     // one predicted dock. Network responses remain in the service-worker cache,
@@ -564,9 +577,9 @@ export class GameUI {
     }
     setCockpitShip(shipId = 'wayfarer') {
         const nextId = COCKPIT_ART_BY_SHIP[shipId] ? shipId : 'wayfarer';
-        void this.preloadImageSet('flight-core', [COCKPIT_ART_BY_SHIP[nextId], ...FLIGHT_SCREEN_ART], { priority: 'high' });
         if (this.cockpitShipId === nextId && this.root.dataset.cockpitShip === nextId)
             return;
+        void this.preloadImageSet('flight-core', [COCKPIT_ART_BY_SHIP[nextId], ...FLIGHT_SCREEN_ART], { priority: 'high' });
         this.cockpitShipId = nextId;
         this.root.dataset.cockpitShip = nextId;
         const art = this.el('.cockpit-art');
@@ -768,7 +781,7 @@ export class GameUI {
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="${t('Own ship status display; tap to open ship menu')}">
             <div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
             <div class="screen-race-strip" id="screen-race-strip"><span id="screen-race-label"></span><b id="screen-race-value"></b></div>
-            <div class="screen-ship-layout"><div class="screen-flight"><div><span>${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div><div><span>${t('HOLD')}</span><b id="screen-own-cargo">0.0</b><small id="screen-own-cargo-cap">/32</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em><small id="screen-own-launcher"></small></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i><em id="screen-own-energy-value">72</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">185</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
+            <div class="screen-ship-layout"><div class="screen-flight"><div><span>${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em><small id="screen-own-launcher"></small></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i><em id="screen-own-energy-value">72</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">185</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="${t('Radar display; tap to open navigation map')}">
             <div class="screen-heading radar-heading" id="screen-radar-transponder" data-touch-action="transponder" role="button" tabindex="0" title="${t('Transponder — press B')}">${t('TRANSPONDER ON')}</div>
@@ -780,7 +793,7 @@ export class GameUI {
             <div id="screen-target-readout" class="screen-target-readout">—</div>
             <div class="screen-target-layout"><canvas class="hull-outline" id="target-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-target-shield"></b></i><em id="screen-target-shield-value">—</em></div><div><span>${t('HULL')}</span><i><b id="screen-target-hull"></b></i><em id="screen-target-hull-value">—</em></div></div></div>
           </div>
-          <button type="button" id="hyperdrive-card" class="cockpit-identity" data-touch-action="autopilot" aria-label="${t('Hyperdrive: engage jump to nav point')}"><b>${t('HYPERDRIVE')}</b><em id="hyperdrive-card-status" class="is-hidden"></em></button>
+          <button type="button" id="hyperdrive-card" class="cockpit-identity" data-touch-action="autopilot" aria-label="${t('Hyperdrive: engage jump to nav point')}"><b>HYPERDRIVE</b></button>
 
           <div id="target-bracket" class="target-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
           <div id="target-edge-pointer" class="target-edge-pointer is-hidden" aria-hidden="true"><i></i><span></span></div>
@@ -838,11 +851,22 @@ export class GameUI {
           <div class="copyright-note">${t('LOCAL AUTOSAVE · TOUCH / PAD / KEYBOARD')}</div>
         </section>
 
+        <section id="new-career-panel" class="new-career-panel is-hidden" role="alertdialog" aria-modal="true" aria-labelledby="new-career-heading" aria-describedby="new-career-description">
+          <div class="new-career-card">
+            <h2 id="new-career-heading">${t('Start a new career?')}</h2>
+            <p id="new-career-description">${t('Your current career autosave will be replaced. This cannot be undone.')}</p>
+            <div class="new-career-actions">
+              <button type="button" data-ui-command="cancel-new-career">${t('KEEP CURRENT CAREER')}</button>
+              <button type="button" class="primary" data-ui-command="confirm-new-career">${t('START NEW CAREER')}</button>
+            </div>
+          </div>
+        </section>
         <section id="dock-screen" class="dock-screen is-hidden" aria-label="${t('Docked location')}"></section>
         <section id="map-panel" class="modal-panel is-hidden" aria-label="${t('Navigation map')}"></section>
         <section id="ship-panel" class="modal-panel is-hidden" aria-label="${t('Ship status')}"></section>
         <section id="pause-panel" class="modal-panel is-hidden" aria-label="${t('Pause and settings')}"></section>
         <section id="arena-panel" class="modal-panel is-hidden" aria-label="${t('Combat simulator')}"></section>
+        <section id="adventure-panel" class="adventure-panel is-hidden" role="dialog" aria-modal="true" aria-label="Conversation"></section>
         <section id="chat-panel" class="modal-panel is-hidden" aria-label="${t('Comms log')}"></section>
         <div id="toast-stack" class="toast-stack global-toasts" aria-live="polite"></div>
         <div id="rotate-notice" class="rotate-notice is-hidden" role="alertdialog" aria-label="${t('Rotate your screen to landscape')}">
@@ -862,7 +886,7 @@ export class GameUI {
     `;
     }
     bindStaticEvents() {
-        const delegatedActionSelector = '[data-ui-command], [data-tutorial-action], [data-tutorial-choice], [data-map-view], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-commodity-id], [data-market-qty], [data-bar-panel], [data-dialogue-topic], [data-dialogue-action], [data-mission-board-tab], [data-mission-select], [data-mission-course], [data-mission-discard], [data-mission-discard-confirm], [data-nav-id], [data-trade], [data-jettison], [data-mission-id], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action], [data-equipment-id], [data-ship-id], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty], [data-pay-mug]';
+        const delegatedActionSelector = '[data-ui-command], [data-tutorial-action], [data-map-view], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-commodity-id], [data-market-qty], [data-bar-panel], [data-dialogue-topic], [data-dialogue-action], [data-mission-board-tab], [data-mission-select], [data-mission-course], [data-mission-discard], [data-mission-discard-confirm], [data-nav-id], [data-trade], [data-jettison], [data-mission-id], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action], [data-equipment-id], [data-ship-id], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty], [data-arena-fit], [data-pay-mug]';
         const directPointerElement = (event) => {
             const correctedSceneControl = event.pointerType !== 'mouse' && event.target instanceof Element
                 ? event.target.closest('.scene-pointer')
@@ -959,11 +983,6 @@ export class GameUI {
                 this.handleCommand(target.dataset.uiCommand, target);
             else if (target.dataset.tutorialAction)
                 this.handleTutorialAction(target.dataset.tutorialAction);
-            else if (target.dataset.tutorialChoice) {
-                const result = this.actions?.chooseTutorial?.(target.dataset.tutorialChoice);
-                if (result?.changed)
-                    this.renderDock();
-            }
             else if (target.dataset.mapView)
                 this.setMapView(target.dataset.mapView);
             else if (target.dataset.arenaEnv) {
@@ -973,6 +992,10 @@ export class GameUI {
             else if (target.dataset.arenaScenario) {
                 this.arenaScenario = target.dataset.arenaScenario;
                 this.root.querySelectorAll('[data-arena-scenario]').forEach((button) => button.classList.toggle('selected', button === target));
+            }
+            else if (target.dataset.arenaFit) {
+                this.arenaFit=target.dataset.arenaFit;
+                this.root.querySelectorAll('[data-arena-fit]').forEach(button=>button.classList.toggle('selected',button===target));
             }
             else if (target.dataset.arenaDifficulty) {
                 this.arenaDifficulty = target.dataset.arenaDifficulty;
@@ -1039,6 +1062,7 @@ export class GameUI {
                     this.dockTab = 'concourse';
                     this.dockTerminal = 'services';
                     this.renderDock();
+                    this.actions?.reviewServices?.();
                 }
             }
             else if (target.dataset.marketPoint) {
@@ -1199,7 +1223,7 @@ export class GameUI {
         this.root.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter' && event.key !== ' ')
                 return;
-            const target = event.target.closest('[data-ui-command], [data-tutorial-action], [data-tutorial-choice], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-dialogue-topic], [data-dialogue-action], [data-mission-board-tab], [data-mission-select], [data-mission-course], [data-mission-discard], [data-mission-discard-confirm], [data-mission-id], [data-guild-id], [data-person-id], [data-ship-detail], [data-ship-detail-back], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action]');
+            const target = event.target.closest('[data-ui-command], [data-tutorial-action], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-dialogue-topic], [data-dialogue-action], [data-mission-board-tab], [data-mission-select], [data-mission-course], [data-mission-discard], [data-mission-discard-confirm], [data-mission-id], [data-guild-id], [data-person-id], [data-ship-detail], [data-ship-detail-back], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action]');
             if (!target)
                 return;
             event.preventDefault();
@@ -1209,6 +1233,10 @@ export class GameUI {
     handleTutorialAction(action) {
         if (action === 'skip') {
             this.tutorialSkipConfirm = true;
+        }
+        else if (action === 'talk-rin') {
+            this.openTutorialDecision();
+            return;
         }
         else if (action === 'cancel-skip') {
             this.tutorialSkipConfirm = false;
@@ -1230,8 +1258,23 @@ export class GameUI {
                 this.actions?.resume();
                 break;
             case 'new':
-                if (!this.hasCareerSave || window.confirm('Start a new career and overwrite the local autosave?'))
+                if (this.hasCareerSave)
+                    this.showNewCareerConfirmation();
+                else
                     this.actions?.startNew();
+                break;
+            case 'cancel-new-career':
+                this.closeNewCareerConfirmation();
+                break;
+            case 'confirm-new-career':
+                if (this.newCareerConfirm) {
+                    this.closeNewCareerConfirmation(false);
+                    // Start in the same user gesture so tilt permission still works.
+                    this.actions?.startNew();
+                }
+                break;
+            case 'outfit-stage':
+                this.setOutfittingStage(element?.dataset.outfitStage);
                 break;
             case 'fullscreen':
                 this.actions?.requestFullscreen();
@@ -1242,9 +1285,19 @@ export class GameUI {
             case 'close-arena':
                 this.hideArena();
                 break;
+            case 'new-arena-run':
+                this.hideArena();this.runFitOpen=false;this.actions?.startArenaRun(false,false);break;
+            case 'resume-arena-run':
+                this.hideArena();this.actions?.startArenaRun(true,false);break;
+            case 'hard-arena-run':
+                this.hideArena();this.runFitOpen=false;this.actions?.startArenaRun(false,true);break;
+            case 'run-launch':this.actions?.startRunWave();break;
+            case 'run-fit-toggle':this.runFitOpen=!this.runFitOpen;this.showArenaRun(this.save);break;
+            case 'run-action':
+                this.actions?.arenaRunAction(element.dataset.runAction,element.dataset.runValue,element.dataset.runKey,element.dataset.runIndex);break;
             case 'launch-arena':
                 this.hideArena();
-                this.actions?.startArena(this.arenaEnv, this.arenaScenario, this.arenaDifficulty);
+                this.actions?.startArena(this.arenaEnv, this.arenaScenario, this.arenaDifficulty, this.arenaFit);
                 break;
             case 'launch':
                 if (DOCK_LOCATION_IDS.includes(this.dockLocation) && this.dockTerminal === 'concourse' && element?.classList.contains('concourse-hover-ship'))
@@ -1298,12 +1351,26 @@ export class GameUI {
             case 'dismiss-mission-settlements':
                 this.actions?.acknowledgeMissionSettlements?.();
                 break;
+            case 'adventure-choice':
+                this.advanceAdventure(Number(element.dataset.choiceId));
+                break;
+            case 'adventure-exit':
+                this.closeAdventure();
+                break;
+            case 'adventure-history':
+                if (this.adventure) { this.adventure.history = !this.adventure.history; this.renderAdventure(); }
+                break;
             case 'dismiss-story':
                 this.dismissStory();
                 break;
             case 'close-chat':
                 this.closeChatLog();
                 break;
+            case 'turret-toggle':
+                this.actions?.toggleTurrets?.();
+                break;
+            case 'dismiss-group-help':
+                this.outfitGroupHelp=false;this.refreshOutfitting();break;
             case 'close-ship':
                 this.hideShipMenu();
                 break;
@@ -1363,7 +1430,49 @@ export class GameUI {
                 console.debug('Unhandled UI command', command, element);
         }
     }
+    showNewCareerConfirmation() {
+        const panel = this.root.querySelector('#new-career-panel');
+        if (!panel || this.newCareerConfirm) return;
+        this.newCareerConfirm = true;
+        const title = this.root.querySelector('#title-screen');
+        if (title) title.inert = true;
+        panel.classList.remove('is-hidden');
+        panel.querySelector('[data-ui-command="cancel-new-career"]')?.focus({preventScroll:true});
+        panel.onkeydown = event => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                this.closeNewCareerConfirmation();
+            }
+            else if (event.key === 'Tab') {
+                const buttons = [...panel.querySelectorAll('button')];
+                const first = buttons[0], last = buttons.at(-1);
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault(); last?.focus();
+                }
+                else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault(); first?.focus();
+                }
+            }
+        };
+    }
+    closeNewCareerConfirmation(restoreFocus = true) {
+        const wasOpen = this.newCareerConfirm;
+        this.newCareerConfirm = false;
+        const panel = this.root.querySelector('#new-career-panel');
+        if (panel) {
+            panel.classList.add('is-hidden');
+            panel.onkeydown = null;
+        }
+        const title = this.root.querySelector('#title-screen');
+        if (title) title.inert = false;
+        if (wasOpen && restoreFocus)
+            this.root.querySelector('[data-ui-command="new"]')?.focus({preventScroll:true});
+    }
     showTitle(hasSave, save) {
+        this.closeNewCareerConfirmation(false);
+        this.closeAdventure(false);
+        this.adventureQueue = [];
         this.save = save;
         this.hasCareerSave = Boolean(hasSave);
         this.titleVisible = true;
@@ -1371,6 +1480,7 @@ export class GameUI {
         this.root.querySelector('#hud')?.classList.add('is-hidden');
         this.root.querySelector('#dock-screen')?.classList.add('is-hidden');
         this.hideArena();
+        this.root.querySelector('#run-inbound')?.classList.add('is-hidden');
         const resume = this.root.querySelector('[data-ui-command="resume"]');
         if (resume) {
             resume.disabled = !hasSave;
@@ -1379,6 +1489,7 @@ export class GameUI {
         this.updateOrientationNotice();
     }
     hideTitle() {
+        this.closeNewCareerConfirmation(false);
         this.titleVisible = false;
         this.root.querySelector('#title-screen')?.classList.add('is-hidden');
         this.updateOrientationNotice();
@@ -1523,7 +1634,6 @@ export class GameUI {
       <div class="dock-content">${terminal}</div>
       ${this.renderSyndicateCard()}
       ${this.renderMissionSettlements()}
-      ${this.renderTutorialChoice()}
     `;
         const content = dock.querySelector('.dock-content');
         const preserveScroll = prevTab === this.dockTab
@@ -1568,14 +1678,6 @@ export class GameUI {
         const campaign = tutorialCampaignSummary(this.save);
         if (!campaign?.active)
             return '';
-        let action = '';
-        if (campaign.stepId === 'meet-family' && this.dockLocation === 'helix')
-            action = `<button type="button" data-dock-hotspot="bar">${t('OPEN BAR')}</button>`;
-        else if ((campaign.stepId === 'buy-supplies' && this.dockLocation === 'helix')
-            || (campaign.stepId === 'sell-supplies' && this.dockLocation === 'vesper'))
-            action = `<button type="button" data-market-point="commodities">${t('OPEN MARKET')}</button>`;
-        else if (campaign.stepId !== 'family-choice')
-            action = `<button type="button" data-ui-command="launch">${t('LAUNCH')}</button>`;
         return `
       <aside class="tutorial-dock-notice" aria-label="${t('Family prologue objective')}">
         ${this.portraitImage('rin-vek', 'Rin Vek')}
@@ -1584,33 +1686,15 @@ export class GameUI {
           <b>${escapeHtml(t(campaign.chapterTitle))}</b>
           <p>${escapeHtml(t(campaign.objective))}${campaign.progress ? ` <em>${escapeHtml(campaign.progress)}</em>` : ''}</p>
         </div>
-        ${this.tutorialSkipConfirm ? this.tutorialSkipControl() : `<div class="tutorial-notice-actions">${action}${this.tutorialSkipControl()}</div>`}
+        ${this.tutorialSkipControl()}
       </aside>`;
     }
-    renderTutorialChoice() {
+    openTutorialDecision() {
         const campaign = tutorialCampaignSummary(this.save);
-        if (!campaign?.active || campaign.stepId !== 'family-choice' || this.dockLocation !== 'cairn')
-            return '';
-        const choices = [
-            ['tell-mara', 'Mara gets the truth.', 'No more family secrets. You and Rin tell her together.'],
-            ['trust-rin', 'I trust you—for now.', 'Keep the recorder between you until Meridian gives you proof.'],
-            ['keep-recorder', 'I keep the recorder.', 'You carry the evidence and decide what happens after Meridian.'],
-        ];
-        return `
-      <div class="tutorial-choice" role="dialog" aria-modal="true" aria-label="${t('A family decision')}">
-        <section class="tutorial-choice-panel">
-          ${this.portraitImage('rin-vek', 'Rin Vek')}
-          <div class="tutorial-choice-copy">
-            <span>${t('CAIRN YARD · FAMILY CHANNEL')}</span>
-            <h3>${t('What the wreck kept')}</h3>
-            <p>“${t('Our mother broke formation to pull me out. The carrier behind us never reached the gate. They changed the evacuation ledger. I let Mara believe it because I was afraid she would blame me.')}”</p>
-            <small>${t('This changes how your family responds later. It does not label the choice as right or wrong.')}</small>
-          </div>
-          <div class="tutorial-choice-actions">
-            ${choices.map(([id, label, detail]) => `<button type="button" data-tutorial-choice="${id}"><b>${t(label)}</b><span>${t(detail)}</span></button>`).join('')}
-          </div>
-        </section>
-      </div>`;
+        if (!campaign?.active || campaign.stepId !== 'family-choice' || this.dockLocation !== 'cairn' || this.adventure)
+            return;
+        this.startAdventure(LOCATIONS.helix.people.find(person => person.id === 'rin-vek'),ADVENTURE_DIALOGUES.cairn);
+        this.adventure.greetingPending = false;
     }
     // The local syndicate's ledger at this dock has crossed the favor line:
     // the fixer opens the smuggler's den (black-market prices for restricted
@@ -1765,6 +1849,7 @@ export class GameUI {
         const serviceDesk = hasAnyLocationService(this.dockLocation, ['repair', 'fuel']);
         const market = hasAnyLocationService(this.dockLocation, ['market', 'outfitting', 'shipyard']);
         const bar = hasAnyLocationService(this.dockLocation, ['bar', 'missions', 'race']);
+        const rinAtBerth = this.dockLocation === 'cairn' && tutorialCampaignSummary(this.save)?.stepId === 'family-choice';
         const raceOnly = hasLocationService(this.dockLocation, 'race') && !hasLocationService(this.dockLocation, 'missions');
         const contractsOnly = hasLocationService(this.dockLocation, 'missions') && !hasLocationService(this.dockLocation, 'bar');
         const deskLabel = raceOnly ? t('RACE DESK') : contractsOnly ? t('CONTRACTS') : t('BAR');
@@ -1790,7 +1875,7 @@ export class GameUI {
           ${showShipPreview ? '' : `<div class="scene-pointer concourse-pointer-ship" data-ui-command="launch" role="button" tabindex="0" aria-label="${t('Launch the docked ship')}"><i>↗</i><b>${t('YOUR SHIP')}</b><small>${t('Launch')}</small></div>`}
           ${serviceDesk ? `<div class="scene-pointer concourse-pointer-services" data-dock-hotspot="services" role="button" tabindex="0" aria-label="${t('Open services')}"><i>⚙</i><b>${t('SERVICES')}</b><small>${hasLocationService(this.dockLocation, 'repair') && hasLocationService(this.dockLocation, 'fuel') ? t('Repair and refuel') : hasLocationService(this.dockLocation, 'repair') ? t('Repair bay') : t('Fuel and ordnance')}</small></div>` : ''}
           ${market ? `<div class="scene-pointer concourse-pointer-market" data-dock-hotspot="market" role="button" tabindex="0" aria-label="${t('Enter the market')}"><i>▣</i><b>${t('MARKET')}</b><small>${hasLocationService(this.dockLocation, 'market') ? t('Trade and fit out') : t('Ship services')}</small></div>` : ''}
-          ${bar ? `<div class="scene-pointer concourse-pointer-bar" data-dock-hotspot="bar" role="button" tabindex="0" aria-label="${escapeHtml(deskLabel)}"><i>✦</i><b>${deskLabel}</b><small>${deskDetail}</small></div>` : ''}
+          ${rinAtBerth ? `<div class="scene-pointer concourse-pointer-bar" data-tutorial-action="talk-rin" role="button" tabindex="0" aria-label="${t('Talk to Rin')}"><i>✦</i><b>RIN VEK</b><small>${t('Your sister')}</small></div>` : bar ? `<div class="scene-pointer concourse-pointer-bar" data-dock-hotspot="bar" role="button" tabindex="0" aria-label="${escapeHtml(deskLabel)}"><i>✦</i><b>${deskLabel}</b><small>${deskDetail}</small></div>` : ''}
           ${this.denUnlockedAt(this.dockLocation) ? `<div class="scene-pointer concourse-pointer-den" data-market-point="den" role="button" tabindex="0" aria-label="${t('Enter the smuggler\'s den')}"><i>☣</i><b>${t('SMUGGLER\'S DEN')}</b><small>${t('Black-market prices')}</small></div>` : ''}
         </div>
       </div>
@@ -1836,13 +1921,15 @@ export class GameUI {
     }
     talkToPerson(personId) {
         const person = LOCATIONS[this.dockLocation].people?.find((entry) => entry.id === personId);
-        if (!person)
-            return;
-        this.actions?.talkToNpc?.(personId, 'greeting');
+        if (!person) return;
         this.barPanel = 'people';
-        this.barPersonId = personId;
+        this.barPersonId = undefined;
         this.dialogueTopic = 'greeting';
         this.renderDock();
+        const firstMeeting = !(this.save.world.npcMemory?.[person.id]?.topics?.greeting > 0);
+        const authored = this.dockLocation === 'helix' && firstMeeting && tutorialDialogue(this.save,person.id)
+            ? (person.id === 'mara-vek' ? ADVENTURE_DIALOGUES.mara : person.id === 'rin-vek' ? ADVENTURE_DIALOGUES.rin : undefined) : undefined;
+        this.startAdventure(person, authored);
     }
     localGuildIds(locationId = this.dockLocation) {
         return (LOCATIONS[locationId]?.guilds ?? []).filter((id) => GUILD_NAMES[id]);
@@ -1860,7 +1947,7 @@ export class GameUI {
     }
     dialogueTopics(person) {
         const topics = [];
-        if (hasAnyLocationService(this.dockLocation, ['missions', 'race']))
+        if (!tutorialCampaignSummary(this.save)?.active && hasAnyLocationService(this.dockLocation, ['missions', 'race']))
             topics.push({ id: 'work', label: t('WORK') });
         if (person.marketTipster)
             topics.push({ id: 'market', label: t('TRADE TIP') });
@@ -1928,7 +2015,10 @@ export class GameUI {
             };
         }
         if (topicId === 'greeting') {
-            const campaignLine = tutorialDialogue(this.save, person.id);
+            const npcMemory = this.save.world.npcMemory ?? {};
+            const current = npcMemory[person.id] ?? {};
+            const campaignLine = tutorialDialogue({...this.save, world:{...this.save.world, npcMemory:{...npcMemory,
+                [person.id]:{...current,topics:{...current.topics,greeting:(current.topics?.greeting ?? 0)+1}}}}}, person.id);
             if (campaignLine)
                 return { text: t(campaignLine) };
             const damaged = this.save.player.hull < getEffectiveShipStats(this.save.player).hull * 0.55;
@@ -1973,6 +2063,191 @@ export class GameUI {
             this.renderDock();
         }
     }
+    adventureLabel(de, en) { return getLanguage() === 'de' ? de : en; }
+    startAdventure(person, script, space = false, message = '') {
+        if (this.adventure) return;
+        if (space) this.storyDismissed = false;
+        if (this.save) this.adventureHistory = this.save.world.dialogueHistory ?? [];
+        this.adventure = { person, script, space, nodeId: script?.start, asked: new Set(), transcript: [], history: false,
+            greetingPending: !space, pendingTopic: undefined, previousFocus: document.activeElement };
+        if (!script) {
+            this.dialogueTopic = 'greeting';
+            const text = space || message ? message : this.dialogueResponse(person,'greeting').text;
+            this.adventure.nodeId = '@greeting';
+            this.adventure.node = { text, next: space || message ? '@end' : '@topics' };
+            const replay = !space && !message && this.dockLocation === 'helix' && (person.id === 'mara-vek' ? 'mara' : person.id === 'rin-vek' ? 'rin' : undefined);
+            if (replay) this.adventure.node.choices = [
+                {label:this.adventureLabel('Ich habe ein paar Fragen.','I have a few questions.'),next:'@topics'},
+                {label:this.adventureLabel('Noch einmal: Wie fing das mit der Wayfarer an?','Tell me again: how did this start with the Wayfarer?'),replay},
+            ];
+        }
+        this.root.querySelector('#game-shell')?.classList.add('adventure-open');
+        this.renderAdventure();
+    }
+    openStoryAdventure(name, text, relation, conversationId) {
+        if (this.adventure) {
+            this.adventureQueue ??= [];
+            this.adventureQueue.push({ name,text,relation,conversationId });
+            return;
+        }
+        const person = Object.values(LOCATIONS).flatMap(location => location.people ?? []).find(person => person.name === name)
+            ?? { id: name === 'Rin Vek' ? 'rin-vek' : '', name };
+        this.commsLog.push({callsign:name,line:text,relation,story:true});
+        if (this.commsLog.length > 40) this.commsLog.shift();
+        const script = conversationId === 'rin-first-flight' ? ADVENTURE_DIALOGUES.flight
+            : ADVENTURE_DIALOGUES[conversationId?.replace(/^tutorial-/, '')];
+        this.storyDismissed = false;
+        this.startAdventure(person,script,!this.dockLocation,text);
+        this.adventure.story = true;
+        this.adventure.conversationId = conversationId;
+        this.adventure.greetingPending = false;
+    }
+    adventureNode() {
+        const state = this.adventure;
+        if (!state.script) return state.node;
+        const node = state.script.nodes[state.nodeId];
+        const choices = (node.returnTo ? state.script.nodes[node.returnTo].choices : node.choices)
+            ?.filter(choice => (!choice.requires || state.asked.has(choice.requires)) && (!choice.next || !state.asked.has(choice.next)));
+        return choices ? { ...node, choices } : node;
+    }
+    adventureTopics(render = true) {
+        const state = this.adventure;
+        const labels = {
+            work: ['Hast du Arbeit für mich?', 'Know of any work?'],
+            market: ['Womit lässt sich hier Geld verdienen?', 'What trades well around here?'],
+            guild: ['Erzähl mir von deiner Gilde.', 'Tell me about your guild.'],
+            local: ['Was gibt es Neues?', 'What is happening around here?'],
+            advice: ['Was sollte ich wissen, bevor ich starte?', 'What should I know before I launch?'],
+        };
+        state.node = { text: state.node.text,
+            choices: this.dialogueTopics(state.person).filter(topic => !state.asked.has(topic.id)).map(topic => ({topic:topic.id,label:this.adventureLabel(...labels[topic.id])}))
+                .concat({label:this.adventureLabel('Wir sprechen uns später.','I will catch you later.'),complete:true}) };
+        if (render) this.renderAdventure();
+    }
+    recordAdventureTopic() {
+        const state = this.adventure;
+        if (!state || state.space) return;
+        const topic = state.pendingTopic ?? (state.greetingPending ? 'greeting' : undefined);
+        if (!topic) return;
+        state.pendingTopic = undefined;
+        state.greetingPending = false;
+        this.actions?.talkToNpc?.(state.person.id,topic);
+    }
+    advanceAdventure(index) {
+        const state = this.adventure;
+        if (!state || state.history) return;
+        const node = this.adventureNode();
+        const choices = node.choices ?? [{label:this.adventureLabel('Weiter','Continue'),next:node.next ?? '@end'}];
+        const choice = choices[index];
+        if (!choice) return;
+        if (node.choices) {
+            state.transcript.push({speaker:this.adventureLabel('Du','You'),text:dialogueText(choice.label,getLanguage())});
+            if (choice.next) state.asked.add(choice.next);
+        }
+        if (choice.tutorialChoice) {
+            if (this.actions?.chooseTutorial?.(choice.tutorialChoice)?.changed)
+                this.closeAdventure();
+            return;
+        }
+        if (choice.replay && ADVENTURE_DIALOGUES[choice.replay]) {
+            // A replay never counts as a new encounter or advances objectives.
+            state.greetingPending = false;
+            state.pendingTopic = undefined;
+            state.script = ADVENTURE_DIALOGUES[choice.replay];
+            state.nodeId = state.script.start;
+        } else if (choice.topic) {
+            this.recordAdventureTopic();
+            const response = this.dialogueResponse(state.person,choice.topic);
+            state.pendingTopic = choice.topic;
+            state.asked.add(choice.topic);
+            state.nodeId = '@reply-' + choice.topic;
+            state.node = {text:response.text,next:'@topics'};
+            this.adventureTopics(false);
+            if (response.action) state.node.choices.unshift(
+                {label:response.actionLabel,action:response.action,destinationId:response.destinationId});
+        } else if (choice.action) {
+            this.recordAdventureTopic();
+            this.closeAdventure();
+            this.handleDialogueAction(choice.action,choice.destinationId);
+            return;
+        } else if (choice.complete || choice.next === '@end') {
+            this.recordAdventureTopic();
+            this.closeAdventure(true, true);
+            return;
+        } else if (choice.next === '@topics') {
+            this.recordAdventureTopic();
+            this.adventureTopics();
+            return;
+        } else if (state.script && state.script.nodes[choice.next]) {
+            state.nodeId = choice.next;
+        } else return;
+        this.renderAdventure();
+    }
+    closeAdventure(refresh = true, completed = false) {
+        const state = this.adventure;
+        if (!state) return;
+        if (state.conversationId)
+            this.actions?.finishTutorialBriefing?.(state.conversationId, completed);
+        this.adventureHistory ??= [];
+        this.adventureHistory.push(...state.transcript);
+        this.adventureHistory = this.adventureHistory.slice(-160);
+        if (this.save) {
+            this.save.world.dialogueHistory = this.adventureHistory;
+            saveGame(this.save);
+        }
+        this.adventure = undefined;
+        this.root.querySelector('#adventure-panel')?.classList.add('is-hidden');
+        this.root.querySelector('#game-shell')?.classList.remove('adventure-open');
+        if (state.space || state.story) this.storyDismissed = true;
+        if (refresh && !state.space && this.dockLocation) this.renderDock();
+        state.previousFocus?.isConnected && state.previousFocus.focus?.();
+        if (refresh && this.adventureQueue?.length) {
+            const next = this.adventureQueue.shift();
+            this.openStoryAdventure(next.name,next.text,next.relation,next.conversationId);
+        }
+    }
+    renderAdventure() {
+        const state = this.adventure, panel = this.root.querySelector('#adventure-panel');
+        if (!state || !panel) return;
+        const node = this.adventureNode();
+        const text = dialogueText(node.text,getLanguage());
+        const identity = state.nodeId ?? node;
+        if (state.lastRendered !== identity && !state.history) {
+            state.transcript.push({speaker:state.person.name,text});
+            state.lastRendered = identity;
+        }
+        const choices = node.choices ?? [{label:this.adventureLabel('Weiter','Continue'),next:node.next ?? '@end'}];
+        const art = !state.space ? DOCK_ART_BY_LOCATION[this.dockLocation]?.bar : undefined;
+        panel.style.backgroundImage = art ? `linear-gradient(90deg,rgba(2,8,16,.35),rgba(2,8,16,.90)),url("${art}")` : '';
+        panel.classList.remove('is-hidden');
+        panel.setAttribute('aria-label',state.person.name);
+        panel.innerHTML = `
+          <header class="adventure-heading"><span>${state.space ? this.adventureLabel('FUNKVERBINDUNG · FLUG PAUSIERT','COMMS LINK · FLIGHT PAUSED') : escapeHtml(LOCATIONS[this.dockLocation]?.name ?? '')}</span>
+            <button data-ui-command="adventure-exit">${this.adventureLabel('Gespräch verlassen','Leave conversation')}</button></header>
+          <div class="adventure-stage">
+            <figure class="adventure-portrait">${this.portraitImage(state.person.id,state.person.name)}<figcaption>${escapeHtml(state.person.name)}${state.person.relationship ? `<small>${escapeHtml(t(state.person.relationship))}</small>` : ''}</figcaption></figure>
+            <section class="adventure-dialogue">
+              <h2>${escapeHtml(state.person.name)}</h2>
+              ${state.history ? `<div class="adventure-transcript" tabindex="0">${[...(this.adventureHistory ?? []),...state.transcript].map(entry=>`<p><b>${escapeHtml(entry.speaker)}</b><br>${escapeHtml(entry.text)}</p>`).join('')}</div>` : `
+                <p class="adventure-speech" aria-live="polite">${escapeHtml(text)}</p>
+                <nav class="adventure-choices" aria-label="${this.adventureLabel('Deine Antwort','Your reply')}">
+                  ${choices.map((choice,index)=>`<button data-ui-command="adventure-choice" data-choice-id="${index}" class="${state.asked.has(choice.topic ?? choice.next) ? 'is-visited' : ''}">${escapeHtml(dialogueText(choice.label,getLanguage()))}</button>`).join('')}
+                </nav>`}
+              <button class="adventure-history" data-ui-command="adventure-history">${state.history ? this.adventureLabel('Zurück zum Gespräch','Back to conversation') : this.adventureLabel('Gespräch nachlesen','Read transcript')}</button>
+            </section>
+          </div>`;
+        panel.querySelector(state.history ? '.adventure-transcript' : '.adventure-choices button')?.focus({preventScroll:true});
+        panel.onkeydown = event => {
+            if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); this.closeAdventure(); }
+            if (event.key === 'Tab') {
+                const focusable = [...panel.querySelectorAll('button,[tabindex="0"]')];
+                const first = focusable[0], last = focusable.at(-1);
+                if (event.shiftKey && document.activeElement === first) {event.preventDefault();last?.focus();}
+                else if (!event.shiftKey && document.activeElement === last) {event.preventDefault();first?.focus();}
+            }
+        };
+    }
+
     renderBarDialogue(personId) {
         const person = LOCATIONS[this.dockLocation].people?.find((entry) => entry.id === personId);
         if (!person)
@@ -2232,6 +2507,7 @@ export class GameUI {
         const changedPoint = this.marketPoint !== point;
         const prevItemScroll = content.querySelector('.dealer-item-list')?.scrollTop ?? 0;
         const prevFitScroll = content.querySelector('.dealer-fit-summary')?.scrollTop ?? 0;
+        const prevFitPanelScroll = content.querySelector('.dealer-fit-scroll')?.scrollTop ?? 0;
         this.marketPoint = point;
         if (point !== 'shipyard')
             this.shipDetailId = undefined;
@@ -2249,6 +2525,9 @@ export class GameUI {
                     itemList.scrollTop = prevItemScroll;
                 if (fitSummary)
                     fitSummary.scrollTop = prevFitScroll;
+                const fitScroll = content.querySelector('.dealer-fit-scroll');
+                if (fitScroll)
+                    fitScroll.scrollTop = prevFitPanelScroll;
             }
         }
         else if (point === 'shipyard') {
@@ -2429,9 +2708,9 @@ export class GameUI {
           <section class="mission-objective"><span>${active ? t('CURRENT OBJECTIVE') : t('CONTRACT SUMMARY')}</span><b>${escapeHtml(this.missionProgress(mission))}</b></section>
           ${!active && eligibility.issues.length ? `<ul class="mission-blockers">${eligibility.issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join('')}</ul>` : ''}
           <footer class="mission-dossier-actions ${discardable ? 'has-discard' : ''}">
-            ${active ? `<button type="button" class="primary" data-mission-course="${route.targetId}" ${route.targetId ? '' : 'disabled'}>${t('SET COURSE')}</button>` : `<button type="button" class="primary" data-mission-id="${mission.id}" ${eligibility.ok ? '' : 'disabled'}>${mission.locked ? t('COURSE LOCKED') : t('ACCEPT & SET COURSE')}</button>`}
+            ${active ? `<button type="button" class="primary" data-mission-course="${route.targetId}" ${route.targetId ? '' : 'disabled'}>${t('SET COURSE')}</button>` : `<button type="button" class="primary" data-mission-id="${mission.id}" ${eligibility.ok && !tutorialCampaignSummary(this.save)?.active ? '' : 'disabled'}>${mission.locked ? t('COURSE LOCKED') : t('ACCEPT & SET COURSE')}</button>`}
             ${discardable ? `<button type="button" class="mission-discard-action" data-mission-discard="${mission.id}" aria-expanded="${confirmingDiscard}">${t('DISCARD CONTRACT')}</button>` : ''}
-            <small>${active ? t('Navigation will follow the next required destination.') : t('Acceptance reserves the bond and any sealed cargo space.')}</small>
+            <small>${!active && tutorialCampaignSummary(this.save)?.active ? t('Finish the family prologue to take on contracts and races.') : active ? t('Navigation will follow the next required destination.') : t('Acceptance reserves the bond and any sealed cargo space.')}</small>
             ${confirmingDiscard ? `<div class="mission-discard-confirm" role="alert"><p>${t('Discard this contract? The bond stays lost, reserved mission cargo is removed, and guild and faction standing fall.')}</p><button type="button" data-ui-command="mission-discard-cancel">${t('KEEP CONTRACT')}</button><button type="button" class="mission-discard-final" data-mission-discard-confirm="${mission.id}">${t('CONFIRM DISCARD')}</button></div>` : ''}
           </footer>
         </article>`;
@@ -2455,7 +2734,7 @@ export class GameUI {
         </header>
         <div class="mission-terminal-body">
           <aside class="mission-browser" aria-label="${t('Contract list')}">
-            ${source.length ? source.map((mission) => this.renderMissionListRow(mission, mission.id === selected?.id)).join('') : `<div class="mission-list-empty"><b>${this.missionBoardTab === 'active' ? t('NO ACTIVE CONTRACTS') : t('NO FRESH CONTRACTS')}</b><p>${this.missionBoardTab === 'active' ? t('Accepted work and live progress will appear here.') : t('Launch, trade, or return after the board cycles.')}</p></div>`}
+            ${source.length ? source.map((mission) => this.renderMissionListRow(mission, mission.id === selected?.id)).join('') : `<div class="mission-list-empty"><b>${this.missionBoardTab === 'active' ? t('NO ACTIVE CONTRACTS') : t('NO FRESH CONTRACTS')}</b><p>${this.missionBoardTab === 'active' ? t('Accepted work and live progress will appear here.') : t(tutorialCampaignSummary(this.save)?.active ? 'Finish the family prologue to take on contracts and races.' : 'Launch, trade, or return after the board cycles.')}</p></div>`}
           </aside>
           <section class="mission-dossier-wrap">${this.renderMissionDossier(selected)}</section>
         </div>
@@ -2491,16 +2770,17 @@ export class GameUI {
         this.outfittingItemId = undefined;
         this.outfittingMountId = undefined;
         this.outfittingCategory = 'guns';
+        this.outfittingStage = 'overview';
         this.outfittingNotice = undefined;
     }
     outfittingMountInfo(mountId, shipId = this.save?.player?.shipId) {
         const spec = HARDPOINT_SPECS[shipId];
         if (!spec)
             return undefined;
-        for (const key of ['guns', 'launchers', 'drive', 'defense', 'utility']) {
+        for (const key of ['guns', 'launchers', 'turrets', 'power', 'drive', 'defense', 'utility']) {
             const index = spec[key].findIndex((mountPoint) => mountPoint.id === mountId);
             if (index >= 0)
-                return { key, category: key === 'guns' ? 'gun' : key === 'launchers' ? 'launcher' : key, index, mount: spec[key][index] };
+                return { key, category: key === 'guns' ? 'gun' : key === 'launchers' ? 'launcher' : key === 'turrets' ? 'turret' : key, index, mount: spec[key][index] };
         }
         return undefined;
     }
@@ -2508,9 +2788,9 @@ export class GameUI {
         const spec = HARDPOINT_SPECS[shipId];
         if (!spec)
             return [];
-        return ['guns', 'launchers', 'drive', 'defense', 'utility'].flatMap((key) => spec[key].map((mount, index) => ({
+        return ['guns', 'launchers', 'turrets', 'power', 'drive', 'defense', 'utility'].flatMap((key) => spec[key].map((mount, index) => ({
             key,
-            category: key === 'guns' ? 'gun' : key === 'launchers' ? 'launcher' : key,
+            category: key === 'guns' ? 'gun' : key === 'launchers' ? 'launcher' : key === 'turrets' ? 'turret' : key,
             index,
             mount,
         })));
@@ -2541,7 +2821,7 @@ export class GameUI {
         return getEffectiveShipStats({ ...player, shipId, outfitting: savedOutfitting });
     }
     outfittingInstalledCount(loadout, itemId) {
-        return ['guns', 'launchers', 'drive', 'defense', 'utility'].reduce((count, key) => count + (loadout?.[key] ?? []).filter((id) => id === itemId).length, 0);
+        return ['guns', 'launchers', 'turrets', 'power', 'drive', 'defense', 'utility'].reduce((count, key) => count + (loadout?.[key] ?? []).filter((id) => id === itemId).length, 0);
     }
     outfittingQuote(draft, options = {}) {
         return quoteOutfitting(this.save.player, this.save.player.shipId, draft, {
@@ -2578,26 +2858,38 @@ export class GameUI {
         if (shipId === this.save?.player?.shipId)
             this.renderMarketPoint('equipment');
     }
-    selectOutfittingMount(mountId) {
-        const selected = this.outfittingMountInfo(mountId);
-        if (!selected)
-            return;
-        this.outfittingMountId = mountId;
-        const item = OUTFIT_ITEMS[this.outfittingItemId];
-        const fittedId = loadoutFor(this.save.player, this.save.player.shipId)?.[selected.key]?.[selected.index];
-        if (item && !itemFitsMount(item, selected.mount) && fittedId)
-            this.outfittingItemId = fittedId;
-        this.outfittingNotice = undefined;
+    refreshOutfitting() {
+        const old=this.root.querySelector('.simple-fit-scroll');
+        this.outfitScroll ??= {};
+        if(old?.dataset?.scrollKey)this.outfitScroll[old.dataset.scrollKey]=old.scrollTop;
         this.renderMarketPoint('equipment');
+        const current=this.root.querySelector('.simple-fit-scroll');
+        if(current)current.scrollTop=this.outfitScroll[current.dataset.scrollKey] ?? 0;
+    }
+    selectOutfittingMount(mountId) {
+        const selected=this.outfittingMountInfo(mountId);
+        if(!selected)return;
+        this.outfittingMountId=mountId;
+        this.outfittingItemId=undefined;
+        this.outfittingStage='equipment';
+        this.outfittingNotice=undefined;
+        this.refreshOutfitting();
     }
     setOutfittingView(category) {
         if (!OUTFIT_DEALER_CATEGORIES[category])
             return;
         this.outfittingCategory = category;
+        this.outfittingStage = 'overview';
         this.outfittingItemId = undefined;
         this.outfittingMountId = undefined;
         this.outfittingNotice = undefined;
-        this.renderMarketPoint('equipment');
+        this.refreshOutfitting();
+    }
+    setOutfittingStage(stage) {
+        if (!['overview','equipment','fit'].includes(stage)) return;
+        this.outfittingStage = stage;
+        this.refreshOutfitting();
+        this.root.querySelector(`[data-ui-command="outfit-stage"][data-outfit-stage="${stage}"]`)?.focus({preventScroll:true});
     }
     installOutfittingItem(itemId) {
         const item = OUTFIT_ITEMS[itemId];
@@ -2610,7 +2902,12 @@ export class GameUI {
             this.outfittingMountId = undefined;
         this.outfittingSelectedMount(item, loadout);
         this.outfittingNotice = undefined;
-        this.renderMarketPoint('equipment');
+        this.outfittingStage = 'fit';
+        this.refreshOutfitting();
+        const stageButton = this.root.querySelector('[data-ui-command="outfit-stage"][data-outfit-stage="fit"]');
+        if (stageButton?.getClientRects().length) stageButton.focus({preventScroll:true});
+        const fitScroll = this.root.querySelector('.dealer-fit-scroll');
+        if (fitScroll) fitScroll.scrollTop = 0;
     }
     handleOutfittingAction(action) {
         if (action === 'install')
@@ -2625,6 +2922,8 @@ export class GameUI {
             this.setOutfittingNotice(t('Outfitting is unavailable.'), 'warning');
             return;
         }
+        if(this.outfittingBusy)return;
+        this.outfittingBusy=true;
         let result;
         try {
             result = this.actions.applyOutfitting(this.save.player.shipId, draft, {
@@ -2634,19 +2933,21 @@ export class GameUI {
             });
         }
         catch (error) {
+            this.outfittingBusy=false;
             this.setOutfittingNotice(this.outfittingErrorLabel(error?.code), 'warning');
             return;
         }
         const finish = (outcome) => {
+            this.outfittingBusy=false;
             if (!outcome?.ok) {
                 this.setOutfittingNotice(this.outfittingErrorLabel(outcome?.code), 'warning');
                 return;
             }
             this.outfittingNotice = { message: successMessage, tone: 'success' };
-            this.renderMarketPoint('equipment');
+            this.refreshOutfitting();
         };
         if (result && typeof result.then === 'function')
-            void result.then(finish).catch((error) => this.setOutfittingNotice(this.outfittingErrorLabel(error?.code), 'warning'));
+            void result.then(finish).catch((error) => {this.outfittingBusy=false;this.setOutfittingNotice(this.outfittingErrorLabel(error?.code), 'warning');});
         else
             finish(result);
     }
@@ -2726,7 +3027,7 @@ export class GameUI {
         const shipId = this.save.player.shipId;
         if (!selectedItem)
             return `<p class="dealer-empty">${t('Pick an item to see where it fits.')}</p>`;
-        const mounts = ['guns', 'launchers', 'drive', 'defense', 'utility'].flatMap((key) => (HARDPOINT_SPECS[shipId]?.[key] ?? [])
+        const mounts = ['guns', 'launchers', 'turrets', 'power', 'drive', 'defense', 'utility'].flatMap((key) => (HARDPOINT_SPECS[shipId]?.[key] ?? [])
             .map((mount, index) => ({ key, mount, index }))
             .filter(({ mount }) => itemFitsMount(selectedItem, mount)));
         if (!mounts.length)
@@ -2757,75 +3058,82 @@ export class GameUI {
         </button>`;
     }
     renderOutfitting() {
-        if (!this.save?.player)
-            return '';
-        const shipId = this.save.player.shipId;
-        if (!OUTFIT_DEALER_CATEGORIES[this.outfittingCategory])
-            this.outfittingCategory = 'guns';
-        const actualLoadout = loadoutFor(this.save.player, shipId);
-        const items = this.outfittingItemsForCategory();
-        if (!items.some((item) => item.id === this.outfittingItemId))
-            this.outfittingItemId = items[0]?.id;
-        const item = OUTFIT_ITEMS[this.outfittingItemId];
-        const selected = item ? this.outfittingSelectedMount(item, actualLoadout) : this.outfittingMountInfo(this.outfittingMountId);
-        const fitted = selected ? OUTFIT_ITEMS[actualLoadout[selected.key]?.[selected.index]] : undefined;
-        const draft = JSON.parse(JSON.stringify(actualLoadout));
-        if (item && selected)
-            draft[selected.key][selected.index] = item.id;
-        const quote = item && selected ? this.outfittingQuote(draft) : { ok: false, code: 'incompatible-mount' };
-        const beforeStats = this.outfittingStatsFor(shipId, actualLoadout);
-        const afterStats = this.outfittingStatsFor(shipId, draft);
-        const usage = outfittingUsage(this.save.player, shipId, draft);
-        const locker = this.save.player.outfitting?.locker ?? {};
-        const baseQuote = this.outfittingQuote(actualLoadout);
-        const lockerCount = item ? Number(locker[item.id] ?? 0) : 0;
-        const sellable = item ? Number(baseQuote.sellable?.[item.id] ?? 0) : 0;
-        const installedHere = Boolean(item && fitted?.id === item.id);
-        const purchaseCount = item ? Number(quote.purchases?.[item.id] ?? 0) : 0;
-        const actionLabel = purchaseCount > 0 ? t('BUY & INSTALL') : t('INSTALL FROM LOCKER');
-        const actionDetail = quote.ok ? (quote.netCost > 0 ? formatCredits(quote.netCost) : t('NO CHARGE')) : this.outfittingErrorLabel(quote.code);
-        const notice = this.outfittingNotice;
-        const impactRows = [
-            ['HULL INTEGRITY', beforeStats.hull, afterStats.hull, 0],
-            ['SHIELD', beforeStats.shield, afterStats.shield, 0],
-            ['REACTOR', beforeStats.reactorOutput, afterStats.reactorOutput, 0],
-            ['CAPACITOR', beforeStats.energyCapacity, afterStats.energyCapacity, 0],
-        ].filter(([, before, after]) => Number(after) !== Number(before)).map(([label, before, after, digits]) => {
-            const changed = Number((after - before).toFixed(digits));
-            return `<div class="dealer-impact"><span>${t(label)}</span><b>${this.outfittingStatValue(before, digits)} → ${this.outfittingStatValue(after, digits)}</b><em class="${changed > 0 ? 'up' : 'down'}">${changed > 0 ? '+' : ''}${changed.toFixed(digits)}</em></div>`;
-        }).join('');
-        const categories = Object.entries(OUTFIT_DEALER_CATEGORIES).map(([id, config]) => `<button type="button" class="${id === this.outfittingCategory ? 'is-active' : ''}" data-outfit-view="${id}" aria-pressed="${id === this.outfittingCategory}">${t(config.label)}</button>`).join('');
-        const selectedCopy = item ? `<div class="dealer-selected-item">
-          <figure class="outfit-item-art-wrap"><span>${escapeHtml(t(item.name).slice(0, 2).toUpperCase())}</span><img class="outfit-item-art" src="${escapeHtml(item.artPath ?? item.art)}" alt="${escapeHtml(t('{name} module art', { name: t(item.name) }))}" decoding="async"></figure>
-          <div><span>${t(OUTFIT_CATEGORY_KEYS[OUTFIT_CATEGORY_TO_KEY[item.category]])} · ${item.size}</span><h4>${escapeHtml(t(item.name))}</h4><strong>${escapeHtml(t(item.stat))}</strong><p>${escapeHtml(t(item.description))}</p>${item.category === 'gun' ? `<small>${t('ENERGY PER SHOT')}: ${item.energyCost}</small>` : ''}</div>
-        </div>` : `<p class="dealer-empty">${t('Your locker is empty.')}</p>`;
-        const selectedFireGroup = selected?.key === 'guns'
-            ? (actualLoadout.fireGroups?.assignments?.[selected.mount.id] === 'B' ? 'B' : 'A')
-            : undefined;
-        const otherFireGroup = selectedFireGroup === 'A' ? 'B' : 'A';
-        const actionButtons = [
-            fitted ? `<button type="button" data-outfit-action="remove"><span>${t('REMOVE')}</span><small>${t('TO LOCKER')}</small></button>` : '',
-            this.outfittingCategory === 'locker' && item ? `<button type="button" data-outfit-action="sell" ${sellable > 0 ? '' : 'disabled'}><span>${t('SELL ONE')}</span>${sellable > 0 ? `<small>+${formatCredits(Math.round(item.price * RESALE_RATE))}</small>` : ''}</button>` : '',
-            selectedFireGroup ? `<button type="button" class="dealer-group-toggle" data-outfit-group="${otherFireGroup}" aria-label="${escapeHtml(t('Fire group {group}; change to {other}.', { group: selectedFireGroup, other: otherFireGroup }))}"><span>${t('GROUP')} ${selectedFireGroup} → ${otherFireGroup}</span><small>${t('CHANGE TO {group}', { group: otherFireGroup })}</small></button>` : '',
-            item && selected && !installedHere ? `<button type="button" class="primary" data-outfit-action="install" ${quote.ok ? '' : 'disabled'}><span>${actionLabel}</span><small>${escapeHtml(actionDetail)}</small></button>` : '',
-        ].filter(Boolean);
-        return `<div class="outfit-dealer" data-outfitting-ship="${shipId}" style="--dealer-backdrop:url('../art/outfitting/v2/dealer-workshop-backdrop-v2.png')">
-          <header class="dealer-header"><img class="dealer-mechanic-portrait" src="./art/outfitting/v2/dealer-mechanic-portrait-v2.png" alt=""><div><span class="eyebrow">${t('DOCKYARD OUTFITTER')}</span><h3>${escapeHtml(SHIPS[shipId].name)}</h3><p>${t('Choose a part, choose a compatible bay, then install.')}</p></div></header>
-          ${notice ? `<div class="dealer-notice is-${notice.tone}" role="status" aria-live="polite">${escapeHtml(notice.message)}</div>` : ''}
-          <div class="dealer-workbench">
-            <section class="dealer-catalog"><div class="dealer-step-heading"><b>1</b><span>${t('PICK EQUIPMENT')}</span></div><nav class="dealer-categories" aria-label="${t('Equipment categories')}">${categories}</nav>${selectedCopy}<div class="dealer-item-list" role="list">${items.length ? items.map((entry) => this.renderOutfittingItemTile(entry, actualLoadout)).join('') : `<p class="dealer-empty">${t('Your locker is empty.')}</p>`}</div></section>
-            <section class="dealer-fit-panel">
-              <div class="dealer-fit-heading"><div class="dealer-step-heading"><b>2</b><span>${t('CHOOSE A BAY')}</span></div><strong>${escapeHtml(SHIPS[shipId].className)}</strong></div>
-              ${this.renderOutfittingMountRack(actualLoadout, item, selected)}
-              <div class="dealer-fit-summary">
-                <div class="dealer-current-fit"><span>${t('CURRENTLY FITTED')}</span><b>${fitted ? escapeHtml(t(fitted.name)) : t('EMPTY MOUNT')}</b><small>${fitted && item && fitted.id !== item.id ? t('{name} returns to your locker.', { name: t(fitted.name) }) : item ? (lockerCount ? t('Owned copies in locker: {count}', { count: lockerCount }) : itemAvailable(this.save.player, item, this.dockLocation) ? t('Available at this dock.') : t('Locked or not stocked here.')) : ''}</small></div>
-                <div class="dealer-fit-metrics"><div><span>${t('FITTING MASS')}</span><b>${usage.mass} / ${usage.massLimit}</b></div>${item?.category === 'gun' ? `<div><span>${t('ENERGY PER SHOT')}</span><b>${item.energyCost}</b></div>` : ''}</div>
-                ${impactRows ? `<div class="dealer-impact-list"><h5>${t('EFFECT ON SHIP')}</h5>${impactRows}</div>` : ''}
-              </div>
-              <div class="dealer-fit-actions"><div class="dealer-step-heading"><b>3</b><span>${t('CONFIRM')}</span></div><div class="dealer-actions action-count-${actionButtons.length}">${actionButtons.join('')}</div></div>
-            </section>
-          </div>
-        </div>`;
+        if(!this.save?.player)return '';
+        const player=this.save.player, loadout=loadoutFor(player,player.shipId);
+        const stored=player.outfitting?.locker ?? {};
+        const mounts=this.outfittingMounts();
+        const selected=mounts.find(x=>x.mount.id===this.outfittingMountId);
+        const storage=this.outfittingCategory==='locker';
+        const stage=storage?'storage':selected?(this.outfittingStage==='fit'?'fit':this.outfittingStage==='overview'?'overview':'equipment'):'overview';
+        const systems=!['guns','launchers','turrets','locker'].includes(this.outfittingCategory);
+        const labelFor=x=>`${t(x.mount.label??OUTFIT_CATEGORY_KEYS[x.key])} ${x.index+1} · ${x.mount.size}`;
+        const back=to=>`<button type="button" data-ui-command="outfit-stage" data-outfit-stage="${to}">${t('BACK')}</button>`;
+        const stats=this.outfittingStatsFor(player.shipId,loadout);
+        const usage=outfittingUsage(player,player.shipId,loadout);
+        const flightEquipment=item=>item?.id==='tracking-turret'?TRACKING_LASER:item?.id==='pdc'?WEAPONS.pdc:WEAPONS[weaponIdForOutfit(item)];
+        const weaponDetails=(item)=>{
+            const w=flightEquipment(item);
+            if(!w?.descriptionKey)return item?t(item.description):t('EMPTY');
+            return t(w.descriptionKey ?? w.envelopeKey,{range:Math.round(w.range ?? w.speed*w.life)});
+        };
+        const rows=mounts.filter(x=>systems?!['guns','launchers','turrets'].includes(x.key):['guns','launchers','turrets'].includes(x.key));
+        let body='',action='',heading=t('INSTALLED EQUIPMENT');
+        if(stage==='overview') {
+            body=rows.map(x=>{
+                const item=OUTFIT_ITEMS[loadout[x.key]?.[x.index]];
+                return `<button type="button" class="fit-slot" data-outfit-slot="${x.mount.id}"><span>${escapeHtml(labelFor(x))}</span><b>${item?escapeHtml(t(item.name)):t('ADD EQUIPMENT')}</b><small>${item?escapeHtml(weaponDetails(item)):t('Choose a compatible module.')}</small></button>`;
+            }).join('');
+            action=`<span>${t('FITTING MASS')}: ${usage.mass} / ${usage.massLimit}</span><button data-outfit-view="locker">${t('STORED EQUIPMENT')}</button>`;
+        } else if(stage==='equipment') {
+            heading=labelFor(selected);
+            const candidates=OUTFIT_ITEM_IDS.map(id=>OUTFIT_ITEMS[id]).filter(item=>itemFitsMount(item,selected.mount) && (stored[item.id]>0 || itemAvailable(player,item,this.dockLocation)))
+                .sort((a,b)=>(stored[b.id]>0)-(stored[a.id]>0) || a.price-b.price);
+            body=candidates.map(item=>`<button type="button" class="fit-slot" data-outfit-item="${item.id}"><b>${escapeHtml(t(item.name))}</b><small>${escapeHtml(weaponDetails(item))}</small><strong>${stored[item.id]>0?t('OWNED'):formatCredits(item.price)}</strong></button>`).join('') || `<p>${t('No compatible equipment is available here.')}</p>`;
+            const fitted=OUTFIT_ITEMS[loadout[selected.key]?.[selected.index]];
+            if(fitted)body+=`<details><summary>${t('CURRENTLY FITTED')}: ${escapeHtml(t(fitted.name))}</summary><button data-outfit-action="remove">${t('REMOVE')} · ${t('TO LOCKER')}</button>${selected.key==='guns'?`<p>${t('FIRE GROUP')} ${loadout.fireGroups?.assignments?.[selected.mount.id] ?? 'A'}</p><button data-outfit-group="A">${t('GROUP')} A</button><button data-outfit-group="B">${t('GROUP')} B</button>`:''}</details>`;
+            action=back('overview');
+        } else if(stage==='fit') {
+            const item=OUTFIT_ITEMS[this.outfittingItemId],old=OUTFIT_ITEMS[loadout[selected.key]?.[selected.index]];
+            if(!item || !itemFitsMount(item,selected.mount)){this.outfittingStage='equipment';return this.renderOutfitting();}
+            heading=t(item.name);
+            const draft=JSON.parse(JSON.stringify(loadout));draft[selected.key][selected.index]=item.id;
+            const quote=this.outfittingQuote(draft),w=flightEquipment(item),before=flightEquipment(old);
+            const after=this.outfittingStatsFor(player.shipId,draft);
+            const metric=(label,a,b)=>`<div class="fit-comparison"><span>${t(label)}</span><b>${a ?? '—'} → ${b}</b></div>`;
+            body=`<p>${escapeHtml(weaponDetails(item))}</p><p>${t('REPLACES')}: <b>${old?escapeHtml(t(old.name)):t('EMPTY')}</b></p>`;
+            if(w){
+                body+=metric('RANGE (km)',before?Math.round(weaponRange(before)):undefined,Math.round(weaponRange(w)));
+                body+=metric('PROJECTILE SPEED (km/s)',before?(before.kind==='beam'?t('INSTANT'):before.speed):undefined,w.kind==='beam'?t('INSTANT'):w.speed);
+                body+=metric('DAMAGE PER ROUND',before?weaponShotDamage(before):undefined,weaponShotDamage(w));
+                if(selected.key==='guns'){
+                    const demand=loadoutGroupDemand(draft,selected.mount.id);
+                    const drain=demand-after.reactorOutput;
+                    body+=`<p>${drain<=0?t('This group can fire continuously.'):t('About {seconds}s of continuous group fire.',{seconds:(after.energyCapacity/drain).toFixed(1)})}<small class="fit-assumption">${t('From full energy, with shields idle and missile defence inactive.')}</small></p>`;
+                    body+=`<details><summary>${t('DETAILS')}</summary>${metric('ENERGY PER SHOT',before?.energyCost,w.energyCost)}${metric('SHOT INTERVAL',before?.cooldown,w.cooldown)}<p>${t('FIRE GROUP')} ${draft.fireGroups?.assignments?.[selected.mount.id] ?? 'A'}</p><button data-outfit-group="A">${t('GROUP')} A</button><button data-outfit-group="B">${t('GROUP')} B</button></details>`;
+                } else {body+=`<p>${escapeHtml(t(item.stat))}</p>`;}
+            } else if(item.category==='launcher'){
+                const launcher=LAUNCHERS[item.weaponId],previous=LAUNCHERS[old?.weaponId];
+                body+=metric('LOCK RANGE (km)',previous?.lockRange,launcher.lockRange)+metric('PROJECTILE SPEED (km/s)',previous?.speed,launcher.speed)+metric('WARHEAD DAMAGE',previous?.damage,launcher.damage);
+            } else {
+                for(const [key,label] of [['hull','HULL INTEGRITY'],['shield','SHIELD'],['reactorOutput','REACTOR'],['energyCapacity','CAPACITOR'],['maxSpeed','SPEED'],['cargo','CARGO'],['angularAcceleration','TURNING'],['burnFuelMultiplier','BOOST FUEL USE'],['shieldRechargeMultiplier','SHIELD RECOVERY']])
+                    if(stats[key]!==after[key])body+=metric(label,stats[key],after[key]);
+            }
+            if(old && old.id!==item.id)body+=`<p>${t('{name} returns to your locker.',{name:t(old.name)})}</p>`;
+            const draftUsage=outfittingUsage(player,player.shipId,draft);
+            body+=`<small>${t('FITTING MASS')}: ${draftUsage.mass} / ${draftUsage.massLimit}</small>`;
+            if(!quote.ok)body+=`<p role="status">${escapeHtml(this.outfittingErrorLabel(quote.code))}</p>`;
+            action=back('equipment')+`<button class="primary" data-outfit-action="install" ${!quote.ok || old?.id===item.id?'disabled':''}>${quote.netCost>0?t('BUY & INSTALL')+' · '+formatCredits(quote.netCost):t('INSTALL FROM LOCKER')+' · '+t('NO CHARGE')}</button>`;
+        } else {
+            heading=t('STORED EQUIPMENT');
+            body=Object.entries(stored).filter(([id,n])=>n>0 && OUTFIT_ITEMS[id]).map(([id,n])=>`<button class="fit-slot" data-outfit-item="${id}"><b>${escapeHtml(t(OUTFIT_ITEMS[id].name))} ×${n}</b><small>${t('SELECT')}</small></button>`).join('') || `<p>${t('Your locker is empty.')}</p>`;
+            const item=OUTFIT_ITEMS[this.outfittingItemId];
+            action=`<button data-outfit-view="guns">${t('BACK')}</button>`;
+            if(item && stored[item.id]>0)action+=`<button data-outfit-action="sell">${t('SELL ONE')} · ${escapeHtml(t(item.name))} · +${formatCredits(Math.round(item.price*RESALE_RATE))}</button>`;
+        }
+        const notice=this.outfittingNotice;
+        return `<div class="simple-outfitting"><header><b>${escapeHtml(heading)}</b><span>${formatCredits(player.credits)}</span></header>
+            ${stage==='overview'?`<nav><button data-outfit-view="guns" aria-pressed="${!systems}">${t('WEAPONS')}</button><button data-outfit-view="systems" aria-pressed="${systems}">${t('SHIP SYSTEMS')}</button></nav>`:''}
+            ${this.outfitGroupHelp?`<aside class="fit-help-popup" role="dialog" aria-label="${t('WEAPON GROUP HELP')}"><h3>${t('WEAPON GROUP HELP')}</h3><p>${t('Tap the weapon name to cycle populated groups and Fire all. Fire all uses every forward gun; missiles and automatic turrets stay separate. In Outfitting, open a gun’s details to assign A or B. Try beams in A and your other weapon in B to control energy use.')}</p><button data-ui-command="dismiss-group-help">${t('UNDERSTOOD')}</button></aside>`:''}<div class="simple-fit-scroll" data-scroll-key="${stage}-${this.outfittingCategory}-${selected?.mount.id ?? ''}">${notice?`<p role="status">${escapeHtml(notice.message)}</p>`:''}${body}</div><footer>${action}</footer></div>`;
     }
     renderEquipment() {
         return this.renderOutfitting();
@@ -3032,7 +3340,7 @@ export class GameUI {
         this.setCockpitShip(model.shipId);
         const setText = (selector, value) => {
             const element = this.el(selector);
-            if (element)
+            if (element && element.textContent !== value)
                 element.textContent = value;
         };
         const setBar = (selector, value) => {
@@ -3040,31 +3348,9 @@ export class GameUI {
             if (element)
                 element.style.width = `${Math.max(0, Math.min(100, value))}%`;
         };
-        // The VOIDRUNNER identity card doubles as the hyperdrive control: it
-        // glows when a jump is clear, and carries the charge/cruise/interrupt
-        // status while the drive is live.
+        // A fixed label and footprint keep drive activity out of the canopy.
         const card = this.el('#hyperdrive-card');
-        const cardStatus = this.el('#hyperdrive-card-status');
-        if (card && cardStatus) {
-            const state = model.hyperdrive?.fx ?? 'none';
-            const progress = Math.max(0, Math.min(1, model.hyperdrive?.progress ?? 0));
-            let status = '';
-            if (state === 'spooling')
-                status = t('CHARGING {percent}%', { percent: Math.round(progress * 100) });
-            else if (state === 'active')
-                status = t('ENGAGED');
-            else if (state === 'gate')
-                status = t('IN TRANSIT');
-            else if (state === 'interrupt')
-                status = t('INTERRUPTED');
-            else if (model.gateArmed)
-                status = t('GATE LIVE · FLY THROUGH');
-            else if (model.hyperdriveStatus)
-                status = t(model.hyperdriveStatus);
-            // No COOLDOWN state: the post-intercept calm window only suppresses
-            // new ambushes, never the drive, so the card has nothing to count.
-            cardStatus.textContent = status;
-            cardStatus.classList.toggle('is-hidden', !status);
+        if (card) {
             card.dataset.hyperdriveReady = model.hyperdriveReady ? 'true' : 'false';
         }
         // Monitor tickers: the own-ship flight recorder and the radar sensor
@@ -3074,19 +3360,29 @@ export class GameUI {
             const ticker = this.el(selector);
             if (!ticker)
                 return;
-            // The message rides an inner span so ellipsis truncation works:
-            // text-overflow only applies to block-level inline content, not
-            // to flex items — a bare text node in the flex ticker would just
-            // hard-clip at the row edge. The full text lives in the ship
-            // menu's RECENT EVENTS.
             let line = ticker.querySelector('.ticker-line');
             if (!line) {
                 line = document.createElement('span');
                 line.className = 'ticker-line';
                 ticker.appendChild(line);
             }
-            line.textContent = entry?.message ?? '';
-            line.title = entry?.message ?? '';
+            const message = entry?.message ?? '';
+            if (line.title !== message || line.dataset.summary !== (entry?.summary ?? '')) {
+                // Instrument notices must be complete words. Longer messages are
+                // available through the monitor's existing ship-menu action.
+                const shortNotices = {
+                    [t('CAPACITOR LOW')]: t('LOW ENERGY'),
+                    [t('NO MISSILE RACK INSTALLED')]: t('NO LAUNCHER'),
+                    [t('NO WEAPON INSTALLED')]: t('NO WEAPON'),
+                    [t('FIRE GROUP EMPTY')]: t('GROUP EMPTY'),
+                };
+                const label = entry?.summary || shortNotices[message] || (message.startsWith('+') || message.length <= 16 ? message
+                    : `${t(entry?.tone === 'danger' || entry?.tone === 'warning' ? 'ALERT LOG' : 'EVENT LOG')} ›`);
+                if (line.textContent !== label)
+                    line.textContent = label;
+                line.title = message;
+                line.dataset.summary = entry?.summary ?? '';
+            }
             ticker.dataset.tone = entry?.tone ?? 'info';
             ticker.classList.toggle('is-visible', Boolean(entry));
         };
@@ -3121,13 +3417,12 @@ export class GameUI {
             weaponReadout.classList.toggle('is-visible', Boolean(weapon));
             weaponReadout.dataset.venting = weapon?.venting ? 'true' : 'false';
             if (weapon) {
-                const groupPrefix = weapon.group ? `${weapon.group} · ` : '';
-                const additionalMounts = Math.max(0, Number(weapon.mountCount ?? 1) - 1);
-                const displayName = `${groupPrefix}${weapon.name}${additionalMounts ? ` +${additionalMounts}` : ''}`;
+                const groupPrefix = weapon.group ? `${weapon.group==='ALL'?t('FIRE ALL'):weapon.group} · ` : '';
+                const displayName = `${groupPrefix}${weapon.name}`;
                 setText('#screen-own-weapon-name', displayName);
                 setText('#screen-own-weapon-ammo', weapon.ammo
-                    ? `${weapon.ammo.current}/${weapon.ammo.capacity}`
-                    : weapon.venting ? t('VENTING') : '∞');
+                    ? String(weapon.ammo.current)
+                    : weapon.recharging ? t('CHARGING') : '⚡');
                 const launcher = model.launcher;
                 setText('#screen-own-launcher', launcher ? `${launcher.displayCode ?? launcher.shortCode} ${launcher.current}/${launcher.capacity}` : '');
                 weaponReadout.title = `${t('Switch fire group — press X or tap')} · ${weapon.fullName ?? weapon.name}${launcher ? ` · ${launcher.name} ${launcher.current}/${launcher.capacity} · ${t('Cycle launcher — press L or tap')}` : ''}`;
@@ -3204,14 +3499,6 @@ export class GameUI {
             speedCell?.setAttribute('title', `${t('SPEED')} ${speed} / ${maxSpeed}`);
         }
         setText('#screen-own-fuel', Math.round((model.fuel / model.maxFuel) * 100).toString());
-        const cargoValue = this.el('#screen-own-cargo');
-        const cargoCap = this.el('#screen-own-cargo-cap');
-        if (cargoValue && cargoCap) {
-            cargoValue.textContent = (model.cargo ?? 0).toFixed(1);
-            cargoValue.classList.toggle('is-full', (model.loadPercent ?? 0) >= 100);
-            cargoValue.classList.remove('is-alert');
-            cargoCap.textContent = `/${model.cargoCapacity ?? 0}`;
-        }
         const standoff = this.el('#screen-standoff');
         if (standoff) {
             standoff.classList.toggle('is-visible', Boolean(model.standoff));
@@ -3397,7 +3684,7 @@ export class GameUI {
     setTargetScreenValue(target) {
         const setText = (selector, value) => {
             const element = this.el(selector);
-            if (element)
+            if (element && element.textContent !== value)
                 element.textContent = value;
         };
         const setBar = (selector, value) => {
@@ -3565,12 +3852,20 @@ export class GameUI {
         if (!canvas)
             return;
         const ctx = canvas.getContext('2d');
-        const profile = shipTopDownProfile(variant ?? 'kestrel');
         const ratio = Math.min(2, window.devicePixelRatio || 1);
         const cssW = canvas.clientWidth || 150;
         const cssH = canvas.clientHeight || 110;
         const width = Math.max(60, Math.floor(cssW * ratio));
         const height = Math.max(60, Math.floor(cssH * ratio));
+        // The own-ship display has a fixed heading. Keep its bitmap until
+        // its contents or size change; target outlines still redraw normally.
+        const ownDrawKey = canvas === this.ownHullCanvas
+            ? [variant, heading, accent, hostile, missiles, missileCapacity, width, height, ratio].join('|')
+            : null;
+        if (ownDrawKey !== null && this.ownHullDrawCanvas === canvas
+            && this.ownHullDrawKey === ownDrawKey && canvas.width === width && canvas.height === height)
+            return;
+        const profile = shipTopDownProfile(variant ?? 'kestrel');
         if (canvas.width !== width || canvas.height !== height) {
             canvas.width = width;
             canvas.height = height;
@@ -3664,6 +3959,10 @@ export class GameUI {
                 const count = left ? leftCount : missileCapacity - leftCount;
                 drawMissile(left ? cx - sideOffset : cx + sideOffset, stackTop(count) + index * step + ms * 1.175, i < missiles);
             }
+        }
+        if (ownDrawKey !== null) {
+            this.ownHullDrawKey = ownDrawKey;
+            this.ownHullDrawCanvas = canvas;
         }
     }
     drawRadar(contacts, rings, searchRings = [], warpCombat = 0.2) {
@@ -3786,12 +4085,13 @@ export class GameUI {
             // next gate GREEN with a slow pulse, the one after it YELLOW, an
             // available shortcut PURPLE, and the travel gathering marker TEAL.
             // Beyond-horizon gates clamp to the rim and carry their distance.
-            if (contact.type === 'racegate' && contact.raceGate) {
+            const waypoint = contact.raceGate ?? contact.waypoint;
+            if (waypoint) {
                 const [wx, wy] = warpPoint(contact.x, contact.y);
                 const x = wx * radius;
                 const y = wy * radius;
-                const state = contact.raceGate.state;
-                const color = contact.raceGathering ? '#5be4d0' : state === 'next' ? '#3dff6e' : state === 'upcoming' ? '#ffd24a' : state === 'shortcut' ? '#c894ff' : '#9fb0bd';
+                const state = waypoint.state;
+                const color = contact.type === 'objective' ? '#ffd24a' : contact.raceGathering ? '#5be4d0' : state === 'next' ? '#3dff6e' : state === 'upcoming' ? '#ffd24a' : state === 'shortcut' ? '#c894ff' : '#9fb0bd';
                 const gateSize = 4.2 * ratio;
                 ctx.strokeStyle = color;
                 ctx.lineWidth = Math.max(1.2, 1.5 * ratio);
@@ -3828,13 +4128,13 @@ export class GameUI {
                         ctx.stroke();
                     }
                 }
-                if (contact.raceGate.beyond) {
+                if (waypoint.beyond) {
                     ctx.globalAlpha = 0.9;
                     ctx.fillStyle = color;
                     ctx.font = radarTextFont;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(`${contact.raceGate.distance}`, x * 0.8, y * 0.8);
+                    ctx.fillText(`${waypoint.distance}`, x * 0.8, y * 0.8);
                 }
                 ctx.globalAlpha = 1;
                 continue;
@@ -3952,14 +4252,24 @@ export class GameUI {
     }
     // Own-ship flight recorder: combat/career events land on the own monitor's
     // ticker and persist in the ship menu's RECENT EVENTS (like the comms log).
-    pushEvent(message, tone = 'info', duration = 5600) {
+    pushEvent(message, tone = 'info', duration = 5600, summary = '') {
         const now = this.save?.world.time ?? 0;
         // `until` rides the sim clock (the ship-menu history ordering); the
         // ticker window itself expires on the REAL clock — sim time stalls
         // (throttled tab, frame drops, menu pauses), and a world-time-only
         // expiry left the last line stuck on the monitor forever (user
         // report: the bounty message never disappeared).
-        this.recentEvents.push({ message, tone, at: now, until: now + duration / 1000, expiresAt: performance.now() + duration });
+        const previous = this.recentEvents.at(-1);
+        const expiresAt = performance.now() + duration;
+        if (previous?.message === message && previous.tone === tone && now - previous.at < 5) {
+            previous.count = (previous.count ?? 1) + 1;
+            previous.at = now;
+            previous.until = now + duration / 1000;
+            previous.expiresAt = expiresAt;
+            previous.summary = summary;
+            return;
+        }
+        this.recentEvents.push({ message, summary, tone, count: 1, at: now, until: now + duration / 1000, expiresAt });
         if (this.recentEvents.length > 24)
             this.recentEvents.shift();
     }
@@ -4002,6 +4312,11 @@ export class GameUI {
         this.commsLog.push({ callsign, line, relation, story });
         if (this.commsLog.length > 40)
             this.commsLog.shift();
+        if (story && this.save) {
+            this.save.world.dialogueHistory ??= [];
+            this.save.world.dialogueHistory.push({speaker:callsign,text:line});
+            this.save.world.dialogueHistory = this.save.world.dialogueHistory.slice(-160);
+        }
         const bar = this.el('#comms-bar');
         if (!bar)
             return;
@@ -4013,14 +4328,21 @@ export class GameUI {
         bar.style.color = color;
         bar.style.borderColor = color;
         bar.classList.add('active');
+        bar.classList.remove('story');
+        bar.setAttribute('data-ui-command', 'open-chat');
         bar.append(text);
         window.clearTimeout(this.commsBarTimer);
-        this.commsBarTimer = window.setTimeout(() => {
+        this.commsBarTimer = window.setTimeout(() => this.clearPilotLine(), duration);
+    }
+    clearPilotLine() {
+        const bar = this.el('#comms-bar');
+        if (bar) {
             bar.classList.remove('active');
             bar.textContent = '';
             bar.style.color = '';
             bar.style.borderColor = '';
-        }, duration);
+        }
+        window.clearTimeout(this.commsBarTimer);
     }
     // A group transmission (a mugging crew that folds together): the bar shows
     // all of their callsigns, comma-joined, ahead of the line.
@@ -4032,7 +4354,11 @@ export class GameUI {
     // Unlike normal chatter it doesn't fade — it stays until dismissed (tap
     // the CONTINUE bar, or the game times it out) — and it's flagged story in
     // the log. The game holds the chatter mute (storyLineUntil) while it's up.
-    showStoryLine(name, text, relation = 'neutral') {
+    showStoryLine(name, text, relation = 'neutral', conversationId) {
+        if (conversationId || this.adventure) {
+            this.openStoryAdventure(name,text,relation,conversationId);
+            return;
+        }
         this.commsLog.push({ callsign: name, line: text, relation, story: true });
         const bar = this.el('#comms-bar');
         if (!bar)
@@ -4150,8 +4476,9 @@ export class GameUI {
             const location = LOCATIONS[id];
             const point = localMapPoints.get(id) ?? systemMapPoint(location.position, id, system.id);
             const selected = model.navTargetId === id || model.currentTargetId === id;
+            const objective = model.tutorial?.active && model.tutorial.destinationId === id;
             const kind = this.save.player.discovered.includes(id) ? t(location.kind) : t('UNSURVEYED');
-            return `<button class="map-node kind-${location.kind} ${selected ? 'selected' : ''}" style="left:${point.left.toFixed(2)}%;top:${point.top.toFixed(2)}%" data-map-layout="spatial" data-map-target-kind="location" data-map-target-id="${id}" aria-label="${escapeHtml(mapLocationLabel(location))} · ${escapeHtml(kind)}"><i aria-hidden="true"></i><b>${escapeHtml(mapLocationLabel(location))}</b></button>`;
+            return `<button class="map-node kind-${location.kind} ${selected ? 'selected' : ''} ${objective ? 'mission-objective' : ''}" style="left:${point.left.toFixed(2)}%;top:${point.top.toFixed(2)}%" data-map-layout="spatial" data-map-target-kind="location" data-map-target-id="${id}" aria-label="${escapeHtml(mapLocationLabel(location))} · ${escapeHtml(kind)}${objective ? ` · ${t('MISSION OBJECTIVE')}` : ''}"><i aria-hidden="true"></i><b>${escapeHtml(mapLocationLabel(location))}</b>${objective ? `<small>${t('MISSION')}</small>` : ''}</button>`;
         }).join('')}
               </div>
             </section>
@@ -4182,10 +4509,11 @@ export class GameUI {
               ${visibleSystems.map((entry) => {
             const current = entry.id === model.systemId;
             const planned = entry.id === model.plannedSystemId;
+            const objective = model.tutorial?.active && LOCATIONS[model.tutorial.destinationId]?.systemId === entry.id && !current;
             const point = REGIONAL_SYSTEM_LAYOUT[entry.id] ?? REGIONAL_SYSTEM_LAYOUT['helios-verge'];
-            const state = current ? t('CURRENT') : planned ? t('ROUTE SET') : t('VISIBLE');
+            const state = objective ? t('MISSION OBJECTIVE') : current ? t('CURRENT') : planned ? t('ROUTE SET') : t('VISIBLE');
             const order = (systemRank.get(entry.id) ?? 0) + 1;
-            return `<button class="regional-system system-${escapeHtml(entry.id)} ${current ? 'current' : ''} ${planned ? 'planned' : ''}" style="left:${point.left}%;top:${point.top}%" data-system-order="${order}" data-map-target-kind="system" data-map-target-id="${escapeHtml(entry.id)}" aria-label="${escapeHtml(entry.name)} · ${escapeHtml(state)}"><em>${String(order).padStart(2, '0')}</em><i aria-hidden="true"></i><span>${escapeHtml(state)}</span><b>${escapeHtml(entry.name)}</b></button>`;
+            return `<button class="regional-system system-${escapeHtml(entry.id)} ${current ? 'current' : ''} ${planned ? 'planned' : ''} ${objective ? 'mission-objective' : ''}" style="left:${point.left}%;top:${point.top}%" data-system-order="${order}" data-map-target-kind="system" data-map-target-id="${escapeHtml(entry.id)}" aria-label="${escapeHtml(entry.name)} · ${escapeHtml(state)}"><em>${String(order).padStart(2, '0')}</em><i aria-hidden="true"></i><span>${escapeHtml(state)}</span><b>${escapeHtml(entry.name)}</b></button>`;
         }).join('')}
             </nav>
           </section>
@@ -4204,8 +4532,10 @@ export class GameUI {
     }
     renderShipTutorial() {
         const campaign = tutorialCampaignSummary(this.save);
-        if (!campaign?.active)
+        if (!campaign || campaign.skipped)
             return '';
+        if (campaign.completed)
+            return `<section class="ship-menu-tutorial"><h3>${t('The prologue is complete.')}</h3><p>${escapeHtml(t(campaign.detail))}</p>${campaign.choice ? `<p>${escapeHtml(t(campaign.choiceLabel))}</p>` : ''}</section>`;
         const chapters = Array.from({ length: campaign.chapterCount }, (_, index) => {
             const chapter = index + 1;
             return `<i class="${chapter < campaign.chapter ? 'is-done' : chapter === campaign.chapter ? 'is-current' : ''}" aria-label="${t('Chapter {chapter}', { chapter })}">${String(chapter).padStart(2, '0')}</i>`;
@@ -4243,7 +4573,7 @@ export class GameUI {
         }));
         const allCargo = [...cargoEntries, ...sealed];
         const cargoRows = allCargo.length
-            ? allCargo.map((entry) => `<div class="cargo-row"><span><b>${escapeHtml(entry.smuggled ? t('{commodity} (syndicate)', { commodity: t(entry.name) }) : t(entry.name))}</b><small>${entry.qty} ${t('UNITS')}</small></span>${entry.id === 'gold' || (mug?.kind === 'cargo' && mug.commodity === entry.id) ? `<button data-jettison="${entry.id}">${t('JETTISON')}</button>` : ''}<em>${entry.mass.toFixed(1)} ${t('MASS')}</em></div>`).join('')
+            ? allCargo.map((entry) => `<div class="cargo-row"><span><b>${escapeHtml(entry.smuggled ? t('{commodity} (syndicate)', { commodity: t(entry.name) }) : t(entry.name))}</b><small>${entry.qty} ${t('UNITS')}</small></span>${entry.id ? `<button data-jettison="${entry.id}">${t('JETTISON')}</button>` : ''}<em>${entry.mass.toFixed(1)} ${t('MASS')}</em></div>`).join('')
             : `<p class="ship-menu-empty">${t('Hold empty. The market is one jump away.')}</p>`;
         const missions = this.save.activeMissions;
         const missionRows = missions.length
@@ -4273,22 +4603,19 @@ export class GameUI {
               </article>`;
             }).join('')
             : `<p class="ship-menu-empty">${t('No active contracts. The bar posts new work at every station.')}</p>`;
-        const eventRows = this.recentEvents.length
-            ? [...this.recentEvents].reverse().map((entry) => `<div class="event-row" data-tone="${escapeHtml(entry.tone)}"><span>${escapeHtml(entry.message)}</span></div>`).join('')
+        const events = [...this.recentEvents].reverse();
+        const eventRow = (entry) => `<div class="event-row" data-tone="${escapeHtml(entry.tone)}"><span>${escapeHtml(entry.message)}</span>${entry.count > 1 ? `<small>×${entry.count}</small>` : ''}</div>`;
+        const eventRows = events.length
+            ? events.slice(0, 5).map(eventRow).join('') + (events.length > 5
+                ? `<details><summary>${t('Earlier events')}</summary>${events.slice(5).map(eventRow).join('')}</details>` : '')
             : `<p class="ship-menu-empty">${t('No flight events recorded. The recorder logs combat, salvage, and pickups.')}</p>`;
-        // Weapon systems card: every gun with its engagement envelope (derived
-        // from the registry — speed × life — so the promise cannot drift from
-        // sim truth) and its ammo pool. The active mount is marked; unowned
-        // guns show their station price — gained, not granted.
-        const weaponRows = WEAPON_ORDER.map((id) => {
+        // Owned weapon details are optional; the shop catalogue stays at dock.
+        const weaponRows = WEAPON_ORDER.filter((id) => weaponOwned(player, id)).map((id) => {
             const weapon = WEAPONS[id];
             const active = player.weaponId === id;
-            const owned = weaponOwned(player, id);
-            const ammo = weapon.ammoId ? `${player.ammo?.[weapon.ammoId] ?? 0}/${AMMO_CAPACITY[weapon.ammoId]}` : '∞';
-            const envelope = t(weapon.envelopeKey, { range: Math.round(weapon.speed * weapon.life) });
-            const price = weapon.equipmentId ? EQUIPMENT[weapon.equipmentId]?.price : undefined;
-            const state = owned ? ammo : `${t('NOT INSTALLED')} · ${formatCredits(price ?? 0)}`;
-            return `<div class="weapon-row${active ? ' is-active' : ''}${owned ? '' : ' is-locked'}"><span>${active ? '▸ ' : ''}${escapeHtml(t(weapon.nameKey))}</span><small>${escapeHtml(envelope)}</small><em>${state}</em></div>`;
+            const ammo = `${weapon.energyCost} ⚡`;
+            const envelope = t(weapon.envelopeKey, { range: Math.round(weaponRange(weapon)) });
+            return `<div class="weapon-row${active ? ' is-active' : ''}"><span>${active ? '▸ ' : ''}${escapeHtml(t(weapon.nameKey))}</span><small>${escapeHtml(envelope)}</small><em>${ammo}</em></div>`;
         }).join('');
         const launcherRows = launcherMagazineEntries(player).map((entry) => (
             `<div class="weapon-row launcher-row${entry.selected ? ' is-active' : ''}"><span>${entry.selected ? '▸ ' : ''}${escapeHtml(t(entry.launcher.nameKey))}</span><small>${escapeHtml(t(entry.launcher.ordnanceNameKey))} · ${t('MOUNT {number}', { number: entry.index + 1 })}</small><em>${entry.rounds}/${entry.capacity}</em></div>`
@@ -4301,16 +4628,15 @@ export class GameUI {
           ${tutorialSection}
           <section class="ship-menu-missions"><h3>${t('ACTIVE CONTRACTS · {count}/6', { count: missions.length })}</h3>${missionRows}</section>
           <section class="ship-menu-cargo"><h3>${t('CARGO HOLD · {mass}/{capacity} MASS ({percent}%)', { mass: mass.toFixed(1), capacity, percent: loadPercent })}</h3>${cargoRows}</section>
-          <section class="ship-menu-weapons"><h3>${t('WEAPON SYSTEMS')}</h3>${weaponRows}${launcherRows}</section>
+          <section class="ship-menu-weapons">${loadoutFor(player).turrets?.some(Boolean)?`<button data-ui-command="turret-toggle">${t(player.turretsHeld?'TURRETS HOLD FIRE':'TURRETS ACTIVE')}</button><p>${escapeHtml(t(player.turretsHeld?'TURRETS HOLD FIRE':(player.turretRuntime?.find(s=>s.status==='TURRETS WAITING FOR ENERGY')?.status??'TURRETS READY')))}</p>`:''}<details><summary>${t('WEAPON SYSTEMS')}</summary>${weaponRows}${launcherRows}</details><details><summary>${t('WEAPON GROUP HELP')}</summary><p>${t('Tap the weapon name to cycle populated groups and Fire all. Fire all uses every forward gun; missiles and automatic turrets stay separate. In Outfitting, open a gun’s details to assign A or B. Try beams in A and your other weapon in B to control energy use.')}</p></details></section>
           <section class="ship-menu-account"><h3>${t('ACCOUNT')}</h3>
             <div class="ship-account-row"><span>${t('AVAILABLE CREDIT')}</span><b>${formatCredits(player.credits)}</b></div>
             ${mug?.kind === 'credits' ? `<div class="ship-account-row"><span>${t('STANDOFF TOLL')}</span><button data-pay-mug="1">${t('PAY')} ${formatCredits(mug.amount)}</button></div>` : ''}
-            <div class="ship-account-row"><span>${t('CARGO LOAD')}</span><b>${loadPercent}%</b></div>
             <div class="ship-account-row"><span>${t('HULL')}</span><b>${Math.ceil(player.hull)}/${Math.ceil(getEffectiveShipStats(player).hull)}</b></div>
           </section>
           <section class="ship-menu-events"><h3>${t('RECENT EVENTS · {count}', { count: this.recentEvents.length })}</h3>${eventRows}</section>
         </div>
-        <footer><span>${t('Contracts carry a destination vector.')}</span><button data-ui-command="map">${t('NAV MAP')}</button></footer>
+
       </div>`;
         this.hidePause();
         this.hideMap();
@@ -4330,7 +4656,7 @@ export class GameUI {
           <section><h3>${t('FLIGHT')}</h3><label><span>${t('Flight assist')}</span><input type="checkbox" data-setting="flightAssist" ${settings.flightAssist ? 'checked' : ''}></label><label><span>${t('Aim assistance')}</span><input type="checkbox" data-setting="aimAssist" ${settings.aimAssist ? 'checked' : ''}></label><label><span>${t('Touch scale')}</span><input type="range" min="0.8" max="1.3" step="0.05" value="${settings.touchScale}" data-setting="touchScale"></label></section>
           <section><h3>${t('TILT STEER')}</h3><label><span>${t('Steering')}</span><select data-setting="steering"><option value="tilt" ${settings.steering !== 'stick' ? 'selected' : ''}>${t('Tilt')}</option><option value="stick" ${settings.steering === 'stick' ? 'selected' : ''}>${t('Stick')}</option></select></label><label><span>${t('Sensitivity')}</span><input type="range" min="0.4" max="1.8" step="0.05" value="${settings.tiltSensitivity}" data-setting="tiltSensitivity"></label><label><span>${t('Invert pitch')}</span><input type="checkbox" data-setting="tiltInvertPitch" ${settings.tiltInvertPitch ? 'checked' : ''}></label><label><span>${t('Invert yaw')}</span><input type="checkbox" data-setting="tiltInvertYaw" ${settings.tiltInvertYaw ? 'checked' : ''}></label><div class="tilt-actions"><button data-ui-command="enable-tilt">${t('ENABLE')}</button><button data-ui-command="calibrate-tilt">${t('SET NEUTRAL')}</button></div></section>
           <section><h3>${t('AUDIO')}</h3><label><span>${t('Music')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.music}" data-setting="music"></label><label><span>${t('Effects')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.effects}" data-setting="effects"></label><label><span>${t('Haptics')}</span><input type="checkbox" data-setting="vibration" ${settings.vibration ? 'checked' : ''}></label></section>
-          <section><h3>${t('DISPLAY')}</h3><label><span>${t('Visuals')}</span><output>${t('High fidelity')}</output></label><label><span>${t('Fullscreen')}</span><button type="button" class="fullscreen-switch" data-ui-command="toggle-fullscreen" role="switch" aria-label="${t('Toggle fullscreen')}" aria-checked="false">⛶</button></label></section>
+          <section><h3>${t('DISPLAY')}</h3><label><span>${t('Power use')}</span><select data-setting="powerMode"><option value="auto" ${!settings.powerMode || settings.powerMode === 'auto' ? 'selected' : ''}>${t('Automatic')}</option><option value="battery" ${settings.powerMode === 'battery' ? 'selected' : ''}>${t('Battery saving · 30 FPS')}</option><option value="performance" ${settings.powerMode === 'performance' ? 'selected' : ''}>${t('Smoother motion · 60 FPS')}</option></select></label><p>${t('Automatic saves power on phones. Choose 60 FPS for smoother motion with higher power use.')}</p><label><span>${t('Visuals')}</span><output>${t('High fidelity')}</output></label><label><span>${t('Fullscreen')}</span><button type="button" class="fullscreen-switch" data-ui-command="toggle-fullscreen" role="switch" aria-label="${t('Toggle fullscreen')}" aria-checked="false">⛶</button></label></section>
           <section><h3>${t('LANGUAGE')}</h3><label><span>${t('Language')}</span><select data-setting="language"><option value="de" ${settings.language !== 'en' ? 'selected' : ''}>Deutsch</option><option value="en" ${settings.language === 'en' ? 'selected' : ''}>English</option></select></label></section>
           <section class="controls-reference"><h3>${t('KEYBOARD / CONTROLLER')}</h3><p>${t('W/S pitch · A/D yaw · Q/E roll · R/F throttle · Shift afterburn · Space fire · X fire group · L launcher · hold M secondary tool / tap missile or capture · T target · C mode · N nav · J hyperdrive · K map · B transponder')}</p><p>${t('Gamepad: left stick steer · right stick roll/throttle · RT fire · hold RB secondary tool / tap missile or capture · LB afterburn · face buttons target/mode/fire group/hyperdrive · left stick click transponder · D-pad launcher/capture/hostile/nav.')}</p></section>
         </div>`;
@@ -4381,7 +4707,63 @@ export class GameUI {
         panel?.replaceChildren();
         this.updateOrientationNotice();
     }
+    setRunInbound(point){
+        let marker=this.root.querySelector('#run-inbound');
+        if(!marker){this.root.insertAdjacentHTML('beforeend','<div id="run-inbound" class="run-inbound is-hidden"></div>');marker=this.root.querySelector('#run-inbound');}
+        marker.classList.toggle('is-hidden',!point);if(!point)return;
+        marker.textContent='◇ '+t('ENTRY')+' · '+point.seconds+'s';
+        marker.style.left=`${Math.max(10,Math.min(90,50+point.x*45))}%`;
+        marker.style.top=`${point.behind?85:Math.max(12,Math.min(85,50-point.y*45))}%`;
+    }
+    showRunCountdown(seconds,name) {
+        let el=this.root.querySelector('#run-countdown');
+        if(!el){el=document.createElement('div');el.id='run-countdown';el.setAttribute('aria-live','polite');(this.root.querySelector('#hud')??this.root).appendChild(el);}
+        el.hidden=seconds<=0;
+        if(seconds>0&&(el.dataset.seconds!==String(seconds)||el.dataset.name!==name)){el.dataset.seconds=String(seconds);el.dataset.name=name;el.innerHTML=`<span>${escapeHtml(name)}</span><b>${seconds}</b>`;}
+    }
+    showArenaRun(save) {
+        const r=save.arenaRun,p=save.player,stats=getEffectiveShipStats(p),wave=RUN_WAVES[r.wave],fit=loadoutFor(p),spec=HARDPOINT_SPECS[p.shipId];
+        const done=r.phase==='won'||r.phase==='lost';
+        const command=(action,value,label,extra='')=>`<button data-ui-command="run-action" data-run-action="${action}" data-run-value="${value}" ${extra}>${label}</button>`;
+        const names={guns:'GUNS',launchers:'MISSILES',turrets:'TURRETS',power:'POWER',drive:'DRIVE',defense:'DEFENSE',utility:'UTILITY'};
+        const hullText={wayfarer:'Two forward guns and one upper turret.',talon:'Agile fighter with three forward guns and no turret.',vanguard:'Two medium guns and upper and lower turrets; slower handling.',prospector:'One forward gun and an upper rear turret.',lancer:'Two medium guns and one upper medium turret.',atlas:'One forward gun and two turrets; a large, slow hull.'};
+        const briefs={
+            'pulse-cannon':'Efficient fire; lead your target.', 'ripper':'Strong against hull; short range.',
+            'gauss-cannon':'Partly bypasses shields; slow firing.', 'ion-blaster':'Strips shields; shared standard lead.',
+            'mortar':'High direct damage and efficiency; slow plasma.', 'pdc':'Missiles first; ten-round hull bursts, weak against shields.',
+            'tracking-turret':'Automatically fires at your selected hostile.', 'engine-mk2':'More speed; slower turning.',
+            'thrusters-mk2':'Sharper turns; lower top speed.', 'capacitor-bank':'Larger energy reserve; slower recharge.',
+            'sustained-reactor':'Faster recharge; smaller reserve.', 'shield-mk2':'More shield protection.', 'recovery-shield':'Faster recovery; weaker shield.'
+        };
+        const labelItems=ids=>{const counts={};ids.forEach(id=>counts[id]=(counts[id]??0)+1);return Object.entries(counts).map(([id,n])=>`${n}× ${t(OUTFIT_ITEMS[id].name)}`).join(' · ');};
+        let body='',footer='';
+        if(done){
+            body=`<div class="run-result"><h3>${t(r.phase==='won'?'Run complete':'Run ended')}</h3><b>${t('Score')}: ${runScore(r)}</b><p>${t('Waves cleared')}: ${r.cleared}/8 · ${t('Damage taken')}: ${Math.round(r.damage)}</p></div>`;
+            footer=`<button data-ui-command="quit-title">${t('QUIT TO TITLE')}</button><button class="primary" data-ui-command="new-arena-run">${t('New run')}</button>`;
+        }else if(!r.hullChosen){
+            body=`<div class="run-stage-label">${t('Choose your hull')}</div><div class="run-offers run-hulls">${Object.keys(hullText).map(id=>command('hull',id,`<b>${SHIPS[id].name}${p.shipId===id?' · '+t('CURRENT'):''}</b><span>${t(hullText[id])}</span>`)).join('')}</div>`;
+            footer=`<button data-ui-command="quit-title">${t('Save and leave')}</button>`;
+        }else if(!r.rewardChosen){
+            body=`<div class="run-stage-label">${t('Choose one reward')}</div><div class="run-offers">${r.offers.map(id=>{
+                const plan=runRewardPlan(save,id);if(!plan)return '';
+                const title=id==='repair'?t('Field repairs'):`${plan.count}× ${t(OUTFIT_ITEMS[id].name)}`;
+                const detail=id==='repair'?t('Restore 40% hull and refill missiles.'):t(briefs[id]??OUTFIT_ITEMS[id].description);
+                const replacement=plan.replaced.length?t('Replaces {items}',{items:labelItems(plan.replaced)}):t('Fits an empty mount');
+                return command('reward',id,`<b>${escapeHtml(title)}</b><span>${escapeHtml(detail)}</span>${id==='repair'?'':`<small>${escapeHtml(replacement)}</small>`}`,`class="${r.selectedReward===id?'is-selected':''}" aria-pressed="${r.selectedReward===id}"`);
+            }).join('')}</div>`;
+            const selected=r.offers.includes(r.selectedReward)&&runRewardPlan(save,r.selectedReward);
+            footer=`<button data-ui-command="quit-title">${t('Save and leave')}</button>${command('equip','',t('Equip and adjust'),selected?'':'disabled')}${command('accept','',t(r.selectedReward==='repair'?'Repair and continue':'Equip and continue'),`class="primary" ${selected?'':'disabled'}`)}`;
+        }else{
+            body=`<div class="run-loadout-summary">${escapeHtml(labelItems(LOADOUT_KEYS.flatMap(k=>fit[k]).filter(Boolean)))}</div>`;
+            if(this.runFitOpen)body+=`<div class="run-fitting">${LOADOUT_KEYS.map(key=>spec[key].map((m,i)=>`<div class="run-slot"><b>${t(names[key])} ${i+1} · ${m.size}</b><span>${fit[key][i]?t(OUTFIT_ITEMS[fit[key][i]].name):t('EMPTY')}</span><div>${command('fit','',t('REMOVE'),`data-run-key="${key}" data-run-index="${i}"`)}${Object.entries(p.outfitting.locker).filter(([id,n])=>n>0&&itemFitsMount(OUTFIT_ITEMS[id],m)).map(([id,n])=>command('fit',id,`${t(OUTFIT_ITEMS[id].name)} ×${n}`,`data-run-key="${key}" data-run-index="${i}"`)).join('')}${key==='guns'&&fit[key][i]?command('group',m.id,t('GROUP')+' '+fit.fireGroups.assignments[m.id]):''}</div></div>`).join('')).join('')}</div>`;
+            footer=`<button data-ui-command="quit-title">${t('Save and leave')}</button><button data-ui-command="run-fit-toggle">${t('Adjust fitting')}</button><button class="primary" data-ui-command="run-launch">${t('Start next wave')}</button>`;
+        }
+        this.root.querySelector('#arena-panel').innerHTML=`<div class="modal-card arena-card run-card"><header><div><h2>${t('Arena Run')} · ${done?`${r.cleared}/8`:t('Wave {wave} of 8',{wave:r.wave+1})}${r.hard?' · '+t('HARD'):''}</h2><span>${escapeHtml(SHIPS[p.shipId].name)} · ${t('HULL')} ${Math.round(p.hull/stats.hull*100)}%</span></div>${done?'':`<details class="run-next"><summary>${t('Next')}: ${t(wave.name)}</summary><p>${t(wave.hint)}</p></details>`}</header><div class="run-scroll">${this.runFitNotice?`<p role="status">${escapeHtml(this.runFitNotice)}</p>`:''}${body}</div><footer>${footer}</footer></div>`;
+        this.root.querySelector('#arena-panel').classList.remove('is-hidden');this.updateOrientationNotice();
+    }
+
     showArena() {
+        const savedRun=readArenaRun(),record=arenaRecord();
         const panel = this.root.querySelector('#arena-panel');
         const envOptions = [['open', 'OPEN SPACE'], ['asteroid-field', 'ASTEROID FIELD'], ['debris-field', 'DEBRIS FIELD']];
         const scenarioOptions = [['1v1', '1V1'], ['1v2', '1V2'], ['1v3', '1V3'], ['2v3', '2V3']];
@@ -4390,6 +4772,7 @@ export class GameUI {
         panel.innerHTML = `
       <div class="modal-card arena-card">
         <header><div><span class="eyebrow">${t('TRAINING SIMULATION')}</span><h2>${t('Dogfight Arena')}</h2></div><button data-ui-command="close-arena">${t('CLOSE')}</button></header>
+        <div class="arena-menu-scroll"><section class="run-entry"><b>${t('Arena Run')}</b>${record.best?`<span> · ${t('Best score')}: ${record.best}</span>`:''}<p>${t('Eight waves. Choose equipment between fights.')}</p><div><button data-ui-command="new-arena-run">${t(savedRun?'New run — replace saved run':'New run')}</button>${savedRun?`<button data-ui-command="resume-arena-run">${t('Resume saved run')}</button>`:''}${record.unlockedHard?`<button data-ui-command="hard-arena-run">${t('Hard Run')}</button>`:''}</div></section>
         <div class="arena-grid">
           <section>
             <h3>${t('ARENA')}</h3>
@@ -4403,8 +4786,9 @@ export class GameUI {
             <h3>${t('PILOTS')}</h3>
             <div class="arena-options">${difficultyOptions.map(([value, label]) => option('difficulty', value, label, this.arenaDifficulty === value)).join('')}</div>
           </section>
+          <section><h3>${t('YOUR WEAPON FIT')}</h3><div class="arena-options">${[['balanced','BALANCED FIT'],['assault','CLOSE ASSAULT'],['support','DEFENSIVE SUPPORT'],['beam','BEAM FIT']].map(([value,label])=>option('fit',value,label,this.arenaFit===value)).join('')}</div></section>
         </div>
-        <footer><span>${t('Simulated sortie — nothing here follows you back out.')}</span><button class="primary" data-ui-command="launch-arena">${t('LAUNCH')}</button></footer>
+        </div><footer><span>${t('Simulated sortie — nothing here follows you back out.')}</span><button class="primary" data-ui-command="launch-arena">${t('LAUNCH')}</button></footer>
       </div>`;
         panel.classList.remove('is-hidden');
         this.updateOrientationNotice();
@@ -4438,11 +4822,12 @@ export class GameUI {
         });
     };
     get isModalOpen() {
+        if (this.newCareerConfirm) return true;
         // The forced-landscape overlay is a modal too: while it blocks play the
         // sim must freeze (the frame loop drops the accumulator for any open
         // modal), so a pilot can't drift into a wall or a pirate's guns while
         // the game is waiting for the phone to be flipped.
-        return !this.root.querySelector('#map-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#ship-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#pause-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#arena-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#chat-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#rotate-notice')?.classList.contains('is-hidden');
+        return Boolean(this.adventure) || !this.root.querySelector('#map-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#ship-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#pause-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#arena-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#chat-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#rotate-notice')?.classList.contains('is-hidden');
     }
     get isTitleVisible() {
         return this.titleVisible;
