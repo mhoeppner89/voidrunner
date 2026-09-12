@@ -1,0 +1,206 @@
+[
+  {
+    "hull": "wayfarer",
+    "beforeBytes": 1432980,
+    "afterBytes": 1483284,
+    "textures": [
+      {
+        "slot": "color",
+        "before": [
+          1024,
+          1024
+        ],
+        "after": [
+          1024,
+          1024
+        ],
+        "adjustedContrast": true
+      },
+      {
+        "slot": "material",
+        "before": [
+          1024,
+          1024
+        ],
+        "after": [
+          1024,
+          1024
+        ],
+        "adjustedContrast": false
+      }
+    ],
+    "geometryUnchanged": true,
+    "errors": 0,
+    "warnings": 0
+  },
+  {
+    "hull": "talon",
+    "beforeBytes": 1705088,
+    "afterBytes": 1194472,
+    "textures": [
+      {
+        "slot": "color",
+        "before": [
+          2048,
+          2048
+        ],
+        "after": [
+          1024,
+          1024
+        ],
+        "adjustedContrast": true
+      },
+      {
+        "slot": "material",
+        "before": [
+          1024,
+          1024
+        ],
+        "after": [
+          1024,
+          1024
+        ],
+        "adjustedContrast": false
+      }
+    ],
+    "geometryUnchanged": true,
+    "errors": 0,
+    "warnings": 0
+  },
+  {
+    "hull": "vanguard",
+    "beforeBytes": 3255076,
+    "afterBytes": 2451356,
+    "textures": [
+      {
+        "slot": "color",
+        "before": [
+          2048,
+          2048
+        ],
+        "after": [
+          1024,
+          1024
+        ],
+        "adjustedContrast": true
+      },
+      {
+        "slot": "material",
+        "before": [
+          1024,
+          1024
+        ],
+        "after": [
+          1024,
+          1024
+        ],
+        "adjustedContrast": false
+      }
+    ],
+    "geometryUnchanged": true,
+    "errors": 0,
+    "warnings": 0
+  },
+  {
+    "hull": "prospector",
+    "beforeBytes": 3456920,
+    "afterBytes": 2596800,
+    "textures": [
+      {
+        "slot": "color",
+        "before": [
+          2048,
+          2048
+        ],
+        "after": [
+          1024,
+          1024
+        ],
+        "adjustedContrast": true
+      },
+      {
+        "slot": "material",
+        "before": [
+          1024,
+          1024
+        ],
+        "after": [
+          1024,
+          1024
+        ],
+        "adjustedContrast": false
+      }
+    ],
+    "geometryUnchanged": true,
+    "errors": 0,
+    "warnings": 0
+  },
+  {
+    "hull": "lancer",
+    "beforeBytes": 2364744,
+    "afterBytes": 1770100,
+    "textures": [
+      {
+        "slot": "color",
+        "before": [
+          2048,
+          2048
+        ],
+        "after": [
+          1024,
+          1024
+        ],
+        "adjustedContrast": true
+      },
+      {
+        "slot": "material",
+        "before": [
+          1024,
+          1024
+        ],
+        "after": [
+          1024,
+          1024
+        ],
+        "adjustedContrast": false
+      }
+    ],
+    "geometryUnchanged": true,
+    "errors": 0,
+    "warnings": 0
+  },
+  {
+    "hull": "atlas",
+    "beforeBytes": 2816312,
+    "afterBytes": 2008844,
+    "textures": [
+      {
+        "slot": "color",
+        "before": [
+          2048,
+          2048
+        ],
+        "after": [
+          1024,
+          1024
+        ],
+        "adjustedContrast": true
+      },
+      {
+        "slot": "material",
+        "before": [
+          1024,
+          1024
+        ],
+        "after": [
+          1024,
+          1024
+        ],
+        "adjustedContrast": false
+      }
+    ],
+    "geometryUnchanged": true,
+    "errors": 0,
+    "warnings": 0
+  }
+]

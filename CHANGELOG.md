@@ -1,3 +1,10 @@
+## 0.8.2o — Compact, sharper ship textures
+
+- Limit all six ships' color and material maps to 1024×1024. Apply modest contrast and restrained sharpening to color maps while preserving material masks.
+- Preserve the approved original paint schemes, geometry, UVs and fitted canopies. Combined GLB downloads shrink from 15.03 to 11.50 MB (23.5%).
+- Estimated RGBA8 texture memory including mipmaps falls from 144 to 64 MiB across the six hulls. This is not a measured FPS improvement.
+- Refresh the service-worker cache so returning players receive the smaller models.
+
 ## 0.8.2n — Optimized ships with fitted canopies
 
 - Ship all six optimized original hulls, retaining their original paint schemes. Combined geometry falls from 333,788 to 178,253 triangles (46.6%).

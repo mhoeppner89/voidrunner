@@ -1,3 +1,5 @@
+> Texture update: 0.8.2o now ships 1024² color and material maps for every hull. Geometry and canopies below are unchanged. See [texture release](../texture-1024/README.md) for the updated download and memory figures.
+
 # Approved ship models — 0.8.2n
 
 The release ships the six optimized original hulls with their original paint schemes. The procedural repaint and rebuilt Wayfarer experiments are not included.
