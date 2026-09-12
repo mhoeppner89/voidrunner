@@ -4,7 +4,7 @@ import { pick, randomBetween, randomInt, seededRandom } from './random.js';
 import { t } from './i18n.js';
 import { RACE_COURSES } from './racing.js';
 import { GRAVEYARD_COLLISION_PROFILES } from './graveyardCollisionProfiles.js';
-import { GRAVEYARD_MODEL_WRECKS, generateWreckNodes, miningClaimCandidates, miningClaimName } from './missionWorldData.js';
+import { wreckSectionDelta, GRAVEYARD_MODEL_WRECKS, generateWreckNodes, miningClaimCandidates, miningClaimName } from './missionWorldData.js';
 
 // Keep the historical worldData exports stable for game/render callers while
 // missions imports the lightweight generator directly.
@@ -299,6 +299,8 @@ const buildGraveyardModelColliders = () => {
     const center = new THREE.Vector3(...LOCATIONS['mourning-line'].position);
     const configQuaternion = new THREE.Quaternion();
     const sectionCenter = new THREE.Vector3();
+    const sectionQuaternion = new THREE.Quaternion();
+    const colliderQuaternion = new THREE.Quaternion();
     const worldCenter = new THREE.Vector3();
     const colliders = [];
     for (const wreck of GRAVEYARD_MODEL_WRECKS) {
@@ -306,7 +308,12 @@ const buildGraveyardModelColliders = () => {
         configQuaternion.setFromEuler(new THREE.Euler(...wreck.rotation, 'XYZ'));
         profiles.forEach((profile, sectionIndex) => {
             const mesh = scaledColliderMesh(wreck.class, sectionIndex, profile, wreck.scale);
-            sectionCenter.set(...profile.center).multiplyScalar(wreck.scale).applyQuaternion(configQuaternion);
+            const delta = wreckSectionDelta(wreck, profile.name);
+            sectionQuaternion.setFromEuler(new THREE.Euler(...(delta?.rotation ?? [0, 0, 0]), 'XYZ'));
+            colliderQuaternion.copy(configQuaternion).multiply(sectionQuaternion);
+            sectionCenter.set(...profile.center).applyQuaternion(sectionQuaternion);
+            if (delta) sectionCenter.add(new THREE.Vector3(...delta.position));
+            sectionCenter.multiplyScalar(wreck.scale).applyQuaternion(configQuaternion);
             worldCenter.copy(center).add(new THREE.Vector3(...wreck.local)).add(sectionCenter);
             const halfExtents = profile.halfExtents.map((extent) => extent * wreck.scale);
             colliders.push(Object.freeze({
@@ -316,7 +323,7 @@ const buildGraveyardModelColliders = () => {
                 sectionName: profile.name,
                 position: Object.freeze(worldCenter.toArray()),
                 halfExtents: Object.freeze(halfExtents),
-                quaternion: Object.freeze(configQuaternion.toArray()),
+                quaternion: Object.freeze(colliderQuaternion.toArray()),
                 collisionRadius: mesh.radius,
                 meshVerts: mesh.verts,
                 meshIndices: mesh.indices,

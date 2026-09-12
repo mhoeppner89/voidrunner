@@ -1,3 +1,10 @@
+## 0.8.2p — Wreck variety and smaller assets
+
+- Give the eight repeated frigates four fixed section arrangements and the two cruisers distinct breakups, sharing GLB files, meshes, textures and collision buffers.
+- Use matching section transforms for visuals and collisions. Keep cruiser interiors and salvage placement fixed.
+- Install the reduced wrecks with faded 512px maps and an asymmetric Talon wing-root/nose breakup; regenerate collision surfaces.
+- Combined wreck downloads fall from 12.81 to 9.62 MB. Unique triangles fall from 302,469 to 222,407.
+
 ## 0.8.2o — Compact, sharper ship textures
 
 - Limit all six ships' color and material maps to 1024×1024. Apply modest contrast and restrained sharpening to color maps while preserving material masks.

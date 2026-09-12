@@ -90,6 +90,36 @@ const WRECK_INTERIORS = Object.freeze({
     cruiser: Object.freeze({ sectionName: 'Cruiser wreck command hull', center: Object.freeze([0.033398, 0.19, 0.04]), halfLength: 0.421548, halfWidth: 0.13, halfHeight: 0.12, hotspotCount: 6 }),
 });
 
+// Fixed section arrangements share each hull's geometry and textures. Deltas
+// act in the model frame (before the whole wreck rotation/scale). Keep the
+// cruiser command hull unchanged: its interior contains authored race/salvage routes.
+const sectionDelta = (position, rotation) => Object.freeze({ position: Object.freeze(position), rotation: Object.freeze(rotation) });
+export const WRECK_SECTION_VARIANTS = Object.freeze({
+    cruiser: Object.freeze([
+        Object.freeze({}),
+        Object.freeze({
+            'Cruiser wreck engine cluster': sectionDelta([0.08, -0.06, 0.08], [0.18, 0.12, -0.08]),
+            'Cruiser wreck prow': sectionDelta([-0.08, 0.04, -0.08], [-0.14, -0.12, 0.06]),
+        }),
+    ]),
+    frigate: Object.freeze([
+        Object.freeze({}),
+        Object.freeze({
+            'Frigate wreck engine section': sectionDelta([-0.08, 0.10, -0.08], [0.42, -0.16, 0.14]),
+            'Frigate wreck forward section': sectionDelta([0.06, -0.08, 0.06], [-0.18, 0.12, -0.12]),
+        }),
+        Object.freeze({
+            'Frigate wreck engine section': sectionDelta([-0.10, -0.12, 0.08], [-0.38, 0.18, -0.16]),
+            'Frigate wreck forward section': sectionDelta([0.08, 0.12, -0.06], [0.26, -0.14, 0.12]),
+        }),
+        Object.freeze({
+            'Frigate wreck engine section': sectionDelta([-0.12, 0.04, 0.12], [0.64, 0.08, -0.10]),
+            'Frigate wreck forward section': sectionDelta([0.10, -0.04, -0.10], [-0.36, -0.08, 0.10]),
+        }),
+    ]),
+});
+export const wreckSectionDelta = (wreck, name) => WRECK_SECTION_VARIANTS[wreck.class]?.[wreck.variant ?? 0]?.[name];
+
 // High-detail wreck landmarks rendered from the same hulls that fly in live
 // space. worldData.js re-exports this object for render/game callers so there
 // remains one shared identity and one source of truth.
@@ -97,14 +127,14 @@ export const GRAVEYARD_MODEL_WRECKS = Object.freeze([
     Object.freeze({ id: 'concord-battleship-wreck', class: 'battleship', file: 'assets/models/wrecks/concord-battleship-wreck-v4.glb', local: [350, -700, 1900], rotation: [0.04, -0.12, 0.05], scale: 1130, clearanceRadius: 1460, interior: WRECK_INTERIORS.battleship }),
     Object.freeze({ id: 'concord-carrier-wreck', class: 'carrier', file: 'assets/models/wrecks/concord-carrier-wreck-v4.glb', local: [-650, 850, -1850], rotation: [0.04, -1.21, 0.05], scale: 902.5508, clearanceRadius: 1250, interior: WRECK_INTERIORS.carrier }),
     Object.freeze({ id: 'concord-cruiser-alpha-wreck', class: 'cruiser', file: 'assets/models/wrecks/concord-cruiser-wreck-v4.glb', local: [2850, 850, -1500], rotation: [-0.08, -0.42, 0.16], scale: 564.0943, clearanceRadius: 900, interior: WRECK_INTERIORS.cruiser }),
-    Object.freeze({ id: 'concord-cruiser-beta-wreck', class: 'cruiser', file: 'assets/models/wrecks/concord-cruiser-wreck-v4.glb', local: [-3000, -650, 1200], rotation: [0.12, 0.82, -0.18], scale: 564.0943, clearanceRadius: 900, interior: WRECK_INTERIORS.cruiser }),
+    Object.freeze({ id: 'concord-cruiser-beta-wreck', variant: 1, class: 'cruiser', file: 'assets/models/wrecks/concord-cruiser-wreck-v4.glb', local: [-3000, -650, 1200], rotation: [0.12, 0.82, -0.18], scale: 564.0943, clearanceRadius: 900, interior: WRECK_INTERIORS.cruiser }),
     Object.freeze({ id: 'concord-frigate-alpha-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-2200, 1300, -850], rotation: [0.16, -1.91, 0.12], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-beta-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [1900, -1400, 100], rotation: [-0.2, -1.11, -0.14], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-gamma-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-3600, 1100, -2600], rotation: [0.12, -0.45, 0.21], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-delta-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [3500, -1200, -2500], rotation: [-0.16, 0.52, -0.1], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-epsilon-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-4300, -300, -100], rotation: [0.25, -2.35, 0.08], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-zeta-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [4200, 500, 600], rotation: [-0.1, 1.22, -0.2], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-eta-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-2700, 300, 3300], rotation: [0.18, -0.78, 0.14], scale: 113, clearanceRadius: 230 }),
+    Object.freeze({ id: 'concord-frigate-beta-wreck', variant: 1, class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [1900, -1400, 100], rotation: [-0.2, -1.11, -0.14], scale: 113, clearanceRadius: 230 }),
+    Object.freeze({ id: 'concord-frigate-gamma-wreck', variant: 2, class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-3600, 1100, -2600], rotation: [0.12, -0.45, 0.21], scale: 113, clearanceRadius: 230 }),
+    Object.freeze({ id: 'concord-frigate-delta-wreck', variant: 3, class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [3500, -1200, -2500], rotation: [-0.16, 0.52, -0.1], scale: 113, clearanceRadius: 230 }),
+    Object.freeze({ id: 'concord-frigate-epsilon-wreck', variant: 1, class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-4300, -300, -100], rotation: [0.25, -2.35, 0.08], scale: 113, clearanceRadius: 230 }),
+    Object.freeze({ id: 'concord-frigate-zeta-wreck', variant: 2, class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [4200, 500, 600], rotation: [-0.1, 1.22, -0.2], scale: 113, clearanceRadius: 230 }),
+    Object.freeze({ id: 'concord-frigate-eta-wreck', variant: 3, class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-2700, 300, 3300], rotation: [0.18, -0.78, 0.14], scale: 113, clearanceRadius: 230 }),
     Object.freeze({ id: 'concord-frigate-theta-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [2600, -200, 3600], rotation: [-0.22, 0.34, -0.12], scale: 113, clearanceRadius: 230 }),
     Object.freeze({ id: 'wayfarer-fighter-wreck', class: 'wayfarer', file: 'assets/models/wrecks/wayfarer-wreck.glb', local: [1100, 900, 3200], rotation: [0.34, -0.88, 0.28], scale: 18, clearanceRadius: 62 }),
     Object.freeze({ id: 'talon-fighter-wreck', class: 'talon', file: 'assets/models/wrecks/talon-wreck.glb', local: [-1650, -1050, -3250], rotation: [-0.26, 0.64, -0.31], scale: 18, clearanceRadius: 62 }),

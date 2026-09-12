@@ -1,0 +1,1042 @@
+{
+  "worstFit": {
+    "id": "concord-battleship-wreck:section:1",
+    "sectionName": "Battleship wreck forward section",
+    "missing": false,
+    "error": 25.670309529814404,
+    "relativeError": 0.01667486236533556
+  },
+  "geometryQa": {
+    "fitChecks": [
+      {
+        "id": "concord-battleship-wreck:section:0",
+        "sectionName": "Battleship wreck engine section",
+        "missing": false,
+        "error": 9.069465295749978,
+        "relativeError": 0.007733672575952557
+      },
+      {
+        "id": "concord-battleship-wreck:section:1",
+        "sectionName": "Battleship wreck forward section",
+        "missing": false,
+        "error": 25.670309529814404,
+        "relativeError": 0.01667486236533556
+      },
+      {
+        "id": "concord-battleship-wreck:section:2",
+        "sectionName": "Battleship wreck midsection",
+        "missing": false,
+        "error": 20.01720958768783,
+        "relativeError": 0.012426737361805305
+      },
+      {
+        "id": "concord-carrier-wreck:section:0",
+        "sectionName": "Carrier wreck bow",
+        "missing": false,
+        "error": 16.092025643123634,
+        "relativeError": 0.01599820297701722
+      },
+      {
+        "id": "concord-carrier-wreck:section:1",
+        "sectionName": "Carrier wreck engine block",
+        "missing": false,
+        "error": 11.89422774873674,
+        "relativeError": 0.011513408103484397
+      },
+      {
+        "id": "concord-carrier-wreck:section:2",
+        "sectionName": "Carrier wreck flight deck",
+        "missing": false,
+        "error": 15.514973131026636,
+        "relativeError": 0.011182614641486947
+      },
+      {
+        "id": "concord-cruiser-alpha-wreck:section:0",
+        "sectionName": "Cruiser wreck command hull",
+        "missing": false,
+        "error": 1.0480154526303522,
+        "relativeError": 0.001235597076776624
+      },
+      {
+        "id": "concord-cruiser-alpha-wreck:section:1",
+        "sectionName": "Cruiser wreck engine cluster",
+        "missing": false,
+        "error": 0.8449099167773966,
+        "relativeError": 0.001133307021802498
+      },
+      {
+        "id": "concord-cruiser-alpha-wreck:section:2",
+        "sectionName": "Cruiser wreck prow",
+        "missing": false,
+        "error": 0.5337917387369089,
+        "relativeError": 0.0011434981509840464
+      },
+      {
+        "id": "concord-cruiser-beta-wreck:section:0",
+        "sectionName": "Cruiser wreck command hull",
+        "missing": false,
+        "error": 1.575281457240635,
+        "relativeError": 0.0018957161090173598
+      },
+      {
+        "id": "concord-cruiser-beta-wreck:section:1",
+        "sectionName": "Cruiser wreck engine cluster",
+        "missing": false,
+        "error": 3.38400562456809,
+        "relativeError": 0.0043880792852901305
+      },
+      {
+        "id": "concord-cruiser-beta-wreck:section:2",
+        "sectionName": "Cruiser wreck prow",
+        "missing": false,
+        "error": 0.45144095489013125,
+        "relativeError": 0.0009361789449147209
+      },
+      {
+        "id": "concord-frigate-alpha-wreck:section:0",
+        "sectionName": "Frigate wreck engine section",
+        "missing": false,
+        "error": 1.1255108402401675,
+        "relativeError": 0.0077104732289253256
+      },
+      {
+        "id": "concord-frigate-alpha-wreck:section:1",
+        "sectionName": "Frigate wreck forward section",
+        "missing": false,
+        "error": 0.6280225758273446,
+        "relativeError": 0.0034214644916939927
+      },
+      {
+        "id": "concord-frigate-beta-wreck:section:0",
+        "sectionName": "Frigate wreck engine section",
+        "missing": false,
+        "error": 1.6212667092113406,
+        "relativeError": 0.01056722153446155
+      },
+      {
+        "id": "concord-frigate-beta-wreck:section:1",
+        "sectionName": "Frigate wreck forward section",
+        "missing": false,
+        "error": 0.8188250438543037,
+        "relativeError": 0.004526762599931342
+      },
+      {
+        "id": "concord-frigate-gamma-wreck:section:0",
+        "sectionName": "Frigate wreck engine section",
+        "missing": false,
+        "error": 1.4172714498708956,
+        "relativeError": 0.00986425148655739
+      },
+      {
+        "id": "concord-frigate-gamma-wreck:section:1",
+        "sectionName": "Frigate wreck forward section",
+        "missing": false,
+        "error": 0.6363710261648521,
+        "relativeError": 0.003338148476029994
+      },
+      {
+        "id": "concord-frigate-delta-wreck:section:0",
+        "sectionName": "Frigate wreck engine section",
+        "missing": false,
+        "error": 0.9904021624242887,
+        "relativeError": 0.006569873338574649
+      },
+      {
+        "id": "concord-frigate-delta-wreck:section:1",
+        "sectionName": "Frigate wreck forward section",
+        "missing": false,
+        "error": 0.6145137094135862,
+        "relativeError": 0.0034896733842604668
+      },
+      {
+        "id": "concord-frigate-epsilon-wreck:section:0",
+        "sectionName": "Frigate wreck engine section",
+        "missing": false,
+        "error": 1.3217540094046853,
+        "relativeError": 0.008438783897819768
+      },
+      {
+        "id": "concord-frigate-epsilon-wreck:section:1",
+        "sectionName": "Frigate wreck forward section",
+        "missing": false,
+        "error": 0.6007581059493532,
+        "relativeError": 0.003123325628833061
+      },
+      {
+        "id": "concord-frigate-zeta-wreck:section:0",
+        "sectionName": "Frigate wreck engine section",
+        "missing": false,
+        "error": 0.5527874202853127,
+        "relativeError": 0.0038276959723933957
+      },
+      {
+        "id": "concord-frigate-zeta-wreck:section:1",
+        "sectionName": "Frigate wreck forward section",
+        "missing": false,
+        "error": 0.7325192165444605,
+        "relativeError": 0.003875449263014575
+      },
+      {
+        "id": "concord-frigate-eta-wreck:section:0",
+        "sectionName": "Frigate wreck engine section",
+        "missing": false,
+        "error": 1.1195922030310612,
+        "relativeError": 0.007403801087265867
+      },
+      {
+        "id": "concord-frigate-eta-wreck:section:1",
+        "sectionName": "Frigate wreck forward section",
+        "missing": false,
+        "error": 0.8027247623977019,
+        "relativeError": 0.004224485503116944
+      },
+      {
+        "id": "concord-frigate-theta-wreck:section:0",
+        "sectionName": "Frigate wreck engine section",
+        "missing": false,
+        "error": 1.5294487633509561,
+        "relativeError": 0.010042408034375193
+      },
+      {
+        "id": "concord-frigate-theta-wreck:section:1",
+        "sectionName": "Frigate wreck forward section",
+        "missing": false,
+        "error": 1.8558468622213695,
+        "relativeError": 0.010738999133163939
+      },
+      {
+        "id": "wayfarer-fighter-wreck:section:0",
+        "sectionName": "Wayfarer wreck cabin",
+        "missing": false,
+        "error": 0.12854048199369572,
+        "relativeError": 0.00640037042162232
+      },
+      {
+        "id": "wayfarer-fighter-wreck:section:1",
+        "sectionName": "Wayfarer wreck drive",
+        "missing": false,
+        "error": 0.07947135274298489,
+        "relativeError": 0.0037013011267911177
+      },
+      {
+        "id": "wayfarer-fighter-wreck:section:2",
+        "sectionName": "Wayfarer wreck prow",
+        "missing": false,
+        "error": 0.07440666545880958,
+        "relativeError": 0.003332680582354881
+      },
+      {
+        "id": "talon-fighter-wreck:section:0",
+        "sectionName": "Talon wreck engine",
+        "missing": false,
+        "error": 0.07984862965531647,
+        "relativeError": 0.002321559994088042
+      },
+      {
+        "id": "talon-fighter-wreck:section:1",
+        "sectionName": "Talon wreck nose",
+        "missing": false,
+        "error": 1.4489804016193375e-05,
+        "relativeError": 1.2853791355790442e-06
+      },
+      {
+        "id": "talon-fighter-wreck:section:2",
+        "sectionName": "Talon wreck wing core",
+        "missing": false,
+        "error": 0.03926453310850775,
+        "relativeError": 0.0015262971688397085
+      }
+    ],
+    "surfaceChecks": [
+      {
+        "id": "concord-battleship-wreck:section:0",
+        "sectionName": "Battleship wreck engine section",
+        "push": 1.5867553942605452,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-battleship-wreck:section:1",
+        "sectionName": "Battleship wreck forward section",
+        "push": 4.334366796184165,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-battleship-wreck:section:2",
+        "sectionName": "Battleship wreck midsection",
+        "push": 1.8300312548945348,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-carrier-wreck:section:0",
+        "sectionName": "Carrier wreck bow",
+        "push": 1.8004772119244485,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-carrier-wreck:section:1",
+        "sectionName": "Carrier wreck engine block",
+        "push": 3.0134928695558636,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-carrier-wreck:section:2",
+        "sectionName": "Carrier wreck flight deck",
+        "push": 3.873901434376247,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-cruiser-alpha-wreck:section:0",
+        "sectionName": "Cruiser wreck command hull",
+        "push": 2.02062967084647,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-cruiser-alpha-wreck:section:1",
+        "sectionName": "Cruiser wreck engine cluster",
+        "push": 3.293214320196896,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-cruiser-alpha-wreck:section:2",
+        "sectionName": "Cruiser wreck prow",
+        "push": 4.278398262458718,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-cruiser-beta-wreck:section:0",
+        "sectionName": "Cruiser wreck command hull",
+        "push": 1.8045441964778313,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-cruiser-beta-wreck:section:1",
+        "sectionName": "Cruiser wreck engine cluster",
+        "push": 4.314888763454416,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-cruiser-beta-wreck:section:2",
+        "sectionName": "Cruiser wreck prow",
+        "push": 3.9374255556975912,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-frigate-alpha-wreck:section:0",
+        "sectionName": "Frigate wreck engine section",
+        "push": 1.9503877303180654,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-frigate-alpha-wreck:section:1",
+        "sectionName": "Frigate wreck forward section",
+        "push": 1.7845214581411564,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-frigate-beta-wreck:section:0",
+        "sectionName": "Frigate wreck engine section",
+        "push": 1.7235569231246903,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-frigate-beta-wreck:section:1",
+        "sectionName": "Frigate wreck forward section",
+        "push": 1.7919918779690465,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-frigate-gamma-wreck:section:0",
+        "sectionName": "Frigate wreck engine section",
+        "push": 1.978156212516827,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-frigate-gamma-wreck:section:1",
+        "sectionName": "Frigate wreck forward section",
+        "push": 2.556406452608995,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-frigate-delta-wreck:section:0",
+        "sectionName": "Frigate wreck engine section",
+        "push": 3.763606567478294,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-frigate-delta-wreck:section:1",
+        "sectionName": "Frigate wreck forward section",
+        "push": 3.5901889125837165,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-frigate-epsilon-wreck:section:0",
+        "sectionName": "Frigate wreck engine section",
+        "push": 3.391781906050075,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-frigate-epsilon-wreck:section:1",
+        "sectionName": "Frigate wreck forward section",
+        "push": 3.4233557740940914,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-frigate-zeta-wreck:section:0",
+        "sectionName": "Frigate wreck engine section",
+        "push": 3.602921675209943,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-frigate-zeta-wreck:section:1",
+        "sectionName": "Frigate wreck forward section",
+        "push": 1.8960162541959782,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-frigate-eta-wreck:section:0",
+        "sectionName": "Frigate wreck engine section",
+        "push": 4.050953389710339,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-frigate-eta-wreck:section:1",
+        "sectionName": "Frigate wreck forward section",
+        "push": 2.769567472952166,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-frigate-theta-wreck:section:0",
+        "sectionName": "Frigate wreck engine section",
+        "push": 1.7974399611052185,
+        "rayBlocked": true
+      },
+      {
+        "id": "concord-frigate-theta-wreck:section:1",
+        "sectionName": "Frigate wreck forward section",
+        "push": 2.781301271171318,
+        "rayBlocked": true
+      },
+      {
+        "id": "wayfarer-fighter-wreck:section:0",
+        "sectionName": "Wayfarer wreck cabin",
+        "push": 2.4888081685073136,
+        "rayBlocked": true
+      },
+      {
+        "id": "wayfarer-fighter-wreck:section:1",
+        "sectionName": "Wayfarer wreck drive",
+        "push": 3.7226364965610936,
+        "rayBlocked": true
+      },
+      {
+        "id": "wayfarer-fighter-wreck:section:2",
+        "sectionName": "Wayfarer wreck prow",
+        "push": 4.294960983909318,
+        "rayBlocked": true
+      },
+      {
+        "id": "talon-fighter-wreck:section:0",
+        "sectionName": "Talon wreck engine",
+        "push": 3.303417588387674,
+        "rayBlocked": true
+      },
+      {
+        "id": "talon-fighter-wreck:section:1",
+        "sectionName": "Talon wreck nose",
+        "push": 1.7200478239254529,
+        "rayBlocked": true
+      },
+      {
+        "id": "talon-fighter-wreck:section:2",
+        "sectionName": "Talon wreck wing core",
+        "push": 3.479553823418788,
+        "rayBlocked": true
+      }
+    ],
+    "coreChecks": [
+      {
+        "wreckId": "concord-battleship-wreck",
+        "maxStaticPush": 0,
+        "failedStatic": 0,
+        "forward": {
+          "maxPush": 0,
+          "contacts": 0,
+          "samples": 635
+        },
+        "reverse": {
+          "maxPush": 0,
+          "contacts": 0,
+          "samples": 635
+        },
+        "hullSweeps": [
+          {
+            "shipId": "wayfarer",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 635
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 635
+            }
+          },
+          {
+            "shipId": "vanguard",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 488
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 488
+            }
+          },
+          {
+            "shipId": "talon",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 418
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 418
+            }
+          },
+          {
+            "shipId": "prospector",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 793
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 793
+            }
+          },
+          {
+            "shipId": "lancer",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 454
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 454
+            }
+          },
+          {
+            "shipId": "atlas",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 933
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 933
+            }
+          }
+        ],
+        "weaponRayClear": true
+      },
+      {
+        "wreckId": "concord-carrier-wreck",
+        "maxStaticPush": 0,
+        "failedStatic": 0,
+        "forward": {
+          "maxPush": 0,
+          "contacts": 0,
+          "samples": 570
+        },
+        "reverse": {
+          "maxPush": 0,
+          "contacts": 0,
+          "samples": 570
+        },
+        "hullSweeps": [
+          {
+            "shipId": "wayfarer",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 570
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 570
+            }
+          },
+          {
+            "shipId": "vanguard",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 438
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 438
+            }
+          },
+          {
+            "shipId": "talon",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 375
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 375
+            }
+          },
+          {
+            "shipId": "prospector",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 712
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 712
+            }
+          },
+          {
+            "shipId": "lancer",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 407
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 407
+            }
+          },
+          {
+            "shipId": "atlas",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 837
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 837
+            }
+          }
+        ],
+        "weaponRayClear": true
+      },
+      {
+        "wreckId": "concord-cruiser-alpha-wreck",
+        "maxStaticPush": 0,
+        "failedStatic": 0,
+        "forward": {
+          "maxPush": 0,
+          "contacts": 0,
+          "samples": 407
+        },
+        "reverse": {
+          "maxPush": 0,
+          "contacts": 0,
+          "samples": 407
+        },
+        "hullSweeps": [
+          {
+            "shipId": "wayfarer",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 407
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 407
+            }
+          },
+          {
+            "shipId": "vanguard",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 313
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 313
+            }
+          },
+          {
+            "shipId": "talon",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 268
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 268
+            }
+          },
+          {
+            "shipId": "prospector",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 508
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 508
+            }
+          },
+          {
+            "shipId": "lancer",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 291
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 291
+            }
+          },
+          {
+            "shipId": "atlas",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 598
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 598
+            }
+          }
+        ],
+        "weaponRayClear": true
+      },
+      {
+        "wreckId": "concord-cruiser-beta-wreck",
+        "maxStaticPush": 0,
+        "failedStatic": 0,
+        "forward": {
+          "maxPush": 0,
+          "contacts": 0,
+          "samples": 407
+        },
+        "reverse": {
+          "maxPush": 0,
+          "contacts": 0,
+          "samples": 407
+        },
+        "hullSweeps": [
+          {
+            "shipId": "wayfarer",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 407
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 407
+            }
+          },
+          {
+            "shipId": "vanguard",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 313
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 313
+            }
+          },
+          {
+            "shipId": "talon",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 268
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 268
+            }
+          },
+          {
+            "shipId": "prospector",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 508
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 508
+            }
+          },
+          {
+            "shipId": "lancer",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 291
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 291
+            }
+          },
+          {
+            "shipId": "atlas",
+            "forward": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 598
+            },
+            "reverse": {
+              "maxPush": 0,
+              "contacts": 0,
+              "samples": 598
+            }
+          }
+        ],
+        "weaponRayClear": true
+      }
+    ],
+    "navigableLanes": [
+      {
+        "wreckId": "concord-battleship-wreck",
+        "clearLane": {
+          "vertical": 0,
+          "side": 0,
+          "forward": {
+            "maxPush": 0,
+            "contacts": 0,
+            "samples": 744
+          },
+          "reverse": {
+            "maxPush": 0,
+            "contacts": 0,
+            "samples": 744
+          }
+        }
+      },
+      {
+        "wreckId": "concord-carrier-wreck",
+        "clearLane": {
+          "vertical": 0,
+          "side": 0,
+          "forward": {
+            "maxPush": 0,
+            "contacts": 0,
+            "samples": 667
+          },
+          "reverse": {
+            "maxPush": 0,
+            "contacts": 0,
+            "samples": 667
+          }
+        }
+      },
+      {
+        "wreckId": "concord-cruiser-alpha-wreck",
+        "clearLane": {
+          "vertical": 0,
+          "side": 0,
+          "forward": {
+            "maxPush": 0,
+            "contacts": 0,
+            "samples": 477
+          },
+          "reverse": {
+            "maxPush": 0,
+            "contacts": 0,
+            "samples": 477
+          }
+        }
+      },
+      {
+        "wreckId": "concord-cruiser-beta-wreck",
+        "clearLane": {
+          "vertical": 0,
+          "side": 0,
+          "forward": {
+            "maxPush": 0,
+            "contacts": 0,
+            "samples": 477
+          },
+          "reverse": {
+            "maxPush": 0,
+            "contacts": 0,
+            "samples": 477
+          }
+        }
+      }
+    ],
+    "arrivals": [
+      {
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "position": [
+          -147923,
+          20796,
+          144658
+        ],
+        "radiusFromFieldCenter": 2896.3841250773353,
+        "nearestModel": {
+          "id": "concord-battleship-wreck",
+          "distance": 423.9158605262928
+        },
+        "clear": true
+      },
+      {
+        "direction": [
+          -1,
+          0,
+          0
+        ],
+        "position": [
+          -151205,
+          20796,
+          144658
+        ],
+        "radiusFromFieldCenter": 2359.347579310857,
+        "nearestModel": {
+          "id": "concord-battleship-wreck",
+          "distance": 363.8128371084167
+        },
+        "clear": true
+      },
+      {
+        "direction": [
+          0,
+          1,
+          0
+        ],
+        "position": [
+          -149644,
+          22357,
+          144658
+        ],
+        "radiusFromFieldCenter": 2115.1408936522407,
+        "nearestModel": {
+          "id": "concord-battleship-wreck",
+          "distance": 1108.877717218289
+        },
+        "clear": true
+      },
+      {
+        "direction": [
+          0,
+          -1,
+          0
+        ],
+        "position": [
+          -149644,
+          19555,
+          144658
+        ],
+        "radiusFromFieldCenter": 2738.609318614103,
+        "nearestModel": {
+          "id": "concord-battleship-wreck",
+          "distance": 703.6404127624337
+        },
+        "clear": true
+      },
+      {
+        "direction": [
+          0,
+          0,
+          1
+        ],
+        "position": [
+          -149644,
+          20796,
+          145899
+        ],
+        "radiusFromFieldCenter": 3237.032746204462,
+        "nearestModel": {
+          "id": "concord-battleship-wreck",
+          "distance": 541.6885263717268
+        },
+        "clear": true
+      },
+      {
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "position": [
+          -149644,
+          20796,
+          143177
+        ],
+        "radiusFromFieldCenter": 887.7279988825406,
+        "nearestModel": {
+          "id": "concord-battleship-wreck",
+          "distance": 946.0830699992366
+        },
+        "clear": true
+      },
+      {
+        "direction": [
+          0.72049141287275,
+          -0.10325535295486908,
+          -0.6857335167999257
+        ],
+        "position": [
+          -148692.23084359508,
+          20659.599678746617,
+          143752.1460243073
+        ],
+        "radiusFromFieldCenter": 1839.1559889269668,
+        "nearestModel": {
+          "id": "concord-battleship-wreck",
+          "distance": 370.93704569194233
+        },
+        "clear": true
+      }
+    ]
+  },
+  "browserErrors": []
+}

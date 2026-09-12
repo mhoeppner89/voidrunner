@@ -1,0 +1,166 @@
+[
+  {
+    "file": "concord-battleship-wreck-v4",
+    "bytes": 2989612,
+    "meshes": [
+      {
+        "name": "Mesh_0.001",
+        "triangles": 13859
+      },
+      {
+        "name": "Mesh_0.003",
+        "triangles": 32327
+      },
+      {
+        "name": "Mesh_0.002",
+        "triangles": 19824
+      }
+    ],
+    "textures": [
+      {
+        "name": "Image_0",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 190843
+      }
+    ]
+  },
+  {
+    "file": "concord-carrier-wreck-v4",
+    "bytes": 3823808,
+    "meshes": [
+      {
+        "name": "Mesh_0.001",
+        "triangles": 22989
+      },
+      {
+        "name": "Mesh_0.003",
+        "triangles": 37800
+      },
+      {
+        "name": "Mesh_0.002",
+        "triangles": 31664
+      }
+    ],
+    "textures": [
+      {
+        "name": "Image_0",
+        "width": 1536,
+        "height": 1536,
+        "bytes": 312795
+      }
+    ]
+  },
+  {
+    "file": "concord-cruiser-wreck-v4",
+    "bytes": 1050532,
+    "meshes": [
+      {
+        "name": "Mesh_0.002",
+        "triangles": 11342
+      },
+      {
+        "name": "Mesh_0.003",
+        "triangles": 16972
+      },
+      {
+        "name": "Mesh_0.001",
+        "triangles": 6329
+      }
+    ],
+    "textures": [
+      {
+        "name": "Image_0",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 118194
+      }
+    ]
+  },
+  {
+    "file": "concord-frigate-wreck-v3",
+    "bytes": 1869748,
+    "meshes": [
+      {
+        "name": "Mesh_0.001",
+        "triangles": 15031
+      },
+      {
+        "name": "Mesh_0.002",
+        "triangles": 24892
+      }
+    ],
+    "textures": [
+      {
+        "name": "Image_0",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 174804
+      }
+    ]
+  },
+  {
+    "file": "wayfarer-wreck",
+    "bytes": 1764360,
+    "meshes": [
+      {
+        "name": "Mesh_0.002",
+        "triangles": 15225
+      },
+      {
+        "name": "Mesh_0.001",
+        "triangles": 14935
+      },
+      {
+        "name": "Mesh_0.003",
+        "triangles": 11218
+      }
+    ],
+    "textures": [
+      {
+        "name": "Image_0",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 320612
+      },
+      {
+        "name": "Image_1",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 303207
+      }
+    ]
+  },
+  {
+    "file": "talon-wreck",
+    "bytes": 1311364,
+    "meshes": [
+      {
+        "name": "Mesh_0.001",
+        "triangles": 18416
+      },
+      {
+        "name": "Mesh_0.003",
+        "triangles": 2254
+      },
+      {
+        "name": "Mesh_0.002",
+        "triangles": 7392
+      }
+    ],
+    "textures": [
+      {
+        "name": "Image_0",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 267182
+      },
+      {
+        "name": "Image_1",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 236256
+      }
+    ]
+  }
+]

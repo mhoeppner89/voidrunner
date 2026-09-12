@@ -1,3 +1,4 @@
+import { wreckSectionDelta } from './missionWorldData.js';
 import {createTurretModel} from './turretModels.js';
 import * as THREE from 'three';
 import { createRingVolume } from './ringVolume.js';
@@ -2637,6 +2638,17 @@ export class SpaceRenderer {
                         ? child.material.map(prepareMaterial)
                         : prepareMaterial(child.material);
                 });
+                // Wrappers leave authored transforms and shared mesh buffers intact.
+                for (const section of [...wreck.children]) {
+                    const delta = wreckSectionDelta(config, section.name);
+                    if (!delta) continue;
+                    const arrangement = new THREE.Group();
+                    arrangement.name = `${section.name} arrangement`;
+                    arrangement.position.set(...delta.position);
+                    arrangement.rotation.set(...delta.rotation);
+                    wreck.add(arrangement);
+                    arrangement.add(section);
+                }
                 wreck.name = config.id;
                 wreck.position.set(center[0] + config.local[0], center[1] + config.local[1], center[2] + config.local[2]);
                 wreck.rotation.set(...config.rotation);

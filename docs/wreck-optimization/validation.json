@@ -1,0 +1,192 @@
+[
+  {
+    "file": "concord-battleship-wreck-v4",
+    "beforeTriangles": 66010,
+    "afterTriangles": 64100,
+    "beforeBytes": 2989612,
+    "afterBytes": 2812520,
+    "textures": [
+      {
+        "color": true,
+        "before": [
+          1024,
+          1024
+        ],
+        "after": [
+          512,
+          512
+        ],
+        "bytesBefore": 190843,
+        "bytesAfter": 105601,
+        "adjusted": true
+      }
+    ],
+    "nodeTransformsUnchanged": true,
+    "talonBreakupRebuilt": false,
+    "errors": 0,
+    "warnings": 0
+  },
+  {
+    "file": "concord-carrier-wreck-v4",
+    "beforeTriangles": 92453,
+    "afterTriangles": 59165,
+    "beforeBytes": 3823808,
+    "afterBytes": 2614104,
+    "textures": [
+      {
+        "color": true,
+        "before": [
+          1536,
+          1536
+        ],
+        "after": [
+          512,
+          512
+        ],
+        "bytesBefore": 312795,
+        "bytesAfter": 92885,
+        "adjusted": true
+      }
+    ],
+    "nodeTransformsUnchanged": true,
+    "talonBreakupRebuilt": false,
+    "errors": 0,
+    "warnings": 0
+  },
+  {
+    "file": "concord-cruiser-wreck-v4",
+    "beforeTriangles": 34643,
+    "afterTriangles": 19051,
+    "beforeBytes": 1050532,
+    "afterBytes": 636836,
+    "textures": [
+      {
+        "color": true,
+        "before": [
+          1024,
+          1024
+        ],
+        "after": [
+          512,
+          512
+        ],
+        "bytesBefore": 118194,
+        "bytesAfter": 74522,
+        "adjusted": true
+      }
+    ],
+    "nodeTransformsUnchanged": true,
+    "talonBreakupRebuilt": false,
+    "errors": 0,
+    "warnings": 0
+  },
+  {
+    "file": "concord-frigate-wreck-v3",
+    "beforeTriangles": 39923,
+    "afterTriangles": 39293,
+    "beforeBytes": 1869748,
+    "afterBytes": 1762132,
+    "textures": [
+      {
+        "color": true,
+        "before": [
+          1024,
+          1024
+        ],
+        "after": [
+          512,
+          512
+        ],
+        "bytesBefore": 174804,
+        "bytesAfter": 98000,
+        "adjusted": true
+      }
+    ],
+    "nodeTransformsUnchanged": true,
+    "talonBreakupRebuilt": false,
+    "errors": 0,
+    "warnings": 0
+  },
+  {
+    "file": "wayfarer-wreck",
+    "beforeTriangles": 41378,
+    "afterTriangles": 22754,
+    "beforeBytes": 1764360,
+    "afterBytes": 975996,
+    "textures": [
+      {
+        "color": true,
+        "before": [
+          1024,
+          1024
+        ],
+        "after": [
+          512,
+          512
+        ],
+        "bytesBefore": 320612,
+        "bytesAfter": 106665,
+        "adjusted": true
+      },
+      {
+        "color": false,
+        "before": [
+          1024,
+          1024
+        ],
+        "after": [
+          512,
+          512
+        ],
+        "bytesBefore": 303207,
+        "bytesAfter": 179035,
+        "adjusted": true
+      }
+    ],
+    "nodeTransformsUnchanged": true,
+    "talonBreakupRebuilt": false,
+    "errors": 0,
+    "warnings": 0
+  },
+  {
+    "file": "talon-wreck",
+    "beforeTriangles": 28062,
+    "afterTriangles": 18044,
+    "beforeBytes": 1311364,
+    "afterBytes": 819720,
+    "textures": [
+      {
+        "color": true,
+        "before": [
+          1024,
+          1024
+        ],
+        "after": [
+          512,
+          512
+        ],
+        "bytesBefore": 445593,
+        "bytesAfter": 97306,
+        "adjusted": true
+      },
+      {
+        "color": false,
+        "before": [
+          1024,
+          1024
+        ],
+        "after": [
+          512,
+          512
+        ],
+        "bytesBefore": 200313,
+        "bytesAfter": 140768,
+        "adjusted": true
+      }
+    ],
+    "nodeTransformsUnchanged": false,
+    "talonBreakupRebuilt": true,
+    "errors": 0,
+    "warnings": 0
+  }
+]
