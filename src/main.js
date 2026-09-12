@@ -1,6 +1,6 @@
 import {newArenaRun,readArenaRun,arenaRecord} from './game/arenaRun.js';
 import { AudioManager } from './game/audio.js';
-import { createNewSave, defaultSettings, loadGame, loadSettingsPreferences, saveGame, saveSettingsPreferences } from './game/save.js';
+import { DRONE_TEST_MODE, createNewSave, defaultSettings, loadGame, loadSettingsPreferences, saveGame, saveSettingsPreferences } from './game/save.js';
 import { DOCK_LOCATION_IDS, LOCATIONS, SHIPS } from './game/data.js';
 import { getLanguage, setLanguage, t } from './game/i18n.js';
 import { GameUI } from './game/ui.js';
@@ -168,7 +168,7 @@ const beginSession = (mode, arena) => {
     session = undefined;
     previousSession?.dispose();
     ui.clearToasts();
-    const save = arena?.run ? (arena.resume?readArenaRun():newArenaRun(Boolean(arena.hard&&arenaRecord().unlockedHard))) : mode === 'new' || mode === 'arena' ? createNewSave(undefined, { tutorial: mode === 'new' }) : loadGame();
+    const save = arena?.run ? (arena.resume?readArenaRun():newArenaRun(Boolean(arena.hard&&arenaRecord().unlockedHard))) : mode === 'new' || mode === 'arena' ? createNewSave(DRONE_TEST_MODE ? 4242 : undefined, { tutorial: mode === 'new' && !DRONE_TEST_MODE }) : loadGame();
     if (!save) {
         ui.showToast(t('No autosave was found.'), 'warning');
         ui.showTitle(false, titleSave());
@@ -356,6 +356,13 @@ const actions = {
     openShipMenu: () => session?.openShipMenu(),
     weaponCycle: () => session?.cycleWeapon(),
     toggleTurrets: () => session?.toggleTurrets(),
+    toggleMiningDrones: () => session?.toggleMiningDrones(),
+    abandonDrones: () => session?.abandonDrones(),
+    setDroneBayMode: (bayId, mode, expected) => session?.setDroneBayMode(bayId, mode, expected),
+    setDronePdcPolicy: (policy) => session?.setDronePdcPolicy(policy),
+    droneServiceQuote: (options) => session?.droneServiceQuote(options),
+    serviceDrones: (options) => session?.serviceDrones(options),
+    miningDrones: () => session?.miningDroneHud(),
     launcherCycle: () => session?.cycleLauncher(),
     selectTarget: (kind, id) => session?.selectTarget(kind, id, 'map'),
     reviewServices: () => session?.checkTutorialServices(true),
@@ -507,6 +514,9 @@ window.__VOID_PRIVATEER__ = {
     startArena: (environment, scenario, difficulty, fit) => beginSession('arena', { environment, scenario, difficulty, fit }),
     getState: () => session?.save ?? cachedSave,
     getRuntime: () => session,
+    miningDrones: () => session?.miningDroneHud(),
+    toggleMiningDrones: () => session?.toggleMiningDrones(),
+    abandonDrones: () => session?.abandonDrones(),
     debugShips: () => session?.ships,
     pickTarget: (x, y) => session?.renderer?.pickTarget(x, y),
     projectToScreen: (position) => session?.renderer?.projectToScreen(position),
@@ -563,6 +573,7 @@ window.render_game_to_text = () => {
             pendingJump: save.world.pendingJump ?? null,
         },
         tutorial: tutorialCampaignSummary(save) ?? null,
+        drones: runtime?.miningDroneHud?.() ?? null,
         stealth: runtime ? {
             identityBroadcasting: runtime.playerIdentityBroadcasting(),
             physicalSignatureRange: Math.round(physicalSignatureRange),
@@ -652,7 +663,29 @@ window.advanceTime = (milliseconds) => {
 // Query-gated development boot used by the shared browser-game smoke client.
 // It never alters a normal load and avoids timing a click against the title
 // screen while the first 3D session is still being constructed.
-if (debrisCollisionTest) {
+if (DRONE_TEST_MODE) {
+    document.title = 'Voidrunner — Drone Mining Test';
+    beginSession('new').then(async (runtime) => {
+        if (!runtime) return;
+        const { asteroidCollisionRadius } = await import('./game/worldData.js');
+        await runtime.launch();
+        const node = runtime.asteroids.find(node => node.remaining >= 4 && !node.moving && !node.tunnelPart);
+        if (!node) return;
+        const player = runtime.save.player;
+        player.position = [node.position[0], node.position[1], node.position[2] + asteroidCollisionRadius(node) + 55];
+        player.rotation = [0, 0, 0, 1];
+        player.velocity = [0, 0, 0]; player.angularVelocity = [0, 0, 0]; player.throttle = 0;
+        player.cargo = {}; player.credits = 500000;
+        player.navTargetId = 'shardbelt';
+        runtime.updateActiveInstance();
+        node.scanned = true;
+        runtime.selectTarget('asteroid', node.id);
+        runtime.ui.showToast(t('MINING TEST · Tap MINE or press M. Hyperdrive recalls your drones. Reload to reset.'), 'info', 7000);
+        runtime.persistSave();
+        window.__DRONE_TEST_READY__ = true;
+    });
+}
+else if (debrisCollisionTest) {
     document.title = 'Voidrunner — Debris Collision Test';
     beginSession('arena', {
         environment: 'debris-field',

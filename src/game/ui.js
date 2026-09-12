@@ -14,6 +14,7 @@ import { HULL_TRADE_IN_RATE, quoteShipTrade } from './shipTrade.js';
 import { LOADOUT_KEYS, HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RATE, itemAvailable, itemFitsMount, loadoutFor, outfittingUsage, quoteOutfitting } from './outfitting.js';
 import { guildJoinCost, missionBriefing, missionTitle } from './missions.js';
 import { tutorialCampaignSummary, tutorialDialogue } from './tutorialCampaign.js';
+import { DRONE_BAY_CAPACITY, DRONE_TYPES, droneBayLayoutFor } from './droneData.js';
 const loadoutGroupDemand=(loadout,mountId)=>{
     const group=loadout.fireGroups?.assignments?.[mountId] ?? 'A';
     const hull=Object.values(HARDPOINT_SPECS).find(spec=>spec.guns.some(m=>m.id===mountId));
@@ -150,7 +151,7 @@ const GUILD_REPRESENTATIVE_BY_LOCATION = Object.freeze({
 const GUILD_BENEFIT_KEYS = Object.freeze({
     merchant: Object.freeze(['Standard freight contracts', 'Larger loads and better route intelligence', 'Specialist cargo equipment', 'Highest-value commercial work']),
     bounty: Object.freeze(['Civilian warrants', 'Veteran target dossiers', 'Ace authentication and combat equipment', 'Marshal-grade warrants']),
-    mining: Object.freeze(['Public mineral claims', 'Richer deposit intelligence', 'Advanced extraction equipment', 'Deep-core claims']),
+    mining: Object.freeze(['Public mineral claims', 'Richer deposit intelligence', 'Higher-paying mining contracts', 'Deep-core claims']),
     salvage: Object.freeze(['Public recovery claims', 'Priority wreck coordinates', 'Long-range recovery equipment', 'Relic-grade claims']),
     syndicate: Object.freeze(['Low-level dark runs', 'Restricted cargo contacts', 'Specialist covert equipment', 'Syndicate priority work']),
 });
@@ -323,7 +324,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.8.1';
+const GAME_VERSION = '0.8.2a';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -781,7 +782,7 @@ export class GameUI {
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="${t('Own ship status display; tap to open ship menu')}">
             <div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
             <div class="screen-race-strip" id="screen-race-strip"><span id="screen-race-label"></span><b id="screen-race-value"></b></div>
-            <div class="screen-ship-layout"><div class="screen-flight"><div><span>${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em><small id="screen-own-launcher"></small></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i><em id="screen-own-energy-value">72</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">185</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
+            <div class="screen-ship-layout"><div class="screen-flight"><div><span>${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em><small id="screen-own-launcher"></small><small id="screen-own-drone-pdc" class="is-hidden"></small></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i><em id="screen-own-energy-value">72</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">185</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="${t('Radar display; tap to open navigation map')}">
             <div class="screen-heading radar-heading" id="screen-radar-transponder" data-touch-action="transponder" role="button" tabindex="0" title="${t('Transponder — press B')}">${t('TRANSPONDER ON')}</div>
@@ -791,6 +792,7 @@ export class GameUI {
             <div class="screen-heading"><span>${t('TARGET STATUS')}</span><b id="screen-target-name">${t('NO LOCK')}</b></div>
             <div id="screen-target-distance" class="screen-target-distance">—</div>
             <div id="screen-target-readout" class="screen-target-readout">—</div>
+            <div id="screen-drone-telemetry" class="screen-drone-telemetry is-hidden"><div id="screen-drone-bays"></div><div id="screen-drone-state"></div><div id="screen-drone-cargo"></div><div id="screen-drone-losses"></div></div>
             <div class="screen-target-layout"><canvas class="hull-outline" id="target-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-target-shield"></b></i><em id="screen-target-shield-value">—</em></div><div><span>${t('HULL')}</span><i><b id="screen-target-hull"></b></i><em id="screen-target-hull-value">—</em></div></div></div>
           </div>
           <button type="button" id="hyperdrive-card" class="cockpit-identity" data-touch-action="autopilot" aria-label="${t('Hyperdrive: engage jump to nav point')}"><b>HYPERDRIVE</b></button>
@@ -812,7 +814,7 @@ export class GameUI {
             </div>
             <div class="touch-right">
               <button class="touch-boost touch-boost-right" data-touch-action="afterburner" aria-label="${t('Afterburner — hold')}"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" fill-rule="evenodd"><path d="M12 2.2C7.9 7.5 5.4 10.3 5.4 14a6.6 6.6 0 0 0 13.2 0c0-3.7-2.5-6.5-6.6-11.8Zm0 7c-2 2.6-2.8 3.8-2.8 5.3a2.8 2.8 0 0 0 5.6 0c0-1.5-.8-2.7-2.8-5.3Z"/></svg></button>
-              <button id="touch-fire" class="touch-fire" data-touch-action="fire" aria-label="${t('Fire — hold')}"><svg data-icon="fire" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.6"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg></button>
+              <button id="touch-fire" class="touch-fire" data-touch-action="fire" aria-label="${t('Fire — hold')}"><svg data-icon="fire" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.6"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg><svg data-icon="scan" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="is-hidden"><circle cx="12" cy="12" r="6.2"/><path d="M12 5.8V12l4.2 2.4M4.8 4.8 3.4 3.4M19.2 4.8l1.4-1.4M4.8 19.2l-1.4 1.4M19.2 19.2l1.4 1.4"/></svg><span id="touch-drone-label" class="is-hidden"></span></button>
               <div class="touch-secondary-row"><button type="button" id="touch-launcher-cycle" class="touch-launcher-cycle" data-touch-action="launcherCycle" aria-label="${t('Cycle launcher — press L or tap')}"><span id="touch-launcher-code">SKR</span><b id="touch-missile-count">0</b></button><button id="touch-missile" class="touch-missile" data-touch-action="missile" aria-label="${t('Missile')}"><svg data-icon="missile" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.4 9.3 8.8h5.4Z"/><path d="M9.3 8.8h5.4v6.4H9.3Z"/><path d="M9.3 15.2 6.8 21M14.7 15.2l2.5 5.8"/></svg><svg data-icon="scan" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="is-hidden"><circle cx="12" cy="12" r="6.2"/><path d="M12 5.8V12l4.2 2.4"/><path d="M4.8 4.8 3.4 3.4M19.2 4.8l1.4-1.4M4.8 19.2l-1.4 1.4M19.2 19.2l1.4 1.4"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg><svg data-icon="capture" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M8 3.6h8l1.8 3H6.2Z"/><path d="M9.2 6.6v2.1M14.8 6.6v2.1"/><path d="M7 11.5h10M8.1 14.5h7.8M9.3 17.5h5.4M10.6 20.5h2.8"/></svg></button></div>
             </div>
           </div>
@@ -1386,6 +1388,13 @@ export class GameUI {
                 break;
             case 'refuel':
                 this.actions?.refuel();
+                break;
+            case 'drone-service':
+            case 'drone-bay-mode':
+            case 'drone-pdc-policy':
+            case 'drone-abandon':
+            case 'drone-toggle':
+                this.handleDroneCommand(command, element);
                 break;
             case 'dock-concourse':
                 this.dockTab = 'concourse';
@@ -2569,7 +2578,7 @@ export class GameUI {
         if (!['delivery', 'transport', 'smuggle'].includes(mission.kind))
             return 0;
         const units = Number(mission.quantity) || 0;
-        const massPerUnit = mission.kind === 'transport' ? 1.2 : (COMMODITIES[mission.commodity]?.mass ?? 0);
+        const massPerUnit = 1;
         return units * massPerUnit;
     }
     missionRisk(mission) {
@@ -2749,6 +2758,120 @@ export class GameUI {
             ? [...this.save.activeMissions, ...activeRaces]
             : posted.filter((mission) => !activeRaces.includes(mission));
     }
+    droneHudSnapshot(model) {
+        let live = model?.miningDrones ?? model?.drones;
+        if (!live) {
+            try { live = this.actions?.miningDrones?.(); } catch { /* Session replaced before its UI callback. */ }
+        }
+        if (Array.isArray(live?.bays)) return live;
+        // A dock can render before the session callbacks are attached. Read
+        // only normalized, owned units; never create stock from the UI.
+        const player = this.save?.player;
+        const fleet = player?.droneFleet;
+        const fit = player?.outfitting?.loadouts?.[player.shipId]?.droneBays;
+        const bays = droneBayLayoutFor(player?.shipId).map(({ bayId }, index) => {
+            const bay = Array.isArray(fit) && fit[index]?.bayId === bayId ? fit[index] : null;
+            const mode = bay?.mode === 'pdc' ? 'pdc' : 'mining';
+            const units = (Array.isArray(bay?.unitIds) ? bay.unitIds : []).slice(0, DRONE_BAY_CAPACITY[mode])
+                .map(id => fleet?.unitsById?.[id]).filter(unit => unit && unit.type === mode);
+            return { bayId, mode, units, operational: units.filter(unit => unit.hull > 0 && unit.state !== 'destroyed').length };
+        });
+        return { ...live, bays, phase: live?.phase ?? fleet?.controller?.phase ?? 'idle',
+            pdcPolicy: live?.pdcPolicy ?? fleet?.pdcPolicy ?? 'defend' };
+    }
+    hasMiningDroneBay(drones, requireStock = false) {
+        const bays = Array.isArray(drones?.bays) ? drones.bays : [];
+        return droneBayLayoutFor(this.save?.player?.shipId ?? this.lastHud?.shipId).some(({ bayId }, index) => {
+            const bay = bays[index];
+            if (bay?.bayId !== bayId || bay.mode !== 'mining') return false;
+            if (!requireStock) return true;
+            return (bay.operational ?? (Array.isArray(bay.units) ? bay.units.slice(0, DRONE_BAY_CAPACITY.mining)
+                .filter(unit => unit?.type === 'mining' && unit.hull > 0 && unit.state !== 'destroyed').length : 0)) > 0;
+        });
+    }
+    async handleDroneCommand(command, element) {
+        if (this.droneCommandPending || element?.disabled || element?.isConnected === false) return;
+        const player = this.save?.player;
+        if (!player) return;
+        const docked = Boolean(player.dockedAt && player.dockedAt === this.dockLocation);
+        if ((command === 'drone-service' || command === 'drone-bay-mode') && !docked) return;
+        this.droneCommandPending = true;
+        let result;
+        try {
+            if (command === 'drone-service') {
+                const quote = this.droneServiceQuotes?.[element?.dataset.droneService];
+                if (quote?.ok && quote.canCommit !== false)
+                    result = await this.actions?.serviceDrones?.({ expected: quote, fillSlots: quote.fillSlots });
+            } else if (command === 'drone-bay-mode') {
+                const bayId = element?.dataset.droneBay;
+                const mode = element?.dataset.droneMode;
+                const bays = this.droneHudSnapshot().bays ?? [];
+                if (hasLocationService(player.dockedAt, 'outfitting') && bays.some(bay => bay.bayId === bayId)
+                    && (mode === 'mining' || mode === 'pdc')) {
+                    result = this.actions?.setDroneBayMode
+                        ? await this.actions.setDroneBayMode(bayId, mode)
+                        : await this.actions?.setDroneBayModes?.(bays.map(bay => ({ bayId: bay.bayId, mode: bay.bayId === bayId ? mode : bay.mode })));
+                }
+            } else if (command === 'drone-abandon') {
+                if (!this.droneAbandonConfirm || performance.now() > this.droneAbandonUntil) {
+                    this.droneAbandonConfirm = true; this.droneAbandonUntil = performance.now() + 5000; result = { ok: true };
+                }
+                else { result = await this.actions?.abandonDrones?.(); this.droneAbandonConfirm = false; }
+            } else if (command === 'drone-toggle') {
+                if (!player.dockedAt && this.droneHudSnapshot().action?.ok)
+                    result = await this.actions?.toggleMiningDrones?.();
+            } else {
+                const policy = element?.dataset.dronePolicy;
+                if (policy === 'defend' || policy === 'stow')
+                    result = await this.actions?.setDronePdcPolicy?.(policy);
+            }
+            this.droneServiceNotice = result === false || result?.ok === false
+                ? t(result.code === 'stale-quote' ? 'Drone quote changed. Review the new total.' : 'Drone action unavailable. Check stock, credits and dock services.')
+                : result == null ? t('Drone controls are not connected yet.') : '';
+        } catch {
+            this.droneServiceNotice = t('Drone action unavailable. Check stock, credits and dock services.');
+        } finally {
+            this.droneCommandPending = false;
+            if (this.save?.player?.dockedAt && this.dockLocation) this.renderDock();
+            else if ((command === 'drone-pdc-policy' || command === 'drone-toggle' || command === 'drone-abandon')
+                && this.root.querySelector('#ship-panel:not(.is-hidden)')) this.showShipMenu();
+        }
+    }
+    renderDronePolicy(drones) {
+        if (!drones.bays?.some(bay => bay.mode === 'pdc')) return '';
+        return `<div class="drone-policy" role="group" aria-label="${t('PDC drone policy')}">${['defend', 'stow'].map(policy => `<button type="button" data-ui-command="drone-pdc-policy" data-drone-policy="${policy}" aria-pressed="${drones.pdcPolicy === policy}" ${!this.actions?.setDronePdcPolicy || this.droneCommandPending ? 'disabled' : ''}>${t(policy === 'defend' ? 'PDC DEFEND' : 'PDC STOW')}</button>`).join('')}</div>`;
+    }
+    renderDroneShipStatus() {
+        const drones = this.droneHudSnapshot();
+        if (!drones.bays?.length) return '';
+        return `<section class="ship-menu-drones"><h3>${t('DRONE BAYS')}</h3><details><summary>${t('Fleet condition')}</summary>${drones.bays.map((bay, index) => `<div class="drone-bay-status"><b>${t('BAY {number}', { number: index + 1 })} · ${t(bay.mode === 'pdc' ? '1 PDC' : '2 MINING')} · ${bay.operational ?? 0}/${DRONE_BAY_CAPACITY[bay.mode]}</b>${(bay.units ?? []).map((unit, unitIndex) => `<p>${t('DRONE {number}', { number: unitIndex + 1 })} · ${escapeHtml(t(String(unit.state).toUpperCase()))} · ${t('HULL')} ${Math.ceil(unit.hull)}/${unit.maxHull ?? DRONE_TYPES[bay.mode].maxHull}${unit.type === 'pdc' ? ` · ${t('AMMO')} ${unit.ammo ?? 0}/${DRONE_TYPES.pdc.magazineCapacity}` : ` · ${t('INBOUND')} ${unit.payload?.units ?? 0}`}</p>`).join('')}</div>`).join('')}</details><p>${escapeHtml(drones.readout ?? '')}</p><button type="button" data-ui-command="drone-toggle" ${this.save.player.dockedAt || !drones.action?.ok || !this.actions?.toggleMiningDrones ? 'disabled' : ''}>${t(drones.phase === 'running' ? 'RECALL' : drones.phase === 'recalling' ? 'RETURNING' : 'MINE')}</button>${this.renderDronePolicy(drones)}${drones.bays.some(b => b.units.some(u => u.state !== 'stowed')) ? `<button type="button" data-ui-command="drone-abandon">${t(this.droneAbandonConfirm ? 'CONFIRM: ABANDON DRONES AND ORE' : 'ABANDON DEPLOYED DRONES')}</button>` : ''}${this.droneServiceNotice ? `<p role="status">${escapeHtml(this.droneServiceNotice)}</p>` : ''}</section>`;
+    }
+    renderDroneBayConfiguration() {
+        const drones = this.droneHudSnapshot();
+        if (!drones.bays?.length) return '';
+        const canConfigure = hasLocationService(this.dockLocation, 'outfitting')
+            && Boolean(this.actions?.setDroneBayMode || this.actions?.setDroneBayModes);
+        const bayRows = drones.bays.map((bay, index) => `<div class="drone-bay-row"><b>${t('BAY {number}', { number: index + 1 })} · ${bay.operational ?? 0}/${DRONE_BAY_CAPACITY[bay.mode] ?? 2}</b><div role="group" aria-label="${t('BAY {number}', { number: index + 1 })}">${['mining', 'pdc'].map(mode => `<button type="button" data-ui-command="drone-bay-mode" data-drone-bay="${escapeHtml(bay.bayId)}" data-drone-mode="${mode}" aria-pressed="${bay.mode === mode}" ${!canConfigure || this.droneCommandPending ? 'disabled' : ''}>${t(mode === 'mining' ? '2 MINING' : '1 PDC')}</button>`).join('')}</div></div>`).join('');
+        return `<section class="drone-service-card"><h3>${t('DRONE BAYS')}</h3>${bayRows}${this.renderDroneServices(true)}${this.renderDronePolicy(drones)}<p>${t('PDC drones launch automatically in DEFEND mode. They intercept missiles first, then attack hostile ships within 300 km. STOW recalls them.')}</p><p>${t('Each bay holds two mining drones or one PDC drone. Stored drones stay in the locker. Fill empty bays with SERVICE DRONES.')}</p></section>`;
+    }
+    renderDroneServices(compact = false) {
+        const drones = this.droneHudSnapshot();
+        if (!drones.bays?.length || !this.save?.player?.dockedAt) return '';
+        this.droneServiceQuotes = {};
+        const quotes = (compact ? ['full'] : ['full', 'maintain']).map(kind => {
+            let quote;
+            try { quote = this.actions?.droneServiceQuote?.(kind === 'maintain' ? { fillSlots: [] } : {}); } catch { /* An old callback can no longer quote this fleet. */ }
+            this.droneServiceQuotes[kind] = quote;
+            const valid = quote?.ok && Number.isFinite(quote.total);
+            const totals = { replacement: 0, repair: 0, rounds: 0 };
+            for (const line of quote?.lines ?? []) if (line.kind in totals) totals[line.kind] += line.cost;
+            const enabled = valid && quote.canCommit !== false && quote.lines?.length
+                && quote.total <= this.save.player.credits && this.actions?.serviceDrones && !this.droneCommandPending;
+            return `${kind === 'maintain' ? `<details><summary>${t('Service options')}</summary>` : ''}<div class="drone-service-quote"><b>${t(kind === 'full' ? 'Refill, repair and rearm' : 'Repair and rearm existing drones')}</b>${valid ? `<details><summary>${t('Cost breakdown')}</summary><dl><div><dt>${t('Drone replacements')}</dt><dd>${formatCredits(totals.replacement)}</dd></div><div><dt>${t('Drone repairs')}</dt><dd>${formatCredits(totals.repair)}</dd></div><div><dt>${t('PDC ammunition')}</dt><dd>${formatCredits(totals.rounds)}</dd></div></dl></details>` : `<p>${t('Drone service quote unavailable.')}</p>`}<button type="button" data-ui-command="drone-service" data-drone-service="${kind}" ${enabled ? '' : 'disabled'}>${t('SERVICE DRONES')} · ${valid ? formatCredits(quote.total) : '—'}</button></div>${kind === 'maintain' ? '</details>' : ''}`;
+        }).join('');
+        if (compact) return `<div class="drone-bay-service">${quotes}${this.droneServiceNotice ? `<p role="status">${escapeHtml(this.droneServiceNotice)}</p>` : ''}</div>`;
+        return `<article class="service-card drone-service-card"><span class="eyebrow">${t('DRONE BAYS')}</span><h3>${t('Drone service')}</h3><p>${t('Repair and rearm your fleet. Missing drones are filled from storage before buying replacements.')}</p>${quotes}${this.droneServiceNotice ? `<p role="status">${escapeHtml(this.droneServiceNotice)}</p>` : ''}</article>`;
+    }
     renderServices() {
         const stats = getEffectiveShipStats(this.save.player);
         const repairs = repairCost(this.save.player);
@@ -2762,6 +2885,7 @@ export class GameUI {
       <div class="service-grid">
         ${repairBay ? `<article class="service-card"><span class="eyebrow">${t('HULL INTEGRITY')}</span><h3>${t('Repair bay')}</h3><div class="service-bars"><label>${t('HULL INTEGRITY')} <i><b style="width:${percent(this.save.player.hull, stats.hull)}%"></b></i><em>${Math.ceil(this.save.player.hull)}/${stats.hull}</em></label></div><p>${t('Replace ablative plate, patch pressure structure, and clear combat faults.')}</p><button class="primary" data-ui-command="repair" ${repairs <= 0 ? 'disabled' : ''}>${t('REPAIR')} · ${formatCredits(repairs)}</button></article>` : ''}
         ${fuelDepot ? `<article class="service-card"><span class="eyebrow">${t('CONSUMABLES')}</span><h3>${t('Fuel and ordnance')}</h3><div class="service-bars"><label>${t('FUEL')} <i><b style="width:${percent(this.save.player.fuel, stats.fuel)}%"></b></i><em>${Math.ceil(this.save.player.fuel)}/${stats.fuel}</em></label>${ordnanceBars}</div><p>${t('Refill afterburner propellant, mounted-rack ordnance, and installed gun magazines.')}</p><button class="primary" data-ui-command="refuel" ${refill <= 0 ? 'disabled' : ''}>${t('REFILL')} · ${formatCredits(refill)}</button></article>` : ''}
+        ${this.renderDroneServices()}
         <article class="service-card danger-service"><span class="eyebrow">${t('INSURANCE NOTE')}</span><h3>${t('Emergency recovery')}</h3><p>${t('A destroyed ship is towed to the last safe dock. The service retains cargo, mission bonds, and a percentage of liquid credit.')}</p><b>${t('FLY WITH A RESERVE.')}</b></article>
       </div>
     `;
@@ -3133,7 +3257,7 @@ export class GameUI {
         const notice=this.outfittingNotice;
         return `<div class="simple-outfitting"><header><b>${escapeHtml(heading)}</b><span>${formatCredits(player.credits)}</span></header>
             ${stage==='overview'?`<nav><button data-outfit-view="guns" aria-pressed="${!systems}">${t('WEAPONS')}</button><button data-outfit-view="systems" aria-pressed="${systems}">${t('SHIP SYSTEMS')}</button></nav>`:''}
-            ${this.outfitGroupHelp?`<aside class="fit-help-popup" role="dialog" aria-label="${t('WEAPON GROUP HELP')}"><h3>${t('WEAPON GROUP HELP')}</h3><p>${t('Tap the weapon name to cycle populated groups and Fire all. Fire all uses every forward gun; missiles and automatic turrets stay separate. In Outfitting, open a gun’s details to assign A or B. Try beams in A and your other weapon in B to control energy use.')}</p><button data-ui-command="dismiss-group-help">${t('UNDERSTOOD')}</button></aside>`:''}<div class="simple-fit-scroll" data-scroll-key="${stage}-${this.outfittingCategory}-${selected?.mount.id ?? ''}">${notice?`<p role="status">${escapeHtml(notice.message)}</p>`:''}${body}</div><footer>${action}</footer></div>`;
+            ${this.outfitGroupHelp?`<aside class="fit-help-popup" role="dialog" aria-label="${t('WEAPON GROUP HELP')}"><h3>${t('WEAPON GROUP HELP')}</h3><p>${t('Tap the weapon name to cycle populated groups and Fire all. Fire all uses every forward gun; missiles and automatic turrets stay separate. In Outfitting, open a gun’s details to assign A or B. Try beams in A and your other weapon in B to control energy use.')}</p><button data-ui-command="dismiss-group-help">${t('UNDERSTOOD')}</button></aside>`:''}<div class="simple-fit-scroll" data-scroll-key="${stage}-${this.outfittingCategory}-${selected?.mount.id ?? ''}">${notice?`<p role="status">${escapeHtml(notice.message)}</p>`:''}${stage === 'overview' && systems ? this.renderDroneBayConfiguration() : ''}${body}</div><footer>${action}</footer></div>`;
     }
     renderEquipment() {
         return this.renderOutfitting();
@@ -3337,6 +3461,7 @@ export class GameUI {
     }
     updateHud(model) {
         this.lastHud = model;
+        this.droneHud = this.droneHudSnapshot(model);
         this.setCockpitShip(model.shipId);
         const setText = (selector, value) => {
             const element = this.el(selector);
@@ -3428,6 +3553,8 @@ export class GameUI {
                 weaponReadout.title = `${t('Switch fire group — press X or tap')} · ${weapon.fullName ?? weapon.name}${launcher ? ` · ${launcher.name} ${launcher.current}/${launcher.capacity} · ${t('Cycle launcher — press L or tap')}` : ''}`;
             }
             else {
+                setText('#screen-own-weapon-name', '');
+                setText('#screen-own-weapon-ammo', '');
                 setText('#screen-own-launcher', '');
                 weaponReadout.title = t('Switch fire group — press X or tap');
             }
@@ -3539,6 +3666,7 @@ export class GameUI {
         setBar('#screen-own-energy', percent(model.energy, model.maxEnergy));
         setBar('#screen-own-hull', percent(model.hull, model.maxHull));
         this.updateTarget(model.target, model.mode);
+        this.updateDroneTelemetry(model);
         const targetReadout = this.el('#screen-target-readout');
         if (targetReadout) {
             // Transient monitor alerts win, then the slow-down call for an
@@ -3611,6 +3739,49 @@ export class GameUI {
             edgePointer?.classList.add('is-hidden');
         }
     }
+    updateDroneTelemetry(model) {
+        const drones = this.droneHud ?? {};
+        const bays = Array.isArray(drones.bays) ? drones.bays : [];
+        // The resource schematic yields its own monitor space to the fleet.
+        // A hostile lock keeps its health bars; alerts keep the readout above.
+        const visible = this.hasMiningDroneBay(drones) && (model.target?.kind === 'asteroid'
+            || (!model.target && (drones.phase === 'running' || drones.phase === 'recalling')));
+        this.el('.cockpit-screen-target')?.classList.toggle('has-drone-telemetry', visible);
+        this.el('#screen-drone-telemetry')?.classList.toggle('is-hidden', !visible);
+        const setText = (selector, text) => {
+            const el = this.el(selector);
+            if (el && el.textContent !== text) el.textContent = text;
+        };
+        if (visible) {
+            setText('#screen-drone-bays', t('{count} DRONES · +{inbound} ORE', { count: drones.operational ?? 0, inbound: drones.inboundCargo ?? 0 }));
+            setText('#screen-drone-state', t(drones.phase === 'running' ? 'MINING' : drones.phase === 'recalling' ? 'RETURNING TO BAY' : 'READY TO MINE'));
+            setText('#screen-drone-cargo', t('ORE {ore} · HOLD {cargo}/{capacity}', { ore: drones.remaining ?? '—', cargo: Math.round(model.cargo ?? 0), capacity: model.cargoCapacity ?? '—' }));
+            setText('#screen-drone-losses', drones.phase === 'idle' ? drones.action?.label ?? '' : '');
+            this.el('#screen-drone-telemetry').title = `${t('DRONE BAYS')} · M: ${t('MINING')} · P: PDC\n${drones.readout ?? ''}\n${t('Inbound cargo reserves hold space until delivery.')}`;
+        }
+        let ammo = 0, capacity = 0, operational = 0, pdcBays = 0;
+        for (const bay of bays) {
+            if (bay.mode !== 'pdc') continue;
+            pdcBays++;
+            operational += bay.operational ?? 0;
+            for (const unit of bay.units ?? []) {
+                if (unit.hull <= 0 || unit.state === 'destroyed') continue;
+                ammo += unit.ammo ?? 0;
+                capacity += DRONE_TYPES.pdc.magazineCapacity;
+            }
+        }
+        const pdc = this.el('#screen-own-drone-pdc');
+        const minersActive = !visible && (drones.phase === 'running' || drones.phase === 'recalling');
+        pdc?.classList.toggle('is-hidden', !pdcBays && !minersActive);
+        if (minersActive && !pdcBays) {
+            setText('#screen-own-drone-pdc', t('{count} DRONES · +{inbound} ORE', { count: drones.operational ?? 0, inbound: drones.inboundCargo ?? 0 }));
+            this.el('#screen-own-weapon')?.classList.add('is-visible');
+        }
+        if (pdcBays) {
+            setText('#screen-own-drone-pdc', `${t(drones.pdcPolicy === 'stow' ? 'PDC STOW' : 'PDC DEFEND')} ${operational}/${pdcBays} · ${ammo}/${capacity}`);
+            this.el('#screen-own-weapon')?.classList.add('is-visible');
+        }
+    }
     updateWeaponButtons(target, mode = this.lastHud?.mode ?? 'combat') {
         const fire = this.el('#touch-fire');
         const missile = this.el('#touch-missile');
@@ -3624,6 +3795,13 @@ export class GameUI {
             ? kind === 'asteroid' ? 'mining' : kind === 'wreck' ? 'salvage' : mode
             : mode;
         const mining = kind === 'asteroid' && contextualMode === 'mining';
+        // Target selection can change drone availability before the next full HUD refresh.
+        let liveDrones;
+        try { liveDrones = this.actions?.miningDrones?.(); } catch { /* Keep the fallback for stale session callbacks. */ }
+        const drones = liveDrones ?? this.droneHud ?? this.droneHudSnapshot(this.lastHud) ?? {};
+        const droneMining = mining;
+        const droneAction = drones.action;
+        const droneLabel = t(drones.phase === 'running' ? 'RECALL' : drones.phase === 'recalling' ? 'RETURNING' : 'MINE');
         const salvage = kind === 'wreck' && contextualMode === 'salvage';
         const utility = mining || salvage;
         const surrendered = kind === 'ship' && Boolean(target.surrendered) && !target.captured;
@@ -3636,20 +3814,29 @@ export class GameUI {
         fire.classList.toggle('is-salvage', salvage);
         fire.classList.toggle('is-surrendered', surrendered);
         missile.classList.toggle('is-scan', utility);
+        missile.classList.remove('is-mining');
+        fire.classList.toggle('is-recalling', droneMining && drones.phase === 'recalling');
         missile.classList.toggle('is-capture', surrendered);
         missile.classList.toggle('is-empty', missileAction && missileCurrent <= 0);
-        fire.dataset.touchAction = utility ? 'utility' : 'fire';
-        missile.dataset.touchAction = utility ? 'scan' : surrendered ? 'capture' : 'missile';
-        // FIRE becomes the held mining/salvage beam for resource contacts. The
-        // smaller pad scans deposits with a tap, or handles missiles/capture
-        // against ordinary and surrendered ships.
+        fire.dataset.touchAction = droneMining ? 'miningDrones' : utility ? 'utility' : 'fire';
+        missile.dataset.touchAction = droneMining ? 'scan' : utility ? 'scan' : surrendered ? 'capture' : 'missile';
+        // Drones use the existing edge missile command. InputManager owns the
+        // edge; do not also invoke a callback from click/pointerup here.
+        fire.disabled = droneMining && droneAction?.ok !== true;
+        fire.title = droneMining ? droneAction?.label ?? t('NO MINING DRONES') : '';
         missile.disabled = surrendered && !capture;
         const showIcon = (button, name) => {
             for (const icon of button.querySelectorAll('svg'))
                 icon.classList.toggle('is-hidden', icon.dataset.icon !== name);
         };
-        showIcon(fire, mining ? 'mine' : salvage ? 'salvage' : 'fire');
-        showIcon(missile, utility ? 'scan' : capture || surrendered ? 'capture' : 'missile');
+        showIcon(fire, droneMining ? 'none' : mining ? 'mine' : salvage ? 'salvage' : 'fire');
+        showIcon(missile, droneMining ? 'scan' : utility ? 'scan' : capture || surrendered ? 'capture' : 'missile');
+        const droneText = this.el('#touch-drone-label');
+        if (droneText) {
+            droneText.classList.toggle('is-hidden', !droneMining);
+            droneText.textContent = droneMining ? droneLabel : '';
+        }
+        missile.title = utility ? t('SCAN') : '';
         const launcherCycle = this.el('#touch-launcher-cycle');
         const missileCount = this.el('#touch-missile-count');
         const launcherCode = this.el('#touch-launcher-code');
@@ -3670,8 +3857,8 @@ export class GameUI {
         }
         if (launcherCode)
             launcherCode.textContent = launcher?.displayCode ?? launcher?.shortCode ?? '—';
-        fire.setAttribute('aria-label', mining ? t('Mine — hold') : salvage ? t('Salvage — hold') : t('Fire — hold'));
-        missile.setAttribute('aria-label', utility
+        fire.setAttribute('aria-label', droneMining ? droneAction?.label ?? droneLabel : mining ? t('Mine — hold') : salvage ? t('Salvage — hold') : t('Fire — hold'));
+        missile.setAttribute('aria-label', droneMining ? t('Scan — tap') : utility
             ? t('Scan — tap')
                 : capture
                     ? t('Capture surrendered pilot')
@@ -4629,6 +4816,7 @@ export class GameUI {
           <section class="ship-menu-missions"><h3>${t('ACTIVE CONTRACTS · {count}/6', { count: missions.length })}</h3>${missionRows}</section>
           <section class="ship-menu-cargo"><h3>${t('CARGO HOLD · {mass}/{capacity} MASS ({percent}%)', { mass: mass.toFixed(1), capacity, percent: loadPercent })}</h3>${cargoRows}</section>
           <section class="ship-menu-weapons">${loadoutFor(player).turrets?.some(Boolean)?`<button data-ui-command="turret-toggle">${t(player.turretsHeld?'TURRETS HOLD FIRE':'TURRETS ACTIVE')}</button><p>${escapeHtml(t(player.turretsHeld?'TURRETS HOLD FIRE':(player.turretRuntime?.find(s=>s.status==='TURRETS WAITING FOR ENERGY')?.status??'TURRETS READY')))}</p>`:''}<details><summary>${t('WEAPON SYSTEMS')}</summary>${weaponRows}${launcherRows}</details><details><summary>${t('WEAPON GROUP HELP')}</summary><p>${t('Tap the weapon name to cycle populated groups and Fire all. Fire all uses every forward gun; missiles and automatic turrets stay separate. In Outfitting, open a gun’s details to assign A or B. Try beams in A and your other weapon in B to control energy use.')}</p></details></section>
+          ${this.renderDroneShipStatus()}
           <section class="ship-menu-account"><h3>${t('ACCOUNT')}</h3>
             <div class="ship-account-row"><span>${t('AVAILABLE CREDIT')}</span><b>${formatCredits(player.credits)}</b></div>
             ${mug?.kind === 'credits' ? `<div class="ship-account-row"><span>${t('STANDOFF TOLL')}</span><button data-pay-mug="1">${t('PAY')} ${formatCredits(mug.amount)}</button></div>` : ''}

@@ -131,7 +131,7 @@ export const missionBriefing = (mission) => {
     if (mission.kind === 'delivery')
         return t('{quantity} units of {commodity} are sealed and waiting. Deliver them intact to {station}. Cargo mass is reserved on acceptance.', { quantity: mission.quantity, commodity: t(COMMODITIES[mission.commodity]?.name ?? mission.commodity), station: LOCATIONS[mission.destination]?.name ?? mission.destination });
     if (mission.kind === 'transport' && mission.cargoLabel)
-        return t('Carry a {cargo} to {station}. The case occupies {mass} cargo mass and the client values punctuality above discretion.', { cargo: t(mission.cargoLabel), station: LOCATIONS[mission.destination]?.name ?? mission.destination, mass: (Number(mission.quantity) * 1.2).toFixed(1) });
+        return t('Carry a {cargo} to {station}. The case occupies {mass} cargo mass and the client values punctuality above discretion.', { cargo: t(mission.cargoLabel), station: LOCATIONS[mission.destination]?.name ?? mission.destination, mass: Number(mission.quantity).toFixed(1) });
     return t(mission.briefing ?? 'Review the route and contract terms before accepting.');
 };
 // Wreck deposits can hold a fractional final unit, but the cutter awards one
@@ -407,7 +407,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             faction: LOCATIONS[destination].faction,
             briefing: kind === 'delivery'
                 ? t('{quantity} units of {commodity} are sealed and waiting. Deliver them intact to {station}. Cargo mass is reserved on acceptance.', { quantity, commodity: t(COMMODITIES[commodity].name), station: LOCATIONS[destination].name })
-                : t('Carry a {cargo} to {station}. The case occupies {mass} cargo mass and the client values punctuality above discretion.', { cargo: t(cargoLabel), station: LOCATIONS[destination].name, mass: (quantity * 1.2).toFixed(1) }),
+                : t('Carry a {cargo} to {station}. The case occupies {mass} cargo mass and the client values punctuality above discretion.', { cargo: t(cargoLabel), station: LOCATIONS[destination].name, mass: quantity.toFixed(1) }),
             ...(complication ? { complication } : {}),
         });
     }
@@ -506,7 +506,7 @@ export const acceptMission = (save, locationId, missionId) => {
     }
     if (offered.kind === 'delivery' || offered.kind === 'transport' || offered.kind === 'smuggle') {
         const units = offered.quantity ?? 0;
-        const massPerUnit = offered.kind === 'transport' ? 1.2 : COMMODITIES[offered.commodity].mass;
+        const massPerUnit = 1;
         const requiredMass = units * massPerUnit;
         if (cargoFree(save.player) + 0.001 < requiredMass) {
             return { ok: false, message: t('Free {mass} cargo mass before accepting this contract.', { mass: requiredMass.toFixed(1) }) };

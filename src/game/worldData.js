@@ -187,7 +187,9 @@ const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 // across saves and after any rock has been mined.
 const depletedOrRoll = (rng, depleted, id, low, high) => {
     const roll = randomBetween(rng, low, high);
-    return Math.max(0, depleted[id] ?? roll);
+    // Deposits are whole cargo units. Legacy fractional remnants still yield
+    // their final unit, matching the former beam extraction behavior.
+    return Math.ceil(Math.max(0, depleted[id] ?? roll));
 };
 // Base half-extents of each graveyard debris geometry, before the per-piece
 // scale. These must mirror createGraveyard's geometryFor so the collision box

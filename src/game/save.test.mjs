@@ -114,9 +114,9 @@ const cargoSave = hydrateSave({
 });
 assert.deepEqual(cargoSave.player.cargo, { water: 2 });
 assert.deepEqual(cargoSave.player.sealedCargo, [{
-    missionId: 'valid-delivery', label: 'Medical cases', units: 3, mass: 0.5,
+    missionId: 'valid-delivery', label: 'Medical cases', units: 3, mass: 1,
 }]);
-assert.equal(cargoMass(cargoSave.player), 3.9);
+assert.equal(cargoMass(cargoSave.player), 5);
 assert.equal(Number.isFinite(cargoMass({ cargo: { water: 'NaN', food: -4 }, sealedCargo: [null, { mass: Infinity, units: 2 }] })), true);
 const tradeQuote = quoteCommodityTrade(cargoSave, 'helix', 'water', 'buy', 1);
 assert.equal(Number.isFinite(tradeQuote.postCargoMass ?? 0), true, 'trade quote never exposes NaN cargo mass');

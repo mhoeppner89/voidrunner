@@ -2,13 +2,16 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v188-0-8-1-arena-combat';
+const CACHE = 'voidrunner-v194-0-8-2a-pdc-combat';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
 // renderer, voxel builder, collision, Three.js, GLB loader, and ship showroom
 // are loaded on demand after a sortie or shipyard interaction. This keeps the
 // title screen bootable offline without precaching optional art or models.
+// Drone data and service quotes are shell dependencies. Flight-only
+// Drone modules are precached below; other flight modules are cached on first request
+// with game.js, preserving the lazy flight module graph.
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -21,6 +24,11 @@ const CORE_ASSETS = [
   './src/game/turretLayouts.js',
   './src/game/combatResources.js',
   './src/game/data.js',
+  './src/game/droneData.js',
+  './src/game/droneMining.js',
+  './src/game/dronePdc.js',
+  './src/game/droneService.js',
+  './src/game/droneSystem.js',
   './src/game/economy.js',
   './src/game/galaxy.js',
   './src/game/galaxyContent.js',

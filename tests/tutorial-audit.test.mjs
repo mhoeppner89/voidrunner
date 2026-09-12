@@ -53,7 +53,11 @@ test('last-unit extraction preserves the next tutorial lock and combat controls'
         session.strikeGoldPocket=()=>{};session.recoverWreckEquipment=()=>{};session.setMonitorStatus=()=>{};
         const node={id:'last-node',remaining:1,salvage:'electronics'};
         if(source==='mining'){
-            session.extractAsteroid(node,2,1);
+            node.remaining=0; // The drone transaction commits the final cut before this callback.
+            const targetNodeKey=`${save.world.seed}:${save.player.systemId}:asteroid:last-node`;
+            session.miningDroneContext={node,targetNodeKey};session.recordExtractionProgress=()=>{};
+            session.processMiningDroneEvent({ok:true,code:'cut-completed',targetNodeKey,remaining:0,units:1});
+            session.processMiningDroneEvent({ok:true,code:'payload-delivered',targetNodeKey,commodityId:'ore',units:1});
             assert.equal(save.player.currentTargetId,'raider');assert.equal(save.player.mode,'combat');
             assert.equal(quest.stepId,'defeat-raider');
             session.handleTutorialEvent('weapon-switched',{group:'B'});

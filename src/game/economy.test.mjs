@@ -169,7 +169,7 @@ const setPrice = (world, locationId, commodityId, price, supply = 50) => {
     assert.equal(current[0].buyPrice, 50);
     assert.equal(current[0].sellPrice, 200);
     assert.equal(current[0].profitPerUnit, 150);
-    assert.equal(current[0].profitPerMass, 300);
+    assert.equal(current[0].profitPerMass, 150);
     assert.equal(current.every((route) => route.commodityId !== 'arms'), true, 'bartender advice remains legal');
     assert.equal(current.every((route) => route.profitPerUnit > 0 && route.profitPerMass > 0), true);
 }

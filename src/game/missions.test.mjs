@@ -227,7 +227,7 @@ const projection = (offers) => offers.map((offer) => ({
     assert.equal(poor.world.offers.helix[0].status, 'offered');
 
     const overloaded = fresh(204);
-    postOffer(overloaded, 'helix', fixture({ id: 'helix-0-0-overloaded', commodity: 'ore', quantity: 20 }));
+    postOffer(overloaded, 'helix', fixture({ id: 'helix-0-0-overloaded', commodity: 'ore', quantity: 40 }));
     const cargoBefore = cargoMass(overloaded.player);
     assert.equal(acceptMission(overloaded, 'helix', 'helix-0-0-overloaded').ok, false);
     assert.equal(cargoMass(overloaded.player), cargoBefore);
@@ -288,9 +288,9 @@ const projection = (offers) => offers.map((offer) => ({
         assert.equal(save.player.sealedCargo.length, 1);
         assert.equal(save.player.sealedCargo[0].missionId, fields.id);
         assert.equal(save.player.sealedCargo[0].units, fields.quantity);
-        assert.equal(save.player.sealedCargo[0].mass, fields.kind === 'transport' ? 1.2 : 0.5);
+        assert.equal(save.player.sealedCargo[0].mass, 1);
         assert.equal(Boolean(save.player.sealedCargo[0].smuggled), false);
-        assert.equal(cargoMass(save.player), fields.quantity * (fields.kind === 'transport' ? 1.2 : 0.5));
+        assert.equal(cargoMass(save.player), fields.quantity * (1));
 
         assert.deepEqual(completeMissionsAtDock(save, 'helix'), []);
         assert.equal(save.activeMissions.length, 1);

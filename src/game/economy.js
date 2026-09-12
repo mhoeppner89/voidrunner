@@ -1,6 +1,7 @@
 import { COMMODITIES, LOCATIONS, MARKET_LOCATION_IDS, commodityIds } from './data.js';
 import { clamp, randomBetween, seededRandom } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
+import { miningReservedMass } from './droneMining.js';
 import { t } from './i18n.js';
 // Selling gold is loud: word reaches the syndicate and pirates watch the
 // Shardbelt lanes for this long after the sale (see updateDynamicEncounters).
@@ -86,7 +87,7 @@ export const cargoMass = (player) => {
     for (const item of Array.isArray(player?.sealedCargo) ? player.sealedCargo : []) {
         if (!item || typeof item !== 'object')
             continue;
-        mass += safeCargoNumber(item.mass) * safeCargoNumber(item.units);
+        mass += safeCargoNumber(item.units);
     }
     for (const commodityId of commodityIds) {
         mass += safeCargoNumber(player?.cargo?.[commodityId]) * COMMODITIES[commodityId].mass;
@@ -94,7 +95,8 @@ export const cargoMass = (player) => {
     return Number.isFinite(mass) ? mass : Number.MAX_SAFE_INTEGER;
 };
 export const cargoCapacity = (player) => getEffectiveShipStats(player).cargo;
-export const cargoFree = (player) => Math.max(0, cargoCapacity(player) - cargoMass(player));
+export const cargoReserved = (player) => player?.droneFleet?.unitsById ? miningReservedMass(player.droneFleet) : 0;
+export const cargoFree = (player) => Math.max(0, cargoCapacity(player) - cargoMass(player) - cargoReserved(player));
 
 // These codes are intentionally short and data-only. UI callers can map them
 // to localized copy without parsing a translated message, and a failed quote

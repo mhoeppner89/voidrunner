@@ -55,6 +55,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
     if(!items.some(Boolean))return;
     const stats=player?session.playerStats():fit.stats;
     const extents=session.turretHullExtents(actor,ownerId),now=session.save.world.time;
+    const assignments=session.pdcAssignments;
     if(actor.turretRuntime?.[0] && !(actor.turretRuntime[0].position instanceof THREE.Vector3))actor.turretRuntime=[];
     actor.turretRuntime??=[];
     for(const [index,mount] of layouts.entries()) {
@@ -74,7 +75,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
         if(!disabled && pdc) {
             let nearest=PDC_TURRET.range;
             for(const p of session.projectiles) {
-                if(p.kind!=='missile'||p.life<=0||p.ownerId===ownerId||p.targetId!==ownerId||(p.pdcAssignedUntil??0)>now)continue;
+                if((p.kind!=='missile'&&p.kind!=='torpedo')||p.life<=0||p.ownerId===ownerId||p.targetId!==ownerId||(assignments?assignments.get(p.id)?.until:p.pdcAssignedUntil)>now)continue;
                 const pos=session.projStore.getPos(p.slot,state.goal),distance=pos.distanceTo(state.position);
                 if(distance<=nearest+rangeEpsilon && clearTurretArc(actor,mount,extents,pos,state) && !session.lineBlocked(state.position,pos,ownerId) && !shipBlocksRay(session,actor,ownerId,p,pos,state)){
                     nearest=distance;target=p;
@@ -110,7 +111,11 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
                     if(intercept) {
                         state.interceptAt=now+PDC_TURRET.interceptInterval;
                         const round=session.spawnGunProjectile(ownerId,PDC_TURRET,state.muzzle,state.direction,actor.velocity??[0,0,0],undefined,`${ownerId}-turret-${index}`);
-                        round.targetMissile=target;target.pdcAssignedUntil=now+flightTime+.12;
+                        if(round){
+                            round.targetMissile=target;
+                            if(assignments)assignments.set(target.id,{defenderId:`${ownerId}-turret-${index}`,until:now+flightTime+.12,round});
+                            else target.pdcAssignedUntil=now+flightTime+.12;
+                        }
                     } else if(pdc) {
                         if(!state.burstRemaining)state.burstRemaining=PDC_TURRET.burstSize;
                         state.burstRemaining--;

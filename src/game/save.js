@@ -10,9 +10,12 @@ import { collapseOutfittingToSingleShip, createOutfittingState, normalizeOutfitt
 import { combinedHullIntegrity, normalizeEnergy } from './combatResources.js';
 import { normalizeQuestStates } from './quests.js';
 import { startTutorialCampaign } from './tutorialCampaign.js';
-export const SAVE_KEY = 'void-privateer-save-v1';
+import { normalizeDroneFleet } from './droneData.js';
+export const DRONE_TEST_MODE = typeof location !== 'undefined' && new URLSearchParams(location.search).get('drone-test') === '1';
+export const SAVE_KEY = DRONE_TEST_MODE ? 'voidrunner-drone-test-v16' : 'void-privateer-save-v1';
+export const DRONE_MIGRATION_BACKUP_KEY = `${SAVE_KEY}-pre-drones`;
 export const SETTINGS_KEY = 'void-privateer-settings-v1';
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 16;
 // Test-funds build: a fresh career starts with enough credits to try any ship,
 // outfitting module or trade route without grinding first.
 export const STARTING_CREDITS = 500000;
@@ -172,6 +175,7 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
         quests: [],
         settings: defaultSettings(),
     };
+    save.player.droneFleet = normalizeDroneFleet(undefined, save.player.outfitting.loadouts, { grantInitial: true });
     normalizeLauncherMagazines(save.player, { fill: true });
     if (options.tutorial === true)
         startTutorialCampaign(save, save.world.time);
@@ -286,6 +290,13 @@ const migrateLegacyPosition = (save, sourceVersion) => {
         save.player.angularVelocity = [0, 0, 0];
     }
 };
+// Retain the original stored JSON before the first drone migration overwrite.
+// If storage is full, the surrounding save/load boundary keeps the old slot.
+const backupBeforeDroneMigration = (raw, parsed = raw ? JSON.parse(raw) : null) => {
+    if (parsed && Number(parsed.version ?? 1) < 15
+        && !window.localStorage.getItem(DRONE_MIGRATION_BACKUP_KEY))
+        window.localStorage.setItem(DRONE_MIGRATION_BACKUP_KEY, raw);
+};
 export const saveGame = (save) => {
     // The combat simulator uses an in-memory arena save and must never touch
     // the career autosave slot.
@@ -313,6 +324,7 @@ export const saveGame = (save) => {
         delete persist.player.prevRotation;
         delete persist.player.shipStates;
         delete persist.player.turretRuntime;
+        backupBeforeDroneMigration(window.localStorage.getItem(SAVE_KEY));
         window.localStorage.setItem(SAVE_KEY, JSON.stringify(persist));
         return true;
     }
@@ -376,7 +388,7 @@ const normalizeSealedCargo = (candidate) => {
             continue;
         const missionId = typeof item.missionId === 'string' ? item.missionId.trim() : '';
         const units = safeCargoNumber(item.units);
-        const mass = safeCargoNumber(item.mass);
+        const mass = 1;
         if (!missionId || units <= 0 || mass <= 0)
             continue;
         const label = typeof item.label === 'string' && item.label.trim()
@@ -469,6 +481,35 @@ export const hydrateSave = (candidate) => {
     candidate = candidate && typeof candidate === 'object' && !Array.isArray(candidate) ? candidate : {};
     const parsedVersion = Number(candidate.version ?? 1);
     const sourceVersion = Number.isFinite(parsedVersion) ? parsedVersion : 1;
+    // Copy the input: hydration must never mutate an imported save.
+    candidate = JSON.parse(JSON.stringify(candidate));
+    let retiredMiningCredit = 0;
+    if (sourceVersion < 16 && candidate.player) {
+        const player = candidate.player;
+        const fit = player.outfitting;
+        let count = 0;
+        if (fit?.loadouts) {
+            count += Math.max(0, Math.floor(Number(fit.locker?.['mining-mk2']) || 0));
+            for (const loadout of Object.values(fit.loadouts)) {
+                for (const slots of Object.values(loadout ?? {})) {
+                    if (!slots || typeof slots !== 'object') continue;
+                    for (const i of Object.keys(slots)) {
+                        if (slots[i] === 'mining-mk2') { count++; slots[i] = null; }
+                    }
+                }
+            }
+            if (fit.locker) delete fit.locker['mining-mk2'];
+            if (fit.factoryLocker) delete fit.factoryLocker['mining-mk2'];
+        } else count = (Array.isArray(player.equipment) ? player.equipment : []).filter(id => id === 'mining-mk2').length;
+        retiredMiningCredit = count * 7600;
+        player.equipment = (Array.isArray(player.equipment) ? player.equipment : []).filter(id => id !== 'mining-mk2');
+        // Existing stacks remain intact even if their new unit count exceeds
+        // capacity. Selling/jettisoning clears the excess; loading more is blocked.
+        for (const unit of Object.values(player.droneFleet?.unitsById ?? {})) {
+            if (unit.job) unit.job.unitMass = 1;
+            if (unit.payload) unit.payload.unitMass = 1;
+        }
+    }
     const fallback = createNewSave(candidate.world?.seed);
     const save = {
         ...fallback,
@@ -632,7 +673,7 @@ export const hydrateSave = (candidate) => {
         .filter((shipId) => shipId !== activeShipId)
         .reduce((total, shipId) => total + Math.round(SHIPS[shipId].price * 0.5), 0);
     const savedCredits = Number(save.player.credits);
-    save.player.credits = (Number.isFinite(savedCredits) ? Math.max(0, savedCredits) : 0) + fleetCredit;
+    save.player.credits = (Number.isFinite(savedCredits) ? Math.max(0, savedCredits) : 0) + fleetCredit + retiredMiningCredit;
     // Outfitting is the source of truth from schema 7 onward. A schema-6
     // career is converted from its flat equipment array. Keep that original
     // flat list on the first load so older callers still see the exact ids
@@ -647,6 +688,11 @@ export const hydrateSave = (candidate) => {
     save.player.ownedShips = [activeShipId];
     delete save.player.shipStates;
     save.player.outfitting = normalizeOutfitting(save.player);
+    // Read the candidate, never the fallback's freshly granted Wayfarer fleet.
+    // Existing empty fleets represent losses, and schema-15 saves with missing
+    // data do not receive another grant. Other career/world fields are intact.
+    save.player.droneFleet = normalizeDroneFleet(candidate.player?.droneFleet,
+        save.player.outfitting.loadouts, { grantInitial: sourceVersion < 15 });
     if (hadCanonicalOutfitting) {
         save.player.equipment = projectLegacyEquipment(save.player, save.player.outfitting);
         save.player.weaponId = projectLegacyWeaponId(save.player, save.player.shipId, save.player.outfitting.loadouts?.[save.player.shipId]?.fireGroups?.activeGroup);
@@ -724,6 +770,7 @@ export const loadGame = () => {
         if (!raw)
             return undefined;
         const parsed = JSON.parse(raw);
+        backupBeforeDroneMigration(raw, parsed);
         return hydrateSave(parsed);
     }
     catch (error) {

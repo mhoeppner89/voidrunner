@@ -465,6 +465,7 @@ export class InputManager {
             launcherCycle: this.consumePressed('KeyL') || this.consumeTouch('launcherCycle') || Boolean(gamepad.launcherCycle),
             missile: this.consumePressed('KeyM') || this.consumeTouch('missile') || Boolean(gamepad.missile),
             scan: this.consumeTouch('scan'),
+            miningDrones: this.consumeTouch('miningDrones'),
             utility: this.keys.has('KeyM') || this.touchHeld.has('utility') || Boolean(gamepad.utility),
             afterburner: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchHeld.has('afterburner') || Boolean(gamepad.afterburner),
             targetNext: this.consumePressed('KeyT', 'Tab') || this.consumeTouch('targetNext') || Boolean(gamepad.targetNext),

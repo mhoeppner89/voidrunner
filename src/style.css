@@ -17,6 +17,8 @@
   --void-cobalt: #0d3d86;
   --void-cyan: #69e4f2;
   --void-gold: #ffd05c;
+  --drone-miner: var(--void-gold);
+  --drone-pdc: var(--void-cyan);
   --void-cream: #fff3cf;
   --void-muted: #a8c7dc;
   --helix-shadow-core: rgba(4, 16, 43, 0.94);
@@ -874,6 +876,22 @@ button.compact {
   color: #fff1c4;
   background: radial-gradient(circle at 38% 32%, rgba(226, 172, 76, 0.98), rgba(101, 57, 22, 0.98));
   border: 2px solid rgba(255, 214, 124, 0.86);
+}
+
+.touch-missile.is-mining {
+  min-width: 72px;
+  color: var(--drone-miner);
+  border-color: var(--drone-miner);
+  padding: 0.15rem;
+}
+
+.touch-missile.is-mining #touch-drone-label {
+  font-size: clamp(10px, 1vw, 13px);
+  letter-spacing: 0;
+}
+
+.touch-missile.is-recalling #touch-drone-label {
+  font-size: 10px;
 }
 
 .touch-boost:active,
@@ -3525,6 +3543,95 @@ html[lang="de"] .comms-bar.story::after {
 }
 .screen-target-layout.no-bars .screen-bars {
   display: none;
+}
+
+/* Drone telemetry occupies the existing resource schematic opening. */
+.screen-drone-telemetry {
+  position: relative;
+  z-index: 1;
+  height: 57%;
+  display: grid;
+  align-content: space-evenly;
+  padding: 0.1rem 0.25rem;
+  color: var(--drone-miner);
+  font: 700 clamp(10px, 0.85vw, 12px)/1.15 var(--pixel-font);
+  letter-spacing: 0;
+}
+
+.screen-drone-telemetry > div {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cockpit-screen-target.has-drone-telemetry .screen-target-layout {
+  display: none;
+}
+
+.screen-own-weapon:has(#screen-own-drone-pdc:not(.is-hidden)) {
+  flex-wrap: wrap;
+  row-gap: 1px;
+}
+
+#screen-own-drone-pdc:not(.is-hidden) {
+  display: block;
+  flex-basis: 100%;
+  color: var(--drone-pdc);
+  font-size: 10px;
+  line-height: 1.1;
+  letter-spacing: 0;
+  white-space: normal;
+}
+
+.drone-bay-row,
+.drone-service-quote {
+  margin-block: 0.7rem;
+  padding-block: 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.drone-bay-row > div,
+.drone-policy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.drone-service-card button,
+.ship-menu-drones button {
+  min-height: 44px;
+  white-space: normal;
+}
+
+.drone-bay-row button[aria-pressed='true'],
+.drone-policy button[aria-pressed='true'] {
+  color: var(--drone-miner);
+  border-color: currentColor;
+}
+
+.drone-policy button[aria-pressed='true'] {
+  color: var(--drone-pdc);
+}
+
+.drone-service-quote dl {
+  margin-block: 0.5rem;
+}
+
+.drone-service-quote dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.drone-service-quote dd {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.drone-bay-status p {
+  overflow-wrap: anywhere;
 }
 
 /* A clipped NPC briefly flashes its outline on the target monitor, so field
@@ -14682,3 +14789,9 @@ button.primary,
 #run-countdown span{display:block;font-size:18px}#run-countdown b{display:block;font-size:56px}#run-countdown[hidden]{display:none}
 @media(max-height:450px) and (min-width:601px){.run-card{padding:9px;gap:6px}.run-card header{padding-bottom:4px}.run-card header h2{font-size:16px}.run-card .run-offers{gap:8px}.run-card .run-offers button{padding:10px;gap:7px}.run-card .run-offers button.is-selected{padding:9px}.run-card .run-offers b{font-size:16px}.run-card .run-offers span{font-size:14px}.run-card .run-offers small{font-size:12px}.run-stage-label{margin-bottom:5px}.run-card footer{padding-top:4px}.run-card .run-hulls{grid-template-columns:repeat(3,minmax(0,1fr))}.run-card .run-hulls span{font-size:12px}}
 @media(max-width:600px){.run-card .run-offers{grid-template-columns:1fr}.run-card{height:calc(100dvh - 20px)}.run-card footer{flex-wrap:wrap}.run-card header{flex-wrap:wrap}.run-card .run-next{max-width:100%}}
+
+/* Mining is a tap action on the primary pad; the secondary remains SCAN. */
+.touch-fire #touch-drone-label { font: 700 clamp(9px, 1.4vw, 14px)/1 var(--pixel-font); }
+.touch-fire:disabled { opacity: 0.5; }
+.screen-drone-telemetry > div:empty { display: none; }
+.drone-service-card details { margin-top: 0.6rem; }

@@ -1,4 +1,5 @@
 import { TURRET_LAYOUTS } from './turretLayouts.js';
+import { createDefaultDroneBays, droneBayLayoutFor, normalizeDroneBays, validateDroneBays } from './droneData.js';
 /*
  * Ship outfitting is deliberately kept independent from the dock UI and the
  * flight simulator.  A loadout is just a set of item ids in named hardpoint
@@ -12,9 +13,11 @@ import { TURRET_LAYOUTS } from './turretLayouts.js';
 import { LOCATIONS, SHIPS } from './data.js';
 
 export const OUTFIT_CATEGORIES = Object.freeze(['gun', 'launcher', 'turret', 'power', 'drive', 'defense', 'utility']);
+// Generic item-id arrays only. droneBays contains physical-unit records and
+// must never enter item pricing, legacy equipment, or factory-item ledgers.
 export const LOADOUT_KEYS = Object.freeze(['guns', 'launchers', 'turrets', 'power', 'drive', 'defense', 'utility']);
 export const RESALE_RATE = 0.7;
-export const OUTFITTING_SCHEMA = 2;
+export const OUTFITTING_SCHEMA = 3;
 
 const freeze = (value) => Object.freeze(value);
 const freezeItem = (item) => {
@@ -172,13 +175,6 @@ const itemRecords = [
         requiredGuild: 'merchant', requiredRank: 1, art: './art/outfitting/cargo-pods.webp',
     },
     {
-        id: 'mining-mk2', name: 'Resonant Mining Lance', category: 'utility', size: 'M', sizes: ['M'],
-        price: 7600, mass: 6,
-        description: 'A resonant lance that exposes richer seams while wasting less heat on fractured rock.', stat: '+70% mining rate',
-        effects: { miningRate: 1.7 }, availability: ['vesper'],
-        requiredGuild: 'mining', requiredRank: 1, art: './art/outfitting/mining-mk2.webp',
-    },
-    {
         id: 'salvage-mk2', name: 'Phase-Locked Tractor', category: 'utility', size: 'M', sizes: ['M'],
         price: 8100, mass: 6,
         description: 'A phase-locked tractor that holds unstable wreckage together while it is pulled aboard.', stat: '+70% salvage rate · 170u range',
@@ -210,6 +206,8 @@ const makeMounts = (shipId, guns, launchers, utilitySizes, mass) => {
         drive: [mount(`${shipId}-drive-0`, 'drive', 'M')],
         defense: [mount(`${shipId}-defense-0`, 'defense', 'M')],
         utility: utilitySizes.map((size, index) => mount(`${shipId}-utility-${index}`, 'utility', size)),
+        // Physical unit records are separate from generic item-id sockets.
+        droneBays: droneBayLayoutFor(shipId),
     };
     spec.mounts = {
         gun: spec.guns,
@@ -253,7 +251,7 @@ export const HULL_HARDPOINTS = freeze({
     atlas: makeMounts('atlas', [['M', 0]], [['M', 0]], ['M', 'M', 'S', 'S'], 120),
 });
 export const HARDPOINT_SPECS = HULL_HARDPOINTS;
-export const UNIQUE_OUTFIT_IDS = freeze(['radar-mk2', 'mining-mk2', 'salvage-mk2']);
+export const UNIQUE_OUTFIT_IDS = freeze(['radar-mk2', 'salvage-mk2']);
 const FACTORY_BASELINE_IDS = freeze(['pulse-cannon', 'gauss-cannon', 'seeker-launcher', 'beam-emitter']);
 
 const categoryKey = (category) => category === 'gun' ? 'guns' : category === 'launcher' ? 'launchers' : category === 'turret' ? 'turrets' : category;
@@ -399,7 +397,7 @@ const normalizeFireGroups = (shipId, source) => {
 const emptyLoadout = (shipId) => {
     const spec = specFor(shipId);
     if (!spec)
-        return { guns: [], launchers: [], turrets:[], power:[], drive: [], defense: [], utility: [] };
+        return { guns: [], launchers: [], turrets:[], power:[], drive: [], defense: [], utility: [], droneBays: [] };
     return {
         guns: spec.guns.map(() => null),
         turrets:spec.turrets.map(()=>null),power:[null],
@@ -407,6 +405,7 @@ const emptyLoadout = (shipId) => {
         drive: spec.drive.map(() => null),
         defense: spec.defense.map(() => null),
         utility: spec.utility.map(() => null),
+        droneBays: createDefaultDroneBays(shipId),
         fireGroups: defaultFireGroups(shipId),
     };
 };
@@ -439,6 +438,7 @@ export const normalizeLoadout = (shipId, source = {}) => {
     // Every gun mount has a stable A/B assignment so the flight layer can
     // resolve a fire group without inventing defaults at runtime.
     result.fireGroups = normalizeFireGroups(shipId, source?.fireGroups);
+    result.droneBays = normalizeDroneBays(shipId, source?.droneBays);
     return result;
 };
 
@@ -565,7 +565,7 @@ const addPaidInstalled = (target, shipId, loadout, savedFlags) => {
 export const collapseOutfittingToSingleShip = (player = {}, shipId = player?.shipId) => {
     const targetId = SHIPS[shipId] && HULL_HARDPOINTS[shipId] ? shipId : 'wayfarer';
     const source = validCanonicalOutfitting(player.outfitting)
-        ? (player.outfitting.schema===1 ? normalizeOutfitting({...player,outfitting:clone(player.outfitting)}) : clone(player.outfitting))
+        ? (player.outfitting.schema<OUTFITTING_SCHEMA ? normalizeOutfitting({...player,outfitting:clone(player.outfitting)}) : clone(player.outfitting))
         : migrateLegacyOutfitting(player);
     const targetLoadout = normalizeLoadout(targetId, source.loadouts?.[targetId] ?? {});
     if (!source.loadouts?.[targetId])
@@ -612,7 +612,7 @@ export const commissionOutfittingForShip = (player = {}, shipId) => {
     if (!targetId)
         return undefined;
     const source = validCanonicalOutfitting(player.outfitting)
-        ? (player.outfitting.schema===1 ? normalizeOutfitting({...player,outfitting:clone(player.outfitting)}) : clone(player.outfitting))
+        ? (player.outfitting.schema<OUTFITTING_SCHEMA ? normalizeOutfitting({...player,outfitting:clone(player.outfitting)}) : clone(player.outfitting))
         : migrateLegacyOutfitting(player);
     const locker = paidLockerCounts(source);
     const owned = new Set(ownedShipIds(player));
@@ -746,7 +746,7 @@ export const migrateLegacyOutfitting = (player = {}) => {
 };
 
 const validCanonicalOutfitting = (source) => {
-    if (!isRecord(source) || ![1,OUTFITTING_SCHEMA].includes(source.schema) || !isRecord(source.locker) || !isRecord(source.loadouts))
+    if (!isRecord(source) || ![1,2,OUTFITTING_SCHEMA].includes(source.schema) || !isRecord(source.locker) || !isRecord(source.loadouts))
         return false;
     if (source.factoryLocker !== undefined && !isRecord(source.factoryLocker))
         return false;
@@ -778,7 +778,7 @@ export const normalizeOutfitting = (player = {}) => {
         // Preserve every displaced copy, including duplicates, exactly once.
         if(source.schema<OUTFITTING_SCHEMA) for(const key of LOADOUT_KEYS) {
             const used=new Set(),remaining={};for(const id of state.loadouts[shipId][key])if(id)remaining[id]=(remaining[id]??0)+1;
-            for(const [index,raw] of (source.loadouts?.[shipId]?.[key]??[]).entries()) {
+            for(const [index,raw] of rawSlots(source.loadouts?.[shipId], key, specFor(shipId)[key]).entries()) {
                 const id=canonicalId(raw);if(!OUTFIT_ITEMS[id])continue;
                 if(remaining[id]>0){const kept=state.loadouts[shipId][key].findIndex((value,i)=>value===id && !used.has(i));used.add(kept);const flag=source.factory?.[shipId]?.[key]?.[index];if(typeof flag==='boolean')state.factory[shipId][key][kept]=flag && Boolean(OUTFIT_ITEMS[id].factoryFit);remaining[id]--;continue;}
                 state.locker[id]=(state.locker[id]??0)+1;
@@ -946,6 +946,7 @@ export const validateLoadout = (player = {}, shipId = player.shipId, draft = {},
         addError(errors, 'ship-not-owned', { shipId });
     const raw = draft ?? {};
     const normalized = normalizeLoadout(shipId, raw);
+    errors.push(...validateDroneBays(shipId, raw.droneBays, player.droneFleet));
     for (const key of LOADOUT_KEYS) {
         const mounts = spec[key];
         const values = rawSlots(raw, key, mounts);
@@ -1096,12 +1097,17 @@ export const quoteOutfitting = (player = {}, shipId = player.shipId, draft, opti
     const workingPlayer = { ...player, outfitting: player?.outfitting ? clone(player.outfitting) : undefined };
     const state = normalizeOutfitting(workingPlayer);
     const current = state.loadouts[shipId] ?? normalizeLoadout(shipId, {});
-    const requested = draft ? normalizeLoadout(shipId, draft) : clone(current);
+    // Older dock callers stage only generic sockets. Preserve drone ownership
+    // when that field is omitted. Dedicated service/refit commits come later.
+    const supplied = draft ? { ...draft, droneBays: draft.droneBays ?? current.droneBays } : current;
+    const requested = normalizeLoadout(shipId, supplied);
     const cargoMass = contextCargoMass(player, safeOptions);
     const validationOptions = { ...safeOptions, locationId, cargoMass };
-    const validation = validateLoadout(workingPlayer, shipId, draft ?? current, validationOptions);
+    const validation = validateLoadout(workingPlayer, shipId, supplied, validationOptions);
     if (!validation.ok)
         return { ok: false, code: validation.code, errors: validation.errors, validation, shipId };
+    if (JSON.stringify(requested.droneBays) !== JSON.stringify(current.droneBays))
+        return { ok: false, code: 'drone-refit-unavailable', errors: [{ code: 'drone-refit-unavailable' }], shipId };
     const explicitPurchases = normalizeCountMap(safeOptions.purchases ?? safeOptions.buy);
     const explicitSales = normalizeCountMap(safeOptions.sales ?? safeOptions.sell);
     const request = normalizedRequest(shipId, requested, explicitPurchases, explicitSales);

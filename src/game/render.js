@@ -233,6 +233,14 @@ export class SpaceRenderer {
     shipMeshes = new Map();
     projectileMeshes = new Map();
     pickupMeshes = new Map();
+    // Raw fleet IDs are stable across launch/return and save hydration. An
+    // object table avoids temporary live-ID sets/arrays in the render loop.
+    droneVisuals = Object.create(null);
+    droneSyncRevision = 0;
+    droneBeamDirection = new THREE.Vector3();
+    droneBeamUp = new THREE.Vector3(0, 1, 0);
+    dronePrevPosition = new THREE.Vector3();
+    dronePrevRotation = new THREE.Quaternion();
     // Shared laser-FX (gauntlet overhaul): owns bolt/muzzle/impact assets in
     // src/game/laserFx.js. Lazily created on first bolt; everything it caches
     // is flagged userData.shared so disposeObject skips it, and it releases
@@ -2229,6 +2237,10 @@ export class SpaceRenderer {
             transparent: true,
             side: THREE.DoubleSide,
             depthWrite: false,
+            // Avoid depth rounding holes where the foreground ring crosses the planet.
+            polygonOffset: true,
+            polygonOffsetFactor: 0,
+            polygonOffsetUnits: -4,
             fog: false,
             toneMapped: false,
         });
@@ -3364,6 +3376,111 @@ export class SpaceRenderer {
                 this.shipMeshes.delete(key);
             }
         }
+    }
+    createDroneVisual(unit) {
+        const pdc = unit.type === 'pdc';
+        const color = pdc ? 0x69e4f2 : 0xffd05c;
+        const root = new THREE.Group();
+        root.name = `drone:${unit.id}`;
+        // Distinct outlines stay legible without labels: miners have two
+        // forward cutting arms; PDCs have broad vanes and twin gun barrels.
+        const part = (x, y, z, sx, sy, sz, accent = false) => {
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz),
+                new THREE.MeshStandardMaterial({ color: accent ? color : 0x586477,
+                    emissive: color, emissiveIntensity: accent ? 0.55 : 0.08, roughness: 0.55, metalness: 0.65 }));
+            mesh.position.set(x, y, z);
+            root.add(mesh);
+            return mesh;
+        };
+        part(0, 0, 0, pdc ? 1.25 : 0.9, 0.6, 1.25);
+        part(0, 0.34, -0.12, 0.45, 0.18, 0.65, true);
+        for (let side = -1; side <= 1; side += 2) {
+            part(side * (pdc ? 0.9 : 0.65), 0, pdc ? 0.15 : -0.6,
+                pdc ? 0.85 : 0.2, 0.18, pdc ? 0.8 : 1.55, true);
+            if (pdc) part(side * 0.32, 0.16, -0.95, 0.13, 0.13, 1.4);
+        }
+        const engine = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.85, 5),
+            new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8, depthWrite: false }));
+        engine.rotation.x = Math.PI / 2;
+        engine.position.z = 1;
+        root.add(engine);
+        const lamp = new THREE.Mesh(new THREE.OctahedronGeometry(0.18),
+            new THREE.MeshBasicMaterial({ color }));
+        lamp.position.set(0, 0, -0.85);
+        root.add(lamp);
+        root.traverse(object => { object.raycast = () => undefined; });
+        const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.065, 1, 5),
+            new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75,
+                blending: THREE.AdditiveBlending, depthWrite: false }));
+        beam.name = `drone-beam:${unit.id}`;
+        beam.raycast = () => undefined;
+        beam.visible = false;
+        this.dynamicRoot.add(root, beam);
+        return { root, beam, engine, lamp, type: unit.type, revision: 0 };
+    }
+    // Call with save.player.droneFleet and the live miningDroneContext (not
+    // miningDroneHud(), which copies arrays). workPoint is a Point or tuple.
+    // Missing/stowed/destroyed units retire on this same reconciliation pass.
+    syncDrones(fleet, miningContext, alpha = 1) {
+        const units = fleet?.unitsById;
+        const revision = ++this.droneSyncRevision;
+        const now = performance.now() * 0.009;
+        if (units) for (const id in units) {
+            const unit = units[id];
+            if (!unit || !unit.position || unit.hull <= 0 || unit.state === 'stowed' || unit.state === 'destroyed'
+                || (unit.type !== 'mining' && unit.type !== 'pdc')) continue;
+            let visual = this.droneVisuals[id];
+            if (visual && visual.type !== unit.type) {
+                this.removeDroneVisual(id);
+                visual = undefined;
+            }
+            if (!visual) visual = this.droneVisuals[id] = this.createDroneVisual(unit);
+            visual.revision = revision;
+            const root = visual.root;
+            root.position.fromArray(unit.position);
+            if (unit.prevPosition && alpha < 1) {
+                this.dronePrevPosition.fromArray(unit.prevPosition);
+                root.position.lerpVectors(this.dronePrevPosition, root.position, alpha);
+            }
+            if (unit.rotation) root.quaternion.fromArray(unit.rotation);
+            else root.quaternion.identity();
+            if (unit.prevRotation && alpha < 1) {
+                this.dronePrevRotation.fromArray(unit.prevRotation);
+                root.quaternion.slerp(this.dronePrevRotation, 1 - alpha);
+            }
+            const working = unit.type === 'mining' && unit.state === 'mining';
+            const returning = unit.state === 'returning' || unit.state === 'docking';
+            visual.engine.visible = !working && unit.state !== 'escorting';
+            visual.engine.scale.set(1, returning ? 1.3 : 1, 1);
+            visual.lamp.scale.setScalar(working ? 1.2 + Math.sin(now) * 0.2 : unit.payload ? 1.4 : 0.8);
+            const point = unit.workPoint ?? miningContext?.workPoint;
+            const end = point?.position ?? point;
+            visual.beam.visible = Boolean(working && end);
+            if (working && end) {
+                this.droneBeamDirection.fromArray(end).sub(root.position);
+                const length = this.droneBeamDirection.length();
+                visual.beam.visible = length > 0.001;
+                if (length > 0.001) {
+                    visual.beam.position.copy(root.position).addScaledVector(this.droneBeamDirection, 0.5);
+                    visual.beam.quaternion.setFromUnitVectors(this.droneBeamUp, this.droneBeamDirection.multiplyScalar(1 / length));
+                    visual.beam.scale.set(1, length, 1);
+                    visual.beam.material.opacity = 0.65 + Math.sin(now) * 0.15;
+                }
+            }
+        }
+        for (const id in this.droneVisuals)
+            if (this.droneVisuals[id].revision !== revision) this.removeDroneVisual(id);
+    }
+    removeDroneVisual(id) {
+        const visual = this.droneVisuals[id];
+        if (!visual) return;
+        this.dynamicRoot.remove(visual.root, visual.beam);
+        this.disposeObject(visual.root);
+        this.disposeObject(visual.beam);
+        delete this.droneVisuals[id];
+    }
+    clearDrones() {
+        for (const id in this.droneVisuals) this.removeDroneVisual(id);
     }
     syncProjectiles(projectiles, store, alpha = 0) {
         const revision = ++this.projectileSyncRevision;
@@ -4825,6 +4942,7 @@ export class SpaceRenderer {
     }
     dispose() {
         this.disposed = true;
+        this.clearDrones();
         window.removeEventListener('resize', this.resize);
         this.renderer.domElement.removeEventListener('webglcontextlost', this.onContextLost);
         this.renderer.domElement.removeEventListener('webglcontextrestored', this.onContextRestored);

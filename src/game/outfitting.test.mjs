@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
     HULL_HARDPOINTS,
     LEGACY_OUTFIT_ID_MAP,
+    OUTFITTING_SCHEMA,
     OUTFIT_ITEM_IDS,
     OUTFIT_ITEMS,
     RESALE_RATE,
@@ -34,14 +35,14 @@ const capablePlayer = (overrides = {}) => ({
     ...overrides,
 });
 
-assert.equal(OUTFIT_ITEM_IDS.length, 23, 'registry includes the beam emitter');
-assert.equal(new Set(OUTFIT_ITEM_IDS).size, 23, 'registry ids are unique');
+assert.equal(OUTFIT_ITEM_IDS.length, 22, 'registry includes the beam emitter');
+assert.equal(new Set(OUTFIT_ITEM_IDS).size, 22, 'registry ids are unique');
 assert.deepEqual(OUTFIT_ITEM_IDS, [
     'tracking-turret','capacitor-bank','sustained-reactor','recovery-shield','beam-emitter',
     'pulse-cannon', 'pulse-mk2', 'gauss-cannon', 'pdc', 'ripper', 'ion-blaster', 'mortar',
     'seeker-launcher', 'swarm-launcher', 'torpedo-launcher',
     'engine-mk2', 'thrusters-mk2', 'shield-mk2', 'armor-mk2',
-    'radar-mk2', 'cargo-pods', 'mining-mk2', 'salvage-mk2',
+    'radar-mk2', 'cargo-pods', 'salvage-mk2',
 ]);
 all(OUTFIT_ITEM_IDS, (id) => {
     const item = OUTFIT_ITEMS[id];
@@ -146,7 +147,7 @@ const energyHungry = {
     launchers: ['seeker-launcher'],
     drive: ['engine-mk2'],
     defense: ['shield-mk2'],
-    utility: ['mining-mk2', 'radar-mk2'],
+    utility: ['salvage-mk2', 'radar-mk2'],
 };
 assert.equal(validateLoadout(player, 'wayfarer', energyHungry).ok, true, 'high-drain weapons are legal fits and constrained by the flight capacitor');
 const tooMass = {
@@ -270,7 +271,7 @@ const hydrated = hydrateSave({
     world: { seed: 42 },
 });
 assert.equal(hydrated.version, SAVE_VERSION);
-assert.equal(hydrated.player.outfitting.schema, 2);
+assert.equal(hydrated.player.outfitting.schema, OUTFITTING_SCHEMA);
 assert.ok(hydrated.player.outfitting.loadouts.wayfarer.guns.includes('beam-emitter'));
 assert.deepEqual(hydrated.player.ownedShips, ['wayfarer'], 'fleet-era careers retain only their active hull');
 assert.equal(hydrated.player.outfitting.loadouts.talon, undefined, 'discarded hull loadout is removed');

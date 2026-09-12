@@ -13,7 +13,7 @@ const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(
 const actualCargoMass = (player = {}) => {
     let mass = 0;
     for (const item of Array.isArray(player.sealedCargo) ? player.sealedCargo : [])
-        mass += Math.max(0, finite(item?.mass)) * Math.max(0, finite(item?.units));
+        mass += Math.max(0, finite(item?.units));
     for (const id of commodityIds)
         mass += Math.max(0, finite(player.cargo?.[id])) * COMMODITIES[id].mass;
     return Math.max(mass, Math.max(0, finite(player.cargoMass)));

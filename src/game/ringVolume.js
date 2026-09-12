@@ -128,8 +128,14 @@ export function createRingVolume(surface, radius, composite = false) {
                 vec3 origin = localCamera;`)
             .replace('float leave = 100.0;', `
                 float depth = texture2D(sceneDepth,screenUv).x;
-                float viewDistance = cameraNear*cameraFar /
-                    (cameraFar-depth*(cameraFar-cameraNear));
+                // Use the far edge of the depth sample's quantization interval.
+                // At planetary distances a 24-bit depth bucket spans kilometres;
+                // its rounded centre can otherwise clip the FRONT of the ring.
+                // The analytic sphere intersection below supplies exact planet
+                // occlusion. Nearby ships/rocks still bound the ray with depth.
+                float farDepth = min(1.0, depth + 1.0/16777216.0);
+                float viewDistance = cameraNear /
+                    ((1.0-farDepth) + farDepth*(cameraNear/cameraFar));
                 float leave = min(100.0,viewDistance*length(localPosition-origin)/planetRadius);`)
             .replaceAll('discard;', 'return;')
             .replace('gl_FragColor = vec4(color/max(opacity,0.001),opacity);',

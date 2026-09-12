@@ -63,7 +63,7 @@ const STEP_DEFINITIONS = {
         chapter: 3,
         chapterTitle: 'Blood in the Belt',
         objective: 'Recover 1 unit of ore from the Shardbelt.',
-        detail: 'Use hyperdrive to reach the Shardbelt. A deposit is selected on arrival. Approach slowly, wait for its automatic scan, and hold MINE within range. Leave room for one unit of ore.',
+        detail: 'Use hyperdrive to reach the Shardbelt. A deposit is selected on arrival. Approach slowly, wait for its automatic scan, and tap MINE within range to send your drones. Wait for them to bring one ore aboard. Tap RECALL to recover them; hyperdrive waits for their return.',
         destinationId: 'shardbelt',
     },
     'service-ship': {

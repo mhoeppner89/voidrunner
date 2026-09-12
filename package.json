@@ -5,5 +5,5 @@
   "scripts": {
     "test": "node src/benchmark-metrics.test.mjs && node --test tests/*.test.mjs && node --import ./src/game/offlineImportHooks.mjs --test src/game/*.test.mjs"
   },
-  "version": "0.8.1"
+  "version": "0.8.2-a"
 }

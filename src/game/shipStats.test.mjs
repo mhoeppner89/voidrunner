@@ -54,7 +54,7 @@ check('wayfarer base acceleration', base.acceleration, 21);
 check('wayfarer base turn authority', base.angularAcceleration, 1.65);
 check('wayfarer base radar range', base.radarRange, 1000);
 check('wayfarer base scan range', base.scanRange, 500);
-check('wayfarer base mining rate', base.miningRate, 1);
+check('mining rate stat retired', base.miningRate, undefined);
 
 // Each piece of equipment applies its documented modifier on top of the hull.
 const engineFit = getEffectiveShipStats(playerWith(['engine-mk2']));
@@ -128,7 +128,7 @@ const radarFit = getEffectiveShipStats(playerWith(['radar-mk2']));
 check('radar-mk2 radar range', radarFit.radarRange, 1250);
 check('radar-mk2 scan range', radarFit.scanRange, 750);
 const miningFit = getEffectiveShipStats(playerWith(['mining-mk2']));
-check('mining-mk2 rate', miningFit.miningRate, 1.7);
+check('mining upgrade retired', miningFit.miningRate, undefined);
 const salvageFit = getEffectiveShipStats(playerWith(['salvage-mk2']));
 check('salvage-mk2 rate', salvageFit.salvageRate, 1.7);
 check('salvage-mk2 range', salvageFit.salvageRange, 170);

@@ -1,4 +1,5 @@
 import { EQUIPMENT, SHIPS } from './data.js';
+import { quoteDroneService } from './droneService.js';
 import { HULL_HARDPOINTS, OUTFIT_ITEMS, installedItemIds, loadoutFor } from './outfitting.js';
 import { AMMO_CAPACITY, AMMO_UNIT_COST, WEAPON_ORDER, WEAPONS, launcherMagazineEntries, missileCapacityForPlayer, weaponIdForOutfit } from './weapons.js';
 export const getEffectiveShipStats = (player) => {
@@ -25,7 +26,6 @@ export const getEffectiveShipStats = (player) => {
     // without an outfitting record therefore have no launcher and no storage;
     // save/runtime boundaries migrate legacy careers before resolving stats.
     const missileCapacity = missileCapacityForPlayer(player);
-    const miningRate = has('mining-mk2') ? effect('mining-mk2', 'miningRate', 1.7) : 1;
     const salvageRate = has('salvage-mk2') ? effect('salvage-mk2', 'salvageRate', 1.7) : 1;
     const salvageRange = has('salvage-mk2') ? effect('salvage-mk2', 'salvageRange', 170) : 100;
     const selectedEffects=installed.map(id=>OUTFIT_ITEMS[id]?.effects??{});
@@ -53,7 +53,6 @@ export const getEffectiveShipStats = (player) => {
         radarRange: has('radar-mk2') ? 1000 * radarMultiplier : 1000,
         scanRange: has('radar-mk2') ? 500 * scanMultiplier : 500,
         miningRange: 100,
-        miningRate,
         salvageRate,
         salvageRange,
     };
@@ -62,6 +61,12 @@ export const repairCost = (player) => {
     const stats = getEffectiveShipStats(player);
     const missingHull = Math.max(0, stats.hull - player.hull);
     return Math.ceil(missingHull * 14);
+};
+// Separate from refillCost until the caller also commits drone service. Infinity
+// makes malformed fleets unaffordable; use quoteDroneService for the error/lines.
+export const droneServiceCost = (player, options) => {
+    const quote = quoteDroneService(player, options);
+    return quote.ok ? quote.total : Infinity;
 };
 export const refillCost = (player) => {
     const stats = getEffectiveShipStats(player);

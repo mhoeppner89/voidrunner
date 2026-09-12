@@ -30,7 +30,13 @@ import { weaponAssistCone, weaponRange, weaponShotDamage, ammoCapacity, AMMO_CAP
 import { HULL_HARDPOINTS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, canonicalOutfitId, collapseOutfittingToSingleShip, commitOutfitting, itemFitsMount, loadoutFor, normalizeOutfitting, outfitItem, projectLegacyEquipment, quoteOutfitting, outfittingUsage } from './outfitting.js';
 import { combinedHullIntegrity, normalizeEnergy, regenerateCombatResources, spendEnergy } from './combatResources.js';
 import { commitShipTrade, quoteShipTrade } from './shipTrade.js';
+import { TURRET_LAYOUTS } from './turretLayouts.js';
 import { SHIP_MOUNT_ANCHORS } from './shipMounts.js';
+import { DRONE_BAY_CAPACITY, DRONE_RULES, DRONE_TYPES, droneBayLayoutFor, normalizeDroneFleet, validateDroneBays } from './droneData.js';
+import { destroyMiningUnit, finishMiningRecall, miningReservedMass, miningStartEligibility, recallMining, startMining } from './droneMining.js';
+import { createMiningDroneSystem } from './droneSystem.js';
+import { createPdcDroneController, destroyPdcDrone } from './dronePdc.js';
+import { quoteDroneService, commitDroneService } from './droneService.js';
 import { asteroidCollisionMesh, asteroidCollisionRadius, ASTEROID_COLLISION_FACTOR, generateAsteroidField, generateGraveyardPieces, generateRegionalAsteroidField, generateWreckNodes, graveyardCollisionMesh, graveyardZoneAt, graveyardZoneLabel, GRAVEYARD_GEOMETRY_PROFILES, GRAVEYARD_MODEL_COLLIDERS, GRAVEYARD_MODEL_COLLIDER_MAX_RADIUS, GRAVEYARD_MODEL_WRECKS, REGIONAL_ASTEROID_FIELD_IDS, wreckNodeCollisionMesh, wreckNodeCollisionRadius } from './worldData.js';
 import { hullVsAsteroid, hullVsBox, hullVsEngine, hullVsHull, hullVsRing, hullVsSphere } from './hullCollision.js';
 import { steerToward } from './npcNav.js';
@@ -153,6 +159,18 @@ const SALVAGE_AMBUSH_DELAY = 4;
 const GOLD_POCKET_CHANCE = 0.08;
 const GOLD_POCKET_MIN = 1;
 const GOLD_POCKET_MAX = 3;
+const MINING_DRONE_ACTION_LABELS = Object.freeze({
+    'can-start': 'DEPLOY MINING DRONES', 'can-recall': 'RECALL MINING DRONES',
+    recalling: 'DRONES RECALLING · WAIT FOR RETURN', 'no-bay': 'NO DRONE BAYS ON THIS HULL',
+    'no-mining-bay': 'NO BAY SET TO MINING', 'no-stock': 'NO OPERATIONAL MINING DRONES · FIT AT DOCK',
+    'no-miners': 'NO MINING DRONES READY', unscanned: 'SCAN ASTEROID FIRST',
+    'out-of-range': 'DRONES OUT OF RANGE · WITHIN {range} km OF SURFACE',
+    exhausted: 'DEPOSIT EXHAUSTED', 'deposit-reserved': 'ORE ALREADY RESERVED',
+    'cargo-full': 'CARGO FULL · INCLUDING INBOUND ORE', 'invalid-target': 'SELECT AN ASTEROID',
+    'target-changed': 'SELECT AN ASTEROID', 'target-lost': 'ASTEROID NO LONGER AVAILABLE',
+    docking: 'LAUNCH BEFORE DEPLOYING DRONES', 'ship-destroyed': 'SHIP UNAVAILABLE',
+    hyperdrive: 'EXIT HYPERDRIVE BEFORE DEPLOYING', 'miners-busy': 'DRONES BUSY · RECALL REQUIRED',
+});
 // A staked claim occasionally draws a rival prospector who contests the rock
 // mid-cut. Seeded per claim node, so the same seam disputes the same way every
 // career, and it fires at most once per claim.
@@ -1071,6 +1089,7 @@ export class GameSession {
     wreckNodes;
     ships = [];
     projectiles = [];
+    pdcAssignments = new Map();
     pickups = [];
     // Per-ship chat memory: the last pool key and line index used, so chatter
     // rotates through the pools instead of repeating the same line back to
@@ -1328,6 +1347,16 @@ export class GameSession {
         // retain matching per-rack magazines unchanged.
         normalizeLauncherMagazines(this.save.player, { legacyMissiles: this.save.player.missiles });
         this.save.player.equipment = projectLegacyEquipment(this.save.player, this.save.player.outfitting);
+        this.save.player.droneFleet = normalizeDroneFleet(this.save.player.droneFleet,
+            this.save.player.outfitting.loadouts, { grantInitial: true });
+        this.initializeMiningDrones();
+        this.initializePdcDrones();
+        this.recallPdcDrones('session-restored');
+        this.recallMiningDrones('session-restored');
+        if (this.save.player.dockedAt) {
+            this.abandonMiningDrones('docked-on-load');
+            this.recallPdcDrones('docked-on-load');
+        }
         const initialStats = getEffectiveShipStats(this.save.player);
         if (Number.isFinite(Number(this.save.player.armor)))
             this.save.player.hull = clamp(combinedHullIntegrity(this.save.player.hull, this.save.player.armor), 0, initialStats.hull);
@@ -2165,9 +2194,14 @@ export class GameSession {
         return tuple(bayCenter.sub(position).normalize());
     }
     restartArena() {
+        this.recallPdcDrones('arena-reset');
+        if (this.hasDeployedPdcDrones()) return;
+        this.abandonMiningDrones('arena-reset');
+        this.renderer?.clearDrones?.();
         if(this.arena?.run){this.showRunPreparation();return;}
         this.ships = [];
         this.projectiles = [];
+        this.pdcAssignments.clear();
         this.pickups = [];
         this.autopilot = false;
         this.armedJumpPointId = null;
@@ -2314,6 +2348,10 @@ export class GameSession {
         if (!this.active)
             return;
         this.active = false;
+        this.recallMiningDrones('teardown');
+        this.recallPdcDrones('teardown');
+        this.renderer?.clearDrones?.();
+        this.pdcAssignments.clear();
         cancelAnimationFrame(this.frameId);
         this.persistSave();
         this.renderer?.canvas.removeEventListener('pointerdown', this.onSpacePointerDown);
@@ -2406,6 +2444,15 @@ export class GameSession {
             }
         }
         else {
+            // The docked world remains paused, but a restored physical return
+            // can finish in fixed steps without changing drone health or ammo.
+            this.pdcDockAccumulator = Math.min((this.pdcDockAccumulator ?? 0) + dt, SIM_STEP * MAX_SIM_STEPS);
+            while (this.pdcDockAccumulator >= SIM_STEP && this.hasDeployedPdcDrones()) {
+                this.updatePdcDrones(SIM_STEP);
+                this.pdcDockAccumulator -= SIM_STEP;
+                if (!this.hasDeployedPdcDrones()) this.persistSave();
+            }
+            if (!this.hasDeployedPdcDrones()) this.pdcDockAccumulator = 0;
             this.simAccumulator = 0;
         }
         const stats = this.playerStats();
@@ -2537,6 +2584,7 @@ export class GameSession {
         this.scanCooldown -= dt;
         this.utilitySoundCooldown -= dt;
         if (this.galaxyJump) {
+            this.updatePdcDrones(dt);
             if (this.save.world.time >= this.galaxyJump.completeAt)
                 this.finishGalaxyJump(this.galaxyJump);
             return;
@@ -2544,6 +2592,7 @@ export class GameSession {
         if (this.deathTimer > 0) {
             this.deathTimer -= dt;
             this.updateDeathDrift(dt);
+            this.updatePdcDrones(dt);
             if (this.deathTimer <= 0)
                 this.recoverPlayer();
             return;
@@ -2553,6 +2602,10 @@ export class GameSession {
         // updatePlayer's acceleration/speed/fuel terms without changing the
         // ship-class stats returned by playerStats().
         this.updateRaceSlipstreamState(dt);
+        if (this.pendingDroneDeparture) {
+            this.save.player.throttle = 0;
+            actions = { ...actions, throttleSet: 0, throttleDelta: 0, afterburner: false };
+        }
         this.updatePlayer(dt, actions);
         this.updateTutorialFlightChecks(dt, actions);
         this.updatePlayerSignature(dt);
@@ -2569,8 +2622,11 @@ export class GameSession {
         // position for the frame against the environment.
         this.resolveShipContacts();
         this.updatePlayerWeapons(dt, actions);
+        this.updatePdcDrones(dt);
         this.updateProjectiles(dt);
         this.updatePickups(dt);
+        this.updateMiningDrones(dt);
+        this.updateDroneDeparture();
         this.updateDiscovery();
         this.updateRegeneration(dt);
         this.cleanupEntities();
@@ -2585,6 +2641,10 @@ export class GameSession {
         }
     }
     handleActions(actions) {
+        // InputManager consumes keyboard/touch/gamepad edges, including key
+        // repeat. The latch also protects sparse drivers passing a held true.
+        const missileEdge = Boolean(actions.missile) && !this.miningMissileHeld;
+        this.miningMissileHeld = Boolean(actions.missile);
         if (actions.cycleMode) {
             const order = ['combat', 'mining', 'salvage'];
             const index = order.indexOf(this.save.player.mode);
@@ -2618,10 +2678,16 @@ export class GameSession {
             this.cycleWeapon();
         if (actions.launcherCycle)
             this.cycleLauncher();
+        if (actions.miningDrones) this.toggleMiningDrones();
         if (actions.missile) {
             const target = this.getTargetRef(false);
+            const asteroid = target?.kind === 'asteroid'
+                || this.asteroids?.some(node => node.id === this.save.player.currentTargetId);
             const ship = target?.kind === 'ship' ? this.ships.find((entry) => entry.id === target.id) : undefined;
-            if (ship?.surrendered && !ship.claimed && !ship.captured && (ship.bountyValue > 0 || ship.missionId))
+            if (asteroid || this.save.player.mode === 'mining') {
+                if (missileEdge) this.toggleMiningDrones();
+            }
+            else if (ship?.surrendered && !ship.claimed && !ship.captured && (ship.bountyValue > 0 || ship.missionId))
                 this.captureTarget();
             else if (!((this.save.player.mode === 'mining' && target?.kind === 'asteroid') || (this.save.player.mode === 'salvage' && target?.kind === 'wreck')))
                 this.fireMissile();
@@ -4274,7 +4340,684 @@ export class GameSession {
         this.renderer.spawnMuzzleFlash(anchorX, anchorY, anchorZ, launcher.id === 'torpedo' ? 0xffa65e : 0xff7a42);
         this.audio.play('missile');
     }
+    initializePdcDrones() {
+        if (this.pdcDroneController || !this.save?.player?.droneFleet) return;
+        this.pdcDroneController = createPdcDroneController();
+        this.pdcAssignments ??= new Map();
+        this.pdcDroneShipId = this.save.player.shipId;
+        this.pdcDroneEvents = [];
+        this.pdcThreatPool = [];
+        this.pdcLiveThreats = new Map();
+        this.pdcAnchorRecords = new Map();
+        this.pdcVector = new THREE.Vector3();
+        this.pdcOmega = new THREE.Vector3();
+        this.pdcOrbitVelocity = new THREE.Vector3();
+        this.pdcRotation = new THREE.Quaternion();
+        this.pdcStart = new THREE.Vector3();
+        this.pdcDirection = new THREE.Vector3();
+        this.pdcEnd = new THREE.Vector3();
+        // Drone tuning supplies speed; collision, damage and rendering remain PDC.
+        this.pdcDroneWeapon = { ...WEAPONS.pdc, speed: DRONE_TYPES.pdc.projectileSpeed };
+        this.pdcDroneContext = { ownerId: 'player', unitIds: [], threats: [], opponents: [],
+            bayAnchors: Object.create(null), escortAnchors: Object.create(null),
+            assignments: this.pdcAssignments,
+            canFire: (unit, threat, start, direction, flightTime) => {
+                if (flightTime > this.pdcDroneWeapon.life) return false;
+                this.pdcStart.fromArray(start);
+                this.pdcEnd.fromArray(direction).multiplyScalar(DRONE_TYPES.pdc.projectileSpeed)
+                    .add(this.pdcVector.fromArray(unit.velocity)).multiplyScalar(flightTime).add(this.pdcStart);
+                return !this.lineBlocked?.(this.pdcStart, this.pdcEnd, 'player')
+                    && !this.pdcDroneShotBlocked(this.pdcStart, this.pdcEnd, threat.id);
+            },
+            // Callers may resolve collision damage here through damagePdcDrone.
+            onUnitStep: (unit, dt, context) => this.onPdcDroneStep?.(unit, dt, context),
+        };
+    }
+    pdcDroneShotBlocked(start, end, targetId) {
+        const dx = end.x-start.x, dy = end.y-start.y, dz = end.z-start.z;
+        const length2 = dx*dx+dy*dy+dz*dz;
+        if (!length2) return true;
+        const blocked = (p, radius) => {
+            const x=p[0]-start.x, y=p[1]-start.y, z=p[2]-start.z;
+            const t=(x*dx+y*dy+z*dz)/length2;
+            return t>0 && t<1 && (x-t*dx)**2+(y-t*dy)**2+(z-t*dz)**2 < radius*radius;
+        };
+        if (blocked(this.save.player.position, this.playerCollisionRadius())) return true;
+        for (const ship of this.ships ?? []) {
+            if (ship.id !== targetId && ship.hull > 0 && blocked(ship.position, Math.max(...this.npcHullExtents(ship)))) return true;
+        }
+        return false;
+    }
+    hasDeployedPdcDrones() {
+        const units = this.save?.player?.droneFleet?.unitsById;
+        for (const id in units) {
+            const unit = units[id];
+            if (unit.type === 'pdc' && unit.hull > 0 && unit.state !== 'stowed' && unit.state !== 'destroyed') return true;
+        }
+        return false;
+    }
+    dronesSafelyStowed() {
+        const units = this.save?.player?.droneFleet?.unitsById;
+        for (const id in units) {
+            const unit = units[id];
+            if (unit.state !== 'stowed' || unit.job || unit.payload) return false;
+        }
+        return true;
+    }
+    recallAllDrones(reason) {
+        this.recallMiningDrones(reason);
+        this.recallPdcDrones(reason);
+    }
+    requestDroneDeparture(kind, locationId = null) {
+        this.recallAllDrones('hyperdrive');
+        if (this.dronesSafelyStowed()) return true;
+        this.pendingDroneDeparture ??= { kind, locationId,
+            navTargetId: this.save.player.navTargetId, throttle: this.save.player.throttle };
+        this.save.player.throttle = 0;
+        this.setHyperdriveStatus(t('RECOVERING DRONES · DEPARTURE QUEUED'), 360000);
+        return false;
+    }
+    cancelDroneDeparture() {
+        const pending = this.pendingDroneDeparture;
+        this.pendingDroneDeparture = null;
+        this.pdcRecallReason = null;
+        if (pending) this.save.player.throttle = pending.throttle;
+        this.setHyperdriveStatus(t('DEPARTURE CANCELLED'), 2500);
+    }
+    updateDroneDeparture() {
+        const pending = this.pendingDroneDeparture;
+        if (!pending) return;
+        if (this.save.player.dockedAt || this.deathTimer > 0
+            || this.save.player.navTargetId !== pending.navTargetId) {
+            this.cancelDroneDeparture();
+            return;
+        }
+        if (!this.dronesSafelyStowed()) return;
+        this.pendingDroneDeparture = null;
+        this.save.player.throttle = pending.throttle;
+        if (pending.kind === 'arm-gate') this.startGalaxyJump(LOCATIONS[pending.locationId]);
+        else if (pending.kind === 'cross-gate') {
+            // Resume approach; the physical gate crossing remains authoritative.
+            this.startGalaxyJump(LOCATIONS[pending.locationId]);
+        } else this.toggleHyperdrive();
+    }
+    abandonDrones() {
+        this.abandonMiningDrones('abandoned');
+        this.abandonPdcDrones('abandoned');
+        this.persistSave?.();
+        return { ok: true };
+    }
+    recallPdcDrones(reason = 'stopped') {
+        const units = this.save?.player?.droneFleet?.unitsById;
+        if (!units) return;
+        if (this.hasDeployedPdcDrones()) this.pdcRecallReason = reason;
+        for (const id in units) {
+            const unit = units[id];
+            if (unit.type !== 'pdc' || unit.state === 'stowed' || unit.state === 'returning' || unit.state === 'destroyed') continue;
+            unit.state = 'returning';
+            unit.phaseTime = 0;
+            unit.recallTime = 0;
+            this.processPdcDroneEvent({ ok: true, type: 'recall', code: 'recall', unitId: id,
+                state: 'returning', threatId: null, ammoSpent: 0, stage: 'begin', reason });
+        }
+    }
+    damagePdcDrone(unitId, amount, reason = 'damage') {
+        const fleet = this.save?.player?.droneFleet;
+        const unit = fleet?.unitsById?.[unitId];
+        if (!unit || unit.type !== 'pdc' || unit.state === 'stowed' || unit.state === 'destroyed'
+            || !Number.isFinite(amount) || amount <= 0) return null;
+        unit.hull = Math.max(0, unit.hull - amount);
+        if (unit.hull > 0) return null;
+        const event = destroyPdcDrone(fleet, unitId, reason);
+        this.processPdcDroneEvent(event);
+        return event;
+    }
+    abandonPdcDrones(reason = 'ship-unavailable') {
+        // Compatibility for transition callers: only resolved damage destroys
+        // PDC inventory. A transition or elapsed return time is not damage.
+        this.recallPdcDrones(reason);
+    }
+    processPdcDroneEvent(event) {
+        if (!event?.ok) return;
+        const fleet = this.save.player.droneFleet;
+        if (event.type === 'fire') {
+            const missile = event.targetKind === 'ship' ? null : this.pdcLiveThreats.get(event.threatId);
+            const ship = event.targetKind === 'ship' ? this.ships.find(s => s.id === event.threatId && s.hostile && s.hull > 0 && !s.race) : null;
+            let round;
+            if (missile?.life > 0 || ship) {
+                round = this.spawnGunProjectile('player', this.pdcDroneWeapon,
+                    this.pdcStart.fromArray(event.start), this.pdcDirection.fromArray(event.direction),
+                    event.inheritedVelocity, ship?.id, event.unitId);
+            }
+            if (round) {
+                if (missile) round.targetMissile = missile;
+                const assignment = this.pdcAssignments.get(event.threatId);
+                if (assignment?.defenderId === event.unitId) assignment.round = round;
+            }
+            else {
+                // A rejected spawn must not spend ammunition or strand a reservation.
+                const unit = fleet.unitsById[event.unitId];
+                if (unit) unit.ammo += event.ammoSpent;
+                if (this.pdcAssignments.get(event.threatId)?.defenderId === event.unitId)
+                    this.pdcAssignments.delete(event.threatId);
+            }
+        } else if (event.type === 'destroyed') {
+            if (fleet.unitsById[event.unitId]?.type !== 'pdc') return;
+            for (const loadout of Object.values(this.save.player.outfitting?.loadouts ?? {})) {
+                for (const bay of loadout.droneBays ?? []) {
+                    for (let slot = 0; slot < bay.unitIds.length; slot++)
+                        if (bay.unitIds[slot] === event.unitId) bay.unitIds[slot] = null;
+                }
+            }
+            if (fleet.lockerIds) fleet.lockerIds = fleet.lockerIds.filter(id => id !== event.unitId);
+            delete fleet.unitsById[event.unitId];
+            delete this.pdcDroneContext?.bayAnchors[event.unitId];
+            delete this.pdcDroneContext?.escortAnchors[event.unitId];
+            this.ui?.pushEvent?.(t('PDC drone lost.'), 'warning', 4000);
+        } else if (event.type === 'empty') {
+            this.ui?.pushSensor?.(t('PDC DRONE EMPTY · RETURNING'), 'warning', 3200);
+        }
+        // Durable module records, including copied fire vectors, are safe for UI/debug consumers.
+        this.onPdcDroneEvent?.(event);
+    }
+    preparePdcDroneContext(dt = 0) {
+        this.initializePdcDrones();
+        const context = this.pdcDroneContext;
+        if (!context || !this.save?.player?.droneFleet?.unitsById) return null;
+        const player = this.save.player, fleet = player.droneFleet;
+        if (this.pdcDroneShipId !== player.shipId) {
+            this.recallPdcDrones('ship-changed');
+            this.renderer?.clearDrones?.();
+            this.pdcDroneShipId = player.shipId;
+        }
+        const layout = droneBayLayoutFor(player.shipId);
+        const bays = player.outfitting?.loadouts?.[player.shipId]?.droneBays;
+        const mounts = SHIP_MOUNT_ANCHORS[player.shipId]?.utility;
+        context.unitIds.length = 0;
+        for (const anchors of this.pdcAnchorRecords.values()) anchors.escortIndex = -1;
+        const point = () => ({ position: [0, 0, 0], velocity: [0, 0, 0] });
+        for (let index = 0; index < layout.length; index++) {
+            const bay = bays?.[index], mount = mounts?.[index];
+            if (!mount || bay?.bayId !== layout[index].bayId) continue;
+            const key = `${player.shipId}:${bay.bayId}`;
+            let anchors = this.pdcAnchorRecords.get(key);
+            if (!anchors) {
+                anchors = { mount, launch: point(), dock: point(), escort: point() };
+                this.pdcAnchorRecords.set(key, anchors);
+            }
+            if (bay.mode !== 'pdc') continue;
+            for (let slot = 0; slot < DRONE_BAY_CAPACITY.pdc; slot++) {
+                const id = bay.unitIds?.[slot], unit = fleet.unitsById[id];
+                if (!unit || unit.type !== 'pdc' || unit.state === 'destroyed' || context.unitIds.includes(id)) continue;
+                anchors.escortIndex = context.unitIds.length;
+                context.unitIds.push(id);
+                context.bayAnchors[id] = anchors;
+                context.escortAnchors[id] = anchors.escort;
+            }
+        }
+        // Restore return anchors for unequipped/locker units without relocating them.
+        // Old mount geometry stays attached to the owner until the return completes.
+        for (const id in fleet.unitsById) {
+            const unit = fleet.unitsById[id];
+            if (unit.type !== 'pdc' || unit.state === 'stowed' || context.bayAnchors[id]) continue;
+            let anchors = this.pdcAnchorRecords.get('return');
+            if (!anchors) {
+                if (!mounts?.[0]) continue;
+                anchors = { mount: mounts[0], launch: point(), dock: point(), escort: point() };
+                this.pdcAnchorRecords.set('return', anchors);
+            }
+            context.bayAnchors[id] = anchors;
+        }
+        const q = this.pdcRotation.fromArray(player.rotation);
+        const angular = player.angularVelocity;
+        const omega = this.pdcOmega.set(angular?.[0] ?? 0, angular?.[1] ?? 0, angular?.[2] ?? 0).applyQuaternion(q);
+        const turret = TURRET_LAYOUTS[player.shipId]?.[0];
+        const hull = HULL_FLIGHT_STATS[playerShipVariant(player.shipId)]?.hullHalfExtents;
+        // Mirror the deck turret across the belly, retaining its fore/aft station.
+        const escortY = -(turret?.side ?? 1) * ((hull?.[1] ?? 3) + DRONE_TYPES.pdc.escortDistance);
+        const escortZ = (turret?.position[2] ?? 0) * (hull?.[2] ?? 6);
+        const count = context.unitIds.length;
+        const orbitRate = 2 * Math.PI / DRONE_TYPES.pdc.escortOrbitSeconds;
+        for (const anchors of this.pdcAnchorRecords.values()) {
+            for (let end = 0; end < 3; end++) {
+                const anchor = end === 0 ? anchors.launch : end === 1 ? anchors.dock : anchors.escort;
+                const offset = this.pdcVector.fromArray(anchors.mount);
+                offset.y -= end === 0 ? 2 : end === 1 ? 0.75 : DRONE_TYPES.pdc.escortDistance;
+                const orbitVelocity = this.pdcOrbitVelocity.set(0, 0, 0);
+                if (end === 2 && anchors.escortIndex >= 0) {
+                    offset.set(0, escortY, escortZ);
+                    if (count > 1) {
+                        // Local XY is perpendicular to the ship's fore/aft Z axis.
+                        // Encircle the hull: above, starboard, below, port.
+                        const phase = this.save.world.time * orbitRate + anchors.escortIndex * 2 * Math.PI / count;
+                        const radius = Math.max(hull?.[0] ?? 3, hull?.[1] ?? 3) + DRONE_TYPES.pdc.escortDistance;
+                        const x = Math.cos(phase) * radius, y = Math.sin(phase) * radius;
+                        offset.set(x, y, 0);
+                        orbitVelocity.set(-y * orbitRate, x * orbitRate, 0).applyQuaternion(q);
+                    }
+                }
+                offset.applyQuaternion(q);
+                const v = anchor.velocity;
+                v[0] = player.velocity[0] + orbitVelocity.x + omega.y * offset.z - omega.z * offset.y;
+                v[1] = player.velocity[1] + orbitVelocity.y + omega.z * offset.x - omega.x * offset.z;
+                v[2] = player.velocity[2] + orbitVelocity.z + omega.x * offset.y - omega.y * offset.x;
+                anchor.position[0] = player.position[0] + offset.x - v[0] * dt;
+                anchor.position[1] = player.position[1] + offset.y - v[1] * dt;
+                anchor.position[2] = player.position[2] + offset.z - v[2] * dt;
+            }
+        }
+        context.shipPosition = player.position;
+        context.shipVelocity = player.velocity;
+        context.ownerRadius = this.playerCollisionRadius();
+        context.now = this.save.world.time;
+        context.inFlight = !player.dockedAt && player.hull > 0 && !this.deathTimer
+            && !this.autopilot && !this.galaxyJump && !this.armedJumpPointId && !this.pdcRecallReason;
+        context.assignments = this.pdcAssignments;
+        context.opponents.length = 0;
+        if (!player.turretsHeld && !player.holdFire && !player.pursuitHoldFire) {
+            for (const ship of this.ships ?? []) if (ship.hostile && ship.hull > 0 && !ship.race) context.opponents.push(ship);
+        }
+        context.threats.length = 0;
+        this.pdcLiveThreats.clear();
+        for (const missile of this.projectiles ?? []) {
+            if ((missile.kind !== 'missile' && missile.kind !== 'torpedo') || !(missile.life > 0)) continue;
+            this.pdcLiveThreats.set(missile.id, missile);
+            if (missile.ownerId === 'player') continue;
+            const target = missile.targetId === 'player' ? player : fleet.unitsById[missile.targetId];
+            if (!target?.position || !target.velocity || !(target.hull > 0)
+                || (target !== player && (target.state === 'stowed' || target.state === 'destroyed'))) continue;
+            // Explicit hostile targeting counts even if the firing ship has since died.
+            const index = context.threats.length;
+            const threat = this.pdcThreatPool[index] ??= { position: [0, 0, 0], velocity: [0, 0, 0] };
+            const slot = missile.slot * 3;
+            for (let axis = 0; axis < 3; axis++) {
+                threat.position[axis] = this.projStore.pos[slot + axis];
+                threat.velocity[axis] = this.projStore.vel[slot + axis];
+            }
+            threat.id = missile.id;
+            threat.kind = missile.launcherId === 'torpedo' || missile.weaponId === 'torpedo' ? 'torpedo' : missile.kind;
+            threat.hostile = true;
+            threat.ownerId = missile.ownerId; threat.targetId = missile.targetId; threat.life = missile.life;
+            const dx = target.position[0] - threat.position[0], dy = target.position[1] - threat.position[1], dz = target.position[2] - threat.position[2];
+            const distance = Math.hypot(dx, dy, dz);
+            const vx = threat.velocity[0] - target.velocity[0], vy = threat.velocity[1] - target.velocity[1], vz = threat.velocity[2] - target.velocity[2];
+            const closing = distance > 0 ? (dx * vx + dy * vy + dz * vz) / distance : 0;
+            const speed = Math.hypot(vx, vy, vz);
+            const radius = target === player ? context.ownerRadius : DRONE_TYPES[target.type].collisionRadius;
+            // Guidance can turn a crossing missile toward its target: estimate that
+            // approach using relative speed when the current radial speed is small.
+            threat.timeToImpact = Math.max(0, distance - radius) / Math.max(closing, speed * 0.5, 0.001);
+            context.threats.push(threat);
+        }
+        for (const [id, assignment] of this.pdcAssignments) {
+            if (!(assignment?.until > context.now) || !this.pdcLiveThreats.has(id)
+                || (assignment.round && !(assignment.round.life > 0))) this.pdcAssignments.delete(id);
+        }
+        return context;
+    }
+    updatePdcDrones(dt = SIM_STEP) {
+        if (!this.save?.player?.droneFleet?.unitsById) return;
+        if (dt === 0) return [];
+        if (!Number.isFinite(dt) || Math.abs(dt - SIM_STEP) > 1e-10)
+            throw new RangeError('PDC drones require one fixed 1/60-second step.');
+        const context = this.preparePdcDroneContext(dt);
+        if (!context) return [];
+        const events = this.pdcDroneEvents;
+        events.length = 0;
+        this.pdcDroneController.update(this.save.player.droneFleet, dt, context, events);
+        for (const event of events) this.processPdcDroneEvent(event);
+        if (!this.hasDeployedPdcDrones() && (this.pdcRecallReason !== 'hyperdrive'
+            && this.pdcRecallReason !== 'system-jump' || this.autopilot || this.armedJumpPointId))
+            this.pdcRecallReason = null;
+        return events;
+    }
+    pdcDroneHud(fleetBays = this.droneFleetSummary().bays) {
+        const bays = fleetBays.filter(bay => bay.mode === 'pdc');
+        const units = bays.flatMap(bay => bay.units);
+        return { policy: this.dronePdcPolicy(), recallReason: this.pdcRecallReason ?? null, bays, units,
+            operational: units.filter(unit => unit.hull > 0 && unit.ammo > 0).length,
+            deployed: units.filter(unit => unit.state === 'escorting').length,
+            returning: units.filter(unit => unit.state === 'returning').length,
+            ammo: units.reduce((sum, unit) => sum + unit.ammo, 0) };
+    }
+    initializeMiningDrones() {
+        if (this.miningDroneSystem || !this.save?.player?.droneFleet) return;
+        this.miningDroneSystem = createMiningDroneSystem();
+        this.miningDroneShipId = this.save.player.shipId;
+        this.miningDroneEvents = [];
+        this.miningDroneVector = new THREE.Vector3();
+        this.miningDroneOmega = new THREE.Vector3();
+        this.miningDroneRotation = new THREE.Quaternion();
+        const point = () => ({ position: [0, 0, 0], velocity: [0, 0, 0] });
+        this.miningDroneContext = { unitIds: [], bayAnchors: Object.create(null),
+            workPoint: point(), node: null, targetNodeKey: null };
+        this.miningDroneBays = Array.from({ length: 3 }, () => ({ launch: point(), dock: point() }));
+    }
+    recallMiningDrones(reason = 'stopped') {
+        const fleet = this.save?.player?.droneFleet;
+        if (!fleet?.controller || !fleet.unitsById) return { ok: false, code: 'unavailable' };
+        const result = recallMining(fleet, reason);
+        for (const id in fleet.unitsById) {
+            const unit = fleet.unitsById[id];
+            // An imported payload with no flight state is not a dock arrival.
+            if (unit.type === 'mining' && unit.state === 'stowed' && unit.payload)
+                this.loseMiningDrone(id, 'invalid-stowed-payload');
+        }
+        // No airborne units: settle immediately so docking is never blocked by
+        // a start/stop edge that occurred before the first launch step.
+        finishMiningRecall(fleet);
+        return result;
+    }
+    loseMiningDrone(unitId, reason) {
+        const player = this.save?.player;
+        if (!player?.droneFleet) return;
+        const event = destroyMiningUnit(player.droneFleet, unitId, reason);
+        if (event.ok) this.processMiningDroneEvent(event);
+        return event;
+    }
+    abandonMiningDrones(reason) {
+        const fleet = this.save?.player?.droneFleet;
+        if (!fleet?.controller || !fleet.unitsById) return;
+        this.recallMiningDrones(reason);
+        for (const id in fleet.unitsById) {
+            const unit = fleet.unitsById[id];
+            if (unit.type === 'mining' && unit.state !== 'destroyed'
+                && (unit.state !== 'stowed' || unit.job || unit.payload)) this.loseMiningDrone(id, reason);
+        }
+        finishMiningRecall(fleet);
+    }
+    // Refresh the tiny dedicated bay list directly. Generic utility sockets
+    // never authorize mining, and PDC mode is reserved for its own controller.
+    prepareMiningDroneContext(dt = 0) {
+        this.initializeMiningDrones();
+        const context = this.miningDroneContext;
+        if (!context || !this.save?.player?.droneFleet?.controller) return null;
+        const player = this.save.player;
+        const fleet = player.droneFleet;
+        if (this.miningDroneShipId !== player.shipId) {
+            this.abandonMiningDrones('ship-changed');
+            this.renderer?.clearDrones?.();
+            this.miningDroneShipId = player.shipId;
+            context.bayAnchors = Object.create(null);
+        }
+        const layout = droneBayLayoutFor(player.shipId);
+        const bays = player.outfitting?.loadouts?.[player.shipId]?.droneBays;
+        const mounts = SHIP_MOUNT_ANCHORS[player.shipId]?.utility;
+        const q = this.miningDroneRotation.fromArray(player.rotation);
+        const angular = player.angularVelocity;
+        const omega = this.miningDroneOmega.set(angular?.[0] ?? 0, angular?.[1] ?? 0, angular?.[2] ?? 0).applyQuaternion(q);
+        let count = 0;
+        let fitChanged = false;
+        context.miningBays = 0;
+        for (let index = 0; index < layout.length; index++) {
+            const bay = bays?.[index];
+            const anchors = this.miningDroneBays[index];
+            const mount = mounts?.[index];
+            if (!mount) continue;
+            // Separate external launch and dock contacts, using the hull's
+            // authored utility mount. Angular and linear velocity follow the bay.
+            for (let end = 0; end < 2; end++) {
+                const point = end === 0 ? anchors.launch : anchors.dock;
+                const offset = this.miningDroneVector.fromArray(mount);
+                offset.y -= end === 0 ? 2 : 0.75;
+                offset.applyQuaternion(q);
+                const velocity = point.velocity;
+                velocity[0] = player.velocity[0] + omega.y * offset.z - omega.z * offset.y;
+                velocity[1] = player.velocity[1] + omega.z * offset.x - omega.x * offset.z;
+                velocity[2] = player.velocity[2] + omega.x * offset.y - omega.y * offset.x;
+                point.position[0] = player.position[0] + offset.x - velocity[0] * dt;
+                point.position[1] = player.position[1] + offset.y - velocity[1] * dt;
+                point.position[2] = player.position[2] + offset.z - velocity[2] * dt;
+            }
+            if (bay?.bayId !== layout[index].bayId || bay.mode !== 'mining') continue;
+            context.miningBays++;
+            for (let slot = 0; slot < DRONE_BAY_CAPACITY.mining; slot++) {
+                const id = bay.unitIds?.[slot];
+                const unit = id && Object.hasOwn(fleet.unitsById, id) ? fleet.unitsById[id] : null;
+                if (!unit || unit.type !== 'mining' || !(unit.hull > 0) || unit.state === 'destroyed') continue;
+                let duplicate = false;
+                for (let prior = 0; prior < count; prior++) if (context.unitIds[prior] === id) duplicate = true;
+                if (duplicate) continue;
+                if (context.unitIds[count] !== id) fitChanged = true;
+                if (context.bayAnchors[id] && context.bayAnchors[id] !== anchors) fitChanged = true;
+                context.unitIds[count++] = id;
+                context.bayAnchors[id] = anchors;
+            }
+        }
+        if (context.unitIds.length !== count) fitChanged = true;
+        context.unitIds.length = count;
+        if (fitChanged && fleet.controller.phase === 'running') this.recallMiningDrones('fit-changed');
+        // Keep the original node through recall/delivery; selecting another
+        // rock can never transfer an outstanding job to it.
+        if (!context.node && fleet.controller.targetNodeKey) {
+            const prefix = `${this.save.world.seed}:${player.systemId}:asteroid:`;
+            if (fleet.controller.targetNodeKey.startsWith(prefix)) {
+                context.node = this.asteroids?.find(node => node.id === fleet.controller.targetNodeKey.slice(prefix.length)) ?? null;
+                context.targetNodeKey = fleet.controller.targetNodeKey;
+                context.systemId = player.systemId;
+            }
+        }
+        if (fleet.controller.phase === 'idle') {
+            const node = context.selectionId === player.currentTargetId && context.asteroids === this.asteroids
+                ? context.node : this.asteroids?.find(entry => entry.id === player.currentTargetId) ?? null;
+            context.selectionId = player.currentTargetId;
+            context.asteroids = this.asteroids;
+            if (context.node !== node || context.systemId !== player.systemId) {
+                context.node = node;
+                context.systemId = player.systemId;
+                context.targetNodeKey = node ? `${this.save.world.seed}:${player.systemId}:asteroid:${node.id}` : null;
+            }
+        }
+        const node = context.node;
+        context.deposit = node;
+        context.scanned = node?.scanned === true;
+        context.commodityId = 'ore';
+        context.unitMass = COMMODITIES.ore.mass;
+        context.cargo = player.cargo;
+        context.cargoMass = cargoMass(player);
+        context.cargoCapacity = this.playerStats().cargo;
+        context.shipPosition = player.position;
+        context.shipVelocity = player.velocity;
+        context.distance = Infinity;
+        context.validity = player.dockedAt ? 'docking' : this.deathTimer > 0 ? 'ship-destroyed'
+            : this.autopilot || this.galaxyJump ? 'hyperdrive'
+            : context.systemId !== player.systemId ? 'system-changed'
+            : node && !this.asteroids?.includes(node) ? 'target-lost' : true;
+        if (node) {
+            const dx = player.position[0] - node.position[0];
+            const dy = player.position[1] - node.position[1];
+            const dz = player.position[2] - node.position[2];
+            const distance = Math.hypot(dx, dy, dz);
+            const radius = asteroidCollisionRadius(node);
+            // Identical to surfaceDistance without a temporary target/vector.
+            context.distance = Math.max(0, distance - radius);
+            const nx = distance > 0.001 ? dx / distance : 0;
+            const ny = distance > 0.001 ? dy / distance : 1;
+            const nz = distance > 0.001 ? dz / distance : 0;
+            const workRadius = radius + DRONE_TYPES.mining.collisionRadius + 1;
+            const work = context.workPoint;
+            const moving = node.moving && this.activeInstanceId === 'shardbelt';
+            const vx = moving ? node.velocity?.[0] ?? 0 : 0;
+            const vy = moving ? node.velocity?.[1] ?? 0 : 0;
+            const vz = moving ? node.velocity?.[2] ?? 0 : 0;
+            const rx = player.velocity[0] - vx, ry = player.velocity[1] - vy, rz = player.velocity[2] - vz;
+            const radial = rx * nx + ry * ny + rz * nz;
+            const scale = distance > 0.001 ? workRadius / distance : 0;
+            work.velocity[0] = vx + (rx - radial * nx) * scale;
+            work.velocity[1] = vy + (ry - radial * ny) * scale;
+            work.velocity[2] = vz + (rz - radial * nz) * scale;
+            work.position[0] = node.position[0] + nx * workRadius - work.velocity[0] * dt;
+            work.position[1] = node.position[1] + ny * workRadius - work.velocity[1] * dt;
+            work.position[2] = node.position[2] + nz * workRadius - work.velocity[2] * dt;
+        }
+        return context;
+    }
+    miningDroneActionState() {
+        const player = this.save?.player;
+        const fleet = player?.droneFleet;
+        const phase = fleet?.controller?.phase ?? 'idle';
+        let result;
+        if (phase === 'recalling') result = { ok: false, code: 'recalling' };
+        else if (phase === 'running') result = { ok: true, code: 'can-recall' };
+        else if (!droneBayLayoutFor(player?.shipId).length) result = { ok: false, code: 'no-bay' };
+        else if (!fleet?.controller || !fleet.unitsById || !this.miningDroneSystem) result = { ok: false, code: 'no-stock' };
+        else {
+            const context = this.prepareMiningDroneContext();
+            result = !context.miningBays ? { ok: false, code: 'no-mining-bay' }
+                : !context.unitIds.length ? { ok: false, code: 'no-stock' }
+                : context.validity !== true ? { ok: false, code: context.validity }
+                : miningStartEligibility(fleet, context);
+        }
+        return { ...result, phase, label: t(MINING_DRONE_ACTION_LABELS[result.code] ?? 'MINING DRONES UNAVAILABLE', { range: DRONE_RULES.operatingRange }),
+            range: DRONE_RULES.operatingRange, targetNodeKey: fleet?.controller?.targetNodeKey ?? null };
+    }
+    toggleMiningDrones() {
+        const action = this.miningDroneActionState();
+        let result = action;
+        if (action.code === 'can-recall') result = this.recallMiningDrones('stopped');
+        else if (action.ok) result = startMining(this.save.player.droneFleet, this.prepareMiningDroneContext());
+        const label = result.code === 'started' ? t('MINING DRONES DEPLOYING')
+            : result.code === 'recalling' ? t('DRONES RECALLING · WAIT FOR RETURN') : action.label;
+        this.utilityReadout = label;
+        this.setMonitorStatus?.(label);
+        this.ui?.showToast?.(label, result.ok ? 'info' : 'warning', 3200);
+        return result;
+    }
+    updateMiningDrones(dt) {
+        if (!this.miningDroneSystem || !this.save?.player?.droneFleet?.controller) return; // Old direct simulation harnesses.
+        const player = this.save.player;
+        if (player.dockedAt || this.deathTimer > 0 || this.galaxyJump) {
+            this.abandonMiningDrones(player.dockedAt ? 'docked' : 'ship-unavailable');
+            return;
+        }
+        const context = this.prepareMiningDroneContext(dt);
+        const fleet = player.droneFleet;
+        const reservedMass = miningReservedMass(fleet);
+        if (fleet.controller.phase === 'running' && (!context.unitIds.length
+            || (reservedMass === 0 && context.cargoMass + context.unitMass > context.cargoCapacity)))
+            this.recallMiningDrones(context.unitIds.length ? 'cargo-full' : 'no-stock');
+        const events = this.miningDroneEvents;
+        events.length = 0;
+        this.miningDroneSystem.update(player.droneFleet, dt, context, events);
+        for (const event of events) this.processMiningDroneEvent(event);
+        for (const id in player.droneFleet.unitsById) {
+            const unit = player.droneFleet.unitsById[id];
+            if (unit.type === 'mining' && unit.state === 'mining') {
+                this.utilityActive = true;
+                this.lastExtractionAt = this.save.world.time;
+                this.seenWorkingUntil = this.save.world.time + SEEN_WORKING_SECONDS;
+                this.playerEmissionHeat = Math.max(this.playerEmissionHeat ?? 0, 180);
+            }
+        }
+        finishMiningRecall(player.droneFleet);
+        if (player.droneFleet.controller.phase === 'recalling') this.utilityReadout = t('DRONES RECALLING · WAIT FOR RETURN');
+        else if (player.droneFleet.controller.phase === 'running' && player.currentTargetId === context.node?.id) this.utilityReadout = t('MINING');
+    }
+    processMiningDroneEvent(event) {
+        if (!event?.ok) return;
+        const player = this.save.player;
+        const fleet = player.droneFleet;
+        if (event.code === 'cut-completed') {
+            const node = this.miningDroneContext?.node;
+            if (!node || event.targetNodeKey !== this.miningDroneContext.targetNodeKey) return;
+            // The transaction has already removed ore from this live deposit.
+            this.save.world.depletedAsteroids[node.id] = node.remaining;
+            this.recordExtractionProgress('mining', event.units);
+            this.recordClaimMining(node.id, event.units);
+            this.lastExtractionAt = this.save.world.time;
+            this.seenWorkingUntil = this.save.world.time + SEEN_WORKING_SECONDS;
+            this.playerEmissionHeat = Math.max(this.playerEmissionHeat ?? 0, 180);
+            if (event.remaining === 0) {
+                this.strikeGoldPocket(node);
+                this.obstacleGridBuiltAt = -Infinity;
+                if (player.currentTargetId === node.id) {
+                    this.setMonitorStatus(t('DEPOSIT EXHAUSTED · ORE INBOUND'));
+                    this.clearTarget();
+                }
+            }
+        } else if (event.code === 'payload-delivered') {
+            // Delivery owns the cargo mutation. Only notify collection here.
+            const nodeId = event.targetNodeKey.slice(event.targetNodeKey.lastIndexOf(':') + 1);
+            this.handleTutorialEvent('extracted', { nodeId, commodityId: event.commodityId,
+                amount: event.units, source: 'mining', instanceId: 'shardbelt' });
+        } else if (event.code === 'miner-destroyed') {
+            for (const loadout of Object.values(player.outfitting?.loadouts ?? {})) {
+                for (const bay of loadout.droneBays ?? []) {
+                    for (let i = 0; i < bay.unitIds.length; i++) if (bay.unitIds[i] === event.unitId) bay.unitIds[i] = null;
+                }
+            }
+            if (fleet.lockerIds) fleet.lockerIds = fleet.lockerIds.filter(id => id !== event.unitId);
+            // Loss has already released the job/payload. Service expects an empty
+            // slot, not a destroyed unit retained as unowned stock.
+            delete fleet.unitsById[event.unitId];
+            this.ui?.pushEvent?.(t('Mining drone lost · {ore} ore lost · {reason}',
+                { ore: event.lostUnits, reason: event.reason }), 'warning', 5000);
+        } else if (event.code === 'recalling') {
+            this.ui?.pushSensor?.(t('Mining drones recalling: {reason}', { reason: event.reason }), 'warning', 3200);
+        }
+    }
+    droneFleetSummary() {
+        const player = this.save?.player;
+        const fleet = player?.droneFleet;
+        const layout = droneBayLayoutFor(player?.shipId);
+        const fit = player?.outfitting?.loadouts?.[player?.shipId]?.droneBays;
+        const bays = layout.map(({ bayId }, index) => {
+            const bay = fit?.[index];
+            const mode = bay?.mode === 'pdc' ? 'pdc' : 'mining';
+            const units = (bay?.bayId === bayId ? bay.unitIds ?? [] : []).slice(0, DRONE_BAY_CAPACITY[mode])
+                .map(id => fleet?.unitsById?.[id]).filter(unit => unit && unit.type === mode)
+                .map(unit => ({ id: unit.id, type: unit.type, state: unit.state, hull: unit.hull,
+                    maxHull: DRONE_TYPES[unit.type].maxHull, ammo: unit.ammo ?? null,
+                    position: unit.position?.slice() ?? null, velocity: unit.velocity?.slice() ?? null,
+                    rotation: unit.rotation?.slice() ?? null,
+                    cutProgress: unit.job ? unit.job.cutTime / unit.job.cutSeconds : 0,
+                    payload: unit.payload ? { ...unit.payload } : null }));
+            return { bayId, mode, units, operational: units.filter(unit => unit.hull > 0 && unit.state !== 'destroyed').length };
+        });
+        let running = 0, recalling = 0, inboundCargo = 0;
+        for (const unit of Object.values(fleet?.unitsById ?? {})) {
+            if (unit.type !== 'mining' || unit.state === 'destroyed') continue;
+            if (['launching', 'outbound', 'mining'].includes(unit.state)) running++;
+            if (['returning', 'docking'].includes(unit.state)) recalling++;
+            inboundCargo += unit.payload?.units ?? 0;
+        }
+        return { phase: fleet?.controller?.phase ?? 'idle', running, recalling,
+            operational: bays.filter(bay => bay.mode === 'mining').reduce((sum, bay) => sum + bay.operational, 0),
+            target: fleet?.controller?.targetNodeKey ?? null, targetId: this.miningDroneContext?.node?.id ?? null,
+            stopReason: fleet?.controller?.stopReason ?? null, inboundCargo,
+            reservedMass: fleet ? miningReservedMass(fleet) : 0, pdcPolicy: this.dronePdcPolicy(), bays };
+    }
+    miningDroneHud() {
+        const action = this.miningDroneActionState();
+        const drones = this.droneFleetSummary();
+        return { ...drones, pdc: this.pdcDroneHud(drones.bays), action, readout: this.utilityReadout || action.label,
+            remaining: this.miningDroneContext?.node?.remaining ?? null,
+            distance: Number.isFinite(this.miningDroneContext?.distance) ? this.miningDroneContext.distance : null,
+            workPoint: this.miningDroneContext?.node ? this.miningDroneContext.workPoint?.position?.slice() ?? null : null };
+    }
+    dronePdcPolicy(policy) {
+        const fleet = this.save?.player?.droneFleet;
+        if (policy !== undefined && (!fleet || !droneBayLayoutFor(this.save.player.shipId).length
+            || (policy !== 'defend' && policy !== 'stow'))) return false;
+        if (policy === 'defend' && (this.pdcRecallReason === 'hyperdrive' || this.pdcRecallReason === 'system-jump'))
+            this.pdcRecallReason = null;
+        if (fleet && (policy === 'defend' || policy === 'stow') && fleet.pdcPolicy !== policy) {
+            fleet.pdcPolicy = policy;
+            if (policy === 'stow') this.recallPdcDrones('policy');
+            this.persistSave?.();
+        }
+        return fleet?.pdcPolicy === 'stow' ? 'stow' : 'defend';
+    }
+    setDronePdcPolicy(policy) {
+        return this.dronePdcPolicy(policy);
+    }
     updateUtilityTool(dt, active) {
+        if (this.save.player.mode === 'mining') {
+            this.renderer.setUtilityBeam(false, 'mining', this.save.player.position);
+            if (!this.miningDroneSystem || (this.save.player.droneFleet?.controller?.phase ?? 'idle') === 'idle')
+                this.utilityReadout = this.miningDroneActionState().label;
+            return;
+        }
         const target = this.getTargetRef();
         const stats = this.playerStats();
         const playerPosition = vec(this.save.player.position, this.tmpShipPlayer);
@@ -4295,24 +5038,7 @@ export class GameSession {
             this.utilityReadout = t('BEAM OBSTRUCTED');
             return;
         }
-        if (mode === 'mining') {
-            const node = this.asteroids.find((entry) => entry.id === target.id);
-            if (!node || node.remaining <= 0)
-                return;
-            if (!node.scanned) {
-                this.requireScanHint();
-                return;
-            }
-            this.utilityActive = true;
-            this.playerEmissionHeat = Math.max(this.playerEmissionHeat, 180);
-            this.renderer.setUtilityBeam(true, mode, this.save.player.position, node.position);
-            this.extractAsteroid(node, dt, stats.miningRate);
-            if (this.utilitySoundCooldown <= 0) {
-                this.utilitySoundCooldown = 0.16;
-                this.audio.play('mining', 0.34);
-            }
-        }
-        else {
+        {
             const node = this.wreckNodes.find((entry) => entry.id === target.id);
             if (!node || node.remaining <= 0)
                 return;
@@ -4336,37 +5062,8 @@ export class GameSession {
         // the target monitor, so there is nothing extra to pop up here.
         this.renderer.setUtilityBeam(false, this.save.player.mode, this.save.player.position);
     }
-    extractAsteroid(node, dt, rate) {
-        this.lastExtractionAt = this.save.world.time;
-        this.seenWorkingUntil = this.save.world.time + SEEN_WORKING_SECONDS;
-        if (cargoFree(this.save.player) < COMMODITIES.ore.mass + 0.001) {
-            this.utilityReadout = t('CARGO FULL');
-            return;
-        }
-        const current = this.extractionCarry.get(node.id) ?? 0;
-        let next = current + dt * 0.58 * rate;
-        while (next >= 1 && node.remaining > 0) {
-            next -= 1;
-            node.remaining = Math.max(0, node.remaining - 1);
-            this.save.world.depletedAsteroids[node.id] = node.remaining;
-            // Ore is tractored straight into the hold — no pickup to chase. The
-            // monitor's remaining-units count ticks down, so no per-unit toast.
-            this.collectExtraction('ore', 'mining', 1);
-            this.recordClaimMining(node.id, 1);
-            this.handleTutorialEvent('extracted', { nodeId: node.id, commodityId: 'ore', amount: 1, source: 'mining', instanceId: this.activeInstanceId });
-            if (node.remaining <= 0) {
-                this.strikeGoldPocket(node);
-                if (this.save.player.currentTargetId === node.id) {
-                    this.setMonitorStatus(t('DEPOSIT EXHAUSTED'));
-                    this.clearTarget();
-                }
-                this.obstacleGridBuiltAt = -Infinity;
-                break;
-            }
-            if (this.ui.isModalOpen || this.save.player.currentTargetId !== node.id) break;
-        }
-        this.extractionCarry.set(node.id, next);
-    }
+    // Mining is owned exclusively by the drone transaction system.
+    extractAsteroid() { return false; }
     extractWreck(node, dt, rate) {
         this.lastExtractionAt = this.save.world.time;
         this.seenWorkingUntil = this.save.world.time + SEEN_WORKING_SECONDS;
@@ -4404,16 +5101,22 @@ export class GameSession {
         if (rng() >= GOLD_POCKET_CHANCE)
             return;
         const amount = randomInt(rng, GOLD_POCKET_MIN, GOLD_POCKET_MAX);
-        const space = Math.floor(cargoFree(this.save.player) / COMMODITIES.gold.mass);
+        const space = Math.max(0, Math.floor(cargoFree(this.save.player) / COMMODITIES.gold.mass));
         const grant = Math.min(amount, space);
-        if (grant <= 0)
+        if (amount > grant) this.spawnPickup('gold', this.save.player.position, 'mining', amount - grant);
+        if (grant <= 0) {
+            this.ui.pushEvent(t('GOLD FOUND · Free cargo space to collect it'), 'success', 5600);
             return;
+        }
         this.save.player.cargo.gold = (this.save.player.cargo.gold ?? 0) + grant;
         this.ui.pushEvent(t('Gold pocket struck: +{amount} GOLD.', { amount: grant }), 'success', 5600);
         this.audio.play('success', 1.35);
     }
     collectExtraction(commodity, source, amount) {
         this.save.player.cargo[commodity] = (this.save.player.cargo[commodity] ?? 0) + amount;
+        this.recordExtractionProgress(source, amount);
+    }
+    recordExtractionProgress(source, amount) {
         if (source === 'mining') {
             this.save.player.stats.mined += amount;
             const rankMessage = awardCareerProgress(this.save, 'mining', 1, 'frontier-miners');
@@ -5275,6 +5978,7 @@ export class GameSession {
         const route = getRoute(jumpPoint.routeId);
         if (!route || !jumpPoint.destinationSystemId || !LOCATIONS[jumpPoint.destinationLocationId])
             return false;
+        if (!this.requestDroneDeparture('arm-gate', jumpPoint.id)) return false;
         const playerPosition = vec(this.save.player.position, this.tmpGateRelative);
         const normal = this.jumpPointNormal(jumpPoint);
         this.armedJumpPointId = jumpPoint.id;
@@ -5288,6 +5992,7 @@ export class GameSession {
         const route = getRoute(jumpPoint.routeId);
         if (!route || !jumpPoint.destinationSystemId || !LOCATIONS[jumpPoint.destinationLocationId])
             return false;
+        if (!this.requestDroneDeparture('cross-gate', jumpPoint.id)) return false;
         const jump = {
             routeId: route.id,
             fromSystemId: this.save.player.systemId,
@@ -5301,6 +6006,7 @@ export class GameSession {
         this.armedJumpPointId = null;
         this.armedJumpPointSide = 0;
         this.renderer.setArmedJumpPoint?.();
+        this.abandonMiningDrones('system-jump');
         this.galaxyJump = jump;
         this.save.world.pendingJump = { ...jump };
         this.save.world.plannedSystemId ??= jump.toSystemId;
@@ -5380,6 +6086,10 @@ export class GameSession {
         return this.beginGalaxyGateTransition(jumpPoint);
     }
     clearTransientSpace() {
+        this.renderer?.clearDrones?.();
+        this.pdcAssignments?.clear();
+        this.recallPdcDrones('space-cleared');
+        this.pdcLiveThreats?.clear();
         for (const projectile of this.projectiles)
             if (this.projStore.isLive(projectile.slot))
                 this.projStore.free(projectile.slot);
@@ -5442,9 +6152,17 @@ export class GameSession {
             this.disarmGalaxyJump();
             return false;
         }
+        this.recallPdcDrones('system-jump');
+        if (this.hasDeployedPdcDrones()) {
+            // Also handles an imported pending jump: keep simulating returns in
+            // the departure frame before changing the coordinate system.
+            this.galaxyJump = jump;
+            return false;
+        }
         const tutorialArrival = isTutorialActive(this.save);
         this.clearTransientSpace();
         const player = this.save.player;
+        this.abandonMiningDrones('system-jump');
         player.systemId = jump.toSystemId;
         player.dockedAt = undefined;
         const outward = vec(arrival.position).normalize();
@@ -5525,6 +6243,7 @@ export class GameSession {
     }
     toggleHyperdrive() {
         if(this.arena?.run)return;
+        if (this.pendingDroneDeparture) { this.cancelDroneDeparture(); return; }
         if (this.armedJumpPointId) {
             // Gates are physical fly-through links, not another drive toggle.
             // Keep the proximity lock live if the player taps the monitor or
@@ -5557,6 +6276,7 @@ export class GameSession {
             return;
         }
         if (jumpPoint) {
+            if (!this.requestDroneDeparture('hyperdrive')) return;
             this.startGalaxyJump(jumpPoint);
             return;
         }
@@ -5569,7 +6289,9 @@ export class GameSession {
         }
         const player = vec(this.save.player.position);
         const nav = LOCATIONS[this.save.player.navTargetId];
+        if (!this.requestDroneDeparture('hyperdrive')) return;
         this.hyperdriveReturnThrottle = this.save.player.throttle;
+        this.recallMiningDrones('hyperdrive');
         this.autopilot = true;
         this.hyperdriveFx = 'spooling';
         this.hyperdriveSpoolStartedAt = this.save.world.time;
@@ -7815,7 +8537,7 @@ export class GameSession {
     tmpBlastEnd = new THREE.Vector3();
     updateProjectiles(dt) {
         const playerPos = vec(this.save.player.position, this.tmpP3);
-        for(const p of this.projectiles)if(p.kind==='missile'&&p.life>0){const i=p.slot*3;p.stepX=this.projStore.pos[i];p.stepY=this.projStore.pos[i+1];p.stepZ=this.projStore.pos[i+2];}
+        for(const p of this.projectiles)if((p.kind==='missile'||p.kind==='torpedo')&&p.life>0){const i=p.slot*3;p.stepX=this.projStore.pos[i];p.stepY=this.projStore.pos[i+1];p.stepZ=this.projStore.pos[i+2];}
         for (const projectile of this.projectiles) {
             if (projectile.life <= 0)
                 continue;
@@ -7823,7 +8545,8 @@ export class GameSession {
             projectile.life -= stepDt;
             const start = this.projStore.getPos(projectile.slot, this.tmpP0);
             const velocity = this.projStore.getVel(projectile.slot, this.tmpP1);
-            if (projectile.kind === 'missile' && projectile.targetId) {
+            const isMissile = projectile.kind === 'missile' || projectile.kind === 'torpedo';
+            if (isMissile && projectile.targetId) {
                 let targetPosition;
                 if (projectile.targetId === 'player') {
                     targetPosition = this.tmpP4.copy(playerPos);
@@ -7832,6 +8555,11 @@ export class GameSession {
                     const targetShip = this.ships.find((entry) => entry.id === projectile.targetId && entry.hull > 0);
                     if (targetShip)
                         targetPosition = vec(targetShip.position, this.tmpP4);
+                    else {
+                        const drone = this.save.player.droneFleet?.unitsById[projectile.targetId];
+                        if (drone?.hull > 0 && drone.position && drone.state !== 'stowed' && drone.state !== 'destroyed')
+                            targetPosition = this.tmpP4.fromArray(drone.position);
+                    }
                 }
                 if (targetPosition) {
                     guideMissile(velocity,targetPosition.sub(start),projectile,stepDt);
@@ -7853,6 +8581,7 @@ export class GameSession {
                 let bestT = 2;
                 let hitKind;
                 let hitShip;
+                let hitDrone;
                 let hitObstacle;
                 const obstacleResult = this.firstObstacleHitInfo(sweepFrom, end, projectile.ownerId);
                 if (obstacleResult !== undefined && obstacleResult.t < bestT) {
@@ -7865,6 +8594,17 @@ export class GameSession {
                     if (playerT !== undefined && playerT < bestT) {
                         bestT = playerT;
                         hitKind = 'player';
+                    }
+                    const units = this.save.player.droneFleet?.unitsById;
+                    for (const id in units) {
+                        const unit = units[id];
+                        if (unit.type !== 'pdc' || !(unit.hull > 0) || !unit.position
+                            || unit.state === 'stowed' || unit.state === 'destroyed') continue;
+                        const hit = segmentSphereHit(sweepFrom, end, this.tmpP4.fromArray(unit.position),
+                            DRONE_TYPES.pdc.collisionRadius + (isMissile ? 0.8 : 0.12));
+                        if (hit !== undefined && hit < bestT) {
+                            bestT = hit; hitKind = 'drone'; hitDrone = unit;
+                        }
                     }
                 }
                 for (const ship of this.ships) {
@@ -7907,6 +8647,8 @@ export class GameSession {
                     }
                     else if (hitKind === 'ship' && hitShip)
                         this.damageShip(hitShip, projectile.damage, projectile.ownerId, tuple(hitPosition), WEAPONS[projectile.weaponId]);
+                    else if (hitKind === 'drone' && hitDrone)
+                        this.damagePdcDrone(hitDrone.id, projectile.damage, isMissile ? 'missile strike' : 'weapons fire');
                     if(projectile.kind==='mortar' || (projectile.kind==='missile'&&projectile.splashRadius>0)){
                         const radius=projectile.splashRadius??18,amount=projectile.splashDamage??projectile.damage,minimum=projectile.splashMin??0;
                         const blastOrigin=this.tmpBlastStart.copy(hitPosition).addScaledVector(velocity,-0.2/Math.max(1,velocity.length()));
@@ -8679,6 +9421,8 @@ export class GameSession {
         }
         if(this.arena?.run)this.save.arenaRun.damage+=applied.shield+applied.hull;
         if (this.save.player.hull <= 0) {
+            this.abandonMiningDrones('ship-destroyed');
+            this.recallPdcDrones('ship-destroyed');
             this.save.player.hull = 0;
             this.deathTimer = 2.1;
             this.renderer.spawnExplosion(this.save.player.position, false, 1.55);
@@ -8698,6 +9442,11 @@ export class GameSession {
         this.save.player.angularVelocity = [0.3, -0.22, 0.38];
     }
     recoverPlayer() {
+        this.recallPdcDrones('ship-destroyed');
+        if (this.hasDeployedPdcDrones()) {
+            this.deathTimer = SIM_STEP;
+            return;
+        }
         if(this.arena?.run){this.loseArenaRun();return;}
         if (this.arena) {
             this.restartArena();
@@ -9463,9 +10212,21 @@ export class GameSession {
     cleanupEntities() {
         for (let index = this.projectiles.length - 1; index >= 0; index -= 1) {
             if (this.projectiles[index].life <= 0) {
-                this.projStore.free(this.projectiles[index].slot);
+                const projectile = this.projectiles[index];
+                this.pdcAssignments?.delete(projectile.id);
+                const target = projectile.targetMissile;
+                if (target) {
+                    const assignment = this.pdcAssignments?.get(target.id);
+                    // An older round must not release a newer defender's shot.
+                    if (assignment?.round === projectile) this.pdcAssignments.delete(target.id);
+                }
+                this.projStore.free(projectile.slot);
                 this.projectiles.splice(index, 1);
             }
+        }
+        if (this.pdcAssignments) for (const [id, assignment] of this.pdcAssignments) {
+            if (!(assignment?.until > this.save.world.time)
+                || (assignment.round && !(assignment.round.life > 0))) this.pdcAssignments.delete(id);
         }
         for (let index = this.pickups.length - 1; index >= 0; index -= 1) {
             if (this.pickups[index].life <= 0) {
@@ -10756,6 +11517,11 @@ export class GameSession {
         return distance <= (LOCATIONS[locationId].dockRadius ?? 55) ? locationId : undefined;
     }
     dockAt(locationId) {
+        this.recallAllDrones('docking');
+        // Auto-docking retries on later live steps while the fleet flies home.
+        // Its bounded recall clock handles drones that cannot reach the bay.
+        if (this.save.player.droneFleet?.controller?.phase === 'recalling' || this.hasDeployedPdcDrones()) return;
+        this.renderer?.clearDrones?.();
         this.autopilot = false;
         this.afterburning = false;
         this.save.player.systemId = LOCATIONS[locationId].systemId;
@@ -11108,6 +11874,8 @@ export class GameSession {
         const race = this.activeRace;
         if (!race || race.course !== course)
             return;
+        this.recallPdcDrones('race-start');
+        if (this.hasDeployedPdcDrones()) return;
         const racers = Array.isArray(race.racers) ? race.racers : [];
         if (racers.length !== 3)
             return;
@@ -11158,6 +11926,7 @@ export class GameSession {
         this.resetPlayerInterpolation(true);
         this.projectiles = [];
         this.pickups = [];
+        this.pdcAssignments.clear();
         Object.assign(this.activeRace, {
             state: 'countdown',
             startedAt: this.save.world.time + 4,
@@ -11235,6 +12004,96 @@ export class GameSession {
         this.persistSave();
         this.checkTutorialServices();
     }
+    droneServiceQuote(options = {}) {
+        if (!this.save.player.dockedAt) return { ok: false, code: 'not-docked' };
+        if (!droneBayLayoutFor(this.save.player.shipId).length) return { ok: false, code: 'no-bay' };
+        if (!this.save.player.droneFleet?.controller) return { ok: false, code: 'invalid-fleet' };
+        if (!this.dockHasService('repair') && !this.dockHasService('fuel'))
+            return { ok: false, code: 'service-unavailable' };
+        const quote = quoteDroneService(this.save.player, options);
+        if (!quote.ok) return quote;
+        const costs = { repair: 0, replacement: 0, ammo: 0 };
+        for (const line of quote.lines) costs[line.kind === 'rounds' ? 'ammo' : line.kind] += line.cost;
+        const available = (!costs.repair && !costs.replacement || this.dockHasService('repair'))
+            && (!costs.ammo || this.dockHasService('fuel'));
+        return { ...quote, costs, repairCost: costs.repair, replacementCost: costs.replacement,
+            ammoCost: costs.ammo, dockId: this.save.player.dockedAt,
+            canCommit: available && this.dronesSafelyStowed(),
+            unavailableReason: !available ? 'service-unavailable' : !this.dronesSafelyStowed() ? 'drones-deployed' : null };
+    }
+    serviceDrones(options = {}) {
+        if (!options || typeof options !== 'object') return { ok: false, code: 'invalid-options' };
+        const expected = options.expected ?? options.quote ?? options.fingerprint;
+        const quote = this.droneServiceQuote({ fillSlots: options.fillSlots === undefined ? expected?.fillSlots : options.fillSlots });
+        if (!quote.ok) return quote;
+        if (!quote.canCommit) return { ok: false, code: quote.unavailableReason, quote };
+        if (expected?.dockId && expected.dockId !== this.save.player.dockedAt)
+            return { ok: false, code: 'stale-quote', quote };
+        // The module reprices synchronously and checks the supplied fingerprint
+        // before debiting credits or replacing any live fleet/loadout record.
+        const result = commitDroneService(this.save.player, { authorized: true, expected,
+            fillSlots: quote.fillSlots });
+        if (!result.ok) return result;
+        this._statsDirty = true;
+        this.droneServiceState = this.droneServiceQuote();
+        this.ui?.showToast?.(t('Drones serviced · repair {repair} · replacements {replacement} · ammo {ammo}', {
+            repair: formatCredits(quote.costs.repair), replacement: formatCredits(quote.costs.replacement),
+            ammo: formatCredits(quote.costs.ammo),
+        }), 'success', 5000);
+        this.ui?.refreshDock?.(this.save);
+        this.persistSave();
+        return { ...result, costs: quote.costs };
+    }
+    droneBayModeQuote(bayId, mode) {
+        const player = this.save.player;
+        if (!player.dockedAt) return { ok: false, code: 'not-docked' };
+        if (!this.dockHasService('outfitting')) return { ok: false, code: 'service-unavailable' };
+        if (!this.dronesSafelyStowed()) return { ok: false, code: 'drones-deployed' };
+        if (mode !== 'mining' && mode !== 'pdc') return { ok: false, code: 'invalid-mode' };
+        if (!droneBayLayoutFor(player.shipId).some(bay => bay.bayId === bayId))
+            return { ok: false, code: 'invalid-bay' };
+        if (!player.droneFleet?.controller) return { ok: false, code: 'invalid-fleet' };
+        // Validate ownership before staging. Normalizing here would mutate the
+        // live loadout even if configuration is rejected later.
+        const before = quoteDroneService(player, { fillSlots: [] });
+        if (!before.ok) return before;
+        const fit = player.outfitting.loadouts[player.shipId];
+        if (!Array.isArray(fit.droneBays)) return { ok: false, code: 'invalid-drone-bays' };
+        const fleet = { ...player.droneFleet, lockerIds: [...player.droneFleet.lockerIds] };
+        const bays = fit.droneBays.map(bay => ({ ...bay, unitIds: [...bay.unitIds] }));
+        const bay = bays.find(bay => bay.bayId === bayId);
+        if (!bay) return { ok: false, code: 'invalid-bay' };
+        if (bay.mode !== mode) {
+            for (const id of bay.unitIds) if (id !== null) fleet.lockerIds.push(id);
+            bay.mode = mode;
+            bay.unitIds = Array.from({ length: DRONE_BAY_CAPACITY[mode] }, () => {
+                const index = fleet.lockerIds.findIndex(id => fleet.unitsById[id].type === mode);
+                return index < 0 ? null : fleet.lockerIds.splice(index, 1)[0];
+            });
+        }
+        if (validateDroneBays(player.shipId, bays, fleet).length) return { ok: false, code: 'invalid-drone-bays' };
+        const staged = { ...player, droneFleet: fleet, outfitting: { ...player.outfitting,
+            loadouts: { ...player.outfitting.loadouts, [player.shipId]: { ...fit, droneBays: bays } } } };
+        const after = quoteDroneService(staged, { fillSlots: [] });
+        if (!after.ok) return after;
+        return { ok: true, bayId, mode, total: 0, bays, lockerIds: fleet.lockerIds,
+            fingerprint: JSON.stringify([player.dockedAt, before.fingerprint, bayId, mode, after.fingerprint]) };
+    }
+    setDroneBayMode(bayId, mode, expected) {
+        const quote = this.droneBayModeQuote(bayId, mode);
+        if (!quote.ok) return quote;
+        if (expected !== undefined && (!expected?.ok || expected.fingerprint !== quote.fingerprint))
+            return { ok: false, code: 'stale-quote' };
+        const player = this.save.player, fit = player.outfitting.loadouts[player.shipId];
+        if (fit.droneBays.find(bay => bay.bayId === bayId).mode === mode) return { ok: true, code: 'unchanged' };
+        player.droneFleet = { ...player.droneFleet, lockerIds: quote.lockerIds };
+        player.outfitting.loadouts[player.shipId] = { ...fit, droneBays: quote.bays };
+        this._statsDirty = true;
+        this.droneServiceState = this.droneServiceQuote();
+        this.ui?.refreshDock?.(this.save);
+        this.persistSave();
+        return { ok: true, code: 'mode-changed', bayId, mode };
+    }
     previewOutfitting(shipId, draft, options = {}) {
         return quoteOutfitting(this.save.player, shipId, draft, {
             ...options,
@@ -11251,6 +12110,7 @@ export class GameSession {
             this.ui.showToast?.(t('Outfitting is not available at this dock.'), 'warning');
             return { ok: false, code: 'service-unavailable' };
         }
+        if (!this.dronesSafelyStowed()) return { ok: false, code: 'drones-deployed' };
         // Accept applyOutfitting(quote) as well as the UI's
         // applyOutfitting(shipId, draft, options) shape.
         let targetShipId = shipId;
@@ -11289,6 +12149,8 @@ export class GameSession {
             this.ui.showToast?.(result.code === 'stale-quote' ? t('The fitting changed; review and apply again.') : t('Fitting could not be applied.'), 'warning');
             return { ...result, quote };
         }
+        this.save.player.droneFleet = normalizeDroneFleet(this.save.player.droneFleet,
+            this.save.player.outfitting.loadouts);
         this._statsDirty = true;
         // Matching racks keep their magazine. A newly fitted ordnance type is
         // deliberately empty until the separate refill service loads it.
@@ -11355,6 +12217,7 @@ export class GameSession {
             this.ui.showToast(t('That hull is not for sale at this location.'), 'warning');
             return { ok: false, code: 'not-for-sale' };
         }
+        if (!this.dronesSafelyStowed()) return { ok: false, code: 'drones-deployed' };
         const ship = SHIPS[shipId];
         if (this.save.player.shipId === shipId)
             return { ok: false, code: 'already-owned' };
@@ -11374,6 +12237,11 @@ export class GameSession {
             this.ui.showToast(t('Ship trade changed; review it again.'), 'warning');
             return result;
         }
+        this.abandonMiningDrones('ship-changed');
+        this.recallPdcDrones('ship-changed');
+        this.renderer?.clearDrones?.();
+        this.save.player.droneFleet = normalizeDroneFleet(this.save.player.droneFleet,
+            this.save.player.outfitting.loadouts);
         this._statsDirty = true;
         this.ui.setCockpitShip(shipId);
         this.initializeCommissionedShipState(this.playerStats());
@@ -11575,6 +12443,7 @@ export class GameSession {
         this.renderer.syncShips(this.ships, alpha);
         this.renderer.syncProjectiles(this.projectiles, this.projStore, alpha);
         this.renderer.syncPickups(this.pickups, this.pickupStore, alpha);
+        this.renderer.syncDrones?.(this.save.player.droneFleet, this.miningDroneContext, alpha);
         this.renderer.render();
         this.renderFrameCount = (this.renderFrameCount ?? 0) + 1;
         if (!this.save.player.dockedAt && now - this.lastHudUpdate > 42) {
@@ -11643,6 +12512,7 @@ export class GameSession {
         const target = this.getTargetRef();
         const launcherMagazines = launcherMagazineEntries(this.save.player);
         const selectedLauncher = launcherMagazines.find((entry) => entry.selected);
+        const drones = this.miningDroneHud();
         let hudTarget;
         if (target) {
             // Project the exact rendered transform. Moving contacts are drawn
@@ -11888,6 +12758,8 @@ export class GameSession {
             patrolReply: this.patrolReplyActive(),
             race: this.raceHud(),
             weapon: this.weaponHud(),
+            drones,
+            miningDrones: drones,
             // Radar ring calibration as fractions of the outer (radarRange) ring:
             // [exposure, scan range, full horizon]. The inner ring shows how far
             // NPC sensors can currently resolve the player: their full horizon
