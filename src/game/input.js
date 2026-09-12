@@ -84,6 +84,7 @@ export class InputManager {
         this.keys.delete(event.code);
     };
     onBlur = () => {
+        this.cancelStick?.();
         this.keys.clear();
         this.pressed.clear();
         this.touchHeld.clear();
@@ -345,20 +346,27 @@ export class InputManager {
                 knob.style.left = '50%';
                 knob.style.top = '50%';
             };
+            this.cancelStick = centerStick;
             const moveStick = (event) => {
                 const rect = stick.getBoundingClientRect();
                 const scale = stick.offsetWidth > 0 ? rect.width / stick.offsetWidth : 1;
                 const cx = rect.left + rect.width / 2;
                 const cy = rect.top + rect.height / 2;
                 const halfTravel = Math.max(1, (stick.offsetWidth - knob.offsetWidth) / 2);
-                const dx = clamp((event.clientX - cx) / scale, -halfTravel, halfTravel);
-                const dy = clamp((event.clientY - cy) / scale, -halfTravel, halfTravel);
-                this.joystickX = dx / halfTravel;
-                this.joystickY = dy / halfTravel;
+                let dx = (event.clientX - cx) / scale;
+                let dy = (event.clientY - cy) / scale;
+                const distance = Math.hypot(dx, dy);
+                const travel = Math.min(distance, halfTravel);
+                if (distance > 0) { dx *= travel / distance; dy *= travel / distance; }
+                const strength = Math.max(0, (travel / halfTravel - 0.08) / 0.92);
+                this.joystickX = travel ? dx / travel * strength : 0;
+                this.joystickY = travel ? dy / travel * strength : 0;
                 knob.style.left = `calc(50% + ${dx}px)`;
                 knob.style.top = `calc(50% + ${dy}px)`;
             };
             this.addTouchListener(stick, 'pointerdown', (event) => {
+                if (stickPointer !== undefined) return;
+                event.preventDefault();
                 stickPointer = event.pointerId;
                 stick.setPointerCapture(event.pointerId);
                 moveStick(event);
@@ -373,6 +381,7 @@ export class InputManager {
             };
             this.addTouchListener(stick, 'pointerup', releaseStick);
             this.addTouchListener(stick, 'pointercancel', releaseStick);
+            this.addTouchListener(stick, 'lostpointercapture', releaseStick);
         }
     }
     keyAxis(positive, negative) {

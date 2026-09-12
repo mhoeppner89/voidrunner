@@ -1,4 +1,11 @@
 :root {
+  --console-brass: #a58b58;
+  --console-brass-light: #cfb67a;
+  --console-face: #17334c;
+  --console-recess: #020a16;
+  --console-edge: #516374;
+  --console-screw: #201b13;
+
   color-scheme: dark;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   /* Base palette (touch UI + generic UI). */
@@ -3834,36 +3841,6 @@ html[lang="de"] .comms-bar.story::after {
      2× CSS size (dpr cap), and nearest-neighbor downscaling dropped pixel
      rows through the distance labels — the "distorted" text on the radar
      (user report). Smooth downscale keeps the disc crisp and text legible. */
-}
-
-.screen-radar-status {
-  position: absolute;
-  z-index: 2;
-  left: 4%;
-  right: 4%;
-  bottom: 1%;
-  overflow: hidden;
-  padding: 0.08rem 0.18rem;
-  color: #91c6bd;
-  background: rgba(2, 9, 18, 0.78);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: clamp(10px, 0.68vw, 11px);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  line-height: 1.15;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  pointer-events: none;
-  text-shadow: 0 0 5px rgba(2, 8, 20, 0.95);
-}
-
-.screen-radar-status[data-tone="warning"] {
-  color: #e0ba68;
-}
-
-.screen-radar-status[data-tone="danger"] {
-  color: #ff816e;
 }
 
 /* Monitor tickers: thin single-line event feeds that replace the in-flight
@@ -14795,3 +14772,113 @@ button.primary,
 .touch-fire:disabled { opacity: 0.5; }
 .screen-drone-telemetry > div:empty { display: none; }
 .drone-service-card details { margin-top: 0.6rem; }
+
+/* Cockpit controls: recessed instruments with clear, consistent touch travel. */
+.touch-left, .touch-right { transform:none; gap:8px; bottom:max(8px,env(safe-area-inset-bottom)); }
+.touch-left { left:max(8px,env(safe-area-inset-left)); }
+.touch-right { right:max(8px,env(safe-area-inset-right)); }
+.touch-left .touch-stick, .touch-left .touch-throttle { margin-left:0; }
+.touch-left .touch-stick {
+  width:clamp(76px,11vw,108px); height:clamp(76px,11vw,108px);
+  border:3px solid var(--void-gold); border-radius:50%; touch-action:none;
+  background:radial-gradient(circle, var(--void-navy) 48%,var(--void-cobalt) 70%,var(--void-navy) 72%);
+  box-shadow:inset 0 4px 10px #000,0 2px 3px #000;
+}
+.touch-stick .touch-stick-knob { width:42px; height:42px; border-radius:50%; border:2px solid var(--void-cream); background:radial-gradient(circle at 40% 30%,var(--void-cobalt),var(--void-navy)); box-shadow:0 3px 5px #000; }
+.touch-left .touch-throttle { width:44px; height:90px; margin-left:12px; border:2px solid var(--void-gold); border-radius:5px; background:repeating-linear-gradient(to top,var(--void-navy) 0 14px,var(--void-muted) 15px,var(--void-navy) 16px); }
+.touch-right .touch-fire, .touch-right .touch-missile, .touch-right .touch-launcher-cycle, .touch-controls .touch-boost {
+  border:2px solid var(--void-gold); border-radius:8px; color:var(--void-cream); background:linear-gradient(var(--void-cobalt),var(--void-navy));
+  box-shadow:inset 0 2px 1px #ffffff40, inset 0 -4px 3px #0009,0 2px 4px #000; opacity:1;
+}
+.touch-right .touch-fire { width:80px; height:64px; display:flex; flex-direction:column; gap:2px; }
+.touch-right .touch-fire svg { width:28px; height:28px; }
+.touch-right #touch-drone-label { font-size:11px; letter-spacing:.04em; }
+.touch-right .touch-missile { width:48px; height:48px; }
+.touch-right .touch-launcher-cycle { width:44px; min-width:44px; height:48px; }
+.touch-secondary-row { gap:4px; }
+.touch-controls .touch-boost { width:48px; height:44px; }
+.touch-controls button:active, .touch-controls button.is-active { box-shadow:inset 0 3px 6px #000; filter:brightness(1.3); }
+.touch-controls button:disabled { opacity:.45; }
+.touch-right .touch-fire.is-mining { color:var(--void-gold); }
+.touch-right .touch-fire.is-salvage { color:var(--void-cyan); }
+.cockpit-screen-radar .radar-heading { order:2; flex:0 0 22px; min-height:22px; padding:2px 4px; font-size:clamp(9px,1.1vw,14px); letter-spacing:0; border-top:1px solid var(--void-cyan); background:var(--void-navy); }
+.cockpit-screen-radar .radar-screen-wrap { flex:1; min-height:0; }
+#screen-drone-losses:empty { display:none; }
+#dock-screen .service-card { min-height:0; padding:12px; gap:8px; }
+#dock-screen .service-card h3 { margin:0; font-size:18px; }
+#dock-screen .service-card p { margin:4px 0; font-size:14px; line-height:1.4; }
+#dock-screen .service-card button { min-height:44px; }
+.simple-outfitting > header,.simple-outfitting > nav { padding:5px 10px; gap:6px; }
+.simple-fit-scroll .fit-slot { padding:8px 10px; gap:3px; margin-bottom:6px; }
+@media (pointer:coarse) { .hud-corner-buttons button { min-width:44px; min-height:44px; border-radius:5px; } }
+.cockpit-screen-radar .radar-heading { position:absolute; top:auto; bottom:0; left:0; right:0; height:22px; box-sizing:border-box; z-index:2; }
+.cockpit-screen-radar .radar-screen-wrap { inset:2% 4% 24px; }
+.touch-controls .touch-boost, .touch-right .touch-missile, .touch-right .touch-fire { padding:4px; }
+.touch-controls .touch-boost svg, .touch-right .touch-missile svg { width:28px; height:28px; flex-shrink:0; }
+#dock-screen .compact-service { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:5px 12px; }
+#dock-screen .compact-service > .eyebrow { display:none; }
+#dock-screen .compact-service > h3 { grid-column:1; grid-row:1; align-self:center; }
+#dock-screen .compact-service > button { grid-column:2; grid-row:1; margin:0; }
+#dock-screen .compact-service > .service-bars, #dock-screen .compact-service > details { grid-column:1 / -1; }
+#dock-screen .compact-service summary { min-height:28px; font-size:14px; cursor:pointer; }
+.touch-left .touch-stick { width:clamp(76px,calc(96px * var(--touch-scale,1)),min(12vw,120px)); height:clamp(76px,calc(96px * var(--touch-scale,1)),min(12vw,120px)); }
+.touch-right .touch-fire { width:clamp(64px,calc(80px * var(--touch-scale,1)),12vw); height:clamp(48px,calc(64px * var(--touch-scale,1)),80px); }
+.touch-right .touch-missile { width:clamp(44px,calc(48px * var(--touch-scale,1)),56px); height:clamp(44px,calc(48px * var(--touch-scale,1)),56px); }
+.title-tilt button[aria-pressed="true"] { border-color:var(--void-gold); color:var(--void-gold); }
+.touch-right .touch-fire { align-items:center; justify-content:center; }
+.touch-right #touch-drone-label { margin:0; }
+
+/* Radar contains navigation only; identity controls live in the ship menu. */
+.cockpit-screen-radar .radar-screen-wrap { inset:2% 4%; }
+.touch-secondary-row:has(> .is-hidden):not(:has(> :not(.is-hidden))) { display:none; }
+
+.touch-right .touch-missile.is-mining { color:var(--void-gold); width:80px; }
+.touch-right .touch-missile.is-salvage { color:var(--void-cyan); }
+.touch-utility-label { font-size:11px; letter-spacing:0; }
+
+/* Painted bezel and live instruments share one viewport and banking transform. */
+.cockpit-instruments {
+  position:absolute; inset:-1.2%; pointer-events:none;
+  transform:translate3d(var(--cockpit-shift-x),var(--cockpit-shift-y),0) rotate(var(--cockpit-roll)) scale(var(--cockpit-zoom));
+  transform-origin:50% 72%;
+}
+.cockpit-instruments .cockpit-art { inset:0; background-size:100% 100%; transform:none; }
+.cockpit-instruments .cockpit-screen { transform:none; }
+.cockpit-instruments .cockpit-screen-own { left:18.8%; top:71.2%; width:16.8%; height:22.6%; }
+.cockpit-instruments .cockpit-screen-radar { left:42.1%; top:71.2%; width:15.2%; height:23.2%; }
+.cockpit-instruments .cockpit-screen-target { left:63.6%; top:71.2%; width:17%; height:22.6%; }
+@media (max-width:900px), (pointer:coarse) { .cockpit-instruments { inset:-2.4%; } }
+@media (max-width:720px) and (orientation:landscape) { .cockpit-instruments { inset:-7.77% -4.6%; } }
+/* At scale 1.3 the steering well reaches the own-display bezel. */
+.touch-left .touch-stick {
+  width:calc((16.6vw - max(8px,env(safe-area-inset-left))) * var(--touch-scale,1) / 1.3);
+  height:calc((16.6vw - max(8px,env(safe-area-inset-left))) * var(--touch-scale,1) / 1.3);
+  min-width:76px; min-height:76px;
+}
+.touch-stick .touch-stick-knob { width:21px; height:21px; }
+@media (max-width:720px) and (orientation:landscape) {
+ .touch-left .touch-stick {
+  width:calc((15.25vw - max(8px,env(safe-area-inset-left))) * var(--touch-scale,1) / 1.3);
+  height:calc((15.25vw - max(8px,env(safe-area-inset-left))) * var(--touch-scale,1) / 1.3);
+ }
+}
+
+@media (min-width:901px) and (pointer:fine) {
+ .touch-left .touch-stick { width:calc((17.3vw - 8px) * var(--touch-scale,1) / 1.3); height:calc((17.3vw - 8px) * var(--touch-scale,1) / 1.3); }
+}
+
+/* Hyperdrive is mounted in the centre console, above the radar bezel. */
+#hyperdrive-card {
+  top:63.7%; width:18%; min-width:124px; max-width:260px;
+  height:clamp(26px,5.8vh,32px); min-height:26px;
+  padding:2px 12px; border:3px ridge var(--console-brass); border-radius:3px;
+  background:linear-gradient(180deg,var(--console-face) 0%,var(--void-navy) 38%,var(--console-recess) 100%);
+  box-shadow:0 2px 2px #000,inset 0 2px 4px #000,inset 0 -1px 0 var(--console-edge);
+}
+#hyperdrive-card::before {
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(circle at 5px 50%,var(--console-screw) 1px,var(--console-brass-light) 2px,transparent 3px),radial-gradient(circle at calc(100% - 5px) 50%,var(--console-screw) 1px,var(--console-brass-light) 2px,transparent 3px);
+}
+#hyperdrive-card b { font-size:clamp(10px,1.45vw,14px); letter-spacing:.1em; }
+#hyperdrive-card:hover,#hyperdrive-card:focus-visible { border-color:var(--console-brass); box-shadow:0 2px 2px #000,inset 0 2px 4px #000,inset 0 -1px 0 var(--console-edge); }
+#hyperdrive-card[data-hyperdrive-ready="true"] { border-color:var(--console-brass-light); box-shadow:0 2px 2px #000,inset 0 2px 4px #000,0 0 9px #f1c97880; }

@@ -12385,6 +12385,8 @@ export class GameSession {
             location.reload();
     }
     syncTiltSteering(useTilt) {
+        this.input.onBlur();
+        this.tiltRequest = (this.tiltRequest ?? 0) + 1;
         if (useTilt) {
             void this.activateTiltSteering({ recalibrate: true });
         }
@@ -12397,9 +12399,14 @@ export class GameSession {
         }
     }
     async activateTiltSteering({ alreadyGranted = false, recalibrate = false } = {}) {
+        const request = this.tiltRequest = (this.tiltRequest ?? 0) + 1;
         const permitted = await this.input.enableTilt(alreadyGranted);
+        if (request !== this.tiltRequest) {
+            if (this.save.settings.steering === 'stick') this.input.disableTilt();
+            return false;
+        }
         const sampled = permitted ? await this.input.waitForTiltSample() : false;
-        if (!this.active)
+        if (!this.active || request !== this.tiltRequest)
             return false;
         let neutral;
         if (sampled && (recalibrate || !this.input.tiltCalibrated))
@@ -12776,7 +12783,6 @@ export class GameSession {
             broadcasting: this.playerIdentityBroadcasting(),
             signatureRange: this.playerPhysicalSignatureRange(),
             signatureBand: signatureBand(this.playerPhysicalSignatureRange(), NPC_SENSOR_RANGE),
-            stealthStatus: this.stealthHudStatus(),
             contacts: this.radarContacts(),
             // Active search sweeps (see searchRings): colored rings at
             // last-known-position anchors so a hunt near the pilot shows on the

@@ -355,6 +355,7 @@ const actions = {
     openMap: () => session?.openMap(),
     openShipMenu: () => session?.openShipMenu(),
     weaponCycle: () => session?.cycleWeapon(),
+    toggleTransponder: () => session?.toggleTransponder(),
     toggleTurrets: () => session?.toggleTurrets(),
     toggleMiningDrones: () => session?.toggleMiningDrones(),
     abandonDrones: () => session?.abandonDrones(),

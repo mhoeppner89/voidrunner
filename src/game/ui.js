@@ -324,7 +324,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.8.2a';
+const GAME_VERSION = '0.8.2f';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -772,11 +772,12 @@ export class GameUI {
     }
     shellMarkup() {
         return `
-      <main id="game-shell" class="steering-tilt">
+      <main id="game-shell">
         <div id="viewport"></div>
         <div class="global-crt-overlay" aria-hidden="true"></div>
         <section id="hud" class="hud is-hidden" aria-label="${t('Cockpit heads-up display')}">
           <div class="cockpit-vignette" aria-hidden="true"></div>
+          <div class="cockpit-instruments">
           <div class="cockpit-art" aria-hidden="true"></div>
           <div class="cockpit-glass" aria-hidden="true"></div>
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="${t('Own ship status display; tap to open ship menu')}">
@@ -785,8 +786,7 @@ export class GameUI {
             <div class="screen-ship-layout"><div class="screen-flight"><div><span>${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em><small id="screen-own-launcher"></small><small id="screen-own-drone-pdc" class="is-hidden"></small></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i><em id="screen-own-energy-value">72</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">185</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="${t('Radar display; tap to open navigation map')}">
-            <div class="screen-heading radar-heading" id="screen-radar-transponder" data-touch-action="transponder" role="button" tabindex="0" title="${t('Transponder — press B')}">${t('TRANSPONDER ON')}</div>
-            <div class="radar-screen-wrap"><canvas id="radar" width="220" height="220" role="button" tabindex="0" aria-label="${t('Open navigation map')}"></canvas><div id="screen-radar-status" class="screen-radar-status" data-tone="clear">${t('NO ACTIVE TRACKS')}</div></div>
+            <div class="radar-screen-wrap"><canvas id="radar" width="220" height="220" role="button" tabindex="0" aria-label="${t('Open navigation map')}"></canvas></div>
           </div>
           <div class="cockpit-screen cockpit-screen-target" data-touch-action="targetNext" aria-label="${t('Target status display; tap to cycle targets')}">
             <div class="screen-heading"><span>${t('TARGET STATUS')}</span><b id="screen-target-name">${t('NO LOCK')}</b></div>
@@ -797,6 +797,7 @@ export class GameUI {
           </div>
           <button type="button" id="hyperdrive-card" class="cockpit-identity" data-touch-action="autopilot" aria-label="${t('Hyperdrive: engage jump to nav point')}"><b>HYPERDRIVE</b></button>
 
+          </div>
           <div id="target-bracket" class="target-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
           <div id="target-edge-pointer" class="target-edge-pointer is-hidden" aria-hidden="true"><i></i><span></span></div>
           <div class="reticle" aria-hidden="true"><span></span><span></span><span></span><span></span><b></b></div>
@@ -842,10 +843,11 @@ export class GameUI {
               <button data-ui-command="options">${t('OPTIONS')}</button>
             </div>
             <div class="title-controls">
-              <span class="title-control-touch">${t('TOUCH: tilt to steer · THRUST · AFTERBURN · FIRE · SECONDARY TOOL')}</span>
+              <span class="title-control-touch">${t('TOUCH: joystick or tilt · THRUST · AFTERBURN · FIRE · SECONDARY TOOL')}</span>
               <span class="title-control-keyboard">${t('KEYBOARD: WASD · Q/E · R/F · Space · T · J')}</span>
             </div>
             <div class="title-tilt">
+              <button data-ui-command="use-stick">${t('JOYSTICK')}</button>
               <button data-ui-command="enable-tilt">${t('ENABLE TILT STEER')}</button>
               <button data-ui-command="calibrate-tilt">${t('SET NEUTRAL')}</button>
             </div>
@@ -1159,16 +1161,6 @@ export class GameUI {
             event.preventDefault();
             this.actions?.openMap();
         });
-        // The radar heading is the transponder toggle (tap toggles on touch;
-        // B toggles on keyboard). Enter/Space activate it as a proper button
-        // for keyboard-only players.
-        const transponderToggle = this.root.querySelector('#screen-radar-transponder');
-        transponderToggle?.addEventListener('keydown', (event) => {
-            if (event.key !== 'Enter' && event.key !== ' ')
-                return;
-            event.preventDefault();
-            this.actions?.toggleTransponder();
-        });
         // Tapping the OWN SHIP STATUS monitor opens the paused ship menu
         // (active contracts, cargo hold, account) — the radar's nav-map twin.
         const ownScreen = this.root.querySelector('.cockpit-screen-own');
@@ -1324,6 +1316,9 @@ export class GameUI {
                 // the choice and reloads the page in the new language.
                 this.actions?.setSetting('language', getLanguage() === 'de' ? 'en' : 'de');
                 break;
+            case 'use-stick':
+                this.actions?.setSetting('steering', 'stick');
+                break;
             case 'enable-tilt':
                 void this.actions?.enableTilt().then((active) => this.showToast(active ? 'Tilt steering engaged. Set neutral if the ship drifts.' : 'Tilt steering unavailable (no gyroscope, or permission denied).', active ? 'success' : 'warning', 4200));
                 break;
@@ -1367,6 +1362,10 @@ export class GameUI {
                 break;
             case 'close-chat':
                 this.closeChatLog();
+                break;
+            case 'transponder-toggle':
+                this.actions?.toggleTransponder?.();
+                this.showShipMenu();
                 break;
             case 'turret-toggle':
                 this.actions?.toggleTurrets?.();
@@ -2883,8 +2882,8 @@ export class GameUI {
         )).join('') || `<label>${t('MISSILES')} <i><b style="width:0%"></b></i><em>0/0</em></label>`;
         return `
       <div class="service-grid">
-        ${repairBay ? `<article class="service-card"><span class="eyebrow">${t('HULL INTEGRITY')}</span><h3>${t('Repair bay')}</h3><div class="service-bars"><label>${t('HULL INTEGRITY')} <i><b style="width:${percent(this.save.player.hull, stats.hull)}%"></b></i><em>${Math.ceil(this.save.player.hull)}/${stats.hull}</em></label></div><p>${t('Replace ablative plate, patch pressure structure, and clear combat faults.')}</p><button class="primary" data-ui-command="repair" ${repairs <= 0 ? 'disabled' : ''}>${t('REPAIR')} · ${formatCredits(repairs)}</button></article>` : ''}
-        ${fuelDepot ? `<article class="service-card"><span class="eyebrow">${t('CONSUMABLES')}</span><h3>${t('Fuel and ordnance')}</h3><div class="service-bars"><label>${t('FUEL')} <i><b style="width:${percent(this.save.player.fuel, stats.fuel)}%"></b></i><em>${Math.ceil(this.save.player.fuel)}/${stats.fuel}</em></label>${ordnanceBars}</div><p>${t('Refill afterburner propellant, mounted-rack ordnance, and installed gun magazines.')}</p><button class="primary" data-ui-command="refuel" ${refill <= 0 ? 'disabled' : ''}>${t('REFILL')} · ${formatCredits(refill)}</button></article>` : ''}
+        ${repairBay ? `<article class="service-card compact-service"><span class="eyebrow">${t('HULL INTEGRITY')}</span><h3>${t('Repair bay')}</h3><div class="service-bars"><label>${t('HULL INTEGRITY')} <i><b style="width:${percent(this.save.player.hull, stats.hull)}%"></b></i><em>${Math.ceil(this.save.player.hull)}/${stats.hull}</em></label></div><details><summary>${t('Details')}</summary><p>${t('Replace ablative plate, patch pressure structure, and clear combat faults.')}</p></details><button class="primary" data-ui-command="repair" ${repairs <= 0 ? 'disabled' : ''}>${t('REPAIR')} · ${formatCredits(repairs)}</button></article>` : ''}
+        ${fuelDepot ? `<article class="service-card compact-service"><span class="eyebrow">${t('CONSUMABLES')}</span><h3>${t('Fuel and ordnance')}</h3><div class="service-bars"><label>${t('FUEL')} <i><b style="width:${percent(this.save.player.fuel, stats.fuel)}%"></b></i><em>${Math.ceil(this.save.player.fuel)}/${stats.fuel}</em></label>${ordnanceBars}</div><details><summary>${t('Details')}</summary><p>${t('Refill afterburner propellant, mounted-rack ordnance, and installed gun magazines.')}</p></details><button class="primary" data-ui-command="refuel" ${refill <= 0 ? 'disabled' : ''}>${t('REFILL')} · ${formatCredits(refill)}</button></article>` : ''}
         ${this.renderDroneServices()}
         <article class="service-card danger-service"><span class="eyebrow">${t('INSURANCE NOTE')}</span><h3>${t('Emergency recovery')}</h3><p>${t('A destroyed ship is towed to the last safe dock. The service retains cargo, mission bonds, and a percentage of liquid credit.')}</p><b>${t('FLY WITH A RESERVE.')}</b></article>
       </div>
@@ -3642,23 +3641,6 @@ export class GameUI {
                 standoff.title = '';
         }
         this.drawRadar(model.contacts, model.radarRings, model.searchRings, model.radarWarp);
-        const transponderChip = this.el('#screen-radar-transponder');
-        if (transponderChip) {
-            const band = t(String(model.signatureBand ?? 'low').toUpperCase());
-            transponderChip.textContent = model.transponder
-                ? t('ID LIVE · SIG {band}', { band })
-                : t('ID DARK · SIG {band}', { band });
-            transponderChip.classList.toggle('is-dark', !model.transponder);
-            transponderChip.dataset.signature = model.signatureBand ?? 'low';
-            transponderChip.title = model.transponder
-                ? t('Identity broadcasting · physical signature {range} km · press B to go dark', { range: Math.round(model.signatureRange ?? 0) })
-                : t('Identity hidden · physical signature {range} km · press B to transmit', { range: Math.round(model.signatureRange ?? 0) });
-        }
-        const radarStatus = this.el('#screen-radar-status');
-        if (radarStatus) {
-            radarStatus.textContent = model.stealthStatus?.label ?? t('NO ACTIVE TRACKS');
-            radarStatus.dataset.tone = model.stealthStatus?.tone ?? 'clear';
-        }
         setText('#screen-own-shield-value', Math.ceil(model.shield).toString());
         setText('#screen-own-energy-value', Math.ceil(model.energy).toString());
         setText('#screen-own-hull-value', Math.ceil(model.hull).toString());
@@ -3755,8 +3737,8 @@ export class GameUI {
         if (visible) {
             setText('#screen-drone-bays', t('{count} DRONES · +{inbound} ORE', { count: drones.operational ?? 0, inbound: drones.inboundCargo ?? 0 }));
             setText('#screen-drone-state', t(drones.phase === 'running' ? 'MINING' : drones.phase === 'recalling' ? 'RETURNING TO BAY' : 'READY TO MINE'));
-            setText('#screen-drone-cargo', t('ORE {ore} · HOLD {cargo}/{capacity}', { ore: drones.remaining ?? '—', cargo: Math.round(model.cargo ?? 0), capacity: model.cargoCapacity ?? '—' }));
-            setText('#screen-drone-losses', drones.phase === 'idle' ? drones.action?.label ?? '' : '');
+            setText('#screen-drone-cargo', t('HOLD {cargo}/{capacity}', { cargo: Math.round(model.cargo ?? 0), capacity: model.cargoCapacity ?? '—' }));
+            setText('#screen-drone-losses', drones.phase === 'idle' && !drones.action?.ok ? drones.action?.label ?? '' : '');
             this.el('#screen-drone-telemetry').title = `${t('DRONE BAYS')} · M: ${t('MINING')} · P: PDC\n${drones.readout ?? ''}\n${t('Inbound cargo reserves hold space until delivery.')}`;
         }
         let ammo = 0, capacity = 0, operational = 0, pdcBays = 0;
@@ -3791,10 +3773,7 @@ export class GameUI {
         // lightweight callers; normal HUD updates pass the full target model.
         const kindString = typeof target === 'string';
         const kind = kindString ? target : target?.kind;
-        const contextualMode = kindString
-            ? kind === 'asteroid' ? 'mining' : kind === 'wreck' ? 'salvage' : mode
-            : mode;
-        const mining = kind === 'asteroid' && contextualMode === 'mining';
+        const mining = kind === 'asteroid';
         // Target selection can change drone availability before the next full HUD refresh.
         let liveDrones;
         try { liveDrones = this.actions?.miningDrones?.(); } catch { /* Keep the fallback for stale session callbacks. */ }
@@ -3802,7 +3781,7 @@ export class GameUI {
         const droneMining = mining;
         const droneAction = drones.action;
         const droneLabel = t(drones.phase === 'running' ? 'RECALL' : drones.phase === 'recalling' ? 'RETURNING' : 'MINE');
-        const salvage = kind === 'wreck' && contextualMode === 'salvage';
+        const salvage = kind === 'wreck';
         const utility = mining || salvage;
         const surrendered = kind === 'ship' && Boolean(target.surrendered) && !target.captured;
         const capture = surrendered && Boolean(target.captureAvailable);
@@ -3810,33 +3789,35 @@ export class GameUI {
         const missileCurrent = Math.max(0, Math.floor(Number(launcher?.current) || 0));
         const missileCapacity = Math.max(0, Math.floor(Number(launcher?.capacity) || 0));
         const missileAction = !utility && !surrendered;
-        fire.classList.toggle('is-mining', mining);
-        fire.classList.toggle('is-salvage', salvage);
-        fire.classList.toggle('is-surrendered', surrendered);
-        missile.classList.toggle('is-scan', utility);
-        missile.classList.remove('is-mining');
-        fire.classList.toggle('is-recalling', droneMining && drones.phase === 'recalling');
+        fire.classList.remove('is-mining', 'is-salvage', 'is-surrendered', 'is-recalling');
+        missile.classList.remove('is-hidden', 'is-scan');
+        missile.classList.toggle('is-mining', mining);
+        missile.classList.toggle('is-salvage', salvage);
+        missile.classList.toggle('is-recalling', droneMining && drones.phase === 'recalling');
         missile.classList.toggle('is-capture', surrendered);
         missile.classList.toggle('is-empty', missileAction && missileCurrent <= 0);
-        fire.dataset.touchAction = droneMining ? 'miningDrones' : utility ? 'utility' : 'fire';
-        missile.dataset.touchAction = droneMining ? 'scan' : utility ? 'scan' : surrendered ? 'capture' : 'missile';
-        // Drones use the existing edge missile command. InputManager owns the
-        // edge; do not also invoke a callback from click/pointerup here.
-        fire.disabled = droneMining && droneAction?.ok !== true;
-        fire.title = droneMining ? droneAction?.label ?? t('NO MINING DRONES') : '';
-        missile.disabled = surrendered && !capture;
+        fire.dataset.touchAction = 'fire';
+        missile.dataset.touchAction = droneMining ? 'miningDrones' : salvage ? 'utility' : surrendered ? 'capture' : 'missile';
+        fire.disabled = false;
+        fire.title = '';
+        missile.disabled = droneMining ? droneAction?.ok !== true : surrendered && !capture;
         const showIcon = (button, name) => {
             for (const icon of button.querySelectorAll('svg'))
                 icon.classList.toggle('is-hidden', icon.dataset.icon !== name);
         };
-        showIcon(fire, droneMining ? 'none' : mining ? 'mine' : salvage ? 'salvage' : 'fire');
-        showIcon(missile, droneMining ? 'scan' : utility ? 'scan' : capture || surrendered ? 'capture' : 'missile');
-        const droneText = this.el('#touch-drone-label');
-        if (droneText) {
-            droneText.classList.toggle('is-hidden', !droneMining);
-            droneText.textContent = droneMining ? droneLabel : '';
+        showIcon(fire, 'fire');
+        showIcon(missile, droneMining ? 'none' : salvage ? 'salvage' : surrendered ? 'capture' : 'missile');
+        const fireText = this.el('#touch-drone-label');
+        if (fireText) { fireText.classList.remove('is-hidden'); fireText.textContent = t('FIRE'); }
+        let utilityText = missile.querySelector('.touch-utility-label');
+        if (!utilityText) {
+            utilityText = document.createElement('span');
+            utilityText.className = 'touch-utility-label';
+            missile.append(utilityText);
         }
-        missile.title = utility ? t('SCAN') : '';
+        utilityText.textContent = droneMining ? droneLabel : '';
+        utilityText.classList.toggle('is-hidden', !droneMining);
+        missile.title = droneMining ? droneAction?.label ?? droneLabel : salvage ? t('Salvage — hold') : '';
         const launcherCycle = this.el('#touch-launcher-cycle');
         const missileCount = this.el('#touch-missile-count');
         const launcherCode = this.el('#touch-launcher-code');
@@ -3857,9 +3838,9 @@ export class GameUI {
         }
         if (launcherCode)
             launcherCode.textContent = launcher?.displayCode ?? launcher?.shortCode ?? '—';
-        fire.setAttribute('aria-label', droneMining ? droneAction?.label ?? droneLabel : mining ? t('Mine — hold') : salvage ? t('Salvage — hold') : t('Fire — hold'));
-        missile.setAttribute('aria-label', droneMining ? t('Scan — tap') : utility
-            ? t('Scan — tap')
+        fire.setAttribute('aria-label', t('Fire — hold'));
+        missile.setAttribute('aria-label', droneMining ? droneAction?.label ?? droneLabel : salvage
+            ? t('Salvage — hold')
                 : capture
                     ? t('Capture surrendered pilot')
                     : surrendered
@@ -4815,7 +4796,7 @@ export class GameUI {
           ${tutorialSection}
           <section class="ship-menu-missions"><h3>${t('ACTIVE CONTRACTS · {count}/6', { count: missions.length })}</h3>${missionRows}</section>
           <section class="ship-menu-cargo"><h3>${t('CARGO HOLD · {mass}/{capacity} MASS ({percent}%)', { mass: mass.toFixed(1), capacity, percent: loadPercent })}</h3>${cargoRows}</section>
-          <section class="ship-menu-weapons">${loadoutFor(player).turrets?.some(Boolean)?`<button data-ui-command="turret-toggle">${t(player.turretsHeld?'TURRETS HOLD FIRE':'TURRETS ACTIVE')}</button><p>${escapeHtml(t(player.turretsHeld?'TURRETS HOLD FIRE':(player.turretRuntime?.find(s=>s.status==='TURRETS WAITING FOR ENERGY')?.status??'TURRETS READY')))}</p>`:''}<details><summary>${t('WEAPON SYSTEMS')}</summary>${weaponRows}${launcherRows}</details><details><summary>${t('WEAPON GROUP HELP')}</summary><p>${t('Tap the weapon name to cycle populated groups and Fire all. Fire all uses every forward gun; missiles and automatic turrets stay separate. In Outfitting, open a gun’s details to assign A or B. Try beams in A and your other weapon in B to control energy use.')}</p></details></section>
+          <section class="ship-menu-weapons"><button data-ui-command="transponder-toggle" aria-pressed="${player.transponder !== false}">${t(player.transponder !== false ? 'TRANSPONDER ON' : 'TRANSPONDER OFF')}</button>${loadoutFor(player).turrets?.some(Boolean)?`<button data-ui-command="turret-toggle">${t(player.turretsHeld?'TURRETS HOLD FIRE':'TURRETS ACTIVE')}</button><p>${escapeHtml(t(player.turretsHeld?'TURRETS HOLD FIRE':(player.turretRuntime?.find(s=>s.status==='TURRETS WAITING FOR ENERGY')?.status??'TURRETS READY')))}</p>`:''}<details><summary>${t('WEAPON SYSTEMS')}</summary>${weaponRows}${launcherRows}</details><details><summary>${t('WEAPON GROUP HELP')}</summary><p>${t('Tap the weapon name to cycle populated groups and Fire all. Fire all uses every forward gun; missiles and automatic turrets stay separate. In Outfitting, open a gun’s details to assign A or B. Try beams in A and your other weapon in B to control energy use.')}</p></details></section>
           ${this.renderDroneShipStatus()}
           <section class="ship-menu-account"><h3>${t('ACCOUNT')}</h3>
             <div class="ship-account-row"><span>${t('AVAILABLE CREDIT')}</span><b>${formatCredits(player.credits)}</b></div>
@@ -4989,6 +4970,8 @@ export class GameUI {
         this.root.style.setProperty('--touch-scale', String(scale));
     }
     setTouchSteering(mode) {
+        this.el('[data-ui-command="use-stick"]')?.setAttribute('aria-pressed', String(mode !== 'tilt'));
+        this.el('[data-ui-command="enable-tilt"]')?.setAttribute('aria-pressed', String(mode === 'tilt'));
         this.root.classList.toggle('steering-tilt', mode === 'tilt');
         this.root.classList.toggle('steering-stick', mode !== 'tilt');
     }

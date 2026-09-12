@@ -1,3 +1,38 @@
+## 0.8.2f — Clear radar
+
+Original prompt: Remove tracking/signature status messages such as “Ortung · bekannt” to keep the radar clear.
+
+- Remove the radar status strip and its HUD update. Detection and identity mechanics remain unchanged; the diagnostic status helper remains available.
+
+## 0.8.2e — Hyperdrive console button
+
+Original prompt: Lower the hyperdrive button and integrate its styling into the cockpit sprite.
+
+- Lower the button into the centre console, with a brass bevel, recessed navy face and mounting screws. Preserve ready illumination and the touch hit area.
+
+## 0.8.2d — Monitor fit and joystick travel
+
+Original prompt: Align cockpit monitors with the painted sprite, halve the joystick centre knob, and let maximum touch scaling reach the own-ship display.
+
+- Sprite and live monitors share one coordinate system and banking transform across screen sizes.
+- Fit monitor rectangles to the sprite's actual display openings.
+- Joystick knob is 21px; steering area grows with touch scale toward the own-monitor bezel.
+
+## 0.8.2c — Automatic scans and clear radar
+
+Original prompt: Remove redundant asteroid scan controls and remove ID/signature from the radar.
+
+- Selected asteroids and wrecks already scan automatically in range. The secondary button now launches missiles, deploys/recalls mining drones, operates salvage, or captures surrendered pilots according to the target. The primary button always fires guns.
+- Remove radar ID/signature text; move the transponder switch into the ship menu. Radar tap still opens navigation.
+
+## 0.8.2b — Cockpit controls (local preview)
+
+- Expose joystick selection on the title screen; retain tilt and existing saved preferences.
+- Recessed cockpit controls, circular joystick travel, a small central deadzone, and reliable recentring.
+- Move radar identity/signature to its lower edge and suppress quiet tracking text.
+- Reduce repeated mining information and compact service/equipment spacing.
+- Landscape-only play retained. Test at http://localhost:4184/game.html?drone-test=1; choose Joystick in Pause → steering.
+
 # Changelog
 
 ## 0.8.2a — Drone mining and PDC escorts
