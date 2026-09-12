@@ -2237,7 +2237,11 @@ export class SpaceRenderer {
             transparent: true,
             side: THREE.DoubleSide,
             depthWrite: false,
-            // Avoid depth rounding holes where the foreground ring crosses the planet.
+            // At travel distances the foreground ring and planet can round to
+            // the same depth, leaving jagged holes in the ring. The shader
+            // above already hides the rear ring analytically; bias the depth
+            // test by a few units so rounding cannot reject the front ring.
+            // Keep depth testing enabled so nearby ships still occlude it.
             polygonOffset: true,
             polygonOffsetFactor: 0,
             polygonOffsetUnits: -4,
