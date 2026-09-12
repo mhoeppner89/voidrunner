@@ -2570,15 +2570,15 @@ Object.assign(DE_CATALOG, {
  'Normal-speed pellet spread deals extra hull damage. Shares the standard lead; 350 km range.':'Streugeschosse mit Standardvorhalt und erhöhtem Hüllenschaden. 350 km Reichweite.',
  'Normal-speed shots strip shields and briefly disrupt exposed weapons. Shares the standard lead; 400 km range.':'Ionen mit Standardvorhalt schwächen Schilde und stören ungeschützte Waffen kurz. 400 km Reichweite.',
  'Slow plasma rewards accurate direct hits with high damage and energy efficiency. Small blast; 450 km range.':'Langsames Plasma belohnt direkte Treffer mit hohem Schaden und guter Energieeffizienz. Kleine Explosion; 450 km Reichweite.',
- 'Missiles first. Ten-round bursts at selected hostiles; 15% shield damage. 300 km range against ships and missiles.':'Raketen haben Vorrang. Zehnersalven auf ausgewählte Feinde; nur 15 % Schildschaden. 300 km gegen Schiffe und Raketen.',
+ 'Missiles first; shared 1.25 s interception recovery with escort drones. Ten-round bursts at selected hostiles; 15% shield damage. 300 km range against ships and missiles.':'Raketen haben Vorrang; 1,25 s gemeinsame Abfangpause mit Begleitdrohnen. Zehnersalven auf ausgewählte Feinde; nur 15 % Schildschaden. 300 km gegen Schiffe und Raketen.',
  'Instant beam pulses make aiming easy. Lower damage and energy efficiency; 300 km range.':'Sofort treffende Strahlen erleichtern das Zielen. Weniger Schaden und Energieeffizienz; 300 km Reichweite.',
  'Instant supporting fire at your selected hostile within 300 km. Reserves energy for forward guns; the hull limits its firing arc.':'Sofortiges Unterstützungsfeuer auf dein ausgewähltes feindliches Ziel bis 300 km. Hält Energie für Bugwaffen frei; die Hülle begrenzt den Schusswinkel.',
- '300 km · 4 damage · 4 energy · 0.7 s interval':'300 km · 4 Schaden · 4 Energie · 0,7 s Schussabstand',
+ '300 km · 6 damage · 4 energy · 0.7 s interval':'300 km · 6 Schaden · 4 Energie · 0,7 s Schussabstand',
  '300 km · 8 damage · 6 energy · 0.4 s interval':'300 km · 8 Schaden · 6 Energie · 0,4 s Schussabstand',
  '400 km · 10 damage · 3.2 energy':'400 km · 10 Schaden · 3,2 Energie',
  '400 km · 13.5 damage · 5 energy':'400 km · 13,5 Schaden · 5 Energie',
  '600 km · 40 damage · 25% shield bypass':'600 km · 40 Schaden · 25 % Schildumgehung',
- '300 km · 10-round bursts · 15% shield damage':'300 km · Zehnersalven · 15 % Schildschaden',
+ '300 km · 1.1 damage · 10-round bursts · 15% shield damage':'300 km · 1,1 Schaden · Zehnersalven · 15 % Schildschaden',
  '350 km · 7 pellets · 9 energy':'350 km · 7 Teilgeschosse · 9 Energie',
  '400 km · ×4 vs shields · 9 energy':'400 km · ×4 gegen Schilde · 9 Energie',
  '450 km · 180 direct damage · 32 energy':'450 km · 180 Direktschaden · 32 Energie',
@@ -2596,3 +2596,5 @@ Object.assign(DE_CATALOG, {'2 torpedoes · 600 km lock · 210 km/s':'2 Torpedos 
 Object.assign(DE_CATALOG, {
     "PDC drones launch automatically in DEFEND mode. They intercept missiles first, then attack hostile ships within 300 km. STOW recalls them.": "PDC-Drohnen starten im Modus PDC ABWEHR automatisch. Sie fangen zuerst Raketen ab und greifen danach feindliche Schiffe innerhalb von 300 km an. VERSTAUEN ruft sie zurück."
 });
+
+Object.assign(DE_CATALOG, {'PORT TURRET':'BACKBORDTURM','STARBOARD TURRET':'STEUERBORDTURM'});

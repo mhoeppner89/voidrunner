@@ -1,46 +1,42 @@
-"""Bake forward-ray clearance from the shipped GLBs, preserving deck anchors.
-Run from project root. Runtime checks a conservative four-cell lookup instead
-of raycasting thousands of triangles each frame. Produces a review image too.
+"""Fit deck pivots and bake full-sphere clearance from shipped hull GLBs.
+Run from project root. Geometry is fitted to the same hull extents as simulation.
 """
-import json,struct,io
+import json, struct
 from pathlib import Path
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from matplotlib.collections import PolyCollection
-from PIL import Image
 root=Path(__file__).resolve().parents[1]
-models={'wayfarer':[(0,1.12,.15)],'vanguard':[(0,1.12,.1),(0,-1.12,.1)],'prospector':[(0,1.12,.5)],'lancer':[(0,1.12,.2)],'atlas':[(0,1.12,.55),(0,-1.12,-.55)]}
-fig,axes=plt.subplots(5,2,figsize=(12,14),facecolor='#111820');results={}
-for row,(name,mounts) in enumerate(models.items()):
+models={'wayfarer':([1.38,2.37,6.09],[(1,1,-.48,'S',10)]),'vanguard':([4.8,2.99,5.9],[(0,-1,.1,'S',10),(0,1,.1,'S',10)]),'prospector':([3.46,2.83,6.7],[(1,1,.5,'S',0)]),'lancer':([6.66,2.02,6.45],[(1,-1,.2,'M',10)]),'atlas':([4.35,4.13,13.4],[(1,1,.55,'S',0),(1,-1,-.55,'S',10)])}
+layouts={'talon':[]};results={}
+for name,(hull,mounts) in models.items():
  data=(root/'assets/models/ships'/f'{name}.glb').read_bytes();jl=struct.unpack_from('<I',data,12)[0];j=json.loads(data[20:20+jl]);binary=data[28+jl:]
  def accessor(i):
-  a=j['accessors'][i];v=j['bufferViews'][a['bufferView']];dtype={5126:'<f4',5125:'<u4',5123:'<u2'}[a['componentType']];width={'VEC3':3,'VEC2':2,'SCALAR':1}[a['type']]
+  a=j['accessors'][i];v=j['bufferViews'][a['bufferView']];dtype={5126:'<f4',5125:'<u4',5123:'<u2'}[a['componentType']];width={'VEC3':3,'SCALAR':1}[a['type']]
   return np.ndarray((a['count'],width),dtype=dtype,buffer=binary,offset=v.get('byteOffset',0)+a.get('byteOffset',0),strides=(v.get('byteStride',np.dtype(dtype).itemsize*width),np.dtype(dtype).itemsize)).copy()
- primitive=j['meshes'][0]['primitives'][0];vertices=accessor(primitive['attributes']['POSITION']);vertices=vertices[:,[2,1,0]];vertices[:,2]*=-1
- extents=np.max(np.abs(vertices),axis=0);vertices/=extents[2];extents/=extents[2]
- indices=accessor(primitive['indices']).ravel();triangles=vertices[indices].reshape(-1,3,3)
- uv=accessor(primitive['attributes']['TEXCOORD_0']);uv=uv[indices].reshape(-1,3,2).mean(axis=1)
- view=j['bufferViews'][j['images'][0]['bufferView']];texture=np.asarray(Image.open(io.BytesIO(binary[view.get('byteOffset',0):view.get('byteOffset',0)+view['byteLength']])).convert('RGB'))/255
- colors=texture[(np.clip(uv[:,1],0,1)*(texture.shape[0]-1)).astype(int),(np.clip(uv[:,0],0,1)*(texture.shape[1]-1)).astype(int)]
- # Side and top views of the actual textured geometry, with unchanged pivots.
- for col,(axis,depth) in enumerate([(1,0),(0,1)]):
-  ax=axes[row,col];ax.set_facecolor('#111820');order=np.argsort(triangles[:,:,depth].mean(axis=1));coords=triangles[:,:,[2,axis]].copy();coords[:,:,0]*=-1
-  ax.add_collection(PolyCollection(coords[order],facecolors=colors[order],edgecolors='none'));ax.autoscale();ax.set_aspect('equal');ax.set_title(name+' — '+('side' if col==0 else 'top'),color='white');ax.tick_params(colors='#99aabb');ax.set_xlabel('Nose →',color='white')
-  for m in mounts:
-   anchor=np.array(m)*extents;ax.scatter([-anchor[2]],[anchor[axis]],c='#ffe77a',s=30,zorder=4);ax.plot([-anchor[2],-anchor[2]+.16],[anchor[axis],anchor[axis]],color='#ffe77a',linewidth=3,zorder=4)
- v0=triangles[:,0];e1=triangles[:,1]-v0;e2=triangles[:,2]-v0;results[name]=[]
- for mount in mounts:
-  origin=np.array(mount)*extents;tvec=origin-v0;qvec=np.cross(tvec,e1);num=np.einsum('ij,ij->i',e2,qvec);grid=[]
-  for el in range(-20,16):
-   for az in range(-30,31,2):
+ primitive=j['meshes'][0]['primitives'][0];vertices=accessor(primitive['attributes']['POSITION'])[:,[2,1,0]];vertices[:,2]*=-1
+ vertices=vertices/np.max(np.abs(vertices),axis=0)*hull
+ triangles=vertices[accessor(primitive['indices']).ravel()].reshape(-1,3,3)
+ v0=triangles[:,0];e1=triangles[:,1]-v0;e2=triangles[:,2]-v0
+ def ray(origin,d):
+  tv=origin-v0;h=np.cross(d,e2);det=np.einsum('ij,ij->i',e1,h);inv=np.divide(1,det,out=np.zeros_like(det),where=np.abs(det)>1e-9);q=np.cross(tv,e1)
+  u=np.einsum('ij,ij->i',tv,h)*inv;v=np.dot(q,d)*inv;t=np.einsum('ij,ij->i',e2,q)*inv
+  valid=(np.abs(det)>1e-9)&(u>=-1e-6)&(v>=-1e-6)&(u+v<=1+1e-6)&(t>1e-5)
+  return float(t[valid].min()) if valid.any() else 1e6
+ layouts[name]=[];results[name]=[]
+ for axis,side,z,size,cone in mounts:
+  start=np.array([0.,0.,z*hull[2]]);start[axis]=side*hull[axis]*2
+  direction=np.zeros(3);direction[axis]=-side
+  depth=ray(start,direction);assert depth<1e6
+  deck=start[axis]-side*depth;scale=1.3 if size=='M' else 1
+  pivot=side*max(side*deck+.59*scale,hull[1]+.55) if cone and axis==1 and name not in ('wayfarer','lancer') else deck+side*.59*scale
+  pedestal=abs(pivot-deck)-.59*scale
+  origin=np.array([0.,0.,z*hull[2]]);origin[axis]=pivot
+  layouts[name].append({'size':size,'pedestal':round(pedestal/scale,6),'hullHalfLength':hull[2],'position':list(origin/np.array(hull)),'side':side,'axis':axis,'forwardCone':cone,'label':('REAR ' if z>=.5 else 'FORWARD ' if z<=-.5 else '')+(('STARBOARD TURRET' if side==1 else 'PORT TURRET') if axis==0 else ('TOP TURRET' if side==1 else 'LOWER TURRET'))})
+  grid=[]
+  for el in range(-90,91,5):
+   for az in range(-180,181,5):
     a,e=np.deg2rad([az,el]);d=np.array([np.sin(a)*np.cos(e),np.sin(e),-np.cos(a)*np.cos(e)])
-    h=np.cross(d,e2);det=np.einsum('ij,ij->i',e1,h);inv=np.divide(1,det,out=np.zeros_like(det),where=np.abs(det)>1e-9)
-    u=np.einsum('ij,ij->i',tvec,h)*inv;v=np.dot(qvec,d)*inv;t=num*inv
-    valid=(np.abs(det)>1e-9)&(u>=-1e-6)&(v>=-1e-6)&(u+v<=1+1e-6)&(t>1e-5)
-    grid.append(round(float(t[valid].min()),5) if valid.any() else 1000000)
+    grid.append(round(ray(origin,d)/hull[2],5))
   results[name].append(grid)
- print(name,'baked',flush=True)
-(root/'src/game/turretClearance.js').write_text('// Generated by scripts/bake-turret-clearance.py from the shipped GLBs.\n// Azimuth -30..30 by 2 degrees; elevation -20..15 by 1 degree.\nexport const TURRET_CLEARANCE='+json.dumps(results,separators=(',',':'))+';\n')
-fig.tight_layout();fig.savefig(root.parent/'turret-model-review.jpg',dpi=90,facecolor=fig.get_facecolor());plt.close(fig)
+ print(name,'deck-fit and full clearance baked')
+(root/'src/game/turretLayouts.js').write_text('// Generated by scripts/bake-turret-clearance.py. Pivots seat Blender bases on local decks.\nexport const TURRET_LAYOUTS = '+json.dumps(layouts,indent=2)+';\n')
+(root/'src/game/turretClearance.js').write_text('// Generated full-sphere clearance: azimuth -180..180, elevation -90..90, both 5 degrees.\nexport const TURRET_CLEARANCE='+json.dumps(results,separators=(',',':'))+';\n')

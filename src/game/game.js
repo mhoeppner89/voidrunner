@@ -1,3 +1,4 @@
+import {getPdcDefenseChannel} from './pdcFireControl.js';
 import {guideMissile,relativeIntercept,closestHullPoint} from './weaponFlight.js';
 import {fieldCombatSteering} from './fieldCombatNav.js';
 import {npcGunneryProfile,npcTriggerCone,npcTriggerReady,npcShotDirection,recordNpcShot} from './npcGunnery.js';
@@ -2202,6 +2203,7 @@ export class GameSession {
         this.ships = [];
         this.projectiles = [];
         this.pdcAssignments.clear();
+        this.pdcDefenseChannels?.clear();
         this.pickups = [];
         this.autopilot = false;
         this.armedJumpPointId = null;
@@ -2352,6 +2354,7 @@ export class GameSession {
         this.recallPdcDrones('teardown');
         this.renderer?.clearDrones?.();
         this.pdcAssignments.clear();
+        this.pdcDefenseChannels?.clear();
         cancelAnimationFrame(this.frameId);
         this.persistSave();
         this.renderer?.canvas.removeEventListener('pointerdown', this.onSpacePointerDown);
@@ -4613,6 +4616,7 @@ export class GameSession {
         context.inFlight = !player.dockedAt && player.hull > 0 && !this.deathTimer
             && !this.autopilot && !this.galaxyJump && !this.armedJumpPointId && !this.pdcRecallReason;
         context.assignments = this.pdcAssignments;
+        context.defenseChannel = getPdcDefenseChannel(this, 'player');
         context.opponents.length = 0;
         if (!player.turretsHeld && !player.holdFire && !player.pursuitHoldFire) {
             for (const ship of this.ships ?? []) if (ship.hostile && ship.hull > 0 && !ship.race) context.opponents.push(ship);
@@ -6088,6 +6092,7 @@ export class GameSession {
     clearTransientSpace() {
         this.renderer?.clearDrones?.();
         this.pdcAssignments?.clear();
+        this.pdcDefenseChannels?.clear();
         this.recallPdcDrones('space-cleared');
         this.pdcLiveThreats?.clear();
         for (const projectile of this.projectiles)
@@ -10235,8 +10240,10 @@ export class GameSession {
             }
         }
         for (let index = this.ships.length - 1; index >= 0; index -= 1) {
-            if (this.ships[index].hull < 0 || (this.ships[index].hull === 0 && this.ships[index].lifetime > 1.3))
+            if (this.ships[index].hull < 0 || (this.ships[index].hull === 0 && this.ships[index].lifetime > 1.3)) {
+                this.pdcDefenseChannels?.delete(this.ships[index].id);
                 this.ships.splice(index, 1);
+            }
         }
     }
     getWorldZone(position = this.save.player.position) {
@@ -11927,6 +11934,7 @@ export class GameSession {
         this.projectiles = [];
         this.pickups = [];
         this.pdcAssignments.clear();
+        this.pdcDefenseChannels?.clear();
         Object.assign(this.activeRace, {
             state: 'countdown',
             startedAt: this.save.world.time + 4,

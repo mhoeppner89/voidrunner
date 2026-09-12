@@ -1,6 +1,6 @@
 import {newArenaRun,readArenaRun,arenaRecord} from './game/arenaRun.js';
 import { AudioManager } from './game/audio.js';
-import { DRONE_TEST_MODE, createNewSave, defaultSettings, loadGame, loadSettingsPreferences, saveGame, saveSettingsPreferences } from './game/save.js';
+import { TURRET_TEST_MODE, DRONE_TEST_MODE, createNewSave, defaultSettings, loadGame, loadSettingsPreferences, saveGame, saveSettingsPreferences } from './game/save.js';
 import { DOCK_LOCATION_IDS, LOCATIONS, SHIPS } from './game/data.js';
 import { getLanguage, setLanguage, t } from './game/i18n.js';
 import { GameUI } from './game/ui.js';
@@ -664,7 +664,21 @@ window.advanceTime = (milliseconds) => {
 // Query-gated development boot used by the shared browser-game smoke client.
 // It never alters a normal load and avoids timing a click against the title
 // screen while the first 3D session is still being constructed.
-if (DRONE_TEST_MODE) {
+if (TURRET_TEST_MODE) {
+    document.title = 'Voidrunner — Turret Test';
+    beginSession('arena', {environment:'open',scenario:'1v1',difficulty:'rookie'}).then(runtime => {
+        if(!runtime)return;
+        const type=new URLSearchParams(location.search).get('turret')==='laser'?'tracking-turret':'pdc';
+        const player=runtime.save.player;
+        player.outfitting.loadouts[player.shipId].turrets[0]=type;
+        player.throttle=0;
+        const enemy=runtime.ships.find(ship=>ship.hostile);
+        if(enemy)runtime.selectTarget('ship',enemy.id);
+        runtime.ui.showToast('TURRET TEST · Selected hostiles trigger supporting fire. Reload to restart.', 'info', 7000);
+        window.__TURRET_TEST_READY__=true;
+    });
+}
+else if (DRONE_TEST_MODE) {
     document.title = 'Voidrunner — Drone Mining Test';
     beginSession('new').then(async (runtime) => {
         if (!runtime) return;

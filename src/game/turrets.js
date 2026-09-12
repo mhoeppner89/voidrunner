@@ -5,9 +5,9 @@ import {spendEnergy} from './combatResources.js';
 import {WEAPONS,TRACKING_LASER} from './weapons.js';
 import {relativeIntercept} from './weaponFlight.js';
 import {TURRET_CLEARANCE} from './turretClearance.js';
+import {getPdcDefenseChannel,PDC_RECOVERY_SECONDS} from './pdcFireControl.js';
 const laser=TRACKING_LASER;
-export const PDC_TURRET=WEAPONS.pdc;
-const up=new THREE.Vector3(0,1,0);
+export const PDC_TURRET=Object.freeze({...WEAPONS.pdc,damageFlat:1.1,interceptInterval:PDC_RECOVERY_SECONDS});
 const identity=new THREE.Quaternion();
 // Missile positions use Float32 storage; tolerate its rounding at the range edge.
 const rangeEpsilon=0.0001;
@@ -15,12 +15,13 @@ const rangeEpsilon=0.0001;
 function clearTurretArc(actor,mount,extents,point,state) {
     const local=state.local.copy(point).sub(state.scratch.fromArray(actor.position)).applyQuaternion(state.inverse);
     const forward=mount.forwardCone && -local.z>local.length()*Math.cos(mount.forwardCone*Math.PI/180);
-    if(local.y*mount.side < -1e-6 && !forward)return false;
+    if(local.getComponent(mount.axis??1)*mount.side < -1e-6 && !forward)return false;
     const ray=state.scratch.set(local.x-mount.position[0]*extents[0],local.y-mount.position[1]*extents[1],local.z-mount.position[2]*extents[2]);
     const az=Math.atan2(ray.x,-ray.z)*180/Math.PI,el=Math.atan2(ray.y,Math.hypot(ray.x,ray.z))*180/Math.PI;
-    if(state.clearance&&az>=-30&&az<30&&el>=-20&&el<15){
-        const x=(az+30)/2,y=el+20,ix=Math.floor(x),iy=Math.floor(y),grid=state.clearance;
-        const nearest=Math.min(grid[iy*31+ix],grid[iy*31+ix+1],grid[(iy+1)*31+ix],grid[(iy+1)*31+ix+1]);
+    if(state.clearance){
+        const x=Math.min(71.999999,Math.max(0,(az+180)/5)),y=Math.min(35.999999,Math.max(0,(el+90)/5));
+        const ix=Math.floor(x),iy=Math.floor(y),grid=state.clearance;
+        const nearest=Math.min(grid[iy*73+ix],grid[iy*73+ix+1],grid[(iy+1)*73+ix],grid[(iy+1)*73+ix+1]);
         return ray.length()<nearest*extents[2]-.01;
     }
     let near=0,far=1;
@@ -55,7 +56,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
     if(!items.some(Boolean))return;
     const stats=player?session.playerStats():fit.stats;
     const extents=session.turretHullExtents(actor,ownerId),now=session.save.world.time;
-    const assignments=session.pdcAssignments;
+    const assignments=session.pdcAssignments,defense=getPdcDefenseChannel(session,ownerId);
     if(actor.turretRuntime?.[0] && !(actor.turretRuntime[0].position instanceof THREE.Vector3))actor.turretRuntime=[];
     actor.turretRuntime??=[];
     for(const [index,mount] of layouts.entries()) {
@@ -65,14 +66,16 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
         if(state.itemId!==item.id){state.itemId=item.id;state.burstRemaining=0;state.interceptAt=0;}
         state.clearance=TURRET_CLEARANCE[hullId]?.[index];
         state.muzzle??=new THREE.Vector3();state.lead??=new THREE.Vector3();
+        state.targetPosition??=[0,0,0];state.targetVelocity??=[0,0,0];
+        state.phase??=Array.from(ownerId).reduce((hash,c)=>(hash*31+c.charCodeAt(0))>>>0, index+1)%628/100;
         state.q.fromArray(actor.rotation);state.inverse.copy(state.q).invert();
         state.position.set(...mount.position).multiply(state.scratch.fromArray(extents)).applyQuaternion(state.q).add(state.scratch.fromArray(actor.position));
-        state.normal.copy(up).multiplyScalar(mount.side).applyQuaternion(state.q);
+        state.normal.set(0,0,0).setComponent(mount.axis??1,mount.side).applyQuaternion(state.q);
         if(state.direction.lengthSq()<0.1)state.direction.copy(state.normal);
         const disabled=actor.turretsHeld || actor.dockedAt || now<(actor.disruptedUntil??0) || (player && session.autopilot);
         state.status=disabled?'TURRETS HOLD FIRE':'TURRETS READY';
         let target,point,intercept=false;
-        if(!disabled && pdc) {
+        if(!disabled && pdc && now>=defense.readyAt) {
             let nearest=PDC_TURRET.range;
             for(const p of session.projectiles) {
                 if((p.kind!=='missile'&&p.kind!=='torpedo')||p.life<=0||p.ownerId===ownerId||p.targetId!==ownerId||(assignments?assignments.get(p.id)?.until:p.pdcAssignedUntil)>now)continue;
@@ -86,13 +89,25 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
         // Reconsider missiles on every simulation step, including burst pauses.
         if(!disabled && !target){target=selectedHostile(session,actor,ownerId,player);if(target)point=state.goal.fromArray(target.position);}
         if(disabled || !target || intercept)state.burstRemaining=0;
+        if(!target || disabled)state.targetId=null;
         if(point) {
             const distance=point.distanceTo(state.position);
             let flightTime=0;
             if(pdc){
-                const targetVelocity=intercept?session.projStore.getVel(target.slot,state.lead).toArray():target.velocity??[0,0,0];
-                flightTime=relativeIntercept(state.position,point.toArray(),actor.velocity??[0,0,0],targetVelocity,PDC_TURRET.speed,state.lead);
+                const targetVelocity=intercept?session.projStore.getVel(target.slot,state.lead).toArray(state.targetVelocity):target.velocity??[0,0,0];
+                flightTime=relativeIntercept(state.position,point.toArray(state.targetPosition),actor.velocity??[0,0,0],targetVelocity,PDC_TURRET.speed,state.lead);
                 if(Number.isFinite(flightTime))point.copy(state.position).add(state.lead);
+            }
+            // Stable angular tracking error changes smoothly: ship evasion matters,
+            // while missile solutions retain their precise intercept lead.
+            if(!intercept){
+                const key=target.id??'player';
+                if(state.targetId!==key){state.targetId=key;state.acquireAt=now+.3;}
+                const spread=(pdc ? .020 : .018)*distance;
+                const phase=now*2.1+state.phase;
+                point.x+=Math.sin(phase)*spread;
+                point.y+=Math.sin(phase*1.37+1.2)*spread;
+                point.z+=Math.cos(phase*.83)*spread*.5;
             }
             const desired=state.desired.copy(point).sub(state.position).normalize();
             const inArc=(!pdc||flightTime<=PDC_TURRET.life) && distance<=(pdc?PDC_TURRET.range:laser.range)+rangeEpsilon && clearTurretArc(actor,mount,extents,point,state);
@@ -105,11 +120,12 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
                 // Ship bursts also leave the energy for one missile intercept.
                 const reserve=Math.max(12,stats.energyCapacity*0.25)+(pdc&&!intercept?PDC_TURRET.interceptEnergy:0);
                 if(actor.energy<reserve+cost)state.status='TURRETS WAITING FOR ENERGY';
-                else if(state.direction.dot(desired)>Math.cos(0.001) && now>=(intercept?state.interceptAt:state.fireAt) && !session.lineBlocked(state.position,point,ownerId) && !shipBlocksRay(session,actor,ownerId,target,point,state) && spendEnergy(actor,cost)) {
+                else if((intercept||now>=state.acquireAt) && state.direction.dot(desired)>Math.cos(0.001) && now>=(intercept?state.interceptAt:state.fireAt) && !session.lineBlocked(state.position,point,ownerId) && !shipBlocksRay(session,actor,ownerId,target,point,state) && spendEnergy(actor,cost)) {
                     const color=player?0xdce9ff:0xff8a5b;
-                    state.muzzle.copy(state.position).addScaledVector(state.direction,1);
+                    state.muzzle.copy(state.position).addScaledVector(state.direction,(pdc ? .94 : .82)*(mount.size==='M'?1.3:1)*extents[2]/mount.hullHalfLength);
                     if(intercept) {
                         state.interceptAt=now+PDC_TURRET.interceptInterval;
+                        defense.readyAt=state.interceptAt;
                         const round=session.spawnGunProjectile(ownerId,PDC_TURRET,state.muzzle,state.direction,actor.velocity??[0,0,0],undefined,`${ownerId}-turret-${index}`);
                         if(round){
                             round.targetMissile=target;
@@ -135,6 +151,10 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
                 }
             }
         }
-        session.renderer.showTurret?.(`${ownerId}-${index}`,state.position,state.direction,mount.size);
+        // When banking carries a held barrel into the deck, retract its aim
+        // outward. The base remains attached to the hull throughout the turn.
+        state.goal.copy(state.position).addScaledVector(state.direction,1.1*(mount.size==='M'?1.3:1)*extents[2]/mount.hullHalfLength);
+        if(!clearTurretArc(actor,mount,extents,state.goal,state))state.direction.copy(state.normal);
+        session.renderer.showTurret?.(`${ownerId}-${index}`,state.position,state.direction,mount.size,pdc?'pdc':'laser',state.q,mount.side,mount.pedestal,extents[2]/mount.hullHalfLength,mount.axis??1);
     }
 }

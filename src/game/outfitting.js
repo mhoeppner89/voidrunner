@@ -42,7 +42,7 @@ const freezeItem = (item) => {
 // working without adding aliases to the 18-item shop roster.
 const itemRecords = [
     { id:'tracking-turret', name:'Tracking Laser Turret', category:'turret', size:'S', sizes:['S','M'], price:4200, mass:3,
-      description:'Instant supporting fire at your selected hostile within 300 km. Reserves energy for forward guns; the hull limits its firing arc.', stat:'300 km · 4 damage · 4 energy · 0.7 s interval',
+      description:'Instant supporting fire at your selected hostile within 300 km. Reserves energy for forward guns; the hull limits its firing arc.', stat:'300 km · 6 damage · 4 energy · 0.7 s interval',
       turretKind:'laser',effects:{turretKind:'laser'},availability:['helix','rook','vesper'],art:'./art/outfitting/pulse-cannon.webp' },
     { id:'capacitor-bank', name:'Large Capacitor', category:'power', size:'M', sizes:['M'], price:3600, mass:4,
       description:'Longer firing bursts, but slower energy recovery.',stat:'+50% capacity · −20% output',
@@ -84,7 +84,7 @@ const itemRecords = [
     {
         id: 'pdc', name: 'Point-Defence Turret', category: 'turret', size: 'S', sizes: ['S', 'M'],
         price: 3600, energyCost: 4, mass: 2, turretKind: 'pdc',
-        description: "Missiles first. Ten-round bursts at selected hostiles; 15% shield damage. 300 km range against ships and missiles.", stat: '300 km · 10-round bursts · 15% shield damage',
+        description: "Missiles first; shared 1.25 s interception recovery with escort drones. Ten-round bursts at selected hostiles; 15% shield damage. 300 km range against ships and missiles.", stat: '300 km · 1.1 damage · 10-round bursts · 15% shield damage',
         effects: { turretKind: 'pdc' }, availability: ['helix', 'rook', 'vesper'],
         legacyEquipmentId: 'pdc-cluster', art: './art/outfitting/pdc.webp',
     },

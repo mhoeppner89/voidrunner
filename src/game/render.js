@@ -1,3 +1,4 @@
+import {createTurretModel} from './turretModels.js';
 import * as THREE from 'three';
 import { createRingVolume } from './ringVolume.js';
 import { createRingParticles } from './ringParticles.js';
@@ -4279,20 +4280,25 @@ export class SpaceRenderer {
         this.laserFx ??= new LaserFx(this.scene, this.effects);
         this.laserFx.rockImpact(position, rockCenter);
     }
-    showTurret(id,position,direction,size) {
+    showTurret(id,position,direction,size,kind='laser',rotation,side=1,pedestal=0,hullScale=1,axis=1) {
         this.turretMeshes??=new Map();
         let mesh=this.turretMeshes.get(id);
+        if(mesh && (mesh.name!==`${kind}-${size}` || mesh.userData.pedestal!==pedestal)) {
+            this.scene.remove(mesh);this.turretMeshes.delete(id);mesh=null;
+        }
         if(!mesh) {
-            if(this.turretMeshes.size>=32)return;
-            mesh=new THREE.Group();
-            const material=new THREE.MeshStandardMaterial({color:0x71848c,metalness:0.7,roughness:0.5});
-            mesh.add(new THREE.Mesh(new THREE.SphereGeometry(size==='M'?0.55:0.35,8,6),material));
-            const barrel=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.13,0.9,6),material);
-            barrel.rotation.x=Math.PI/2;barrel.position.z=-0.55;mesh.add(barrel);
+            mesh=createTurretModel(kind,size,pedestal);
             this.scene.add(mesh);this.turretMeshes.set(id,mesh);
         }
-        mesh.position.copy(position);mesh.quaternion.setFromUnitVectors(NEG_Z,direction);
-        mesh.userData.life=0.25;mesh.visible=true;
+        mesh.scale.setScalar((size==='M'?1.3:1)*hullScale);
+        mesh.position.copy(position);
+        if(rotation)mesh.quaternion.copy(rotation);else mesh.quaternion.identity();
+        if(axis===0)mesh.rotateZ(-side*Math.PI/2);
+        else if(side<0)mesh.rotateX(Math.PI);
+        const local=mesh.userData.local.copy(direction).applyQuaternion(mesh.userData.inverse.copy(mesh.quaternion).invert());
+        mesh.userData.yaw.rotation.y=Math.atan2(-local.x,-local.z);
+        mesh.userData.pitch.rotation.x=Math.atan2(local.y,Math.hypot(local.x,local.z));
+        mesh.userData.life=.25;mesh.visible=true;
     }
     showCombatBeam(id,start,end,color) {
         this.combatBeams ??= new Map();
@@ -4473,7 +4479,7 @@ export class SpaceRenderer {
         for(const beam of this.combatBeams?.values() ?? []) {beam.userData.life-=dt;beam.visible=beam.userData.life>0;}
         for(const [id,mesh] of this.turretMeshes??[]) {
             mesh.userData.life-=dt;
-            if(mesh.userData.life<=0){this.scene.remove(mesh);this.disposeObject(mesh);this.turretMeshes.delete(id);}
+            if(mesh.userData.life<=0){this.scene.remove(mesh);this.turretMeshes.delete(id);}
         }
         this.updateHyperdriveFx(dt);
         if (this.starShimmer) {
@@ -4982,7 +4988,7 @@ export class SpaceRenderer {
         this.combatBeams?.clear();
         for(const tracer of this.pdcTracers??[]) {this.scene.remove(tracer);tracer.geometry.dispose();tracer.material.dispose();}
         this.pdcTracers=[];
-        for(const mesh of this.turretMeshes?.values()??[]) {this.scene.remove(mesh);this.disposeObject(mesh);}
+        for(const mesh of this.turretMeshes?.values()??[]) {this.scene.remove(mesh);}
         this.turretMeshes?.clear();
         this.laserFx?.dispose();
         this.laserFx = null;

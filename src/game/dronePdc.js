@@ -1,3 +1,4 @@
+import {PDC_RECOVERY_SECONDS} from './pdcFireControl.js';
 import { DRONE_TYPES } from './droneData.js';
 
 export const PDC_DRONE_STEP = 1 / 60;
@@ -238,6 +239,7 @@ export function createPdcDroneController() {
 
             let best = null, bestImpact = Infinity, bestFlight = Infinity;
             for (const threat of context.threats) {
+                if (context.defenseChannel?.readyAt > context.now) break;
                 if (!threat || !idValid(threat.id) || threat.hostile !== true
                     || (threat.kind !== 'missile' && threat.kind !== 'torpedo')
                     || threat.ownerId === context.ownerId || (threat.life != null && !(threat.life > 0))
@@ -286,6 +288,7 @@ export function createPdcDroneController() {
                     if (!context.tryAssign(best.id, id, until, context.now)) continue;
                 } else context.assignments.set(best.id, { defenderId: id, until });
             }
+            if (!attackShip && context.defenseChannel) context.defenseChannel.readyAt = context.now + PDC_RECOVERY_SECONDS;
             unit.ammo--;
             unit.fireCooldown = TYPE.shotInterval;
             events.push(event('fire', unit, { threatId: best.id, targetKind: attackShip ? 'ship' : 'missile', ammoSpent: 1,

@@ -1,3 +1,26 @@
+## 0.8.2i — Lower turret mounts
+
+Original prompt: Wayfarer and Lancer turrets protrude too much.
+
+- Remove the extra support pedestals on those hulls and seat the turret bases directly against the local hull surface. Rebuild clearance for the lower pivots.
+
+## 0.8.2h — Revised turret positions
+
+Original prompt: Move the Wayfarer turret forward onto the antenna area, put Vanguard turrets on the ship's sides, and move the Lancer turret underneath.
+
+- Refit those three hulls and rebuild clearance from their meshes. Vanguard mounts now use port/starboard normals for aiming, model orientation and firing arcs. Lancer uses a lower mount.
+- Updated local model inspection and regression checks for side and belly coverage.
+
+## 0.8.2g — Turret overhaul
+
+Original prompt: Review turret placement, logic and models on all hulls; reduce anti-ship accuracy, increase damage slightly, and let close missile pairs and swarms overwhelm point defence.
+
+- Blender-authored laser and four-barrel PDC assemblies with fixed bases, independent yaw/elevation, fitted pedestals and rebuilt hull clearance. All five turret-capable hulls covered; Talon remains turret-free.
+- Laser damage 4→6; turret PDC damage 0.8→1.1. Anti-ship tracking error grows with distance, with 0.3 s acquisition on a new target. Ship targeting remains selected-hostile support within 300 km.
+- A mothership's PDC turrets and escort drones share a 1.25 s interception recovery. Precise single-missile shots remain; close pairs and swarms can penetrate.
+- Local isolated sorties: `game.html?turret-test=1` (PDC), append `&turret=laser` for laser. Interactive model inspection: `.freebuff/turret-review.html`.
+- Verification: 54 automated checks passed across weapon/turret and drone suites; affected turret cases rechecked after final barrel-clearance fix. 24 controlled damage scenarios and desktop/landscape-phone browser captures. Details: `docs/turret-review/IMPLEMENTED.md`.
+
 ## 0.8.2f — Clear radar
 
 Original prompt: Remove tracking/signature status messages such as “Ortung · bekannt” to keep the radar clear.

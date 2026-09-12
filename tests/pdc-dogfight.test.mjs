@@ -26,10 +26,10 @@ test('PDC fires ten timed rounds, pauses, and deals modest hull damage with a st
  s.spawnGunProjectile=(...args)=>{shots.push(s.save.world.time);return fire(...args);};
  for(let i=0;i<600 && shots.length<10;i++)tick(s,1/120);
  assert.equal(shots.length,10);assert.ok(shots[9]-shots[0]>=.63-1e-9);
- tick(s,.2);assert.ok(Math.abs(enemy.shield-98.8)<1e-8);assert.equal(enemy.hull,100);
+ tick(s,.2);assert.ok(Math.abs(enemy.shield-98.35)<1e-8);assert.equal(enemy.hull,100);
  tick(s,.7);assert.equal(shots.length,10,'a visible pause separates bursts');
  enemy.shield=0;for(let i=0;i<600 && shots.length<20;i++)tick(s,1/120);
- assert.equal(shots.length,20);tick(s,.2);assert.ok(Math.abs(enemy.hull-92)<1e-8);
+ assert.equal(shots.length,20);tick(s,.2);assert.ok(Math.abs(enemy.hull-89)<1e-8);
  assert.ok(p.energy>=s.playerStats().energyCapacity*.25+4);
 });
 
@@ -41,7 +41,7 @@ test('missiles interrupt ship bursts and remain available during the ship burst 
   assert.equal(m.life,0,'one missile should be destroyed promptly despite offensive cooldown');
   const a=missile(s,[0,4,-30]),b=missile(s,[0,4,-40]);tick(s,.1);
   assert.ok(a.life>0 && b.life>0,'an interception cooldown prevents instant salvo deletion');
-  tick(s,.6);assert.equal(a.life,0);assert.ok(b.life>0);
+  tick(s,1.25);assert.equal(a.life,0);assert.ok(b.life>0);
   assert.ok(p.energy>0);
  }
 });
