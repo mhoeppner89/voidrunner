@@ -3219,9 +3219,10 @@ export class SpaceRenderer {
         group.traverse((child) => {
             if (child.material instanceof THREE.MeshStandardMaterial) {
                 const material = child.material.clone();
-                if (!config.preserveColor)
+                const isCanopy = material.name.startsWith('VR_Canopy_');
+                if (!config.preserveColor && !isCanopy)
                     material.color.copy(tint).lerp(new THREE.Color(0xffffff), 0.45);
-                if (entity.race) {
+                if (entity.race && !isCanopy) {
                     // A low self-lit wash keeps the custom race paint readable
                     // while the ships idle at the gathering point and under
                     // the Shardbelt's uneven lighting.
@@ -4281,6 +4282,9 @@ export class SpaceRenderer {
         this.laserFx.rockImpact(position, rockCenter);
     }
     showTurret(id,position,direction,size,kind='laser',rotation,side=1,pedestal=0,hullScale=1,axis=1) {
+        // The cockpit camera is at the ship origin and its exterior hull is
+        // omitted. Drawing own-ship turrets would expose them through the canopy.
+        if(id.startsWith('player-'))return;
         this.turretMeshes??=new Map();
         let mesh=this.turretMeshes.get(id);
         if(mesh && (mesh.name!==`${kind}-${size}` || mesh.userData.pedestal!==pedestal)) {

@@ -1,20 +1,30 @@
 """Fit deck pivots and bake full-sphere clearance from shipped hull GLBs.
 Run from project root. Geometry is fitted to the same hull extents as simulation.
 """
-import json, struct
+import json, struct, sys
 from pathlib import Path
 import numpy as np
 root=Path(__file__).resolve().parents[1]
 models={'wayfarer':([1.38,2.37,6.09],[(1,1,-.48,'S',10)]),'vanguard':([4.8,2.99,5.9],[(0,-1,.1,'S',10),(0,1,.1,'S',10)]),'prospector':([3.46,2.83,6.7],[(1,1,.5,'S',0)]),'lancer':([6.66,2.02,6.45],[(1,-1,.2,'M',10)]),'atlas':([4.35,4.13,13.4],[(1,1,.55,'S',0),(1,-1,-.55,'S',10)])}
 layouts={'talon':[]};results={}
+preserve='--preserve-mounts' in sys.argv
+existing=json.loads((root/'src/game/turretLayouts.js').read_text().split('= ',1)[1].strip().rstrip(';')) if preserve else {}
 for name,(hull,mounts) in models.items():
  data=(root/'assets/models/ships'/f'{name}.glb').read_bytes();jl=struct.unpack_from('<I',data,12)[0];j=json.loads(data[20:20+jl]);binary=data[28+jl:]
  def accessor(i):
   a=j['accessors'][i];v=j['bufferViews'][a['bufferView']];dtype={5126:'<f4',5125:'<u4',5123:'<u2'}[a['componentType']];width={'VEC3':3,'SCALAR':1}[a['type']]
   return np.ndarray((a['count'],width),dtype=dtype,buffer=binary,offset=v.get('byteOffset',0)+a.get('byteOffset',0),strides=(v.get('byteStride',np.dtype(dtype).itemsize*width),np.dtype(dtype).itemsize)).copy()
- primitive=j['meshes'][0]['primitives'][0];vertices=accessor(primitive['attributes']['POSITION'])[:,[2,1,0]];vertices[:,2]*=-1
- vertices=vertices/np.max(np.abs(vertices),axis=0)*hull
- triangles=vertices[accessor(primitive['indices']).ravel()].reshape(-1,3,3)
+ # Include the hull and separate glass/frame primitives in obstruction tests.
+ primitives=j['meshes'][0]['primitives']
+ raw=[accessor(p['attributes']['POSITION'])[:,[2,1,0]] for p in primitives]
+ extent=np.max(np.abs(np.concatenate(raw)),axis=0)
+ pieces=[]
+ for primitive,vertices in zip(primitives,raw):
+  vertices[:,2]*=-1
+  vertices=vertices/extent*hull
+  indices=accessor(primitive['indices']).ravel() if 'indices' in primitive else np.arange(len(vertices))
+  pieces.append(vertices[indices].reshape(-1,3,3))
+ triangles=np.concatenate(pieces)
  v0=triangles[:,0];e1=triangles[:,1]-v0;e2=triangles[:,2]-v0
  def ray(origin,d):
   tv=origin-v0;h=np.cross(d,e2);det=np.einsum('ij,ij->i',e1,h);inv=np.divide(1,det,out=np.zeros_like(det),where=np.abs(det)>1e-9);q=np.cross(tv,e1)
@@ -31,6 +41,9 @@ for name,(hull,mounts) in models.items():
   pedestal=abs(pivot-deck)-.59*scale
   origin=np.array([0.,0.,z*hull[2]]);origin[axis]=pivot
   layouts[name].append({'size':size,'pedestal':round(pedestal/scale,6),'hullHalfLength':hull[2],'position':list(origin/np.array(hull)),'side':side,'axis':axis,'forwardCone':cone,'label':('REAR ' if z>=.5 else 'FORWARD ' if z<=-.5 else '')+(('STARBOARD TURRET' if side==1 else 'PORT TURRET') if axis==0 else ('TOP TURRET' if side==1 else 'LOWER TURRET'))})
+  if preserve:
+   layouts[name][-1]=existing[name][len(layouts[name])-1]
+   origin=np.array(layouts[name][-1]['position'])*np.array(hull)
   grid=[]
   for el in range(-90,91,5):
    for az in range(-180,181,5):

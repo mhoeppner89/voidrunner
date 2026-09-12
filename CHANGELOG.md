@@ -1,3 +1,37 @@
+## 0.8.2n — Optimized ships with fitted canopies
+
+- Ship all six optimized original hulls, retaining their original paint schemes. Combined geometry falls from 333,788 to 178,253 triangles (46.6%).
+- Wayfarer has nine larger mirrored panes, triangular forward side windows, aligned dividers and solid frames fitted to the hull. It uses 22,900 triangles.
+- Lancer retains its original textures with symmetrical glass and conservative hull/wing straightening, at 28,108 triangles. Atlas retains its symmetrical bridge windows.
+- Preserve turret positions, rebuild hull obstruction clearance, and retain the cockpit turret visibility and canopy material fixes. Invalidate the service-worker cache for returning players.
+
+## 0.8.2m — Lancer canopy correction
+
+- Clear uneven hull triangles from Lancer's six mirrored glass panes, keeping UV seams closed and retaining its original textures and 28,978 triangles.
+- Extend the canopy symmetry and obstruction regression check to Lancer. Keep its belly turret mount unchanged.
+
+## 0.8.2l — Symmetrical Wayfarer and Atlas canopies
+
+- Keep the optimized original hulls and their existing textures. Mirror canopy glass and frames precisely about each ship's centerline.
+- Seat the hull surface below the windows so uneven triangles cannot cut across the panes. Move coincident UV-seam vertices together to avoid gaps without welding or changing UVs.
+- Preserve polygon counts and turret positions. Add front/top canopy views to the local ship comparison.
+
+## 0.8.2k — Cleaner ship models and sharper textures
+
+Original prompt: Clean up the ship models in Blender, reduce polygons, add crisp reflective glass and frames, and sharpen the textures while preserving Talon's look.
+
+- Reduce the six hulls from 333,788 to 178,293 triangles (46.6%), protecting UV boundaries to avoid cracks or distorted paint stripes.
+- Restore 2048px source paint maps for five hulls; Wayfarer retains its native 1024px source. Apply restrained sharpening to the five non-Talon paint maps and enable 8× anisotropic filtering, capped by the GPU. Keep material masks at 1024px.
+- Fit separate opaque reflective glass and frames into existing windows; preserve Talon's green canopy. Keep Atlas's two bridge window bands. Preserve canopy material colors under NPC faction tinting.
+- Keep turret mounts fixed and rebuild obstruction clearance against the reduced hulls and canopy parts. Preserve the cockpit turret visibility fix from 0.8.2j.
+- Local before/after review: `.freebuff/ship-cleanup/review.html`; drag to rotate and select any hull. Editable Blender source: `glb_models/ships-cleaned.blend` (local authoring archive).
+
+## 0.8.2j — Cockpit turret visibility
+
+Original prompt: The Wayfarer cockpit shows its turret even though the mount is behind the canopy.
+
+- Omit own-ship exterior turret meshes from the cockpit renderer, which uses a ship-centre camera and does not draw the exterior hull. Retain turret combat logic, NPC models and exterior model inspection.
+
 ## 0.8.2i — Lower turret mounts
 
 Original prompt: Wayfarer and Lancer turrets protrude too much.

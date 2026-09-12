@@ -1,0 +1,224 @@
+[
+  {
+    "hull": "wayfarer",
+    "bounds": [
+      [
+        -0.22651536762714408,
+        -0.37468385696411133,
+        -0.9965758323669434
+      ],
+      [
+        0.22635591030120872,
+        0.39980676770210266,
+        1.000199556350708
+      ]
+    ],
+    "materials": [
+      {
+        "name": "painted.031",
+        "metalness": 1,
+        "roughness": 1,
+        "texture": [
+          1024,
+          1024
+        ],
+        "anisotropy": 8
+      },
+      {
+        "name": "VR_Canopy_Glass",
+        "metalness": 0.3499999940395355,
+        "roughness": 0.1599999964237213,
+        "texture": null
+      },
+      {
+        "name": "VR_Canopy_Frame",
+        "metalness": 0.44999998807907104,
+        "roughness": 0.33000001311302185,
+        "texture": null
+      }
+    ]
+  },
+  {
+    "hull": "talon",
+    "bounds": [
+      [
+        -0.9967829585075381,
+        -0.24620351195335388,
+        -0.9175802469253542
+      ],
+      [
+        0.9969449043273928,
+        0.2388981580734253,
+        0.9166666865348818
+      ]
+    ],
+    "materials": [
+      {
+        "name": "painted.003",
+        "metalness": 1,
+        "roughness": 1,
+        "texture": [
+          2048,
+          2048
+        ],
+        "anisotropy": 8
+      }
+    ]
+  },
+  {
+    "hull": "vanguard",
+    "bounds": [
+      [
+        -0.815784811973572,
+        -0.4989825487136841,
+        -0.9999952316284182
+      ],
+      [
+        0.8130352497100832,
+        0.5139707326889038,
+        1.0005093812942507
+      ]
+    ],
+    "materials": [
+      {
+        "name": "painted.004",
+        "metalness": 1,
+        "roughness": 1,
+        "texture": [
+          2048,
+          2048
+        ],
+        "anisotropy": 8
+      },
+      {
+        "name": "VR_Canopy_Glass",
+        "metalness": 0.3499999940395355,
+        "roughness": 0.1599999964237213,
+        "texture": null
+      },
+      {
+        "name": "VR_Canopy_Frame",
+        "metalness": 0.44999998807907104,
+        "roughness": 0.33000001311302185,
+        "texture": null
+      }
+    ]
+  },
+  {
+    "hull": "prospector",
+    "bounds": [
+      [
+        -0.5150665640830996,
+        -0.4388212263584137,
+        -1.0006115436553957
+      ],
+      [
+        0.5173119902610781,
+        0.40585410594940186,
+        1.001073241233826
+      ]
+    ],
+    "materials": [
+      {
+        "name": "painted.006",
+        "metalness": 1,
+        "roughness": 1,
+        "texture": [
+          2048,
+          2048
+        ],
+        "anisotropy": 8
+      },
+      {
+        "name": "VR_Canopy_Glass",
+        "metalness": 0.3499999940395355,
+        "roughness": 0.1599999964237213,
+        "texture": null
+      },
+      {
+        "name": "VR_Canopy_Frame",
+        "metalness": 0.44999998807907104,
+        "roughness": 0.33000001311302185,
+        "texture": null
+      }
+    ]
+  },
+  {
+    "hull": "lancer",
+    "bounds": [
+      [
+        -1.0016720294952395,
+        -0.3029080033302307,
+        -0.9701660275459292
+      ],
+      [
+        1.000396013259888,
+        0.30327001214027405,
+        0.9696540236473086
+      ]
+    ],
+    "materials": [
+      {
+        "name": "painted",
+        "metalness": 1,
+        "roughness": 1,
+        "texture": [
+          2048,
+          2048
+        ],
+        "anisotropy": 8
+      },
+      {
+        "name": "VR_Canopy_Glass",
+        "metalness": 0.3499999940395355,
+        "roughness": 0.1599999964237213,
+        "texture": null
+      },
+      {
+        "name": "VR_Canopy_Frame",
+        "metalness": 0.44999998807907104,
+        "roughness": 0.33000001311302185,
+        "texture": null
+      }
+    ]
+  },
+  {
+    "hull": "atlas",
+    "bounds": [
+      [
+        -0.324634909629822,
+        -0.332330584526062,
+        -0.9995732903480531
+      ],
+      [
+        0.3246784806251528,
+        0.2840625047683716,
+        1.000387191772461
+      ]
+    ],
+    "materials": [
+      {
+        "name": "painted.014",
+        "metalness": 1,
+        "roughness": 1,
+        "texture": [
+          2048,
+          2048
+        ],
+        "anisotropy": 8
+      },
+      {
+        "name": "VR_Canopy_Glass",
+        "metalness": 0.3499999940395355,
+        "roughness": 0.1599999964237213,
+        "texture": null
+      },
+      {
+        "name": "VR_Canopy_Frame",
+        "metalness": 0.44999998807907104,
+        "roughness": 0.33000001311302185,
+        "texture": null
+      }
+    ]
+  }
+]

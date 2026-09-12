@@ -1,0 +1,44 @@
+[
+  {
+    "hull": "wayfarer",
+    "triangles": 22900,
+    "bytes": 1432980,
+    "errors": 0,
+    "warnings": 0
+  },
+  {
+    "hull": "talon",
+    "triangles": 17308,
+    "bytes": 1705088,
+    "errors": 0,
+    "warnings": 0
+  },
+  {
+    "hull": "vanguard",
+    "triangles": 40808,
+    "bytes": 3255076,
+    "errors": 0,
+    "warnings": 0
+  },
+  {
+    "hull": "prospector",
+    "triangles": 41436,
+    "bytes": 3456920,
+    "errors": 0,
+    "warnings": 0
+  },
+  {
+    "hull": "lancer",
+    "triangles": 28108,
+    "bytes": 2364744,
+    "errors": 0,
+    "warnings": 0
+  },
+  {
+    "hull": "atlas",
+    "triangles": 27693,
+    "bytes": 2816312,
+    "errors": 0,
+    "warnings": 0
+  }
+]

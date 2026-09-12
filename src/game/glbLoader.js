@@ -81,6 +81,9 @@ export async function buildGlbScene(arrayBuffer) {
         if (!bitmap)
             return undefined;
         const texture = new THREE.Texture(bitmap);
+        // Keep painted panel detail legible at grazing angles. Three.js clamps
+        // this request to the device's supported anisotropy level.
+        texture.anisotropy = 8;
         const sampler = json.samplers?.[definition.sampler];
         if (sampler?.wrapS !== undefined)
             texture.wrapS = wrapping(sampler.wrapS);
@@ -97,7 +100,7 @@ export async function buildGlbScene(arrayBuffer) {
             color: new THREE.Color(factor[0], factor[1], factor[2]),
             opacity: factor[3] ?? 1,
             roughness: pbr.roughnessFactor ?? 1,
-            metalness: pbr.metalnessFactor ?? 1,
+            metalness: pbr.metallicFactor ?? 1,
             side: definition.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
         });
         if (pbr.baseColorTexture !== undefined) {
