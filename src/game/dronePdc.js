@@ -1,3 +1,4 @@
+import { combatTargetEligible } from './combatTargeting.js';
 import {PDC_RECOVERY_SECONDS} from './pdcFireControl.js';
 import { DRONE_TYPES } from './droneData.js';
 
@@ -268,7 +269,7 @@ export function createPdcDroneController() {
             if (!best) {
                 let nearest = TYPE.attackRange ** 2;
                 for (const ship of context.opponents ?? []) {
-                    if (!ship || !idValid(ship.id) || ship.hostile !== true || !(ship.hull > 0)
+                    if (!ship || !idValid(ship.id) || ship.hostile !== true || !combatTargetEligible(ship)
                         || ship.race || !vector(ship.position) || !vector(ship.velocity)) continue;
                     const dx=ship.position[0]-unit.position[0], dy=ship.position[1]-unit.position[1], dz=ship.position[2]-unit.position[2];
                     const distance = dx*dx+dy*dy+dz*dz;

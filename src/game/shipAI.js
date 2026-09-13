@@ -24,6 +24,7 @@
 import { COMMODITIES, LOCATIONS, activityLocationIdsForSystem, dockLocationIdsForSystem, marketLocationIdsForSystem } from './data.js';
 import { deliverCargo } from './economy.js';
 import { pick, randomBetween, seededRandom } from './random.js';
+import { continueShieldRecovery } from './combatRecovery.js';
 
 // How close a ship must be to its waypoint before the task advances (matches
 // updateTravelAI's arrival distance).
@@ -208,6 +209,8 @@ export function updateShipAI(session, ship, dt) {
     // but it cannot receive the player's live position until it has built a
     // firing-quality track; otherwise it follows its fixed intelligence point.
     session.updateSensorAwareness?.(ship, dt);
+
+    if (continueShieldRecovery(session, ship, dt)) return;
 
     // Search/inspection runs before live target resolution. That prevents the
     // unconditional player target from leaking the current position into a

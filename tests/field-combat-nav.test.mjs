@@ -33,7 +33,7 @@ for(const seed of [718,941])for(const field of ['debris','asteroids'])for(const 
 }
 for(const field of ['debris','asteroids']){const rows=results.filter(x=>x.field===field),slow=rows.reduce((n,x)=>n+x.slow,0)/rows.length;assert.ok(slow<(field==='debris'?.05:.12),JSON.stringify({field,slow}));}
 const moves=new Set(results.flatMap(x=>x.moves));for(const name of ['drift-pass','boost-reversal','rolling-break'])assert.ok(moves.has(name),name);
-assert.ok(results.filter(x=>x.tier!=='ace').every(x=>x.moves.length===0));
+assert.ok(results.filter(x=>x.tier==='novice').every(x=>x.moves.length===0));
 console.log('Field flight:',JSON.stringify(results.reduce((summary,row)=>{summary[row.field]??={cases:0,slow:0,impacts:0};const item=summary[row.field];item.cases++;item.slow+=row.slow;item.impacts+=row.hits;return summary;},{})));
 });
 

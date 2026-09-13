@@ -7,14 +7,14 @@ import {WEAPONS,weaponAssistCone} from '../src/game/weapons.js';
 import {seededRandom} from '../src/game/random.js';
 const dir=degrees=>new THREE.Vector3(Math.sin(degrees*Math.PI/180),0,-Math.cos(degrees*Math.PI/180));
 function pilot(tier){return {rotation:[0,0,0,1],pilot:{tier},aiRng:seededRandom('gunnery-'+tier)};}
-test('forward aim correction stays narrow, while beams share player assistance',()=>{
+test('forward aim correction stays narrow, while beams retain the shared acquisition cone',()=>{
  for(const tier of ['novice','veteran','ace']){
   const ship=pilot(tier),out=new THREE.Vector3();
   assert.ok(npcShotDirection(ship,WEAPONS.pulse,dir(3.9),out));
-  assert.equal(npcShotDirection(ship,WEAPONS.pulse,dir(4.1),out),tier==='novice');
+  assert.equal(npcShotDirection(ship,WEAPONS.pulse,dir(4.1),out),false);
   for(const angle of [30,90,180])assert.equal(npcShotDirection(ship,WEAPONS.pulse,dir(angle),out),false);
   assert.equal(npcForwardCone(WEAPONS.beam),weaponAssistCone(WEAPONS.beam));
-  assert.ok(npcShotDirection(ship,WEAPONS.beam,dir(14),out));assert.ok(out.angleTo(dir(14))<1e-7);
+  assert.ok(npcShotDirection(ship,WEAPONS.beam,dir(14),out));assert.ok(out.angleTo(dir(14))<1.5*Math.PI/180);
   assert.equal(npcShotDirection(ship,WEAPONS.beam,dir(15),out),false);
  }
 });
@@ -40,13 +40,13 @@ test('actual NPC firing rejects sideways shots without spending energy and uses 
 test('NPC beam assistance aims from the physical mount and refuses a target outside the shared cone',()=>{
  const s=fixture(),ship=s.spawnShip('pirate',[0,0,0],undefined,undefined,{tier:'novice'});ship.rotation=[0,0,0,1];ship.targetId='player';ship.combatWeaponIndex=0;ship.combatFit.weapons[0]='beam';ship.combatFit.fireAt[0]=0;s.save.world.time=1;
  s.save.player.position=dir(8).multiplyScalar(150).toArray();let shots=0;
- s.fireBeam=(owner,w,start,ray)=>{shots++;assert.ok(ray.angleTo(new THREE.Vector3().fromArray(s.save.player.position).sub(start))<1e-7);};
+ s.fireBeam=(owner,w,start,ray)=>{shots++;const error=ray.angleTo(new THREE.Vector3().fromArray(s.save.player.position).sub(start));assert.ok(error>0&&error<1.5*Math.PI/180);};
  s.fireNpcGun(ship,dir(8));assert.equal(shots,1);
  s.save.world.time=2;s.save.player.position=dir(25).multiplyScalar(150).toArray();s.fireNpcGun(ship,dir(25));assert.equal(shots,1);
 });
 
 
-test('novice spray starts early but flies along the nose rather than toward an off-axis target',()=>{
- const ship=pilot('novice'),out=new THREE.Vector3();for(let i=0;i<200;i++){assert.ok(npcShotDirection(ship,WEAPONS.pulse,dir(11),out));assert.ok(out.angleTo(dir(0))<=2.5*Math.PI/180+1e-8);assert.ok(out.angleTo(dir(11))>8*Math.PI/180);}
- assert.equal(npcShotDirection(pilot('veteran'),WEAPONS.pulse,dir(11),out),false);
+test('ordinary novice shots require forward alignment and retain bounded spread and tracking error',()=>{
+ const ship=pilot('novice'),out=new THREE.Vector3();for(let i=0;i<200;i++){assert.ok(npcShotDirection(ship,WEAPONS.pulse,dir(3.9),out));assert.ok(out.angleTo(dir(0))<=4.5*Math.PI/180+1e-8);}
+ assert.equal(npcShotDirection(pilot('novice'),WEAPONS.pulse,dir(4.1),out),false);
 });

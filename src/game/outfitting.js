@@ -84,7 +84,7 @@ const itemRecords = [
     {
         id: 'pdc', name: 'Point-Defence Turret', category: 'turret', size: 'S', sizes: ['S', 'M'],
         price: 3600, energyCost: 4, mass: 2, turretKind: 'pdc',
-        description: "Missiles first; shared 1.25 s interception recovery with escort drones. Ten-round bursts at selected hostiles; 15% shield damage. 300 km range against ships and missiles.", stat: '300 km · 1.1 damage · 10-round bursts · 15% shield damage',
+        description: "Missiles first; shared 2.5 s interception recovery with escort drones. Ten-round bursts at selected hostiles; 15% shield damage. 300 km range against ships and missiles.", stat: '300 km · 2.2 damage · 10-round bursts · 15% shield damage',
         effects: { turretKind: 'pdc' }, availability: ['helix', 'rook', 'vesper'],
         legacyEquipmentId: 'pdc-cluster', art: './art/outfitting/pdc.webp',
     },
@@ -98,14 +98,14 @@ const itemRecords = [
     {
         id: 'ion-blaster', name: 'Ion Projector', category: 'gun', size: 'M', sizes: ['M'],
         price: 5600, energyCost: 9, mass: 5, weaponId: 'ion',
-        description: "Normal-speed shots strip shields and briefly disrupt exposed weapons. Shares the standard lead; 400 km range.", stat: '400 km · ×4 vs shields · 9 energy',
-        effects: { weaponId: 'ion', shieldMultiplier: 4, jamSeconds: 0.8 }, availability: ['rook', 'vesper'],
+        description: "Normal-speed shots strip shields and briefly halve exposed weapon fire rate and double energy per shot. Shares the standard lead; 400 km range.", stat: '400 km · ×8 vs shields · 9 energy',
+        effects: { weaponId: 'ion', shieldMultiplier: 8, jamSeconds: 0.8 }, availability: ['rook', 'vesper'],
         legacyEquipmentId: 'ion-lance', art: './art/outfitting/ion-blaster.webp',
     },
     {
         id: 'mortar', name: 'Sunlance Plasma Mortar', category: 'gun', size: 'M', sizes: ['M'],
-        price: 7200, energyCost: 32, mass: 7, weaponId: 'mortar',
-        description: "Slow plasma rewards accurate direct hits with high damage and energy efficiency. Small blast; 450 km range.", stat: '450 km · 180 direct damage · 32 energy',
+        price: 7200, energyCost: 16, mass: 7, weaponId: 'mortar',
+        description: "Slow plasma rewards accurate direct hits with high damage and energy efficiency. Small blast; 450 km range.", stat: '450 km · 90 direct damage · 16 energy',
         effects: { weaponId: 'mortar', splashRadius: 18 }, availability: ['rook'],
         legacyEquipmentId: 'sunlance-mortar', art: './art/outfitting/mortar.webp',
     },

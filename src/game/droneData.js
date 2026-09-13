@@ -20,7 +20,7 @@ export const DRONE_TYPES = freeze({
         acceleration: 120, payloadUnits: 1, cutSecondsPerUnit: 8, replacementPrice: 250 }),
     pdc: freeze({ maxHull: 40, collisionRadius: 0.75, cruiseSpeed: 160,
         acceleration: 160, payloadUnits: 0, replacementPrice: 1500,
-        escortDistance: 15, escortOrbitSeconds: 12, magazineCapacity: 120, shotInterval: 0.2,
+        escortDistance: 15, escortOrbitSeconds: 12, magazineCapacity: 120, shotInterval: 0.4,
         projectileSpeed: 500, interceptRange: 300, attackRange: 300, roundPrice: 2 }),
 });
 export const DRONE_RULES = freeze({ operatingRange: 100, recallSeconds: 15,

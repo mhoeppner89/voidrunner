@@ -7,9 +7,12 @@ export function weaponDamage(shield, amount, weapon = {}) {
     const hull = (bypass + Math.max(0, damage - bypass - absorbed / shieldMultiplier)) * (weapon.hullMul ?? 1);
     return { shield: absorbed, hull };
 }
-export function disruptWeapons(actor, weapon, time) {
-    if (!weapon.jamSeconds || actor.shield > 0 || time < (actor.disruptionRecoveryUntil ?? 0)) return false;
+export function disruptWeapons(actor, weapon, time, shieldBeforeHit = actor.shield) {
+    if (weapon.id !== 'ion' || !weapon.jamSeconds || shieldBeforeHit > 0 || time < (actor.disruptionRecoveryUntil ?? 0)) return false;
     actor.disruptedUntil = time + weapon.jamSeconds;
     actor.disruptionRecoveryUntil = actor.disruptedUntil + 3;
     return true;
 }
+
+// Twice the interval and energy per shot: half DPS, unchanged sustained drain.
+export const disruptionFactor = (actor, time) => time < (actor.disruptedUntil ?? 0) ? 2 : 1;

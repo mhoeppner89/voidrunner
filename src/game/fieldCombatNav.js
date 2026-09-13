@@ -53,14 +53,16 @@ export function fieldCombatSteering(session,ship,goal,desired,dt,out){
   // use five waypoints around the closest blocker in debris. Round asteroid
   // fields reuse their sampled headings only at this slower planning cadence.
   s.goal.copy(desired).normalize();
-  if(ship.shield<ship.maxShield*.3&&now>=(s.rechargeReadyAt??0)){s.rechargeUntil=now+3;s.rechargeReadyAt=now+12;}
-  if(now<(s.rechargeUntil??0))s.goal.copy(s.nose).lerp(s.delta.copy(p).sub(goal).normalize(),.55).addScaledVector(worldUp,.25).normalize();
-  s.roundField=s.obstacles.length>0&&s.obstacles.every(o=>o.shape==='asteroid');
+  // Commit around isolated cover while hunting. Dense fields keep sampled
+  // escape headings, which handle overlapping clearance bounds better.
+  s.roundField=(ship.combatIntent!=='hunt'||s.obstacles.length>3)&&s.obstacles.length>0&&s.obstacles.every(o=>o.shape==='asteroid');
   if(s.roundField)steerToward(session,ship,goal,{goalDir:s.goal,speed,horizon:1.8,brakeScale:0,synthesize:true},s.goal);
   const goalClear=clearDistance(s,p,s.goal,reach,look);
-  const stuck=s.lowTime>1.5||(Boolean(ship.search)&&s.blockedTime>.4);
+  const stuck=(s.obstacles.length>0 && (s.lowTime>.75||s.blockedTime>.6))||(Boolean(ship.search)&&s.blockedTime>.4);
   const committed=s.until>now&&p.distanceTo(s.waypoint)>35;
-  if(committed&&!s.recovering){s.delta.copy(s.waypoint).sub(p).normalize();if(clearDistance(s,p,s.delta,reach,Math.min(look,100))<20)s.until=0;}
+  // Remaining momentum can carry a hull out of its planned exit corridor even
+  // during recovery. Keep a commitment only while that corridor remains usable.
+  if(committed){s.delta.copy(s.waypoint).sub(p).normalize();if(clearDistance(s,p,s.delta,reach,Math.min(look,100))<20)s.until=0;}
   if(!committed||s.until===0||(stuck&&!s.recovering)){
    s.until=0;s.bank=0;s.recovering=stuck;
    if((!s.roundField&&goalClear<look*.85)||stuck){
@@ -81,13 +83,29 @@ export function fieldCombatSteering(session,ship,goal,desired,dt,out){
      const value=(clear<corridor*.98?-2:0)+clear/corridor*2+turn*.35+progress*(stuck?.15:.65)+(i<2?.08:0)+(ship.pilot?.tier==='ace'&&i===2?.16:0);
      if(value>score){score=value;s.best.copy(s.candidate);bestIndex=i;}
     }
-    s.waypoint.copy(s.best);s.until=now+(stuck?3:2);if(stuck)s.lowTime=0;
+    if(stuck){
+     // A single blocker's left/right waypoints can all enter its neighbours.
+     // At a standstill, sample the surrounding volume for a short clear exit.
+     let exitScore=-Infinity;
+     for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++){
+      if(x===0&&y===0&&z===0)continue;
+      s.delta.set(x,y,z).normalize();
+      const clear=clearDistance(s,p,s.delta,reach,110);
+      const value=clear/110*4+s.nose.dot(s.delta)*.35+s.goal.dot(s.delta)*.1;
+      if(value>exitScore){exitScore=value;s.best.copy(p).addScaledVector(s.delta,Math.max(45,Math.min(100,clear-5)));}
+     }
+    }
+    s.waypoint.copy(s.best);
+    // Heavy hulls can need more than three seconds to turn toward an exit.
+    // Replacing the waypoint mid-turn made a stopped ship alternate directions.
+    const exitAngle=Math.acos(clamp(s.nose.dot(s.delta.copy(s.best).sub(p).normalize()),-1,1));
+    s.until=now+(stuck?clamp(exitAngle*stats.angularDamping/stats.angularAcceleration+2,3,7):2);if(stuck)s.lowTime=0;
     s.bank=ship.pilot?.tier==='ace'?(bestIndex%2===0?1:-1)*.65:0;
    }
   }
  }
  s.active=s.until>now&&p.distanceTo(s.waypoint)>30;
- out.copy(s.active?s.direction.copy(s.waypoint).sub(p).normalize():s.roundField||now<(s.rechargeUntil??0)?s.goal:desired).normalize();
+ out.copy(s.active?s.direction.copy(s.waypoint).sub(p).normalize():s.roundField?s.goal:desired).normalize();
  // Only the current motion and nose corridor can demand braking. Sideways
  // clearance affects the next route choice, never the throttle itself.
  const travelClear=clearDistance(s,p,v,reach,look);

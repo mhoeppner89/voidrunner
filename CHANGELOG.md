@@ -1,3 +1,56 @@
+## 0.8.2q — Combat movement and limited shield recovery
+
+- Let NPC boost commitments last through hull acceleration and turning. Trained pilots avoid slow defensive drifts that leave them easy to track.
+- Faster damaged ships can briefly withdraw; slower ships can seek nearby cover. Recovery aims for partial shields, with a 14-second cap, an 18-second cooldown, and one attempt per opponent (two for aces).
+- Once clear, use a broad return arc. Do not abandon an affordable finish against an exposed, damaged opponent. A withdrawing wingman yields the pressure role to an ally.
+- Preserve finite fuel, normal acceleration, turn limits, weapon accuracy and shield recharge. Offensive fire pauses during recovery; missile interception remains active. Cover recovery uses the last seen target position if contact is lost.
+- Local test page now includes Wayfarer, Beam/Ripper options, and a Damaged veteran preset. See docs/combat-review/RECOVERY.md for movement checks, TTK limits and NPC duel results.
+
+## 0.8.2q — Weapon accuracy and pilot skill
+
+- NPC beams retain forgiving acquisition but gain physical pointing error: novices miss sometimes, veterans less often, aces rarely.
+- Magrail spread accounts for range and pilot skill; its fast projectile remains useful against evasive targets.
+- NPC PDC and tracking-turret accuracy, acquisition and traverse now depend on pilot skill when attacking ships. Missile-interception accuracy and shared recovery are preserved.
+- Pulse and Ripper can attempt brief speculative bursts near a firing opportunity. The barrel remains physical, assistance stays narrow, and an ally in the actual firing line stops the shot.
+- All pilots retain small changing aim errors. Limited turn compensation uses only recently observed target motion and resets after lost sight or a target change.
+
+## 0.8.2q — Tracking moving opponents
+
+- Give trained pilots more room against moving targets and let them match closure below the previous cruise floor when already too close.
+- Prioritize the forward firing solution during a useful attack window; approach offsets no longer continually pull guns off target. Cooling weapons retain the same tracking geometry.
+- Keep tracking through a short capacitor recharge pause instead of turning away and boosting. Threat and shield-recovery breaks remain active.
+- Improve veteran motion lead from 0.888 to 0.96; novice lead, ace lead, dispersion, weapon damage and firing cones are unchanged.
+
+## 0.8.2q — Predictive NPC flight decisions
+
+- Anticipate overshoot using closing speed, hull braking and turn time; stop boost before a pass becomes unmanageable.
+- Cut across distant targets' paths and use a shallower pursuit angle when following a close turn. Gun lead stays separate during drift.
+- Choose escape directions from observed attacker geometry and clear corridors. Novices consider lateral exits; trained pilots can also break above or below.
+- End drifts and reversals when a useful firing attitude returns. Trained pilots can briefly hold an affordable shot; heavy incoming damage still forces a break.
+- Change approach after an unproductive chase. Groups share a pressure pilot and approach from separate flanks, withholding rounds when an ally crosses the firing line.
+- Recover from blocked field routes by choosing a short clear exit, allowing enough turning time, and replacing an exit made unsafe by remaining drift.
+
+## 0.8.2q — Hunting, evasive flight and Sunlance balance
+
+- Replace crawl-speed alignment and automatic long strafing runs with speed-matched hunting, short clearance moves and finite boost bursts. Track moving firing solutions within the hull's normal turn authority.
+- Novices break early under light fire. Veterans and aces judge recent damage against remaining reserves. Visible incoming projectile paths can trigger a delayed response; covered shots and harmless flybys do not.
+- Give veterans deliberate drift passes. Aces also combine boost, coasting turns and reversals. Obstacle clearance cancels unsafe commitments; dense fields retain their escape steering.
+- Improve Talon acceleration 36→46, angular acceleration 2.45→3.4, boost speed 114→128, and assisted lateral recovery. Applies to player and NPC Talons.
+- Halve Sunlance direct damage 180→90 and energy per shot 32→16. Keep its 1.5-second interval and small splash. Two direct hits leave a fresh Talon with 15 hull.
+
+## 0.8.2q — PDC cadence, novice alignment and ion hit rules
+
+- Double mounted PDC shot/burst intervals and per-round damage (2.2), preserving nominal burst-cycle DPS. Double drone shot interval (0.4 s) and round damage (1.6), preserving 4 hull DPS. Shared missile-interception recovery is 2.5 s.
+- Novices wait for the four-degree forward firing window and compensate for relative motion more accurately. Their wide dispersion and four-shot bursts with long pauses remain; gun damage is unchanged.
+- Ion disruption requires shields to be down before the ion hit. A shield-breaking hit does not disrupt; a subsequent ion hit can. Non-ion damage cannot apply the effect.
+
+## 0.8.2q — Combat recovery and engagement rules
+
+- Give NPCs room to turn and reduce approach throttle while lining up narrow forward guns, restoring fire on later passes.
+- Ion deals ×8 shield damage. Exposed weapons fire at half rate for 0.8 seconds, spending twice the energy per shot; the three-second disruption recovery remains.
+- Patrols exclude themselves and disengaged ships. They pursue the last seen position for up to four seconds and may fire physical rounds toward it for 0.8 seconds; cover still blocks projectiles.
+- PDC drones and mounted turrets respect pirate demands and stand-down states. Incoming missile defense remains active, with the existing shared recovery limiting volley interception.
+
 ## 0.8.2p — Wreck variety and smaller assets
 
 - Give the eight repeated frigates four fixed section arrangements and the two cruisers distinct breakups, sharing GLB files, meshes, textures and collision buffers.

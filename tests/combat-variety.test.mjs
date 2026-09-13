@@ -56,13 +56,13 @@ test('sustained hits never postpone a pending reaction, and a later attack gets 
     assert.equal(ship.evasiveLatencyUntil,first);assert.ok(first<0.5);assert.ok(ship.evasiveUntil>2.5);
     registerHitReaction(ship,10);assert.ok(ship.evasiveLatencyUntil>10);
 });
-test('aces drift and reverse through flight controls, then recover; veterans use ordinary passes',()=>{
+test('veterans drift, aces also reverse; both recover through normal flight controls',()=>{
     for(const tier of ['veteran','ace'])for(const move of ['drift-pass','boost-reversal']) {
         const s=fixture(),ship=spawn(s,'pirate',tier,[0,0,120]);ship.combatFit=createEnemyLoadout(ship,3);s.npcFlightStats(ship);ship.combatFit.missiles=0;s.fireNpcGun=()=>{};
         ship.velocity=move==='drift-pass'?[60,0,-45]:[0,0,76];
         if(move==='boost-reversal'){ship.rotation=[0,1,0,0];ship.attackPhase='extend';}
         const before=new THREE.Vector3(...ship.velocity);step(s,ship);
-        if(tier==='veteran'){assert.equal(ship.aceMove,undefined);continue;}
+        if(tier==='veteran'&&move==='boost-reversal'){assert.equal(ship.aceMove,undefined);continue;}
         assert.equal(ship.aceMove?.kind,move);
         if(move==='drift-pass')assert.ok(new THREE.Vector3(...ship.velocity).distanceTo(before)<1e-7);
         else assert.equal(ship.burning,true);
@@ -110,15 +110,16 @@ test('one hull supports distinct equipment roles and each shot uses its equipped
         ranges.push(Math.round(distance/1800));assert.ok(s.projectiles.length>0,`fit ${fitIndex} must find a firing opportunity`);
         for(const shot of s.projectiles){const weapon=WEAPONS[shot.weaponId];assert.ok(ship.combatFit.weapons.includes(weapon.id));assert.equal(shot.life,weapon.life);}
     }
-    assert.ok(ranges[1]<ranges[0]&&ranges[1]<ranges[2],`close-range fit must close further: ${ranges}`);
+    assert.ok(ranges[1]<ranges[0]*.9,`scatter/ion must close further than long-range gauss: ${ranges}`);
     console.log('Same hull, three equipment fits: mean ranges',ranges);
 });
-test('shield failure prompts a short moving retreat with a cooldown',()=>{
- const s=fixture(),ship=spawn(s);ship.shield=10;
- step(s,ship);assert.ok(ship.fieldNav.rechargeUntil>s.save.world.time);assert.equal(ship.covering,false);
- const first=ship.fieldNav.rechargeReadyAt;
+test('a faster ship commits to shield recovery and leaves it on a bounded cooldown',()=>{
+ const s=fixture(),ship=spawn(s);ship.shield=10;ship.shieldDelay=4.5;
+ step(s,ship);const r=ship.combatPlan.recovery;assert.equal(r.active,true);assert.equal(ship.combatIntent,'disengage');
  for(let i=0;i<240;i++)step(s,ship);
- assert.ok(ship.fieldNav.rechargeUntil<s.save.world.time);assert.equal(ship.fieldNav.rechargeReadyAt,first);
+ assert.equal(r.active,true,'four seconds is too early to turn back into fire');
+ for(let i=0;i<1500&&r.active;i++)step(s,ship);
+ assert.equal(r.active,false,'an unsuccessful recovery cannot flee forever');assert.ok(r.readyAt>s.save.world.time);
  assert.ok(Math.hypot(...ship.velocity)>ship.speed*.4);
 });
 test('legacy rookie profiles normalize and tutorial/capital weapons retain authored limits',()=>{

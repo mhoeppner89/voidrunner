@@ -40,7 +40,7 @@ export const getEffectiveShipStats = (player) => {
         hull: base.hull + (has('armor-mk2') ? effect('armor-mk2', 'hullCapacity', 40) : 0),
         reactorOutput: base.reactorOutput * product('outputMultiplier'),
         energyCapacity: base.energyCapacity * product('capacityMultiplier'),
-        burnFuelMultiplier:product('burnFuelMultiplier'),lateralMultiplier:product('lateralMultiplier'),shieldRechargeMultiplier:product('rechargeMultiplier'),
+        burnFuelMultiplier:product('burnFuelMultiplier'),lateralMultiplier:(base.lateralMultiplier??1)*product('lateralMultiplier'),shieldRechargeMultiplier:product('rechargeMultiplier'),
         cargo: base.cargo + cargoBonus,
         // Pulse Mk II's multiplier lives on its projectile definition. Keeping
         // the hull's base gunDamage untouched prevents an installed gun from
