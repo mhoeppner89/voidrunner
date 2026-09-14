@@ -1,0 +1,54 @@
+[
+  {
+    "guns": [
+      "pulse-cannon",
+      "pulse-cannon"
+    ],
+    "shielded": true,
+    "seconds": 30,
+    "damage": 2860,
+    "dps": 95.33333333333333,
+    "shots": 286,
+    "energy": 2.350000000001212,
+    "reactor": 27
+  },
+  {
+    "guns": [
+      "pulse-cannon",
+      "pulse-cannon"
+    ],
+    "shielded": false,
+    "seconds": 30,
+    "damage": 2860,
+    "dps": 95.33333333333333,
+    "shots": 286,
+    "energy": 2.350000000001212,
+    "reactor": 27
+  },
+  {
+    "guns": [
+      "pulse-cannon",
+      "ion-blaster"
+    ],
+    "shielded": true,
+    "seconds": 30,
+    "damage": 3420,
+    "dps": 114,
+    "shots": 201,
+    "energy": 1.7500000000021638,
+    "reactor": 27
+  },
+  {
+    "guns": [
+      "pulse-cannon",
+      "ion-blaster"
+    ],
+    "shielded": false,
+    "seconds": 30,
+    "damage": 1775,
+    "dps": 59.166666666666664,
+    "shots": 201,
+    "energy": 1.7500000000021638,
+    "reactor": 27
+  }
+]

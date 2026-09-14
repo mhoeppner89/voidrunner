@@ -1,0 +1,82 @@
+{
+  "seconds": 81.78333333332998,
+  "withdrawal": 20.266666666666797,
+  "attempts": 2,
+  "playerHull": 185,
+  "npcHull": 0,
+  "npcShield": 0,
+  "samples": [
+    {
+      "time": 0.016666666666666666,
+      "playerHull": 185,
+      "npcHull": 137,
+      "npcShield": 42,
+      "range": 279.98052443737924,
+      "intent": "hunt"
+    },
+    {
+      "time": 10.016666666666744,
+      "playerHull": 185,
+      "npcHull": 35,
+      "npcShield": 0,
+      "range": 485.1056191696216,
+      "intent": "disengage"
+    },
+    {
+      "time": 20.01666666666681,
+      "playerHull": 185,
+      "npcHull": 35,
+      "npcShield": 14.778333333333364,
+      "range": 108.47913240409191,
+      "intent": "evade"
+    },
+    {
+      "time": 30.016666666666243,
+      "playerHull": 185,
+      "npcHull": 35,
+      "npcShield": 51.96666666666645,
+      "range": 84.46327892194769,
+      "intent": "hunt"
+    },
+    {
+      "time": 40.01666666666568,
+      "playerHull": 185,
+      "npcHull": 35,
+      "npcShield": 10,
+      "range": 224.85907152333053,
+      "intent": "disengage"
+    },
+    {
+      "time": 50.01666666666511,
+      "playerHull": 185,
+      "npcHull": 35,
+      "npcShield": 47.45333333333318,
+      "range": 273.5966634034029,
+      "intent": "hunt"
+    },
+    {
+      "time": 60.01666666666454,
+      "playerHull": 185,
+      "npcHull": 35,
+      "npcShield": 50,
+      "range": 294.38838902187257,
+      "intent": "hunt"
+    },
+    {
+      "time": 70.01666666666398,
+      "playerHull": 185,
+      "npcHull": 35,
+      "npcShield": 32.89000000000007,
+      "range": 271.8964470586463,
+      "intent": "hunt"
+    },
+    {
+      "time": 80.01666666666341,
+      "playerHull": 185,
+      "npcHull": 13.391666666666755,
+      "npcShield": 0,
+      "range": 309.589398415289,
+      "intent": "hunt"
+    }
+  ]
+}

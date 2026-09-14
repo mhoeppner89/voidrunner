@@ -1,0 +1,190 @@
+[
+  {
+    "hull": "wayfarer",
+    "gun": "pulse-cannon",
+    "moving": true,
+    "seconds": 148.08333333334332,
+    "playerHull": 137.39021622348827,
+    "playerShield": 42.90255907585322,
+    "bossHull": 0,
+    "bossShield": 0,
+    "mounts": [
+      100,
+      100,
+      0,
+      0,
+      65,
+      65,
+      65,
+      65
+    ],
+    "fuel": 52.200833333337044,
+    "obstacles": 495,
+    "rounds": 120,
+    "samples": [
+      {
+        "time": 0.016666666666666666,
+        "range": 584.1106923126417,
+        "playerHull": 185,
+        "bossHull": 1400,
+        "bossShield": 650,
+        "rounds": 0
+      },
+      {
+        "time": 30.016666666666243,
+        "range": 409.008668856008,
+        "playerHull": 185,
+        "bossHull": 1400,
+        "bossShield": 240,
+        "rounds": 28
+      },
+      {
+        "time": 60.01666666666454,
+        "range": 318.74315866698714,
+        "playerHull": 164.12990091008436,
+        "bossHull": 1400,
+        "bossShield": 90,
+        "rounds": 41
+      },
+      {
+        "time": 90.01666666666284,
+        "range": 440.1903315689246,
+        "playerHull": 141.652244783269,
+        "bossHull": 970.0377696602159,
+        "bossShield": 0,
+        "rounds": 73
+      },
+      {
+        "time": 120.01666666666114,
+        "range": 452.38243700448646,
+        "playerHull": 137.39021622348827,
+        "bossHull": 600.0377696602159,
+        "bossShield": 0,
+        "rounds": 95
+      }
+    ]
+  },
+  {
+    "hull": "vanguard",
+    "gun": "pulse-cannon",
+    "moving": true,
+    "seconds": 106.38333333332858,
+    "playerHull": 295,
+    "playerShield": 78.26500000000001,
+    "bossHull": 0,
+    "bossShield": 0,
+    "mounts": [
+      100,
+      100,
+      100,
+      0,
+      65,
+      65,
+      65,
+      65
+    ],
+    "fuel": 72.8887500000021,
+    "obstacles": 499,
+    "rounds": 75,
+    "samples": [
+      {
+        "time": 0.016666666666666666,
+        "range": 643.135276904536,
+        "playerHull": 295,
+        "bossHull": 1400,
+        "bossShield": 650,
+        "rounds": 0
+      },
+      {
+        "time": 30.016666666666243,
+        "range": 308.20864737556656,
+        "playerHull": 295,
+        "bossHull": 1400,
+        "bossShield": 161.01906384597748,
+        "rounds": 37
+      },
+      {
+        "time": 60.01666666666454,
+        "range": 443.9774090628329,
+        "playerHull": 295,
+        "bossHull": 901.0190638459776,
+        "bossShield": 0,
+        "rounds": 60
+      },
+      {
+        "time": 90.01666666666284,
+        "range": 368.03408968758595,
+        "playerHull": 295,
+        "bossHull": 221.0190638459776,
+        "bossShield": 0,
+        "rounds": 69
+      }
+    ]
+  },
+  {
+    "hull": "wayfarer",
+    "gun": "pulse-cannon",
+    "moving": false,
+    "seconds": 16.816666666666993,
+    "playerHull": 0,
+    "playerShield": 0,
+    "bossHull": 1220,
+    "bossShield": 0,
+    "mounts": [
+      100,
+      100,
+      100,
+      100,
+      65,
+      65,
+      65,
+      65
+    ],
+    "fuel": 100,
+    "obstacles": 495,
+    "rounds": 28,
+    "samples": [
+      {
+        "time": 0.016666666666666666,
+        "range": 584.1106923126417,
+        "playerHull": 185,
+        "bossHull": 1400,
+        "bossShield": 650,
+        "rounds": 0
+      }
+    ]
+  },
+  {
+    "hull": "vanguard",
+    "gun": "pulse-cannon",
+    "moving": false,
+    "seconds": 24.199999999999907,
+    "playerHull": 0,
+    "playerShield": 0,
+    "bossHull": 320,
+    "bossShield": 0,
+    "mounts": [
+      100,
+      100,
+      100,
+      100,
+      65,
+      65,
+      65,
+      65
+    ],
+    "fuel": 100,
+    "obstacles": 499,
+    "rounds": 42,
+    "samples": [
+      {
+        "time": 0.016666666666666666,
+        "range": 643.135276904536,
+        "playerHull": 295,
+        "bossHull": 1400,
+        "bossShield": 650,
+        "rounds": 0
+      }
+    ]
+  }
+]

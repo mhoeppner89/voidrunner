@@ -1,0 +1,252 @@
+{
+  "idealPlayer": [
+    {
+      "gun": "pulse-cannon",
+      "initial": {
+        "hull": 137,
+        "shield": 58
+      },
+      "seconds": 1.88,
+      "killed": true,
+      "energy": 35.5
+    },
+    {
+      "gun": "beam-emitter",
+      "initial": {
+        "hull": 137,
+        "shield": 58
+      },
+      "seconds": 5,
+      "killed": true,
+      "energy": 6
+    },
+    {
+      "gun": "ripper",
+      "initial": {
+        "hull": 137,
+        "shield": 58
+      },
+      "seconds": 1.02,
+      "killed": true,
+      "energy": 54.3
+    }
+  ],
+  "duels": [
+    {
+      "seed": 11,
+      "hull": "talon",
+      "seconds": 18.57,
+      "killed": true,
+      "fled": false,
+      "firstBreak": 8.533333333333337,
+      "shots": [
+        6,
+        58
+      ],
+      "hits": [
+        2,
+        24
+      ],
+      "hullDamage": [
+        0,
+        137
+      ],
+      "lastShot": [
+        7.19999999999998,
+        18.566666666666894
+      ],
+      "a": {
+        "hull": 0,
+        "shield": 0
+      },
+      "b": {
+        "hull": 137,
+        "shield": 58
+      },
+      "recovery": [
+        null,
+        null
+      ]
+    },
+    {
+      "seed": 11,
+      "hull": "vanguard",
+      "seconds": 29.53,
+      "killed": true,
+      "fled": false,
+      "firstBreak": 10.700000000000111,
+      "shots": [
+        6,
+        42
+      ],
+      "hits": [
+        5,
+        33
+      ],
+      "hullDamage": [
+        0,
+        162
+      ],
+      "lastShot": [
+        9.500000000000052,
+        29.533333333332937
+      ],
+      "a": {
+        "hull": 0,
+        "shield": 0
+      },
+      "b": {
+        "hull": 162,
+        "shield": 75
+      },
+      "recovery": [
+        null,
+        null
+      ]
+    },
+    {
+      "seed": 23,
+      "hull": "talon",
+      "seconds": 35.13,
+      "killed": true,
+      "fled": false,
+      "firstBreak": 16.533333333333676,
+      "shots": [
+        29,
+        56
+      ],
+      "hits": [
+        10,
+        27
+      ],
+      "hullDamage": [
+        1.8216666666664878,
+        137
+      ],
+      "lastShot": [
+        23.88333333333326,
+        35.13333333333262
+      ],
+      "a": {
+        "hull": 0,
+        "shield": 0
+      },
+      "b": {
+        "hull": 135.1783333333335,
+        "shield": 40.87999999999995
+      },
+      "recovery": [
+        null,
+        null
+      ]
+    },
+    {
+      "seed": 23,
+      "hull": "vanguard",
+      "seconds": 20.18,
+      "killed": true,
+      "fled": false,
+      "firstBreak": 10.433333333333431,
+      "shots": [
+        48,
+        4
+      ],
+      "hits": [
+        30,
+        3
+      ],
+      "hullDamage": [
+        162,
+        0
+      ],
+      "lastShot": [
+        20.18333333333347,
+        1.2166666666666672
+      ],
+      "a": {
+        "hull": 162,
+        "shield": 75
+      },
+      "b": {
+        "hull": 0,
+        "shield": 0
+      },
+      "recovery": [
+        null,
+        null
+      ]
+    },
+    {
+      "seed": 37,
+      "hull": "talon",
+      "seconds": 27.48,
+      "killed": true,
+      "fled": false,
+      "firstBreak": 1.7666666666666653,
+      "shots": [
+        10,
+        46
+      ],
+      "hits": [
+        6,
+        26
+      ],
+      "hullDamage": [
+        0,
+        137
+      ],
+      "lastShot": [
+        12.133333333333516,
+        27.483333333333054
+      ],
+      "a": {
+        "hull": 0,
+        "shield": 0
+      },
+      "b": {
+        "hull": 137,
+        "shield": 58
+      },
+      "recovery": [
+        null,
+        null
+      ]
+    },
+    {
+      "seed": 37,
+      "hull": "vanguard",
+      "seconds": 16.78,
+      "killed": true,
+      "fled": false,
+      "firstBreak": 9.300000000000042,
+      "shots": [
+        5,
+        42
+      ],
+      "hits": [
+        3,
+        29
+      ],
+      "hullDamage": [
+        0,
+        162
+      ],
+      "lastShot": [
+        1.100000000000001,
+        16.716666666667
+      ],
+      "a": {
+        "hull": 0,
+        "shield": 0
+      },
+      "b": {
+        "hull": 162,
+        "shield": 75
+      },
+      "recovery": [
+        null,
+        null
+      ]
+    }
+  ]
+}

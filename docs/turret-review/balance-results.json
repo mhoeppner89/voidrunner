@@ -1,0 +1,242 @@
+[
+  {
+    "kind": "tracking-turret",
+    "target": "small",
+    "range": 50,
+    "motion": "straight",
+    "shots": 42,
+    "hits": 42,
+    "hitPercent": 100,
+    "dps": 8.4
+  },
+  {
+    "kind": "tracking-turret",
+    "target": "small",
+    "range": 50,
+    "motion": "weaving",
+    "shots": 42,
+    "hits": 42,
+    "hitPercent": 100,
+    "dps": 8.4
+  },
+  {
+    "kind": "tracking-turret",
+    "target": "small",
+    "range": 150,
+    "motion": "straight",
+    "shots": 42,
+    "hits": 29,
+    "hitPercent": 69,
+    "dps": 5.8
+  },
+  {
+    "kind": "tracking-turret",
+    "target": "small",
+    "range": 150,
+    "motion": "weaving",
+    "shots": 42,
+    "hits": 28,
+    "hitPercent": 67,
+    "dps": 5.6
+  },
+  {
+    "kind": "tracking-turret",
+    "target": "small",
+    "range": 299,
+    "motion": "straight",
+    "shots": 42,
+    "hits": 9,
+    "hitPercent": 21,
+    "dps": 1.8
+  },
+  {
+    "kind": "tracking-turret",
+    "target": "small",
+    "range": 299,
+    "motion": "weaving",
+    "shots": 31,
+    "hits": 7,
+    "hitPercent": 23,
+    "dps": 1.4
+  },
+  {
+    "kind": "tracking-turret",
+    "target": "large",
+    "range": 50,
+    "motion": "straight",
+    "shots": 42,
+    "hits": 42,
+    "hitPercent": 100,
+    "dps": 8.4
+  },
+  {
+    "kind": "tracking-turret",
+    "target": "large",
+    "range": 50,
+    "motion": "weaving",
+    "shots": 42,
+    "hits": 42,
+    "hitPercent": 100,
+    "dps": 8.4
+  },
+  {
+    "kind": "tracking-turret",
+    "target": "large",
+    "range": 150,
+    "motion": "straight",
+    "shots": 42,
+    "hits": 42,
+    "hitPercent": 100,
+    "dps": 8.4
+  },
+  {
+    "kind": "tracking-turret",
+    "target": "large",
+    "range": 150,
+    "motion": "weaving",
+    "shots": 42,
+    "hits": 42,
+    "hitPercent": 100,
+    "dps": 8.4
+  },
+  {
+    "kind": "tracking-turret",
+    "target": "large",
+    "range": 299,
+    "motion": "straight",
+    "shots": 42,
+    "hits": 42,
+    "hitPercent": 100,
+    "dps": 8.4
+  },
+  {
+    "kind": "tracking-turret",
+    "target": "large",
+    "range": 299,
+    "motion": "weaving",
+    "shots": 31,
+    "hits": 31,
+    "hitPercent": 100,
+    "dps": 6.2
+  },
+  {
+    "kind": "pdc",
+    "target": "small",
+    "range": 50,
+    "motion": "straight",
+    "shots": 170,
+    "hits": 170,
+    "hitPercent": 100,
+    "dps": 6.23
+  },
+  {
+    "kind": "pdc",
+    "target": "small",
+    "range": 50,
+    "motion": "weaving",
+    "shots": 170,
+    "hits": 170,
+    "hitPercent": 100,
+    "dps": 6.23
+  },
+  {
+    "kind": "pdc",
+    "target": "small",
+    "range": 150,
+    "motion": "straight",
+    "shots": 170,
+    "hits": 107,
+    "hitPercent": 63,
+    "dps": 3.92
+  },
+  {
+    "kind": "pdc",
+    "target": "small",
+    "range": 150,
+    "motion": "weaving",
+    "shots": 170,
+    "hits": 101,
+    "hitPercent": 59,
+    "dps": 3.7
+  },
+  {
+    "kind": "pdc",
+    "target": "small",
+    "range": 299,
+    "motion": "straight",
+    "shots": 170,
+    "hits": 38,
+    "hitPercent": 22,
+    "dps": 1.39
+  },
+  {
+    "kind": "pdc",
+    "target": "small",
+    "range": 299,
+    "motion": "weaving",
+    "shots": 76,
+    "hits": 16,
+    "hitPercent": 21,
+    "dps": 0.59
+  },
+  {
+    "kind": "pdc",
+    "target": "large",
+    "range": 50,
+    "motion": "straight",
+    "shots": 170,
+    "hits": 170,
+    "hitPercent": 100,
+    "dps": 6.23
+  },
+  {
+    "kind": "pdc",
+    "target": "large",
+    "range": 50,
+    "motion": "weaving",
+    "shots": 170,
+    "hits": 170,
+    "hitPercent": 100,
+    "dps": 6.23
+  },
+  {
+    "kind": "pdc",
+    "target": "large",
+    "range": 150,
+    "motion": "straight",
+    "shots": 170,
+    "hits": 170,
+    "hitPercent": 100,
+    "dps": 6.23
+  },
+  {
+    "kind": "pdc",
+    "target": "large",
+    "range": 150,
+    "motion": "weaving",
+    "shots": 170,
+    "hits": 170,
+    "hitPercent": 100,
+    "dps": 6.23
+  },
+  {
+    "kind": "pdc",
+    "target": "large",
+    "range": 299,
+    "motion": "straight",
+    "shots": 170,
+    "hits": 170,
+    "hitPercent": 100,
+    "dps": 6.23
+  },
+  {
+    "kind": "pdc",
+    "target": "large",
+    "range": 299,
+    "motion": "weaving",
+    "shots": 76,
+    "hits": 63,
+    "hitPercent": 83,
+    "dps": 2.31
+  }
+]

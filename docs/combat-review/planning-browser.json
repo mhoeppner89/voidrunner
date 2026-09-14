@@ -1,0 +1,81 @@
+{
+  "results": [
+    {
+      "fight": "2",
+      "playerHull": 295,
+      "playerRounds": 20,
+      "enemyShots": 15,
+      "enemyShooters": 1,
+      "roles": [
+        "solo"
+      ],
+      "pursuits": [
+        "direct",
+        "lead",
+        "lag"
+      ],
+      "moves": [
+        "drift-pass"
+      ],
+      "overshootFrames": 186,
+      "reapproaches": 0,
+      "burnFrames": 199,
+      "ships": [
+        {
+          "hull": 137,
+          "role": "solo",
+          "intent": "hunt",
+          "speed": 40.180437038307886,
+          "plans": 82
+        }
+      ]
+    },
+    {
+      "fight": "wing",
+      "playerHull": 0,
+      "playerRounds": 2,
+      "enemyShots": 136,
+      "enemyShooters": 3,
+      "roles": [
+        "pressure",
+        "flank"
+      ],
+      "pursuits": [
+        "direct",
+        "lead",
+        "lag"
+      ],
+      "moves": [
+        "drift-pass",
+        "boost-reversal"
+      ],
+      "overshootFrames": 508,
+      "reapproaches": 1,
+      "burnFrames": 649,
+      "ships": [
+        {
+          "hull": 137,
+          "role": "flank",
+          "intent": "hunt",
+          "speed": 78.68212632451873,
+          "plans": 75
+        },
+        {
+          "hull": 137,
+          "role": "flank",
+          "intent": "hunt",
+          "speed": 34.00041317117366,
+          "plans": 75
+        },
+        {
+          "hull": 225,
+          "role": "pressure",
+          "intent": "hunt",
+          "speed": 45.911465645580705,
+          "plans": 75
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

@@ -1,0 +1,76 @@
+Same hull, three equipment fits: mean ranges [ 225, 137, 215 ]
+30-second incoming projectile probe {
+  novice: { hits: 18, damage: 93.00000000000004 },
+  ace: { hits: 106, damage: 775.9000000000005 },
+  dodging: { hits: 12, damage: 40.800000000000004 }
+}
+(node:32061) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ shared flight preserves coasting, bounds thrust, and gives NPCs hull speed and finite afterburn fuel (22.496041ms)
+✔ sustained hits never postpone a pending reaction, and a later attack gets a fresh delay (0.127291ms)
+✔ veterans drift, aces also reverse; both recover through normal flight controls (45.215875ms)
+✔ an obstacle on the drift path cancels the ace commitment and starts its recovery interval (6.786125ms)
+✔ weapon rays are translation invariant, including spiral turns, and stop at real cover (34.296083ms)
+✔ intercept handles equal projectile speed and weapon-specific crossing velocities (0.099584ms)
+✔ one hull supports distinct equipment roles and each shot uses its equipped weapon (61.404875ms)
+✔ a faster ship commits to shield recovery and leaves it on a bounded cooldown (10.852542ms)
+✔ legacy rookie profiles normalize and tutorial/capital weapons retain authored limits (21.917625ms)
+✔ three aces punish stationary flight, while evasive flying reduces incoming damage (159.062791ms)
+✔ both three-enemy simulator scenarios stage varied equipment and ace pilots (15.840583ms)
+✔ ten actual waves advance once, wait for reinforcements, and unlock hard mode only on victory (29.132458ms)
+✔ offers and accepted equipment survive reload; a reward cannot be taken twice (28.178541ms)
+✔ hull changes preserve all copies, health fraction and limited ordnance; no empty forward fit (35.483667ms)
+✔ baseline service restores limited hull and one missile; loss remains lost on reload (21.709542ms)
+✔ interrupted combat returns to its fixed preparation checkpoint without changing offers or granting repairs (46.80675ms)
+✔ preparation screens render in both languages and every wave briefing is translated (14.030833ms)
+✔ hard mode raises pilot tiers and reduces automatic repairs (11.625ms)
+✔ repair is offered at 80% or below, replaced above it, including saved offers without rerolling the others (39.1ms)
+✔ actual undocked preparation fits earned thrusters and preserves inventory through swaps and reloads (25.9515ms)
+✔ normal and hard runs introduce finite ordnance only at wave four (235.412334ms)
+✔ new runs enter a frozen countdown directly, preserving throttle at every wave and resume (33.108875ms)
+✔ weapon sets fit matching mounts atomically and preserve replaced equipment (38.1705ms)
+✔ legacy completed runs stay completed and active checkpoints extend to ten waves (50.87225ms)
+✔ Vanguard wave precedes a fully serviced frigate boss (13.507208ms)
+✔ frigate spawn search stays ahead even when early positions are obstructed (11.7545ms)
+Same hull, three equipment fits: mean ranges [ 225, 137, 215 ]
+30-second incoming projectile probe {
+  novice: { hits: 18, damage: 93.00000000000004 },
+  ace: { hits: 106, damage: 775.9000000000005 },
+  dodging: { hits: 12, damage: 40.800000000000004 }
+}
+(node:32062) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ shared flight preserves coasting, bounds thrust, and gives NPCs hull speed and finite afterburn fuel (22.806458ms)
+✔ sustained hits never postpone a pending reaction, and a later attack gets a fresh delay (0.133333ms)
+✔ veterans drift, aces also reverse; both recover through normal flight controls (45.184625ms)
+✔ an obstacle on the drift path cancels the ace commitment and starts its recovery interval (7.512625ms)
+✔ weapon rays are translation invariant, including spiral turns, and stop at real cover (34.318583ms)
+✔ intercept handles equal projectile speed and weapon-specific crossing velocities (0.101ms)
+✔ one hull supports distinct equipment roles and each shot uses its equipped weapon (62.721ms)
+✔ a faster ship commits to shield recovery and leaves it on a bounded cooldown (10.595042ms)
+✔ legacy rookie profiles normalize and tutorial/capital weapons retain authored limits (18.686209ms)
+✔ three aces punish stationary flight, while evasive flying reduces incoming damage (152.106916ms)
+✔ both three-enemy simulator scenarios stage varied equipment and ace pilots (13.642959ms)
+✔ cockpit stages have exact boundaries and repair without permanent corruption (0.076084ms)
+✔ frigate charges, fires finite physical salvos, and does not use forward fighter fire (23.90275ms)
+✔ cover and stand-offs prevent main battery fire (19.830167ms)
+✔ exposed turret damage disables only the hit assembly (7.382833ms)
+✔ hostile patrols keep the player target; friendly patrols still defend against hostiles (6.524625ms)
+✔ all four frigate PDC mounts share one missile recovery channel (6.724583ms)
+✔ a real beam hit destroys an exposed assembly only after shields are down (6.683584ms)
+✔ frigate approach remains continuous across the old range threshold and keeps its broadside (12.121542ms)
+✔ physical asteroid cover blocks battery fire and breaking cover restarts the warning (13.041584ms)
+✔ subtarget selection moves beam assistance to the battery and skips destroyed mounts (6.76075ms)
+✔ main battery extents match the live capital hull and PDC scale (5.788125ms)
+✔ boss recovery is a shared, five-second anti-ship ceasefire (15.971167ms)
+✔ boss commits to the observed course before its salvo and cover cancels it (8.456792ms)
+✔ ion shield damage does not multiply the fitted hull shield capacity (1.615167ms)
+✔ destroying all main batteries ends attack warnings and anti-ship salvos (7.642959ms)
+ℹ tests 52
+ℹ suites 0
+ℹ pass 52
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1258.8775

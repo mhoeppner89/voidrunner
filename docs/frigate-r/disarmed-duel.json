@@ -1,0 +1,23 @@
+[
+  {
+    "hull": "vanguard",
+    "gun": "pulse-cannon",
+    "moving": true,
+    "seconds": 29.349999999999614,
+    "playerHull": 295,
+    "playerShield": 610.1399999999994,
+    "bossHull": 0,
+    "bossShield": 0,
+    "rounds": 69,
+    "samples": [
+      {
+        "time": 0.016666666666666666,
+        "range": 360,
+        "playerHull": 295,
+        "bossHull": 1600,
+        "bossShield": 0,
+        "rounds": 0
+      }
+    ]
+  }
+]

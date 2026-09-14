@@ -1,0 +1,307 @@
+{
+  "exposure": [
+    {
+      "seed": 11,
+      "tier": "novice",
+      "initial": {
+        "hull": 185,
+        "shield": 90
+      },
+      "seconds": 59.999999999997875,
+      "firstHit": 3.7999999999999914,
+      "shieldBreak": null,
+      "hull": 185,
+      "shield": 48,
+      "enemyGuns": [
+        "pulse-cannon",
+        "pulse-cannon",
+        "gauss-cannon"
+      ],
+      "losses": {
+        "weapons fire": 10,
+        "missile strike": 168
+      }
+    },
+    {
+      "seed": 11,
+      "tier": "veteran",
+      "initial": {
+        "hull": 185,
+        "shield": 90
+      },
+      "seconds": 56.499999999998074,
+      "firstHit": 2.0999999999999974,
+      "shieldBreak": 3.4166666666666594,
+      "hull": 0,
+      "shield": 0,
+      "enemyGuns": [
+        "pulse-cannon",
+        "pulse-cannon",
+        "gauss-cannon"
+      ],
+      "losses": {
+        "weapons fire": 262.90833333333245,
+        "missile strike": 168
+      }
+    },
+    {
+      "seed": 23,
+      "tier": "novice",
+      "initial": {
+        "hull": 185,
+        "shield": 90
+      },
+      "seconds": 59.999999999997875,
+      "firstHit": 4.599999999999989,
+      "shieldBreak": null,
+      "hull": 185,
+      "shield": 38,
+      "enemyGuns": [
+        "pulse-cannon",
+        "pulse-cannon",
+        "gauss-cannon"
+      ],
+      "losses": {
+        "missile strike": 168,
+        "weapons fire": 20
+      }
+    },
+    {
+      "seed": 23,
+      "tier": "veteran",
+      "initial": {
+        "hull": 185,
+        "shield": 90
+      },
+      "seconds": 40.28333333333233,
+      "firstHit": 1.1333333333333342,
+      "shieldBreak": 3.9999999999999907,
+      "hull": 0,
+      "shield": 0,
+      "enemyGuns": [
+        "pulse-cannon",
+        "pulse-cannon",
+        "gauss-cannon"
+      ],
+      "losses": {
+        "weapons fire": 253.58666666666608,
+        "missile strike": 126
+      }
+    },
+    {
+      "seed": 37,
+      "tier": "novice",
+      "initial": {
+        "hull": 185,
+        "shield": 90
+      },
+      "seconds": 59.999999999997875,
+      "firstHit": 4.666666666666655,
+      "shieldBreak": null,
+      "hull": 185,
+      "shield": 38,
+      "enemyGuns": [
+        "pulse-cannon",
+        "pulse-cannon",
+        "gauss-cannon"
+      ],
+      "losses": {
+        "missile strike": 168,
+        "weapons fire": 20
+      }
+    },
+    {
+      "seed": 37,
+      "tier": "veteran",
+      "initial": {
+        "hull": 185,
+        "shield": 90
+      },
+      "seconds": 59.999999999997875,
+      "firstHit": 3.049999999999994,
+      "shieldBreak": 22.966666666666644,
+      "hull": 18.5799999999996,
+      "shield": 0,
+      "enemyGuns": [
+        "pulse-cannon",
+        "pulse-cannon",
+        "gauss-cannon"
+      ],
+      "losses": {
+        "weapons fire": 240,
+        "missile strike": 168
+      }
+    }
+  ],
+  "duels": [
+    {
+      "seed": 11,
+      "mixed": false,
+      "seconds": 42.049999999998896,
+      "a": {
+        "hull": 73.11188081602134,
+        "maxHull": 162,
+        "shield": 75,
+        "energy": 100.60000000000002,
+        "fleeing": false,
+        "shots": 44,
+        "shieldBreak": 2.1833333333333305
+      },
+      "b": {
+        "hull": 0,
+        "maxHull": 162,
+        "shield": 0,
+        "energy": 108,
+        "fleeing": false,
+        "shots": 15,
+        "shieldBreak": 2.666666666666662
+      },
+      "losses": {
+        "A:pulse": 140,
+        "B:pulse": 332.1902141493546,
+        "A:collision-or-ordnance": 23.88811918397866,
+        "B:collision-or-ordnance": 23.88811918397866
+      }
+    },
+    {
+      "seed": 11,
+      "mixed": true,
+      "seconds": 53.183333333331596,
+      "a": {
+        "hull": 83.11188081602134,
+        "maxHull": 162,
+        "shield": 75,
+        "energy": 102.45000000000007,
+        "fleeing": false,
+        "shots": 44,
+        "shieldBreak": 2.1833333333333305
+      },
+      "b": {
+        "hull": 0,
+        "maxHull": 162,
+        "shield": 0,
+        "energy": 108,
+        "fleeing": false,
+        "shots": 15,
+        "shieldBreak": 2.1833333333333305
+      },
+      "losses": {
+        "A:pulse": 130,
+        "B:ion": 180.09687499999995,
+        "B:pulse": 188.84000581602135,
+        "A:collision-or-ordnance": 23.88811918397866,
+        "B:collision-or-ordnance": 23.88811918397866
+      }
+    },
+    {
+      "seed": 23,
+      "mixed": false,
+      "seconds": 34.09999999999935,
+      "a": {
+        "hull": 107.17333333333309,
+        "maxHull": 162,
+        "shield": 59.71333333333285,
+        "energy": 99.5416666666674,
+        "fleeing": false,
+        "shots": 60,
+        "shieldBreak": 3.0833333333333273
+      },
+      "b": {
+        "hull": 0,
+        "maxHull": 162,
+        "shield": 0,
+        "energy": 108,
+        "fleeing": false,
+        "shots": 34,
+        "shieldBreak": 2.966666666666661
+      },
+      "losses": {
+        "B:pulse": 338.2299999999995,
+        "A:pulse": 180
+      }
+    },
+    {
+      "seed": 23,
+      "mixed": true,
+      "seconds": 29.466666666666274,
+      "a": {
+        "hull": 162,
+        "maxHull": 162,
+        "shield": 55,
+        "energy": 106.5000000000001,
+        "fleeing": false,
+        "shots": 44,
+        "shieldBreak": null
+      },
+      "b": {
+        "hull": 0,
+        "maxHull": 162,
+        "shield": 0,
+        "energy": 108,
+        "fleeing": false,
+        "shots": 17,
+        "shieldBreak": 3.133333333333327
+      },
+      "losses": {
+        "B:ion": 88.38583333333348,
+        "A:pulse": 60,
+        "B:pulse": 220.34083333333336
+      }
+    },
+    {
+      "seed": 37,
+      "mixed": false,
+      "seconds": 28.249999999999677,
+      "a": {
+        "hull": 0,
+        "maxHull": 162,
+        "shield": 0,
+        "energy": 108,
+        "fleeing": false,
+        "shots": 20,
+        "shieldBreak": 3.0833333333333273
+      },
+      "b": {
+        "hull": 162,
+        "maxHull": 162,
+        "shield": 75,
+        "energy": 107.75000000000009,
+        "fleeing": false,
+        "shots": 45,
+        "shieldBreak": null
+      },
+      "losses": {
+        "A:pulse": 308.90333333333353,
+        "B:pulse": 60
+      }
+    },
+    {
+      "seed": 37,
+      "mixed": true,
+      "seconds": 28.166666666666348,
+      "a": {
+        "hull": 0,
+        "maxHull": 162,
+        "shield": 0,
+        "energy": 103.3000000000001,
+        "fleeing": false,
+        "shots": 25,
+        "shieldBreak": 3.0833333333333273
+      },
+      "b": {
+        "hull": 121.375,
+        "maxHull": 162,
+        "shield": 31.531666666666332,
+        "energy": 102.18541666666707,
+        "fleeing": false,
+        "shots": 50,
+        "shieldBreak": 2.749999999999995
+      },
+      "losses": {
+        "A:pulse": 306.8716666666668,
+        "B:ion": 75.625,
+        "B:pulse": 90
+      }
+    }
+  ]
+}

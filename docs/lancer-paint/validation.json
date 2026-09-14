@@ -1,0 +1,42 @@
+{
+  "triangles": 28978,
+  "geometryUnchanged": true,
+  "issues": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 0,
+    "numHints": 0,
+    "messages": [],
+    "truncated": false
+  },
+  "materials": [
+    {
+      "name": "VR_Canopy_Glass"
+    },
+    {
+      "name": "VR_Canopy_Frame"
+    },
+    {
+      "name": "VR_Lancer_Nose_Armor",
+      "base": [
+        2048,
+        2048
+      ],
+      "metalRough": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "name": "VR_Lancer_Hull_Armor",
+      "base": [
+        2048,
+        2048
+      ],
+      "metalRough": [
+        2048,
+        2048
+      ]
+    }
+  ]
+}

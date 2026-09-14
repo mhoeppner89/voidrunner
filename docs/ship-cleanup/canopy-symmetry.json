@@ -1,0 +1,23 @@
+{
+  "ships": [
+    {
+      "hull": "atlas",
+      "panes": 10,
+      "reseatedHullVertices": 58,
+      "maxOriginalMirrorError": 6.143906154658885e-08
+    },
+    {
+      "hull": "lancer",
+      "panes": 6,
+      "reseatedHullVertices": 81,
+      "maxOriginalMirrorError": 0
+    },
+    {
+      "hull": "wayfarer",
+      "panes": 9,
+      "reseatedHullVertices": 111,
+      "maxOriginalMirrorError": 0,
+      "maxFrameReturnDepth": 0.012386650696396828
+    }
+  ]
+}

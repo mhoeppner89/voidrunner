@@ -1,0 +1,41 @@
+{
+  "results": [
+    {
+      "wave": 3,
+      "tier": "veteran",
+      "seconds": 20,
+      "shots": 177,
+      "medianRange": 75.75254945512398,
+      "huntFraction": 1,
+      "trackingFraction": 0.9979144942648592,
+      "meanAimError": 2.2876290774999717,
+      "attackAimError": 2.288820579026897,
+      "playerHull": 259.7766666666667,
+      "playerShield": 0,
+      "weapons": [
+        "ripper",
+        "ripper",
+        "ion"
+      ]
+    },
+    {
+      "wave": 6,
+      "tier": "ace",
+      "seconds": 20,
+      "shots": 208,
+      "medianRange": 75.76436751786454,
+      "huntFraction": 1,
+      "trackingFraction": 0.9979144942648592,
+      "meanAimError": 2.0459779674926564,
+      "attackAimError": 2.0470958240673074,
+      "playerHull": 251.375,
+      "playerShield": 0,
+      "weapons": [
+        "ripper",
+        "ripper",
+        "ion"
+      ]
+    }
+  ],
+  "errors": []
+}

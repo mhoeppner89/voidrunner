@@ -1,0 +1,56 @@
+{
+  "results": [
+    {
+      "tier": "novice",
+      "seconds": 20,
+      "weapons": [
+        "pulse",
+        "pulse",
+        "beam"
+      ],
+      "beamShots": 6,
+      "meanBeamError": 0.3380221756742256,
+      "physicalShots": 14,
+      "medianRange": 201.52758648499062,
+      "speculativeSeconds": 1.1333333333333333,
+      "observedAcceleration": 17.04117232777793,
+      "playerHull": 295,
+      "playerShield": 126
+    },
+    {
+      "tier": "veteran",
+      "seconds": 20,
+      "weapons": [
+        "pulse",
+        "pulse",
+        "beam"
+      ],
+      "beamShots": 22,
+      "meanBeamError": 0.10329288909780342,
+      "physicalShots": 33,
+      "medianRange": 160.32949343768863,
+      "speculativeSeconds": 1.7,
+      "observedAcceleration": 17.049015158273477,
+      "playerHull": 259,
+      "playerShield": 0
+    },
+    {
+      "tier": "ace",
+      "seconds": 20,
+      "weapons": [
+        "pulse",
+        "pulse",
+        "beam"
+      ],
+      "beamShots": 32,
+      "meanBeamError": 0.02657334040244882,
+      "physicalShots": 74,
+      "medianRange": 148.5126014873664,
+      "speculativeSeconds": 0.85,
+      "observedAcceleration": 17.049015158273477,
+      "playerHull": 109,
+      "playerShield": 0
+    }
+  ],
+  "errors": []
+}

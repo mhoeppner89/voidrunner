@@ -1,0 +1,50 @@
+[
+  {
+    "hull": "atlas",
+    "maxBoundsChange": 0.00042891502380371094,
+    "validatorErrors": 0,
+    "validatorWarnings": 0,
+    "oldBytes": 2586672,
+    "newBytes": 2813804
+  },
+  {
+    "hull": "prospector",
+    "maxBoundsChange": 0.0006476640701293945,
+    "validatorErrors": 0,
+    "validatorWarnings": 0,
+    "oldBytes": 3748816,
+    "newBytes": 3456920
+  },
+  {
+    "hull": "wayfarer",
+    "maxBoundsChange": 0.0004075169563293457,
+    "validatorErrors": 0,
+    "validatorWarnings": 0,
+    "oldBytes": 1944888,
+    "newBytes": 1405492
+  },
+  {
+    "hull": "talon",
+    "maxBoundsChange": 4.7713518142700195e-05,
+    "validatorErrors": 0,
+    "validatorWarnings": 0,
+    "oldBytes": 1410664,
+    "newBytes": 1705088
+  },
+  {
+    "hull": "vanguard",
+    "maxBoundsChange": 0.0004578828811645508,
+    "validatorErrors": 0,
+    "validatorWarnings": 0,
+    "oldBytes": 3602624,
+    "newBytes": 3255076
+  },
+  {
+    "hull": "lancer",
+    "maxBoundsChange": 0.00040781497955322266,
+    "validatorErrors": 0,
+    "validatorWarnings": 0,
+    "oldBytes": 2291280,
+    "newBytes": 2236152
+  }
+]

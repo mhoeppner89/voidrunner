@@ -1,0 +1,86 @@
+[
+  {
+    "hull": "wayfarer",
+    "gun": "pulse-cannon",
+    "moving": true,
+    "seconds": 25.78333333333315,
+    "playerHull": 0,
+    "playerShield": 0,
+    "bossHull": 730,
+    "bossShield": 0,
+    "rounds": 46,
+    "samples": [
+      {
+        "time": 0.016666666666666666,
+        "range": 360,
+        "playerHull": 185,
+        "bossHull": 1400,
+        "bossShield": 650,
+        "rounds": 0
+      }
+    ]
+  },
+  {
+    "hull": "vanguard",
+    "gun": "pulse-cannon",
+    "moving": true,
+    "seconds": 24.23333333333324,
+    "playerHull": 192.05999999999995,
+    "playerShield": 10.511666666666638,
+    "bossHull": 0,
+    "bossShield": 0,
+    "rounds": 38,
+    "samples": [
+      {
+        "time": 0.016666666666666666,
+        "range": 360,
+        "playerHull": 295,
+        "bossHull": 1400,
+        "bossShield": 650,
+        "rounds": 0
+      }
+    ]
+  },
+  {
+    "hull": "wayfarer",
+    "gun": "pulse-cannon",
+    "moving": false,
+    "seconds": 16.83333333333366,
+    "playerHull": 0,
+    "playerShield": 0,
+    "bossHull": 960,
+    "bossShield": 0,
+    "rounds": 17,
+    "samples": [
+      {
+        "time": 0.016666666666666666,
+        "range": 360,
+        "playerHull": 185,
+        "bossHull": 1400,
+        "bossShield": 650,
+        "rounds": 0
+      }
+    ]
+  },
+  {
+    "hull": "vanguard",
+    "gun": "pulse-cannon",
+    "moving": false,
+    "seconds": 21.416666666666732,
+    "playerHull": 119.85999999999997,
+    "playerShield": 0,
+    "bossHull": 0,
+    "bossShield": 0,
+    "rounds": 19,
+    "samples": [
+      {
+        "time": 0.016666666666666666,
+        "range": 360,
+        "playerHull": 295,
+        "bossHull": 1400,
+        "bossShield": 650,
+        "rounds": 0
+      }
+    ]
+  }
+]

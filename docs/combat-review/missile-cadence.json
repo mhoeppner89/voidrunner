@@ -1,0 +1,44 @@
+[
+  {
+    "id": "seeker",
+    "gap": 0,
+    "count": 1,
+    "pdcShots": 1,
+    "damage": 0
+  },
+  {
+    "id": "seeker",
+    "gap": 0.15,
+    "count": 2,
+    "pdcShots": 1,
+    "damage": 42
+  },
+  {
+    "id": "seeker",
+    "gap": 1.1,
+    "count": 2,
+    "pdcShots": 1,
+    "damage": 42
+  },
+  {
+    "id": "swarm",
+    "gap": 0,
+    "count": 4,
+    "pdcShots": 1,
+    "damage": 45
+  },
+  {
+    "id": "torpedo",
+    "gap": 0,
+    "count": 1,
+    "pdcShots": 1,
+    "damage": 0
+  },
+  {
+    "id": "torpedo",
+    "gap": 2.6,
+    "count": 2,
+    "pdcShots": 2,
+    "damage": 0
+  }
+]

@@ -1,0 +1,19 @@
+{
+  "errors": [],
+  "perf": [
+    {
+      "hull": 1,
+      "medianSubmitMs": 0.5999999940395355,
+      "calls": 98,
+      "triangles": 226880,
+      "textures": 22
+    },
+    {
+      "hull": 0.08,
+      "medianSubmitMs": 0.5,
+      "calls": 98,
+      "triangles": 226880,
+      "textures": 22
+    }
+  ]
+}

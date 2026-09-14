@@ -1,0 +1,19 @@
+{
+  "state": {
+    "phase": "combat",
+    "countdown": 0,
+    "playerHull": "talon",
+    "enemies": [
+      {
+        "hull": 137,
+        "position": [
+          -66.05657842289655,
+          59.85868499818215,
+          -169.76392698365234
+        ],
+        "intent": "hunt"
+      }
+    ]
+  },
+  "errors": []
+}

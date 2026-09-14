@@ -1,0 +1,113 @@
+{
+  "idealPlayer": [],
+  "duels": [
+    {
+      "seed": 11,
+      "hull": "mixed",
+      "seconds": 11.17,
+      "killed": true,
+      "fled": false,
+      "firstBreak": 10.516666666666769,
+      "shots": [
+        47,
+        18
+      ],
+      "hits": [
+        21,
+        13
+      ],
+      "hullDamage": [
+        161.99999999999997,
+        10
+      ],
+      "lastShot": [
+        11.116666666666799,
+        11.066666666666796
+      ],
+      "a": {
+        "hull": 127,
+        "shield": 29.65166666666689
+      },
+      "b": {
+        "hull": 0,
+        "shield": 0
+      },
+      "recovery": [
+        null,
+        null
+      ]
+    },
+    {
+      "seed": 23,
+      "hull": "mixed",
+      "seconds": 12.28,
+      "killed": true,
+      "fled": false,
+      "firstBreak": 1.5333333333333328,
+      "shots": [
+        33,
+        16
+      ],
+      "hits": [
+        21,
+        11
+      ],
+      "hullDamage": [
+        161.99999999999997,
+        0
+      ],
+      "lastShot": [
+        12.133333333333516,
+        12.03333333333351
+      ],
+      "a": {
+        "hull": 137,
+        "shield": 57.67
+      },
+      "b": {
+        "hull": 0,
+        "shield": 0
+      },
+      "recovery": [
+        null,
+        null
+      ]
+    },
+    {
+      "seed": 37,
+      "hull": "mixed",
+      "seconds": 20.58,
+      "killed": true,
+      "fled": false,
+      "firstBreak": 18.133333333333585,
+      "shots": [
+        86,
+        47
+      ],
+      "hits": [
+        28,
+        33
+      ],
+      "hullDamage": [
+        161.99999999999994,
+        0
+      ],
+      "lastShot": [
+        20.30000000000013,
+        18.85000000000021
+      ],
+      "a": {
+        "hull": 137,
+        "shield": 29.453333333333504
+      },
+      "b": {
+        "hull": 0,
+        "shield": 0
+      },
+      "recovery": [
+        null,
+        null
+      ]
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "exposure": [
+    {
+      "seed": 11,
+      "tier": "novice",
+      "emitted": {
+        "gauss": 21,
+        "pulse": 37
+      },
+      "lastGunShot": 59.999999999997875,
+      "initial": {
+        "hull": 185,
+        "shield": 90
+      },
+      "seconds": 59.999999999997875,
+      "firstHit": 3.7999999999999914,
+      "shieldBreak": null,
+      "hull": 185,
+      "shield": 38,
+      "enemyGuns": [
+        "pulse-cannon",
+        "pulse-cannon",
+        "gauss-cannon"
+      ],
+      "losses": {
+        "weapons fire": 30,
+        "missile strike": 168
+      }
+    },
+    {
+      "seed": 23,
+      "tier": "novice",
+      "emitted": {
+        "gauss": 20,
+        "pulse": 36
+      },
+      "lastGunShot": 58.799999999997944,
+      "initial": {
+        "hull": 185,
+        "shield": 90
+      },
+      "seconds": 59.999999999997875,
+      "firstHit": 4.599999999999989,
+      "shieldBreak": null,
+      "hull": 185,
+      "shield": 48,
+      "enemyGuns": [
+        "pulse-cannon",
+        "pulse-cannon",
+        "gauss-cannon"
+      ],
+      "losses": {
+        "missile strike": 168,
+        "weapons fire": 10
+      }
+    },
+    {
+      "seed": 37,
+      "tier": "novice",
+      "emitted": {
+        "gauss": 20,
+        "pulse": 36
+      },
+      "lastGunShot": 59.11666666666459,
+      "initial": {
+        "hull": 185,
+        "shield": 90
+      },
+      "seconds": 59.999999999997875,
+      "firstHit": 4.666666666666655,
+      "shieldBreak": null,
+      "hull": 175,
+      "shield": 37.99166666666754,
+      "enemyGuns": [
+        "pulse-cannon",
+        "pulse-cannon",
+        "gauss-cannon"
+      ],
+      "losses": {
+        "missile strike": 168,
+        "weapons fire": 50
+      }
+    }
+  ],
+  "duels": []
+}

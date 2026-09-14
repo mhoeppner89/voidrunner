@@ -1,0 +1,13 @@
+import {createRequire} from 'node:module';
+import {resolve} from 'node:path';
+import {writeFile} from 'node:fs/promises';
+const require=createRequire(resolve(process.env.GLTF_TOOLS_ROOT??'/tmp/voidrunner-gltf-tools','package.json'));
+const {NodeIO}=require('@gltf-transform/core'),{dedup,prune}=require('@gltf-transform/functions'),sharp=require('sharp'),validator=require('gltf-validator');
+const io=new NodeIO(),d=await io.read('.freebuff/frigate-r/geometry.glb');
+for(const t of d.getRoot().listTextures())t.setImage(await sharp(t.getImage()).resize(512,512,{kernel:'lanczos3'}).linear(1.07,-8.96).sharpen({sigma:.6,m1:.6,m2:1.2,x1:2,y2:4,y3:8}).jpeg({quality:93,chromaSubsampling:'4:4:4'}).toBuffer()).setMimeType('image/jpeg');
+await d.transform(dedup(),prune());
+const bytes=await io.writeBinary(d),v=await validator.validateBytes(bytes);
+if(v.issues.numErrors)throw Error(JSON.stringify(v.issues));
+await writeFile('assets/models/capital/concord-frigate.glb',bytes);
+await writeFile('docs/frigate-r/validation.json',JSON.stringify({bytes:bytes.length,issues:v.issues},null,2));
+console.log({bytes:bytes.length,errors:v.issues.numErrors});

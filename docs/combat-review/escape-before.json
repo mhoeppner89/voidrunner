@@ -1,0 +1,113 @@
+[
+  {
+    "tier": "novice",
+    "pursuer": "stationary Wayfarer",
+    "maxSpeed": 107.3,
+    "maxRange": 565,
+    "boostPct": 16,
+    "fullSpeedPct": 0,
+    "shieldRegained": 44,
+    "finalShield": 29,
+    "intents": {
+      "hunt": 12.250000000000188,
+      "recover": 0.2833333333333333,
+      "evade": 22.466666666666672
+    },
+    "moves": {}
+  },
+  {
+    "tier": "veteran",
+    "pursuer": "stationary Wayfarer",
+    "maxSpeed": 107.1,
+    "maxRange": 491,
+    "boostPct": 28,
+    "fullSpeedPct": 0,
+    "shieldRegained": 67.1,
+    "finalShield": 52.4,
+    "intents": {
+      "hunt": 23.1333333333333,
+      "recover": 2.549999999999996,
+      "evade": 3.4666666666666592,
+      "reposition": 5.8499999999999845
+    },
+    "moves": {
+      "drift-pass": 1.7166666666666655
+    }
+  },
+  {
+    "tier": "ace",
+    "pursuer": "stationary Wayfarer",
+    "maxSpeed": 104.7,
+    "maxRange": 263,
+    "boostPct": 33,
+    "fullSpeedPct": 0,
+    "shieldRegained": 69,
+    "finalShield": 58,
+    "intents": {
+      "hunt": 24.799999999999873,
+      "recover": 1.100000000000001,
+      "evade": 3.5499999999999923,
+      "reposition": 5.549999999999986
+    },
+    "moves": {
+      "drift-pass": 1.5999999999999992,
+      "boost-reversal": 1.8499999999999983
+    }
+  },
+  {
+    "tier": "novice",
+    "pursuer": "Wayfarer full boost",
+    "maxSpeed": 94.9,
+    "maxRange": 383,
+    "boostPct": 14,
+    "fullSpeedPct": 0,
+    "shieldRegained": 60,
+    "finalShield": 58,
+    "intents": {
+      "hunt": 20.400000000000123,
+      "recover": 1.266666666666667,
+      "evade": 11.050000000000129,
+      "reposition": 2.28333333333333
+    },
+    "moves": {}
+  },
+  {
+    "tier": "veteran",
+    "pursuer": "Wayfarer full boost",
+    "maxSpeed": 112.3,
+    "maxRange": 365,
+    "boostPct": 22,
+    "fullSpeedPct": 0,
+    "shieldRegained": 62.9,
+    "finalShield": 55.9,
+    "intents": {
+      "hunt": 25.31666666666651,
+      "recover": 3.1499999999999937,
+      "evade": 3.0666666666666607,
+      "reposition": 3.4666666666666592
+    },
+    "moves": {
+      "drift-pass": 1.100000000000001
+    }
+  },
+  {
+    "tier": "ace",
+    "pursuer": "Wayfarer full boost",
+    "maxSpeed": 96.6,
+    "maxRange": 309,
+    "boostPct": 22,
+    "fullSpeedPct": 0,
+    "shieldRegained": 58,
+    "finalShield": 53,
+    "intents": {
+      "hunt": 28.399999999999668,
+      "recover": 0.08333333333333333,
+      "evade": 3.1499999999999937,
+      "reposition": 3.3666666666666596
+    },
+    "moves": {
+      "drift-pass": 1.5999999999999992,
+      "boost-reversal": 1.2000000000000006
+    }
+  }
+]

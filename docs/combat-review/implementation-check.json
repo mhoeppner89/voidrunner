@@ -1,0 +1,473 @@
+{
+  "patrol": {
+    "patrol": "ship-1",
+    "enemy": "ship-2",
+    "hostileTarget": "ship-2",
+    "normalTarget": "ship-2",
+    "occludedTarget": "ship-2"
+  },
+  "firing": [
+    {
+      "role": "pirate",
+      "item": "pulse-cannon",
+      "profile": "fighter",
+      "shots": 38,
+      "lastShot": 26.399999999999782,
+      "tail": [
+        {
+          "t": 26,
+          "angle": 1.3,
+          "distance": 129.1,
+          "phase": "approach",
+          "speed": 41.54146885523218,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 9.119804949240562,
+          "quatError": 0,
+          "angular": [
+            0.0016178375496608299,
+            -0.04102826350009514,
+            -0.017786647477427607
+          ],
+          "fleeing": false,
+          "hull": 137,
+          "energy": 58,
+          "shots": 35
+        },
+        {
+          "t": 27,
+          "angle": 5.38,
+          "distance": 99.6,
+          "phase": "approach",
+          "speed": 10.124369322870786,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 1.6103739770061314,
+          "quatError": 0,
+          "angular": [
+            0.0007081295507949784,
+            -0.035810793198671,
+            -0.017029586897775277
+          ],
+          "fleeing": false,
+          "hull": 137,
+          "energy": 58,
+          "shots": 38
+        },
+        {
+          "t": 28,
+          "angle": 6.58,
+          "distance": 95.2,
+          "phase": "approach",
+          "speed": 4.038379246323869,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 0.6505433226879409,
+          "quatError": 0,
+          "angular": [
+            0.00040198420164292364,
+            -0.01580491052217684,
+            -0.006376715097548708
+          ],
+          "fleeing": false,
+          "hull": 137,
+          "energy": 58,
+          "shots": 38
+        },
+        {
+          "t": 29,
+          "angle": 7.27,
+          "distance": 91.2,
+          "phase": "approach",
+          "speed": 4.0078877204937475,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 0.27083534284696836,
+          "quatError": 0,
+          "angular": [
+            0.0003388226240761898,
+            -0.006531132134840718,
+            -0.0024964720381013814
+          ],
+          "fleeing": false,
+          "hull": 137,
+          "energy": 58,
+          "shots": 38
+        },
+        {
+          "t": 30,
+          "angle": 7.76,
+          "distance": 87.2,
+          "phase": "approach",
+          "speed": 4.0015937721485075,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 0.11913728204068884,
+          "quatError": 0,
+          "angular": [
+            0.00018652944586039816,
+            -0.0028102357539258067,
+            -0.0021979927353566087
+          ],
+          "fleeing": false,
+          "hull": 137,
+          "energy": 58,
+          "shots": 38
+        }
+      ]
+    },
+    {
+      "role": "patrol",
+      "item": "pulse-cannon",
+      "profile": "fighter",
+      "shots": 37,
+      "lastShot": 29.966666666666246,
+      "tail": [
+        {
+          "t": 26,
+          "angle": 6.8,
+          "distance": 294.9,
+          "phase": "approach",
+          "speed": 11.06411657001501,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 6.799659277363554,
+          "quatError": 0,
+          "angular": [
+            -0.003341489413549253,
+            0.1924280435347866,
+            -0.007778686810761959
+          ],
+          "fleeing": false,
+          "hull": 162,
+          "energy": 108,
+          "shots": 20
+        },
+        {
+          "t": 27,
+          "angle": 1.26,
+          "distance": 282.1,
+          "phase": "approach",
+          "speed": 19.833198167545845,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 1.2572502234508782,
+          "quatError": 0,
+          "angular": [
+            -0.0009955210947484988,
+            0.04671859476907861,
+            -0.003079881401236157
+          ],
+          "fleeing": false,
+          "hull": 162,
+          "energy": 108,
+          "shots": 23
+        },
+        {
+          "t": 28,
+          "angle": 0.25,
+          "distance": 253.8,
+          "phase": "approach",
+          "speed": 36.668303457008946,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 0.2498192958246001,
+          "quatError": 0,
+          "angular": [
+            -0.00014794349420732422,
+            0.009025647916643566,
+            -0.0015993455834247168
+          ],
+          "fleeing": false,
+          "hull": 162,
+          "energy": 106.15,
+          "shots": 28
+        },
+        {
+          "t": 29,
+          "angle": 0.14,
+          "distance": 209.5,
+          "phase": "approach",
+          "speed": 47.98599315499543,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 0.14488137909520285,
+          "quatError": 0,
+          "angular": [
+            -0.0000041125376669436346,
+            0.00304742882175024,
+            -0.0009043718095400342
+          ],
+          "fleeing": false,
+          "hull": 162,
+          "energy": 108,
+          "shots": 32
+        },
+        {
+          "t": 30,
+          "angle": 1.18,
+          "distance": 162.1,
+          "phase": "approach",
+          "speed": 46.27588722374899,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 6.447700081708554,
+          "quatError": 0,
+          "angular": [
+            0.0014739731049008573,
+            -0.06568230177421648,
+            -0.028970726458827832
+          ],
+          "fleeing": false,
+          "hull": 162,
+          "energy": 105.7,
+          "shots": 37
+        }
+      ]
+    },
+    {
+      "role": "patrol",
+      "item": "ion-blaster",
+      "profile": "interceptor",
+      "shots": 20,
+      "lastShot": 29.083333333332963,
+      "tail": [
+        {
+          "t": 26,
+          "angle": 2.9,
+          "distance": 144.7,
+          "phase": "approach",
+          "speed": 45.70127188313722,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 7.7369855540197525,
+          "quatError": 0,
+          "angular": [
+            0.0022453842683857615,
+            -0.10560519448227768,
+            -0.025990087600108562
+          ],
+          "fleeing": false,
+          "hull": 162,
+          "energy": 108,
+          "shots": 17
+        },
+        {
+          "t": 27,
+          "angle": 6.73,
+          "distance": 108.5,
+          "phase": "approach",
+          "speed": 25.793933694923336,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 6.729257685814204,
+          "quatError": 0,
+          "angular": [
+            -0.0013476042152891804,
+            0.048073909987301704,
+            0.007146872198976263
+          ],
+          "fleeing": false,
+          "hull": 162,
+          "energy": 108,
+          "shots": 17
+        },
+        {
+          "t": 28,
+          "angle": 2.75,
+          "distance": 92.8,
+          "phase": "approach",
+          "speed": 11.546023941873784,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 2.750536753140344,
+          "quatError": 0,
+          "angular": [
+            -0.0015816582859561905,
+            0.06539689361088964,
+            0.01042281604934437
+          ],
+          "fleeing": false,
+          "hull": 162,
+          "energy": 103.95000000000003,
+          "shots": 18
+        },
+        {
+          "t": 29,
+          "angle": 1.77,
+          "distance": 73.2,
+          "phase": "approach",
+          "speed": 23.540471199001335,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 5.160632092431568,
+          "quatError": 0,
+          "angular": [
+            0.0006729313048683863,
+            -0.04345084531709917,
+            -0.013726764657132474
+          ],
+          "fleeing": false,
+          "hull": 162,
+          "energy": 108,
+          "shots": 19
+        },
+        {
+          "t": 30,
+          "angle": 4.33,
+          "distance": 55.7,
+          "phase": "approach",
+          "speed": 8.201883141639726,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 4.326694386410293,
+          "quatError": 0,
+          "angular": [
+            -0.0010040965740884399,
+            0.03651468825122537,
+            0.0030804982615335835
+          ],
+          "fleeing": false,
+          "hull": 162,
+          "energy": 108,
+          "shots": 20
+        }
+      ]
+    },
+    {
+      "role": "patrol",
+      "item": "ripper",
+      "profile": "interceptor",
+      "shots": 126,
+      "lastShot": 29.383333333332946,
+      "tail": [
+        {
+          "t": 26,
+          "angle": 2.9,
+          "distance": 144.7,
+          "phase": "approach",
+          "speed": 45.70127188313722,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 7.7369855540197525,
+          "quatError": 0,
+          "angular": [
+            0.0022453842683857615,
+            -0.10560519448227768,
+            -0.025990087600108562
+          ],
+          "fleeing": false,
+          "hull": 162,
+          "energy": 108,
+          "shots": 105
+        },
+        {
+          "t": 27,
+          "angle": 6.73,
+          "distance": 108.5,
+          "phase": "approach",
+          "speed": 25.793933694923336,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 6.729257685814204,
+          "quatError": 0,
+          "angular": [
+            -0.0013476042152891804,
+            0.048073909987301704,
+            0.007146872198976263
+          ],
+          "fleeing": false,
+          "hull": 162,
+          "energy": 108,
+          "shots": 105
+        },
+        {
+          "t": 28,
+          "angle": 2.75,
+          "distance": 92.8,
+          "phase": "approach",
+          "speed": 11.546023941873784,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 2.750536753140344,
+          "quatError": 0,
+          "angular": [
+            -0.0015816582859561905,
+            0.06539689361088964,
+            0.01042281604934437
+          ],
+          "fleeing": false,
+          "hull": 162,
+          "energy": 103.95000000000003,
+          "shots": 112
+        },
+        {
+          "t": 29,
+          "angle": 1.77,
+          "distance": 73.2,
+          "phase": "approach",
+          "speed": 23.540471199001335,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 5.160632092431568,
+          "quatError": 0,
+          "angular": [
+            0.0006729313048683863,
+            -0.04345084531709917,
+            -0.013726764657132474
+          ],
+          "fleeing": false,
+          "hull": 162,
+          "energy": 108,
+          "shots": 119
+        },
+        {
+          "t": 30,
+          "angle": 4.33,
+          "distance": 55.7,
+          "phase": "approach",
+          "speed": 8.201883141639726,
+          "nav": false,
+          "obstacles": 0,
+          "desiredError": 4.326694386410293,
+          "quatError": 0,
+          "angular": [
+            -0.0010040965740884399,
+            0.03651468825122537,
+            0.0030804982615335835
+          ],
+          "fleeing": false,
+          "hull": 162,
+          "energy": 108,
+          "shots": 126
+        }
+      ]
+    }
+  ],
+  "damage": {
+    "pulse": {
+      "shieldPerHit": 10,
+      "shieldDps": 58.8235294117647,
+      "hullDps": 58.8235294117647,
+      "energyPerSecond": 18.823529411764707
+    },
+    "pulse-mk2": {
+      "shieldPerHit": 13.5,
+      "shieldDps": 79.41176470588235,
+      "hullDps": 79.41176470588235,
+      "energyPerSecond": 29.41176470588235
+    },
+    "ion": {
+      "shieldPerHit": 40,
+      "shieldDps": 64.51612903225806,
+      "hullDps": 8.064516129032258,
+      "energyPerSecond": 14.516129032258064
+    },
+    "mortar": {
+      "shieldPerHit": 180,
+      "shieldDps": 120,
+      "hullDps": 120,
+      "energyPerSecond": 21.333333333333332
+    }
+  }
+}

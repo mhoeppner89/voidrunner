@@ -1,0 +1,15 @@
+{
+  "triangles": 32226,
+  "vertices": 18456,
+  "materials": [
+    "WF_Hull_Atlas",
+    "VR_Canopy_Glass",
+    "VR_Canopy_Frame"
+  ],
+  "bounds": [
+    1.9971179962158203,
+    0.4528495967388153,
+    0.7748981714248657
+  ],
+  "file": "/Users/mhoeppner/Desktop/Voidrunner/.freebuff/wayfarer-rebuild/wayfarer.glb"
+}

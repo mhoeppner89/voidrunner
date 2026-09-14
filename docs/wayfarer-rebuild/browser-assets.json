@@ -1,0 +1,41 @@
+[
+  {
+    "hull": "wayfarer",
+    "bounds": [
+      [
+        -0.22659753262996696,
+        -0.3750913739204407,
+        -0.9969184398651123
+      ],
+      [
+        0.2262520641088488,
+        0.39980679750442505,
+        1.000199556350708
+      ]
+    ],
+    "materials": [
+      {
+        "name": "WF_Hull_Atlas",
+        "metalness": 1,
+        "roughness": 1,
+        "texture": [
+          1024,
+          512
+        ],
+        "anisotropy": 8
+      },
+      {
+        "name": "VR_Canopy_Glass",
+        "metalness": 0.6800000071525574,
+        "roughness": 0.11999999731779099,
+        "texture": null
+      },
+      {
+        "name": "VR_Canopy_Frame",
+        "metalness": 0.800000011920929,
+        "roughness": 0.25,
+        "texture": null
+      }
+    ]
+  }
+]

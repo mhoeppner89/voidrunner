@@ -1,0 +1,13 @@
+{
+  environment: 'asteroid-field',
+  instance: 'shardbelt',
+  obstacles: 495,
+  spawnClear: true
+}
+{ mount: 0, name: 'ARENA-FREGATTE' }
+{ phase: 'CHARGING', text: 'SALVE · AUSWEICHEN', overflow: false }
+{ phase: 'SALVO', text: 'SALVE', overflow: false }
+{ phase: 'RECOVERING', text: 'JETZT ANGREIFEN', overflow: false }
+{ phase: 'DISARMED', text: 'BATTERIEN AUS', overflow: false }
+{ disabled: 0 }
+{ errors: [] }

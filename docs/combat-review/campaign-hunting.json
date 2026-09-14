@@ -1,0 +1,149 @@
+{
+  "results": [
+    {
+      "wave": 1,
+      "gun": "pulse-cannon",
+      "seconds": 30,
+      "phase": "combat",
+      "initial": {
+        "hull": 295,
+        "shield": 150
+      },
+      "hull": 295,
+      "shield": 93.13400288746345,
+      "damage": 93.17099711253857,
+      "enemyRounds": 0,
+      "playerRounds": 20,
+      "burnSeconds": 2.8333333333333335,
+      "driftSeconds": 0,
+      "enemies": [
+        {
+          "hull": 137,
+          "shield": 53.90736599883181,
+          "intent": "hunt"
+        }
+      ]
+    },
+    {
+      "wave": 1,
+      "gun": "mortar",
+      "seconds": 30,
+      "phase": "combat",
+      "initial": {
+        "hull": 295,
+        "shield": 150
+      },
+      "hull": 295,
+      "shield": 77.0166666666675,
+      "damage": 88,
+      "enemyRounds": 0,
+      "playerRounds": 2,
+      "burnSeconds": 3.55,
+      "driftSeconds": 0,
+      "enemies": [
+        {
+          "hull": 137,
+          "shield": 58,
+          "intent": "reposition"
+        }
+      ]
+    },
+    {
+      "wave": 3,
+      "gun": "pulse-cannon",
+      "seconds": 30,
+      "phase": "combat",
+      "initial": {
+        "hull": 295,
+        "shield": 150
+      },
+      "hull": 295,
+      "shield": 114.14166666666935,
+      "damage": 83.99999999999997,
+      "enemyRounds": 123,
+      "playerRounds": 24,
+      "burnSeconds": 6.866666666666666,
+      "driftSeconds": 2.216666666666667,
+      "enemies": [
+        {
+          "hull": 137,
+          "shield": 58,
+          "intent": "hunt"
+        }
+      ]
+    },
+    {
+      "wave": 3,
+      "gun": "mortar",
+      "seconds": 30,
+      "phase": "combat",
+      "initial": {
+        "hull": 295,
+        "shield": 150
+      },
+      "hull": 187.29145833333328,
+      "shield": 0,
+      "damage": 275.8402083333333,
+      "enemyRounds": 190,
+      "playerRounds": 4,
+      "burnSeconds": 7.45,
+      "driftSeconds": 1.1166666666666667,
+      "enemies": [
+        {
+          "hull": 137,
+          "shield": 58,
+          "intent": "hunt"
+        }
+      ]
+    },
+    {
+      "wave": 6,
+      "gun": "pulse-cannon",
+      "seconds": 30,
+      "phase": "combat",
+      "initial": {
+        "hull": 295,
+        "shield": 150
+      },
+      "hull": 295,
+      "shield": 150,
+      "damage": 5.5,
+      "enemyRounds": 69,
+      "playerRounds": 18,
+      "burnSeconds": 5.833333333333333,
+      "driftSeconds": 3.2333333333333334,
+      "enemies": [
+        {
+          "hull": 115,
+          "shield": 17.84333333333331,
+          "intent": "hunt"
+        }
+      ]
+    },
+    {
+      "wave": 6,
+      "gun": "mortar",
+      "seconds": 30,
+      "phase": "combat",
+      "initial": {
+        "hull": 295,
+        "shield": 150
+      },
+      "hull": 273.03916666666663,
+      "shield": 13.24999999999996,
+      "damage": 199.87416666666684,
+      "enemyRounds": 138,
+      "playerRounds": 12,
+      "burnSeconds": 8.9,
+      "driftSeconds": 0,
+      "enemies": [
+        {
+          "hull": 15,
+          "shield": 55.0316666666663,
+          "intent": "hunt"
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

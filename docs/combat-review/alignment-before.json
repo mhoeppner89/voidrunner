@@ -1,0 +1,54 @@
+[
+  {
+    "tier": "veteran",
+    "path": "straight",
+    "shots": 215,
+    "hits": 17,
+    "rangeMedian": 210,
+    "rangeLow": 183,
+    "closePct": 0,
+    "alignedPct": 88,
+    "meanAimError": 2,
+    "badHeadingPct": 4,
+    "driftPct": 0
+  },
+  {
+    "tier": "veteran",
+    "path": "turning",
+    "shots": 170,
+    "hits": 14,
+    "rangeMedian": 112,
+    "rangeLow": 87,
+    "closePct": 61,
+    "alignedPct": 65,
+    "meanAimError": 5.3,
+    "badHeadingPct": 22,
+    "driftPct": 6
+  },
+  {
+    "tier": "ace",
+    "path": "straight",
+    "shots": 211,
+    "hits": 24,
+    "rangeMedian": 176,
+    "rangeLow": 160,
+    "closePct": 0,
+    "alignedPct": 62,
+    "meanAimError": 3.7,
+    "badHeadingPct": 35,
+    "driftPct": 0
+  },
+  {
+    "tier": "ace",
+    "path": "turning",
+    "shots": 178,
+    "hits": 6,
+    "rangeMedian": 202,
+    "rangeLow": 134,
+    "closePct": 5,
+    "alignedPct": 39,
+    "meanAimError": 19.3,
+    "badHeadingPct": 0,
+    "driftPct": 24
+  }
+]

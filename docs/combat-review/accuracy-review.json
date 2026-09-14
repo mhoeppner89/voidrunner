@@ -1,0 +1,1068 @@
+{
+  "method": {
+    "count": 1000,
+    "target": "player Talon",
+    "speed": 60,
+    "ranges": [
+      100,
+      250
+    ],
+    "nose": "aligned to each skill’s estimated lead; no pursuit lag",
+    "path": "straight crossing or 160 km-radius transverse turn at 60 km/s (XY plane, initial z=-range)",
+    "measurement": "direct-hit estimate per physical round; Ripper also per trigger; no DPS/energy or splash comparison"
+  },
+  "results": [
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "novice",
+      "weapon": "beam",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "novice",
+      "weapon": "pulse",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 18.3,
+      "triggerHitPct": 18.3
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "novice",
+      "weapon": "pulse-mk2",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 16.7,
+      "triggerHitPct": 16.7
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "novice",
+      "weapon": "gauss",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 19.6,
+      "triggerHitPct": 19.6
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "novice",
+      "weapon": "ripper",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 7000,
+      "hitPct": 18.7,
+      "triggerHitPct": 44.1
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "novice",
+      "weapon": "ion",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 17.6,
+      "triggerHitPct": 17.6
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "novice",
+      "weapon": "mortar",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 17.7,
+      "triggerHitPct": 17.7
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "veteran",
+      "weapon": "beam",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "veteran",
+      "weapon": "pulse",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "veteran",
+      "weapon": "pulse-mk2",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "veteran",
+      "weapon": "gauss",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "veteran",
+      "weapon": "ripper",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 7000,
+      "hitPct": 81.5,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "veteran",
+      "weapon": "ion",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "veteran",
+      "weapon": "mortar",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "ace",
+      "weapon": "beam",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "ace",
+      "weapon": "pulse",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "ace",
+      "weapon": "pulse-mk2",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "ace",
+      "weapon": "gauss",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "ace",
+      "weapon": "ripper",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 7000,
+      "hitPct": 84.1,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "ace",
+      "weapon": "ion",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "crossing",
+      "tier": "ace",
+      "weapon": "mortar",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "novice",
+      "weapon": "beam",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "novice",
+      "weapon": "pulse",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 16.7,
+      "triggerHitPct": 16.7
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "novice",
+      "weapon": "pulse-mk2",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 16.8,
+      "triggerHitPct": 16.8
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "novice",
+      "weapon": "gauss",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 16.6,
+      "triggerHitPct": 16.6
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "novice",
+      "weapon": "ripper",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 7000,
+      "hitPct": 18.6,
+      "triggerHitPct": 42.9
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "novice",
+      "weapon": "ion",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 17.1,
+      "triggerHitPct": 17.1
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "novice",
+      "weapon": "mortar",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 18.9,
+      "triggerHitPct": 18.9
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "veteran",
+      "weapon": "beam",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "veteran",
+      "weapon": "pulse",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "veteran",
+      "weapon": "pulse-mk2",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "veteran",
+      "weapon": "gauss",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "veteran",
+      "weapon": "ripper",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 7000,
+      "hitPct": 78.4,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "veteran",
+      "weapon": "ion",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "veteran",
+      "weapon": "mortar",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 66.9,
+      "triggerHitPct": 66.9
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "ace",
+      "weapon": "beam",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "ace",
+      "weapon": "pulse",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "ace",
+      "weapon": "pulse-mk2",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "ace",
+      "weapon": "gauss",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "ace",
+      "weapon": "ripper",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 7000,
+      "hitPct": 80.4,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "ace",
+      "weapon": "ion",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 100,
+      "path": "turning",
+      "tier": "ace",
+      "weapon": "mortar",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 70,
+      "triggerHitPct": 70
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "novice",
+      "weapon": "beam",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "novice",
+      "weapon": "pulse",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 2.2,
+      "triggerHitPct": 2.2
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "novice",
+      "weapon": "pulse-mk2",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 2.1,
+      "triggerHitPct": 2.1
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "novice",
+      "weapon": "gauss",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 2.6,
+      "triggerHitPct": 2.6
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "novice",
+      "weapon": "ripper",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 7000,
+      "hitPct": 2.8,
+      "triggerHitPct": 11.1
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "novice",
+      "weapon": "ion",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 3,
+      "triggerHitPct": 3
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "novice",
+      "weapon": "mortar",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 2.5,
+      "triggerHitPct": 2.5
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "veteran",
+      "weapon": "beam",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "veteran",
+      "weapon": "pulse",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 45.8,
+      "triggerHitPct": 45.8
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "veteran",
+      "weapon": "pulse-mk2",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 48.3,
+      "triggerHitPct": 48.3
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "veteran",
+      "weapon": "gauss",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 47.7,
+      "triggerHitPct": 47.7
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "veteran",
+      "weapon": "ripper",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 7000,
+      "hitPct": 25.9,
+      "triggerHitPct": 81.7
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "veteran",
+      "weapon": "ion",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 48.6,
+      "triggerHitPct": 48.6
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "veteran",
+      "weapon": "mortar",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 46.3,
+      "triggerHitPct": 46.3
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "ace",
+      "weapon": "beam",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "ace",
+      "weapon": "pulse",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "ace",
+      "weapon": "pulse-mk2",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "ace",
+      "weapon": "gauss",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "ace",
+      "weapon": "ripper",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 7000,
+      "hitPct": 43.5,
+      "triggerHitPct": 97.7
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "ace",
+      "weapon": "ion",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 250,
+      "path": "crossing",
+      "tier": "ace",
+      "weapon": "mortar",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "novice",
+      "weapon": "beam",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "novice",
+      "weapon": "pulse",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 2.4,
+      "triggerHitPct": 2.4
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "novice",
+      "weapon": "pulse-mk2",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 3.5,
+      "triggerHitPct": 3.5
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "novice",
+      "weapon": "gauss",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 3.8,
+      "triggerHitPct": 3.8
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "novice",
+      "weapon": "ripper",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 7000,
+      "hitPct": 2.3,
+      "triggerHitPct": 10.6
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "novice",
+      "weapon": "ion",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 2.1,
+      "triggerHitPct": 2.1
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "novice",
+      "weapon": "mortar",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 3,
+      "triggerHitPct": 3
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "veteran",
+      "weapon": "beam",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "veteran",
+      "weapon": "pulse",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 17.8,
+      "triggerHitPct": 17.8
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "veteran",
+      "weapon": "pulse-mk2",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 16.4,
+      "triggerHitPct": 16.4
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "veteran",
+      "weapon": "gauss",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 46.2,
+      "triggerHitPct": 46.2
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "veteran",
+      "weapon": "ripper",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 7000,
+      "hitPct": 13.5,
+      "triggerHitPct": 53.1
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "veteran",
+      "weapon": "ion",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 14.3,
+      "triggerHitPct": 14.3
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "veteran",
+      "weapon": "mortar",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 0,
+      "triggerHitPct": 0
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "ace",
+      "weapon": "beam",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "ace",
+      "weapon": "pulse",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 0,
+      "triggerHitPct": 0
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "ace",
+      "weapon": "pulse-mk2",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 0,
+      "triggerHitPct": 0
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "ace",
+      "weapon": "gauss",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 100,
+      "triggerHitPct": 100
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "ace",
+      "weapon": "ripper",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 7000,
+      "hitPct": 10.3,
+      "triggerHitPct": 53.6
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "ace",
+      "weapon": "ion",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 0,
+      "triggerHitPct": 0
+    },
+    {
+      "range": 250,
+      "path": "turning",
+      "tier": "ace",
+      "weapon": "mortar",
+      "playerRadius": 1.5,
+      "shots": 1000,
+      "rounds": 1000,
+      "hitPct": 0,
+      "triggerHitPct": 0
+    }
+  ],
+  "triggerGates": [
+    {
+      "3": true,
+      "6": false,
+      "12": false,
+      "tier": "novice",
+      "weapon": "pulse"
+    },
+    {
+      "3": true,
+      "6": false,
+      "12": false,
+      "tier": "novice",
+      "weapon": "gauss"
+    },
+    {
+      "3": true,
+      "6": false,
+      "12": false,
+      "tier": "novice",
+      "weapon": "ripper"
+    },
+    {
+      "3": true,
+      "6": false,
+      "12": false,
+      "tier": "novice",
+      "weapon": "ion"
+    },
+    {
+      "3": true,
+      "6": false,
+      "12": false,
+      "tier": "novice",
+      "weapon": "mortar"
+    },
+    {
+      "3": true,
+      "6": true,
+      "12": true,
+      "tier": "novice",
+      "weapon": "beam"
+    },
+    {
+      "3": true,
+      "6": false,
+      "12": false,
+      "tier": "veteran",
+      "weapon": "pulse"
+    },
+    {
+      "3": true,
+      "6": false,
+      "12": false,
+      "tier": "veteran",
+      "weapon": "gauss"
+    },
+    {
+      "3": true,
+      "6": false,
+      "12": false,
+      "tier": "veteran",
+      "weapon": "ripper"
+    },
+    {
+      "3": true,
+      "6": false,
+      "12": false,
+      "tier": "veteran",
+      "weapon": "ion"
+    },
+    {
+      "3": true,
+      "6": false,
+      "12": false,
+      "tier": "veteran",
+      "weapon": "mortar"
+    },
+    {
+      "3": true,
+      "6": true,
+      "12": true,
+      "tier": "veteran",
+      "weapon": "beam"
+    },
+    {
+      "3": true,
+      "6": false,
+      "12": false,
+      "tier": "ace",
+      "weapon": "pulse"
+    },
+    {
+      "3": true,
+      "6": false,
+      "12": false,
+      "tier": "ace",
+      "weapon": "gauss"
+    },
+    {
+      "3": true,
+      "6": false,
+      "12": false,
+      "tier": "ace",
+      "weapon": "ripper"
+    },
+    {
+      "3": true,
+      "6": false,
+      "12": false,
+      "tier": "ace",
+      "weapon": "ion"
+    },
+    {
+      "3": true,
+      "6": false,
+      "12": false,
+      "tier": "ace",
+      "weapon": "mortar"
+    },
+    {
+      "3": true,
+      "6": true,
+      "12": true,
+      "tier": "ace",
+      "weapon": "beam"
+    }
+  ]
+}

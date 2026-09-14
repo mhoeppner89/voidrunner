@@ -1,0 +1,176 @@
+[
+  {
+    "name": "Cleanup_atlas",
+    "vertices": 37247,
+    "triangles": 50172,
+    "materials": [
+      "painted"
+    ],
+    "dimensions": [
+      2.0009396076202393,
+      0.64897620677948,
+      0.6159641742706299
+    ],
+    "images": [
+      {
+        "name": "Image_0",
+        "size": [
+          1024,
+          1024
+        ]
+      },
+      {
+        "name": "Image_1",
+        "size": [
+          1024,
+          1024
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Cleanup_lancer",
+    "vertices": 36007,
+    "triangles": 52580,
+    "materials": [
+      "painted.001"
+    ],
+    "dimensions": [
+      1.9399501085281372,
+      2.002068042755127,
+      0.605778694152832
+    ],
+    "images": [
+      {
+        "name": "Image_0.001",
+        "size": [
+          1024,
+          1024
+        ]
+      },
+      {
+        "name": "Image_1.001",
+        "size": [
+          1024,
+          1024
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Cleanup_prospector",
+    "vertices": 59746,
+    "triangles": 82812,
+    "materials": [
+      "painted.002"
+    ],
+    "dimensions": [
+      2.001037120819092,
+      1.032331109046936,
+      0.8446146249771118
+    ],
+    "images": [
+      {
+        "name": "Image_0.002",
+        "size": [
+          1024,
+          1024
+        ]
+      },
+      {
+        "name": "Image_1.002",
+        "size": [
+          1024,
+          1024
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Cleanup_talon",
+    "vertices": 18319,
+    "triangles": 26628,
+    "materials": [
+      "painted.003"
+    ],
+    "dimensions": [
+      1.8342468738555908,
+      1.9937279224395752,
+      0.4850539565086365
+    ],
+    "images": [
+      {
+        "name": "Image_0.003",
+        "size": [
+          1024,
+          1024
+        ]
+      },
+      {
+        "name": "Image_1.003",
+        "size": [
+          1024,
+          1024
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Cleanup_vanguard",
+    "vertices": 57184,
+    "triangles": 81596,
+    "materials": [
+      "painted.004"
+    ],
+    "dimensions": [
+      2.000504493713379,
+      1.6284762620925903,
+      1.012953281402588
+    ],
+    "images": [
+      {
+        "name": "Image_0.004",
+        "size": [
+          1024,
+          1024
+        ]
+      },
+      {
+        "name": "Image_1.004",
+        "size": [
+          1024,
+          1024
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Cleanup_wayfarer",
+    "vertices": 26237,
+    "triangles": 40000,
+    "materials": [
+      "painted.005"
+    ],
+    "dimensions": [
+      1.9971178770065308,
+      0.4528495967388153,
+      0.7748981714248657
+    ],
+    "images": [
+      {
+        "name": "Image_0.005",
+        "size": [
+          1024,
+          1024
+        ]
+      },
+      {
+        "name": "Image_1.005",
+        "size": [
+          1024,
+          1024
+        ]
+      }
+    ]
+  }
+]

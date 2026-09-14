@@ -1,0 +1,33 @@
+{
+  "results": [
+    {
+      "wave": "9",
+      "frames": 22,
+      "samples": 176,
+      "maxError": 5.707387807667375e-13,
+      "maxScaleError": 0,
+      "owners": [
+        "ship-1"
+      ],
+      "travel": [
+        7.8834125739138186
+      ]
+    },
+    {
+      "wave": "8",
+      "frames": 22,
+      "samples": 88,
+      "maxError": 1.7874245903380366e-14,
+      "maxScaleError": 0,
+      "owners": [
+        "ship-1",
+        "ship-2"
+      ],
+      "travel": [
+        12.982975461400256,
+        18.536743272085328
+      ]
+    }
+  ],
+  "errors": []
+}

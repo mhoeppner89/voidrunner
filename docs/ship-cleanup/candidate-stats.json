@@ -1,0 +1,40 @@
+{
+  "ships": [
+    {
+      "name": "wayfarer",
+      "before": 40000,
+      "after": 22070,
+      "fileBytes": 4480212
+    },
+    {
+      "name": "talon",
+      "before": 26628,
+      "after": 17308,
+      "fileBytes": 9389568
+    },
+    {
+      "name": "vanguard",
+      "before": 81596,
+      "after": 40808,
+      "fileBytes": 14074080
+    },
+    {
+      "name": "prospector",
+      "before": 82812,
+      "after": 41436,
+      "fileBytes": 14309652
+    },
+    {
+      "name": "lancer",
+      "before": 52580,
+      "after": 28978,
+      "fileBytes": 10120088
+    },
+    {
+      "name": "atlas",
+      "before": 50172,
+      "after": 27693,
+      "fileBytes": 13696232
+    }
+  ]
+}

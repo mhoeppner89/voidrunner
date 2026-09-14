@@ -1,0 +1,55 @@
+[
+  {
+    "tier": "novice",
+    "scenario": "field",
+    "shots": 21,
+    "lastShot": 39.99999999999901,
+    "damage": 145.99999989509558,
+    "meanSpeed": 56.460345157206646,
+    "slowPercent": 10.81568273997296,
+    "burnSeconds": 3.566666666666667,
+    "driftSeconds": 0,
+    "huntSeconds": 28.416666666666668,
+    "breaks": 2,
+    "moves": [],
+    "hull": 137,
+    "finalRange": 223.86641364534017
+  },
+  {
+    "tier": "veteran",
+    "scenario": "field",
+    "shots": 70,
+    "lastShot": 39.683333333332364,
+    "damage": 564,
+    "meanSpeed": 57.529346399165284,
+    "slowPercent": 9.914375844975213,
+    "burnSeconds": 10.016666666666667,
+    "driftSeconds": 2.8333333333333335,
+    "huntSeconds": 30.266666666666666,
+    "breaks": 2,
+    "moves": [
+      "drift-pass"
+    ],
+    "hull": 137,
+    "finalRange": 223.24009919218065
+  },
+  {
+    "tier": "ace",
+    "scenario": "field",
+    "shots": 115,
+    "lastShot": 39.93333333333235,
+    "damage": 729.0203289588289,
+    "meanSpeed": 59.48356707740136,
+    "slowPercent": 11.536728255971159,
+    "burnSeconds": 8.766666666666667,
+    "driftSeconds": 0,
+    "huntSeconds": 26.716666666666665,
+    "breaks": 4,
+    "moves": [
+      "rolling-break",
+      "boost-reversal"
+    ],
+    "hull": 137,
+    "finalRange": 294.08330403932183
+  }
+]

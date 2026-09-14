@@ -1,0 +1,104 @@
+[
+  {
+    "file": "concord-battleship-wreck-v4",
+    "mesh": "Mesh_0.001",
+    "before": 13859,
+    "after": 13529
+  },
+  {
+    "file": "concord-battleship-wreck-v4",
+    "mesh": "Mesh_0.003",
+    "before": 32327,
+    "after": 31563
+  },
+  {
+    "file": "concord-battleship-wreck-v4",
+    "mesh": "Mesh_0.002",
+    "before": 19824,
+    "after": 19008
+  },
+  {
+    "file": "concord-carrier-wreck-v4",
+    "mesh": "Mesh_0.001",
+    "before": 22989,
+    "after": 15169
+  },
+  {
+    "file": "concord-carrier-wreck-v4",
+    "mesh": "Mesh_0.003",
+    "before": 37800,
+    "after": 22678
+  },
+  {
+    "file": "concord-carrier-wreck-v4",
+    "mesh": "Mesh_0.002",
+    "before": 31664,
+    "after": 21318
+  },
+  {
+    "file": "concord-cruiser-wreck-v4",
+    "mesh": "Mesh_0.002",
+    "before": 11342,
+    "after": 6238
+  },
+  {
+    "file": "concord-cruiser-wreck-v4",
+    "mesh": "Mesh_0.003",
+    "before": 16972,
+    "after": 9334
+  },
+  {
+    "file": "concord-cruiser-wreck-v4",
+    "mesh": "Mesh_0.001",
+    "before": 6329,
+    "after": 3479
+  },
+  {
+    "file": "concord-frigate-wreck-v3",
+    "mesh": "Mesh_0.001",
+    "before": 15031,
+    "after": 14723
+  },
+  {
+    "file": "concord-frigate-wreck-v3",
+    "mesh": "Mesh_0.002",
+    "before": 24892,
+    "after": 24570
+  },
+  {
+    "file": "wayfarer-wreck",
+    "mesh": "Mesh_0.002",
+    "before": 15225,
+    "after": 8373
+  },
+  {
+    "file": "wayfarer-wreck",
+    "mesh": "Mesh_0.001",
+    "before": 14935,
+    "after": 8213
+  },
+  {
+    "file": "wayfarer-wreck",
+    "mesh": "Mesh_0.003",
+    "before": 11218,
+    "after": 6168
+  },
+  {
+    "file": "talon-wreck",
+    "mesh": "Mesh_0.001",
+    "before": 18416,
+    "after": 10128
+  },
+  {
+    "file": "talon-wreck",
+    "mesh": "Mesh_0.003",
+    "before": 2254,
+    "after": 1238
+  },
+  {
+    "file": "talon-wreck",
+    "mesh": "Mesh_0.002",
+    "before": 7392,
+    "after": 4064
+  }
+]

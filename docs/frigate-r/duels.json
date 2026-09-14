@@ -1,0 +1,102 @@
+[
+  {
+    "hull": "wayfarer",
+    "gun": "pulse-cannon",
+    "moving": true,
+    "seconds": 25.78333333333315,
+    "playerHull": 0,
+    "playerShield": 0,
+    "bossHull": 780,
+    "bossShield": 0,
+    "rounds": 46,
+    "samples": [
+      {
+        "time": 0.016666666666666666,
+        "range": 360,
+        "playerHull": 185,
+        "bossHull": 1400,
+        "bossShield": 650,
+        "rounds": 0
+      }
+    ]
+  },
+  {
+    "hull": "vanguard",
+    "gun": "pulse-cannon",
+    "moving": true,
+    "seconds": 33.483333333332716,
+    "playerHull": 295,
+    "playerShield": 895.9000000000106,
+    "bossHull": 0,
+    "bossShield": 0,
+    "rounds": 48,
+    "samples": [
+      {
+        "time": 0.016666666666666666,
+        "range": 360,
+        "playerHull": 295,
+        "bossHull": 1400,
+        "bossShield": 650,
+        "rounds": 0
+      },
+      {
+        "time": 30.016666666666243,
+        "range": 289.63179762861415,
+        "playerHull": 295,
+        "bossHull": 155,
+        "bossShield": 0,
+        "rounds": 44
+      }
+    ]
+  },
+  {
+    "hull": "wayfarer",
+    "gun": "pulse-cannon",
+    "moving": false,
+    "seconds": 16.83333333333366,
+    "playerHull": 0,
+    "playerShield": 0,
+    "bossHull": 1160,
+    "bossShield": 0,
+    "rounds": 17,
+    "samples": [
+      {
+        "time": 0.016666666666666666,
+        "range": 360,
+        "playerHull": 185,
+        "bossHull": 1400,
+        "bossShield": 650,
+        "rounds": 0
+      }
+    ]
+  },
+  {
+    "hull": "vanguard",
+    "gun": "pulse-cannon",
+    "moving": false,
+    "seconds": 30.433333333332886,
+    "playerHull": 295,
+    "playerShield": 775.9933333333378,
+    "bossHull": 0,
+    "bossShield": 0,
+    "rounds": 33,
+    "samples": [
+      {
+        "time": 0.016666666666666666,
+        "range": 360,
+        "playerHull": 295,
+        "bossHull": 1400,
+        "bossShield": 650,
+        "rounds": 0
+      },
+      {
+        "time": 30.016666666666243,
+        "range": 282.7431418922986,
+        "playerHull": 295,
+        "bossHull": 20,
+        "bossShield": 0,
+        "rounds": 33
+      }
+    ]
+  }
+]

@@ -1,0 +1,116 @@
+[
+  {
+    "hull": "wayfarer",
+    "triangles": 22070,
+    "fileBytes": 1405492,
+    "textures": [
+      {
+        "slot": "baseColor",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 463487
+      },
+      {
+        "slot": "metallicRoughness",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 249923
+      }
+    ]
+  },
+  {
+    "hull": "talon",
+    "triangles": 17308,
+    "fileBytes": 1705088,
+    "textures": [
+      {
+        "slot": "baseColor",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 956214
+      },
+      {
+        "slot": "metallicRoughness",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 200313
+      }
+    ]
+  },
+  {
+    "hull": "vanguard",
+    "triangles": 40808,
+    "fileBytes": 3255076,
+    "textures": [
+      {
+        "slot": "baseColor",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 1465446
+      },
+      {
+        "slot": "metallicRoughness",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 337712
+      }
+    ]
+  },
+  {
+    "hull": "prospector",
+    "triangles": 41436,
+    "fileBytes": 3456920,
+    "textures": [
+      {
+        "slot": "baseColor",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 1575272
+      },
+      {
+        "slot": "metallicRoughness",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 353019
+      }
+    ]
+  },
+  {
+    "hull": "lancer",
+    "triangles": 28978,
+    "fileBytes": 2236152,
+    "textures": [
+      {
+        "slot": "baseColor",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 1103894
+      },
+      {
+        "slot": "metallicRoughness",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 165969
+      }
+    ]
+  },
+  {
+    "hull": "atlas",
+    "triangles": 27693,
+    "fileBytes": 2813804,
+    "textures": [
+      {
+        "slot": "baseColor",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 1458449
+      },
+      {
+        "slot": "metallicRoughness",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 333412
+      }
+    ]
+  }
+]

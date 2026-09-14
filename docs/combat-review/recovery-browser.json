@@ -1,0 +1,39 @@
+{
+  "results": [
+    {
+      "wave": "recovery",
+      "tier": "veteran",
+      "seconds": 37.16666666666584,
+      "maxSpeed": 128.9139092135507,
+      "maxRange": 448.14991365604646,
+      "boostSeconds": 17.10000000000031,
+      "withdrawalSeconds": 6.866666666666648,
+      "recovery": "recovered",
+      "attempts": 1,
+      "npcShots": 114,
+      "firstShieldBreak": null,
+      "npcHull": 137,
+      "npcShield": 58,
+      "playerHull": 185,
+      "playerShield": 41.81833333333339
+    },
+    {
+      "wave": "5",
+      "tier": "ace",
+      "seconds": 36.96666666666585,
+      "maxSpeed": 140.49469803150868,
+      "maxRange": 487.1693288767151,
+      "boostSeconds": 17.383333333333628,
+      "withdrawalSeconds": 15.883333333333702,
+      "recovery": "recovered",
+      "attempts": 2,
+      "npcShots": 136,
+      "firstShieldBreak": 4.983333333333321,
+      "npcHull": 99,
+      "npcShield": 3.1866666666668095,
+      "playerHull": 126.39600000000004,
+      "playerShield": 27.82500000000013
+    }
+  ],
+  "errors": []
+}
