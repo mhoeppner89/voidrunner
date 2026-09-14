@@ -15,42 +15,46 @@
 import { HULL_HARDPOINTS, OUTFIT_ITEMS, canonicalOutfitId } from './outfitting.js';
 // A shared speed also means a shared lead solution. Values are km/s in the
 // simulation; firing-platform velocity is inherited by every physical round.
+export const WEAPON_DAMAGE_SCALE = 0.8;
 export const PROJECTILE_SPEEDS=Object.freeze({normal:500,gauss:1200,plasma:300});
 export const WEAPONS = {
     pulse:{id:'pulse',nameKey:'PULSE LASER',hudNameKey:'PULSE',kind:'laser',slot:1,
-        speed:PROJECTILE_SPEEDS.normal,range:400,cooldown:.17,damageFlat:10,energyCost:3.2,assist:1,audioKey:'laser',mountSize:'S'},
+        speed:PROJECTILE_SPEEDS.normal,range:450,cooldown:.17,damageFlat:11.5,energyCost:3.2,assist:1,audioKey:'laser',mountSize:'S'},
     beam:{id:'beam',nameKey:'BEAM EMITTER',hudNameKey:'BEAM',kind:'beam',slot:8,
-        speed:100000,range:300,cooldown:.4,damageFlat:8,energyCost:6,assist:1.4,audioKey:'ion',mountSize:'S'},
+        speed:100000,range:350,cooldown:.4,damageFlat:13,energyCost:3.5,assist:1.4,audioKey:'ion',mountSize:'S'},
     'pulse-mk2':{id:'pulse-mk2',nameKey:'PULSE CANNON MK II',hudNameKey:'PULSE MK II',kind:'laser',slot:7,equipmentId:'pulse-mk2',
-        speed:PROJECTILE_SPEEDS.normal,range:400,cooldown:.17,damageFlat:13.5,energyCost:5,assist:1,audioKey:'laser',mountSize:'M'},
+        speed:PROJECTILE_SPEEDS.normal,range:450,cooldown:.17,damageFlat:13.5,energyCost:3.6,assist:1,audioKey:'laser',mountSize:'M'},
     gauss:{id:'gauss',nameKey:'MAGRAIL',hudNameKey:'MAGRAIL',kind:'gauss',slot:2,
-        speed:PROJECTILE_SPEEDS.gauss,range:600,cooldown:.95,damageFlat:40,energyCost:14,shieldBypass:.25,assist:.5,audioKey:'gauss',mountSize:'M'},
+        speed:PROJECTILE_SPEEDS.gauss,range:600,cooldown:1.1,damageFlat:34,energyCost:14,shieldBypass:.15,assist:.5,audioKey:'gauss',mountSize:'M'},
     pdc:{id:'pdc',nameKey:'POINT-DEFENSE CLUSTER',hudNameKey:'PDC',kind:'pdc',slot:3,equipmentId:'pdc-cluster',
         speed:PROJECTILE_SPEEDS.normal,range:300,cooldown:.07,damageFlat:.8,energyCost:.6,shieldMul:.15,assist:1,audioKey:'pdc',mountSize:'S',
         burstSize:10,shotInterval:.07,burstPause:1,interceptInterval:.6,interceptEnergy:4},
     ripper:{id:'ripper',nameKey:'RIPPER SCATTERGUN',hudNameKey:'RIPPER',kind:'ripper',slot:4,equipmentId:'ripper-scattergun',
-        speed:PROJECTILE_SPEEDS.normal,range:350,cooldown:.78,damageFlat:5.5,energyCost:9,hullMul:1.7,pellets:7,spreadRad:.035,assist:1,audioKey:'ripper',mountSize:'S'},
+        speed:PROJECTILE_SPEEDS.normal,range:350,cooldown:.72,damageFlat:5,energyCost:9,hullMul:1.35,pellets:7,spreadRad:.018,assist:1,audioKey:'ripper',mountSize:'S'},
     ion:{id:'ion',nameKey:'ION PROJECTOR',hudNameKey:'ION',kind:'ion',slot:5,equipmentId:'ion-lance',
-        speed:PROJECTILE_SPEEDS.normal,range:400,cooldown:.62,damageFlat:5,energyCost:9,shieldMul:8,jamSeconds:.8,assist:1,audioKey:'ion',mountSize:'M'},
+        speed:PROJECTILE_SPEEDS.normal,range:400,cooldown:.62,damageFlat:5,energyCost:9,shieldMul:12,jamSeconds:1.0,assist:1,audioKey:'ion',mountSize:'M'},
     mortar:{id:'mortar',nameKey:'SUNLANCE PLASMA MORTAR',hudNameKey:'PLASMA MORTAR',kind:'mortar',slot:6,equipmentId:'sunlance-mortar',
-        speed:PROJECTILE_SPEEDS.plasma,range:450,cooldown:1.5,damageFlat:90,energyCost:16,splashRadius:18,splashMin:4,splashDamage:24,assist:.35,audioKey:'mortar',mountSize:'M'},
+        speed:PROJECTILE_SPEEDS.plasma,range:500,cooldown:1.5,damageFlat:70,energyCost:16,splashRadius:18,splashMin:4,splashDamage:21,assist:.35,audioKey:'mortar',mountSize:'M'},
 };
 const descriptions={
-    pulse:'Normal-speed fire. Shares its lead with pulse, ion and scatterguns. 400 km range.',
-    'pulse-mk2':'Stronger normal-speed pulse fire. Shares the standard lead; uses more energy. 400 km range.',
-    gauss:'Very fast precision shots bypass 25% of shields. Slow firing; 600 km range.',
+    pulse:'Normal-speed fire. Shares its lead with pulse, ion and scatterguns. 450 km range.',
+    'pulse-mk2':'Stronger normal-speed pulse fire. Shares the standard lead; uses more energy. 450 km range.',
+    gauss:'Very fast precision shots bypass 15% of shields. Slow firing; 600 km range.',
     ripper:'Normal-speed pellet spread deals extra hull damage. Shares the standard lead; 350 km range.',
     ion:'Normal-speed shots strip shields and briefly halve exposed weapon fire rate and double energy per shot. Shares the standard lead; 400 km range.',
-    mortar:'Slow plasma rewards accurate direct hits with high damage and energy efficiency. Small blast; 450 km range.',
+    mortar:'Slow plasma rewards accurate direct hits with high damage and energy efficiency. Small blast; 500 km range.',
     pdc:'Missiles first. Ten-round bursts at selected hostiles; 15% shield damage. 300 km range against ships and missiles.',
-    beam:'Instant beam pulses make aiming easy. Lower damage and energy efficiency; 300 km range.',
+    beam:'Instant beam pulses make aiming easy. Moderate damage and efficient sustained fire; 350 km range.',
 };
 for(const weapon of Object.values(WEAPONS)){
+    weapon.damageFlat *= WEAPON_DAMAGE_SCALE;
+    if (weapon.splashDamage != null) weapon.splashDamage *= WEAPON_DAMAGE_SCALE;
+    if (weapon.splashMin != null) weapon.splashMin *= WEAPON_DAMAGE_SCALE;
     weapon.life=weapon.range/weapon.speed;
     weapon.ammoId=null;weapon.pierce=0;
     weapon.descriptionKey=weapon.envelopeKey=descriptions[weapon.id];
 }
-export const TRACKING_LASER=Object.freeze({id:'tracking-turret',kind:'beam',range:300,speed:100000,damageFlat:6,energyCost:4,cooldown:.7});
+export const TRACKING_LASER=Object.freeze({id:'tracking-turret',kind:'beam',range:300,speed:100000,damageFlat:6*WEAPON_DAMAGE_SCALE,energyCost:4,cooldown:.7});
 export const weaponRange=weapon=>weapon.range??weapon.speed*weapon.life;
 export const weaponShotDamage=weapon=>weapon.damageFlat??0;
 // Launcher records are kept beside guns because they share target and
@@ -121,6 +125,10 @@ export const LAUNCHERS = {
         audioKey: 'missile',
     },
 };
+for (const launcher of Object.values(LAUNCHERS)) {
+    launcher.damage *= WEAPON_DAMAGE_SCALE;
+    if (launcher.splashMin != null) launcher.splashMin *= WEAPON_DAMAGE_SCALE;
+}
 export const WEAPON_ORDER = ['pulse', 'gauss', 'pdc', 'ripper', 'ion', 'mortar', 'pulse-mk2', 'beam'];
 export const LAUNCHER_ORDER = ['seeker', 'swarm', 'torpedo'];
 // Ammo pool capacities keyed by ammoId (null-ammo weapons are energy-pooled

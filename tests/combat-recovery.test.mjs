@@ -15,7 +15,7 @@ const zero=new THREE.Vector3(),forward=new THREE.Vector3(0,0,-1);
 function setup(tier='veteran',role='pirate'){
  const s=fixture(),ship=s.spawnShip(role,[0,0,180],undefined,undefined,{tier,temperament:'steady'});
  ship.combatFit=createEnemyLoadout(ship,3);ship.combatFit.missiles=0;ship.combatFit.turrets=[];
- ship.rotation=[0,0,0,1];ship.velocity=[0,0,-40];ship.shield=8;ship.shieldDelay=4.5;ship.targetId='player';ship.noSurrender=true;
+ ship.rotation=[0,1,0,0];ship.velocity=[0,0,60];ship.shield=8;ship.shieldDelay=4.5;ship.targetId='player';ship.noSurrender=true;
  s.npcFlightStats(ship);return {s,ship};
 }
 function plan(s,ship){return planCombatFlight(s,ship,zero,zero,forward,Math.hypot(...ship.position),0);}
@@ -26,7 +26,7 @@ function step(s,ship){
 }
 test('a faster fighter reaches boost speed, recovers partially and returns to firing without endless resets',()=>{
  for(const tier of ['novice','veteran','ace']){
-  const {s,ship}=setup(tier);const fuel=ship.fuel;let maxSpeed=0,attempts=0,recoveryTime=0,lastShot=0;
+  const {s,ship}=setup(tier);s.damagePlayer=()=>{};const fuel=ship.fuel;let maxSpeed=0,attempts=0,recoveryTime=0,lastShot=0;
   const fire=s.fireNpcGun;s.fireNpcGun=function(...args){lastShot=this.save.world.time;return fire.apply(this,args);};
   for(let i=0;i<2400;i++){
    step(s,ship);const r=ship.combatPlan.recovery;attempts=Math.max(attempts,r.attempts);

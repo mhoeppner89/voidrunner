@@ -2,7 +2,7 @@
 // Keep the historical aceMove field for renderer/probe compatibility.
 export function aceManeuver(ship, time, distance, noseDot, travelDot, range, safe, inField=false, firingDot=noseDot, velocityDot=travelDot) {
     const ace=ship.pilot?.tier==='ace',veteran=ship.pilot?.tier==='veteran';
-    if ((!ace&&!veteran) || ship.tutorialEnemy || ship.tutorialCompanion || ship.capitalClass || ship.fleeing || ship.covering || ship.combatPlan?.recovery?.active || !safe) {
+    if ((!ace&&!veteran) || ship.tutorialEnemy || ship.tutorialCompanion || ship.capitalClass || ship.fleeing || ship.covering || ship.combatPlan?.recovery?.active || ship.combatPlan?.crossfire?.active || !safe) {
         if (ship.aceMove) ship.aceMoveReadyAt=time+(ace?5:8);
         ship.aceMove=undefined;
         return;

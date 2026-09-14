@@ -5,13 +5,13 @@ import * as THREE from 'three';
 import {OUTFIT_ITEMS} from './outfitting.js';
 import {TURRET_LAYOUTS} from './turretLayouts.js';
 import {spendEnergy} from './combatResources.js';
-import {WEAPONS,TRACKING_LASER} from './weapons.js';
+import {WEAPONS,TRACKING_LASER,WEAPON_DAMAGE_SCALE} from './weapons.js';
 import {relativeIntercept} from './weaponFlight.js';
 import {TURRET_CLEARANCE} from './turretClearance.js';
 import {getPdcDefenseChannel,PDC_RECOVERY_SECONDS} from './pdcFireControl.js';
 import {npcGunneryProfile} from './npcGunnery.js';
 const laser=TRACKING_LASER;
-export const PDC_TURRET=Object.freeze({...WEAPONS.pdc,damageFlat:2.2,shotInterval:.14,burstPause:2,interceptInterval:PDC_RECOVERY_SECONDS});
+export const PDC_TURRET=Object.freeze({...WEAPONS.pdc,damageFlat:2.2*WEAPON_DAMAGE_SCALE,shotInterval:.14,burstPause:2,interceptInterval:PDC_RECOVERY_SECONDS});
 const identity=new THREE.Quaternion();
 // Missile positions use Float32 storage; tolerate its rounding at the range edge.
 const rangeEpsilon=0.0001;
@@ -49,7 +49,7 @@ export function shipBlocksRay(session,actor,ownerId,target,point,state) {
     return session.ships.some(other=>other!==actor && other.id!==ownerId && other!==target && other.hull>0 && blocks(other.position,Math.max(...session.npcHullExtents(other))));
 }
 function selectedHostile(session,actor,ownerId,player) {
-    if(actor.capitalBoss&&actor.capitalAttack==='RECOVERING')return;
+    if(actor.capitalClass==='frigate'&&actor.capitalAttack==='RECOVERING')return;
     if(actor.patrolMemoryActive || actor.fleeing || actor.holdFire || actor.pursuitHoldFire || actor.combatPlan?.recovery?.active || (player && actor.mode!=='combat'))return;
     const ref=player?session.getTargetRef():{kind:'ship',id:actor.targetId};
     if(!player && actor.targetId==='player' && actor.hostile && session.save.player.hull>0)return session.save.player;

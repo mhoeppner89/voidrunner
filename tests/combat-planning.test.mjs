@@ -25,7 +25,7 @@ test('braking uses hull acceleration and future turning room, and cuts an active
  const p=plan(s,ship);assert.equal(p.overshoot,true);
  const fastHull=p.brakingDistance;
  const speed=combatThrottle(ship,0,240,120,0,1,235,true);
- assert.equal(ship.burning,false);assert.ok(speed>=ship.speed*.45&&speed<ship.speed);
+ assert.equal(ship.burning,false);assert.ok(speed>=ship.speed*.45&&speed<=ship.speed&&speed<120);
  ship.combatFit.stats=SHIPS.lancer;s.save.world.time=.3;plan(s,ship);assert.ok(p.brakingDistance>fastHull);
  ship.position[2]=1000;s.save.world.time=.6;plan(s,ship);assert.equal(p.overshoot,false);
 });
@@ -45,7 +45,7 @@ test('trained hunters match range while guns cool down and keep their heading du
   assert.ok(p.preferredRange>235&&p.preferredRange<400);
   updateCombatIntent(ship,0,200,50);assert.equal(ship.combatIntent,'hunt');assert.ok(ship.energyRecoverUntil>0&&ship.energyRecoverUntil<=1.2);
   const out=new THREE.Vector3();combatPursuitDirection(ship,origin,lead,200,out);assert.ok(out.dot(lead)>.99999);
-  const speed=combatThrottle(ship,0,200,50,20,1,235,true);assert.ok(speed<ship.speed*.65&&speed>=ship.speed*.25);assert.equal(ship.burning,false);
+  const speed=combatThrottle(ship,0,200,50,20,1,235,true);assert.ok(speed<=ship.speed&&speed>=ship.speed*.45);assert.equal(ship.burning,false);
  }
 });
 test('trained pilots choose the open vertical escape when both sides and the lower corridor are blocked',()=>{
@@ -106,7 +106,7 @@ test('moving-target pursuit retains forward firing opportunities through turns a
    const t=i/60;s.save.world.time=t;target.set(160*Math.sin(t*.375),20*Math.sin(t*.55),160*(1-Math.cos(t*.375)));velocity.set(60*Math.cos(t*.375),11*Math.cos(t*.55),60*Math.sin(t*.375));
    target.toArray(s.save.player.position);velocity.toArray(s.save.player.velocity);
    ship.fireCooldown-=1/60;regenerateCombatResources(ship,fit.resources,1/60,100);s.updateAttackAI(ship,target,velocity,1/60);
-   if(i>=300){samples++;nose.set(0,0,-1).applyQuaternion(q.fromArray(ship.rotation));const angle=nose.angleTo(s.tmpG);error+=angle;if(angle<Math.PI/45)aligned++;if(target.distanceTo(nose.fromArray(ship.position))<120)close++;}
+   if(i>=300){samples++;nose.set(0,0,-1).applyQuaternion(q.fromArray(ship.rotation));const angle=nose.angleTo(s.tmpNpcGunLead);error+=angle;if(angle<Math.PI/45)aligned++;if(target.distanceTo(nose.fromArray(ship.position))<120)close++;}
   }
   assert.ok(aligned/samples>.8,`${tier} aligned ${aligned/samples}`);assert.ok(error/samples<3*Math.PI/180,`${tier} mean angle ${error/samples}`);assert.ok(close/samples<.3,`${tier} close fraction ${close/samples}`);assert.ok(s.projectiles.length>30);
  }

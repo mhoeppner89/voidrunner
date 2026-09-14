@@ -10,7 +10,7 @@ export function weaponDamage(shield, amount, weapon = {}) {
 export function disruptWeapons(actor, weapon, time, shieldBeforeHit = actor.shield) {
     if (weapon.id !== 'ion' || !weapon.jamSeconds || shieldBeforeHit > 0 || time < (actor.disruptionRecoveryUntil ?? 0)) return false;
     actor.disruptedUntil = time + weapon.jamSeconds;
-    actor.disruptionRecoveryUntil = actor.disruptedUntil + 3;
+    actor.disruptionRecoveryUntil = actor.disruptedUntil + 1;
     return true;
 }
 

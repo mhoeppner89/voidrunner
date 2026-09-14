@@ -2,12 +2,12 @@ import * as THREE from 'three';
 import {weaponAssistCone} from './weapons.js';
 const DEG=Math.PI/180,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const profiles={
- novice:{settle:.12,shots:4,pause:1.2,spread:2.5*DEG,lead:.888,wander:.4*DEG,curve:.12,beam:.25*DEG,beamSlip:.16,beamWide:1.2*DEG,turretError:1.25,turretAcquire:.45,turretTurn:.85},
- veteran:{settle:.12,shots:5,pause:.35,spread:.6*DEG,lead:.96,wander:.18*DEG,curve:.55,beam:.12*DEG,beamSlip:.045,beamWide:.8*DEG,turretError:.65,turretAcquire:.3,turretTurn:1},
- ace:{settle:0,shots:8,pause:.15,spread:.15*DEG,lead:.988,wander:.09*DEG,curve:.85,beam:.035*DEG,beamSlip:.006,beamWide:.45*DEG,turretError:.35,turretAcquire:.18,turretTurn:1.15},
+ novice:{settle:.08,shots:7,pause:.55,spread:1.7*DEG,lead:.925,wander:.4*DEG,curve:.12,beam:.25*DEG,beamSlip:.16,beamWide:1.2*DEG,turretError:1.25,turretAcquire:.45,turretTurn:.85},
+ veteran:{settle:.12,shots:5,pause:.35,spread:.3*DEG,lead:.99,wander:.18*DEG,curve:.55,beam:.12*DEG,beamSlip:.045,beamWide:.8*DEG,turretError:.65,turretAcquire:.3,turretTurn:1},
+ ace:{settle:0,shots:8,pause:.15,spread:.15*DEG,lead:1,wander:.09*DEG,curve:.85,beam:.035*DEG,beamSlip:.006,beamWide:.45*DEG,turretError:.35,turretAcquire:.18,turretTurn:1.15},
 };
 export const npcGunneryProfile=ship=>profiles[ship.pilot?.tier]??profiles.veteran;
-export const npcForwardCone=weapon=>weapon?.kind==='beam'?weaponAssistCone(weapon):4*Math.PI/180;
+export const npcForwardCone=weapon=>weapon?.kind==='beam'?weaponAssistCone(weapon):(weapon?.id==='ripper'?7:weapon?.id==='pulse'||weapon?.id==='pulse-mk2'?6:4)*DEG;
 const sprayCone=weapon=>weapon?.id==='ripper'?9*DEG:weapon?.id==='pulse'||weapon?.id==='pulse-mk2'?7*DEG:0;
 export const npcTriggerCone=(ship,weapon,now=0)=>ship.gunSpeculateWeapon===weapon?.id&&now<(ship.gunSpeculateUntil??0)?sprayCone(weapon):npcForwardCone(weapon);
 export function npcTriggerReady(ship,weapon,facing,now){
@@ -28,12 +28,13 @@ export function npcTriggerReady(ship,weapon,facing,now){
  }
  ship.gunLastAlignedAt=now;
  ship.gunAlignedSince??=now;
- return now-ship.gunAlignedSince>=npcGunneryProfile(ship).settle;
+ const easy=weapon?.kind==='beam'||weapon?.id==='pulse'||weapon?.id==='pulse-mk2'||weapon?.id==='ripper';
+ return now-ship.gunAlignedSince>=(easy?0:npcGunneryProfile(ship).settle);
 }
 export function recordNpcShot(ship,now){ship.lastCombatShotAt=now;const p=npcGunneryProfile(ship);ship.gunBurstCount=(ship.gunBurstCount??0)+1;if(ship.gunBurstCount>=p.shots){ship.gunBurstCount=0;ship.gunBurstPauseUntil=now+p.pause;}}
 function aimState(ship){
  if(!ship.gunAim){let hash=0;for(const c of ship.id??'pilot')hash=(hash*31+c.charCodeAt(0))>>>0;
-  ship.gunAim={rotation:new THREE.Quaternion(),error:new THREE.Vector3(),velocity:new THREE.Vector3(),acceleration:new THREE.Vector3(),delta:new THREE.Vector3(),phase:hash%628/100,observedAt:-Infinity};}
+  ship.gunAim={rotation:new THREE.Quaternion(),error:new THREE.Vector3(),velocity:new THREE.Vector3(),trackedVelocity:new THREE.Vector3(),acceleration:new THREE.Vector3(),delta:new THREE.Vector3(),phase:hash%628/100,observedAt:-Infinity};}
  return ship.gunAim;
 }
 // Called by the visible-target planner at 5 Hz (3.3 Hz for novices). Never
@@ -41,8 +42,8 @@ function aimState(ship){
 export function observeNpcTargetMotion(ship,velocity,now,visible){
  const s=aimState(ship),dt=now-s.observedAt;
  if(!visible||!velocity){s.visible=false;s.acceleration.set(0,0,0);return;}
- if(!s.visible||s.targetId!==ship.targetId||dt<=0||dt>.6)s.acceleration.set(0,0,0);
- else {s.delta.copy(velocity).sub(s.velocity).multiplyScalar(1/dt).clampLength(0,40);s.acceleration.lerp(s.delta,1-Math.exp(-6*dt));}
+ if(!s.visible||s.targetId!==ship.targetId||dt<=0||dt>.6){s.acceleration.set(0,0,0);s.trackedVelocity.copy(velocity);}
+ else {s.delta.copy(velocity).sub(s.velocity).multiplyScalar(1/dt).clampLength(0,40);s.acceleration.lerp(s.delta,1-Math.exp(-6*dt));s.trackedVelocity.lerp(velocity,1-Math.exp(-(ship.pilot?.tier==='ace'?18:ship.pilot?.tier==='novice'?2:3)*dt));}
  s.velocity.copy(velocity);s.targetId=ship.targetId;s.observedAt=now;s.visible=true;
 }
 export function applyNpcTurnLead(ship,predicted,leadTime,now){
@@ -62,8 +63,13 @@ export function npcShotDirection(ship,weapon,targetDirection,out,now=0,distance=
  let spread=p.spread;
  if(beam){out.copy(targetDirection);spread=rng()<p.beamSlip?p.beamWide:p.beam;}
  else {
+  const tier=ship.pilot?.tier??'veteran',hard=gauss||weapon?.id==='mortar';
+  // Precision weapons demand deliberate tracking; forgiving guns retain a
+  // useful stream of speculative fire even with inexperienced pilots.
+  if(hard)spread*=tier==='novice'?(gauss?1.2:1.35):tier==='veteran'?2:1;
+  else spread*=tier==='novice'?.65:1;
   if(gauss)spread*=.45+.6*clamp(distance/weapon.range,0,1);
-  if(out.dot(targetDirection)>=Math.cos(npcForwardCone(weapon)))out.lerp(targetDirection,.34).normalize();
+  if(out.dot(targetDirection)>=Math.cos(npcForwardCone(weapon)))out.lerp(targetDirection,tier==='ace'?(hard?1:.94):tier==='veteran'?(hard?.55:.97):gauss?.85:hard?.25:.65).normalize();
  }
  const radius=Math.sqrt(rng())*Math.tan(spread),angle=rng()*Math.PI*2;
  const wander=p.wander*(beam?.2:gauss?.5:1),phase=now*1.7+s.phase;
@@ -71,3 +77,5 @@ export function npcShotDirection(ship,weapon,targetDirection,out,now=0,distance=
  out.add(s.error).normalize();
  return true;
 }
+
+export function npcTrackedVelocity(ship,velocity,out){const s=ship.gunAim;return out.copy(s?.visible&&s.targetId===ship.targetId?s.trackedVelocity:velocity);}

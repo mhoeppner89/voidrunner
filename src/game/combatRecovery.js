@@ -26,7 +26,8 @@ export function planShieldRecovery(session,ship,plan,target,now,distance){
  const finishable=target&&target.shield<1&&target.hull<=(target.maxHull??hull?.hull??0)*.4&&ship.hull>ship.maxHull*.4;
  if(!r.active&&now>=r.readyAt&&r.attempts<(ace?2:1)&&plan.visible&&target&&!finishable&&!ship.fleeing&&!ship.holdFire&&ship.shield<ship.maxShield*(novice?.35:ace?.2:.25)){
   const cover=!r.speedAdvantage?session.findCoverPoint(plan.position,r.threat):undefined;
-  if(r.speedAdvantage||cover){
+  const exitReady=distance>120&&(plan.nose.dot(plan.direct)<-.25||plan.travel.dot(plan.direct)<-stats.maxSpeed*.4||distance>clamp((ship.observedWeaponRange??400)+80,380,750));
+  if(r.speedAdvantage&&exitReady||cover){
    r.mode=cover?'cover':'range';if(cover)r.cover.set(cover.x,cover.y,cover.z);
    r.active=true;r.attempts++;r.started=now;r.startRange=distance;r.holdingRange=false;r.shieldGoal=ship.maxShield*(novice?.3:ace?.4:.35);
    r.safeRange=clamp((ship.observedWeaponRange??400)+80,380,750);

@@ -15,7 +15,7 @@ test('novices break on grazing PDC fire; trained pilots tolerate it but react to
   const p=pilot(tier);for(let i=0;i<8;i++)registerHitReaction(p,i*.14,.33);
   updateCombatIntent(p,1.2,180,10);assert.equal(p.combatIntent,tier==='novice'?'evade':'hunt');
   registerHitReaction(p,2,45);const first=p.evasiveLatencyUntil;registerHitReaction(p,2.05,45);assert.equal(p.evasiveLatencyUntil,first);
-  updateCombatIntent(p,2.4,180,10);assert.equal(p.combatIntent,'evade');
+  updateCombatIntent(p,2.4,180,10);assert.equal(p.combatIntent,tier==='novice'?'hunt':'evade');
  }
 });
 test('nearby unthreatened pilots hunt, use speed matching, and reserve breaks for clearance',()=>{
@@ -53,6 +53,6 @@ test('Sunlance costs half the energy and a paired salvo cannot erase a fresh Tal
  const s=session(),p=s.save.player;p.shipId='vanguard';p.ownedShips=['vanguard'];const fit=loadoutFor(p);fit.guns=['mortar','mortar'];fit.fireGroups.activeGroup='ALL';p.outfitting.loadouts.vanguard=fit;p.energy=100;
  const victim={tutorialCompanion:true,position:[0,0,-100],hull:137,shield:58};let impacts=0;
  s.spawnPlayerGunProjectile=w=>{impacts++;s.damageShip(victim,w.damageFlat,'enemy',undefined,w);};
- s.fireMountedPlayerGuns();assert.equal(impacts,2);assert.equal(p.energy,68);assert.equal(victim.hull,15);assert.equal(victim.shield,0);
+ s.fireMountedPlayerGuns();assert.equal(impacts,2);assert.equal(p.energy,68);assert.equal(victim.hull,137+58-2*WEAPONS.mortar.damageFlat);assert.equal(victim.shield,0);
  assert.equal(WEAPONS.mortar.cooldown,1.5);assert.equal(WEAPONS.mortar.energyCost,16);
 });

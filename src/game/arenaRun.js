@@ -17,7 +17,7 @@ export const RUN_WAVES=[
  {name:'Crossfire',hint:'One veteran attacks shields; the other carries three seekers. Separate them.',environment:'debris-field',enemies:[['pirate','veteran',1,0],['bounty','veteran',0,0,{launcher:'seeker',missiles:3}]]},
  {name:'Final flight',hint:'The ace carries two torpedoes. An escort with two seekers arrives after fifteen seconds.',environment:'asteroid-field',enemies:[['bounty','ace',2,0,{launcher:'torpedo',missiles:2}],['pirate','veteran',1,0],['escort','veteran',3,15,{launcher:'seeker',missiles:2}]]},
  {name:'Vanguard pair',hint:'Two Vanguards cover each other. Isolate one and keep moving through their turret arcs.',environment:'open',enemies:[['patrol','veteran',1,0],['patrol','ace',0,0,{launcher:'seeker',missiles:2}]]},
- {name:'The frigate',hint:'Watch the charge, then change course or take cover. Attack during recovery. The aim button selects visible batteries; disabling them weakens later salvos.',environment:'asteroid-field',enemies:[['frigate','ace',0,0]]},
+ {name:'The frigate',hint:'Batteries fire in two waves: watch the charge and take cover. Attack during recovery. Plasma and torpedoes penetrate the armored hull; use the aim button to target exposed batteries.',environment:'asteroid-field',enemies:[['frigate','ace',0,0]]},
 ];
 export function newArenaRun(hard=false,seed=Date.now()) {
  const save=createNewSave(seed,{tutorial:false});save.arena={run:true};save.player.credits=0;save.player.cargo={};save.player.throttle=.35;

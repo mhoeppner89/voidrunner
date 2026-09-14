@@ -11,7 +11,7 @@ test('automatic engagement waits through a demand and stops at surrender or stan
  for(const state of ['holdFire','standingDown','surrendered','captured','poweredDown','pendingMug','pendingMugLeaderId'])assert.equal(combatTargetEligible({...ship,[state]:true}),false,state);
 });
 test('patrol excludes itself, remembers only seen coordinates, expires memory and respects stand-down',()=>{
- const s=fixture(),p=s.spawnShip('patrol',[0,0,0]),e=s.spawnShip('pirate',[0,0,100]);p.hostile=true;e.hostile=true;s.canSee=()=>true;
+ const s=fixture(),p=s.spawnShip('patrol',[0,0,0]),e=s.spawnShip('pirate',[0,0,100]);p.hostile=false;e.hostile=true;s.canSee=()=>true;
  s.resolveShipTarget(p);assert.equal(p.targetId,e.id);
  s.canSee=()=>false;s.shipTracksPlayer=()=>false;e.position=[500,400,300];s.save.world.time+=.2;
  assert.deepEqual(s.resolveShipTarget(p).position.toArray(),[0,0,100]);assert.equal(p.patrolMemoryActive,true);

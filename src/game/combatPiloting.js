@@ -31,7 +31,7 @@ export function observeIncomingFire(session,ship) {
   ship.combatThreatId=best.ownerId;ship.combatThreatUntil=now+2;
   if(WEAPONS[best.weaponId])ship.observedWeaponRange=Math.max(ship.observedWeaponRange??0,weaponRange(WEAPONS[best.weaponId]));
   const damage=weaponDamage(ship.shield,best.damage,WEAPONS[best.weaponId]);
-  registerHitReaction(ship,now,damage.shield+damage.hull);
+  registerHitReaction(ship,now,damage.shield+damage.hull,true);
  }
 }
 
@@ -41,25 +41,27 @@ export function updateCombatIntent(ship,now,distance,closing) {
  const trackingRecharge=ship.combatPlan?.movingEngagement;
  if(reacting){
   if(now>=(ship.breakUntil??0)&&!ship.combatPlan){ship.breakSide=(ship.aiRng?.()??.5)<.5?-1:1;ship.breakPitch=((ship.aiRng?.()??.5)-.5)*.6;}
-  ship.breakUntil=Math.max(ship.breakUntil??0,now+.65);
+  ship.breakUntil=Math.max(ship.breakUntil??0,ship.evasiveUntil??now+.65);
  }
  // A short clearance maneuver, not a mandatory long strafing run.
- const clearance=Math.max(24,Math.min(180,(ship.combatFit.profile?.range??70)*.35));
+ const clearance=ship.combatPlan?.clearance??24;
  if(distance<clearance||(distance<Math.max(75,clearance*1.3)&&closing>35&&distance/closing<.65))ship.repositionUntil=Math.max(ship.repositionUntil??0,now+1);
  if(lowEnergy&&now>=(ship.energyRecoverReadyAt??0)){
   const stats=ship.combatFit.stats;
   ship.energyRecoverUntil=now+(trackingRecharge?clamp((stats.energyCapacity*.25-ship.energy)/Math.max(1,stats.reactorOutput),.35,1.2):2);ship.energyRecoverReadyAt=now+6;
  }
- ship.combatIntent=ship.fleeing?'flee':ship.combatPlan?.recovery?.active?'disengage':now<(ship.breakUntil??0)?'evade':now<(ship.repositionUntil??0)||now<(ship.combatPlan?.reapproachUntil??0)?'reposition':!trackingRecharge&&now<(ship.energyRecoverUntil??0)?'recover':'hunt';
+ ship.combatIntent=ship.fleeing?'flee':ship.combatPlan?.recovery?.active?'disengage':now<(ship.breakUntil??0)&&!holdingFiringWindow(ship,now)?'evade':now<(ship.repositionUntil??0)||now<(ship.combatPlan?.reapproachUntil??0)?'reposition':!trackingRecharge&&now<(ship.energyRecoverUntil??0)?'recover':'hunt';
  ship.attackPhase=ship.combatIntent==='hunt'?'approach':'extend';
 }
 
 export function holdingFiringWindow(ship,now) {
  const pressure=(ship.combatPressure??0)*Math.exp(-Math.max(0,now-(ship.combatPressureAt??now))/1.5);
- return ship.pilot?.tier!=='novice'&&now<(ship.fireCommitUntil??0)&&pressure<(ship.fireCommitDamageLimit??0)&&ship.energy>3;
+ const prior=(ship.fireCommitPressure??0)*Math.exp(-Math.max(0,now-(ship.fireCommitStarted??now))/1.5);
+ return ship.pilot?.tier!=='novice'&&now<(ship.fireCommitUntil??0)&&pressure-prior<(ship.fireCommitDamageLimit??0)&&ship.energy>3;
 }
 
 export function combatThrottle(ship,now,distance,closing,targetRadial,noseDot,preferred,canBoost,turnAngle=0) {
+ const crossfire=ship.combatPlan?.crossfire;
  const recovery=ship.combatPlan?.recovery;
  if(recovery?.active){
   const extend=recovery.mode==='range'?(distance<recovery.safeRange+80||distance<recovery.safeRange+200&&closing>5):recovery.coverDistance>100;
@@ -67,13 +69,20 @@ export function combatThrottle(ship,now,distance,closing,targetRadial,noseDot,pr
   if(recovery.mode==='cover'&&recovery.coverDistance<100)return ship.speed*.25;
   return ship.burning?ship.afterburnSpeed:ship.speed;
  }
+ if(!ship.fleeing&&!ship.covering&&ship.combatPlan?.finishing&&distance<220){ship.burning=false;return clamp(targetRadial+(distance-75)*.5,ship.speed*.25,ship.speed);}
+ if(!ship.fleeing&&!ship.covering&&ship.pilot?.tier==='ace'&&crossfire?.outnumbered&&distance<600){ship.burning=Boolean(canBoost&&ship.fuel>2);return ship.burning?ship.afterburnSpeed:ship.speed;}
+ if(crossfire?.active){ship.burning=Boolean(canBoost&&ship.fuel>2);return ship.burning?ship.afterburnSpeed:ship.speed;}
  const hunting=ship.combatIntent==='hunt';
  preferred=ship.combatPlan?.preferredRange??preferred;
- const matching=hunting&&ship.combatPlan?.movingEngagement&&ship.combatPlan?.aimingRun;
- const speedFloor=ship.speed*(matching?.25+.4*clamp((distance/preferred-.65)/.35,0,1):.65);
+ const pressure=(ship.combatPressure??0)*Math.exp(-Math.max(0,now-(ship.combatPressureAt??now))/1.5);
+ const threatened=now<(ship.evasiveUntil??0)||pressure>Math.max(4,(ship.shield+ship.hull*.4)*.06);
+ const main=ship.combatFit.weapons?.at(-1);
+ const artillery=main==='gauss'&&!threatened;
+ const matching=artillery&&hunting&&ship.combatPlan?.aimingRun;
+ const speedFloor=ship.speed*(matching?.25+.4*clamp((distance/preferred-.65)/.35,0,1):hunting&&!threatened&&distance<preferred*.65?.35:.65);
  const overshoot=hunting&&ship.combatPlan?.overshoot;
  canBoost=canBoost&&!overshoot;
- const request=!hunting || (noseDot>.65 && distance>preferred*1.2 && closing<ship.speed*.5);
+ const request=threatened || !hunting || (noseDot>.65 && distance>preferred*1.2 && closing<ship.speed*.5);
  if(canBoost&&request&&ship.fuel>1&&now>=(ship.combatBoostReadyAt??0)){
   const novice=ship.pilot?.tier==='novice';
   const stats=ship.combatFit.stats,speed=Math.hypot(...ship.velocity);
@@ -85,7 +94,8 @@ export function combatThrottle(ship,now,distance,closing,targetRadial,noseDot,pr
  }
  ship.burning=Boolean(canBoost&&ship.fuel>.5&&now<(ship.combatBoostUntil??0));
  if(ship.burning)return ship.afterburnSpeed;
- let speed=hunting?clamp(targetRadial+(distance-preferred)*.6,speedFloor,ship.speed):ship.speed;
+ const turningShot=hunting&&ship.combatPlan?.aimingRun&&ship.combatPlan.angularRate>.15&&!threatened;
+ let speed=(artillery&&hunting||turningShot)?clamp(targetRadial+(distance-preferred)*.6,speedFloor,ship.speed):ship.speed;
  if(overshoot)speed=Math.max(Math.min(speedFloor,ship.speed*.45),Math.min(speed,targetRadial+ship.combatPlan.safeClosing));
  return speed;
 }

@@ -2459,7 +2459,7 @@ export const DE_CATALOG = {
 Object.assign(DE_CATALOG, {
     "Reliable medium-range fire with moderate energy demand.": "Zuverlässiges Feuer auf mittlere Entfernung bei mäßigem Energiebedarf.",
     "Stronger pulse bursts. Requires a medium mount and more energy.": "Stärkere Impulssalven. Benötigt einen mittleren Einbauplatz und mehr Energie.",
-    "Precision shots bypass 25% of shields. Slow firing and high energy cost.": "Präzisionsschüsse umgehen Schilde zu 25 %. Langsame Schussfolge und hoher Energiebedarf.",
+    "Precision shots bypass 15% of shields. Slow firing and high energy cost.": "Präzisionsschüsse umgehen Schilde zu 25 %. Langsame Schussfolge und hoher Energiebedarf.",
     "Close-range spread deals extra hull damage. Ineffective at distance.": "Streufeuer verursacht aus der Nähe zusätzlichen Hüllenschaden. Auf Distanz kaum wirksam.",
     "Strong against shields. Briefly disrupts weapons after shields fail. Weak against hull.": "Stark gegen Schilde. Stört nach deren Ausfall kurz die Waffen. Schwach gegen die Hülle.",
     "Slow explosive shot damages nearby ships. Solid cover blocks the blast.": "Ein langsames Explosivgeschoss trifft auch nahe Schiffe. Feste Deckung hält die Druckwirkung ab.",
@@ -2577,24 +2577,24 @@ Object.assign(DE_CATALOG, {
 });
 
 Object.assign(DE_CATALOG, {
- 'Normal-speed fire. Shares its lead with pulse, ion and scatterguns. 400 km range.':'Standardtempo: gleicher Vorhalt wie Impuls-, Ionen- und Streuwaffen. 400 km Reichweite.',
- 'Stronger normal-speed pulse fire. Shares the standard lead; uses more energy. 400 km range.':'Stärkere Impulsschüsse mit Standardvorhalt und höherem Energieverbrauch. 400 km Reichweite.',
- 'Very fast precision shots bypass 25% of shields. Slow firing; 600 km range.':'Sehr schnelle Präzisionsgeschosse umgehen 25 % der Schilde. Langsame Schussfolge; 600 km Reichweite.',
+ 'Normal-speed fire. Shares its lead with pulse, ion and scatterguns. 450 km range.':'Standardtempo: gleicher Vorhalt wie Impuls-, Ionen- und Streuwaffen. 450 km Reichweite.',
+ 'Stronger normal-speed pulse fire. Shares the standard lead; uses more energy. 450 km range.':'Stärkere Impulsschüsse mit Standardvorhalt und höherem Energieverbrauch. 450 km Reichweite.',
+ 'Very fast precision shots bypass 15% of shields. Slow firing; 600 km range.':'Sehr schnelle Präzisionsgeschosse umgehen 15 % der Schilde. Langsame Schussfolge; 600 km Reichweite.',
  'Normal-speed pellet spread deals extra hull damage. Shares the standard lead; 350 km range.':'Streugeschosse mit Standardvorhalt und erhöhtem Hüllenschaden. 350 km Reichweite.',
  'Normal-speed shots strip shields and briefly halve exposed weapon fire rate and double energy per shot. Shares the standard lead; 400 km range.':'Ionen schwächen Schilde. Ungeschützte Waffen feuern kurz halb so schnell und brauchen doppelte Energie pro Schuss. Standardvorhalt; 400 km Reichweite.',
- 'Slow plasma rewards accurate direct hits with high damage and energy efficiency. Small blast; 450 km range.':'Langsames Plasma belohnt direkte Treffer mit hohem Schaden und guter Energieeffizienz. Kleine Explosion; 450 km Reichweite.',
+ 'Slow plasma rewards accurate direct hits with high damage and energy efficiency. Small blast; 500 km range.':'Langsames Plasma belohnt direkte Treffer mit hohem Schaden und guter Energieeffizienz. Kleine Explosion; 500 km Reichweite.',
  'Missiles first; shared 2.5 s interception recovery with escort drones. Ten-round bursts at selected hostiles; 15% shield damage. 300 km range against ships and missiles.':'Raketen haben Vorrang; 2,5 s gemeinsame Abfangpause mit Begleitdrohnen. Zehnersalven auf ausgewählte Feinde; nur 15 % Schildschaden. 300 km gegen Schiffe und Raketen.',
- 'Instant beam pulses make aiming easy. Lower damage and energy efficiency; 300 km range.':'Sofort treffende Strahlen erleichtern das Zielen. Weniger Schaden und Energieeffizienz; 300 km Reichweite.',
+ 'Instant beam pulses make aiming easy. Moderate damage and efficient sustained fire; 350 km range.':'Sofort treffende Strahlen erleichtern das Zielen. Moderater Schaden und effizientes Dauerfeuer; 350 km Reichweite.',
  'Instant supporting fire at your selected hostile within 300 km. Reserves energy for forward guns; the hull limits its firing arc.':'Sofortiges Unterstützungsfeuer auf dein ausgewähltes feindliches Ziel bis 300 km. Hält Energie für Bugwaffen frei; die Hülle begrenzt den Schusswinkel.',
- '300 km · 6 damage · 4 energy · 0.7 s interval':'300 km · 6 Schaden · 4 Energie · 0,7 s Schussabstand',
- '300 km · 8 damage · 6 energy · 0.4 s interval':'300 km · 8 Schaden · 6 Energie · 0,4 s Schussabstand',
- '400 km · 10 damage · 3.2 energy':'400 km · 10 Schaden · 3,2 Energie',
- '400 km · 13.5 damage · 5 energy':'400 km · 13,5 Schaden · 5 Energie',
- '600 km · 40 damage · 25% shield bypass':'600 km · 40 Schaden · 25 % Schildumgehung',
- '300 km · 2.2 damage · 10-round bursts · 15% shield damage':'300 km · 2,2 Schaden · Zehnersalven · 15 % Schildschaden',
+ '300 km · 4.8 damage · 4 energy · 0.7 s interval':'300 km · 4,8 Schaden · 4 Energie · 0,7 s Schussabstand',
+ '350 km · 10.4 damage · 3.5 energy · 0.4 s interval':'350 km · 10,4 Schaden · 3,5 Energie · 0,4 s Schussabstand',
+ '450 km · 9.2 damage · 3.2 energy':'450 km · 9,2 Schaden · 3,2 Energie',
+ '450 km · 10.8 damage · 3.6 energy':'450 km · 10,8 Schaden · 3,6 Energie',
+ '600 km · 27.2 damage · 15% shield bypass':'600 km · 27,2 Schaden · 15 % Schildumgehung',
+ '300 km · 1.76 damage · 10-round bursts · 15% shield damage':'300 km · 1,76 Schaden · Zehnersalven · 15 % Schildschaden',
  '350 km · 7 pellets · 9 energy':'350 km · 7 Teilgeschosse · 9 Energie',
- '400 km · ×8 vs shields · 9 energy':'400 km · ×8 gegen Schilde · 9 Energie',
- '450 km · 90 direct damage · 16 energy':'450 km · 90 Direktschaden · 16 Energie',
+ '400 km · ×12 vs shields · 9 energy':'400 km · ×12 gegen Schilde · 9 Energie',
+ '500 km · 56 direct damage · 16 energy':'500 km · 56 Direktschaden · 16 Energie',
  '4 seekers · 800 km lock · 260 km/s':'4 Suchraketen · 800 km Aufschaltung · 260 km/s',
  '12 canisters · 4 warheads · 300 km/s':'12 Behälter · 4 Sprengköpfe · 300 km/s',
  'RANGE (km)':'REICHWEITE (km)', 'LOCK RANGE (km)':'AUFSCHALTUNG (km)',
@@ -2630,3 +2630,7 @@ Object.assign(DE_CATALOG, {
 });
 
 Object.assign(DE_CATALOG, {'BATTERIES DOWN':'BATTERIEN AUS'});
+
+Object.assign(DE_CATALOG, {'Absorbs more damage and recharges at the standard rate.':'Absorbiert mehr Schaden und lädt mit normaler Geschwindigkeit nach.','+45 shield capacity · standard recovery':'+45 Schildkapazität · normale Regeneration'});
+
+Object.assign(DE_CATALOG, {'Batteries fire in two waves: watch the charge and take cover. Attack during recovery. Plasma and torpedoes penetrate the armored hull; use the aim button to target exposed batteries.':'Die Batterien feuern in zwei Wellen: Achte auf das Aufladen und suche Deckung. Greife in der Feuerpause an. Plasma und Torpedos durchdringen die Panzerung; mit der Zieltaste wählst du freiliegende Batterien.'});

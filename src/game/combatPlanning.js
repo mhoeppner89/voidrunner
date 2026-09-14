@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {combatTargetEligible} from './combatTargeting.js';
 import {WEAPONS,weaponRange,weaponShotDamage} from './weapons.js';
 import {observeNpcTargetMotion} from './npcGunnery.js';
+import {planCrossfire} from './combatAwareness.js';
 import {planShieldRecovery} from './combatRecovery.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const UP=new THREE.Vector3(0,1,0),FORWARD=new THREE.Vector3(0,0,-1);
@@ -91,7 +92,10 @@ export function planCombatFlight(session,ship,targetPosition,targetVelocity,lead
  if(now<s.next)return s;
  const novice=ship.pilot?.tier==='novice',ace=ship.pilot?.tier==='ace';
  s.next=now+(novice?.3:.2);s.plans++;
- const stats=ship.combatFit.stats,preferred=ship.combatFit.profile.range;
+ const stats=ship.combatFit.stats;
+ // An inexperienced marksman closes to a usable shot instead of missing
+ // indefinitely from the railgun's maximum standoff distance.
+ const preferred=novice&&ship.combatFit.weapons?.at(-1)==='gauss'?300:ship.combatFit.profile.range;
  s.position.fromArray(ship.position);s.travel.fromArray(ship.velocity);s.nose.copy(FORWARD).applyQuaternion(s.q.fromArray(ship.rotation));
  s.relative.copy(targetPosition).sub(s.position);s.direct.copy(s.relative).normalize();
  s.targetVelocity.copy(targetVelocity??s.delta.set(0,0,0));
@@ -114,7 +118,7 @@ export function planCombatFlight(session,ship,targetPosition,targetVelocity,lead
  s.delta.copy(s.targetVelocity).sub(s.travel).multiplyScalar(future).add(s.relative).normalize();
  const angle=Math.acos(clamp(s.nose.dot(s.delta),-1,1));
  s.turnTime=Math.max(Math.sqrt(2*angle/stats.angularAcceleration),angle/(stats.angularAcceleration/stats.angularDamping));
- s.clearance=Math.max(24,Math.min(180,preferred*.35));
+ s.clearance=novice?Math.max(24,Math.min(180,preferred*.35)):Math.max(24,Math.min(preferred*.35,60,ship.speed/turnAuthority*.45));
  const room=Math.max(0,distance-Math.max(s.clearance,preferred*.55)),reaction=novice?.3:ace?.1:.18;
  const deceleration=stats.acceleration*1.25;
  s.brakingDistance=Math.max(0,closing)**2/(2*deceleration)+Math.max(0,closing)*(reaction+Math.min(1.5,s.turnTime)*.35);
@@ -127,12 +131,18 @@ export function planCombatFlight(session,ship,targetPosition,targetVelocity,lead
  // cancels this; novices retain their unconditional light-hit break behavior.
  const weapon=WEAPONS[ship.combatFit.weapons?.[ship.combatWeaponIndex]];
  const trackingWeapon=weapon??mainWeapon;
- s.aimingRun=s.movingEngagement&&s.visible&&trackingWeapon&&distance<weaponRange(trackingWeapon)*.92&&facing>.5;
+ s.aimingRun=s.visible&&trackingWeapon&&distance<weaponRange(trackingWeapon)&&facing>.35;
  const effectiveReserve=ship.shield+ship.hull*.4;
- ship.fireCommitDamageLimit=Math.max(5,effectiveReserve*(ace?.22:.15));
- const finishing=target&&target.hull+target.shield<=weaponShotDamage(weapon??{});
- if(!novice&&s.visible&&weapon&&facing>.997&&!s.overshoot&&distance<weaponRange(weapon)&&ship.energy>=weapon.energyCost&&now>=(ship.combatFit.fireAt[ship.combatWeaponIndex]??0)-.2&&now>=(ship.gunBurstPauseUntil??0)&&now>=(ship.fireCommitReadyAt??0)&&(ship.shield>ship.maxShield*.35||ace&&finishing&&ship.hull>ship.maxHull*.6)&&!friendlyFiringLaneBlocked(session,ship,s.position,lead,distance)){
-  ship.fireCommitUntil=now+(ace?.65:.45);ship.fireCommitReadyAt=now+1.8;
+ ship.fireCommitDamageLimit=Math.max(5,effectiveReserve*(ace?.3:.22));
+ let salvo=0;for(const id of ship.combatFit.weapons)salvo+=weaponShotDamage(WEAPONS[id]);
+ const finishing=target&&target.hull+target.shield<=salvo*3;
+ // Scatter fits must first close to useful pellet density; an early aiming
+ // coast at maximum reach gives long-range opponents a free standoff.
+ const commitRange=weapon?.id==='ripper'?175:weapon?weaponRange(weapon):0;
+ s.finishing=ace&&finishing&&ship.hull+ship.shield>(target.hull+target.shield)*1.3&&distance>45&&facing>.94;
+ if(!novice&&s.visible&&weapon&&facing>.94&&distance>s.clearance+Math.max(0,closing)*.8&&distance<commitRange&&ship.energy>=weapon.energyCost&&now>=(ship.combatFit.fireAt[ship.combatWeaponIndex]??0)-.2&&now>=(ship.gunBurstPauseUntil??0)&&now>=(ship.fireCommitReadyAt??0)&&(ship.shield>ship.maxShield*.35||ace&&finishing&&ship.hull>ship.maxHull*.6)&&!friendlyFiringLaneBlocked(session,ship,s.position,lead,distance)){
+  ship.fireCommitUntil=now+(ace?1:.8);ship.fireCommitReadyAt=now+1.8;
+  ship.fireCommitStarted=now;ship.fireCommitPressure=(ship.combatPressure??0)*Math.exp(-Math.max(0,now-(ship.combatPressureAt??now))/1.5);
  }
 
  // Plan against the observed attacker, which need not be the current target.
@@ -147,6 +157,7 @@ export function planCombatFlight(session,ship,targetPosition,targetVelocity,lead
  }
  s.delta.copy(s.threatPosition).sub(s.position).normalize();basis(s.delta,s.right,s.up);
  planShieldRecovery(session,ship,s,target,now,distance);
+ planCrossfire(session,ship,s,now,distance);
  const needsBreak=now<(ship.evasiveUntil??0)||s.overshoot||distance<s.clearance;
  if(needsBreak&&now>=(s.escapePlannedUntil??0))chooseEscape(session,ship,s,now,novice);
 
@@ -181,7 +192,7 @@ export function combatPursuitDirection(ship,targetPosition,lead,distance,out) {
  if(!s)return out;
  // Pursuit geometry steers the approach, but it must not continuously point
  // forward guns outside their own firing window once the shot is available.
- if(s.aimingRun&&(s.teamRole!=='flank'||distance<preferred*1.15))return out;
+ if(s.aimingRun)return out;
  if(s.pursuit!=='direct'){
   s.delta.copy(targetPosition).sub(s.position).addScaledVector(s.targetVelocity,s.pursuitTime).normalize();
   // Close guns still need a useful forward bearing. Coasting maneuvers use

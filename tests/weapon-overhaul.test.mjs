@@ -39,14 +39,14 @@ test('bypass, shield overflow and hull bonuses are identical through player and 
   s.damagePlayer(20,'test',false,w);s.damageShip(ship,20,'enemy',undefined,w);
   assert.equal(player.hull,ship.hull);assert.equal(player.shield,ship.shield);
  }
- assert.deepEqual(weaponDamage(100,20,WEAPONS.gauss),{shield:15,hull:5});
- assert.deepEqual(weaponDamage(10,20,WEAPONS.ripper),{shield:10,hull:17});
+ assert.deepEqual(weaponDamage(100,20,WEAPONS.gauss),{shield:17,hull:3});
+ assert.deepEqual(weaponDamage(10,20,WEAPONS.ripper),{shield:10,hull:13.5});
 });
 test('ion cannot repeatedly disable weapons and shields prevent disruption',()=>{
  const actor={shield:1};assert.equal(disruptWeapons(actor,WEAPONS.ion,0),false);
  actor.shield=0;assert.equal(disruptWeapons(actor,WEAPONS.ion,0),true);
- assert.equal(disruptWeapons(actor,WEAPONS.ion,0.7),false);assert.equal(actor.disruptedUntil,0.8);
- assert.equal(disruptWeapons(actor,WEAPONS.ion,3.7),false);assert.equal(disruptWeapons(actor,WEAPONS.ion,3.8),true);
+ assert.equal(disruptWeapons(actor,WEAPONS.ion,0.7),false);assert.equal(actor.disruptedUntil,1);
+ assert.equal(disruptWeapons(actor,WEAPONS.ion,1.9),false);assert.equal(disruptWeapons(actor,WEAPONS.ion,2),true);
 });
 test('mounted pulse and magnetic guns keep independent cadence and stop on empty energy',()=>{
  const s=session();s.save.player.shipId='talon';s.save.player.ownedShips=['talon'];const fit=loadoutFor(s.save.player);fit.guns=['pulse-cannon',null,'gauss-cannon'];
@@ -63,31 +63,31 @@ test('beam assist snaps within its cone and respects range and the assist settin
  const aim=()=>s.weaponAimDirection(new THREE.Vector3(),[0,0,0],WEAPONS.beam,target,base,out);
  assert.ok(aim().angleTo(new THREE.Vector3(...ship.position))<1e-7);
  ship.position=[40,0,-100];assert.ok(aim().equals(base));
- ship.position=[20,0,-300];assert.ok(aim().equals(base));
+ ship.position=[20,0,-WEAPONS.beam.range];assert.ok(aim().equals(base));
  ship.position=[20,0,-100];s.save.settings.aimAssist=false;assert.ok(aim().equals(base));
  s.configureArenaImpulseFit('beam');const fit=loadoutFor(s.save.player);
  assert.deepEqual(fit.guns,['beam-emitter','beam-emitter']);assert.deepEqual(fit.turrets,['tracking-turret']);
  assert.ok(Object.values(fit.fireGroups.assignments).every(g=>g==='A'));
  for(const [i,m] of HULL_HARDPOINTS.wayfarer.guns.entries())assert.ok(itemFitsMount(OUTFIT_ITEMS[fit.guns[i]],m));
 });
-test('holding beam fire produces separate pulses, with lower damage and efficiency than accurate pulse shots',()=>{
+test('holding beam fire produces separate pulses, with lower peak damage and better energy efficiency than accurate pulse shots',()=>{
  const s=session(),fit=loadoutFor(s.save.player);fit.guns=['beam-emitter',null];
  for(const m of HULL_HARDPOINTS.wayfarer.guns)fit.fireGroups.assignments[m.id]='A';fit.fireGroups.activeGroup='A';s.save.player.outfitting.loadouts.wayfarer=fit;
  const shots=[];s.fireBeam=()=>shots.push(s.save.world.time);
  for(let frame=0;frame<120;frame++){s.save.world.time=frame/60;s.save.player.energy=100;s.fireMountedPlayerGuns();}
  assert.equal(shots.length,5);
  for(let i=1;i<shots.length;i++)assert.ok(shots[i]-shots[i-1]>=0.4-1e-9);
- s.save.world.time=3;s.save.player.energy=5;s.fireMountedPlayerGuns();assert.equal(shots.length,5);
+ s.save.world.time=3;s.save.player.energy=WEAPONS.beam.energyCost-.01;s.fireMountedPlayerGuns();assert.equal(shots.length,5);
  const b=WEAPONS.beam,p=WEAPONS.pulse,damage=p.damageFlat;
  assert.ok(b.damageFlat/b.cooldown<damage/p.cooldown);
- assert.ok(b.damageFlat/b.energyCost<damage/p.energyCost);
+ assert.ok(b.damageFlat/b.energyCost>damage/p.energyCost);
 });
 test('beam damages the first hull only, respects obstacles and has bounded reusable visuals',()=>{
  const s=session();const a={id:'a',role:'pirate',position:[0,0,-80],rotation:[0,0,0,1],hull:100},b={...a,id:'b',position:[0,0,-150]};s.ships=[a,b];
  const hits=[];s.damageShip=(ship,damage)=>hits.push({id:ship.id,damage});
  let end;const impacts=[];s.renderer.spawnImpact=p=>impacts.push(p);s.renderer.showCombatBeam=(id,start,last)=>{end=last.clone();};
  for(let i=0;i<20;i++)s.fireBeam('player',WEAPONS.beam,new THREE.Vector3(),new THREE.Vector3(0,0,-1),'mount');
- assert.equal(hits.length,20);assert.ok(hits.every(x=>x.id==='a'));assert.equal(hits.reduce((sum,x)=>sum+x.damage,0),160);assert.ok(end.z>-80);
+ assert.equal(hits.length,20);assert.ok(hits.every(x=>x.id==='a'));assert.ok(Math.abs(hits.reduce((sum,x)=>sum+x.damage,0)-20*WEAPONS.beam.damageFlat)<1e-8);assert.ok(end.z>-80);
  assert.equal(impacts.length,20);assert.deepEqual(impacts.at(-1),end.toArray());
  s.obstacles=[{id:'rock',x:0,y:0,z:-40,radius:8,losRadius:8}];hits.length=0;s.fireBeam('player',WEAPONS.beam,new THREE.Vector3(),new THREE.Vector3(0,0,-1),'mount');assert.equal(hits.length,0);assert.ok(end.z>-40);assert.equal(impacts.length,21);
  s.obstacles=[];s.ships=[];s.fireBeam('player',WEAPONS.beam,new THREE.Vector3(),new THREE.Vector3(0,0,-1),'mount');assert.equal(impacts.length,21);

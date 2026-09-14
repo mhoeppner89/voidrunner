@@ -42,18 +42,19 @@ export const ArenaRunMethods={
  runEntryPosition(index){
   const q=new THREE.Quaternion().fromArray(this.save.player.rotation),origin=new THREE.Vector3().fromArray(this.save.player.position);
   const obstacles=this.activeFieldObstacles();
-  let point;for(let attempt=0;attempt<24;attempt++){point=new THREE.Vector3((index-1)*110+Math.sin(attempt*1.7)*180,30+Math.cos(attempt)*65,-240-attempt*20).applyQuaternion(q).add(origin);if(!this.lineBlocked(origin,point)&&this.entryPositionClear(point,obstacles,22))return point.toArray();}
+  let point;for(let attempt=0;attempt<24;attempt++){point=new THREE.Vector3((index-1)*110+Math.sin(attempt*1.7)*180,30+Math.cos(attempt)*65,-1000-attempt*20).applyQuaternion(q).add(origin);if(this.entryPositionClear(point,obstacles,22)&&(attempt>=12||!this.lineBlocked(origin,point)))return point.toArray();}
   return null;
  },
  spawnRunEnemy(spec,index){
   const r=this.save.arenaRun,[role,tier,fitIndex,,ordnance]=spec;
   const origin=new THREE.Vector3().fromArray(this.save.player.position);
-  const entry=r.entry??this.runEntryPosition(index);if(!entry)return false;
+  const cached=r.entry;
+  const entry=cached && origin.distanceTo(new THREE.Vector3().fromArray(cached))>=1000 ? cached : this.runEntryPosition(index);if(!entry)return false;
   const point=new THREE.Vector3().fromArray(entry);r.entry=null;this.ui.setRunInbound?.(null);
   if(role==='frigate'){
    const obstacles=this.activeFieldObstacles(),facing=new THREE.Quaternion().fromArray(this.save.player.rotation);let clear=false;
    for(let attempt=0;attempt<80;attempt++){
-    const angle=Math.sin(attempt*2.4)*1.1,distance=580+Math.floor(attempt/12)*55;point.set(Math.sin(angle)*distance,Math.sin(attempt*1.7)*140,-Math.cos(angle)*distance).applyQuaternion(facing).add(origin);
+    const angle=Math.sin(attempt*2.4)*1.1,distance=1000+Math.floor(attempt/12)*55;point.set(Math.sin(angle)*distance,Math.sin(attempt*1.7)*140,-Math.cos(angle)*distance).applyQuaternion(facing).add(origin);
     if(this.entryPositionClear(point,obstacles,140)){clear=true;break;}
    }
    if(!clear)return false;

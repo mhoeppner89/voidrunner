@@ -48,7 +48,7 @@ test('subtarget selection moves beam assistance to the battery and skips destroy
 
 test('main battery extents match the live capital hull and PDC scale',()=>{const {s,ship}=stage();assert.deepEqual(FRIGATE_EXTENTS,s.npcHullExtents(ship));});
 
-test('boss recovery is a shared, five-second anti-ship ceasefire',()=>{
+test('boss recovery is a shared, three-and-a-half-second anti-ship ceasefire',()=>{
  const {s,ship}=stage(),shots=[],phases=[];
  s.spawnGunProjectile=(id,w)=>shots.push({phase:ship.capitalAttack,time:s.save.world.time,main:w===FRIGATE_BOSS_GUN});
  for(let i=0;i<1200;i++){
@@ -57,7 +57,7 @@ test('boss recovery is a shared, five-second anti-ship ceasefire',()=>{
  }
  assert.ok(shots.some(x=>x.main));assert.ok(shots.every(x=>x.phase!=='RECOVERING'));
  assert.ok(shots.filter(x=>x.main).every(x=>x.phase==='SALVO'));
- for(let i=1;i<phases.length-1;i++)if(phases[i].phase==='RECOVERING')assert.ok(phases[i+1].time-phases[i].time>=5.49);
+ for(let i=1;i<phases.length-1;i++)if(phases[i].phase==='RECOVERING')assert.ok(phases[i+1].time-phases[i].time>=3.49);
 });
 
 test('boss commits to the observed course before its salvo and cover cancels it',()=>{
@@ -69,7 +69,7 @@ test('boss commits to the observed course before its salvo and cover cancels it'
  for(let i=361;i<420;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,point,velocity);}
  assert.deepEqual(gun.lockedTarget.toArray(),locked);assert.deepEqual(gun.lockedVelocity.toArray(),[0,0,10]);
  s.lineBlocked=()=>true;s.save.world.time=7;updateFrigateBatteries(s,ship,1/60,point,velocity);
- assert.equal(ship.capitalAttack,'RECOVERING');assert.ok(ship.capitalAttackRemaining>=5.49);
+ assert.equal(ship.capitalAttack,'RECOVERING');assert.ok(ship.capitalAttackRemaining>=3.49);
 });
 
 test('ion shield damage does not multiply the fitted hull shield capacity',async()=>{

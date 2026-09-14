@@ -72,8 +72,8 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             // the hull: drive heat, weapons, damage, and utility emissions still
             // create a physical sensor contact in flight.
             transponder: true,
-            shield: 90,
-            hull: 185,
+            shield: SHIPS.wayfarer.shield,
+            hull: SHIPS.wayfarer.hull,
             energy: 72,
             missiles: 4,
             launcherMagazines: {},

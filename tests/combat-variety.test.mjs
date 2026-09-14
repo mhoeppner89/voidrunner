@@ -58,7 +58,7 @@ test('sustained hits never postpone a pending reaction, and a later attack gets 
 });
 test('veterans drift, aces also reverse; both recover through normal flight controls',()=>{
     for(const tier of ['veteran','ace'])for(const move of ['drift-pass','boost-reversal']) {
-        const s=fixture(),ship=spawn(s,'pirate',tier,[0,0,120]);ship.combatFit=createEnemyLoadout(ship,3);s.npcFlightStats(ship);ship.combatFit.missiles=0;s.fireNpcGun=()=>{};
+        const s=fixture(),ship=spawn(s,'pirate',tier,[0,0,120]);ship.combatFit=createEnemyLoadout(ship,3);s.npcFlightStats(ship);ship.combatFit.missiles=0;ship.fireCommitReadyAt=100;s.fireNpcGun=()=>{};
         ship.velocity=move==='drift-pass'?[60,0,-45]:[0,0,76];
         if(move==='boost-reversal'){ship.rotation=[0,1,0,0];ship.attackPhase='extend';}
         const before=new THREE.Vector3(...ship.velocity);step(s,ship);
@@ -66,13 +66,13 @@ test('veterans drift, aces also reverse; both recover through normal flight cont
         assert.equal(ship.aceMove?.kind,move);
         if(move==='drift-pass')assert.ok(new THREE.Vector3(...ship.velocity).distanceTo(before)<1e-7);
         else assert.equal(ship.burning,true);
-        for(let i=0;i<330;i++)step(s,ship);
-        assert.equal(ship.aceMove,undefined);assert.ok(ship.aceMoveReadyAt>s.save.world.time);
+        for(let i=0;i<240&&ship.aceMove;i++)step(s,ship);
+        assert.equal(ship.aceMove,undefined);assert.ok(ship.aceMoveReadyAt>s.save.world.time,'ending a maneuver starts a finite cooldown');
         assert.ok(ship.position.every(Number.isFinite));assert.ok(ship.rotation.every(Number.isFinite));
     }
 });
 test('an obstacle on the drift path cancels the ace commitment and starts its recovery interval',()=>{
-    const s=fixture(),ship=spawn(s,'pirate','ace',[0,0,120]);ship.combatFit=createEnemyLoadout(ship,3);s.npcFlightStats(ship);ship.combatFit.missiles=0;s.fireNpcGun=()=>{};
+    const s=fixture(),ship=spawn(s,'pirate','ace',[0,0,120]);ship.combatFit=createEnemyLoadout(ship,3);s.npcFlightStats(ship);ship.combatFit.missiles=0;ship.fireCommitReadyAt=100;s.fireNpcGun=()=>{};
     ship.velocity=[60,0,-45];step(s,ship);assert.equal(ship.aceMove?.kind,'drift-pass');
     s.obstacles=[{id:'rock',x:ship.position[0]+30,y:0,z:ship.position[2]-22.5,radius:15,collisionRadius:15,losRadius:15}];
     ship.aceClearanceAt=0;step(s,ship);
@@ -104,7 +104,7 @@ test('intercept handles equal projectile speed and weapon-specific crossing velo
 test('one hull supports distinct equipment roles and each shot uses its equipped weapon',()=>{
     const ranges=[];
     for(let fitIndex=0;fitIndex<3;fitIndex++){
-        const s=fixture(),ship=spawn(s);ship.combatFit=createEnemyLoadout(ship,fitIndex);ship.combatFit.missiles=0;
+        const s=fixture(),ship=spawn(s,'pirate','ace',[0,0,750]);ship.combatFit=createEnemyLoadout(ship,fitIndex);ship.combatFit.missiles=0;
         let distance=0;
         for(let i=0;i<1800;i++){step(s,ship);distance+=Math.hypot(...ship.position);assert.ok(ship.position.every(Number.isFinite));}
         ranges.push(Math.round(distance/1800));assert.ok(s.projectiles.length>0,`fit ${fitIndex} must find a firing opportunity`);
@@ -114,7 +114,7 @@ test('one hull supports distinct equipment roles and each shot uses its equipped
     console.log('Same hull, three equipment fits: mean ranges',ranges);
 });
 test('a faster ship commits to shield recovery and leaves it on a bounded cooldown',()=>{
- const s=fixture(),ship=spawn(s);ship.shield=10;ship.shieldDelay=4.5;
+ const s=fixture(),ship=spawn(s);ship.shield=10;ship.shieldDelay=4.5;ship.rotation=[0,1,0,0];ship.velocity=[0,0,60];
  step(s,ship);const r=ship.combatPlan.recovery;assert.equal(r.active,true);assert.equal(ship.combatIntent,'disengage');
  for(let i=0;i<240;i++)step(s,ship);
  assert.equal(r.active,true,'four seconds is too early to turn back into fire');
@@ -128,7 +128,7 @@ test('legacy rookie profiles normalize and tutorial/capital weapons retain autho
     for(const flag of ['tutorialEnemy','tutorialCompanion','capitalClass']){
         const s=fixture(),ship=spawn(s);ship[flag]=true;ship.gunDamage=3;
         assert.equal(combatProfile(ship),undefined);s.fireNpcGun(ship,new THREE.Vector3(0,0,-1));
-        assert.equal(s.projectiles[0].damage,3);assert.equal(s.projectiles[0].life,1.55);
+        assert.ok(Math.abs(s.projectiles[0].damage-2.4)<1e-9);assert.equal(s.projectiles[0].life,1.55);
     }
 });
 
