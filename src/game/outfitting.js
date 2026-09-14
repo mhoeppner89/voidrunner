@@ -99,7 +99,7 @@ const itemRecords = [
         id: 'ion-blaster', name: 'Ion Projector', category: 'gun', size: 'M', sizes: ['M'],
         price: 5600, energyCost: 9, mass: 5, weaponId: 'ion',
         description: "Normal-speed shots strip shields and briefly halve exposed weapon fire rate and double energy per shot. Shares the standard lead; 400 km range.", stat: '400 km · ×8 vs shields · 9 energy',
-        effects: { weaponId: 'ion', shieldMultiplier: 8, jamSeconds: 0.8 }, availability: ['rook', 'vesper'],
+        effects: { weaponId: 'ion', shieldDamageMultiplier: 8, jamSeconds: 0.8 }, availability: ['rook', 'vesper'],
         legacyEquipmentId: 'ion-lance', art: './art/outfitting/ion-blaster.webp',
     },
     {

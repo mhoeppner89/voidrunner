@@ -1,3 +1,4 @@
+import {equipFrigate} from './capitalCombat.js';
 import * as THREE from 'three';
 import {RUN_WAVES,writeArenaRun,recordArenaRun,recoverRun,runOffers,refreshRunRewardOffers,chooseRunReward,fitRunItem,changeRunHull} from './arenaRun.js';
 import {createEnemyLoadout} from './enemyLoadouts.js';
@@ -35,7 +36,7 @@ export const ArenaRunMethods={
   r.checkpointStats={elapsed:r.elapsed,damage:r.damage,missiles:r.missiles};
   r.countdown=3;r.startedAt=this.save.world.time;r.entry=null;r.nextEnemy=0;r.warned=-1;r.waveMissiles=this.save.player.missiles??0;
   writeArenaRun(this.save);this.ui.hideArena();this.ui.hidePause();this.ui.showHud();
-  this.ui.pushEvent(t('Wave {wave} of 8',{wave:r.wave+1})+' · '+t(wave.name),'info',5000);
+  this.ui.pushEvent(t('Wave {wave} of {total}',{wave:r.wave+1,total:RUN_WAVES.length})+' · '+t(wave.name),'info',5000);
   this.ui.showRunCountdown?.(3,t(wave.name));
  },
  runEntryPosition(index){
@@ -49,7 +50,21 @@ export const ArenaRunMethods={
   const origin=new THREE.Vector3().fromArray(this.save.player.position);
   const entry=r.entry??this.runEntryPosition(index);if(!entry)return false;
   const point=new THREE.Vector3().fromArray(entry);r.entry=null;this.ui.setRunInbound?.(null);
+  if(role==='frigate'){
+   const obstacles=this.activeFieldObstacles(),facing=new THREE.Quaternion().fromArray(this.save.player.rotation);let clear=false;
+   for(let attempt=0;attempt<80;attempt++){
+    const angle=Math.sin(attempt*2.4)*1.1,distance=580+Math.floor(attempt/12)*55;point.set(Math.sin(angle)*distance,Math.sin(attempt*1.7)*140,-Math.cos(angle)*distance).applyQuaternion(facing).add(origin);
+    if(this.entryPositionClear(point,obstacles,140)){clear=true;break;}
+   }
+   if(!clear)return false;
+   const ship=this.spawnCapitalShip('concord-frigate',point.toArray(),'rook',t('Arena frigate'));
+   equipFrigate(ship,true);ship.hostile=true;ship.targetId='player';ship.arenaRunEnemy=true;ship.noSurrender=true;ship.faction='red-talons';
+   delete ship.task;delete ship.capitalHome;ship.holdFire=false;ship.playerAwareness=1;
+   ship.rotation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),origin.clone().sub(point).normalize()).toArray();
+   this.selectTarget('ship',ship.id);this.ui.pushEvent(t('Frigate entering. Use asteroid cover; select its batteries on the target monitor.'),'warning',6000);return true;
+  }
   const ship=this.spawnShip(role,point.toArray(),undefined,undefined,{tier:r.hard?(tier==='novice'?'veteran':tier==='veteran'?'ace':tier):tier});
+  ship.faction='red-talons';
   ship.hostile=true;ship.targetId='player';ship.arenaRunEnemy=true;ship.noSurrender=true;ship.combatFit=createEnemyLoadout(ship,fitIndex);
   ship.combatFit.launcher=ordnance?.launcher;ship.combatFit.missiles=ordnance?.missiles??0;
   if(r.wave===0&&!r.hard){ship.combatFit.guns=['beam-emitter',null,null];ship.combatFit.weapons=['beam'];ship.combatFit.attackOrder=[0];ship.combatFit.fireAt=[this.save.world.time+4];ship.combatFit.missiles=0;ship.combatFit.turrets=[];}
@@ -70,8 +85,8 @@ export const ArenaRunMethods={
   if(r.nextEnemy===wave.enemies.length&&!this.ships.some(s=>s.arenaRunEnemy&&s.hull>0&&!s.surrendered)){
    r.missiles+=Math.max(0,r.waveMissiles-(this.save.player.missiles??0));r.cleared=r.wave+1;
    this.clearTransientSpace();this.save.player.velocity=[0,0,0];
-   if(r.cleared===8){r.phase='won';recordArenaRun(this.save);}
-   else{recoverRun(this.save);r.wave++;r.phase='prepare';r.rewardChosen=false;r.selectedReward=null;this.ui.runFitOpen=false;r.hullChosen=![3,6].includes(r.wave);r.offers=r.hullChosen?runOffers(this.save):[];}
+   if(r.cleared===RUN_WAVES.length){r.phase='won';recordArenaRun(this.save);}
+   else{recoverRun(this.save);r.wave++;if(r.wave===9){const p=this.save.player;p.hull=getEffectiveShipStats(p).hull;recoverRun(this.save,true);}r.phase='prepare';r.rewardChosen=false;r.selectedReward=null;this.ui.runFitOpen=false;r.hullChosen=![3,6].includes(r.wave);r.offers=r.hullChosen?runOffers(this.save):[];}
    delete r.checkpoint;writeArenaRun(this.save);this.showRunPreparation();
   }
  },

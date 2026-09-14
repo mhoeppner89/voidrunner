@@ -16,9 +16,9 @@ function runSession(wave=1){const s=fixture();s.save=newArenaRun(false,718);s.sa
  s.clearTransientSpace=()=>{for(const p of s.projectiles)s.projStore.free(p.slot);s.projectiles=[];s.ships=[];};
  s.selectTarget=(kind,id)=>s.save.player.currentTargetId=id;s.setupRun();return s;
 }
-test('eight actual waves advance once, wait for reinforcements, and unlock hard mode only on victory',()=>{
+test('ten actual waves advance once, wait for reinforcements, and unlock hard mode only on victory',()=>{
  const data=storage();data.set('void-privateer-save-v1','career sentinel');const s=runSession(0);
- for(let wave=0;wave<8;wave++){
+ for(let wave=0;wave<RUN_WAVES.length;wave++){
   const r=s.save.arenaRun;assert.equal(r.wave,wave);assert.equal(r.phase,wave===0?'combat':'prepare');
   if(!r.hullChosen){assert.equal(changeRunHull(s.save,wave===3?'talon':'vanguard'),true);}
   if(!r.rewardChosen)assert.equal(chooseRunReward(s.save,r.offers.includes('repair')?'repair':r.offers[0]),true);
@@ -86,12 +86,12 @@ test('actual undocked preparation fits earned thrusters and preserves inventory 
  s.startRunWave();assert.equal(fitRunItem(s.save,'drive',0,'thrusters-mk2'),false,'combat fitting remains blocked');
 });
 test('normal and hard runs introduce finite ordnance only at wave four',()=>{
- for(const hard of [false,true])for(let wave=0;wave<8;wave++){
+ for(const hard of [false,true])for(let wave=0;wave<RUN_WAVES.length;wave++){
   storage();const s=runSession();s.save.arenaRun.hard=hard;s.save.arenaRun.wave=wave;
   const notices=[];s.ui.pushEvent=message=>notices.push(message);
   RUN_WAVES[wave].enemies.forEach((spec,index)=>{s.save.arenaRun.entry=[index*50,0,-200];assert.equal(s.spawnRunEnemy(spec,index),true);});
   const stocks=s.ships.map(ship=>ship.combatFit.missiles);
-  assert.deepEqual(stocks,[[0],[0,0],[0],[2,0,0],[2,0],[0],[0,3],[2,0,2]][wave]);
+  assert.deepEqual(stocks,[[0],[0,0],[0],[2,0,0],[2,0],[0],[0,3],[2,0,2],[0,2],[0]][wave]);
   assert.equal(notices.filter(message=>/Raketenträger|Missile carrier/.test(message)).length,stocks.filter(n=>n>0).length);
  }
 });
@@ -121,3 +121,9 @@ test('weapon sets fit matching mounts atomically and preserve replaced equipment
   writeArenaRun(save);assert.equal(loadoutFor(readArenaRun().player).guns.filter(x=>x==='pulse-cannon').length,after.guns.filter(x=>x==='pulse-cannon').length);
  }
 });
+test('legacy completed runs stay completed and active checkpoints extend to ten waves',()=>{
+ const data=storage();for(const phase of ['prepare','combat','won','lost']){const save=newArenaRun();Object.assign(save.arenaRun,{version:1,wave:7,phase,cleared:phase==='won'?8:7});delete save.arenaRun.totalWaves;data.set(ARENA_RUN_KEY,JSON.stringify(save));const r=readArenaRun().arenaRun;assert.equal(r.phase,phase);assert.equal(r.totalWaves,['won','lost'].includes(phase)?8:10);assert.equal(r.version,2);}
+});
+test('Vanguard wave precedes a fully serviced frigate boss',()=>{storage();const s=runSession(8);s.startRunWave();s.tickArenaRun(3);assert.equal(s.ships.length,2);assert.ok(s.ships.every(x=>x.combatFit.hullId==='vanguard'));s.save.player.hull=5;s.ships.forEach(x=>x.hull=0);s.tickArenaRun(0);assert.equal(s.save.arenaRun.wave,9);assert.equal(s.save.player.hull,getEffectiveShipStats(s.save.player).hull);chooseRunReward(s.save,s.save.arenaRun.offers[0]);s.startRunWave();s.tickArenaRun(3);assert.equal(s.ships.length,1);assert.equal(s.ships[0].capitalBoss,true);assert.equal(s.ships[0].combatFit.turrets.filter(Boolean).length,4);});
+
+test('frigate spawn search stays ahead even when early positions are obstructed',()=>{storage();const s=runSession(9);s.startRunWave();let attempts=0;s.entryPositionClear=()=>++attempts>18;s.save.arenaRun.entry=[0,0,-200];assert.equal(s.spawnRunEnemy(RUN_WAVES[9].enemies[0],0),true);const delta=new THREE.Vector3(...s.ships[0].position).sub(new THREE.Vector3(...s.save.player.position)),ahead=new THREE.Vector3(0,0,-1).applyQuaternion(new THREE.Quaternion(...s.save.player.rotation));assert.ok(delta.dot(ahead)>0);});

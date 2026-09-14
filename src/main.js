@@ -364,6 +364,7 @@ const actions = {
     droneServiceQuote: (options) => session?.droneServiceQuote(options),
     serviceDrones: (options) => session?.serviceDrones(options),
     miningDrones: () => session?.miningDroneHud(),
+    cycleCapitalSubtarget: () => session?.cycleCapitalSubtarget(),
     launcherCycle: () => session?.cycleLauncher(),
     selectTarget: (kind, id) => session?.selectTarget(kind, id, 'map'),
     reviewServices: () => session?.checkTutorialServices(true),

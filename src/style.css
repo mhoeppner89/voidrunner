@@ -14882,3 +14882,51 @@ button.primary,
 #hyperdrive-card b { font-size:clamp(10px,1.45vw,14px); letter-spacing:.1em; }
 #hyperdrive-card:hover,#hyperdrive-card:focus-visible { border-color:var(--console-brass); box-shadow:0 2px 2px #000,inset 0 2px 4px #000,inset 0 -1px 0 var(--console-edge); }
 #hyperdrive-card[data-hyperdrive-ready="true"] { border-color:var(--console-brass-light); box-shadow:0 2px 2px #000,inset 0 2px 4px #000,0 0 9px #f1c97880; }
+
+/* Hull fractures share the painted cockpit transform and inverse alpha mask. */
+.cockpit-damage { position:absolute; inset:0; width:100%; height:100%; z-index:3; pointer-events:none; }
+.fracture { opacity:0; stroke:#cfebed; stroke-width:1.05; filter:drop-shadow(1px 1px 0 #071318); }
+.glass-shard { fill:#b7d1d329; stroke-width:1.8; }
+#game-shell[data-damage-stage="1"] .fracture-1,
+#game-shell[data-damage-stage="2"] :is(.fracture-1,.fracture-2),
+#game-shell[data-damage-stage="3"] :is(.fracture-1,.fracture-2,.fracture-3),
+#game-shell[data-damage-stage="4"] .fracture { opacity:.8; }
+/* Instrument failure belongs to the display: no decorative glass cracks. */
+.monitor-damage { position:absolute; inset:2%; z-index:8; pointer-events:none; opacity:0; overflow:hidden; --fault-strength:.25; --monitor-dim:.3; --flicker-time:10.7s; --flicker-offset:-2.1s; }
+#game-shell:not([data-damage-stage="0"]) .monitor-damage { opacity:1; }
+#game-shell[data-damage-stage="2"] .monitor-damage { --fault-strength:.5; --monitor-dim:.55; }
+#game-shell[data-damage-stage="3"] .monitor-damage { --fault-strength:.8; --monitor-dim:.8; }
+#game-shell[data-damage-stage="4"] .monitor-damage { --fault-strength:1; --monitor-dim:.96; }
+.monitor-damage::before { content:""; position:absolute; inset:0; opacity:var(--fault-strength);
+ background:repeating-linear-gradient(0deg,#01060bf0 0 2px,#163b40b3 2px 3px,#01060be0 3px 7px),repeating-linear-gradient(90deg,transparent 0 3px,#02070a 3px 5px);
+ clip-path:polygon(91% 22%,98% 22%,98% 59%,94% 59%,94% 53%,87% 53%,87% 50%,93% 50%,93% 39%,89% 39%,89% 34%,94% 34%,94% 28%,91% 28%);
+}
+.cockpit-screen-radar .monitor-damage { --flicker-time:8.9s; --flicker-offset:-5.6s; --fault-mirror:-1; }
+.cockpit-screen-radar .monitor-damage::before { transform:scaleX(-1); clip-path:polygon(94% 38%,99% 38%,99% 69%,90% 69%,90% 66%,96% 66%,96% 57%,87% 57%,87% 54%,94% 54%); }
+.cockpit-screen-target .monitor-damage { --flicker-time:7.3s; --flicker-offset:-.9s; }
+.cockpit-screen-target .monitor-damage::before { clip-path:polygon(88% 26%,98% 26%,98% 57%,94% 57%,94% 48%,90% 48%,90% 45%,95% 45%,95% 37%,84% 37%,84% 34%,91% 34%,91% 30%,88% 30%); }
+.monitor-damage::after { content:""; position:absolute; inset:0; opacity:0; background:rgb(0 4 9 / var(--monitor-dim)); }
+#game-shell:not([data-damage-stage="0"])[data-reduced-damage="false"] .monitor-damage::after { animation:monitor-power-flicker var(--flicker-time) steps(1,end) var(--flicker-offset) infinite; }
+#game-shell:is([data-damage-stage="3"],[data-damage-stage="4"])[data-reduced-damage="false"] .monitor-damage::before { animation:monitor-signal-tear 6.1s steps(1,end) var(--flicker-offset) infinite; }
+#game-shell[data-damage-impact="true"][data-reduced-damage="false"] .monitor-damage { background:repeating-linear-gradient(0deg,transparent 0 11px,#061017a0 11px 13px); }
+#game-shell[data-damage-stage="4"] .cockpit-art { filter:contrast(1.06) brightness(.9) sepia(.15) drop-shadow(0 -4px 10px #b8312050); }
+/* Brief brownouts at different times per display; no bright flashes. */
+@keyframes monitor-power-flicker {
+ 0%,13%,16%,58%,61%,100% {opacity:0;}
+ 13.5%,14.2% {opacity:.65;}
+ 14.3%,15.2% {opacity:.18;}
+ 58.5%,60% {opacity:1;}
+}
+@keyframes monitor-signal-tear {
+ 0%,77%,81%,100% {transform:translateY(0) scaleX(var(--fault-mirror,1));}
+ 78% {transform:translateY(2px) scaleX(var(--fault-mirror,1));filter:brightness(1.5);}
+ 80% {transform:translateY(-1px) scaleX(var(--fault-mirror,1));filter:none;}
+}
+@media(prefers-reduced-motion:reduce){ .monitor-damage::before,.monitor-damage::after {animation:none !important;} }
+
+/* Capital target control occupies the target diagram, preserving the status bars. */
+#capital-subtarget { position:absolute; left:5%; right:5%; top:45%; z-index:12; min-height:28px; padding:3px 5px; border:1px solid var(--void-gold); color:var(--void-gold); background:#081525; font:inherit; font-size:clamp(8px,.8vw,12px); cursor:pointer; }
+
+.screen-target-layout.has-capital-target #target-hull-outline { visibility:hidden; }
+
+.screen-target-readout.is-capital-warning { color:var(--void-gold); }

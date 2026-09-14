@@ -16,12 +16,21 @@ export const RUN_WAVES=[
  {name:'The duellist',hint:'An ace uses drift and reversals. Save energy for the opening.',environment:'open',enemies:[['pirate','ace',1,0]]},
  {name:'Crossfire',hint:'One veteran attacks shields; the other carries three seekers. Separate them.',environment:'debris-field',enemies:[['pirate','veteran',1,0],['bounty','veteran',0,0,{launcher:'seeker',missiles:3}]]},
  {name:'Final flight',hint:'The ace carries two torpedoes. An escort with two seekers arrives after fifteen seconds.',environment:'asteroid-field',enemies:[['bounty','ace',2,0,{launcher:'torpedo',missiles:2}],['pirate','veteran',1,0],['escort','veteran',3,15,{launcher:'seeker',missiles:2}]]},
+ {name:'Vanguard pair',hint:'Two Vanguards cover each other. Isolate one and keep moving through their turret arcs.',environment:'open',enemies:[['patrol','veteran',1,0],['patrol','ace',0,0,{launcher:'seeker',missiles:2}]]},
+ {name:'The frigate',hint:'Watch the charge, then change course or take cover. Attack during recovery. The aim button selects visible batteries; disabling them weakens later salvos.',environment:'asteroid-field',enemies:[['frigate','ace',0,0]]},
 ];
 export function newArenaRun(hard=false,seed=Date.now()) {
  const save=createNewSave(seed,{tutorial:false});save.arena={run:true};save.player.credits=0;save.player.cargo={};save.player.throttle=.35;
- save.arenaRun={version:1,seed,hard,wave:0,phase:'prepare',rewardChosen:true,hullChosen:true,offers:[],cleared:0,elapsed:0,damage:0,missiles:0};return save;
+ save.arenaRun={version:2,totalWaves:RUN_WAVES.length,seed,hard,wave:0,phase:'prepare',rewardChosen:true,hullChosen:true,offers:[],cleared:0,elapsed:0,damage:0,missiles:0};return save;
 }
-export function readArenaRun(){try{const raw=JSON.parse(window.localStorage.getItem(ARENA_RUN_KEY));if(raw?.arenaRun?.version!==1||!['prepare','combat','won','lost'].includes(raw.arenaRun.phase)||!Number.isInteger(raw.arenaRun.wave)||raw.arenaRun.wave<0||raw.arenaRun.wave>7)return null;const save=hydrateSave(raw);save.arenaRun=raw.arenaRun;save.arena={run:true};refreshRunRewardOffers(save);return save;}catch{return null;}}
+export function readArenaRun(){try{
+ const raw=JSON.parse(window.localStorage.getItem(ARENA_RUN_KEY)),r=raw?.arenaRun;
+ if(![1,2].includes(r?.version)||!['prepare','combat','won','lost'].includes(r.phase)||!Number.isInteger(r.wave)||r.wave<0||r.wave>=(r.version===1?8:RUN_WAVES.length))return null;
+ // Finished eight-wave records remain finished. Active checkpoints gain waves 9–10.
+ if(r.version===1){r.totalWaves=['won','lost'].includes(r.phase)?8:RUN_WAVES.length;r.version=2;}
+ const save=hydrateSave(raw);save.arenaRun=r;save.arena={run:true};refreshRunRewardOffers(save);return save;
+ }catch{return null;}}
+
 export function writeArenaRun(save){try{const clean={...save,player:{...save.player}};delete clean.player.turretRuntime;delete clean.player.prevPosition;delete clean.player.prevRotation;window.localStorage.setItem(ARENA_RUN_KEY,JSON.stringify(clean));return true;}catch{return false;}}
 export function arenaRecord(){try{return JSON.parse(window.localStorage.getItem(ARENA_RECORD_KEY))??{};}catch{return {};}}
 export function recordArenaRun(save){const r=save.arenaRun,old=arenaRecord();try{window.localStorage.setItem(ARENA_RECORD_KEY,JSON.stringify({unlockedHard:old.unlockedHard||r.phase==='won',best:Math.max(old.best??0,runScore(r)),last:{cleared:r.cleared,score:runScore(r)}}));}catch{}}

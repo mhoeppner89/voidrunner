@@ -1,3 +1,4 @@
+import {FRIGATE_CLEARANCE} from './frigateMounts.js';
 import { combatTargetEligible } from './combatTargeting.js';
 import { disruptionFactor } from './weaponDamage.js';
 import * as THREE from 'three';
@@ -15,7 +16,7 @@ const identity=new THREE.Quaternion();
 // Missile positions use Float32 storage; tolerate its rounding at the range edge.
 const rangeEpsilon=0.0001;
 // The forward sector crosses the mounting plane, but never the owner's hull.
-function clearTurretArc(actor,mount,extents,point,state) {
+export function clearTurretArc(actor,mount,extents,point,state) {
     const local=state.local.copy(point).sub(state.scratch.fromArray(actor.position)).applyQuaternion(state.inverse);
     const forward=mount.forwardCone && -local.z>local.length()*Math.cos(mount.forwardCone*Math.PI/180);
     if(local.getComponent(mount.axis??1)*mount.side < -1e-6 && !forward)return false;
@@ -36,7 +37,7 @@ function clearTurretArc(actor,mount,extents,point,state) {
     }
     return false;
 }
-function shipBlocksRay(session,actor,ownerId,target,point,state) {
+export function shipBlocksRay(session,actor,ownerId,target,point,state) {
     const direction=state.scratch.copy(point).sub(state.position).normalize();
     const distance=point.distanceTo(state.position);
     const blocks=(position,radius)=>{
@@ -48,6 +49,7 @@ function shipBlocksRay(session,actor,ownerId,target,point,state) {
     return session.ships.some(other=>other!==actor && other.id!==ownerId && other!==target && other.hull>0 && blocks(other.position,Math.max(...session.npcHullExtents(other))));
 }
 function selectedHostile(session,actor,ownerId,player) {
+    if(actor.capitalBoss&&actor.capitalAttack==='RECOVERING')return;
     if(actor.patrolMemoryActive || actor.fleeing || actor.holdFire || actor.pursuitHoldFire || actor.combatPlan?.recovery?.active || (player && actor.mode!=='combat'))return;
     const ref=player?session.getTargetRef():{kind:'ship',id:actor.targetId};
     if(!player && actor.targetId==='player' && actor.hostile && session.save.player.hull>0)return session.save.player;
@@ -63,11 +65,11 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
     if(actor.turretRuntime?.[0] && !(actor.turretRuntime[0].position instanceof THREE.Vector3))actor.turretRuntime=[];
     actor.turretRuntime??=[];
     for(const [index,mount] of layouts.entries()) {
-        const item=OUTFIT_ITEMS[items[index]];if(!item)continue;
+        const item=OUTFIT_ITEMS[items[index]];if(!item || actor.capitalMountHull?.[index]<=0)continue;
         const pdc=item.turretKind==='pdc';
         const state=actor.turretRuntime[index]??= {position:new THREE.Vector3(),normal:new THREE.Vector3(),direction:new THREE.Vector3(),goal:new THREE.Vector3(),scratch:new THREE.Vector3(),desired:new THREE.Vector3(),q:new THREE.Quaternion(),turn:new THREE.Quaternion(),inverse:new THREE.Quaternion(),local:new THREE.Vector3(),fireAt:0};
         if(state.itemId!==item.id){state.itemId=item.id;state.burstRemaining=0;state.interceptAt=0;}
-        state.clearance=TURRET_CLEARANCE[hullId]?.[index];
+        state.clearance=hullId==='concord-frigate'?FRIGATE_CLEARANCE[index]:TURRET_CLEARANCE[hullId]?.[index];
         state.muzzle??=new THREE.Vector3();state.lead??=new THREE.Vector3();
         state.targetPosition??=[0,0,0];state.targetVelocity??=[0,0,0];
         state.phase??=Array.from(ownerId).reduce((hash,c)=>(hash*31+c.charCodeAt(0))>>>0, index+1)%628/100;
@@ -160,6 +162,6 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
         // outward. The base remains attached to the hull throughout the turn.
         state.goal.copy(state.position).addScaledVector(state.direction,1.1*(mount.size==='M'?1.3:1)*extents[2]/mount.hullHalfLength);
         if(!clearTurretArc(actor,mount,extents,state.goal,state))state.direction.copy(state.normal);
-        session.renderer.showTurret?.(`${ownerId}-${index}`,state.position,state.direction,mount.size,pdc?'pdc':'laser',state.q,mount.side,mount.pedestal,extents[2]/mount.hullHalfLength,mount.axis??1);
+        session.renderer.showTurret?.(`${ownerId}-${index}`,state.position,state.direction,mount.size,pdc?'pdc':'laser',state.q,mount.side,mount.pedestal,extents[2]/mount.hullHalfLength,mount.axis??1,actor);
     }
 }

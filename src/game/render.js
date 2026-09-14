@@ -1,3 +1,4 @@
+import {cockpitDamageStage} from './cockpitDamage.js';
 import { wreckSectionDelta } from './missionWorldData.js';
 import {createTurretModel} from './turretModels.js';
 import * as THREE from 'three';
@@ -417,6 +418,13 @@ export class SpaceRenderer {
         this.cockpitWarning = this.cockpit.getObjectByName('warning-light');
         this.cockpitZoom = COCKPIT_ZOOM_IDLE;
         window.addEventListener('resize', this.resize);
+        // Fullscreen iframe/container changes need not resize the window.
+        // Keep marker projection dimensions aligned with the actual canvas.
+        this.containerResizeObserver = new ResizeObserver(() => {
+            const rect = this.container.getBoundingClientRect();
+            if (rect.width !== this.viewportWidth || rect.height !== this.viewportHeight) this.resize();
+        });
+        this.containerResizeObserver.observe(this.container);
         this.renderer.domElement.addEventListener('webglcontextlost', this.onContextLost);
         this.renderer.domElement.addEventListener('webglcontextrestored', this.onContextRestored);
         this.resize();
@@ -3300,7 +3308,6 @@ export class SpaceRenderer {
         });
     }
     syncShips(entities, alpha = 0) {
-        const now = performance.now();
         const revision = ++this.shipSyncRevision;
         entities.forEach((entity) => {
             let mesh = this.shipMeshes.get(entity.id);
@@ -3341,23 +3348,20 @@ export class SpaceRenderer {
             }
             mesh.userData.syncRevision = revision;
             mesh.position.set(...entity.position);
-            if (entity.prevPosition && alpha > 0) {
+            if (entity.prevPosition && alpha >= 0) {
                 this.tmpPrevPos.set(entity.prevPosition[0], entity.prevPosition[1], entity.prevPosition[2]);
                 mesh.position.lerpVectors(this.tmpPrevPos, mesh.position, alpha);
             }
             mesh.quaternion.set(...entity.rotation);
-            if (entity.prevRotation && alpha > 0) {
+            if (entity.prevRotation && alpha >= 0) {
                 this.tmpPrevQuat.set(...entity.prevRotation);
                 this.tmpCurQuat.copy(mesh.quaternion);
                 mesh.quaternion.copy(this.tmpPrevQuat).slerp(this.tmpCurQuat, alpha);
             }
             const damage = 1 - entity.hull / entity.maxHull;
             const baseScale = Number(mesh.userData.baseScale ?? 1);
-            // Older/special entities may not carry spawnTime. A NaN phase
-            // makes the whole object matrix NaN and silently draws nothing,
-            // even though mesh.visible remains true.
-            const spawnPhase = Number.isFinite(entity.spawnTime) ? entity.spawnTime : 0;
-            mesh.scale.setScalar(baseScale * (1 + Math.sin(now * 0.013 + spawnPhase) * 0.006));
+            // Rigid hulls keep a fixed scale. Engine effects carry the animation.
+            mesh.scale.setScalar(baseScale);
             mesh.visible = entity.hull > 0;
             const emissiveIntensity = entity.race ? 0.24 + damage * 0.12 : entity.hostile ? 0.18 + damage * 0.28 : damage * 0.12;
             const emissiveMaterials = mesh.userData.emissiveMaterials;
@@ -3393,6 +3397,26 @@ export class SpaceRenderer {
                     this.disposeObject(mesh);
                 this.shipMeshes.delete(key);
             }
+        }
+        this.syncTurretAttachments(alpha);
+    }
+    syncTurretAttachments(alpha = 1) {
+        for(const mesh of this.turretMeshes?.values()??[]){
+            const a=mesh.userData.attachment;if(!a)continue;
+            const hull=this.shipMeshes.get(a.ownerId);
+            if(!hull||!hull.visible){mesh.visible=false;continue;}
+            mesh.position.copy(a.position).applyQuaternion(hull.quaternion).add(hull.position);
+            mesh.quaternion.copy(hull.quaternion);
+            if(a.axis===0)mesh.rotateZ(-a.side*Math.PI/2);else if(a.side<0)mesh.rotateX(Math.PI);
+            const direction=a.renderDirection.copy(a.previousDirection).lerp(a.direction,Math.max(0,Math.min(1,alpha))).normalize().applyQuaternion(hull.quaternion);
+            const local=mesh.userData.local.copy(direction).applyQuaternion(mesh.userData.inverse.copy(mesh.quaternion).invert());
+            mesh.userData.yaw.rotation.y=Math.atan2(-local.x,-local.z);
+            mesh.userData.pitch.rotation.x=Math.atan2(local.y,Math.hypot(local.x,local.z));
+            mesh.visible=true;
+        }
+        for(const glow of this.capitalCharges?.values()??[]){
+            const a=glow.userData.attachment;if(!a)continue;
+            const hull=this.shipMeshes.get(a.ownerId);if(hull)glow.position.copy(a.position).applyQuaternion(hull.quaternion).add(hull.position);
         }
     }
     createDroneVisual(unit) {
@@ -4122,7 +4146,7 @@ export class SpaceRenderer {
         this.pointer.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
         this.raycaster.setFromCamera(this.pointer, this.camera);
         this.raycaster.params.Points.threshold = 5;
-        const targets = [...this.shipMeshes.values()];
+        const targets = [...this.shipMeshes.values(),...[...(this.turretMeshes?.values()??[])].filter(m=>m.visible)];
         // Planets and stations are persistent landmarks: always rendered, always tappable.
         for (const locationMesh of this.locationMeshes.values()) {
             if (locationMesh.visible)
@@ -4154,7 +4178,7 @@ export class SpaceRenderer {
                 const kind = object.userData.targetKind;
                 const id = object.userData.targetId;
                 if (kind && id)
-                    return { kind, id };
+                    return { kind, id, mount: object.userData.targetMount };
                 object = object.parent;
             }
         }
@@ -4163,9 +4187,20 @@ export class SpaceRenderer {
     setCockpitVisible(visible) {
         if (this.cockpit) this.cockpit.visible = !!visible;
     }
-    setDamageWarning(level) {
+    setDamageWarning(level, reduced = false) {
         const normalized = clamp(level, 0, 1);
         this.setShellStyle('--damage-warning', normalized.toFixed(3));
+        if(this.shell){
+            const stage=String(cockpitDamageStage(1-normalized));
+            if(this.shell.dataset.damageStage!==stage)this.shell.dataset.damageStage=stage;
+            const mode=String(reduced||this.reducedHyperdriveMotion);
+            if(this.shell.dataset.reducedDamage!==mode)this.shell.dataset.reducedDamage=mode;
+            const impact=normalized>(this.previousDamage??normalized)+.001;
+            if(impact)this.damageImpactUntil=performance.now()+360;
+            const pulse=String(performance.now()<(this.damageImpactUntil??0));
+            if(this.shell.dataset.damageImpact!==pulse)this.shell.dataset.damageImpact=pulse;
+        }
+        this.previousDamage=normalized;
         const material = this.cockpitWarning?.material;
         if (material instanceof THREE.MeshBasicMaterial) {
             material.opacity = 0;
@@ -4293,7 +4328,29 @@ export class SpaceRenderer {
         this.laserFx ??= new LaserFx(this.scene, this.effects);
         this.laserFx.rockImpact(position, rockCenter);
     }
-    showTurret(id,position,direction,size,kind='laser',rotation,side=1,pedestal=0,hullScale=1,axis=1) {
+    showDisabledCapitalMount(id,position,rotation,actor,index) {
+        this.showTurret(id,position,(this.tmpDisabledDirection??=new THREE.Vector3()).set(0,1,0).applyQuaternion(rotation),index<4?'M':'S',index<4?'laser':'pdc',rotation,index===0||index===1||index>5?-1:1,0,index<4?112.9/18:112.9/22,index<4?0:1,actor);
+        const mesh=this.turretMeshes.get(id);mesh.userData.yaw.visible=false;
+        for(const child of mesh.children)if(child.isMesh){
+            this.destroyedMountMaterial??=new THREE.MeshStandardMaterial({color:0x221915,roughness:1});
+            child.material=this.destroyedMountMaterial;
+        }
+    }
+    showCapitalCharge(id,position,amount,actor) {
+        this.capitalCharges??=new Map();
+        let glow=this.capitalCharges.get(id);
+        if(!glow){
+            this.capitalChargeGeometry??=new THREE.SphereGeometry(1,8,6);
+            glow=new THREE.Mesh(this.capitalChargeGeometry,new THREE.MeshBasicMaterial({color:0xffb34d,transparent:true,depthWrite:false}));
+            this.capitalCharges.set(id,glow);this.scene.add(glow);
+        }
+        if(actor){
+            const a=glow.userData.attachment??={ownerId:actor.id,position:new THREE.Vector3(),origin:new THREE.Vector3(),q:new THREE.Quaternion()};
+            a.position.copy(position).sub(a.origin.fromArray(actor.position)).applyQuaternion(a.q.fromArray(actor.rotation).invert());
+        }
+        glow.position.copy(position);glow.scale.setScalar(1.2+amount);glow.material.opacity=.25+amount*.45;glow.userData.life=.12;glow.visible=true;
+    }
+    showTurret(id,position,direction,size,kind='laser',rotation,side=1,pedestal=0,hullScale=1,axis=1,actor) {
         // The cockpit camera is at the ship origin and its exterior hull is
         // omitted. Drawing own-ship turrets would expose them through the canopy.
         if(id.startsWith('player-'))return;
@@ -4305,6 +4362,17 @@ export class SpaceRenderer {
         if(!mesh) {
             mesh=createTurretModel(kind,size,pedestal);
             this.scene.add(mesh);this.turretMeshes.set(id,mesh);
+        }
+        if(actor){
+            const a=mesh.userData.attachment??={ownerId:actor.id,position:new THREE.Vector3(),direction:new THREE.Vector3(),previousDirection:new THREE.Vector3(),renderDirection:new THREE.Vector3(),q:new THREE.Quaternion(),origin:new THREE.Vector3()};
+            a.q.copy(rotation).invert();a.position.copy(position).sub(a.origin.fromArray(actor.position)).applyQuaternion(a.q);
+            if(a.stamp!==actor.lifetime){a.previousDirection.copy(a.direction);a.stamp=actor.lifetime;}
+            a.direction.copy(direction).applyQuaternion(a.q);if(a.previousDirection.lengthSq()<.1)a.previousDirection.copy(a.direction);
+            a.axis=axis;a.side=side;
+        }
+        if(actor?.capitalMountHull){
+            mesh.userData.targetKind='ship';mesh.userData.targetId=actor.id;
+            mesh.userData.targetMount=Number(id.split('-').at(-1));
         }
         mesh.scale.setScalar((size==='M'?1.3:1)*hullScale);
         mesh.position.copy(position);
@@ -4493,6 +4561,7 @@ export class SpaceRenderer {
         if (dt <= 0) return;
         this.updatePdcTracers(dt);
         for(const beam of this.combatBeams?.values() ?? []) {beam.userData.life-=dt;beam.visible=beam.userData.life>0;}
+        for(const glow of this.capitalCharges?.values()??[]){glow.userData.life-=dt;glow.visible=glow.userData.life>0;}
         for(const [id,mesh] of this.turretMeshes??[]) {
             mesh.userData.life-=dt;
             if(mesh.userData.life<=0){this.scene.remove(mesh);this.turretMeshes.delete(id);}
@@ -4879,9 +4948,11 @@ export class SpaceRenderer {
             behind,
         };
     }
-    projectTargetToScreen(kind, id, fallbackPosition) {
+    projectTargetToScreen(kind, id, fallbackPosition, mount) {
         let renderedPosition;
-        if (kind === 'ship') {
+        if (kind === 'ship' && Number.isInteger(mount)) {
+            renderedPosition=this.turretMeshes?.get(`${id}-${mount<4?'main-':''}${mount}`)?.position;
+        } else if (kind === 'ship') {
             renderedPosition = this.shipMeshes.get(id)?.position;
         }
         else if (kind === 'pickup') {
@@ -4970,6 +5041,7 @@ export class SpaceRenderer {
         this.disposed = true;
         this.clearDrones();
         window.removeEventListener('resize', this.resize);
+        this.containerResizeObserver?.disconnect();
         this.renderer.domElement.removeEventListener('webglcontextlost', this.onContextLost);
         this.renderer.domElement.removeEventListener('webglcontextrestored', this.onContextRestored);
         // Separate GLB clones from their cached owners before disposing the
@@ -5006,6 +5078,8 @@ export class SpaceRenderer {
         this.pdcTracers=[];
         for(const mesh of this.turretMeshes?.values()??[]) {this.scene.remove(mesh);}
         this.turretMeshes?.clear();
+        for(const glow of this.capitalCharges?.values()??[]){this.scene.remove(glow);glow.material.dispose();}
+        this.capitalCharges?.clear();
         this.laserFx?.dispose();
         this.laserFx = null;
         this.pixelTextures.forEach((texture) => texture.dispose());

@@ -1,3 +1,14 @@
+## 0.8.2r — Cockpit damage and the frigate arena finale
+
+- Four hull-damage stages add canopy fractures, broken-glass edges, instrument faults and emergency lighting. Each hull uses its own canopy mask; repairs restore the appropriate stage. Reduced damage effects are available in Display settings and respect reduced-motion preferences.
+- Arena wave 9 fields two Vanguards. Wave 10 is a frigate with four physical main batteries and four PDC mounts, visible charge-up, synchronized three-shot salvos, long pauses and destroyable exposed assemblies. Full repair/rearm precedes the boss.
+- The frigate retains its design and UVs with near-planar cleanup, 37,921 triangles (from 150,000), 512² texture (from 2048²) and a 1.75 MB GLB (from 6.62 MB). Shared turrets add 4,752 triangles.
+- Removed the fixed dorsal gun and twin nose barrels, closing their openings with hull panels. Turrets now follow each hull’s interpolated pose; removed decorative hull scaling and stabilized the frigate’s broadside choice.
+- Frigate finale starts inside the asteroid field. Heavy batteries charge visibly, fire dangerous salvos and recover; cover interrupts their attack. The labelled aim button cycles the hull and visible surviving main batteries; turrets can also be tapped directly. Destroyed mounts leave burned bases and stop firing. Boss shields/hull are 650/1,400 with no shield regeneration. A shared 2.5-second charge, 1.3-second salvo and 5.5-second recovery gives a real opening; anti-ship PDC fire also stops during recovery. Batteries commit to the observed course before firing, so deliberate turns can evade them.
+- Fixed an ion fitting bug that also multiplied the owner’s shield capacity by eight; the ×8 multiplier now applies only to shield damage.
+- Active eight-wave checkpoints extend to ten waves; finished legacy records stay finished. Hostile patrols retain their player target instead of switching back to policing other hostiles.
+- Local tests: `.freebuff/frigate-r/play.html` (levels 9/10 and hull-damage slider) and `.freebuff/frigate-r/review.html` (model comparison, turret layout and arcs).
+
 ## 0.8.2q — Combat movement and limited shield recovery
 
 - Let NPC boost commitments last through hull acceleration and turning. Trained pilots avoid slow defensive drifts that leave them easy to track.

@@ -1,3 +1,4 @@
+import {equipFrigate,updateFrigateAttack,updateFrigateBatteries,damageFrigateMount,segmentFrigateMountHit,frigateMountPosition,visibleFrigateBatteries} from './capitalCombat.js';
 import {observeIncomingFire, updateCombatIntent, combatThrottle, combatTrackingRate, holdingFiringWindow} from './combatPiloting.js';
 import {planCombatFlight, combatPursuitDirection, friendlyFiringLaneBlocked} from './combatPlanning.js';
 import { combatTargetEligible } from './combatTargeting.js';
@@ -755,7 +756,12 @@ const segmentSphereHit = (start, end, center, radius) => {
 // Segment against a ship's oriented ellipsoid. Fighters keep their measured
 // hull envelope and capital ships gain accurate kilometre-scale hit detection
 // without the enormous empty corners of a bounding sphere.
-const segmentShipHullHit = (start, end, ship, halfExtents, padding = 0) => {
+const segmentShipHullHit = (start,end,ship,halfExtents,padding=0) => {
+    const hull=segmentEllipsoidHit(start,end,ship,halfExtents,padding);
+    const mount=segmentFrigateMountHit(start,end,ship,padding);
+    return mount===undefined?hull:hull===undefined?mount:Math.min(hull,mount);
+};
+const segmentEllipsoidHit = (start, end, ship, halfExtents, padding = 0) => {
     const qx = ship.rotation[0];
     const qy = ship.rotation[1];
     const qz = ship.rotation[2];
@@ -2081,7 +2087,7 @@ export class GameSession {
         if (instanceId) {
             if (debrisCollisionTest)
                 stagedForward = this.setDebrisCollisionTestPosition(center);
-            else if (environment === 'debris-field')
+            else if (environment === 'debris-field' || (config.run && this.save.arenaRun?.wave===9))
                 this.setFieldArenaPosition(center, instanceId);
             else
                 this.setFieldEntryPosition(center, instanceId, FORWARD);
@@ -2247,6 +2253,7 @@ export class GameSession {
     };
     selectPickedTarget(target) {
         this.selectTarget(target.kind, target.id);
+        if(Number.isInteger(target.mount))this.capitalSubtarget={id:target.id,index:target.mount};
     }
     updateActiveInstance(force = false) {
         const player = vec(this.save.player.position);
@@ -4035,16 +4042,17 @@ export class GameSession {
         const ship = this.ships.find((entry) => entry.id === target.id);
         if (!ship)
             return out;
-        const r = this.tmpP3.set(ship.position[0] - position.x, ship.position[1] - position.y, ship.position[2] - position.z);
+        const aimPoint=Number.isInteger(target.mount)?target.position:ship.position;
+        const r = this.tmpP3.set(aimPoint[0] - position.x, aimPoint[1] - position.y, aimPoint[2] - position.z);
         const distance = r.length();
         // Instant beams aim at the current hull position, without projectile lead.
         if (weapon.kind === 'beam') {
             if (ship.hull > 0 && distance <= weapon.range && distance > 0 && out.angleTo(r) < weaponAssistCone(weapon))
-                out.set(ship.position[0]-muzzle.x,ship.position[1]-muzzle.y,ship.position[2]-muzzle.z).normalize();
+                out.set(aimPoint[0]-muzzle.x,aimPoint[1]-muzzle.y,aimPoint[2]-muzzle.z).normalize();
             return out;
         }
         const predicted=this.tmpP0;
-        const time=relativeIntercept(position,ship.position,velocity,ship.velocity,weapon.speed,predicted);
+        const time=relativeIntercept(position,aimPoint,velocity,ship.velocity,weapon.speed,predicted);
         if(!Number.isFinite(time)||time>weapon.life)return out;
         const length=predicted.length();predicted.normalize();
         if(out.angleTo(predicted)<weaponAssistCone(weapon))out.lerp(predicted,.34).normalize();
@@ -5737,6 +5745,7 @@ export class GameSession {
         return true;
     }
     selectTarget(kind, id, source) {
+        this.capitalSubtarget=undefined;
         let target;
         const tutorialTarget = this.tutorialFieldTarget();
         if (tutorialTarget?.kind === kind && tutorialTarget.id === id) {
@@ -5910,6 +5919,14 @@ export class GameSession {
         this.clearTarget();
         this.setMonitorStatus(t('CONTACT LOST · LOCK BROKEN'));
     }
+    cycleCapitalSubtarget() {
+        const ship=this.ships.find(s=>s.id===this.save.player.currentTargetId&&s.capitalMountHull&&s.hull>0);
+        if(!ship)return;
+        const choices=[-1,...visibleFrigateBatteries(this,ship,this.save.player.position)];
+        const current=this.capitalSubtarget?.id===ship.id?this.capitalSubtarget.index:-1;
+        const index=choices[(choices.indexOf(current)+1)%choices.length];
+        this.capitalSubtarget=index>=0?{id:ship.id,index}:undefined;
+    }
     getTargetRef(clearInvalid = true) {
         const id = this.save.player.currentTargetId;
         if (!id)
@@ -5922,8 +5939,14 @@ export class GameSession {
             return { kind: 'location', id: locationId, position: location.position, name: location.name };
         }
         const ship = this.ships.find((entry) => entry.id === id && !entry.claimed && !entry.captured && entry.hull > 0);
-        if (ship)
+        if (ship) {
+            const mount=this.capitalSubtarget?.id===id?this.capitalSubtarget.index:undefined;
+            if(Number.isInteger(mount)&&ship.capitalMountHull?.[mount]>0){
+                this.capitalTargetPoint??=new THREE.Vector3();this.capitalTargetTuple??=[];
+                return {kind:'ship',id,position:frigateMountPosition(ship,mount,this.capitalTargetPoint).toArray(this.capitalTargetTuple),name:ship.name,mount};
+            }
             return { kind: 'ship', id, position: ship.position, name: ship.name };
+        }
         const pickup = this.pickups.find((entry) => entry.id === id && entry.life > 0);
         if (pickup)
             return { kind: 'pickup', id, position: tuple(this.pickupStore.getPos(pickup.slot, this.tmpP0)), name: this.pickupLabel(pickup) };
@@ -6484,6 +6507,7 @@ export class GameSession {
                 this.updateTutorialCompanion(ship, dt);
             else
                 updateShipAI(this, ship, dt);
+            if(ship.capitalClass==='frigate' && ship.capitalBatteriesAt!==this.save.world.time)updateFrigateBatteries(this,ship,dt);
             this.resolveNpcCollisions(ship);
             const position = vec(ship.position, this.tmpShipPos);
             // Priority order for the one-voice slot: the one-shot recognition
@@ -7663,7 +7687,7 @@ export class GameSession {
             }
             ship.targetId = victim && bestDistSq < 150 * 150 && distSqTo(ship.position, this.save.player.position) > 100 * 100 ? victim.id : 'player';
         }
-        if (ship.role === 'patrol') {
+        if (ship.role === 'patrol' && !ship.hostile) {
             // Patrols engage hostiles they can actually see: lit hostiles at the
             // standard sensor range, dark ones only inside the dark-detection
             // line, rocks blocking the view either way. If the player is under
@@ -7743,6 +7767,7 @@ export class GameSession {
         position.addScaledVector(velocity,dt);
     }
     updateAttackAI(ship, targetPosition, targetVelocity, dt) {
+        if(ship.capitalClass==='frigate')return updateFrigateAttack(this,ship,targetPosition,targetVelocity,dt);
         const flightStats=this.npcFlightStats(ship);
         if(flightStats)observeIncomingFire(this,ship);
         if(flightStats)this.updateTurrets(ship,ship.id,dt);
@@ -8798,6 +8823,11 @@ export class GameSession {
         ship.shield -= applied.shield;
         const remaining = applied.hull;
         ship.hull -= remaining;
+        const disabledMount=damageFrigateMount(ship,position,remaining);
+        if(disabledMount>=0&&ship.capitalMountHull[disabledMount]===0){
+            this.renderer.spawnExplosion?.(position,true,.45);
+            if(attackerId==='player')this.ui.pushEvent(t(disabledMount<4?'BATTERY {n} DISABLED':'PDC {n} DISABLED',{n:disabledMount<4?disabledMount+1:disabledMount-3}),'info',3500);
+        }
         if (amount > 0) disruptWeapons(ship, weapon, this.save.world.time, shieldBeforeHit);
         if (ship.hull>0 && !ship.tutorialCompanion && !ship.surrendered && !ship.captured && !ship.poweredDown)
             registerHitReaction(ship,this.save.world.time,applied.shield+remaining);
@@ -10232,6 +10262,7 @@ export class GameSession {
         ship.mugCapable = false;
         ship.fireCooldown = profile.fireCooldown;
         rebasePatrolTask(ship, this, homeId);
+        if(capitalClass==='frigate')equipFrigate(ship);
         // Begin the lazy fetch as soon as the landmark is authorized. The
         // correctly scaled voxel silhouette covers only the short load window.
         this.renderer.ensureGlbShipModel?.(variant);
@@ -12417,7 +12448,7 @@ export class GameSession {
             this.save.settings[key] = Boolean(value);
             this.input.configureTilt({ [key]: this.save.settings[key] });
         }
-        else if (key === 'flightAssist' || key === 'aimAssist' || key === 'vibration') {
+        else if (key === 'flightAssist' || key === 'aimAssist' || key === 'vibration' || key === 'reducedDamageEffects') {
             this.save.settings[key] = Boolean(value);
         }
         else if (key === 'quality' && (value === 'auto' || value === 'low' || value === 'high')) {
@@ -12507,7 +12538,7 @@ export class GameSession {
         const alpha = clamp(this.simAccumulator / SIM_STEP, 0, 1);
         this.renderer.setHyperdriveFx(fxState.fx, fxState.progress);
         this.renderer.updateCamera(this.save.player.position, this.save.player.prevPosition, this.save.player.rotation, this.save.player.prevRotation, this.save.player.angularVelocity, clamp(speed / Math.max(1, stats.afterburnSpeed), 0, 2), this.afterburning || (this.autopilot && speed > stats.afterburnSpeed), dt, alpha);
-        this.renderer.setDamageWarning(1 - this.save.player.hull / stats.hull);
+        this.renderer.setDamageWarning(1 - this.save.player.hull / stats.hull, this.save.settings.reducedDamageEffects);
         this.renderer.syncShips(this.ships, alpha);
         this.renderer.syncProjectiles(this.projectiles, this.projStore, alpha);
         this.renderer.syncPickups(this.pickups, this.pickupStore, alpha);
@@ -12586,7 +12617,7 @@ export class GameSession {
             // Project the exact rendered transform. Moving contacts are drawn
             // between sim steps; using their newer raw state made the bracket
             // lead and wiggle around the visible target while steering.
-            const projection = this.renderer.projectTargetToScreen(target.kind, target.id, target.position);
+            const projection = this.renderer.projectTargetToScreen(target.kind, target.id, target.position, target.mount);
             const edge = this.targetEdge(projection);
             const distance = this.surfaceDistance(player, target);
             const screen = { screenX: projection.x, screenY: projection.y, onScreen: projection.visible && !projection.behind, edge };
@@ -12609,6 +12640,13 @@ export class GameSession {
                 hudTarget = {
                     kind: 'ship',
                     name: identified ? ship.name : t('UNRESOLVED CONTACT'),
+                    capitalSubtarget: !!ship.capitalMountHull,
+                    capitalAttack: ship.capitalAttack,
+                    capitalAttackRemaining: ship.capitalAttackRemaining,
+                    capitalDisarmed: ship.capitalDisarmed,
+                    capitalMount: target.mount,
+                    capitalShielded: ship.shield>0,
+                    capitalSelected: Number.isInteger(target.mount)?ship.capitalMountHull[target.mount]:undefined,
                     hostile: ship.hostile,
                     surrendered: ship.surrendered,
                     captured: ship.captured,
@@ -12624,7 +12662,7 @@ export class GameSession {
                     // skill tier, prefixed with the recognition marker when the
                     // pilot remembers the player (spared or escaped). Temperament
                     // stays off the HUD: it reads through behavior and comms.
-                    readout: ship.captured || ship.surrendered
+                    readout: ship.capitalMountHull && identified ? t('BATTERIES {guns}/4 · PDC {pdc}/4',{guns:ship.capitalMountHull.slice(0,4).filter(n=>n>0).length,pdc:ship.capitalMountHull.slice(4).filter(n=>n>0).length}) : ship.captured || ship.surrendered
                         ? surrenderReadout
                         : !identified
                             ? distance > stats.scanRange

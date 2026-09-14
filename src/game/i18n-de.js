@@ -12,6 +12,18 @@
 // Player address is informal "du" throughout, matching the frontier voice of
 // the English lines. Values are plain text — never HTML.
 export const DE_CATALOG = {
+ 'BATTERIES {guns}/4 · PDC {pdc}/4': 'BATTERIEN {guns}/4 · PDC {pdc}/4',
+
+ 'Wave {wave} of {total}': 'Welle {wave} von {total}',
+ 'Ten waves. Choose equipment between fights.': 'Zehn Gegnerwellen. Wähle zwischen den Kämpfen neue Ausrüstung.',
+ 'Vanguard pair': 'Vanguard-Paar',
+ 'Two Vanguards cover each other. Isolate one and keep moving through their turret arcs.': 'Zwei Vanguards decken sich gegenseitig. Isoliere eines und bleibe in Bewegung.',
+ 'The frigate': 'Die Fregatte',
+ 'Watch the amber battery charge. Strike between salvos; exposed turrets can be destroyed after the shields fall.': 'Achte auf das gelbe Ladeleuchten. Greife zwischen Salven an. Ohne Schilde sind die Geschütztürme zerstörbar.',
+ 'Arena frigate': 'Arena-Fregatte',
+ 'Frigate entering. Watch its battery charge.': 'Fregatte im Anflug. Achte auf das Ladeleuchten der Geschütze.',
+ 'Reduced damage effects': 'Reduzierte Schadenseffekte',
+
     '{count} DRONES · +{inbound} ORE': '{count} DROHNEN · +{inbound} ERZ',
     'Cost breakdown': 'Kostenübersicht',
     'Higher-paying mining contracts': 'Besser bezahlte Bergbauaufträge',
@@ -2441,6 +2453,7 @@ export const DE_CATALOG = {
     'Boreal crews do not need promises. We need a delivery time and a pilot who keeps it.': 'Die Crews auf Boreal brauchen keine Versprechen. Wir brauchen eine Lieferzeit und einen Piloten, der sie einhält.',
     'A tiny navigation relay in a clear gap in the rings, important because it is the last quiet stop before the dense bands.': 'Ein winziges Navigationsrelais in einer Lücke zwischen den Ringen – wichtig, weil es der letzte ruhige Halt vor den dichten Bändern ist.',
     'A vast field of ice, dust, and rock with shifting corridors, lost probes, hidden caches, and unreliable sensors.': 'Ein weites Feld aus Eis, Staub und Fels mit wechselnden Korridoren, verlorenen Sonden, verborgenen Depots und unzuverlässigen Sensoren.',
+    'AIM: {target}': 'ZIEL: {target}',
 };
 
 Object.assign(DE_CATALOG, {
@@ -2598,3 +2611,22 @@ Object.assign(DE_CATALOG, {
 });
 
 Object.assign(DE_CATALOG, {'PORT TURRET':'BACKBORDTURM','STARBOARD TURRET':'STEUERBORDTURM'});
+
+Object.assign(DE_CATALOG, {
+ 'SUBTARGET':'TEILZIEL', 'Cycle hull, batteries and PDC':'Rumpf, Batterien und PDC durchschalten',
+ 'BATTERY {n}':'BATTERIE {n}', 'PDC {n}':'PDC {n}', 'FIRING':'FEUERT', 'SALVO':'SALVE', 'RECOVERING':'ABKÜHLEN',
+ 'Use asteroid cover during the amber charge. Select batteries on the target monitor; destroy them after shields fall.':'Bei gelbem Ladeleuchten hinter Asteroiden Deckung suchen. Batterien am Zielmonitor wählen und bei ausgefallenen Schilden zerstören.',
+ 'Frigate entering. Use asteroid cover; select its batteries on the target monitor.':'Fregatte im Anflug. Asteroiden als Deckung nutzen; Batterien am Zielmonitor wählen.'
+});
+
+Object.assign(DE_CATALOG, {'BATTERY {n} DISABLED':'BATTERIE {n} AUSGESCHALTET','PDC {n} DISABLED':'PDC {n} AUSGESCHALTET'});
+
+Object.assign(DE_CATALOG, {'SHIELDED':'GESCHÜTZT'});
+
+Object.assign(DE_CATALOG, {
+ 'Choose a visible main battery or the hull':'Sichtbare Hauptbatterie oder Rumpf wählen',
+ 'INCOMING · MOVE':'SALVE · AUSWEICHEN', 'OPENING · FIRE':'JETZT ANGREIFEN',
+ 'Watch the charge, then change course or take cover. Attack during recovery. The aim button selects visible batteries; disabling them weakens later salvos.':'Beim Ladeleuchten Kurs ändern oder Deckung suchen. In der Feuerpause angreifen. Die Zielwahl bietet sichtbare Batterien an; zerstörte Batterien schwächen weitere Salven.'
+});
+
+Object.assign(DE_CATALOG, {'BATTERIES DOWN':'BATTERIEN AUS'});

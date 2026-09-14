@@ -1,3 +1,4 @@
+import {cockpitDamageMarkup,CANOPY_APERTURES} from './cockpitDamage.js';
 import {RUN_WAVES,readArenaRun,arenaRecord,runScore,runRewardPlan} from './arenaRun.js';
 import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, LOCATIONS, SHIPS, SYSTEM_MAP_EXTENT, commodityIds, displaySpeed, routeDistanceBetween } from './data.js';
 import { JUMP_ROUTES, SYSTEMS, planRoute } from './galaxy.js';
@@ -324,7 +325,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.8.2q';
+const GAME_VERSION = '0.8.2r';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -583,6 +584,8 @@ export class GameUI {
         void this.preloadImageSet('flight-core', [COCKPIT_ART_BY_SHIP[nextId], ...FLIGHT_SCREEN_ART], { priority: 'high' });
         this.cockpitShipId = nextId;
         this.root.dataset.cockpitShip = nextId;
+        this.el('.canopy-aperture')?.setAttribute('points',CANOPY_APERTURES[nextId]);
+        this.el('.canopy-art-mask')?.setAttribute('href',COCKPIT_ART_BY_SHIP[nextId]);
         const art = this.el('.cockpit-art');
         if (art)
             art.style.backgroundImage = `url("${COCKPIT_ART_BY_SHIP[nextId]}")`;
@@ -779,19 +782,19 @@ export class GameUI {
           <div class="cockpit-vignette" aria-hidden="true"></div>
           <div class="cockpit-instruments">
           <div class="cockpit-art" aria-hidden="true"></div>
-          <div class="cockpit-glass" aria-hidden="true"></div>
+          <div class="cockpit-glass" aria-hidden="true"></div>${cockpitDamageMarkup()}
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="${t('Own ship status display; tap to open ship menu')}">
-            <div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
+            <div class="monitor-damage" aria-hidden="true"></div><div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
             <div class="screen-race-strip" id="screen-race-strip"><span id="screen-race-label"></span><b id="screen-race-value"></b></div>
             <div class="screen-ship-layout"><div class="screen-flight"><div><span>${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em><small id="screen-own-launcher"></small><small id="screen-own-drone-pdc" class="is-hidden"></small></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i><em id="screen-own-energy-value">72</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">185</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="${t('Radar display; tap to open navigation map')}">
-            <div class="radar-screen-wrap"><canvas id="radar" width="220" height="220" role="button" tabindex="0" aria-label="${t('Open navigation map')}"></canvas></div>
+            <div class="monitor-damage" aria-hidden="true"></div><div class="radar-screen-wrap"><canvas id="radar" width="220" height="220" role="button" tabindex="0" aria-label="${t('Open navigation map')}"></canvas></div>
           </div>
           <div class="cockpit-screen cockpit-screen-target" data-touch-action="targetNext" aria-label="${t('Target status display; tap to cycle targets')}">
-            <div class="screen-heading"><span>${t('TARGET STATUS')}</span><b id="screen-target-name">${t('NO LOCK')}</b></div>
+            <div class="monitor-damage" aria-hidden="true"></div><div class="screen-heading"><span>${t('TARGET STATUS')}</span><b id="screen-target-name">${t('NO LOCK')}</b></div>
             <div id="screen-target-distance" class="screen-target-distance">—</div>
-            <div id="screen-target-readout" class="screen-target-readout">—</div>
+            <button type="button" id="capital-subtarget" class="is-hidden" aria-label="Cycle frigate subtarget"></button><div id="screen-target-readout" class="screen-target-readout">—</div>
             <div id="screen-drone-telemetry" class="screen-drone-telemetry is-hidden"><div id="screen-drone-bays"></div><div id="screen-drone-state"></div><div id="screen-drone-cargo"></div><div id="screen-drone-losses"></div></div>
             <div class="screen-target-layout"><canvas class="hull-outline" id="target-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-target-shield"></b></i><em id="screen-target-shield-value">—</em></div><div><span>${t('HULL')}</span><i><b id="screen-target-hull"></b></i><em id="screen-target-hull-value">—</em></div></div></div>
           </div>
@@ -1187,6 +1190,10 @@ export class GameUI {
             event.stopPropagation();
             this.actions?.weaponCycle?.();
         });
+        const subtarget=this.root.querySelector('#capital-subtarget');
+        subtarget?.addEventListener('pointerdown',e=>e.stopPropagation());
+        subtarget?.addEventListener('pointerup',e=>e.stopPropagation());
+        subtarget?.addEventListener('click',e=>{e.stopPropagation();this.actions?.cycleCapitalSubtarget?.();});
         const launcherCycle = this.root.querySelector('#touch-launcher-cycle');
         launcherCycle?.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter' && event.key !== ' ')
@@ -3671,6 +3678,18 @@ export class GameUI {
             throttleFill.style.height = `${model.throttle * 100}%`;
     }
     updateTarget(target, mode = this.lastHud?.mode ?? 'combat') {
+        this.el('#screen-target-readout').classList.toggle('is-capital-warning',!!target?.capitalSubtarget&&!target.capitalDisarmed&&['CHARGING','SALVO'].includes(target.capitalAttack));
+        const subtarget=this.el('#capital-subtarget');
+        subtarget?.classList.toggle('is-hidden',!target?.capitalSubtarget);
+        this.targetLayout?.classList.toggle('has-capital-target',!!target?.capitalSubtarget);
+        if(target?.capitalSubtarget){
+            const mount=target.capitalMount;
+            let label=Number.isInteger(mount)?t(mount<4?'BATTERY {n}':'PDC {n}',{n:mount<4?mount+1:mount-3}):t('HULL');
+            if(Number.isInteger(mount)&&!target.capitalShielded)label+=` ${Math.ceil(100*target.capitalSelected/(mount<4?100:65))}%`;
+            subtarget.textContent=t('AIM: {target}',{target:label})+' ›';
+            subtarget.title=t('Choose a visible main battery or the hull');
+            subtarget.setAttribute('aria-label',subtarget.title+': '+label);
+        }
         const bracket = this.el('#target-bracket');
         const edgePointer = this.el('#target-edge-pointer');
         // The target monitor carries the lock (name, bars, distance) — the old
@@ -3694,7 +3713,7 @@ export class GameUI {
         edgePointer?.classList.toggle('is-hostile', hostile);
         edgePointer?.classList.toggle('is-surrendered', surrendered && !hostile);
         this.el('#screen-target-distance').textContent = `${formatNumber(target.distance)} km`;
-        this.el('#screen-target-readout').textContent = target.readout ?? '—';
+        this.el('#screen-target-readout').textContent = target.capitalSubtarget ? t(target.capitalDisarmed?'BATTERIES DOWN':target.capitalAttack==='CHARGING'?'INCOMING · MOVE':target.capitalAttack==='SALVO'?'SALVO': 'OPENING · FIRE') : target.readout ?? '—';
         this.el('#screen-target-readout').title = target.readout ?? '';
         this.setTargetScreenValue(target);
         this.updateWeaponButtons(target, mode);
@@ -4825,7 +4844,7 @@ export class GameUI {
           <section><h3>${t('FLIGHT')}</h3><label><span>${t('Flight assist')}</span><input type="checkbox" data-setting="flightAssist" ${settings.flightAssist ? 'checked' : ''}></label><label><span>${t('Aim assistance')}</span><input type="checkbox" data-setting="aimAssist" ${settings.aimAssist ? 'checked' : ''}></label><label><span>${t('Touch scale')}</span><input type="range" min="0.8" max="1.3" step="0.05" value="${settings.touchScale}" data-setting="touchScale"></label></section>
           <section><h3>${t('TILT STEER')}</h3><label><span>${t('Steering')}</span><select data-setting="steering"><option value="tilt" ${settings.steering !== 'stick' ? 'selected' : ''}>${t('Tilt')}</option><option value="stick" ${settings.steering === 'stick' ? 'selected' : ''}>${t('Stick')}</option></select></label><label><span>${t('Sensitivity')}</span><input type="range" min="0.4" max="1.8" step="0.05" value="${settings.tiltSensitivity}" data-setting="tiltSensitivity"></label><label><span>${t('Invert pitch')}</span><input type="checkbox" data-setting="tiltInvertPitch" ${settings.tiltInvertPitch ? 'checked' : ''}></label><label><span>${t('Invert yaw')}</span><input type="checkbox" data-setting="tiltInvertYaw" ${settings.tiltInvertYaw ? 'checked' : ''}></label><div class="tilt-actions"><button data-ui-command="enable-tilt">${t('ENABLE')}</button><button data-ui-command="calibrate-tilt">${t('SET NEUTRAL')}</button></div></section>
           <section><h3>${t('AUDIO')}</h3><label><span>${t('Music')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.music}" data-setting="music"></label><label><span>${t('Effects')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.effects}" data-setting="effects"></label><label><span>${t('Haptics')}</span><input type="checkbox" data-setting="vibration" ${settings.vibration ? 'checked' : ''}></label></section>
-          <section><h3>${t('DISPLAY')}</h3><label><span>${t('Power use')}</span><select data-setting="powerMode"><option value="auto" ${!settings.powerMode || settings.powerMode === 'auto' ? 'selected' : ''}>${t('Automatic')}</option><option value="battery" ${settings.powerMode === 'battery' ? 'selected' : ''}>${t('Battery saving · 30 FPS')}</option><option value="performance" ${settings.powerMode === 'performance' ? 'selected' : ''}>${t('Smoother motion · 60 FPS')}</option></select></label><p>${t('Automatic saves power on phones. Choose 60 FPS for smoother motion with higher power use.')}</p><label><span>${t('Visuals')}</span><output>${t('High fidelity')}</output></label><label><span>${t('Fullscreen')}</span><button type="button" class="fullscreen-switch" data-ui-command="toggle-fullscreen" role="switch" aria-label="${t('Toggle fullscreen')}" aria-checked="false">⛶</button></label></section>
+          <section><h3>${t('DISPLAY')}</h3><label><span>${t('Power use')}</span><select data-setting="powerMode"><option value="auto" ${!settings.powerMode || settings.powerMode === 'auto' ? 'selected' : ''}>${t('Automatic')}</option><option value="battery" ${settings.powerMode === 'battery' ? 'selected' : ''}>${t('Battery saving · 30 FPS')}</option><option value="performance" ${settings.powerMode === 'performance' ? 'selected' : ''}>${t('Smoother motion · 60 FPS')}</option></select></label><p>${t('Automatic saves power on phones. Choose 60 FPS for smoother motion with higher power use.')}</p><label><span>${t('Reduced damage effects')}</span><input type="checkbox" data-setting="reducedDamageEffects" ${settings.reducedDamageEffects ? 'checked' : ''}></label><label><span>${t('Visuals')}</span><output>${t('High fidelity')}</output></label><label><span>${t('Fullscreen')}</span><button type="button" class="fullscreen-switch" data-ui-command="toggle-fullscreen" role="switch" aria-label="${t('Toggle fullscreen')}" aria-checked="false">⛶</button></label></section>
           <section><h3>${t('LANGUAGE')}</h3><label><span>${t('Language')}</span><select data-setting="language"><option value="de" ${settings.language !== 'en' ? 'selected' : ''}>Deutsch</option><option value="en" ${settings.language === 'en' ? 'selected' : ''}>English</option></select></label></section>
           <section class="controls-reference"><h3>${t('KEYBOARD / CONTROLLER')}</h3><p>${t('W/S pitch · A/D yaw · Q/E roll · R/F throttle · Shift afterburn · Space fire · X fire group · L launcher · hold M secondary tool / tap missile or capture · T target · C mode · N nav · J hyperdrive · K map · B transponder')}</p><p>${t('Gamepad: left stick steer · right stick roll/throttle · RT fire · hold RB secondary tool / tap missile or capture · LB afterburn · face buttons target/mode/fire group/hyperdrive · left stick click transponder · D-pad launcher/capture/hostile/nav.')}</p></section>
         </div>`;
@@ -4907,7 +4926,7 @@ export class GameUI {
         const labelItems=ids=>{const counts={};ids.forEach(id=>counts[id]=(counts[id]??0)+1);return Object.entries(counts).map(([id,n])=>`${n}× ${t(OUTFIT_ITEMS[id].name)}`).join(' · ');};
         let body='',footer='';
         if(done){
-            body=`<div class="run-result"><h3>${t(r.phase==='won'?'Run complete':'Run ended')}</h3><b>${t('Score')}: ${runScore(r)}</b><p>${t('Waves cleared')}: ${r.cleared}/8 · ${t('Damage taken')}: ${Math.round(r.damage)}</p></div>`;
+            body=`<div class="run-result"><h3>${t(r.phase==='won'?'Run complete':'Run ended')}</h3><b>${t('Score')}: ${runScore(r)}</b><p>${t('Waves cleared')}: ${r.cleared}/${r.totalWaves??RUN_WAVES.length} · ${t('Damage taken')}: ${Math.round(r.damage)}</p></div>`;
             footer=`<button data-ui-command="quit-title">${t('QUIT TO TITLE')}</button><button class="primary" data-ui-command="new-arena-run">${t('New run')}</button>`;
         }else if(!r.hullChosen){
             body=`<div class="run-stage-label">${t('Choose your hull')}</div><div class="run-offers run-hulls">${Object.keys(hullText).map(id=>command('hull',id,`<b>${SHIPS[id].name}${p.shipId===id?' · '+t('CURRENT'):''}</b><span>${t(hullText[id])}</span>`)).join('')}</div>`;
@@ -4927,7 +4946,7 @@ export class GameUI {
             if(this.runFitOpen)body+=`<div class="run-fitting">${LOADOUT_KEYS.map(key=>spec[key].map((m,i)=>`<div class="run-slot"><b>${t(names[key])} ${i+1} · ${m.size}</b><span>${fit[key][i]?t(OUTFIT_ITEMS[fit[key][i]].name):t('EMPTY')}</span><div>${command('fit','',t('REMOVE'),`data-run-key="${key}" data-run-index="${i}"`)}${Object.entries(p.outfitting.locker).filter(([id,n])=>n>0&&itemFitsMount(OUTFIT_ITEMS[id],m)).map(([id,n])=>command('fit',id,`${t(OUTFIT_ITEMS[id].name)} ×${n}`,`data-run-key="${key}" data-run-index="${i}"`)).join('')}${key==='guns'&&fit[key][i]?command('group',m.id,t('GROUP')+' '+fit.fireGroups.assignments[m.id]):''}</div></div>`).join('')).join('')}</div>`;
             footer=`<button data-ui-command="quit-title">${t('Save and leave')}</button><button data-ui-command="run-fit-toggle">${t('Adjust fitting')}</button><button class="primary" data-ui-command="run-launch">${t('Start next wave')}</button>`;
         }
-        this.root.querySelector('#arena-panel').innerHTML=`<div class="modal-card arena-card run-card"><header><div><h2>${t('Arena Run')} · ${done?`${r.cleared}/8`:t('Wave {wave} of 8',{wave:r.wave+1})}${r.hard?' · '+t('HARD'):''}</h2><span>${escapeHtml(SHIPS[p.shipId].name)} · ${t('HULL')} ${Math.round(p.hull/stats.hull*100)}%</span></div>${done?'':`<details class="run-next"><summary>${t('Next')}: ${t(wave.name)}</summary><p>${t(wave.hint)}</p></details>`}</header><div class="run-scroll">${this.runFitNotice?`<p role="status">${escapeHtml(this.runFitNotice)}</p>`:''}${body}</div><footer>${footer}</footer></div>`;
+        this.root.querySelector('#arena-panel').innerHTML=`<div class="modal-card arena-card run-card"><header><div><h2>${t('Arena Run')} · ${done?`${r.cleared}/${r.totalWaves??RUN_WAVES.length}`:t('Wave {wave} of {total}',{wave:r.wave+1,total:RUN_WAVES.length})}${r.hard?' · '+t('HARD'):''}</h2><span>${escapeHtml(SHIPS[p.shipId].name)} · ${t('HULL')} ${Math.round(p.hull/stats.hull*100)}%</span></div>${done?'':`<details class="run-next"><summary>${t('Next')}: ${t(wave.name)}</summary><p>${t(wave.hint)}</p></details>`}</header><div class="run-scroll">${this.runFitNotice?`<p role="status">${escapeHtml(this.runFitNotice)}</p>`:''}${body}</div><footer>${footer}</footer></div>`;
         this.root.querySelector('#arena-panel').classList.remove('is-hidden');this.updateOrientationNotice();
     }
 
@@ -4941,7 +4960,7 @@ export class GameUI {
         panel.innerHTML = `
       <div class="modal-card arena-card">
         <header><div><span class="eyebrow">${t('TRAINING SIMULATION')}</span><h2>${t('Dogfight Arena')}</h2></div><button data-ui-command="close-arena">${t('CLOSE')}</button></header>
-        <div class="arena-menu-scroll"><section class="run-entry"><b>${t('Arena Run')}</b>${record.best?`<span> · ${t('Best score')}: ${record.best}</span>`:''}<p>${t('Eight waves. Choose equipment between fights.')}</p><div><button data-ui-command="new-arena-run">${t(savedRun?'New run — replace saved run':'New run')}</button>${savedRun?`<button data-ui-command="resume-arena-run">${t('Resume saved run')}</button>`:''}${record.unlockedHard?`<button data-ui-command="hard-arena-run">${t('Hard Run')}</button>`:''}</div></section>
+        <div class="arena-menu-scroll"><section class="run-entry"><b>${t('Arena Run')}</b>${record.best?`<span> · ${t('Best score')}: ${record.best}</span>`:''}<p>${t('Ten waves. Choose equipment between fights.')}</p><div><button data-ui-command="new-arena-run">${t(savedRun?'New run — replace saved run':'New run')}</button>${savedRun?`<button data-ui-command="resume-arena-run">${t('Resume saved run')}</button>`:''}${record.unlockedHard?`<button data-ui-command="hard-arena-run">${t('Hard Run')}</button>`:''}</div></section>
         <div class="arena-grid">
           <section>
             <h3>${t('ARENA')}</h3>
