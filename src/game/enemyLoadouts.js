@@ -7,17 +7,18 @@ const FITS = [
     ['pulse-cannon','pulse-cannon','mortar'],
     ['pulse-cannon','pulse-cannon','beam-emitter'],
 ];
-export function createEnemyLoadout(ship, index) {
+export function createEnemyLoadout(ship, index, arenaFit) {
     const hullId = ship.role === 'bounty' ? 'lancer' : ship.role === 'trader' ? 'atlas' : ship.role === 'miner' ? 'prospector' : ship.role === 'escort' ? 'wayfarer' : ship.role === 'patrol' ? 'vanguard' : 'talon';
     const spec=HULL_HARDPOINTS[hullId], choices=FITS[index % FITS.length];
     const guns=spec.guns.map((mount,i)=>{
-        const item=i===spec.guns.length-1?choices[2]:choices[i % choices.length];
+        const item=arenaFit?.guns ? arenaFit.guns[i] : i===spec.guns.length-1?choices[2]:choices[i % choices.length];
+        if(!item)return null;
         return itemFitsMount(OUTFIT_ITEMS[item],mount)?item:'pulse-cannon';
     });
-    const weapons=guns.map(weaponIdForOutfit);
-    const profile=profileForWeapons(weapons,ship.pilot?.tier);
+    const weapons=guns.filter(Boolean).map(weaponIdForOutfit);
+    const profile=profileForWeapons(weapons.filter(Boolean),ship.pilot?.tier);
     const stats=getEffectiveShipStats({shipId:hullId,equipment:[]});
-    return {hullId,guns,weapons,turrets:spec.turrets.map(()=>index%2===0?'pdc':'tracking-turret'),profile,stats,attackOrder:[...weapons.keys()].reverse(),resources:{...stats,shield:ship.maxShield},fireAt:weapons.map(()=>0),
+    return {hullId,guns,weapons,turrets:spec.turrets.map((mount,i)=>arenaFit?.turrets?arenaFit.turrets[i]??null:index%2===0?'pdc':'tracking-turret'),profile,stats,attackOrder:[...weapons.keys()].filter(i=>weapons[i]).reverse(),resources:{...stats,shield:ship.maxShield},fireAt:weapons.map(()=>0),
         launcher: hullId==='lancer'?'torpedo':index%3===0?'seeker':undefined,
         missiles: hullId==='lancer'?2:index%3===0?4:0};
 }

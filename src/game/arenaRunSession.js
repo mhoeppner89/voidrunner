@@ -66,7 +66,7 @@ export const ArenaRunMethods={
   }
   const ship=this.spawnShip(role,point.toArray(),undefined,undefined,{tier:r.hard?(tier==='novice'?'veteran':tier==='veteran'?'ace':tier):tier});
   ship.faction='red-talons';
-  ship.hostile=true;ship.targetId='player';ship.arenaRunEnemy=true;ship.noSurrender=true;ship.combatFit=createEnemyLoadout(ship,fitIndex);
+  ship.hostile=true;ship.targetId='player';ship.arenaRunEnemy=true;ship.noSurrender=true;ship.combatFit=createEnemyLoadout(ship,fitIndex,ordnance);
   ship.combatFit.launcher=ordnance?.launcher;ship.combatFit.missiles=ordnance?.missiles??0;
   if(r.wave===0&&!r.hard){ship.combatFit.guns=['beam-emitter',null,null];ship.combatFit.weapons=['beam'];ship.combatFit.attackOrder=[0];ship.combatFit.fireAt=[this.save.world.time+4];ship.combatFit.missiles=0;ship.combatFit.turrets=[];}
   ship.energy=ship.combatFit.stats.energyCapacity;

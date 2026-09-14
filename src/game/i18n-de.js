@@ -12,6 +12,13 @@
 // Player address is informal "du" throughout, matching the frontier voice of
 // the English lines. Values are plain text — never HTML.
 export const DE_CATALOG = {
+ 'Includes a full magazine.': 'Inklusive vollem Magazin.',
+
+ 'Two novices enter first. A veteran arrives after twenty seconds. Use wrecks against their seekers.': 'Zuerst kommen zwei Anfänger. Nach zwanzig Sekunden folgt ein Veteran. Nutze Wracks als Deckung gegen Suchraketen.',
+ 'A close-range veteran enters first. A missile gunship joins after eight seconds. Separate them.': 'Zuerst kommt ein Veteran für den Nahkampf. Nach acht Sekunden folgt ein Raketenträger. Trenne sie voneinander.',
+ 'The ace carries two torpedoes. A veteran escort arrives after ten seconds.': 'Das Ass hat zwei Torpedos. Nach zehn Sekunden folgt eine Veteranen-Eskorte.',
+ 'Two Vanguards cover each other. Use wrecks to isolate one and escape their turret arcs.': 'Zwei Vanguards decken sich gegenseitig. Nutze Wracks, um eines zu isolieren und den Geschützen zu entkommen.',
+
  'BATTERIES {guns}/4 · PDC {pdc}/4': 'BATTERIEN {guns}/4 · PDC {pdc}/4',
 
  'Wave {wave} of {total}': 'Welle {wave} von {total}',

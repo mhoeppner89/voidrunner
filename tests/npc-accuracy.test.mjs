@@ -4,7 +4,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import {fixture} from './combat-variety.test.mjs';
 import {WEAPONS} from '../src/game/weapons.js';
 import {seededRandom} from '../src/game/random.js';
-import {npcShotDirection,npcTriggerReady,observeNpcTargetMotion,applyNpcTurnLead} from '../src/game/npcGunnery.js';
+import {npcShotDirection,npcTriggerReady,observeNpcTargetMotion,applyNpcTurnLead,npcTrackedVelocity} from '../src/game/npcGunnery.js';
 
 const DEG=Math.PI/180,tiers=['novice','veteran','ace'];
 const direction=degrees=>new THREE.Vector3(Math.sin(degrees*DEG),0,-Math.cos(degrees*DEG));
@@ -104,4 +104,19 @@ test('NPC pilot skill does not degrade the precise missile-interception solution
   assert.ok(first);const channel=s.pdcDefenseChannels.get(ship.id);assert.ok(Math.abs(channel.readyAt-first.at-2.5)<1e-9);shots.push(first);
  }
  assert.deepEqual(shots[0],shots[1]);assert.deepEqual(shots[1],shots[2]);
+});
+
+
+test('sudden evasive turns leave a temporary tracking error, with aces recovering fastest',()=>{
+ const errors=[];
+ for(const tier of tiers){
+  const p=pilot(tier),before=new THREE.Vector3(60,0,0),after=new THREE.Vector3(0,60,0),tracked=new THREE.Vector3();
+  observeNpcTargetMotion(p,before,0,true);observeNpcTargetMotion(p,after,.2,true);
+  npcTrackedVelocity(p,after,tracked);const error=tracked.distanceTo(after);errors.push(error);
+  assert.ok(error>20,'a sharp turn cannot be followed almost instantly');
+  for(let i=2;i<=8;i++)observeNpcTargetMotion(p,after,i*.2,true);
+  npcTrackedVelocity(p,after,tracked);assert.ok(tracked.distanceTo(after)<error*.1,'steady flight can be tracked again');
+  observeNpcTargetMotion(p,after,1.8,false);npcTrackedVelocity(p,before,tracked);assert.deepEqual(tracked.toArray(),before.toArray());
+ }
+ assert.ok(errors[0]>errors[1]&&errors[1]>errors[2]);console.log('Velocity tracking error 0.2s after turn:',errors);
 });

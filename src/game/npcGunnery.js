@@ -3,8 +3,8 @@ import {weaponAssistCone} from './weapons.js';
 const DEG=Math.PI/180,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const profiles={
  novice:{settle:.08,shots:7,pause:.55,spread:1.7*DEG,lead:.925,wander:.4*DEG,curve:.12,beam:.25*DEG,beamSlip:.16,beamWide:1.2*DEG,turretError:1.25,turretAcquire:.45,turretTurn:.85},
- veteran:{settle:.12,shots:5,pause:.35,spread:.3*DEG,lead:.99,wander:.18*DEG,curve:.55,beam:.12*DEG,beamSlip:.045,beamWide:.8*DEG,turretError:.65,turretAcquire:.3,turretTurn:1},
- ace:{settle:0,shots:8,pause:.15,spread:.15*DEG,lead:1,wander:.09*DEG,curve:.85,beam:.035*DEG,beamSlip:.006,beamWide:.45*DEG,turretError:.35,turretAcquire:.18,turretTurn:1.15},
+ veteran:{settle:.12,shots:5,pause:.35,spread:.3*DEG,lead:.99,wander:.22*DEG,curve:.55,beam:.12*DEG,beamSlip:.045,beamWide:.8*DEG,turretError:.65,turretAcquire:.3,turretTurn:1},
+ ace:{settle:0,shots:8,pause:.15,spread:.15*DEG,lead:1,wander:.13*DEG,curve:.85,beam:.035*DEG,beamSlip:.006,beamWide:.45*DEG,turretError:.35,turretAcquire:.18,turretTurn:1.15},
 };
 export const npcGunneryProfile=ship=>profiles[ship.pilot?.tier]??profiles.veteran;
 export const npcForwardCone=weapon=>weapon?.kind==='beam'?weaponAssistCone(weapon):(weapon?.id==='ripper'?7:weapon?.id==='pulse'||weapon?.id==='pulse-mk2'?6:4)*DEG;
@@ -43,7 +43,7 @@ export function observeNpcTargetMotion(ship,velocity,now,visible){
  const s=aimState(ship),dt=now-s.observedAt;
  if(!visible||!velocity){s.visible=false;s.acceleration.set(0,0,0);return;}
  if(!s.visible||s.targetId!==ship.targetId||dt<=0||dt>.6){s.acceleration.set(0,0,0);s.trackedVelocity.copy(velocity);}
- else {s.delta.copy(velocity).sub(s.velocity).multiplyScalar(1/dt).clampLength(0,40);s.acceleration.lerp(s.delta,1-Math.exp(-6*dt));s.trackedVelocity.lerp(velocity,1-Math.exp(-(ship.pilot?.tier==='ace'?18:ship.pilot?.tier==='novice'?2:3)*dt));}
+ else {s.delta.copy(velocity).sub(s.velocity).multiplyScalar(1/dt).clampLength(0,40);s.acceleration.lerp(s.delta,1-Math.exp(-6*dt));s.trackedVelocity.lerp(velocity,1-Math.exp(-(ship.pilot?.tier==='ace'?5:ship.pilot?.tier==='novice'?2:3)*dt));}
  s.velocity.copy(velocity);s.targetId=ship.targetId;s.observedAt=now;s.visible=true;
 }
 export function applyNpcTurnLead(ship,predicted,leadTime,now){
@@ -69,7 +69,7 @@ export function npcShotDirection(ship,weapon,targetDirection,out,now=0,distance=
   if(hard)spread*=tier==='novice'?(gauss?1.2:1.35):tier==='veteran'?2:1;
   else spread*=tier==='novice'?.65:1;
   if(gauss)spread*=.45+.6*clamp(distance/weapon.range,0,1);
-  if(out.dot(targetDirection)>=Math.cos(npcForwardCone(weapon)))out.lerp(targetDirection,tier==='ace'?(hard?1:.94):tier==='veteran'?(hard?.55:.97):gauss?.85:hard?.25:.65).normalize();
+  if(out.dot(targetDirection)>=Math.cos(npcForwardCone(weapon)))out.lerp(targetDirection,tier==='ace'?(hard?.96:.94):tier==='veteran'?(hard?.55:.97):gauss?.85:hard?.25:.65).normalize();
  }
  const radius=Math.sqrt(rng())*Math.tan(spread),angle=rng()*Math.PI*2;
  const wander=p.wander*(beam?.2:gauss?.5:1),phase=now*1.7+s.phase;

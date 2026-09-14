@@ -91,7 +91,7 @@ test('normal and hard runs introduce finite ordnance only at wave four',()=>{
   const notices=[];s.ui.pushEvent=message=>notices.push(message);
   RUN_WAVES[wave].enemies.forEach((spec,index)=>{s.save.arenaRun.entry=[index*50,0,-200];assert.equal(s.spawnRunEnemy(spec,index),true);});
   const stocks=s.ships.map(ship=>ship.combatFit.missiles);
-  assert.deepEqual(stocks,[[0],[0,0],[0],[2,0,0],[2,0],[0],[0,3],[2,0,2],[0,2],[0]][wave]);
+  assert.deepEqual(stocks,[[0],[0,0],[0],[2,0,0],[2,0],[0],[0,3],[2,2],[0,2],[0]][wave]);
   assert.equal(notices.filter(message=>/Raketenträger|Missile carrier/.test(message)).length,stocks.filter(n=>n>0).length);
  }
 });
@@ -127,3 +127,45 @@ test('legacy completed runs stay completed and active checkpoints extend to ten 
 test('Vanguard wave precedes a fully serviced frigate boss',()=>{storage();const s=runSession(8);s.startRunWave();s.tickArenaRun(3);assert.equal(s.ships.length,2);assert.ok(s.ships.every(x=>x.combatFit.hullId==='vanguard'));s.save.player.hull=5;s.ships.forEach(x=>x.hull=0);s.tickArenaRun(0);assert.equal(s.save.arenaRun.wave,9);assert.equal(s.save.player.hull,getEffectiveShipStats(s.save.player).hull);chooseRunReward(s.save,s.save.arenaRun.offers[0]);s.startRunWave();s.tickArenaRun(3);assert.equal(s.ships.length,1);assert.equal(s.ships[0].capitalBoss,true);assert.equal(s.ships[0].combatFit.turrets.filter(Boolean).length,4);});
 
 test('frigate spawn search stays ahead even when early positions are obstructed',()=>{storage();const s=runSession(9);s.startRunWave();let attempts=0;s.entryPositionClear=()=>++attempts>18;s.save.arenaRun.entry=[0,0,-200];assert.equal(s.spawnRunEnemy(RUN_WAVES[9].enemies[0],0),true);const delta=new THREE.Vector3(...s.ships[0].position).sub(new THREE.Vector3(...s.save.player.position)),ahead=new THREE.Vector3(0,0,-1).applyQuaternion(new THREE.Quaternion(...s.save.player.rotation));assert.ok(delta.dot(ahead)>0);});
+
+
+test('hull changes retain equipped guns and groups ahead of stored beams, including save reload',()=>{
+ storage();const save=newArenaRun(false,903),p=save.player,fit=p.outfitting.loadouts[p.shipId];
+ fit.guns=['pulse-cannon','ripper'];fit.fireGroups.activeGroup='B';
+ const mounts=HULL_HARDPOINTS[p.shipId].guns;fit.fireGroups.assignments[mounts[0].id]='A';fit.fireGroups.assignments[mounts[1].id]='B';
+ p.outfitting.locker={'beam-emitter':4,...p.outfitting.locker};
+ Object.assign(save.arenaRun,{wave:3,hullChosen:false});assert.equal(changeRunHull(save,'lancer'),true);
+ assert.deepEqual(loadoutFor(p).guns,['pulse-cannon','ripper']);
+ const after=loadoutFor(p);assert.equal(after.fireGroups.activeGroup,'B');assert.equal(after.fireGroups.assignments[HULL_HARDPOINTS.lancer.guns[1].id],'B');
+ writeArenaRun(save);assert.deepEqual(loadoutFor(readArenaRun().player).guns,after.guns);
+});
+test('staged rewards include Mk II and compatible missile upgrades with ammunition',()=>{
+ storage();const seen=new Set();
+ for(let seed=0;seed<80;seed++){
+  const save=newArenaRun(false,seed);save.player.shipId='lancer';save.player.ownedShips=['lancer'];save.player.outfitting=createOutfittingState(['lancer']);
+  Object.assign(save.arenaRun,{wave:6,rewardChosen:false});
+  for(const id of runOffers(save))seen.add(id);
+ }
+ for(const id of ['pulse-mk2','swarm-launcher','torpedo-launcher'])assert.ok(seen.has(id),id);
+ const save=newArenaRun(false,903);save.player.shipId='lancer';save.player.ownedShips=['lancer'];save.player.outfitting=createOutfittingState(['lancer']);
+ Object.assign(save.arenaRun,{wave:6,rewardChosen:false,offers:['torpedo-launcher']});
+ assert.equal(chooseRunReward(save,'torpedo-launcher'),true);
+ const entry=launcherMagazineEntries(save.player).find(e=>e.launcherId==='torpedo');assert.ok(entry);assert.equal(entry.rounds,entry.capacity);
+ save.player.launcherMagazines[entry.mount.id].rounds=0;recoverRun(save);assert.equal(launcherMagazineEntries(save.player).find(e=>e.mount.id===entry.mount.id).rounds,1);
+});
+test('all hulls receive a usable boss counter and damaged ships retain a repair choice',()=>{
+ storage();for(const hull of ['wayfarer','talon','vanguard','lancer','prospector','atlas']){
+  const save=newArenaRun(false,8);save.player.shipId=hull;save.player.ownedShips=[hull];save.player.outfitting=createOutfittingState([hull]);
+  Object.assign(save.arenaRun,{wave:9,rewardChosen:false});save.player.hull=getEffectiveShipStats(save.player).hull*.5;
+  save.arenaRun.offers=runOffers(save);assert.ok(save.arenaRun.offers.includes('repair'));
+  const id=save.arenaRun.offers.find(id=>id==='mortar'||id==='torpedo-launcher'||id==='ripper');assert.ok(id,hull);assert.equal(chooseRunReward(save,id),true);assert.ok(validateLoadout(save.player,hull,loadoutFor(save.player)).ok);
+ }
+});
+test('arena equipment matches authored guns and wave nine uses debris cover',()=>{
+ assert.equal(RUN_WAVES[8].environment,'debris-field');storage();
+ for(let wave=1;wave<9;wave++){const s=runSession(wave);for(const [i,spec] of RUN_WAVES[wave].enemies.entries()){
+  assert.ok(s.spawnRunEnemy(spec,i));const fit=s.ships.at(-1).combatFit;
+  assert.deepEqual(fit.guns,spec[4].guns);assert.ok(fit.attackOrder.every(i=>fit.weapons[i]));
+ }}
+ const save=newArenaRun();save.player.shipId='lancer';save.player.ownedShips=['lancer'];save.player.outfitting=createOutfittingState(['lancer']);assert.equal(runRewardPlan(save,'ion-blaster').count,1,'ion reward retains a hull-damage gun');
+});

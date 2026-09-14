@@ -325,7 +325,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
         return combatDisplay + (fraction - combat) * ((scanDisplay - combatDisplay) / (scan - combat));
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
-const GAME_VERSION = '0.8.2s';
+const GAME_VERSION = '0.8.2t';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -4935,7 +4935,7 @@ export class GameUI {
             body=`<div class="run-stage-label">${t('Choose one reward')}</div><div class="run-offers">${r.offers.map(id=>{
                 const plan=runRewardPlan(save,id);if(!plan)return '';
                 const title=id==='repair'?t('Field repairs'):`${plan.count}× ${t(OUTFIT_ITEMS[id].name)}`;
-                const detail=id==='repair'?t('Restore 40% hull and refill missiles.'):t(briefs[id]??OUTFIT_ITEMS[id].description);
+                const detail=id==='repair'?t('Restore 40% hull and refill missiles.'):t(briefs[id]??OUTFIT_ITEMS[id].description)+(OUTFIT_ITEMS[id]?.category==='launcher'?' '+t('Includes a full magazine.'): '');
                 const replacement=plan.replaced.length?t('Replaces {items}',{items:labelItems(plan.replaced)}):t('Fits an empty mount');
                 return command('reward',id,`<b>${escapeHtml(title)}</b><span>${escapeHtml(detail)}</span>${id==='repair'?'':`<small>${escapeHtml(replacement)}</small>`}`,`class="${r.selectedReward===id?'is-selected':''}" aria-pressed="${r.selectedReward===id}"`);
             }).join('')}</div>`;

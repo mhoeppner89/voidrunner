@@ -7,16 +7,18 @@ export const ARENA_RUN_KEY='voidrunner-arena-run-v1';
 export const ARENA_RECORD_KEY='voidrunner-arena-record-v1';
 // Enemy entries: role, pilot tier, gun fit, arrival delay, optional finite ordnance.
 // Omitted ordnance means no missiles, independently of the normal flight loadout.
+// Each wave specifies guns and turrets explicitly, independent of world presets.
+const enemy=(role,tier,guns,delay=0,ordnance={})=>[role,tier,0,delay,{guns,turrets:['pdc','pdc'],...ordnance}];
 export const RUN_WAVES=[
- {name:'First contact',hint:'One hesitant pilot. Take your time and watch your energy.',environment:'open',enemies:[['pirate','novice',3,0]]},
- {name:'Second contact',hint:'A second novice joins after twelve seconds. Watch the entry marker.',environment:'open',enemies:[['pirate','novice',0,0],['escort','novice',3,12]]},
- {name:'Interceptor',hint:'An agile veteran. Turn early and fire during the close pass.',environment:'open',enemies:[['pirate','veteran',1,0]]},
- {name:'Broken formation',hint:'Your first missile carrier has two seekers. Turn out of its sights or use wrecks to break its lock.',environment:'debris-field',enemies:[['escort','novice',0,0,{launcher:'seeker',missiles:2}],['pirate','veteran',1,0],['pirate','novice',3,14]]},
- {name:'Heavy escort',hint:'The gunship carries two seekers. Its light escort is easier to isolate.',environment:'asteroid-field',enemies:[['bounty','veteran',2,0,{launcher:'seeker',missiles:2}],['pirate','novice',0,0]]},
- {name:'The duellist',hint:'An ace uses drift and reversals. Save energy for the opening.',environment:'open',enemies:[['pirate','ace',1,0]]},
- {name:'Crossfire',hint:'One veteran attacks shields; the other carries three seekers. Separate them.',environment:'debris-field',enemies:[['pirate','veteran',1,0],['bounty','veteran',0,0,{launcher:'seeker',missiles:3}]]},
- {name:'Final flight',hint:'The ace carries two torpedoes. An escort with two seekers arrives after fifteen seconds.',environment:'asteroid-field',enemies:[['bounty','ace',2,0,{launcher:'torpedo',missiles:2}],['pirate','veteran',1,0],['escort','veteran',3,15,{launcher:'seeker',missiles:2}]]},
- {name:'Vanguard pair',hint:'Two Vanguards cover each other. Isolate one and keep moving through their turret arcs.',environment:'open',enemies:[['patrol','veteran',1,0],['patrol','ace',0,0,{launcher:'seeker',missiles:2}]]},
+ {name:'First contact',hint:'One hesitant pilot. Take your time and watch your energy.',environment:'open',enemies:[enemy('pirate','novice',['beam-emitter',null,null])]},
+ {name:'Second contact',hint:'A second novice joins after twelve seconds. Watch the entry marker.',environment:'open',enemies:[enemy('pirate','novice',['pulse-cannon','pulse-cannon',null]),enemy('escort','novice',['pulse-cannon','beam-emitter'],12)]},
+ {name:'Interceptor',hint:'An agile veteran. Turn early and fire during the close pass.',environment:'open',enemies:[enemy('pirate','veteran',['pulse-cannon','pulse-cannon',null])]},
+ {name:'Broken formation',hint:'Two novices enter first. A veteran arrives after twenty seconds. Use wrecks against their seekers.',environment:'debris-field',enemies:[enemy('escort','novice',['pulse-cannon','beam-emitter'],0,{launcher:'seeker',missiles:2}),enemy('pirate','novice',['pulse-cannon','pulse-cannon',null]),enemy('pirate','veteran',['pulse-cannon','pulse-cannon',null],20)]},
+ {name:'Heavy escort',hint:'The gunship carries two seekers. Its light escort is easier to isolate.',environment:'asteroid-field',enemies:[enemy('bounty','veteran',['pulse-cannon','mortar'],0,{launcher:'seeker',missiles:2}),enemy('pirate','novice',['pulse-cannon','pulse-cannon','beam-emitter'])]},
+ {name:'The duellist',hint:'An ace uses drift and reversals. Save energy for the opening.',environment:'open',enemies:[enemy('pirate','ace',['pulse-cannon','pulse-cannon','beam-emitter'])]},
+ {name:'Crossfire',hint:'A close-range veteran enters first. A missile gunship joins after eight seconds. Separate them.',environment:'debris-field',enemies:[enemy('pirate','veteran',['ripper','ripper','ion-blaster']),enemy('bounty','veteran',['pulse-cannon','gauss-cannon'],8,{launcher:'seeker',missiles:3})]},
+ {name:'Final flight',hint:'The ace carries two torpedoes. A veteran escort arrives after ten seconds.',environment:'asteroid-field',enemies:[enemy('bounty','ace',['pulse-cannon','mortar'],0,{launcher:'torpedo',missiles:2}),enemy('escort','veteran',['pulse-cannon','beam-emitter'],10,{launcher:'seeker',missiles:2})]},
+ {name:'Vanguard pair',hint:'Two Vanguards cover each other. Use wrecks to isolate one and escape their turret arcs.',environment:'debris-field',enemies:[enemy('patrol','veteran',['ripper','ion-blaster']),enemy('patrol','ace',['pulse-cannon','gauss-cannon'],0,{launcher:'seeker',missiles:2})]},
  {name:'The frigate',hint:'Batteries fire in two waves: watch the charge and take cover. Attack during recovery. Plasma and torpedoes penetrate the armored hull; use the aim button to target exposed batteries.',environment:'asteroid-field',enemies:[['frigate','ace',0,0]]},
 ];
 export function newArenaRun(hard=false,seed=Date.now()) {
@@ -35,10 +37,29 @@ export function writeArenaRun(save){try{const clean={...save,player:{...save.pla
 export function arenaRecord(){try{return JSON.parse(window.localStorage.getItem(ARENA_RECORD_KEY))??{};}catch{return {};}}
 export function recordArenaRun(save){const r=save.arenaRun,old=arenaRecord();try{window.localStorage.setItem(ARENA_RECORD_KEY,JSON.stringify({unlockedHard:old.unlockedHard||r.phase==='won',best:Math.max(old.best??0,runScore(r)),last:{cleared:r.cleared,score:runScore(r)}}));}catch{}}
 export const runScore=r=>Math.max(0,Math.round(r.cleared*1000+(r.phase==='won'?2000:0)-r.elapsed*2-r.damage*2-r.missiles*20));
-const pool=['pulse-cannon','ripper','gauss-cannon','ion-blaster','mortar','pdc','tracking-turret','engine-mk2','thrusters-mk2','capacitor-bank','sustained-reactor','shield-mk2','recovery-shield'];
-export function runOffers(save){const r=save.arenaRun,spec=HULL_HARDPOINTS[save.player.shipId],fit=loadoutFor(save.player),owned=LOADOUT_KEYS.flatMap(k=>fit[k]).filter(Boolean);const rng=seededRandom(`${r.seed}:reward:${r.wave}:${save.player.shipId}`);
- const choices=pool.filter(id=>runRewardPlan(save,id) && (OUTFIT_ITEMS[id].category==='gun'||!owned.includes(id)) && !(save.player.outfitting.locker[id]>0)).map(id=>({id,sort:rng()})).sort((a,b)=>a.sort-b.sort).map(x=>x.id);
- return save.player.hull>getEffectiveShipStats(save.player).hull*.8?choices.slice(0,3):[...choices.slice(0,2),'repair'];
+const rewardPools={
+ offense:['pulse-cannon','ripper','gauss-cannon','ion-blaster','mortar','pulse-mk2','swarm-launcher','torpedo-launcher'],
+ survival:['pdc','tracking-turret','shield-mk2','recovery-shield'],
+ handling:['engine-mk2','thrusters-mk2','capacitor-bank','sustained-reactor'],
+};
+const rewardWave={'pulse-mk2':3,'swarm-launcher':3,'torpedo-launcher':5,'mortar':2,'gauss-cannon':2};
+export function runOffers(save){
+ const r=save.arenaRun,p=save.player,fit=loadoutFor(p),owned=LOADOUT_KEYS.flatMap(k=>fit[k]).filter(Boolean);
+ const rng=seededRandom(`${r.seed}:reward:${r.wave}:${p.shipId}`);
+ const eligible=id=>r.wave>=(rewardWave[id]??1)&&runRewardPlan(save,id)&&!p.outfitting.locker[id]&&(OUTFIT_ITEMS[id].category==='gun'||!owned.includes(id));
+ const candidates=Object.fromEntries(Object.entries(rewardPools).map(([key,ids])=>[key,ids.filter(eligible).map(id=>({id,sort:rng()})).sort((a,b)=>a.sort-b.sort).map(x=>x.id)]));
+ const offers=[];
+ // Offer a heavy boss weapon where mounts permit it; small hulls get
+ // scatterguns for exposed batteries. Stored copies do not block this offer.
+ if(r.wave===9){
+  const heavy=HULL_HARDPOINTS[p.shipId].guns.some(m=>m.size==='M')||HULL_HARDPOINTS[p.shipId].launchers.some(m=>m.size==='M');
+  const counters=heavy?['torpedo-launcher','mortar']:['ripper'];
+  if(!owned.some(id=>counters.includes(id))){const counter=counters.find(id=>runRewardPlan(save,id));if(counter)offers.push(counter);}
+ }
+ for(const key of ['offense','survival','handling']){if(key==='offense'&&offers.length)continue;const id=candidates[key].find(id=>!offers.includes(id));if(id)offers.push(id);}
+ for(const id of Object.values(candidates).flat())if(offers.length<3&&!offers.includes(id))offers.push(id);
+ if(p.hull<=getEffectiveShipStats(p).hull*.8)offers.splice(2,1,'repair');
+ return offers;
 }
 // Preserve the two already-offered items when an old checkpoint has an unnecessary repair.
 export function refreshRunRepairOffer(save){const r=save.arenaRun;if(r.phase!=='prepare'||r.rewardChosen||!r.hullChosen||!r.offers.includes('repair')||save.player.hull<=getEffectiveShipStats(save.player).hull*.8)return;
@@ -49,18 +70,19 @@ export function refreshRunRewardOffers(save){
  const highHull=save.player.hull>getEffectiveShipStats(save.player).hull*.8;
  const valid=(r.offers??[]).filter(id=>runRewardPlan(save,id)&&!(highHull&&id==='repair'));
  for(const id of runOffers(save))if(valid.length<3&&!valid.includes(id))valid.push(id);
+ const bossOffer=runOffers(save)[0];if(r.wave===9&&['torpedo-launcher','mortar','ripper'].includes(bossOffer)&&!valid.includes(bossOffer))valid[0]=bossOffer;
  r.offers=valid;if(!valid.includes(r.selectedReward))r.selectedReward=null;
 }
 export function recoverRun(save,extra=false){const p=save.player,stats=getEffectiveShipStats(p),r=save.arenaRun;p.hull=Math.min(stats.hull,p.hull+stats.hull*(extra?.4:r.hard?.1:.2));p.shield=stats.shield;p.energy=stats.energyCapacity;p.fuel=stats.fuel;
- if(extra)fillLauncherMagazines(p);else {const entry=launcherMagazineEntries(p).find(e=>e.rounds<e.capacity);if(entry){normalizeLauncherMagazines(p);p.launcherMagazines[entry.mount.id].rounds++;normalizeLauncherMagazines(p);}}
+ if(extra)fillLauncherMagazines(p);else {for(const entry of normalizeLauncherMagazines(p))if(entry.rounds<entry.capacity)p.launcherMagazines[entry.mount.id].rounds++;normalizeLauncherMagazines(p);}
 }
 // A reward is a complete, mass-checked replacement plan, not a loose gun.
 export function runRewardPlan(save,id){
  if(id==='repair')return {id,count:1,changes:[],replaced:[]};
- const p=save.player,item=OUTFIT_ITEMS[id],spec=HULL_HARDPOINTS[p.shipId];if(!item)return null;
+ const p=save.player,item=OUTFIT_ITEMS[id],spec=HULL_HARDPOINTS[p.shipId];if(!item||id==='ion-blaster'&&spec.guns.length<2)return null;
  const fit=loadoutFor(p),key=LOADOUT_KEYS.find(k=>spec[k].some(m=>itemFitsMount(item,m)));if(!key)return null;
  let indices=spec[key].map((m,i)=>itemFitsMount(item,m)?i:-1).filter(i=>i>=0);
- if(key==='guns'){
+ if(key==='guns'&&id!=='ion-blaster'){
   // Pair matching wing mounts; retain the Talon's independent centre gun.
   const size=spec[key][indices[0]].size;indices=indices.filter(i=>spec[key][i].size===size);
  }else indices=[indices.find(i=>!fit[key][i])??indices.find(i=>fit[key][i]!==id)??indices[0]];
@@ -82,6 +104,7 @@ export function chooseRunReward(save,id){
    fit[key][index]=id;state.factory[p.shipId][key][index]=false;
   }
   const equipped={...p,outfitting:state};p.equipment=projectLegacyEquipment(equipped,state);p.weaponId=projectLegacyWeaponId(equipped);p.outfitting=state;normalizeLauncherMagazines(p);
+  if(OUTFIT_ITEMS[id].category==='launcher'){for(const entry of launcherMagazineEntries(p))if(plan.changes.some(c=>c.key==='launchers'&&HULL_HARDPOINTS[p.shipId].launchers[c.index].id===entry.mount.id)){p.launcherMagazines[entry.mount.id].rounds=entry.capacity;p.activeLauncherMountId=entry.mount.id;}normalizeLauncherMagazines(p);}
  }
  r.rewardChosen=true;r.selectedReward=null;return true;
 }
@@ -102,11 +125,37 @@ export function fitRunItem(save,key,index,id){
  p.equipment=projectLegacyEquipment(equipped,state);p.weaponId=projectLegacyWeaponId(equipped);p.outfitting=state;
  normalizeLauncherMagazines(p);return true;
 }
-export function changeRunHull(save,id){const r=save.arenaRun,p=save.player;if(r.phase!=='prepare'||r.hullChosen||![3,6].includes(r.wave)||!['wayfarer','talon','vanguard','prospector','lancer','atlas'].includes(id))return false;
- if(id!==p.shipId){const fraction=p.hull/getEffectiveShipStats(p).hull,rounds=p.missiles??0,old=loadoutFor(p),locker={...p.outfitting.locker};for(const key of LOADOUT_KEYS)for(const item of old[key])if(item)locker[item]=(locker[item]??0)+1;
- p.shipId=id;p.ownedShips=[id];p.outfitting=createOutfittingState([id]);const fit=p.outfitting.loadouts[id],spec=HULL_HARDPOINTS[id];for(const key of LOADOUT_KEYS){fit[key].fill(null);p.outfitting.factory[id][key].fill(false);}p.outfitting.locker=locker;p.outfitting.factoryLocker={};
- let mass=0;for(const key of LOADOUT_KEYS)for(const [i,m] of spec[key].entries()){const item=Object.keys(locker).find(x=>locker[x]>0&&itemFitsMount(OUTFIT_ITEMS[x],m)&&mass+OUTFIT_ITEMS[x].mass<=spec.massBudget);if(item){fit[key][i]=item;locker[item]--;mass+=OUTFIT_ITEMS[item].mass;}}
- fit.fireGroups.activeGroup='ALL';p.hull=getEffectiveShipStats(p).hull*fraction;p.launcherMagazines={};p.missiles=rounds;normalizeLauncherMagazines(p,{legacyMissiles:rounds});
+export function changeRunHull(save,id){
+ const r=save.arenaRun,p=save.player;if(r.phase!=='prepare'||r.hullChosen||![3,6].includes(r.wave)||!['wayfarer','talon','vanguard','prospector','lancer','atlas'].includes(id))return false;
+ if(id!==p.shipId){
+  const fraction=p.hull/getEffectiveShipStats(p).hull,old=loadoutFor(p),oldSpec=HULL_HARDPOINTS[p.shipId],oldFactory=p.outfitting.factory[p.shipId];
+  const magazines=launcherMagazineEntries(p),locker={...p.outfitting.locker},factoryLocker={...p.outfitting.factoryLocker};
+  for(const key of LOADOUT_KEYS)for(const [i,item] of old[key].entries())if(item){locker[item]=(locker[item]??0)+1;if(oldFactory[key][i])factoryLocker[item]=(factoryLocker[item]??0)+1;}
+  p.shipId=id;p.ownedShips=[id];p.outfitting=createOutfittingState([id]);const fit=p.outfitting.loadouts[id],spec=HULL_HARDPOINTS[id],flags=p.outfitting.factory[id];
+  for(const key of LOADOUT_KEYS){fit[key].fill(null);flags[key].fill(false);}p.outfitting.locker=locker;p.outfitting.factoryLocker=factoryLocker;
+  let mass=0;
+  const install=(key,index,item,sourceIndex)=>{
+   const mount=spec[key][index];if(!item||fit[key][index]||!locker[item]||!itemFitsMount(OUTFIT_ITEMS[item],mount)||mass+OUTFIT_ITEMS[item].mass>spec.massBudget)return false;
+   fit[key][index]=item;locker[item]--;mass+=OUTFIT_ITEMS[item].mass;
+   if(factoryLocker[item]>0){flags[key][index]=true;factoryLocker[item]--;}
+   if(key==='guns'&&sourceIndex!==undefined)fit.fireGroups.assignments[mount.id]=old.fireGroups.assignments[oldSpec.guns[sourceIndex].id];
+   return true;
+  };
+  // Reserve compatible installed equipment before considering any stored items.
+  // Matching positions first; then move surplus guns into compatible free mounts.
+  for(const key of LOADOUT_KEYS)for(const [i,item] of old[key].entries()){
+   if(i<spec[key].length&&install(key,i,item,i))continue;
+   for(let j=0;j<spec[key].length;j++)if(install(key,j,item,i))break;
+  }
+  for(const key of LOADOUT_KEYS)for(let i=0;i<spec[key].length;i++)for(const item of Object.keys(locker))if(install(key,i,item))break;
+  fit.fireGroups.activeGroup=old.fireGroups.activeGroup;
+  if(fit.fireGroups.activeGroup!=='ALL'&&!spec.guns.some((m,i)=>fit.guns[i]&&fit.fireGroups.assignments[m.id]===fit.fireGroups.activeGroup))fit.fireGroups.activeGroup='ALL';
+  p.equipment=projectLegacyEquipment(p,p.outfitting);p.weaponId=projectLegacyWeaponId(p);
+  p.hull=getEffectiveShipStats(p).hull*fraction;p.launcherMagazines={};p.missiles=0;
+  // Transfer ammunition only between racks of the same type; never turn seekers into torpedoes.
+  const ammo={};for(const e of magazines)ammo[e.launcherId]=(ammo[e.launcherId]??0)+e.rounds;
+  for(const e of normalizeLauncherMagazines(p)){const rounds=Math.min(e.capacity,ammo[e.launcherId]??0);p.launcherMagazines[e.mount.id].rounds=rounds;ammo[e.launcherId]-=rounds;}
+  normalizeLauncherMagazines(p);
  }
  r.hullChosen=true;r.offers=runOffers(save);return true;
 }
