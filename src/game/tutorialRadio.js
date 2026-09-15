@@ -1,140 +1,101 @@
 // Route-specific transmissions use the ordinary radio bar and never pause flight.
 // IDs are saved with the quest so returning to a route does not repeat a line.
+// Kept deliberately sparse: a wingman on comms drops short remarks, not
+// lectures — the objective panel carries the step-by-step instructions.
 export const TUTORIAL_RADIO = [
-    {"after":"vesper-home","destination":"vesper","id":"vesper-docks","step":"fly-vesper","text":"The first habitats stood beside the landing pads. Cargo arrived before there were roads. That is why the commodity market is still by the port."},
-    {"after":"vesper-docks","destination":"vesper","id":"vesper-price","step":"fly-vesper","text":"We do not have to carry the same cargo back. Vesper has plenty of ore and too little food. A good trade starts with listening to people."},
-    {"after":"vesper-price","destination":"vesper","id":"vesper-mara","step":"fly-vesper","text":"Mara knew our mother when they were children. When she tells those stories, it sometimes takes me a while to work out who started the trouble."},
-    {"after":"belt-living","destination":"shardbelt","id":"belt-work","step":"mine-shardbelt","text":"The big companies want continuous deposits. Small leftover seams can still pay for us. We do not have a whole fleet to support."},
-    {"after":"belt-work","destination":"shardbelt","id":"belt-markers","step":"mine-shardbelt","text":"The belt's markers were left by different crews. Some mark clear passages, others mining sites. That is why we check what the target monitor has actually identified."},
-    {"after":"belt-markers","destination":"shardbelt","id":"belt-mother","step":"mine-shardbelt","text":"Our mother hated throwing things away. A broken pump housing became a flowerpot at home. Mara still keeps it behind the bar."},
-    {"after":"wreck-search","destination":"mourning-line","id":"wreck-registry","step":"salvage-black-box","text":"The Salvage Union records where each piece was found. Without those records, it would be almost impossible to tell which ship it came from."},
-    {"after":"wreck-registry","destination":"mourning-line","id":"wreck-radio","step":"salvage-black-box","text":"The carrier recorded the shared radio channel. If its recorder is still readable, we may hear more than its own crew's final words."},
-    {"after":"wreck-radio","destination":"mourning-line","id":"wreck-care","step":"salvage-black-box","text":"We only take what we can recover safely. Another accident would help nobody here."},
-    {"after":"cairn-berth","destination":"cairn","id":"cairn-crews","step":"dock-cairn","text":"Cairn lives off its salvage crews. Many of the mechanics also work out among the wrecks. They notice fairly quickly when someone leaves part of a story out."},
-    {"after":"cairn-crews","destination":"cairn","id":"cairn-record","step":"dock-cairn","text":"Leave the recording as it is for now. I have filled in so many gaps in my head that I need to be careful about what I actually heard."},
-    {"after":"gate-convoy","destination":"verge-meridian-point","id":"gate-records","step":"cross-meridian-gate","text":"Clearance does not prove a ship arrived. We will need to compare the departure lists with the arrival records."},
-    {"after":"gate-records","destination":"verge-meridian-point","id":"gate-trade","step":"cross-meridian-gate","text":"Meridian processes much of what is mined here. Machinery and electronics come back the other way. The gates connect more than star systems."},
-    {"after":"gate-trade","destination":"verge-meridian-point","id":"gate-family","step":"cross-meridian-gate","text":"I am glad you are here today. On my own, I would probably have found another reason not to look."},
-    {id:'vesper-drive', step:'fly-vesper', destination:'vesper', cue:'hyperdrive',
-        text:'You are lined up with Vesper. Engage HYPERDRIVE when you are ready; I will stay with you.'},
-    {id:'vesper-approach', step:'fly-vesper', destination:'vesper', cue:'arrival',
-        text:'That is Vesper ahead. Keep it selected and ease the throttle forward. The landing system takes over as you approach.'},
-    {id:'vesper-food', step:'fly-vesper', destination:'vesper',
-        text:'Vesper keeps adding new habitats, but its farms cannot feed everyone yet. That is why Mara sends protein out here.'},
-    {id:'vesper-home', step:'fly-vesper', destination:'vesper', after:'vesper-food',
-        text:'Our mother used to bring us back sweets from these runs. Mara always knew. Apparently, hiding cargo from your aunt takes more skill than flying it.'},
-    {id:'belt-route', step:'mine-shardbelt', destination:'shardbelt',
-        text:'Our mother taught me to read this belt. Watch the rocks turning as we approach; the gaps move with them.'},
-    {id:'belt-living', step:'mine-shardbelt', destination:'shardbelt', after:'belt-route',
-        text:'Cairn buys ore from small crews like ours. Learning to work the belt gives you a way to pay for fuel when the trade prices are poor.'},
-    {id:'wreck-names', step:'salvage-black-box', destination:'mourning-line',
-        text:'People still come to Mourning Line looking for a name or a flight record. Not everyone who lost someone had a ship to search from.'},
-    {id:'wreck-search', step:'salvage-black-box', destination:'mourning-line', after:'wreck-names',
-        text:'A salvage crew sent me the carrier’s markings last week. I recognised them. That is why I wanted us to take this route together.'},
-    {id:'cairn-berth', step:'dock-cairn', destination:'cairn',
-        text:'Mara found me a berth at Cairn after the evacuation. She never asked me to pay her back. I should have given her an honest account, at least.'},
-    {id:'gate-convoy', step:'cross-meridian-gate', destination:'verge-meridian-point',
-        text:'The evacuation ships all had to pass through this gate. The traffic ledger should say who was cleared to cross, and who was still waiting.'},
-
+    {"id":"vesper-food","step":"fly-vesper","destination":"vesper","text":"Vesper keeps growing faster than its farms can follow. That is why Mara sends protein out here."},
+    {"after":"vesper-food","destination":"vesper","id":"vesper-home","step":"fly-vesper","text":"Our mother always brought us sweets back from this run. Mara still found every one of them."},
+    {"after":"vesper-home","destination":"vesper","id":"vesper-price","step":"fly-vesper","text":"Vesper has ore to spare and food to spare for nobody. A good trade starts with listening."},
+    {"after":"vesper-price","destination":"vesper","id":"vesper-docks","step":"fly-vesper","text":"The first habitats stood right beside the landing pads. That is why the market is still at the port."},
+    {"id":"vesper-drive", step:'fly-vesper', destination:'vesper', cue:'hyperdrive',
+        text:'You are lined up with Vesper. Engage HYPERDRIVE when you are ready.'},
+    {"id":"vesper-approach", step:'fly-vesper', destination:'vesper', cue:'arrival',
+        text:'Vesper dead ahead. Keep it selected and ease in slowly – the ship handles the landing.'},
+    {"after":"belt-living","destination":"shardbelt","id":"belt-mother","step":"mine-shardbelt","text":"Our mother never threw anything away. A broken pump became a flowerpot – Mara still keeps it behind the bar."},
+    {"after":"belt-route","destination":"shardbelt","id":"belt-living","step":"mine-shardbelt","text":"Cairn buys ore from small crews like ours. It pays for fuel when a trade is not worth taking."},
+    {"id":"belt-route", step:'mine-shardbelt', destination:'shardbelt',
+        text:'Our mother taught me this belt. The gaps drift with the rocks.'},
+    {"after":"wreck-names","destination":"mourning-line","id":"wreck-radio","step":"salvage-black-box","text":"The carrier recorded the shared radio channel. If the recorder is still readable, we may hear more than the final words."},
+    {"id":"wreck-names", step:'salvage-black-box', destination:'mourning-line',
+        text:'People still come to Mourning Line looking for a name or a flight record.'},
+    {"after":"cairn-berth","destination":"cairn","id":"cairn-record","step":"dock-cairn","text":"Leave the recording as it is for now. I need to be sure of what I actually heard."},
+    {"id":"cairn-berth", step:'dock-cairn', destination:'cairn',
+        text:'Mara found me this berth at Cairn after the evacuation. I never gave her an honest word for it.'},
+    {"id":"gate-depart", step:'galaxy-map', destination:'cairn', speaker:'Rin Vek',
+        text:'The Second Light just cleared the traffic lane. Her drive signature is already fading – good travel, sister.'},
+    {"id":"helios-gate-worry", step:'cross-meridian-gate', destination:'verge-meridian-point', speaker:'Mara Vek',
+        text:'No word from Rin since the gate. Fly safe out there – and call me the moment you hear from her.'},
 ];
 
 // Public regional traffic continues world-building after the prologue.
 // Every transmission is heard once per career and remains in the transcript.
+// Kept short and idiomatic — traffic control talks in clipped routines, not
+// essays.
 export const TRAVEL_RADIO = [
     {
         "id": "helios-harvest",
         "speaker": "Helix traffic control",
         "system": "helios-verge",
-        "text": "Freighters from Azure Reach are being handled at the outer docks. The new harvest has arrived. Please keep the approach clear for refrigerated containers."
-    },
-    {
-        "id": "helios-shifts",
-        "speaker": "Vesper local radio",
-        "system": "helios-verge",
-        "text": "The late shift at the smelters will start an hour later. The port asks arriving crews to report repair needs before unloading."
+        "text": "Refrigerated containers on the approach. Outer docks are handling the Azure Reach freighters — keep the lane clear."
     },
     {
         "id": "helios-tags",
         "speaker": "Salvage Union radio",
         "system": "helios-verge",
-        "text": "Anyone finding personal belongings in the wreck field should record the location. Families are still searching for traces of missing crew members."
-    },
-    {
-        "id": "helios-repairs",
-        "speaker": "Cairn local radio",
-        "system": "helios-verge",
-        "text": "Our workshop asks for patience. Two salvage ships have reported damaged coolant lines. Parts recovered from old wrecks are checked individually before fitting."
+        "text": "Personal effects found in the field: log the location. Families are still looking for traces."
     },
     {
         "id": "helios-trade",
         "speaker": "Merchant radio",
         "system": "helios-verge",
-        "text": "A note for new traders: strong demand does not guarantee a profit. Compare your purchase price with the destination's offer before filling the hold."
+        "text": "Note for new traders: strong demand is not a profit. Compare the buy price with what the destination pays before you load."
     },
     {
         "id": "helios-names",
-        "speaker": "Salvage Union radio",
+        "speaker": "Cairn local radio",
         "system": "helios-verge",
-        "text": "Cairn's book of remembrance remains open to visitors. Anyone wishing to add a name can contact the port office."
+        "text": "The book of remembrance stays open. Adding a name goes through the port office."
     },
     {
         "id": "meridian-yard",
         "speaker": "Argent traffic control",
         "system": "meridian",
-        "text": "Yard traffic has priority in the test corridor. The new frigates are testing braking manoeuvres today. Even a ship that looks slow can need plenty of room."
-    },
-    {
-        "id": "meridian-cargo",
-        "speaker": "Merchant radio",
-        "system": "meridian",
-        "text": "Argent does not only process fresh ore. Sorted scrap from the outer colonies goes straight back into production. Some ships are older than their build dates suggest."
+        "text": "Yard traffic has priority in the test corridor. Frigates are braking today — give them room."
     },
     {
         "id": "meridian-customs",
         "speaker": "Concord traffic control",
         "system": "meridian",
-        "text": "Please keep your transponder on during approach. Customs matches your identity with your cargo. A missing identity does not shorten the inspection."
+        "text": "Transponders on during approach. No identity, no fast inspection."
     },
     {
         "id": "meridian-city",
         "speaker": "Meridian local radio",
         "system": "meridian",
-        "text": "The outer residential rings remain dependent on freight deliveries. The administration asks for water and medical shipments to be handled first."
+        "text": "Outer rings are waiting on freight. Water and medical shipments first, please."
     },
     {
         "id": "redwake-pump",
         "speaker": "Cinder local radio",
         "system": "redwake",
-        "text": "The replacement pump is on its way. Until it is fitted, the refinery is running at reduced output. The workshop asks crews to set usable seals aside from other scrap."
+        "text": "Replacement pump is inbound; refinery is on reduced output. Set usable seals aside from scrap."
     },
     {
         "id": "redwake-cost",
         "speaker": "Merchant radio",
         "system": "redwake",
-        "text": "A cheap offer at Blackglass may need an expensive escort. Work out the cost of the whole route before accepting."
-    },
-    {
-        "id": "redwake-parts",
-        "speaker": "Cinder local radio",
-        "system": "redwake",
-        "text": "Water filters and replacement valves are still needed. The new residential sections are finished, but their doors stay closed until supplies arrive."
+        "text": "A cheap Blackglass offer may want an expensive escort. Price the whole route before you take it."
     },
     {
         "id": "pale-survey",
         "speaker": "Nacre survey radio",
         "system": "pale-ring",
-        "text": "Survey ships report changing passages through the dense ring bands. Older coordinates are only a guide. Leave room around drifting ice on approach."
+        "text": "Passages through the ring bands keep shifting. Old coordinates are a guide, not a promise."
     },
     {
         "id": "pale-clinic",
         "speaker": "Boreal local radio",
         "system": "pale-ring",
-        "text": "The clinic has requested more refrigerated containers. Medical shipments can only be accepted with their transport seals intact."
+        "text": "Clinic needs refrigerated containers. Medical shipments accepted only with transport seals intact."
     },
-    {
-        "id": "pale-water",
-        "speaker": "Merchant radio",
-        "system": "pale-ring",
-        "text": "Boreal has water in abundance. The difficult part is processing and shipping it. Every full tank represents weeks of work beneath the ice."
-    }
 ];

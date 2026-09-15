@@ -142,6 +142,9 @@ const HYPERDRIVE_FX_DURATION = 0.9;
 const HYPERDRIVE_INTERRUPT_DURATION = 1.1;
 const GATE_TRANSITION_SECONDS = 0.52;
 const TUTORIAL_COMPLETION_REWARD = 2500;
+// After Rin jumps ahead, Mara's "she never called" transmission waits this
+// long so the earn-and-equip stretch is really played before the story calls.
+const TUTORIAL_MARA_CALL_DELAY = 150;
 const TUTORIAL_COMPANION_NAME = 'Rin Vek · Second Light';
 const TUTORIAL_ENEMY_NAME = 'Ash Moth';
 const TUTORIAL_RIN_HELP_DELAY = 28;
@@ -1588,6 +1591,11 @@ export class GameSession {
     ensureTutorialCompanion(forcePosition = false) {
         if (!this.renderer || this.save.player.dockedAt || !isTutorialActive(this.save))
             return undefined;
+        // Rin has jumped ahead through the gate: from the galaxy-map step on,
+        // the Second Light is story-absent and the Wayfarer flies solo.
+        const summary = this.tutorialSummary();
+        if (['galaxy-map','cross-meridian-gate'].includes(summary?.stepId))
+            return undefined;
         let ship = this.ships.find((entry) => entry.tutorialCompanion && entry.hull > 0);
         const goal = this.tutorialFormationGoal();
         if (!ship) {
@@ -1915,6 +1923,14 @@ export class GameSession {
         this.playStoryLine('Rin Vek', t('Rin has something to discuss.'), 'ally', 15000, 'tutorial-' + id);
     }
     finishTutorialBriefing(conversationId, completed) {
+        if (conversationId === 'tutorial-handoff') {
+            this.tutorialMaraCallOffered = false;
+            this.nextTutorialMaraCallAt = this.save.world.time + 12;
+            const quest = getTutorialQuest(this.save);
+            if (completed && quest) setFlag(this.save, quest.id, 'maraCallMade', true);
+            this.persistSave();
+            return;
+        }
         const id = conversationId?.replace(/^tutorial-/, '');
         if (!this.pendingTutorialBriefings?.delete(id)) return;
         const quest = getTutorialQuest(this.save);
@@ -1981,11 +1997,27 @@ export class GameSession {
         else if (stepId === 'family-choice') {
             this.ui.showToast(t('Rin is waiting at the Cairn berth with the recorder.'), 'warning', 6200);
         }
-        else if (stepId === 'cross-meridian-gate') {
-            this.setTutorialDestination('meridian-prime');
-            this.ui.showToast(t('Final objective: fly through the Helios–Meridian jump gate.'), 'success', 6200);
+        else if (stepId === 'galaxy-map') {
+            // Rin jumps ahead alone: the Second Light leaves the formation,
+            // she says goodbye in person, and the prologue's earn-and-equip
+            // stretch begins. Mara's worried call is scheduled, not scripted
+            // to this instant.
+            this.removeTutorialActors();
+            setFlag(this.save, getTutorialQuest(this.save).id, 'rinDeparted', true);
+            this.tutorialMaraCallDue = this.save.world.time + TUTORIAL_MARA_CALL_DELAY;
+            // Persist the due time: the session field dies with the page, and a
+            // reload mid-stretch must not drop Mara's remaining wait.
+            setFlag(this.save, getTutorialQuest(this.save).id, 'maraCallDueAt', this.tutorialMaraCallDue);
+            this.playStoryLine('Rin Vek', t('Rin has something to discuss.'), 'ally', 15000, 'tutorial-departure');
+            this.playTutorialBriefing('galaxy');
+            this.ui.showToast(t('The Second Light jumps ahead. Refit the Wayfarer and earn your crossing money before you follow.'), 'info', 7000);
         }
-        else if (stepId === 'plot-meridian') this.ui.showToast(t('Launch, then plot Meridian in the GALAXY view of your navigation map.'),'info',6000);
+        else if (stepId === 'cross-meridian-gate') {
+            // The player's own galaxy plot set the gate route; the tutorial
+            // must not stomp it (the local jump point would clear the plan).
+            // Crossing is the player's decision, on their own timetable.
+            this.ui.showToast(t('Meridian is plotted. Cross when you are ready.'), 'success', 6200);
+        }
         else if (stepId === 'complete') {
             const quest = getTutorialQuest(this.save);
             if (!quest.flags?.rewardGranted) {
@@ -1996,7 +2028,7 @@ export class GameSession {
             refreshMissionOffers(this.save);
             this.removeTutorialActors();
             this.setTutorialDestination('meridian-prime');
-            this.playTutorialBriefing('ending');
+            this.queueTutorialMaraCall();
             this.ui.pushEvent(t('FAMILY PROLOGUE COMPLETE · +{credits}', { credits: formatCredits(TUTORIAL_COMPLETION_REWARD) }), 'success', 7000);
         }
     }
@@ -2011,16 +2043,17 @@ export class GameSession {
         if(summary.stepId==='check-weapons')this.handleTutorialEvent('resume');
         summary = this.tutorialSummary();
         this.ensureTutorialDelivery();
-        if (!summary.stepId.startsWith('plot-') && summary.stepId !== 'launch-helix') this.setTutorialDestination(summary.destinationId);
+        if (!['galaxy-map','cross-meridian-gate'].includes(summary.stepId) && summary.stepId !== 'launch-helix') this.setTutorialDestination(summary.destinationId);
         if (!this.save.player.dockedAt && this.renderer) {
             this.ensureTutorialCompanion();
             if (summary.stepId === 'defeat-raider')
                 this.ensureTutorialEnemy();
             this.ensureTutorialFieldTarget();
             this.ensureTutorialCargo();
-            const briefing = {'plot-vesper':'navigation','flight-checks':'flight','check-weapons':'weapons','collect-cargo':'cargo','mine-shardbelt':'mining','salvage-black-box':'salvage','dock-cairn':'recorder','plot-meridian':'galaxy','cross-meridian-gate':'gate'}[summary.stepId];
+            const briefing = {'plot-vesper':'navigation','flight-checks':'flight','check-weapons':'weapons','collect-cargo':'cargo','mine-shardbelt':'mining','salvage-black-box':'salvage','dock-cairn':'recorder','galaxy-map':'galaxy'}[summary.stepId];
             if (briefing) this.playTutorialBriefing(briefing);
         }
+        this.queueTutorialMaraCall();
         return summary;
     }
     handleTutorialEvent(type, payload = {}) {
@@ -2039,6 +2072,34 @@ export class GameSession {
             this.ui.refreshDock(this.save);
         this.persistSave();
         return { ...result, summary: this.tutorialSummary() };
+    }
+    // Mara's own comms line for the lost-Rin stretch: fire once when her call
+    // becomes due. Ticked every second from updateTutorialRadio so ordinary
+    // earning (trades, mining, docking) counts toward the wait without each
+    // event site needing to know about the call. Opening as a story bar plus
+    // conversation keeps it out of the radio noise, and the transcript shows
+    // it under Mara's own portrait (openStoryAdventure matches her by name).
+    queueTutorialMaraCall() {
+        const quest = getTutorialQuest(this.save);
+        const summary = this.tutorialSummary();
+        const stepId = quest?.stepId;
+        if (!summary || summary.skipped || this.deathTimer > 0 || this.save.player.hull <= 0
+            || this.galaxyJump || this.ui.isModalOpen || this.storyLineActive()
+            || !['galaxy-map','cross-meridian-gate','complete'].includes(stepId)
+            || quest.flags?.maraCallMade || this.tutorialMaraCallOffered
+            || this.save.world.time < (this.nextTutorialMaraCallAt ?? 0)
+            || (this.pendingStoryConversations ?? []).some(entry => entry.conversationId === 'tutorial-handoff'))
+            return;
+        // Crossing ends the prologue: Mara's call is due the moment the
+        // Wayfarer reaches Meridian, whatever the earn-and-equip delay said.
+        // Session field wins while the page lives; the persisted flag covers
+        // resumes. Hand-crafted/fast-forwarded saves carry neither, so the
+        // speedrunner gets the call the moment it becomes due.
+        const maraCallDue = this.tutorialMaraCallDue ?? quest.flags?.maraCallDueAt ?? 0;
+        if (stepId !== 'complete' && this.save.world.time < maraCallDue)
+            return;
+        this.tutorialMaraCallOffered = true;
+        this.playStoryLine('Mara Vek', t('Incoming transmission · Mara Vek'), 'ally', 15000, 'tutorial-handoff');
     }
     skipTutorial() {
         const result = skipTutorialCampaign(this.save, this.save.world.time);
@@ -6314,7 +6375,7 @@ export class GameSession {
         }
         const jumpPoint = this.readyJumpPoint();
         const lesson = this.tutorialSummary();
-        if (lesson?.active && (lesson.stepId === 'plot-vesper' || lesson.stepId === 'flight-checks' || lesson.stepId === 'plot-meridian')) {
+        if (lesson?.active && (lesson.stepId === 'plot-vesper' || lesson.stepId === 'flight-checks' || lesson.stepId === 'galaxy-map')) {
             this.setHyperdriveStatus(t(lesson.objective),5000);
             return;
         }
@@ -6644,6 +6705,10 @@ export class GameSession {
     // Called every frame: lift the story mute when the player dismissed the
     // bar or the duration elapsed, and unpin the bar.
     refreshStoryLine() {
+        if (this.ui.storyDismissed && this.tutorialMaraCallOffered && this.ui.adventure?.conversationId !== 'tutorial-handoff' && !this.pendingStoryConversations?.some(entry=>entry.conversationId==='tutorial-handoff')) {
+            this.tutorialMaraCallOffered = false;
+            this.nextTutorialMaraCallAt = this.save.world.time + 12;
+        }
         if (this.ui.storyDismissed || (this.storyLineUntil !== undefined && this.save.world.time >= this.storyLineUntil)) {
             this.storyLineUntil = undefined;
             this.ui.dismissStory?.();
@@ -6651,7 +6716,10 @@ export class GameSession {
         }
         while (this.pendingStoryConversations?.length) {
             const next = this.pendingStoryConversations[0];
-            if (this.save.player.dockedAt || (next.tutorialStepId && next.tutorialStepId !== getTutorialQuest(this.save)?.stepId)) {
+            // The terminal debrief may arrive while hostiles are near and open
+            // at the next port instead of being discarded on dock.
+            const stale = next.conversationId !== 'tutorial-handoff' && next.tutorialStepId && next.tutorialStepId !== getTutorialQuest(this.save)?.stepId;
+            if ((this.save.player.dockedAt && next.conversationId !== 'tutorial-handoff') || stale) {
                 this.pendingStoryConversations.shift();
                 this.finishTutorialBriefing(next.conversationId, false);
                 continue;
@@ -6667,18 +6735,28 @@ export class GameSession {
         const now = this.save.world.time;
         if (now < (this.nextTutorialRadioCheck ?? 0)) return;
         this.nextTutorialRadioCheck = now + 1;
-        if (this.save.player.dockedAt || this.ui.isModalOpen
+        this.queueTutorialMaraCall();
+        // Route lore keeps playing after docking; the hyperdrive call must not
+        // fire inside the hangar where the button is out of reach.
+        const quest0 = getTutorialQuest(this.save);
+        const radioHoldDocked = this.save.player.dockedAt
+            && TUTORIAL_RADIO.some(entry => entry.cue === 'hyperdrive' && entry.step === quest0?.stepId);
+        if ((this.save.player.dockedAt && !radioHoldDocked) || this.ui.isModalOpen
             || this.deathTimer > 0 || this.galaxyJump || now < (this.flightDialogueAfter ?? 0)
             || this.storyLineActive() || this.pendingStoryConversations?.length) return;
         if (!isTutorialActive(this.save)) return this.updateTravelRadio();
         const summary = this.tutorialSummary();
         const hintKey = summary.stepId + ':' + (summary.lessonId ?? summary.progress ?? '');
-        if (['plot-vesper','flight-checks','check-weapons','collect-cargo','plot-meridian'].includes(summary.stepId)
+        if (['plot-vesper','flight-checks','check-weapons','collect-cargo','galaxy-map'].includes(summary.stepId)
             && this.lastTutorialHint !== hintKey && this.chatterOpen()) {
+            // Rin is ahead through the gate in the late prologue: the map
+            // hint still reads objective copy, but it can no longer be her
+            // voice — the player is alone with the radio silence.
             const text = summary.stepId === 'check-weapons'
                 ? t(getTutorialQuest(this.save).flags['weapon-B'] ? 'Now tap the weapon name again to return to group A.' : 'Tap the weapon name on the left monitor to select group B.')
                 : t(summary.detail);
-            this.ui.showPilotLine?.('Rin Vek',text,'ally',12000,true);
+            const speaker = summary.stepId === 'galaxy-map' ? 'Mara Vek' : 'Rin Vek';
+            this.ui.showPilotLine?.(speaker,text,'ally',12000,true);
             this.lastTutorialHint = hintKey;
             this.nextChatterAt = now + 15;
             return;
@@ -6699,6 +6777,9 @@ export class GameSession {
         }
         const radioPlaying = now < (this.tutorialRadioUntil ?? 0);
         if (!this.chatterOpen() && !radioPlaying) return;
+        // From Rin's departure on, the tutorial radio speaks with Mara's
+        // voice — the Second Light has gone quiet ahead of the gate.
+        const radioSpeaker = summary.stepId === 'cross-meridian-gate' ? 'Mara Vek' : 'Rin Vek';
         const quest = getTutorialQuest(this.save), player = this.save.player;
         const vesperDistance = Math.hypot(...player.position.map((value, i) => value - LOCATIONS.vesper.position[i]));
         const line = TUTORIAL_RADIO.find(entry => {
@@ -6722,7 +6803,7 @@ export class GameSession {
         this.tutorialRadioUntil = now + duration / 1000;
         this.nextChatterAt = this.tutorialRadioUntil + (line.cue ? 5 : 12);
         setFlag(this.save, quest.id, 'radio-' + line.id, true);
-        this.ui.showPilotLine?.('Rin Vek', text, 'ally', duration, true);
+        this.ui.showPilotLine?.(radioSpeaker, text, 'ally', duration, true);
         this.audio?.playComms?.('steady');
         this.persistSave();
     }

@@ -92,7 +92,7 @@ const advance = (save, type, payload = {}) => advanceTutorialCampaign(save, { ty
     const choiceSave = structuredClone(save);
     advance(choiceSave, 'choice', { choiceId: 'trust-rin' });
     assert.equal(getTutorialQuest(choiceSave).choices.recorder, 'trust-rin');
-    assert.equal(getTutorialQuest(choiceSave).stepId, 'plot-meridian');
+    assert.equal(getTutorialQuest(choiceSave).stepId, 'galaxy-map');
     advance(choiceSave,'map-selected',{kind:'system',id:'meridian'});
     assert.equal(getTutorialQuest(choiceSave).stepId, 'cross-meridian-gate');
     advance(choiceSave, 'system-arrived', { systemId: 'meridian', at: 42 });
@@ -100,13 +100,13 @@ const advance = (save, type, payload = {}) => advanceTutorialCampaign(save, { ty
     assert.equal(getTutorialQuest(choiceSave).completedAt, 42);
     assert.equal(choiceSave.world.campaignUnlocked, true);
     assert.equal(isTutorialActive(choiceSave), false);
-    assert.equal(tutorialCampaignSummary(choiceSave).chapter, 5);
+    assert.equal(tutorialCampaignSummary(choiceSave).chapter, 4);
 
     for (const choiceId of ['tell-mara', 'keep-recorder']) {
         const branch = structuredClone(save);
         advance(branch, 'choice', { choiceId });
         assert.equal(getTutorialQuest(branch).choices.recorder, choiceId);
-        assert.equal(getTutorialQuest(branch).stepId, 'plot-meridian');
+        assert.equal(getTutorialQuest(branch).stepId, 'galaxy-map');
     }
 }
 

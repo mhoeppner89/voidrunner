@@ -486,6 +486,9 @@ export const hydrateSave = (candidate) => {
     const sourceVersion = Number.isFinite(parsedVersion) ? parsedVersion : 1;
     // Copy the input: hydration must never mutate an imported save.
     candidate = JSON.parse(JSON.stringify(candidate));
+    // Preserve progress in careers saved before the tutorial map-step rename.
+    for (const quest of Array.isArray(candidate.quests) ? candidate.quests : [])
+        if (quest?.id === 'the-spare-key' && quest.stepId === 'plot-meridian') quest.stepId = 'galaxy-map';
     let retiredMiningCredit = 0;
     if (sourceVersion < 16 && candidate.player) {
         const player = candidate.player;

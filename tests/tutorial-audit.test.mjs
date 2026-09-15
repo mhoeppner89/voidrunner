@@ -98,7 +98,7 @@ test('each Cairn decision follows the account, survives reload and has a journal
         choose('plan');choose(branch);
         assert.equal(quest.stepId,'family-choice');
         ui.advanceAdventure(0);
-        assert.equal(quest.stepId,'plot-meridian');assert.equal(quest.choices.recorder,decision);
+        assert.equal(quest.stepId,'galaxy-map');assert.equal(quest.choices.recorder,decision);
         assert.ok(tutorialCampaignSummary(hydrateSave(JSON.parse(JSON.stringify(save)))).choiceLabel);
         if(decision==='tell-mara')assert.match(tutorialDialogue(save,'mara-vek'),/sent me the recording/);
     }
@@ -172,4 +172,49 @@ test('finishing each branch pays once and skipping never pays the completion rew
     }
     const {save,session}=fixture('mine-shardbelt');const before=save.player.credits;
     session.skipTutorial();assert.equal(save.player.credits,before);
+});
+test('Rin departs in person and Mara calls when the earn-and-equip stretch runs long',()=>{
+    globalThis.document??={activeElement:null};
+    const {save,session,quest,briefings}=fixture('galaxy-map');
+    save.player.dockedAt='cairn';
+    session.handleTutorialEvent('map-selected',{kind:'system',id:'meridian'});
+    assert.equal(quest.stepId,'cross-meridian-gate');
+    session.tutorialMaraCallDue=save.world.time+1000;
+    const during=briefings.length;
+    session.queueTutorialMaraCall();
+    assert.equal(briefings.length,during,'Mara stays quiet while the player is still earning');
+    session.tutorialMaraCallDue=save.world.time;
+    session.queueTutorialMaraCall();
+    assert.equal(briefings.length,during+1);
+    assert.equal(briefings[during][0],'Mara Vek');assert.equal(briefings[during][4],'tutorial-handoff');
+    const ui=Object.create(GameUI.prototype);ui.save=save;ui.dockLocation=undefined;ui.commsLog=[];
+    ui.root={querySelector:()=>({classList:{add(){},remove(){}}})};ui.renderAdventure=()=>{};ui.renderDock=()=>{};
+    ui.actions={talkToNpc:()=>assert.fail('Story cannot count as a bar greeting'),finishTutorialBriefing:(...args)=>session.finishTutorialBriefing(...args)};
+    ui.openStoryAdventure(briefings[during][0],briefings[during][1],briefings[during][2],briefings[during][4]);
+    assert.equal(ui.adventure.story,true);
+    assert.match(ui.adventureNode().text.en,/never called after the gate/);
+    ui.advanceAdventure(0);ui.advanceAdventure(0);ui.advanceAdventure(0);ui.advanceAdventure(0);
+    assert.equal(ui.adventure,undefined,'the call closes with the crossing task accepted');
+    const loaded=hydrateSave(JSON.parse(JSON.stringify(save)));
+    assert.equal(getTutorialQuest(loaded).flags.maraCallMade,true);
+});
+
+test('legacy map-step saves retain progress and all chapters fit the counter',()=>{
+ const {save,quest}=fixture('plot-meridian');const loaded=hydrateSave(JSON.parse(JSON.stringify(save)));
+ assert.equal(getTutorialQuest(loaded).stepId,'galaxy-map');assert.equal(quest.stepId,'plot-meridian','hydration does not mutate the source');
+ assert.equal(advanceTutorialCampaign(loaded,{type:'map-selected',kind:'system',id:'meridian'}).changed,true);
+ for(const step of Object.keys(TUTORIAL_STEPS)){getTutorialQuest(loaded).stepId=step;const s=tutorialCampaignSummary(loaded);assert.ok(s.chapter<=s.chapterCount,step);}
+});
+test('Mara call survives combat deferral, crossing and reload until acknowledged',()=>{
+ const {save,session,quest}=fixture('cross-meridian-gate');save.player.dockedAt=undefined;
+ session.ui={isModalOpen:true};session.hostilesVisibleNear=()=>true;session.playStoryLine=GameSession.prototype.playStoryLine;
+ session.queueTutorialMaraCall();assert.equal(session.pendingStoryConversations?.length??0,0,'do not interrupt an open menu');session.ui.isModalOpen=false;
+ session.queueTutorialMaraCall();assert.equal(session.pendingStoryConversations.length,1);assert.notEqual(quest.flags.maraCallMade,true);
+ quest.stepId='complete';session.refreshStoryLine();assert.equal(session.pendingStoryConversations.length,1);
+ session.queueTutorialMaraCall();assert.equal(session.pendingStoryConversations.length,1,'no duplicate pending calls');
+ const reloaded=fixture('complete');reloaded.session.save=hydrateSave(JSON.parse(JSON.stringify(save)));
+ reloaded.session.queueTutorialMaraCall();assert.equal(reloaded.briefings.length,1,'an undelivered call survives reload');
+ session.hostilesVisibleNear=()=>false;let shown=0;session.ui.showStoryLine=()=>shown++;session.refreshStoryLine();assert.equal(shown,1);
+ session.finishTutorialBriefing('tutorial-handoff',false);session.ui.storyDismissed=true;session.refreshStoryLine();save.world.time+=12;session.queueTutorialMaraCall();assert.equal(shown,2,'closing early permits retry');
+ session.finishTutorialBriefing('tutorial-handoff',true);session.queueTutorialMaraCall();assert.equal(shown,2);assert.equal(quest.flags.maraCallMade,true);
 });

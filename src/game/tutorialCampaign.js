@@ -3,21 +3,21 @@ import { completeQuest, getQuest, recordChoice, setFlag, setStep, startQuest } f
 export const TUTORIAL_QUEST_ID = 'the-spare-key';
 export const TUTORIAL_STARTING_CREDITS = 3500;
 export const TUTORIAL_REQUIRED_SUPPLIES = 2;
-export const TUTORIAL_CHAPTER_COUNT = 5;
+export const TUTORIAL_CHAPTER_COUNT = 4;
 
 const STEP_DEFINITIONS = {
     'meet-family': {
         chapter: 1,
         chapterTitle: 'The Spare Key',
         objective: 'Meet Mara and Rin in the Helix bar.',
-        detail: 'Open the Helix bar and finish your conversations with Mara and Rin. You can speak to them in either order.',
+        detail: 'Talk to Mara and Rin in the Helix bar, in either order.',
         destinationId: 'helix',
     },
     'buy-supplies': {
         chapter: 1,
         chapterTitle: 'The Spare Key',
         objective: 'Buy 2 Protein Packs at the Helix commodity market.',
-        detail: 'Open the Helix commodity market and buy two Protein Packs. Leave room in the hold; you can sell other cargo if it is full.',
+        detail: 'Open the Helix commodity market and buy two Protein Packs. If the hold is full, sell other cargo first.',
         destinationId: 'helix',
     },
     'launch-helix': {
@@ -30,106 +30,106 @@ const STEP_DEFINITIONS = {
     'fit-upgrade': {
         chapter: 1, chapterTitle: 'The Spare Key',
         objective: 'Fit Rin’s spare radar at the Helix outfitter.',
-        detail: 'At the market, enter Ship Outfitting. Open Ship Systems, tap an empty utility slot and choose the owned Long-Baseline Radar. Install it at no charge.',
+        detail: 'Enter Ship Outfitting at the market, open Ship Systems and install the owned Long-Baseline Radar in a free utility slot.',
         destinationId: 'helix',
     },
     'plot-vesper': {
         chapter: 2, chapterTitle: 'Family Business',
         objective: 'Select Vesper on the navigation map.',
-        detail: 'Tap the centre radar to open the navigation map. In SECTOR, tap VESPER. The gold mission label marks your destination; selecting it sets the flight vector.',
+        detail: 'Tap the centre radar and select VESPER on the sector chart. The gold mission marker marks the destination.',
         destinationId: 'vesper',
     },
     'flight-checks': {
         chapter: 2, chapterTitle: 'Family Business',
         objective: 'Try the flight controls with Rin.',
-        detail: 'Practise thrust, steering, a short afterburner burst and the two cockpit monitors before engaging hyperdrive.',
+        detail: 'Practise thrust, steering, a short afterburner burst and both cockpit monitors before engaging hyperdrive.',
         destinationId: 'vesper',
     },
     'fly-vesper': {
         chapter: 2,
         chapterTitle: 'Family Business',
         objective: 'Fly to Vesper Colony and land.',
-        detail: 'You have plotted Vesper. Aim at its marker and engage HYPERDRIVE. After arrival, keep Vesper selected and approach slowly for automatic landing. Tap the centre radar to choose another destination.',
+        detail: 'Vesper is plotted. Engage HYPERDRIVE, then approach slowly with Vesper selected for automatic landing.',
         destinationId: 'vesper',
     },
     'sell-supplies': {
         chapter: 2,
         chapterTitle: 'Family Business',
         objective: 'Sell the 2 Protein Packs at Vesper.',
-        detail: 'Open the Vesper commodity market and sell two Protein Packs from your hold. You can sell them separately or together.',
+        detail: 'Sell two Protein Packs at the Vesper commodity market.',
         destinationId: 'vesper',
     },
     'mine-shardbelt': {
         chapter: 3,
         chapterTitle: 'Blood in the Belt',
         objective: 'Recover 1 unit of ore from the Shardbelt.',
-        detail: 'Use hyperdrive to reach the Shardbelt. A deposit is selected on arrival. Approach slowly, wait for its automatic scan, and tap MINE within range to send your drones. Wait for them to bring one ore aboard. Tap RECALL to recover them; hyperdrive waits for their return.',
+        detail: 'Hyperdrive to the Shardbelt. Approach the marked deposit until the automatic scan completes, then tap MINE to deploy your drones. Tap RECALL before leaving; hyperdrive waits for their return.',
         destinationId: 'shardbelt',
     },
     'service-ship': {
         chapter: 2, chapterTitle: 'Family Business',
         objective: 'Check the Wayfarer at Vesper’s service desk.',
-        detail: 'Open SERVICES on the concourse. Refill fuel and ordnance, and repair the hull if needed. Shields and energy recharge in flight; hull damage needs dock repairs.',
+        detail: 'Open SERVICES and refill fuel and ordnance; repair the hull if needed. Shields recharge in flight, hull does not.',
         destinationId: 'vesper',
     },
     'check-weapons': {
         chapter: 3, chapterTitle: 'Blood in the Belt',
         objective: 'Prepare for combat.',
-        detail: 'Your beam lasers use regenerating energy. Release fire briefly if the capacitor runs low. Only missiles need ammunition.',
+        detail: 'Your beam lasers draw on regenerating energy. Release fire briefly if the capacitor runs low. Only missiles need ammunition.',
         destinationId: 'shardbelt',
     },
     'collect-cargo': {
         chapter: 3, chapterTitle: 'Blood in the Belt',
         objective: 'Collect the marked cargo crate.',
-        detail: 'The crate is selected. Approach it slowly; cargo is collected automatically at close range. The left monitor opens your hold, where you can jettison unwanted goods if it is full.',
+        detail: 'Approach the marked crate slowly; it is collected automatically at close range. The left monitor opens your hold.',
         destinationId: 'shardbelt',
     },
     'defeat-raider': {
         chapter: 3,
         chapterTitle: 'Blood in the Belt',
         objective: 'Defeat Ash Moth.',
-        detail: 'Ash Moth is selected and combat mode is active. Aim and hold FIRE with a clear line of sight. Missiles are optional. Rin helps if the fight drags on or your hull is badly damaged.',
+        detail: 'Ash Moth is selected and combat mode is active. Hold FIRE with a clear line of sight. Rin helps if the fight drags on.',
         destinationId: 'shardbelt',
     },
     'salvage-black-box': {
         chapter: 4,
         chapterTitle: 'What the Wreck Kept',
         objective: 'Recover the marked salvage in Mourning Line.',
-        detail: 'Use the navigation map to select CONVOY RECORDER SIGNAL in the contact list. Its mission beacon stays visible beyond sensor range. Hyperdrive takes you to Mourning Line; then follow the marker, wait for the automatic scan and hold SALVAGE within range.',
+        detail: 'Select CONVOY RECORDER SIGNAL in the map contacts, hyperdrive to Mourning Line, then hold SALVAGE within range of the marker.',
         destinationId: 'mourning-line',
     },
     'dock-cairn': {
         chapter: 4,
         chapterTitle: 'What the Wreck Kept',
         objective: 'Dock at Cairn Yard and confront Rin.',
-        detail: 'The carrier recorder contains your mother’s radio transmissions. Select Cairn Yard and approach slowly to dock, then talk to Rin about the evacuation.',
+        detail: 'The carrier recorder holds your mother’s radio transmissions. Select Cairn Yard and approach slowly to dock.',
         destinationId: 'cairn',
     },
     'family-choice': {
         chapter: 4,
         chapterTitle: 'What the Wreck Kept',
         objective: 'Decide what to do with the recorder.',
-        detail: 'Talk to Rin at the Cairn berth. Ask about the evacuation and the recording before deciding what to tell Mara. You can leave the conversation and return before choosing.',
+        detail: 'Talk to Rin at the Cairn berth. You can leave the conversation and return before deciding.',
+        destinationId: 'cairn',
+    },
+    'galaxy-map': {
+        chapter: 4, chapterTitle: 'What the Wreck Kept',
+        objective: 'Plot the Meridian gate on the galaxy map.',
+        detail: 'Launch, open the GALAXY map and select MERIDIAN once, then close it. The gate route stays saved for later.',
         destinationId: 'cairn',
     },
     'cross-meridian-gate': {
-        chapter: 5,
-        chapterTitle: 'The Other Version',
-        objective: 'Cross the Helios–Meridian jump gate.',
-        detail: 'The route to Meridian is set. Use hyperdrive to reach the Helios–Meridian jump point, then steer through the gate opening under normal thrust.',
-        destinationId: 'meridian-prime',
-    },
-    'plot-meridian': {
-        chapter: 5, chapterTitle: 'The Other Version',
-        objective: 'Plot Meridian using the galaxy map.',
-        detail: 'Launch from Cairn. Tap the centre radar, choose GALAXY and select MERIDIAN. The navigation computer sets the Helios–Meridian gate as the next local waypoint.',
-        destinationId: 'meridian-prime',
+        chapter: 4,
+        chapterTitle: 'What the Wreck Kept',
+        objective: 'Cross the Helios–Meridian jump gate to look for Rin.',
+        detail: 'Rin went ahead and has gone quiet. When you are ready, plot Meridian and cross the gate.',
+        destinationId: 'verge-meridian-point',
     },
     complete: {
-        chapter: 5,
-        chapterTitle: 'The Other Version',
+        chapter: 4,
+        chapterTitle: 'What the Wreck Kept',
         objective: 'The prologue is complete.',
-        detail: 'You reached Meridian and recovered a recording that contradicts the evacuation report. The original ledger remains an unresolved lead. You can now explore, trade, race and take local contracts.',
+        detail: 'Mara is waiting for word from Rin. Find her, keep the Wayfarer flying, and explore, trade, race and take contracts on your own terms.',
         destinationId: 'meridian-prime',
     },
 };
@@ -139,11 +139,11 @@ export const TUTORIAL_STEPS = Object.freeze(Object.fromEntries(
 ));
 
 export const TUTORIAL_FLIGHT_LESSONS = [
-    {id:'thrust', objective:'Raise the thrust slider and get moving.', detail:'The slider on the left sets your speed. Raise it until you are moving, then ease it back to slow down.'},
-    {id:'steering', objective:'Turn the Wayfarer using the joystick or tilt controls.', detail:'Make a gentle turn. The marker at the edge of the canopy points toward a selected target that is outside your view.'},
-    {id:'boost', objective:'Hold the gold afterburner button for a short burst.', detail:'Set the thrust slider to full. Once you reach cruising speed, hold the gold button for two seconds. Afterburner consumes fuel. Ordinary thrust and hyperdrive do not.'},
-    {id:'target-monitor', objective:'Tap the right target monitor to cycle contacts.', detail:'The right monitor cycles targets and shows distance, scan results and enemy shields and hull. Selecting a ship keeps your route. Selecting a location also changes your flight vector.'},
-    {id:'ship-monitor', objective:'Open the left ship monitor and review your ship.', detail:'Tap the left monitor below the weapon readout. Review your hull, energy, cargo and mission objective, then close it to resume flight.'},
+    {id:'thrust', objective:'Raise the thrust slider and get moving.', detail:'The slider on the left sets your speed.'},
+    {id:'steering', objective:'Turn the Wayfarer using the joystick or tilt controls.', detail:'The marker at the canopy edge points toward a selected target outside your view.'},
+    {id:'boost', objective:'Hold the gold afterburner button for a short burst.', detail:'Full thrust, then hold the gold button for two seconds. Afterburner consumes fuel; ordinary thrust does not.'},
+    {id:'target-monitor', objective:'Tap the right target monitor to cycle contacts.', detail:'The right monitor cycles targets and shows distance, scan results and enemy shields and hull.'},
+    {id:'ship-monitor', objective:'Open the left ship monitor and review your ship.', detail:'Hull, energy, cargo and the mission objective are on the left monitor.'},
 ];
 
 const choices = new Set(['tell-mara', 'trust-rin', 'keep-recorder']);
@@ -320,9 +320,9 @@ export const advanceTutorialCampaign = (save, event = {}) => {
         return transition(save, quest, 'family-choice');
     if (stepId === 'family-choice' && type === 'choice' && choices.has(event.choiceId)) {
         recordChoice(save, TUTORIAL_QUEST_ID, 'recorder', event.choiceId);
-        return transition(save, quest, 'plot-meridian');
+        return transition(save, quest, 'galaxy-map');
     }
-    if (stepId === 'plot-meridian' && type === 'map-selected' && event.kind === 'system' && event.id === 'meridian')
+    if (stepId === 'galaxy-map' && type === 'map-selected' && event.kind === 'system' && event.id === 'meridian')
         return transition(save,quest,'cross-meridian-gate');
     if (stepId === 'cross-meridian-gate' && type === 'system-arrived' && event.systemId === 'meridian') {
         const result = transition(save, quest, 'complete');
@@ -367,7 +367,7 @@ export const tutorialCampaignSummary = (save) => {
         progress,
         choice: quest.choices?.recorder,
         choiceLabel: {
-            'tell-mara':'You asked Rin to send Mara the recording and an explanation.',
+            'tell-mara':'You asked Rin to send Mara the recording.',
             'trust-rin':'You chose to trust Rin and keep investigating together.',
             'keep-recorder':'You kept the recorder and reserved your judgment.',
         }[quest.choices?.recorder],
@@ -396,6 +396,8 @@ export const tutorialDialogue = (save, personId) => {
             return 'The ship is yours, but Rin is still pretending this is only a delivery run. Talk to your sister before either of you leaves.';
         if (quest.stepId === 'buy-supplies' || quest.stepId === 'launch-helix')
             return 'Two Protein Packs for Vesper. Small work, honest work. That is how this family keeps a ship flying.';
+        if (['galaxy-map','cross-meridian-gate'].includes(quest.stepId))
+            return 'No word from Rin since she jumped. Go find her when the Wayfarer is ready.';
         return 'Bring each other home. Whatever else the Vek name means, it has to mean that.';
     }
     if (personId === 'rin-vek') {
@@ -407,5 +409,7 @@ export const tutorialDialogue = (save, personId) => {
             return 'I will be outside the dock. You fly the Wayfarer; I will follow your lead.';
         return 'We can take our time. Check the route when you are ready; I will stay close.';
     }
+    // Rin is ahead through the gate: Mara's block above carries the worrying
+    // lines so the silence reads as the story while the player prepares.
     return undefined;
 };

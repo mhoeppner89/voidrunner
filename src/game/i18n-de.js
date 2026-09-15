@@ -51,7 +51,6 @@ export const DE_CATALOG = {
     "ORE {ore} · HOLD {cargo}/{capacity}": "ERZ {ore} · FRACHT {cargo}/{capacity}",
     "GOLD FOUND · Free cargo space to collect it": "GOLD GEFUNDEN · Schaffe Frachtraum zum Einsammeln",
     "MINING TEST · Tap MINE or press M. Hyperdrive recalls your drones. Reload to reset.": "BERGBAUTEST · Tippe MINE oder drücke M. Der Hyperantrieb ruft die Drohnen zurück. Neuladen setzt den Test zurück.",
-    "Use hyperdrive to reach the Shardbelt. A deposit is selected on arrival. Approach slowly, wait for its automatic scan, and tap MINE within range to send your drones. Wait for them to bring one ore aboard. Tap RECALL to recover them; hyperdrive waits for their return.": "Fliege per Hyperantrieb zum Shardbelt. Bei Ankunft wird ein Vorkommen ausgewählt. Nähere dich langsam und warte auf den automatischen Scan. Tippe in Reichweite auf MINE. Warte, bis die Drohnen Erz abliefern. ZURÜCK ruft sie heim; der Hyperantrieb wartet auf ihre Rückkehr.",
 
     'DRONE BAYS': 'DROHNENBUCHTEN',
     'DRONE {number}': 'DROHNE {number}',
@@ -123,38 +122,9 @@ export const DE_CATALOG = {
     'Battery saving · 30 FPS': 'Stromsparend · 30 FPS',
     'Smoother motion · 60 FPS': 'Flüssiger · 60 FPS',
     'Automatic saves power on phones. Choose 60 FPS for smoother motion with higher power use.': 'Automatisch spart auf Smartphones Strom. Wähle 60 FPS für flüssigere Bewegungen bei höherem Stromverbrauch.',
-    "A cheap offer at Blackglass may need an expensive escort. Work out the cost of the whole route before accepting.": "Ein günstiges Angebot in Blackglass kann einen teuren Begleitschutz brauchen. Rechnet die ganze Strecke durch, bevor ihr zusagt.",
-    "A note for new traders: strong demand does not guarantee a profit. Compare your purchase price with the destination's offer before filling the hold.": "Ein Hinweis für neue Händler: Eine hohe Nachfrage ist kein garantierter Gewinn. Vergleicht den Einkaufspreis mit dem Angebot am Ziel, bevor ihr den Frachtraum füllt.",
-    "Anyone finding personal belongings in the wreck field should record the location. Families are still searching for traces of missing crew members.": "Wer im Wrackfeld persönliche Gegenstände findet, soll die Fundstelle dokumentieren. Angehörige suchen noch immer nach Spuren vermisster Besatzungsmitglieder.",
-    "Argent does not only process fresh ore. Sorted scrap from the outer colonies goes straight back into production. Some ships are older than their build dates suggest.": "Argent verarbeitet nicht nur frisches Erz. Sortierter Schrott aus den Außenkolonien geht direkt zurück in die Fertigung. Manche Schiffe sind älter als ihr Baujahr vermuten lässt.",
-    "Boreal has water in abundance. The difficult part is processing and shipping it. Every full tank represents weeks of work beneath the ice.": "Boreal hat Wasser im Überfluss. Der schwierige Teil ist, es aufzubereiten und zu verschiffen. Hinter jeder vollen Tankladung stehen Wochen Arbeit unter dem Eis.",
-    "Cairn lives off its salvage crews. Many of the mechanics also work out among the wrecks. They notice fairly quickly when someone leaves part of a story out.": "Cairn lebt von den Bergungstrupps. Viele Mechaniker arbeiten selbst draußen an den Wracks. Sie verstehen ziemlich schnell, wenn jemand beim Erzählen etwas auslässt.",
-    "Cairn's book of remembrance remains open to visitors. Anyone wishing to add a name can contact the port office.": "Das Erinnerungsbuch in Cairn bleibt für Besucher geöffnet. Wer einen Namen ergänzen möchte, kann sich bei der Hafenverwaltung melden.",
-    "Clearance does not prove a ship arrived. We will need to compare the departure lists with the arrival records.": "Eine Freigabe beweist noch nicht, dass ein Schiff auch angekommen ist. Wir müssen die Abfluglisten mit den Ankunftsprotokollen vergleichen.",
-    "Freighters from Azure Reach are being handled at the outer docks. The new harvest has arrived. Please keep the approach clear for refrigerated containers.": "Frachter aus Azure Reach werden an den äußeren Docks abgefertigt. Die neue Ernte ist eingetroffen. Bitte haltet die Zufahrt für die Kühlcontainer frei.",
-    "I am glad you are here today. On my own, I would probably have found another reason not to look.": "Ich bin froh, dass du heute dabei bist. Allein hätte ich wahrscheinlich wieder einen Grund gefunden, nicht nachzusehen.",
-    "Leave the recording as it is for now. I have filled in so many gaps in my head that I need to be careful about what I actually heard.": "Lass die Aufnahme vorerst unverändert. Ich habe sie so oft im Kopf ergänzt, dass ich selbst aufpassen muss, was ich wirklich gehört habe.",
-    "Mara knew our mother when they were children. When she tells those stories, it sometimes takes me a while to work out who started the trouble.": "Mara kannte unsere Mutter schon als Kind. Wenn sie von früher erzählt, erkenne ich manchmal erst nach einer Weile, von wem der Ärger ausgegangen ist.",
-    "Meridian processes much of what is mined here. Machinery and electronics come back the other way. The gates connect more than star systems.": "Meridian verarbeitet viel von dem, was hier abgebaut wird. Auf dem Rückweg kommen Maschinen und Elektronik. Die Tore verbinden mehr als nur Sternsysteme.",
-    "Our mother hated throwing things away. A broken pump housing became a flowerpot at home. Mara still keeps it behind the bar.": "Unsere Mutter hat nie gern etwas weggeworfen. Aus einem kaputten Pumpengehäuse wurde bei uns ein Blumentopf. Mara hat ihn noch hinter der Bar stehen.",
-    "Our workshop asks for patience. Two salvage ships have reported damaged coolant lines. Parts recovered from old wrecks are checked individually before fitting.": "Unsere Werkstatt bittet um Geduld. Zwei Bergungsschiffe haben beschädigte Kühlleitungen gemeldet. Ersatzteile aus alten Wracks werden vor dem Einbau einzeln geprüft.",
-    "Please keep your transponder on during approach. Customs matches your identity with your cargo. A missing identity does not shorten the inspection.": "Bitte lasst den Transponder im Anflug eingeschaltet. Die Zollkontrolle gleicht eure Kennung mit der Ladung ab. Eine fehlende Kennung verkürzt die Kontrolle nicht.",
-    "Survey ships report changing passages through the dense ring bands. Older coordinates are only a guide. Leave room around drifting ice on approach.": "Vermessungsschiffe melden veränderte Durchflüge in den dichten Ringbändern. Ältere Koordinaten sind nur ein Anhaltspunkt. Haltet beim Anflug genug Abstand zu den Eisbrocken.",
-    "The Salvage Union records where each piece was found. Without those records, it would be almost impossible to tell which ship it came from.": "Die Bergungsunion führt Buch darüber, wo jedes Teil gefunden wurde. Ohne diese Aufzeichnungen wäre später kaum noch festzustellen, zu welchem Schiff es gehört hat.",
-    "The belt's markers were left by different crews. Some mark clear passages, others mining sites. That is why we check what the target monitor has actually identified.": "Die Markierungen im Gürtel stammen von verschiedenen Besatzungen. Einige zeigen sichere Durchflüge, andere Abbaustellen. Deshalb prüfen wir immer, was der Zielmonitor tatsächlich erkannt hat.",
-    "The big companies want continuous deposits. Small leftover seams can still pay for us. We do not have a whole fleet to support.": "Die großen Firmen suchen zusammenhängende Lagerstätten. Für uns können sich auch kleine Restadern lohnen. Wir müssen schließlich keine ganze Flotte bezahlen.",
-    "The carrier recorded the shared radio channel. If its recorder is still readable, we may hear more than its own crew's final words.": "Der Träger hat den gemeinsamen Funkkanal aufgezeichnet. Wenn sein Rekorder noch lesbar ist, hören wir vielleicht mehr als die letzten Worte seiner eigenen Besatzung.",
-    "The clinic has requested more refrigerated containers. Medical shipments can only be accepted with their transport seals intact.": "Die Klinik hat weitere Kühlbehälter angefordert. Medikamente können nur angenommen werden, wenn die Transportversiegelung unbeschädigt ist.",
-    "The first habitats stood beside the landing pads. Cargo arrived before there were roads. That is why the commodity market is still by the port.": "Die ersten Wohnkuppeln standen direkt neben den Anlegestellen. Die Fracht kam an, bevor es Straßen gab. Deshalb liegt die Warenbörse heute noch am Hafen.",
-    "The late shift at the smelters will start an hour later. The port asks arriving crews to report repair needs before unloading.": "Die Spätschicht in den Schmelzwerken beginnt eine Stunde später. Der Hafen bittet ankommende Besatzungen, Reparaturbedarf noch vor dem Entladen anzumelden.",
-    "The outer residential rings remain dependent on freight deliveries. The administration asks for water and medical shipments to be handled first.": "Die Versorgung der äußeren Wohnringe bleibt vom Frachtverkehr abhängig. Die Verwaltung bittet darum, Lieferungen von Wasser und Medikamenten zuerst abzufertigen.",
-    "The replacement pump is on its way. Until it is fitted, the refinery is running at reduced output. The workshop asks crews to set usable seals aside from other scrap.": "Die Ersatzpumpe ist unterwegs. Bis sie eingebaut ist, läuft die Raffinerie mit verminderter Leistung. Die Werkstatt bittet, brauchbare Dichtungen nicht mit dem übrigen Schrott abzugeben.",
-    "Water filters and replacement valves are still needed. The new residential sections are finished, but their doors stay closed until supplies arrive.": "Gesucht werden weiterhin Wasserfilter und Ersatzventile. Die neuen Wohnbereiche sind fertig, aber ohne Versorgung bleiben ihre Türen geschlossen.",
-    "We do not have to carry the same cargo back. Vesper has plenty of ore and too little food. A good trade starts with listening to people.": "Beim Rückflug müssen wir nicht dieselbe Ware mitnehmen. Vesper hat reichlich Erz, aber wenig Nahrung. Ein guter Handel fängt damit an, dass man den Leuten zuhört.",
-    "We only take what we can recover safely. Another accident would help nobody here.": "Wir nehmen nur mit, was wir sicher bergen können. Ein weiterer Unfall würde hier niemandem helfen.",
-    "Yard traffic has priority in the test corridor. The new frigates are testing braking manoeuvres today. Even a ship that looks slow can need plenty of room.": "Werftverkehr hat im Testkorridor Vorrang. Die neuen Fregatten fliegen heute Bremsmanöver. Auch ein Schiff, das langsam aussieht, kann viel Platz brauchen.",
+
     "Helix traffic control": "Helix-Flugkontrolle",
-    "Vesper local radio": "Vesper-Lokalfunk",
+
     "Salvage Union radio": "Funk der Bergungsunion",
     "Cairn local radio": "Cairn-Lokalfunk",
     "Merchant radio": "Händlerfunk",
@@ -176,29 +146,27 @@ export const DE_CATALOG = {
     "Fit Rin’s spare radar at the Helix outfitter.": "Baue Rins Ersatzradar in der Schiffsausrüstung auf Helix ein.",
     "At the market, enter Outfitting. Choose the Long-Baseline Radar from your locker, select a compatible utility mount and install it. The quote should show no purchase cost.": "Geh auf dem MARKTPLATZ zur SCHIFFSAUSRÜSTUNG. Wähle unter LAGER das Langstreckenradar und eine freie Halterung für Hilfssysteme. Bestätige mit AUS LAGER EINBAUEN. Das Radar gehört dir bereits; der Einbau kostet nichts.",
     "Select Vesper on the navigation map.": "Wähle Vesper auf der NAV-KARTE aus.",
-    "Tap the centre radar to open the navigation map. In SECTOR, tap VESPER. The gold mission label marks your destination; selecting it sets the flight vector.": "Tippe auf das mittlere Radar, um die NAV-KARTE zu öffnen. Wähle unter SEKTOR den Punkt VESPER. Die goldene Missionsmarkierung zeigt dein Ziel. Durch Antippen setzt du den Flugvektor.",
+
     "Try the flight controls with Rin.": "Probiere mit Rin die Flugsteuerung aus.",
-    "Practise thrust, steering, a short afterburner burst and the two cockpit monitors before engaging hyperdrive.": "Probiere Schub, Steuerung, einen kurzen Nachbrennerstoß und die beiden Cockpitmonitore aus, bevor du den Hyperdrive aktivierst.",
-    "You have plotted Vesper. Aim at its marker and engage HYPERDRIVE. After arrival, keep Vesper selected and approach slowly for automatic landing. Tap the centre radar to choose another destination.": "Der Kurs nach Vesper steht. Richte dich auf die Markierung aus und aktiviere den HYPERDRIVE. Lass Vesper nach der Ankunft angewählt und nähere dich langsam für die automatische Landung. Über das mittlere Radar kannst du ein anderes Ziel wählen.",
+
     "Check the Wayfarer at Vesper’s service desk.": "Überprüfe die Wayfarer beim Service von Vesper.",
-    "Open SERVICES on the concourse. Refill fuel and ordnance, and repair the hull if needed. Shields and energy recharge in flight; hull damage needs dock repairs.": "Öffne SERVICE in der DOCKHALLE. Fülle Treibstoff und Munition auf und lass bei Bedarf die Hülle reparieren. Schilde und Energie laden sich im Flug wieder auf. Hüllenschäden musst du im Hafen reparieren lassen.",
+
     "Try both weapon groups before continuing.": "Probiere beide Waffengruppen aus, bevor es weitergeht.",
     "Tap the weapon name on the left monitor to switch fire groups. Select B, then A. The factory Wayfarer carries the ammunition-fed magrail in B and the pulse gun in A.": "Tippe auf den Waffennamen im linken Monitor, um die Feuergruppe zu wechseln. Wähle B und dann A. Ab Werk liegt die Magnetkanone in B und die Impulskanone in A.",
     "Collect the marked cargo crate.": "Sammle die markierte Frachtkiste ein.",
-    "The crate is selected. Approach it slowly; cargo is collected automatically at close range. The left monitor opens your hold, where you can jettison unwanted goods if it is full.": "Die Kiste ist angewählt. Nähere dich langsam. Fracht wird aus kurzer Entfernung automatisch aufgenommen. Über den linken Monitor öffnest du den Laderaum. Ist er voll, kannst du dort entbehrliche Waren abwerfen.",
-    "Use the navigation map to select CONVOY RECORDER SIGNAL in the contact list. Its mission beacon stays visible beyond sensor range. Hyperdrive takes you to Mourning Line; then follow the marker, wait for the automatic scan and hold SALVAGE within range.": "Wähle auf der NAV-KARTE das REKORDERSIGNAL DES KONVOIS in der Kontaktliste. Die Missionsbake bleibt auch außerhalb der Sensorreichweite sichtbar. Fliege per Hyperdrive zur Mourning Line und folge dann der Markierung. Warte den automatischen Scan ab und halte in Reichweite BERGEN gedrückt.",
+
     "Plot Meridian using the galaxy map.": "Plane den Kurs nach Meridian auf der Galaxiekarte.",
-    "Launch from Cairn. Tap the centre radar, choose GALAXY and select MERIDIAN. The navigation computer sets the Helios–Meridian gate as the next local waypoint.": "Starte von Cairn. Tippe auf das mittlere Radar, öffne GALAXIS und wähle MERIDIAN. Der Navigationscomputer setzt das Helios–Meridian-Tor als nächsten Wegpunkt im System.",
+
     "Raise the thrust slider and get moving.": "Schiebe den Schubregler nach oben und setze dich in Bewegung.",
-    "The slider on the left sets your speed. Raise it until you are moving, then ease it back to slow down.": "Mit dem Regler links stellst du deine Geschwindigkeit ein. Schiebe ihn nach oben, bis du dich bewegst, und nimm ihn zum Abbremsen wieder zurück.",
+
     "Turn the Wayfarer using the joystick or tilt controls.": "Drehe die Wayfarer mit dem Joystick oder der Neigungssteuerung.",
-    "Make a gentle turn. The marker at the edge of the canopy points toward a selected target that is outside your view.": "Fliege eine sanfte Kurve. Die Markierung am Rand der Kanzel weist zu einem angewählten Ziel, das gerade außerhalb deines Blickfelds liegt.",
+
     "Hold the gold afterburner button for a short burst.": "Halte die goldene Nachbrennertaste für einen kurzen Schubstoß gedrückt.",
-    "Set the thrust slider to full. Once you reach cruising speed, hold the gold button for two seconds. Afterburner consumes fuel. Ordinary thrust and hyperdrive do not.": "Schiebe den Schubregler ganz nach oben. Halte bei voller Reisegeschwindigkeit die goldene Taste zwei Sekunden lang gedrückt. Der Nachbrenner verbraucht Treibstoff. Normaler Schub und Hyperdrive verbrauchen keinen.",
+
     "Tap the right target monitor to cycle contacts.": "Tippe auf den rechten Zielmonitor, um zwischen Kontakten zu wechseln.",
-    "The right monitor cycles targets and shows distance, scan results and enemy shields and hull. Selecting a ship keeps your route. Selecting a location also changes your flight vector.": "Durch Antippen des rechten Monitors wechselst du das Ziel. Er zeigt Entfernung, Scanergebnisse sowie Schilde und Hülle anderer Schiffe. Ein Schiffsziel lässt deinen Kurs unverändert. Wählst du einen Ort, setzt du auch den Kurs dorthin.",
+
     "Open the left ship monitor and review your ship.": "Öffne den linken Schiffsmonitor und sieh dir dein Schiff an.",
-    "Tap the left monitor below the weapon readout. Review your hull, energy, cargo and mission objective, then close it to resume flight.": "Tippe im linken Monitor unterhalb der Waffenanzeige. Schau dir Hülle, Energie, Fracht und Missionsziel an und schließe die Übersicht danach, um weiterzufliegen.",
+
     "RIN’S MINING MARKER": "RINS ABBAUMARKIERUNG",
     "CONVOY RECORDER SIGNAL": "REKORDERSIGNAL DES KONVOIS",
     "RECOVERED CARGO": "GEBORGENE FRACHT",
@@ -209,7 +177,7 @@ export const DE_CATALOG = {
     "Visit SERVICES and finish the ship check before launching.": "Geh vor dem Start zum SERVICE und lass Treibstoff, Munition und Hülle prüfen.",
     "Install Rin’s radar before selling it.": "Baue Rins Radar zuerst ein, bevor du es verkaufst.",
     "Keep a gun in both fire groups for Rin’s weapon lesson.": "Lass für Rins Waffenübung eine Kanone in jeder Feuergruppe.",
-    "Launch, then plot Meridian in the GALAXY view of your navigation map.": "Starte und wähle dann Meridian unter GALAXIS auf deiner NAV-KARTE.",
+
     "Now tap the weapon name again to return to group A.": "Tippe jetzt noch einmal auf den Waffennamen, um zu Gruppe A zurückzukehren.",
     "Tap the weapon name on the left monitor to select group B.": "Tippe auf den Waffennamen im linken Monitor, um Gruppe B auszuwählen.",
     "Your energy is running low. Release the trigger and let the reactor recharge. Your shields need that energy too.": "Deine Energie wird knapp. Lass den Feuerknopf los, damit der Reaktor den Speicher wieder aufladen kann. Auch die Schilde brauchen diese Energie.",
@@ -218,16 +186,7 @@ export const DE_CATALOG = {
     'Pilot of the Second Light': 'Pilotin der Second Light',
     'Your aunt · your mother’s sister': 'Deine Tante · die Schwester deiner Mutter',
     'The ship is yours, but Rin is still pretending this is only a delivery run. Talk to your sister before either of you leaves.': 'Das Schiff gehört dir, aber Rin tut noch so, als wäre das nur ein Lieferflug. Sprich mit deiner Schwester, bevor ihr aufbrecht.',
-    'You are lined up with Vesper. Engage HYPERDRIVE when you are ready; I will stay with you.': 'Du bist auf Vesper ausgerichtet. Aktiviere den HYPERDRIVE, wenn du bereit bist. Ich bleibe bei dir.',
-    'That is Vesper ahead. Keep it selected and ease the throttle forward. The landing system takes over as you approach.': 'Vor uns liegt Vesper. Lass die Kolonie angewählt und gib vorsichtig Schub. Beim Anflug übernimmt das Landesystem.',
-    'Vesper keeps adding new habitats, but its farms cannot feed everyone yet. That is why Mara sends protein out here.': 'Vesper baut immer neue Wohnkuppeln, aber die Farmen können noch nicht alle ernähren. Deshalb schickt Mara Protein hierher.',
-    'Our mother used to bring us back sweets from these runs. Mara always knew. Apparently, hiding cargo from your aunt takes more skill than flying it.': 'Unsere Mutter brachte uns von diesen Flügen immer Süßigkeiten mit. Mara wusste jedes Mal Bescheid. Fracht vor der eigenen Tante zu verstecken ist wohl schwerer, als sie zu fliegen.',
-    'Our mother taught me to read this belt. Watch the rocks turning as we approach; the gaps move with them.': 'Unsere Mutter hat mir beigebracht, mich in diesem Gürtel zurechtzufinden. Beobachte beim Anflug die Drehung der Felsen. Die Lücken bewegen sich mit ihnen.',
-    'Cairn buys ore from small crews like ours. Learning to work the belt gives you a way to pay for fuel when the trade prices are poor.': 'Cairn kauft Erz von kleinen Besatzungen wie unserer. Wenn du im Gürtel arbeiten kannst, reicht es auch bei schlechten Handelspreisen noch für Treibstoff.',
-    'People still come to Mourning Line looking for a name or a flight record. Not everyone who lost someone had a ship to search from.': 'Noch immer kommen Menschen zur Mourning Line, um einen Namen oder ein Flugprotokoll zu finden. Nicht alle, die jemanden verloren haben, hatten ein Schiff für die Suche.',
-    'A salvage crew sent me the carrier’s markings last week. I recognised them. That is why I wanted us to take this route together.': 'Eine Bergungscrew hat mir letzte Woche die Kennung des Trägers geschickt. Ich habe sie erkannt. Deshalb wollte ich diese Strecke mit dir zusammen fliegen.',
-    'Mara found me a berth at Cairn after the evacuation. She never asked me to pay her back. I should have given her an honest account, at least.': 'Mara hat mir nach der Evakuierung einen Liegeplatz bei Cairn besorgt. Sie wollte nie etwas dafür zurück. Eine ehrliche Erklärung hätte ich ihr wenigstens geben sollen.',
-    'The evacuation ships all had to pass through this gate. The traffic ledger should say who was cleared to cross, and who was still waiting.': 'Die Evakuierungsschiffe mussten alle durch dieses Tor. Im Verkehrsregister müsste stehen, wer eine Freigabe hatte und wer noch warten musste.',
+
     'Finish your conversations with Mara and Rin before launching.': 'Beende vor dem Start deine Gespräche mit Mara und Rin.',
     'Buy two Protein Packs at the Helix commodity market before launching.': 'Kauf vor dem Start zwei Proteinpakete an der Warenbörse von Helix.',
     'Sell the family delivery at the Vesper commodity market before launching.': 'Verkauf vor dem Start die Familienlieferung an der Warenbörse von Vesper.',
@@ -307,23 +266,20 @@ export const DE_CATALOG = {
     "We can take our time. Check the route when you are ready; I will stay close.": "Wir können uns Zeit lassen. Sieh dir den Kurs an, sobald du bereit bist. Ich bleibe in deiner Nähe.",
     // Tutorial audit: guidance and journal.
     "Open the Helix bar and finish your conversations with Mara and Rin. You can speak to them in either order.": "Öffne die Helix-Bar und führe die Gespräche mit Mara und Rin zu Ende. Die Reihenfolge ist dir überlassen.",
-    "Open the Helix commodity market and buy two Protein Packs. Leave room in the hold; you can sell other cargo if it is full.": "Öffne die Warenbörse von Helix und kauf zwei Proteinpakete. Ist der Frachtraum voll, kannst du andere Ware verkaufen, um Platz zu schaffen.",
+
     "Vesper is selected for you. Engage hyperdrive, then keep Vesper selected and approach slowly for automatic landing. Keep your transponder on. The centre monitor opens the navigation map.": "Vesper ist bereits angewählt. Aktiviere den Hyperdrive, lass Vesper danach angewählt und nähere dich langsam für die automatische Landung. Lass den Transponder eingeschaltet. Über den mittleren Monitor öffnest du die NAV-KARTE.",
-    "Open the Vesper commodity market and sell two Protein Packs from your hold. You can sell them separately or together.": "Öffne die Warenbörse von Vesper und verkauf zwei Proteinpakete aus deinem Frachtraum. Du kannst sie einzeln oder zusammen verkaufen.",
+
     "Use hyperdrive to reach the Shardbelt. A deposit is selected on arrival. Approach slowly, wait for its automatic scan, and hold MINE within range. Leave room for one unit of ore.": "Flieg mit dem Hyperdrive zum Shardbelt. Bei der Ankunft wird eine Lagerstätte angewählt. Nähere dich langsam, warte auf den automatischen Scan und halte ABBAU in Reichweite gedrückt. Lass Platz für eine Einheit Erz.",
     "Defeat Ash Moth.": "Besiege Ash Moth.",
-    "Ash Moth is selected and combat mode is active. Aim and hold FIRE with a clear line of sight. Missiles are optional. Rin helps if the fight drags on or your hull is badly damaged.": "Ash Moth ist angewählt und der Kampfmodus ist aktiv. Ziele und halte bei freier Schussbahn FEUER gedrückt. Raketen sind optional. Rin hilft, wenn der Kampf zu lange dauert oder deine Hülle stark beschädigt ist.",
+
     "Recover the marked salvage in Mourning Line.": "Berge das markierte Fundstück in der Mourning Line.",
     "Travel to Mourning Line. The salvage point is selected on arrival. Approach slowly, wait for its automatic scan, and hold SALVAGE within range. Make room in your hold if needed.": "Flieg zur Mourning Line. Bei der Ankunft wird der Bergungspunkt angewählt. Nähere dich langsam, warte auf den automatischen Scan und halte BERGEN in Reichweite gedrückt. Schaffe bei Bedarf Platz im Frachtraum.",
-    "The carrier recorder contains your mother’s radio transmissions. Select Cairn Yard and approach slowly to dock, then talk to Rin about the evacuation.": "Der Rekorder des Trägers enthält die Funksprüche deiner Mutter. Wähle Cairn Yard an und nähere dich langsam zum Andocken. Sprich dann mit Rin über die Evakuierung.",
-    "Talk to Rin at the Cairn berth. Ask about the evacuation and the recording before deciding what to tell Mara. You can leave the conversation and return before choosing.": "Sprich mit Rin am Liegeplatz von Cairn. Frag nach der Evakuierung und der Aufnahme, bevor du entscheidest, was Mara erfahren soll. Du kannst das Gespräch verlassen und vor deiner Entscheidung zurückkehren.",
-    "The route to Meridian is set. Use hyperdrive to reach the Helios–Meridian jump point, then steer through the gate opening under normal thrust.": "Der Kurs nach Meridian ist gesetzt. Flieg mit dem Hyperdrive zum Helios–Meridian-Sprungpunkt und steuere danach mit normalem Schub durch die Toröffnung.",
-    "You reached Meridian and recovered a recording that contradicts the evacuation report. The original ledger remains an unresolved lead. You can now explore, trade, race and take local contracts.": "Du hast Meridian erreicht. Die geborgene Aufnahme widerspricht dem Evakuierungsbericht; das Original des Verkehrsregisters muss noch gefunden werden. Du kannst jetzt frei erkunden, handeln, Rennen fliegen und Aufträge annehmen.",
-    "You asked Rin to send Mara the recording and an explanation.": "Du hast Rin gebeten, Mara die Aufnahme und eine Erklärung zu schicken.",
+
     "You chose to trust Rin and keep investigating together.": "Du hast beschlossen, Rin zu vertrauen und gemeinsam weiterzusuchen.",
     "You kept the recorder and reserved your judgment.": "Du hast den Rekorder behalten und dir Zeit für dein Urteil genommen.",
     "Rin sent me the recording. I wish I had heard this years ago. Thank you for making sure I heard it now. We have a great deal to talk about.": "Rin hat mir die Aufnahme geschickt. Ich wünschte, ich hätte das schon vor Jahren erfahren. Danke, dass ich es jetzt gehört habe. Wir haben eine Menge zu besprechen.",
     "Rin has something to discuss.": "Rin möchte mit dir sprechen.",
+    "Incoming transmission · Mara Vek": "Eingehende Übertragung · Mara Vek",
     "Talk to Rin": "Mit Rin sprechen",
     "Keep two Protein Packs aboard until you sell the delivery at Vesper.": "Behalte zwei Proteinpakete an Bord, bis du die Lieferung auf Vesper verkaufst.",
     "Tutorial skipped. Free flight, local stories and ordinary contracts are unlocked.": "Tutorial übersprungen. Du kannst jetzt frei fliegen, örtlichen Hinweisen nachgehen und Aufträge annehmen.",
@@ -385,7 +341,6 @@ export const DE_CATALOG = {
     'You flew that clean. One more stop: Mourning Line. I need something from those carrier wrecks.': 'Sauber geflogen. Noch ein Halt: Mourning Line. Ich brauche etwas aus den Trägerwracks.',
     "That is not ordinary salvage. It is our mother's recorder. Dock at Cairn. We talk face to face.": "Auf dem Rekorder sind Funksprüche unserer Mutter. Lass uns in Cairn Yard anlegen. Ich möchte dir erklären, was damals passiert ist.",
     'Rin is waiting at the Cairn berth with the recorder.': "Rin wartet mit dem Rekorder am Liegeplatz von Cairn.",
-    'Final objective: fly through the Helios–Meridian jump gate.': 'Letztes Ziel: Flieg durch das Helios–Meridian-Sprungtor.',
     'I will go ahead to Meridian Prime. The original evacuation ledger is there. Find me before Concord does.': "Das ursprüngliche Evakuierungsregister könnte noch auf Meridian Prime liegen. Ich gehe dieser Spur nach. Bis dahin kannst du dir selbst den nächsten Auftrag suchen.",
     'FAMILY PROLOGUE COMPLETE · +{credits}': 'FAMILIENPROLOG ABGESCHLOSSEN · +{credits}',
     'Tutorial skipped. Family campaign and ordinary contracts are unlocked.': "Tutorial übersprungen. Du kannst jetzt frei handeln, erkunden und Aufträge annehmen.",
@@ -2472,7 +2427,7 @@ Object.assign(DE_CATALOG, {
     "Slow explosive shot damages nearby ships. Solid cover blocks the blast.": "Ein langsames Explosivgeschoss trifft auch nahe Schiffe. Feste Deckung hält die Druckwirkung ab.",
     "Short-range defence. Automatically intercepts missiles, spending energy.": "Nahbereichsabwehr. Fängt automatisch Raketen ab und verbraucht dabei Energie.",
     "Short, instant beam pulses make aiming easy. Lower damage and energy efficiency than accurate projectile fire; cover blocks the beam.": "Kurze Strahlpulse treffen sofort und erleichtern das Zielen. Wer mit Projektilwaffen sicher trifft, verursacht mehr Schaden und braucht weniger Energie. Hindernisse blockieren den Strahl.",
-    "At the market, enter Ship Outfitting. Open Ship Systems, tap an empty utility slot and choose the owned Long-Baseline Radar. Install it at no charge.": "Öffne auf dem MARKTPLATZ die SCHIFFSAUSRÜSTUNG. Wähle SCHIFFSSYSTEME, tippe auf einen freien Platz für Hilfssysteme und wähle das bereits vorhandene Langstreckenradar. Baue es kostenlos ein.",
+
     "Tap the weapon name on the left monitor to switch fire groups. Select B, then A. Both the magnetic cannon in B and the pulse guns in A use regenerating energy. Only missiles need ammunition.": "Tippe auf den Waffennamen im linken Monitor, um die Feuergruppe zu wechseln. Wähle B und dann A. Die Magnetkanone in B und die Impulskanonen in A brauchen Energie, die sich wieder auflädt. Nur Raketen benötigen Munition.",
     "BEAM EMITTER": "STRAHLEMITTER",
     "BEAM": "STRAHL",
@@ -2508,7 +2463,7 @@ Object.assign(DE_CATALOG, {"TURRETS": "GESCHÜTZTÜRME", "POWER": "ENERGIEVERSOR
 Object.assign(DE_CATALOG, {
     'A heavy escort with broad turret coverage and substantial cargo space. Its mass limits acceleration and turning.': 'Ein schweres Begleitschiff mit großem Schussfeld für seine Türme und reichlich Frachtraum. Seine Masse begrenzt Beschleunigung und Wendigkeit.',
     'Prepare for combat.': 'Bereite dich auf den Kampf vor.',
-    'Your beam lasers use regenerating energy. Release fire briefly if the capacitor runs low. Only missiles need ammunition.': 'Deine Strahllaser verbrauchen Energie, die sich wieder auflädt. Lege eine kurze Feuerpause ein, wenn der Energiespeicher fast leer ist. Nur Raketen benötigen Munition.',
+
 });
 
 Object.assign(DE_CATALOG, {
@@ -2641,3 +2596,95 @@ Object.assign(DE_CATALOG, {'BATTERIES DOWN':'BATTERIEN AUS'});
 Object.assign(DE_CATALOG, {'Absorbs more damage and recharges at the standard rate.':'Absorbiert mehr Schaden und lädt mit normaler Geschwindigkeit nach.','+45 shield capacity · standard recovery':'+45 Schildkapazität · normale Regeneration'});
 
 Object.assign(DE_CATALOG, {'Batteries fire in two waves: watch the charge and take cover. Attack during recovery. Plasma and torpedoes penetrate the armored hull; use the aim button to target exposed batteries.':'Die Batterien feuern in zwei Wellen: Achte auf das Aufladen und suche Deckung. Greife in der Feuerpause an. Plasma und Torpedos durchdringen die Panzerung; mit der Zieltaste wählst du freiliegende Batterien.'});
+
+// 0.8.2u tutorial rewrite: radio comms, step details, lessons and labels.
+Object.assign(DE_CATALOG, {
+    // Tutorial radio (Rin)
+    'Vesper keeps growing faster than its farms can follow. That is why Mara sends protein out here.': 'Vesper wächst schneller, als seine Farmen nachkommen. Deshalb schickt Mara Protein hier raus.',
+    'Our mother always brought us sweets back from this run. Mara still found every one of them.': 'Von diesen Flügen hat unsere Mutter immer Süßigkeiten mitgebracht. Mara hat trotzdem jede einzelne gefunden.',
+    'Vesper has ore to spare and food to spare for nobody. A good trade starts with listening.': 'Vesper hat Erz im Überfluss und Essen für niemanden. Guter Handel beginnt mit Zuhören.',
+    'The first habitats stood right beside the landing pads. That is why the market is still at the port.': 'Die ersten Habitate standen direkt an den Landeflächen. Deshalb liegt der Markt bis heute am Hafen.',
+    'You are lined up with Vesper. Engage HYPERDRIVE when you are ready.': 'Du bist auf Vesper ausgerichtet. Zünde den HYPERDRIVE, wenn du bereit bist.',
+    'Vesper dead ahead. Keep it selected and ease in slowly – the ship handles the landing.': 'Vesper direkt voraus. Angewählt lassen und langsam ran – die Landung übernimmt das Schiff.',
+    'Our mother never threw anything away. A broken pump became a flowerpot – Mara still keeps it behind the bar.': 'Unsere Mutter hat nichts weggeworfen. Aus einer kaputten Pumpe wurde ein Blumentopf – Mara bewahrt ihn noch hinter der Bar auf.',
+    'Cairn buys ore from small crews like ours. It pays for fuel when a trade is not worth taking.': 'Cairn kauft Erz auch von kleinen Crews wie unserer. Das zahlt den Treibstoff, wenn sich ein Handel mal nicht lohnt.',
+    'Our mother taught me this belt. The gaps drift with the rocks.': 'Unsere Mutter hat mir diesen Gürtel beigebracht. Die Lücken wandern mit den Felsen.',
+    'The carrier recorded the shared radio channel. If the recorder is still readable, we may hear more than the final words.': 'Der Träger hat den gemeinsamen Funkkanal mitgeschnitten. Wenn der Rekorder noch lesbar ist, hören wir mehr als die letzten Worte.',
+    'People still come to Mourning Line looking for a name or a flight record.': 'Mourning Line: Leute kommen noch heute her und suchen nach einem Namen oder einem Flugbericht.',
+    'Leave the recording as it is for now. I need to be sure of what I actually heard.': 'Lass die Aufnahme erst mal, wie sie ist. Ich muss sicher sein, was ich wirklich gehört habe.',
+    'Mara found me this berth at Cairn after the evacuation. I never gave her an honest word for it.': 'Mara hat mir nach der Evakuierung diesen Liegeplatz bei Cairn vermittelt. Ein ehrliches Wort dafür habe ich ihr nie gegeben.',
+    'I am glad you are here today. On my own, I would have found a reason not to look.': 'Gut, dass du heute dabei bist. Allein hätte ich einen Grund gefunden, nicht hinzuschauen.',
+    // Regional travel radio
+    'Refrigerated containers on the approach. Outer docks are handling the Azure Reach freighters — keep the lane clear.': 'Kühlcontainer in der Anflugzone. Die äußeren Docks wickeln die Frachter aus Azure Reach ab — Freihaltung der Gasse.',
+    'Personal effects found in the field: log the location. Families are still looking for traces.': 'Persönliche Gegenstände im Trümmerfeld: Fundort dokumentieren. Familien suchen noch immer nach Spuren.',
+    'Note for new traders: strong demand is not a profit. Compare the buy price with what the destination pays before you load.': 'Hinweis für neue Händler: Starke Nachfrage ist kein Gewinn. Vergleich den Einkaufspreis mit dem Zielort, bevor du lädst.',
+    'The book of remembrance stays open. Adding a name goes through the port office.': 'Das Buch der Erinnerung bleibt offen. Eintragungen laufen über das Hafenbüro.',
+    'Yard traffic has priority in the test corridor. Frigates are braking today — give them room.': 'Werftverkehr hat Vorrang im Testkorridor. Heute bremsen Fregatten — Raum lassen.',
+    'Transponders on during approach. No identity, no fast inspection.': 'Transponder an beim Anflug. Ohne Identität keine schnelle Kontrolle.',
+    'Outer rings are waiting on freight. Water and medical shipments first, please.': 'Die äußeren Ringe warten auf Fracht. Wasser- und Medikamentenlieferungen zuerst, bitte.',
+    'Replacement pump is inbound; refinery is on reduced output. Set usable seals aside from scrap.': 'Der Ersatzverdichter ist unterwegs; die Raffinerie fährt reduziert. Brauchbare Dichtungen vom Schrott trennen.',
+    'A cheap Blackglass offer may want an expensive escort. Price the whole route before you take it.': 'Ein billiges Angebot bei Blackglass will oft teure Eskorte. Rechne die ganze Route, bevor du zuschlägst.',
+    'Passages through the ring bands keep shifting. Old coordinates are a guide, not a promise.': 'Die Passagen durch die Ringbänder verschieben sich laufend. Alte Koordinaten sind ein Anhaltspunkt, kein Versprechen.',
+    'Clinic needs refrigerated containers. Medical shipments accepted only with transport seals intact.': 'Die Klinik braucht Kühlcontainer. Medizinische Lieferungen nur mit intakten Transportplomben.',
+    // Tutorial step details and labels
+    'Plot the Meridian gate on the galaxy map.': 'Wähl auf der Galaxiekarte das Meridian-Tor an.',
+    'Launch from Cairn, open the GALAXY map and select MERIDIAN. The jump gate becomes your next waypoint.': 'Starte von Cairn, öffne die Karte auf GALAXIS und wähle MERIDIAN. Das Sprungtor wird dein nächster Wegpunkt.',
+    'Talk to Mara and Rin in the Helix bar, in either order.': 'Sprich in der Bar von Helix mit Mara und Rin – in beliebiger Reihenfolge.',
+    'Open the Helix commodity market and buy two Protein Packs. If the hold is full, sell other cargo first.': 'Öffne die Warenbörse von Helix und kauf zwei Proteinpakete. Ist der Frachtraum voll, verkauf zuerst andere Ware.',
+    'Enter Ship Outfitting at the market, open Ship Systems and install the owned Long-Baseline Radar in a free utility slot.': 'Geh auf dem Markt zur Schiffsausrüstung, öffne Schiffssysteme und bau das vorhandene Langstreckenradar in einen freien Hilfssystemplatz ein.',
+    'Tap the centre radar and select VESPER on the sector chart. The gold mission marker marks the destination.': 'Tippe auf das mittlere Radar und wähle VESPER in der Sektorkarte. Die goldene Missionsmarkierung steht für das Ziel.',
+    'Practise thrust, steering, a short afterburner burst and both cockpit monitors before engaging hyperdrive.': 'Übe Schub, Steuerung, einen kurzen Nachbrennerstoß und beide Cockpitmonitore, bevor du den Hyperdrive zündest.',
+    'Vesper is plotted. Engage HYPERDRIVE, then approach slowly with Vesper selected for automatic landing.': 'Vesper ist gesetzt. Zünde den HYPERDRIVE und flieg Vesper danach langsam an – die Landung erfolgt automatisch.',
+    'Sell two Protein Packs at the Vesper commodity market.': 'Verkauf zwei Proteinpakete an der Warenbörse von Vesper.',
+    'Hyperdrive to the Shardbelt. Approach the marked deposit until the automatic scan completes, then tap MINE to deploy your drones. Tap RECALL before leaving; hyperdrive waits for their return.': 'Fliege per Hyperdrive zum Shardbelt. Nähere dich dem markierten Vorkommen bis zum automatischen Scan und tippe auf ABBAU, um die Drohnen zu starten. Tippe vor dem Abflug auf RÜCKRUF; der Hyperdrive wartet auf ihre Rückkehr.',
+    'Open SERVICES and refill fuel and ordnance; repair the hull if needed. Shields recharge in flight, hull does not.': 'Öffne SERVICE und fülle Treibstoff und Raketen auf; repariere bei Bedarf die Hülle. Schilde laden im Flug nach, die Hülle nicht.',
+    'Your beam lasers draw on regenerating energy. Release fire briefly if the capacitor runs low. Only missiles need ammunition.': 'Deine Strahllaser nutzen sich regenerierende Energie. Lass bei leerem Speicher kurz vom Feuerknopf ab. Nur Raketen brauchen Munition.',
+    'Approach the marked crate slowly; it is collected automatically at close range. The left monitor opens your hold.': 'Flieg langsam an die markierte Kiste heran; sie wird auf kurze Distanz automatisch aufgenommen. Der linke Monitor zeigt deinen Laderaum.',
+    'Ash Moth is selected and combat mode is active. Hold FIRE with a clear line of sight. Rin helps if the fight drags on.': 'Ash Moth ist angewählt, der Kampfmodus aktiv. Halte FEUER mit freier Schusslinie gedrückt. Rin hilft, wenn der Kampf zu lange dauert.',
+    'Select CONVOY RECORDER SIGNAL in the map contacts, hyperdrive to Mourning Line, then hold SALVAGE within range of the marker.': 'Wähl in den Kartenkontakten das Rekordersignal des Konvois, spring zur Mourning Line und halte in Reichweite des Markers BERGEN gedrückt.',
+    'The carrier recorder holds your mother’s radio transmissions. Select Cairn Yard and approach slowly to dock.': 'Der Trägerrekorder enthält die Funksprüche deiner Mutter. Wähl Cairn Yard an und flieg langsam heran, um anzudocken.',
+    'Talk to Rin at the Cairn berth. You can leave the conversation and return before deciding.': 'Sprich mit Rin am Liegeplatz von Cairn. Du kannst das Gespräch unterbrechen und später entscheiden.',
+    'Hyperdrive to the jump point, then steer through the gate opening under normal thrust.': 'Hyperdrive zum Sprungpunkt, dann mit normalem Schub durch die Toröffnung steuern.',
+    // Flight lessons
+    'The slider on the left sets your speed.': 'Der Schieber links setzt dein Tempo.',
+    'The marker at the canopy edge points toward a selected target outside your view.': 'Die Markierung am Kanzlerand zeigt auf ein angewähltes Ziel außerhalb deines Sichtfelds.',
+    'Full thrust, then hold the gold button for two seconds. Afterburner consumes fuel; ordinary thrust does not.': 'Voller Schub, dann die goldene Taste zwei Sekunden halten. Der Nachbrenner verbraucht Treibstoff, der normale Schub nicht.',
+    'The right monitor cycles targets and shows distance, scan results and enemy shields and hull.': 'Der rechte Monitor wechselt Ziele und zeigt Entfernung, Scanergebnis sowie feindliche Schilde und Hülle.',
+    'Hull, energy, cargo and the mission objective are on the left monitor.': 'Hülle, Energie, Ladung und Missionsziel findest du im linken Monitor.',
+    // Decision summaries and toasts
+    'You asked Rin to send Mara the recording.': 'Du hast Rin gebeten, Mara die Aufnahme zu schicken.'
+});
+
+// 0.8.2u: Rin jumps ahead after the family decision — the prologue ends with
+// an earn-and-equip stretch in Helios, Mara's worried call and a crossing the
+// player chooses on their own.
+Object.assign(DE_CATALOG, {
+    // Steps
+    'Plot the Meridian gate on the galaxy map.': 'Wähle das Meridian-Sprungtor auf der Galaxiskarte.',
+    'Launch, open the GALAXY map and select MERIDIAN once, then close it. The gate route stays saved for later.': 'Starte, öffne die GALAXIS-Karte und wähle MERIDIAN einmal an, dann schließe sie. Die Torroute bleibt gespeichert.',
+    'Cross the Helios–Meridian jump gate to look for Rin.': 'Durchquere das Helios–Meridian-Sprungtor, um Rin zu finden.',
+    'Rin went ahead and has gone quiet. When you are ready, plot Meridian and cross the gate.': 'Rin ist vorausgeflogen und meldet sich nicht. Wenn du bereit bist, plane Meridian und flieg durch das Tor.',
+    'The prologue is complete.': 'Das Prolog ist abgeschlossen.',
+    'Mara is waiting for word from Rin. Find her, keep the Wayfarer flying, and explore, trade, race and take contracts on your own terms.': 'Mara wartet auf ein Lebenszeichen von Rin. Finde sie, halte die Wayfarer flugbereit und erkunde, handle, flieg Rennen und nimm Aufträge nach deinen eigenen Bedingungen.',
+    // Toasts
+    'The Second Light jumps ahead. Refit the Wayfarer and earn your crossing money before you follow.': 'Die Second Light springt voraus. Rüste die Wayfarer und verdiene dein Geld für die Überfahrt, bevor du folgst.',
+    'Meridian is plotted. Cross when you are ready.': 'Meridian ist eingeplant. Flieg durch, wenn du bereit bist.',
+    // Radio: Rin departs, then the silence speaks
+    'The Second Light just cleared the traffic lane. Her drive signature is already fading – good travel, sister.': 'Die Second Light hat gerade die Verkehrsspur verlassen. Ihre Antriebssignatur verblasst schon – gute Reise, Schwester.',
+    'The gate channel is quiet. No Rin, no traffic control, nothing. The silence is the lead now.': 'Der Torfunkkanal ist still. Keine Rin, keine Verkehrszentrale, nichts. Das Schweigen ist jetzt die Spur.',
+    'No word from Rin since the gate. Fly safe out there – and call me the moment you hear from her.': 'Kein Wort von Rin seit dem Tor. Flieg sicher da draußen – und ruf an, sobald du etwas von ihr hörst.',
+    // Rin's departure scene
+    'I am jumping ahead now. Someone has to be at the ledger before another recorder disappears – and you still need to earn your refit money here.': 'Ich springe jetzt voraus. Jemand muss am Register sein, bevor ein weiterer Rekorder verschwindet – und du musst hier noch dein Geld für die Ausrüstung verdienen.',
+    'Once I am through the gate, I will call Mara. Fit the Wayfarer properly – fuel, ordnance, whatever the account allows.': 'Sobald ich durch das Tor bin, rufe ich Mara an. Rüste die Wayfarer richtig aus – Treibstoff, Munition, was das Konto hergibt.',
+    'And if you do not call?': 'Und wenn du dich nicht meldest?',
+    'Safe trip, sister. I will follow you.': 'Gute Reise, Schwester. Ich folge dir.',
+    'Then come after me. But it will not be necessary. I will call.': 'Dann flieg mir hinterher. Aber es wird nicht nötig sein. Ich melde mich.',
+    // Mara's call
+    'It is Mara. Rin never called after the gate. No radio, no return, nothing – and that is not like her.': 'Hier ist Mara. Rin hat sich nach dem Tor nicht gemeldet. Kein Funk, keine Rückkehr, nichts – das ist nicht ihre Art.',
+    'She wanted to see the ledger in Meridian Prime. You are now flying the only Wayfarer that can follow her.': 'Sie wollte das Register in Meridian Prime sehen. Du fliegst jetzt die einzige Wayfarer, die ihr folgen kann.',
+    'What else should I do for the Wayfarer?': 'Was soll ich sonst noch für die Wayfarer tun?',
+    'I will take the gate and look for her.': 'Ich nehme das Tor und suche sie.',
+    'Cairn buys ore and the race desks pay without a contract – that is how you earn before you launch. And when an opponent surrenders: hold fire, and the blue button takes the handover.': 'Cairn kauft Erz und das Rennbüro zahlt ohne Auftrag – so verdienst du vor dem Start. Und wenn ein Gegner aufgibt: Feuer einstellen, dann nimmt die blaue Taste die Übergabe an.',
+    // Bar lines while Rin is away
+    'No word from Rin since she jumped. Go find her when the Wayfarer is ready.': 'Kein Wort von Rin, seit sie gesprungen ist. Finde sie, wenn die Wayfarer bereit ist.',
+});

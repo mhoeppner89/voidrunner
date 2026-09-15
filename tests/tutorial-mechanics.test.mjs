@@ -155,12 +155,28 @@ test('jettisoning ordinary goods makes room without immediately scooping the sam
 });
 
 test('selecting Meridian in the galaxy map creates the actual gate route and completes the plotting lesson',()=>{
-    const {session,save,quest}=fixture('plot-meridian');save.player.dockedAt=undefined;
+    const {session,save,quest}=fixture('galaxy-map');save.player.dockedAt=undefined;
     save.player.position=[...LOCATIONS.cairn.position];
-    session.selectTarget('system','meridian');assert.equal(quest.stepId,'plot-meridian');
+    session.selectTarget('system','meridian');assert.equal(quest.stepId,'galaxy-map');
     session.selectTarget('system','meridian','map');assert.equal(quest.stepId,'cross-meridian-gate');
     assert.equal(save.world.plannedSystemId,'meridian');
     assert.equal(save.player.navTargetId,'verge-meridian-point');
     assert.equal(session.getTargetRef().kind,'location');
     assert.equal(session.getTargetRef().id,'verge-meridian-point');
+    // Rin has jumped ahead: the companion stays out of the sky for the whole
+    // earn-and-equip stretch, and the saved gate route survives a reload.
+    const restored=hydrateSave(JSON.parse(JSON.stringify(save)));
+    assert.equal(getTutorialQuest(restored).stepId,'cross-meridian-gate');
+    assert.equal(restored.world.plannedSystemId,'meridian');
+});
+test('after Rin departs, the Wayfarer flies solo and the galaxy plot still lands',()=>{
+    const {session,save,quest}=fixture('family-choice');
+    save.player.dockedAt='cairn';
+    session.handleTutorialEvent('choice',{choiceId:'trust-rin'});
+    assert.equal(quest.stepId,'galaxy-map');assert.equal(quest.flags.rinDeparted,true);
+    assert.equal(session.ensureTutorialCompanion(),undefined);
+    // The player keeps flying their own routes while Rin is away.
+    assert.equal(session.tutorialSummary().destinationId,'cairn');
+    session.selectTarget('system','meridian','map');
+    assert.equal(quest.stepId,'cross-meridian-gate');
 });
