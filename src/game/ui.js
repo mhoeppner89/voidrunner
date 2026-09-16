@@ -26,6 +26,16 @@ const loadoutGroupDemand=(loadout,mountId)=>{
 };
 const escapeHtml = (value) => value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const percent = (value, max) => (max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100)));
+const observerTime = (seconds) => {
+    const total = Math.max(0, Number(seconds) || 0);
+    let minutes = Math.floor(total / 60);
+    let remaining = total - minutes * 60;
+    if (remaining >= 59.95) {
+        minutes += 1;
+        remaining = 0;
+    }
+    return `${String(minutes).padStart(2, '0')}:${remaining.toFixed(1).padStart(4, '0')}`;
+};
 // Every dock screen resolves through one explicit art record. This keeps minor
 // ports on their dedicated mission terminals and prevents a missing plate from
 // silently falling back to an unrelated concourse image.
@@ -326,7 +336,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2u';
+const GAME_VERSION = '0.8.2aa';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -497,6 +507,11 @@ export class GameUI {
     arenaScenario = '1v1';
     arenaDifficulty = 'veteran';
     arenaFit = 'balanced';
+    observerScenario = '1v1';
+    observerDifficulty = 'veteran';
+    observerBlueFit = 'varied';
+    observerRedFit = 'varied';
+    observerNodes = new Map();
     radarContext;
     radarLayoutDirty = true;
     radarCssWidth = 0;
@@ -874,6 +889,7 @@ export class GameUI {
         <section id="ship-panel" class="modal-panel is-hidden" aria-label="${t('Ship status')}"></section>
         <section id="pause-panel" class="modal-panel is-hidden" aria-label="${t('Pause and settings')}"></section>
         <section id="arena-panel" class="modal-panel is-hidden" aria-label="${t('Combat simulator')}"></section>
+        <section id="observer-panel" class="observer-panel is-hidden" aria-label="${t('NPC combat observer')}"></section>
         <section id="adventure-panel" class="adventure-panel is-hidden" role="dialog" aria-modal="true" aria-label="Conversation"></section>
         <section id="chat-panel" class="modal-panel is-hidden" aria-label="${t('Comms log')}"></section>
         <div id="toast-stack" class="toast-stack global-toasts" aria-live="polite"></div>
@@ -894,7 +910,7 @@ export class GameUI {
     `;
     }
     bindStaticEvents() {
-        const delegatedActionSelector = '[data-ui-command], [data-tutorial-action], [data-map-view], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-commodity-id], [data-market-qty], [data-bar-panel], [data-dialogue-topic], [data-dialogue-action], [data-mission-board-tab], [data-mission-select], [data-mission-course], [data-mission-discard], [data-mission-discard-confirm], [data-nav-id], [data-trade], [data-jettison], [data-mission-id], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action], [data-equipment-id], [data-ship-id], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty], [data-arena-fit], [data-pay-mug]';
+        const delegatedActionSelector = '[data-ui-command], [data-tutorial-action], [data-map-view], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-commodity-id], [data-market-qty], [data-bar-panel], [data-dialogue-topic], [data-dialogue-action], [data-mission-board-tab], [data-mission-select], [data-mission-course], [data-mission-discard], [data-mission-discard-confirm], [data-nav-id], [data-trade], [data-jettison], [data-mission-id], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action], [data-equipment-id], [data-ship-id], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty], [data-arena-fit], [data-observer-scenario], [data-observer-difficulty], [data-observer-blue-fit], [data-observer-red-fit], [data-pay-mug]';
         const directPointerElement = (event) => {
             const correctedSceneControl = event.pointerType !== 'mouse' && event.target instanceof Element
                 ? event.target.closest('.scene-pointer')
@@ -1008,6 +1024,22 @@ export class GameUI {
             else if (target.dataset.arenaDifficulty) {
                 this.arenaDifficulty = target.dataset.arenaDifficulty;
                 this.root.querySelectorAll('[data-arena-difficulty]').forEach((button) => button.classList.toggle('selected', button === target));
+            }
+            else if (target.dataset.observerScenario) {
+                this.observerScenario = target.dataset.observerScenario;
+                this.root.querySelectorAll('[data-observer-scenario]').forEach((button) => button.classList.toggle('selected', button === target));
+            }
+            else if (target.dataset.observerDifficulty) {
+                this.observerDifficulty = target.dataset.observerDifficulty;
+                this.root.querySelectorAll('[data-observer-difficulty]').forEach((button) => button.classList.toggle('selected', button === target));
+            }
+            else if (target.dataset.observerBlueFit) {
+                this.observerBlueFit = target.dataset.observerBlueFit;
+                this.root.querySelectorAll('[data-observer-blue-fit]').forEach((button) => button.classList.toggle('selected', button === target));
+            }
+            else if (target.dataset.observerRedFit) {
+                this.observerRedFit = target.dataset.observerRedFit;
+                this.root.querySelectorAll('[data-observer-red-fit]').forEach((button) => button.classList.toggle('selected', button === target));
             }
             else if (target.dataset.mapTargetKind && target.dataset.mapTargetId) {
                 const key = mapTargetKey(target);
@@ -1210,6 +1242,10 @@ export class GameUI {
         });
         this.root.addEventListener('input', (event) => {
             const element = event.target;
+            if (element.matches?.('[data-observer-aim-error]')) {
+                this.actions?.observerSetAimError(Number(element.value));
+                return;
+            }
             const setting = element.dataset.setting;
             if (!setting)
                 return;
@@ -1284,6 +1320,10 @@ export class GameUI {
             case 'arena':
                 this.showArena();
                 break;
+            case 'observer-start':
+                this.hideArena();
+                this.actions?.startObserver('open');
+                break;
             case 'close-arena':
                 this.hideArena();
                 break;
@@ -1300,6 +1340,54 @@ export class GameUI {
             case 'launch-arena':
                 this.hideArena();
                 this.actions?.startArena(this.arenaEnv, this.arenaScenario, this.arenaDifficulty, this.arenaFit);
+                break;
+            case 'observer-map':
+                this.actions?.observerSetMap(element?.dataset.observerMap);
+                break;
+            case 'observer-team':
+                this.actions?.observerSetTeam(element?.dataset.observerTeam);
+                break;
+            case 'observer-difficulty':
+                this.actions?.observerSetDifficulty(element?.dataset.observerDifficulty);
+                break;
+            case 'observer-ship':
+                this.actions?.observerSelectShip(element?.dataset.observerShip);
+                break;
+            case 'observer-fit':
+                this.actions?.observerSelectFit(element?.dataset.observerFit);
+                break;
+            case 'observer-zoom-in':
+                this.actions?.observerZoomIn();
+                break;
+            case 'observer-zoom-out':
+                this.actions?.observerZoomOut();
+                break;
+            case 'observer-center':
+                this.actions?.observerCenterCamera();
+                break;
+            case 'observer-fleet':
+                this.actions?.observerReturnToEditor();
+                break;
+            case 'observer-start-battle':
+                this.actions?.observerStartBattle();
+                break;
+            case 'observer-clear':
+                this.actions?.observerClearFormation();
+                break;
+            case 'observer-remove':
+                this.actions?.observerRemoveShip(element?.dataset.observerUnit);
+                break;
+            case 'observer-toggle-pause':
+                this.actions?.observerTogglePause();
+                break;
+            case 'observer-speed':
+                this.actions?.observerCycleSpeed();
+                break;
+            case 'observer-restart':
+                this.actions?.observerRestart();
+                break;
+            case 'observer-exit':
+                this.actions?.quitToTitle();
                 break;
             case 'launch':
                 if (DOCK_LOCATION_IDS.includes(this.dockLocation) && this.dockTerminal === 'concourse' && element?.classList.contains('concourse-hover-ship'))
@@ -1496,6 +1584,7 @@ export class GameUI {
         this.root.querySelector('#hud')?.classList.add('is-hidden');
         this.root.querySelector('#dock-screen')?.classList.add('is-hidden');
         this.hideArena();
+        this.hideObserverView();
         this.root.querySelector('#run-inbound')?.classList.add('is-hidden');
         const resume = this.root.querySelector('[data-ui-command="resume"]');
         if (resume) {
@@ -4961,7 +5050,7 @@ export class GameUI {
         panel.innerHTML = `
       <div class="modal-card arena-card">
         <header><div><span class="eyebrow">${t('TRAINING SIMULATION')}</span><h2>${t('Dogfight Arena')}</h2></div><button data-ui-command="close-arena">${t('CLOSE')}</button></header>
-        <div class="arena-menu-scroll"><section class="run-entry"><b>${t('Arena Run')}</b>${record.best?`<span> · ${t('Best score')}: ${record.best}</span>`:''}<p>${t('Ten waves. Choose equipment between fights.')}</p><div><button data-ui-command="new-arena-run">${t(savedRun?'New run — replace saved run':'New run')}</button>${savedRun?`<button data-ui-command="resume-arena-run">${t('Resume saved run')}</button>`:''}${record.unlockedHard?`<button data-ui-command="hard-arena-run">${t('Hard Run')}</button>`:''}</div></section>
+        <div class="arena-menu-scroll"><section class="run-entry"><b>${t('Arena Run')}</b>${record.best?`<span> · ${t('Best score')}: ${record.best}</span>`:''}<p>${t('Ten waves. Choose equipment between fights.')}</p><div><button data-ui-command="new-arena-run">${t(savedRun?'New run — replace saved run':'New run')}</button>${savedRun?`<button data-ui-command="resume-arena-run">${t('Resume saved run')}</button>`:''}${record.unlockedHard?`<button data-ui-command="hard-arena-run">${t('Hard Run')}</button>`:''}</div></section><section class="run-entry observer-entry"><b>${t('NPC COMBAT VIEW')}</b><p>${t('Watch NPC-only fights with live game-time tracking and unit lifebars.')}</p><button data-ui-command="observer-start">${t('OPEN OBSERVER')}</button></section>
         <div class="arena-grid">
           <section>
             <h3>${t('ARENA')}</h3>
@@ -4985,6 +5074,230 @@ export class GameUI {
     hideArena() {
         this.root.querySelector('#arena-panel')?.classList.add('is-hidden');
         this.updateOrientationNotice();
+    }
+    showObserverView(config = {}) {
+        const panel = this.root.querySelector('#observer-panel');
+        if (!panel)
+            return;
+        const maps = [['open', 'OPEN SPACE'], ['asteroid-field', 'ASTEROID FIELD'], ['debris-field', 'DEBRIS FIELD']];
+        const difficultyOptions = [['novice', 'ROOKIE'], ['veteran', 'VETERAN'], ['ace', 'ACE']];
+        const fitOptions = [['varied', 'ROLE DEFAULTS'], ['balanced', 'BALANCED FIT'], ['assault', 'CLOSE ASSAULT'], ['support', 'DEFENSIVE SUPPORT'], ['beam', 'BEAM FIT']];
+        const ships = [
+            ['wayfarer', 'WAYFARER', 'BALANCED FIT'],
+            ['vanguard', 'VANGUARD', 'DEFENSIVE SUPPORT'],
+            ['talon', 'TALON', 'CLOSE ASSAULT'],
+            ['prospector', 'PROSPECTOR', 'DEFENSIVE SUPPORT'],
+            ['lancer', 'LANCER', 'BEAM FIT'],
+            ['atlas', 'ATLAS', 'BALANCED FIT'],
+            ['frigate', 'CONCORD FRIGATE', 'CAPITAL HULL'],
+        ];
+        this.observerNodes.clear();
+        panel.innerHTML = `
+      <div class="observer-toolbar">
+        <div class="observer-heading"><span class="eyebrow">${t('TACTICAL ANALYSIS')}</span><b id="observer-matchup"></b><small id="observer-fit"></small></div>
+        <div class="observer-clock"><small>${t('GAME TIME')}</small><strong id="observer-time">00:00.0</strong></div>
+        <div id="observer-status" class="observer-status" aria-live="polite">${t('LIVE')}</div>
+        <div class="observer-camera-tools" aria-label="${t('Observer camera')}"><span id="observer-camera-readout">${t('ZOOM')} 1250 · X 0 · Z 0</span><button type="button" data-ui-command="observer-zoom-out" title="${t('Zoom out')}" aria-label="${t('Zoom out')}">−</button><button type="button" data-ui-command="observer-center" title="${t('Center camera')}" aria-label="${t('Center camera')}">◎</button><button type="button" data-ui-command="observer-zoom-in" title="${t('Zoom in')}" aria-label="${t('Zoom in')}">+</button></div>
+        <div class="observer-actions"><button id="observer-pause" data-ui-command="observer-toggle-pause">${t('PAUSE')}</button><button id="observer-speed" data-ui-command="observer-speed">${t('SPEED')} 1×</button><button data-ui-command="observer-restart">${t('RESTART')}</button><button data-ui-command="observer-fleet" title="${t('FLEET LAYOUT')}">${t('FLEET')}</button><button data-ui-command="observer-exit">${t('EXIT OBSERVER')}</button></div>
+      </div>
+      <aside id="observer-editor" class="observer-editor">
+        <div class="observer-editor-card">
+          <div class="observer-editor-title"><div><span class="eyebrow">${t('STAGING EDITOR')}</span><b>${t('BUILD YOUR FIGHT')}</b></div><small>${t('Choose a side and ship, then tap the map to place it.')}</small></div>
+          <section class="observer-editor-section"><h3>${t('MAP')}</h3><div class="observer-editor-options">${maps.map(([id, label]) => `<button data-ui-command="observer-map" data-observer-map="${id}">${t(label)}</button>`).join('')}</div></section>
+          <section class="observer-editor-section"><h3>${t('SIDE')}</h3><div class="observer-editor-options observer-team-options"><button data-ui-command="observer-team" data-observer-team="blue">${t('BLUE')}</button><button data-ui-command="observer-team" data-observer-team="red">${t('RED')}</button></div></section>
+          <section class="observer-editor-section"><h3>${t('PILOTS')}</h3><div class="observer-editor-options observer-difficulty-options">${difficultyOptions.map(([id, label]) => `<button data-ui-command="observer-difficulty" data-observer-difficulty="${id}">${t(label)}</button>`).join('')}</div></section>
+          <section class="observer-editor-section observer-aim-section"><h3>${t('NPC AIM ERROR')}</h3><div class="observer-aim-control"><input type="range" min="1" max="2" step="0.05" value="${Number(config.aimError ?? 1.35).toFixed(2)}" data-observer-aim-error aria-label="${t('NPC AIM ERROR')}"><output id="observer-aim-error-value">1.35×</output></div><small>${t('1.00 = PRECISE · 1.35 = PLAYER BUFFER · FRIGATES IGNORE THIS')} · ${t('NO ROUND TIME LIMIT')}</small></section>
+          <section class="observer-editor-section"><h3>${t('LOADOUT FOR NEXT SHIP')}</h3><div class="observer-editor-options observer-fit-options">${fitOptions.map(([id, label]) => `<button data-ui-command="observer-fit" data-observer-fit="${id}">${t(label)}</button>`).join('')}</div></section>
+          <section class="observer-editor-section observer-ship-section"><h3>${t('ADD SHIP')}</h3><div class="observer-ship-palette">${ships.map(([id, label, fit]) => `<button data-ui-command="observer-ship" data-observer-ship="${id}"><b>${t(label)}</b><small>${t(fit)}</small></button>`).join('')}</div></section>
+          <p id="observer-editor-hint" class="observer-editor-hint">${t('Select a ship, then tap the map to place it.')}</p>
+          <small class="observer-axis-note">${t('X/Z MAP PLANE · WORLD Y LEVEL')}</small>
+          <div class="observer-editor-footer"><span id="observer-counts"></span><div><button data-ui-command="observer-clear">${t('CLEAR FORMATION')}</button><button id="observer-start" class="primary" data-ui-command="observer-start-battle">${t('START BATTLE')}</button></div></div>
+        </div>
+      </aside>
+      <div class="observer-legend" aria-label="${t('Teams')}"><span><i data-team="blue"></i>${t('BLUE')}</span><span><i data-team="red"></i>${t('RED')}</span></div>
+      <div id="observer-units" class="observer-units" aria-label="${t('Observed combat units')}"></div>`;
+        panel.dataset.observerEnvironment = config.environment ?? 'open';
+        panel.classList.remove('is-hidden');
+        this.updateOrientationNotice();
+    }
+    hideObserverView() {
+        const panel = this.root.querySelector('#observer-panel');
+        this.observerNodes.clear();
+        if (panel) {
+            panel.classList.add('is-hidden');
+            panel.innerHTML = '';
+        }
+        this.updateOrientationNotice();
+    }
+    updateObserverView(model = {}) {
+        const panel = this.root.querySelector('#observer-panel');
+        if (!panel || panel.classList.contains('is-hidden'))
+            return;
+        const editor = Boolean(model.editor);
+        const time = panel.querySelector('#observer-time');
+        const status = panel.querySelector('#observer-status');
+        const matchup = panel.querySelector('#observer-matchup');
+        const fit = panel.querySelector('#observer-fit');
+        const pause = panel.querySelector('#observer-pause');
+        const speed = panel.querySelector('#observer-speed');
+        const cameraReadout = panel.querySelector('#observer-camera-readout');
+        const aimError = panel.querySelector('[data-observer-aim-error]');
+        const aimErrorValue = panel.querySelector('#observer-aim-error-value');
+        const restart = panel.querySelector('[data-ui-command="observer-restart"]');
+        const editorPanel = panel.querySelector('#observer-editor');
+        const counts = panel.querySelector('#observer-counts');
+        const hint = panel.querySelector('#observer-editor-hint');
+        const start = panel.querySelector('#observer-start');
+        const fitLabels = { varied: 'ROLE DEFAULTS', balanced: 'BALANCED FIT', assault: 'CLOSE ASSAULT', support: 'DEFENSIVE SUPPORT', beam: 'BEAM FIT' };
+        const catalog = model.catalog ?? [];
+        const pending = catalog.find((entry) => entry.id === model.pendingShip);
+        const pendingLabel = pending?.label ?? model.pendingShip;
+        const pendingFitLabel = pending?.capital ? 'CAPITAL HULL' : fitLabels[model.pendingFit] ?? fitLabels.varied;
+        const blueCount = model.counts?.blue ?? 0;
+        const redCount = model.counts?.red ?? 0;
+        const aimErrorFactor = Number(model.aimError ?? 1.35);
+        if (aimError) {
+            aimError.value = aimErrorFactor.toFixed(2);
+            aimError.disabled = !editor;
+        }
+        if (aimErrorValue)
+            aimErrorValue.textContent = `${aimErrorFactor.toFixed(2)}×`;
+        if (cameraReadout) {
+            const zoom = Math.round(Number(model.zoom ?? 1250));
+            const panX = Math.round(Number(model.pan?.x ?? 0));
+            const panZ = Math.round(Number(model.pan?.z ?? 0));
+            cameraReadout.textContent = `${t('ZOOM')} ${zoom} · X ${panX} · Z ${panZ}`;
+        }
+        if (time)
+            time.textContent = observerTime(model.elapsed);
+        if (status) {
+            status.textContent = model.result ? t(model.result) : editor ? t('PLACE UNITS') : (model.paused ? t('PAUSED') : t('LIVE'));
+            status.dataset.state = model.result ? 'complete' : editor ? 'editor' : model.paused ? 'paused' : 'live';
+        }
+        if (matchup)
+            matchup.textContent = editor
+                ? `${t('FORMATION EDITOR')} · ${t(model.environmentLabel ?? 'OPEN SPACE')}`
+                : `${t('BLUE')} ${blueCount} · ${t('RED')} ${redCount}`;
+        if (fit)
+            fit.textContent = editor
+                ? (pendingLabel ? `${t('NEXT')}: ${t(pendingLabel)} · ${t(pendingFitLabel)}` : t('SELECT A SHIP TO PLACE'))
+                : `${t('MAP')}: ${t(model.environmentLabel ?? 'OPEN SPACE')} · ${t('AIM ERROR')} ${aimErrorFactor.toFixed(2)}×`;
+        if (pause) {
+            pause.hidden = editor;
+            pause.textContent = model.paused ? t('RESUME') : t('PAUSE');
+        }
+        if (speed) {
+            speed.hidden = editor;
+            speed.textContent = `${t('SPEED')} ${model.speed ?? 1}×`;
+        }
+        if (restart)
+            restart.textContent = editor ? t('RESET FORMATION') : t('RESTART');
+        if (editorPanel)
+            editorPanel.classList.toggle('is-hidden', !editor);
+        panel.querySelectorAll('[data-observer-map]').forEach((button) => button.classList.toggle('selected', button.dataset.observerMap === model.environment));
+        panel.querySelectorAll('[data-observer-team]').forEach((button) => button.classList.toggle('selected', button.dataset.observerTeam === model.team));
+        panel.querySelectorAll('[data-observer-difficulty]').forEach((button) => button.classList.toggle('selected', button.dataset.observerDifficulty === model.difficulty));
+        panel.querySelectorAll('[data-observer-fit]').forEach((button) => button.classList.toggle('selected', button.dataset.observerFit === model.pendingFit));
+        panel.querySelectorAll('[data-observer-ship]').forEach((button) => button.classList.toggle('selected', button.dataset.observerShip === model.pendingShip));
+        if (counts)
+            counts.textContent = `${t('BLUE')} ${blueCount} · ${t('RED')} ${redCount}`;
+        if (hint) {
+            const placementHint = pendingLabel
+                ? t('TAP TO PLACE {ship} FOR {team}', { ship: t(pendingLabel), team: t(model.team === 'red' ? 'RED' : 'BLUE') })
+                : model.selectedShipId ? t('DRAG TO REPOSITION OR SELECT ANOTHER SHIP') : t('SELECT A SHIP TO PLACE');
+            hint.textContent = editor
+                ? `${placementHint} · ${t('DRAG EMPTY MAP TO PAN · WHEEL OR ± TO ZOOM')}`
+                : '';
+        }
+        if (start)
+            start.disabled = editor && (!blueCount || !redCount);
+        const layer = panel.querySelector('#observer-units');
+        if (!layer)
+            return;
+        const seen = new Set();
+        const placements = [];
+        for (const ship of model.ships ?? []) {
+            seen.add(ship.id);
+            let node = this.observerNodes.get(ship.id);
+            if (!node) {
+                node = document.createElement('div');
+                node.className = 'observer-unit';
+                layer.append(node);
+                this.observerNodes.set(ship.id, node);
+            }
+            const mode = editor ? 'editor' : 'battle';
+            if (node.dataset.mode !== mode) {
+                const remove = editor
+                    ? `<button class="observer-unit-remove" data-ui-command="observer-remove" data-observer-unit="${escapeHtml(ship.draftId ?? '')}" aria-label="${escapeHtml(t('Remove unit'))}">×</button>`
+                    : '';
+                node.innerHTML = `<div class="observer-unit-label"><i></i><b></b>${remove}</div><div class="observer-unit-bars"><i class="observer-shield"><b data-observer-shield></b></i><i class="observer-hull"><b data-observer-hull></b></i></div><small></small>`;
+                node.dataset.mode = mode;
+            }
+            const projection = ship.projection;
+            const x = Number(projection?.x ?? -1000);
+            const y = Number(projection?.y ?? -1000);
+            node.dataset.team = ship.team ?? 'blue';
+            node.classList.toggle('is-selected', editor && model.selectedShipId === ship.draftId);
+            node.style.left = `${x.toFixed(1)}px`;
+            node.style.top = `${y.toFixed(1)}px`;
+            node.style.setProperty('--observer-lift', '0px');
+            node.classList.toggle('is-offscreen', !projection?.visible);
+            const label = node.querySelector('.observer-unit-label b');
+            if (label)
+                label.textContent = ship.label ?? ship.id;
+            const shield = node.querySelector('[data-observer-shield]');
+            const hull = node.querySelector('[data-observer-hull]');
+            if (shield)
+                shield.style.width = `${percent(ship.shield, ship.maxShield)}%`;
+            if (hull)
+                hull.style.width = `${percent(ship.hull, ship.maxHull)}%`;
+            const state = node.querySelector('small');
+            if (state) {
+                const shipType = catalog.find((entry) => entry.id === ship.shipType);
+                state.textContent = ship.hull > 0
+                    ? editor
+                        ? `${t(shipType?.label ?? ship.shipType ?? ship.role ?? '')} · ${t(ship.capital ? 'CAPITAL HULL' : fitLabels[ship.fit] ?? fitLabels.varied)}`
+                        : `${ship.tier?.toUpperCase() ?? ''} · ${ship.hullId ?? ship.role ?? ''}`
+                    : t('DESTROYED');
+            }
+            if (projection?.visible) {
+                const width = node.offsetWidth || 128;
+                const height = node.offsetHeight || 54;
+                const halfWidth = width * 0.5;
+                const gap = 6;
+                let lift = 0;
+                for (let pass = 0; pass < placements.length; pass += 1) {
+                    const top = y - 12 - height - lift;
+                    const bottom = y - 12 - lift;
+                    let moved = false;
+                    for (const other of placements) {
+                        const horizontal = x - halfWidth < other.right + gap && x + halfWidth > other.left - gap;
+                        const vertical = top < other.bottom + gap && bottom > other.top - gap;
+                        if (horizontal && vertical) {
+                            const required = other.bottom + gap - top;
+                            if (required > 0) {
+                                // Move the marker away from the other ship's
+                                // anchor. A lower ship needs its marker nudged
+                                // down; always lifting would make that overlap
+                                // worse when formations pass vertically.
+                                lift += y >= other.anchorY ? -required : required;
+                                moved = true;
+                            }
+                        }
+                    }
+                    if (!moved)
+                        break;
+                }
+                node.style.setProperty('--observer-lift', `${lift.toFixed(1)}px`);
+                placements.push({ left: x - halfWidth, right: x + halfWidth, top: y - 12 - height - lift, bottom: y - 12 - lift, anchorY: y });
+            }
+        }
+        for (const [id, node] of this.observerNodes) {
+            if (seen.has(id))
+                continue;
+            node.remove();
+            this.observerNodes.delete(id);
+        }
     }
     setTouchScale(scale) {
         this.root.style.setProperty('--touch-scale', String(scale));

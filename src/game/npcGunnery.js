@@ -7,6 +7,16 @@ const profiles={
  ace:{settle:0,shots:8,pause:.15,spread:.15*DEG,lead:1,wander:.13*DEG,curve:.85,beam:.035*DEG,beamSlip:.006,beamWide:.45*DEG,turretError:.35,turretAcquire:.18,turretTurn:1.15},
 };
 export const npcGunneryProfile=ship=>profiles[ship.pilot?.tier]??profiles.veteran;
+// Give a player a modest, trajectory-independent fairness buffer. In the
+// observer, a staged fighter may override the target-only default so an entire
+// NPC-vs-NPC fight can be watched at a chosen error level. Concord frigates
+// keep their authored capital accuracy in every mode.
+export const npcAimErrorFactor=ship=>{
+ if(ship.capitalClass==='frigate')return 1;
+ const observerFactor=Number(ship.observerAimErrorFactor);
+ if(Number.isFinite(observerFactor))return observerFactor;
+ return ship.targetId==='player'?1.35:1;
+};
 export const npcForwardCone=weapon=>weapon?.kind==='beam'?weaponAssistCone(weapon):(weapon?.id==='ripper'?7:weapon?.id==='pulse'||weapon?.id==='pulse-mk2'?6:4)*DEG;
 const sprayCone=weapon=>weapon?.id==='ripper'?9*DEG:weapon?.id==='pulse'||weapon?.id==='pulse-mk2'?7*DEG:0;
 export const npcTriggerCone=(ship,weapon,now=0)=>ship.gunSpeculateWeapon===weapon?.id&&now<(ship.gunSpeculateUntil??0)?sprayCone(weapon):npcForwardCone(weapon);
@@ -59,9 +69,9 @@ export function npcShotDirection(ship,weapon,targetDirection,out,now=0,distance=
  const s=aimState(ship),rotation=s.rotation.fromArray(ship.rotation);
  out.set(0,0,-1).applyQuaternion(rotation);
  if(out.dot(targetDirection)<Math.cos(npcTriggerCone(ship,weapon,now)))return false;
- const rng=ship.aiRng??Math.random,p=npcGunneryProfile(ship),beam=weapon?.kind==='beam',gauss=weapon?.id==='gauss';
- let spread=p.spread;
- if(beam){out.copy(targetDirection);spread=rng()<p.beamSlip?p.beamWide:p.beam;}
+ const rng=ship.aiRng??Math.random,p=npcGunneryProfile(ship),beam=weapon?.kind==='beam',gauss=weapon?.id==='gauss',aimError=npcAimErrorFactor(ship);
+ let spread=p.spread*aimError;
+ if(beam){out.copy(targetDirection);spread=(rng()<p.beamSlip?p.beamWide:p.beam)*aimError;}
  else {
   const tier=ship.pilot?.tier??'veteran',hard=gauss||weapon?.id==='mortar';
   // Precision weapons demand deliberate tracking; forgiving guns retain a
@@ -72,7 +82,7 @@ export function npcShotDirection(ship,weapon,targetDirection,out,now=0,distance=
   if(out.dot(targetDirection)>=Math.cos(npcForwardCone(weapon)))out.lerp(targetDirection,tier==='ace'?(hard?.96:.94):tier==='veteran'?(hard?.55:.97):gauss?.85:hard?.25:.65).normalize();
  }
  const radius=Math.sqrt(rng())*Math.tan(spread),angle=rng()*Math.PI*2;
- const wander=p.wander*(beam?.2:gauss?.5:1),phase=now*1.7+s.phase;
+ const wander=p.wander*(beam?.2:gauss?.5:1)*aimError,phase=now*1.7+s.phase;
  s.error.set(Math.cos(angle)*radius+Math.sin(phase)*wander,Math.sin(angle)*radius+Math.sin(phase*1.31+1.2)*wander,0).applyQuaternion(rotation);
  out.add(s.error).normalize();
  return true;

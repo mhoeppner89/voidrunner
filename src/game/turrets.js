@@ -9,7 +9,7 @@ import {WEAPONS,TRACKING_LASER,WEAPON_DAMAGE_SCALE} from './weapons.js';
 import {relativeIntercept} from './weaponFlight.js';
 import {TURRET_CLEARANCE} from './turretClearance.js';
 import {getPdcDefenseChannel,PDC_RECOVERY_SECONDS} from './pdcFireControl.js';
-import {npcGunneryProfile} from './npcGunnery.js';
+import {npcGunneryProfile,npcAimErrorFactor} from './npcGunnery.js';
 const laser=TRACKING_LASER;
 export const PDC_TURRET=Object.freeze({...WEAPONS.pdc,damageFlat:2.2*WEAPON_DAMAGE_SCALE,shotInterval:.14,burstPause:2,interceptInterval:PDC_RECOVERY_SECONDS});
 const identity=new THREE.Quaternion();
@@ -109,7 +109,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
             if(!intercept){
                 const key=target.id??'player';
                 if(state.targetId!==key){state.targetId=key;state.acquireAt=now+(pilot?.turretAcquire??.3);}
-                const spread=(pdc ? .020 : .018)*distance*(pilot?.turretError??1);
+                const spread=(pdc ? .020 : .018)*distance*(pilot?.turretError??1)*npcAimErrorFactor(actor);
                 const phase=now*2.1+state.phase;
                 point.x+=Math.sin(phase)*spread;
                 point.y+=Math.sin(phase*1.37+1.2)*spread;

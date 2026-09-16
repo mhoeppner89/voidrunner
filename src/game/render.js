@@ -299,6 +299,7 @@ export class SpaceRenderer {
     tmpCurQuat = new THREE.Quaternion();
     tmpScale = new THREE.Vector3();
     tmpEuler = new THREE.Euler();
+    observerPlacementPlane = new THREE.Plane();
     pixelTextures = new Set();
     screenTextures = [];
     forward = new THREE.Vector3();
@@ -4207,6 +4208,18 @@ export class SpaceRenderer {
             material.transparent = true;
         }
     }
+    observerWorldPointFromScreen(clientX, clientY, planeY = 0, out = this.tmpPosition) {
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0)
+            return undefined;
+        // The observer camera is top-down: screen X/Y becomes world X/Z,
+        // while the placement height is supplied as a fixed horizontal plane.
+        this.pointer.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+        this.raycaster.setFromCamera(this.pointer, this.camera);
+        this.observerPlacementPlane.normal.set(0, 1, 0);
+        this.observerPlacementPlane.constant = -planeY;
+        return this.raycaster.ray.intersectPlane(this.observerPlacementPlane, out) ?? undefined;
+    }
     setHyperdriveFx(fx, progress) {
         const state = fx && fx !== 'none' ? fx : 'none';
         if (state !== this.hyperdriveFxState) {
@@ -4218,6 +4231,23 @@ export class SpaceRenderer {
         this.hyperdriveFxProgress = clamp(progress, 0, 1);
         if (this.shell && this.shell.dataset.hyperdriveFx !== state)
             this.shell.dataset.hyperdriveFx = state;
+    }
+    updateObserverCamera(center, zoom, dt = 0) {
+        const x = center?.isVector3 ? center.x : Number(center?.[0] ?? 0);
+        const y = center?.isVector3 ? center.y : Number(center?.[1] ?? 0);
+        const z = center?.isVector3 ? center.z : Number(center?.[2] ?? 0);
+        this.ringParticleDt = dt;
+        this.camera.position.set(x, y + Math.max(1, Number(zoom) || 1), z);
+        this.camera.up.set(0, 0, -1);
+        this.camera.lookAt(x, y, z);
+        this.fovTarget = 52;
+        const previousFov = this.camera.fov;
+        this.camera.fov += (this.fovTarget - this.camera.fov) * (1 - Math.exp(-7 * dt));
+        if (Math.abs(this.camera.fov - previousFov) > 0.001)
+            this.camera.updateProjectionMatrix();
+        this.setCockpitVisible(false);
+        this.updateDistantInstanceVisibility();
+        this.skyRoot.position.copy(this.camera.position);
     }
     updateCamera(position, prevPosition, rotation, prevRotation, angularVelocity, speedRatio, afterburner, dt, alpha = 0) {
         this.ringParticleDt = dt;

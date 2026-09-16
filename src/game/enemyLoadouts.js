@@ -1,5 +1,5 @@
 import {HULL_HARDPOINTS, OUTFIT_ITEMS, itemFitsMount} from './outfitting.js';
-import {WEAPONS, weaponRange, weaponIdForOutfit} from './weapons.js';
+import {LAUNCHERS, WEAPONS, launcherIdForOutfit, weaponRange, weaponIdForOutfit} from './weapons.js';
 import {getEffectiveShipStats} from './shipStats.js';
 const FITS = [
     ['pulse-cannon','pulse-cannon','gauss-cannon'],
@@ -7,20 +7,48 @@ const FITS = [
     ['pulse-cannon','pulse-cannon','mortar'],
     ['pulse-cannon','pulse-cannon','beam-emitter'],
 ];
+// Observer presets are deliberately expressed as real outfitting item ids.
+// createEnemyLoadout still checks every choice against the active hull's
+// mounts, so a medium-only weapon simply falls back to the universal pulse
+// cannon on a small bay instead of creating an impossible ship.
+const OBSERVER_FITS = Object.freeze({
+    balanced: Object.freeze({ guns: ['pulse-cannon', 'pulse-cannon', 'gauss-cannon'], turret: 'pdc', launcher: 'seeker-launcher' }),
+    assault: Object.freeze({ guns: ['ripper', 'ripper', 'ion-blaster'], turret: 'tracking-turret', launcher: 'swarm-launcher', drive: 'engine-mk2', defense: 'recovery-shield' }),
+    support: Object.freeze({ guns: ['pulse-cannon', 'pulse-cannon', 'mortar'], turret: 'pdc', launcher: 'seeker-launcher', power: 'capacitor-bank', defense: 'shield-mk2' }),
+    beam: Object.freeze({ guns: ['beam-emitter', 'beam-emitter', 'beam-emitter'], turret: 'tracking-turret', launcher: 'seeker-launcher', power: 'sustained-reactor' }),
+});
 export function createEnemyLoadout(ship, index, arenaFit) {
     const hullId = ship.role === 'bounty' ? 'lancer' : ship.role === 'trader' ? 'atlas' : ship.role === 'miner' ? 'prospector' : ship.role === 'escort' ? 'wayfarer' : ship.role === 'patrol' ? 'vanguard' : 'talon';
     const spec=HULL_HARDPOINTS[hullId], choices=FITS[index % FITS.length];
+    const observerFit = typeof arenaFit === 'string' ? OBSERVER_FITS[arenaFit] : undefined;
     const guns=spec.guns.map((mount,i)=>{
-        const item=arenaFit?.guns ? arenaFit.guns[i] : i===spec.guns.length-1?choices[2]:choices[i % choices.length];
+        const item=observerFit?.guns ? observerFit.guns[i] : arenaFit?.guns ? arenaFit.guns[i] : i===spec.guns.length-1?choices[2]:choices[i % choices.length];
         if(!item)return null;
         return itemFitsMount(OUTFIT_ITEMS[item],mount)?item:'pulse-cannon';
     });
+    const turrets=spec.turrets.map((mount,i)=>{
+        const item=observerFit?.turret ?? arenaFit?.turrets?.[i] ?? (observerFit ? null : index%2===0?'pdc':'tracking-turret');
+        return item && itemFitsMount(OUTFIT_ITEMS[item],mount) ? item : null;
+    });
+    const launchers=spec.launchers.map((mount,i)=>{
+        const item=observerFit?.launcher;
+        return item && itemFitsMount(OUTFIT_ITEMS[item],mount) ? item : null;
+    });
     const weapons=guns.filter(Boolean).map(weaponIdForOutfit);
     const profile=profileForWeapons(weapons.filter(Boolean),ship.pilot?.tier);
-    const stats=getEffectiveShipStats({shipId:hullId,equipment:[]});
-    return {hullId,guns,weapons,turrets:spec.turrets.map((mount,i)=>arenaFit?.turrets?arenaFit.turrets[i]??null:index%2===0?'pdc':'tracking-turret'),profile,stats,attackOrder:[...weapons.keys()].filter(i=>weapons[i]).reverse(),resources:{...stats,shield:ship.maxShield},fireAt:weapons.map(()=>0),
-        launcher: hullId==='lancer'?'torpedo':index%3===0?'seeker':undefined,
-        missiles: hullId==='lancer'?2:index%3===0?4:0};
+    const equipmentLoadout={guns,launchers,turrets,
+        power:spec.power.map((mount)=>observerFit?.power && itemFitsMount(OUTFIT_ITEMS[observerFit.power],mount)?observerFit.power:null),
+        drive:spec.drive.map((mount)=>observerFit?.drive && itemFitsMount(OUTFIT_ITEMS[observerFit.drive],mount)?observerFit.drive:null),
+        defense:spec.defense.map((mount)=>observerFit?.defense && itemFitsMount(OUTFIT_ITEMS[observerFit.defense],mount)?observerFit.defense:null),
+        utility:spec.utility.map((mount)=>observerFit?.utility && itemFitsMount(OUTFIT_ITEMS[observerFit.utility],mount)?observerFit.utility:null),
+        fireGroups:{activeGroup:'ALL',assignments:Object.fromEntries(spec.guns.map((mount)=>[mount.id,'A']))}};
+    const stats=observerFit
+        ? getEffectiveShipStats({shipId:hullId,outfitting:{schema:3,locker:{},loadouts:{[hullId]:equipmentLoadout}}})
+        : getEffectiveShipStats({shipId:hullId,equipment:[]});
+    const launcher = observerFit ? launcherIdForOutfit(launchers.find(Boolean)) : hullId==='lancer'?'torpedo':index%3===0?'seeker':undefined;
+    return {hullId,guns,weapons,turrets,launchers,power:equipmentLoadout.power,drive:equipmentLoadout.drive,defense:equipmentLoadout.defense,utility:equipmentLoadout.utility,fitId:observerFit ? arenaFit : undefined,profile,stats,attackOrder:[...weapons.keys()].filter(i=>weapons[i]).reverse(),resources:{...stats,shield:stats.shield},fireAt:weapons.map(()=>0),
+        launcher,
+        missiles:observerFit ? (LAUNCHERS[launcher]?.capacity ?? 0) : hullId==='lancer'?2:index%3===0?4:0};
 }
 
 // Shared by live NPC fitting and controlled balance fixtures.

@@ -171,3 +171,23 @@ test('both three-enemy simulator scenarios stage varied equipment and ace pilots
         assert.ok(s.ships.filter(x=>x.hostile).every(x=>x.pilot.tier==='ace'));
     }
 });
+test('observer loadout presets fit real hull mounts and alter only equipment stats',()=>{
+    const expected={
+        balanced:{gun:'gauss-cannon',turret:'pdc'},
+        assault:{gun:'ion-blaster',turret:'tracking-turret'},
+        support:{gun:'mortar',turret:'pdc'},
+        beam:{gun:'beam-emitter',turret:'tracking-turret'},
+    };
+    const baseline=createEnemyLoadout({role:'pirate',pilot:{tier:'veteran'},maxShield:58},0);
+    for(const [id,choice] of Object.entries(expected)){
+        const fit=createEnemyLoadout({role:'pirate',pilot:{tier:'veteran'},maxShield:58},0,id);
+        const turretFit=createEnemyLoadout({role:'patrol',pilot:{tier:'veteran'},maxShield:75},0,id);
+        assert.equal(fit.fitId,id);
+        assert.ok(fit.guns.includes(choice.gun),`${id} should mount its defining gun`);
+        assert.ok(turretFit.turrets.includes(choice.turret),`${id} should mount its selected turret on a hull with turrets`);
+        assert.ok(fit.stats.maxSpeed>0&&fit.stats.shield>0&&fit.stats.hull>0);
+        if(id==='assault')assert.ok(fit.stats.maxSpeed>baseline.stats.maxSpeed,'the assault engine should affect NPC flight speed');
+        else assert.equal(fit.stats.maxSpeed,baseline.stats.maxSpeed,'the preset must use the real hull stat path');
+    }
+    assert.notEqual(createEnemyLoadout({role:'pirate',pilot:{tier:'veteran'},maxShield:58},0,'support').stats.energyCapacity,baseline.stats.energyCapacity);
+});

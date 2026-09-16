@@ -92,6 +92,30 @@ const ARENA_FIELD_START_OFFSETS = [
     [120, -120, -120],
     [-120, -120, 120],
 ];
+const OBSERVER_MAPS = Object.freeze([
+    Object.freeze({ id: 'open', label: 'OPEN SPACE', instanceId: undefined }),
+    Object.freeze({ id: 'asteroid-field', label: 'ASTEROID FIELD', instanceId: 'shardbelt' }),
+    Object.freeze({ id: 'debris-field', label: 'DEBRIS FIELD', instanceId: 'mourning-line' }),
+]);
+// The editor exposes the seven authored ship silhouettes that can participate
+// in combat. The frigate is the capital exception: it keeps its authored
+// battery/PDC system instead of receiving a fighter loadout.
+const OBSERVER_SHIP_TYPES = Object.freeze([
+    Object.freeze({ id: 'wayfarer', label: 'WAYFARER', role: 'escort', defaultFit: 'balanced' }),
+    Object.freeze({ id: 'vanguard', label: 'VANGUARD', role: 'patrol', defaultFit: 'support' }),
+    Object.freeze({ id: 'talon', label: 'TALON', role: 'pirate', defaultFit: 'assault' }),
+    Object.freeze({ id: 'prospector', label: 'PROSPECTOR', role: 'miner', defaultFit: 'support' }),
+    Object.freeze({ id: 'lancer', label: 'LANCER', role: 'bounty', defaultFit: 'beam' }),
+    Object.freeze({ id: 'atlas', label: 'ATLAS', role: 'trader', defaultFit: 'balanced' }),
+    Object.freeze({ id: 'frigate', label: 'CONCORD FRIGATE', role: 'patrol', capitalVariant: 'concord-frigate', defaultFit: undefined }),
+]);
+const OBSERVER_FITS = Object.freeze(['varied', 'balanced', 'assault', 'support', 'beam']);
+const OBSERVER_AIM_ERROR_MIN = 1;
+const OBSERVER_AIM_ERROR_MAX = 2;
+const OBSERVER_DEFAULT_AIM_ERROR = 1.35;
+const OBSERVER_MIN_ZOOM = 420;
+const OBSERVER_MAX_ZOOM = 5200;
+const OBSERVER_MAX_PAN = 4200;
 // Mourning arrivals should reveal the battlefield immediately. Stage the ship
 // on the approach-facing side of the battleship and walk outward only until a
 // 320 km collision-safe point is found. The conservative authored clearance
@@ -706,6 +730,31 @@ const SHIP_AVOID_SEPARATION = 20;
 const SHIP_AVOID_HORIZON = 4.0;
 const SHIP_AVOID_RANGE = 240;
 const SHIP_AVOID_STEER = 1.8;
+const SHIP_AVOID_BUFFER = 12;
+const SHIP_AVOID_MAX_HORIZON = 8;
+const SHIP_AVOID_MAX_RANGE = 960;
+// NPCs need more room to avoid one another than they need to avoid the player:
+// the visual hulls are wider than the old flat 20-unit threshold, and several
+// NPCs can commit to the same attack lane at once. This only affects the
+// The observer can spread opposing staged formations more decisively, while
+// the normal game keeps its established tactical steering. The clearance shell
+// below protects NPC pairs in both contexts without changing weapons or skills.
+const NPC_SHIP_AVOID_BUFFER = 24;
+const NPC_SHIP_AVOID_HORIZON = 6.5;
+const NPC_SHIP_AVOID_RANGE = 320;
+const NPC_SHIP_AVOID_STEER = 2.4;
+const FRIGATE_NPC_IMPACT_DAMAGE_SCALE = 0.2;
+const npcShipCollisionDamage = (impact, victim, attacker) => {
+    if (impact <= 4)
+        return 0;
+    // A fighter hitting a capital hull should be a glancing nuisance, not a
+    // free second weapon battery. The fighter still pays the full collision
+    // cost; only the much larger frigate's received impact is plated down.
+    const scale = victim.capitalClass === 'frigate' && !attacker.capitalClass
+        ? FRIGATE_NPC_IMPACT_DAMAGE_SCALE
+        : 1;
+    return Math.min((impact - 3) * 1.35 * scale, Math.max(10, victim.maxHull * 0.25));
+};
 // Cover-seeking: a damaged ship with drained shields ducks behind a big rock
 // or wreck to let shields regenerate before breaking out for another joust.
 const COVER_MIN_RADIUS = 42;
@@ -1329,6 +1378,33 @@ export class GameSession {
     activeInstanceId;
     targetPointer;
     arena = null;
+    observerFocus = new THREE.Vector3();
+    observerMapOrigin = new THREE.Vector3();
+    observerCameraPan = new THREE.Vector3();
+    observerPlacementWorld = new THREE.Vector3();
+    observerPlacementLocal = new THREE.Vector3();
+    observerPanFromWorld = new THREE.Vector3();
+    observerPanToWorld = new THREE.Vector3();
+    tmpObserverDirection = new THREE.Vector3();
+    observerZoom = 1100;
+    observerSpeed = 1;
+    observerPaused = false;
+    observerEditor = false;
+    observerStarted = false;
+    observerMap = 'open';
+    observerDifficulty = 'veteran';
+    observerTeam = 'blue';
+    observerPendingShip = undefined;
+    observerPendingFit = 'varied';
+    observerAimError = OBSERVER_DEFAULT_AIM_ERROR;
+    observerSelectedShipId = undefined;
+    observerDraft = [];
+    observerUnitCounter = 0;
+    observerPointer;
+    observerPointerPlacementAt = 0;
+    observerPointerSuppressClickUntil = 0;
+    observerResult;
+    observerStartTime = 0;
     activeRace = null;
     // Race slipstream assist is computed before updatePlayer and consumed by
     // that controller without changing the player's ship-class statistics.
@@ -1427,7 +1503,12 @@ export class GameSession {
         if (!arena && save.world.pendingJump)
             this.finishGalaxyJump(save.world.pendingJump, false, false);
         if (arena) {
-            if(arena.run)this.setupRun();else this.setupArena(arena);
+            if (arena.observer)
+                this.setupObserver(arena);
+            else if(arena.run)
+                this.setupRun();
+            else
+                this.setupArena(arena);
         }
         else if (needsFlightRuntime)
             this.ensureInitialTraffic();
@@ -1451,8 +1532,12 @@ export class GameSession {
         if (this.qualityScale !== 1)
             this.renderer.setQualityScale(this.qualityScale);
         this.renderer.canvas.addEventListener('pointerdown', this.onSpacePointerDown, { passive: true });
+        this.renderer.canvas.addEventListener('pointermove', this.onSpacePointerMove, { passive: true });
         this.renderer.canvas.addEventListener('pointerup', this.onSpacePointerUp);
         this.renderer.canvas.addEventListener('pointercancel', this.onSpacePointerCancel);
+        this.renderer.canvas.addEventListener('click', this.onObserverCanvasClick);
+        this.renderer.canvas.addEventListener('wheel', this.onObserverWheel, { passive: false });
+        this.renderer.canvas.addEventListener('contextmenu', this.onObserverContextMenu);
         return this.renderer;
     }
     ensureInitialTraffic() {
@@ -2124,6 +2209,475 @@ export class GameSession {
             return { changed: false };
         return this.handleTutorialEvent('choice', { choiceId });
     }
+    setupObserver(config = {}, announce = true) {
+        const preserveDraft = Boolean(config.preserveDraft);
+        const draft = preserveDraft
+            ? this.observerDraft.map((entry) => ({ ...entry, position: [...entry.position] }))
+            : [];
+        this.clearTransientSpace();
+        this.combatTeams?.clear();
+        this.nextCombatTeamCleanup = 0;
+        this.observerSpeed = 1;
+        this.observerMap = OBSERVER_MAPS.some((entry) => entry.id === config.environment) ? config.environment : 'open';
+        this.observerDifficulty = config.difficulty ?? this.observerDifficulty ?? 'veteran';
+        this.observerEditor = config.editor !== false && config.started !== true;
+        this.observerStarted = !this.observerEditor;
+        this.observerPaused = this.observerEditor;
+        this.observerTeam = 'blue';
+        this.observerPendingShip = undefined;
+        this.observerPendingFit = 'varied';
+        this.observerSelectedShipId = undefined;
+        this.observerDraft = draft;
+        if (!preserveDraft)
+            this.observerUnitCounter = 0;
+        this.observerResult = undefined;
+        const player = this.save.player;
+        const stats = getEffectiveShipStats(player);
+        player.dockedAt = undefined;
+        player.velocity = [0, 0, 0];
+        player.angularVelocity = [0, 0, 0];
+        player.rotation = [0, 0, 0, 1];
+        player.throttle = 0;
+        player.shield = stats.shield;
+        player.hull = stats.hull;
+        player.energy = stats.energyCapacity;
+        player.fuel = stats.fuel;
+        player.currentTargetId = undefined;
+        player.navTargetId = 'helix';
+        this.audio.setStationMode(false);
+        this.resetPlayerInterpolation(true);
+        this.configureObserverEnvironment(this.observerMap);
+        this.observerStartTime = this.save.world.time;
+        for (const entry of this.observerDraft)
+            this.spawnObserverDraftUnit(entry);
+        if (this.observerStarted)
+            this.activateObserverBattle();
+        this.renderer.setCockpitVisible(false);
+        this.ui.hideHud();
+        this.arena.environment = this.observerMap;
+        this.arena.editor = this.observerEditor;
+        this.arena.started = this.observerStarted;
+        this.ui.showObserverView({ ...config, environment: this.observerMap, editor: this.observerEditor });
+        if (announce && this.observerStarted)
+            this.ui.pushEvent?.(t('NPC OBSERVER READY · {map}', { map: this.observerMap.toUpperCase() }), 'info', 4200);
+    }
+    observerMapEntry(environment = this.observerMap) {
+        return OBSERVER_MAPS.find((entry) => entry.id === environment) ?? OBSERVER_MAPS[0];
+    }
+    observerShipType(shipType) {
+        return OBSERVER_SHIP_TYPES.find((entry) => entry.id === shipType) ?? OBSERVER_SHIP_TYPES[0];
+    }
+    configureObserverEnvironment(environment = 'open') {
+        const map = this.observerMapEntry(environment);
+        this.observerMap = map.id;
+        this.observerCameraPan.set(0, 0, 0);
+        this.observerZoom = 1250;
+        this.observerPointer = undefined;
+        this.observerPointerSuppressClickUntil = 0;
+        if (map.instanceId) {
+            this.observerMapOrigin.copy(vec(LOCATIONS[map.instanceId].position));
+            this.setFieldArenaPosition(this.observerMapOrigin, map.instanceId);
+        }
+        else {
+            this.observerMapOrigin.set(0, 0, 0);
+        }
+        this.activeInstanceId = map.instanceId;
+        this.renderer.setActiveInstance(map.instanceId);
+        this.save.player.position = tuple(this.observerMapOrigin);
+        this.save.player.navTargetId = map.instanceId ?? 'helix';
+        this.observerFocus.copy(this.observerMapOrigin);
+        for (const entry of this.observerDraft) {
+            const ship = this.ships.find((candidate) => candidate.observerUnitId === entry.id);
+            if (!ship)
+                continue;
+            this.observerWorldPosition(entry, this.observerPlacementWorld);
+            tupleInto(ship.position, this.observerPlacementWorld);
+            tupleInto(ship.velocity, [0, 0, 0]);
+            ship.prevPosition = new Float64Array(ship.position);
+            ship.task = { kind: 'hunt', anchor: [...ship.position], destination: undefined };
+        }
+    }
+    observerWorldPosition(entry, out = this.observerPlacementWorld) {
+        return out.set(
+            this.observerMapOrigin.x + Number(entry.position?.[0] ?? 0),
+            this.observerMapOrigin.y + Number(entry.position?.[1] ?? 0),
+            this.observerMapOrigin.z + Number(entry.position?.[2] ?? 0),
+        );
+    }
+    applyObserverShipState(ship, entry) {
+        const team = entry.team === 'red' ? 'red' : 'blue';
+        const type = this.observerShipType(entry.shipType);
+        ship.observerUnitId = entry.id;
+        ship.observerShipType = type.id;
+        ship.observerTeam = team;
+        ship.observerFit = entry.fit ?? 'varied';
+        ship.observerLabel = type.label;
+        ship.hostile = team === 'red';
+        ship.authorizedTarget = team === 'red';
+        ship.faction = team === 'red' ? 'red-talons' : 'concord';
+        ship.dark = false;
+        ship.mugCapable = false;
+        ship.noSurrender = true;
+        ship.holdFire = false;
+        ship.pursuitHoldFire = false;
+        ship.destination = undefined;
+        ship.targetId = undefined;
+        ship.velocity[0] = 0;
+        ship.velocity[1] = 0;
+        ship.velocity[2] = 0;
+        const direction = team === 'blue' ? this.tmpObserverDirection?.set(1, 0, 0) : this.tmpObserverDirection?.set(-1, 0, 0);
+        if (direction) {
+            ship.rotation = quatTuple(new THREE.Quaternion().setFromUnitVectors(FORWARD, direction));
+            ship.prevRotation = new Float64Array(ship.rotation);
+        }
+        ship.prevPosition = new Float64Array(ship.position);
+        ship.task = { kind: 'hunt', anchor: [...ship.position], destination: undefined };
+        this.applyObserverAimError(ship);
+    }
+    applyObserverAimError(ship) {
+        // Capital frigates have a separately tuned battery/PDC model. The
+        // observer slider is for ordinary NPC opponents only.
+        ship.observerAimErrorFactor = ship.capitalClass === 'frigate' ? 1 : this.observerAimError;
+    }
+    spawnObserverDraftUnit(entry) {
+        const type = this.observerShipType(entry.shipType);
+        const world = this.observerWorldPosition(entry, this.observerPlacementWorld);
+        const ship = type.capitalVariant
+            ? this.spawnCapitalShip(type.capitalVariant, world.toArray(), undefined, undefined)
+            : this.spawnShip(type.role, world.toArray(), undefined, undefined, { tier: this.observerDifficulty });
+        if (!type.capitalVariant) {
+            const fit = entry.fit === 'varied' ? type.defaultFit : entry.fit;
+            ship.combatFit = createEnemyLoadout(ship, this.ships.length, fit);
+            ship.maxShield = ship.shield = ship.combatFit.stats.shield;
+            ship.maxHull = ship.hull = ship.combatFit.stats.hull;
+            ship.combatFit.resources.shield = ship.maxShield;
+            ship.energy = ship.combatFit.stats.energyCapacity;
+            ship.fuel = ship.combatFit.stats.fuel;
+        }
+        this.applyObserverShipState(ship, entry);
+        this.relabelObserverShips();
+        return ship;
+    }
+    relabelObserverShips() {
+        const counts = { blue: 0, red: 0 };
+        for (const ship of this.ships) {
+            if (!ship.observerTeam)
+                continue;
+            counts[ship.observerTeam] += 1;
+            ship.observerLabel = `${ship.observerTeam === 'blue' ? 'BLUE' : 'RED'} ${counts[ship.observerTeam]}`;
+        }
+    }
+    observerSetMap(environment) {
+        if (!this.arena?.observer || !this.observerEditor)
+            return;
+        this.configureObserverEnvironment(environment);
+        this.arena.environment = this.observerMap;
+        this.ui.updateObserverView(this.observerViewModel());
+    }
+    observerZoomBy(factor) {
+        if (!this.arena?.observer || !Number.isFinite(factor) || factor <= 0)
+            return;
+        this.observerZoom = clamp(this.observerZoom * factor, OBSERVER_MIN_ZOOM, OBSERVER_MAX_ZOOM);
+        this.ui.updateObserverView(this.observerViewModel());
+    }
+    observerZoomIn() {
+        this.observerZoomBy(0.8);
+    }
+    observerZoomOut() {
+        this.observerZoomBy(1.25);
+    }
+    observerCenterCamera() {
+        if (!this.arena?.observer)
+            return;
+        this.observerCameraPan.set(0, 0, 0);
+        this.observerZoom = 1250;
+        this.ui.updateObserverView(this.observerViewModel());
+    }
+    observerSetTeam(team) {
+        if (!this.observerEditor || !['blue', 'red'].includes(team))
+            return;
+        this.observerTeam = team;
+        this.ui.updateObserverView(this.observerViewModel());
+    }
+    observerSetDifficulty(difficulty) {
+        if (!this.observerEditor || !['novice', 'veteran', 'ace'].includes(difficulty))
+            return;
+        this.observerDifficulty = difficulty;
+        this.arena.difficulty = difficulty;
+        this.ui.updateObserverView(this.observerViewModel());
+    }
+    observerSetAimError(value) {
+        if (!this.arena?.observer || !Number.isFinite(value))
+            return;
+        this.observerAimError = clamp(value, OBSERVER_AIM_ERROR_MIN, OBSERVER_AIM_ERROR_MAX);
+        for (const ship of this.ships) {
+            if (ship.observerUnitId)
+                this.applyObserverAimError(ship);
+        }
+        this.ui.updateObserverView(this.observerViewModel());
+    }
+    observerSelectFit(fit) {
+        if (!this.observerEditor || !OBSERVER_FITS.includes(fit))
+            return;
+        this.observerPendingFit = fit;
+        this.ui.updateObserverView(this.observerViewModel());
+    }
+    observerSelectShip(shipType) {
+        if (!this.observerEditor || !OBSERVER_SHIP_TYPES.some((entry) => entry.id === shipType))
+            return;
+        this.observerPendingShip = shipType;
+        this.ui.updateObserverView(this.observerViewModel());
+    }
+    observerDraftPositionAt(clientX, clientY, out = this.observerPlacementLocal) {
+        const world = this.renderer.observerWorldPointFromScreen(clientX, clientY, this.observerMapOrigin.y, this.observerPlacementWorld);
+        if (!world)
+            return undefined;
+        // The observer camera looks straight down world +Y. Screen X/Y map to
+        // the horizontal world X/Z plane; world Y is a fixed level for every
+        // staged unit so placement never invents a depth/height coordinate.
+        return out.set(
+            clamp(world.x - this.observerMapOrigin.x, -1100, 1100),
+            0,
+            clamp(world.z - this.observerMapOrigin.z, -850, 850),
+        );
+    }
+    observerPlacePendingAt(clientX, clientY) {
+        if (!this.observerEditor || !this.observerPendingShip)
+            return false;
+        const local = this.observerDraftPositionAt(clientX, clientY);
+        if (!local)
+            return false;
+        const entry = {
+            id: `observer-unit-${++this.observerUnitCounter}`,
+            shipType: this.observerPendingShip,
+            team: this.observerTeam,
+            fit: this.observerPendingShip === 'frigate' ? 'varied' : this.observerPendingFit,
+            position: [local.x, local.y, local.z],
+        };
+        this.observerDraft.push(entry);
+        this.spawnObserverDraftUnit(entry);
+        this.observerSelectedShipId = entry.id;
+        this.observerPendingShip = undefined;
+        this.observerPointerPlacementAt = performance.now();
+        this.ui.updateObserverView(this.observerViewModel());
+        return true;
+    }
+    observerMoveShipAt(unitId, clientX, clientY) {
+        if (!this.observerEditor)
+            return false;
+        const entry = this.observerDraft.find((candidate) => candidate.id === unitId);
+        const ship = this.ships.find((candidate) => candidate.observerUnitId === unitId);
+        const local = this.observerDraftPositionAt(clientX, clientY);
+        if (!entry || !ship || !local)
+            return false;
+        entry.position = [local.x, local.y, local.z];
+        this.observerWorldPosition(entry, this.observerPlacementWorld);
+        tupleInto(ship.position, this.observerPlacementWorld);
+        tupleInto(ship.velocity, [0, 0, 0]);
+        ship.prevPosition = new Float64Array(ship.position);
+        ship.task = { kind: 'hunt', anchor: [...ship.position], destination: undefined };
+        this.observerSelectedShipId = unitId;
+        return true;
+    }
+    observerRemoveShip(unitId) {
+        if (!this.observerEditor)
+            return;
+        this.observerDraft = this.observerDraft.filter((entry) => entry.id !== unitId);
+        this.ships = this.ships.filter((ship) => ship.observerUnitId !== unitId);
+        this.observerSelectedShipId = undefined;
+        this.relabelObserverShips();
+        this.renderer.syncShips(this.ships);
+        this.ui.updateObserverView(this.observerViewModel());
+    }
+    observerClearFormation() {
+        if (!this.observerEditor)
+            return;
+        this.observerDraft = [];
+        this.ships.length = 0;
+        this.observerSelectedShipId = undefined;
+        this.observerPendingShip = undefined;
+        this.renderer.syncShips(this.ships);
+        this.ui.updateObserverView(this.observerViewModel());
+    }
+    activateObserverBattle() {
+        const blue = this.ships.filter((ship) => ship.observerTeam === 'blue' && ship.hull > 0);
+        const red = this.ships.filter((ship) => ship.observerTeam === 'red' && ship.hull > 0);
+        if (!blue.length || !red.length)
+            return false;
+        const faceToward = (ship, target) => {
+            const direction = this.tmpObserverDirection.set(target.position[0] - ship.position[0], target.position[1] - ship.position[1], target.position[2] - ship.position[2]).normalize();
+            ship.rotation = quatTuple(new THREE.Quaternion().setFromUnitVectors(FORWARD, direction));
+            ship.prevPosition = new Float64Array(ship.position);
+            ship.prevRotation = new Float64Array(ship.rotation);
+            ship.velocity[0] = 0;
+            ship.velocity[1] = 0;
+            ship.velocity[2] = 0;
+            ship.task = { kind: 'hunt', anchor: [...ship.position], destination: undefined };
+        };
+        blue.forEach((ship, index) => {
+            ship.targetId = red[index % red.length].id;
+            faceToward(ship, red[index % red.length]);
+        });
+        red.forEach((ship, index) => {
+            ship.targetId = blue[index % blue.length].id;
+            faceToward(ship, blue[index % blue.length]);
+        });
+        this.observerEditor = false;
+        this.observerStarted = true;
+        this.observerPaused = false;
+        this.observerResult = undefined;
+        this.observerStartTime = this.save.world.time;
+        this.simAccumulator = 0;
+        this.arena.editor = false;
+        this.arena.started = true;
+        this.ui.updateObserverView(this.observerViewModel());
+        return true;
+    }
+    observerStartBattle() {
+        if (!this.arena?.observer || !this.observerEditor)
+            return false;
+        return this.activateObserverBattle();
+    }
+    observerReturnToEditor() {
+        if (!this.arena?.observer || this.observerEditor)
+            return false;
+        // Keep the authored formation, but rebuild the observer's transient
+        // ships so destroyed units return at full strength and can be moved,
+        // removed or refit before the next manual start.
+        this.setupObserver({
+            ...this.arena,
+            observer: true,
+            editor: true,
+            started: false,
+            preserveDraft: true,
+            aimError: this.observerAimError,
+        }, false);
+        return true;
+    }
+    updateObserverFocus() {
+        if (this.observerEditor) {
+            this.observerFocus.set(
+                this.observerMapOrigin.x + this.observerCameraPan.x,
+                this.observerMapOrigin.y,
+                this.observerMapOrigin.z + this.observerCameraPan.z,
+            );
+            return this.observerFocus;
+        }
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+        for (const ship of this.ships) {
+            if (ship.hull <= 0)
+                continue;
+            minX = Math.min(minX, ship.position[0]);
+            maxX = Math.max(maxX, ship.position[0]);
+            minY = Math.min(minY, ship.position[1]);
+            maxY = Math.max(maxY, ship.position[1]);
+            minZ = Math.min(minZ, ship.position[2]);
+            maxZ = Math.max(maxZ, ship.position[2]);
+        }
+        if (minX !== Infinity) {
+            this.observerFocus.set((minX + maxX) * 0.5, (minY + maxY) * 0.5, (minZ + maxZ) * 0.5);
+            const span = Math.max(maxX - minX, maxZ - minZ) + 360;
+            this.observerZoom = clamp(span * 0.95, 900, 2600);
+        }
+        else {
+            this.observerFocus.copy(this.observerMapOrigin);
+            this.observerZoom = 1250;
+        }
+        return this.observerFocus;
+    }
+    observerViewModel() {
+        const elapsed = this.observerStarted ? Math.max(0, this.save.world.time - this.observerStartTime) : 0;
+        const counts = this.ships.reduce((result, ship) => {
+            if (ship.observerTeam)
+                result[ship.observerTeam] = (result[ship.observerTeam] ?? 0) + (ship.hull > 0 ? 1 : 0);
+            return result;
+        }, { blue: 0, red: 0 });
+        return {
+            environment: this.observerMap,
+            environmentLabel: this.observerMapEntry().label,
+            difficulty: this.observerDifficulty,
+            editor: this.observerEditor,
+            started: this.observerStarted,
+            team: this.observerTeam,
+            pendingShip: this.observerPendingShip,
+            pendingFit: this.observerPendingFit,
+            aimError: this.observerAimError,
+            selectedShipId: this.observerSelectedShipId,
+            maps: OBSERVER_MAPS.map(({ id, label }) => ({ id, label })),
+            catalog: OBSERVER_SHIP_TYPES.map(({ id, label, defaultFit, capitalVariant }) => ({ id, label, defaultFit, capital: Boolean(capitalVariant) })),
+            counts,
+            elapsed,
+            paused: this.observerPaused,
+            speed: this.observerSpeed,
+            zoom: this.observerZoom,
+            pan: { x: this.observerCameraPan.x, z: this.observerCameraPan.z },
+            result: this.observerResult,
+            ships: this.ships.map((ship) => ({
+                id: ship.id,
+                draftId: ship.observerUnitId,
+                label: ship.observerLabel ?? ship.name,
+                team: ship.observerTeam ?? (ship.hostile ? 'red' : 'blue'),
+                role: ship.role,
+                shipType: ship.observerShipType,
+                fit: ship.observerFit ?? 'varied',
+                hullId: ship.observerShipType === 'frigate' ? 'frigate' : ship.combatFit?.hullId,
+                tier: ship.pilot?.tier,
+                capital: Boolean(ship.capitalClass),
+                shield: Math.max(0, ship.shield),
+                maxShield: ship.maxShield,
+                hull: Math.max(0, ship.hull),
+                maxHull: ship.maxHull,
+                projection: this.renderer.projectTargetToScreen('ship', ship.id, ship.position),
+            })),
+        };
+    }
+    updateObserverBattleState() {
+        // Observer rounds end only when one side has no surviving ship. The
+        // clock is informational; there is deliberately no time-limit draw.
+        if (!this.observerStarted || this.observerEditor || this.observerResult)
+            return;
+        let blueAlive = false, redAlive = false;
+        for (const ship of this.ships) {
+            if (ship.hull <= 0)
+                continue;
+            if (ship.observerTeam === 'red')
+                redAlive = true;
+            else if (ship.observerTeam === 'blue')
+                blueAlive = true;
+        }
+        if (blueAlive && redAlive)
+            return;
+        this.observerResult = blueAlive ? 'BLUE WINS' : redAlive ? 'RED WINS' : 'DRAW';
+        this.observerPaused = true;
+        this.simAccumulator = 0;
+    }
+    toggleObserverPause() {
+        if (!this.arena?.observer || !this.observerStarted || this.observerResult)
+            return;
+        this.observerPaused = !this.observerPaused;
+        this.simAccumulator = 0;
+        this.ui.updateObserverView(this.observerViewModel());
+    }
+    cycleObserverSpeed() {
+        if (!this.arena?.observer || !this.observerStarted)
+            return;
+        const speeds = [0.5, 1, 2, 4, 8];
+        const index = speeds.indexOf(this.observerSpeed);
+        this.observerSpeed = speeds[(index + 1) % speeds.length];
+        this.ui.updateObserverView(this.observerViewModel());
+    }
+    restartObserver() {
+        if (!this.arena?.observer)
+            return;
+        if (this.observerEditor) {
+            this.observerClearFormation();
+            return;
+        }
+        this.arena.editor = false;
+        this.arena.started = true;
+        this.arena.preserveDraft = true;
+        this.setupObserver(this.arena, false);
+    }
     setupArena(config, announce = true) {
         // Every arena attempt is a clean sortie: restore all weapon pools and
         // clear session-only heat/cooldowns before spawning the player or
@@ -2272,6 +2826,10 @@ export class GameSession {
         this.abandonMiningDrones('arena-reset');
         this.renderer?.clearDrones?.();
         if(this.arena?.run){this.showRunPreparation();return;}
+        if (this.arena?.observer) {
+            this.restartObserver();
+            return;
+        }
         this.ships = [];
         this.projectiles = [];
         this.pdcAssignments.clear();
@@ -2294,12 +2852,109 @@ export class GameSession {
         this.setupArena(this.arena, false);
         this.ui.pushEvent(t('Ship destroyed — arena reset.'), 'warning', 3600);
     }
+    onObserverPointerDown(event) {
+        // Touch pointers report `button` inconsistently across browsers
+        // (some use -1/undefined for the contact). Secondary mouse buttons
+        // pan the map; only the primary button can stage or move a unit.
+        if (!this.observerEditor || this.save.player.dockedAt || (event.pointerType === 'mouse' && ![0, 1, 2].includes(event.button)))
+            return;
+        const picked = event.button === 0 ? this.renderer.pickTarget(event.clientX, event.clientY) : undefined;
+        const ship = picked?.kind === 'ship' ? this.ships.find((entry) => entry.id === picked.id) : undefined;
+        const panGesture = event.button === 1 || event.button === 2 || event.shiftKey || (!ship && !this.observerPendingShip);
+        this.observerPointer = {
+            id: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            draftId: ship?.observerUnitId,
+            mode: panGesture ? 'pan' : ship ? 'move' : 'place',
+            lastX: event.clientX,
+            lastY: event.clientY,
+        };
+        if (ship?.observerUnitId)
+            this.observerSelectedShipId = ship.observerUnitId;
+        this.renderer.canvas.setPointerCapture?.(event.pointerId);
+    }
+    onObserverPointerMove(event) {
+        const pointer = this.observerPointer;
+        if (!pointer || pointer.id !== event.pointerId)
+            return;
+        if (pointer.mode === 'place' && Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y) > TARGET_TAP_DRIFT) {
+            pointer.mode = 'pan';
+            this.beginObserverPan(pointer);
+        }
+        if (pointer.mode === 'move' && pointer.draftId)
+            this.observerMoveShipAt(pointer.draftId, event.clientX, event.clientY);
+        else if (pointer.mode === 'pan')
+            this.observerPanAt(pointer, event.clientX, event.clientY);
+    }
+    beginObserverPan(pointer) {
+        pointer.lastX = pointer.x;
+        pointer.lastY = pointer.y;
+    }
+    observerPanAt(pointer, clientX, clientY) {
+        const from = this.renderer.observerWorldPointFromScreen(pointer.lastX, pointer.lastY, this.observerMapOrigin.y, this.observerPanFromWorld);
+        const to = this.renderer.observerWorldPointFromScreen(clientX, clientY, this.observerMapOrigin.y, this.observerPanToWorld);
+        if (from && to) {
+            this.observerCameraPan.x = clamp(this.observerCameraPan.x + from.x - to.x, -OBSERVER_MAX_PAN, OBSERVER_MAX_PAN);
+            this.observerCameraPan.z = clamp(this.observerCameraPan.z + from.z - to.z, -OBSERVER_MAX_PAN, OBSERVER_MAX_PAN);
+            this.ui.updateObserverView(this.observerViewModel());
+        }
+        pointer.lastX = clientX;
+        pointer.lastY = clientY;
+    }
+    onObserverPointerUp(event) {
+        const pointer = this.observerPointer;
+        this.observerPointer = undefined;
+        if (!pointer || pointer.id !== event.pointerId)
+            return;
+        this.renderer.canvas.releasePointerCapture?.(event.pointerId);
+        const moved = Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y) > TARGET_TAP_DRIFT;
+        if (pointer.mode === 'place' && !moved)
+            this.observerPlacePendingAt(event.clientX, event.clientY);
+        else if (pointer.mode === 'pan' || moved)
+            this.observerPointerSuppressClickUntil = performance.now() + 350;
+        else if (pointer.mode === 'move')
+            this.ui.updateObserverView(this.observerViewModel());
+    }
+    onObserverCanvasClick = (event) => {
+        if (!this.observerEditor || !this.observerPendingShip || performance.now() - this.observerPointerPlacementAt < 350 || performance.now() < this.observerPointerSuppressClickUntil)
+            return;
+        // The click fallback covers browsers that deliver a compatibility
+        // click but lose the pointerup during canvas capture. Never place a
+        // new ship on top of an existing hull when that happens.
+        const picked = this.renderer.pickTarget(event.clientX, event.clientY);
+        if (picked?.kind === 'ship')
+            return;
+        this.observerPlacePendingAt(event.clientX, event.clientY);
+    };
+    onObserverWheel = (event) => {
+        if (!this.arena?.observer || !this.observerEditor)
+            return;
+        event.preventDefault();
+        this.observerZoomBy(event.deltaY > 0 ? 1.12 : 0.88);
+    };
+    onObserverContextMenu = (event) => {
+        if (this.arena?.observer && this.observerEditor)
+            event.preventDefault();
+    };
     onSpacePointerDown = (event) => {
+        if (this.arena?.observer) {
+            this.onObserverPointerDown(event);
+            return;
+        }
         if (event.button !== 0 || this.save.player.dockedAt || this.ui.isModalOpen)
             return;
         this.targetPointer = { id: event.pointerId, x: event.clientX, y: event.clientY, at: performance.now() };
     };
+    onSpacePointerMove = (event) => {
+        if (this.arena?.observer)
+            this.onObserverPointerMove(event);
+    };
     onSpacePointerUp = (event) => {
+        if (this.arena?.observer) {
+            this.onObserverPointerUp(event);
+            return;
+        }
         const start = this.targetPointer;
         this.targetPointer = undefined;
         if (!start || start.id !== event.pointerId || this.save.player.dockedAt || this.ui.isModalOpen)
@@ -2313,6 +2968,7 @@ export class GameSession {
     };
     onSpacePointerCancel = () => {
         this.targetPointer = undefined;
+        this.observerPointer = undefined;
     };
     selectPickedTarget(target) {
         this.selectTarget(target.kind, target.id);
@@ -2396,6 +3052,13 @@ export class GameSession {
             messages.forEach((message) => this.ui.showToast(message, 'success', 5200));
             this.persistSave();
         }
+        else if (this.arena?.observer) {
+            this.renderer?.setCockpitVisible(false);
+            this.ui.hideDock();
+            this.ui.hideTitle();
+            this.ui.hideHud();
+            this.ui.showObserverView(this.arena);
+        }
         else {
             this.renderer.setCockpitVisible(true);
             this.ui.hideDock();
@@ -2431,8 +3094,12 @@ export class GameSession {
         cancelAnimationFrame(this.frameId);
         this.persistSave();
         this.renderer?.canvas.removeEventListener('pointerdown', this.onSpacePointerDown);
+        this.renderer?.canvas.removeEventListener('pointermove', this.onSpacePointerMove);
         this.renderer?.canvas.removeEventListener('pointerup', this.onSpacePointerUp);
         this.renderer?.canvas.removeEventListener('pointercancel', this.onSpacePointerCancel);
+        this.renderer?.canvas.removeEventListener('click', this.onObserverCanvasClick);
+        this.renderer?.canvas.removeEventListener('wheel', this.onObserverWheel);
+        this.renderer?.canvas.removeEventListener('contextmenu', this.onObserverContextMenu);
         this.input.dispose();
         this.renderer?.dispose();
         this.audio.dispose();
@@ -2472,10 +3139,13 @@ export class GameSession {
             dt = 0;
         if (dt > 0.25)
             dt = 0.25;
-        this.simAccumulator += dt;
+        const observerActive = Boolean(this.arena?.observer);
+        const observerScale = observerActive ? (this.observerPaused ? 0 : this.observerSpeed) : 1;
+        this.simAccumulator += dt * observerScale;
         // Hard cap so a stall/tab-switch can't queue an unbounded catch-up burst.
-        if (this.simAccumulator > SIM_STEP * MAX_SIM_STEPS)
-            this.simAccumulator = SIM_STEP * MAX_SIM_STEPS;
+        const maxCatchUp = observerActive ? MAX_SIM_STEPS * 6 : MAX_SIM_STEPS;
+        if (this.simAccumulator > SIM_STEP * maxCatchUp)
+            this.simAccumulator = SIM_STEP * maxCatchUp;
         // End a story line's mute when the player dismissed the bar or the
         // duration elapsed; runs before the sim so chatter can resume the
         // same frame the story clears.
@@ -2501,6 +3171,18 @@ export class GameSession {
             else if (actions.map) {
                 this.simAccumulator = 0;
                 this.openMap();
+            }
+            else if (observerActive) {
+                if (actions.pause)
+                    this.toggleObserverPause();
+                let steps = 0;
+                while (this.observerStarted && !this.observerPaused && this.simAccumulator >= SIM_STEP && steps < maxCatchUp) {
+                    this.updateSimulation(SIM_STEP, { throttleDelta: 0, pitch: 0, yaw: 0, roll: 0 });
+                    this.simAccumulator -= SIM_STEP;
+                    steps += 1;
+                }
+                if (this.observerPaused)
+                    this.simAccumulator = 0;
             }
             else {
                 // Edge actions (target cycle, hyperdrive toggle, missile, capture…) run
@@ -2659,6 +3341,17 @@ export class GameSession {
         this.hintCooldown -= dt;
         this.scanCooldown -= dt;
         this.utilitySoundCooldown -= dt;
+        if (this.arena?.observer) {
+            if (!this.observerStarted)
+                return;
+            this.updateShips(dt);
+            this.resolveShipContacts();
+            this.updateProjectiles(dt);
+            this.updatePickups(dt);
+            this.cleanupEntities();
+            this.updateObserverBattleState();
+            return;
+        }
         if (this.galaxyJump) {
             this.updatePdcDrones(dt);
             if (this.save.world.time >= this.galaxyJump.completeAt)
@@ -6586,7 +7279,7 @@ export class GameSession {
             // Priority order for the one-voice slot: the one-shot recognition
             // line lands first (a wary re-encounter shouldn't lose it to generic
             // combat chatter), then the proximity mutter, then the timed lines.
-            if (!ship.tutorialCompanion) {
+            if (!this.arena?.observer && !ship.tutorialCompanion) {
                 this.maybeRecognitionLine(ship, position, playerPosition);
                 this.maybeProximityLine(ship, position, playerPosition);
                 this.maybePilotLine(ship, position, playerPosition);
@@ -8540,6 +9233,57 @@ export class GameSession {
             }
             return inward + Math.hypot(rvx, rvy, rvz) * 0.16;
         };
+        // Keep NPCs from entering the physical collision envelope in the first
+        // place. The steering pass above normally does this, but two ships can
+        // turn toward the same target between prediction samples. A small,
+        // damage-free traffic bubble catches that last frame without changing
+        // the weapon model or pilot skill: if the actual hull test did not hit
+        // yet, gently separate the ships and let them continue their attack.
+        const softlySeparateNpcPair = (aPos, aVel, bPos, bVel, aRadius, bRadius, aVol, bVol) => {
+            const dx = aPos[0] - bPos[0];
+            const dy = aPos[1] - bPos[1];
+            const dz = aPos[2] - bPos[2];
+            const distSq = dx * dx + dy * dy + dz * dz;
+            const reach = aRadius + bRadius;
+            const clearance = reach + NPC_SHIP_AVOID_BUFFER;
+            if (distSq >= clearance * clearance)
+                return false;
+            const dist = Math.sqrt(distSq);
+            let nx = dist > 1e-4 ? dx / dist : 1;
+            let ny = dist > 1e-4 ? dy / dist : 0;
+            let nz = dist > 1e-4 ? dz / dist : 0;
+            if (dist <= 1e-4) {
+                const rvx = aVel[0] - bVel[0];
+                const rvy = aVel[1] - bVel[1];
+                const rvz = aVel[2] - bVel[2];
+                const relativeSpeed = Math.hypot(rvx, rvy, rvz);
+                if (relativeSpeed > 1e-4) {
+                    nx = rvx / relativeSpeed;
+                    ny = rvy / relativeSpeed;
+                    nz = rvz / relativeSpeed;
+                }
+            }
+            const shareA = bVol / (aVol + bVol);
+            const shareB = aVol / (aVol + bVol);
+            const correction = clearance - dist;
+            aPos[0] += nx * correction * shareA;
+            aPos[1] += ny * correction * shareA;
+            aPos[2] += nz * correction * shareA;
+            bPos[0] -= nx * correction * shareB;
+            bPos[1] -= ny * correction * shareB;
+            bPos[2] -= nz * correction * shareB;
+            const relativeClosing = (aVel[0] - bVel[0]) * nx + (aVel[1] - bVel[1]) * ny + (aVel[2] - bVel[2]) * nz;
+            if (relativeClosing < 0) {
+                const impulse = -relativeClosing * 1.05;
+                aVel[0] += nx * impulse * shareA;
+                aVel[1] += ny * impulse * shareA;
+                aVel[2] += nz * impulse * shareA;
+                bVel[0] -= nx * impulse * shareB;
+                bVel[1] -= ny * impulse * shareB;
+                bVel[2] -= nz * impulse * shareB;
+            }
+            return true;
+        };
         const ships = this.ships;
         for (let i = 0; i < ships.length; i += 1) {
             const ship = ships[i];
@@ -8550,6 +9294,7 @@ export class GameSession {
             if (ship.race)
                 continue;
             const shipExtents = this.npcHullExtents(ship);
+            const shipRadius = Math.max(shipExtents[0], shipExtents[1], shipExtents[2]);
             const shipVolume = shipExtents[0] * shipExtents[1] * shipExtents[2];
             // Player vs ship.
             const shipPos = this.tmpP0.set(ship.position[0], ship.position[1], ship.position[2]);
@@ -8601,12 +9346,16 @@ export class GameSession {
                     const otherVel0 = [ov[0], ov[1], ov[2]];
                     const shipImpact = apply(ship.position, ship.velocity, otherVel0, shipVolume, otherVolume, 1);
                     const otherImpact = apply(other.position, other.velocity, shipVel0, otherVolume, shipVolume, -1);
-                    const shipDmg = shipImpact > 4 ? Math.min((shipImpact - 3) * 1.35, Math.max(10, ship.maxHull * 0.25)) : 0;
-                    const otherDmg = otherImpact > 4 ? Math.min((otherImpact - 3) * 1.35, Math.max(10, other.maxHull * 0.25)) : 0;
+                    const shipDmg = npcShipCollisionDamage(shipImpact, ship, other);
+                    const otherDmg = npcShipCollisionDamage(otherImpact, other, ship);
                     if (shipDmg > 0)
                         this.damageShip(ship, shipDmg, other.id, tuple(otherPos));
                     if (otherDmg > 0)
                         this.damageShip(other, otherDmg, ship.id, tuple(shipPos));
+                }
+                else if (softlySeparateNpcPair(ship.position, ship.velocity, other.position, other.velocity, shipRadius, Math.max(otherExtents[0], otherExtents[1], otherExtents[2]), shipVolume, otherVolume)) {
+                    // The next pair in this row must see the corrected centre.
+                    shipPos.set(ship.position[0], ship.position[1], ship.position[2]);
                 }
             }
         }
@@ -11366,7 +12115,7 @@ export class GameSession {
             visit(cx, cy, cz);
         }
     }
-    getShipAvoidance(position, velocity, shipId) {
+    getShipAvoidance(position, velocity, shipId, selfRadius = SHIP_AVOID_SEPARATION * 0.5) {
         // Evasive turn away from any other ship (player included) that is closing
         // on a course whose closest approach is inside SHIP_AVOID_SEPARATION units.
         // Returns a steering vector scaled by urgency, or undefined if the lane is
@@ -11382,12 +12131,33 @@ export class GameSession {
         const vy = velocity.y;
         const vz = velocity.z;
         const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
-        const consider = (op, ov) => {
+        let selfShip;
+        if (shipId) {
+            for (const candidate of this.ships) {
+                if (candidate.id === shipId) {
+                    selfShip = candidate;
+                    break;
+                }
+            }
+        }
+        const actualSelfRadius = selfShip ? Math.max(...this.npcHullExtents(selfShip)) : selfRadius;
+        const consider = (op, ov, otherRadius, npcPair = false) => {
             const rx = op[0] - px;
             const ry = op[1] - py;
             const rz = op[2] - pz;
             const distSq = rx * rx + ry * ry + rz * rz;
-            if (distSq >= SHIP_AVOID_RANGE * SHIP_AVOID_RANGE || distSq < 0.0001)
+            const largeHullContact = (npcPair ? actualSelfRadius : selfRadius) > SHIP_AVOID_SEPARATION * 2 || otherRadius > SHIP_AVOID_SEPARATION * 2;
+            const separation = npcPair
+                ? Math.max(SHIP_AVOID_SEPARATION, actualSelfRadius + otherRadius + NPC_SHIP_AVOID_BUFFER)
+                : largeHullContact
+                ? Math.max(SHIP_AVOID_SEPARATION, selfRadius + otherRadius + SHIP_AVOID_BUFFER)
+                : SHIP_AVOID_SEPARATION;
+            const range = npcPair
+                ? Math.max(NPC_SHIP_AVOID_RANGE, Math.min(SHIP_AVOID_MAX_RANGE, separation * 3))
+                : largeHullContact
+                ? Math.max(SHIP_AVOID_RANGE, Math.min(SHIP_AVOID_MAX_RANGE, separation * 2.2))
+                : SHIP_AVOID_RANGE;
+            if (distSq >= range * range || distSq < 0.0001)
                 return;
             const rvx = ov[0] - vx;
             const rvy = ov[1] - vy;
@@ -11396,15 +12166,21 @@ export class GameSession {
             if (closing >= 0)
                 return;
             const rvSq = rvx * rvx + rvy * rvy + rvz * rvz;
-            const t = Math.min(-closing / Math.max(rvSq, 1e-4), SHIP_AVOID_HORIZON);
+            const relativeSpeed = Math.sqrt(rvSq);
+            const horizon = npcPair
+                ? Math.max(NPC_SHIP_AVOID_HORIZON, Math.min(SHIP_AVOID_MAX_HORIZON, separation / Math.max(12, relativeSpeed) * 4))
+                : largeHullContact
+                ? Math.max(SHIP_AVOID_HORIZON, Math.min(SHIP_AVOID_MAX_HORIZON, separation / Math.max(12, relativeSpeed) * 3))
+                : SHIP_AVOID_HORIZON;
+            const t = Math.min(-closing / Math.max(rvSq, 1e-4), horizon);
             const cax = rx + rvx * t;
             const cay = ry + rvy * t;
             const caz = rz + rvz * t;
             const ca = Math.sqrt(cax * cax + cay * cay + caz * caz);
-            if (ca >= SHIP_AVOID_SEPARATION)
+            if (ca >= separation)
                 return;
             const dist = Math.sqrt(distSq);
-            const urgency = (1 - ca / SHIP_AVOID_SEPARATION) * (1 - t / SHIP_AVOID_HORIZON) * clamp(dist / SHIP_AVOID_RANGE, 0.35, 1);
+            const urgency = (1 - ca / separation) * (1 - t / horizon) * clamp(dist / range, 0.35, 1);
             if (urgency <= bestUrgency)
                 return;
             bestUrgency = urgency;
@@ -11435,15 +12211,17 @@ export class GameSession {
                     len = 1;
                 }
             }
-            this.tmpShipAvoid.set(ex / len, ey / len, ez / len).multiplyScalar(urgency * SHIP_AVOID_STEER);
+            this.tmpShipAvoid.set(ex / len, ey / len, ez / len).multiplyScalar(urgency * (npcPair ? NPC_SHIP_AVOID_STEER : SHIP_AVOID_STEER));
             found = true;
         };
         const player = this.save.player;
-        consider(player.position, player.velocity);
+        consider(player.position, player.velocity, Math.max(this.playerCollisionRadius?.() ?? PLAYER_RADIUS, PLAYER_RADIUS));
         for (const other of this.ships) {
             if (other.id === shipId || other.hull <= 0)
                 continue;
-            consider(other.position, other.velocity);
+            const sameFaction = selfShip?.faction && other.faction && selfShip.faction === other.faction;
+            const expandedNpcPair = Boolean(this.arena?.observer && selfShip && !sameFaction);
+            consider(other.position, other.velocity, Math.max(...this.npcHullExtents(other)), expandedNpcPair);
         }
         return found ? this.tmpShipAvoid : undefined;
     }
@@ -12661,6 +13439,19 @@ export class GameSession {
         return neutral;
     }
     syncRender(dt, now) {
+        if (this.arena?.observer) {
+            const focus = this.updateObserverFocus();
+            this.renderer.setCockpitVisible(false);
+            this.renderer.updateObserverCamera(focus, this.observerZoom, dt);
+            const alpha = clamp(this.simAccumulator / SIM_STEP, 0, 1);
+            this.renderer.syncShips(this.ships, alpha);
+            this.renderer.syncProjectiles(this.projectiles, this.projStore, alpha);
+            this.renderer.syncPickups(this.pickups, this.pickupStore, alpha);
+            this.renderer.render();
+            this.ui.updateObserverView(this.observerViewModel());
+            this.renderFrameCount = (this.renderFrameCount ?? 0) + 1;
+            return;
+        }
         const stats = this.playerStats();
         const vv = this.save.player.velocity;
         const speed = Math.hypot(vv[0], vv[1], vv[2]);

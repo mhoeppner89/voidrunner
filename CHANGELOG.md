@@ -1,3 +1,50 @@
+## 0.8.2aa — Combat sim polish
+
+- Refined the observer staging editor with clearer section hierarchy, stronger selected states, a wider setup card and a sticky formation footer that keeps counts and Start Battle available while the ship palette scrolls.
+- Grouped the live toolbar controls, improved status and camera readability, and kept the team legend visible beside the editor.
+- Enlarged projected unit labels and lifebars with compact shield/hull markers. Combat rules and balance are unchanged.
+- Browser smoke checks passed for editor launch, placement, manual start, live lifebars, Fleet return, desktop/touch sizing and clean browser logs.
+- Release identifiers: GAME_VERSION `0.8.2aa`, CACHE `voidrunner-v251-0-8-2aa-combat-sim-polish`.
+
+## 0.8.2z — NPC collision separation
+
+- NPC-to-NPC avoidance now uses both ships' real hull envelopes, a longer look-ahead and a stronger lateral turn, so fighter, freighter and frigate attack lanes separate earlier.
+- Added a small damage-free NPC clearance shell as a last-frame safeguard. It pushes NPCs apart before their physical hulls touch without changing player collisions, weapons, accuracy or pilot skill balance; already-overlapping hard contacts still use the existing collision damage rules.
+- Added a focused clearance regression. The collision, frigate, recovery and variety suites pass 81/81, and the controlled 3v3 head-on diagnostic produced zero NPC contact events.
+- Release identifiers: GAME_VERSION `0.8.2z`, CACHE `voidrunner-v250-0-8-2z-npc-separation`.
+
+## 0.8.2y — Observer editor return
+
+- The observer toolbar's FLOTTE button now returns to the paused formation editor instead of opening the regular player ship-status menu over the fight.
+- The current staged formation is preserved for repositioning, removal or refitting; the next manual start rebuilds fresh units.
+- Release identifiers: GAME_VERSION `0.8.2y`, CACHE `voidrunner-v249-0-8-2y-observer-editor-return`.
+
+## 0.8.2x — Safer NPC hull contacts
+
+- NPC ship avoidance now uses the combined hull envelopes and a longer look-ahead when a fighter approaches a large ship, so normal attack passes turn away before the frigate hull is reached.
+- A rare NPC fighter–frigate contact still hurts the fighter normally, while the frigate's received collision damage is reduced to 20% to reflect its heavier plating. Player collision rules and weapon/NPC skill balance are unchanged.
+- Added focused collision regressions and verified six frigate balance fights; the targeted collision/frigate recovery/variety suites pass.
+- Release identifiers: GAME_VERSION `0.8.2x`, CACHE `voidrunner-v248-0-8-2x-npc-collision-safety`.
+
+## 0.8.2w — Hands-on NPC combat staging editor
+
+- The NPC combat view now opens directly in a paused staging editor instead of a scenario menu.
+- Choose Open Space, Asteroid Field or Debris Field, select Blue or Red, set pilot tier and choose the next ship's fit.
+- Add seven authored ship types — Wayfarer, Vanguard, Talon, Prospector, Lancer, Atlas and Concord Frigate — by tapping the map. Drag placed units to reposition them, remove individual units, clear the formation, and start the battle by hand.
+- Staged units use the live flight, pilot, weapon, projectile, collision, shield, hull and capital-frigate systems. The editor is a camera/UI layer over the real 3D fields.
+- Added wheel/± zoom and drag-to-pan camera controls. The mouse ray now places on the visible world X/Z plane with a fixed world-Y level.
+- Added a Fleet button to the observer toolbar; it opens the paused ship/fleet layout and Close returns to combat.
+- Added a 1.00×–2.00× NPC aim-error slider for ordinary observer opponents. Concord frigates ignore it and keep their tuned capital accuracy; observer rounds have no time-limit draw.
+- Release identifiers: GAME_VERSION `0.8.2w`, CACHE `voidrunner-v247-0-8-2w-observer-editor-camera-aim`.
+
+## 0.8.2v — Combat fairness and NPC combat observer
+
+- NPC forward guns and ship-mounted laser/PDC fire use a modest player-only pointing-error buffer. Missile interception remains precise.
+- Weapon stats, damage, cooldowns, hull values and the novice/veteran/ace skill ordering are unchanged; NPC-vs-NPC accuracy is unchanged.
+- Added an RTS-style NPC combat observer with 1v1, 1v2, 1v3, 2v3 and 3v3 matchups, live game-time clock, pause, speed control, restart and result display.
+- Observer fights run through the live flight, weapon, projectile, shield and hull systems. Blue and Red can use independent role-default, balanced, close-assault, defensive-support or beam fits with real mount validation and fitted stats.
+- Targeted accuracy, combat, turret, weapon and observer-fitting regression tests pass; browser smoke checks cover live fights, lifebars, speed, pause, restart and asymmetric fits.
+
 ## 0.8.2r — Cockpit damage and the frigate arena finale
 
 - Four hull-damage stages add canopy fractures, broken-glass edges, instrument faults and emergency lighting. Each hull uses its own canopy mask; repairs restore the appropriate stage. Reduced damage effects are available in Display settings and respect reduced-motion preferences.

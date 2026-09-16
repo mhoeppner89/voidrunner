@@ -168,7 +168,7 @@ const beginSession = (mode, arena) => {
     session = undefined;
     previousSession?.dispose();
     ui.clearToasts();
-    const save = arena?.run ? (arena.resume?readArenaRun():newArenaRun(Boolean(arena.hard&&arenaRecord().unlockedHard))) : mode === 'new' || mode === 'arena' ? createNewSave(DRONE_TEST_MODE ? 4242 : undefined, { tutorial: mode === 'new' && !DRONE_TEST_MODE }) : loadGame();
+    const save = arena?.run ? (arena.resume?readArenaRun():newArenaRun(Boolean(arena.hard&&arenaRecord().unlockedHard))) : mode === 'new' || mode === 'arena' || mode === 'observer' ? createNewSave(DRONE_TEST_MODE ? 4242 : undefined, { tutorial: mode === 'new' && !DRONE_TEST_MODE }) : loadGame();
     if (!save) {
         ui.showToast(t('No autosave was found.'), 'warning');
         ui.showTitle(false, titleSave());
@@ -220,7 +220,7 @@ const beginSession = (mode, arena) => {
         if (devPreviewShip)
             save.player.shipId = devPreviewShip;
     }
-    if (mode === 'arena')
+    if (mode === 'arena' || mode === 'observer')
         save.arena = arena;
     syncTitleSettings(save.settings);
     // The combat sim uses the same canonical factory hardpoints as a career.
@@ -235,7 +235,7 @@ const beginSession = (mode, arena) => {
     // flight runtime up front.
     const audioManager = new AudioManager();
     void audioManager.enable();
-    ui.setLoading(true, t(mode === 'arena' ? 'PREPARING FLIGHT' : 'LOADING CAREER'));
+    ui.setLoading(true, t(mode === 'arena' ? 'PREPARING FLIGHT' : mode === 'observer' ? 'PREPARING OBSERVER' : 'LOADING CAREER'));
     const starting = (async () => {
         await nextPaint();
         const shipId = SHIP_WARM_ASSETS[save.player.shipId] ? save.player.shipId : 'wayfarer';
@@ -244,7 +244,7 @@ const beginSession = (mode, arena) => {
             loadGameSession(),
             Promise.allSettled([
                 warmBinary(SHIP_WARM_ASSETS[shipId][0], 'high'),
-                ui.preloadSessionAssets(save, { priority: 'high', includeLocation: mode !== 'arena' }),
+                ui.preloadSessionAssets(save, { priority: 'high', includeLocation: mode !== 'arena' && mode !== 'observer' }),
             ]),
         ]);
         if (tiltPermission === true)
@@ -258,7 +258,7 @@ const beginSession = (mode, arena) => {
                 saveGame(cachedSave);
             }
             showTitleScreen();
-        }, mode === 'arena' ? arena : null, tiltPermission, audioManager);
+        }, mode === 'arena' || mode === 'observer' ? arena : null, tiltPermission, audioManager);
         session = nextSession;
         if (!arena && save.player.dockedAt)
             await nextSession.prepareDockedFlightRuntime({ showLoading: false });
@@ -339,6 +339,23 @@ const actions = {
     arenaRunAction: (...args) => session?.arenaRunAction(...args),
     startRunWave: () => session?.startRunWave(),
     startArena: (environment, scenario, difficulty, fit) => beginSession('arena', { environment, scenario, difficulty, fit }),
+    startObserver: (environment = 'open') => beginSession('observer', { observer: true, editor: true, environment }),
+    observerTogglePause: () => session?.toggleObserverPause(),
+    observerCycleSpeed: () => session?.cycleObserverSpeed(),
+    observerRestart: () => session?.restartObserver(),
+    observerSetMap: (environment) => session?.observerSetMap(environment),
+    observerSetTeam: (team) => session?.observerSetTeam(team),
+    observerSetDifficulty: (difficulty) => session?.observerSetDifficulty(difficulty),
+    observerSetAimError: (value) => session?.observerSetAimError(value),
+    observerSelectShip: (shipType) => session?.observerSelectShip(shipType),
+    observerSelectFit: (fit) => session?.observerSelectFit(fit),
+    observerZoomIn: () => session?.observerZoomIn(),
+    observerZoomOut: () => session?.observerZoomOut(),
+    observerCenterCamera: () => session?.observerCenterCamera(),
+    observerStartBattle: () => session?.observerStartBattle(),
+    observerReturnToEditor: () => session?.observerReturnToEditor(),
+    observerClearFormation: () => session?.observerClearFormation(),
+    observerRemoveShip: (unitId) => session?.observerRemoveShip(unitId),
     requestFullscreen: () => void enterFullscreen(),
     toggleFullscreen: () => void toggleFullscreen(),
     launch: () => {
@@ -514,6 +531,22 @@ window.__VOID_PRIVATEER__ = {
     arenaRunAction: (...args) => session?.arenaRunAction(...args),
     startRunWave: () => session?.startRunWave(),
     startArena: (environment, scenario, difficulty, fit) => beginSession('arena', { environment, scenario, difficulty, fit }),
+    startObserver: (environment = 'open') => beginSession('observer', { observer: true, editor: true, environment }),
+    observerTogglePause: () => session?.toggleObserverPause(),
+    observerCycleSpeed: () => session?.cycleObserverSpeed(),
+    observerRestart: () => session?.restartObserver(),
+    observerSetMap: (environment) => session?.observerSetMap(environment),
+    observerSetTeam: (team) => session?.observerSetTeam(team),
+    observerSetDifficulty: (difficulty) => session?.observerSetDifficulty(difficulty),
+    observerSetAimError: (value) => session?.observerSetAimError(value),
+    observerSelectShip: (shipType) => session?.observerSelectShip(shipType),
+    observerSelectFit: (fit) => session?.observerSelectFit(fit),
+    observerZoomIn: () => session?.observerZoomIn(),
+    observerZoomOut: () => session?.observerZoomOut(),
+    observerCenterCamera: () => session?.observerCenterCamera(),
+    observerStartBattle: () => session?.observerStartBattle(),
+    observerClearFormation: () => session?.observerClearFormation(),
+    observerRemoveShip: (unitId) => session?.observerRemoveShip(unitId),
     getState: () => session?.save ?? cachedSave,
     getRuntime: () => session,
     miningDrones: () => session?.miningDroneHud(),
@@ -544,8 +577,25 @@ window.render_game_to_text = () => {
     const race = runtime?.activeRace;
     const physicalSignatureRange = runtime?.playerPhysicalSignatureRange?.();
     return JSON.stringify({
-        mode: save.player.dockedAt ? 'docked' : race?.state ? `race-${race.state}` : 'flight',
+        mode: runtime?.arena?.observer ? 'observer' : save.player.dockedAt ? 'docked' : race?.state ? `race-${race.state}` : 'flight',
         testMode: runtime?.arena?.testMode ?? null,
+        observer: runtime?.arena?.observer ? {
+            environment: runtime.observerMap ?? runtime.arena.environment ?? 'open',
+            editor: Boolean(runtime.observerEditor),
+            started: Boolean(runtime.observerStarted),
+            difficulty: runtime.observerDifficulty ?? runtime.arena.difficulty ?? 'veteran',
+            aimError: runtime.observerAimError ?? 1.35,
+            timeLimit: null,
+            elapsed: Math.max(0, (save.world.time ?? 0) - (runtime.observerStartTime ?? 0)),
+            paused: Boolean(runtime.observerPaused),
+            speed: runtime.observerSpeed ?? 1,
+            result: runtime.observerResult ?? null,
+            alive: runtime.ships.reduce((teams, ship) => {
+                const team = ship.observerTeam ?? 'unknown';
+                teams[team] = (teams[team] ?? 0) + (ship.hull > 0 ? 1 : 0);
+                return teams;
+            }, {}),
+        } : null,
         coordinates: 'world [x,y,z]; +y is up; ship forward is local -z',
         player: {
             credits: save.player.credits,
