@@ -336,7 +336,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2al';
+const GAME_VERSION = '0.8.2am';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -5009,9 +5009,9 @@ export class GameUI {
             'pulse-cannon':'Efficient fire; lead your target.', 'ripper':'Strong against hull; short range.',
             'gauss-cannon':'Partly bypasses shields; slow firing.', 'ion-blaster':'Strips shields; shared standard lead.',
             'mortar':'High direct damage and efficiency; slow plasma.', 'pdc':'Missiles first; ten-round hull bursts, weak against shields.',
-            'tracking-turret':'Automatically fires at your selected hostile.', 'engine-mk2':'More speed; slower turning.',
-            'thrusters-mk2':'Sharper turns; lower top speed.', 'capacitor-bank':'Larger energy reserve; slower recharge.',
-            'sustained-reactor':'Faster recharge; smaller reserve.', 'shield-mk2':'More shield protection.', 'recovery-shield':'Faster recovery; weaker shield.'
+            'tracking-turret':'Automatically fires at your selected hostile.', 'engine-mk2':'More speed; a small turning penalty.',
+            'thrusters-mk2':'Sharper turns; a small speed penalty.', 'capacitor-bank':'Larger energy reserve; a mild recharge penalty.',
+            'sustained-reactor':'Faster recharge; standard reserve.', 'shield-mk2':'More shield protection.', 'recovery-shield':'Faster recovery; slightly less capacity.'
         };
         const labelItems=ids=>{const counts={};ids.forEach(id=>counts[id]=(counts[id]??0)+1);return Object.entries(counts).map(([id,n])=>`${n}× ${t(OUTFIT_ITEMS[id].name)}`).join(' · ');};
         let body='',footer='';
@@ -5025,7 +5025,7 @@ export class GameUI {
             body=`<div class="run-stage-label">${t('Choose one reward')}</div><div class="run-offers">${r.offers.map(id=>{
                 const plan=runRewardPlan(save,id);if(!plan)return '';
                 const title=id==='repair'?t('Field repairs'):`${plan.count}× ${t(OUTFIT_ITEMS[id].name)}`;
-                const detail=id==='repair'?t('Restore 40% hull and refill missiles.'):t(briefs[id]??OUTFIT_ITEMS[id].description)+(OUTFIT_ITEMS[id]?.category==='launcher'?' '+t('Includes a full magazine.'): '');
+                const detail=id==='repair'?t('Restore 50% hull and refill missiles.'):t(briefs[id]??OUTFIT_ITEMS[id].description)+(OUTFIT_ITEMS[id]?.category==='launcher'?' '+t('Includes a full magazine.'): '');
                 const replacement=plan.replaced.length?t('Replaces {items}',{items:labelItems(plan.replaced)}):t('Fits an empty mount');
                 return command('reward',id,`<b>${escapeHtml(title)}</b><span>${escapeHtml(detail)}</span>${id==='repair'?'':`<small>${escapeHtml(replacement)}</small>`}`,`class="${r.selectedReward===id?'is-selected':''}" aria-pressed="${r.selectedReward===id}"`);
             }).join('')}</div>`;

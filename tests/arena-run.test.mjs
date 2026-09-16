@@ -47,8 +47,12 @@ test('hull changes preserve all copies, health fraction and limited ordnance; no
 test('baseline service restores limited hull and one missile; loss remains lost on reload',()=>{
  storage();const s=runSession(),p=s.save.player,stats=getEffectiveShipStats(p);p.hull=stats.hull*.3;
  const magazine=launcherMagazineEntries(p)[0];p.launcherMagazines[magazine.mount.id].rounds=0;
- recoverRun(s.save);assert.ok(Math.abs(p.hull-stats.hull*.5)<1e-8);assert.equal(p.missiles,1);
+ recoverRun(s.save);assert.ok(Math.abs(p.hull-stats.hull*.6)<1e-8);assert.equal(p.missiles,1);
  s.startRunWave();p.hull=0;s.recoverPlayer();assert.equal(s.save.arenaRun.phase,'lost');assert.equal(readArenaRun().arenaRun.phase,'lost');assert.equal(Boolean(arenaRecord().unlockedHard),false);
+});
+test('field repair restores a larger normal-run hull buffer',()=>{
+ storage();const save=newArenaRun(false,91),stats=getEffectiveShipStats(save.player);save.arenaRun.rewardChosen=false;save.arenaRun.hullChosen=true;save.arenaRun.offers=['repair'];save.player.hull=stats.hull*.2;
+ assert.equal(chooseRunReward(save,'repair'),true);assert.ok(Math.abs(save.player.hull-stats.hull*.7)<1e-8);
 });
 test('interrupted combat returns to its fixed preparation checkpoint without changing offers or granting repairs',()=>{
  storage();const s=runSession();s.save.player.hull=30;s.startRunWave();const before=readArenaRun();s.save.player.hull=2;s.save.arenaRun.damage=999;s.persistSave();
@@ -124,7 +128,7 @@ test('weapon sets fit matching mounts atomically and preserve replaced equipment
 test('legacy completed runs stay completed and active checkpoints extend to ten waves',()=>{
  const data=storage();for(const phase of ['prepare','combat','won','lost']){const save=newArenaRun();Object.assign(save.arenaRun,{version:1,wave:7,phase,cleared:phase==='won'?8:7});delete save.arenaRun.totalWaves;data.set(ARENA_RUN_KEY,JSON.stringify(save));const r=readArenaRun().arenaRun;assert.equal(r.phase,phase);assert.equal(r.totalWaves,['won','lost'].includes(phase)?8:10);assert.equal(r.version,2);}
 });
-test('Vanguard wave precedes a fully serviced frigate boss',()=>{storage();const s=runSession(8);s.startRunWave();s.tickArenaRun(3);assert.equal(s.ships.length,2);assert.ok(s.ships.every(x=>x.combatFit.hullId==='vanguard'));s.save.player.hull=5;s.ships.forEach(x=>x.hull=0);s.tickArenaRun(0);assert.equal(s.save.arenaRun.wave,9);assert.equal(s.save.player.hull,getEffectiveShipStats(s.save.player).hull);chooseRunReward(s.save,s.save.arenaRun.offers[0]);s.startRunWave();s.tickArenaRun(3);assert.equal(s.ships.length,1);assert.equal(s.ships[0].capitalBoss,true);assert.equal(s.ships[0].combatFit.turrets.filter(Boolean).length,4);});
+test('Vanguard wave stages the ace before a fully serviced frigate boss',()=>{storage();const s=runSession(8);s.startRunWave();s.tickArenaRun(3);assert.equal(s.ships.length,1);assert.equal(s.ships[0].combatFit.hullId,'vanguard');s.save.world.time=s.save.arenaRun.startedAt+12;s.tickArenaRun(9);assert.equal(s.ships.length,2);assert.ok(s.ships.every(x=>x.combatFit.hullId==='vanguard'));s.save.player.hull=5;s.ships.forEach(x=>x.hull=0);s.tickArenaRun(0);assert.equal(s.save.arenaRun.wave,9);assert.equal(s.save.player.hull,getEffectiveShipStats(s.save.player).hull);chooseRunReward(s.save,s.save.arenaRun.offers[0]);s.startRunWave();s.tickArenaRun(3);assert.equal(s.ships.length,1);assert.equal(s.ships[0].capitalBoss,true);assert.equal(s.ships[0].combatFit.turrets.filter(Boolean).length,4);});
 
 test('frigate spawn search stays ahead even when early positions are obstructed',()=>{storage();const s=runSession(9);s.startRunWave();let attempts=0;s.entryPositionClear=()=>++attempts>18;s.save.arenaRun.entry=[0,0,-200];assert.equal(s.spawnRunEnemy(RUN_WAVES[9].enemies[0],0),true);const delta=new THREE.Vector3(...s.ships[0].position).sub(new THREE.Vector3(...s.save.player.position)),ahead=new THREE.Vector3(0,0,-1).applyQuaternion(new THREE.Quaternion(...s.save.player.rotation));assert.ok(delta.dot(ahead)>0);});
 

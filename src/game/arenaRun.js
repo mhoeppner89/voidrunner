@@ -18,7 +18,7 @@ export const RUN_WAVES=[
  {name:'The duellist',hint:'An ace uses drift and reversals. Save energy for the opening.',environment:'open',enemies:[enemy('pirate','ace',['pulse-cannon','pulse-cannon','beam-emitter'])]},
  {name:'Crossfire',hint:'A close-range veteran enters first. A missile gunship joins after eight seconds. Separate them.',environment:'debris-field',enemies:[enemy('pirate','veteran',['ripper','ripper','ion-blaster']),enemy('bounty','veteran',['pulse-cannon','gauss-cannon'],8,{launcher:'seeker',missiles:3})]},
  {name:'Final flight',hint:'The ace carries two torpedoes. A veteran escort arrives after ten seconds.',environment:'asteroid-field',enemies:[enemy('bounty','ace',['pulse-cannon','mortar'],0,{launcher:'torpedo',missiles:2}),enemy('escort','veteran',['pulse-cannon','beam-emitter'],10,{launcher:'seeker',missiles:2})]},
- {name:'Vanguard pair',hint:'Two Vanguards cover each other. Use wrecks to isolate one and escape their turret arcs.',environment:'debris-field',enemies:[enemy('patrol','veteran',['ripper','ion-blaster']),enemy('patrol','ace',['pulse-cannon','gauss-cannon'],0,{launcher:'seeker',missiles:2})]},
+ {name:'Vanguard pair',hint:'A veteran enters first. The ace arrives after twelve seconds, giving you a short window to isolate one through the wrecks.',environment:'debris-field',enemies:[enemy('patrol','veteran',['ripper','ion-blaster']),enemy('patrol','ace',['pulse-cannon','gauss-cannon'],12,{launcher:'seeker',missiles:2})]},
  {name:'The frigate',hint:'Batteries fire in two waves: watch the charge and take cover. Attack during recovery. Plasma and torpedoes penetrate the armored hull; use the aim button to target exposed batteries.',environment:'asteroid-field',enemies:[['frigate','ace',0,0]]},
 ];
 export function newArenaRun(hard=false,seed=Date.now()) {
@@ -73,7 +73,7 @@ export function refreshRunRewardOffers(save){
  const bossOffer=runOffers(save)[0];if(r.wave===9&&['torpedo-launcher','mortar','ripper'].includes(bossOffer)&&!valid.includes(bossOffer))valid[0]=bossOffer;
  r.offers=valid;if(!valid.includes(r.selectedReward))r.selectedReward=null;
 }
-export function recoverRun(save,extra=false){const p=save.player,stats=getEffectiveShipStats(p),r=save.arenaRun;p.hull=Math.min(stats.hull,p.hull+stats.hull*(extra?.4:r.hard?.1:.2));p.shield=stats.shield;p.energy=stats.energyCapacity;p.fuel=stats.fuel;
+export function recoverRun(save,extra=false){const p=save.player,stats=getEffectiveShipStats(p),r=save.arenaRun;p.hull=Math.min(stats.hull,p.hull+stats.hull*(extra?.5:r.hard?.1:.3));p.shield=stats.shield;p.energy=stats.energyCapacity;p.fuel=stats.fuel;
  if(extra)fillLauncherMagazines(p);else {for(const entry of normalizeLauncherMagazines(p))if(entry.rounds<entry.capacity)p.launcherMagazines[entry.mount.id].rounds++;normalizeLauncherMagazines(p);}
 }
 // A reward is a complete, mass-checked replacement plan, not a loose gun.

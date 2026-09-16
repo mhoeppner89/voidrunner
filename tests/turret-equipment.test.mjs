@@ -48,13 +48,13 @@ test('tracking turret requires a selected hostile and clear sight; banking chang
  s.lineBlocked=()=>false;tick(s);assert.ok(fired>0);const before=fired;
  p.rotation=[0,0,1,0];tick(s);assert.equal(fired,before);
 });
-test('power, shield and engine alternatives have real opposing effects',()=>{
+test('power, shield and engine alternatives keep their roles without crippling penalties',()=>{
  const p=createNewSave(8).player,base=getEffectiveShipStats(p),fit=p.outfitting.loadouts.wayfarer;
- fit.power=['capacitor-bank'];let stats=getEffectiveShipStats(p);assert.ok(stats.energyCapacity>base.energyCapacity&&stats.reactorOutput<base.reactorOutput);
- fit.power=['sustained-reactor'];stats=getEffectiveShipStats(p);assert.ok(stats.energyCapacity<base.energyCapacity&&stats.reactorOutput>base.reactorOutput);
- fit.drive=['engine-mk2'];stats=getEffectiveShipStats(p);assert.ok(stats.maxSpeed>base.maxSpeed&&stats.angularAcceleration<base.angularAcceleration&&stats.burnFuelMultiplier>1);
- fit.drive=['thrusters-mk2'];stats=getEffectiveShipStats(p);assert.ok(stats.maxSpeed<base.maxSpeed&&stats.angularAcceleration>base.angularAcceleration&&stats.lateralMultiplier>1);
- fit.defense=['recovery-shield'];stats=getEffectiveShipStats(p);assert.ok(stats.shield<base.shield&&stats.shieldRechargeMultiplier>1);
+ fit.power=['capacitor-bank'];let stats=getEffectiveShipStats(p);assert.ok(stats.energyCapacity>base.energyCapacity&&stats.reactorOutput<base.reactorOutput&&stats.reactorOutput>=base.reactorOutput*.9);
+ fit.power=['sustained-reactor'];stats=getEffectiveShipStats(p);assert.equal(stats.energyCapacity,base.energyCapacity);assert.ok(stats.reactorOutput>base.reactorOutput);
+ fit.drive=['engine-mk2'];stats=getEffectiveShipStats(p);assert.ok(stats.maxSpeed>base.maxSpeed&&stats.angularAcceleration<base.angularAcceleration&&stats.angularAcceleration>=base.angularAcceleration*.92&&stats.burnFuelMultiplier>1);
+ fit.drive=['thrusters-mk2'];stats=getEffectiveShipStats(p);assert.ok(stats.maxSpeed<base.maxSpeed&&stats.maxSpeed>=base.maxSpeed*.94&&stats.angularAcceleration>base.angularAcceleration&&stats.lateralMultiplier>1);
+ fit.defense=['recovery-shield'];stats=getEffectiveShipStats(p);assert.ok(stats.shield<base.shield&&stats.shield>=base.shield*.9&&stats.shieldRechargeMultiplier>1);
 });
 
 

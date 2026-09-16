@@ -13,11 +13,23 @@
 // the English lines. Values are plain text — never HTML.
 export const DE_CATALOG = {
  'Includes a full magazine.': 'Inklusive vollem Magazin.',
+ 'Restore 50% hull and refill missiles.': 'Stellt 50 % Hülle wieder her und füllt Raketen auf.',
+ 'More speed; a small turning penalty.': 'Mehr Geschwindigkeit, nur ein kleiner Wendigkeitsverlust.',
+ 'Sharper turns; a small speed penalty.': 'Schärfere Kurven, nur ein kleiner Geschwindigkeitsverlust.',
+ 'Larger energy reserve; a mild recharge penalty.': 'Größerer Energievorrat, nur geringfügig langsameres Nachladen.',
+ 'Faster recharge; standard reserve.': 'Schnelleres Nachladen bei normalem Energievorrat.',
+ 'Faster recovery; slightly less capacity.': 'Schnellere Regeneration bei leicht kleinerem Schildvorrat.',
+ 'Longer firing bursts with only a modest recovery penalty.': 'Längere Feuerstöße bei nur geringfügig langsamerer Regeneration.',
+ 'Supports sustained fire without sacrificing the normal capacitor reserve.': 'Unterstützt Dauerfeuer ohne den normalen Energievorrat zu verkleinern.',
+ 'Recovers quickly after breaking contact while giving up only a small amount of reserve.': 'Regeneriert nach einer Feuerpause schnell und verliert dabei nur wenig Vorrat.',
+ 'Higher speed for long passes, with a small turning and boost-fuel tradeoff.': 'Höhere Geschwindigkeit für weite Angriffspässe, mit kleinen Nachteilen bei Wendigkeit und Nachbrennertreibstoff.',
+ 'Stronger turning and drift correction with only a small top-speed tradeoff.': 'Stärkere Wendigkeit und Driftkorrektur bei nur leicht reduzierter Höchstgeschwindigkeit.',
 
  'Two novices enter first. A veteran arrives after twenty seconds. Use wrecks against their seekers.': 'Zuerst kommen zwei Anfänger. Nach zwanzig Sekunden folgt ein Veteran. Nutze Wracks als Deckung gegen Suchraketen.',
  'A close-range veteran enters first. A missile gunship joins after eight seconds. Separate them.': 'Zuerst kommt ein Veteran für den Nahkampf. Nach acht Sekunden folgt ein Raketenträger. Trenne sie voneinander.',
  'The ace carries two torpedoes. A veteran escort arrives after ten seconds.': 'Das Ass hat zwei Torpedos. Nach zehn Sekunden folgt eine Veteranen-Eskorte.',
  'Two Vanguards cover each other. Use wrecks to isolate one and escape their turret arcs.': 'Zwei Vanguards decken sich gegenseitig. Nutze Wracks, um eines zu isolieren und den Geschützen zu entkommen.',
+ 'A veteran enters first. The ace arrives after twelve seconds, giving you a short window to isolate one through the wrecks.': 'Zuerst kommt ein Veteran. Nach zwölf Sekunden trifft das Ass ein, sodass du kurz Zeit hast, eines der Schiffe zwischen den Wracks zu isolieren.',
 
  'BATTERIES {guns}/4 · PDC {pdc}/4': 'BATTERIEN {guns}/4 · PDC {pdc}/4',
 

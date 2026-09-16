@@ -1,3 +1,11 @@
+## 0.8.2am — Arena progression and utility balance
+
+- Normal Arena Run waves now add 30% max hull between fights; Field Repairs add 50%. Hard mode keeps its 10% recovery, and the frigate transition still receives its full service.
+- The late Vanguard pair is staged: the veteran enters first and the ace arrives after twelve seconds, creating a deliberate isolation window before the frigate.
+- Softened the harsh penalties on power, drive and recovery modules while keeping their roles distinct: larger capacitors recover a little slower, high-output reactors keep the normal reserve, and engine/thruster upgrades give up less handling or speed.
+- Updated the Arena reward descriptions and German strings to match the new effects.
+- Release identifiers: GAME_VERSION `0.8.2am`, CACHE `voidrunner-v263-0-8-2am-arena-balance`.
+
 ## 0.8.2al — Smartphone edge control correction
 
 - Removed the landscape safe-area inset from the touch-pad horizontal anchors so the joystick and thrust slider sit 3px from the physical left screen edge.
