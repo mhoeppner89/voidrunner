@@ -1,3 +1,9 @@
+## 0.8.2ak — Smartphone control alignment
+
+- Aligned the mobile joystick and thrust slider to the left edge with a 3px margin and kept the joystick's maximum touch scaling clear of the cockpit monitor.
+- Aligned the fire, missile and afterburner controls to the right edge with a 3px margin; the afterburner remains slightly elevated above the weapon stack.
+- Release identifiers: GAME_VERSION `0.8.2ak`, CACHE `voidrunner-v261-0-8-2ak-mobile-control-alignment`.
+
 ## 0.8.2aj — Larger smartphone flight controls
 
 - Enlarged the mobile joystick and thrust slider and moved both closer to the left edge for easier thumb access.
