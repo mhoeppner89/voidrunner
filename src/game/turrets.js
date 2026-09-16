@@ -109,7 +109,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
             if(!intercept){
                 const key=target.id??'player';
                 if(state.targetId!==key){state.targetId=key;state.acquireAt=now+(pilot?.turretAcquire??.3);}
-                const spread=(pdc ? .020 : .018)*distance*(pilot?.turretError??1)*npcAimErrorFactor(actor);
+                const spread=(pdc ? .020 : .018)*distance*(pilot?.turretError??1)*(pilot ? npcAimErrorFactor(actor) : 1);
                 const phase=now*2.1+state.phase;
                 point.x+=Math.sin(phase)*spread;
                 point.y+=Math.sin(phase*1.37+1.2)*spread;

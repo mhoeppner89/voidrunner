@@ -7,7 +7,7 @@ import {relativeIntercept} from './weaponFlight.js';
 // Live capital hulls render at twice their authored scale. PDCs use the same
 // extents through npcHullExtents; main batteries and assembly hits must agree.
 export const FRIGATE_EXTENTS=[37.46,44.92,112.9];
-export const FRIGATE_GUN=Object.freeze({id:'frigate-battery',kind:'laser',speed:520,range:600,life:600/520,damageFlat:60*WEAPON_DAMAGE_SCALE,energyCost:12});
+export const FRIGATE_GUN=Object.freeze({id:'frigate-battery',kind:'laser',speed:520,range:600,life:600/520,damageFlat:72*WEAPON_DAMAGE_SCALE,energyCost:12});
 export const FRIGATE_BOSS_GUN=FRIGATE_GUN;
 const forward=new THREE.Vector3(0,0,-1);
 export function equipFrigate(ship,boss=false){

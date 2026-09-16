@@ -584,7 +584,7 @@ window.render_game_to_text = () => {
             editor: Boolean(runtime.observerEditor),
             started: Boolean(runtime.observerStarted),
             difficulty: runtime.observerDifficulty ?? runtime.arena.difficulty ?? 'veteran',
-            aimError: runtime.observerAimError ?? 1.35,
+            aimError: runtime.observerAimError ?? 1.5,
             timeLimit: null,
             elapsed: Math.max(0, (save.world.time ?? 0) - (runtime.observerStartTime ?? 0)),
             paused: Boolean(runtime.observerPaused),

@@ -336,7 +336,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2aa';
+const GAME_VERSION = '0.8.2ai';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -5106,7 +5106,7 @@ export class GameUI {
           <section class="observer-editor-section"><h3>${t('MAP')}</h3><div class="observer-editor-options">${maps.map(([id, label]) => `<button data-ui-command="observer-map" data-observer-map="${id}">${t(label)}</button>`).join('')}</div></section>
           <section class="observer-editor-section"><h3>${t('SIDE')}</h3><div class="observer-editor-options observer-team-options"><button data-ui-command="observer-team" data-observer-team="blue">${t('BLUE')}</button><button data-ui-command="observer-team" data-observer-team="red">${t('RED')}</button></div></section>
           <section class="observer-editor-section"><h3>${t('PILOTS')}</h3><div class="observer-editor-options observer-difficulty-options">${difficultyOptions.map(([id, label]) => `<button data-ui-command="observer-difficulty" data-observer-difficulty="${id}">${t(label)}</button>`).join('')}</div></section>
-          <section class="observer-editor-section observer-aim-section"><h3>${t('NPC AIM ERROR')}</h3><div class="observer-aim-control"><input type="range" min="1" max="2" step="0.05" value="${Number(config.aimError ?? 1.35).toFixed(2)}" data-observer-aim-error aria-label="${t('NPC AIM ERROR')}"><output id="observer-aim-error-value">1.35×</output></div><small>${t('1.00 = PRECISE · 1.35 = PLAYER BUFFER · FRIGATES IGNORE THIS')} · ${t('NO ROUND TIME LIMIT')}</small></section>
+          <section class="observer-editor-section observer-aim-section"><h3>${t('NPC AIM ERROR')}</h3><div class="observer-aim-control"><input type="range" min="1" max="2" step="0.05" value="${Number(config.aimError ?? 1.5).toFixed(2)}" data-observer-aim-error aria-label="${t('NPC AIM ERROR')}"><output id="observer-aim-error-value">1.50×</output></div><small>${t('1.00 = PRECISE · 1.50 = DEFAULT · FRIGATES IGNORE THIS')} · ${t('NO ROUND TIME LIMIT')}</small></section>
           <section class="observer-editor-section"><h3>${t('LOADOUT FOR NEXT SHIP')}</h3><div class="observer-editor-options observer-fit-options">${fitOptions.map(([id, label]) => `<button data-ui-command="observer-fit" data-observer-fit="${id}">${t(label)}</button>`).join('')}</div></section>
           <section class="observer-editor-section observer-ship-section"><h3>${t('ADD SHIP')}</h3><div class="observer-ship-palette">${ships.map(([id, label, fit]) => `<button data-ui-command="observer-ship" data-observer-ship="${id}"><b>${t(label)}</b><small>${t(fit)}</small></button>`).join('')}</div></section>
           <p id="observer-editor-hint" class="observer-editor-hint">${t('Select a ship, then tap the map to place it.')}</p>
@@ -5140,6 +5140,7 @@ export class GameUI {
         const fit = panel.querySelector('#observer-fit');
         const pause = panel.querySelector('#observer-pause');
         const speed = panel.querySelector('#observer-speed');
+        const fleet = panel.querySelector('[data-ui-command="observer-fleet"]');
         const cameraReadout = panel.querySelector('#observer-camera-readout');
         const aimError = panel.querySelector('[data-observer-aim-error]');
         const aimErrorValue = panel.querySelector('#observer-aim-error-value');
@@ -5155,7 +5156,8 @@ export class GameUI {
         const pendingFitLabel = pending?.capital ? 'CAPITAL HULL' : fitLabels[model.pendingFit] ?? fitLabels.varied;
         const blueCount = model.counts?.blue ?? 0;
         const redCount = model.counts?.red ?? 0;
-        const aimErrorFactor = Number(model.aimError ?? 1.35);
+        const aimErrorFactor = Number(model.aimError ?? 1.5);
+        const finished = Boolean(model.result);
         if (aimError) {
             aimError.value = aimErrorFactor.toFixed(2);
             aimError.disabled = !editor;
@@ -5183,13 +5185,17 @@ export class GameUI {
                 ? (pendingLabel ? `${t('NEXT')}: ${t(pendingLabel)} · ${t(pendingFitLabel)}` : t('SELECT A SHIP TO PLACE'))
                 : `${t('MAP')}: ${t(model.environmentLabel ?? 'OPEN SPACE')} · ${t('AIM ERROR')} ${aimErrorFactor.toFixed(2)}×`;
         if (pause) {
-            pause.hidden = editor;
+            pause.hidden = editor || finished;
+            pause.disabled = editor || finished;
             pause.textContent = model.paused ? t('RESUME') : t('PAUSE');
         }
         if (speed) {
-            speed.hidden = editor;
+            speed.hidden = editor || finished;
+            speed.disabled = editor || finished;
             speed.textContent = `${t('SPEED')} ${model.speed ?? 1}×`;
         }
+        if (fleet)
+            fleet.hidden = editor;
         if (restart)
             restart.textContent = editor ? t('RESET FORMATION') : t('RESTART');
         if (editorPanel)

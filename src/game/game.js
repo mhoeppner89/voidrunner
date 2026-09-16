@@ -6,7 +6,7 @@ import { combatTargetEligible } from './combatTargeting.js';
 import {getPdcDefenseChannel} from './pdcFireControl.js';
 import {guideMissile,relativeIntercept,closestHullPoint} from './weaponFlight.js';
 import {fieldCombatSteering} from './fieldCombatNav.js';
-import {npcTrackedVelocity,npcGunneryProfile,npcTriggerCone,npcTriggerReady,npcShotDirection,recordNpcShot,applyNpcTurnLead} from './npcGunnery.js';
+import {DEFAULT_NPC_AIM_ERROR,npcTrackedVelocity,npcGunneryProfile,npcTriggerCone,npcTriggerReady,npcShotDirection,recordNpcShot,applyNpcTurnLead} from './npcGunnery.js';
 import {ArenaRunMethods} from './arenaRunSession.js';
 import {writeArenaRun} from './arenaRun.js';
 import { updateAutomaticTurrets } from './turrets.js';
@@ -55,6 +55,23 @@ import { SENSOR_CLOSE_VISUAL_RANGE, SENSOR_CONTACT_THRESHOLD, SENSOR_HORIZON, SE
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const UP = new THREE.Vector3(0, 1, 0);
 const RIGHT = new THREE.Vector3(1, 0, 0);
+const npcDistanceSq = (from, point) => {
+    const dx = point[0] - from[0];
+    const dy = point[1] - from[1];
+    const dz = point[2] - from[2];
+    return dx * dx + dy * dy + dz * dz;
+};
+const npcSpeed = velocity => Math.hypot(velocity[0], velocity[1], velocity[2]);
+const npcTargetIsValid = (session, ship, entry, observerCombat, retaliation = false) => {
+    if (!entry || entry === ship || !combatTargetEligible(entry))
+        return false;
+    if (observerCombat)
+        return Boolean(entry.observerTeam && entry.observerTeam !== ship.observerTeam);
+    const factionOpponent = session.projectileCanHitShip
+        ? session.projectileCanHitShip({ ownerId: ship.id, faction: ship.faction }, entry)
+        : Boolean(entry.faction && ship.faction && entry.faction !== ship.faction);
+    return Boolean(factionOpponent || retaliation && entry.targetId === ship.id);
+};
 // Keep the AI update callable with lightweight debug/test ship objects that do
 // not carry the seeded runtime RNG used by spawned ships.
 const FALLBACK_AI_RNG = () => 0.5;
@@ -112,7 +129,7 @@ const OBSERVER_SHIP_TYPES = Object.freeze([
 const OBSERVER_FITS = Object.freeze(['varied', 'balanced', 'assault', 'support', 'beam']);
 const OBSERVER_AIM_ERROR_MIN = 1;
 const OBSERVER_AIM_ERROR_MAX = 2;
-const OBSERVER_DEFAULT_AIM_ERROR = 1.35;
+const OBSERVER_DEFAULT_AIM_ERROR = DEFAULT_NPC_AIM_ERROR;
 const OBSERVER_MIN_ZOOM = 420;
 const OBSERVER_MAX_ZOOM = 5200;
 const OBSERVER_MAX_PAN = 4200;
@@ -1387,6 +1404,7 @@ export class GameSession {
     observerPanToWorld = new THREE.Vector3();
     tmpObserverDirection = new THREE.Vector3();
     observerZoom = 1100;
+    observerCameraAutoFrame = true;
     observerSpeed = 1;
     observerPaused = false;
     observerEditor = false;
@@ -2210,6 +2228,14 @@ export class GameSession {
         return this.handleTutorialEvent('choice', { choiceId });
     }
     setupObserver(config = {}, announce = true) {
+        // Focus-loss pause is correct for normal flight, but its modal can
+        // outlive the player-facing screen that opened it. Clear any stale
+        // player modal before showing the observer so LIVE really means the
+        // observer is running and its controls are reachable immediately.
+        this.ui.hidePause?.();
+        this.ui.hideMap?.();
+        this.ui.hideShipMenu?.();
+        this.ui.hideChatLog?.();
         const preserveDraft = Boolean(config.preserveDraft);
         const draft = preserveDraft
             ? this.observerDraft.map((entry) => ({ ...entry, position: [...entry.position] }))
@@ -2218,6 +2244,7 @@ export class GameSession {
         this.combatTeams?.clear();
         this.nextCombatTeamCleanup = 0;
         this.observerSpeed = 1;
+        this.observerCameraAutoFrame = true;
         this.observerMap = OBSERVER_MAPS.some((entry) => entry.id === config.environment) ? config.environment : 'open';
         this.observerDifficulty = config.difficulty ?? this.observerDifficulty ?? 'veteran';
         this.observerEditor = config.editor !== false && config.started !== true;
@@ -2258,6 +2285,11 @@ export class GameSession {
         this.arena.editor = this.observerEditor;
         this.arena.started = this.observerStarted;
         this.ui.showObserverView({ ...config, environment: this.observerMap, editor: this.observerEditor });
+        // showObserverView rebuilds the panel markup. Apply the live model
+        // immediately as well as on the next render frame so a Fleet return,
+        // restart, or fresh editor open cannot briefly expose stale combat
+        // controls from the previous mode.
+        this.ui.updateObserverView(this.observerViewModel());
         if (announce && this.observerStarted)
             this.ui.pushEvent?.(t('NPC OBSERVER READY · {map}', { map: this.observerMap.toUpperCase() }), 'info', 4200);
     }
@@ -2344,7 +2376,7 @@ export class GameSession {
         const world = this.observerWorldPosition(entry, this.observerPlacementWorld);
         const ship = type.capitalVariant
             ? this.spawnCapitalShip(type.capitalVariant, world.toArray(), undefined, undefined)
-            : this.spawnShip(type.role, world.toArray(), undefined, undefined, { tier: this.observerDifficulty });
+            : this.spawnShip(type.role, world.toArray(), undefined, undefined, { tier: entry.tier ?? this.observerDifficulty });
         if (!type.capitalVariant) {
             const fit = entry.fit === 'varied' ? type.defaultFit : entry.fit;
             ship.combatFit = createEnemyLoadout(ship, this.ships.length, fit);
@@ -2378,6 +2410,7 @@ export class GameSession {
         if (!this.arena?.observer || !Number.isFinite(factor) || factor <= 0)
             return;
         this.observerZoom = clamp(this.observerZoom * factor, OBSERVER_MIN_ZOOM, OBSERVER_MAX_ZOOM);
+        this.observerCameraAutoFrame = false;
         this.ui.updateObserverView(this.observerViewModel());
     }
     observerZoomIn() {
@@ -2391,6 +2424,7 @@ export class GameSession {
             return;
         this.observerCameraPan.set(0, 0, 0);
         this.observerZoom = 1250;
+        this.observerCameraAutoFrame = false;
         this.ui.updateObserverView(this.observerViewModel());
     }
     observerSetTeam(team) {
@@ -2451,13 +2485,13 @@ export class GameSession {
             id: `observer-unit-${++this.observerUnitCounter}`,
             shipType: this.observerPendingShip,
             team: this.observerTeam,
+            tier: this.observerDifficulty,
             fit: this.observerPendingShip === 'frigate' ? 'varied' : this.observerPendingFit,
             position: [local.x, local.y, local.z],
         };
         this.observerDraft.push(entry);
         this.spawnObserverDraftUnit(entry);
         this.observerSelectedShipId = entry.id;
-        this.observerPendingShip = undefined;
         this.observerPointerPlacementAt = performance.now();
         this.ui.updateObserverView(this.observerViewModel());
         return true;
@@ -2504,6 +2538,13 @@ export class GameSession {
         const red = this.ships.filter((ship) => ship.observerTeam === 'red' && ship.hull > 0);
         if (!blue.length || !red.length)
             return false;
+        // The editor can remain open while the browser regains focus after a
+        // focus-loss pause. Starting the battle must close that stale modal
+        // before the observer enters its LIVE state.
+        this.ui.hidePause?.();
+        this.ui.hideMap?.();
+        this.ui.hideShipMenu?.();
+        this.ui.hideChatLog?.();
         const faceToward = (ship, target) => {
             const direction = this.tmpObserverDirection.set(target.position[0] - ship.position[0], target.position[1] - ship.position[1], target.position[2] - ship.position[2]).normalize();
             ship.rotation = quatTuple(new THREE.Quaternion().setFromUnitVectors(FORWARD, direction));
@@ -2524,6 +2565,7 @@ export class GameSession {
         });
         this.observerEditor = false;
         this.observerStarted = true;
+        this.observerCameraAutoFrame = true;
         this.observerPaused = false;
         this.observerResult = undefined;
         this.observerStartTime = this.save.world.time;
@@ -2576,12 +2618,18 @@ export class GameSession {
         }
         if (minX !== Infinity) {
             this.observerFocus.set((minX + maxX) * 0.5, (minY + maxY) * 0.5, (minZ + maxZ) * 0.5);
-            const span = Math.max(maxX - minX, maxZ - minZ) + 360;
-            this.observerZoom = clamp(span * 0.95, 900, 2600);
+            if (this.observerCameraAutoFrame) {
+                const span = Math.max(maxX - minX, maxZ - minZ) + 360;
+                this.observerZoom = clamp(span * 0.95, 900, 2600);
+                this.observerCameraAutoFrame = false;
+            }
         }
         else {
             this.observerFocus.copy(this.observerMapOrigin);
-            this.observerZoom = 1250;
+            if (this.observerCameraAutoFrame) {
+                this.observerZoom = 1250;
+                this.observerCameraAutoFrame = false;
+            }
         }
         return this.observerFocus;
     }
@@ -2659,7 +2707,7 @@ export class GameSession {
         this.ui.updateObserverView(this.observerViewModel());
     }
     cycleObserverSpeed() {
-        if (!this.arena?.observer || !this.observerStarted)
+        if (!this.arena?.observer || !this.observerStarted || this.observerResult)
             return;
         const speeds = [0.5, 1, 2, 4, 8];
         const index = speeds.indexOf(this.observerSpeed);
@@ -3058,6 +3106,7 @@ export class GameSession {
             this.ui.hideTitle();
             this.ui.hideHud();
             this.ui.showObserverView(this.arena);
+            this.ui.updateObserverView(this.observerViewModel());
         }
         else {
             this.renderer.setCockpitVisible(true);
@@ -8449,71 +8498,156 @@ export class GameSession {
     }
     resolveShipTarget(ship) {
         const playerPosition = vec(this.save.player.position);
-        const distSqTo = (from, p) => {
-            const dx = p[0] - from[0];
-            const dy = p[1] - from[1];
-            const dz = p[2] - from[2];
-            return dx * dx + dy * dy + dz * dz;
-        };
-        if (!ship.surrendered && !ship.standingDown && !this.deferentialPilot(ship) && (ship.role === 'pirate' || ship.role === 'bounty' || ship.role === 'escort' || ship.hostile) && !ship.targetId) {
-            // Nearest non-hostile civilian mark in a single pass — the same
-            // pick as the old filter+sort (a stable sort keeps the earliest
-            // array index on ties, and a strict `<` scan keeps that match),
-            // without allocating a sorted copy every frame.
-            let victim;
-            let bestDistSq = Infinity;
-            for (const entry of this.ships) {
-                if (entry.hostile || entry.hull <= 0 || (entry.role !== 'trader' && entry.role !== 'miner'))
-                    continue;
-                const d = distSqTo(ship.position, entry.position);
-                if (d < bestDistSq) {
-                    bestDistSq = d;
-                    victim = entry;
-                }
-            }
-            ship.targetId = victim && bestDistSq < 150 * 150 && distSqTo(ship.position, this.save.player.position) > 100 * 100 ? victim.id : 'player';
+        const now = this.save.world.time;
+        const observerCombat = Boolean(this.arena?.observer && ship.observerTeam);
+        const hunter = ship.hostile || ship.role === 'pirate' || ship.role === 'bounty' || ship.role === 'escort';
+        const playerAvailable = !observerCombat && this.save.player.hull > 0 && !this.save.player.dockedAt;
+
+        ship.npcTargetReason = undefined;
+        if (ship.surrendered || ship.standingDown || this.deferentialPilot(ship)) {
+            ship.targetId = undefined;
+            return undefined;
         }
-        if (ship.role === 'patrol' && !ship.hostile) {
-            // Patrols engage hostiles they can actually see: lit hostiles at the
-            // standard sensor range, dark ones only inside the dark-detection
-            // line, rocks blocking the view either way. If the player is under
-            // attack and the patrol can see THEM, it answers the distress even
-            // before it can resolve the attacker — that's the rescue leg, and it
-            // costs a dark player their safety net. Nearest satisfying hostile
-            // in a single pass (same pick as filter+sort+find); the player's
-            // sensor args are hoisted out of the candidate loop.
-            let hostile;
+
+        // Shared target priority for observer and live combat: answer fire,
+        // preserve a live lock, then acquire the nearest valid opponent. The
+        // observer never falls back to the hidden player actor at map origin.
+        let selectedId;
+        let selectedReason;
+        const recentThreatId = ship.combatThreatId && now < (ship.combatThreatUntil ?? -Infinity) ? ship.combatThreatId : undefined;
+        if (recentThreatId === 'player') {
+            if (playerAvailable && hunter && this.shipTracksPlayer(ship)) {
+                selectedId = 'player';
+                selectedReason = 'threat';
+            }
+        }
+        else if (recentThreatId) {
+            for (const entry of this.ships) {
+                if (entry.id !== recentThreatId || !npcTargetIsValid(this, ship, entry, observerCombat, true))
+                    continue;
+                selectedId = entry.id;
+                selectedReason = 'threat';
+                break;
+            }
+        }
+
+        // A ship actively targeting us outranks a previous lock. This covers
+        // observer replacement targets and normal NPC self-defence even when
+        // the incoming projectile has not registered a hit yet.
+        if (!selectedId) {
+            let attacker;
             let bestDistSq = Infinity;
             for (const entry of this.ships) {
-                if (entry === ship || !entry.hostile || !combatTargetEligible(entry))
+                if (entry.targetId !== ship.id || !npcTargetIsValid(this, ship, entry, observerCombat, true))
                     continue;
-                const d = distSqTo(ship.position, entry.position);
-                if (d >= bestDistSq)
-                    continue;
-                if (this.canSee(ship.position, entry.position, entry.dark, vec(entry.velocity).length(), entry.speed)
-                    || (entry.targetId === 'player' && this.shipTracksPlayer(ship))) {
-                    bestDistSq = d;
-                    hostile = entry;
+                const distance = npcDistanceSq(ship.position, entry.position);
+                if (distance < bestDistSq) {
+                    bestDistSq = distance;
+                    attacker = entry;
                 }
             }
-            if (hostile) {
+            if (attacker) {
+                selectedId = attacker.id;
+                selectedReason = 'attacker';
+            }
+        }
+
+        // Keep the current lock when it is still legal. Civilian marks retain
+        // the old hail/chase behavior; combat targets do not become mugging
+        // victims just because they are non-hostile to the player.
+        if (!selectedId && ship.targetId === 'player' && playerAvailable) {
+            selectedId = 'player';
+            selectedReason = 'current';
+        }
+        if (!selectedId && ship.targetId && ship.targetId !== 'player') {
+            for (const entry of this.ships) {
+                if (entry.id !== ship.targetId || !npcTargetIsValid(this, ship, entry, observerCombat))
+                    continue;
+                if (!observerCombat && ship.role === 'patrol' && !ship.hostile
+                    && !this.canSee(ship.position, entry.position, entry.dark, npcSpeed(entry.velocity), entry.speed)
+                    && !(entry.targetId === 'player' && this.shipTracksPlayer(ship)))
+                    continue;
+                selectedId = entry.id;
+                selectedReason = !observerCombat && hunter && !entry.hostile
+                    && (entry.role === 'trader' || entry.role === 'miner') ? 'mark' : 'current';
+                break;
+            }
+        }
+
+        // Observer ships and normal combatants acquire the nearest opposing
+        // ship. Ambient civilians stay passive unless explicitly attacked.
+        const canAcquireNearest = observerCombat || hunter || ship.role === 'patrol' && !ship.hostile;
+        if (!selectedId && canAcquireNearest) {
+            let nearest;
+            let bestDistSq = Infinity;
+            if (!observerCombat && hunter && playerAvailable && this.shipTracksPlayer(ship)) {
+                nearest = 'player';
+                bestDistSq = npcDistanceSq(ship.position, this.save.player.position);
+            }
+            for (const entry of this.ships) {
+                if (!npcTargetIsValid(this, ship, entry, observerCombat))
+                    continue;
+                if (!observerCombat && ship.role === 'patrol' && !ship.hostile
+                    && !this.canSee(ship.position, entry.position, entry.dark, npcSpeed(entry.velocity), entry.speed)
+                    && !(entry.targetId === 'player' && this.shipTracksPlayer(ship)))
+                    continue;
+                const distance = npcDistanceSq(ship.position, entry.position);
+                if (distance < bestDistSq) {
+                    bestDistSq = distance;
+                    nearest = entry;
+                }
+            }
+            if (nearest) {
+                selectedId = typeof nearest === 'string' ? nearest : nearest.id;
+                selectedReason = nearest === 'player' ? 'nearest' : !observerCombat && hunter && !nearest.hostile
+                    && (nearest.role === 'trader' || nearest.role === 'miner') ? 'mark' : 'nearest';
+            }
+        }
+
+        if (!observerCombat && ship.role === 'patrol' && !ship.hostile && selectedId && selectedId !== 'player') {
+            const selected = this.ships.find((entry) => entry.id === selectedId && entry.hull > 0);
+            if (selected?.hostile) {
                 ship.patrolMemory ??= { position: [0, 0, 0], id: null, seenAt: 0 };
-                ship.patrolMemory.id = hostile.id;
-                ship.patrolMemory.seenAt = this.save.world.time;
-                for (let i=0;i<3;i++) ship.patrolMemory.position[i]=hostile.position[i];
+                ship.patrolMemory.id = selected.id;
+                ship.patrolMemory.seenAt = now;
+                for (let i = 0; i < 3; i++)
+                    ship.patrolMemory.position[i] = selected.position[i];
                 ship.patrolMemoryActive = false;
-                ship.targetId = hostile.id;
-            } else {
-                const memory=ship.patrolMemory;
-                const previous=memory && this.ships.find(entry=>entry.id===memory.id);
-                if (memory && previous?.hostile && combatTargetEligible(previous) && this.save.world.time-memory.seenAt<4) {
-                    ship.targetId=memory.id;
-                    ship.patrolMemoryActive=true;
-                    return {position:vec(memory.position, this.tmpPatrolPosition ??= new THREE.Vector3()),
-                        velocity:(this.tmpPatrolVelocity ??= new THREE.Vector3()).set(0,0,0)};
-                }
-                ship.targetId=undefined;ship.patrolMemoryActive=false;ship.patrolMemory=undefined;
             }
+        }
+
+        if (!selectedId && !observerCombat && ship.role === 'patrol' && !ship.hostile) {
+            const memory = ship.patrolMemory;
+            const previous = memory && this.ships.find((entry) => entry.id === memory.id);
+            if (memory && previous?.hostile && combatTargetEligible(previous) && now - memory.seenAt < 4) {
+                ship.targetId = memory.id;
+                ship.npcTargetReason = 'memory';
+                ship.patrolMemoryActive = true;
+                return {
+                    position: vec(memory.position, this.tmpPatrolPosition ??= new THREE.Vector3()),
+                    velocity: (this.tmpPatrolVelocity ??= new THREE.Vector3()).set(0, 0, 0),
+                };
+            }
+            ship.patrolMemoryActive = false;
+            ship.patrolMemory = undefined;
+        }
+
+        // If no NPC opponent is available, preserve the normal game's fixed-
+        // intelligence player hunt. This is deliberately after ship acquisition
+        // so a visible attack or nearer NPC wins first.
+        if (!selectedId && !observerCombat && hunter && playerAvailable) {
+            selectedId = 'player';
+            selectedReason = 'player';
+        }
+        if (!selectedId) {
+            ship.targetId = undefined;
+            return undefined;
+        }
+        ship.targetId = selectedId;
+        ship.npcTargetReason = selectedReason;
+        if (selectedReason === 'threat' || selectedReason === 'attacker' || selectedReason === 'nearest') {
+            ship.pursuitHoldFire = false;
+            ship.pursuitUntil = 0;
         }
         selectCombatFocus(this,ship);
         if (!ship.targetId)

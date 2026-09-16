@@ -226,7 +226,8 @@ export function updateShipAI(session, ship, dt) {
     // Hunt-task pursuit: when a hunter acquires a fresh non-hostile ship
     // victim (a trader or miner — never another fighter) it hails and closes
     // before the guns come up; the victim bolts, so the beat reads as a chase.
-    const freshVictim = ship.targetId && ship.targetId !== 'player' && ship.targetId !== ship.prevTargetId
+    const freshVictim = !session.arena?.observer && ship.npcTargetReason === 'mark'
+        && ship.targetId && ship.targetId !== 'player' && ship.targetId !== ship.prevTargetId
         ? session.ships.find((entry) => entry.id === ship.targetId) : undefined;
     if (target && !deferring && freshVictim && !freshVictim.hostile && ship.task?.kind === 'hunt') {
         ship.pursuitHoldFire = true;

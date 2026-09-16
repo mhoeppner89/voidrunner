@@ -1,3 +1,51 @@
+## 0.8.2ai — Wayfarer and frigate combat balance
+
+- Trimmed the Wayfarer's base durability from 100 shield / 200 hull to 95 / 190. Weapon slots, weapon stats and NPC pilot-skill curves are unchanged; a fully fitted Wayfarer remains viable while giving heavy hulls a fairer matchup.
+- Raised the frigate main-battery authored damage from 60 to 72 before the shared 0.8 weapon scale (48 to 57.6 applied damage). PDCs, player weapons, exposed-mount counterplay, cover and recovery windows are unchanged.
+- Release identifiers: GAME_VERSION `0.8.2ai`, CACHE `voidrunner-v259-0-8-2ai-wayfarer-frigate-balance`.
+
+## 0.8.2ah — Global NPC aim-error default
+
+- Raised the default non-frigate NPC pointing-error multiplier from 1.35× player-only / 1.00× NPC-vs-NPC to 1.50× for all NPC targets. Weapon stats, damage, cooldowns and pilot-skill ordering are unchanged.
+- The spectator slider remains adjustable from 1.00×–2.00× and now defaults to 1.50×; Concord frigates retain their authored accuracy and missile interception remains precise.
+- Release identifiers: GAME_VERSION `0.8.2ah`, CACHE `voidrunner-v258-0-8-2ah-global-npc-aim-error`.
+
+## 0.8.2ag — Observer modal reset and no-limit guard
+
+- Observer entry, restart and battle start now clear stale player-facing pause, map, ship-menu and chat modals. A focus-loss pause can no longer leave the observer displaying LIVE while its simulation and controls are blocked.
+- Added a regression proving an observer fight remains unresolved after 6000 seconds when both teams are still alive; results still occur only after a team is eliminated.
+- Release identifiers: GAME_VERSION `0.8.2ag`, CACHE `voidrunner-v257-0-8-2ag-observer-modal-reset`.
+
+## 0.8.2af — Preserve observer pilot tiers
+
+- Observer draft units now retain the pilot tier selected when each ship was placed, so Restart and Fleet return preserve mixed Rookie/Veteran/Ace formations.
+- Release identifiers: GAME_VERSION `0.8.2af`, CACHE `voidrunner-v256-0-8-2af-observer-draft-tiers`.
+
+## 0.8.2ae — Observer end-state controls
+
+- Finished spectator rounds now hide pause and speed controls that cannot change a completed fight; Restart, Fleet and Exit remain available.
+- Rebuilding the observer panel applies its editor/live state immediately, preventing stale combat controls after Fleet return or restart.
+- Release identifiers: GAME_VERSION `0.8.2ae`, CACHE `voidrunner-v255-0-8-2ae-observer-end-controls`.
+
+## 0.8.2ad — General NPC target priority
+
+- NPCs now share one target hierarchy in the live game and observer combat: recent attackers first, ships actively targeting them next, then a valid current lock, then the nearest opposing combatant.
+- Observer ships retarget surviving opponents after every kill and never fall back to the hidden observer player. Normal-game civilians remain passive until attacked, while hostile hunters retain their player fallback when no opposing NPC is available.
+- Added focused targeting regressions for retaliation, nearest-opponent acquisition, observer retargeting and the no-player fallback.
+- Release identifiers: GAME_VERSION `0.8.2ad`, CACHE `voidrunner-v254-0-8-2ad-npc-target-priority`.
+
+## 0.8.2ac — Observer controls and placement
+
+- Live observer camera framing now runs once when combat begins instead of overwriting manual zoom every render frame. Pause remains available during combat, and Fleet is hidden while staging.
+- The selected ship type remains active after placement, so consecutive canvas taps add additional copies of the same ship while the current team and fit remain selected.
+- Release identifiers: GAME_VERSION `0.8.2ac`, CACHE `voidrunner-v253-0-8-2ac-observer-controls`.
+
+## 0.8.2ab — Compact observer lifebars
+
+- Reduced observer shield and hull bars to roughly 40% width, with a small minimum width for readability. Unit names and bars remain anchored directly above ships.
+- Combat behavior and balance are unchanged.
+- Release identifiers: GAME_VERSION `0.8.2ab`, CACHE `voidrunner-v252-0-8-2ab-compact-observer-bars`.
+
 ## 0.8.2aa — Combat sim polish
 
 - Refined the observer staging editor with clearer section hierarchy, stronger selected states, a wider setup card and a sticky formation footer that keeps counts and Start Battle available while the ship palette scrolls.

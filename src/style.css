@@ -601,7 +601,7 @@ button.compact {
    settings grid's row height. Icon swaps between ⛶ and ⤡ with the state. */
 .fullscreen-switch {
   display: flex;
-  width: 52px;
+  width: 128px;
   height: 26px;
   align-items: center;
   justify-content: center;
@@ -10045,7 +10045,11 @@ button.primary,
 .observer-unit-bars {
   display: grid;
   gap: 1px;
-  width: 100%;
+  width: 40%;
+  min-width: 34px;
+  max-width: 52px;
+  margin-right: auto;
+  margin-left: auto;
   margin-top: 1px;
   padding: 1px;
   background: rgba(1, 5, 9, 0.78);

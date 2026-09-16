@@ -7,15 +7,15 @@ const profiles={
  ace:{settle:0,shots:8,pause:.15,spread:.15*DEG,lead:1,wander:.13*DEG,curve:.85,beam:.035*DEG,beamSlip:.006,beamWide:.45*DEG,turretError:.35,turretAcquire:.18,turretTurn:1.15},
 };
 export const npcGunneryProfile=ship=>profiles[ship.pilot?.tier]??profiles.veteran;
-// Give a player a modest, trajectory-independent fairness buffer. In the
-// observer, a staged fighter may override the target-only default so an entire
-// NPC-vs-NPC fight can be watched at a chosen error level. Concord frigates
-// keep their authored capital accuracy in every mode.
+export const DEFAULT_NPC_AIM_ERROR=1.5;
+// Give every non-frigate NPC a modest, trajectory-independent fairness buffer.
+// The observer may override it for controlled NPC-vs-NPC studies. Concord
+// frigates keep their authored capital accuracy in every mode.
 export const npcAimErrorFactor=ship=>{
  if(ship.capitalClass==='frigate')return 1;
  const observerFactor=Number(ship.observerAimErrorFactor);
  if(Number.isFinite(observerFactor))return observerFactor;
- return ship.targetId==='player'?1.35:1;
+ return DEFAULT_NPC_AIM_ERROR;
 };
 export const npcForwardCone=weapon=>weapon?.kind==='beam'?weaponAssistCone(weapon):(weapon?.id==='ripper'?7:weapon?.id==='pulse'||weapon?.id==='pulse-mk2'?6:4)*DEG;
 const sprayCone=weapon=>weapon?.id==='ripper'?9*DEG:weapon?.id==='pulse'||weapon?.id==='pulse-mk2'?7*DEG:0;

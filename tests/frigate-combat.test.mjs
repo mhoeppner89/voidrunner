@@ -1,12 +1,18 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from '../vendor/three.module.min.js';
-import {equipFrigate,updateFrigateBatteries,updateFrigateAttack,frigateMountPosition,damageFrigateMount,FRIGATE_BOSS_GUN,FRIGATE_EXTENTS,visibleFrigateBatteries} from '../src/game/capitalCombat.js';
+import {equipFrigate,updateFrigateBatteries,updateFrigateAttack,frigateMountPosition,damageFrigateMount,FRIGATE_GUN,FRIGATE_BOSS_GUN,FRIGATE_EXTENTS,visibleFrigateBatteries} from '../src/game/capitalCombat.js';
+import {WEAPON_DAMAGE_SCALE} from '../src/game/weapons.js';
 import {FRIGATE_MOUNTS} from '../src/game/frigateMounts.js';
 import {cockpitDamageStage} from '../src/game/cockpitDamage.js';
 import {fixture} from './combat-variety.test.mjs';
 function stage(){const s=fixture();s.tmpAvoidance=new THREE.Vector3();s.save.player.position=[180,0,0];s.save.player.velocity=[0,0,0];s.save.player.hull=185;const ship=s.spawnCapitalShip('concord-frigate',[0,0,0],'rook','Boss');equipFrigate(ship,true);ship.rotation=[0,0,0,1];ship.targetId='player';ship.hostile=true;ship.holdFire=false;return {s,ship};}
 test('cockpit stages have exact boundaries and repair without permanent corruption',()=>{for(const [f,stage] of [[1,0],[.75,0],[.749,1],[.5,1],[.499,2],[.25,2],[.249,3],[.1,3],[.099,4],[1,0]])assert.equal(cockpitDamageStage(f),stage);});
+test('frigate main batteries get a capital-only damage lift without changing weapon scaling',()=>{
+ assert.equal(FRIGATE_GUN,FRIGATE_BOSS_GUN);
+ assert.equal(FRIGATE_GUN.damageFlat,72*WEAPON_DAMAGE_SCALE);
+ assert.equal(FRIGATE_GUN.energyCost,12);
+});
 test('frigate charges, fires finite physical salvos, and does not use forward fighter fire',()=>{const {s,ship}=stage();const rounds=[];s.spawnGunProjectile=(owner,w,start,dir)=>{rounds.push({time:s.save.world.time,w,pos:start.toArray(),dir:dir.toArray()});};s.fireNpcGun=()=>assert.fail('legacy forward fire');
  const target=new THREE.Vector3(180,0,0),velocity=new THREE.Vector3();
  for(let i=0;i<1200;i++){s.save.world.time=i/60;updateFrigateAttack(s,ship,target,velocity,1/60);}

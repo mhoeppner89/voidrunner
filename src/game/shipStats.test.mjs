@@ -29,8 +29,8 @@ const checkTrue = (label, condition) => {
 const playerWith = (equipment, overrides = {}) => ({
     shipId: 'wayfarer',
     equipment,
-    hull: 185,
-    shield: 90,
+    hull: 190,
+    shield: 95,
     energy: 72,
     fuel: 100,
     missiles: 4,
@@ -40,8 +40,8 @@ const playerWith = (equipment, overrides = {}) => ({
 
 // A bare wayfarer with an empty loadout resolves to the hull's own stat block.
 const base = getEffectiveShipStats(playerWith([]));
-check('wayfarer base shield', base.shield, 90);
-check('wayfarer base hull integrity', base.hull, 185);
+check('wayfarer base shield', base.shield, 95);
+check('wayfarer base hull integrity', base.hull, 190);
 check('wayfarer base reactor output', base.reactorOutput, 18);
 check('wayfarer base energy capacity', base.energyCapacity, 72);
 check('wayfarer base cargo', base.cargo, 32);
@@ -65,9 +65,9 @@ check('engine-mk2 reactor output', engineFit.reactorOutput, 18);
 const thrusterFit = getEffectiveShipStats(playerWith(['thrusters-mk2']));
 check('thrusters-mk2 turn authority', thrusterFit.angularAcceleration, 1.65 * 1.35);
 const shieldFit = getEffectiveShipStats(playerWith(['shield-mk2']));
-check('shield-mk2 capacity', shieldFit.shield, 135);
+check('shield-mk2 capacity', shieldFit.shield, 140);
 const armorFit = getEffectiveShipStats(playerWith(['armor-mk2']));
-check('hull weave capacity', armorFit.hull, 225);
+check('hull weave capacity', armorFit.hull, 230);
 const pulseFit = getEffectiveShipStats(playerWith(['pulse-mk2']));
 check('pulse-mk2 does not globally buff hull damage', pulseFit.gunDamage, 10);
 // In the canonical state the Mk II multiplier belongs to its own projectile;
@@ -135,7 +135,7 @@ check('salvage-mk2 range', salvageFit.salvageRange, 170);
 // Modifiers compose when several pieces are fitted at once.
 const comboFit = getEffectiveShipStats(playerWith(['engine-mk2', 'shield-mk2', 'cargo-pods', 'radar-mk2']));
 check('combo keeps engine boost', comboFit.maxSpeed, 50 * 1.18);
-check('combo keeps shield boost', comboFit.shield, 135);
+check('combo keeps shield boost', comboFit.shield, 140);
 check('combo keeps cargo boost', comboFit.cargo, 50);
 check('combo keeps radar boost', comboFit.radarRange, 1250);
 
@@ -160,7 +160,7 @@ check('fresh save starts on wayfarer', fresh.player.shipId, 'wayfarer');
 check('fresh save docks at helix', fresh.player.dockedAt, 'helix');
 check('fresh save starting credits', fresh.player.credits, STARTING_CREDITS);
 check('fresh save resolves wayfarer stats', getEffectiveShipStats(fresh.player).cargo, 32);
-check('fresh save resolves wayfarer shield', getEffectiveShipStats(fresh.player).shield, 90);
+check('fresh save resolves wayfarer shield', getEffectiveShipStats(fresh.player).shield, 95);
 check('fresh save starts at full energy', fresh.player.energy, 72);
 const freshMagazines = launcherMagazineEntries(fresh.player);
 check('fresh save has one explicit launcher magazine', freshMagazines.length, 1);
@@ -186,7 +186,7 @@ const migrated = hydrateSave({
     world: { seed: 1234 },
 });
 check('migration preserves equipment rack', migrated.player.equipment.join(','), 'shield-mk2,pulse-mk2,cargo-pods,engine-mk2');
-check('migrated shield resolves', getEffectiveShipStats(migrated.player).shield, 135);
+check('migrated shield resolves', getEffectiveShipStats(migrated.player).shield, 140);
 check('migrated pulse-mk2 does not globally buff hull damage', getEffectiveShipStats(migrated.player).gunDamage, 10);
 check('migrated cargo resolves', getEffectiveShipStats(migrated.player).cargo, 50);
 check('migrated engine resolves', getEffectiveShipStats(migrated.player).maxSpeed, 50 * 1.18);

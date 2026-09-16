@@ -9,9 +9,10 @@ import {npcShotDirection,npcTriggerReady,observeNpcTargetMotion,applyNpcTurnLead
 const DEG=Math.PI/180,tiers=['novice','veteran','ace'];
 const direction=degrees=>new THREE.Vector3(Math.sin(degrees*DEG),0,-Math.cos(degrees*DEG));
 function pilot(tier){return {id:'accuracy',pilot:{tier},rotation:[0,0,0,1],targetId:'player',aiRng:seededRandom('accuracy-'+tier)};}
-test('player-facing aim error stays isolated, while observer actors can opt in',()=>{
- assert.equal(npcAimErrorFactor(pilot('novice')),1.35);
- assert.equal(npcAimErrorFactor({...pilot('veteran'),targetId:'other'}),1);
+test('global NPC aim error defaults across targets, while observer actors can tune it',()=>{
+ assert.equal(npcAimErrorFactor(pilot('novice')),1.5);
+ assert.equal(npcAimErrorFactor({...pilot('veteran'),targetId:'other'}),1.5);
+ assert.equal(npcAimErrorFactor({...pilot('ace'),targetId:'player'}),1.5);
  assert.equal(npcAimErrorFactor({...pilot('veteran'),targetId:'other',observerAimErrorFactor:1.8}),1.8);
  assert.equal(npcAimErrorFactor({...pilot('ace'),capitalClass:'frigate',observerAimErrorFactor:2}),1);
 });
@@ -76,7 +77,7 @@ test('observed turn compensation reduces curved-path lead error, remains bounded
 test('ace pointing error changes over time without changing the requested firing solution',()=>{
  const p={...pilot('ace'),targetId:'other'},lead=direction(0),a=new THREE.Vector3(),b=new THREE.Vector3();p.aiRng=()=>0;
  npcShotDirection(p,WEAPONS.pulse,lead,a,0,250);npcShotDirection(p,WEAPONS.pulse,lead,b,1,250);
- assert.ok(a.angleTo(b)>.02*DEG);assert.ok(a.angleTo(lead)<.2*DEG&&b.angleTo(lead)<.2*DEG);assert.deepEqual(lead.toArray(),[0,0,-1]);
+ assert.ok(a.angleTo(b)>.02*DEG);assert.ok(a.angleTo(lead)<.3*DEG&&b.angleTo(lead)<.3*DEG);assert.deepEqual(lead.toArray(),[0,0,-1]);
 });
 
 test('NPC PDC and laser turret fire both improve with pilot skill',()=>{
