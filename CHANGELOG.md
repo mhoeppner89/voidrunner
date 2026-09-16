@@ -1,3 +1,9 @@
+## 0.8.2aj — Larger smartphone flight controls
+
+- Enlarged the mobile joystick and thrust slider and moved both closer to the left edge for easier thumb access.
+- Made the afterburner target slightly larger and positioned it higher and farther right above the weapon controls. Desktop layout and fire/missile placement are unchanged.
+- Release identifiers: GAME_VERSION `0.8.2aj`, CACHE `voidrunner-v260-0-8-2aj-mobile-flight-controls`.
+
 ## 0.8.2ai — Wayfarer and frigate combat balance
 
 - Trimmed the Wayfarer's base durability from 100 shield / 200 hull to 95 / 190. Weapon slots, weapon stats and NPC pilot-skill curves are unchanged; a fully fitted Wayfarer remains viable while giving heavy hulls a fairer matchup.

@@ -15647,3 +15647,44 @@ button.primary,
 .screen-target-layout.has-capital-target #target-hull-outline { visibility:hidden; }
 
 .screen-target-readout.is-capital-warning { color:var(--void-gold); }
+
+/* Smartphone flight controls: give the steering and thrust inputs more room
+   while keeping the centre of the cockpit clear. The afterburner stays above
+   the weapon stack, but gets a larger, upper-right tap target in stick mode. */
+@media (pointer: coarse), (max-width: 900px) {
+  .touch-left {
+    left: max(4px, env(safe-area-inset-left));
+  }
+
+  .touch-left .touch-stick {
+    width: clamp(88px, calc(14vw * var(--touch-scale, 1)), 128px);
+    height: clamp(88px, calc(14vw * var(--touch-scale, 1)), 128px);
+  }
+
+  .touch-left .touch-stick .touch-stick-knob {
+    width: 30px;
+    height: 30px;
+  }
+
+  .touch-left .touch-throttle {
+    width: 52px;
+    height: 112px;
+    margin-left: 0;
+  }
+
+  .touch-controls .touch-boost {
+    width: 58px;
+    height: 54px;
+  }
+
+  .touch-left .touch-boost-left {
+    align-self: flex-end;
+    transform: translate(4px, -4px);
+  }
+
+  .steering-stick .touch-boost-right {
+    align-self: flex-end;
+    margin-right: -4px;
+    transform: translateY(-4px);
+  }
+}
