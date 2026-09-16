@@ -1,3 +1,9 @@
+## 0.8.2al — Smartphone edge control correction
+
+- Removed the landscape safe-area inset from the touch-pad horizontal anchors so the joystick and thrust slider sit 3px from the physical left screen edge.
+- Kept the maximum joystick size capped against the cockpit monitor and pinned fire, missile and afterburner 3px from the physical right screen edge.
+- Release identifiers: GAME_VERSION `0.8.2al`, CACHE `voidrunner-v262-0-8-2al-mobile-edge-controls`.
+
 ## 0.8.2ak — Smartphone control alignment
 
 - Aligned the mobile joystick and thrust slider to the left edge with a 3px margin and kept the joystick's maximum touch scaling clear of the cockpit monitor.

@@ -15653,16 +15653,22 @@ button.primary,
    the weapon stack, but gets a larger, upper-right tap target in stick mode. */
 @media (pointer: coarse), (max-width: 900px) {
   .touch-left {
-    left: max(3px, env(safe-area-inset-left));
+    /* The touch pads intentionally use the physical screen edge. Safe-area
+       padding belongs to cockpit readouts; it made the pads drift inward on
+       landscape phones with a large left sensor inset. */
+    left: 3px;
+    align-items: flex-start;
+    transform: none;
   }
 
   .touch-left .touch-stick {
     /* The cockpit's own monitor begins at roughly 17vw. Keep a small visual
        gap there even when the user selects the 1.3× touch-size maximum. */
-    width: min(118px, calc(14vw * var(--touch-scale, 1)), calc(17vw - max(3px, env(safe-area-inset-left)) - 5px));
-    height: min(118px, calc(14vw * var(--touch-scale, 1)), calc(17vw - max(3px, env(safe-area-inset-left)) - 5px));
-    min-width: min(58px, calc(17vw - max(3px, env(safe-area-inset-left)) - 5px));
-    min-height: min(58px, calc(17vw - max(3px, env(safe-area-inset-left)) - 5px));
+    width: min(118px, calc(14vw * var(--touch-scale, 1)), calc(17vw - 3px - 5px));
+    height: min(118px, calc(14vw * var(--touch-scale, 1)), calc(17vw - 3px - 5px));
+    min-width: min(58px, calc(17vw - 3px - 5px));
+    min-height: min(58px, calc(17vw - 3px - 5px));
+    margin-left: 0;
   }
 
   .touch-left .touch-stick .touch-stick-knob {
@@ -15677,8 +15683,9 @@ button.primary,
   }
 
   .touch-right {
-    right: max(3px, env(safe-area-inset-right));
+    right: 3px;
     align-items: flex-end;
+    transform: none;
   }
 
   .touch-controls .touch-boost {
