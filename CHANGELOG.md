@@ -1,3 +1,37 @@
+## 0.8.2ar — Tutorial value gate
+
+- Mara's final tutorial handoff to Meridian now waits until the player's live combat-value proxy reaches 50,000.
+- The threshold uses full ship and equipment value, half cash value and no cargo value, matching the dock combat-value display.
+- Added regression coverage for the blocked and unlocked handoff states.
+- Release identifiers: GAME_VERSION `0.8.2ar`, CACHE `voidrunner-v268-0-8-2ar-tutorial-value-gate`.
+
+## 0.8.2aq — Player combat-value proxy
+
+- Added a live combat-value number for the current hull and all owned equipment at full listed value, plus cash at half value.
+- Cargo is deliberately excluded so profitable hauls do not inflate the combat-strength proxy.
+- Release identifiers: GAME_VERSION `0.8.2aq`, CACHE `voidrunner-v267-0-8-2aq-player-combat-value`.
+
+## 0.8.2ap — Single mission completion message
+
+- Removed the small duplicate notification shown underneath the full mission payment screen.
+- Mission completion now presents one clear payment screen instead of repeating the same information twice.
+- Release identifiers: GAME_VERSION `0.8.2ap`, CACHE `voidrunner-v266-0-8-2ap-remove-mission-toast`.
+
+## 0.8.2ao — Simpler dock screen
+
+- Removed the automatic “last trip” report from the dock screen.
+- Removed the automatic suggestion for which upgrade to buy next.
+- Kept the useful before/after explanations inside Outfitting, where they support an actual purchase decision.
+- Release identifiers: GAME_VERSION `0.8.2ao`, CACHE `voidrunner-v265-0-8-2ao-remove-sortie-debrief`.
+
+## 0.8.2an — Career sortie pacing and mission pressure
+
+- Added a persistent sortie ledger that measures real career sorties from launch through docking, including mission income, trade flow, repairs, refills, drone service, outfitting, ship trades, race fees/payouts, rescue/bounty income, losses and reputation changes.
+- Added a dock debrief with duration, gross earnings, total costs, net credits, completed contracts, standing changes and the next meaningful compatible upgrade. Outfitting now shows plain-language before/after sortie impact for power, defense, drive and utility modules.
+- Mission-linked pressure now follows mining claims, salvage claims and sealed cargo routes, while the encounter ledger distinguishes ambient traffic, patrols, distress calls, beam ambushes, opportunists, frigates and mission threats. Near-dock escape/resupply space remains intact.
+- Added persistent-save normalization and focused career pacing tests. Save schema is 17; existing saves migrate with an empty sortie ledger.
+- Release identifiers: GAME_VERSION `0.8.2an`, CACHE `voidrunner-v264-0-8-2an-career-loop`.
+
 ## 0.8.2am — Arena progression and utility balance
 
 - Normal Arena Run waves now add 30% max hull between fights; Field Repairs add 50%. Hard mode keeps its 10% recovery, and the frigate transition still receives its full service.

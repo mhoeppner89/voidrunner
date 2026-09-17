@@ -29,9 +29,11 @@ import { clamp, damp, formatCredits, pick, proceduralCallsign, randomBetween, ra
 import { EntityStore } from './entityStore.js';
 import { NPC_FIGHTER_SCALE, SpaceRenderer, npcShipScaleForVariant } from './render.js';
 import { saveGame } from './save.js';
+import { beginSortie, finishSortie, markSortieDocked, recordSortieCredit, recordSortieEncounter, recordSortieUpgrade } from './careerMetrics.js';
 import { getQuest, setFlag, setStep, startQuest } from './quests.js';
-import { advanceTutorialCampaign, getTutorialQuest, isTutorialActive, skipTutorialCampaign, tutorialCampaignSummary, tutorialLaunchBlock } from './tutorialCampaign.js';
+import { advanceTutorialCampaign, getTutorialQuest, isTutorialActive, skipTutorialCampaign, tutorialCampaignSummary, tutorialLaunchBlock, TUTORIAL_MARA_CALL_MIN_COMBAT_VALUE } from './tutorialCampaign.js';
 import { TUTORIAL_RADIO, TRAVEL_RADIO } from './tutorialRadio.js';
+import { playerStrengthValue } from './playerStrength.js';
 import { getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
 import { WEAPON_DAMAGE_SCALE, weaponAssistCone, weaponRange, weaponShotDamage, ammoCapacity, AMMO_CAPACITY, clearLauncherMagazines, fillLauncherMagazines, launcherMagazineEntries, normalizeLauncherMagazines, syncLauncherMissileTotal, WEAPON_ORDER, WEAPONS, LAUNCHERS, weaponForSlot, weaponIdForOutfit, weaponOwned } from './weapons.js';
 import { HULL_HARDPOINTS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, canonicalOutfitId, collapseOutfittingToSingleShip, commitOutfitting, itemFitsMount, loadoutFor, normalizeOutfitting, outfitItem, projectLegacyEquipment, quoteOutfitting, outfittingUsage } from './outfitting.js';
@@ -2193,13 +2195,15 @@ export class GameSession {
             || this.save.world.time < (this.nextTutorialMaraCallAt ?? 0)
             || (this.pendingStoryConversations ?? []).some(entry => entry.conversationId === 'tutorial-handoff'))
             return;
-        // Crossing ends the prologue: Mara's call is due the moment the
-        // Wayfarer reaches Meridian, whatever the earn-and-equip delay said.
-        // Session field wins while the page lives; the persisted flag covers
-        // resumes. Hand-crafted/fast-forwarded saves carry neither, so the
-        // speedrunner gets the call the moment it becomes due.
+        // Crossing ends the prologue: Mara's call is due when the Wayfarer
+        // reaches Meridian, but the handoff waits for the player's combat
+        // value to show that the ship is ready. Session field wins while the
+        // page lives; the persisted flag covers resumes. Hand-crafted or
+        // fast-forwarded saves carry neither, so they use the current time.
         const maraCallDue = this.tutorialMaraCallDue ?? quest.flags?.maraCallDueAt ?? 0;
         if (stepId !== 'complete' && this.save.world.time < maraCallDue)
+            return;
+        if (playerStrengthValue(this.save.player) < TUTORIAL_MARA_CALL_MIN_COMBAT_VALUE)
             return;
         this.tutorialMaraCallOffered = true;
         this.playStoryLine('Mara Vek', t('Incoming transmission · Mara Vek'), 'ally', 15000, 'tutorial-handoff');
@@ -3093,11 +3097,11 @@ export class GameSession {
     restoreViewState() {
         if (this.save.player.dockedAt) {
             this.renderer?.setCockpitVisible(false);
-            const messages = completeMissionsAtDock(this.save, this.save.player.dockedAt);
+            completeMissionsAtDock(this.save, this.save.player.dockedAt);
+            markSortieDocked(this.save, this.save.player.dockedAt);
             refreshMissionOffers(this.save);
             recordMarketVisit(this.save.world, this.save.player.dockedAt);
             this.ui.showDock(this.save, this.save.player.dockedAt);
-            messages.forEach((message) => this.ui.showToast(message, 'success', 5200));
             this.persistSave();
         }
         else if (this.arena?.observer) {
@@ -4036,6 +4040,7 @@ export class GameSession {
         const rank = this.racePlayerRank();
         const payout = racePayout(race.course, rank);
         this.save.player.credits += payout;
+        recordSortieCredit(this.save, payout, 'races');
         const finishTime = this.save.world.time - (race.playerStartTime ?? this.save.world.time);
         const previous = normalizeRaceRecord(this.save.world.raceRecords[race.course.id]);
         const result = recordRaceResult(previous, {
@@ -6172,6 +6177,7 @@ export class GameSession {
             // A surrendered pilot's transfer: credits, straight to the wallet —
             // no cargo space involved.
             this.save.player.credits += pickup.amount;
+            recordSortieCredit(this.save, pickup.amount, 'pickups');
             pickup.life = 0;
             this.setOwnMonitorStatus(`+${formatCredits(pickup.amount)}`);
             return;
@@ -8274,6 +8280,7 @@ export class GameSession {
         const fine = SMUGGLE_BUST_FINE + units * SMUGGLE_BUST_PER_UNIT;
         const paid = Math.min(fine, this.save.player.credits ?? 0);
         this.save.player.credits = (this.save.player.credits ?? 0) - paid;
+        recordSortieCredit(this.save, -paid, 'fees');
         this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + SMUGGLE_BUST_REP, -100, 100);
         const line = PATROL_BUST_LINES[Math.floor(patrol.proxRng() * PATROL_BUST_LINES.length)];
         this.sayPilotLine(patrol, line);
@@ -10330,6 +10337,7 @@ export class GameSession {
         if ((this.save.player.credits ?? 0) < amount)
             return false;
         this.save.player.credits -= amount;
+        recordSortieCredit(this.save, -amount, 'fees');
         this.standDownMug(mugger);
         this.ui.pushEvent(t('Toll paid ({credits}). Pirates break off.', { credits: formatCredits(amount) }), 'info', 5200, t('Toll paid'));
         this.audio.play('ui', 0.6);
@@ -10394,6 +10402,7 @@ export class GameSession {
         if (ship.bountyValue > 0) {
             const payment = ship.bountyValue;
             this.save.player.credits += payment;
+            recordSortieCredit(this.save, payment, 'bounties');
             this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + 1, -100, 100);
             this.ui.pushEvent(t('Pilot captured. You collected a bounty of {credits}.', { credits: formatCredits(payment) }), 'success', 4200, t('Bounty collected'));
         }
@@ -10423,6 +10432,7 @@ export class GameSession {
             this.sayPilotLine(victim, RESCUE_GRATITUDE_LINES[Math.floor(victim.aiRng() * RESCUE_GRATITUDE_LINES.length)]);
         const tip = Math.round(RESCUE_TIP_BASE + victim.aiRng() * RESCUE_TIP_RANGE);
         this.save.player.credits = (this.save.player.credits ?? 0) + tip;
+        recordSortieCredit(this.save, tip, 'rescues');
         this.ui.pushEvent(t('{name} sends their thanks — {credits} tip wired.', { name: victim.name, credits: formatCredits(tip) }), 'success', 4200, t('Rescue rewarded'));
         this.audio.play('success');
     }
@@ -10451,6 +10461,7 @@ export class GameSession {
             if (!ship.captured && (ship.authorizedTarget || (ship.faction === 'red-talons' && !ship.crimeVictim))) {
                 const payment = ship.bountyValue;
                 this.save.player.credits += payment;
+                recordSortieCredit(this.save, payment, 'bounties');
                 this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + 1, -100, 100);
                 if (payment > 0)
                     this.ui.pushEvent(t('Hostile destroyed. You collected a bounty of {credits}.', { credits: formatCredits(payment) }), 'success', 4200, t('Bounty collected'));
@@ -10579,11 +10590,13 @@ export class GameSession {
             this.restoreTutorialRuntime();
             this.ui.showDock(this.save, location.id);
             this.ui.showToast(t('Rin pulled the Wayfarer home. The tutorial objective is ready to retry.'), 'warning', 6500);
+            finishSortie(this.save, location.id, 'tutorial-recovery');
             this.persistSave();
             return;
         }
         const loss = Math.min(this.save.player.credits, Math.max(500, Math.floor(this.save.player.credits * 0.15)));
         this.save.player.credits -= loss;
+        recordSortieCredit(this.save, -loss, 'losses');
         for (const id of Object.keys(this.save.player.cargo)) {
             this.save.player.cargo[id] = Math.floor((this.save.player.cargo[id] ?? 0) * 0.35);
         }
@@ -10613,6 +10626,7 @@ export class GameSession {
         refreshMissionOffers(this.save);
         this.ui.showDock(this.save, dock);
         this.ui.showToast(t('Emergency tow complete. Recovery fee: {credits}.', { credits: formatCredits(loss) }), 'danger', 6500);
+        finishSortie(this.save, dock, 'loss');
         this.persistSave();
     }
     updateBountySpawns() {
@@ -10643,6 +10657,7 @@ export class GameSession {
             // roll so the callsign is still stable.
             const pinnedPilot = mission.pilot ?? (mission.targetName ? rollPilot(seededRandom(`${mission.targetName}:pilot`), this.spawnThreat(spawnPosition, mission.id), 'red-talons') : undefined);
             const target = this.spawnShip('bounty', tuple(spawnPosition), mission.id, mission.targetName, pinnedPilot);
+            recordSortieEncounter(this.save, 'mission', `bounty:${mission.id}`);
             const escorts = [];
             if (this.save.player.guildRank.bounty >= 1 || mission.reward > 6500) {
                 const escort = this.spawnShip('escort', tuple(vec(target.position).add(new THREE.Vector3(12, 7, -14))));
@@ -10656,6 +10671,20 @@ export class GameSession {
             this.ui.pushEvent(t('Warrant target detected: {name}', { name: mission.targetName }), 'danger', 5600, t('Target detected'));
             this.audio.play('warning');
         }
+    }
+    missionEncounterPressure() {
+        const activeInstance = this.activeInstanceId;
+        const missions = this.save.activeMissions ?? [];
+        if (activeInstance === 'shardbelt' && missions.some((mission) => mission.kind === 'mining' && mission.claimNodeId))
+            return { kind: 'mining-claim', level: 1.25, message: t('Claim traffic detected — the warrant board is not the only one watching this seam.') };
+        if (activeInstance === 'mourning-line' && missions.some((mission) => mission.kind === 'salvage' && mission.targetNodeId))
+            return { kind: 'salvage-claim', level: 1.25, message: t('Recovery traffic detected — unstable wreckage is drawing scavengers.') };
+        const sealed = missions.find((mission) => mission.kind === 'smuggle' || mission.kind === 'delivery' || mission.kind === 'transport');
+        if (sealed && this.save.player.sealedCargo?.length) {
+            const dark = sealed.kind === 'smuggle' && this.save.player.transponder === false;
+            return { kind: dark ? 'sealed-route-dark' : 'sealed-route', level: dark ? 0.72 : 1.05, message: dark ? t('Sealed cargo stays quiet, but the route is not empty.') : t('Manifest traffic detected — your sealed cargo is attracting attention.') };
+        }
+        return null;
     }
     updateDynamicEncounters() {
         // The combat simulator drives its own roster; ambient traffic stays out.
@@ -10712,6 +10741,19 @@ export class GameSession {
         const police = this.policePresence(player);
         const exposureFraction = clamp(this.playerExposureRange() / NPC_SENSOR_RANGE, 0, 1);
         const exposed = this.utilityActive || exposureFraction >= 0.55;
+        const missionPressure = this.missionEncounterPressure();
+        if (missionPressure && this.save.world.time >= (this.missionThreatNextAt ?? 0)
+            && rng() < 0.22 * missionPressure.level * (exposed ? 1.25 : 0.7) && police < 0.72) {
+            this.missionThreatNextAt = this.save.world.time + randomBetween(rng, 78, 118);
+            const lead = this.spawnShip('pirate', this.encounterPosition(rng, 190));
+            const escorts = rng() < 0.35 ? [this.spawnShip('escort', this.encounterPosition(rng, 222))] : [];
+            this.stageHunterGroup(lead, escorts, { forceTrack: true });
+            recordSortieEncounter(this.save, 'mission', missionPressure.kind);
+            this.ui.pushSensor(missionPressure.message, 'danger', 5200);
+            this.audio.play('warning');
+            this.nextEncounterAt = this.save.world.time + randomBetween(rng, 28, 48);
+            return;
+        }
         // The extraction beam broadcasts a working signature: while it actually
         // runs in the asteroid field, pirates on the fringes converge on the
         // work. A throttled seeded roll keeps a dark miner lit by their own
@@ -10728,6 +10770,7 @@ export class GameSession {
         if (this.utilityActive && zone === 'asteroid-field' && police < OPPORTUNITY_MAX_POLICE && !this.activeMug() && this.save.world.time >= (this.beamAmbushNextAt ?? 0)) {
             this.beamAmbushNextAt = this.save.world.time + randomBetween(rng, BEAM_AMBUSH_MIN, BEAM_AMBUSH_MAX);
             if (rng() < BEAM_AMBUSH_CHANCE) {
+                recordSortieEncounter(this.save, 'beam', 'extraction-beam');
                 const count = randomInt(rng, 1, 2);
                 const escorts = [];
                 let lead;
@@ -10771,6 +10814,7 @@ export class GameSession {
         const haulWorth = this.holdWorth();
         const opportunity = (recentlyWorking ? 1 : 0) + (haulWorth >= OPPORTUNITY_HOLD_WORTH ? 1 : 0);
         if (exposed && opportunity > 0 && police < OPPORTUNITY_MAX_POLICE && rng() < OPPORTUNITY_CHANCE * (opportunity / 2) * (1 - police)) {
+            recordSortieEncounter(this.save, 'opportunity', 'haul-exposure');
             const count = randomInt(rng, 1, 2);
             const escorts = [];
             let lead;
@@ -10823,11 +10867,13 @@ export class GameSession {
         const pirateVisibility = DARK_ENCOUNTER_MULT + (1 - DARK_ENCOUNTER_MULT) * exposureFraction;
         const pirateCutoff = patrolCutoffAdjusted + (1 - patrolCutoffAdjusted) * pirateVisibility;
         if (bucket < minerCutoff) {
+            recordSortieEncounter(this.save, 'ambient', 'miner');
             const miner = this.spawnShip('miner', this.encounterPosition(rng, 180));
             const zone = LOCATIONS[this.currentActivityLocationIds()[0] ?? 'shardbelt'];
             miner.destination = tuple(vec(zone.position).add(new THREE.Vector3(randomBetween(rng, -70, 70), randomBetween(rng, -35, 35), randomBetween(rng, -70, 70))));
         }
         else if (bucket < traderCutoff) {
+            recordSortieEncounter(this.save, 'distress', 'trader-lane');
             const trader = this.spawnShip('trader', this.encounterPosition(rng, 225));
             if (rng() < 0.55) {
                 const pirate = this.spawnShip('pirate', this.encounterPosition(rng, 188));
@@ -10840,9 +10886,11 @@ export class GameSession {
             }
         }
         else if (bucket < patrolCutoffAdjusted) {
+            recordSortieEncounter(this.save, 'patrol', 'security-lane');
             this.spawnShip('patrol', this.encounterPosition(rng, 218));
         }
         else if (bucket < pirateCutoff) {
+            recordSortieEncounter(this.save, 'ambient', `pirate-group:${zone}`);
             const count = randomInt(rng, 1, zone === 'graveyard' ? 3 : 2);
             const escorts = [];
             let lead;
@@ -10941,6 +10989,8 @@ export class GameSession {
                 return;
             this.capitalSpawnedHomes.add(key);
             const location = LOCATIONS[homeId];
+            if (capitalClass === 'frigate')
+                recordSortieEncounter(this.save, 'frigate', `${variant}:${homeId}`);
             this.spawnCapitalShip(variant, this.capitalApproachPosition(location, capitalClass, flankSign), homeId, name);
         };
         if (this.save.player.systemId === 'meridian') {
@@ -11613,6 +11663,7 @@ export class GameSession {
             return false;
         }
         this.save.player.credits -= fee;
+        recordSortieCredit(this.save, -fee, 'fees');
         const underworld = this.save.world.underworld ?? (this.save.world.underworld = {});
         underworld[pending.locationId] = (underworld[pending.locationId] ?? 0) + fee;
         // The berth's receipt: the dock screen shows this saved message for the
@@ -12678,7 +12729,8 @@ export class GameSession {
         // concourse opens on a payment card (pay or launch back out).
         if (this.save.player.transponder === false && this.darkDockPolicy(locationId) === 'syndicate')
             this.beginDarkArrival(locationId);
-        completeMissionsAtDock(this.save, locationId).forEach((message) => this.ui.showToast(message, 'success', 6000));
+        completeMissionsAtDock(this.save, locationId);
+        markSortieDocked(this.save, locationId);
         refreshMissionOffers(this.save);
         this.renderer.setCockpitVisible(false);
         this.renderer.setUtilityBeam(false, this.save.player.mode, this.save.player.position);
@@ -12746,6 +12798,11 @@ export class GameSession {
             return false;
         }
         const location = LOCATIONS[locationId];
+        // The prior sortie remains open while the pilot reviews the debrief and
+        // pays for service. Close it only after those dock-side transactions,
+        // then start a fresh ledger for the departure now being prepared.
+        finishSortie(this.save, locationId, 'launch');
+        beginSortie(this.save, locationId);
         const center = vec(location.position);
         const launchDistance = (location.dockRadius ?? location.radius * 1.7) + 8;
         // Exit pointing at the cluster of points of interest that leaves the most of
@@ -12961,6 +13018,7 @@ export class GameSession {
         }
         const now = this.save.world.time;
         this.save.player.credits -= course.entryFee;
+        recordSortieCredit(this.save, -course.entryFee, 'fees');
         // Races are repeatable. Reset the prior quest run's transient flags so
         // a completion/forfeit cannot leak its course or deadline into a new
         // ticket, while the separate race record keeps the personal best.
@@ -13096,6 +13154,7 @@ export class GameSession {
         }
         const stats = this.playerStats();
         this.save.player.credits -= cost;
+        recordSortieCredit(this.save, -cost, 'repair');
         this.save.player.hull = stats.hull;
         this.ui.showToast(t('Repair complete. {credits} charged.', { credits: formatCredits(cost) }), 'success');
         this.audio.play('success');
@@ -13117,6 +13176,7 @@ export class GameSession {
         }
         const stats = this.playerStats();
         this.save.player.credits -= cost;
+        recordSortieCredit(this.save, -cost, 'refill');
         this.save.player.fuel = stats.fuel;
         fillLauncherMagazines(this.save.player);
         // Weapon ammo pools top up with the ordnance (pricing in shipStats.refillCost).
@@ -13171,6 +13231,7 @@ export class GameSession {
             fillSlots: quote.fillSlots });
         if (!result.ok) return result;
         this._statsDirty = true;
+        recordSortieCredit(this.save, -Object.values(quote.costs).reduce((sum, value) => sum + value, 0), 'drones');
         this.droneServiceState = this.droneServiceQuote();
         this.ui?.showToast?.(t('Drones serviced · repair {repair} · replacements {replacement} · ammo {ammo}', {
             repair: formatCredits(quote.costs.repair), replacement: formatCredits(quote.costs.replacement),
@@ -13292,6 +13353,22 @@ export class GameSession {
         // deliberately empty until the separate refill service loads it.
         normalizeLauncherMagazines(this.save.player);
         const afterStats = targetShipId === this.save.player.shipId ? this.playerStats() : undefined;
+        if (Number(quote.netCost) > 0)
+            recordSortieCredit(this.save, -Number(quote.netCost), 'outfitting');
+        else if (Number(quote.netCost) < 0)
+            recordSortieCredit(this.save, -Number(quote.netCost), 'other');
+        const outfitSlots = ['guns', 'launchers', 'power', 'drive', 'defense', 'utility'];
+        const beforeIds = outfitSlots.flatMap((key) => quote.beforeLoadout?.[key] ?? []).filter(Boolean);
+        const afterIds = outfitSlots.flatMap((key) => quote.afterLoadout?.[key] ?? []).filter(Boolean);
+        const beforeCounts = beforeIds.reduce((counts, id) => {
+            counts[id] = (counts[id] ?? 0) + 1;
+            return counts;
+        }, {});
+        for (const id of afterIds) {
+            beforeCounts[id] = (beforeCounts[id] ?? 0) - 1;
+            if (beforeCounts[id] < 0 && !OUTFIT_ITEMS[id]?.factoryFit)
+                recordSortieUpgrade(this.save, id);
+        }
         if (beforeStats && afterStats) {
             // A refit changes the ceiling, not the live condition. Preserve
             // damage while fitting a larger grid; only clamp values that no
@@ -13373,6 +13450,7 @@ export class GameSession {
             this.ui.showToast(t('Ship trade changed; review it again.'), 'warning');
             return result;
         }
+        recordSortieCredit(this.save, this.save.player.credits - quote.creditsBefore, 'ship');
         this.abandonMiningDrones('ship-changed');
         this.recallPdcDrones('ship-changed');
         this.renderer?.clearDrones?.();

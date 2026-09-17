@@ -13052,6 +13052,36 @@ button.primary,
   font-size: 18px;
 }
 
+#dock-screen .dock-wallet-strength {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin-top: 0.28rem;
+  padding-top: 0.24rem;
+  border-top: 1px solid rgba(91, 193, 240, 0.24);
+}
+
+#dock-screen .dock-wallet-strength span {
+  color: #8fc9dc;
+  font-size: var(--station-label);
+}
+
+#dock-screen .dock-wallet-strength b {
+  color: var(--void-cream);
+  font-family: var(--pixel-font);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+#dock-screen .ship-account-row span small {
+  color: #718b99;
+  font-size: 0.56rem;
+  letter-spacing: 0.06em;
+}
+
 #dock-screen .dock-content {
   min-height: 0;
   overflow-x: hidden;
@@ -15437,6 +15467,8 @@ button.primary,
 .simple-fit-scroll .fit-slot {display:flex;flex-direction:column;align-items:flex-start;gap:5px;width:100%;text-align:left;margin:0 0 8px;padding:12px;background:#1a2c3e;}
 .simple-fit-scroll .fit-slot b {font-size:16px;}.simple-fit-scroll small,.fit-slot span {font-size:14px;line-height:1.45;color:#bed0de;}
 .fit-assumption {display:block;margin-top:6px;}.fit-comparison {display:flex;justify-content:space-between;gap:15px;padding:8px 0;border-bottom:1px solid #30475a;}
+.fit-impact {display:grid;gap:4px;margin:10px 0;padding:8px 10px;border-left:2px solid #e3bb6b;background:rgba(24,49,62,.72);color:#dbecef;line-height:1.45;}
+.fit-impact b {color:#f1d58e;font-size:11px;letter-spacing:.08em;}.fit-impact span {font-size:13px;}
 .simple-fit-scroll details {padding:10px 0;}.simple-fit-scroll summary {min-height:44px;cursor:pointer;}
 .simple-outfitting footer .primary {margin-left:auto;}.simple-outfitting footer button {max-width:75%;}
 @media (pointer:coarse) and (max-height:600px) {

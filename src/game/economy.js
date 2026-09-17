@@ -3,6 +3,7 @@ import { clamp, randomBetween, seededRandom } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
 import { miningReservedMass } from './droneMining.js';
 import { t } from './i18n.js';
+import { recordSortieCredit } from './careerMetrics.js';
 // Selling gold is loud: word reaches the syndicate and pirates watch the
 // Shardbelt lanes for this long after the sale (see updateDynamicEncounters).
 const GOLD_HEAT_SECONDS = 360;
@@ -338,12 +339,14 @@ const executeTradeQuote = (save, quote) => {
     const isBuy = quote.kind === 'buy' || quote.kind === 'den-buy';
     if (isBuy) {
         save.player.credits -= quote.total;
+        recordSortieCredit(save, -quote.total, 'trades');
         save.player.cargo[quote.commodityId] = (save.player.cargo[quote.commodityId] ?? 0) + quote.quantity;
         item.supply = clamp(item.supply - quote.quantity, 0, 99);
         item.demand = clamp(item.demand + Math.ceil(quote.quantity * 0.3), 0, 99);
     }
     else {
         save.player.credits += quote.total;
+        recordSortieCredit(save, quote.total, 'trades');
         save.player.cargo[quote.commodityId] = (save.player.cargo[quote.commodityId] ?? 0) - quote.quantity;
         item.supply = clamp(item.supply + quote.quantity, 0, 99);
         item.demand = clamp(item.demand - Math.ceil(quote.quantity * 0.35), 0, 99);

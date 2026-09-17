@@ -5,7 +5,8 @@ registerHooks({resolve(specifier,context,next){return next(specifier==='three'?n
 const {GameSession}=await import('../src/game/game.js');
 const {GameUI}=await import('../src/game/ui.js');
 const {createNewSave,hydrateSave}=await import('../src/game/save.js');
-const {getTutorialQuest,advanceTutorialCampaign,tutorialCampaignSummary,tutorialDialogue,TUTORIAL_STEPS,TUTORIAL_FLIGHT_LESSONS}=await import('../src/game/tutorialCampaign.js');
+const {getTutorialQuest,advanceTutorialCampaign,tutorialCampaignSummary,tutorialDialogue,TUTORIAL_STEPS,TUTORIAL_FLIGHT_LESSONS,TUTORIAL_MARA_CALL_MIN_COMBAT_VALUE}=await import('../src/game/tutorialCampaign.js');
+const {playerStrengthValue}=await import('../src/game/playerStrength.js');
 const {ADVENTURE_DIALOGUES}=await import('../src/game/adventureDialogues.js');
 const {DE_CATALOG}=await import('../src/game/i18n-de.js');
 function fixture(step){
@@ -184,6 +185,7 @@ test('Rin departs in person and Mara calls when the earn-and-equip stretch runs 
     session.queueTutorialMaraCall();
     assert.equal(briefings.length,during,'Mara stays quiet while the player is still earning');
     session.tutorialMaraCallDue=save.world.time;
+    save.player.credits=100000;
     session.queueTutorialMaraCall();
     assert.equal(briefings.length,during+1);
     assert.equal(briefings[during][0],'Mara Vek');assert.equal(briefings[during][4],'tutorial-handoff');
@@ -207,6 +209,7 @@ test('legacy map-step saves retain progress and all chapters fit the counter',()
 });
 test('Mara call survives combat deferral, crossing and reload until acknowledged',()=>{
  const {save,session,quest}=fixture('cross-meridian-gate');save.player.dockedAt=undefined;
+ save.player.credits=100000;
  session.ui={isModalOpen:true};session.hostilesVisibleNear=()=>true;session.playStoryLine=GameSession.prototype.playStoryLine;
  session.queueTutorialMaraCall();assert.equal(session.pendingStoryConversations?.length??0,0,'do not interrupt an open menu');session.ui.isModalOpen=false;
  session.queueTutorialMaraCall();assert.equal(session.pendingStoryConversations.length,1);assert.notEqual(quest.flags.maraCallMade,true);
@@ -217,4 +220,15 @@ test('Mara call survives combat deferral, crossing and reload until acknowledged
  session.hostilesVisibleNear=()=>false;let shown=0;session.ui.showStoryLine=()=>shown++;session.refreshStoryLine();assert.equal(shown,1);
  session.finishTutorialBriefing('tutorial-handoff',false);session.ui.storyDismissed=true;session.refreshStoryLine();save.world.time+=12;session.queueTutorialMaraCall();assert.equal(shown,2,'closing early permits retry');
  session.finishTutorialBriefing('tutorial-handoff',true);session.queueTutorialMaraCall();assert.equal(shown,2);assert.equal(quest.flags.maraCallMade,true);
+});
+test('Mara handoff waits for the 50k player combat-value threshold',()=>{
+ const {save,session,briefings}=fixture('cross-meridian-gate');save.player.dockedAt=undefined;
+ session.tutorialMaraCallDue=save.world.time;
+ assert.ok(playerStrengthValue(save.player)<TUTORIAL_MARA_CALL_MIN_COMBAT_VALUE);
+ session.queueTutorialMaraCall();
+ assert.equal(briefings.length,0,'the Meridian handoff stays quiet below the threshold');
+ save.player.credits=100000;
+ assert.ok(playerStrengthValue(save.player)>=TUTORIAL_MARA_CALL_MIN_COMBAT_VALUE);
+ session.queueTutorialMaraCall();
+ assert.equal(briefings.length,1,'the handoff becomes available once the threshold is met');
 });

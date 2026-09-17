@@ -13,6 +13,7 @@ import { getLanguage, t } from './i18n.js';
 import { ADVENTURE_DIALOGUES, dialogueText } from './adventureDialogues.js';
 import { HULL_TRADE_IN_RATE, quoteShipTrade } from './shipTrade.js';
 import { LOADOUT_KEYS, HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RATE, itemAvailable, itemFitsMount, loadoutFor, outfittingUsage, quoteOutfitting } from './outfitting.js';
+import { playerStrengthValue } from './playerStrength.js';
 import { guildJoinCost, missionBriefing, missionTitle } from './missions.js';
 import { tutorialCampaignSummary, tutorialDialogue } from './tutorialCampaign.js';
 import { DRONE_BAY_CAPACITY, DRONE_TYPES, droneBayLayoutFor } from './droneData.js';
@@ -26,6 +27,31 @@ const loadoutGroupDemand=(loadout,mountId)=>{
 };
 const escapeHtml = (value) => value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const percent = (value, max) => (max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100)));
+const sortieImpactMarkup = (item, before = {}, after = {}) => {
+    if (!item || item.category === 'gun' || item.category === 'launcher' || item.category === 'turret')
+        return '';
+    const value = (key, digits = 0) => {
+        const number = Number(after[key]);
+        return Number.isFinite(number) ? number.toFixed(digits) : '—';
+    };
+    const previous = (key, digits = 0) => {
+        const number = Number(before[key]);
+        return Number.isFinite(number) ? number.toFixed(digits) : '—';
+    };
+    const lines = {
+        'capacitor-bank': t('Longer firing window: capacitor {before} → {after}; reactor output {output}%', { before: previous('energyCapacity'), after: value('energyCapacity'), output: Math.round((after.reactorOutput / Math.max(0.001, before.reactorOutput || after.reactorOutput)) * 100) }),
+        'sustained-reactor': t('More sustained fire: reactor output {before} → {after}; capacitor reserve stays {reserve}.', { before: previous('reactorOutput'), after: value('reactorOutput'), reserve: value('energyCapacity') }),
+        'recovery-shield': t('Shorter recovery windows: shield capacity {before} → {after}; recharge {multiplier}×.', { before: previous('shield'), after: value('shield'), multiplier: (after.shieldRechargeMultiplier ?? 1).toFixed(2) }),
+        'shield-mk2': t('More damage buffered before a repair: shield {before} → {after}.', { before: previous('shield'), after: value('shield') }),
+        'armor-mk2': t('More damage survives after shields fail: hull {before} → {after}.', { before: previous('hull'), after: value('hull') }),
+        'engine-mk2': t('Longer attack passes: speed {before} → {after}; boost fuel {fuel}×.', { before: previous('maxSpeed'), after: value('maxSpeed'), fuel: (after.burnFuelMultiplier ?? 1).toFixed(2) }),
+        'thrusters-mk2': t('Tighter evasion: turning {before} → {after}; speed {speed} km/s.', { before: previous('angularAcceleration', 2), after: value('angularAcceleration', 2), speed: value('maxSpeed') }),
+        'radar-mk2': t('Earlier contact and safer scans: radar {before} → {after} km; scan {scanBefore} → {scanAfter} km.', { before: previous('radarRange'), after: value('radarRange'), scanBefore: previous('scanRange'), scanAfter: value('scanRange') }),
+        'cargo-pods': t('More earning capacity per run: cargo {before} → {after} mass.', { before: previous('cargo'), after: value('cargo') }),
+        'salvage-mk2': t('More salvage per approach: pull range {beforeRange} → {range} km; recovery rate {beforeRate} → {rate}×.', { beforeRange: previous('salvageRange'), range: value('salvageRange'), beforeRate: (before.salvageRate ?? 1).toFixed(2), rate: (after.salvageRate ?? 1).toFixed(2) }),
+    }[item.id];
+    return lines ? `<aside class="fit-impact"><b>${t('SORTIE IMPACT')}</b><span>${escapeHtml(lines)}</span></aside>` : '';
+};
 const observerTime = (seconds) => {
     const total = Math.max(0, Number(seconds) || 0);
     let minutes = Math.floor(total / 60);
@@ -336,7 +362,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2am';
+const GAME_VERSION = '0.8.2ar';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -1728,12 +1754,13 @@ export class GameUI {
                 : 'concourse';
         const terminal = this.dockTerminal ? this.renderDockTab(this.dockTerminal) : '';
         const notices = `${this.renderDockNotice()}${this.renderTutorialNotice()}`;
+        const combatValue = playerStrengthValue(this.save.player);
         dock.innerHTML = `
       <div class="dock-backdrop">${this.locationIllustration(this.dockLocation, illustrationScreen)}</div>
       <div class="dock-scanlines" aria-hidden="true"></div>        <header class="dock-header">
         <div><span>${t(location.kind.toUpperCase())} / ${t(FACTION_NAMES[location.faction])}</span><h2>${escapeHtml(location.name)}</h2></div>
         ${this.dockTerminal !== 'concourse' ? `<div class="dock-back-button dock-pointer" data-ui-command="dock-concourse" role="button" tabindex="0" aria-label="${t('Return to the concourse')}">${t('◀ CONCOURSE')}</div>` : ''}
-        <div class="dock-wallet-unit"><div class="dock-wallet"><span>${t('AVAILABLE CREDIT')}</span><strong>${formatCredits(this.save.player.credits)}</strong><small>${SHIPS[this.save.player.shipId].name} · ${cargoMass(this.save.player).toFixed(1)}/${cargoCapacity(this.save.player)} mass</small></div><button class="dock-options-button dock-pointer" data-ui-command="options" role="button" tabindex="0" aria-label="${t('Options')}">⚙</button></div>
+        <div class="dock-wallet-unit"><div class="dock-wallet"><span>${t('AVAILABLE CREDIT')}</span><strong>${formatCredits(this.save.player.credits)}</strong><small>${SHIPS[this.save.player.shipId].name} · ${cargoMass(this.save.player).toFixed(1)}/${cargoCapacity(this.save.player)} mass</small><div class="dock-wallet-strength" title="${t('Current ship and owned equipment at full value; cash at half; cargo excluded.')}" aria-label="${t('Combat value breakdown')}"><span>${t('COMBAT VALUE')}</span><b>${formatCredits(combatValue)}</b></div></div><button class="dock-options-button dock-pointer" data-ui-command="options" role="button" tabindex="0" aria-label="${t('Options')}">⚙</button></div>
       </header>
       ${notices ? `<div class="dock-notice-stack">${notices}</div>` : ''}
       <div class="dock-content">${terminal}</div>
@@ -3337,6 +3364,7 @@ export class GameUI {
             } else {
                 for(const [key,label] of [['hull','HULL INTEGRITY'],['shield','SHIELD'],['reactorOutput','REACTOR'],['energyCapacity','CAPACITOR'],['maxSpeed','SPEED'],['cargo','CARGO'],['angularAcceleration','TURNING'],['burnFuelMultiplier','BOOST FUEL USE'],['shieldRechargeMultiplier','SHIELD RECOVERY']])
                     if(stats[key]!==after[key])body+=metric(label,stats[key],after[key]);
+                body+=sortieImpactMarkup(item,stats,after);
             }
             if(old && old.id!==item.id)body+=`<p>${t('{name} returns to your locker.',{name:t(old.name)})}</p>`;
             const draftUsage=outfittingUsage(player,player.shipId,draft);
@@ -4832,6 +4860,7 @@ export class GameUI {
         const panel = this.root.querySelector('#ship-panel');
         const player = this.save.player;
         const ship = SHIPS[player.shipId];
+        const combatValue = playerStrengthValue(player);
         const mass = cargoMass(player);
         const capacity = cargoCapacity(player);
         const loadPercent = capacity > 0 ? Math.min(100, Math.round((mass / capacity) * 100)) : 0;
@@ -4909,6 +4938,7 @@ export class GameUI {
           ${this.renderDroneShipStatus()}
           <section class="ship-menu-account"><h3>${t('ACCOUNT')}</h3>
             <div class="ship-account-row"><span>${t('AVAILABLE CREDIT')}</span><b>${formatCredits(player.credits)}</b></div>
+            <div class="ship-account-row"><span>${t('COMBAT VALUE')}<small>${t('SHIP + EQUIPMENT · HALF CASH · NO CARGO')}</small></span><b>${formatCredits(combatValue)}</b></div>
             ${mug?.kind === 'credits' ? `<div class="ship-account-row"><span>${t('STANDOFF TOLL')}</span><button data-pay-mug="1">${t('PAY')} ${formatCredits(mug.amount)}</button></div>` : ''}
             <div class="ship-account-row"><span>${t('HULL')}</span><b>${Math.ceil(player.hull)}/${Math.ceil(getEffectiveShipStats(player).hull)}</b></div>
           </section>

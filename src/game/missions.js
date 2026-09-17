@@ -7,6 +7,7 @@ import { t } from './i18n.js';
 import { RACE_COURSES, raceBriefingLine, raceOffersForLocation, raceCourseUnlocked, normalizeRaceRecord } from './racing.js';
 import { LOCAL_CONTRACT_CHAIN_IDS, findNextLocalContractStage, localContractToMissionOffer } from './localContracts.js';
 import { tutorialContentUnlocked } from './tutorialCampaign.js';
+import { recordSortieCredit, recordSortieMission } from './careerMetrics.js';
 const GUILD_NAMES_FALLBACK = (guild) => guild === 'merchant' ? 'Merchant Guild' : guild === 'bounty' ? 'Bounty Registry' : guild === 'mining' ? 'Prospectors Guild' : guild === 'syndicate' ? 'Red Talon Syndicate' : 'Salvage Union';
 const merchantIssuers = ['Kestrel Freight', 'Orison Combine', 'Free Haulers Desk', 'Sable Route Logistics', 'Guild Dispatch'];
 const bountyIssuers = ['Concord Warrant Desk', 'Frontier Security Office', 'Bounty Hunters Registry', 'Civil Claims Bureau'];
@@ -527,6 +528,8 @@ export const acceptMission = (save, locationId, missionId) => {
         });
     }
     save.player.credits -= offered.deposit;
+    recordSortieCredit(save, -offered.deposit, 'bonds');
+    recordSortieMission(save, 'accepted', offered.kind);
     if (offered.complication?.kind === 'fragile')
         offered.complication = { ...offered.complication, intact: true };
     offered.status = 'active';
@@ -584,6 +587,8 @@ const awardMission = (save, mission) => {
         save.world.localContractOffersDirty = true;
     }
     save.player.credits += total;
+    recordSortieCredit(save, total, 'missions');
+    recordSortieMission(save, 'completed', mission.kind);
     save.player.guildRep[mission.guild] = (save.player.guildRep[mission.guild] ?? 0) + mission.guildRep;
     save.player.reputation[mission.faction] = clamp(save.player.reputation[mission.faction] + factionDelta, -100, 100);
     save.player.stats.contracts += 1;
@@ -735,6 +740,7 @@ export const failMission = (save, mission, options = {}) => {
     save.player.sealedCargo = save.player.sealedCargo.filter((cargo) => cargo.missionId !== mission.id);
     save.player.guildRep[mission.guild] = Math.max(0, (save.player.guildRep[mission.guild] ?? 0) + repDelta);
     save.player.reputation[mission.faction] = clamp((save.player.reputation[mission.faction] ?? 0) + factionDelta, -100, 100);
+    recordSortieMission(save, 'failed', mission.kind);
     if (mission.authored)
         save.world.localContractOffersDirty = true;
     queueMissionSettlement(save, {
@@ -809,6 +815,7 @@ export const joinGuild = (save, guild, locationId) => {
     if (save.player.credits < cost)
         return { ok: false, message: t('Membership requires {credits} credits.', { credits: cost }) };
     save.player.credits -= cost;
+    recordSortieCredit(save, -cost, 'fees');
     save.player.guildRep[guild] = 1;
     updateGuildRank(save.player, guild);
     return { ok: true, message: t('Joined {guild}. Entry fee paid.', { guild: t(GUILD_NAMES_FALLBACK(guild)) }) };

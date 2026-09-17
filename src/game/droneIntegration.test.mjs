@@ -5,7 +5,8 @@ import { createNewSave, hydrateSave } from './save.js';
 import { cargoFree, cargoMass, quoteCommodityTrade } from './economy.js';
 import { generateAsteroidField } from './worldData.js';
 import { GameSession } from './game.js';
-import { createDroneUnit, droneBayLayoutFor } from './droneData.js';
+import { createDroneUnit, droneBayLayoutFor, normalizeDroneFleet } from './droneData.js';
+import { createOutfittingState } from './outfitting.js';
 
 assert.ok(generateAsteroidField(4242, {}).every(node => Number.isSafeInteger(node.remaining)), 'real generated deposits are mineable');
 assert.ok(Object.values(COMMODITIES).every(c => c.mass === 1));
@@ -43,6 +44,18 @@ for (const hull of Object.keys(SHIPS)) {
  if (!['wayfarer', 'prospector'].includes(hull)) {
   assert.equal(GameSession.prototype.miningDroneActionState.call({ save: { player: { shipId: hull } } }).code, 'no-bay');
  }
+}
+// Both authored drone hulls receive a complete fresh complement: Wayfarer has
+// one two-slot bay, while Prospector has three. This guards the full player
+// setup rather than only the isolated controller fixtures below.
+for (const hull of ['wayfarer', 'prospector']) {
+ const loadouts = createOutfittingState([hull]).loadouts;
+ const fleet = normalizeDroneFleet(null, loadouts, { grantInitial: true });
+ const fit = loadouts[hull];
+ const assigned = fit.droneBays.flatMap(bay => bay.unitIds).filter(Boolean);
+ assert.equal(assigned.length, hull === 'wayfarer' ? 2 : 6, `${hull} receives every bay slot`);
+ assert.equal(new Set(assigned).size, assigned.length, `${hull} drone identities are unique`);
+ assert.ok(assigned.every(id => fleet.unitsById[id]?.type === 'mining'), `${hull} complement is operational mining stock`);
 }
 // A new flight target does not cancel the assigned mining cycle.
 const rt = Object.create(GameSession.prototype);

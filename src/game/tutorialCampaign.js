@@ -4,6 +4,7 @@ export const TUTORIAL_QUEST_ID = 'the-spare-key';
 export const TUTORIAL_STARTING_CREDITS = 3500;
 export const TUTORIAL_REQUIRED_SUPPLIES = 2;
 export const TUTORIAL_CHAPTER_COUNT = 4;
+export const TUTORIAL_MARA_CALL_MIN_COMBAT_VALUE = 50000;
 
 const STEP_DEFINITIONS = {
     'meet-family': {

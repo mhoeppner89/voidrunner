@@ -11,12 +11,13 @@ import { combinedHullIntegrity, normalizeEnergy } from './combatResources.js';
 import { normalizeQuestStates } from './quests.js';
 import { startTutorialCampaign } from './tutorialCampaign.js';
 import { normalizeDroneFleet } from './droneData.js';
+import { normalizeActiveSortie, normalizeSortieHistory } from './careerMetrics.js';
 export const DRONE_TEST_MODE = typeof location !== 'undefined' && new URLSearchParams(location.search).get('drone-test') === '1';
 export const TURRET_TEST_MODE = typeof location !== 'undefined' && new URLSearchParams(location.search).get('turret-test') === '1';
 export const SAVE_KEY = TURRET_TEST_MODE ? 'voidrunner-turret-test-v1' : DRONE_TEST_MODE ? 'voidrunner-drone-test-v16' : 'void-privateer-save-v1';
 export const DRONE_MIGRATION_BACKUP_KEY = `${SAVE_KEY}-pre-drones`;
 export const SETTINGS_KEY = 'void-privateer-settings-v1';
-export const SAVE_VERSION = 16;
+export const SAVE_VERSION = 17;
 // Test-funds build: a fresh career starts with enough credits to try any ship,
 // outfitting module or trade route without grinding first.
 export const STARTING_CREDITS = 500000;
@@ -158,6 +159,10 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             // a proper settlement docket. Entries are acknowledged and removed
             // by the player, so this queue stays short in normal play.
             missionSettlements: [],
+            // The active sortie stays open through the dock service window so
+            // repair, refill, drone and fitting charges appear in its debrief.
+            sortie: null,
+            sortieHistory: [],
             // Highest completed stage in each authored local contract chain.
             // Active work remains in activeMissions; this only unlocks the
             // next posting when a stage settles.
@@ -582,6 +587,8 @@ export const hydrateSave = (candidate) => {
                 .filter(entry => entry && typeof entry.speaker === 'string' && typeof entry.text === 'string')
                 .slice(-160).map(entry => ({speaker:entry.speaker.slice(0,120),text:entry.text.slice(0,4000)})),
             missionSettlements: normalizeMissionSettlements(candidate.world?.missionSettlements),
+            sortie: normalizeActiveSortie(candidate.world?.sortie),
+            sortieHistory: normalizeSortieHistory(candidate.world?.sortieHistory),
             localContractProgress: normalizeLocalContractProgress(candidate.world?.localContractProgress),
             // Upgrade legacy rank/time entries into the persistent PB/split
             // shape and deliberately discard any old replay/ghost payloads.
