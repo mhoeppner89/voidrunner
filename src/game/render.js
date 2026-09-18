@@ -39,6 +39,28 @@ const MOURNING_ROOT_VISIBILITY_RANGE = WRECK_RENDER_DISTANCE + 6000;
 const MOURNING_ROOT_VISIBILITY_RANGE_SQ = MOURNING_ROOT_VISIBILITY_RANGE * MOURNING_ROOT_VISIBILITY_RANGE;
 const HIDDEN_SCALE = [0.0001, 0.0001, 0.0001];
 const SHADER_WARMUP_TIMEOUT_MS = 2500;
+const IOS_RENDER_WIDTH = 720;
+
+// iPadOS can identify itself as macOS, so platform alone is not enough here.
+// Keep this as a small capability check instead of tying the render profile to
+// a browser user-agent string: it also catches desktop-mode iPads reliably.
+export const isAppleTouchDevice = (platform = typeof navigator !== 'undefined' ? navigator : undefined) => {
+    if (!platform)
+        return false;
+    const identity = `${platform.platform ?? ''} ${platform.userAgent ?? ''}`;
+    return /iPad|iPhone|iPod/i.test(identity)
+        || (platform.platform === 'MacIntel' && Number(platform.maxTouchPoints) > 1);
+};
+export const renderBaseWidth = ({ qualityMode, isIOS = false, touchDevice = false, viewportWidth = 0 }) =>
+    qualityMode === 'low'
+        ? 640
+        : isIOS
+            ? IOS_RENDER_WIDTH
+            : qualityMode === 'high'
+                ? 1280
+                : touchDevice || viewportWidth < 900
+                    ? 720
+                    : 960;
 // Bloom is deliberately low-frequency. Keeping the main scene at the full
 // high-fidelity resolution while extracting and blurring glow at quarter
 // resolution cuts most of the post-process fill cost without softening hulls,
@@ -328,6 +350,8 @@ export class SpaceRenderer {
     // recovers — otherwise a machine hovering around the threshold would pop
     // the glow on and off every second.
     bloomOff = false;
+    isIOS = false;
+    sceneQuality = 'high';
     qualityMode;
     contextLost = false;
     bloomSceneTarget;
@@ -361,6 +385,10 @@ export class SpaceRenderer {
         this.asteroids = asteroids;
         this.regionalFields = regionalFields;
         this.qualityMode = quality;
+        this.isIOS = isAppleTouchDevice();
+        // Keep the save setting at high for desktop and Android, but avoid
+        // constructing the densest sky/dust/warp variant on iPhone/iPad.
+        this.sceneQuality = this.isIOS && quality === 'high' ? 'auto' : quality;
         // Touch-primary devices get the phone render tier regardless of CSS
         // width — landscape phones are 900+ CSS px wide, and the old <900
         // check silently gave them the desktop 960p tier.
@@ -371,7 +399,10 @@ export class SpaceRenderer {
         this.renderer = new THREE.WebGLRenderer({
             antialias: false,
             alpha: false,
-            powerPreference: this.touchDevice ? 'low-power' : 'high-performance',
+            // Safari's low-power hint can select a particularly conservative
+            // WebGL path. iOS gets the performance context because its render
+            // profile is already capped for battery and fill-rate reasons.
+            powerPreference: this.touchDevice && !this.isIOS ? 'low-power' : 'high-performance',
             depth: true,
             stencil: false,
         });
@@ -404,14 +435,14 @@ export class SpaceRenderer {
         this.createLighting();
         this.createEnvironmentMap();
         this.createGalacticBand();
-        this.createStarfield(seed, quality);
-        this.createNebulae(seed, quality);
-        this.createFieldDust(seed, quality);
+        this.createStarfield(seed, this.sceneQuality);
+        this.createNebulae(seed, this.sceneQuality);
+        this.createFieldDust(seed, this.sceneQuality);
         this.createLocations();
         this.createAsteroids();
         this.createGraveyard();
         this.createWreckNodes();
-        this.createHyperdriveFx();
+        this.createHyperdriveFx(this.sceneQuality);
         this.createCockpit();
         this.setSystem(systemId);
         this.setActiveInstance(undefined);
@@ -438,7 +469,10 @@ export class SpaceRenderer {
         this.renderer.domElement.addEventListener('webglcontextlost', this.onContextLost);
         this.renderer.domElement.addEventListener('webglcontextrestored', this.onContextRestored);
         this.resize();
-        this.createBloomPipeline();
+        // iOS renders the scene directly by default. The bloom targets are
+        // created lazily only if the Azure ring-volume pass needs them.
+        if (!this.isIOS)
+            this.createBloomPipeline();
         // Warm only the player's current hull. Traffic variants load when an
         // actual ship enters the scene, avoiding six multi-megabyte requests
         // on every career start.
@@ -2973,9 +3007,9 @@ export class SpaceRenderer {
         texture.generateMipmaps = false;
         return texture;
     }
-    createHyperdriveFx() {
-        const streakCount = this.qualityMode === 'low' ? 44 : this.qualityMode === 'high' ? 88 : 68;
-        const ringCount = this.qualityMode === 'low' ? 5 : 7;
+    createHyperdriveFx(quality = this.sceneQuality ?? this.qualityMode) {
+        const streakCount = quality === 'low' ? 44 : quality === 'high' ? 88 : 68;
+        const ringCount = quality === 'low' ? 5 : 7;
         const rng = seededRandom('hyperdrive-world-fx');
         this.reducedHyperdriveMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
         this.hyperdriveFxRoot.name = 'hyperdrive-world-fx';
@@ -5037,11 +5071,13 @@ export class SpaceRenderer {
         this.bloomBlurMaterial.uniforms.uResolution.value.set(width * 2, height * 2);
     }
     // Bloom costs three extra full-screen passes every frame, which is most of
-    // the GPU bill on a weak chip. The Low quality tier and the auto governor's
-    // low end skip it: the scene still composites through the tone-mapping
-    // shader, just without the bright-pass glow. The governor turns bloom back
-    // on once the device proves it can keep up.
+    // the GPU bill on a weak chip. iOS skips it as part of its fixed phone
+    // profile; the Low quality tier and the auto governor's low end also skip
+    // it. Desktop/Android auto can turn bloom back on once the device proves it
+    // can keep up.
     bloomEnabled() {
+        if (this.isIOS)
+            return false;
         if (this.qualityMode === 'high')
             return true;
         if (this.qualityMode === 'low')
@@ -5088,8 +5124,6 @@ export class SpaceRenderer {
         if (this.contextLost)
             return;
         this.updateWorldVisuals();
-        if (!this.bloomSceneTarget)
-            this.resizeBloomTargets();
         // Keep the atmosphere shells' camera-distance uniform fresh so the
         // near-field dome fade tracks the pilot's altitude.
         const cam = this.camera.position;
@@ -5109,6 +5143,18 @@ export class SpaceRenderer {
             && this.viewFrustum.intersectsSphere(this.ringVolume.bounds);
         if (this.ringVolumeEnabled && this.azureRingSurface) this.azureRingSurface.visible = false;
         const bloomOn = this.bloomEnabled();
+        // A phone without bloom does not need an HDR scene target or a
+        // tone-mapping copy pass. Render straight to the screen; this removes
+        // the full-resolution half-float buffer as well as the extra quad.
+        // Azure's ring volume still uses the post-process path when visible.
+        if (!bloomOn && !volumeActive) {
+            this.renderer.setRenderTarget(null);
+            this.renderer.render(this.scene, this.camera);
+            this.ringParticleDt = 0;
+            return;
+        }
+        if (!this.bloomSceneTarget)
+            this.createBloomPipeline();
         // Pass 1: the full scene into a float buffer.
         this.renderer.setRenderTarget(this.bloomSceneTarget);
         this.renderer.render(this.scene, this.camera);
@@ -5220,13 +5266,12 @@ export class SpaceRenderer {
         this.viewportWidth = Math.max(1, rect.width);
         this.viewportHeight = Math.max(1, rect.height);
         const aspect = this.viewportWidth / this.viewportHeight;
-        const baseWidth = this.qualityMode === 'low'
-            ? 640
-            : this.qualityMode === 'high'
-                ? 1280
-                : this.touchDevice || this.viewportWidth < 900
-                    ? 720
-                    : 960;
+        const baseWidth = renderBaseWidth({
+            qualityMode: this.qualityMode,
+            isIOS: this.isIOS,
+            touchDevice: this.touchDevice,
+            viewportWidth: this.viewportWidth,
+        });
         const renderWidth = Math.max(288, Math.round(Math.min(this.viewportWidth, baseWidth) * this.lastQualityScale));
         const renderHeight = Math.max(180, Math.round(renderWidth / aspect));
         this.renderer.setPixelRatio(1);

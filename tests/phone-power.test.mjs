@@ -4,7 +4,7 @@ import {test} from 'node:test';
 registerHooks({resolve(specifier,context,next){return next(specifier==='three'?new URL('../vendor/three.module.min.js',import.meta.url).href:specifier,context);}});
 const THREE=await import('three');
 const {GameSession}=await import('../src/game/game.js');
-const {SpaceRenderer}=await import('../src/game/render.js');
+const {SpaceRenderer,isAppleTouchDevice,renderBaseWidth}=await import('../src/game/render.js');
 const {FrameBudget,flightFrameRate}=await import('../src/game/frameBudget.js');
 const {createRingVolume}=await import('../src/game/ringVolume.js');
 const {AudioManager}=await import('../src/game/audio.js');
@@ -46,6 +46,37 @@ test('phone rendering is bounded at 30 fps on 60/90/120 Hz screens without slowi
     assert.equal(hydrateSave(JSON.parse(JSON.stringify(saved))).settings.powerMode,'battery');
     delete saved.settings.powerMode;
     assert.equal(hydrateSave(JSON.parse(JSON.stringify(saved))).settings.powerMode,'auto');
+});
+test('iPhone and desktop-mode iPad use the bounded render profile without changing Android',()=>{
+    assert.equal(isAppleTouchDevice({ platform: 'iPhone', userAgent: 'Mozilla/5.0' }), true);
+    assert.equal(isAppleTouchDevice({ platform: 'MacIntel', userAgent: 'Macintosh', maxTouchPoints: 5 }), true);
+    assert.equal(isAppleTouchDevice({ platform: 'Linux armv8l', userAgent: 'Android', maxTouchPoints: 5 }), false);
+    assert.equal(isAppleTouchDevice({ platform: 'MacIntel', userAgent: 'Macintosh', maxTouchPoints: 0 }), false);
+
+    assert.equal(renderBaseWidth({ qualityMode: 'high', isIOS: true, touchDevice: true, viewportWidth: 1000 }), 720, 'iOS high mode is capped at the phone render width');
+    assert.equal(renderBaseWidth({ qualityMode: 'high', isIOS: false, touchDevice: true, viewportWidth: 1000 }), 1280, 'Android high mode keeps its existing render tier');
+    const ios = Object.create(SpaceRenderer.prototype);
+    ios.isIOS = true;
+    assert.equal(ios.bloomEnabled(), false, 'iOS does not pay for HDR bloom');
+
+    const android = Object.create(SpaceRenderer.prototype);
+    android.isIOS = false;
+    android.qualityMode = 'high';
+    android.lastQualityScale = 1;
+    assert.equal(android.bloomEnabled(), true, 'Android keeps the high-fidelity bloom path');
+});
+test('iOS renders directly when the Azure ring volume is not active',()=>{
+    const r=Object.create(SpaceRenderer.prototype);
+    r.contextLost=false;r.isIOS=true;r.qualityMode='high';r.scene=new THREE.Scene();
+    r.camera=new THREE.PerspectiveCamera(60,2,0.1,1000);r.viewProjection=new THREE.Matrix4();r.viewFrustum=new THREE.Frustum();
+    r.atmosphereShells=[];r.instanceRoots=new Map();r.locationMeshes=new Map();r.ringVolumeEnabled=false;
+    r.updateWorldVisuals=()=>{};
+    let calls=0;let targetChanges=0;
+    r.renderer={setRenderTarget(){targetChanges++;},render(){calls++;}};
+    r.render();
+    assert.equal(calls,1,'iOS submits one scene pass without bloom or a copy quad');
+    assert.equal(targetChanges,1,'iOS selects the default framebuffer directly');
+    assert.equal(r.bloomSceneTarget,undefined,'iOS does not allocate an HDR target for ordinary flight');
 });
 test('paused and hidden flight does no continuous rendering, redraws once on resize, and resumes without catch-up',()=>{
     const s=frameSession();s.updateFrame(17);const draws=s.draws.length,steps=s.steps;
