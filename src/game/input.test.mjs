@@ -274,6 +274,36 @@ test('touch holds, touch edges, throttle slider, joystick, and vibration', () =>
     input.dispose();
 });
 
+test('joystick axes honor the pitch and yaw inversion options', () => {
+    gamepads = [];
+    const controls = makeTouchRoot();
+    const input = createInput(controls.root);
+
+    controls.stick.emit('pointerdown', event({ pointerId: 21, clientX: 50, clientY: 0 }));
+    assert.equal(input.getActions().pitch, -1);
+    assert.equal(input.getActions().yaw, 0);
+    controls.stick.emit('pointerup', event({ pointerId: 21 }));
+
+    controls.stick.emit('pointerdown', event({ pointerId: 22, clientX: 100, clientY: 50 }));
+    assert.equal(input.getActions().pitch, 0);
+    assert.equal(input.getActions().yaw, 1);
+    controls.stick.emit('pointerup', event({ pointerId: 22 }));
+
+    input.configureTilt({ tiltInvertPitch: true, tiltInvertYaw: true });
+
+    controls.stick.emit('pointerdown', event({ pointerId: 23, clientX: 50, clientY: 0 }));
+    assert.equal(input.getActions().pitch, 1);
+    assert.equal(input.getActions().yaw, 0);
+    controls.stick.emit('pointerup', event({ pointerId: 23 }));
+
+    controls.stick.emit('pointerdown', event({ pointerId: 24, clientX: 100, clientY: 50 }));
+    assert.equal(input.getActions().pitch, 0);
+    assert.equal(input.getActions().yaw, -1);
+    controls.stick.emit('pointerup', event({ pointerId: 24 }));
+
+    input.dispose();
+});
+
 test('blur clears held and pending input state', () => {
     const controls = makeTouchRoot();
     const input = createInput(controls.root);

@@ -454,11 +454,13 @@ export class InputManager {
         const throttleKeyboard = this.keyAxis(['KeyR', 'Equal', 'NumpadAdd'], ['KeyF', 'Minus', 'NumpadSubtract']);
         const tilt = this.tiltActive ? this.tiltSteering() : undefined;
         const tiltValid = Boolean(tilt && Number.isFinite(tilt.pitch) && Number.isFinite(tilt.yaw));
+        const joystickPitch = this.joystickY * (this.tiltInvertPitch ? -1 : 1);
+        const joystickYaw = this.joystickX * (this.tiltInvertYaw ? -1 : 1);
         const throttleSet = this.throttleSet;
         this.throttleSet = undefined;
         return {
-            pitch: clamp(tiltValid ? tilt.pitch : (this.joystickY || pitchKeyboard || gamepad.pitch || 0), -1, 1),
-            yaw: clamp(tiltValid ? tilt.yaw : (this.joystickX || yawKeyboard || gamepad.yaw || 0), -1, 1),
+            pitch: clamp(tiltValid ? tilt.pitch : (joystickPitch || pitchKeyboard || gamepad.pitch || 0), -1, 1),
+            yaw: clamp(tiltValid ? tilt.yaw : (joystickYaw || yawKeyboard || gamepad.yaw || 0), -1, 1),
             roll: clamp((this.touchHeld.has('roll-right') ? 1 : 0) - (this.touchHeld.has('roll-left') ? 1 : 0) || rollKeyboard || gamepad.roll || 0, -1, 1),
             throttleDelta: throttleKeyboard * 0.46 + (gamepad.throttleDelta ?? 0),
             throttleSet,
