@@ -319,7 +319,7 @@ const assignSetting = (settings, key, value) => {
     else if (key === 'steering') {
         settings.steering = value === 'stick' ? 'stick' : 'tilt';
     }
-    else if (key === 'tiltInvertPitch' || key === 'tiltInvertYaw' || key === 'flightAssist' || key === 'aimAssist' || key === 'vibration') {
+    else if (key === 'tiltInvertPitch' || key === 'tiltInvertYaw' || key === 'flightAssist' || key === 'aimAssist' || key === 'vibration' || key === 'easyMode') {
         settings[key] = Boolean(value);
     }
     else if (key === 'quality' && (value === 'auto' || value === 'low' || value === 'high')) {
@@ -613,6 +613,7 @@ window.render_game_to_text = () => {
             velocity: save.player.velocity.map((value) => Math.round(value * 10) / 10),
             throttle: Math.round(save.player.throttle * 100),
             flightAssist: Boolean(save.settings.flightAssist),
+            easyMode: Boolean(save.settings.easyMode),
             fuel: Math.round(save.player.fuel * 10) / 10,
             missiles: save.player.missiles,
             maxMissiles: runtime?.playerStats?.().missileCapacity ?? null,

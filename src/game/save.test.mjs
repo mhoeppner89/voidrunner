@@ -53,6 +53,15 @@ assert.equal(saveSettingsPreferences(firstRunSettings), true);
 assert.equal(hasSavedGame(), false);
 assert.equal(storage.has(SETTINGS_KEY), true);
 assert.deepEqual(loadSettingsPreferences(), { ...firstRunSettings, quality: 'high' });
+assert.equal(defaultSettings().easyMode, false);
+
+const easyModeSave = hydrateSave({
+    version: SAVE_VERSION,
+    player: canonicalPlayer(),
+    world: { seed: 1191 },
+    settings: { easyMode: true },
+});
+assert.equal(easyModeSave.settings.easyMode, true);
 
 // A current save preserves an intentional full mute; only legacy silent
 // defaults receive the one-time sound-on migration.

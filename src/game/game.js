@@ -10524,8 +10524,9 @@ export class GameSession {
     damagePlayer(amount, source, feedback = true, weapon = {}) {
         if (this.deathTimer > 0 || amount <= 0)
             return;
+        const incomingAmount = this.save.settings.easyMode ? amount * 0.5 : amount;
         const shieldBeforeHit = this.save.player.shield;
-        const applied = weaponDamage(this.save.player.shield, amount, weapon);
+        const applied = weaponDamage(this.save.player.shield, incomingAmount, weapon);
         this.save.player.shield -= applied.shield;
         const remaining = applied.hull;
         if (disruptWeapons(this.save.player, weapon, this.save.world.time, shieldBeforeHit))
@@ -13597,7 +13598,7 @@ export class GameSession {
             this.save.settings[key] = Boolean(value);
             this.input.configureTilt({ [key]: this.save.settings[key] });
         }
-        else if (key === 'flightAssist' || key === 'aimAssist' || key === 'vibration' || key === 'reducedDamageEffects') {
+        else if (key === 'flightAssist' || key === 'aimAssist' || key === 'vibration' || key === 'reducedDamageEffects' || key === 'easyMode') {
             this.save.settings[key] = Boolean(value);
         }
         else if (key === 'quality' && (value === 'auto' || value === 'low' || value === 'high')) {

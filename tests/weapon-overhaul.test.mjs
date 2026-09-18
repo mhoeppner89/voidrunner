@@ -42,6 +42,23 @@ test('bypass, shield overflow and hull bonuses are identical through player and 
  assert.deepEqual(weaponDamage(100,20,WEAPONS.gauss),{shield:17,hull:3});
  assert.deepEqual(weaponDamage(10,20,WEAPONS.ripper),{shield:10,hull:13.5});
 });
+test('easy mode halves incoming player damage in career and arena sessions',()=>{
+ for(const shield of [0,12])for(const arena of [false,true]){
+  const normal=session(),easy=session();
+  if(arena){
+   normal.arena={run:true};easy.arena={run:true};
+   normal.save.arenaRun={damage:0};easy.save.arenaRun={damage:0};
+  }
+  for(const s of [normal,easy]){s.save.player.shield=shield;s.save.player.hull=100;}
+  normal.damagePlayer(20,'test',false,WEAPONS.pulse);
+  easy.save.settings.easyMode=true;
+  easy.damagePlayer(20,'test',false,WEAPONS.pulse);
+  const normalLoss=shield-normal.save.player.shield+100-normal.save.player.hull;
+  const easyLoss=shield-easy.save.player.shield+100-easy.save.player.hull;
+  assert.equal(easyLoss,normalLoss*.5,arena?'arena hull damage':'career hull damage');
+  if(arena)assert.equal(easy.save.arenaRun.damage,easyLoss,'arena score tracks reduced damage taken');
+ }
+});
 test('ion cannot repeatedly disable weapons and shields prevent disruption',()=>{
  const actor={shield:1};assert.equal(disruptWeapons(actor,WEAPONS.ion,0),false);
  actor.shield=0;assert.equal(disruptWeapons(actor,WEAPONS.ion,0),true);
