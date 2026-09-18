@@ -4,7 +4,7 @@ import {test} from 'node:test';
 registerHooks({resolve(specifier,context,next){return next(specifier==='three'?new URL('../vendor/three.module.min.js',import.meta.url).href:specifier,context);}});
 const THREE=await import('three');
 const {GameSession}=await import('../src/game/game.js');
-const {SpaceRenderer,isAppleTouchDevice,renderBaseWidth}=await import('../src/game/render.js');
+const {SpaceRenderer,isAppleTouchDevice,renderBaseWidth,sceneQualityForDevice,IOS_INITIAL_SCALE}=await import('../src/game/render.js');
 const {FrameBudget,flightFrameRate}=await import('../src/game/frameBudget.js');
 const {createRingVolume}=await import('../src/game/ringVolume.js');
 const {AudioManager}=await import('../src/game/audio.js');
@@ -53,11 +53,19 @@ test('iPhone and desktop-mode iPad use the bounded render profile without changi
     assert.equal(isAppleTouchDevice({ platform: 'Linux armv8l', userAgent: 'Android', maxTouchPoints: 5 }), false);
     assert.equal(isAppleTouchDevice({ platform: 'MacIntel', userAgent: 'Macintosh', maxTouchPoints: 0 }), false);
 
-    assert.equal(renderBaseWidth({ qualityMode: 'high', isIOS: true, touchDevice: true, viewportWidth: 1000 }), 720, 'iOS high mode is capped at the phone render width');
+    assert.equal(renderBaseWidth({ qualityMode: 'high', isIOS: true, touchDevice: true, viewportWidth: 1000 }), 640, 'iOS high mode is capped at the reduced phone render width');
+    assert.equal(sceneQualityForDevice({ qualityMode: 'high', isIOS: true }), 'low', 'iOS high mode uses the low-density environment profile');
+    assert.equal(sceneQualityForDevice({ qualityMode: 'high', isIOS: false }), 'high', 'Android high mode keeps its dense environment profile');
+    assert.equal(IOS_INITIAL_SCALE, 0.82, 'iOS starts below full render scale so the governor can recover quickly');
     assert.equal(renderBaseWidth({ qualityMode: 'high', isIOS: false, touchDevice: true, viewportWidth: 1000 }), 1280, 'Android high mode keeps its existing render tier');
     const ios = Object.create(SpaceRenderer.prototype);
     ios.isIOS = true;
     assert.equal(ios.bloomEnabled(), false, 'iOS does not pay for HDR bloom');
+    const appleMaterial = { bumpMap: {}, normalMap: {}, roughnessMap: {}, metalnessMap: {}, needsUpdate: false };
+    ios.simplifyAppleMaterial(appleMaterial);
+    assert.equal(appleMaterial.bumpMap, null, 'iOS removes bump-map shader work');
+    assert.equal(appleMaterial.roughnessMap, null, 'iOS removes scalar-map shader work');
+    assert.equal(appleMaterial.needsUpdate, true);
 
     const android = Object.create(SpaceRenderer.prototype);
     android.isIOS = false;

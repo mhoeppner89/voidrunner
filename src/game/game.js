@@ -1557,6 +1557,8 @@ export class GameSession {
         const initialVariant = playerShipVariant(this.save.player.shipId);
         this.renderer = new SpaceRenderer(this.ui.viewport, this.save.world.seed, this.asteroids, this.graveyard, this.wreckNodes, this.save.settings.quality, this.save.player.systemId, this.regionalFields, [initialVariant]);
         this.renderer.setSystem?.(this.save.player.systemId);
+        if (this.renderer.isIOS && this.save.settings.quality === 'high')
+            this.qualityScale = this.renderer.lastQualityScale;
         if (this.qualityScale !== 1)
             this.renderer.setQualityScale(this.qualityScale);
         this.renderer.canvas.addEventListener('pointerdown', this.onSpacePointerDown, { passive: true });
@@ -13713,7 +13715,7 @@ export class GameSession {
             this.lastHudUpdate = now;
             this.ui.updateHud(this.buildHudModel());
         }
-        if (this.save.settings.quality === 'auto') {
+        if (this.save.settings.quality === 'auto' || this.renderer.isIOS) {
             // Respond fast and deep: a dense debris field can halve a phone's
             // frame rate in a single step, and the old 2.5s / -0.08 reaction
             // left a long slideshow before resolution dropped. 1.2s windows,

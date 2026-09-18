@@ -101,7 +101,7 @@ test('own hull redraws for content, size and canvas changes; targets remain live
 
 test('cockpit images are preloaded on ship changes, not every HUD update', () => {
     const ui = Object.create(GameUI.prototype);
-    ui.root = { dataset: {} }; ui.el = () => ({ style: {} });
+    ui.root = { dataset: {} }; ui.el = () => ({ style: {}, setAttribute() {} });
     let preloads = 0; ui.preloadImageSet = () => { preloads++; };
     ui.setCockpitShip('wayfarer');
     for (let i = 0; i < 60; i++) ui.setCockpitShip('wayfarer');

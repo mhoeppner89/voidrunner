@@ -39,7 +39,8 @@ const MOURNING_ROOT_VISIBILITY_RANGE = WRECK_RENDER_DISTANCE + 6000;
 const MOURNING_ROOT_VISIBILITY_RANGE_SQ = MOURNING_ROOT_VISIBILITY_RANGE * MOURNING_ROOT_VISIBILITY_RANGE;
 const HIDDEN_SCALE = [0.0001, 0.0001, 0.0001];
 const SHADER_WARMUP_TIMEOUT_MS = 2500;
-const IOS_RENDER_WIDTH = 720;
+const IOS_RENDER_WIDTH = 640;
+export const IOS_INITIAL_SCALE = 0.82;
 
 // iPadOS can identify itself as macOS, so platform alone is not enough here.
 // Keep this as a small capability check instead of tying the render profile to
@@ -61,6 +62,8 @@ export const renderBaseWidth = ({ qualityMode, isIOS = false, touchDevice = fals
                 : touchDevice || viewportWidth < 900
                     ? 720
                     : 960;
+export const sceneQualityForDevice = ({ qualityMode, isIOS = false }) =>
+    isIOS && qualityMode === 'high' ? 'low' : qualityMode;
 // Bloom is deliberately low-frequency. Keeping the main scene at the full
 // high-fidelity resolution while extracting and blurring glow at quarter
 // resolution cuts most of the post-process fill cost without softening hulls,
@@ -388,7 +391,9 @@ export class SpaceRenderer {
         this.isIOS = isAppleTouchDevice();
         // Keep the save setting at high for desktop and Android, but avoid
         // constructing the densest sky/dust/warp variant on iPhone/iPad.
-        this.sceneQuality = this.isIOS && quality === 'high' ? 'auto' : quality;
+        this.sceneQuality = sceneQualityForDevice({ qualityMode: quality, isIOS: this.isIOS });
+        if (this.isIOS)
+            this.lastQualityScale = IOS_INITIAL_SCALE;
         // Touch-primary devices get the phone render tier regardless of CSS
         // width — landscape phones are 900+ CSS px wide, and the old <900
         // check silently gave them the desktop 960p tier.
@@ -1504,6 +1509,7 @@ export class SpaceRenderer {
                     for (const material of materials) {
                         material.fog = false;
                         material.envMapIntensity = 0.3;
+                        this.simplifyAppleMaterial(material);
                         if (material.map) {
                             material.map.anisotropy = Math.min(4, this.renderer.capabilities.getMaxAnisotropy());
                             material.map.needsUpdate = true;
@@ -1659,6 +1665,7 @@ export class SpaceRenderer {
             emissiveIntensity: style.emissive ? 0.22 : 0,
             fog: false,
         });
+        this.simplifyAppleMaterial(material);
         const geometries = getAsteroidBaseMeshes().map((entry) => entry.geometry);
         const byShape = new Map();
         nodes.forEach((node) => {
@@ -1743,6 +1750,7 @@ export class SpaceRenderer {
             metalness: 0.72,
             fog: false,
         });
+        this.simplifyAppleMaterial(hull);
         const dark = new THREE.MeshStandardMaterial({
             color: secondary.clone().multiplyScalar(0.42),
             roughness: 0.68,
@@ -2130,11 +2138,12 @@ export class SpaceRenderer {
         this.worldTextureLoads ??= [];
         const loader = new THREE.TextureLoader();
         const base = new URL('../../assets/textures/worlds/', import.meta.url);
-        const pending = Promise.all(['color', 'roughness', 'height'].map(kind =>
+        const textureKinds = this.isIOS ? ['color'] : ['color', 'roughness', 'height'];
+        const pending = Promise.all(textureKinds.map(kind =>
             loader.loadAsync(new URL(`${id}-${kind}.webp`, base).href)
         )).then(([color, roughness, height]) => {
-            if (this.disposed) { [color, roughness, height].forEach(t => t.dispose()); return; }
-            for (const texture of [color, roughness, height]) {
+            if (this.disposed) { [color, roughness, height].filter(Boolean).forEach(t => t.dispose()); return; }
+            for (const texture of [color, roughness, height].filter(Boolean)) {
                 texture.wrapS = THREE.RepeatWrapping;
                 texture.wrapT = THREE.ClampToEdgeWrapping;
                 texture.anisotropy = Math.min(4, this.renderer.capabilities.getMaxAnisotropy());
@@ -2143,11 +2152,19 @@ export class SpaceRenderer {
             material.fog = false;
             material.map = color;
             material.color.setHex(0xffffff);
-            material.roughnessMap = roughness;
-            material.roughness = 1;
-            material.metalness = 0;
-            material.bumpMap = height;
-            material.bumpScale = id === 'blackglass' ? 2.5 : id === 'boreal' ? 2 : 1;
+            if (this.isIOS) {
+                this.simplifyAppleMaterial(material);
+                material.roughness = 0.9;
+                material.metalness = 0.02;
+                material.bumpScale = 0;
+            }
+            else {
+                material.roughnessMap = roughness;
+                material.roughness = 1;
+                material.metalness = 0;
+                material.bumpMap = height;
+                material.bumpScale = id === 'blackglass' ? 2.5 : id === 'boreal' ? 2 : 1;
+            }
             material.emissive.setHex(0x000000);
             material.emissiveIntensity = 0;
             material.needsUpdate = true;
@@ -2213,6 +2230,7 @@ export class SpaceRenderer {
             flatShading: false,
             fog: false,
         });
+        this.simplifyAppleMaterial(surfaceMaterial);
         const surface = sphereLod('surface', [
             [lodDistances[0], location.radius, 192, 128],
             [lodDistances[1], location.radius, 96, 64],
@@ -2267,9 +2285,17 @@ export class SpaceRenderer {
             ring.material = this.createRingMaterial(location, new THREE.Vector3(0, 0, 1).applyQuaternion(ring.quaternion));
             group.add(ring);
             this.azureRingSurface = ring;
-            this.ringVolume = createRingVolume(ring, location.radius, true);
-            this.ringVolumeEnabled = true;
-            this.ringParticles = createRingParticles(ring.material.uniforms.uRingMap.value);
+            if (this.isIOS) {
+                // The planar ring is cheap and still readable on a phone. The
+                // volumetric replacement ray-marches 16 samples per pixel and
+                // is disproportionately expensive in Safari's fragment path.
+                this.ringVolumeEnabled = false;
+            }
+            else {
+                this.ringVolume = createRingVolume(ring, location.radius, true);
+                this.ringVolumeEnabled = true;
+                this.ringParticles = createRingParticles(ring.material.uniforms.uRingMap.value);
+            }
             // Render-only: the ring must not swallow taps from behind the planet.
             ring.raycast = () => undefined;
         }
@@ -2475,6 +2501,19 @@ export class SpaceRenderer {
             });
         });
     }
+    simplifyAppleMaterial(material) {
+        if (!this.isIOS || !material)
+            return material;
+        // Safari's WebGL path pays heavily for derivative-based material maps.
+        // Keep the color map, but remove repeated bump and scalar-map samples
+        // from environment materials on Apple touch devices.
+        material.bumpMap = null;
+        material.normalMap = null;
+        material.roughnessMap = null;
+        material.metalnessMap = null;
+        material.needsUpdate = true;
+        return material;
+    }
     toneStationGlow(root) {
         // Stations are ten times the size of a fighter, so the ship-grade fresnel
         // rim and additive window glow read as an overexposed halo. Dim both so the
@@ -2544,6 +2583,8 @@ export class SpaceRenderer {
             flatShading: true,
             vertexColors: true,
         });
+        for (const material of [ironMaterial, iceMaterial, darkMaterial])
+            this.simplifyAppleMaterial(material);
         const kindPalettes = {
             iron: { base: 0x9aa4b0, accent: 0xd0a060, scan: 0xc4ad7a },
             ice:  { base: 0xb8cee0, accent: 0xe6f4ff, scan: 0xa8c4dc },
@@ -2893,6 +2934,8 @@ export class SpaceRenderer {
             emissiveIntensity: 0,
             side: THREE.DoubleSide,
         });
+        this.simplifyAppleMaterial(techMaterial);
+        this.simplifyAppleMaterial(bulkMaterial);
         const materialFor = (node) => (node.salvage === 'arms' || node.salvage === 'electronics' ? techMaterial : bulkMaterial);
         const groups = new Map();
         this.wreckNodes.forEach((node, nodeIndex) => {
@@ -5139,9 +5182,10 @@ export class SpaceRenderer {
             if (this.instanceRoots.get('shardbelt')?.visible)
                 this.updateAsteroidInstances(this.viewFrustum);
         }
-        const volumeActive = this.ringVolumeEnabled && this.locationMeshes.get('azure')?.visible
+        const volumeActive = !this.isIOS && this.ringVolumeEnabled && this.locationMeshes.get('azure')?.visible
             && this.viewFrustum.intersectsSphere(this.ringVolume.bounds);
-        if (this.ringVolumeEnabled && this.azureRingSurface) this.azureRingSurface.visible = false;
+        if (this.ringVolumeEnabled && this.azureRingSurface)
+            this.azureRingSurface.visible = this.isIOS ? Boolean(this.locationMeshes.get('azure')?.visible) : false;
         const bloomOn = this.bloomEnabled();
         // A phone without bloom does not need an HDR scene target or a
         // tone-mapping copy pass. Render straight to the screen; this removes
