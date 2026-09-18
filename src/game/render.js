@@ -38,6 +38,7 @@ const WRECK_RENDER_DISTANCE_SQ = WRECK_RENDER_DISTANCE * WRECK_RENDER_DISTANCE;
 const MOURNING_ROOT_VISIBILITY_RANGE = WRECK_RENDER_DISTANCE + 6000;
 const MOURNING_ROOT_VISIBILITY_RANGE_SQ = MOURNING_ROOT_VISIBILITY_RANGE * MOURNING_ROOT_VISIBILITY_RANGE;
 const HIDDEN_SCALE = [0.0001, 0.0001, 0.0001];
+const SHADER_WARMUP_TIMEOUT_MS = 2500;
 // Bloom is deliberately low-frequency. Keeping the main scene at the full
 // high-fidelity resolution while extracting and blurring glow at quarter
 // resolution cuts most of the post-process fill cost without softening hulls,
@@ -5057,16 +5058,30 @@ export class SpaceRenderer {
     async prepareActiveScene() {
         if (this.contextLost)
             return;
+        let timeoutId;
+        let timedOut = false;
         try {
-            if (typeof this.renderer.compileAsync === 'function')
-                await this.renderer.compileAsync(this.scene, this.camera);
-            else
-                this.renderer.compile(this.scene, this.camera);
+            const compile = typeof this.renderer.compileAsync === 'function'
+                ? this.renderer.compileAsync(this.scene, this.camera)
+                : Promise.resolve(this.renderer.compile(this.scene, this.camera));
+            const timeout = new Promise((resolve) => {
+                timeoutId = setTimeout(() => {
+                    timedOut = true;
+                    resolve();
+                }, SHADER_WARMUP_TIMEOUT_MS);
+            });
+            await Promise.race([compile, timeout]);
+            if (timedOut)
+                console.warn('Flight-scene shader warm-up timed out; using first-render fallback.');
         }
         catch (error) {
             // Shader compilation can be interrupted by a context reset. The
             // normal first render remains a safe fallback and must still run.
             console.warn('Flight-scene shader warm-up was interrupted.', error);
+        }
+        finally {
+            if (timeoutId !== undefined)
+                clearTimeout(timeoutId);
         }
     }
     render() {

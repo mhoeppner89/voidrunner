@@ -17,6 +17,29 @@ import { playerStrengthValue } from './playerStrength.js';
 import { guildJoinCost, missionBriefing, missionTitle } from './missions.js';
 import { tutorialCampaignSummary, tutorialDialogue } from './tutorialCampaign.js';
 import { DRONE_BAY_CAPACITY, DRONE_TYPES, droneBayLayoutFor } from './droneData.js';
+const WARM_IMAGE_TIMEOUT_MS = 5000;
+const settleWarmupPromise = (promise, fallback = false) => new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+        if (settled)
+            return;
+        settled = true;
+        resolve(fallback);
+    }, WARM_IMAGE_TIMEOUT_MS);
+    Promise.resolve(promise).then((value) => {
+        if (settled)
+            return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(value);
+    }, () => {
+        if (settled)
+            return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(fallback);
+    });
+});
 const loadoutGroupDemand=(loadout,mountId)=>{
     const group=loadout.fireGroups?.assignments?.[mountId] ?? 'A';
     const hull=Object.values(HARDPOINT_SPECS).find(spec=>spec.guns.some(m=>m.id===mountId));
@@ -700,17 +723,14 @@ export class GameUI {
         image.src = url;
         record = { image, refs: 0, ready: false, failed: false, promise: undefined };
         record.promise = (async () => {
-            let ok = false;
-            try {
-                if (typeof image.decode === 'function')
-                    await image.decode();
-                else
-                    ok = await loaded;
-                ok = ok || image.naturalWidth > 0;
-            }
-            catch {
-                ok = await loaded;
-            }
+            // Wait for the network event first, then treat decode as a
+            // best-effort improvement. WebKit has shipped cases where
+            // HTMLImageElement.decode() never settles for background images;
+            // neither phase is allowed to retain the warm-up forever.
+            let ok = await settleWarmupPromise(loaded);
+            if (ok && typeof image.decode === 'function')
+                await settleWarmupPromise(Promise.resolve().then(() => image.decode()), false);
+            ok = Boolean(ok || image.naturalWidth > 0);
             record.ready = Boolean(ok && image.naturalWidth > 0);
             record.failed = !record.ready;
             return record.ready;

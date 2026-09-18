@@ -240,13 +240,16 @@ const beginSession = (mode, arena) => {
     const starting = (async () => {
         await nextPaint();
         const shipId = SHIP_WARM_ASSETS[save.player.shipId] ? save.player.shipId : 'wayfarer';
+        // Asset warm-up is opportunistic. It must not be part of session boot:
+        // iOS Safari can leave an explicit image decode pending, and a slow
+        // GLB/image request must never keep the loading veil on screen.
+        void Promise.allSettled([
+            warmBinary(SHIP_WARM_ASSETS[shipId][0], 'high'),
+            ui.preloadSessionAssets(save, { priority: 'high', includeLocation: mode !== 'arena' && mode !== 'observer' }),
+        ]);
         const [tiltPermission, gameModule] = await Promise.all([
             tiltPermissionRequest,
             loadGameSession(),
-            Promise.allSettled([
-                warmBinary(SHIP_WARM_ASSETS[shipId][0], 'high'),
-                ui.preloadSessionAssets(save, { priority: 'high', includeLocation: mode !== 'arena' && mode !== 'observer' }),
-            ]),
         ]);
         if (tiltPermission === true)
             tiltGranted = true;
