@@ -55,3 +55,6 @@ PLAYABLE_README.md
 
 # Nested checkouts (agent worktrees) — never commit these.
 .worktrees/
+
+# Shipped planet and moon surface maps
+!assets/textures/worlds/*.webp

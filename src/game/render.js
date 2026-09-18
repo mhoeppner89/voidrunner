@@ -1378,7 +1378,7 @@ export class SpaceRenderer {
         const rng = seededRandom(`generic-location:${id}`);
         if (location.kind === 'planet') {
             const planet = new THREE.Mesh(
-                new THREE.SphereGeometry(location.radius, 48, 28),
+                new THREE.SphereGeometry(location.radius, 64, 40),
                 new THREE.MeshStandardMaterial({
                     color: accent,
                     emissive: secondary,
@@ -1389,9 +1389,10 @@ export class SpaceRenderer {
                 }),
             );
             group.add(planet);
+            this.applyWorldSurface(planet.material, id);
             const halo = new THREE.Mesh(
-                new THREE.SphereGeometry(location.radius * 1.035, 36, 20),
-                new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.09, side: THREE.BackSide, depthWrite: false, fog: false }),
+                new THREE.SphereGeometry(location.radius * 1.025, 48, 28),
+                this.createAtmosphereMaterial(accent, location.radius * 1.025, id === 'boreal' ? 0.035 : 0.25, 0, 1, location.position),
             );
             halo.raycast = () => {};
             group.add(halo);
@@ -1404,9 +1405,11 @@ export class SpaceRenderer {
         }
         else if (location.id === 'blackglass' && location.radius > 2500) {
             const moon = new THREE.Mesh(
-                new THREE.IcosahedronGeometry(location.radius * 0.82, 3),
+                new THREE.SphereGeometry(location.radius * 0.82, 64, 40),
                 new THREE.MeshStandardMaterial({ color: 0x181b23, roughness: 0.96, metalness: 0.04 }),
             );
+            moon.name = 'blackglass-moon';
+            this.applyWorldSurface(moon.material, 'blackglass');
             group.add(moon);
             const dockRing = new THREE.Mesh(
                 new THREE.TorusGeometry(location.radius * 0.68, 90, 10, 64),
@@ -1439,9 +1442,12 @@ export class SpaceRenderer {
         this.locationRoot.add(group);
         this.locationMeshes.set(id, group);
     }
-    ensureAcheronStations() {
+    ensureStationModels(systemId = this.systemId) {
         this.stationModelLoads ??= new Map();
-        for (const id of ['haven', 'league-yard', 'cinderfall']) {
+        for (const id of ['helix', 'rook', 'cairn', 'argent', 'gatehouse-twelve',
+            'blackglass', 'cinder', 'torchwell', 'nacre', 'shepherd',
+            'haven', 'league-yard', 'cinderfall']) {
+            if (LOCATIONS[id].systemId !== systemId) continue;
             if (this.stationModelLoads.has(id)) continue;
             const root = this.locationMeshes.get(id);
             if (!root) continue;
@@ -1450,7 +1456,12 @@ export class SpaceRenderer {
                 // Blender authors a 100-unit bounding sphere. Keep every part
                 // within the existing collision envelope and docking distance.
                 model.scale.setScalar(LOCATIONS[id].radius * 0.95 / 100);
-                model.name = `acheron-station-${id}`;
+                model.name = `station-${id}`;
+                if (id === 'blackglass') {
+                    // Front galleries clear the moon; rear anchors enter the rock.
+                    model.scale.setScalar(LOCATIONS[id].radius * 0.2 / 100);
+                    model.position.z = LOCATIONS[id].radius * 0.835;
+                }
                 model.userData.stationAsset = id;
                 model.traverse(node => {
                     if (!node.isMesh) return;
@@ -1464,7 +1475,13 @@ export class SpaceRenderer {
                         }
                     }
                 });
-                for (const old of [...root.children]) { root.remove(old); this.disposeObject(old); }
+                for (const old of [...root.children]) {
+                    if (old.name === 'blackglass-moon') continue;
+                    root.remove(old); this.disposeObject(old);
+                }
+                // Helix/Rook's primitive fallbacks use a tenfold root scale.
+                root.scale.setScalar(1);
+                if (id === 'helix') this.helixRotor = null;
                 root.add(model);
                 this.tagTargetable(root, 'location', id);
                 this.renderRevision = (this.renderRevision ?? 0) + 1;
@@ -2069,6 +2086,41 @@ export class SpaceRenderer {
         this.atmosphereShells.push({ material, center: new THREE.Vector3(...center), shellRadius });
         return material;
     }
+    applyWorldSurface(material, id) {
+        this.worldSurfaceMaterials ??= new Map();
+        this.worldSurfaceMaterials.set(id, material);
+        this.worldTexturesStarted ??= new Set();
+        if (LOCATIONS[id].systemId !== this.systemId || this.worldTexturesStarted.has(id)) return Promise.resolve();
+        this.worldTexturesStarted.add(id);
+        this.worldTextureLoads ??= [];
+        const loader = new THREE.TextureLoader();
+        const base = new URL('../../assets/textures/worlds/', import.meta.url);
+        const pending = Promise.all(['color', 'roughness', 'height'].map(kind =>
+            loader.loadAsync(new URL(`${id}-${kind}.webp`, base).href)
+        )).then(([color, roughness, height]) => {
+            if (this.disposed) { [color, roughness, height].forEach(t => t.dispose()); return; }
+            for (const texture of [color, roughness, height]) {
+                texture.wrapS = THREE.RepeatWrapping;
+                texture.wrapT = THREE.ClampToEdgeWrapping;
+                texture.anisotropy = Math.min(4, this.renderer.capabilities.getMaxAnisotropy());
+            }
+            color.colorSpace = THREE.SRGBColorSpace;
+            material.fog = false;
+            material.map = color;
+            material.color.setHex(0xffffff);
+            material.roughnessMap = roughness;
+            material.roughness = 1;
+            material.metalness = 0;
+            material.bumpMap = height;
+            material.bumpScale = id === 'blackglass' ? 2.5 : id === 'boreal' ? 2 : 1;
+            material.emissive.setHex(0x000000);
+            material.emissiveIntensity = 0;
+            material.needsUpdate = true;
+            this.renderRevision = (this.renderRevision ?? 0) + 1;
+        }).catch(error => console.warn(`World surface ${id} unavailable; retaining fallback.`, error));
+        this.worldTextureLoads.push(pending);
+        return pending;
+    }
     createPlanet(id, color, dark, atmosphere, ringed) {
         const location = LOCATIONS[id];
         const group = new THREE.Group();
@@ -2132,6 +2184,7 @@ export class SpaceRenderer {
             [lodDistances[2], location.radius, 48, 32],
         ], surfaceMaterial);
         group.add(surface);
+        this.applyWorldSurface(surfaceMaterial, id);
         // Cloud decks scrapped (0.7.7b): Azure's two layers rendered at 0.11/0.13
         // opacity — invisible at play distances — and the dry worlds' 0.40 deck
         // washed the disc for two extra transparent sphere passes + per-frame
@@ -4196,7 +4249,8 @@ export class SpaceRenderer {
     setSystem(systemId) {
         this.systemId = SYSTEM_RENDER_STYLE[systemId] ? systemId : 'helios-verge';
         const style = SYSTEM_RENDER_STYLE[this.systemId];
-        if (this.systemId === 'acheron') this.ensureAcheronStations();
+        this.ensureStationModels(this.systemId);
+        for (const [id, material] of this.worldSurfaceMaterials ?? []) this.applyWorldSurface(material, id);
         this.renderer.setClearColor(style.clear, 1);
         if (this.scene.fog) {
             this.scene.fog.color.setHex(style.fog);

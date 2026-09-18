@@ -398,7 +398,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2av';
+const GAME_VERSION = '0.8.2ax';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -510,6 +510,14 @@ const CONCOURSE_PREVIEW_ANCHORS = Object.freeze({
     helix: Object.freeze({ shipX: 1280, shipY: 520, smallShipY: 560, shadowX: 1280, shadowY: 680, services: { x: 1010, y: 520 }, market: { x: 320, y: 500 }, bar: { x: 280, y: 320 } }),
     rook: Object.freeze({ shipX: 836, shipY: 560, smallShipY: 568, shadowX: 836, shadowY: 690, services: { x: 1240, y: 470 }, market: { x: 380, y: 470 }, bar: { x: 340, y: 280 } }),
     azure: Object.freeze({ shipX: 680, shipY: 430, shadowX: 500, shadowY: 580, smallShipX: 540, smallShipY: 500, smallShadowX: 450, smallShadowY: 590, atlasShipX: 650, atlasShadowX: 470, services: { x: 1190, y: 650 }, market: { x: 1290, y: 350 }, bar: { x: 250, y: 320 } }),
+    // Acheron’s new 1280×720 plates have deliberately different staging:
+    // Haven’s landing circle is low and central, Unity’s is in the open
+    // foreground below the drydocks, and Cinderfall’s is on the white floor
+    // ring. Keep these in the same 1672×941 authoring space as the legacy
+    // plates so the shared conversion above handles every viewport.
+    haven: Object.freeze({ shipX: 848, shipY: 680, shadowX: 848, shadowY: 740, services: { x: 1340, y: 562 }, market: { x: 327, y: 523 }, bar: { x: 1019, y: 444 } }),
+    'league-yard': Object.freeze({ shipX: 848, shipY: 790, shadowX: 848, shadowY: 860, shipScale: 0.95, shadowScale: 0.95, services: { x: 1340, y: 569 }, market: { x: 366, y: 588 }, bar: { x: 1397, y: 359 } }),
+    cinderfall: Object.freeze({ shipX: 850, shipY: 740, shadowX: 850, shadowY: 800, services: { x: 1340, y: 614 }, market: { x: 314, y: 549 }, bar: { x: 1045, y: 517 } }),
     cairn: Object.freeze({ shipX: 820, shipY: 600, shadowX: 770, shadowY: 720, shipScale: 1.15, shadowScale: 1.15, services: { x: 240, y: 480 }, market: { x: 1000, y: 450 }, bar: { x: 1350, y: 440 } }),
     'meridian-prime': Object.freeze({ shipX: 500, shipY: 620, shadowX: 450, shadowY: 735, shipScale: 1.18, shadowScale: 1.18, services: { x: 1320, y: 620 }, market: { x: 1380, y: 360 }, bar: { x: 1050, y: 480 } }),
     argent: Object.freeze({ shipX: 840, shipY: 600, shadowX: 790, shadowY: 705, shipScale: 1.18, shadowScale: 1.18, services: { x: 440, y: 500 }, market: { x: 1320, y: 500 }, bar: { x: 650, y: 300 } }),
@@ -1953,8 +1961,15 @@ export class GameUI {
         const renderedHeight = naturalHeight * scale;
         const contentLeft = imageRect.left + (imageRect.width - renderedWidth) / 2;
         const contentTop = imageRect.top + (imageRect.height - renderedHeight) / 2;
-        const anchorX = (sourceX) => `${(contentLeft + sourceX * scale - sceneRect.left).toFixed(2)}px`;
-        const anchorY = (sourceY) => `${(contentTop + sourceY * scale - sceneRect.top).toFixed(2)}px`;
+        // The location anchors and ship profiles are authored in the original
+        // 1672×941 plate space. Simplified art is served at 1280×720, so
+        // convert from that stable design space before applying object-cover.
+        // Without this conversion every overlay drifts down/right and the
+        // ship grows when the smaller simplified plate is used.
+        const plateScaleX = renderedWidth / VESPER_ART_WIDTH;
+        const plateScaleY = renderedHeight / VESPER_ART_HEIGHT;
+        const anchorX = (sourceX) => `${(contentLeft + sourceX * plateScaleX - sceneRect.left).toFixed(2)}px`;
+        const anchorY = (sourceY) => `${(contentTop + sourceY * plateScaleY - sceneRect.top).toFixed(2)}px`;
         const profile = this.getVesperShipProfile();
         const anchors = CONCOURSE_PREVIEW_ANCHORS[this.dockLocation] ?? CONCOURSE_PREVIEW_ANCHORS.vesper;
         const isAtlas = profile === VESPER_SHIP_PROFILES.atlas;
@@ -1970,13 +1985,13 @@ export class GameUI {
         const concourseShadowScale = anchors.shadowScale ?? (this.dockLocation === 'rook' ? 0.9 : 1);
         layer.style.setProperty('--vesper-ship-left', anchorX(shipAnchorX));
         layer.style.setProperty('--vesper-ship-top', anchorY(shipAnchorY));
-        layer.style.setProperty('--vesper-ship-width', `${(profile.width * scale * concourseShipScale).toFixed(2)}px`);
+        layer.style.setProperty('--vesper-ship-width', `${(profile.width * plateScaleX * concourseShipScale).toFixed(2)}px`);
         layer.style.setProperty('--vesper-ship-angle', `${profile.angle + (anchors.angleOffset ?? 0)}deg`);
-        layer.style.setProperty('--vesper-ship-bob', `${(profile.bob * scale * concourseShipScale).toFixed(2)}px`);
+        layer.style.setProperty('--vesper-ship-bob', `${(profile.bob * plateScaleY * concourseShipScale).toFixed(2)}px`);
         layer.style.setProperty('--vesper-shadow-left', anchorX(shadowAnchorX));
         layer.style.setProperty('--vesper-shadow-top', anchorY(shadowAnchorY));
-        layer.style.setProperty('--vesper-shadow-width', `${(profile.shadowWidth * scale * concourseShadowScale).toFixed(2)}px`);
-        layer.style.setProperty('--vesper-shadow-height', `${(58 * scale * concourseShadowScale).toFixed(2)}px`);
+        layer.style.setProperty('--vesper-shadow-width', `${(profile.shadowWidth * plateScaleX * concourseShadowScale).toFixed(2)}px`);
+        layer.style.setProperty('--vesper-shadow-height', `${(58 * plateScaleY * concourseShadowScale).toFixed(2)}px`);
         layer.style.setProperty('--vesper-shadow-angle', `${anchors.shadowAngle ?? 3}deg`);
         scene.style.setProperty('--concourse-services-left', anchorX(anchors.services.x));
         scene.style.setProperty('--concourse-services-top', anchorY(anchors.services.y));

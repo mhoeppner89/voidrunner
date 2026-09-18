@@ -97,12 +97,16 @@ def tower(x,y,z):
  for i in range(7):box('Bridge lights',(x-6+i*2,y-6.59,z+9),(1.1,.1,.45),'warm',0)
  cyl('Antenna mast',(x,y,z+20),.4,18,'steel',8)
  beam('Antenna spar',(x-5,y,z+22),(x+5,y,z+22),.35)
+exec(open(ROOT+'/scripts/station-mesh-cleanup.py').read())
 def export(id):
  # Apply parts, planar UVs aligned to local structural faces, batch by material.
  bpy.context.view_layer.update()
  for o in objects:
   bpy.context.view_layer.objects.active=o;o.select_set(True)
   bpy.ops.object.transform_apply(location=False,rotation=True,scale=True);o.select_set(False)
+ bpy.context.view_layer.update()
+ cleaned=clean_station_surfaces(objects)
+ for o in objects:
   uv=o.data.uv_layers.new(name='Structural panel UV')
   for poly in o.data.polygons:
    axis=max(range(3),key=lambda k:abs(poly.normal[k]));axes=[k for k in range(3)if k!=axis]
@@ -122,7 +126,7 @@ def export(id):
  for o in current:o.select_set(True)
  bpy.ops.export_scene.gltf(filepath=OUT+'/'+id+'.glb',export_format='GLB',use_selection=True,use_active_scene=True,export_yup=True,export_extras=False)
  tris=sum(len(p.vertices)-2 for o in current for p in o.data.polygons)
- bounds={ 'id':id,'triangles':tris,'materials':len(current),'sourceRadius':maxr }
+ bounds={ 'id':id,'triangles':tris,'materials':len(current),'sourceRadius':maxr, 'coplanarCuts':cleaned }
  for o in current:o.hide_set(True);o.hide_render=True
  objects.clear();return bounds
 report=[]
