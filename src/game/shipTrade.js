@@ -52,6 +52,8 @@ export const quoteShipTrade = (player = {}, targetShipId, options = {}) => {
         return { ok: false, code: 'already-owned' };
     if (!(LOCATIONS[player.dockedAt]?.shipsForSale ?? []).includes(targetShipId))
         return { ok: false, code: 'not-for-sale' };
+    if (target.requiredReputation > (player.reputation?.[target.requiredFaction] ?? 0))
+        return {ok:false,code:'reputation-required',requiredReputation:target.requiredReputation};
     const cargoMass = resolvedCargoMass(player, options.cargoMass);
     const tradeIn = Math.round(current.price * HULL_TRADE_IN_RATE);
     const amountDue = target.price - tradeIn;

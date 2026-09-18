@@ -91,3 +91,41 @@ test('destroying all main batteries ends attack warnings and anti-ship salvos',(
  for(let i=0;i<900;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,new THREE.Vector3(180,0,0),new THREE.Vector3());}
  assert.equal(ship.capitalDisarmed,true);assert.equal(ship.capitalAttack,'RECOVERING');assert.equal(shots,0);
 });
+
+test('frigate closes from outside battery range then holds distance without running down its target',()=>{
+ const {s,ship}=stage();ship.holdFire=true;s.getAvoidanceVector=()=>s.tmpAvoidance.set(0,0,0);
+ const point=new THREE.Vector3(800,0,0),velocity=new THREE.Vector3();let minimum=Infinity;
+ for(let i=0;i<90*60;i++){s.save.world.time=i/60;updateFrigateAttack(s,ship,point,velocity,1/60);minimum=Math.min(minimum,point.distanceTo(new THREE.Vector3(...ship.position)));}
+ const range=point.distanceTo(new THREE.Vector3(...ship.position));assert.ok(range>370&&range<470,`range ${range}`);assert.ok(minimum>350);assert.ok(Math.hypot(...ship.velocity)<1);
+ const right=new THREE.Vector3(1,0,0).applyQuaternion(new THREE.Quaternion(...ship.rotation));assert.ok(Math.abs(right.dot(point.clone().sub(new THREE.Vector3(...ship.position)).normalize()))>.95);
+});
+test('frigate opens distance from a close target and pursues a retreating one without exceeding hull speed',()=>{
+ const {s,ship}=stage();ship.holdFire=true;s.getAvoidanceVector=()=>s.tmpAvoidance.set(0,0,0);
+ const point=new THREE.Vector3(130,0,0),velocity=new THREE.Vector3();
+ for(let i=0;i<1800;i++){s.save.world.time=i/60;updateFrigateAttack(s,ship,point,velocity,1/60);}
+ assert.ok(point.distanceTo(new THREE.Vector3(...ship.position))>340);
+ velocity.set(8,0,0);const start=ship.position[0];
+ for(let i=1800;i<5400;i++){point.addScaledVector(velocity,1/60);s.save.world.time=i/60;updateFrigateAttack(s,ship,point,velocity,1/60);assert.ok(Math.hypot(...ship.velocity)<=ship.speed+.001);}
+ assert.ok(ship.position[0]>start+100);assert.ok(point.distanceTo(new THREE.Vector3(...ship.position))<500);
+});
+test('opposite broadsides shoot distinct active enemies and respect shared recovery',()=>{
+ const {s,ship}=stage();const enemy=s.spawnShip('pirate',[-380,0,0]);enemy.instanceId=ship.instanceId;enemy.pendingMug=false;enemy.holdFire=false;enemy.targetId=ship.id;
+ s.save.player.position=[380,0,0];const shots=[];s.spawnGunProjectile=(owner,w,p,d,v,target)=>{if(w===FRIGATE_GUN)shots.push({target,phase:ship.capitalAttack});};
+ for(let i=0;i<1200;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,new THREE.Vector3(...s.save.player.position),new THREE.Vector3());}
+ assert.ok(shots.some(x=>x.target==='player'));assert.ok(shots.some(x=>x.target===enemy.id));assert.ok(shots.every(x=>x.phase==='SALVO'));
+});
+test('secondary batteries do not acquire stand-offs, surrendered ships, allies or another instance',()=>{
+ for(const mode of ['stand-off','surrendered','ally','instance']){
+  const {s,ship}=stage();const enemy=s.spawnShip('pirate',[-380,0,0]);enemy.instanceId=ship.instanceId;enemy.pendingMug=false;enemy.holdFire=false;
+  if(mode==='stand-off')enemy.pendingMug=true;if(mode==='surrendered')enemy.surrendered=true;if(mode==='ally')enemy.faction=ship.faction;if(mode==='instance')enemy.instanceId='elsewhere';
+  const shots=[];s.spawnGunProjectile=(o,w,p,d,v,t)=>{if(w===FRIGATE_GUN)shots.push(t);};
+  for(let i=0;i<900;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,new THREE.Vector3(380,0,0),new THREE.Vector3());}
+  assert.ok(!shots.includes(enemy.id),mode);
+ }
+});
+test('frigate repositions around blocked firing lanes without firing through cover',()=>{
+ const {s,ship}=stage();ship.holdFire=true;s.lineBlocked=()=>true;s.getAvoidanceVector=()=>s.tmpAvoidance.set(0,0,0);
+ const point=new THREE.Vector3(414,0,0);
+ for(let i=0;i<300;i++){s.save.world.time=i/60;updateFrigateAttack(s,ship,point,new THREE.Vector3(),1/60);}
+ assert.ok(Math.abs(ship.position[2])>10);assert.ok(ship.position.every(Number.isFinite));
+});

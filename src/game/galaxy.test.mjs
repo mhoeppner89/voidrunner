@@ -20,7 +20,7 @@ import {
 } from './galaxy.js';
 
 test('all systems are visible from the beginning and expose planned locations', () => {
-    assert.deepEqual(Object.keys(SYSTEMS), ['helios-verge', 'meridian', 'redwake', 'pale-ring']);
+    assert.deepEqual(Object.keys(SYSTEMS), ['helios-verge', 'meridian', 'redwake', 'pale-ring', 'acheron']);
     for (const system of Object.values(SYSTEMS)) {
         assert.equal(system.visible, true);
         assert.equal(system.visibleFromStart, true);
@@ -42,8 +42,9 @@ test('all systems are visible from the beginning and expose planned locations', 
 });
 
 test('jump routes are symmetric and use stable endpoint location IDs', () => {
-    assert.equal(JUMP_ROUTES.length, 3);
+    assert.equal(JUMP_ROUTES.length, 4);
     const expected = [
+        ['pale-ring','acheron','pale-acheron-point','acheron-pale-point'],
         ['helios-verge', 'meridian', 'verge-meridian-point', 'meridian-verge-point'],
         ['meridian', 'pale-ring', 'verge-pale-point', 'pale-verge-point'],
         ['pale-ring', 'redwake', 'verge-redwake-point', 'redwake-verge-point'],
@@ -70,7 +71,7 @@ test('jump routes are symmetric and use stable endpoint location IDs', () => {
 
     assert.deepEqual(directlyConnectedRoutes('helios-verge').map((route) => route.toSystemId), ['meridian']);
     assert.deepEqual(directlyConnectedRoutes('meridian').map((route) => route.toSystemId), ['helios-verge', 'pale-ring']);
-    assert.deepEqual(directlyConnectedRoutes('pale-ring').map((route) => route.toSystemId), ['meridian', 'redwake']);
+    assert.deepEqual(directlyConnectedRoutes('pale-ring').map((route) => route.toSystemId), ['meridian', 'redwake', 'acheron']);
     assert.deepEqual(directlyConnectedRoutes('redwake').map((route) => route.toSystemId), ['pale-ring']);
 });
 

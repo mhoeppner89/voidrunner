@@ -486,6 +486,7 @@ const buildAtlasFreighter = () => {
     };
 };
 const SHIP_BUILDERS = {
+    speedster:buildTalon, legionary:buildLancer, andromeda:buildWarden, torsas:buildKestrel, astra:buildKestrel,
     kestrel: buildKestrel,
     talon: buildTalon,
     warden: buildWarden,
@@ -525,6 +526,7 @@ export const paletteForFaction = (faction, hostile) => {
         };
     }
     switch (faction) {
+        case 'frontier-league': return {hull:0xd0d1c1,dark:0x25313b,accent:0xe5bb47,canopy:0x142330,engine:0x81dafa,warning:0xffbb55,window:0xb5e9ff};
         case 'concord':
             return {
                 hull: 0x839ba4,

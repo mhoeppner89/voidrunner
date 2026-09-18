@@ -7,7 +7,7 @@ const bays = (count) => freeze(Array.from({ length: count }, (_, index) => {
     return freeze({ bayId, launchAnchorId: `${bayId}-launch`, dockAnchorId: `${bayId}-dock` });
 }));
 export const DRONE_BAY_LAYOUTS = freeze({
-    wayfarer: bays(1), prospector: bays(3),
+    wayfarer: bays(1), prospector: bays(3), torsas:bays(1), astra:bays(1),
     talon: emptyBays, vanguard: emptyBays, lancer: emptyBays, atlas: emptyBays,
 });
 export const droneBayLayoutFor = (shipId) => Object.hasOwn(DRONE_BAY_LAYOUTS, shipId)
@@ -17,7 +17,7 @@ export const DRONE_FLEET_VERSION = 1;
 // Provisional tuning from the approved 0.8.2 addendum, in simulation units.
 export const DRONE_TYPES = freeze({
     mining: freeze({ maxHull: 20, collisionRadius: 0.5, cruiseSpeed: 120,
-        acceleration: 120, payloadUnits: 1, cutSecondsPerUnit: 8, replacementPrice: 250 }),
+        acceleration: 120, payloadUnits: 1, cutSecondsPerUnit: 2.4, replacementPrice: 250 }),
     pdc: freeze({ maxHull: 40, collisionRadius: 0.75, cruiseSpeed: 160,
         acceleration: 160, payloadUnits: 0, replacementPrice: 1500,
         escortDistance: 15, escortOrbitSeconds: 12, magazineCapacity: 120, shotInterval: 0.4,
@@ -28,6 +28,7 @@ export const DRONE_RULES = freeze({ operatingRange: 100, recallSeconds: 15,
 const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const unitId = (value) => typeof value === 'string' && value.length > 0 ? value : null;
 const copy = (value) => JSON.parse(JSON.stringify(value));
+export const canMineWithHull = id => id === 'wayfarer' || id === 'prospector';
 const validMode = (mode) => mode === 'mining' || mode === 'pdc';
 
 // Empty positions stay empty: configuration normalization never creates stock.
@@ -36,10 +37,10 @@ export const normalizeDroneBays = (shipId, source) => {
     const seen = new Set();
     return droneBayLayoutFor(shipId).map(({ bayId }, index) => {
         const raw = values[index];
-        const mode = validMode(raw?.mode) ? raw.mode : 'mining';
+        const mode = !canMineWithHull(shipId) ? 'pdc' : validMode(raw?.mode) ? raw.mode : 'mining';
         const unitIds = Array.from({ length: DRONE_BAY_CAPACITY[mode] }, (_, position) => {
             const id = Array.isArray(raw?.unitIds) ? unitId(raw.unitIds[position]) : null;
-            if (!id || seen.has(id) || raw?.bayId !== bayId) return null;
+            if (!id || seen.has(id) || raw?.bayId !== bayId || raw?.mode !== mode) return null;
             seen.add(id);
             return id;
         });
@@ -58,6 +59,7 @@ export const validateDroneBays = (shipId, source, fleet) => {
     const seen = new Set();
     for (const [index, bay] of source.entries()) {
         if (!isRecord(bay) || bay.bayId !== layout[index].bayId || !validMode(bay.mode)
+            || bay.mode === 'mining' && !canMineWithHull(shipId)
             || !Array.isArray(bay.unitIds) || bay.unitIds.length !== DRONE_BAY_CAPACITY[bay.mode]) {
             errors.push({ code: 'invalid-drone-bay', slot: 'droneBays', index });
             continue;

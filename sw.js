@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v269-0-8-2as-optimized-ship-models';
+const CACHE = 'voidrunner-v278-0-8-2av-acheron-identities';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -31,11 +31,15 @@ const CORE_ASSETS = [
   './src/game/pdcFireControl.js',
   './src/game/combatResources.js',
   './src/game/data.js',
+  './src/game/leagueContent.js',
+  './src/game/blackHole.js',
   './src/game/droneData.js',
   './src/game/droneMining.js',
   './src/game/dronePdc.js',
   './src/game/droneService.js',
   './src/game/droneSystem.js',
+  './src/game/droneFlight.js',
+  './src/game/miningSurface.js',
   './src/game/economy.js',
   './src/game/galaxy.js',
   './src/game/galaxyContent.js',

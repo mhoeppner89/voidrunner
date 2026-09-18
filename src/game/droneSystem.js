@@ -1,3 +1,4 @@
+import { orientDrone, rotateDroneTo } from './droneFlight.js';
 import { DRONE_RULES, DRONE_TYPES } from './droneData.js';
 import {
     advanceMinerTimers, advanceMiningCut, cancelMiningJob, deliverMiningPayload,
@@ -38,6 +39,7 @@ function travel(unit, point, fallbackVelocity, dt, radius) {
     const acceleration = DRONE_TYPES.mining.acceleration;
     if (distance <= radius && Math.hypot(rx, ry, rz) <= acceleration * dt * 2) {
         attach(unit, point, fallbackVelocity, dt);
+        unit.thrust = 0;
         return true;
     }
     const speed = Math.min(DRONE_TYPES.mining.cruiseSpeed,
@@ -46,6 +48,7 @@ function travel(unit, point, fallbackVelocity, dt, radius) {
     const ax = dx * scale - rx, ay = dy * scale - ry, az = dz * scale - rz;
     const delta = Math.hypot(ax, ay, az);
     const blend = delta > 0 ? Math.min(1, acceleration * dt / delta) : 0;
+    unit.thrust = Math.min(1, delta / (acceleration * dt));
     v[0] += ax * blend; v[1] += ay * blend; v[2] += az * blend;
     p[0] += v[0] * dt; p[1] += v[1] * dt; p[2] += v[2] * dt;
     return false;
@@ -179,11 +182,17 @@ export function createMiningDroneSystem({ launchSeconds = 0.25, dockSeconds = 0.
                     reason: fleet.controller.stopReason, recallTime: unit.recallTime });
 
             const anchors = context.getBayAnchors ? context.getBayAnchors(unit, context) : context.bayAnchors?.[id];
+            const portBusy = anchors?.portId != null && orderedIds.some(otherId => {
+                if (otherId === id) return false;
+                const other = fleet.unitsById[otherId];
+                return context.bayAnchors?.[otherId]?.portId === anchors.portId
+                    && (other.state === 'launching' || other.state === 'docking');
+            });
             let point;
             let arrived = false;
             let navigationFailure = null;
             if (state === 'stowed') {
-                if (fleet.controller.phase !== 'running' || !equipped.has(id)) continue;
+                if (fleet.controller.phase !== 'running' || !equipped.has(id) || portBusy) continue;
                 if (!pointValid(anchors?.launch) || !pointValid(anchors?.dock)) {
                     reportBlocked(id, 'missing-bay-anchor', events);
                     continue;
@@ -193,23 +202,26 @@ export function createMiningDroneSystem({ launchSeconds = 0.25, dockSeconds = 0.
                 unit.position ??= [0, 0, 0];
                 unit.velocity ??= [0, 0, 0];
                 unit.rotation ??= [0, 0, 0, 1];
-                attach(unit, anchors.launch, context.shipVelocity);
+                unit.needsSurfaceLift = false;
+                attach(unit, anchors.dock, context.shipVelocity);
                 events.push(event);
             } else if (!vector(unit.position) || !vector(unit.velocity)) {
                 navigationFailure = 'invalid-transform';
             } else if (state === 'launching') {
                 point = anchors?.launch;
                 if (pointValid(point)) {
-                    attach(unit, point, context.shipVelocity, dt);
-                    arrived = true;
+                    arrived = travel(unit, point, context.shipVelocity, dt, arrivalRadius);
                 } else navigationFailure = 'missing-bay-anchor';
             } else {
                 const working = state === 'outbound' || state === 'mining';
                 point = working
                     ? context.getWorkPoint ? context.getWorkPoint(unit, context) : context.workPoint
-                    : anchors?.dock;
+                    : state === 'returning' ? (unit.needsSurfaceLift ? context.workPoints?.[id]?.lift ?? anchors?.launch : anchors?.launch) : anchors?.dock;
                 if (pointValid(point)) {
-                    arrived = travel(unit, point, working ? ZERO : context.shipVelocity, dt, arrivalRadius);
+                    if (state === 'mining' && point.rotation) {
+                        attach(unit, point, ZERO); unit.thrust=0; unit.needsSurfaceLift=true; arrived=true;
+                    } else arrived = travel(unit, point, working ? ZERO : context.shipVelocity, dt, arrivalRadius);
+                    if (state === 'returning' && unit.needsSurfaceLift && arrived) {unit.needsSurfaceLift=false;arrived=false;}
                 } else {
                     navigationFailure = working ? 'missing-work-point' : 'missing-bay-anchor';
                     if (working && fleet.controller.phase === 'running')
@@ -217,6 +229,9 @@ export function createMiningDroneSystem({ launchSeconds = 0.25, dockSeconds = 0.
                 }
             }
 
+            const landing = point?.rotation && (state === 'mining' || state === 'outbound' && Math.hypot(unit.position[0]-point.position[0],unit.position[1]-point.position[1],unit.position[2]-point.position[2])<3);
+            if (landing) rotateDroneTo(unit,dt,point.rotation);
+            else orientDrone(unit, dt, context.shipVelocity, point, state === 'launching' || state === 'docking');
             // No economic commit precedes the caller's collision/damage decision.
             const worldEvent = context.onUnitStep?.(unit, dt, context);
             if (worldEvent) events.push(worldEvent);
@@ -227,8 +242,8 @@ export function createMiningDroneSystem({ launchSeconds = 0.25, dockSeconds = 0.
                 continue;
             }
             // Collision resolution can push a previously arrived unit off its point.
-            if (arrived) {
-                const pv = point.velocity ?? (state === 'outbound' || state === 'mining' ? ZERO : context.shipVelocity);
+            if (arrived && !(state === 'mining' && point.rotation)) {
+                const pv = state === 'mining' && point.rotation ? ZERO : point.velocity ?? (state === 'outbound' || state === 'mining' ? ZERO : context.shipVelocity);
                 arrived = Math.hypot(unit.position[0] - point.position[0] - pv[0] * dt,
                     unit.position[1] - point.position[1] - pv[1] * dt,
                     unit.position[2] - point.position[2] - pv[2] * dt) <= arrivalRadius
@@ -244,7 +259,7 @@ export function createMiningDroneSystem({ launchSeconds = 0.25, dockSeconds = 0.
             else if (state === 'mining' && arrived) {
                 const event = advanceMiningCut(fleet, id, dt, miningContext);
                 if (event) events.push(event);
-            } else if (state === 'returning' && arrived)
+            } else if (state === 'returning' && arrived && !portBusy)
                 events.push(transitionMinerUnit(fleet, id, 'docking'));
             else if (state === 'docking') {
                 if (!arrived) { unit.phaseTime = 0; continue; }

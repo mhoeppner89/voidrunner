@@ -1,0 +1,973 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vesper Colony · Dialogue Review</title>
+<style>
+:root {
+    --navy-0: #020711;
+    --navy-1: #071426;
+    --navy-2: #0b1d35;
+    --navy-3: #102844;
+    --ink: #e7eff5;
+    --muted: #8ea4b6;
+    --faint: #587188;
+    --gold: #f0bb4d;
+    --gold-soft: #f7d991;
+    --cyan: #5bd0d4;
+    --cyan-soft: #a4edf0;
+    --red: #e77c70;
+    --line: rgba(125, 173, 201, .24);
+    --line-strong: rgba(240, 187, 77, .58);
+    --shadow: 0 20px 70px rgba(0, 0, 0, .34);
+}
+
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+    margin: 0;
+    color: var(--ink);
+    background:
+        radial-gradient(circle at 76% -5%, rgba(64, 124, 166, .23), transparent 30rem),
+        linear-gradient(145deg, #020711 0%, #061223 52%, #03101b 100%);
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    letter-spacing: .015em;
+}
+
+button, input, textarea, select { font: inherit; }
+button { color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: 2px;
+}
+
+.app-shell { min-height: 100vh; padding: 18px; }
+.topbar, .toolbar, .panel, .editor-surface, .inspector-surface {
+    background: linear-gradient(145deg, rgba(9, 28, 50, .94), rgba(3, 14, 27, .94));
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+}
+.topbar {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 18px 20px;
+    border-top: 2px solid var(--gold);
+    position: relative;
+    overflow: hidden;
+}
+.topbar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(255,255,255,.018) 4px);
+    mix-blend-mode: screen;
+}
+.brand { position: relative; z-index: 1; }
+.eyebrow, .micro-label {
+    display: block;
+    color: var(--cyan);
+    font-size: .68rem;
+    letter-spacing: .17em;
+    text-transform: uppercase;
+}
+.brand h1 {
+    margin: 6px 0 1px;
+    color: #fff1c9;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(1.7rem, 4vw, 3rem);
+    letter-spacing: .08em;
+    font-weight: 500;
+}
+.brand p { margin: 0; color: var(--muted); font-size: .84rem; }
+.top-actions {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    position: relative;
+    z-index: 1;
+}
+.metric {
+    min-width: 78px;
+    padding: 8px 10px;
+    border-left: 1px solid var(--line);
+}
+.metric strong { display: block; margin-top: 3px; color: var(--gold-soft); font-size: 1.1rem; }
+.metric small { color: var(--muted); font-size: .67rem; }
+
+.toolbar {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 12px;
+    padding: 10px;
+    box-shadow: none;
+}
+.search {
+    flex: 1 1 280px;
+    min-width: 130px;
+    color: var(--ink);
+    background: rgba(1, 9, 19, .72);
+    border: 1px solid var(--line);
+    padding: 10px 12px;
+}
+.toolbar select {
+    min-width: 170px;
+    color: var(--ink);
+    background: var(--navy-1);
+    border: 1px solid var(--line);
+    padding: 10px 12px;
+}
+.check {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+    color: var(--muted);
+    font-size: .8rem;
+}
+.check input { accent-color: var(--gold); }
+.toolbar-status { margin-left: auto; color: var(--muted); font-size: .77rem; white-space: nowrap; }
+
+.button {
+    border: 1px solid var(--line);
+    background: rgba(20, 45, 69, .72);
+    padding: 9px 11px;
+    color: var(--ink);
+    font-size: .72rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+.button:hover { border-color: var(--gold); color: #fff4d1; background: rgba(52, 65, 74, .8); }
+.button.primary { border-color: var(--gold); color: #17130a; background: var(--gold); }
+.button.primary:hover { background: #ffd979; }
+.button.quiet { color: var(--muted); background: transparent; }
+
+.workspace {
+    display: grid;
+    grid-template-columns: minmax(210px, 270px) minmax(420px, 1fr) minmax(230px, 300px);
+    gap: 12px;
+    margin-top: 12px;
+    min-height: calc(100vh - 170px);
+}
+.panel, .editor-surface, .inspector-surface { min-height: 0; }
+.panel-header, .surface-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 15px 15px 12px;
+    border-bottom: 1px solid var(--line);
+}
+.panel-header h2, .surface-header h2 { margin: 4px 0 0; font-size: .95rem; font-weight: 500; letter-spacing: .08em; }
+.panel-header p, .surface-header p { margin: 6px 0 0; color: var(--muted); font-size: .74rem; line-height: 1.45; }
+.library-scroll { max-height: calc(100vh - 250px); overflow: auto; padding: 9px; }
+.group-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 13px 5px 5px;
+    color: var(--cyan);
+    font-size: .65rem;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+}
+.group-title:first-child { margin-top: 3px; }
+.group-count { color: var(--faint); letter-spacing: 0; }
+.library-item {
+    display: block;
+    width: 100%;
+    padding: 9px 10px;
+    margin: 3px 0;
+    text-align: left;
+    border: 1px solid transparent;
+    background: rgba(3, 14, 27, .42);
+}
+.library-item:hover { background: rgba(17, 43, 65, .78); border-color: var(--line); }
+.library-item.is-selected { background: rgba(49, 62, 65, .85); border-color: var(--gold); }
+.library-item .item-name { display: flex; align-items: center; gap: 7px; color: #eaf2f6; font-size: .78rem; }
+.library-item small { display: block; margin-top: 4px; color: var(--muted); font-size: .67rem; line-height: 1.35; }
+.change-dot { width: 6px; height: 6px; flex: 0 0 auto; border-radius: 50%; background: var(--gold); box-shadow: 0 0 9px rgba(240,187,77,.6); }
+.empty-list { padding: 20px 10px; color: var(--muted); font-size: .78rem; line-height: 1.5; }
+
+.editor-surface { display: flex; flex-direction: column; overflow: hidden; }
+.editor-scroll { overflow: auto; padding: 16px; }
+.story-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.story-heading h2 { margin: 0; color: #fff1c9; font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.35rem, 2.4vw, 2rem); font-weight: 500; }
+.story-heading p { margin: 7px 0 0; color: var(--muted); font-size: .8rem; line-height: 1.45; }
+.badge {
+    display: inline-block;
+    padding: 5px 7px;
+    border: 1px solid rgba(91, 208, 212, .48);
+    color: var(--cyan-soft);
+    font-size: .64rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.source-strip, .context-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px 14px;
+    margin-top: 13px;
+    padding: 9px 10px;
+    color: var(--muted);
+    background: rgba(2, 10, 19, .62);
+    border-left: 2px solid var(--gold);
+    font-size: .72rem;
+}
+.source-strip code { color: var(--gold-soft); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .68rem; }
+.context-chip { color: var(--muted); }
+.context-chip b { color: var(--ink); font-weight: 500; }
+
+.conversation-map { margin-top: 15px; }
+.map-label { margin-bottom: 7px; color: var(--muted); font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; }
+.node-map { display: flex; flex-wrap: wrap; gap: 6px; }
+.node-button {
+    max-width: 190px;
+    padding: 7px 9px;
+    text-align: left;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    background: rgba(7, 23, 40, .72);
+}
+.node-button:hover { border-color: var(--cyan); color: var(--ink); }
+.node-button.is-selected { border-color: var(--gold); color: #fff3c7; background: rgba(58, 54, 35, .72); }
+.node-button.is-changed { border-bottom: 2px solid var(--gold); }
+.node-button b { display: block; font-size: .72rem; font-weight: 500; }
+.node-button small { display: block; overflow: hidden; margin-top: 3px; text-overflow: ellipsis; white-space: nowrap; font-size: .64rem; }
+
+.path-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 13px 0; color: var(--faint); font-size: .7rem; }
+.path-step { border: 0; padding: 3px 5px; color: var(--muted); background: transparent; }
+.path-step:hover { color: var(--gold-soft); }
+.path-step.current { color: var(--gold-soft); }
+.path-arrow { color: var(--faint); }
+
+.node-editor, .flat-editor { margin-top: 12px; padding: 14px; border: 1px solid var(--line); background: rgba(3, 12, 24, .62); }
+.node-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
+.node-meta strong { color: var(--gold-soft); font-size: .85rem; font-weight: 500; }
+.node-meta span { color: var(--muted); font-size: .72rem; }
+.field { display: block; margin-top: 10px; }
+.field-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 5px; color: var(--cyan-soft); font-size: .66rem; letter-spacing: .14em; text-transform: uppercase; }
+.field-label em { color: var(--faint); font-style: normal; letter-spacing: 0; text-transform: none; }
+textarea.edit-text {
+    display: block;
+    width: 100%;
+    min-height: 92px;
+    resize: vertical;
+    padding: 10px 11px;
+    color: #fff3d0;
+    background: #061323;
+    border: 1px solid rgba(240, 187, 77, .35);
+    line-height: 1.55;
+}
+textarea.edit-text:focus { border-color: var(--gold); }
+.reference {
+    margin-top: 8px;
+    padding: 9px 10px;
+    color: #9cb5c3;
+    background: rgba(10, 28, 43, .66);
+    border-left: 2px solid rgba(91, 208, 212, .45);
+    font-size: .77rem;
+    line-height: 1.48;
+}
+.reference strong { display: block; margin-bottom: 4px; color: var(--faint); font-size: .62rem; letter-spacing: .14em; text-transform: uppercase; }
+.reference.is-missing { border-left-color: var(--red); }
+.reference.is-missing strong { color: var(--red); }
+.choices { display: grid; gap: 9px; margin-top: 18px; }
+.choice-card { padding: 10px; border: 1px solid rgba(125, 173, 201, .18); background: rgba(8, 26, 44, .54); }
+.choice-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.choice-top strong { color: var(--gold-soft); font-size: .72rem; font-weight: 500; }
+.jump-button { border: 1px solid var(--line); padding: 4px 7px; color: var(--cyan-soft); background: transparent; font-size: .64rem; }
+.jump-button:hover { border-color: var(--cyan); }
+.link-note { margin-top: 10px; color: var(--muted); font-size: .72rem; }
+.link-note button { border: 0; padding: 0; color: var(--cyan-soft); background: transparent; text-decoration: underline; }
+
+.flat-context { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 7px; margin: 14px 0; }
+.flat-context .context-box { padding: 9px; background: rgba(2, 10, 19, .55); border: 1px solid var(--line); }
+.context-box span { display: block; color: var(--faint); font-size: .62rem; letter-spacing: .12em; text-transform: uppercase; }
+.context-box b { display: block; margin-top: 4px; color: var(--ink); font-size: .76rem; font-weight: 500; }
+.peer-list { display: grid; gap: 4px; margin-top: 13px; }
+.peer-list button { display: grid; grid-template-columns: 72px 1fr; gap: 8px; padding: 7px 8px; text-align: left; border: 1px solid transparent; color: var(--muted); background: rgba(3, 14, 27, .38); font-size: .7rem; }
+.peer-list button:hover { border-color: var(--line); color: var(--ink); }
+.peer-list button.is-current { border-color: var(--gold); color: #fff3c7; background: rgba(58, 54, 35, .56); }
+.peer-list small { overflow: hidden; color: var(--faint); text-overflow: ellipsis; white-space: nowrap; }
+.peer-list span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.inspector-surface { overflow: auto; }
+.inspector-body { padding: 14px; }
+.inspector-block { margin-bottom: 19px; }
+.inspector-block h3 { margin: 0 0 7px; color: var(--cyan-soft); font-size: .67rem; letter-spacing: .14em; font-weight: 500; text-transform: uppercase; }
+.inspector-block p { margin: 0; color: var(--muted); font-size: .74rem; line-height: 1.5; }
+.inspector-block code { display: block; padding: 8px; overflow-wrap: anywhere; color: var(--gold-soft); background: rgba(2, 10, 19, .68); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .66rem; line-height: 1.45; }
+.inspector-block .status-ok { color: var(--cyan-soft); }
+.inspector-block .status-changed { color: var(--gold-soft); }
+.note-area { min-height: 95px; margin-top: 8px; border-color: var(--line); color: var(--ink); background: rgba(2, 10, 19, .68); }
+.revision-list { display: grid; gap: 5px; max-height: 240px; overflow: auto; }
+.revision-list button { display: flex; justify-content: space-between; gap: 8px; padding: 7px; text-align: left; border: 1px solid transparent; color: var(--muted); background: rgba(2, 10, 19, .45); font-size: .68rem; }
+.revision-list button:hover { border-color: var(--line); color: var(--ink); }
+.revision-list small { color: var(--gold-soft); }
+.empty-state { display: grid; place-items: center; min-height: 55vh; padding: 30px; text-align: center; color: var(--muted); }
+.empty-state h2 { color: #fff1c9; font-family: Georgia, "Times New Roman", serif; font-weight: 500; }
+.empty-state p { max-width: 420px; line-height: 1.55; font-size: .84rem; }
+.footer-note { margin-top: 10px; color: var(--faint); font-size: .7rem; line-height: 1.5; text-align: center; }
+
+@media (max-width: 1080px) {
+    .workspace { grid-template-columns: 220px minmax(380px, 1fr); }
+    .inspector-surface { grid-column: 1 / -1; max-height: none; }
+    .inspector-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .inspector-block { margin: 0; }
+}
+@media (max-width: 760px) {
+    .app-shell { padding: 8px; }
+    .topbar { display: block; padding: 14px; }
+    .top-actions { flex-wrap: wrap; margin-top: 13px; }
+    .toolbar { flex-wrap: wrap; }
+    .toolbar-status { width: 100%; margin-left: 0; }
+    .workspace { display: block; min-height: 0; }
+    .library-scroll { max-height: 32vh; }
+    .editor-surface { margin-top: 12px; }
+    .inspector-surface { margin-top: 12px; }
+    .inspector-body { display: block; }
+    .inspector-block { margin-bottom: 19px; }
+    .story-heading { display: block; }
+    .story-heading .badge { margin-top: 10px; }
+}
+</style>
+</head>
+<body>
+<div class="app-shell">
+    <header class="topbar">
+        <div class="brand">
+            <span class="eyebrow">Vesper Colony · narrative workbench</span>
+            <h1>Dialoge überarbeiten</h1>
+            <p>Deutsche Fassung prüfen, im Kontext lesen, Änderungen exportieren.</p>
+        </div>
+        <div class="top-actions">
+            <div class="metric"><span class="micro-label">Texte</span><strong id="metric-total">—</strong><small>bearbeitbare Einträge</small></div>
+            <div class="metric"><span class="micro-label">Änderungen</span><strong id="metric-changed">0</strong><small>im aktuellen Entwurf</small></div>
+            <button class="button" id="import-button" type="button">Entwurf laden</button>
+            <button class="button primary" id="export-button" type="button">Entwurf exportieren</button>
+            <input id="import-file" type="file" accept="application/json,.json" hidden>
+        </div>
+    </header>
+
+    <section class="toolbar" aria-label="Filter">
+        <input class="search" id="search" type="search" placeholder="Dialog, Person, Ort oder Wort suchen …" autocomplete="off">
+        <select id="collection-filter" aria-label="Sammlung filtern">
+            <option value="all">Alle Sammlungen</option>
+            <option value="scripted">Gesprächsszenen</option>
+            <option value="tutorial">Tutorial-Texte</option>
+            <option value="radio">Funk &amp; Radio</option>
+            <option value="dock">Hafenfiguren</option>
+            <option value="briefing">Auftragsbriefings</option>
+        </select>
+        <label class="check"><input id="only-changed" type="checkbox"> Nur Änderungen</label>
+        <button class="button quiet" id="reset-button" type="button">Änderungen löschen</button>
+        <span class="toolbar-status" id="toolbar-status">Wird geladen …</span>
+    </section>
+
+    <div class="workspace">
+        <aside class="panel" aria-label="Dialogbibliothek">
+            <div class="panel-header">
+                <div><span class="eyebrow">Bibliothek</span><h2>Story-Kontext</h2><p>Wähle eine Szene oder eine einzelne Zeile.</p></div>
+            </div>
+            <div class="library-scroll" id="library"></div>
+        </aside>
+
+        <main class="editor-surface" aria-live="polite">
+            <div class="editor-scroll" id="editor">
+                <div class="empty-state">
+                    <div><h2>Dialoge werden vorbereitet …</h2><p>Die deutschen Dialoge und ihre englischen Referenzen werden aus dem aktuellen Spielstand geladen.</p></div>
+                </div>
+            </div>
+        </main>
+
+        <aside class="inspector-surface" aria-label="Eintragsinformationen">
+            <div class="surface-header"><div><span class="eyebrow">Revision</span><h2>Für die Integration</h2><p>Jede Änderung bleibt mit ihrer Quelle verknüpft.</p></div></div>
+            <div class="inspector-body" id="inspector"></div>
+        </aside>
+    </div>
+    <p class="footer-note">Der Export enthält stabile IDs, den Originaltext, deine deutsche Revision, die englische Referenz und den Quellpfad. Schick mir später einfach die JSON-Datei zurück.</p>
+</div>
+
+<script type="module">
+import { ADVENTURE_DIALOGUES } from './src/game/adventureDialogues.js';
+import { DE_CATALOG } from './src/game/i18n-de.js';
+import { LOCATIONS } from './src/game/data.js';
+import { LOCAL_CONTRACT_CATALOG } from './src/game/localContracts.js';
+import { TUTORIAL_FLIGHT_LESSONS, TUTORIAL_STEPS, tutorialDialogue } from './src/game/tutorialCampaign.js';
+import { TRAVEL_RADIO, TUTORIAL_RADIO } from './src/game/tutorialRadio.js';
+
+const BUILD = '0.8.2ar';
+const DRAFT_KEY = 'voidrunner-dialogue-review-v1';
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+const escapeAttr = escapeHtml;
+const short = (value, max = 86) => {
+    const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+    return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+};
+const pretty = (value) => String(value ?? '').replace(/[-_]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+const germanFor = (english) => DE_CATALOG[english] ?? english;
+const pairFor = (value) => {
+    if (value && typeof value === 'object') {
+        const english = String(value.en ?? value.de ?? '');
+        return { german: String(value.de ?? english), english, translated: true };
+    }
+    const english = String(value ?? '');
+    return { german: germanFor(english), english, translated: Object.prototype.hasOwnProperty.call(DE_CATALOG, english) };
+};
+
+const entries = [];
+const conversations = [];
+const entryById = new Map();
+const addEntry = (config, raw) => {
+    const pair = pairFor(raw);
+    const entry = {
+        ...config,
+        originalGerman: pair.german,
+        german: pair.german,
+        english: pair.english,
+        missingGerman: !pair.translated,
+        note: '',
+    };
+    entries.push(entry);
+    entryById.set(entry.id, entry);
+    return entry;
+};
+
+const adventureMeta = {
+    outfitting: ['Rin · Ausrüstung', 'Rin Vek'],
+    navigation: ['Rin · Navigation', 'Rin Vek'],
+    services: ['Rin · Service', 'Rin Vek'],
+    weapons: ['Rin · Waffen', 'Rin Vek'],
+    cargo: ['Rin · Bergung', 'Rin Vek'],
+    galaxy: ['Rin · Meridian-Route', 'Rin Vek'],
+    mara: ['Mara · Der Ersatzschlüssel', 'Mara Vek'],
+    rin: ['Rin · Der Ersatzschlüssel', 'Rin Vek'],
+    mining: ['Rin · Shardbelt', 'Rin Vek'],
+    salvage: ['Rin · Mourning Line', 'Rin Vek'],
+    recorder: ['Rin · Die Aufzeichnung', 'Rin Vek'],
+    cairn: ['Rin · Die Wahrheit', 'Rin Vek'],
+    departure: ['Rin · Abschied', 'Rin Vek'],
+    handoff: ['Mara · Meridian', 'Mara Vek'],
+    combat: ['Rin · Erster Kampf', 'Rin Vek'],
+    flight: ['Rin · Flugstunde', 'Rin Vek'],
+};
+
+for (const [conversationId, script] of Object.entries(ADVENTURE_DIALOGUES)) {
+    const [title, speaker] = adventureMeta[conversationId] ?? [pretty(conversationId), 'Unbekannt'];
+    const nodes = [];
+    for (const [nodeId, node] of Object.entries(script.nodes ?? {})) {
+        const line = addEntry({
+            id: `adventure:${conversationId}:node:${nodeId}`,
+            collection: 'scripted',
+            collectionLabel: 'Gesprächsszenen',
+            groupKey: `adventure:${conversationId}`,
+            groupLabel: title,
+            title,
+            speaker,
+            kind: 'dialogue-line',
+            context: `${title} · Knoten ${nodeId}`,
+            sourcePath: `src/game/adventureDialogues.js :: ADVENTURE_DIALOGUES.${conversationId}.nodes.${nodeId}.text.de`,
+            translationPath: `src/game/adventureDialogues.js :: ADVENTURE_DIALOGUES.${conversationId}.nodes.${nodeId}.text.en`,
+            conversationId,
+            nodeId,
+        }, node.text);
+        const choices = (node.choices ?? []).map((choice, index) => {
+            const choiceEntry = addEntry({
+                id: `adventure:${conversationId}:node:${nodeId}:choice:${index}`,
+                collection: 'scripted',
+                collectionLabel: 'Gesprächsszenen',
+                groupKey: `adventure:${conversationId}`,
+                groupLabel: title,
+                title,
+                speaker: 'Spielerantwort',
+                kind: 'choice',
+                context: `${title} · Antwort auf ${nodeId}`,
+                sourcePath: `src/game/adventureDialogues.js :: ADVENTURE_DIALOGUES.${conversationId}.nodes.${nodeId}.choices[${index}].label.de`,
+                translationPath: `src/game/adventureDialogues.js :: ADVENTURE_DIALOGUES.${conversationId}.nodes.${nodeId}.choices[${index}].label.en`,
+                conversationId,
+                nodeId,
+                choiceIndex: index,
+                nextNodeId: choice.next,
+                complete: Boolean(choice.complete),
+                requires: choice.requires,
+                tutorialChoice: choice.tutorialChoice,
+            }, choice.label);
+            return { ...choice, entryId: choiceEntry.id };
+        });
+        nodes.push({ nodeId, lineEntryId: line.id, next: node.next, returnTo: node.returnTo, choices });
+    }
+    conversations.push({ id: `adventure:${conversationId}`, conversationId, title, speaker, collection: 'scripted', nodes, start: script.start });
+}
+
+const addTranslatedLine = (config, english, extra = {}) => addEntry({ ...config, ...extra }, english);
+
+const tutorialRadioRecords = [];
+for (const [index, line] of TUTORIAL_RADIO.entries()) {
+    const id = `radio:tutorial:${line.id}`;
+    const entry = addTranslatedLine({
+        id,
+        collection: 'radio',
+        collectionLabel: 'Funk & Radio',
+        groupKey: 'radio:tutorial',
+        groupLabel: 'Tutorial-Funk',
+        title: 'Tutorial-Funk',
+        speaker: line.speaker ?? 'Rin Vek',
+        kind: 'radio-line',
+        context: `Tutorial-Funk · ${line.step}`,
+        sourcePath: `src/game/tutorialRadio.js :: TUTORIAL_RADIO[${index}].text`,
+        translationPath: `src/game/i18n-de.js :: DE_CATALOG[${JSON.stringify(line.text)}]`,
+        radioId: line.id,
+        step: line.step,
+        destination: line.destination,
+        after: line.after,
+        cue: line.cue,
+    }, line.text);
+    tutorialRadioRecords.push(entry);
+}
+const travelRadioRecords = [];
+for (const [index, line] of TRAVEL_RADIO.entries()) {
+    const id = `radio:regional:${line.id}`;
+    const entry = addTranslatedLine({
+        id,
+        collection: 'radio',
+        collectionLabel: 'Funk & Radio',
+        groupKey: 'radio:regional',
+        groupLabel: 'Regionaler Funk',
+        title: 'Regionaler Funk',
+        speaker: line.speaker ?? 'Lokalfunk',
+        kind: 'radio-line',
+        context: `Regionaler Funk · ${line.system}`,
+        sourcePath: `src/game/tutorialRadio.js :: TRAVEL_RADIO[${index}].text`,
+        translationPath: `src/game/i18n-de.js :: DE_CATALOG[${JSON.stringify(line.text)}]`,
+        radioId: line.id,
+        system: line.system,
+    }, line.text);
+    travelRadioRecords.push(entry);
+}
+
+const tutorialScenarios = [
+    { id: 'mara-first-greeting', label: 'Mara · erste Begrüßung', personId: 'mara-vek', stepId: 'meet-family', greeting: 1 },
+    { id: 'mara-before-rin', label: 'Mara · Rin noch nicht gesprochen', personId: 'mara-vek', stepId: 'meet-family', greeting: 2 },
+    { id: 'mara-supplies', label: 'Mara · Proteinpakete', personId: 'mara-vek', stepId: 'buy-supplies', greeting: 2, metRin: true },
+    { id: 'mara-away', label: 'Mara · Rin voraus', personId: 'mara-vek', stepId: 'cross-meridian-gate', greeting: 2, metRin: true },
+    { id: 'mara-default', label: 'Mara · allgemeiner Abschied', personId: 'mara-vek', stepId: 'family-choice', greeting: 2, metRin: true },
+    { id: 'mara-recording', label: 'Mara · Aufnahme erhalten', personId: 'mara-vek', stepId: 'complete', greeting: 2, metRin: true, choice: 'tell-mara' },
+    { id: 'rin-first-greeting', label: 'Rin · erste Begrüßung', personId: 'rin-vek', stepId: 'meet-family', greeting: 1 },
+    { id: 'rin-supplies', label: 'Rin · Proteinpakete', personId: 'rin-vek', stepId: 'buy-supplies', greeting: 2 },
+    { id: 'rin-launch', label: 'Rin · vor dem Start', personId: 'rin-vek', stepId: 'launch-helix', greeting: 2 },
+    { id: 'rin-default', label: 'Rin · allgemeine Antwort', personId: 'rin-vek', stepId: 'flight-checks', greeting: 2 },
+    { id: 'rin-complete', label: 'Rin · nach dem Prolog', personId: 'rin-vek', stepId: 'complete', greeting: 2, choice: 'trust-rin', completed: true },
+];
+for (const scenario of tutorialScenarios) {
+    const quest = { id: 'the-spare-key', stepId: scenario.stepId, flags: { metRin: Boolean(scenario.metRin) }, choices: {} };
+    if (scenario.choice) quest.choices.recorder = scenario.choice;
+    if (scenario.completed) quest.completedAt = 1;
+    const save = { quests: [quest], world: { npcMemory: { [scenario.personId]: { topics: { greeting: scenario.greeting } } } } };
+    const english = tutorialDialogue(save, scenario.personId);
+    if (!english) continue;
+    addTranslatedLine({
+        id: `tutorial:bar:${scenario.id}`,
+        collection: 'tutorial',
+        collectionLabel: 'Tutorial-Texte',
+        groupKey: 'tutorial:bar',
+        groupLabel: 'Tutorial · Hafen-Gespräche',
+        title: scenario.label,
+        speaker: scenario.personId === 'mara-vek' ? 'Mara Vek' : 'Rin Vek',
+        kind: 'context-line',
+        context: `${scenario.label} · Schritt ${scenario.stepId}`,
+        sourcePath: `src/game/tutorialCampaign.js :: tutorialDialogue(save, '${scenario.personId}') · ${scenario.stepId}`,
+        translationPath: `src/game/i18n-de.js :: DE_CATALOG[${JSON.stringify(english)}]`,
+        scenarioId: scenario.id,
+        step: scenario.stepId,
+    }, english);
+}
+
+for (const [stepId, step] of Object.entries(TUTORIAL_STEPS)) {
+    for (const [field, value] of [['objective', step.objective], ['detail', step.detail]]) {
+        addTranslatedLine({
+            id: `tutorial:step:${stepId}:${field}`,
+            collection: 'tutorial',
+            collectionLabel: 'Tutorial-Texte',
+            groupKey: `tutorial:step:${stepId}`,
+            groupLabel: `Tutorial · ${step.chapterTitle}`,
+            title: `${pretty(stepId)} · ${field === 'objective' ? 'Ziel' : 'Hinweis'}`,
+            speaker: 'Tutorial-Oberfläche',
+            kind: 'tutorial-copy',
+            context: `${step.chapterTitle} · ${pretty(stepId)}`,
+            sourcePath: `src/game/tutorialCampaign.js :: TUTORIAL_STEPS.${stepId}.${field}`,
+            translationPath: `src/game/i18n-de.js :: DE_CATALOG[${JSON.stringify(value)}]`,
+            step: stepId,
+            copyField: field,
+        }, value);
+    }
+}
+for (const lesson of TUTORIAL_FLIGHT_LESSONS) {
+    for (const [field, value] of [['objective', lesson.objective], ['detail', lesson.detail]]) {
+        addTranslatedLine({
+            id: `tutorial:lesson:${lesson.id}:${field}`,
+            collection: 'tutorial',
+            collectionLabel: 'Tutorial-Texte',
+            groupKey: `tutorial:lesson:${lesson.id}`,
+            groupLabel: 'Tutorial · Flugstunden',
+            title: `${pretty(lesson.id)} · ${field === 'objective' ? 'Ziel' : 'Hinweis'}`,
+            speaker: 'Tutorial-Oberfläche',
+            kind: 'tutorial-copy',
+            context: `Flugstunde · ${pretty(lesson.id)}`,
+            sourcePath: `src/game/tutorialCampaign.js :: TUTORIAL_FLIGHT_LESSONS[${JSON.stringify(lesson.id)}].${field}`,
+            translationPath: `src/game/i18n-de.js :: DE_CATALOG[${JSON.stringify(value)}]`,
+            lessonId: lesson.id,
+            copyField: field,
+        }, value);
+    }
+}
+
+for (const [locationId, location] of Object.entries(LOCATIONS)) {
+    for (const person of location.people ?? []) {
+        for (const [lineIndex, line] of (person.lines ?? []).entries()) {
+            addTranslatedLine({
+                id: `dock:${locationId}:${person.id}:${lineIndex}`,
+                collection: 'dock',
+                collectionLabel: 'Hafenfiguren',
+                groupKey: `dock:${locationId}:${person.id}`,
+                groupLabel: `${location.name} · ${person.name}`,
+                title: person.name,
+                speaker: person.name,
+                kind: 'dock-line',
+                context: `${location.name} · ${person.role ?? 'Hafenfigur'}`,
+                sourcePath: `src/game/data.js :: LOCATIONS.${locationId}.people.${person.id}.lines[${lineIndex}]`,
+                translationPath: `src/game/i18n-de.js :: DE_CATALOG[${JSON.stringify(line)}]`,
+                locationId,
+                personId: person.id,
+                role: person.role,
+                lineIndex,
+            }, line);
+        }
+    }
+}
+
+for (const stage of LOCAL_CONTRACT_CATALOG) {
+    addTranslatedLine({
+        id: `briefing:${stage.id}`,
+        collection: 'briefing',
+        collectionLabel: 'Auftragsbriefings',
+        groupKey: `briefing:${stage.chainId}`,
+        groupLabel: `${stage.chainLabel} · ${stage.stageLabel}`,
+        title: stage.title,
+        speaker: stage.issuer,
+        kind: 'briefing',
+        context: `${stage.chainLabel} · ${stage.stageLabel}`,
+        sourcePath: `src/game/localContracts.js :: LOCAL_CONTRACT_CATALOG.${stage.id}.briefing`,
+        translationPath: `src/game/i18n-de.js :: DE_CATALOG[${JSON.stringify(stage.briefing)}]`,
+        contractId: stage.id,
+        chainId: stage.chainId,
+        issuer: stage.issuer,
+        stageLabel: stage.stageLabel,
+    }, stage.briefing);
+}
+
+const collectionLabels = {
+    scripted: 'Gesprächsszenen',
+    tutorial: 'Tutorial-Texte',
+    radio: 'Funk & Radio',
+    dock: 'Hafenfiguren',
+    briefing: 'Auftragsbriefings',
+};
+const state = { selectedId: entries[0]?.id, search: '', collection: 'all', onlyChanged: false };
+
+function isChanged(entry) { return entry.german !== entry.originalGerman || Boolean(entry.note); }
+function visibleEntry(entry) {
+    if (state.collection !== 'all' && entry.collection !== state.collection) return false;
+    if (state.onlyChanged && !isChanged(entry)) return false;
+    if (!state.search) return true;
+    const haystack = [entry.title, entry.context, entry.speaker, entry.german, entry.english, entry.sourcePath].join(' ').toLowerCase();
+    return haystack.includes(state.search.toLowerCase());
+}
+function saveDraft() {
+    try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ build: BUILD, savedAt: new Date().toISOString(), entries: entries.filter(isChanged).map((entry) => ({ id: entry.id, german: entry.german, note: entry.note })) }));
+    } catch { /* local storage is optional */ }
+}
+function loadDraft() {
+    try {
+        const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null');
+        for (const revision of draft?.entries ?? []) {
+            const entry = entryById.get(revision.id);
+            if (!entry) continue;
+            if (typeof revision.german === 'string') entry.german = revision.german;
+            if (typeof revision.note === 'string') entry.note = revision.note;
+        }
+    } catch { /* ignore an old or malformed local draft */ }
+}
+loadDraft();
+
+const library = document.querySelector('#library');
+const editor = document.querySelector('#editor');
+const inspector = document.querySelector('#inspector');
+const status = document.querySelector('#toolbar-status');
+const metricTotal = document.querySelector('#metric-total');
+const metricChanged = document.querySelector('#metric-changed');
+
+function changedCount() { return entries.filter(isChanged).length; }
+function updateMetrics() {
+    const changed = changedCount();
+    metricTotal.textContent = entries.length;
+    metricChanged.textContent = changed;
+    status.textContent = `${changed} geändert · ${entries.length} Einträge · lokale Sicherung aktiv`;
+}
+function selectedEntry() { return entryById.get(state.selectedId) ?? entries[0]; }
+function selectEntry(id) {
+    if (!entryById.has(id)) return;
+    state.selectedId = id;
+    renderAll();
+    requestAnimationFrame(() => document.querySelector(`[data-entry="${escapeAttr(id)}"]`)?.focus({ preventScroll: true }));
+}
+function entryButton(entry, label = entry.title, secondary = entry.context) {
+    const selected = entry.id === state.selectedId;
+    return `<button class="library-item ${selected ? 'is-selected' : ''}" data-select-entry="${escapeAttr(entry.id)}"><span class="item-name">${isChanged(entry) ? '<i class="change-dot" aria-label="geändert"></i>' : ''}${escapeHtml(label)}</span><small>${escapeHtml(short(secondary, 74))}</small></button>`;
+}
+function collectionEntries(collection) { return entries.filter((entry) => entry.collection === collection && visibleEntry(entry)); }
+function renderLibrary() {
+    const sections = [];
+    const adventureVisible = conversations.filter((conversation) => conversation.nodes.some((node) => node.lineEntryId && visibleEntry(entryById.get(node.lineEntryId)) || node.choices.some((choice) => visibleEntry(entryById.get(choice.entryId)))));
+    if ((state.collection === 'all' || state.collection === 'scripted') && adventureVisible.length) {
+        sections.push(`<div class="group-title">Gesprächsszenen <span class="group-count">${adventureVisible.length}</span></div>`);
+        for (const conversation of adventureVisible) {
+            const lineEntries = conversation.nodes.flatMap((node) => [entryById.get(node.lineEntryId), ...node.choices.map((choice) => entryById.get(choice.entryId))]).filter(Boolean);
+            const changed = lineEntries.filter(isChanged).length;
+            const first = entryById.get(conversation.nodes.find((node) => node.nodeId === conversation.start)?.lineEntryId ?? conversation.nodes[0]?.lineEntryId);
+            if (!first) continue;
+            sections.push(entryButton({ ...first, id: first.id }, `${conversation.title}${changed ? ` · ${changed} geändert` : ''}`, `${conversation.nodes.length} Knoten · Start: ${conversation.start}`));
+        }
+    }
+    for (const collection of ['tutorial', 'radio', 'dock', 'briefing']) {
+        if (state.collection !== 'all' && state.collection !== collection) continue;
+        const visible = collectionEntries(collection);
+        if (!visible.length) continue;
+        const groups = new Map();
+        for (const entry of visible) {
+            if (!groups.has(entry.groupKey)) groups.set(entry.groupKey, []);
+            groups.get(entry.groupKey).push(entry);
+        }
+        sections.push(`<div class="group-title">${escapeHtml(collectionLabels[collection])} <span class="group-count">${visible.length}</span></div>`);
+        for (const group of groups.values()) {
+            const head = group[0];
+            sections.push(`<div class="group-title" style="margin-top:8px;color:var(--faint);letter-spacing:.06em;text-transform:none">${escapeHtml(head.groupLabel)} <span class="group-count">${group.length}</span></div>`);
+            sections.push(group.map((entry) => entryButton(entry, entry.title, entry.context)).join(''));
+        }
+    }
+    library.innerHTML = sections.join('') || '<div class="empty-list">Keine passenden Texte. Suche anpassen oder den Filter zurücksetzen.</div>';
+}
+
+function findConversation(entry) { return conversations.find((conversation) => conversation.conversationId === entry.conversationId); }
+function findNode(conversation, entry) {
+    return conversation?.nodes.find((node) => node.lineEntryId === entry.id || node.choices.some((choice) => choice.entryId === entry.id));
+}
+function nodePath(conversation, targetId) {
+    const start = conversation?.start ?? conversation?.nodes[0]?.nodeId;
+    if (!conversation || !start) return [];
+    const queue = [{ id: start, path: [start] }];
+    const seen = new Set();
+    while (queue.length) {
+        const current = queue.shift();
+        if (current.id === targetId) return current.path;
+        if (seen.has(current.id)) continue;
+        seen.add(current.id);
+        const node = conversation.nodes.find((item) => item.nodeId === current.id);
+        const targets = [node?.next, node?.returnTo, ...(node?.choices ?? []).map((choice) => choice.next)].filter(Boolean);
+        for (const target of targets) if (!seen.has(target)) queue.push({ id: target, path: [...current.path, target] });
+    }
+    return [targetId];
+}
+function nodeButton(conversation, node, selectedNodeId) {
+    const line = entryById.get(node.lineEntryId);
+    const changed = line && isChanged(line) || node.choices.some((choice) => isChanged(entryById.get(choice.entryId)));
+    return `<button class="node-button ${node.nodeId === selectedNodeId ? 'is-selected' : ''} ${changed ? 'is-changed' : ''}" data-select-entry="${escapeAttr(node.lineEntryId)}"><b>${escapeHtml(node.nodeId)}</b><small>${escapeHtml(short(line?.german, 34))}</small></button>`;
+}
+function reference(entry) {
+    return `<div class="reference ${entry.missingGerman ? 'is-missing' : ''}"><strong>${entry.missingGerman ? 'Deutsche Übersetzung fehlt · English source' : 'English reference'}</strong>${escapeHtml(entry.english)}</div>`;
+}
+function editorField(entry, label = 'Deutsch') {
+    return `<label class="field"><span class="field-label"><span>${label}</span><em>${entry.german.length} Zeichen</em></span><textarea class="edit-text" data-entry="${escapeAttr(entry.id)}" spellcheck="true">${escapeHtml(entry.german)}</textarea></label>${reference(entry)}`;
+}
+function renderPath(conversation, targetNodeId) {
+    const path = nodePath(conversation, targetNodeId);
+    return `<div class="path-strip"><span class="micro-label" style="margin-right:3px">Lesepfad</span>${path.map((nodeId, index) => `<button class="path-step ${nodeId === targetNodeId ? 'current' : ''}" data-select-entry="${escapeAttr(conversation.nodes.find((node) => node.nodeId === nodeId)?.lineEntryId ?? '')}">${escapeHtml(nodeId)}</button>${index < path.length - 1 ? '<span class="path-arrow">›</span>' : ''}`).join('')}</div>`;
+}
+function renderAdventure(entry) {
+    const conversation = findConversation(entry);
+    const node = findNode(conversation, entry) ?? conversation?.nodes[0];
+    const line = entryById.get(node?.lineEntryId);
+    if (!conversation || !node || !line) return '<div class="empty-state"><div><h2>Szene nicht gefunden</h2><p>Dieser Eintrag ist nicht mehr in der aktuellen Datenquelle vorhanden.</p></div></div>';
+    return `<div class="story-heading"><div><span class="eyebrow">${escapeHtml(conversation.speaker)} · Gesprächsszene</span><h2>${escapeHtml(conversation.title)}</h2><p>Die Knoten und Antworten bleiben sichtbar, damit du den Ton nicht aus dem Zusammenhang reißen musst.</p></div><span class="badge">${isChanged(line) ? 'Entwurf geändert' : 'Original'}</span></div>
+        <div class="source-strip"><span>Knoten <b>${escapeHtml(node.nodeId)}</b></span><span>Start <b>${escapeHtml(conversation.start)}</b></span><span>Quelle <code>adventureDialogues.js</code></span></div>
+        <div class="conversation-map"><div class="map-label">Szenenkarte · zum Knoten springen</div><div class="node-map">${conversation.nodes.map((item) => nodeButton(conversation, item, node.nodeId)).join('')}</div></div>
+        ${renderPath(conversation, node.nodeId)}
+        <article class="node-editor"><div class="node-meta"><strong>${escapeHtml(conversation.speaker)}</strong><span>${escapeHtml(node.nodeId)}</span></div>${editorField(line)}${node.next ? `<p class="link-note">Weiter zu <button data-select-entry="${escapeAttr(conversation.nodes.find((item) => item.nodeId === node.next)?.lineEntryId ?? '')}">${escapeHtml(node.next)}</button>.</p>` : ''}${node.returnTo ? `<p class="link-note">Kehrt zurück zu <button data-select-entry="${escapeAttr(conversation.nodes.find((item) => item.nodeId === node.returnTo)?.lineEntryId ?? '')}">${escapeHtml(node.returnTo)}</button>.</p>` : ''}${node.choices?.length ? `<div class="choices"><div class="map-label">Antworten des Spielers</div>${node.choices.map((choice, index) => { const choiceEntry = entryById.get(choice.entryId); const target = conversation.nodes.find((item) => item.nodeId === choice.next); return `<article class="choice-card"><div class="choice-top"><strong>Antwort ${index + 1}${choice.complete ? ' · Ende' : ''}</strong>${target ? `<button class="jump-button" data-select-entry="${escapeAttr(target.lineEntryId)}">→ ${escapeHtml(choice.next)}</button>` : ''}</div>${editorField(choiceEntry, 'Deutsch · Spielerantwort')}${choice.requires ? `<p class="link-note">Voraussetzung: ${escapeHtml(choice.requires)}</p>` : ''}</article>`; }).join('')}</div>` : ''}</article>`;
+}
+
+function peerEntries(entry) {
+    return entries.filter((candidate) => candidate.groupKey === entry.groupKey && candidate.collection === entry.collection && visibleEntry(candidate));
+}
+function renderFlat(entry) {
+    const peers = peerEntries(entry);
+    const index = peers.findIndex((candidate) => candidate.id === entry.id);
+    const contextBoxes = [
+        ['Sammlung', entry.collectionLabel],
+        ['Sprecher', entry.speaker],
+        ['Kontext', entry.context],
+    ];
+    if (entry.step) contextBoxes.push(['Schritt', entry.step]);
+    if (entry.destination) contextBoxes.push(['Ziel', entry.destination]);
+    if (entry.locationId) contextBoxes.push(['Ort', LOCATIONS[entry.locationId]?.name ?? entry.locationId]);
+    if (entry.role) contextBoxes.push(['Rolle', entry.role]);
+    if (entry.issuer) contextBoxes.push(['Auftraggeber', entry.issuer]);
+    return `<div class="story-heading"><div><span class="eyebrow">${escapeHtml(entry.speaker)} · ${escapeHtml(entry.collectionLabel)}</span><h2>${escapeHtml(entry.title)}</h2><p>Die Einträge rundherum zeigen, wann und wo diese Zeile im Spiel auftaucht.</p></div><span class="badge">${isChanged(entry) ? 'Entwurf geändert' : 'Original'}</span></div>
+        <div class="source-strip"><span>Typ <b>${escapeHtml(entry.kind)}</b></span><span>Eintrag <b>${escapeHtml(entry.id)}</b></span><span>Quelle <code>${escapeHtml(entry.sourcePath.split(' :: ')[0])}</code></span></div>
+        <div class="flat-context">${contextBoxes.map(([label, value]) => `<div class="context-box"><span>${escapeHtml(label)}</span><b>${escapeHtml(value ?? '—')}</b></div>`).join('')}</div>
+        <div class="peer-list"><div class="map-label">Benachbarte Zeilen in diesem Kontext</div>${peers.map((peer) => `<button class="${peer.id === entry.id ? 'is-current' : ''}" data-select-entry="${escapeAttr(peer.id)}"><small>${escapeHtml(peer.id.split(':').at(-1) ?? '')}</small><span>${isChanged(peer) ? '● ' : ''}${escapeHtml(short(peer.german, 105))}</span></button>`).join('')}</div>
+        <article class="flat-editor">${editorField(entry)}${entry.after ? `<p class="link-note">Spielt nach: ${escapeHtml(entry.after)}</p>` : ''}${entry.cue ? `<p class="link-note">Auslöser: ${escapeHtml(entry.cue)}</p>` : ''}</article>`;
+}
+
+function renderEditor() {
+    const entry = selectedEntry();
+    if (!entry) {
+        editor.innerHTML = '<div class="empty-state"><div><h2>Keine Einträge</h2><p>Die Datenquelle enthält keine Texte für die aktuelle Auswahl.</p></div></div>';
+        return;
+    }
+    editor.innerHTML = `<div class="editor-scroll-inner">${entry.collection === 'scripted' ? renderAdventure(entry) : renderFlat(entry)}</div>`;
+}
+function renderInspector() {
+    const entry = selectedEntry();
+    if (!entry) { inspector.innerHTML = '<div class="empty-list">Nichts ausgewählt.</div>'; return; }
+    const revisions = entries.filter(isChanged).slice().reverse();
+    inspector.innerHTML = `<div class="inspector-block"><h3>Status</h3><p class="${isChanged(entry) ? 'status-changed' : 'status-ok'}">${isChanged(entry) ? 'Diese Zeile wurde geändert.' : 'Originaltext, noch nicht geändert.'}</p></div>
+        <div class="inspector-block"><h3>Stabile ID</h3><code>${escapeHtml(entry.id)}</code></div>
+        <div class="inspector-block"><h3>Quellpfad</h3><code>${escapeHtml(entry.sourcePath)}</code></div>
+        <div class="inspector-block"><h3>Übersetzungspfad</h3><code>${escapeHtml(entry.translationPath)}</code></div>
+        <div class="inspector-block"><h3>Integrationsnotiz</h3><p>Optional: Schreib hier, was die englische Fassung später bewahren soll.</p><textarea class="edit-text note-area" data-note="${escapeAttr(entry.id)}" placeholder="z. B. trockener, kürzer, mehr familiäre Spannung …">${escapeHtml(entry.note)}</textarea></div>
+        <div class="inspector-block"><h3>Geänderte Einträge · ${revisions.length}</h3>${revisions.length ? `<div class="revision-list">${revisions.map((revision) => `<button data-select-entry="${escapeAttr(revision.id)}"><span>${escapeHtml(short(revision.title, 31))}</span><small>${escapeHtml(revision.kind)}</small></button>`).join('')}</div>` : '<p>Noch keine Änderungen. Deine Eingaben werden lokal gespeichert.</p>'}</div>`;
+}
+function renderAll() {
+    renderLibrary();
+    renderEditor();
+    renderInspector();
+    updateMetrics();
+}
+function updateEntryText(id, text) {
+    const entry = entryById.get(id);
+    if (!entry) return;
+    entry.german = text;
+    saveDraft();
+    updateMetrics();
+    const input = document.querySelector(`[data-entry="${escapeAttr(id)}"]`);
+    if (input) {
+        const counter = input.closest('.field')?.querySelector('.field-label em');
+        if (counter) counter.textContent = `${text.length} Zeichen`;
+    }
+    const selected = selectedEntry();
+    const badge = document.querySelector('.story-heading .badge');
+    if (badge && selected) badge.textContent = isChanged(selected) ? 'Entwurf geändert' : 'Original';
+    renderLibrary();
+    renderInspector();
+}
+function updateEntryNote(id, note) {
+    const entry = entryById.get(id);
+    if (!entry) return;
+    entry.note = note;
+    saveDraft();
+    updateMetrics();
+    renderLibrary();
+}
+
+document.addEventListener('click', (event) => {
+    const selector = event.target.closest('[data-select-entry]');
+    if (selector?.dataset.selectEntry) {
+        event.preventDefault();
+        selectEntry(selector.dataset.selectEntry);
+        return;
+    }
+});
+document.addEventListener('input', (event) => {
+    if (event.target.matches('[data-entry]')) updateEntryText(event.target.dataset.entry, event.target.value);
+    if (event.target.matches('[data-note]')) updateEntryNote(event.target.dataset.note, event.target.value);
+});
+document.querySelector('#search').addEventListener('input', (event) => { state.search = event.target.value.trim(); renderAll(); });
+document.querySelector('#collection-filter').addEventListener('change', (event) => { state.collection = event.target.value; renderAll(); });
+document.querySelector('#only-changed').addEventListener('change', (event) => { state.onlyChanged = event.target.checked; renderAll(); });
+document.querySelector('#reset-button').addEventListener('click', () => {
+    if (!confirm('Alle lokalen Dialogänderungen löschen?')) return;
+    for (const entry of entries) { entry.german = entry.originalGerman; entry.note = ''; }
+    saveDraft();
+    renderAll();
+});
+const exportPayload = (onlyChanges = false) => {
+    const selected = onlyChanges ? entries.filter(isChanged) : entries;
+    return {
+        schema: 'voidrunner-dialogue-review',
+        schemaVersion: 1,
+        gameBuild: BUILD,
+        language: 'de',
+        exportedAt: new Date().toISOString(),
+        changedCount: changedCount(),
+        entries: selected.map((entry) => ({
+            id: entry.id,
+            kind: entry.kind,
+            collection: entry.collection,
+            context: entry.context,
+            sourcePath: entry.sourcePath,
+            translationPath: entry.translationPath,
+            originalGerman: entry.originalGerman,
+            revisedGerman: entry.german,
+            englishReference: entry.english,
+            note: entry.note || undefined,
+            changed: isChanged(entry),
+        })),
+    };
+};
+const downloadJson = (payload, name) => {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = name;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+};
+document.querySelector('#export-button').addEventListener('click', () => downloadJson(exportPayload(false), `voidrunner-dialogue-draft-${new Date().toISOString().slice(0,10)}.json`));
+document.querySelector('#import-button').addEventListener('click', () => document.querySelector('#import-file').click());
+document.querySelector('#import-file').addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+        const payload = JSON.parse(await file.text());
+        const revisions = Array.isArray(payload.entries) ? payload.entries : [];
+        let applied = 0;
+        for (const revision of revisions) {
+            const entry = entryById.get(revision.id);
+            const german = revision.revisedGerman ?? revision.german;
+            if (!entry || typeof german !== 'string') continue;
+            entry.german = german;
+            entry.note = typeof revision.note === 'string' ? revision.note : entry.note;
+            applied += 1;
+        }
+        saveDraft();
+        renderAll();
+        alert(`${applied} Dialogeinträge geladen.`);
+    } catch (error) {
+        alert(`Der Entwurf konnte nicht geladen werden: ${error.message}`);
+    } finally {
+        event.target.value = '';
+    }
+});
+
+window.render_game_to_text = () => JSON.stringify({ tool: 'dialogue-review', language: 'de', selected: state.selectedId, changed: changedCount(), total: entries.length, coordinateSystem: 'DOM editor; no game-world coordinates' });
+window.advanceTime = () => {};
+renderAll();
+</script>
+</body>
+</html>

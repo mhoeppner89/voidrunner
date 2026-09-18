@@ -1,8 +1,10 @@
+import {LEAGUE_HULLS} from './leagueContent.js';
 import { GALAXY_LOCATIONS } from './galaxyContent.js';
 import { JUMP_ROUTES, SYSTEMS, systemHops } from './galaxy.js';
 
 export const FACTION_NAMES = {
     concord: 'Concord Patrol',
+    'frontier-league': 'Frontier League',
     'free-merchants': 'Free Merchants Compact',
     'frontier-miners': 'Frontier Miners Cooperative',
     'salvage-union': 'Salvage Union',
@@ -29,7 +31,7 @@ export const COMMODITIES = {
         description: 'Shielded tanks of potable water. Cheap, bulky, always needed.',
         flavor: 'Clean water is never glamorous. It is always cargo.',
         packaging: 'Shielded tanks',
-        image: './art/commodities/water.webp',
+        image: './art/commodities/simplified/water.webp',
         accent: '#59c9e8',
         basePrice: 18,
         mass: 1,
@@ -42,7 +44,7 @@ export const COMMODITIES = {
         description: 'Long-life nutrient blocks and cultivated protein.',
         flavor: 'Crew days, counted and vacuum-sealed.',
         packaging: 'Vacuum cartons',
-        image: './art/commodities/food.webp',
+        image: './art/commodities/simplified/food.webp',
         accent: '#d99b55',
         basePrice: 38,
         mass: 1,
@@ -55,7 +57,7 @@ export const COMMODITIES = {
         description: 'Temperature-controlled trauma and anti-radiation compounds.',
         flavor: 'Cold-chain cargo with no room for a late arrival.',
         packaging: 'Cold-chain case',
-        image: './art/commodities/medicine.webp',
+        image: './art/commodities/simplified/medicine.webp',
         accent: '#70d8c2',
         basePrice: 290,
         mass: 1,
@@ -68,7 +70,7 @@ export const COMMODITIES = {
         description: 'Navigation boards, sensor cores, and industrial logic units.',
         flavor: 'Small crates that keep large machines thinking.',
         packaging: 'Anti-static crates',
-        image: './art/commodities/electronics.webp',
+        image: './art/commodities/simplified/electronics.webp',
         accent: '#65aef2',
         basePrice: 407,
         mass: 1,
@@ -81,7 +83,7 @@ export const COMMODITIES = {
         description: 'Actuators, pumps, drill heads, and pressure-rated assemblies.',
         flavor: 'Heavy replacements for the parts a frontier wears out.',
         packaging: 'Pressure-rated pallet',
-        image: './art/commodities/machinery.webp',
+        image: './art/commodities/simplified/machinery.webp',
         accent: '#d78b49',
         basePrice: 80,
         mass: 1,
@@ -94,7 +96,7 @@ export const COMMODITIES = {
         description: 'Dense mixed-metal concentrate recovered from frontier rock.',
         flavor: 'Unrefined mass with a refinery waiting at the other end.',
         packaging: 'Lined ore hopper',
-        image: './art/commodities/ore.webp',
+        image: './art/commodities/simplified/ore.webp',
         accent: '#b98a61',
         // At Helix's typical surplus, 32 ore sells for about 6,000 credits.
         basePrice: 315,
@@ -108,7 +110,7 @@ export const COMMODITIES = {
         description: 'Precious metal veins recovered from frontier rock. A rare, valuable find.',
         flavor: 'Assayed, compact, and loud enough to attract pirates.',
         packaging: 'Security ingots',
-        image: './art/commodities/gold.webp',
+        image: './art/commodities/simplified/gold.webp',
         accent: '#e9bd4d',
         basePrice: 1800,
         mass: 1,
@@ -121,7 +123,7 @@ export const COMMODITIES = {
         description: 'Sorted hull plate, cable, and machinery fragments.',
         flavor: 'Yesterday\'s wreck, tomorrow\'s pressure door.',
         packaging: 'Banded salvage bale',
-        image: './art/commodities/scrap.webp',
+        image: './art/commodities/simplified/scrap.webp',
         accent: '#8ca39c',
         basePrice: 43,
         mass: 1,
@@ -134,7 +136,7 @@ export const COMMODITIES = {
         description: 'Spices, artisan spirits, and prestige consumer goods.',
         flavor: 'What people buy when survival stops taking the whole wage.',
         packaging: 'Cushioned display case',
-        image: './art/commodities/luxuries.webp',
+        image: './art/commodities/simplified/luxuries.webp',
         accent: '#c58ae8',
         basePrice: 413,
         mass: 1,
@@ -147,7 +149,7 @@ export const COMMODITIES = {
         description: 'Sealed weapon components. Legal only under licensed manifests.',
         flavor: 'Manifest-controlled hardware with a second price off the books.',
         packaging: 'Sealed weapons crate',
-        image: './art/commodities/arms.webp',
+        image: './art/commodities/simplified/arms.webp',
         accent: '#df6659',
         basePrice: 439,
         mass: 1,
@@ -461,6 +463,8 @@ const HELIOS_WITH_SYSTEM = Object.fromEntries(Object.entries(HELIOS_LOCATIONS).m
 }]));
 
 const JUMP_POINT_POSITIONS = Object.freeze({
+    'pale-acheron-point': [-230000,-20000,-190000],
+    'acheron-pale-point': [240000,10000,200000],
     'verge-meridian-point': [250000, 45000, 210000],
     'meridian-verge-point': [-250000, 18000, 225000],
     'verge-redwake-point': [245000, 16000, 205000],
@@ -484,7 +488,7 @@ for (const route of JUMP_ROUTES) {
             kind: 'jump-point',
             position: JUMP_POINT_POSITIONS[id],
             radius: 460,
-            faction: systemId === 'redwake' ? 'red-talons' : 'concord',
+            faction: systemId === 'acheron' ? 'frontier-league' : systemId === 'redwake' ? 'red-talons' : 'concord',
             accent: systemId === 'redwake' ? '#d26759' : '#80bad0',
             secondary: '#202c38',
             description: `A stabilized jump approach linking ${SYSTEMS[systemId].name} with ${destinationSystem.name}.`,
@@ -507,6 +511,7 @@ export const LOCATIONS = Object.freeze({
 // rendered and simulated, while these anchors keep each navigation chart
 // visually distinct.
 export const SYSTEM_SUN_POSITIONS = Object.freeze({
+    acheron: [150000,160000,-850000],
     'helios-verge': [-360000, 144000, 800000],
     meridian: [620000, 110000, 690000],
     redwake: [-680000, -60000, 590000],
@@ -515,12 +520,14 @@ export const SYSTEM_SUN_POSITIONS = Object.freeze({
 export const SUN_POSITION = SYSTEM_SUN_POSITIONS['helios-verge'];
 export const sunPositionForSystem = (systemId) => SYSTEM_SUN_POSITIONS[systemId] ?? SUN_POSITION;
 export const DEFAULT_NAV_LOCATION_BY_SYSTEM = Object.freeze({
+    acheron: 'acheron-belt',
     'helios-verge': 'shardbelt',
     meridian: 'foundry-lanes',
     redwake: 'redwake-belt',
     'pale-ring': 'pale-rings',
 });
 export const DEFAULT_DOCK_LOCATION_BY_SYSTEM = Object.freeze({
+    acheron: 'haven',
     'helios-verge': 'helix',
     meridian: 'meridian-prime',
     redwake: 'cinder',
@@ -779,8 +786,10 @@ export const SHIPS = {
         fuel: 200,
         gunDamage: 9,
     },
+    ...LEAGUE_HULLS,
 };
 export const LOCATION_ORDER = Object.freeze([
+    'haven','league-yard','cinderfall','acheron-belt',
     'helix', 'rook', 'azure', 'shardbelt', 'vesper', 'mourning-line', 'cairn',
     'meridian-prime', 'argent', 'gatehouse-twelve', 'foundry-lanes',
     'blackglass', 'cinder', 'torchwell', 'redwake-belt',

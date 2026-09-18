@@ -1,3 +1,4 @@
+import {combatTargetEligible} from './combatTargeting.js';
 import {WEAPON_DAMAGE_SCALE} from './weapons.js';
 import * as THREE from 'three';
 import {FRIGATE_MOUNTS,FRIGATE_CLEARANCE} from './frigateMounts.js';
@@ -52,7 +53,15 @@ export function updateFrigateBatteries(session,ship,dt,targetPosition,targetVelo
   cycle=s.cycle??={phase:'RECOVERING',until:now+4,serial:0};
   const armed=ship.capitalMountHull[0]>0||ship.capitalMountHull[1]>0||ship.capitalMountHull[2]>0||ship.capitalMountHull[3]>0;
   ship.capitalDisarmed=!armed;
-  const visible=armed&&target&&s.target.distanceTo(s.position.fromArray(ship.position))<=weapon.range&&!session.lineBlocked(s.position,s.target,ship.id);
+  let visible=armed&&target&&s.target.distanceTo(s.position.fromArray(ship.position))<=weapon.range&&!session.lineBlocked(s.position,s.target,ship.id);
+  if(armed&&target&&!visible){
+   for(const actor of session.ships){
+    if(!secondaryEnemy(session,ship,actor))continue;
+    s.target.fromArray(actor.position);
+    if(s.target.distanceTo(s.position)<=weapon.range&&!session.lineBlocked(s.position,s.target,ship.id)){visible=true;break;}
+   }
+   s.target.copy(targetPosition);
+  }
   if(!visible&&cycle.phase!=='RECOVERING'){cycle.phase='RECOVERING';cycle.until=now+3.5;}
   if(now>=cycle.until){
    if(cycle.phase==='RECOVERING'&&visible){cycle.phase='CHARGING';cycle.until=now+2.5;cycle.serial++;}
@@ -69,17 +78,41 @@ export function updateFrigateBatteries(session,ship,dt,targetPosition,targetVelo
   frigateMountPosition(ship,i,s.position);s.normal.set(0,0,0).setComponent(m.axis,m.side).applyQuaternion(s.q);
   if(gun.direction.lengthSq()<.1)gun.direction.copy(s.normal);
   s.clearance=FRIGATE_CLEARANCE[i];let solution=false;
+  let batteryId=ship.targetId,batteryVelocity=targetVelocity;
   if(target){
+   s.target.copy(targetPosition);
+   // Each broadside may engage a different active enemy, while preserving
+   // the shared warning/recovery cycle and the committed salvo solution.
+   if(!clearTurretArc(ship,m,FRIGATE_EXTENTS,s.target,s)||session.lineBlocked(s.position,s.target,ship.id)){
+    let nearest=weapon.range;
+    for(const actor of session.ships){
+     if(!secondaryEnemy(session,ship,actor))continue;
+     s.target.fromArray(actor.position);const d=s.position.distanceTo(s.target);
+     if(d<nearest&&clearTurretArc(ship,m,FRIGATE_EXTENTS,s.target,s)&&!session.lineBlocked(s.position,s.target,ship.id)){
+      nearest=d;batteryId=actor.id;batteryVelocity=actor.velocity;
+     }
+    }
+    if(batteryId===ship.targetId)s.target.copy(targetPosition);
+    else s.target.fromArray(session.ships.find(actor=>actor.id===batteryId).position);
+   }
+   if(gun.lockSerial===cycle.serial&&cycle.phase!=='RECOVERING'&&gun.lockedId){
+    batteryId=gun.lockedId;
+    const actor=batteryId==='player'?session.save.player:session.ships.find(actor=>actor.id===batteryId);
+    if(!actor||actor.hull<=0||(batteryId!=='player'&&!combatTargetEligible(actor)))continue;
+    if(batteryId===ship.targetId)s.target.copy(targetPosition);else s.target.fromArray(actor.position);
+    batteryVelocity=actor.velocity;
+   }
+
    // Commit to the observed course before firing; do not read new player
    // velocity throughout the salvo. A deliberate turn can defeat the solution.
    const offset=(i%2)*1.1,fireAt=cycle.phase==='CHARGING'?cycle.until+offset:(cycle.salvoAt??now)+offset;
    if(cycle.phase!=='RECOVERING'&&now>=fireAt-.6&&gun.lockSerial!==cycle.serial){
-    gun.lockSerial=cycle.serial;gun.lockedAt=now;gun.lockedTarget??=new THREE.Vector3();gun.lockedVelocity??=new THREE.Vector3();
-    gun.lockedTarget.copy(s.target);gun.lockedVelocity.copy(targetVelocity?.isVector3?targetVelocity:s.velocity.fromArray(targetVelocity??[0,0,0]));gun.rounds=4;gun.fireAt=fireAt;
+    gun.lockSerial=cycle.serial;gun.lockedId=batteryId;gun.lockedAt=now;gun.lockedTarget??=new THREE.Vector3();gun.lockedVelocity??=new THREE.Vector3();
+    gun.lockedTarget.copy(s.target);gun.lockedVelocity.copy(batteryVelocity?.isVector3?batteryVelocity:s.velocity.fromArray(batteryVelocity??zeroVelocity));gun.rounds=4;gun.fireAt=fireAt;
    }
    const locked=cycle&&gun.lockSerial===cycle.serial&&cycle.phase!=='RECOVERING';
    const aimTarget=locked?(s.bossAim??=new THREE.Vector3()).copy(gun.lockedTarget).addScaledVector(gun.lockedVelocity,now-gun.lockedAt):s.target;
-   const aimVelocity=locked?gun.lockedVelocity:targetVelocity;
+   const aimVelocity=locked?gun.lockedVelocity:batteryVelocity;
    const flight=relativeIntercept(s.position,aimTarget.toArray(s.targetTuple??=[]),ship.velocity,aimVelocity?.toArray?.(s.velocityTuple??=[])??aimVelocity??[0,0,0],weapon.speed,s.lead);
    s.lead.add(s.position);
    const error=s.position.distanceTo(s.target)*(.003);
@@ -92,7 +125,7 @@ export function updateFrigateBatteries(session,ship,dt,targetPosition,targetVelo
   s.lead.copy(s.position).addScaledVector(gun.direction,5);
   if(!clearTurretArc(ship,m,FRIGATE_EXTENTS,s.lead,s))gun.direction.copy(s.normal);
   session.renderer.showTurret?.(`${ship.id}-main-${i}`,s.position,gun.direction,'M','laser',s.q,m.side,0,FRIGATE_EXTENTS[2]/m.hullHalfLength,m.axis,ship);
-  if(solution){const actor=ship.targetId==='player'?session.save.player:session.ships.find(x=>x.id===ship.targetId);if(shipBlocksRay(session,ship,ship.id,actor,s.target,s))solution=false;}
+  if(solution){const actor=batteryId==='player'?session.save.player:session.ships.find(x=>x.id===batteryId);if(shipBlocksRay(session,ship,ship.id,actor,s.target,s))solution=false;}
   if(cycle){
    const groupFireAt=cycle.phase==='CHARGING'?cycle.until+(i%2)*1.1:(cycle.salvoAt??now)+(i%2)*1.1;
    if(cycle.phase==='CHARGING'||cycle.phase==='SALVO'&&now<groupFireAt){
@@ -107,33 +140,71 @@ export function updateFrigateBatteries(session,ship,dt,targetPosition,targetVelo
   s.lead.copy(s.position).addScaledVector(gun.direction,8.6);
   if(session.lineBlocked(s.position,s.lead,ship.id))continue;
   ship.energy-=cost;
-  session.spawnGunProjectile(ship.id,weapon,s.lead,gun.direction,ship.velocity,ship.targetId,`${ship.id}-main-${i}`);
+  session.spawnGunProjectile(ship.id,weapon,s.lead,gun.direction,ship.velocity,batteryId,`${ship.id}-main-${i}`);
   session.renderer.spawnMuzzleFlash?.(s.lead.x,s.lead.y,s.lead.z,0xffb366);
   gun.rounds--;gun.fireAt=now+(gun.rounds?.42:5)*factor;
   if(!gun.rounds)gun.chargeAt=0;
  }
 }
 const newIdentity=new THREE.Quaternion();
+// Separate steering scratch from battery scratch: battery transforms overwrite stateFor vectors.
+function navigationFor(ship){
+ return stateFor(ship).navigation??={radial:new THREE.Vector3(),tangent:new THREE.Vector3(),axis:new THREE.Vector3(),other:new THREE.Vector3(),desired:new THREE.Vector3(),heading:new THREE.Vector3(),velocity:new THREE.Vector3(),position:new THREE.Vector3(),q:new THREE.Quaternion(),goal:new THREE.Quaternion(),until:0};
+}
+function secondaryEnemy(session,ship,actor){
+ const probe=stateFor(ship).enemyProbe??={ownerId:ship.id};probe.faction=ship.faction;probe.targetId=ship.targetId;
+ return actor!==ship&&actor.id!==ship.targetId&&combatTargetEligible(actor)
+  &&actor.instanceId===ship.instanceId
+  &&session.projectileCanHitShip(probe,actor);
+}
 export function updateFrigateAttack(session,ship,targetPosition,targetVelocity,dt){
- const s=stateFor(ship);s.target.copy(targetPosition);s.position.fromArray(ship.position);s.q.fromArray(ship.rotation);
- const distance=s.target.distanceTo(s.position);
- s.direction.copy(s.target).sub(s.position).normalize();
- // Commit to a broadside; crossing a distance threshold must not reverse
- // the heading goal or make the heavy hull oscillate between approach angles.
+ const s=stateFor(ship),n=navigationFor(ship),now=session.save.world.time;
+ n.position.fromArray(ship.position);n.q.fromArray(ship.rotation);
+ n.radial.copy(targetPosition).sub(n.position);const distance=n.radial.length();
+ if(distance<1e-6)n.radial.set(1,0,0);else n.radial.multiplyScalar(1/distance);
  if(s.attackSide===undefined||s.attackTarget!==ship.targetId){
-  s.attackTarget=ship.targetId;
-  s.local.copy(s.direction).applyQuaternion(s.inverse.copy(s.q).invert());
-  s.attackSide=s.local.x>=0?-1:1;
+  s.attackTarget=ship.targetId;s.local.copy(n.radial).applyQuaternion(s.inverse.copy(n.q).invert());
+  s.attackSide=s.local.x>=0?-1:1;n.until=0;
  }
- const approach=Math.max(0,Math.min(1,(distance-450)/300));
- s.direction.applyAxisAngle(worldUp,s.attackSide*(1.35-.35*approach));
- if(session.getAvoidanceVector)s.direction.addScaledVector(session.getAvoidanceVector(s.position,s.direction,90,ship.speed),2).normalize();
- s.goal.setFromUnitVectors(forward,s.direction);s.q.rotateTowards(s.goal,ship.turnRate*dt);s.q.toArray(ship.rotation);
- const speed=distance>620?ship.speed:distance<180?ship.speed*.85:ship.speed*.6;
- s.velocity.fromArray(ship.velocity);s.direction.copy(forward).applyQuaternion(s.q).multiplyScalar(speed);
- s.velocity.lerp(s.direction,Math.min(1,dt*.45));s.position.addScaledVector(s.velocity,dt);s.velocity.toArray(ship.velocity);s.position.toArray(ship.position);
+ const preferred=FRIGATE_GUN.range*.69,band=FRIGATE_GUN.range*.06;
+ // Re-evaluate headings slowly. Opposite threats can use both broadsides;
+ // clustered threats do not tempt the frigate into the middle of the group.
+ if(now>=n.until){
+  n.axis.copy(n.radial);let best=0,opponent;
+  for(const actor of session.ships){
+   if(!secondaryEnemy(session,ship,actor))continue;
+   n.other.fromArray(actor.position).sub(n.position);const d=n.other.length();
+   if(d<1||d>FRIGATE_GUN.range||session.lineBlocked(n.position,n.other.fromArray(actor.position),ship.id))continue;
+   n.other.fromArray(actor.position).sub(n.position).normalize();const opposition=-n.radial.dot(n.other);
+   if(opposition>Math.max(.35,best)){best=opposition;opponent=actor;}
+  }
+  if(opponent){n.other.fromArray(opponent.position).sub(n.position).normalize();n.axis.sub(n.other).normalize();}
+  n.tangent.crossVectors(worldUp,n.axis);
+  if(n.tangent.lengthSq()<.001)n.tangent.set(1,0,0);else n.tangent.normalize();
+  n.tangent.multiplyScalar(s.attackSide);
+  n.heading.copy(n.tangent);n.goal.setFromUnitVectors(forward,n.heading);n.until=now+2;
+ }
+ // Keep a dead band instead of a threshold-driven forward/reverse throttle.
+ // Lateral station-keeping lets the hull stay broadside without ramming the target.
+ const error=distance-preferred;
+ const radialSpeed=Math.max(-ship.speed,Math.min(ship.speed,(Math.abs(error)>band?error-Math.sign(error)*band:0)*.12));
+ if(targetVelocity?.isVector3)n.desired.copy(targetVelocity);else n.desired.fromArray(targetVelocity??zeroVelocity);
+ n.desired.clampLength(0,ship.speed*.65).addScaledVector(n.radial,radialSpeed);
+ const blocked=session.lineBlocked(n.position,targetPosition,ship.id);
+ if(blocked)n.desired.addScaledVector(n.tangent,ship.speed*.7);
+ n.desired.clampLength(0,ship.speed);
+ if(session.getAvoidanceVector){
+  n.other.copy(n.desired);if(n.other.lengthSq()<.001)n.other.copy(n.heading);else n.other.normalize();
+  const avoid=session.getAvoidanceVector(n.position,n.other,FRIGATE_EXTENTS[2]+20,ship.speed);
+  if(avoid.lengthSq()>.001)n.desired.addScaledVector(avoid,ship.speed).clampLength(0,ship.speed);
+ }
+ n.q.rotateTowards(n.goal,ship.turnRate*dt);n.q.toArray(ship.rotation);
+ n.velocity.fromArray(ship.velocity).lerp(n.desired,1-Math.exp(-dt*.3));n.position.addScaledVector(n.velocity,dt);
+ n.velocity.toArray(ship.velocity);n.position.toArray(ship.position);
+ s.goal.copy(n.goal);ship.capitalPreferredRange=preferred;
  updateFrigateBatteries(session,ship,dt,targetPosition,targetVelocity);
 }
+const zeroVelocity=[0,0,0];
 const worldUp=new THREE.Vector3(0,1,0);
 
 // Exposed mount envelopes supplement the ordinary ellipsoid hull collision.

@@ -266,7 +266,7 @@ export function updateShipAI(session, ship, dt) {
         ship.pursuitHoldFire = false;
     // Interaction layer: a patrol with a live arrest chases the smuggler;
     // otherwise the task layer yields the travel waypoint.
-    if (ship.role === 'patrol' && session.updatePatrolArrest?.(ship)) {
+    if (ship.role === 'patrol' && ship.faction === 'concord' && session.updatePatrolArrest?.(ship)) {
         session.updateTravelAI(ship, dt);
         return;
     }

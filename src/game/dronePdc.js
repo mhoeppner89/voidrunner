@@ -1,3 +1,4 @@
+import { orientDrone } from './droneFlight.js';
 import { combatTargetEligible } from './combatTargeting.js';
 import {PDC_RECOVERY_SECONDS} from './pdcFireControl.js';
 import { DRONE_TYPES } from './droneData.js';
@@ -44,6 +45,7 @@ function travel(unit, point, fallbackVelocity, dt) {
     const rx = v[0] - tv[0], ry = v[1] - tv[1], rz = v[2] - tv[2];
     if (distance <= TYPE.collisionRadius && Math.hypot(rx, ry, rz) <= TYPE.acceleration * dt * 2) {
         attach(unit, point, fallbackVelocity, dt);
+        unit.thrust = 0;
         return true;
     }
     const speed = Math.min(TYPE.cruiseSpeed,
@@ -52,6 +54,7 @@ function travel(unit, point, fallbackVelocity, dt) {
     const ax = dx * scale - rx, ay = dy * scale - ry, az = dz * scale - rz;
     const delta = Math.hypot(ax, ay, az);
     const blend = delta > 0 ? Math.min(1, TYPE.acceleration * dt / delta) : 0;
+    unit.thrust = Math.min(1, delta / (TYPE.acceleration * dt));
     v[0] += ax * blend; v[1] += ay * blend; v[2] += az * blend;
     p[0] += v[0] * dt; p[1] += v[1] * dt; p[2] += v[2] * dt;
     return false;
@@ -208,7 +211,8 @@ export function createPdcDroneController() {
                 unit.position ??= [0, 0, 0];
                 unit.velocity ??= [0, 0, 0];
                 unit.rotation ??= [0, 0, 0, 1];
-                attach(unit, anchors.launch, context.shipVelocity);
+                attach(unit, anchors.dock, context.shipVelocity);
+                unit.portStage = 'launch';
                 unit.state = 'escorting';
                 unit.phaseTime = 0;
                 unit.recallTime = 0;
@@ -218,8 +222,11 @@ export function createPdcDroneController() {
             unit.phaseTime = (Number.isFinite(unit.phaseTime) ? unit.phaseTime : 0) + dt;
             const returning = unit.state === 'returning';
             if (returning) unit.recallTime = (Number.isFinite(unit.recallTime) ? unit.recallTime : 0) + dt;
-            const point = returning ? anchors?.dock : escort;
+            const point = returning ? (unit.portStage === 'enter' ? anchors?.dock : anchors?.launch)
+                : unit.portStage === 'launch' ? anchors?.launch : escort;
             const arrived = pointValid(point) && travel(unit, point, context.shipVelocity, dt);
+            orientDrone(unit, dt, context.shipVelocity, point, returning || unit.portStage === 'launch');
+            if (!returning && arrived && unit.portStage === 'launch') unit.portStage = null;
             const stepEvent = context.onUnitStep?.(unit, dt, context);
             if (stepEvent) events.push(stepEvent);
             if (fleet.unitsById[id] !== unit || unit.state === 'destroyed') continue;
@@ -228,7 +235,9 @@ export function createPdcDroneController() {
                 continue;
             }
             if (returning) {
+                if (arrived && unit.portStage !== 'enter') { unit.portStage = 'enter'; continue; }
                 if (arrived) {
+                    unit.portStage = null;
                     unit.state = 'stowed';
                     unit.phaseTime = 0;
                     unit.recallTime = 0;

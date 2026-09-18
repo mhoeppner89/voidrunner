@@ -3,6 +3,212 @@
 // can merge or filter it without having to import any game systems.
 
 export const GALAXY_LOCATIONS = {
+    "haven": {
+        "id": "haven",
+        "systemId": "acheron",
+        "name": "Haven Freeport",
+        "shortName": "HAVEN",
+        "kind": "station",
+        "position": [
+            -115000,
+            18000,
+            120000
+        ],
+        "radius": 700,
+        "faction": "frontier-league",
+        "guilds": [
+            "merchant",
+            "bounty"
+        ],
+        "accent": "#73c9d1",
+        "secondary": "#173b4a",
+        "description": "A civilian freeport built from repaired modules and shared work. Its open markets face Acheron’s distant black hole, and its people keep the League supplied without asking who you used to be.",
+        "services": {
+            "fuel": true,
+            "repair": true,
+            "market": true,
+            "bar": true,
+            "shipyard": true,
+            "outfitting": true,
+            "missions": true,
+            "race": false
+        },
+        "encounterRate": 0.3,
+        "dockRadius": 1250,
+        "shipsForSale": [
+            "torsas",
+            "astra",
+            "speedster"
+        ],
+        "economy": {
+            "ore": 1.12,
+            "food": 1.15,
+            "electronics": 0.88,
+            "machinery": 0.9
+        },
+        "people": [
+            {
+                "id": "haven-factor",
+                "name": "Iona Rell",
+                "role": "Freeport liaison",
+                "affiliation": "Frontier League",
+                "portraitSeed": 311,
+                "lines": [
+                    "Haven stays open because everybody here has repaired something for somebody else.",
+                    "We trade water, food and machine parts under Acheron’s shadow. No parade, no gatekeeping—just fair weights and a berth if you need one.",
+                    "Unity builds the League’s hard ships. Haven keeps the crews fed and the civilian hulls moving. If you want their trust, start with work that helps people."
+                ]
+            }
+        ]
+    },
+    "league-yard": {
+        "id": "league-yard",
+        "systemId": "acheron",
+        "name": "Unity Shipworks",
+        "shortName": "UNITY",
+        "kind": "station",
+        "position": [
+            110000,
+            -12000,
+            30000
+        ],
+        "radius": 900,
+        "faction": "frontier-league",
+        "guilds": [
+            "merchant",
+            "bounty"
+        ],
+        "accent": "#dfbd63",
+        "secondary": "#1c2d41",
+        "description": "The League’s disciplined shipworks: a ring of drydocks, test bays and supply halls where the frontier hulls are assembled and refitted beneath Acheron’s distant shadow.",
+        "services": {
+            "fuel": true,
+            "repair": true,
+            "market": true,
+            "bar": true,
+            "shipyard": true,
+            "outfitting": true,
+            "missions": true,
+            "race": false
+        },
+        "encounterRate": 0.3,
+        "dockRadius": 1500,
+        "shipsForSale": [
+            "speedster",
+            "legionary",
+            "andromeda",
+            "torsas",
+            "astra"
+        ],
+        "economy": {
+            "ore": 1.12,
+            "food": 1.15,
+            "electronics": 0.88,
+            "machinery": 0.9
+        },
+        "people": [
+            {
+                "id": "league-yard-factor",
+                "name": "Commander Soren Vale",
+                "role": "Shipworks commander",
+                "affiliation": "Frontier League",
+                "portraitSeed": 312,
+                "lines": [
+                    "A hull tells you what its builders believe. Ours are compact, repairable and built to come home.",
+                    "Unity does not sell military hulls on a handshake. Earn League standing, then choose the ship that matches the work you are willing to do.",
+                    "The League’s ships are in these bays, not in some admiral’s story. Look closely at the Speedster, Legionary, Andromeda, Torsas and Astra before you decide."
+                ]
+            }
+        ]
+    },
+    "cinderfall": {
+        "id": "cinderfall",
+        "systemId": "acheron",
+        "name": "Cinderfall Habitat",
+        "shortName": "CINDERFALL",
+        "kind": "station",
+        "position": [
+            160000,
+            24000,
+            -150000
+        ],
+        "radius": 600,
+        "faction": "frontier-league",
+        "guilds": [
+            "merchant",
+            "bounty"
+        ],
+        "accent": "#e07d42",
+        "secondary": "#3e251e",
+        "description": "A shielded foundry habitat beyond Acheron’s dangerous inner region. Ore comes in hot, food keeps the shifts moving, and every useful part leaves with a little furnace dust on it.",
+        "services": {
+            "fuel": true,
+            "repair": true,
+            "market": true,
+            "bar": true,
+            "shipyard": true,
+            "outfitting": true,
+            "missions": true,
+            "race": false
+        },
+        "encounterRate": 0.3,
+        "dockRadius": 1100,
+        "shipsForSale": [
+            "torsas",
+            "astra",
+            "speedster"
+        ],
+        "economy": {
+            "ore": 1.12,
+            "food": 1.15,
+            "electronics": 0.88,
+            "machinery": 0.9
+        },
+        "people": [
+            {
+                "id": "cinderfall-factor",
+                "name": "Mika Dorn",
+                "role": "Foundry liaison",
+                "affiliation": "Frontier League",
+                "portraitSeed": 313,
+                "lines": [
+                    "If the floor is warm, the habitat is earning its keep.",
+                    "Cinderfall turns Shattered Crown ore into the parts Haven trades and Unity bolts onto hulls. We are not pretty, but we are why the frontier keeps moving.",
+                    "Bring ore, food or a willingness to work. Leave the speeches to the officers at Unity."
+                ]
+            }
+        ]
+    },
+    "acheron-belt": {
+        "id": "acheron-belt",
+        "systemId": "acheron",
+        "name": "The Shattered Crown",
+        "shortName": "CROWN",
+        "kind": "field",
+        "position": [
+            -120000,
+            -26000,
+            -115000
+        ],
+        "radius": 3400,
+        "faction": "frontier-league",
+        "guilds": [],
+        "accent": "#c4934b",
+        "secondary": "#2a2331",
+        "description": "The Shattered Crown is a mineral-rich belt of broken rock and old machinery. League scouts mark safe lanes while Cinderfall crews take the risks that keep its furnaces fed.",
+        "services": {
+            "fuel": false,
+            "repair": false,
+            "market": false,
+            "bar": false,
+            "shipyard": false,
+            "outfitting": false,
+            "missions": false,
+            "race": false
+        },
+        "encounterRate": 0.55
+    },
+
     cairn: {
         id: 'cairn',
         systemId: 'helios-verge',

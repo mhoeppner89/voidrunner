@@ -98,6 +98,7 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             lastDockedAt: 'helix',
             reputation: {
                 concord: 0,
+                'frontier-league': 0,
                 'free-merchants': 4,
                 'frontier-miners': 0,
                 'salvage-union': 0,

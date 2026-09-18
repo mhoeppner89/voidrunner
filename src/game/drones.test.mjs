@@ -259,6 +259,8 @@ const finiteSecond = finitePdc.update(finiteAmmoFleet, PDC_DRONE_STEP, {
     now: PDC_DRONE_STEP,
     threats: [],
 }, []);
+assert.equal(finiteAmmoFleet.unitsById['pdc-ammo'].portStage, 'enter');
+finitePdc.update(finiteAmmoFleet, PDC_DRONE_STEP, {...finiteContext, threats: []}, []);
 assert.equal(finiteAmmoFleet.unitsById['pdc-ammo'].state, 'stowed');
 assert.equal(finiteSecond.filter((event) => event.type === 'empty').length, 0, 'empty notification is latched');
 
@@ -271,6 +273,7 @@ const recallPdcEvents = recallPdc.update(recallPdcFleet, PDC_DRONE_STEP, {
     inFlight: false,
     now: PDC_DRONE_STEP,
 }, []);
+recallPdc.update(recallPdcFleet, PDC_DRONE_STEP, {...recallPdcContext,inFlight:false}, recallPdcEvents);
 assert.equal(recallPdcFleet.unitsById['pdc-recall'].state, 'stowed');
 assert.deepEqual(recallPdcEvents.filter((event) => event.type === 'recall').map((event) => event.stage), ['begin', 'stowed']);
 const destroyedPdc = destroyPdcDrone(recallPdcFleet, 'pdc-recall', 'missile');

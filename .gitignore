@@ -15,6 +15,7 @@ __pycache__/
 # Source ship models (full-res GLBs + reference art). Dev-only: the game
 # loads optimized copies generated from these, never the folder itself.
 glb_models/
+obj_models/
 
 # Docs kept out of the repo; only the game + hosting live here.
 AGENTS.md
@@ -29,6 +30,16 @@ PLAYABLE_README.md
 !art/portraits/v2/*.webp
 !art/portraits/v3/*.webp
 !art/sky/*.webp
+!art/commodities/simplified/
+!art/commodities/simplified/*.webp
+!art/outfitting/simplified/
+!art/outfitting/simplified/*.webp
+!art/locations/simplified/
+!art/locations/simplified/*.webp
+!art/portraits/simplified/
+!art/portraits/simplified/*.webp
+!assets/remaster/landed-flat/
+!assets/remaster/landed-flat/*.webp
 !assets/remaster/cockpit-vanguard.webp
 !assets/remaster/cockpit-talon.webp
 !assets/remaster/cockpit-prospector.webp

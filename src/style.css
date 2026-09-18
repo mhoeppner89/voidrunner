@@ -15736,3 +15736,7 @@ button.primary,
     transform: translateY(-4px);
   }
 }
+
+/* Acheron’s chart marker matches its black-hole sky landmark. */
+.galaxy-map-stage .regional-system.system-acheron i,
+.system-star-key.star-acheron i {background:#040609;border:2px solid var(--void-gold);box-shadow:0 0 10px var(--void-gold);}

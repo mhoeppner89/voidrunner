@@ -1,9 +1,11 @@
+import { DRONE_PORTS } from './droneFlight.js';
 import {cockpitDamageStage} from './cockpitDamage.js';
 import { wreckSectionDelta } from './missionWorldData.js';
 import {createTurretModel} from './turretModels.js';
 import * as THREE from 'three';
 import { createRingVolume } from './ringVolume.js';
 import { createRingParticles } from './ringParticles.js';
+import {createBlackHole} from './blackHole.js';
 import { LOCATIONS, SUN_POSITION, sunPositionForSystem } from './data.js';
 import { createVoxelShipModel, createVoxelStationModel, paletteForFaction, shipVariantForRole } from './voxelModels.js';
 import { clamp, seededRandom } from './random.js';
@@ -42,6 +44,7 @@ const HIDDEN_SCALE = [0.0001, 0.0001, 0.0001];
 // cockpit edges, text, or the galactic sky.
 const BLOOM_DOWNSAMPLE = 4;
 const SYSTEM_RENDER_STYLE = Object.freeze({
+    acheron:{clear:0x070d17,fog:0x202538,density:.00006,stars:0xe2edff,band:0xbac3d8,bandOpacity:.35,nebula:0x655978,nebulaOpacity:.23},
     'helios-verge': { clear: 0x0a1735, fog: 0x2a1e44, density: 0.000115, stars: 0xfff1df, band: 0xffffff, bandOpacity: 0.72, nebula: 0xd8a38c, nebulaOpacity: 0.72 },
     meridian: { clear: 0x0d2032, fog: 0x284358, density: 0.000105, stars: 0xe4f4ff, band: 0xffffff, bandOpacity: 0.68, nebula: 0x91b5c3, nebulaOpacity: 0.68 },
     redwake: { clear: 0x1f0d18, fog: 0x4b2029, density: 0.00013, stars: 0xffd2ca, band: 0xffffff, bandOpacity: 0.66, nebula: 0xa86268, nebulaOpacity: 0.6 },
@@ -132,6 +135,11 @@ const factionColor = (faction) => {
 // Exported so the shipyard's buy-ship preview (shipPreview.js) loads the same
 // hulls with the same orientation and world scale.
 export const GLB_SHIP_CONFIG = {
+    speedster: {file:'speedster.glb',preload:false,yaw:-Math.PI/2,scale:5.5,preserveColor:true,enginePorts:[[0.95498,-0.05,0.19],[0.95628,-0.05,-0.19]]},
+    legionary: {file:'legionary.glb',preload:false,yaw:Math.PI,scale:6.2,preserveColor:true,enginePorts:[[0.23,0.095,-0.94653],[-0.23,0.095,-0.94515]]},
+    andromeda: {file:'andromeda.glb',preload:false,yaw:Math.PI,scale:7.8,preserveColor:true,enginePorts:[[0.75,0.17,-0.99882],[0.4,0.19,-0.98845],[-0.4,0.19,-0.99751],[-0.75,0.17,-0.99744]]},
+    torsas: {file:'torsas.glb',preload:false,yaw:Math.PI,scale:8,preserveColor:true,enginePorts:[[0.26,0,-0.9416],[-0.26,0,-0.94243],[0.16,0.18,-0.5042],[-0.16,0.18,-0.50363]]},
+    astra: {file:'astra.glb',preload:false,yaw:Math.PI,scale:6.4,preserveColor:true,enginePorts:[[0.2,0.32,-0.85589],[-0.2,0.32,-0.8542],[0.57,-0.05,-0.85452],[-0.57,-0.05,-0.8535],[0.57,-0.3,-0.85646],[-0.57,-0.3,-0.85323],[0.19,-0.32,-0.8533],[-0.19,-0.32,-0.85367]]},
     kestrel: { file: 'wayfarer.glb', yaw: Math.PI / 2, scale: 6.1, enginePorts: [[-0.85, 0, -0.06], [-0.85, 0, 0.06]] },
     warden: { file: 'vanguard.glb', yaw: Math.PI / 2, scale: 5.9, enginePorts: [[-0.85, 0, -0.3], [-0.85, 0, 0.3]] },
     talon: { file: 'talon.glb', yaw: Math.PI / 2, scale: 5.65, enginePorts: [[-0.85, 0, -0.12], [-0.85, 0, 0.12]] },
@@ -173,7 +181,7 @@ export const GLB_SHIP_CONFIG = {
 // their separately-authored wrecks keep the full 2x scale.
 export const NPC_FIGHTER_SCALE = 1.6;
 export const NPC_CAPITAL_SCALE = 2;
-const NPC_FIGHTER_VARIANTS = new Set([
+const NPC_FIGHTER_VARIANTS = new Set(['speedster','legionary','andromeda','astra',
     'kestrel',
     'talon',
     'lancer',
@@ -1430,6 +1438,43 @@ export class SpaceRenderer {
         this.tagTargetable(group, 'location', id);
         this.locationRoot.add(group);
         this.locationMeshes.set(id, group);
+    }
+    ensureAcheronStations() {
+        this.stationModelLoads ??= new Map();
+        for (const id of ['haven', 'league-yard', 'cinderfall']) {
+            if (this.stationModelLoads.has(id)) continue;
+            const root = this.locationMeshes.get(id);
+            if (!root) continue;
+            const pending = loadGlb(`assets/models/stations/${id}.glb`).then(model => {
+                if (this.disposed) { this.disposeObject(model); return; }
+                // Blender authors a 100-unit bounding sphere. Keep every part
+                // within the existing collision envelope and docking distance.
+                model.scale.setScalar(LOCATIONS[id].radius * 0.95 / 100);
+                model.name = `acheron-station-${id}`;
+                model.userData.stationAsset = id;
+                model.traverse(node => {
+                    if (!node.isMesh) return;
+                    const materials = Array.isArray(node.material) ? node.material : [node.material];
+                    for (const material of materials) {
+                        material.fog = false;
+                        material.envMapIntensity = 0.3;
+                        if (material.map) {
+                            material.map.anisotropy = Math.min(4, this.renderer.capabilities.getMaxAnisotropy());
+                            material.map.needsUpdate = true;
+                        }
+                    }
+                });
+                for (const old of [...root.children]) { root.remove(old); this.disposeObject(old); }
+                root.add(model);
+                this.tagTargetable(root, 'location', id);
+                this.renderRevision = (this.renderRevision ?? 0) + 1;
+            }).catch(error => {
+                console.warn(`Station ${id} model unavailable; retaining fallback.`, error);
+                this.stationModelLoads.delete(id);
+            });
+            this.stationModelLoads.set(id, pending);
+        }
+        return Promise.all(this.stationModelLoads.values());
     }
     createJumpPointVisual(id, location, accent, secondary, rng) {
         const landmark = new THREE.Group();
@@ -3234,6 +3279,8 @@ export class SpaceRenderer {
         const group = model.clone(true);
         wrapper.add(group);
         const variant = variantOverride ?? shipVariantForEntity(entity);
+        const ports = this.createDronePorts(variant === 'kestrel' ? 'wayfarer' : variant);
+        ports.scale.setScalar(npcShipScaleForVariant(variant)); wrapper.add(ports);
         const palette = paletteForEntity(entity);
         const tint = new THREE.Color(palette.hull);
         const emissiveMaterials = [];
@@ -3298,6 +3345,8 @@ export class SpaceRenderer {
     // release per-ship materials and flare maps. Cached hull assets remain
     // alive until renderer shutdown.
     disposeGlbShip(mesh) {
+        const ports = mesh.getObjectByName('drone-docking-ports');
+        if (ports) { mesh.remove(ports); this.disposeObject(ports); }
         const flareTextures = new Set((mesh.userData.engineFlares ?? []).map(flare => flare.material.map));
         for (const texture of flareTextures)
             texture?.dispose();
@@ -3347,6 +3396,7 @@ export class SpaceRenderer {
                 this.dynamicRoot.add(mesh);
                 this.shipMeshes.set(entity.id, mesh);
             }
+            this.syncDronePorts(mesh.getObjectByName('drone-docking-ports'), entity.droneFleet);
             mesh.userData.syncRevision = revision;
             mesh.position.set(...entity.position);
             if (entity.prevPosition && alpha >= 0) {
@@ -3420,6 +3470,64 @@ export class SpaceRenderer {
             const hull=this.shipMeshes.get(a.ownerId);if(hull)glow.position.copy(a.position).applyQuaternion(hull.quaternion).add(hull.position);
         }
     }
+    createDronePorts(hullId) {
+        const group = new THREE.Group(); group.name = 'drone-docking-ports';
+        for (const port of DRONE_PORTS[hullId] ?? []) {
+            const bay = new THREE.Group(); bay.position.fromArray(port); group.add(bay);
+            const box = (x,y,z,w,h,d,color) => {
+                const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), new THREE.MeshStandardMaterial({color,roughness:.72,metalness:.65}));
+                m.position.set(x,y,z); m.raycast=()=>undefined; bay.add(m); return m;
+            };
+            const wayfarer = hullId === 'wayfarer';
+            if (wayfarer) {
+                // The Wayfarer belly narrows above the mouth: a sloped collar
+                // reaches the actual hull instead of leaving wide vertical walls.
+                const ring = (x,z,cut,y) => [[-x+cut,y,-z],[x-cut,y,-z],[x,y,-z+cut],[x,y,z-cut],[x-cut,y,z],[-x+cut,y,z],[-x,y,z-cut],[-x,y,-z+cut]];
+                const upper=ring(.82,1.58,.2,.62), lower=ring(1.12,1.4,.23,-.22), inner=ring(1.04,1.25,.14,-.23);
+                const vertices=[],uvs=[];
+                const quad=(a,b,c,d)=>{for(const [v,u,w] of [[a,0,0],[b,1,0],[c,1,1],[a,0,0],[c,1,1],[d,0,1]]){vertices.push(...v);uvs.push(u,w);}};
+                for(let i=0;i<8;i++){const j=(i+1)%8;quad(upper[i],upper[j],lower[j],lower[i]);quad(lower[i],lower[j],inner[j],inner[i]);}
+                const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geometry.computeVertexNormals();
+                const paint=(base,stripe)=>{
+                    const canvas=document.createElement('canvas');canvas.width=canvas.height=128;const ctx=canvas.getContext('2d');
+                    ctx.fillStyle=base;ctx.fillRect(0,0,128,128);
+                    if(stripe){ctx.fillStyle='#233b50';ctx.fillRect(0,76,128,39);ctx.fillStyle='#af8130';ctx.fillRect(0,73,128,4);}
+                    const rng=seededRandom('wayfarer-drone-port');
+                    for(let i=0;i<360;i++){ctx.fillStyle=i%3?'rgba(29,23,16,.18)':'rgba(224,209,172,.26)';ctx.fillRect(rng()*128,rng()*128,1+rng()*4,1);}
+                    ctx.strokeStyle='#655b49';ctx.lineWidth=2;ctx.strokeRect(3,3,122,122);
+                    for(const x of [9,119])for(const y of [10,118]){ctx.fillStyle='#303132';ctx.fillRect(x-1,y-1,3,3);}
+                    const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;return texture;
+                };
+                const shell=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({map:paint('#b8ac90',true),roughness:.8,metalness:.35,side:THREE.DoubleSide}));shell.raycast=()=>undefined;bay.add(shell);
+                box(0,-.18,0,2.1,.06,2.48,0x050a0e);
+                bay.userData.doors=[-1,1].map(side=>{const door=box(side*.525,-.245,0,1.05,.035,2.48,0xffffff);door.material.map=paint('#233747',false);door.material.roughness=.78;return door;});
+                // Short service markings replace the oversized gold rails.
+                for(const x of [-1.065,1.065])box(x,-.25,.35,.055,.02,.38,0xb88c36);
+            } else {
+                box(-1.12,.2,0,.14,.7,2.8,0x26343c); box(1.12,.2,0,.14,.7,2.8,0x26343c);
+                box(0,.2,-1.32,2.38,.7,.16,0x26343c); box(0,.2,1.32,2.38,.7,.16,0x26343c);
+                box(0,-.08,0,2.12,.1,2.5,0x050a0e);
+                for (const x of [-1.13,1.13]) box(x,-.15,0,.15,.06,1.4,0xc4a457);
+                bay.userData.doors = [-1,1].map(side => box(side*.525,-.145,0,1.05,.06,2.48,0x35414a));
+            }
+            bay.userData.open = 0;
+        }
+        return group;
+    }
+    syncDronePorts(ports, fleet) {
+        if (!ports) return;
+        let active = false;
+        const units = fleet?.unitsById;
+        if (units) for (const id in units) if (units[id].state !== 'stowed' && units[id].state !== 'destroyed') {active=true;break;}
+        for (const bay of ports.children) {
+            bay.userData.open += ((active ? 1 : 0) - bay.userData.open) * .18;
+            for (let i=0;i<2;i++) {
+                const door=bay.userData.doors[i], open=bay.userData.open;
+                door.scale.x=Math.max(.001,1-open);
+                door.position.x=(i===0?-1:1)*(.525+.525*open);
+            }
+        }
+    }
     createDroneVisual(unit) {
         const pdc = unit.type === 'pdc';
         const color = pdc ? 0x69e4f2 : 0xffd05c;
@@ -3442,24 +3550,44 @@ export class SpaceRenderer {
                 pdc ? 0.85 : 0.2, 0.18, pdc ? 0.8 : 1.55, true);
             if (pdc) part(side * 0.32, 0.16, -0.95, 0.13, 0.13, 1.4);
         }
-        const engine = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.85, 5),
-            new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8, depthWrite: false }));
-        engine.rotation.x = Math.PI / 2;
-        engine.position.z = 1;
+        const engine = new THREE.Group();
+        const flareTexture = this.radialTexture('#c2f5ff', '#55bde8');
+        for (const side of [-1, 1]) {
+            const flare = new THREE.Sprite(new THREE.SpriteMaterial({map: flareTexture,
+                transparent: true, opacity: .65, blending: THREE.AdditiveBlending, depthWrite: false}));
+            flare.position.set(side * (pdc ? .55 : .43) * 1.15, -.06 * 1.15, .74 * 1.15);
+            flare.scale.setScalar(.65);
+            engine.add(flare);
+        }
         root.add(engine);
         const lamp = new THREE.Mesh(new THREE.OctahedronGeometry(0.18),
             new THREE.MeshBasicMaterial({ color }));
         lamp.position.set(0, 0, -0.85);
         root.add(lamp);
         root.traverse(object => { object.raycast = () => undefined; });
-        const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.065, 1, 5),
-            new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75,
-                blending: THREE.AdditiveBlending, depthWrite: false }));
+        const beam = new THREE.Group(); // Retained as an inert handle for drone reconciliation.
         beam.name = `drone-beam:${unit.id}`;
         beam.raycast = () => undefined;
         beam.visible = false;
         this.dynamicRoot.add(root, beam);
-        return { root, beam, engine, lamp, type: unit.type, revision: 0 };
+        this.droneModels ??= new Map();
+        const kind = pdc ? 'combat' : 'mining';
+        if (!this.droneModels.has(kind)) this.droneModels.set(kind,
+            loadGlb(`assets/models/drones/${kind}-drone.glb`).then(model => {
+                if (this.disposed) { this.disposeObject(model); return null; }
+                return model;
+            }).catch(error => { console.warn('Drone model unavailable', error); return null; }));
+        this.droneModels.get(kind).then(template => {
+            if (!template || this.disposed || !root.parent) return;
+            for (const child of [...root.children]) if (child !== engine && child !== lamp) {
+                root.remove(child); this.disposeObject(child);
+            }
+            const model = template.clone(true);
+            model.traverse(o => { if(o.isMesh) {o.geometry=o.geometry.clone();o.material=o.material.clone();o.raycast=()=>undefined;} });
+            model.scale.setScalar(1.15); root.add(model); lamp.visible=false;
+            root.userData.newDroneModel=true;
+        });
+        return { root, beam, engine, lamp, type: unit.type, revision: 0, glow: .2 };
     }
     // Call with save.player.droneFleet and the live miningDroneContext (not
     // miningDroneHud(), which copies arrays). workPoint is a Point or tuple.
@@ -3493,23 +3621,16 @@ export class SpaceRenderer {
             }
             const working = unit.type === 'mining' && unit.state === 'mining';
             const returning = unit.state === 'returning' || unit.state === 'docking';
-            visual.engine.visible = !working && unit.state !== 'escorting';
-            visual.engine.scale.set(1, returning ? 1.3 : 1, 1);
-            visual.lamp.scale.setScalar(working ? 1.2 + Math.sin(now) * 0.2 : unit.payload ? 1.4 : 0.8);
-            const point = unit.workPoint ?? miningContext?.workPoint;
-            const end = point?.position ?? point;
-            visual.beam.visible = Boolean(working && end);
-            if (working && end) {
-                this.droneBeamDirection.fromArray(end).sub(root.position);
-                const length = this.droneBeamDirection.length();
-                visual.beam.visible = length > 0.001;
-                if (length > 0.001) {
-                    visual.beam.position.copy(root.position).addScaledVector(this.droneBeamDirection, 0.5);
-                    visual.beam.quaternion.setFromUnitVectors(this.droneBeamUp, this.droneBeamDirection.multiplyScalar(1 / length));
-                    visual.beam.scale.set(1, length, 1);
-                    visual.beam.material.opacity = 0.65 + Math.sin(now) * 0.15;
-                }
+            visual.engine.visible = !working;
+            visual.glow += ((working ? .1 : .18 + .82 * (unit.thrust ?? 0)) - visual.glow) * .15;
+            for (const flare of visual.engine.children) {
+                flare.material.opacity = .18 + .62 * visual.glow;
+                flare.scale.setScalar(.35 + .55 * visual.glow);
             }
+            visual.lamp.scale.setScalar(working ? 1.2 + Math.sin(now) * 0.2 : unit.payload ? 1.4 : 0.8);
+            // Surface contact replaces the former stand-off mining beam.
+            visual.beam.visible = false;
+
         }
         for (const id in this.droneVisuals)
             if (this.droneVisuals[id].revision !== revision) this.removeDroneVisual(id);
@@ -4075,6 +4196,7 @@ export class SpaceRenderer {
     setSystem(systemId) {
         this.systemId = SYSTEM_RENDER_STYLE[systemId] ? systemId : 'helios-verge';
         const style = SYSTEM_RENDER_STYLE[this.systemId];
+        if (this.systemId === 'acheron') this.ensureAcheronStations();
         this.renderer.setClearColor(style.clear, 1);
         if (this.scene.fog) {
             this.scene.fog.color.setHex(style.fog);
@@ -4091,6 +4213,12 @@ export class SpaceRenderer {
             material.opacity = material.userData.baseOpacity * style.nebulaOpacity;
         }
         this.applySystemStarProfile(this.systemId);
+        const blackHoleSystem=this.systemId==='acheron';
+        if(!this.blackHole){this.blackHole=createBlackHole();this.skyRoot.add(this.blackHole);}
+        this.blackHole.visible=blackHoleSystem;
+        this.blackHole.position.set(...sunPositionForSystem('acheron'));
+        for(const visual of this.sunVisuals)visual.visible=!blackHoleSystem;
+        if(blackHoleSystem){this.sunLight.color.setHex(0xffd5a0);this.sunLight.intensity=3.5;}
         const sunPosition = sunPositionForSystem(this.systemId);
         for (const visual of this.sunVisuals)
             visual.position.set(...sunPosition);
@@ -4428,7 +4556,7 @@ export class SpaceRenderer {
             }
             this.combatBeams.set(id,beam);
         }
-        beam.material.color.setHex(color);beam.visible=true;beam.userData.life=0.09;
+        beam.material.color.setHex(color);beam.visible=true;beam.userData.life=0.09;beam.userData.fresh=true;
         beam.position.copy(start).lerp(end,0.5);beam.scale.y=start.distanceTo(end);
         beam.quaternion.setFromUnitVectors(UP_AXIS,new THREE.Vector3().subVectors(end,start).normalize());
     }
@@ -4446,7 +4574,7 @@ export class SpaceRenderer {
         }
         const data=tracer.userData;
         data.start.copy(start);data.end.copy(end);data.distance=start.distanceTo(end);
-        data.duration=Math.max(0.06,data.distance/750);data.life=data.duration;
+        data.duration=Math.max(0.06,data.distance/750);data.life=data.duration;data.fresh=true;
         data.direction.subVectors(end,start).normalize();
         tracer.material.color.setHex(color);tracer.visible=true;
         tracer.scale.y=Math.min(8,data.distance);
@@ -4456,7 +4584,7 @@ export class SpaceRenderer {
     updatePdcTracers(dt) {
         for(const tracer of this.pdcTracers??[]){
             if(!tracer.visible)continue;
-            const data=tracer.userData;data.life-=dt;
+            const data=tracer.userData;if(data.fresh){data.fresh=false;continue;}data.life-=dt;
             tracer.visible=data.life>0;
             const progress=Math.min(1,1-data.life/data.duration);
             tracer.position.copy(data.start).addScaledVector(data.direction,tracer.scale.y/2+(data.distance-tracer.scale.y)*progress);
@@ -4492,6 +4620,8 @@ export class SpaceRenderer {
     updateEffects(dt) {
         for (let index = this.effects.length - 1; index >= 0; index -= 1) {
             const effect = this.effects[index];
+            // Effects spawned during catch-up steps must reach the screen once.
+            if (!effect.presented) { effect.presented = true; continue; }
             effect.life -= dt;
             const ratio = clamp(effect.life / effect.maxLife, 0, 1);
             if (effect.points) {
@@ -4590,7 +4720,10 @@ export class SpaceRenderer {
         this.pendingWorldVisualDt = 0;
         if (dt <= 0) return;
         this.updatePdcTracers(dt);
-        for(const beam of this.combatBeams?.values() ?? []) {beam.userData.life-=dt;beam.visible=beam.userData.life>0;}
+        for(const beam of this.combatBeams?.values() ?? []) {
+            if(beam.userData.fresh){beam.userData.fresh=false;continue;}
+            beam.userData.life-=dt;beam.visible=beam.userData.life>0;
+        }
         for(const glow of this.capitalCharges?.values()??[]){glow.userData.life-=dt;glow.visible=glow.userData.life>0;}
         for(const [id,mesh] of this.turretMeshes??[]) {
             mesh.userData.life-=dt;
@@ -5115,6 +5248,7 @@ export class SpaceRenderer {
         this.pixelTextures.forEach((texture) => texture.dispose());
         this.pixelTextures.clear();
         this.screenTextures.length = 0;
+        for (const pending of this.droneModels?.values() ?? []) pending.then(model => { if(model)this.disposeObject(model); });
         this.renderer.dispose();
         this.renderer.domElement.remove();
     }

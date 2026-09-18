@@ -6,6 +6,7 @@ import { cargoFree, cargoMass, quoteCommodityTrade } from './economy.js';
 import { generateAsteroidField } from './worldData.js';
 import { GameSession } from './game.js';
 import { createDroneUnit, droneBayLayoutFor, normalizeDroneFleet } from './droneData.js';
+import { startMining } from './droneMining.js';
 import { createOutfittingState } from './outfitting.js';
 
 assert.ok(generateAsteroidField(4242, {}).every(node => Number.isSafeInteger(node.remaining)), 'real generated deposits are mineable');
@@ -39,7 +40,7 @@ GameSession.prototype.collectPickup.call({ save, setOwnMonitorStatus() {} }, pic
 assert.equal(pickup.life, 10, 'pickup cannot steal reserved space');
 assert.equal(save.player.cargo.food, undefined);
 for (const hull of Object.keys(SHIPS)) {
- assert.equal(droneBayLayoutFor(hull).length > 0, ['wayfarer', 'prospector'].includes(hull));
+ assert.equal(droneBayLayoutFor(hull).length > 0, ['wayfarer', 'prospector', 'torsas', 'astra'].includes(hull));
  assert.equal(GameSession.prototype.extractAsteroid.call({}, { remaining: 10 }, 100, 999), false, 'no direct extraction on any hull');
  if (!['wayfarer', 'prospector'].includes(hull)) {
   assert.equal(GameSession.prototype.miningDroneActionState.call({ save: { player: { shipId: hull } } }).code, 'no-bay');
@@ -93,3 +94,37 @@ const average = oreTotal / 32;
 assert.ok(average > 5000 && average < 7000, `ore haul average ${average}`);
 assert.ok(goldTotal > oreTotal * 1.5, 'three gold raises a haul substantially');
 console.log(`Drone integration passed; mean Helix haul: ore ${average.toFixed(0)} cr; 29 ore + 3 gold ${(goldTotal / 32).toFixed(0)} cr.`);
+
+// The live adapter gives each miner its own launch lane and work point.
+// Equal-duration mining verifies that two units contribute twice, not just render twice.
+function measureMiners(hull, limit) {
+ const loadouts = createOutfittingState([hull]).loadouts;
+ const save = createNewSave(4242);
+ Object.assign(save.player, { shipId: hull, dockedAt: null, cargo: {}, position: [0, 0, 80],
+  velocity: [0, 0, 0], rotation: [0, 0, 0, 1], angularVelocity: [0, 0, 0] });
+ save.player.outfitting.loadouts = loadouts;
+ save.player.droneFleet = normalizeDroneFleet(null, loadouts, { grantInitial: true });
+ if (limit === 1) loadouts[hull].droneBays[0].unitIds[1] = null;
+ const node = generateAsteroidField(4242, {})[0];
+ Object.assign(node, { position: [0, 0, 0], moving: false, scanned: true, remaining: 1000 });
+ save.player.currentTargetId = node.id;
+ const rt = Object.create(GameSession.prototype);
+ Object.assign(rt, { save, asteroids: [node], deathTimer: 0, playerStats: () => ({ cargo: 1000 }) });
+ let ctx = rt.prepareMiningDroneContext();
+ assert.equal(ctx.unitIds.length, limit ?? (hull === 'wayfarer' ? 2 : 6));
+ assert.equal(new Set(ctx.unitIds.map(id => ctx.bayAnchors[id].launch.position.join(','))).size, ctx.unitIds.length);
+ assert.equal(new Set(ctx.unitIds.map(id => ctx.getWorkPoint(save.player.droneFleet.unitsById[id], ctx).position.join(','))).size, ctx.unitIds.length);
+ assert.equal(startMining(save.player.droneFleet, ctx).ok, true);
+ for (let i = 0; i < 120 * 60; i++) {
+  ctx = rt.prepareMiningDroneContext(1 / 60);
+  rt.miningDroneSystem.update(save.player.droneFleet, 1 / 60, ctx, []);
+ }
+ return save.player.cargo.ore ?? 0;
+}
+const soloYield = measureMiners('wayfarer', 1);
+const pairYield = measureMiners('wayfarer');
+const sixYield = measureMiners('prospector');
+assert.ok(soloYield > 0);
+assert.ok(pairYield / soloYield >= 1.8 && pairYield / soloYield <= 2.2);
+assert.ok(sixYield / pairYield >= 2.7 && sixYield / pairYield <= 3.3);
+console.log(`120s mining deliveries: one ${soloYield}, pair ${pairYield}, three pairs ${sixYield}`);

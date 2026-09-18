@@ -20,11 +20,19 @@ export const RESALE_RATE = 0.7;
 export const OUTFITTING_SCHEMA = 3;
 
 const freeze = (value) => Object.freeze(value);
+const simplifiedOutfitArt = (path) => {
+    const filename = path?.split('/').at(-1);
+    return filename
+        ? `./art/outfitting/simplified/${filename.replace(/\.(png|webp)$/i, '.webp')}`
+        : path;
+};
 const freezeItem = (item) => {
     const sizes = freeze([...item.sizes]);
     const availability = freeze([...item.availability]);
+    const art = simplifiedOutfitArt(item.art);
     return freeze({
         ...item,
+        art,
         sizes,
         // Aliases keep the contract self-describing for UI/catalog callers
         // that prefer a more explicit name than `sizes`.
@@ -32,7 +40,7 @@ const freezeItem = (item) => {
         sizeCompatibility: sizes,
         availability,
         availableAt: availability,
-        artPath: item.art,
+        artPath: art,
         effects: freeze({ ...(item.effects ?? {}) }),
     });
 };
@@ -243,6 +251,11 @@ const makeMounts = (shipId, guns, launchers, utilitySizes, mass) => {
 // never an installation gate: a demanding gun fit is legal, but it can drain
 // the capacitor faster than the hull replenishes it.
 export const HULL_HARDPOINTS = freeze({
+    speedster: makeMounts('speedster', [['S',0],['S',1]], [['S',0]], ['S'], 28),
+    legionary: makeMounts('legionary', [['M',0],['M',1]], [['M',0]], ['S'], 42),
+    andromeda: makeMounts('andromeda', [['M',0],['M',1]], [['M',0],['M',1]], ['S'], 52),
+    torsas: makeMounts('torsas', [['S',0],['S',1]], [['S',0]], ['M','S'], 58),
+    astra: makeMounts('astra', [['S',0],['M',1]], [['S',0]], ['M','S'], 42),
     wayfarer: makeMounts('wayfarer', [['S', 0], ['S', 1]], [['S', 0]], ['M', 'S'], 34),
     talon: makeMounts('talon', [['S', 0], ['S', 1], ['M', 2]], [['S', 0]], ['S'], 28),
     vanguard: makeMounts('vanguard', [['M', 0], ['M', 1]], [['M', 0]], ['M', 'S'], 52),
@@ -461,7 +474,8 @@ const standardFit = (shipId, loadout) => {
     // A pulse cannon is the universal baseline. Gauss occupies an M bay when
     // one exists and seeker preserves the existing missile control. Factory
     // copies are bundled in the hull state, not an infinite global stock.
-    if(shipId==='wayfarer'){place('beam-emitter');place('beam-emitter');}
+    if(shipId==='wayfarer'||shipId==='torsas'){place('beam-emitter');place('beam-emitter');}
+    else if(shipId==='speedster'){place('pulse-cannon');place('pulse-cannon');}
     else {place('pulse-cannon');place('gauss-cannon');}
     place('seeker-launcher', () => true, ['launchers']);
     // Alternate the guns that are actually installed, rather than alternating
@@ -924,7 +938,7 @@ export const itemAvailable = (player, itemOrId, locationId = player?.dockedAt) =
     const item = itemFor(itemOrId);
     if (!item)
         return false;
-    if (item.availability?.length && locationId && !item.availability.includes(locationId))
+    if (item.availability?.length && locationId && LOCATIONS[locationId]?.faction !== 'frontier-league' && !item.availability.includes(locationId))
         return false;
     if (item.requiredGuild && guildRank(player, item.requiredGuild) < (item.requiredRank ?? 0))
         return false;

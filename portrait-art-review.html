@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vesper Colony · Portrait Art Review</title>
+<style>
+:root {
+    --bg: #030913;
+    --panel: #071625;
+    --line: rgba(134, 190, 211, .22);
+    --text: #e9f1f4;
+    --muted: #8da6b6;
+    --faint: #547287;
+    --gold: #efba4b;
+    --cyan: #63d2d6;
+    --red: #e77e70;
+    --shadow: 0 22px 70px rgba(0, 0, 0, .34);
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+    margin: 0;
+    color: var(--text);
+    background:
+        radial-gradient(circle at 78% -8%, rgba(40, 113, 155, .22), transparent 34rem),
+        linear-gradient(145deg, #020710, #061525 56%, #03111b);
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    letter-spacing: .015em;
+}
+button, input, select { font: inherit; }
+button { cursor: pointer; color: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.shell { min-height: 100vh; padding: 18px; }
+.topbar, .toolbar, .card, .detail {
+    border: 1px solid var(--line);
+    background: linear-gradient(145deg, rgba(9, 31, 51, .95), rgba(3, 14, 27, .96));
+    box-shadow: var(--shadow);
+}
+.topbar {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 18px 20px;
+    border-top: 2px solid var(--gold);
+}
+.eyebrow, .label {
+    display: block;
+    color: var(--cyan);
+    font-size: .68rem;
+    letter-spacing: .17em;
+    text-transform: uppercase;
+}
+h1, h2, p { margin: 0; }
+h1 { margin-top: 5px; color: #fff0c5; font: 500 clamp(1.7rem, 4vw, 3rem)/1.05 Georgia, "Times New Roman", serif; letter-spacing: .08em; }
+.intro { margin-top: 7px; color: var(--muted); font-size: .83rem; line-height: 1.45; }
+.metrics { display: flex; align-items: stretch; gap: 10px; }
+.metric { min-width: 84px; padding: 8px 11px; border-left: 1px solid var(--line); }
+.metric strong { display: block; margin-top: 3px; color: #f8d986; font-size: 1.2rem; }
+.metric small { color: var(--muted); font-size: .65rem; }
+.toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-top: 12px; padding: 10px; box-shadow: none; }
+.toolbar input, .toolbar select { min-height: 39px; color: var(--text); background: rgba(1, 9, 18, .72); border: 1px solid var(--line); padding: 9px 11px; }
+.toolbar input[type="search"] { flex: 1 1 280px; min-width: 150px; }
+.toolbar select { min-width: 145px; }
+.toolbar button { min-height: 39px; border: 1px solid var(--line); background: rgba(22, 48, 70, .66); padding: 8px 12px; }
+.toolbar button.is-active { border-color: var(--gold); color: #fff1c2; background: rgba(73, 63, 36, .72); }
+.status { margin-left: auto; color: var(--muted); font-size: .75rem; white-space: nowrap; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 12px; margin-top: 12px; }
+.card { overflow: hidden; box-shadow: none; }
+.card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 12px 13px 10px; border-bottom: 1px solid var(--line); }
+.card h2 { margin-top: 3px; color: #fff1c9; font: 500 1.07rem/1.15 Georgia, "Times New Roman", serif; }
+.meta { margin-top: 5px; color: var(--muted); font-size: .7rem; }
+.state { flex: 0 0 auto; padding: 4px 6px; border: 1px solid rgba(91, 208, 212, .45); color: var(--cyan); font-size: .6rem; letter-spacing: .1em; text-transform: uppercase; }
+.state.pending { border-color: rgba(231, 126, 112, .5); color: var(--red); }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); }
+.pane { min-width: 0; background: #030b14; }
+.pane-label { display: flex; align-items: center; justify-content: space-between; padding: 7px 9px; color: var(--muted); background: rgba(5, 18, 31, .96); font-size: .63rem; letter-spacing: .12em; text-transform: uppercase; }
+.pane-label b { color: var(--gold); font-weight: 500; }
+.pane img { display: block; width: 100%; height: auto; background: #01050a; }
+.pane.after img { opacity: .98; }
+.missing { display: grid; place-items: center; min-height: 190px; padding: 15px; color: var(--red); background: repeating-linear-gradient(135deg, rgba(231,126,112,.06) 0 8px, transparent 8px 16px), #07111b; font-size: .7rem; line-height: 1.4; text-align: center; }
+.card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; color: var(--faint); font: .61rem/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.card-footer span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-footer button { border: 0; padding: 2px 0; color: var(--cyan); background: transparent; font-size: .63rem; }
+.detail { position: fixed; z-index: 5; inset: 3vh 4vw; display: none; overflow: auto; padding: 14px; background: rgba(3, 12, 23, .98); }
+.detail.is-open { display: block; }
+.detail-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+.detail h2 { color: #fff1c9; font: 500 1.4rem Georgia, "Times New Roman", serif; }
+.detail-close { border: 1px solid var(--line); background: rgba(22, 48, 70, .66); padding: 8px 11px; }
+.detail-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.detail-pair figure { min-width: 0; margin: 0; }
+.detail-pair figcaption { margin-bottom: 5px; color: var(--cyan); font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; }
+.detail-pair img { display: block; width: 100%; max-height: 72vh; object-fit: contain; border: 1px solid var(--line); background: #01050a; }
+.detail-note { margin-top: 10px; color: var(--muted); font-size: .74rem; line-height: 1.45; }
+.empty { grid-column: 1 / -1; padding: 35px; color: var(--muted); border: 1px solid var(--line); text-align: center; }
+.footer { margin: 12px 0 0; color: var(--faint); font-size: .7rem; line-height: 1.5; text-align: center; }
+.footer a { color: var(--cyan); }
+@media (max-width: 760px) {
+    .shell { padding: 8px; }
+    .topbar { display: block; padding: 14px; }
+    .metrics { margin-top: 15px; }
+    .metric { flex: 1; }
+    .grid { grid-template-columns: 1fr; }
+    .detail { inset: 1vh 1vw; padding: 9px; }
+    .detail-pair { grid-template-columns: 1fr; }
+    .status { width: 100%; margin-left: 0; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+    <header class="topbar">
+        <div>
+            <span class="eyebrow">Vesper Colony · character art pass</span>
+            <h1>Portrait art review</h1>
+            <p class="intro">Before and simplified-after previews. The generated images are review copies only; the game still uses the original portraits. Mara Vek has an additional modest, practical wardrobe pass.</p>
+        </div>
+        <div class="metrics" aria-label="Review counts">
+            <div class="metric"><span class="label">Portraits</span><strong id="total">—</strong><small>current source images</small></div>
+            <div class="metric"><span class="label">Ready</span><strong id="ready">—</strong><small>after images found</small></div>
+        </div>
+    </header>
+
+    <section class="toolbar" aria-label="Review filters">
+        <input id="search" type="search" placeholder="Search character or portrait …" autocomplete="off">
+        <select id="type-filter" aria-label="Filter portrait type">
+            <option value="all">All portraits</option>
+            <option value="npc">Characters</option>
+            <option value="outfitting">Outfitting</option>
+        </select>
+        <button id="pending-toggle" type="button">Show unfinished only</button>
+        <span class="status" id="status">Loading previews …</span>
+    </section>
+
+    <main class="grid" id="grid" aria-live="polite"></main>
+    <p class="footer">Click any pair to enlarge it. <a href="./station-art-review.html">Open station artwork review</a>. When you approve a pass, the after-images can be wired into the game in a separate change.</p>
+</div>
+
+<section class="detail" id="detail" role="dialog" aria-modal="true" aria-label="Portrait comparison">
+    <div class="detail-top"><div><span class="eyebrow">Comparison</span><h2 id="detail-title">—</h2></div><button class="detail-close" id="detail-close" type="button">Close</button></div>
+    <div class="detail-pair">
+        <figure><figcaption>Before</figcaption><img id="detail-before" alt="Original character portrait"></figure>
+        <figure><figcaption>After</figcaption><div id="detail-after-wrap"><img id="detail-after" alt="Simplified character portrait"></div></figure>
+    </div>
+    <p class="detail-note" id="detail-note"></p>
+</section>
+
+<script>
+const PLATES = [
+    ['Captain Dorne', 'Character portrait', 'npc', 'art/portraits/v2/captain-dorne-hd-v2.webp'],
+    ['Devi Castor', 'Character portrait', 'npc', 'art/portraits/v2/devi-castor-hd-v2.webp'],
+    ['Doctor Ames', 'Character portrait', 'npc', 'art/portraits/v2/doctor-ames-hd-v2.webp'],
+    ['Ivo Senn', 'Character portrait', 'npc', 'art/portraits/v2/ivo-senn-hd-v2.webp'],
+    ['Kes Ali', 'Character portrait', 'npc', 'art/portraits/v2/kes-ali-hd-v2.webp'],
+    ['Linh Sorel', 'Character portrait', 'npc', 'art/portraits/v2/linh-sorel-hd-v2.webp'],
+    ['Mara Vek', 'Character portrait · aunt pass', 'npc', 'art/portraits/v2/mara-vek-hd-v2.webp', 'Mara’s after image uses a modest, practical high-collar work jacket and removes the glamour accessories while preserving her identity.'],
+    ['Oskar Brill', 'Character portrait', 'npc', 'art/portraits/v2/oskar-brill-hd-v2.webp'],
+    ['Ren Iverson', 'Character portrait', 'npc', 'art/portraits/v2/ren-iverson-hd-v2.webp'],
+    ['Sana Kell', 'Character portrait', 'npc', 'art/portraits/v2/sana-kell-hd-v2.webp'],
+    ['Tovik', 'Character portrait', 'npc', 'art/portraits/v2/tovik-hd-v2.webp'],
+    ['Yara Tan', 'Character portrait', 'npc', 'art/portraits/v2/yara-tan-hd-v2.webp'],
+    ['Juno Rell', 'Character portrait', 'npc', 'art/portraits/v3/juno-rell-hd-v1.webp'],
+    ['Merrit Voss', 'Character portrait', 'npc', 'art/portraits/v3/merrit-voss-hd-v1.webp'],
+    ['Leon Vale', 'Character portrait', 'npc', 'art/portraits/v3/leon-vale-hd-v1.webp'],
+    ['Sela Orrin', 'Character portrait', 'npc', 'art/portraits/v3/sela-orrin-hd-v1.webp'],
+    ['Tomas Quin', 'Character portrait', 'npc', 'art/portraits/v3/tomas-quin-hd-v1.webp'],
+    ['Arden Kai', 'Character portrait', 'npc', 'art/portraits/v3/arden-kai-hd-v1.webp'],
+    ['Mira Kest', 'Character portrait', 'npc', 'art/portraits/v3/mira-kest-hd-v1.webp'],
+    ['Bram Tel', 'Character portrait', 'npc', 'art/portraits/v3/bram-tel-hd-v1.webp'],
+    ['Vesh Orr', 'Character portrait', 'npc', 'art/portraits/v3/vesh-orr-hd-v1.webp'],
+    ['Nara Quill', 'Character portrait', 'npc', 'art/portraits/v3/nara-quill-hd-v1.webp'],
+    ['Kellan Rusk', 'Character portrait', 'npc', 'art/portraits/v3/kellan-rusk-hd-v1.webp'],
+    ['Mara Jen', 'Character portrait', 'npc', 'art/portraits/v3/mara-jen-hd-v1.webp'],
+    ['Dax Hollis', 'Character portrait', 'npc', 'art/portraits/v3/dax-hollis-hd-v1.webp'],
+    ['Rhea Sol', 'Character portrait', 'npc', 'art/portraits/v3/rhea-sol-hd-v1.webp'],
+    ['Dr. Elin Saye', 'Character portrait', 'npc', 'art/portraits/v3/dr-elin-saye-hd-v1.webp'],
+    ['Pavel Orn', 'Character portrait', 'npc', 'art/portraits/v3/pavel-orn-hd-v1.webp'],
+    ['Tessa Rye', 'Character portrait', 'npc', 'art/portraits/v3/tessa-rye-hd-v1.webp'],
+    ['Soren Vek', 'Character portrait', 'npc', 'art/portraits/v3/soren-vek-hd-v1.webp'],
+    ['Rin Vek', 'Character portrait', 'npc', 'art/portraits/v3/rin-vek-hd-v1.webp'],
+    ['Aya North', 'Character portrait', 'npc', 'art/portraits/v3/aya-north-hd-v1.webp'],
+    ['Halden Ree', 'Character portrait', 'npc', 'art/portraits/v3/halden-ree-hd-v1.webp'],
+    ['Outfitting mechanic', 'Dealer portrait', 'outfitting', 'art/outfitting/v2/dealer-mechanic-portrait-v2.png'],
+].map(([name, screen, type, before, note]) => ({
+    name,
+    screen,
+    type,
+    before: `./${before}`,
+    after: `./output/imagegen/portrait-review/${before.split('/').at(-1).replace(/\.(png|webp)$/i, '-after.png')}`,
+    note,
+}));
+
+const state = { search: '', type: 'all', pendingOnly: false };
+const grid = document.querySelector('#grid');
+const status = document.querySelector('#status');
+const total = document.querySelector('#total');
+const ready = document.querySelector('#ready');
+const filename = (path) => path.split('/').at(-1);
+const visible = (plate) => {
+    if (state.type !== 'all' && plate.type !== state.type) return false;
+    if (state.pendingOnly && plate.ready) return false;
+    if (!state.search) return true;
+    return `${plate.name} ${plate.screen} ${plate.before}`.toLowerCase().includes(state.search.toLowerCase());
+};
+const escaped = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+
+function card(plate, index) {
+    const stateLabel = plate.ready ? 'Ready' : 'Waiting';
+    return `<article class="card ${plate.ready ? '' : 'is-pending'}" data-index="${index}">
+        <header class="card-header"><div><span class="eyebrow">${escaped(plate.type)}</span><h2>${escaped(plate.name)}</h2><p class="meta">${escaped(plate.screen)}</p></div><span class="state ${plate.ready ? '' : 'pending'}">${stateLabel}</span></header>
+        <div class="pair">
+            <div class="pane"><div class="pane-label"><span>Before</span><b>Source</b></div><img src="${plate.before}" alt="${escaped(plate.name)} original" loading="lazy"></div>
+            <div class="pane after"><div class="pane-label"><span>After</span><b>${plate.ready ? 'Generated' : 'Not ready'}</b></div>${plate.ready ? `<img src="${plate.after}" alt="${escaped(plate.name)} simplified" loading="lazy">` : '<div class="missing">The portrait image pass is still running.</div>'}</div>
+        </div>
+        <footer class="card-footer"><span title="${escaped(filename(plate.before))}">${escaped(filename(plate.before))}</span><button type="button" data-open="${index}">Enlarge</button></footer>
+    </article>`;
+}
+
+function render() {
+    const matches = PLATES.filter(visible);
+    grid.innerHTML = matches.length ? matches.map((plate) => card(plate, PLATES.indexOf(plate))).join('') : '<div class="empty">No portraits match this filter.</div>';
+    status.textContent = `${matches.length} shown · ${PLATES.filter((plate) => plate.ready).length}/${PLATES.length} after images ready`;
+    document.querySelectorAll('[data-open]').forEach((button) => button.addEventListener('click', () => openDetail(Number(button.dataset.open))));
+}
+
+function openDetail(index) {
+    const plate = PLATES[index];
+    if (!plate) return;
+    document.querySelector('#detail-title').textContent = plate.name;
+    document.querySelector('#detail-before').src = plate.before;
+    const wrap = document.querySelector('#detail-after-wrap');
+    wrap.innerHTML = plate.ready ? `<img id="detail-after" src="${plate.after}" alt="${escaped(plate.name)} simplified">` : '<div class="missing">The after image is not ready yet.</div>';
+    document.querySelector('#detail-note').textContent = `${filename(plate.before)} · ${plate.note || (plate.ready ? 'Generated review copy is available.' : 'The portrait pass has not finished this plate.')}`;
+    document.querySelector('#detail').classList.add('is-open');
+}
+
+function probeAfterImages() {
+    let remaining = PLATES.length;
+    const updateReady = () => { ready.textContent = PLATES.filter((plate) => plate.ready).length; };
+    PLATES.forEach((plate) => {
+        const image = new Image();
+        image.onload = () => { plate.ready = true; remaining -= 1; updateReady(); render(); };
+        image.onerror = () => { remaining -= 1; updateReady(); if (!remaining) render(); };
+        image.src = plate.after;
+    });
+}
+
+document.querySelector('#search').addEventListener('input', (event) => { state.search = event.target.value.trim(); render(); });
+document.querySelector('#type-filter').addEventListener('change', (event) => { state.type = event.target.value; render(); });
+document.querySelector('#pending-toggle').addEventListener('click', (event) => { state.pendingOnly = !state.pendingOnly; event.currentTarget.classList.toggle('is-active', state.pendingOnly); event.currentTarget.textContent = state.pendingOnly ? 'Show all portraits' : 'Show unfinished only'; render(); });
+document.querySelector('#detail-close').addEventListener('click', () => document.querySelector('#detail').classList.remove('is-open'));
+document.querySelector('#detail').addEventListener('click', (event) => { if (event.target.id === 'detail') event.currentTarget.classList.remove('is-open'); });
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape') document.querySelector('#detail').classList.remove('is-open'); });
+
+total.textContent = PLATES.length;
+ready.textContent = '0';
+render();
+probeAfterImages();
+window.render_game_to_text = () => JSON.stringify({ tool: 'portrait-art-review', total: PLATES.length, ready: PLATES.filter((plate) => plate.ready).length, filters: state, coordinateSystem: 'DOM review grid; no game-world coordinates' });
+window.advanceTime = () => {};
+</script>
+</body>
+</html>

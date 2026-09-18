@@ -52,3 +52,20 @@ test('pickup replacement updates target identity, source geometry and live slots
     sync('d', 'salvage', 1); assert.deepEqual([...r.pickupMeshes.keys()], [1]);
     r.syncPickups([], store); assert.equal(r.dynamicRoot.children.length, 0);
 });
+test('new beam, PDC and muzzle effects survive their first slow render, then expire', () => {
+    const r = renderer();
+    Object.assign(r, {scene:new THREE.Scene(),effects:[],jumpPointVisuals:[],instanceRoots:new Map(),locationMeshes:new Map(),updateHyperdriveFx:()=>{}});
+    const start=new THREE.Vector3(),end=new THREE.Vector3(0,0,-30);
+    r.showCombatBeam('test',start,end,0xffffff);
+    r.showPdcTracer(start,end,0xffffff);
+    const flash=new THREE.Sprite(new THREE.SpriteMaterial());r.scene.add(flash);
+    r.effects.push({object:flash,life:.04,maxLife:.04,muzzle:true});
+    r.pendingWorldVisualDt=.1;r.updateWorldVisuals();
+    assert.equal(r.combatBeams.get('test').visible,true);
+    assert.equal(r.pdcTracers[0].visible,true);
+    assert.equal(r.effects.length,1);assert.equal(flash.parent,r.scene);
+    r.pendingWorldVisualDt=.1;r.updateWorldVisuals();
+    assert.equal(r.combatBeams.get('test').visible,false);
+    assert.equal(r.pdcTracers[0].visible,false);
+    assert.equal(r.effects.length,0);
+});

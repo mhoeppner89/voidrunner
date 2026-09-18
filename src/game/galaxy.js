@@ -88,10 +88,12 @@ const SYSTEM_DEFINITIONS = {
             'boreal',
             'shepherd',
             'pale-rings',
+            'pale-acheron-point',
             'pale-verge-point',
             'verge-redwake-point',
         ],
     },
+    acheron: {id:'acheron',name:'Acheron',displayName:'Acheron',shortName:'ACHERON',visible:true,visibleFromStart:true,discoveryRequired:false,character:'Frontier League stronghold around a black hole',economicRole:'independent shipbuilding and frontier exports',locations:['haven','league-yard','cinderfall','acheron-belt','acheron-pale-point']},
 };
 
 // The location catalogue is intentionally independent of data.js.  Existing
@@ -99,6 +101,10 @@ const SYSTEM_DEFINITIONS = {
 // continue to use the richer rendering/economy records from data.js until
 // the galaxy migration is complete.
 const LOCATION_DEFINITIONS = {
+    "acheron-belt": {"id": "acheron-belt", "name": "The Shattered Crown", "kind": "field", "systemId": "acheron", "major": false, "services": ["mining"]},
+    "cinderfall": {"id": "cinderfall", "name": "Cinderfall Habitat", "kind": "station", "systemId": "acheron", "major": true, "services": ["market", "missions", "repairs", "fuel", "ships", "outfitting"]},
+    "league-yard": {"id": "league-yard", "name": "Unity Shipworks", "kind": "station", "systemId": "acheron", "major": true, "services": ["market", "missions", "repairs", "fuel", "ships", "outfitting"]},
+    "haven": {"id": "haven", "name": "Haven Freeport", "kind": "station", "systemId": "acheron", "major": true, "services": ["market", "missions", "repairs", "fuel", "ships", "outfitting"]},
     helix: { id: 'helix', name: 'Helix Freeport', kind: 'station', systemId: 'helios-verge', major: true, services: ['market', 'missions', 'repairs', 'fuel', 'ships', 'outfitting'] },
     rook: { id: 'rook', name: 'Rookhaven Bastion', kind: 'station', systemId: 'helios-verge', major: true, services: ['market', 'missions', 'repairs', 'fuel', 'ships', 'bounties'] },
     vesper: { id: 'vesper', name: 'Vesper Colony', kind: 'planet', systemId: 'helios-verge', major: true, services: ['market', 'missions', 'repairs', 'fuel'] },
@@ -154,6 +160,7 @@ const ROUTE_DEFINITIONS = [
     routeDefinition('verge-meridian', 'helios-verge', 'meridian', 'verge-meridian-point', 'meridian-verge-point'),
     routeDefinition('meridian-pale', 'meridian', 'pale-ring', 'verge-pale-point', 'pale-verge-point'),
     routeDefinition('pale-redwake', 'pale-ring', 'redwake', 'verge-redwake-point', 'redwake-verge-point', 1.85),
+    routeDefinition('pale-acheron','pale-ring','acheron','pale-acheron-point','acheron-pale-point',1.25),
 ];
 
 const jumpPoint = (id, systemId, routeId, pairedLocationId) => ({
@@ -168,6 +175,8 @@ const jumpPoint = (id, systemId, routeId, pairedLocationId) => ({
 });
 
 Object.assign(LOCATION_DEFINITIONS, {
+    'pale-acheron-point': jumpPoint('pale-acheron-point','pale-ring','pale-acheron','acheron-pale-point'),
+    'acheron-pale-point': jumpPoint('acheron-pale-point','acheron','pale-acheron','pale-acheron-point'),
     'verge-meridian-point': jumpPoint('verge-meridian-point', 'helios-verge', 'verge-meridian', 'meridian-verge-point'),
     'meridian-verge-point': jumpPoint('meridian-verge-point', 'meridian', 'verge-meridian', 'verge-meridian-point'),
     // Keep the six endpoint IDs stable for existing careers. Their system and

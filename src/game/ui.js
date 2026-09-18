@@ -132,8 +132,32 @@ const DOCK_ART_BY_LOCATION = Object.freeze({
         concourse: './art/locations/v6/concourse-shepherd-hd-v2.png',
         bar: './art/locations/v6/mission-shepherd-hd-v1.png',
     }),
+    haven: Object.freeze({
+        concourse: './art/locations/simplified/acheron-haven-concourse.webp',
+        bar: './art/locations/simplified/acheron-haven-bar.webp',
+        market: './art/locations/simplified/acheron-haven-market.webp',
+    }),
+    'league-yard': Object.freeze({
+        concourse: './art/locations/simplified/acheron-unity-concourse.webp',
+        bar: './art/locations/simplified/acheron-unity-bar.webp',
+        market: './art/locations/simplified/acheron-unity-market.webp',
+    }),
+    cinderfall: Object.freeze({
+        concourse: './art/locations/simplified/acheron-cinderfall-concourse.webp',
+        bar: './art/locations/simplified/acheron-cinderfall-bar.webp',
+        market: './art/locations/simplified/acheron-cinderfall-market.webp',
+    }),
 });
-const NPC_PORTRAIT_BY_ID = Object.freeze({
+const ACTIVE_DOCK_ART_BY_LOCATION = Object.freeze(Object.fromEntries(
+    Object.entries(DOCK_ART_BY_LOCATION).map(([locationId, screens]) => [
+        locationId,
+        Object.freeze(Object.fromEntries(Object.entries(screens).map(([screen, path]) => [
+            screen,
+            `./art/locations/simplified/${path.split('/').at(-1).replace(/\.png$/i, '.webp')}`,
+        ]))),
+    ]),
+));
+const ORIGINAL_NPC_PORTRAIT_BY_ID = Object.freeze({
     'captain-dorne': './art/portraits/v2/captain-dorne-hd-v2.webp',
     'devi-castor': './art/portraits/v2/devi-castor-hd-v2.webp',
     'doctor-ames': './art/portraits/v2/doctor-ames-hd-v2.webp',
@@ -168,6 +192,16 @@ const NPC_PORTRAIT_BY_ID = Object.freeze({
     'aya-north': './art/portraits/v3/aya-north-hd-v1.webp',
     'halden-ree': './art/portraits/v3/halden-ree-hd-v1.webp',
 });
+const ACTIVE_NPC_PORTRAIT_BY_ID = Object.freeze({
+    ...Object.fromEntries(Object.entries(ORIGINAL_NPC_PORTRAIT_BY_ID).map(([personId, path]) => [
+        personId,
+        `./art/portraits/simplified/${path.split('/').at(-1).replace(/\.(png|webp)$/i, '.webp')}`,
+    ])),
+    'haven-factor': './art/portraits/simplified/haven-factor-portrait.webp',
+    'league-yard-factor': './art/portraits/simplified/unity-yard-factor-portrait.webp',
+    'cinderfall-factor': './art/portraits/simplified/cinderfall-factor-portrait.webp',
+});
+const NPC_PORTRAIT_BY_ID = ACTIVE_NPC_PORTRAIT_BY_ID;
 const FULL_DOCK_SERVICES = Object.freeze({ fuel: true, repair: true, market: true, bar: true, shipyard: true, outfitting: true, missions: true });
 const locationServices = (locationId) => LOCATIONS[locationId]?.services ?? FULL_DOCK_SERVICES;
 const hasLocationService = (locationId, service) => Boolean(locationServices(locationId)?.[service]);
@@ -195,13 +229,15 @@ const GUILD_BENEFIT_KEYS = Object.freeze({
 // The regional chart follows the real four-system corridor, but bends it into
 // a broad zig-zag so the route has rhythm and room for full labels.
 const REGIONAL_SYSTEM_LAYOUT = Object.freeze({
+    acheron: Object.freeze({left:87,top:73}),
     'helios-verge': Object.freeze({ left: 14, top: 69 }),
     meridian: Object.freeze({ left: 38, top: 29 }),
     'pale-ring': Object.freeze({ left: 64, top: 68 }),
     redwake: Object.freeze({ left: 87, top: 27 }),
 });
-const REGIONAL_SYSTEM_ORDER = Object.freeze(['helios-verge', 'meridian', 'pale-ring', 'redwake']);
+const REGIONAL_SYSTEM_ORDER = Object.freeze(['helios-verge', 'meridian', 'pale-ring', 'redwake', 'acheron']);
 const SYSTEM_STAR_TYPES = Object.freeze({
+    acheron:'BLACK HOLE',
     'helios-verge': 'YELLOW STAR',
     meridian: 'WHITE STAR',
     redwake: 'RED DWARF',
@@ -362,7 +398,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2as';
+const GAME_VERSION = '0.8.2av';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -381,9 +417,14 @@ const VESPER_ART_HEIGHT = 941;
 // transparent canvas padding does not decide how high the ship appears to
 // hover above a concourse pad.
 const VESPER_SHIP_PROFILES = Object.freeze({
+    speedster: Object.freeze({name:'Speedster',art:'./assets/remaster/landed-league/speedster.png',anchorX:848,anchorY:498,width:950,angle:0,bob:6,shadowX:790,shadowY:625,shadowWidth:280}),
+    legionary: Object.freeze({name:'Legionary',art:'./assets/remaster/landed-league/legionary.png',anchorX:848,anchorY:498,width:1050,angle:0,bob:6,shadowX:790,shadowY:625,shadowWidth:280}),
+    andromeda: Object.freeze({name:'Andromeda',art:'./assets/remaster/landed-league/andromeda.png',anchorX:848,anchorY:498,width:1050,angle:0,bob:6,shadowX:790,shadowY:625,shadowWidth:280}),
+    torsas: Object.freeze({name:'Torsas',art:'./assets/remaster/landed-league/torsas.png',anchorX:848,anchorY:498,width:1300,angle:0,bob:6,shadowX:790,shadowY:625,shadowWidth:280}),
+    astra: Object.freeze({name:'Astra',art:'./assets/remaster/landed-league/astra.png',anchorX:848,anchorY:498,width:1100,angle:0,bob:6,shadowX:790,shadowY:625,shadowWidth:280}),
     wayfarer: Object.freeze({
         name: 'Wayfarer',
-        art: './assets/remaster/ship-isometric-wayfarer-vesper-lit-v3.png',
+        art: './assets/remaster/landed-flat/wayfarer.webp',
         anchorX: 848,
         anchorY: 498,
         width: 245,
@@ -395,7 +436,7 @@ const VESPER_SHIP_PROFILES = Object.freeze({
     }),
     talon: Object.freeze({
         name: 'Talon',
-        art: './assets/remaster/ship-isometric-talon-vesper-lit-v1.png',
+        art: './assets/remaster/landed-flat/talon.webp',
         anchorX: 848,
         anchorY: 492,
         width: 228.2,
@@ -407,7 +448,7 @@ const VESPER_SHIP_PROFILES = Object.freeze({
     }),
     vanguard: Object.freeze({
         name: 'Vanguard',
-        art: './assets/remaster/ship-isometric-vanguard-vesper-lit-v1.png',
+        art: './assets/remaster/landed-flat/vanguard.webp',
         anchorX: 848,
         anchorY: 497,
         width: 225.4,
@@ -419,7 +460,7 @@ const VESPER_SHIP_PROFILES = Object.freeze({
     }),
     prospector: Object.freeze({
         name: 'Prospector',
-        art: './assets/remaster/ship-isometric-prospector-vesper-lit-v1.png',
+        art: './assets/remaster/landed-flat/prospector.webp',
         anchorX: 848,
         anchorY: 512,
         width: 222.6,
@@ -431,7 +472,7 @@ const VESPER_SHIP_PROFILES = Object.freeze({
     }),
     lancer: Object.freeze({
         name: 'Lancer',
-        art: './assets/remaster/ship-isometric-lancer-vesper-lit-v1.png',
+        art: './assets/remaster/landed-flat/lancer.webp',
         anchorX: 848,
         anchorY: 497,
         width: 228.2,
@@ -443,7 +484,7 @@ const VESPER_SHIP_PROFILES = Object.freeze({
     }),
     atlas: Object.freeze({
         name: 'Atlas Hauler',
-        art: './assets/remaster/ship-isometric-atlas-vesper-lit-v1.png',
+        art: './assets/remaster/landed-flat/atlas.webp',
         anchorX: 848,
         anchorY: 505,
         width: 420,
@@ -486,6 +527,8 @@ const INITIAL_PREVIEW_SHIP_ID = VESPER_SHIP_PROFILES[DEV_PREVIEW_SHIP_ID]
         ? VESPER_HOVER_SHIP_ID
         : undefined;
 const COCKPIT_ART_BY_SHIP = Object.freeze({
+    speedster:'./assets/remaster/cockpit-talon.webp', legionary:'./assets/remaster/cockpit-lancer.webp',
+    andromeda:'./assets/remaster/cockpit-vanguard.webp', torsas:'./assets/remaster/cockpit-frame.webp', astra:'./assets/remaster/cockpit-frame.webp',
     wayfarer: './assets/remaster/cockpit-frame.webp',
     vanguard: './assets/remaster/cockpit-vanguard.webp',
     talon: './assets/remaster/cockpit-talon.webp',
@@ -496,7 +539,7 @@ const COCKPIT_ART_BY_SHIP = Object.freeze({
 const FLIGHT_SCREEN_ART = Object.freeze(['./art/sky/milky-way-wide-alpha-v3.webp']);
 const OUTFITTING_SCREEN_ART = Object.freeze([
     './art/outfitting/v2/dealer-workshop-backdrop-v2.png',
-    './art/outfitting/v2/dealer-mechanic-portrait-v2.png',
+    './art/portraits/simplified/dealer-mechanic-portrait-v2.webp',
 ]);
 const OUTFIT_CATEGORY_KEYS = Object.freeze({ turrets:'TURRETS',power:'POWER',guns: 'GUNS', launchers: 'LAUNCHER', drive: 'DRIVE', defense: 'DEFENSE', utility: 'UTILITY' });
 const OUTFIT_CATEGORY_TO_KEY = Object.freeze({ gun: 'guns', launcher: 'launchers', drive: 'drive', defense: 'defense', utility: 'utility' });
@@ -620,7 +663,7 @@ export class GameUI {
         this.setCockpitShip(save?.player?.shipId);
     }
     setCockpitShip(shipId = 'wayfarer') {
-        const nextId = COCKPIT_ART_BY_SHIP[shipId] ? shipId : 'wayfarer';
+        const nextId = ({speedster:'talon',legionary:'lancer',andromeda:'vanguard',torsas:'wayfarer',astra:'wayfarer'}[shipId]) ?? (COCKPIT_ART_BY_SHIP[shipId] ? shipId : 'wayfarer');
         if (this.cockpitShipId === nextId && this.root.dataset.cockpitShip === nextId)
             return;
         void this.preloadImageSet('flight-core', [COCKPIT_ART_BY_SHIP[nextId], ...FLIGHT_SCREEN_ART], { priority: 'high' });
@@ -709,7 +752,7 @@ export class GameUI {
     }
     locationAssetUrls(locationId, shipId = this.save?.player?.shipId ?? 'wayfarer') {
         const location = LOCATIONS[locationId];
-        const art = DOCK_ART_BY_LOCATION[locationId];
+        const art = ACTIVE_DOCK_ART_BY_LOCATION[locationId];
         if (!location || !art)
             return [];
         const urls = [...Object.values(art)];
@@ -2349,7 +2392,7 @@ export class GameUI {
             state.lastRendered = identity;
         }
         const choices = node.choices ?? [{label:this.adventureLabel('Weiter','Continue'),next:node.next ?? '@end'}];
-        const art = !state.space ? DOCK_ART_BY_LOCATION[this.dockLocation]?.bar : undefined;
+        const art = !state.space ? ACTIVE_DOCK_ART_BY_LOCATION[this.dockLocation]?.bar : undefined;
         panel.style.backgroundImage = art ? `linear-gradient(90deg,rgba(2,8,16,.35),rgba(2,8,16,.90)),url("${art}")` : '';
         panel.classList.remove('is-hidden');
         panel.setAttribute('aria-label',state.person.name);
@@ -2974,7 +3017,7 @@ export class GameUI {
         if (!drones.bays?.length) return '';
         const canConfigure = hasLocationService(this.dockLocation, 'outfitting')
             && Boolean(this.actions?.setDroneBayMode || this.actions?.setDroneBayModes);
-        const bayRows = drones.bays.map((bay, index) => `<div class="drone-bay-row"><b>${t('BAY {number}', { number: index + 1 })} · ${bay.operational ?? 0}/${DRONE_BAY_CAPACITY[bay.mode] ?? 2}</b><div role="group" aria-label="${t('BAY {number}', { number: index + 1 })}">${['mining', 'pdc'].map(mode => `<button type="button" data-ui-command="drone-bay-mode" data-drone-bay="${escapeHtml(bay.bayId)}" data-drone-mode="${mode}" aria-pressed="${bay.mode === mode}" ${!canConfigure || this.droneCommandPending ? 'disabled' : ''}>${t(mode === 'mining' ? '2 MINING' : '1 PDC')}</button>`).join('')}</div></div>`).join('');
+        const bayRows = drones.bays.map((bay, index) => `<div class="drone-bay-row"><b>${t('BAY {number}', { number: index + 1 })} · ${bay.operational ?? 0}/${DRONE_BAY_CAPACITY[bay.mode] ?? 2}</b><div role="group" aria-label="${t('BAY {number}', { number: index + 1 })}">${(['wayfarer','prospector'].includes(this.save.player.shipId)?['mining','pdc']:['pdc']).map(mode => `<button type="button" data-ui-command="drone-bay-mode" data-drone-bay="${escapeHtml(bay.bayId)}" data-drone-mode="${mode}" aria-pressed="${bay.mode === mode}" ${!canConfigure || this.droneCommandPending ? 'disabled' : ''}>${t(mode === 'mining' ? '2 MINING' : '1 PDC')}</button>`).join('')}</div></div>`).join('');
         return `<section class="drone-service-card"><h3>${t('DRONE BAYS')}</h3>${bayRows}${this.renderDroneServices(true)}${this.renderDronePolicy(drones)}<p>${t('PDC drones launch automatically in DEFEND mode. They intercept missiles first, then attack hostile ships within 300 km. STOW recalls them.')}</p><p>${t('Each bay holds two mining drones or one PDC drone. Stored drones stay in the locker. Fill empty bays with SERVICE DRONES.')}</p></section>`;
     }
     renderDroneServices(compact = false) {
@@ -3436,7 +3479,7 @@ export class GameUI {
         ];
         const missingCredits = Math.max(0, amountDue - Number(this.save.player.credits ?? 0));
         const excessCargo = Math.max(0, carriedMass - capacity);
-        const blockedMessage = quote.code === 'insufficient-credits'
+        const blockedMessage = quote.code === 'reputation-required' ? `Frontier League standing ${quote.requiredReputation} required` : quote.code === 'insufficient-credits'
             ? t('{credits} MORE NEEDED', { credits: formatCredits(missingCredits) })
             : quote.code === 'cargo-over-capacity'
                 ? t('UNLOAD {mass} CARGO MASS', { mass: formatNumber(excessCargo) })
@@ -3573,10 +3616,10 @@ export class GameUI {
             : screen === 'market'
                 ? t('{name} market', { name: location.name })
                 : location.name;
-        const art = DOCK_ART_BY_LOCATION[locationId];
+        const art = ACTIVE_DOCK_ART_BY_LOCATION[locationId];
         if (art) {
             const source = VESPER_HOVER_PREVIEW && locationId === 'vesper' && screen === 'concourse'
-                ? './art/locations/v3/vesper-preview.png'
+                ? './art/locations/simplified/vesper-preview.webp'
                 : art[screen] ?? art.concourse;
             return `<img src="${source}" alt="${t('HD view')} of ${escapeHtml(label)}" draggable="false">`;
         }
@@ -4802,7 +4845,7 @@ export class GameUI {
         </div>
         <div id="map-galaxy-view" class="map-view map-view-galaxy" role="tabpanel" aria-labelledby="map-galaxy-tab" data-map-view-panel="galaxy" hidden>
           <section class="map-section galaxy-map-section">
-            <div class="map-section-heading"><span>${t('ROUTE NETWORK')}</span><b>${t('4 SYSTEMS · 3 JUMPS')}</b></div>
+            <div class="map-section-heading"><span>${t('ROUTE NETWORK')}</span><b>${t('{count} SYSTEMS · {jumps} JUMPS', {count:visibleSystems.length,jumps:JUMP_ROUTES.length})}</b></div>
             <nav class="regional-galaxy-map galaxy-map-stage" aria-label="${t('Regional systems')}">
               <svg class="regional-route-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                 ${JUMP_ROUTES.map((route) => {

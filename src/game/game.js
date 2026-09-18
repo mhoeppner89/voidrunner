@@ -1,3 +1,5 @@
+import {createMiningContacts,updateMiningContacts} from './miningSurface.js';
+import { DRONE_PORTS } from './droneFlight.js';
 import {updateNpcDrones,droneUnits,damageNpcDrone} from './npcDrones.js';
 import {frigateHullDamageScale,equipFrigate,updateFrigateAttack,updateFrigateBatteries,damageFrigateMount,segmentFrigateMountHit,frigateMountPosition,visibleFrigateBatteries} from './capitalCombat.js';
 import {observeIncomingFire, updateCombatIntent, combatThrottle, combatTrackingRate, holdingFiringWindow} from './combatPiloting.js';
@@ -52,6 +54,7 @@ import { steerToward } from './npcNav.js';
 import { PILOT_LINES, pilotMod, rollPilot, TIER_LABELS } from './pilots.js';
 import { setLanguage, t } from './i18n.js';
 import { MUG_CHANCE, SMUGGLE_CHANCE, createSmuggleTask, createTask, rebasePatrolTask, rollNpcCargo, updateShipAI } from './shipAI.js';
+import {LEAGUE_HULLS,leagueTrafficChance,factionsOpposed} from './leagueContent.js';
 import { paletteForFaction, playerShipVariant, shipVariantForRole } from './voxelModels.js';
 import { SENSOR_CLOSE_VISUAL_RANGE, SENSOR_CONTACT_THRESHOLD, SENSOR_HORIZON, SENSOR_IDENTIFY_THRESHOLD, SENSOR_TRACK_THRESHOLD, addEmissionHeat, awarenessState, npcPhysicalSignatureRangeValues, physicalSignatureRangeValues, signatureBand, stepDriveHeat, stepEmissionHeat, stepSensorAwareness } from './sensors.js';
 const FORWARD = new THREE.Vector3(0, 0, -1);
@@ -672,6 +675,11 @@ const MINER_GOLD_DROP_CHANCE = 0.12;
 // not just what it looks like. Light interceptors turn on a dime; freighters
 // wallow through their turns.
 const HULL_FLIGHT_STATS = {
+    speedster: {speed:SHIPS.speedster.maxSpeed,afterburnSpeed:SHIPS.speedster.afterburnSpeed,turnRate:SHIPS.speedster.angularAcceleration,collisionRadius:2,hullHalfExtents:[2.0753063410520554, 1.3931982517242432, 5.501492917537689]},
+    legionary: {speed:SHIPS.legionary.maxSpeed,afterburnSpeed:SHIPS.legionary.afterburnSpeed,turnRate:SHIPS.legionary.angularAcceleration,collisionRadius:2,hullHalfExtents:[5.0039146661758425, 2.0397572934627535, 6.172646737098694]},
+    andromeda: {speed:SHIPS.andromeda.maxSpeed,afterburnSpeed:SHIPS.andromeda.afterburnSpeed,turnRate:SHIPS.andromeda.angularAcceleration,collisionRadius:2,hullHalfExtents:[7.033175075054168, 3.0514688372611998, 7.799801480770111]},
+    torsas: {speed:SHIPS.torsas.maxSpeed,afterburnSpeed:SHIPS.torsas.afterburnSpeed,turnRate:SHIPS.torsas.angularAcceleration,collisionRadius:2,hullHalfExtents:[2.894996166229248, 3.4195950031280518, 8.00974178314209]},
+    astra: {speed:SHIPS.astra.maxSpeed,afterburnSpeed:SHIPS.astra.afterburnSpeed,turnRate:SHIPS.astra.angularAcceleration,collisionRadius:2,hullHalfExtents:[4.384183120727539, 2.9311553955078127, 6.400563049316407]},
     // hullHalfExtents: the GLB hull's half-size in the ship frame —
     // [starboard X, up Y, forward Z] — measured from the baked models
     // (GLB_SHIP_CONFIG yaw + scale). The player's hard collision is an
@@ -5366,7 +5374,7 @@ export class GameSession {
         }
         const layout = droneBayLayoutFor(player.shipId);
         const bays = player.outfitting?.loadouts?.[player.shipId]?.droneBays;
-        const mounts = SHIP_MOUNT_ANCHORS[player.shipId]?.utility;
+        const mounts = DRONE_PORTS[player.shipId];
         context.unitIds.length = 0;
         for (const anchors of this.pdcAnchorRecords.values()) anchors.escortIndex = -1;
         const point = () => ({ position: [0, 0, 0], velocity: [0, 0, 0] });
@@ -5416,7 +5424,7 @@ export class GameSession {
             for (let end = 0; end < 3; end++) {
                 const anchor = end === 0 ? anchors.launch : end === 1 ? anchors.dock : anchors.escort;
                 const offset = this.pdcVector.fromArray(anchors.mount);
-                offset.y -= end === 0 ? 2 : end === 1 ? 0.75 : DRONE_TYPES.pdc.escortDistance;
+                offset.y += end === 0 ? -3.5 : end === 1 ? 1 : -DRONE_TYPES.pdc.escortDistance;
                 const orbitVelocity = this.pdcOrbitVelocity.set(0, 0, 0);
                 if (end === 2 && anchors.escortIndex >= 0) {
                     offset.set(0, escortY, escortZ);
@@ -5525,7 +5533,9 @@ export class GameSession {
         this.miningDroneRotation = new THREE.Quaternion();
         const point = () => ({ position: [0, 0, 0], velocity: [0, 0, 0] });
         this.miningDroneContext = { unitIds: [], bayAnchors: Object.create(null),
-            workPoint: point(), node: null, targetNodeKey: null };
+            workPoint: point(), workPoints: Object.create(null), node: null, targetNodeKey: null,
+            getWorkPoint: (unit, context) => context.workPoints[unit.id] ?? context.workPoint };
+        this.miningDroneSlots = Array.from({ length: 6 }, (_, i) => ({ portId: Math.floor(i / 2), launch: point(), dock: point(), work: point() }));
         this.miningDroneBays = Array.from({ length: 3 }, () => ({ launch: point(), dock: point() }));
     }
     recallMiningDrones(reason = 'stopped') {
@@ -5577,7 +5587,7 @@ export class GameSession {
         }
         const layout = droneBayLayoutFor(player.shipId);
         const bays = player.outfitting?.loadouts?.[player.shipId]?.droneBays;
-        const mounts = SHIP_MOUNT_ANCHORS[player.shipId]?.utility;
+        const mounts = DRONE_PORTS[player.shipId];
         const q = this.miningDroneRotation.fromArray(player.rotation);
         const angular = player.angularVelocity;
         const omega = this.miningDroneOmega.set(angular?.[0] ?? 0, angular?.[1] ?? 0, angular?.[2] ?? 0).applyQuaternion(q);
@@ -5594,7 +5604,7 @@ export class GameSession {
             for (let end = 0; end < 2; end++) {
                 const point = end === 0 ? anchors.launch : anchors.dock;
                 const offset = this.miningDroneVector.fromArray(mount);
-                offset.y -= end === 0 ? 2 : 0.75;
+                offset.y += end === 0 ? -3.5 : 1;
                 offset.applyQuaternion(q);
                 const velocity = point.velocity;
                 velocity[0] = player.velocity[0] + omega.y * offset.z - omega.z * offset.y;
@@ -5604,7 +5614,7 @@ export class GameSession {
                 point.position[1] = player.position[1] + offset.y - velocity[1] * dt;
                 point.position[2] = player.position[2] + offset.z - velocity[2] * dt;
             }
-            if (bay?.bayId !== layout[index].bayId || bay.mode !== 'mining') continue;
+            if (!['wayfarer','prospector'].includes(player.shipId) || bay?.bayId !== layout[index].bayId || bay.mode !== 'mining') continue;
             context.miningBays++;
             for (let slot = 0; slot < DRONE_BAY_CAPACITY.mining; slot++) {
                 const id = bay.unitIds?.[slot];
@@ -5614,9 +5624,25 @@ export class GameSession {
                 for (let prior = 0; prior < count; prior++) if (context.unitIds[prior] === id) duplicate = true;
                 if (duplicate) continue;
                 if (context.unitIds[count] !== id) fitChanged = true;
-                if (context.bayAnchors[id] && context.bayAnchors[id] !== anchors) fitChanged = true;
+                const station = this.miningDroneSlots[index * DRONE_BAY_CAPACITY.mining + slot];
+                if (context.bayAnchors[id] && context.bayAnchors[id] !== station) fitChanged = true;
+                // Two distinct launch lanes per bay, following hull rotation.
+                const offset = this.miningDroneVector.set((slot === 0 ? -1 : 1) * 1.2, 0, 0).applyQuaternion(q);
+                const dvx = omega.y * offset.z - omega.z * offset.y;
+                const dvy = omega.z * offset.x - omega.x * offset.z;
+                const dvz = omega.x * offset.y - omega.y * offset.x;
+                for (let endIndex = 0; endIndex < 2; endIndex++) {
+                    const end = endIndex === 0 ? 'launch' : 'dock';
+                    const source = anchors[end], dest = station[end];
+                    for (let axis = 0; axis < 3; axis++) {
+                        const dv = axis === 0 ? dvx : axis === 1 ? dvy : dvz;
+                        dest.velocity[axis] = source.velocity[axis] + (end === 'launch' ? dv : 0);
+                        dest.position[axis] = source.position[axis] + (end === 'launch' ? offset.getComponent(axis) - dv * dt : 0);
+                    }
+                }
                 context.unitIds[count++] = id;
-                context.bayAnchors[id] = anchors;
+                context.bayAnchors[id] = station;
+                context.workPoints[id] = station.work;
             }
         }
         if (context.unitIds.length !== count) fitChanged = true;
@@ -5666,24 +5692,17 @@ export class GameSession {
             const radius = asteroidCollisionRadius(node);
             // Identical to surfaceDistance without a temporary target/vector.
             context.distance = Math.max(0, distance - radius);
-            const nx = distance > 0.001 ? dx / distance : 0;
-            const ny = distance > 0.001 ? dy / distance : 1;
-            const nz = distance > 0.001 ? dz / distance : 0;
-            const workRadius = radius + DRONE_TYPES.mining.collisionRadius + 1;
-            const work = context.workPoint;
-            const moving = node.moving && this.activeInstanceId === 'shardbelt';
-            const vx = moving ? node.velocity?.[0] ?? 0 : 0;
-            const vy = moving ? node.velocity?.[1] ?? 0 : 0;
-            const vz = moving ? node.velocity?.[2] ?? 0 : 0;
-            const rx = player.velocity[0] - vx, ry = player.velocity[1] - vy, rz = player.velocity[2] - vz;
-            const radial = rx * nx + ry * ny + rz * nz;
-            const scale = distance > 0.001 ? workRadius / distance : 0;
-            work.velocity[0] = vx + (rx - radial * nx) * scale;
-            work.velocity[1] = vy + (ry - radial * ny) * scale;
-            work.velocity[2] = vz + (rz - radial * nz) * scale;
-            work.position[0] = node.position[0] + nx * workRadius - work.velocity[0] * dt;
-            work.position[1] = node.position[1] + ny * workRadius - work.velocity[1] * dt;
-            work.position[2] = node.position[2] + nz * workRadius - work.velocity[2] * dt;
+            if (this.miningContacts?.node !== node || this.miningContacts.count !== count) {
+                this.miningContacts = createMiningContacts(node, player.position, count);
+                for (const id of context.unitIds) context.workPoints[id].contactReady = false;
+            }
+            updateMiningContacts(this.miningContacts, context.workPoints, context.unitIds, dt);
+            const firstContact = context.workPoints[context.unitIds[0]];
+            if (firstContact) for (let axis=0;axis<3;axis++) {
+                context.workPoint.position[axis]=firstContact.position[axis];
+                context.workPoint.velocity[axis]=firstContact.velocity[axis];
+            }
+
         }
         return context;
     }
@@ -5694,7 +5713,7 @@ export class GameSession {
         let result;
         if (phase === 'recalling') result = { ok: false, code: 'recalling' };
         else if (phase === 'running') result = { ok: true, code: 'can-recall' };
-        else if (!droneBayLayoutFor(player?.shipId).length) result = { ok: false, code: 'no-bay' };
+        else if (!['wayfarer','prospector'].includes(player?.shipId)) result = { ok: false, code: 'no-bay' };
         else if (!fleet?.controller || !fleet.unitsById || !this.miningDroneSystem) result = { ok: false, code: 'no-stock' };
         else {
             const context = this.prepareMiningDroneContext();
@@ -7990,6 +8009,7 @@ export class GameSession {
     // a hostile re-engages. Returns true while the ship is mid-search — its
     // movement is the travel AI on the sweep point, not a live chase.
     updateSearchAI(ship, dt) {
+        if(ship.faction==='frontier-league' && !ship.hostile)return false;
         if (this.arena)
             return false;
         const isPatrol = ship.role === 'patrol' && !ship.hostile;
@@ -9529,6 +9549,11 @@ export class GameSession {
     }
     updateNpcOrdnance(ship,targetPosition,dt) {
         const fit=ship.combatFit,time=this.save.world.time;
+        if(fit.racks){
+            const capital=this.ships.some(s=>s.id===ship.targetId&&s.capitalClass),wanted=capital?'torpedo':'swarm';
+            const rack=fit.racks.find(r=>r.missiles>0&&r.launcher===wanted)??fit.racks.find(r=>r.missiles>0);
+            fit.activeRack=rack;fit.launcher=rack?.launcher;fit.missiles=rack?.missiles??0;
+        }
         const novice=ship.pilot?.tier==='novice',lockTime=novice?4:2.5,gap=novice?10:6;
         if(fit.lockTarget!==ship.targetId){fit.lock=0;fit.warned=false;fit.lockTarget=ship.targetId;}
         if(time<(fit.launchAt??0)){fit.lock=0;fit.warned=false;return;}
@@ -9551,7 +9576,7 @@ export class GameSession {
                 targetId:ship.targetId,faction:ship.faction,launcherId:launcher.id,homingSpeed:launcher.homingSpeed,homingTurn:launcher.homingTurn,
                 acceleration:launcher.acceleration,splashRadius:launcher.splashRadius,splashMin:launcher.splashMin});
         }
-        fit.missiles--;fit.lock=0;fit.warned=false;fit.launchAt=time+Math.max(gap,launcher.cooldown)*disruptionFactor(ship,time);
+        fit.missiles--;if(fit.activeRack)fit.activeRack.missiles=fit.missiles;fit.lock=0;fit.warned=false;fit.launchAt=time+Math.max(gap,launcher.cooldown)*disruptionFactor(ship,time);
     }
     fireNpcGun(ship, direction, opportunity) {
         const disruption=disruptionFactor(ship,this.save.world.time);
@@ -9799,11 +9824,7 @@ export class GameSession {
     projectileCanHitShip(projectile, ship) {
         if (projectile.targetId === ship.id)
             return true;
-        if (projectile.faction === 'red-talons')
-            return ship.faction !== 'red-talons';
-        if (ship.faction === 'red-talons')
-            return true;
-        return false;
+        return factionsOpposed(projectile.faction, ship.faction);
     }
     crimeIdentified(victim, position = victim.position) {
         if (victim.playerIdentified)
@@ -10874,7 +10895,7 @@ export class GameSession {
         }
         else if (bucket < traderCutoff) {
             recordSortieEncounter(this.save, 'distress', 'trader-lane');
-            const trader = this.spawnShip('trader', this.encounterPosition(rng, 225));
+            const trader = this.spawnShip('trader', this.encounterPosition(rng, 225), undefined, undefined, undefined, this.leagueTrafficOptions('trader',this.activeInstanceId ?? this.save.player.navTargetId,rng));
             if (rng() < 0.55) {
                 const pirate = this.spawnShip('pirate', this.encounterPosition(rng, 188));
                 pirate.targetId = trader.id;
@@ -10887,7 +10908,7 @@ export class GameSession {
         }
         else if (bucket < patrolCutoffAdjusted) {
             recordSortieEncounter(this.save, 'patrol', 'security-lane');
-            this.spawnShip('patrol', this.encounterPosition(rng, 218));
+            this.spawnShip('patrol', this.encounterPosition(rng, 650), undefined, undefined, undefined, this.leagueTrafficOptions('patrol',this.activeInstanceId ?? this.save.player.navTargetId,rng));
         }
         else if (bucket < pirateCutoff) {
             recordSortieEncounter(this.save, 'ambient', `pirate-group:${zone}`);
@@ -11037,7 +11058,7 @@ export class GameSession {
                 : id === 'vesper' ? (rng() < 0.5 ? 'miner' : 'trader')
                 : rng() < 0.72 ? 'trader' : 'patrol';
             const direction = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.5, rng() - 0.5).normalize();
-            const ship = this.spawnShip(role, tuple(vec(location.position).clone().addScaledVector(direction, clearance + randomBetween(rng, 60, 260))));
+            const ship = this.spawnShip(role, tuple(vec(location.position).clone().addScaledVector(direction, clearance + randomBetween(rng, 60, 260))), undefined, undefined, undefined, this.leagueTrafficOptions(role,id,rng));
             ship.stationTraffic = id;
             // A patrol posted here beats a lane around its own port, not Rook —
             // that is where the smugglers actually are (see updatePatrolArrest).
@@ -11088,6 +11109,11 @@ export class GameSession {
         offset.normalize().multiplyScalar(clearance);
         return position.copy(center).add(offset);
     }
+    leagueTrafficOptions(role, locationId, rng) {
+        if (this.arena || !['patrol','trader'].includes(role) || rng() >= leagueTrafficChance(this.save.player.systemId, locationId)) return {};
+        const hullId = role === 'trader' ? (rng()<.65?'torsas':'astra') : (rng()<.55?'legionary':rng()<.6?'speedster':'andromeda');
+        return {faction:'frontier-league',hullId};
+    }
     spawnInitialTraffic() {
         const systemId = this.save.player.systemId;
         const rng = seededRandom(`${this.save.world.seed}:initial-traffic:${systemId}:${Math.floor(this.save.world.time / 60)}`);
@@ -11100,10 +11126,10 @@ export class GameSession {
             return tuple(vec(location.position).clone().addScaledVector(direction, spawnClearance(location) + randomBetween(rng, 60, 260)));
         };
         if (dockId) {
-            const trader = this.spawnShip('trader', around(LOCATIONS[dockId]));
+            const trader = this.spawnShip('trader', around(LOCATIONS[dockId]), undefined, undefined, undefined, this.leagueTrafficOptions('trader',dockId,rng));
             trader.destination = LOCATIONS[docks.find((id) => id !== dockId) ?? dockId].position;
             const patrolHome = docks.find((id) => LOCATIONS[id].faction === 'concord') ?? dockId;
-            const patrol = this.spawnShip('patrol', around(LOCATIONS[patrolHome]));
+            const patrol = this.spawnShip('patrol', around(LOCATIONS[patrolHome]), undefined, undefined, undefined, this.leagueTrafficOptions('patrol',patrolHome,rng));
             patrol.destination = LOCATIONS[dockId].position;
             rebasePatrolTask(patrol, this, patrolHome);
         }
@@ -11130,11 +11156,11 @@ export class GameSession {
             return 0.35;
         return 0.45;
     }
-    spawnShip(role, position, missionId, nameOverride, pilotOverride) {
+    spawnShip(role, position, missionId, nameOverride, pilotOverride, fleetOptions = {}) {
         const index = ++this.entityCounter;
         const rng = seededRandom(`${this.save.world.seed}:ship:${index}:${Math.floor(this.save.world.time)}`);
-        const faction = role === 'pirate' || role === 'bounty' || role === 'escort' ? 'red-talons' : role === 'patrol' ? 'concord' : role === 'miner' ? 'frontier-miners' : 'free-merchants';
-        const hostile = faction === 'red-talons';
+        const faction = fleetOptions.faction ?? (role === 'pirate' || role === 'bounty' || role === 'escort' ? 'red-talons' : role === 'patrol' ? 'concord' : role === 'miner' ? 'frontier-miners' : 'free-merchants');
+        const hostile = faction === 'red-talons' || faction === 'frontier-league' && (this.save.player.reputation[faction] ?? 0) <= -30;
         // Every ship rolls a pilot at spawn (seeded, deterministic). The profile
         // is transient per-ship state — no save-schema change.
         const pilot = rollPilot(rng, this.spawnThreat(position, missionId), faction, pilotOverride);
@@ -11164,10 +11190,11 @@ export class GameSession {
         // hostile again, but they cut and run earlier than usual (see damageShip).
         const waryOfPlayer = recognizesPlayer && prior === 'fled';
         const isHostile = hostile && !(recognizesPlayer && !waryOfPlayer);
-        const hullFlight = HULL_FLIGHT_STATS[shipVariantForRole(role)] ?? HULL_FLIGHT_STATS.talon;
+        const hullFlight = HULL_FLIGHT_STATS[fleetOptions.hullId ?? shipVariantForRole(role)] ?? HULL_FLIGHT_STATS.talon;
         const ship = {
             id: `ship-${index}`,
-            name: shipName,
+            hullId: fleetOptions.hullId, variant: fleetOptions.hullId,
+            name: fleetOptions.faction === 'frontier-league' && !nameOverride ? `FLV ${SHIPS[fleetOptions.hullId]?.name ?? fleetOptions.hullId} ${index}` : shipName,
             role,
             faction,
             position: [...position],
@@ -11263,7 +11290,7 @@ export class GameSession {
             // A stable per-ship roll gives clean, identified traffic a small
             // chance of a routine check. It is independent of actual cargo,
             // so patrols never gain supernatural contraband knowledge.
-            routineInspectionDue: role === 'patrol'
+            routineInspectionDue: faction === 'concord' && role === 'patrol'
                 && seededRandom(`${this.save.world.seed}:routine-inspection:${index}`)() < 0.22,
             routineInspectionDone: false,
         };
@@ -13246,7 +13273,7 @@ export class GameSession {
         if (!player.dockedAt) return { ok: false, code: 'not-docked' };
         if (!this.dockHasService('outfitting')) return { ok: false, code: 'service-unavailable' };
         if (!this.dronesSafelyStowed()) return { ok: false, code: 'drones-deployed' };
-        if (mode !== 'mining' && mode !== 'pdc') return { ok: false, code: 'invalid-mode' };
+        if (mode !== 'mining' && mode !== 'pdc' || mode === 'mining' && !['wayfarer','prospector'].includes(player.shipId)) return { ok: false, code: 'invalid-mode' };
         if (!droneBayLayoutFor(player.shipId).some(bay => bay.bayId === bayId))
             return { ok: false, code: 'invalid-bay' };
         if (!player.droneFleet?.controller) return { ok: false, code: 'invalid-fleet' };
@@ -13437,7 +13464,7 @@ export class GameSession {
         const carriedMass = cargoMass(this.save.player);
         const quote = quoteShipTrade(this.save.player, shipId, { cargoMass: carriedMass });
         if (!quote.ok) {
-            const message = quote.code === 'insufficient-credits'
+            const message = quote.code === 'reputation-required' ? `Frontier League standing ${quote.requiredReputation} required.` : quote.code === 'insufficient-credits'
                 ? t('Insufficient credits after trade-in.')
                 : quote.code === 'cargo-over-capacity'
                     ? t('Current cargo exceeds the new hull capacity.')
@@ -14464,6 +14491,7 @@ export class GameSession {
 }
 const FACTION_LABEL = (faction) => {
     switch (faction) {
+        case 'frontier-league': return t('Frontier League');
         case 'concord':
             return t('CONCORD');
         case 'free-merchants':

@@ -56,8 +56,9 @@ all(OUTFIT_ITEM_IDS, (id) => {
         && item.effects && item.availability.length > 0
         && typeof item.description === 'string' && item.description.length > 0
         && typeof item.stat === 'string' && item.stat.length > 0
+        && item.art.includes('/art/outfitting/simplified/')
         && item.art.endsWith('.webp') && item.artPath === item.art;
-}, 'every item has fitting, balance, effects, availability, copy, and WebP art metadata');
+}, 'every item has fitting, balance, effects, availability, copy, and simplified art metadata');
 assert.equal(Object.keys(LEGACY_OUTFIT_ID_MAP).length, 4);
 
 const expectedCounts = {
