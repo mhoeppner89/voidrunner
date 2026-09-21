@@ -50,7 +50,7 @@ all(OUTFIT_ITEM_IDS, (id) => {
         && ['S', 'M'].includes(item.size)
         && item.sizes.length > 0
         && Number.isFinite(item.price) && item.price >= 0
-        && Number.isFinite(item.mass) && item.mass > 0
+        && item.mass === undefined
         && (item.category !== 'gun' || (Number.isFinite(item.energyCost) && item.energyCost > 0))
         && item.power === undefined
         && item.effects && item.availability.length > 0
@@ -151,7 +151,10 @@ const energyHungry = {
     utility: ['salvage-mk2', 'radar-mk2'],
 };
 assert.equal(validateLoadout(player, 'wayfarer', energyHungry).ok, true, 'high-drain weapons are legal fits and constrained by the flight capacitor');
-const tooMass = {
+// The mounts are the fitting limit. This fit fills every bay a Wayfarer has,
+// including the heaviest modules in them, and must be legal: nothing is refused
+// for weighing too much.
+const fullBays = {
     ...empty,
     guns: ['ripper', 'ripper'],
     launchers: ['seeker-launcher'],
@@ -159,7 +162,11 @@ const tooMass = {
     defense: ['armor-mk2'],
     utility: ['cargo-pods', 'radar-mk2'],power:['capacitor-bank'],turrets:['tracking-turret'],
 };
-assert.ok(validateLoadout(player, 'wayfarer', tooMass).errors.some((error) => error.code === 'mass-over-budget'));
+const fullBayCheck = validateLoadout(player, 'wayfarer', fullBays);
+assert.equal(fullBayCheck.ok, true, 'a full bay of heavy modules is legal');
+assert.equal(fullBayCheck.errors.some((error) => error.code === 'mass-over-budget'), false);
+assert.equal(fullBayCheck.usage.mass, undefined, 'fitted mass is no longer tracked');
+assert.equal(fullBayCheck.usage.massLimit, undefined);
 const cargoInvalid = validateLoadout(player, { shipId: 'wayfarer' }, empty);
 assert.equal(cargoInvalid.code, 'unknown-ship');
 assert.equal(validateLoadout(player, 'wayfarer', empty, { cargoMass: 33 }).code, 'cargo-over-capacity');

@@ -795,7 +795,7 @@ export const GALAXY_LOCATIONS = {
                 portraitSeed: 421,
                 lines: [
                     'Tessa Rye, clinic stores. If you have room for medicine, I can give you a delivery that matters.',
-                    'Keep the cold-chain cases sealed; taking hull damage can cost the fragile-load bonus.',
+                    'Medicine travels at temperature or not at all. Take the long lane rather than risk a warm case.',
                     'Boreal’s eastern settlement is short on medigel after a fracture opened beneath the pressure domes.',
                 ],
             },

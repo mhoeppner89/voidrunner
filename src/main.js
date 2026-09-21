@@ -493,7 +493,7 @@ const actions = {
         return true;
     },
 };
-ui.mugDemand = () => session?.activeMugDemand();
+ui.mugStandoff = () => session?.standoffBriefing();
 ui.setActions(actions);
 showTitleScreen();
 scheduleLikelyFlightWarmup();

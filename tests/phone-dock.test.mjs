@@ -8,7 +8,8 @@ const {GameUI} = await import('../src/game/ui.js');
 const {GameSession} = await import('../src/game/game.js');
 const {createNewSave, hydrateSave} = await import('../src/game/save.js');
 const {getTutorialQuest} = await import('../src/game/tutorialCampaign.js');
-const {HARDPOINT_SPECS, loadoutFor} = await import('../src/game/outfitting.js');
+const {HARDPOINT_SPECS, OUTFIT_ITEMS, loadoutFor} = await import('../src/game/outfitting.js');
+const {formatCredits} = await import('../src/game/random.js');
 const {setLanguage} = await import('../src/game/i18n.js');
 
 function confirmationFixture(hasSave = true) {
@@ -114,5 +115,44 @@ test('slot-first phone fitting installs the owned radar in three selections in b
         assert.equal(save.player.credits,credits);
         const restored = hydrateSave(JSON.parse(JSON.stringify(save)));
         assert.ok(loadoutFor(restored.player).utility.includes('radar-mk2'));
+    }
+});
+
+// Rin's spare radar is a prologue gift. A pilot who never received it (skipped
+// prologue, or still early in chapter one) has to buy the 5.400 cr module on
+// 3.500 starting credits: the fit stage must quote that price and the shortfall
+// instead of advertising a free install from an empty locker with a disabled
+// button that contradicts the status line.
+test('an unowned, unaffordable module is quoted at its price instead of a free locker fit',()=>{
+    for (const language of ['en','de']) {
+        setLanguage(language);
+        const save = createNewSave(842,{tutorial:true});
+        const price = OUTFIT_ITEMS['radar-mk2'].price;
+        assert.ok(save.player.credits < price,'fit the fixture: starting credits cannot cover the radar');
+        assert.ok(!(save.player.outfitting.locker?.['radar-mk2'] > 0),'fit the fixture: the locker holds no spare radar');
+        let commits = 0;
+        const ui = Object.create(GameUI.prototype);
+        ui.save = save;
+        ui.dockLocation = 'helix';
+        ui.root = {querySelector:()=>null};
+        ui.resetOutfittingDrafts();
+        let markup;
+        ui.renderMarketPoint = ()=>{markup=ui.renderOutfitting();};
+        ui.actions = {applyOutfitting(){commits++;}};
+        ui.setOutfittingView('systems');
+        const loadout=loadoutFor(save.player);
+        const mount=HARDPOINT_SPECS[save.player.shipId].utility[loadout.utility.indexOf(null)];
+        ui.selectOutfittingMount(mount.id);
+        ui.installOutfittingItem('radar-mk2');
+        assert.equal(ui.outfittingStage,'fit');
+        const action = markup.match(/<button[^>]*data-outfit-action="install"[^>]*>([^<]*)<\/button>/);
+        assert.ok(action,`${language}: the fit stage renders an install action`);
+        assert.ok(action[0].includes('disabled'),`${language}: an unaffordable fit disables the action`);
+        assert.ok(action[1].includes(formatCredits(price)),`${language}: the action names the purchase price, got "${action[1]}"`);
+        assert.ok(!action[1].includes('NO CHARGE') && !action[1].includes('KOSTENLOS'),`${language}: a purchase is never advertised as free, got "${action[1]}"`);
+        assert.match(markup,/You need|Dir fehlen noch/,`${language}: the status names the shortfall`);
+        ui.handleOutfittingAction('install');
+        assert.equal(commits,0,`${language}: an unaffordable fitting cannot commit`);
+        assert.equal(ui.outfittingNotice?.tone,'warning',`${language}: the pilot is told why`);
     }
 });

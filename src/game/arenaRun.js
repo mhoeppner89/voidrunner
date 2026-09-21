@@ -76,7 +76,7 @@ export function refreshRunRewardOffers(save){
 export function recoverRun(save,extra=false){const p=save.player,stats=getEffectiveShipStats(p),r=save.arenaRun;p.hull=Math.min(stats.hull,p.hull+stats.hull*(extra?.5:r.hard?.1:.3));p.shield=stats.shield;p.energy=stats.energyCapacity;p.fuel=stats.fuel;
  if(extra)fillLauncherMagazines(p);else {for(const entry of normalizeLauncherMagazines(p))if(entry.rounds<entry.capacity)p.launcherMagazines[entry.mount.id].rounds++;normalizeLauncherMagazines(p);}
 }
-// A reward is a complete, mass-checked replacement plan, not a loose gun.
+// A reward is a complete, mount-checked replacement plan, not a loose gun.
 export function runRewardPlan(save,id){
  if(id==='repair')return {id,count:1,changes:[],replaced:[]};
  const p=save.player,item=OUTFIT_ITEMS[id],spec=HULL_HARDPOINTS[p.shipId];if(!item||id==='ion-blaster'&&spec.guns.length<2)return null;
@@ -133,10 +133,9 @@ export function changeRunHull(save,id){
   for(const key of LOADOUT_KEYS)for(const [i,item] of old[key].entries())if(item){locker[item]=(locker[item]??0)+1;if(oldFactory[key][i])factoryLocker[item]=(factoryLocker[item]??0)+1;}
   p.shipId=id;p.ownedShips=[id];p.outfitting=createOutfittingState([id]);const fit=p.outfitting.loadouts[id],spec=HULL_HARDPOINTS[id],flags=p.outfitting.factory[id];
   for(const key of LOADOUT_KEYS){fit[key].fill(null);flags[key].fill(false);}p.outfitting.locker=locker;p.outfitting.factoryLocker=factoryLocker;
-  let mass=0;
   const install=(key,index,item,sourceIndex)=>{
-   const mount=spec[key][index];if(!item||fit[key][index]||!locker[item]||!itemFitsMount(OUTFIT_ITEMS[item],mount)||mass+OUTFIT_ITEMS[item].mass>spec.massBudget)return false;
-   fit[key][index]=item;locker[item]--;mass+=OUTFIT_ITEMS[item].mass;
+   const mount=spec[key][index];if(!item||fit[key][index]||!locker[item]||!itemFitsMount(OUTFIT_ITEMS[item],mount))return false;
+   fit[key][index]=item;locker[item]--;
    if(factoryLocker[item]>0){flags[key][index]=true;factoryLocker[item]--;}
    if(key==='guns'&&sourceIndex!==undefined)fit.fireGroups.assignments[mount.id]=old.fireGroups.assignments[oldSpec.guns[sourceIndex].id];
    return true;

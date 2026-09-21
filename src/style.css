@@ -7933,6 +7933,15 @@ button.primary,
   grid-template-rows: auto minmax(0, 1fr);
 }
 
+/* The station body is one column that never exceeds the viewport. An `auto`
+   column sizes to its content's min-content width, so one wide row (the ship
+dealer's tabs, or its two-column showroom) used to stretch the whole dock to
+   654px inside a 388px window — and `overflow: hidden` then clipped the right
+   third of every screen instead of scrolling it. */
+#dock-screen {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .dock-screen::after {
   display: none !important;
   content: none !important;
@@ -14380,6 +14389,10 @@ button.primary,
 
   #dock-screen .ship-showroom {
     grid-template-columns: minmax(0, 1.08fr) minmax(325px, 0.92fr);
+    /* The preview is its own column, not a banner stretched to the spec
+       sheet's height — otherwise the ship model fills the phone and the
+       trade button sits below the fold. */
+    align-items: start;
   }
 
   #dock-screen .ship-showroom-stage {
@@ -14390,6 +14403,7 @@ button.primary,
 
   #dock-screen .ship-showroom-stage .ship-silhouette {
     min-height: 230px;
+    max-height: 230px;
   }
 
   #dock-screen .ship-stage-title h3 {
@@ -14994,7 +15008,7 @@ button.primary,
 
 .tutorial-notice-copy > span {
   color: #72d4d6;
-  font-size: 9px;
+  font-size: 12.9px;
   letter-spacing: .1em;
 }
 
@@ -15164,11 +15178,14 @@ button.primary,
     padding-block: 4px;
   }
   #dock-screen .tutorial-dock-notice > .avatar { width: 40px; height: 46px; }
+  /* The prologue notice is the first thing a new pilot reads. It used to set
+     its title at 10px, its line at 9px and its skip control at 8px — smaller
+     than anything else on a phone, on the one screen nobody can skip past. */
   .tutorial-notice-copy > span { display: none; }
-  .tutorial-notice-copy > b { font-size: 10px; }
-  .tutorial-notice-copy > p { font-size: 9px; }
+  .tutorial-notice-copy > b { font-size: var(--station-label); }
+  .tutorial-notice-copy > p { font-size: 12.9px; line-height: 1.3; }
   .tutorial-notice-actions { gap: 4px; }
-  .tutorial-notice-actions button { min-width: 104px; padding-inline: 6px; font-size: 8px; }
+  .tutorial-notice-actions button { min-width: 104px; padding-inline: 8px; font-size: 12.9px; }
 }
 
 @media (max-width: 620px), (orientation: portrait) {
@@ -15210,7 +15227,7 @@ button.primary,
 }
 #hyperdrive-card:active:not(:disabled) { transform: translateX(-50%); }
 .ship-menu-weapons summary { cursor: pointer; padding: 0.5rem 0; }
-.ship-menu-events { order: -1; }
+.ship-menu-events { order: 4; }
 .event-row span { overflow-wrap: anywhere; }
 .event-row small { flex-shrink: 0; color: #a9b7b3; }
 
@@ -15740,3 +15757,456 @@ button.primary,
 /* Acheron’s chart marker matches its black-hole sky landmark. */
 .galaxy-map-stage .regional-system.system-acheron i,
 .system-star-key.star-acheron i {background:#040609;border:2px solid var(--void-gold);box-shadow:0 0 10px var(--void-gold);}
+
+/* ── 0.8.3 station menu pass ───────────────────────────────────────────────
+   The station menus are read on a 390 px-tall landscape phone. Four rules
+   keep them legible and calm there:
+
+     1. one header bar names the place and the screen — content panels no
+        longer repeat the same title as their own band;
+     2. sentences keep the readable face and sentence case — the tracked pixel
+        face is reserved for short labels and numeric readouts;
+     3. nothing a player must read renders below 13 px (12 px for bare digits),
+        which previously excluded the contract rows and the prologue notice;
+     4. a phone shows one task at a time: the commodity catalog, or one trade
+        ticket — never both in the same scroll.
+
+   Both faces were leaking into each other because the global button style
+   (uppercase, 0.09em tracking) is inherited by cards and rows that carry
+   whole sentences. */
+#dock-screen .dock-header {
+  display: flex;
+  min-height: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 5px max(10px, var(--safe-right)) 5px max(8px, var(--safe-left));
+}
+
+#dock-screen .dock-heading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#dock-screen .dock-heading h2 {
+  overflow: hidden;
+  font-size: clamp(18px, 2vw, 26px);
+  line-height: 1.05;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#dock-screen .dock-heading > span {
+  font-size: var(--station-label);
+}
+
+#dock-screen .dock-back-button {
+  display: grid;
+  flex: 0 0 auto;
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  place-items: center;
+  padding: 0;
+  font-size: 15px;
+}
+
+/* "Where am I" — the screen the pilot opened, now that the panels below no
+   longer carry their own title band. */
+#dock-screen .dock-screen-label {
+  flex: 0 1 auto;
+  max-width: 32%;
+  overflow: hidden;
+  padding: 6px 10px;
+  color: color-mix(in srgb, var(--dock-accent), #ffe7b0 30%);
+  background: rgba(2, 7, 6, 0.72);
+  border: 1px solid color-mix(in srgb, var(--dock-accent), transparent 55%);
+  font-family: var(--pixel-font);
+  /* The station's own label scale: the screen name is not a footnote. */
+  font-size: var(--station-label);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#dock-screen .dock-wallet-unit { align-self: center; }
+#dock-screen .dock-options-button { min-height: 44px; }
+#dock-screen .dock-wallet { padding: 4px 10px; }
+#dock-screen .dock-wallet span { font-size: var(--station-label); }
+#dock-screen .dock-wallet strong { font-size: 17px; }
+
+@media (max-height: 560px) and (orientation: landscape) {
+  /* A phone header is one line: back, place, screen, credits. */
+  #dock-screen .dock-heading > span { display: none; }
+
+  #dock-screen .dock-header { gap: 8px; }
+
+  /* On a 390px-tall screen the dock content window is ~266px, so the showroom
+     keeps its preview to one band and lets the spec sheet scroll. */
+  #dock-screen .ship-showroom-stage {
+    min-height: 0;
+    grid-template-rows: auto minmax(140px, auto) auto;
+  }
+
+  #dock-screen .ship-showroom-stage .ship-silhouette {
+    min-height: 140px;
+    max-height: 160px;
+  }
+}
+
+/* A window narrower than the header's one-row content (back, place, market
+   tabs, gear ≈ 650px) stacks the tabs under it instead of clipping them. The
+   tab strip already scrolls on its own; it just needs a row to itself. */
+@media (max-width: 700px) {
+  #dock-screen .dock-header { flex-wrap: wrap; row-gap: 6px; }
+  #dock-screen .dock-screen-tabs { order: 3; flex: 1 0 100%; }
+}
+
+/* Sentences keep the readable face; only short labels keep the lettering. */
+#dock-screen :is(.mission-row, .commodity-card, .cargo-sale-item, .ship-stock-option,
+                 .fit-slot, .dealer-item-tile, .dealer-mount, .drone-bay-row,
+                 .trade-ticket, .mission-dossier, .service-card, .ship-card,
+                 .guild-card, .bar-dialogue-card, .ship-showroom-sheet) {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+
+#dock-screen :is(.mission-row, .commodity-card, .cargo-sale-item, .ship-stock-option,
+                 .fit-slot, .dealer-item-tile, .dealer-mount) :is(b, strong) {
+  font-family: var(--pixel-font);
+  letter-spacing: 0.035em;
+}
+
+/* Contract rows: readable at a glance, wrapping instead of truncating. */
+#dock-screen .mission-row { min-height: 78px; }
+#dock-screen .mission-row-copy small { font-size: 13px; letter-spacing: 0.05em; }
+#dock-screen .mission-row-copy b {
+  overflow: visible;
+  font-size: 15px;
+  line-height: 1.25;
+  white-space: normal;
+  text-overflow: clip;
+}
+#dock-screen .mission-row-copy em {
+  overflow: visible;
+  font-size: 13px;
+  white-space: normal;
+  text-overflow: clip;
+}
+#dock-screen .mission-row-value strong { font-size: 15px; }
+#dock-screen .mission-row-value small { margin-top: 8px; font-size: 13px; }
+
+/* The prologue notice is the first thing a new pilot reads. */
+#dock-screen .tutorial-notice-copy > b { font-size: 13px; }
+#dock-screen .tutorial-notice-copy > p { font-size: 13px; line-height: 1.35; }
+#dock-screen .tutorial-notice-actions button { font-size: 13px; }
+.tutorial-skip { font-size: 13px; }
+.ship-menu-tutorial header > b { font-size: 13px; }
+.ship-menu-tutorial > strong { font-size: 13px; }
+.ship-menu-tutorial > p { font-size: 13px; }
+.tutorial-chapter-track i { font-size: 12px; }
+
+/* Ship broker: the comparison values were the smallest text at the dock. */
+#dock-screen .ship-spec-grid > div > span { font-size: 13px; letter-spacing: 0.02em; }
+#dock-screen .ship-hardpoints span { font-size: 13px; }
+#dock-screen .ship-description { font-size: 13px; }
+
+/* Hold state survives the removed exchange title band. */
+#dock-screen .commodity-hold-strip {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  background: rgba(2, 10, 14, 0.72);
+  border-left: 3px solid var(--dock-accent);
+}
+
+#dock-screen .commodity-hold-strip span { color: #8fc9dc; font-size: 11px; letter-spacing: 0.09em; }
+#dock-screen .commodity-hold-strip b { color: var(--void-cream); font-family: var(--pixel-font); font-size: 15px; }
+
+#dock-screen .commodity-list-back { display: none; }
+
+@media (pointer: coarse), (max-width: 900px) {
+  /* Pick a commodity, then trade it — instead of scrolling a catalog past a
+     ticket that stays open for the commodity you did not choose. */
+  #dock-screen .commodity-market-shell { grid-template-columns: minmax(0, 1fr); }
+  #dock-screen .commodity-exchange:not(.is-detail-open) .trade-ticket { display: none; }
+  #dock-screen .commodity-exchange.is-detail-open :is(.commodity-catalog, .cargo-sale-manifest, .market-opportunity-strip) { display: none; }
+  #dock-screen .commodity-list-back { display: block; min-height: 44px; margin-bottom: 8px; }
+  #dock-screen .trade-ticket { position: static; }
+}
+
+/* The flight HUD keeps the tightest targets in the game; the two free-standing
+   corner controls hold the 44 px floor the station menus already enforce. */
+.pause-button,
+.fullscreen-button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Boards opened from the bar rely on the header chevron for going back, so
+   their own header row is just the board's controls. */
+#dock-screen :is(.mission-terminal-header, .guild-terminal-header).is-solo {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  min-height: 0;
+  padding: 6px 8px;
+}
+
+#dock-screen .mission-terminal-header.is-solo nav { grid-column: 1 / -1; width: 100%; }
+#dock-screen .mission-terminal-header.is-solo nav button { flex: 1 1 0; min-height: 44px; padding: 8px 10px; font-size: 13px; }
+#dock-screen .mission-terminal-header.is-solo nav button > b { font-size: 12px; }
+
+/* Dossier and terms: the comparison values were 9–11 px. */
+#dock-screen .mission-dossier-header span { font-size: 12px; }
+#dock-screen .mission-dossier-header small { font-size: 13px; }
+#dock-screen .mission-route-strip small { font-size: 12px; }
+#dock-screen .mission-route-strip b { font-size: 14px; }
+#dock-screen .mission-route-strip em { font-size: 12px; }
+#dock-screen .mission-terms dt { font-size: 12px; }
+#dock-screen .mission-terms dd { font-size: 14px; }
+#dock-screen .mission-objective span { font-size: 12px; }
+#dock-screen .mission-objective b { font-size: 14px; }
+
+#dock-screen .dock-wallet span { font-size: var(--station-label); }
+#dock-screen .mission-list-back { font-size: 13px; }
+#dock-screen .mission-briefing { font-size: 14px; line-height: 1.45; }
+#dock-screen .mission-dossier-actions > small { font-size: 13px; }
+
+/* Final floor sweep: badges, broker deltas and the guild desks were the last
+   places still rendering single-digit type at the dock. */
+#dock-screen .commodity-hold-strip span { font-size: 12px; }
+#dock-screen .ship-spec-grid .stat-delta { font-size: 12px; }
+#dock-screen .ship-trade-numbers small { font-size: 12px; }
+#dock-screen .bar-person-pointer > em { font-size: 12px; }
+#dock-screen .guild-card-head small { font-size: 12px; }
+#dock-screen .guild-meter em { font-size: 12px; }
+#dock-screen .guild-benefits span { font-size: 12px; }
+#dock-screen .guild-next span { font-size: 12px; }
+#dock-screen .guild-next p { font-size: 13px; line-height: 1.4; }
+
+#dock-screen .bar-person-pointer.is-new em { font-size: 12px; }
+#dock-screen .mission-list-empty p,
+#dock-screen .mission-dossier-empty p { font-size: 13px; }
+
+/* Own ship menu (in flight): the four vitals a pilot checks are a strip at the
+   top, the panel is two columns on a phone, and the recorder log is collapsed
+   at the bottom instead of sorted to the front. */
+#ship-panel .ship-status-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  padding: 0 1rem 0.6rem;
+}
+
+#ship-panel .ship-status-cell {
+  display: grid;
+  gap: 3px;
+  padding: 6px 8px;
+  background: rgba(4, 8, 8, 0.5);
+  border: 1px solid rgba(133, 151, 142, 0.22);
+}
+
+#ship-panel .ship-status-cell > span { color: #9db0ab; font-size: 12px; letter-spacing: 0.1em; }
+#ship-panel .ship-status-cell > b { color: var(--void-cream); font-family: var(--pixel-font); font-size: 15px; }
+#ship-panel .ship-status-cell > i { display: block; height: 4px; background: rgba(255, 255, 255, 0.12); }
+#ship-panel .ship-status-cell > i > em { display: block; height: 100%; background: var(--void-cyan); }
+#ship-panel .ship-status-cell[data-tone="hull"] > i > em { background: var(--success); }
+#ship-panel .ship-status-cell[data-tone="shield"] > i > em { background: var(--teal); }
+#ship-panel .ship-status-cell[data-tone="energy"] > i > em { background: var(--void-gold); }
+#ship-panel .ship-status-cell[data-tone="cargo"] > i > em { background: var(--retro-amber); }
+
+#ship-panel .weapon-row span { font-size: 13px; }
+#ship-panel .weapon-row small { font-size: 12px; }
+#ship-panel .weapon-row em { font-size: 12px; }
+#ship-panel .ship-account-row span { font-size: 13px; }
+#ship-panel .ship-account-row span small { font-size: 12px; }
+#ship-panel .ship-account-row b { font-size: 14px; }
+#ship-panel .pause-grid h3 { font-size: 12px; }
+#ship-panel .event-row span { font-size: 13px; }
+#ship-panel .ship-menu-events summary { min-height: 44px; font-size: 12px; }
+#ship-panel .eyebrow { font-size: 12px; }
+
+@media (max-height: 640px) and (orientation: landscape) {
+  /* A phone pairs the short sections side by side and gives the long ones the
+     full width, roughly halving the scroll a pilot has to do mid-flight. */
+  #ship-panel .pause-grid.ship-menu-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 0 10px 10px;
+  }
+
+  #ship-panel :is(.ship-menu-missions, .ship-menu-tutorial, .ship-menu-events) { grid-column: 1 / -1; }
+  #ship-panel .pause-grid section { padding: 8px 10px; }
+  #ship-panel .pause-grid h3 { margin-bottom: 6px; }
+  #ship-panel .ship-status-strip { gap: 5px; padding: 0 10px 6px; }
+}
+
+/* The header chevron is the way back to the market floor, on every layout; the
+   floor plaque above the content was a second control for the same step in a
+   band of its own. */
+#dock-screen .market-menu-screen > .scene-return-pointer { display: none; }
+
+#dock-screen .cargo-sale-empty-line {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  color: #93a8b3;
+  background: rgba(2, 10, 14, 0.66);
+  border-left: 3px solid rgba(140, 170, 180, 0.35);
+  font-size: 13px;
+}
+
+/* The fire-group row (12 px) and the hyperdrive plaque (26 px) are sized by the
+   cockpit art, so an invisible pad — the same trick the plaque already used —
+   extends their touch targets toward the 44 px floor without moving anything. */
+#screen-own-weapon { position: relative; }
+#screen-own-weapon::after { content: ""; position: absolute; inset: -8px 0; }
+#hyperdrive-card::after { inset: -9px 0; }
+
+/* The fitting screen hides the dock header for working height (see the
+   max-height 600px landscape / max-width 700px block), so its own header has
+   to carry the way out. Where the header is still visible it already owns
+   that control, and a second chevron would be one too many. */
+.simple-outfitting > header { gap: 8px; }
+.simple-outfitting .outfit-exit { display: none; }
+
+/* One header row: the way out, what this screen is showing, the wallet. The
+   view tabs name the screen, so they replaced the heading that repeated it in
+   a second full-width band. */
+.simple-outfitting > header > :is(.outfit-heading, .outfit-view-tabs) { flex: 1 1 auto; min-width: 0; }
+.simple-outfitting .outfit-heading { overflow: hidden; font-size: 16px; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+/* No font-size here on purpose: #dock-screen button owns the station's control
+   scale (--station-control) and outranks both of these selectors, so the tabs
+   and the chevron stay the same size as every other dock control. */
+.simple-outfitting .outfit-view-tabs { display: flex; gap: 6px; min-width: 0; }
+.simple-outfitting .outfit-view-tabs button { flex: 0 1 auto; min-width: 0; padding-inline: 12px; overflow: hidden; text-overflow: ellipsis; }
+.simple-outfitting .outfit-credits { flex: 0 0 auto; color: #cfdde4; font-size: var(--station-control); }
+
+@media (max-height: 600px) and (orientation: landscape), (max-width: 700px) {
+  .simple-outfitting .outfit-exit {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+}
+
+/* A pirate ultimatum owns the top of the own-ship menu. It is the one piece of
+   state that decides what the pilot must do in the next few seconds — what is
+   demanded, by whom, and how long is left — so it sits directly under the panel
+   header, above the vitals strip and outside every scrolling section, with a
+   single compliance button beside the terms. */
+#ship-panel .standoff-ultimatum {
+  display: grid;
+  gap: 4px;
+  margin: 0 1rem 0.7rem;
+  padding: 9px 12px 10px;
+  background: linear-gradient(90deg, rgba(122, 30, 22, 0.62), rgba(24, 14, 16, 0.44));
+  border: 1px solid var(--danger);
+  border-left-width: 6px;
+}
+
+#ship-panel .standoff-ultimatum > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+#ship-panel .standoff-ultimatum > header > span {
+  color: #ffb9a6;
+  font-size: 12px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+#ship-panel .standoff-ultimatum > header > em {
+  color: var(--void-cream);
+  font-family: var(--pixel-font);
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+  font-style: normal;
+}
+
+#ship-panel .standoff-demand {
+  color: var(--void-cream);
+  font-family: var(--pixel-font);
+  font-variant-numeric: tabular-nums;
+  font-size: 24px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+#ship-panel .standoff-ultimatum > small { color: #f0c0b0; font-size: 12.5px; }
+
+#ship-panel .standoff-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 5px;
+}
+
+#ship-panel .standoff-actions > button { min-height: 44px; font-size: 13px; }
+#ship-panel .standoff-actions > span {
+  flex: 1 1 190px;
+  min-width: 0;
+  color: #f0c0b0;
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+@media (max-height: 640px) and (orientation: landscape) {
+  #ship-panel .standoff-ultimatum { margin: 0 10px 6px; padding: 6px 10px 8px; }
+  #ship-panel .standoff-demand { font-size: 20px; }
+}
+
+@media (pointer: coarse), (max-width: 900px) {
+  /* The probe-station-navigation walk found two primary controls under the
+     44 px floor on a phone: the trade ticket's quantity stepper (38 px wide
+     cells) and the contract dossier's way back (38 px tall). Both are things a
+     thumb has to hit. */
+  #dock-screen .trade-quantity > div { grid-template-columns: repeat(5, minmax(44px, auto)); }
+  #dock-screen .mission-list-back { min-height: 44px; }
+}
+
+/* Screens that switch within themselves put their tabs in the header bar,
+   exactly where the static screen name sits: one band names the screen and
+   switches inside it, so no panel below repeats the name in a band of its own.
+   This is the grammar Schiffsaustrüstung uses for WEAPONS / SHIP SYSTEMS. */
+#dock-screen .dock-screen-tabs {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+#dock-screen .dock-screen-tabs::-webkit-scrollbar { display: none; }
+
+#dock-screen .dock-screen-tabs button {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+#dock-screen .dock-screen-tabs button.is-active {
+  border-color: #f4ba68;
+  color: #f4ba68;
+}
+
+/* Three panels lost their title row with the same change, so their grid loses
+   that row too — the body has to keep filling the screen instead of collapsing
+   into the auto row. */
+#dock-screen .mission-terminal,
+#dock-screen .guild-terminal { grid-template-rows: minmax(0, 1fr); }
+
+#dock-screen .ship-broker { grid-template-rows: auto minmax(0, 1fr); }

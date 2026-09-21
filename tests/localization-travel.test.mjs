@@ -34,6 +34,22 @@ test('German variables, radio entries and the labels used in lessons remain cons
     assert.doesNotMatch(JSON.stringify(ADVENTURE_DIALOGUES),/Hundekampfarena|Langbasis-Radar|BERGUNG gedrückt|Impulswaffe/);
 });
 
+// Bar contacts are prose, not proper nouns: an untranslated key renders the
+// English sentence inside a German conversation. Location names stay as they
+// are on purpose, so only the person-voiced fields are audited here.
+test('every bar contact has German prose for roles and spoken lines',()=>{
+    const missing=[];
+    for(const [locationId,location] of Object.entries(LOCATIONS))
+        for(const person of location.people??[]){
+            for(const field of ['role','relationship','affiliation','title'])
+                if(person[field] && !DE_CATALOG[person[field]]) missing.push(`${locationId}/${person.id}.${field}: ${person[field]}`);
+            for(const field of ['lines','linesNoPrologue'])
+                for(const [index,line] of (person[field]??[]).entries())
+                    if(!DE_CATALOG[line]) missing.push(`${locationId}/${person.id}.${field}[${index}]: ${line}`);
+        }
+    assert.deepEqual(missing,[]);
+});
+
 function salvageSession(seed,oldSave){
     const save=oldSave??createNewSave(seed,{tutorial:true});
     const quest=getTutorialQuest(save);quest.stepId='salvage-black-box';

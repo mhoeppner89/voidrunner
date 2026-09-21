@@ -180,9 +180,20 @@ const helixPeople = [
         affiliation: 'Vek family',
         portraitSeed: 18,
         lines: [
-            'You finally have the spare key. I will take the Second Light and stay close until the Wayfarer feels like yours.',
+            // Greeting line. The prologue supplies Rin's own line while it runs
+            // (tutorialDialogue), so this one only speaks once that story is
+            // over - and it must not promise an escort that never flies.
+            'Two keys, two ships: you have the Wayfarer, I have the Second Light. That is how our mother wanted it.',
             'Use the target monitor for the next contact and the navigation map for the route. I will keep off your firing line.',
             'Mara calls this a delivery run. She is not wrong, but she is not telling you why I chose the route.',
+        ],
+        // Shown instead when the prologue was skipped: the monitor lesson flew
+        // with a wingman who is not there, and the route was never chosen for a
+        // delivery this career never carried.
+        linesNoPrologue: [
+            'Two keys, two ships: you have the Wayfarer, I have the Second Light. That is how our mother wanted it.',
+            'Keep the transponder on and the hold half empty; a light ship outruns anything you cannot shoot.',
+            'Mara kept that key for years and handed it over the day you walked in. Ask her why now – I would.',
         ],
     },
     {

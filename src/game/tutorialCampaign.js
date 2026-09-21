@@ -369,7 +369,7 @@ export const tutorialCampaignSummary = (save) => {
         choice: quest.choices?.recorder,
         choiceLabel: {
             'tell-mara':'You asked Rin to send Mara the recording.',
-            'trust-rin':'You chose to trust Rin and keep investigating together.',
+            'trust-rin':'You chose to trust Rin and keep looking for the ledger.',
             'keep-recorder':'You kept the recorder and reserved your judgment.',
         }[quest.choices?.recorder],
     };

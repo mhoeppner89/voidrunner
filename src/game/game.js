@@ -9995,6 +9995,32 @@ export class GameSession {
     activeMugDemand() {
         return this.activeMug()?.demand;
     }
+    // How the demand reads to the pilot: "2 × ELECTRONICS" or "1.200 cr". The
+    // compact scan token stays, but it goes through the catalog so the German
+    // build reads "2 × ELEKTRONIK".
+    mugDemandLabel(demand) {
+        if (!demand)
+            return '';
+        return demand.kind === 'cargo'
+            ? `${demand.quantity} × ${t(SCAN_COMMODITY_LABELS[demand.commodity] ?? COMMODITIES[demand.commodity].name.toUpperCase())}`
+            : formatCredits(demand.amount);
+    }
+    // The standoff as the own-ship menu presents it: the demand, who is making
+    // it, how many guns are on the pilot, and the seconds left. The menu calls
+    // this once when it opens, so the group scan stays off the per-frame HUD
+    // path (activeMug is read every frame for the monitor strip).
+    standoffBriefing() {
+        const mugger = this.ships.find((ship) => ship.mug && ship.holdFire);
+        if (!mugger)
+            return undefined;
+        return {
+            demand: mugger.mug.demand,
+            label: this.mugDemandLabel(mugger.mug.demand),
+            secondsLeft: Math.max(0, Math.ceil((mugger.demandUntil ?? 0) - this.save.world.time)),
+            leadName: mugger.name,
+            groupSize: this.ships.filter((ship) => ship.mug === mugger.mug).length,
+        };
+    }
     activeMugCargoCommodity() {
         const demand = this.activeMugDemand();
         return demand?.kind === 'cargo' ? demand.commodity : undefined;
@@ -13244,13 +13270,11 @@ export class GameSession {
             const code = quote?.code ?? 'invalid-quote';
             const message = code === 'insufficient-credits'
                 ? t('Insufficient credits.')
-                : code === 'mass-over-budget'
-                        ? t('Fitting mass exceeded.')
-                        : code === 'cargo-over-capacity'
-                            ? t('Current cargo would exceed the new capacity.')
-                            : code === 'stale-quote'
-                                ? t('The fitting changed; review and apply again.')
-                                : t('Fitting could not be applied.');
+                : code === 'cargo-over-capacity'
+                    ? t('Current cargo would exceed the new capacity.')
+                    : code === 'stale-quote'
+                        ? t('The fitting changed; review and apply again.')
+                        : t('Fitting could not be applied.');
             this.ui.showToast?.(message, 'warning');
             return { ok: false, code, quote };
         }
@@ -13840,9 +13864,7 @@ export class GameSession {
         const mug = this.activeMug();
         const standoff = mug ? {
             kind: mug.demand.kind,
-            label: mug.demand.kind === 'cargo'
-                ? `${mug.demand.quantity} × ${SCAN_COMMODITY_LABELS[mug.demand.commodity] ?? COMMODITIES[mug.demand.commodity].name.toUpperCase()}`
-                : formatCredits(mug.demand.amount),
+            label: this.mugDemandLabel(mug.demand),
             seconds: mug.secondsLeft,
         } : undefined;
         return {

@@ -13,10 +13,10 @@ import { defaultSettings, saveGame } from './save.js';
 import { getLanguage, t } from './i18n.js';
 import { ADVENTURE_DIALOGUES, dialogueText } from './adventureDialogues.js';
 import { HULL_TRADE_IN_RATE, quoteShipTrade } from './shipTrade.js';
-import { LOADOUT_KEYS, HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RATE, itemAvailable, itemFitsMount, loadoutFor, outfittingUsage, quoteOutfitting } from './outfitting.js';
+import { LOADOUT_KEYS, HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RATE, itemAvailable, itemFitsMount, loadoutFor, quoteOutfitting } from './outfitting.js';
 import { playerStrengthValue } from './playerStrength.js';
 import { guildJoinCost, missionBriefing, missionTitle } from './missions.js';
-import { tutorialCampaignSummary, tutorialDialogue } from './tutorialCampaign.js';
+import { getTutorialQuest, tutorialCampaignSummary, tutorialDialogue } from './tutorialCampaign.js';
 import { DRONE_BAY_CAPACITY, DRONE_TYPES, droneBayLayoutFor } from './droneData.js';
 const WARM_IMAGE_TIMEOUT_MS = 5000;
 const settleWarmupPromise = (promise, fallback = false) => new Promise((resolve) => {
@@ -601,6 +601,9 @@ export class GameUI {
     missionDiscardId;
     tutorialSkipConfirm = false;
     missionMobileDetail = false;
+    // Phones show the commodity catalog or one trade ticket, never both. The
+    // wide layout keeps its two columns; the flag only drives the CSS split.
+    marketMobileDetail = false;
     titleVisible = true;
     hasCareerSave = false;
     newCareerConfirm = false;
@@ -1626,7 +1629,12 @@ export class GameUI {
                 this.dockTab = 'market';
                 this.dockTerminal = 'market';
                 this.marketPoint = '';
+                this.marketMobileDetail = false;
                 this.renderDock();
+                break;
+            case 'commodity-list':
+                this.marketMobileDetail = false;
+                this.renderMarketPoint(this.marketPoint || 'commodities');
                 break;
             default:
                 console.debug('Unhandled UI command', command, element);
@@ -1722,6 +1730,7 @@ export class GameUI {
         this.dockTab = 'concourse';
         this.dockTerminal = 'concourse';
         this.marketPoint = '';
+        this.marketMobileDetail = false;
         this.resetOutfittingDrafts();
         this.barPanel = 'people';
         this.barPersonId = undefined;
@@ -1797,6 +1806,49 @@ export class GameUI {
         flight.addEventListener('animationend', onAnimationEnd);
         this.vesperLaunchTimer = window.setTimeout(finish, VESPER_LAUNCH_DURATION + 120);
     }
+    // Screens that switch within themselves put their tabs in the header bar,
+    // exactly where the static screen name would sit: one band names the screen
+    // and switches inside it, and nothing repeats the name underneath. Returns
+    // '' when the screen has nothing to switch between, which leaves the plain
+    // label in place.
+    dockScreenTabs() {
+        if (this.dockTerminal === 'market' && this.marketPoint) {
+            const tab = (point, label) => `<button type="button" class="${this.marketPoint === point ? 'is-active' : ''}" data-market-point="${point}" aria-pressed="${this.marketPoint === point}">${t(label)}</button>`;
+            const tabs = [
+                hasLocationService(this.dockLocation, 'market') ? tab('commodities', 'COMMODITY MARKET') : '',
+                hasLocationService(this.dockLocation, 'outfitting') ? tab('equipment', 'SHIP PARTS') : '',
+                hasLocationService(this.dockLocation, 'shipyard') ? tab('shipyard', 'NEW SHIP') : '',
+                this.denUnlockedAt(this.dockLocation) ? tab('den', "SMUGGLER'S DEN") : '',
+            ].filter(Boolean);
+            // A lone tab would just repeat the label beside it.
+            return tabs.length > 1 ? `<nav class="dock-screen-tabs" aria-label="${t('Market points')}">${tabs.join('')}</nav>` : '';
+        }
+        if (this.dockTerminal === 'bar' && this.barPanel === 'missions') {
+            const { offers, active } = this.missionBoardCounts();
+            const tab = (id, label, count) => `<button type="button" class="${this.missionBoardTab === id ? 'is-active' : ''}" data-mission-board-tab="${id}" aria-pressed="${this.missionBoardTab === id}">${t(label)} <b>${count}</b></button>`;
+            return `<nav class="dock-screen-tabs" aria-label="${t('Mission board sections')}">${tab('available', 'AVAILABLE', offers.length)}${tab('active', 'ACTIVE', active.length)}</nav>`;
+        }
+        return '';
+    }
+    // The screen name shown in the dock header. Content panels no longer
+    // repeat it as their own title band, so this is the single "where am I".
+    dockScreenLabel() {
+        if (this.dockTerminal === 'market')
+            return { commodities: t('COMMODITY MARKET'), equipment: t('SHIP PARTS'), shipyard: t('NEW SHIP'), den: t("SMUGGLER'S DEN") }[this.marketPoint] ?? t('MARKET');
+        if (this.dockTerminal === 'bar' && this.barPanel === 'missions')
+            return t('CONTRACT TERMINAL');
+        if (this.dockTerminal === 'bar' && this.barPanel === 'guilds')
+            return t('GUILDS');
+        return {
+            concourse: t('CONCOURSE'),
+            services: t('SERVICES'),
+            bar: t('BAR'),
+            missions: t('CONTRACT TERMINAL'),
+            guilds: t('GUILDS'),
+            equipment: t('SHIP PARTS'),
+            shipyard: t('NEW SHIP'),
+        }[this.dockTerminal] ?? t('CONCOURSE');
+    }
     renderDock() {
         if (!this.save || !this.dockLocation)
             return;
@@ -1826,12 +1878,27 @@ export class GameUI {
                 : 'concourse';
         const terminal = this.dockTerminal ? this.renderDockTab(this.dockTerminal) : '';
         const notices = `${this.renderDockNotice()}${this.renderTutorialNotice()}`;
+        // One bar names the place and the screen. The old three tiers (station
+        // header, terminal tab row, in-panel title) said the same thing twice
+        // and spent a phone's entire first screen before any content showed.
+        const marketPointOpen = Boolean(this.dockTerminal === 'market' && this.marketPoint);
+        // The bar's boards are a level deeper than the bar floor, so the single
+        // back control steps up one level at a time.
+        const barPanelOpen = this.dockTerminal === 'bar' && this.barPanel !== 'people';
+        const backCommand = marketPointOpen ? 'market-overview'
+            : barPanelOpen ? 'bar-scene'
+                : this.dockTerminal !== 'concourse' ? 'dock-concourse' : '';
+        const backLabel = marketPointOpen ? t('Return to the market floor')
+            : barPanelOpen ? t('Return to the bar')
+                : t('Return to the concourse');
         dock.innerHTML = `
       <div class="dock-backdrop">${this.locationIllustration(this.dockLocation, illustrationScreen)}</div>
-      <div class="dock-scanlines" aria-hidden="true"></div>        <header class="dock-header">
-        <div><span>${t(location.kind.toUpperCase())} / ${t(FACTION_NAMES[location.faction])}</span><h2>${escapeHtml(location.name)}</h2></div>
-        ${this.dockTerminal !== 'concourse' ? `<div class="dock-back-button dock-pointer" data-ui-command="dock-concourse" role="button" tabindex="0" aria-label="${t('Return to the concourse')}">${t('◀ CONCOURSE')}</div>` : ''}
-        <div class="dock-wallet-unit"><div class="dock-wallet"><span>${t('AVAILABLE CREDIT')}</span><strong>${formatCredits(this.save.player.credits)}</strong><small>${SHIPS[this.save.player.shipId].name} · ${cargoMass(this.save.player).toFixed(1)}/${cargoCapacity(this.save.player)} mass</small></div><button class="dock-options-button dock-pointer" data-ui-command="options" role="button" tabindex="0" aria-label="${t('Options')}">⚙</button></div>
+      <div class="dock-scanlines" aria-hidden="true"></div>
+      <header class="dock-header">
+        ${backCommand ? `<button type="button" class="dock-back-button dock-pointer" data-ui-command="${backCommand}" aria-label="${escapeHtml(backLabel)}">◀</button>` : ''}
+        <div class="dock-heading"><span>${t(location.kind.toUpperCase())} · ${t(FACTION_NAMES[location.faction])}</span><h2>${escapeHtml(location.name)}</h2></div>
+        ${this.dockScreenTabs() || `<span class="dock-screen-label">${escapeHtml(this.dockScreenLabel())}</span>`}
+        <div class="dock-wallet-unit"><div class="dock-wallet"><span>${t('CREDIT')}</span><strong>${formatCredits(this.save.player.credits)}</strong></div><button class="dock-options-button dock-pointer" data-ui-command="options" role="button" tabindex="0" aria-label="${t('Options')}">⚙</button></div>
       </header>
       ${notices ? `<div class="dock-notice-stack">${notices}</div>` : ''}
       <div class="dock-content">${terminal}</div>
@@ -1896,7 +1963,7 @@ export class GameUI {
         const campaign = tutorialCampaignSummary(this.save);
         if (!campaign?.active || campaign.stepId !== 'family-choice' || this.dockLocation !== 'cairn' || this.adventure)
             return;
-        this.startAdventure(LOCATIONS.helix.people.find(person => person.id === 'rin-vek'),ADVENTURE_DIALOGUES.cairn);
+        this.startAdventure(this.barPeople('helix').find(person => person.id === 'rin-vek'),ADVENTURE_DIALOGUES.cairn);
         this.adventure.greetingPending = false;
     }
     // The local syndicate's ledger at this dock has crossed the favor line:
@@ -2107,8 +2174,32 @@ export class GameUI {
         }
         this.renderDock();
     }
+    // Bar contacts follow the story, the same way the concourse keeps Rin's
+    // Cairn appearance conditional on the family-choice step. Rin is the worked
+    // example: she jumps ahead to Meridian during the prologue's departure
+    // scene, so she must not still be standing in the Helix bar afterwards
+    // while the campaign panel and her aunt both tell the pilot that she has
+    // gone quiet out there.
+    //
+    // The condition reads the story position, not just the departure flag: a
+    // save that already crossed the gate keeps her away even if that flag did
+    // not survive a migration. A skipped prologue never sent her anywhere, so
+    // she stays - she is how that career hears the family story at all.
+    contactInPort(person, locationId = this.dockLocation) {
+        if (locationId !== 'helix' || person.id !== 'rin-vek')
+            return true;
+        const quest = getTutorialQuest(this.save);
+        if (!quest || quest.flags?.skipped === true)
+            return true;
+        if (quest.flags?.rinDeparted === true || quest.completedAt !== undefined)
+            return false;
+        return !['galaxy-map', 'cross-meridian-gate'].includes(quest.stepId);
+    }
+    barPeople(locationId = this.dockLocation) {
+        return (LOCATIONS[locationId]?.people ?? []).filter((person) => this.contactInPort(person, locationId));
+    }
     renderBar() {
-        const people = LOCATIONS[this.dockLocation].people ?? [];
+        const people = this.barPeople();
         const missionDesk = hasAnyLocationService(this.dockLocation, ['missions', 'race']);
         const guildDesk = this.localGuildIds().length > 0;
         if (this.barPanel === 'missions')
@@ -2130,7 +2221,7 @@ export class GameUI {
     `;
     }
     talkToPerson(personId) {
-        const person = LOCATIONS[this.dockLocation].people?.find((entry) => entry.id === personId);
+        const person = this.barPeople().find((entry) => entry.id === personId);
         if (!person) return;
         this.barPanel = 'people';
         this.barPersonId = undefined;
@@ -2149,7 +2240,7 @@ export class GameUI {
     }
     guildRepresentative(guildId, locationId = this.dockLocation) {
         const personId = this.guildRepresentativeId(guildId, locationId);
-        return LOCATIONS[locationId]?.people?.find((person) => person.id === personId);
+        return this.barPeople(locationId).find((person) => person.id === personId);
     }
     personGuildId(personId) {
         return Object.entries(GUILD_REPRESENTATIVE_BY_LOCATION[this.dockLocation] ?? {})
@@ -2176,7 +2267,7 @@ export class GameUI {
     dialogueResponse(person, topicId) {
         const memory = this.save.world.npcMemory?.[person.id] ?? { topics: {}, talks: 0 };
         const count = Math.max(0, (memory.topics?.[topicId] ?? 1) - 1);
-        const lines = (person.lines ?? []).map((line) => t(line));
+        const lines = ((this.prologueUnplayed() && person.linesNoPrologue) || person.lines || []).map((line) => t(line));
         const activeMission = this.dialogueMission(person);
         if (topicId === 'work') {
             if (activeMission) {
@@ -2247,7 +2338,7 @@ export class GameUI {
         return { text: lines[lineIndex] ?? lines[0] ?? t('Nothing useful comes to mind.') };
     }
     selectDialogueTopic(topicId) {
-        const person = LOCATIONS[this.dockLocation]?.people?.find((entry) => entry.id === this.barPersonId);
+        const person = this.barPeople().find((entry) => entry.id === this.barPersonId);
         if (!person || !this.dialogueTopics(person).some((topic) => topic.id === topicId))
             return;
         this.actions?.talkToNpc?.(person.id, topicId);
@@ -2273,23 +2364,39 @@ export class GameUI {
             this.renderDock();
         }
     }
+    // A career that skipped (or never started) the prologue never flew the
+    // escort, the delivery or the practice flights those conversations describe.
+    // Its copies of them must not promise a Second Light that never takes off.
+    prologueUnplayed() {
+        const quest = getTutorialQuest(this.save);
+        return !quest || quest.flags?.skipped === true;
+    }
     adventureLabel(de, en) { return getLanguage() === 'de' ? de : en; }
     startAdventure(person, script, space = false, message = '') {
         if (this.adventure) return;
         if (space) this.storyDismissed = false;
         if (this.save) this.adventureHistory = this.save.world.dialogueHistory ?? [];
         this.adventure = { person, script, space, nodeId: script?.start, asked: new Set(), transcript: [], history: false,
-            greetingPending: !space, pendingTopic: undefined, previousFocus: document.activeElement };
+            noPrologue: this.prologueUnplayed(), greetingPending: !space, pendingTopic: undefined, previousFocus: document.activeElement };
         if (!script) {
             this.dialogueTopic = 'greeting';
             const text = space || message ? message : this.dialogueResponse(person,'greeting').text;
             this.adventure.nodeId = '@greeting';
             this.adventure.node = { text, next: space || message ? '@end' : '@topics' };
             const replay = !space && !message && this.dockLocation === 'helix' && (person.id === 'mara-vek' ? 'mara' : person.id === 'rin-vek' ? 'rin' : undefined);
-            if (replay) this.adventure.node.choices = [
-                {label:this.adventureLabel('Ich habe ein paar Fragen.','I have a few questions.'),next:'@topics'},
-                {label:this.adventureLabel('Noch einmal: Wie fing das mit der Wayfarer an?','Tell me again: how did this start with the Wayfarer?'),replay},
-            ];
+            if (replay) {
+                // "Tell me again" only when the pilot actually heard it. An
+                // aborted prologue leaves both family flags unset, and asking a
+                // stranger to repeat a story they never heard reads as a bug;
+                // the same choice becomes how a skipped career hears it at all.
+                const heard = Boolean(getTutorialQuest(this.save)?.flags?.[person.id === 'mara-vek' ? 'metMara' : 'metRin']);
+                this.adventure.node.choices = [
+                    {label:this.adventureLabel('Ich habe ein paar Fragen.','I have a few questions.'),next:'@topics'},
+                    heard
+                        ? {label:this.adventureLabel('Noch einmal: Wie fing das mit der Wayfarer an?','Tell me again: how did this start with the Wayfarer?'),replay}
+                        : {label:this.adventureLabel('Wie fing das mit der Wayfarer an?','How did this start with the Wayfarer?'),replay},
+                ];
+            }
         }
         this.root.querySelector('#game-shell')?.classList.add('adventure-open');
         this.renderAdventure();
@@ -2315,9 +2422,11 @@ export class GameUI {
     adventureNode() {
         const state = this.adventure;
         if (!state.script) return state.node;
-        const node = state.script.nodes[state.nodeId];
+        const scripted = state.script.nodes[state.nodeId];
+        const node = state.noPrologue && scripted.noPrologue ? { ...scripted, ...scripted.noPrologue } : scripted;
         const choices = (node.returnTo ? state.script.nodes[node.returnTo].choices : node.choices)
-            ?.filter(choice => (!choice.requires || state.asked.has(choice.requires)) && (!choice.next || !state.asked.has(choice.next)));
+            ?.filter(choice => (!choice.requires || state.asked.has(choice.requires)) && (!choice.next || !state.asked.has(choice.next)))
+            ?.map(choice => state.noPrologue && choice.noPrologueLabel ? { ...choice, label: choice.noPrologueLabel } : choice);
         return choices ? { ...node, choices } : node;
     }
     adventureTopics(render = true) {
@@ -2459,7 +2568,7 @@ export class GameUI {
     }
 
     renderBarDialogue(personId) {
-        const person = LOCATIONS[this.dockLocation].people?.find((entry) => entry.id === personId);
+        const person = this.barPeople().find((entry) => entry.id === personId);
         if (!person)
             return this.renderBar();
         const response = this.dialogueResponse(person, this.dialogueTopic);
@@ -2502,7 +2611,6 @@ export class GameUI {
         return `
       <div class="market-screen market-menu-screen">
         <div class="scene-pointer scene-return-pointer" data-ui-command="market-overview" role="button" tabindex="0" aria-label="${t('Return to the market floor')}"><i>◀</i><b>${t('MARKET FLOOR')}</b><small>${t('Back to the scene')}</small></div>
-        <nav class="market-points" aria-label="${t('Market points')}">${commodityMarket ? `<button class="${this.marketPoint === 'commodities' ? 'active' : ''}" data-market-point="commodities">${t('COMMODITY MARKET')}</button>` : ''}${outfitting ? `<button class="${this.marketPoint === 'equipment' ? 'active' : ''}" data-market-point="equipment">${t('SHIP PARTS')}</button>` : ''}${shipyard ? `<button class="${this.marketPoint === 'shipyard' ? 'active' : ''}" data-market-point="shipyard">${t('NEW SHIP')}</button>` : ''}${this.denUnlockedAt(this.dockLocation) ? `<button class="${this.marketPoint === 'den' ? 'active' : ''}" data-market-point="den">${t('SMUGGLER\'S DEN')}</button>` : ''}</nav>
         <div id="market-point-content"></div>
       </div>
     `;
@@ -2530,6 +2638,17 @@ export class GameUI {
             this.marketCommodityId = restrictedIds.find((id) => (this.save.player.cargo[id] ?? 0) > 0) ?? restrictedIds[0] ?? commodityIds[0];
         }
         this.marketQuantity = 1;
+        this.marketMobileDetail = false;
+        // The fitting stage lives on the UI object, so a pilot who left the
+        // dealer on an item's detail page used to land straight back on it
+        // instead of the fitting overview. Entering always starts at the top;
+        // the guns/systems choice is a preference and survives.
+        if (point === 'equipment') {
+            this.outfittingItemId = undefined;
+            this.outfittingMountId = undefined;
+            this.outfittingStage = 'overview';
+            this.outfittingNotice = undefined;
+        }
         this.renderDock();
     }
     selectMarketCommodity(commodityId) {
@@ -2539,6 +2658,7 @@ export class GameUI {
             return;
         this.marketCommodityId = commodityId;
         this.marketQuantity = 1;
+        this.marketMobileDetail = true;
         this.renderMarketPoint(this.marketPoint || 'commodities');
     }
     setMarketQuantity(command) {
@@ -2679,17 +2799,18 @@ export class GameUI {
             ? `<div class="best-known-route"><span>${t('BEST KNOWN ROUTE')}</span><b>${escapeHtml(LOCATIONS[bestRoute.destinationId]?.shortName ?? bestRoute.destinationId)} · +${formatCredits(bestRoute.profitPerUnit)}/${t('UNIT')}</b><small>${t('Estimate from your last observed destination price.')}</small></div>`
             : `<div class="best-known-route muted"><span>${t('BEST KNOWN ROUTE')}</span><b>${t('NO PROFITABLE QUOTE RECORDED')}</b><small>${t('Visit ports or ask around at the bar.')}</small></div>`;
         return `
-        <div class="market-layout commodity-exchange ${den ? 'is-den' : ''}">
-          <div class="table-title commodity-market-title"><div><span class="eyebrow">${den ? t('UNLICENSED EXCHANGE') : t('COMMODITY EXCHANGE')}</span><h3>${den ? t('Smuggler\'s den') : t('Cargo catalog')}</h3></div><div><span>${t('HOLD')}</span><b>${cargoMass(this.save.player).toFixed(1)} / ${cargoCapacity(this.save.player)} ${t('MASS')}</b></div></div>
-          <section class="cargo-sale-manifest ${carried.length ? '' : 'is-empty'}" aria-label="${t('CARGO TO SELL')}">
-            <header><div><span class="eyebrow">${t('YOUR HOLD')}</span><h3>${t('CARGO TO SELL')}</h3></div>${carried.length ? `<div><span>${carriedTypeLabel} · ${carriedUnitLabel}</span><b>${formatCredits(carriedValue)}</b><small>${t('AT CURRENT PRICES')}</small></div>` : ''}</header>
+        <div class="market-layout commodity-exchange ${den ? 'is-den' : ''} ${this.marketMobileDetail ? 'is-detail-open' : ''}">
+          <div class="commodity-hold-strip"><span>${t('HOLD')}</span><b>${cargoMass(this.save.player).toFixed(1)} / ${cargoCapacity(this.save.player)} ${t('MASS')}</b></div>
+          ${carried.length ? `<section class="cargo-sale-manifest" aria-label="${t('CARGO TO SELL')}">
+            <header><div><span class="eyebrow">${t('YOUR HOLD')}</span><h3>${t('CARGO TO SELL')}</h3></div><div><span>${carriedTypeLabel} · ${carriedUnitLabel}</span><b>${formatCredits(carriedValue)}</b><small>${t('AT CURRENT PRICES')}</small></div></header>
             ${cargoManifest}
             ${otherCargoMass > 0.01 ? `<small class="cargo-sale-other">${t('OTHER CARGO · {mass} MASS IS NOT TRADED HERE', { mass: otherCargoMass.toFixed(1) })}</small>` : ''}
-          </section>
+          </section>` : `<p class="cargo-sale-empty-line">${t(den ? 'NO RESTRICTED CARGO LOADED' : 'NO LOOSE CARGO LOADED')} — ${t(den ? 'Restricted goods in your hold will appear here.' : 'Bought, mined, and salvaged goods will appear here.')}</p>`}
           ${den ? '' : `<div class="market-opportunity-strip"><span><small>${t('BEST LOCAL BUY')}</small><b>${escapeHtml(t(COMMODITIES[bestLocalBuy].name))} · ${formatCredits(market[bestLocalBuy].lastPrice)}</b></span><span><small>${t('STRONGEST LOCAL DEMAND')}</small><b>${escapeHtml(t(COMMODITIES[strongestDemand].name))}</b></span><em>${t('Remote quotes are last-known, not live.')}</em></div>`}
           <div class="commodity-market-shell">
             <div class="commodity-catalog" role="listbox" aria-label="${t('Commodities')}">${catalog}</div>
             <section class="trade-ticket ${commodity.legal ? '' : 'restricted'}" style="--commodity-accent:${commodity.accent}">
+              <button type="button" class="commodity-list-back" data-ui-command="commodity-list">${t('◀ ALL COMMODITIES')}</button>
               <div class="trade-ticket-hero">${this.commodityArt(commodity, 'hero')}<div><span class="eyebrow">${escapeHtml(t(commodity.category))} · ${escapeHtml(t(commodity.packaging))}</span><h3>${escapeHtml(t(commodity.name))}</h3><p>${escapeHtml(t(commodity.description))}</p><blockquote>${escapeHtml(t(commodity.flavor))}</blockquote></div></div>
               <div class="trade-market-readout">
                 <div><span>${t('UNIT PRICE')}</span><b>${formatCredits(price)}</b><small class="price-${band.className}">${band.label}</small></div>
@@ -2722,7 +2843,6 @@ export class GameUI {
         if (point !== 'shipyard')
             this.shipDetailId = undefined;
         this.disposeShipPreviews();
-        marketScreen.querySelectorAll('[data-market-point]').forEach((button) => button.classList.toggle('active', button.dataset.marketPoint === point));
         // A commodity selection refreshes the same exchange panel; keep the
         // catalog's scroll anchor instead of bouncing back to the top.
         const prevCatalogScroll = content.querySelector('.commodity-catalog')?.scrollTop ?? 0;
@@ -2925,23 +3045,24 @@ export class GameUI {
           </footer>
         </article>`;
     }
-    renderMissions() {
+    // The board's two lists, in the order the tabs and the list both need them.
+    missionBoardCounts() {
         const posted = this.save.world.offers[this.dockLocation] ?? [];
         const raceActive = (mission) => mission.kind === 'race'
             && this.save.world.raceRecords?.[mission.id.slice(5)]?.active === true;
-        const offers = posted.filter((mission) => !raceActive(mission));
-        const active = [...this.save.activeMissions, ...posted.filter(raceActive)];
+        return {
+            offers: posted.filter((mission) => !raceActive(mission)),
+            active: [...this.save.activeMissions, ...posted.filter(raceActive)],
+        };
+    }
+    renderMissions() {
+        const { offers, active } = this.missionBoardCounts();
         const source = this.missionBoardTab === 'active' ? active : offers;
         const selected = source.find((mission) => mission.id === this.missionSelectedId) ?? source[0];
         if (selected)
             this.missionSelectedId = selected.id;
         return `
       <div class="mission-terminal ${this.missionMobileDetail ? 'is-detail-open' : ''}">
-        <header class="mission-terminal-header">
-          <button type="button" data-ui-command="bar-scene">${t('◀ BAR')}</button>
-          <div><span class="eyebrow">${t('CONTRACT TERMINAL')}</span><h3>${t('Local work')}</h3></div>
-          <nav aria-label="${t('Mission board sections')}"><button type="button" class="${this.missionBoardTab === 'available' ? 'is-active' : ''}" data-mission-board-tab="available">${t('AVAILABLE')} <b>${offers.length}</b></button><button type="button" class="${this.missionBoardTab === 'active' ? 'is-active' : ''}" data-mission-board-tab="active">${t('ACTIVE')} <b>${active.length}</b></button></nav>
-        </header>
         <div class="mission-terminal-body">
           <aside class="mission-browser" aria-label="${t('Contract list')}">
             ${source.length ? source.map((mission) => this.renderMissionListRow(mission, mission.id === selected?.id)).join('') : `<div class="mission-list-empty"><b>${this.missionBoardTab === 'active' ? t('NO ACTIVE CONTRACTS') : t('NO FRESH CONTRACTS')}</b><p>${this.missionBoardTab === 'active' ? t('Accepted work and live progress will appear here.') : t(tutorialCampaignSummary(this.save)?.active ? 'Finish the family prologue to take on contracts and races.' : 'Launch, trade, or return after the board cycles.')}</p></div>`}
@@ -3163,7 +3284,6 @@ export class GameUI {
             'invalid-item': t('Invalid module assignment.'),
             'incompatible-mount': t('That module does not fit this mount.'),
             'too-many-items': t('Too many modules in this group.'),
-            'mass-over-budget': t('Fitting mass exceeded.'),
             'cargo-over-capacity': t('Current cargo would exceed the new capacity.'),
             'duplicate-unique-module': t('This utility can only be fitted once.'),
             'item-unavailable': t('That module is not available at this dock.'),
@@ -3394,7 +3514,6 @@ export class GameUI {
         const labelFor=x=>`${t(x.mount.label??OUTFIT_CATEGORY_KEYS[x.key])} ${x.index+1} · ${x.mount.size}`;
         const back=to=>`<button type="button" data-ui-command="outfit-stage" data-outfit-stage="${to}">${t('BACK')}</button>`;
         const stats=this.outfittingStatsFor(player.shipId,loadout);
-        const usage=outfittingUsage(player,player.shipId,loadout);
         const flightEquipment=item=>item?.id==='tracking-turret'?TRACKING_LASER:item?.id==='pdc'?WEAPONS.pdc:WEAPONS[weaponIdForOutfit(item)];
         const weaponDetails=(item)=>{
             const w=flightEquipment(item);
@@ -3408,7 +3527,7 @@ export class GameUI {
                 const item=OUTFIT_ITEMS[loadout[x.key]?.[x.index]];
                 return `<button type="button" class="fit-slot" data-outfit-slot="${x.mount.id}"><span>${escapeHtml(labelFor(x))}</span><b>${item?escapeHtml(t(item.name)):t('ADD EQUIPMENT')}</b><small>${item?escapeHtml(weaponDetails(item)):t('Choose a compatible module.')}</small></button>`;
             }).join('');
-            action=`<span>${t('FITTING MASS')}: ${usage.mass} / ${usage.massLimit}</span><button data-outfit-view="locker">${t('STORED EQUIPMENT')}</button>`;
+            action=`<button data-outfit-view="locker">${t('STORED EQUIPMENT')}</button>`;
         } else if(stage==='equipment') {
             heading=labelFor(selected);
             const candidates=OUTFIT_ITEM_IDS.map(id=>OUTFIT_ITEMS[id]).filter(item=>itemFitsMount(item,selected.mount) && (stored[item.id]>0 || itemAvailable(player,item,this.dockLocation)))
@@ -3424,7 +3543,11 @@ export class GameUI {
             const draft=JSON.parse(JSON.stringify(loadout));draft[selected.key][selected.index]=item.id;
             const quote=this.outfittingQuote(draft),w=flightEquipment(item),before=flightEquipment(old);
             const after=this.outfittingStatsFor(player.shipId,draft);
-            const metric=(label,a,b)=>`<div class="fit-comparison"><span>${t(label)}</span><b>${a ?? '—'} → ${b}</b></div>`;
+            // Stat numbers are scaled at load (WEAPON_DAMAGE_SCALE), so raw
+            // floats like 9.200000000000001 reach the panel. Trim the noise
+            // instead of printing it.
+            const statText=v=>typeof v==='number'?String(Math.round(v*1000)/1000):(v ?? '—');
+            const metric=(label,a,b)=>`<div class="fit-comparison"><span>${t(label)}</span><b>${statText(a)} → ${statText(b)}</b></div>`;
             body=`<p>${escapeHtml(weaponDetails(item))}</p><p>${t('REPLACES')}: <b>${old?escapeHtml(t(old.name)):t('EMPTY')}</b></p>`;
             if(w){
                 body+=metric('RANGE (km)',before?Math.round(weaponRange(before)):undefined,Math.round(weaponRange(w)));
@@ -3445,10 +3568,15 @@ export class GameUI {
                 body+=sortieImpactMarkup(item,stats,after);
             }
             if(old && old.id!==item.id)body+=`<p>${t('{name} returns to your locker.',{name:t(old.name)})}</p>`;
-            const draftUsage=outfittingUsage(player,player.shipId,draft);
-            body+=`<small>${t('FITTING MASS')}: ${draftUsage.mass} / ${draftUsage.massLimit}</small>`;
-            if(!quote.ok)body+=`<p role="status">${escapeHtml(this.outfittingErrorLabel(quote.code))}</p>`;
-            action=back('equipment')+`<button class="primary" data-outfit-action="install" ${!quote.ok || old?.id===item.id?'disabled':''}>${quote.netCost>0?t('BUY & INSTALL')+' · '+formatCredits(quote.netCost):t('INSTALL FROM LOCKER')+' · '+t('NO CHARGE')}</button>`;
+            // A failed quote reports what the staged fit would cost rather
+            // than omitting it, so the action can never advertise a free locker
+            // install for a module the pilot has to buy.
+            const stagedCost=Math.max(0,Number(quote.netCost ?? quote.spent ?? 0));
+            if(!quote.ok){
+                const shortfall=Math.max(0,stagedCost-Number(player.credits));
+                body+=`<p role="status">${escapeHtml(quote.code==='insufficient-credits'&&shortfall>0?t('You need {credits} more.',{credits:formatCredits(shortfall)}):this.outfittingErrorLabel(quote.code))}</p>`;
+            }
+            action=back('equipment')+`<button class="primary" data-outfit-action="install" ${!quote.ok || old?.id===item.id?'disabled':''}>${stagedCost>0?t('BUY & INSTALL')+' · '+formatCredits(stagedCost):t('INSTALL FROM LOCKER')+' · '+t('NO CHARGE')}</button>`;
         } else {
             heading=t('STORED EQUIPMENT');
             body=Object.entries(stored).filter(([id,n])=>n>0 && OUTFIT_ITEMS[id]).map(([id,n])=>`<button class="fit-slot" data-outfit-item="${id}"><b>${escapeHtml(t(OUTFIT_ITEMS[id].name))} ×${n}</b><small>${t('SELECT')}</small></button>`).join('') || `<p>${t('Your locker is empty.')}</p>`;
@@ -3457,8 +3585,19 @@ export class GameUI {
             if(item && stored[item.id]>0)action+=`<button data-outfit-action="sell">${t('SELL ONE')} · ${escapeHtml(t(item.name))} · +${formatCredits(Math.round(item.price*RESALE_RATE))}</button>`;
         }
         const notice=this.outfittingNotice;
-        return `<div class="simple-outfitting"><header><b>${escapeHtml(heading)}</b><span>${formatCredits(player.credits)}</span></header>
-            ${stage==='overview'?`<nav><button data-outfit-view="guns" aria-pressed="${!systems}">${t('WEAPONS')}</button><button data-outfit-view="systems" aria-pressed="${systems}">${t('SHIP SYSTEMS')}</button></nav>`:''}
+        // The fitting screen trades the dock header for working height, so it
+        // carries its own way out: up to the market floor when the dealer was
+        // opened from it, otherwise back to the concourse. Without this the
+        // screen had no exit at all on a phone.
+        const exitCommand=this.marketPoint?'market-overview':'dock-concourse';
+        const exitLabel=this.marketPoint?t('Return to the market floor'):t('Return to the concourse');
+        // One row: the way out, what this screen is showing, and the wallet. On
+        // the overview the view tabs name the screen — a heading above them
+        // said the same thing in a second row and cost a phone 40px of list.
+        const headerMiddle=stage==='overview'
+            ? `<nav class="outfit-view-tabs" aria-label="${t('Fitting sections')}"><button data-outfit-view="guns" aria-pressed="${!systems}">${t('WEAPONS')}</button><button data-outfit-view="systems" aria-pressed="${systems}">${t('SHIP SYSTEMS')}</button></nav>`
+            : `<b class="outfit-heading">${escapeHtml(heading)}</b>`;
+        return `<div class="simple-outfitting"><header><button type="button" class="outfit-exit dock-pointer" data-ui-command="${exitCommand}" aria-label="${escapeHtml(exitLabel)}">◀</button>${headerMiddle}<span class="outfit-credits">${formatCredits(player.credits)}</span></header>
             ${this.outfitGroupHelp?`<aside class="fit-help-popup" role="dialog" aria-label="${t('WEAPON GROUP HELP')}"><h3>${t('WEAPON GROUP HELP')}</h3><p>${t('Tap the weapon name to cycle populated groups and Fire all. Fire all uses every forward gun; missiles and automatic turrets stay separate. In Outfitting, open a gun’s details to assign A or B. Try beams in A and your other weapon in B to control energy use.')}</p><button data-ui-command="dismiss-group-help">${t('UNDERSTOOD')}</button></aside>`:''}<div class="simple-fit-scroll" data-scroll-key="${stage}-${this.outfittingCategory}-${selected?.mount.id ?? ''}">${notice?`<p role="status">${escapeHtml(notice.message)}</p>`:''}${stage === 'overview' && systems ? this.renderDroneBayConfiguration() : ''}${body}</div><footer>${action}</footer></div>`;
     }
     renderEquipment() {
@@ -3469,14 +3608,11 @@ export class GameUI {
         if (!stockIds.length)
             return `<div class="shipyard-grid"><p class="market-empty">${t('No hulls for sale at this port.')}</p></div>`;
         const selectedId = stockIds.includes(this.shipDetailId) ? this.shipDetailId : stockIds[0];
-        const current = SHIPS[this.save.player.shipId] ?? SHIPS.wayfarer;
-        const tradeIn = Math.round(current.price * HULL_TRADE_IN_RATE);
         this.shipDetailId = selectedId;
+        // No broker title band: the header bar names the screen, the stock list
+        // is the screen, and the selected hull's card already carries the
+        // current ship, the trade-in value and the balance.
         return `<div class="ship-broker" data-selected-ship="${selectedId}">
-          <header class="ship-broker-header">
-            <div><span class="eyebrow">${t('SHIP BROKER')}</span><h3>${escapeHtml(t('HULLS AT {location}', { location: LOCATIONS[this.dockLocation].name }))}</h3></div>
-            <div class="ship-broker-current"><span>${t('CURRENT SHIP')}</span><b>${escapeHtml(current.name)}</b><small>${t('TRADE-IN VALUE')} · ${formatCredits(tradeIn)}</small></div>
-          </header>
           <nav class="ship-stock-list" aria-label="${t('Hulls for sale')}">
             ${stockIds.map((shipId) => this.renderShipSelector(shipId, selectedId)).join('')}
           </nav>
@@ -3588,7 +3724,6 @@ export class GameUI {
         const guildIds = this.localGuildIds();
         return `
       <div class="guild-terminal">
-        <header class="guild-terminal-header"><button type="button" data-ui-command="bar-scene">${t('◀ BAR')}</button><div><span class="eyebrow">${t('LOCAL REPRESENTATIVES')}</span><h3>${t('Guild desks')}</h3></div><small>${escapeHtml(LOCATIONS[this.dockLocation].name)}</small></header>
         <div class="guild-grid">
         ${guildIds.map((id) => {
             const rep = this.save.player.guildRep[id];
@@ -4944,7 +5079,7 @@ export class GameUI {
         const mass = cargoMass(player);
         const capacity = cargoCapacity(player);
         const loadPercent = capacity > 0 ? Math.min(100, Math.round((mass / capacity) * 100)) : 0;
-        const mug = this.mugDemand?.();
+        const standoff = this.mugStandoff?.();
         const cargoEntries = Object.entries(player.cargo)
             .filter(([, qty]) => qty > 0)
             .map(([id, qty]) => {
@@ -5007,9 +5142,50 @@ export class GameUI {
             `<div class="weapon-row launcher-row${entry.selected ? ' is-active' : ''}"><span>${entry.selected ? '▸ ' : ''}${escapeHtml(t(entry.launcher.nameKey))}</span><small>${escapeHtml(t(entry.launcher.ordnanceNameKey))} · ${t('MOUNT {number}', { number: entry.index + 1 })}</small><em>${entry.rounds}/${entry.capacity}</em></div>`
         )).join('') || `<div class="weapon-row is-locked"><span>${t('LAUNCHER')}</span><small>${t('NOT INSTALLED')}</small><em>0/0</em></div>`;
         const tutorialSection = this.renderShipTutorial();
+        // The four numbers a pilot checks mid-flight, at the top of the panel
+        // instead of scattered through the account and drone sections below.
+        const stats = getEffectiveShipStats(player);
+        const statusCells = [
+            ['HULL', `${Math.ceil(player.hull)}/${Math.ceil(stats.hull)}`, (player.hull / Math.max(1, stats.hull)) * 100, 'hull'],
+            ['SHIELDS', `${Math.round(player.shield)}/${Math.round(stats.shield)}`, (player.shield / Math.max(1, stats.shield)) * 100, 'shield'],
+            ['ENERGY', `${Math.round(player.energy)}/${Math.round(stats.energyCapacity)}`, (player.energy / Math.max(1, stats.energyCapacity)) * 100, 'energy'],
+            ['CARGO', `${mass.toFixed(1)}/${capacity}`, loadPercent, 'cargo'],
+        ].map(([label, value, fill, tone]) => `<div class="ship-status-cell" data-tone="${tone}"><span>${t(label)}</span><b>${value}</b><i><em style="width:${Math.max(0, Math.min(100, fill)).toFixed(0)}%"></em></i></div>`).join('');
+        // A pirate ultimatum is the one thing in the panel that decides what the
+        // pilot must do in the next few seconds, so it sits above the vitals and
+        // ahead of every scrolling section, with its own countdown and a single
+        // compliance button. It used to be a row inside ACCOUNT, below the fold.
+        const standoffBanner = (() => {
+            const demand = standoff?.demand;
+            if (!demand)
+                return '';
+            const cargo = demand.kind === 'cargo';
+            const amount = demand.amount ?? 0;
+            const affordable = cargo || player.credits >= amount;
+            const crew = standoff.groupSize > 1
+                ? t('{count} SHIPS HOLDING FIRE', { count: standoff.groupSize })
+                : t('SHIP HOLDING FIRE');
+            const who = [callsignHandle(standoff.leadName ?? ''), crew].filter(Boolean).join(' · ');
+            const comply = cargo
+                ? `<button type="button" class="primary" data-jettison="${escapeHtml(demand.commodity ?? '')}">${t('JETTISON {label}', { label: standoff.label })}</button>`
+                : `<button type="button" class="primary" data-pay-mug="1" ${affordable ? '' : 'disabled'}>${t('PAY {label}', { label: standoff.label })}</button>`;
+            const terms = cargo
+                ? t('They take the cargo and leave. Fight and they open fire.')
+                : affordable
+                    ? t('They take the toll and leave. Fight and they open fire.')
+                    : t('Credit short by {credits}. Jettison cargo or fight.', { credits: formatCredits(amount - player.credits) });
+            return `<aside class="standoff-ultimatum" data-tone="danger" role="alert">
+            <header><span>${t('PIRATE ULTIMATUM')}</span><em>${t('{seconds}s', { seconds: standoff.secondsLeft })}</em></header>
+            <b class="standoff-demand">${escapeHtml(standoff.label)}</b>
+            <small>${escapeHtml(who)}</small>
+            <div class="standoff-actions">${comply}<span>${escapeHtml(terms)}</span></div>
+          </aside>`;
+        })();
         panel.innerHTML = `
       <div class="modal-card ship-card">
         <header><div><span class="eyebrow">${t('SHIP STATUS / PAUSED')}</span><h2>${escapeHtml(ship?.name ?? 'VOIDRUNNER')}</h2></div><button data-ui-command="close-ship">${t('CLOSE')}</button></header>
+        ${standoffBanner}
+        <div class="ship-status-strip">${statusCells}</div>
         <div class="pause-grid ship-menu-grid">
           ${tutorialSection}
           <section class="ship-menu-missions"><h3>${t('ACTIVE CONTRACTS · {count}/6', { count: missions.length })}</h3>${missionRows}</section>
@@ -5019,10 +5195,8 @@ export class GameUI {
           <section class="ship-menu-account"><h3>${t('ACCOUNT')}</h3>
             <div class="ship-account-row"><span>${t('AVAILABLE CREDIT')}</span><b>${formatCredits(player.credits)}</b></div>
             <div class="ship-account-row"><span>${t('COMBAT VALUE')}<small>${t('SHIP + EQUIPMENT · HALF CASH · NO CARGO')}</small></span><b>${formatCredits(combatValue)}</b></div>
-            ${mug?.kind === 'credits' ? `<div class="ship-account-row"><span>${t('STANDOFF TOLL')}</span><button data-pay-mug="1">${t('PAY')} ${formatCredits(mug.amount)}</button></div>` : ''}
-            <div class="ship-account-row"><span>${t('HULL')}</span><b>${Math.ceil(player.hull)}/${Math.ceil(getEffectiveShipStats(player).hull)}</b></div>
           </section>
-          <section class="ship-menu-events"><h3>${t('RECENT EVENTS · {count}', { count: this.recentEvents.length })}</h3>${eventRows}</section>
+          <section class="ship-menu-events"><details><summary>${t('RECENT EVENTS · {count}', { count: this.recentEvents.length })}</summary>${eventRows}</details></section>
         </div>
 
       </div>`;
