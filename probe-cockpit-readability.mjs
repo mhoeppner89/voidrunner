@@ -12,13 +12,14 @@ const CDP_PORT = 9385;
 const profile = mkdtempSync(join(tmpdir(), 'vr-cockpit-readability-'));
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], {
+const reuseServer = process.argv.includes('--reuse-server');
+const server = reuseServer ? null : spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], {
     cwd: ROOT,
     stdio: ['ignore', 'pipe', 'pipe'],
 });
 let serverOutput = '';
-server.stdout.on('data', (chunk) => { serverOutput += chunk; });
-server.stderr.on('data', (chunk) => { serverOutput += chunk; });
+server?.stdout.on('data', (chunk) => { serverOutput += chunk; });
+server?.stderr.on('data', (chunk) => { serverOutput += chunk; });
 
 const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
     '--headless=new', '--disable-gpu', '--enable-unsafe-swiftshader',
@@ -42,7 +43,13 @@ const send = (method, params = {}) => new Promise((resolve, reject) => {
 });
 
 const evaluate = async (expression) => {
-    const response = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+    let response;
+    try {
+        response = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+    }
+    catch (error) {
+        throw new Error('Runtime.evaluate failed for: ' + expression.slice(0, 110) + ' — ' + error.message);
+    }
     if (response.exceptionDetails)
         throw new Error(response.exceptionDetails.exception?.description ?? response.exceptionDetails.text);
     return response.result?.value;
@@ -81,6 +88,15 @@ if (!activeViewports.length)
     throw new Error(`Unknown cockpit viewport: ${requestedViewport}`);
 
 const STATES = ['target', 'race', 'warning'];
+const COCKPIT_SHIP_IDS = ['wayfarer', 'vanguard', 'talon', 'prospector', 'lancer', 'atlas',
+    'speedster', 'legionary', 'andromeda', 'torsas', 'astra'];
+const allHulls = process.argv.includes('--all-hulls');
+const opponentSightline = process.argv.includes('--sightline');
+const requestedShip = process.argv.find((arg) => arg.startsWith('--ship='))?.slice('--ship='.length);
+const activeShips = allHulls ? COCKPIT_SHIP_IDS : [requestedShip ?? 'wayfarer'];
+if (activeShips.some((shipId) => !COCKPIT_SHIP_IDS.includes(shipId)))
+    throw new Error('Unknown cockpit ship: ' + requestedShip);
+const activeStates = allHulls ? ['target'] : STATES;
 
 const setViewport = (viewport) => send('Emulation.setDeviceMetricsOverride', {
     width: viewport.width,
@@ -102,22 +118,23 @@ const navigate = async (url) => {
 
 const prepareFlight = async (viewport) => {
     await setViewport(viewport);
-    await navigate(`http://127.0.0.1:${PORT}/?cockpit-readability=${Date.now()}`);
+    await navigate(`http://127.0.0.1:${PORT}/?startup-probe=1&cockpit-readability=${Date.now()}`);
     await waitFor('Boolean(window.__VOID_PRIVATEER__)', 'game hooks');
     await evaluate(`localStorage.setItem('voidrunner-lang', ${JSON.stringify(viewport.language)}); localStorage.setItem('__VOID_PRIVATEER_PROBE_LANG__', ${JSON.stringify(viewport.language)})`);
-    await navigate(`http://127.0.0.1:${PORT}/?cockpit-language=${viewport.language}&reload=${Date.now()}`);
+    await navigate(`http://127.0.0.1:${PORT}/?startup-probe=1&cockpit-language=${viewport.language}&reload=${Date.now()}`);
     await waitFor('Boolean(window.__VOID_PRIVATEER__)', 'reloaded game hooks');
     await waitFor(`document.documentElement.lang === ${JSON.stringify(viewport.language)}`, 'requested language');
-    await evaluate('window.__VOID_PRIVATEER__.newGame()');
-    await waitFor("window.__VOID_PRIVATEER__.getRuntime?.()?.save?.player?.dockedAt === 'helix'", 'docked career');
-    await evaluate('window.__VOID_PRIVATEER__.launch()');
-    await waitFor("!window.__VOID_PRIVATEER__.getRuntime?.()?.save?.player?.dockedAt && !document.querySelector('#hud')?.classList.contains('is-hidden')", 'live cockpit');
+    // Arena flight skips the tutorial's required first-dock conversations.
+    // Return a sentinel instead of serializing the live session graph.
+    await evaluate("window.__VOID_PRIVATEER__.startArena('open', '1v1', 'rookie'); true");
+    await waitFor("Boolean(window.__VOID_PRIVATEER__.getRuntime()) && !document.querySelector('#hud')?.classList.contains('is-hidden')", 'live cockpit');
     await pause(250);
 };
 
-const rigState = (state) => evaluate(`(() => {
+const rigState = (state, shipId = 'wayfarer') => evaluate(`(() => {
     const rt = window.__VOID_PRIVATEER__.getRuntime();
     const ui = rt.ui;
+    ui.setCockpitShip(${JSON.stringify(shipId)});
     // Hold the live HUD refresh while the probe presents a dense deterministic
     // state. The world can keep rendering, but it must not overwrite the model
     // between updateHud() and the screenshot/measurement.
@@ -126,6 +143,10 @@ const rigState = (state) => evaluate(`(() => {
     ui.dismissStory();
     ui.recentEvents.length = 0;
     const model = rt.buildHudModel();
+    // updateHud selects the cockpit artwork from the model, so preserve the
+    // requested preview hull instead of silently reverting every capture to
+    // the saved ship id.
+    model.shipId = ${JSON.stringify(shipId)};
     model.contacts = [{
         type: 'distress', distress: true, x: 0.82, y: -0.42, altitude: 0,
         distance: 1284, selected: false,
@@ -167,6 +188,13 @@ const rigState = (state) => evaluate(`(() => {
         onScreen: false,
         edge: { x: innerWidth - 74, y: Math.round(innerHeight * 0.42), angleDeg: 90 },
     };
+    if (${opponentSightline}) {
+        model.target.onScreen = true;
+        model.target.screenX = innerWidth / 2;
+        model.target.screenY = innerHeight / 2;
+        model.target.distance = 135;
+        delete model.target.edge;
+    }
     model.monitorStatus = undefined;
     model.ownMonitorStatus = undefined;
     model.standoff = undefined;
@@ -213,6 +241,59 @@ const rigState = (state) => evaluate(`(() => {
     }
     ui.updateHud(model);
     return true;
+})()`);
+
+const placeOpponentInSightline = (shipId) => evaluate(`(async () => {
+    const api = window.__VOID_PRIVATEER__;
+    const rt = api.getRuntime();
+    const { Vector3, Quaternion } = await import('./vendor/three.module.min.js');
+    if (rt.frameId)
+        cancelAnimationFrame(rt.frameId);
+    rt.active = false;
+    const player = rt.save.player;
+    const firstPirate = rt.ships.find((entry) => entry.role === 'pirate' && entry.hull > 0);
+    if (!firstPirate)
+        return { missing: true, reason: 'arena did not spawn a pirate' };
+    const playerPosition = new Vector3(...player.position);
+    const playerRotation = new Quaternion(...player.rotation);
+    const forward = new Vector3(0, 0, -1).applyQuaternion(playerRotation).normalize();
+    const right = new Vector3(1, 0, 0).applyQuaternion(playerRotation).normalize();
+    const opponents = rt.__cockpitSightlineShips ??= [firstPirate];
+    while (opponents.length < 3)
+        opponents.push(rt.spawnShip('pirate', playerPosition.toArray()));
+    const lateralOffsets = [0, -57, 57];
+    for (let index = 0; index < opponents.length; index += 1) {
+        const opponent = opponents[index];
+        opponent.position = playerPosition.clone()
+            .addScaledVector(forward, 135)
+            .addScaledVector(right, lateralOffsets[index])
+            .toArray();
+        opponent.prevPosition = [...opponent.position];
+        opponent.velocity = [0, 0, 0];
+        opponent.prevRotation = [...opponent.rotation];
+        opponent.variant ??= 'talon';
+        rt.renderer.ensureGlbShipModel(opponent.variant);
+    }
+    await Promise.all(opponents.map((opponent) => rt.renderer.glbShipLoading.get(opponent.variant)));
+    const opponent = opponents[0];
+    rt.save.player.currentTargetId = opponent.id;
+    rt.renderer.setTarget(opponent.id);
+    rt.lastHudUpdate = Number.POSITIVE_INFINITY;
+    rt.syncRender(0, performance.now());
+    const projections = opponents.map((entry) => api.projectToScreen(entry.position));
+    const projection = projections[0];
+    return {
+        missing: false,
+        shipId: opponent.id,
+        variant: opponent.variant,
+        projection,
+        opponentCount: opponents.length,
+        visibleCount: projections.filter((entry) => entry.visible && !entry.behind).length,
+        viewport: [innerWidth, innerHeight],
+        centered: projection.visible
+            && Math.abs(projection.x - innerWidth / 2) < innerWidth * 0.04
+            && Math.abs(projection.y - innerHeight / 2) < innerHeight * 0.04,
+    };
 })()`);
 
 const scanCockpit = () => evaluate(`(() => {
@@ -267,6 +348,24 @@ const scanCockpit = () => evaluate(`(() => {
         }).filter((entry) => entry.left < -1 || entry.top < -1 || entry.right > 1 || entry.bottom > 1);
         return { className: monitor.className, rect: [rect.x, rect.y, rect.width, rect.height], escaped };
     });
+    const touchControls = [
+        ['throttle', '.touch-left .touch-throttle'], ['stick', '.touch-left .touch-stick'],
+        ['boost', '.touch-right .touch-boost-right'], ['fire', '#touch-fire'],
+        ['launcher', '#touch-launcher-cycle'], ['missile', '#touch-missile'],
+    ].map(([name, selector]) => {
+        const element = root.querySelector(selector);
+        const rect = element?.getBoundingClientRect();
+        return { name, visible: Boolean(element && visible(element)), rect: rect ? [rect.x, rect.y, rect.width, rect.height] : null };
+    });
+    const touchOcclusions = monitors.flatMap((monitor) => {
+        const [left, top, width, height] = monitor.rect;
+        const right = left + width, bottom = top + height;
+        return touchControls.filter((control) => control.visible && control.rect).filter((control) => {
+            const [controlLeft, controlTop, controlWidth, controlHeight] = control.rect;
+            return Math.min(right, controlLeft + controlWidth) - Math.max(left, controlLeft) > 1
+                && Math.min(bottom, controlTop + controlHeight) - Math.max(top, controlTop) > 1;
+        }).map((control) => ({ screen: monitor.className, control: control.name }));
+    });
     const own = root.querySelector('.cockpit-screen-own');
     const ownLauncher = root.querySelector('#screen-own-launcher');
     const ownBars = own.querySelector('.screen-bars').getBoundingClientRect();
@@ -283,7 +382,7 @@ const scanCockpit = () => evaluate(`(() => {
     const touchMissileCount = root.querySelector('#touch-missile-count');
     const touchLauncherCode = root.querySelector('#touch-launcher-code');
     const targetName = root.querySelector('#screen-target-name');
-    const transponder = root.querySelector('#screen-radar-transponder');
+    const radarCanvas = root.querySelector('#radar');
     const telemetryClipped = [...root.querySelectorAll('.screen-flight span, .screen-flight b, .screen-flight small')]
         .filter(visible)
         .filter((element) => element.scrollWidth > element.clientWidth + 1)
@@ -306,15 +405,14 @@ const scanCockpit = () => evaluate(`(() => {
         tinyText,
         critical,
         monitors,
+        touchControls,
+        touchOcclusions,
         targetName: {
             visible: visible(targetName),
             size: Number.parseFloat(getComputedStyle(targetName).fontSize),
             text: targetName.textContent,
         },
-        transponder: {
-            size: Number.parseFloat(getComputedStyle(transponder).fontSize),
-            text: transponder.textContent,
-        },
+        radar: { visible: visible(radarCanvas), label: radarCanvas?.getAttribute('aria-label') ?? '' },
         telemetryClipped,
         ownLauncher: {
             visible: visible(ownLauncher),
@@ -388,25 +486,27 @@ try {
 
     for (const viewport of activeViewports) {
         await prepareFlight(viewport);
-        for (const state of STATES) {
-            await rigState(state);
+        for (const shipId of activeShips) {
+        for (const state of activeStates) {
+            await rigState(state, shipId);
             await pause(180);
             const result = await scanCockpit();
-            const prefix = `${viewport.name} ${viewport.language} ${state}`;
+            const prefix = `${viewport.name} ${viewport.language} ${shipId} ${state}`;
             check(`${prefix}: cockpit renders`, !result.missing);
             check(`${prefix}: no page overflow`, result.overflowX <= 1, `${result.overflowX}px`);
             check(`${prefix}: all visible cockpit text is at least 10px`, result.tinyText.length === 0, JSON.stringify(result.tinyText.slice(0, 8)));
             check(`${prefix}: critical monitor text is at least 10px`, result.critical.every((entry) => entry.size >= 9.9), JSON.stringify(result.critical.filter((entry) => entry.size < 9.9).slice(0, 8)));
             check(`${prefix}: all monitor children stay inside their screens`, result.monitors.every((entry) => entry.escaped.length === 0), JSON.stringify(result.monitors.flatMap((entry) => entry.escaped).slice(0, 8)));
             check(`${prefix}: target name remains visible`, result.targetName.visible && result.targetName.size >= 9.9, JSON.stringify(result.targetName));
-            check(`${prefix}: transponder state is readable`, result.transponder.size >= 9.9, JSON.stringify(result.transponder));
+            check(`${prefix}: radar canvas has an accessible navigation label`, result.radar.visible && Boolean(result.radar.label), JSON.stringify(result.radar));
             check(`${prefix}: core telemetry values are complete`, result.telemetryClipped.length === 0, JSON.stringify(result.telemetryClipped));
             check(`${prefix}: radar distance text is at least 10px`, result.radarFont >= 9.9, `${result.radarFont}px`);
             check(`${prefix}: race/warning strip clears the status bars`, result.stripOverlap <= 1, `${result.stripOverlap.toFixed(1)}px`);
-            check(`${prefix}: cockpit buttons do not clip their text`, result.buttons.every((entry) => !entry.overflow), JSON.stringify(result.buttons));
-            if (!viewport.mobile)
+            if (!allHulls)
+                check(`${prefix}: cockpit buttons do not clip their text`, result.buttons.every((entry) => !entry.overflow), JSON.stringify(result.buttons));
+            if (!allHulls && !viewport.mobile)
                 check(`${prefix}: own monitor shows the selected launcher`, result.ownLauncher.visible && result.ownLauncher.text === 'SKR 1 3/4', JSON.stringify(result.ownLauncher));
-            if (viewport.mobile) {
+            if (!allHulls && viewport.mobile) {
                 check(`${prefix}: cockpit text buttons are 44px touch targets`, result.buttons.every((entry) => entry.height >= 43.5), JSON.stringify(result.buttons));
                 check(`${prefix}: hyperdrive control fits its phone content`, result.hyperdrive.width <= 180, `${result.hyperdrive.width.toFixed(1)}px`);
                 check(`${prefix}: launcher selector carries typed live ordnance`, result.touchLauncher.visible
@@ -419,7 +519,16 @@ try {
                     && result.touchLauncher.height >= 47.5
                     && !result.touchLauncher.overlapsMissile, JSON.stringify(result.touchLauncher));
             }
-            await capture(`/private/tmp/voidrunner-cockpit-${viewport.name}-${viewport.language}-${state}.png`);
+            if (viewport.mobile && (shipId === 'vanguard' || allHulls))
+                check(`${prefix}: live monitors stay clear of phone controls`, result.touchOcclusions.length === 0, JSON.stringify(result.touchOcclusions));
+            await capture(`/private/tmp/voidrunner-cockpit-${viewport.name}-${viewport.language}-${shipId}-${state}.png`);
+            if (opponentSightline) {
+                const sightline = await placeOpponentInSightline(shipId);
+                check(`${prefix}: three real opponents remain visible in the forward field`, !sightline.missing && sightline.centered && sightline.opponentCount === 3 && sightline.visibleCount === 3, JSON.stringify(sightline));
+                await pause(120);
+                await capture(`/private/tmp/voidrunner-cockpit-sightline-${viewport.name}-${shipId}-${state}.png`);
+            }
+        }
         }
     }
 
@@ -449,12 +558,14 @@ try {
 }
 catch (error) {
     console.error('COCKPIT READABILITY ERROR:', error.stack ?? error.message);
+    console.error('BROWSER ERRORS:', JSON.stringify(pageErrors.slice(0, 8)));
+    console.error('BROWSER STATE:', await evaluate("JSON.stringify({ title: document.title, hud: document.querySelector('#hud')?.className, dockedAt: window.__VOID_PRIVATEER__?.getState()?.player?.dockedAt, body: document.body.innerText.slice(0, 160) })").catch(() => 'unavailable'));
     process.exitCode = 1;
 }
 finally {
     try { await send('Browser.close'); } catch { /* ignore */ }
     chrome.kill();
-    server.kill();
+    server?.kill();
     await pause(350);
     rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 }

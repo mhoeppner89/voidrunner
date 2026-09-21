@@ -10,10 +10,15 @@ export const CANOPY_APERTURES={
  prospector:'200,120 800,120 905,290 900,490 820,625 180,625 100,490 95,290',
  lancer:'205,100 795,100 890,330 875,480 805,625 195,625 125,480 110,330',
  atlas:'200,140 800,140 835,210 835,555 805,620 195,620 165,555 165,210',
+ speedster:'280,115 720,115 835,255 805,510 670,635 330,635 195,510 165,255',
+ legionary:'165,160 835,160 905,300 865,515 770,625 230,625 135,515 95,300',
+ andromeda:'75,215 925,215 980,350 930,550 805,625 195,625 70,550 20,350',
+ torsas:'105,75 895,75 895,440 765,625 235,625 105,440',
+ astra:'175,100 825,100 910,320 820,595 180,595 90,320',
 };
 export function cockpitDamageMarkup() {
  return `<svg class="cockpit-damage" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true">
- <defs><clipPath id="canopy-aperture"><polygon class="canopy-aperture" points="${CANOPY_APERTURES.wayfarer}"/></clipPath><mask id="canopy-damage-mask" maskUnits="userSpaceOnUse"><rect width="1000" height="660" fill="white"/><image class="canopy-art-mask" width="1000" height="1000" preserveAspectRatio="none" href="./assets/remaster/cockpit-frame.webp" filter="url(#canopy-opaque)"/></mask><filter id="canopy-opaque"><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"/></filter></defs>
+ <defs><clipPath id="canopy-aperture"><polygon class="canopy-aperture" points="${CANOPY_APERTURES.wayfarer}"/></clipPath><mask id="canopy-damage-mask" maskUnits="userSpaceOnUse"><rect width="1000" height="660" fill="white"/><image class="canopy-art-mask" width="1000" height="1000" preserveAspectRatio="none" href="./assets/remaster/cockpit-wayfarer-sprite.png" filter="url(#canopy-opaque)"/></mask><filter id="canopy-opaque"><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"/></filter></defs>
  <g clip-path="url(#canopy-aperture)" mask="url(#canopy-damage-mask)" fill="none" stroke-linejoin="miter">
  <g class="fracture fracture-1"><path d="M80 210L141 253 158 295 211 327 226 369M141 253L183 247 202 218M158 295L119 314 102 352M211 327L243 318 268 340M898 140L861 194 877 235 843 267 811 278M861 194L821 190 794 161M877 235L910 261 919 295"/></g>
  <g class="fracture fracture-2"><path d="M102 352L163 391 176 448 215 470 228 527M163 391L209 375 254 389 286 371M176 448L143 468 128 509M226 369L254 389 272 438 304 460M811 278L773 312 783 359 748 385 723 416M783 359L831 386 855 428M773 312L736 296 710 306M215 470L252 489 271 535"/></g>

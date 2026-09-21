@@ -2757,9 +2757,9 @@ button.compact {
   }
 }
 
-/* Wayfarer cockpit integration: three live displays sit in the generated
-   freighter dashboard windows. The canvas remains visible through the blank
-   canopy aperture; only physical frame pixels come from the art plate. */
+/* Live displays sit inside each hull's painted apertures. The canvas remains
+   visible through the open canopy; the art plate supplies the physical frame
+   and instrument panels. */
 .cockpit-screen {
   position: absolute;
   z-index: 3;
@@ -3997,7 +3997,7 @@ html[lang="de"] .comms-bar.story::after {
     text-align: center;
   }
 
-  .screen-flight span { grid-area: label; }
+  .screen-flight span { grid-area: label; letter-spacing: -.055em; }
   .screen-flight b { grid-area: value; text-align: right; }
   .screen-flight small { grid-area: suffix; text-align: left; }
 }
@@ -5051,18 +5051,18 @@ button.primary,
 }
 
 /* In-flight cockpit painted sprite — .cockpit-art receives the active hull's
-   frame from GameUI, with Wayfarer as the CSS fallback. The HUD overlays sit
-   above the shared monitor openings. Locked to the camera via
+   frame from GameUI, with a ship-specific monitor layout. The HUD overlays sit
+   inside each hull's painted monitor openings. Locked to the camera via
    translate3d+rotate so it tracks with the cockpit transform during banking
    and afterburner. */
 .cockpit-art {
   inset: -1.2%;
   z-index: 1;
-  background: url("../assets/remaster/cockpit-frame.webp") center / 100% 100% no-repeat;
-  image-rendering: pixelated;
+  background: url("../assets/remaster/cockpit-wayfarer-sprite.png") center / 100% 100% no-repeat;
+  image-rendering: auto;
   transform: translate3d(var(--cockpit-shift-x), var(--cockpit-shift-y), 0) rotate(var(--cockpit-roll)) scale(var(--cockpit-zoom));
   transform-origin: 50% 72%;
-  filter: contrast(1.06) saturate(1.00) brightness(1.04) drop-shadow(0 -6px 18px rgba(0, 0, 0, 0.55));
+  filter: drop-shadow(0 -6px 18px rgba(0, 0, 0, 0.55));
   opacity: 1 !important;
   will-change: transform;
 }
@@ -15610,9 +15610,22 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 }
 .cockpit-instruments .cockpit-art { inset:0; background-size:100% 100%; transform:none; }
 .cockpit-instruments .cockpit-screen { transform:none; }
-.cockpit-instruments .cockpit-screen-own { left:18.8%; top:71.2%; width:16.8%; height:22.6%; }
-.cockpit-instruments .cockpit-screen-radar { left:42.1%; top:71.2%; width:15.2%; height:23.2%; }
-.cockpit-instruments .cockpit-screen-target { left:63.6%; top:71.2%; width:17%; height:22.6%; }
+.cockpit-instruments .cockpit-screen-own {
+  left:var(--cockpit-own-left,12.8%); top:var(--cockpit-own-top,74%);
+  width:var(--cockpit-own-width,20.3%); height:var(--cockpit-own-height,22.3%);
+}
+.cockpit-instruments .cockpit-screen-radar {
+  left:var(--cockpit-radar-left,42.7%); top:var(--cockpit-radar-top,75.1%);
+  width:var(--cockpit-radar-width,14%); height:var(--cockpit-radar-height,18.1%);
+}
+.cockpit-instruments .cockpit-screen-target {
+  left:var(--cockpit-target-left,65.9%); top:var(--cockpit-target-top,73.5%);
+  width:var(--cockpit-target-width,18.9%); height:var(--cockpit-target-height,21%);
+}
+#game-shell:is([data-cockpit-ship="talon"],[data-cockpit-ship="prospector"],[data-cockpit-ship="atlas"],[data-cockpit-ship="speedster"],[data-cockpit-ship="andromeda"],[data-cockpit-ship="torsas"],[data-cockpit-ship="astra"]) .cockpit-screen-radar,
+#game-shell:is([data-cockpit-ship="talon"],[data-cockpit-ship="prospector"],[data-cockpit-ship="atlas"],[data-cockpit-ship="speedster"],[data-cockpit-ship="andromeda"],[data-cockpit-ship="torsas"],[data-cockpit-ship="astra"]) .cockpit-screen-radar::after {
+  border-radius:50%;
+}
 @media (max-width:900px), (pointer:coarse) { .cockpit-instruments { inset:-2.4%; } }
 @media (max-width:720px) and (orientation:landscape) { .cockpit-instruments { inset:-7.77% -4.6%; } }
 /* At scale 1.3 the steering well reaches the own-display bezel. */

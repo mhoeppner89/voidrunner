@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Voidrunner cockpit art — before / after</title>
+  <style>
+    :root { color-scheme: dark; font: 15px/1.45 system-ui,sans-serif; background:#11181d; color:#e4e5dd; }
+    * { box-sizing:border-box; }
+    body { margin:0; }
+    main { max-width:1500px; margin:auto; padding:28px clamp(14px,3vw,42px) 60px; }
+    header { max-width:760px; margin:0 0 24px; }
+    h1 { margin:0 0 8px; font-size:clamp(25px,4vw,40px); letter-spacing:-.035em; }
+    header p { margin:6px 0; color:#aab4b3; }
+    .key { display:flex; gap:8px; align-items:center; margin:18px 0 26px; color:#aab4b3; font-size:13px; }
+    .key i { width:22px; height:14px; border:1px solid #4cc8d5; background:#071317; display:inline-block; }
+    .ships { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,560px),1fr)); gap:18px; }
+    article { min-width:0; padding:16px; background:#1b242a; border:1px solid #344148; }
+    .ship-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+    .ship-copy { min-width:0; }
+    h2 { margin:0; font-size:18px; }
+    .role { color:#9aa7a4; font-size:12px; }
+    .hull-reference { flex:none; width:92px; height:58px; object-fit:contain; background:#11191e; border:1px solid #344148; }
+    .comparison { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    figure { min-width:0; margin:0; }
+    figcaption { margin:0 0 5px; color:#aab4b3; font-size:11px; text-transform:uppercase; letter-spacing:.1em; }
+    .art-window {
+      position:relative; width:100%; aspect-ratio:1672 / 941; overflow:hidden;
+      background-color:#1d292e;
+      background-image:linear-gradient(45deg,#27343a 25%,transparent 25%),linear-gradient(-45deg,#27343a 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#27343a 75%),linear-gradient(-45deg,transparent 75%,#27343a 75%);
+      background-size:16px 16px; background-position:0 0,0 8px,8px -8px,-8px 0;
+      outline:1px solid #3b494c;
+    }
+    .art-window img { position:absolute; inset:0; width:100%; height:100%; object-fit:fill; }
+    .screen-guide {
+      position:absolute; display:grid; place-items:center; overflow:hidden;
+      color:#78d8dc; background:rgba(3,13,17,.94);
+      border:1px solid #48bac5; box-shadow:inset 0 0 0 1px #081c20;
+      font:700 clamp(6px,.72vw,10px)/1 ui-monospace,monospace; letter-spacing:.04em;
+    }
+    .screen-own { left:var(--own-left); top:var(--own-top); width:var(--own-width); height:var(--own-height); }
+    .screen-radar { left:var(--radar-left); top:var(--radar-top); width:var(--radar-width); height:var(--radar-height); }
+    .screen-target { left:var(--target-left); top:var(--target-top); width:var(--target-width); height:var(--target-height); }
+    .screen-guide::after { content:""; position:absolute; inset:15%; border:1px solid #28636a; opacity:.8; }
+    .round-radar .screen-radar, .round-radar .screen-radar::after { border-radius:50%; }
+    .note { margin:8px 0 0; color:#aab4b3; font-size:11px; }
+    .gameplay { margin-top:14px; }
+    .gameplay-shot { display:block; width:100%; aspect-ratio:16 / 9; object-fit:contain; background:#05090e; outline:1px solid #3b494c; }
+    .gameplay-shot.phone-shot { aspect-ratio:844 / 390; }
+    @media (max-width:600px) {
+      main { padding-top:18px; }
+      article { padding:11px; }
+      .comparison { gap:8px; }
+      .ship-heading { align-items:center; }
+      .hull-reference { width:72px; height:46px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Ship-specific cockpit art</h1>
+      <p>All eleven hulls, compared with the previous shared cockpit art. Wayfarer is unchanged; the other frames use simpler flat panels, hull-matched colors and different screen layouts. The radar, own-ship and target guides are aligned to the sprite glass. Actual desktop and phone flight captures show how much of space remains visible.</p>
+      <div class="key"><i aria-hidden="true"></i> live-screen opening / placement</div>
+    </header>
+    <section class="ships" id="ships" aria-label="Before and after cockpit art for every ship"></section>
+  </main>
+  <script>
+    const sharedLayout = {
+      own: { left:'18.8%', top:'71.2%', width:'16.8%', height:'22.6%' },
+      radar: { left:'42.1%', top:'71.2%', width:'15.2%', height:'23.2%' },
+      target: { left:'63.6%', top:'71.2%', width:'17%', height:'22.6%' },
+    };
+    const ships = [
+      { id:'wayfarer', name:'Wayfarer', role:'freighter · Vesper', hull:'ship-isometric-wayfarer-vesper-lit-v3.png', before:'frame', phoneShot:'cockpit-sightlines/wayfarer-phone.png', finish:'Approved Wayfarer cockpit, sprite and monitor layout are unchanged.', layout:{ own:{left:'18%',top:'71%',width:'17.6%',height:'22.6%'}, radar:{left:'42.2%',top:'70.2%',width:'14.7%',height:'22.9%'}, target:{left:'64.1%',top:'70.6%',width:'18.7%',height:'22.5%'} } },
+      { id:'vanguard', name:'Vanguard', role:'heavy fighter · Vesper', hull:'ship-isometric-vanguard.webp', before:'vanguard', afterAsset:'cockpit-vanguard-sprite-v7.png', phoneShot:'cockpit-sightlines/vanguard-phone.png', finish:'The enlarged radar and two side displays now sit below the phone crop; the blue-and-cream Vesper brow retains a clear central view and open control wells.', layout:{ own:{left:'23.4%',top:'17.6%',width:'11.2%',height:'8.9%'}, radar:{left:'41.3%',top:'11.8%',width:'17.4%',height:'12.2%'}, target:{left:'65.4%',top:'17.6%',width:'11.2%',height:'8.9%'} } },
+      { id:'talon', name:'Talon', role:'interceptor · Vesper', hull:'ship-isometric-talon-vesper-lit-v1.png', before:'talon', afterAsset:'cockpit-talon-sprite-v6.png', phoneShot:'cockpit-sightlines/talon-phone.png', finish:'The target sits fully inside the brow; the starboard radar is raised above touch controls, with own-ship status low-center.', round:true, layout:{ own:{left:'40.4%',top:'82.7%',width:'18.8%',height:'9.8%'}, radar:{left:'81.9%',top:'28.5%',width:'8.9%',height:'15.5%'}, target:{left:'40.8%',top:'11.9%',width:'18.4%',height:'6.9%'} } },
+      { id:'prospector', name:'Prospector', role:'mining ship · Vesper', hull:'ship-isometric-prospector-vesper-lit-v1.png', before:'prospector', afterAsset:'cockpit-prospector-sprite-v3.png', phoneShot:'cockpit-sightlines/prospector-phone.png', finish:'Broad olive and cream workboat panels, restrained rust-orange pipes, a port own/radar stack and lower-center target screen.', round:true, layout:{ own:{left:'11.1%',top:'22.1%',width:'11.7%',height:'13.8%'}, radar:{left:'11.4%',top:'41.8%',width:'10.6%',height:'18.8%'}, target:{left:'39.9%',top:'76.6%',width:'20.3%',height:'14%'} } },
+      { id:'lancer', name:'Lancer', role:'medium fighter · Vesper', hull:'ship-isometric-lancer-vesper-lit-v1.png', before:'lancer', afterAsset:'cockpit-lancer-sprite-v2.png', phoneShot:'cockpit-sightlines/lancer-phone.png', finish:'Pale-metal and graphite fighter frame with rust-red panels, split upper radar/target stations and a wide low-center own display.', layout:{ own:{left:'36.4%',top:'73.2%',width:'27.3%',height:'18.9%'}, radar:{left:'15.1%',top:'24.2%',width:'17.5%',height:'24.2%'}, target:{left:'67.3%',top:'24.3%',width:'17.6%',height:'24.1%'} } },
+      { id:'atlas', name:'Atlas', role:'heavy hauler · Vesper', hull:'ship-isometric-atlas-vesper-lit-v1.png', before:'atlas', afterAsset:'cockpit-atlas-sprite-v4.png', phoneShot:'cockpit-sightlines/atlas-phone.png', finish:'A broad freighter canopy with a top-center target and starboard radar; the port telemetry pod is raised clear of the throttle.', round:true, layout:{ own:{left:'7.5%',top:'20.1%',width:'12.5%',height:'16.7%'}, radar:{left:'80.7%',top:'20.8%',width:'12.8%',height:'22.8%'}, target:{left:'36.8%',top:'6.5%',width:'26.4%',height:'15%'} } },
+      { id:'speedster', name:'Speedster', role:'light interceptor · Acheron', hull:'landed-league/speedster.png', before:'talon', afterAsset:'cockpit-speedster-sprite-v4.png', phoneShot:'cockpit-sightlines/speedster-phone.png', finish:'Its upper-left telemetry now clears the throttle; independent starboard targeting and a broad low-center radar define the forked interceptor layout.', round:true, layout:{ own:{left:'4.5%',top:'20.6%',width:'11.4%',height:'13.2%'}, radar:{left:'41.9%',top:'62.8%',width:'16.3%',height:'28.9%'}, target:{left:'83.6%',top:'25.5%',width:'11.6%',height:'13.4%'} } },
+      { id:'legionary', name:'Legionary', role:'line fighter · Acheron', hull:'landed-league/legionary.png', before:'lancer', afterAsset:'cockpit-legionary-sprite-v3.png', phoneShot:'cockpit-sightlines/legionary-phone.png', finish:'A shallow, pale Acheron fighter frame with a unique low-center triptych; the main forward view stays completely clear.', layout:{ own:{left:'44.4%',top:'80.6%',width:'11.2%',height:'7.5%'}, radar:{left:'28.7%',top:'76.8%',width:'11.8%',height:'10.8%'}, target:{left:'59.5%',top:'76.8%',width:'11.8%',height:'10.8%'} } },
+      { id:'andromeda', name:'Andromeda', role:'strike gunship · Acheron', hull:'landed-league/andromeda.png', before:'vanguard', afterAsset:'cockpit-andromeda-sprite-v2.png', phoneShot:'cockpit-sightlines/andromeda-phone.png', finish:'A broad silver/graphite gunship frame with a port-side round radar, high starboard target station and low-center telemetry.', round:true, layout:{ own:{left:'39.4%',top:'75.6%',width:'21.4%',height:'15.9%'}, radar:{left:'9.6%',top:'41.6%',width:'14.4%',height:'25.2%'}, target:{left:'66.3%',top:'26.6%',width:'23.9%',height:'19.9%'} } },
+      { id:'torsas', name:'Torsas', role:'transport / gunship · Acheron', hull:'landed-league/torsas.png', before:'frame', afterAsset:'cockpit-torsas-sprite-v4.png', phoneShot:'cockpit-sightlines/torsas-phone.png', finish:'The upper-port target pod is raised and moved inboard from the throttle; starboard radar and low-center telemetry leave the main view open.', round:true, layout:{ target:{left:'8.1%',top:'19.3%',width:'15.1%',height:'16.7%'}, radar:{left:'82.4%',top:'15.9%',width:'11.4%',height:'20.9%'}, own:{left:'37.4%',top:'86.5%',width:'25.2%',height:'10.4%'} } },
+      { id:'astra', name:'Astra', role:'exploration cutter · Acheron', hull:'landed-league/astra.png', before:'frame', afterAsset:'cockpit-astra-sprite-v2.png', phoneShot:'cockpit-sightlines/astra-phone.png', finish:'A light twin-prong silver cutter with a high round radar and two separated lower-center screens.', round:true, layout:{ target:{left:'58.7%',top:'72.3%',width:'17.4%',height:'14.9%'}, own:{left:'23.9%',top:'72.3%',width:'17.3%',height:'14.9%'}, radar:{left:'43.4%',top:'10.3%',width:'13.2%',height:'22.8%'} } },
+    ];
+    const screenMarkup = () => ['own','radar','target'].map((name) =>
+      '<span class="screen-guide screen-' + name + '" aria-hidden="true">' +
+      (name === 'own' ? 'OWN' : name === 'radar' ? 'RADAR' : 'LOCK') + '</span>'
+    ).join('');
+    const makeWindow = (ship, after) => {
+      const layout = after ? ship.layout : sharedLayout;
+      const source = after
+        ? '../assets/remaster/' + (ship.afterAsset || 'cockpit-' + ship.id + '-sprite.png')
+        : '../assets/remaster/cockpit-' + ship.before + '.webp';
+      const window = document.createElement('div');
+      window.className = 'art-window' + (after && ship.round ? ' round-radar' : '');
+      for (const [name, box] of Object.entries(layout)) {
+        for (const [property, value] of Object.entries(box))
+          window.style.setProperty('--' + name + '-' + property, value);
+      }
+      window.innerHTML = '<img src="' + source + '" alt="">' + screenMarkup();
+      return window;
+    };
+    for (const ship of ships) {
+      const card = document.createElement('article');
+      card.innerHTML = '<div class="ship-heading"><div class="ship-copy"><h2>' + ship.name + '</h2><span class="role">' + ship.role + '</span></div><img class="hull-reference" src="../assets/remaster/' + ship.hull + '" alt="' + ship.name + ' hull reference"></div><div class="comparison"><figure><figcaption>Before</figcaption></figure><figure><figcaption>After</figcaption></figure></div><p class="note">' + ship.finish + ' Display guides: own, radar, and target.</p><figure class="gameplay"><figcaption>Actual game · three opponents ahead</figcaption><img class="gameplay-shot" loading="lazy" src="cockpit-sightlines/' + ship.id + '-desktop.png" alt="' + ship.name + ' cockpit during flight with three pirate ships visible ahead"></figure>';
+      const figures = card.querySelectorAll('figure');
+      figures[0].append(makeWindow(ship, false));
+      figures[1].append(makeWindow(ship, true));
+      const phoneFigure = document.createElement('figure');
+      phoneFigure.className = 'gameplay';
+      phoneFigure.innerHTML = '<figcaption>Phone controls · actual game · 844×390</figcaption><img class="gameplay-shot phone-shot" loading="lazy" src="' + ship.phoneShot + '" alt="' + ship.name + ' cockpit in flight on a phone with touch controls">';
+      card.append(phoneFigure);
+      document.querySelector('#ships').append(card);
+    }
+  </script>
+</body>
+</html>

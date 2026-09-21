@@ -49,12 +49,17 @@ const devPreviewLocation = DOCK_LOCATION_IDS.includes(devPreviewLocationParam) ?
 const devPreviewShipParam = devPreviewParams.get('dev-ship');
 const devPreviewShip = SHIPS[devPreviewShipParam] ? devPreviewShipParam : undefined;
 const SHIP_WARM_ASSETS = Object.freeze({
-    wayfarer: ['./assets/models/ships/wayfarer.glb', './assets/remaster/cockpit-frame.webp'],
-    vanguard: ['./assets/models/ships/vanguard.glb', './assets/remaster/cockpit-vanguard.webp'],
-    talon: ['./assets/models/ships/talon.glb', './assets/remaster/cockpit-talon.webp'],
-    prospector: ['./assets/models/ships/prospector.glb', './assets/remaster/cockpit-prospector.webp'],
-    lancer: ['./assets/models/ships/lancer.glb', './assets/remaster/cockpit-lancer.webp'],
-    atlas: ['./assets/models/ships/atlas.glb', './assets/remaster/cockpit-atlas.webp'],
+    speedster: ['./assets/models/ships/speedster.glb', './assets/remaster/cockpit-speedster-sprite-v4.png'],
+    legionary: ['./assets/models/ships/legionary.glb', './assets/remaster/cockpit-legionary-sprite-v3.png'],
+    andromeda: ['./assets/models/ships/andromeda.glb', './assets/remaster/cockpit-andromeda-sprite-v2.png'],
+    torsas: ['./assets/models/ships/torsas.glb', './assets/remaster/cockpit-torsas-sprite-v4.png'],
+    astra: ['./assets/models/ships/astra.glb', './assets/remaster/cockpit-astra-sprite-v2.png'],
+    wayfarer: ['./assets/models/ships/wayfarer.glb', './assets/remaster/cockpit-wayfarer-sprite.png'],
+    vanguard: ['./assets/models/ships/vanguard.glb', './assets/remaster/cockpit-vanguard-sprite-v7.png'],
+    talon: ['./assets/models/ships/talon.glb', './assets/remaster/cockpit-talon-sprite-v6.png'],
+    prospector: ['./assets/models/ships/prospector.glb', './assets/remaster/cockpit-prospector-sprite-v3.png'],
+    lancer: ['./assets/models/ships/lancer.glb', './assets/remaster/cockpit-lancer-sprite-v2.png'],
+    atlas: ['./assets/models/ships/atlas.glb', './assets/remaster/cockpit-atlas-sprite-v4.png'],
 });
 const warmedBinaries = new Map();
 const warmBinary = (url, priority = 'low') => {

@@ -29,7 +29,7 @@ Speeds below use simulation values (HUD speed = ×2). Starting balance values ha
 
 NPC fittings are declared in `src/game/leagueContent.js`. Andromeda racks have independent ammunition and select torpedoes for capital targets, swarms for fighters, falling back to the remaining rack when depleted. Player hull trades preserve legal existing equipment through the normal fitting-transfer rules; shipyard stock is not a free copy of a military NPC outfit.
 
-Models remain below 5,000 triangles, with 512-square hull textures and reflective canopy materials. Model orientation, collision bounds, muzzle anchors, engine nozzles, turret clearance, drone ports, cockpit silhouettes and landed sprites are integrated. Cockpit artwork reuses existing frames with their corresponding damage masks. All models load on demand.
+Models remain below 5,000 triangles, with 512-square hull textures and reflective canopy materials. Model orientation, collision bounds, muzzle anchors, engine nozzles, turret clearance, drone ports, cockpit silhouettes and landed sprites are integrated. Every hull has its own transparent cockpit sprite with hull-matched palette, material cues, frame weight, monitor openings and damage aperture; the Acheron panels use privateer-inspired structure and individual console layouts. All models load on demand.
 
 ## Verification
 

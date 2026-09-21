@@ -422,7 +422,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2ba';
+const GAME_VERSION = '0.8.2bf';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -559,14 +559,74 @@ const INITIAL_PREVIEW_SHIP_ID = VESPER_SHIP_PROFILES[DEV_PREVIEW_SHIP_ID]
         ? VESPER_HOVER_SHIP_ID
         : undefined;
 const COCKPIT_ART_BY_SHIP = Object.freeze({
-    speedster:'./assets/remaster/cockpit-talon.webp', legionary:'./assets/remaster/cockpit-lancer.webp',
-    andromeda:'./assets/remaster/cockpit-vanguard.webp', torsas:'./assets/remaster/cockpit-frame.webp', astra:'./assets/remaster/cockpit-frame.webp',
-    wayfarer: './assets/remaster/cockpit-frame.webp',
-    vanguard: './assets/remaster/cockpit-vanguard.webp',
-    talon: './assets/remaster/cockpit-talon.webp',
-    prospector: './assets/remaster/cockpit-prospector.webp',
-    lancer: './assets/remaster/cockpit-lancer.webp',
-    atlas: './assets/remaster/cockpit-atlas.webp',
+    speedster: './assets/remaster/cockpit-speedster-sprite-v4.png',
+    legionary: './assets/remaster/cockpit-legionary-sprite-v3.png',
+    andromeda: './assets/remaster/cockpit-andromeda-sprite-v2.png',
+    torsas: './assets/remaster/cockpit-torsas-sprite-v4.png',
+    astra: './assets/remaster/cockpit-astra-sprite-v2.png',
+    wayfarer: './assets/remaster/cockpit-wayfarer-sprite.png',
+    vanguard: './assets/remaster/cockpit-vanguard-sprite-v7.png',
+    talon: './assets/remaster/cockpit-talon-sprite-v6.png',
+    prospector: './assets/remaster/cockpit-prospector-sprite-v3.png',
+    lancer: './assets/remaster/cockpit-lancer-sprite-v2.png',
+    atlas: './assets/remaster/cockpit-atlas-sprite-v4.png',
+});
+const COCKPIT_LAYOUT_BY_SHIP = Object.freeze({
+    wayfarer: Object.freeze({
+        own: Object.freeze({ left:'18.0%', top:'71.0%', width:'17.6%', height:'22.6%' }),
+        radar: Object.freeze({ left:'42.2%', top:'70.2%', width:'14.7%', height:'22.9%' }),
+        target: Object.freeze({ left:'64.1%', top:'70.6%', width:'18.7%', height:'22.5%' }),
+    }),
+    vanguard: Object.freeze({
+        own: Object.freeze({ left:'23.4%', top:'17.6%', width:'11.2%', height:'8.9%' }),
+        radar: Object.freeze({ left:'41.3%', top:'11.8%', width:'17.4%', height:'12.2%' }),
+        target: Object.freeze({ left:'65.4%', top:'17.6%', width:'11.2%', height:'8.9%' }),
+    }),
+    talon: Object.freeze({
+        own: Object.freeze({ left:'40.4%', top:'82.7%', width:'18.8%', height:'9.8%' }),
+        radar: Object.freeze({ left:'81.9%', top:'28.5%', width:'8.9%', height:'15.5%' }),
+        target: Object.freeze({ left:'40.8%', top:'11.9%', width:'18.4%', height:'6.9%' }),
+    }),
+    prospector: Object.freeze({
+        own: Object.freeze({ left:'11.1%', top:'22.1%', width:'11.7%', height:'13.8%' }),
+        radar: Object.freeze({ left:'11.4%', top:'41.8%', width:'10.6%', height:'18.8%' }),
+        target: Object.freeze({ left:'39.9%', top:'76.6%', width:'20.3%', height:'14.0%' }),
+    }),
+    lancer: Object.freeze({
+        own: Object.freeze({ left:'36.4%', top:'73.2%', width:'27.3%', height:'18.9%' }),
+        radar: Object.freeze({ left:'15.1%', top:'24.2%', width:'17.5%', height:'24.2%' }),
+        target: Object.freeze({ left:'67.3%', top:'24.3%', width:'17.6%', height:'24.1%' }),
+    }),
+    atlas: Object.freeze({
+        own: Object.freeze({ left:'7.5%', top:'20.1%', width:'12.5%', height:'16.7%' }),
+        radar: Object.freeze({ left:'80.7%', top:'20.8%', width:'12.8%', height:'22.8%' }),
+        target: Object.freeze({ left:'36.7%', top:'6.6%', width:'26.5%', height:'14.9%' }),
+    }),
+    speedster: Object.freeze({
+        own: Object.freeze({ left:'4.5%', top:'20.6%', width:'11.4%', height:'13.2%' }),
+        radar: Object.freeze({ left:'41.9%', top:'62.8%', width:'16.3%', height:'28.9%' }),
+        target: Object.freeze({ left:'83.6%', top:'25.5%', width:'11.6%', height:'13.4%' }),
+    }),
+    legionary: Object.freeze({
+        own: Object.freeze({ left:'44.4%', top:'80.6%', width:'11.2%', height:'7.5%' }),
+        radar: Object.freeze({ left:'28.7%', top:'76.8%', width:'11.8%', height:'10.8%' }),
+        target: Object.freeze({ left:'59.5%', top:'76.8%', width:'11.8%', height:'10.8%' }),
+    }),
+    andromeda: Object.freeze({
+        own: Object.freeze({ left:'39.4%', top:'75.6%', width:'21.4%', height:'15.9%' }),
+        radar: Object.freeze({ left:'9.6%', top:'41.6%', width:'14.4%', height:'25.2%' }),
+        target: Object.freeze({ left:'66.3%', top:'26.6%', width:'23.9%', height:'19.9%' }),
+    }),
+    torsas: Object.freeze({
+        target: Object.freeze({ left:'8.1%', top:'19.3%', width:'15.1%', height:'16.7%' }),
+        radar: Object.freeze({ left:'82.4%', top:'15.9%', width:'11.4%', height:'20.9%' }),
+        own: Object.freeze({ left:'37.4%', top:'86.5%', width:'25.2%', height:'10.4%' }),
+    }),
+    astra: Object.freeze({
+        target: Object.freeze({ left:'58.7%', top:'72.3%', width:'17.4%', height:'14.9%' }),
+        own: Object.freeze({ left:'23.9%', top:'72.3%', width:'17.3%', height:'14.9%' }),
+        radar: Object.freeze({ left:'43.4%', top:'10.3%', width:'13.2%', height:'22.8%' }),
+    }),
 });
 const FLIGHT_SCREEN_ART = Object.freeze(['./art/sky/milky-way-wide-alpha-v3.webp']);
 const OUTFITTING_SCREEN_ART = Object.freeze([
@@ -698,7 +758,7 @@ export class GameUI {
         this.setCockpitShip(save?.player?.shipId);
     }
     setCockpitShip(shipId = 'wayfarer') {
-        const nextId = ({speedster:'talon',legionary:'lancer',andromeda:'vanguard',torsas:'wayfarer',astra:'wayfarer'}[shipId]) ?? (COCKPIT_ART_BY_SHIP[shipId] ? shipId : 'wayfarer');
+        const nextId = COCKPIT_ART_BY_SHIP[shipId] ? shipId : 'wayfarer';
         if (this.cockpitShipId === nextId && this.root.dataset.cockpitShip === nextId)
             return;
         void this.preloadImageSet('flight-core', [COCKPIT_ART_BY_SHIP[nextId], ...FLIGHT_SCREEN_ART], { priority: 'high' });
@@ -706,6 +766,11 @@ export class GameUI {
         this.root.dataset.cockpitShip = nextId;
         this.el('.canopy-aperture')?.setAttribute('points',CANOPY_APERTURES[nextId]);
         this.el('.canopy-art-mask')?.setAttribute('href',COCKPIT_ART_BY_SHIP[nextId]);
+        const instruments = this.el('.cockpit-instruments');
+        for (const [screen, layout] of Object.entries(COCKPIT_LAYOUT_BY_SHIP[nextId])) {
+            for (const [property, value] of Object.entries(layout))
+                instruments?.style?.setProperty?.('--cockpit-' + screen + '-' + property, value);
+        }
         const art = this.el('.cockpit-art');
         if (art)
             art.style.backgroundImage = `url("${COCKPIT_ART_BY_SHIP[nextId]}")`;
