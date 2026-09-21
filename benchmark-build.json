@@ -1,18 +1,21 @@
 {
   "source": "mhoeppner89/voidrunner",
   "distribution": "playable game and smartphone benchmark",
-  "protocol": "voidrunner-phone-v2",
-  "revision": "german-travel-phone-power-2026-09-08",
+  "protocol": "voidrunner-phone-v5",
+  "revision": "exact-flight-work-2026-09-19",
+  "source_base_commit": "011912d718c59c95d1b6d34f65fae2532e70a044",
   "changes": [
-    "423 existing German catalog entries revised; menu, tutorial and dialogue terms aligned",
-    "Salvage lesson arrival within 220–300 km of a marked reachable fragment",
-    "14 additional tutorial transmissions and 16 regional travel broadcasts",
-    "Phone Auto mode renders at 30 fps with unchanged 60 Hz simulation and scene resolution",
-    "Paused and hidden rendering stopped; offscreen ring composite culled",
-    "Cosmetic updates once per rendered frame; static phone CRT decorations",
-    "Shipyard previews at 30 fps, hidden previews idle, phone preview pixel ratio capped at 1",
-    "Unchanged audio targets are cached; background page audio suspended",
-    "Benchmark v2 measures rendered-frame cadence and accumulates CPU work between renders"
+    "Skip hidden visual subtrees while retaining explicit world-space queries",
+    "Coalesce instance matrix/color upload ranges without changing geometry or picking identity",
+    "Reuse bounded glow textures and per-ship tinted materials",
+    "Cache hull canvas CSS sizes with ResizeObserver",
+    "Use bulk copies for packed GLB attributes",
+    "Cache conservative triangle hierarchies and keep exact collision surfaces and nearest-hit semantics",
+    "Stop Boolean obstruction checks after the first real blocker",
+    "Query ordered occupied obstacle cells without scanning empty grid cubes",
+    "Correct spatial-key strides for the documented coordinate range",
+    "Add opt-in phase-separated frame and JS-stage capture; no production profiling overhead",
+    "Preserve existing quality, resolution, effects, physics, AI decision rules, and frame scheduling"
   ],
-  "source_base_commit": "cf3d43a983b554444472c8e423fefa8fb29b92a5"
+  "validation": "Performance tests, collision/render equivalence sweeps, and focused headless browser flows passed; 16 full-suite failures reproduced on base; physical iPhone/Pixel measurements outstanding"
 }

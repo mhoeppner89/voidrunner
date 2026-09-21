@@ -1,3 +1,5 @@
+import { indexObstacleCells, visitObstacleCells } from './obstacleQueries.js';
+import { segmentMeshHit } from './meshQueries.js';
 import {createMiningContacts,updateMiningContacts} from './miningSurface.js';
 import { DRONE_PORTS } from './droneFlight.js';
 import {updateNpcDrones,droneUnits,damageNpcDrone} from './npcDrones.js';
@@ -990,130 +992,6 @@ const segmentBoxHit = (start, end, obstacle, padding = 0.05) => {
             return undefined;
     }
     return near >= 0 && near <= 1 ? near : undefined;
-};
-// Allocation-free segment/mesh intersection for laser and beam line of sight
-// against asteroids. The rock's deformed-icosahedron collision mesh (shared
-// with the renderer and hard collision) is the exact visible surface, so a
-// shot is blocked only where rock is actually drawn — the old enclosing OBB
-// stuck out past the silhouette at its corners (up to ~1.56× on a round rock)
-// and ate shots in open space. The segment is transformed into the rock's
-// local frame (translate + inverse rotation), then Möller–Trumbore tests each
-// triangle; t is preserved by the rigid transform.
-const segmentMeshHit = (start, end, obstacle) => {
-    const mesh = obstacle.meshVerts;
-    const indices = obstacle.meshIndices;
-    if (!mesh || !indices)
-        return undefined;
-    // Cheap reject: the segment must pass within the rock's bounding reach
-    // (losRadius is the OBB corner reach, which contains the whole mesh).
-    // Use the closest-approach distance, NOT segmentSphereHit: that helper
-    // returns undefined when BOTH endpoints are inside the sphere (both roots
-    // fall outside [0, 1]) — exactly the case once a projectile's step-start
-    // enters the rock's envelope. Treating that as a miss culled every shot
-    // from the moment it entered the bounding reach (~3.4x the visible
-    // surface along a diagonal) and let bolts sail clean through the rock.
-    const ocx = start.x - obstacle.x;
-    const ocy = start.y - obstacle.y;
-    const ocz = start.z - obstacle.z;
-    const sdx = end.x - start.x;
-    const sdy = end.y - start.y;
-    const sdz = end.z - start.z;
-    const segLenSq = sdx * sdx + sdy * sdy + sdz * sdz;
-    let closestSq;
-    if (segLenSq < 1e-12) {
-        closestSq = ocx * ocx + ocy * ocy + ocz * ocz;
-    }
-    else {
-        const tc = Math.max(0, Math.min(1, -(ocx * sdx + ocy * sdy + ocz * sdz) / segLenSq));
-        const ccx = ocx + sdx * tc;
-        const ccy = ocy + sdy * tc;
-        const ccz = ocz + sdz * tc;
-        closestSq = ccx * ccx + ccy * ccy + ccz * ccz;
-    }
-    if (closestSq > obstacle.losRadius * obstacle.losRadius)
-        return undefined;
-    const box = obstacle.box;
-    const qx = box.qx;
-    const qy = box.qy;
-    const qz = box.qz;
-    const qw = box.qw;
-    // World -> rock-local rotation (the same matrix segmentBoxHit builds).
-    const m00 = 1 - 2 * (qy * qy + qz * qz);
-    const m01 = 2 * (qx * qy - qz * qw);
-    const m02 = 2 * (qx * qz + qy * qw);
-    const m10 = 2 * (qx * qy + qz * qw);
-    const m11 = 1 - 2 * (qx * qx + qz * qz);
-    const m12 = 2 * (qy * qz - qx * qw);
-    const m20 = 2 * (qx * qz - qy * qw);
-    const m21 = 2 * (qy * qz + qx * qw);
-    const m22 = 1 - 2 * (qx * qx + qy * qy);
-    const sx = m00 * (start.x - obstacle.x) + m10 * (start.y - obstacle.y) + m20 * (start.z - obstacle.z);
-    const sy = m01 * (start.x - obstacle.x) + m11 * (start.y - obstacle.y) + m21 * (start.z - obstacle.z);
-    const sz = m02 * (start.x - obstacle.x) + m12 * (start.y - obstacle.y) + m22 * (start.z - obstacle.z);
-    const ex = m00 * (end.x - obstacle.x) + m10 * (end.y - obstacle.y) + m20 * (end.z - obstacle.z);
-    const ey = m01 * (end.x - obstacle.x) + m11 * (end.y - obstacle.y) + m21 * (end.z - obstacle.z);
-    const ez = m02 * (end.x - obstacle.x) + m12 * (end.y - obstacle.y) + m22 * (end.z - obstacle.z);
-    const dx = ex - sx;
-    const dy = ey - sy;
-    const dz = ez - sz;
-    // A projectile starting inside the rock's envelope is already past the
-    // blocker (a muzzle touching rock must not self-hit). The envelope is the
-    // rock's INSCRIBED sphere (minReach), NOT the oriented box: the box's
-    // corner reach overhangs the visible surface by up to ~2x along diagonals
-    // (half-extents are 0.9x the mesh axes, but hypot(hx,hy,hz) spans the
-    // corners), so a box test declared approaching shots "already past" once
-    // their step-start entered the overhang and let them sail through the
-    // rock. Any point within minReach is provably inside the closed mesh;
-    // points beyond it are still tested against the real surface.
-    if (Number.isFinite(obstacle.minReach) && ocx * ocx + ocy * ocy + ocz * ocz <= obstacle.minReach * obstacle.minReach)
-        return undefined;
-    let best;
-    for (let t = 0; t < indices.length; t += 3) {
-        const i0 = indices[t] * 3;
-        const i1 = indices[t + 1] * 3;
-        const i2 = indices[t + 2] * 3;
-        const ax = mesh[i0];
-        const ay = mesh[i0 + 1];
-        const az = mesh[i0 + 2];
-        const bx = mesh[i1];
-        const by = mesh[i1 + 1];
-        const bz = mesh[i1 + 2];
-        const cx = mesh[i2];
-        const cy = mesh[i2 + 1];
-        const cz = mesh[i2 + 2];
-        const e1x = bx - ax;
-        const e1y = by - ay;
-        const e1z = bz - az;
-        const e2x = cx - ax;
-        const e2y = cy - ay;
-        const e2z = cz - az;
-        const hx = dy * e2z - dz * e2y;
-        const hy = dz * e2x - dx * e2z;
-        const hz = dx * e2y - dy * e2x;
-        const det = e1x * hx + e1y * hy + e1z * hz;
-        if (det > -1e-9 && det < 1e-9)
-            continue;
-        const invDet = 1 / det;
-        const ox = sx - ax;
-        const oy = sy - ay;
-        const oz = sz - az;
-        const u = invDet * (ox * hx + oy * hy + oz * hz);
-        if (u < 0 || u > 1)
-            continue;
-        // Möller–Trumbore: q = s × e1 (not e2), and t = f * (e2 · q). The two
-        // are easy to swap, and doing so both misses real surface hits and
-        // fabricates phantom ones.
-        const qx2 = oy * e1z - oz * e1y;
-        const qy2 = oz * e1x - ox * e1z;
-        const qz2 = ox * e1y - oy * e1x;
-        const v = invDet * (dx * qx2 + dy * qy2 + dz * qz2);
-        if (v < 0 || u + v > 1)
-            continue;
-        const tt = invDet * (e2x * qx2 + e2y * qy2 + e2z * qz2);
-        if (tt >= 0 && tt <= 1 && (best === undefined || tt < best))
-            best = tt;
-    }
-    return best;
 };
 const segmentRadialBandAt = (s0, s1, d0, d1, t, innerSq, outerSq) => {
     const first = s0 + d0 * t;
@@ -12224,17 +12102,18 @@ export class GameSession {
             }
         }
         this.obstacleGrid = grid;
+        this.obstacleBoxIndex = indexObstacleCells(grid, size);
         this.obstacleSegmentGrid = segmentGrid;
         this.obstacleGridInstance = this.activeInstanceId;
         this.obstacleGridBuiltAt = this.save.world.time;
     }
     cellKey(cx, cy, cz) {
-        // Numeric key instead of a "x,y,z" string: the obstacle grid is queried
-        // tens of thousands of times a second, and the string version was the
-        // top GC/CPU cost in flight.
-        // Cell coords stay within ±4096 (the playable system spans ~±1M units at
-        // a 256-unit cell size), so 13 bits per axis pack losslessly into a double.
-        return (cx + 4096) * 16777216 + (cy + 4096) * 4096 + (cz + 4096);
+        // Three 13-bit coordinates fit exactly in a Number (39 bits). The
+        // previous 12-bit stride aliased cells separated by 4096 in Y/Z.
+        // Keep a collision-free fallback for very long debug/observer routes.
+        if (cx < -4096 || cx >= 4096 || cy < -4096 || cy >= 4096 || cz < -4096 || cz >= 4096)
+            return `${cx},${cy},${cz}`;
+        return (cx + 4096) * 67108864 + (cy + 4096) * 8192 + (cz + 4096);
     }
     forEachObstacleInBox(minX, minY, minZ, maxX, maxY, maxZ, callback) {
         this.ensureObstacleGrid();
@@ -12248,6 +12127,11 @@ export class GameSession {
         const cx1 = Math.floor(maxX / size);
         const cy1 = Math.floor(maxY / size);
         const cz1 = Math.floor(maxZ / size);
+        if (this.obstacleBoxIndex?.grid === this.obstacleGrid) {
+            visitObstacleCells(this.obstacleBoxIndex, cx0, cy0, cz0, cx1, cy1, cz1, stamp, callback);
+            return;
+        }
+        // Preserve direct-grid fixtures and callers that replace the map.
         for (let cx = cx0; cx <= cx1; cx += 1) {
             for (let cy = cy0; cy <= cy1; cy += 1) {
                 for (let cz = cz0; cz <= cz1; cz += 1) {
@@ -12302,10 +12186,10 @@ export class GameSession {
                 if (obstacle._queryStamp === stamp)
                     continue;
                 obstacle._queryStamp = stamp;
-                callback(obstacle);
+                if (callback(obstacle) === true) return true;
             }
         };
-        visit(cx, cy, cz);
+        if (visit(cx, cy, cz)) return true;
         while (cx !== ex || cy !== ey || cz !== ez) {
             // Never step an axis whose plane crossing lies beyond the ray's end
             // (tMax > 1): a ray landing exactly on a grid corner ties all three
@@ -12327,7 +12211,7 @@ export class GameSession {
             }
             else
                 break;
-            visit(cx, cy, cz);
+            if (visit(cx, cy, cz)) return true;
         }
     }
     getShipAvoidance(position, velocity, shipId, selfRadius = SHIP_AVOID_SEPARATION * 0.5) {
@@ -12650,7 +12534,7 @@ export class GameSession {
         return Math.min(innerHit, outerHit);
     }
     lineBlocked(start, end, ignoreId) {
-        return this.firstObstacleHit(start, end, ignoreId) !== undefined;
+        return this.firstObstacleHitInfo(start, end, ignoreId, true) !== undefined;
     }
     // The line-test entry point: returns the nearest obstacle hit's parameter
     // t along the segment (or undefined). Callers that need to know WHAT was
@@ -12658,25 +12542,30 @@ export class GameSession {
     firstObstacleHit(start, end, ignoreId) {
         return this.firstObstacleHitInfo(start, end, ignoreId)?.t;
     }
-    firstObstacleHitInfo(start, end, ignoreId) {
+    firstObstacleHitInfo(start, end, ignoreId, anyHit = false) {
         let best;
         let bestObstacle;
         const test = (obstacle) => {
+            // Boolean visibility queries stop at the first real surface hit.
+            // Projectile callers retain the nearest-hit path and obstacle ID.
+            if (anyHit && best !== undefined) return true;
             if (obstacle.id === ignoreId)
                 return;
             if (obstacle.shape === 'ring') {
-                const hit = obstacle.meshVerts ? segmentMeshHit(start, end, obstacle) : this.segmentRingHit(start, end, obstacle);
+                const hit = obstacle.meshVerts ? segmentMeshHit(start, end, obstacle, anyHit) : this.segmentRingHit(start, end, obstacle);
                 if (hit !== undefined && (best === undefined || hit < best)) {
                     best = hit;
                     bestObstacle = obstacle;
+                    if (anyHit) return true;
                 }
                 return;
             }
             if (obstacle.shape === 'engine') {
-                const hit = obstacle.meshVerts ? segmentMeshHit(start, end, obstacle) : this.segmentEngineHit(start, end, obstacle);
+                const hit = obstacle.meshVerts ? segmentMeshHit(start, end, obstacle, anyHit) : this.segmentEngineHit(start, end, obstacle);
                 if (hit !== undefined && (best === undefined || hit < best)) {
                     best = hit;
                     bestObstacle = obstacle;
+                    if (anyHit) return true;
                 }
                 return;
             }
@@ -12686,10 +12575,11 @@ export class GameSession {
             // in open space. Debris pieces keep the box, which mirrors their
             // rendered shape exactly.
             if (obstacle.meshVerts) {
-                const hit = segmentMeshHit(start, end, obstacle);
+                const hit = segmentMeshHit(start, end, obstacle, anyHit);
                 if (hit !== undefined && (best === undefined || hit < best)) {
                     best = hit;
                     bestObstacle = obstacle;
+                    if (anyHit) return true;
                 }
                 return;
             }
@@ -12698,6 +12588,7 @@ export class GameSession {
                 if (hit !== undefined && (best === undefined || hit < best)) {
                     best = hit;
                     bestObstacle = obstacle;
+                    if (anyHit) return true;
                 }
                 return;
             }
@@ -12711,6 +12602,7 @@ export class GameSession {
             if (hit !== undefined && (best === undefined || hit < best)) {
                 best = hit;
                 bestObstacle = obstacle;
+                if (anyHit) return true;
             }
         };
         const dock = this.activeDockObstacle();

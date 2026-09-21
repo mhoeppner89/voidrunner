@@ -1,3 +1,4 @@
+import { CanvasSizeCache } from './canvasSizeCache.js';
 import {cockpitDamageMarkup,CANOPY_APERTURES} from './cockpitDamage.js';
 import {RUN_WAVES,readArenaRun,arenaRecord,runScore,runRewardPlan} from './arenaRun.js';
 import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, LOCATIONS, SHIPS, SYSTEM_MAP_EXTENT, commodityIds, displaySpeed, routeDistanceBetween } from './data.js';
@@ -421,7 +422,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2az';
+const GAME_VERSION = '0.8.2ba';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -4111,8 +4112,9 @@ export class GameUI {
             return;
         const ctx = canvas.getContext('2d');
         const ratio = Math.min(2, window.devicePixelRatio || 1);
-        const cssW = canvas.clientWidth || 150;
-        const cssH = canvas.clientHeight || 110;
+        const size = (this.hullCanvasSizes ??= new CanvasSizeCache()).get(canvas);
+        const cssW = size.width || 150;
+        const cssH = size.height || 110;
         const width = Math.max(60, Math.floor(cssW * ratio));
         const height = Math.max(60, Math.floor(cssH * ratio));
         if (canvas.width !== width || canvas.height !== height) {
@@ -4235,8 +4237,9 @@ export class GameUI {
             return;
         const ctx = canvas.getContext('2d');
         const ratio = Math.min(2, window.devicePixelRatio || 1);
-        const cssW = canvas.clientWidth || 150;
-        const cssH = canvas.clientHeight || 110;
+        const size = (this.hullCanvasSizes ??= new CanvasSizeCache()).get(canvas);
+        const cssW = size.width || 150;
+        const cssH = size.height || 110;
         const width = Math.max(60, Math.floor(cssW * ratio));
         const height = Math.max(60, Math.floor(cssH * ratio));
         // The own-ship display has a fixed heading. Keep its bitmap until

@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node src/benchmark-metrics.test.mjs && node --test tests/*.test.mjs && node --import ./src/game/offlineImportHooks.mjs --test src/game/*.test.mjs"
+    "test": "node src/benchmark-metrics.test.mjs && node --import ./src/game/offlineImportHooks.mjs --test --test-concurrency=4 tests/*.test.mjs && node --import ./src/game/offlineImportHooks.mjs --test --test-concurrency=4 src/game/*.test.mjs",
+    "test:render": "node --import ./src/game/offlineImportHooks.mjs --test tests/render-work.test.mjs tests/glb-packed-accessors.test.mjs tests/renderer-resources.test.mjs tests/phone-power.test.mjs",
+    "test:performance": "node --import ./src/game/offlineImportHooks.mjs --test tests/render-work.test.mjs tests/glb-packed-accessors.test.mjs tests/renderer-resources.test.mjs tests/phone-power.test.mjs tests/collision-work.test.mjs tests/flight-diagnostics.test.mjs"
   },
   "version": "0.8.2-a"
 }

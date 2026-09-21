@@ -553,6 +553,10 @@ window.__VOID_PRIVATEER__ = {
     observerRemoveShip: (unitId) => session?.observerRemoveShip(unitId),
     getState: () => session?.save ?? cachedSave,
     getRuntime: () => session,
+    startPerformanceCapture: async (options = {}) => {
+        const { startFlightCapture } = await import('./game/flightDiagnostics.js');
+        return startFlightCapture(session, options);
+    },
     miningDrones: () => session?.miningDroneHud(),
     toggleMiningDrones: () => session?.toggleMiningDrones(),
     abandonDrones: () => session?.abandonDrones(),

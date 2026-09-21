@@ -926,7 +926,7 @@ const goalLineBlocked = (session, px, py, pz, goalX, goalY, goalZ, shipClearance
     let blocked = false;
     session.forEachObstacleAlongSegment({ x: px, y: py, z: pz }, { x: goalX, y: goalY, z: goalZ }, (o) => {
         if (blocked)
-            return;
+            return true;
         const wx = o.x - px;
         const wy = o.y - py;
         const wz = o.z - pz;
@@ -936,8 +936,10 @@ const goalLineBlocked = (session, px, py, pz, goalX, goalY, goalZ, shipClearance
         const hx = wx - t * ux;
         const hy = wy - t * uy;
         const hz = wz - t * uz;
-        if (hx * hx + hy * hy + hz * hz < (o.radius + reach) * (o.radius + reach))
+        if (hx * hx + hy * hy + hz * hz < (o.radius + reach) * (o.radius + reach)) {
             blocked = true;
+            return true;
+        }
     });
     return blocked;
 };

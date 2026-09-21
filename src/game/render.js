@@ -1,3 +1,4 @@
+import { skipHiddenWorldMatrices, markAttributeSpan } from './renderWork.js';
 import { DRONE_PORTS } from './droneFlight.js';
 import {cockpitDamageStage} from './cockpitDamage.js';
 import { wreckSectionDelta } from './missionWorldData.js';
@@ -433,6 +434,7 @@ export class SpaceRenderer {
             const root = new THREE.Group();
             root.name = `poi-instance-${id}`;
             root.visible = false;
+            skipHiddenWorldMatrices(root);
             this.instanceRoots.set(id, root);
             this.scene.add(root);
         });
@@ -444,11 +446,15 @@ export class SpaceRenderer {
         this.createNebulae(seed, this.sceneQuality);
         this.createFieldDust(seed, this.sceneQuality);
         this.createLocations();
+        // Other systems stay resident for fast jumps, but contribute no pixels.
+        for (const root of this.locationMeshes.values()) skipHiddenWorldMatrices(root);
         this.createAsteroids();
         this.createGraveyard();
         this.createWreckNodes();
         this.createHyperdriveFx(this.sceneQuality);
         this.createCockpit();
+        skipHiddenWorldMatrices(this.hyperdriveFxRoot);
+        skipHiddenWorldMatrices(this.cockpit);
         this.setSystem(systemId);
         this.setActiveInstance(undefined);
         this.utilityBeamMaterial = new THREE.MeshBasicMaterial({
@@ -663,6 +669,9 @@ export class SpaceRenderer {
         context.putImageData(image, 0, 0);
     }
     radialTexture(inner, outer) {
+        const cache = this.radialTextureCache ??= new Map();
+        const key = `${inner}|${outer}`;
+        if (cache.has(key)) return cache.get(key);
         const canvas = document.createElement('canvas');
         canvas.width = 256;
         canvas.height = 256;
@@ -675,6 +684,10 @@ export class SpaceRenderer {
         context.fillRect(0, 0, 256, 256);
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
+        if (cache.size < 64) {
+            texture.userData.shared = true;
+            cache.set(key, texture);
+        }
         return texture;
     }
     createGalacticBand() {
@@ -2643,8 +2656,8 @@ export class SpaceRenderer {
             const { mesh, entries, kind } = batch;
             const palette = palettes[kind] ?? palettes.iron;
             let count = 0;
-            let changed = false;
-            let colorChanged = false;
+            let matrixStart = Infinity, matrixEnd = 0;
+            let colorStart = Infinity, colorEnd = 0;
             for (const entry of entries) {
                 const { node } = entry;
                 this.viewSphere.center.set(...node.position);
@@ -2660,29 +2673,27 @@ export class SpaceRenderer {
                     this.tmpScale.set(node.radius * node.scale[0], node.radius * node.scale[1], node.radius * node.scale[2]);
                     this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
                     mesh.setMatrixAt(count, this.tmpMatrix);
-                    mesh.instanceMatrix.addUpdateRange(count * 16, 16);
-                    changed = true;
+                    matrixStart = Math.min(matrixStart, count * 16);
+                    matrixEnd = (count + 1) * 16;
                 }
                 const tint = node.id === this.selectedAsteroidId ? 0xcfe884 : node.scanned ? palette.scan : palette.base;
                 if (reassigned || entry.renderTint !== tint) {
                     color.setHex(tint);
                     mesh.setColorAt(count, color);
-                    mesh.instanceColor.addUpdateRange(count * 3, 3);
+                    colorStart = Math.min(colorStart, count * 3);
+                    colorEnd = (count + 1) * 3;
                     entry.renderTint = tint;
-                    colorChanged = true;
                 }
                 batch.renderedEntries[count] = entry;
                 mesh.userData.nodeIndices[count] = entry.index;
                 count++;
             }
-            if (changed || mesh.count !== count)
+            if (matrixEnd > matrixStart || mesh.count !== count)
                 mesh.boundingSphere = null; // raycasting must use current instances
             mesh.count = count;
             mesh.visible = count > 0;
-            if (changed)
-                mesh.instanceMatrix.needsUpdate = true;
-            if (colorChanged)
-                mesh.instanceColor.needsUpdate = true;
+            markAttributeSpan(mesh.instanceMatrix, matrixStart, matrixEnd);
+            if (mesh.instanceColor) markAttributeSpan(mesh.instanceColor, colorStart, colorEnd);
         }
     }
     createGraveyard() {
@@ -2859,7 +2870,7 @@ export class SpaceRenderer {
         const cam = this.camera.position;
         for (const batch of this.graveyardBatches) {
             let count = 0;
-            let changed = false;
+            let matrixStart = Infinity, matrixEnd = 0;
             for (const piece of batch.pieces) {
                 const dx = piece.position[0] - cam.x;
                 const dy = piece.position[1] - cam.y;
@@ -2880,16 +2891,15 @@ export class SpaceRenderer {
                     this.tmpScale.set(...piece.scale);
                     this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
                     batch.mesh.setMatrixAt(count, this.tmpMatrix);
-                    batch.mesh.instanceMatrix.addUpdateRange(count * 16, 16);
+                    matrixStart = Math.min(matrixStart, count * 16);
+                    matrixEnd = (count + 1) * 16;
                     batch.renderedPieces[count] = piece;
-                    changed = true;
                 }
                 count++;
             }
             batch.mesh.count = count;
             batch.mesh.visible = count > 0;
-            if (changed)
-                batch.mesh.instanceMatrix.needsUpdate = true;
+            markAttributeSpan(batch.mesh.instanceMatrix, matrixStart, matrixEnd);
         }
     }
     createWreckNodes() {
@@ -2970,7 +2980,7 @@ export class SpaceRenderer {
     updateWreckNodeInstances(dt = 0) {
         const cam = this.camera.position;
         for (const batch of this.wreckBatches) {
-            let changed = false;
+            let matrixStart = Infinity, matrixEnd = 0;
             batch.entries.forEach((entry, index) => {
                 const node = entry.node;
                 const dx = node.position[0] - cam.x;
@@ -2989,17 +2999,16 @@ export class SpaceRenderer {
                 entry.culled = culled;
                 entry.hidden = hidden;
                 entry.initialized = true;
-                changed = true;
                 this.tmpPosition.set(...node.position);
                 this.tmpEuler.set(...entry.rotation);
                 this.tmpQuaternion.setFromEuler(this.tmpEuler);
                 this.tmpScale.setScalar(hidden ? HIDDEN_SCALE[0] : wreckNodeVisualScale(node));
                 this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
                 batch.mesh.setMatrixAt(index, this.tmpMatrix);
-                batch.mesh.instanceMatrix.addUpdateRange(index * 16, 16);
+                matrixStart = Math.min(matrixStart, index * 16);
+                matrixEnd = (index + 1) * 16;
             });
-            if (changed)
-                batch.mesh.instanceMatrix.needsUpdate = true;
+            markAttributeSpan(batch.mesh.instanceMatrix, matrixStart, matrixEnd);
         }
     }
     createHyperdriveStreakTexture() {
@@ -3415,9 +3424,14 @@ export class SpaceRenderer {
         const palette = paletteForEntity(entity);
         const tint = new THREE.Color(palette.hull);
         const emissiveMaterials = [];
+        const tintedMaterials = new Map();
         group.traverse((child) => {
             if (child.material instanceof THREE.MeshStandardMaterial) {
-                const material = child.material.clone();
+                const source = child.material;
+                const cached = tintedMaterials.get(source);
+                if (cached) { child.material = cached; return; }
+                const material = source.clone();
+                tintedMaterials.set(source, material);
                 const isCanopy = material.name.startsWith('VR_Canopy_');
                 if (!config.preserveColor && !isCanopy)
                     material.color.copy(tint).lerp(new THREE.Color(0xffffff), 0.45);
@@ -3473,20 +3487,22 @@ export class SpaceRenderer {
         this.shipMeshes.set(entity.id, glbMesh);
     }
     // GLB ship clones share geometry and textures with the cached model, so
-    // release per-ship materials and flare maps. Cached hull assets remain
+    // release per-ship materials and any uncached flare maps. Shared assets remain
     // alive until renderer shutdown.
     disposeGlbShip(mesh) {
         const ports = mesh.getObjectByName('drone-docking-ports');
         if (ports) { mesh.remove(ports); this.disposeObject(ports); }
         const flareTextures = new Set((mesh.userData.engineFlares ?? []).map(flare => flare.material.map));
         for (const texture of flareTextures)
-            texture?.dispose();
+            if (!texture?.userData?.shared) texture?.dispose();
+        const ownedMaterials = new Set();
         mesh.traverse((child) => {
             if (!(child instanceof THREE.Mesh || child instanceof THREE.Sprite))
                 return;
             const materials = Array.isArray(child.material) ? child.material : [child.material];
-            materials.forEach((material) => material?.dispose?.());
+            materials.forEach((material) => { if (material) ownedMaterials.add(material); });
         });
+        for (const material of ownedMaterials) material.dispose();
     }
     syncShips(entities, alpha = 0) {
         const revision = ++this.shipSyncRevision;
@@ -3527,7 +3543,9 @@ export class SpaceRenderer {
                 this.dynamicRoot.add(mesh);
                 this.shipMeshes.set(entity.id, mesh);
             }
-            this.syncDronePorts(mesh.getObjectByName('drone-docking-ports'), entity.droneFleet);
+            if (mesh.userData.dronePorts === undefined)
+                mesh.userData.dronePorts = mesh.getObjectByName('drone-docking-ports') ?? null;
+            this.syncDronePorts(mesh.userData.dronePorts, entity.droneFleet);
             mesh.userData.syncRevision = revision;
             mesh.position.set(...entity.position);
             if (entity.prevPosition && alpha >= 0) {
@@ -5405,6 +5423,9 @@ export class SpaceRenderer {
         this.laserFx = null;
         this.pixelTextures.forEach((texture) => texture.dispose());
         this.pixelTextures.clear();
+        for (const texture of this.radialTextureCache?.values() ?? []) texture.dispose();
+        this.radialTextureCache?.clear();
+        this.starTextureCache?.clear();
         this.screenTextures.length = 0;
         for (const pending of this.droneModels?.values() ?? []) pending.then(model => { if(model)this.disposeObject(model); });
         this.renderer.dispose();

@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v283-0-8-2az-iphone-performance';
+const CACHE = 'voidrunner-v285-0-8-2ba-flight-work';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -68,6 +68,7 @@ const CORE_ASSETS = [
   './src/game/shipTrade.js',
   './src/game/tutorialCampaign.js',
   './src/game/ui.js',
+  './src/game/canvasSizeCache.js',
   './src/game/weapons.js',
   './art/title-cockpit.webp',
 ];

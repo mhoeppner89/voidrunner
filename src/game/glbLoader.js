@@ -8,6 +8,7 @@ import * as THREE from 'three';
 // synchronous after the embedded textures finish decoding.
 const COMPONENT_SIZE = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
 const TYPE_COUNT = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 };
+const LITTLE_ENDIAN = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
 
 const decodeImage = (bytes, mime) => {
     const blob = new Blob([bytes], { type: mime });
@@ -151,6 +152,15 @@ export async function buildGlbScene(arrayBuffer) {
             const itemSize = TYPE_COUNT[accessor.type] ?? 1;
             const stride = bufferView.byteStride ?? componentSize * itemSize;
             const out = new (accessor.componentType === 5126 ? Float32Array : accessor.componentType === 5123 ? Uint16Array : Uint32Array)(accessor.count * itemSize);
+            const absoluteOffset = bin.byteOffset + byteOffset;
+            if (LITTLE_ENDIAN && stride === componentSize * itemSize
+                && absoluteOffset % componentSize === 0
+                && (accessor.componentType === 5126 || accessor.componentType === 5123 || accessor.componentType === 5125)) {
+                // Copy, rather than retain a view into the multi-megabyte GLB:
+                // this preserves independent geometry buffers and frees BIN.
+                out.set(new out.constructor(bin.buffer, absoluteOffset, out.length));
+                return out;
+            }
             const reader = accessor.componentType === 5126
                 ? (o) => dataView.getFloat32(o, true)
                 : accessor.componentType === 5123

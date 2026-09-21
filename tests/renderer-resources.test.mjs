@@ -103,7 +103,7 @@ function model() {
     return source;
 }
 
-test('trail-free ships release flares but preserve cached hulls', () => {
+test('trail-free ships reuse glow textures and preserve cached hulls', () => {
     const r = renderer(), source = model();
     const hull = source.children[0];
     const hullGeometry = watch(hull.geometry), hullTexture = watch(hull.material.map), hullMaterial = watch(hull.material);
@@ -114,7 +114,8 @@ test('trail-free ships release flares but preserve cached hulls', () => {
         assert.equal(ship.children[0].children.filter(child => child.isMesh).length, 1, 'only the hull mesh remains');
         const tintDisposed = watch(ship.children[0].children[0].material);
         r.disposeGlbShip(ship);
-        assert.equal(flareDisposed(), 1, 'release the per-ship flare texture once');
+        assert.equal(flareDisposed(), 0, 'shared glow stays alive for the next ship');
+        assert.equal(r.radialTextureCache.size, 1, 'identical ship glows use one bitmap');
         assert.equal(tintDisposed(), 1);
     }
     assert.equal(hullGeometry(), 0);
@@ -140,10 +141,39 @@ test('renderer shutdown releases postprocessing and cached resources', () => {
     r.bloomCompositeMaterial = new THREE.ShaderMaterial();
     r.bloomQuad = new THREE.Mesh(new THREE.PlaneGeometry(), r.bloomCompositeMaterial);
     r.renderer = { domElement: { removeEventListener() {}, remove() {} }, dispose() {} };
-    const resources = [r.scene.environment, r.bloomSceneTarget, ...r.bloomBlurTargets,
+    const glow = r.radialTexture('#ffffff', '#123456');
+    const resources = [glow, r.scene.environment, r.bloomSceneTarget, ...r.bloomBlurTargets,
         r.bloomBrightMaterial, r.bloomBlurMaterial, r.bloomCompositeMaterial, r.bloomQuad.geometry,
         r.glbShipModels.get('talon').children[0].geometry];
     const counts = resources.map(watch);
     r.dispose();
     assert.deepEqual(counts.map(count => count()), resources.map(() => 1));
+    assert.equal(r.radialTextureCache.size, 0);
+});
+
+test('shared source materials are tinted once per ship and released once', () => {
+    const r = renderer(), source = model();
+    source.add(new THREE.Mesh(source.children[0].geometry, source.children[0].material));
+    const a = r.createGlbShipMesh({ id: 'a', role: 'pirate', hostile: true }, source, config, 'talon');
+    const b = r.createGlbShipMesh({ id: 'b', role: 'trader', faction: 'concord' }, source, config, 'talon');
+    const material = a.children[0].children[0].material;
+    assert.equal(material, a.children[0].children[1].material);
+    assert.notEqual(material, source.children[0].material, 'source palette stays untouched');
+    assert.notEqual(material, b.children[0].children[0].material, 'different ships keep independent palettes');
+    assert.equal(a.userData.emissiveMaterials.length, 1);
+    const disposed = watch(material); r.disposeGlbShip(a); assert.equal(disposed(), 1);
+    r.disposeGlbShip(b);
+});
+test('glow cache has bounded retention; overflow textures remain individually owned', () => {
+    const r = renderer();
+    for (let i = 0; i < 70; i++) {
+        const texture = r.radialTexture('#ffffff', `#${i.toString(16).padStart(6, '0')}`);
+        assert.equal(Boolean(texture.userData.shared), i < 64);
+        if (i >= 64) {
+            const disposed = watch(texture);
+            r.disposeObject(new THREE.Sprite(new THREE.SpriteMaterial({ map: texture })));
+            assert.equal(disposed(), 1);
+        }
+    }
+    assert.equal(r.radialTextureCache.size, 64);
 });
