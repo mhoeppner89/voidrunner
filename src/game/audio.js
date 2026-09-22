@@ -1,3 +1,4 @@
+import { playIndustrial, warmIndustrial, INDUSTRIAL_DURATIONS, playWorkSample, updateSampleEngines, stopSampleLoops } from './sampleSfx.js';
 import { clamp } from './random.js';
 
 const midiToFrequency = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
@@ -181,6 +182,7 @@ export class AudioManager {
         // different but deterministic phrase sequence.
         this.musicRngState = (Date.now() & 0x7fffffff) || 1;
         this.enabled = true;
+        this.samplesReady = warmIndustrial(this);
         await this.context.resume();
     }
 
@@ -269,6 +271,7 @@ export class AudioManager {
         // State changes can happen between frame updates (landing, quitting,
         // or replacing a session). Silence continuous flight layers here too.
         if (station) {
+            stopSampleLoops(this);
             const now = this.context.currentTime;
             this.engineGain?.gain.cancelScheduledValues(now);
             this.engineGain?.gain.setTargetAtTime(0, now, 0.035);
@@ -285,6 +288,10 @@ export class AudioManager {
         const context = this.context;
         const now = context.currentTime;
         this.stopDrones();
+        stopSampleLoops(this);
+        this.sampleEngines = undefined;
+        for(const release of this.effectReleases ?? []) release();
+        this.effectTimes?.clear();
         this.master?.gain.cancelScheduledValues(now);
         this.master?.gain.setTargetAtTime(0, now, 0.02);
         this.enabled = false;
@@ -302,14 +309,15 @@ export class AudioManager {
         const now = this.context.currentTime;
         const thrust = this.stationMode ? 0 : throttle;
         const burn = this.stationMode ? 0 : (afterburner ? 1 : 0);
-        const engineBase = this.stationMode ? 0 : 0.04 + thrust * 0.06 + burn * 0.05;
+        const sampledEngines = updateSampleEngines(this, thrust, burn);
+        const engineBase = sampledEngines || this.stationMode ? 0 : 0.04 + thrust * 0.06 + burn * 0.05;
         this.setEngineTarget(this.engineGain?.gain, engineBase, now, 0.11);
         const pitch = 41 + thrust * 30 + burn * 25 + damage * 7;
         this.setEngineTarget(this.engineOscA?.frequency, pitch, now, 0.1);
         this.setEngineTarget(this.engineOscB?.frequency, pitch * 1.047, now, 0.1);
         this.setEngineTarget(this.engineSub?.frequency, pitch * 0.49, now, 0.12);
         this.setEngineTarget(this.engineFilter?.frequency, 190 + thrust * 330 + burn * 480, now, 0.1);
-        const wash = this.stationMode ? 0 : 0.008 + thrust * 0.038 + burn * 0.028;
+        const wash = sampledEngines || this.stationMode ? 0 : 0.008 + thrust * 0.038 + burn * 0.028;
         this.setEngineTarget(this.engineWashGain?.gain, wash, now, 0.12);
         this.setEngineTarget(this.engineWashFilter?.frequency, 300 + thrust * 430 + burn * 680, now, 0.12);
         this.setEngineTarget(this.stationGain?.gain, (this.stationMode ? 0.018 : 0) * this.effectsVolume, now, 0.35);
@@ -762,16 +770,36 @@ export class AudioManager {
         if (!this.context || !this.effectsGain || !this.reverbInput || !this.enabled || this.effectsVolume <= 0.001)
             return;
         const now = this.context.currentTime;
-        const strength = clamp(intensity, 0.15, 2);
+        if (['repair','mining'].includes(effect) && Number.isFinite(intensity) && intensity > 0) {
+            playWorkSample(this,effect,intensity,Number.isFinite(pan)?pan:0,Number.isFinite(distance)?distance:0);return;
+        }
+        if (!Number.isFinite(intensity) || intensity <= 0) return;
+        pan = Number.isFinite(pan) ? pan : 0;
+        distance = Number.isFinite(distance) ? Math.max(0,distance) : 0;
+        this.effectTimes ??= new Map();
+        const spacing = {salvage:1.65,hyperActive:3.6,warning:.65,ui:.035,hit:.065,shield:.065,impact:.035,rock:.035,pdc:.035}[effect] ?? 0;
+        if (now-(this.effectTimes.get(effect) ?? -Infinity)<spacing) return;
+        this.effectTimes.set(effect,now);
+        const strength = clamp(intensity, 0.001, 2);
         // Every effect gets its own pan + distance lowpass so simultaneous
         // sounds do not smear into one position (the old single panner).
-        const out = this.eventChain(pan, distance);
-        out.connect(this.effectsGain);
-        out.connect(this.effectsReverbGain);
+        const chain = this.eventChain(pan, distance);
+        const out = chain.input;
+        out.pitchRatio = ['laser','gauss','pdc','ripper','ion','mortar','impact','hit','rock','mining','repair'].includes(effect) ? .97+Math.random()*.06 : 1;
+        chain.output.connect(this.effectsGain);
+        const wet = this.context.createGain();
+        wet.gain.value = {pdc:.06,laser:.12,ripper:.12,ui:0,warning:.04,hit:.08,shield:.12,repair:.06,mining:.08}[effect] ?? .25;
+        chain.output.connect(wet);wet.connect(this.effectsReverbGain);
+        this.effectReleases ??= new Set();
         const release = () => {
-            try { out.disconnect(this.effectsGain); out.disconnect(this.effectsReverbGain); } catch { /* already gone */ }
+            clearTimeout(timer);
+            chain.input.disconnect();chain.filter.disconnect();chain.output.disconnect();wet.disconnect();
+            this.effectReleases.delete(release);
         };
         switch (effect) {
+            case 'beam': this.playBeam(now,strength,out); break;
+            case 'shield': this.playShieldHit(now,strength,out); break;
+            case 'capitalExplosion': this.playCapitalExplosion(now,strength,out); break;
             case 'laser': this.playLaser(now, strength, out); break;
             case 'gauss': this.playGauss(now, strength, out); break;
             case 'pdc': this.playPdc(now, strength, out); break;
@@ -783,11 +811,12 @@ export class AudioManager {
             case 'rock': this.playRockImpact(now, strength, out); break;
             case 'hit': this.playHit(now, strength, out); break;
             case 'explosion': this.playExplosion(now, strength, out); break;
-            case 'scan': this.playTone({ at: now, frequency: 320, endFrequency: 1050, duration: 0.38, type: 'sine', level: 0.035, out }); break;
+            case 'scan': playIndustrial(this,'scan',now,strength,out); break;
             case 'dock': this.playDockChord(out); break;
             case 'ui': this.playUiBlip(strength, out); break;
             case 'success': this.playSuccessChord(strength, out); break;
             case 'warning': this.playWarning(strength, out); break;
+            case 'repair': this.playRepairWeld(now, strength, out); break;
             case 'mining': this.playMiningHit(strength, out); break;
             case 'salvage': this.playSalvageClunk(strength, out); break;
             case 'hyperSpool': this.playHyperdriveSpool(strength, out); break;
@@ -798,8 +827,9 @@ export class AudioManager {
             default: this.playImpact(now, strength, out); break;
         }
         // Release the chain when the effect is done (the longest tail wins).
-        const releaseAt = { explosion: 1.6, dock: 1.1, missile: 0.85, gauss: 0.5, pdc: 0.3, ripper: 0.6, ion: 0.45, mortar: 0.8, scan: 0.5, hyperSpool: 2.1, hyperActive: 4.0, hyperDrop: 0.6, slipstream: 0.75, pickup: 0.35 }[effect] ?? 0.4;
-        setTimeout(release, releaseAt * 1000 + 60);
+        const releaseAt = (INDUSTRIAL_DURATIONS[effect] ?? .5) / .97 + .12;
+        const timer = setTimeout(release, releaseAt * 1000 + 60);
+        this.effectReleases.add(release);
     }
 
     // One spatial voice: pan → distance lowpass → gain. Returns the gain node
@@ -811,16 +841,16 @@ export class AudioManager {
         // so far events arrive muffled behind the music.
         const lowpass = this.context.createBiquadFilter();
         lowpass.type = 'lowpass';
-        lowpass.frequency.value = distance > 0 ? Math.max(6000, 22000 - distance * 18) : 22000;
+        lowpass.frequency.value = distance > 0 ? Math.max(1400, 18000 / (1 + distance / 100)) : 22000;
         const gain = this.context.createGain();
         rose.connect(lowpass); lowpass.connect(gain);
-        return gain;
+        return {input:rose,filter:lowpass,output:gain};
     }
 
     // Distant events should not arrive at full volume. The squared falloff
     // keeps nearby combat punchy while far-away fights feel physically remote.
     playAtDirection(effect, intensity, distance, localX) {
-        const range = effect === 'explosion' ? 900 : 520;
+        const range = effect === 'capitalExplosion' ? 1800 : effect === 'explosion' ? 900 : 520;
         // Web audio THROWS on non-finite AudioParam values, and a throw inside
         // updateProjectiles would take the sim loop down with it — a NaN that
         // slips out of a sim edge case must stay a silent non-event.
@@ -830,11 +860,12 @@ export class AudioManager {
             localX = 0;
         if (!Number.isFinite(intensity))
             intensity = 0.4;
+        if(distance >= range) return;
         const proximity = clamp(1 - clamp(distance, 0, range) / range, 0, 1);
         const direction = clamp(localX / Math.max(1, distance), -1, 1);
         // Distance dominates at long range; stereo separation becomes clearer
         // as the source gets closer, which matches how cockpit audio behaves.
-        this.play(effect, intensity * (0.18 + proximity * proximity * 0.82), direction * (0.25 + proximity * 0.6), distance);
+        this.play(effect, intensity * proximity * proximity, direction * (0.25 + proximity * 0.6), distance);
     }
 
     playNoiseBurst({ at, duration, start = 1200, end = 90, q = 0.8, level = 0.08, playbackRate = 1, out }) {
@@ -854,22 +885,24 @@ export class AudioManager {
         gain.connect(out ?? this.effectsGain);
         if (!out)
             gain.connect(this.effectsReverbGain);
-        source.start(at); source.stop(at + duration + 0.03);
+        source.start(at, Math.random()*Math.max(.01,this.pinkBuffer.duration-.01)); source.stop(at + duration + 0.03);
     }
 
-    playTone({ at, frequency, endFrequency, duration, type = 'sine', level = 0.05, attack = 0.006, filterFrequency = 2400, out }) {
+    playTone({ at, frequency, endFrequency, duration, type = 'sine', level = 0.05, attack = 0.006, filterFrequency = 2400, hold = 0, out }) {
         const oscillator = this.context.createOscillator();
         const filter = this.context.createBiquadFilter();
         const gain = this.context.createGain();
         oscillator.type = type;
-        oscillator.frequency.setValueAtTime(frequency, at);
+        const pitch = out?.pitchRatio ?? 1;
+        oscillator.frequency.setValueAtTime(frequency*pitch, at);
         if (endFrequency !== undefined)
-            oscillator.frequency.exponentialRampToValueAtTime(Math.max(20, endFrequency), at + duration);
+            oscillator.frequency.exponentialRampToValueAtTime(Math.max(20, endFrequency*pitch), at + duration);
         filter.type = 'lowpass';
         filter.frequency.setValueAtTime(filterFrequency, at);
         filter.frequency.exponentialRampToValueAtTime(Math.max(60, filterFrequency * 0.32), at + duration);
         gain.gain.setValueAtTime(0.0001, at);
         gain.gain.exponentialRampToValueAtTime(level, at + attack);
+        if (hold > 0) gain.gain.setValueAtTime(level, at + Math.max(attack, duration*hold));
         gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
         oscillator.connect(filter); filter.connect(gain);
         gain.connect(out ?? this.effectsGain);
@@ -878,213 +911,107 @@ export class AudioManager {
         oscillator.start(at); oscillator.stop(at + duration + 0.02);
     }
 
-    // Energy cannon: a sharp transient crack, a detuned twin-square zing that
-    // sweeps down fast, and a low thump for weight. Reads as a punchy weapon
-    // rather than a thin blip.
+    // Industrial one-shots share cached procedural Foley buffers.
+    playBeam(at, intensity, out) {
+        playIndustrial(this, 'beam', at, intensity, out);
+    }
+    playShieldHit(at, intensity, out) {
+        playIndustrial(this, 'shield', at, intensity, out);
+    }
+    playCapitalExplosion(at, intensity, out) {
+        playIndustrial(this, 'capitalExplosion', at, intensity, out);
+    }
+
     playLaser(at, intensity, out) {
-        this.playNoiseBurst({ at, duration: 0.035, start: 5200, end: 900, level: 0.086 * intensity, out });
-        this.playTone({ at, frequency: 1500, endFrequency: 240, duration: 0.11, type: 'square', level: 0.086 * intensity, filterFrequency: 4200, out });
-        this.playTone({ at, frequency: 1518, endFrequency: 252, duration: 0.1, type: 'square', level: 0.062 * intensity, filterFrequency: 3900, out });
-        this.playTone({ at, frequency: 190, endFrequency: 62, duration: 0.09, type: 'sine', level: 0.16 * intensity, filterFrequency: 520, out });
+        playIndustrial(this, 'laser', at, intensity, out);
     }
 
-    // Missile: an ignition puff, a rising rumble, then a long whoosh as the
-    // round accelerates away.
     playMissileLaunch(at, intensity, out) {
-        this.playNoiseBurst({ at, duration: 0.07, start: 300, end: 950, level: 0.17 * intensity, playbackRate: 0.8, out });
-        this.playTone({ at, frequency: 68, endFrequency: 132, duration: 0.35, type: 'sine', level: 0.36 * intensity, filterFrequency: 300, out });
-        this.playNoiseBurst({ at: at + 0.05, duration: 0.7, start: 2400, end: 220, level: 0.22 * intensity, playbackRate: 0.66, out });
+        playIndustrial(this, 'missile', at, intensity, out);
     }
 
-    // Magrail: a full-power rail discharge — a hard wide-spectrum crack, a fast
-    // detuned rail-whine falling two octaves, and a deep recoil thump. Deliberately
-    // heavier and longer than the pulse laser's zing: one shot, real weight.
     playGauss(at, intensity, out) {
-        this.playNoiseBurst({ at, duration: 0.05, start: 9000, end: 1400, q: 0.5, level: 0.11 * intensity, out });
-        this.playTone({ at, frequency: 2400, endFrequency: 190, duration: 0.17, type: 'sawtooth', level: 0.075 * intensity, filterFrequency: 5200, out });
-        this.playTone({ at, frequency: 2430, endFrequency: 205, duration: 0.15, type: 'square', level: 0.05 * intensity, filterFrequency: 4800, out });
-        this.playTone({ at, frequency: 95, endFrequency: 42, duration: 0.14, type: 'sine', level: 0.12 * intensity, filterFrequency: 300, out });
+        playIndustrial(this, 'gauss', at, intensity, out);
     }
 
-    // Point-Defense Cluster: a dry electric buzz-rip — two short detuned
-    // square blips over a tight noise tick. Reads as a machine, not a cannon:
-    // it fires sixteen times a second and must never pile into a wall of sound.
     playPdc(at, intensity, out) {
-        this.playNoiseBurst({ at, duration: 0.02, start: 6000, end: 2200, level: 0.05 * intensity, out });
-        this.playTone({ at, frequency: 1150, endFrequency: 640, duration: 0.05, type: 'square', level: 0.042 * intensity, filterFrequency: 3400, out });
-        this.playTone({ at: at + 0.004, frequency: 1180, endFrequency: 700, duration: 0.045, type: 'square', level: 0.03 * intensity, filterFrequency: 3100, out });
+        playIndustrial(this, 'pdc', at, intensity, out);
     }
 
-    // Ripper Scattergun: a boom-scatter — one fat low thump with a wide noise
-    // spray falling off slowly behind it, like the pellets losing cohesion.
     playRipper(at, intensity, out) {
-        this.playTone({ at, frequency: 130, endFrequency: 38, duration: 0.24, type: 'triangle', level: 0.24 * intensity, filterFrequency: 520, out });
-        this.playNoiseBurst({ at, duration: 0.16, start: 2600, end: 320, level: 0.14 * intensity, playbackRate: 0.72, out });
-        this.playNoiseBurst({ at: at + 0.06, duration: 0.22, start: 1400, end: 180, level: 0.07 * intensity, playbackRate: 0.6, out });
+        playIndustrial(this, 'ripper', at, intensity, out);
     }
 
-    // Ion Lance: a zap-hum — a bright sawtooth that snaps up then hums down,
-    // with a thin fifth above it. Energy discharge, not a kinetic hit.
     playIon(at, intensity, out) {
-        this.playTone({ at, frequency: 520, endFrequency: 1500, duration: 0.06, type: 'sawtooth', level: 0.07 * intensity, filterFrequency: 4200, out });
-        this.playTone({ at: at + 0.055, frequency: 780, endFrequency: 210, duration: 0.22, type: 'sawtooth', level: 0.055 * intensity, filterFrequency: 2400, out });
-        this.playTone({ at: at + 0.055, frequency: 1170, endFrequency: 315, duration: 0.19, type: 'sine', level: 0.03 * intensity, filterFrequency: 2800, out });
+        playIndustrial(this, 'ion', at, intensity, out);
     }
 
-    // Sunlance Plasma Mortar: a thoomp — a deep bowl-shaped drop with a slow
-    // pressurized-noise exhale. Slow, heavy, and unmistakably lobbed.
     playMortar(at, intensity, out) {
-        this.playTone({ at, frequency: 210, endFrequency: 46, duration: 0.34, type: 'sine', level: 0.22 * intensity, filterFrequency: 380, out });
-        this.playNoiseBurst({ at, duration: 0.28, start: 900, end: 160, level: 0.1 * intensity, playbackRate: 0.55, out });
-        this.playTone({ at: at + 0.02, frequency: 74, endFrequency: 40, duration: 0.26, type: 'triangle', level: 0.1 * intensity, filterFrequency: 260, out });
+        playIndustrial(this, 'mortar', at, intensity, out);
     }
 
-    // Rock impact (belt/grazing fire): a dry gravel crunch with a dull thud —
-    // no metallic ring, so shots landing on asteroids read as stone, distinct
-    // from the sharp crack of a hull impact.
     playRockImpact(at, intensity, out) {
-        this.playNoiseBurst({ at, duration: 0.14, start: 2400, end: 280, level: 0.09 * intensity, out });
-        this.playTone({ at, frequency: 150, endFrequency: 44, duration: 0.2, type: 'triangle', level: 0.17 * intensity, filterFrequency: 480, out });
-        this.playTone({ at: at + 0.015, frequency: 520, endFrequency: 210, duration: 0.12, type: 'square', level: 0.035 * intensity, filterFrequency: 1400, out });
+        playIndustrial(this, 'rock', at, intensity, out);
     }
 
-    // Collision / hull impact: a sharp crack, a deep thud, and a short
-    // metallic ring.
     playImpact(at, intensity, out) {
-        this.playNoiseBurst({ at, duration: 0.04, start: 3800, end: 700, level: 0.12 * intensity, out });
-        this.playTone({ at, frequency: 200, endFrequency: 52, duration: 0.2, type: 'triangle', level: 0.26 * intensity, filterFrequency: 700, out });
-        this.playTone({ at: at + 0.005, frequency: 780, endFrequency: 300, duration: 0.22, type: 'square', level: 0.07 * intensity, filterFrequency: 2200, out });
+        playIndustrial(this, 'impact', at, intensity, out);
     }
 
-    // Hull damage: a sharper clang with an alarm edge so incoming damage reads
-    // instantly from nearby impacts.
     playHit(at, intensity, out) {
-        this.playNoiseBurst({ at, duration: 0.05, start: 4200, end: 600, level: 0.2 * intensity, out });
-        this.playTone({ at, frequency: 340, endFrequency: 90, duration: 0.22, type: 'triangle', level: 0.38 * intensity, filterFrequency: 900, out });
-        this.playTone({ at: at + 0.01, frequency: 900, endFrequency: 520, duration: 0.18, type: 'square', level: 0.13 * intensity, filterFrequency: 2600, out });
+        playIndustrial(this, 'hit', at, intensity, out);
+    }
+
+    playRepairWeld(at, intensity, out) {
+        playIndustrial(this, 'repair', at, intensity, out);
     }
 
     playMiningHit(intensity, out) {
-        const now = this.context.currentTime;
-        // A heavy thud with a bright rock-chip ping on top.
-        this.playTone({ at: now, frequency: 260, endFrequency: 120, duration: 0.11, type: 'triangle', level: 0.05 * intensity, filterFrequency: 1500, out });
-        this.playTone({ at: now, frequency: 1250, endFrequency: 980, duration: 0.12, type: 'sine', level: 0.022 * intensity, filterFrequency: 3200, out });
-        this.playNoiseBurst({ at: now, duration: 0.09, start: 3800, end: 500, level: 0.04 * intensity, out });
+        playIndustrial(this, 'mining', this.context.currentTime, intensity, out);
     }
 
     playSalvageClunk(intensity, out) {
-        const now = this.context.currentTime;
-        // A hollow metal clunk followed by a short scrape.
-        this.playTone({ at: now, frequency: 96, endFrequency: 46, duration: 0.16, type: 'square', level: 0.055 * intensity, filterFrequency: 420, out });
-        this.playNoiseBurst({ at: now + 0.02, duration: 0.11, start: 1000, end: 140, level: 0.035 * intensity, out });
-        this.playNoiseBurst({ at: now + 0.09, duration: 0.07, start: 700, end: 220, level: 0.02 * intensity, playbackRate: 0.8, out });
+        playIndustrial(this, 'salvage', this.context.currentTime, intensity, out);
     }
 
-    // Hyperdrive: a rising whine + engine-intensify as the drive charges.
     playHyperdriveSpool(intensity = 1, out) {
-        const now = this.context.currentTime;
-        const dur = 2.0;
-        this.playTone({ at: now, frequency: 220, endFrequency: 880, duration: dur, type: 'sawtooth', level: 0.016 * intensity, filterFrequency: 1600, out });
-        this.playTone({ at: now, frequency: 440, endFrequency: 1760, duration: dur, type: 'sine', level: 0.008 * intensity, filterFrequency: 2200, out });
-        // Airy rising noise underneath — the drive winding up.
-        this.playNoiseBurst({ at: now, duration: dur, start: 500, end: 2400, level: 0.012 * intensity, playbackRate: 0.8, out });
+        playIndustrial(this, 'hyperSpool', this.context.currentTime, intensity, out);
     }
 
-    // Drive drop/arrival: a downward swoosh + thump as the bubble collapses.
     playHyperdriveDrop(intensity = 1, out) {
-        const now = this.context.currentTime;
-        this.playTone({ at: now, frequency: 1800, endFrequency: 120, duration: 0.5, type: 'sine', level: 0.05 * intensity, filterFrequency: 2400, out });
-        this.playNoiseBurst({ at: now, duration: 0.4, start: 3200, end: 150, level: 0.06 * intensity, playbackRate: 0.75, out });
-        this.playTone({ at: now + 0.02, frequency: 90, endFrequency: 32, duration: 0.5, type: 'triangle', level: 0.08 * intensity, filterFrequency: 420, out });
+        playIndustrial(this, 'hyperDrop', this.context.currentTime, intensity, out);
     }
 
-    // While cruising in the drive, a slow undulating "space wind" bed.
     playHyperdriveActive(out) {
-        const now = this.context.currentTime;
-        this.playNoiseBurst({ at: now, duration: 2.6, start: 900, end: 1800, level: 0.018, playbackRate: 0.6, out });
-        this.playNoiseBurst({ at: now + 1.3, duration: 2.6, start: 1400, end: 700, level: 0.014, playbackRate: 0.45, out });
+        playIndustrial(this, 'hyperActive', this.context.currentTime, 1, out);
     }
 
-    // Drafting cue: a short filtered rush that rises as the ship enters the
-    // narrow wake, followed by a bright slingshot tick. It is deliberately
-    // brief; the race code plays it only on entry so it never becomes a drone.
     playSlipstream(intensity = 1, out) {
-        const now = this.context.currentTime;
-        this.playNoiseBurst({ at: now, duration: 0.58, start: 420, end: 2600, level: 0.028 * intensity, playbackRate: 1.15, out });
-        this.playTone({ at: now + 0.18, frequency: 310, endFrequency: 1040, duration: 0.34, type: 'sine', level: 0.025 * intensity, filterFrequency: 2800, out });
-        this.playTone({ at: now + 0.43, frequency: 1180, endFrequency: 1540, duration: 0.12, type: 'triangle', level: 0.018 * intensity, filterFrequency: 3400, out });
+        playIndustrial(this, 'slipstream', this.context.currentTime, intensity, out);
     }
 
-    // A bright rising chime for tractored cargo / ore / loot.
     playPickup(intensity = 1, out) {
-        const now = this.context.currentTime;
-        [880, 1108, 1318].forEach((freq, index) => this.playTone({
-            at: now + index * 0.045,
-            frequency: freq, endFrequency: freq * 1.5,
-            duration: 0.2,
-            type: 'sine', level: 0.03 * intensity,
-            filterFrequency: 3200,
-            out,
-        }));
+        playIndustrial(this, 'pickup', this.context.currentTime, intensity, out);
     }
 
     playWarning(intensity, out) {
-        const now = this.context.currentTime;
-        // Three descending insistent beeps so warnings read as urgent.
-        this.playTone({ at: now, frequency: 660, duration: 0.1, type: 'triangle', level: 0.07 * intensity, filterFrequency: 1800, out });
-        this.playTone({ at: now + 0.13, frequency: 505, duration: 0.12, type: 'triangle', level: 0.062 * intensity, filterFrequency: 1500, out });
-        this.playTone({ at: now + 0.27, frequency: 610, duration: 0.14, type: 'triangle', level: 0.056 * intensity, filterFrequency: 1700, out });
+        playIndustrial(this, 'warning', this.context.currentTime, intensity, out);
     }
 
     playSuccessChord(intensity, out) {
-        const now = this.context.currentTime;
-        [64, 69, 73].forEach((midi, index) => this.playTone({
-            at: now + index * 0.035,
-            frequency: midiToFrequency(midi),
-            duration: 0.34,
-            type: 'triangle',
-            level: 0.03 * intensity,
-            filterFrequency: 2600,
-            out,
-        }));
+        playIndustrial(this, 'success', this.context.currentTime, intensity, out);
     }
 
     playDockChord(out) {
-        const now = this.context.currentTime;
-        [45, 57, 61, 66].forEach((midi, index) => this.playTone({
-            at: now + index * 0.07,
-            frequency: midiToFrequency(midi),
-            duration: 0.75,
-            type: 'triangle',
-            level: 0.022,
-            filterFrequency: 1300,
-            out,
-        }));
-        this.playNoiseBurst({ at: now, duration: 0.5, start: 420, end: 70, level: 0.016, out });
+        playIndustrial(this, 'dock', this.context.currentTime, 1, out);
     }
 
     playUiBlip(intensity, out) {
-        this.playTone({
-            at: this.context.currentTime,
-            frequency: 510,
-            endFrequency: 690,
-            duration: 0.055,
-            type: 'triangle',
-            level: 0.025 * intensity,
-            filterFrequency: 2800,
-            out,
-        });
+        playIndustrial(this, 'ui', this.context.currentTime, intensity, out);
     }
 
-    // Layered blast: a sharp shockwave transient, a deep sub thump, a sawtooth
-    // body rumble, a long airy blast, and a bright debris crackle tail.
     playExplosion(at, intensity, out) {
-        const size = clamp(intensity, 0.4, 2);
-        this.playNoiseBurst({ at, duration: 0.05, start: 5200, end: 700, level: 0.16 * size, playbackRate: 0.9, out });
-        this.playTone({ at, frequency: 68 / Math.sqrt(size), endFrequency: 16, duration: 0.9 * size, type: 'sine', level: 0.25 * size, filterFrequency: 300, out });
-        this.playTone({ at: at + 0.01, frequency: 150, endFrequency: 30, duration: 0.5 * size, type: 'sawtooth', level: 0.13 * size, filterFrequency: 420, out });
-        this.playNoiseBurst({ at, duration: 0.7 * size, start: 2400, end: 60, level: 0.19 * size, playbackRate: 0.6, out });
-        this.playNoiseBurst({ at: at + 0.08, duration: 1.3 * size, start: 3200, end: 900, level: 0.08 * size, playbackRate: 1.3, out });
+        playIndustrial(this, 'explosion', at, intensity, out);
     }
 
     playComms(temperament = 'steady') {

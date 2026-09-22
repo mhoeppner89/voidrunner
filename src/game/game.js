@@ -5637,6 +5637,10 @@ export class GameSession {
         for (const id in player.droneFleet.unitsById) {
             const unit = player.droneFleet.unitsById[id];
             if (unit.type === 'mining' && unit.state === 'mining') {
+                if (this.save.world.time >= (this.miningSoundAt ?? 0)) {
+                    this.miningSoundAt = this.save.world.time + .25;
+                    this.audio?.play?.('mining', .32);
+                }
                 this.utilityActive = true;
                 this.lastExtractionAt = this.save.world.time;
                 this.seenWorkingUntil = this.save.world.time + SEEN_WORKING_SECONDS;
