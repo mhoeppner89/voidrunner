@@ -422,7 +422,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2cl';
+const GAME_VERSION = '0.8.2cs';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -571,62 +571,336 @@ const COCKPIT_ART_BY_SHIP = Object.freeze({
     lancer: './assets/remaster/cockpit-lancer-sprite-v2.png',
     atlas: './assets/remaster/cockpit-atlas-sprite-v4.png',
 });
+const COCKPIT_BEZEL_BY_SHIP = {
+    "wayfarer": {
+        "own": [
+            18.0,
+            71.0,
+            17.6,
+            22.6
+        ],
+        "radar": [
+            42.2,
+            70.2,
+            14.7,
+            22.9
+        ],
+        "target": [
+            64.1,
+            70.6,
+            18.7,
+            22.5
+        ]
+    },
+    "vanguard": {
+        "own": [
+            23.4,
+            17.6,
+            11.2,
+            8.9
+        ],
+        "radar": [
+            41.3,
+            11.8,
+            17.4,
+            12.2
+        ],
+        "target": [
+            65.4,
+            17.6,
+            11.2,
+            8.9
+        ]
+    },
+    "talon": {
+        "own": [
+            40.4,
+            82.7,
+            18.8,
+            9.8
+        ],
+        "radar": [
+            81.9,
+            28.5,
+            8.9,
+            15.5
+        ],
+        "target": [
+            40.8,
+            11.9,
+            18.4,
+            6.9
+        ]
+    },
+    "prospector": {
+        "own": [
+            11.1,
+            22.1,
+            11.7,
+            13.8
+        ],
+        "radar": [
+            11.4,
+            41.8,
+            10.6,
+            18.8
+        ],
+        "target": [
+            39.9,
+            76.6,
+            20.3,
+            14.0
+        ]
+    },
+    "lancer": {
+        "own": [
+            36.4,
+            73.2,
+            27.3,
+            18.9
+        ],
+        "radar": [
+            15.1,
+            24.2,
+            17.5,
+            24.2
+        ],
+        "target": [
+            67.3,
+            24.3,
+            17.6,
+            24.1
+        ]
+    },
+    "atlas": {
+        "own": [
+            7.5,
+            20.1,
+            12.5,
+            16.7
+        ],
+        "radar": [
+            80.7,
+            20.8,
+            12.8,
+            22.8
+        ],
+        "target": [
+            36.7,
+            6.6,
+            26.5,
+            14.9
+        ]
+    },
+    "speedster": {
+        "own": [
+            4.5,
+            20.6,
+            11.4,
+            13.2
+        ],
+        "radar": [
+            41.9,
+            62.8,
+            16.3,
+            28.9
+        ],
+        "target": [
+            83.6,
+            25.5,
+            11.6,
+            13.4
+        ]
+    },
+    "legionary": {
+        "own": [
+            44.4,
+            80.6,
+            11.2,
+            7.5
+        ],
+        "radar": [
+            28.7,
+            76.8,
+            11.8,
+            10.8
+        ],
+        "target": [
+            59.5,
+            76.8,
+            11.8,
+            10.8
+        ]
+    },
+    "andromeda": {
+        "own": [
+            39.4,
+            75.6,
+            21.4,
+            15.9
+        ],
+        "radar": [
+            9.6,
+            41.6,
+            14.4,
+            25.2
+        ],
+        "target": [
+            66.3,
+            26.6,
+            23.9,
+            19.9
+        ]
+    },
+    "torsas": {
+        "target": [
+            8.1,
+            19.3,
+            15.1,
+            16.7
+        ],
+        "radar": [
+            82.4,
+            15.9,
+            11.4,
+            20.9
+        ],
+        "own": [
+            37.4,
+            86.5,
+            25.2,
+            10.4
+        ]
+    },
+    "astra": {
+        "target": [
+            58.7,
+            72.3,
+            17.4,
+            14.9
+        ],
+        "own": [
+            23.9,
+            72.3,
+            17.3,
+            14.9
+        ],
+        "radar": [
+            43.4,
+            10.3,
+            13.2,
+            22.8
+        ]
+    }
+};
+// Readable instruments mounted to each hull’s structural frame.
 const COCKPIT_LAYOUT_BY_SHIP = Object.freeze({
-    wayfarer: Object.freeze({
-        own: Object.freeze({ left:'18.0%', top:'71.0%', width:'17.6%', height:'22.6%' }),
-        radar: Object.freeze({ left:'42.2%', top:'70.2%', width:'14.7%', height:'22.9%' }),
-        target: Object.freeze({ left:'64.1%', top:'70.6%', width:'18.7%', height:'22.5%' }),
-    }),
-    vanguard: Object.freeze({
-        own: Object.freeze({ left:'23.4%', top:'17.6%', width:'11.2%', height:'8.9%' }),
-        radar: Object.freeze({ left:'41.3%', top:'11.8%', width:'17.4%', height:'12.2%' }),
-        target: Object.freeze({ left:'65.4%', top:'17.6%', width:'11.2%', height:'8.9%' }),
-    }),
-    talon: Object.freeze({
-        own: Object.freeze({ left:'40.4%', top:'82.7%', width:'18.8%', height:'9.8%' }),
-        radar: Object.freeze({ left:'81.9%', top:'28.5%', width:'8.9%', height:'15.5%' }),
-        target: Object.freeze({ left:'40.8%', top:'11.9%', width:'18.4%', height:'6.9%' }),
-    }),
-    prospector: Object.freeze({
-        own: Object.freeze({ left:'11.1%', top:'22.1%', width:'11.7%', height:'13.8%' }),
-        radar: Object.freeze({ left:'11.4%', top:'41.8%', width:'10.6%', height:'18.8%' }),
-        target: Object.freeze({ left:'39.9%', top:'76.6%', width:'20.3%', height:'14.0%' }),
-    }),
-    lancer: Object.freeze({
-        own: Object.freeze({ left:'36.4%', top:'73.2%', width:'27.3%', height:'18.9%' }),
-        radar: Object.freeze({ left:'15.1%', top:'24.2%', width:'17.5%', height:'24.2%' }),
-        target: Object.freeze({ left:'67.3%', top:'24.3%', width:'17.6%', height:'24.1%' }),
-    }),
-    atlas: Object.freeze({
-        own: Object.freeze({ left:'7.5%', top:'20.1%', width:'12.5%', height:'16.7%' }),
-        radar: Object.freeze({ left:'80.7%', top:'20.8%', width:'12.8%', height:'22.8%' }),
-        target: Object.freeze({ left:'36.7%', top:'6.6%', width:'26.5%', height:'14.9%' }),
-    }),
-    speedster: Object.freeze({
-        own: Object.freeze({ left:'4.5%', top:'20.6%', width:'11.4%', height:'13.2%' }),
-        radar: Object.freeze({ left:'41.9%', top:'62.8%', width:'16.3%', height:'28.9%' }),
-        target: Object.freeze({ left:'83.6%', top:'25.5%', width:'11.6%', height:'13.4%' }),
-    }),
-    legionary: Object.freeze({
-        own: Object.freeze({ left:'44.4%', top:'80.6%', width:'11.2%', height:'7.5%' }),
-        radar: Object.freeze({ left:'28.7%', top:'76.8%', width:'11.8%', height:'10.8%' }),
-        target: Object.freeze({ left:'59.5%', top:'76.8%', width:'11.8%', height:'10.8%' }),
-    }),
-    andromeda: Object.freeze({
-        own: Object.freeze({ left:'39.4%', top:'75.6%', width:'21.4%', height:'15.9%' }),
-        radar: Object.freeze({ left:'9.6%', top:'41.6%', width:'14.4%', height:'25.2%' }),
-        target: Object.freeze({ left:'66.3%', top:'26.6%', width:'23.9%', height:'19.9%' }),
-    }),
-    torsas: Object.freeze({
-        target: Object.freeze({ left:'8.1%', top:'19.3%', width:'15.1%', height:'16.7%' }),
-        radar: Object.freeze({ left:'82.4%', top:'15.9%', width:'11.4%', height:'20.9%' }),
-        own: Object.freeze({ left:'37.4%', top:'86.5%', width:'25.2%', height:'10.4%' }),
-    }),
-    astra: Object.freeze({
-        target: Object.freeze({ left:'58.7%', top:'72.3%', width:'17.4%', height:'14.9%' }),
-        own: Object.freeze({ left:'23.9%', top:'72.3%', width:'17.3%', height:'14.9%' }),
-        radar: Object.freeze({ left:'43.4%', top:'10.3%', width:'13.2%', height:'22.8%' }),
-    }),
+    'wayfarer': {
+        own: {left: '18%', top: '71%', width: '17.6%', height: '22.6%'},
+        radar: {left: '42.2%', top: '70.2%', width: '14.7%', height: '22.9%'},
+        target: {left: '64.1%', top: '70.6%', width: '18.7%', height: '22.5%'},
+        hyperdrive: {left: '50%', top: '63.7%', width: '18%', height: '4%'},
+    },
+    'vanguard': {
+        own: {left: '19.98%', top: '13.00%', width: '18.04%', height: '18.0%'},
+        ownPhone: {left: '17.25%', top: '10.25%', width: '23.5%', height: '23.5%'},
+        radar: {left: '43.50%', top: '7.90%', width: '13.0%', height: '20.0%'},
+        radarPhone: {left: '43.00%', top: '4.90%', width: '14.0%', height: '26.0%'},
+        target: {left: '61.98%', top: '13.00%', width: '18.04%', height: '18.0%'},
+        targetPhone: {left: '59.25%', top: '10.25%', width: '23.5%', height: '23.5%'},
+        hyperdrive: {left: '50%', top: '90%', width: '18%', height: '4%'},
+        hyperdrivePhone: {left: '50%', top: '87%', width: '20%', height: '6%'},
+    },
+    'talon': {
+        own: {left: '37.50%', top: '78.00%', width: '24.6%', height: '18.0%'},
+        ownPhone: {left: '38.05%', top: '73.50%', width: '23.5%', height: '23.5%'},
+        radar: {left: '81.90%', top: '28.50%', width: '8.9%', height: '15.5%'},
+        radarPhone: {left: '79.85%', top: '24.25%', width: '13.0%', height: '24.0%'},
+        target: {left: '38.52%', top: '7.00%', width: '22.96%', height: '18.0%'},
+        targetPhone: {left: '38.25%', top: '4.25%', width: '23.5%', height: '23.5%'},
+        hyperdrive: {left: '23%', top: '91%', width: '17%', height: '4%'},
+        hyperdrivePhone: {left: '19%', top: '88%', width: '21%', height: '6%'},
+    },
+    'prospector': {
+        own: {left: '7.11%', top: '20.00%', width: '19.68%', height: '18.0%'},
+        ownPhone: {left: '5.20%', top: '17.25%', width: '23.5%', height: '23.5%'},
+        radar: {left: '11.40%', top: '41.80%', width: '10.6%', height: '18.8%'},
+        radarPhone: {left: '11.40%', top: '41.80%', width: '10.6%', height: '18.8%'},
+        target: {left: '38.57%', top: '74.60%', width: '22.96%', height: '18.0%'},
+        targetPhone: {left: '38.30%', top: '71.85%', width: '23.5%', height: '23.5%'},
+        hyperdrive: {left: '50%', top: '5%', width: '20%', height: '4%'},
+        hyperdrivePhone: {left: '50%', top: '5%', width: '22%', height: '6%'},
+    },
+    'lancer': {
+        own: {left: '38.52%', top: '74%', width: '22.96%', height: '18%'},
+        ownPhone: {left: '38.25%', top: '73.5%', width: '23.5%', height: '23.5%'},
+        radar: {left: '6%', top: '13%', width: '17.5%', height: '24.2%'},
+        radarPhone: {left: '7%', top: '16%', width: '18%', height: '28%'},
+        target: {left: '75.07%', top: '13.0%', width: '18.86%', height: '18%'},
+        targetPhone: {left: '70.25%', top: '16.0%', width: '23.5%', height: '23.5%'},
+        hyperdrive: {left: '50%', top: '69%', width: '18%', height: '4%'},
+        hyperdrivePhone: {left: '50%', top: '67%', width: '21%', height: '6%'},
+    },
+    'atlas': {
+        own: {left: '3.91%', top: '19.45%', width: '19.68%', height: '18.0%'},
+        ownPhone: {left: '5%', top: '22%', width: '23.5%', height: '23.5%'},
+        radar: {left: '80.70%', top: '20.80%', width: '12.8%', height: '22.8%'},
+        radarPhone: {left: '80.70%', top: '20.80%', width: '12.8%', height: '22.8%'},
+        target: {left: '37.65%', top: '5.00%', width: '24.6%', height: '18.0%'},
+        targetPhone: {left: '38.20%', top: '4.00%', width: '23.5%', height: '23.5%'},
+        hyperdrive: {left: '23%', top: '8%', width: '15%', height: '4%'},
+        hyperdrivePhone: {left: '23%', top: '8%', width: '15%', height: '6%'},
+    },
+    'speedster': {
+        own: {left: '4%', top: '18.0%', width: '19.68%', height: '18%'},
+        ownPhone: {left: '2%', top: '17.0%', width: '23.5%', height: '23.5%'},
+        radar: {left: '41.9%', top: '62.8%', width: '16.3%', height: '28.9%'},
+        radarPhone: {left: '42%', top: '65%', width: '16%', height: '28%'},
+        target: {left: '75.5%', top: '22.0%', width: '19.68%', height: '18%'},
+        targetPhone: {left: '74.5%', top: '12.0%', width: '23.5%', height: '23.5%'},
+        hyperdrive: {left: '50%', top: '60%', width: '18%', height: '4%'},
+        hyperdrivePhone: {left: '50%', top: '61%', width: '22%', height: '6%'},
+    },
+    'legionary': {
+        own: {left: '24.16%', top: '78.0%', width: '19.68%', height: '18%'},
+        ownPhone: {left: '18.25%', top: '73.5%', width: '23.5%', height: '23.5%'},
+        radar: {left: '47%', top: '74%', width: '13%', height: '22%'},
+        radarPhone: {left: '45%', top: '72%', width: '13%', height: '24%'},
+        target: {left: '63.16%', top: '78.0%', width: '19.68%', height: '18%'},
+        targetPhone: {left: '60.75%', top: '73.5%', width: '23.5%', height: '23.5%'},
+        hyperdrive: {left: '50%', top: '5%', width: '20%', height: '4%'},
+        hyperdrivePhone: {left: '50%', top: '5%', width: '22%', height: '6%'},
+    },
+    'andromeda': {
+        own: {left: '37.80%', top: '74.55%', width: '24.6%', height: '18.0%'},
+        ownPhone: {left: '38.35%', top: '71.80%', width: '23.5%', height: '23.5%'},
+        radar: {left: '9.6%', top: '41.6%', width: '14.4%', height: '25.2%'},
+        radarPhone: {left: '9.6%', top: '41.6%', width: '14.4%', height: '25.2%'},
+        target: {left: '66.36%', top: '27.55%', width: '23.78%', height: '18.0%'},
+        targetPhone: {left: '66.50%', top: '24.80%', width: '23.5%', height: '23.5%'},
+        hyperdrive: {left: '50%', top: '69%', width: '20%', height: '4%'},
+        hyperdrivePhone: {left: '50%', top: '65.5%', width: '22%', height: '6%'},
+    },
+    'torsas': {
+        own: {left: '36.88%', top: '78.0%', width: '26.24%', height: '18%'},
+        ownPhone: {left: '38.25%', top: '73.5%', width: '23.5%', height: '23.5%'},
+        radar: {left: '82.4%', top: '15.9%', width: '11.4%', height: '20.9%'},
+        radarPhone: {left: '82.4%', top: '15.9%', width: '11.4%', height: '20.9%'},
+        target: {left: '7.34%', top: '18.65%', width: '21.32%', height: '18.0%'},
+        targetPhone: {left: '6.25%', top: '15.90%', width: '23.5%', height: '23.5%'},
+        hyperdrive: {left: '50%', top: '6%', width: '22%', height: '4%'},
+        hyperdrivePhone: {left: '50%', top: '6%', width: '24%', height: '6%'},
+    },
+    'astra': {
+        own: {left: '22.30%', top: '70.75%', width: '20.5%', height: '18.0%'},
+        ownPhone: {left: '20.80%', top: '68.00%', width: '23.5%', height: '23.5%'},
+        radar: {left: '43.4%', top: '10.3%', width: '13.2%', height: '22.8%'},
+        radarPhone: {left: '43.4%', top: '10.3%', width: '13.2%', height: '22.8%'},
+        target: {left: '57.15%', top: '70.75%', width: '20.5%', height: '18.0%'},
+        targetPhone: {left: '55.65%', top: '68.00%', width: '23.5%', height: '23.5%'},
+        hyperdrive: {left: '50%', top: '88%', width: '10%', height: '4%'},
+        hyperdrivePhone: {left: '50%', top: '87%', width: '10%', height: '6%'},
+    },
 });
 const FLIGHT_SCREEN_ART = Object.freeze(['./art/sky/milky-way-wide-alpha-v3.webp']);
 const OUTFITTING_SCREEN_ART = Object.freeze([
@@ -763,13 +1037,30 @@ export class GameUI {
             return;
         void this.preloadImageSet('flight-core', [COCKPIT_ART_BY_SHIP[nextId], ...FLIGHT_SCREEN_ART], { priority: 'high' });
         this.cockpitShipId = nextId;
+        this.radarLayoutDirty = true;
         this.root.dataset.cockpitShip = nextId;
         this.el('.canopy-aperture')?.setAttribute('points',CANOPY_APERTURES[nextId]);
         this.el('.canopy-art-mask')?.setAttribute('href',COCKPIT_ART_BY_SHIP[nextId]);
         const instruments = this.el('.cockpit-instruments');
+        instruments?.removeAttribute('style');
         for (const [screen, layout] of Object.entries(COCKPIT_LAYOUT_BY_SHIP[nextId])) {
             for (const [property, value] of Object.entries(layout))
-                instruments?.style?.setProperty?.('--cockpit-' + screen + '-' + property, value);
+                instruments?.style?.setProperty?.('--cockpit-' + screen.replace('Phone', '-phone') + '-' + property, value);
+        }
+        // Reuse the actual ship's painted bezel around resized screen apertures.
+        // CSS crops the sprite; no extra textures, downloads or canvas redraws.
+        for (const [panel, [x,y,w,h]] of Object.entries(COCKPIT_BEZEL_BY_SHIP[nextId])) {
+            let bezel = instruments.querySelector('.cockpit-bezel-' + panel);
+            if (!bezel) {
+                bezel = document.createElement('div');
+                bezel.className = 'cockpit-bezel cockpit-bezel-' + panel;
+                bezel.setAttribute('aria-hidden','true');
+                instruments.append(bezel);
+            }
+            const cw=w*1.16, ch=h*1.24;
+            bezel.style.setProperty('--bezel-art', `url("${new URL(COCKPIT_ART_BY_SHIP[nextId], document.baseURI).href}")`);
+            bezel.style.setProperty('--bezel-size', `${10000/cw}% ${10000/ch}%`);
+            bezel.style.setProperty('--bezel-position', `${(x-w*.08)/(100-cw)*100}% ${(y-h*.12)/(100-ch)*100}%`);
         }
         const art = this.el('.cockpit-art');
         if (art)
@@ -968,7 +1259,7 @@ export class GameUI {
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="${t('Own ship status display; tap to open ship menu')}">
             <div class="monitor-damage" aria-hidden="true"></div><div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
             <div class="screen-race-strip" id="screen-race-strip"><span id="screen-race-label"></span><b id="screen-race-value"></b></div>
-            <div class="screen-ship-layout"><div class="screen-flight"><div><span>${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span>${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em><small id="screen-own-launcher"></small><small id="screen-own-drone-pdc" class="is-hidden"></small></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i><em id="screen-own-energy-value">72</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">185</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
+            <div class="screen-ship-layout"><div class="screen-flight"><div><span data-short="SPD">${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span data-short="FUEL">${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em><small id="screen-own-launcher"></small><small id="screen-own-drone-pdc" class="is-hidden"></small></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i><em id="screen-own-energy-value">72</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">185</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="${t('Radar display; tap to open navigation map')}">
             <div class="monitor-damage" aria-hidden="true"></div><div class="radar-screen-wrap"><canvas id="radar" width="220" height="220" role="button" tabindex="0" aria-label="${t('Open navigation map')}"></canvas></div>
@@ -986,8 +1277,8 @@ export class GameUI {
           <div id="target-bracket" class="target-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
           <div id="target-edge-pointer" class="target-edge-pointer is-hidden" aria-hidden="true"><i></i><span></span></div>
           <div class="reticle" aria-hidden="true"><span></span><span></span><span></span><span></span><b></b></div>
-          <button type="button" id="comms-bar" class="comms-bar" data-ui-command="open-chat" role="button" tabindex="0" aria-label="${t('Open comms log')}"></button>
-          <button type="button" id="patrol-reply-chip" class="patrol-reply-chip is-hidden" data-ui-command="patrol-reply" role="button" tabindex="0" aria-label="${t('Reply to the patrol greeting')}">${t('REPLY')} <em id="patrol-reply-timer"></em></button>
+          <div class="comms-channel"><button type="button" id="comms-bar" class="comms-bar" data-ui-command="open-chat" role="button" tabindex="0" aria-label="${t('Open comms log')}"></button>
+          <button type="button" id="patrol-reply-chip" class="patrol-reply-chip is-hidden" data-ui-command="patrol-reply" role="button" tabindex="0" aria-label="${t('Reply to the patrol greeting')}">${t('REPLY')} <em id="patrol-reply-timer"></em></button></div>
           <div class="touch-controls" aria-label="${t('Touch flight controls')}">
             <div class="touch-left">
               <div class="touch-throttle" data-touch-throttle>
@@ -4109,7 +4400,7 @@ export class GameUI {
         edgePointer?.classList.toggle('is-hostile', hostile);
         edgePointer?.classList.toggle('is-surrendered', surrendered && !hostile);
         this.el('#screen-target-distance').textContent = `${formatNumber(target.distance)} km`;
-        this.el('#screen-target-readout').textContent = target.capitalSubtarget ? t(target.capitalDisarmed?'BATTERIES DOWN':target.capitalAttack==='CHARGING'?'INCOMING · MOVE':target.capitalAttack==='SALVO'?'SALVO': 'OPENING · FIRE') : target.readout ?? '—';
+        this.el('#screen-target-readout').textContent = target.capitalSubtarget ? t(target.capitalDisarmed?'BATTERIES DOWN':target.capitalAttack==='CHARGING'?'INCOMING · MOVE':target.capitalAttack==='SALVO'?'SALVO': 'OPENING · FIRE') : target.kind === 'ship' ? (target.readout ?? '—').replace(/\s*·\s*[\d.,]+\s*\/\s*[\d.,]+\s*km\s*$/i, '') : target.readout ?? '—';
         this.el('#screen-target-readout').title = target.readout ?? '';
         this.setTargetScreenValue(target);
         this.updateWeaponButtons(target, mode);
@@ -4151,9 +4442,9 @@ export class GameUI {
         };
         if (visible) {
             setText('#screen-drone-bays', t('{count} DRONES · +{inbound} ORE', { count: drones.operational ?? 0, inbound: drones.inboundCargo ?? 0 }));
-            setText('#screen-drone-state', t(drones.phase === 'running' ? 'MINING' : drones.phase === 'recalling' ? 'RETURNING TO BAY' : 'READY TO MINE'));
+            setText('#screen-drone-state', drones.phase === 'idle' && !drones.action?.ok ? drones.action?.label || t('READY TO MINE') : t(drones.phase === 'running' ? 'MINING' : drones.phase === 'recalling' ? 'RETURNING TO BAY' : 'READY TO MINE'));
             setText('#screen-drone-cargo', t('HOLD {cargo}/{capacity}', { cargo: Math.round(model.cargo ?? 0), capacity: model.cargoCapacity ?? '—' }));
-            setText('#screen-drone-losses', drones.phase === 'idle' && !drones.action?.ok ? drones.action?.label ?? '' : '');
+            setText('#screen-drone-losses', '');
             this.el('#screen-drone-telemetry').title = `${t('DRONE BAYS')} · M: ${t('MINING')} · P: PDC\n${drones.readout ?? ''}\n${t('Inbound cargo reserves hold space until delivery.')}`;
         }
         let ammo = 0, capacity = 0, operational = 0, pdcBays = 0;
@@ -4915,6 +5206,7 @@ export class GameUI {
         bar.classList.add('active');
         bar.classList.remove('story');
         bar.setAttribute('data-ui-command', 'open-chat');
+        bar.setAttribute('aria-label', t('Open comms log'));
         bar.append(text);
         window.clearTimeout(this.commsBarTimer);
         this.commsBarTimer = window.setTimeout(() => this.clearPilotLine(), duration);
@@ -4922,7 +5214,9 @@ export class GameUI {
     clearPilotLine() {
         const bar = this.el('#comms-bar');
         if (bar) {
-            bar.classList.remove('active');
+            bar.classList.remove('active', 'story');
+            bar.setAttribute('data-ui-command', 'open-chat');
+            bar.setAttribute('aria-label', t('Open comms log'));
             bar.textContent = '';
             bar.style.color = '';
             bar.style.borderColor = '';
@@ -4953,6 +5247,7 @@ export class GameUI {
         bar.style.borderColor = 'rgba(232, 200, 122, 0.6)';
         bar.classList.add('active', 'story');
         bar.setAttribute('data-ui-command', 'dismiss-story');
+        bar.setAttribute('aria-label', t('CONTINUE'));
         const textNode = document.createElement('span');
         textNode.className = 'talker-text';
         textNode.textContent = `${name}: ${text}`;
@@ -4965,6 +5260,7 @@ export class GameUI {
         if (bar) {
             bar.classList.remove('active', 'story');
             bar.setAttribute('data-ui-command', 'open-chat');
+            bar.setAttribute('aria-label', t('Open comms log'));
             bar.textContent = '';
             bar.style.color = '';
             bar.style.borderColor = '';
@@ -4976,22 +5272,15 @@ export class GameUI {
         const panel = this.root.querySelector('#chat-panel');
         if (!panel)
             return;
-        // Screen-aware transcript: show only as many of the newest lines as the
-        // viewport can hold comfortably (~52px of height per line), so a short
-        // landscape phone isn't handed a wall of cramped rows. The list still
-        // scrolls for the rest when a line wraps.
-        const heightBudget = Math.floor((window.innerHeight || 800) / 52);
-        const maxRows = Math.min(this.commsLog.length, Math.max(5, heightBudget));
-        const visible = this.commsLog.slice(-maxRows);
+        // Retain every recorded transmission; the bounded panel scrolls.
+        const visible = this.commsLog;
         const rows = [...visible].reverse().map((entry) => {
             const color = relationColor(entry.relation);
             return `<div class="comms-row" style="border-left-color:${color};"><b style="color:${color};">${escapeHtml(callsignHandle(entry.callsign))}</b><p>${escapeHtml(entry.line)}</p></div>`;
         }).join('');
-        const countLabel = visible.length < this.commsLog.length
-            ? t('Showing {shown} of {total} transmissions', { shown: visible.length, total: this.commsLog.length })
-            : this.commsLog.length === 1
-                ? t('{count} transmission recorded', { count: this.commsLog.length })
-                : t('{count} transmissions recorded', { count: this.commsLog.length });
+        const countLabel = this.commsLog.length === 1
+            ? t('{count} transmission recorded', { count: this.commsLog.length })
+            : t('{count} transmissions recorded', { count: this.commsLog.length });
         panel.innerHTML = `
       <div class="modal-card comms-card">
         <header><div><span class="eyebrow">${t('COMMS LOG / PAUSED')}</span><h2>${t('Incoming transmissions')}</h2></div><button data-ui-command="close-chat">${t('CLOSE')}</button></header>
