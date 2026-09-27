@@ -1,3 +1,4 @@
+import { surfaceMeshCandidates } from './surfaceMeshCandidates.js';
 // hullCollision.js — every ship's hull vs every kind of obstacle.
 //
 // Both the player and every NPC collide through the same envelope: an
@@ -308,6 +309,8 @@ export const hullVsAsteroid = (pos, hull, quat, quatInv, obstacle, scratch, cont
     const oz = pos.z - obstacle.z;
     if (ox * ox + oy * oy + oz * oz >= reach * reach)
         return false;
+    const candidates = surfaceMeshCandidates(pos, hull, obstacle, scratch);
+    if (candidates && candidates.triangleCount === 0) return false;
     const rqx = box.qx;
     const rqy = box.qy;
     const rqz = box.qz;
@@ -319,7 +322,9 @@ export const hullVsAsteroid = (pos, hull, quat, quatInv, obstacle, scratch, cont
     const invHx = 1 / hx;
     const invHy = 1 / hy;
     const invHz = 1 / hz;
-    for (let i = 0; i < mesh.length; i += 3) {
+    const vertexCount = candidates ? candidates.vertexCount : mesh.length / 3;
+    for (let cursor = 0; cursor < vertexCount; cursor++) {
+        const i = candidates ? candidates.vertices[cursor] * 3 : cursor * 3;
         // rock-local -> world, then world -> player-hull space.
         let x = mesh[i];
         let y = mesh[i + 1];
@@ -343,12 +348,14 @@ export const hullVsAsteroid = (pos, hull, quat, quatInv, obstacle, scratch, cont
     let bestCx = 0;
     let bestCy = 0;
     let bestCz = 0;
-    for (let t = 0; t < indices.length; t += 3) {
+    const triangleCount = candidates ? candidates.triangleCount : indices.length / 3;
+    for (let cursor = 0; cursor < triangleCount; cursor++) {
+        const t = candidates ? candidates.triangles[cursor] : cursor * 3;
         const i0 = indices[t] * 3;
         const i1 = indices[t + 1] * 3;
         const i2 = indices[t + 2] * 3;
         const distSq = triangleClosestDistSq(scratch[i0], scratch[i0 + 1], scratch[i0 + 2], scratch[i1], scratch[i1 + 1], scratch[i1 + 2], scratch[i2], scratch[i2 + 1], scratch[i2 + 2]);
-        if (distSq < bestDistSq) {
+        if (distSq < bestDistSq || (distSq === bestDistSq && t < bestTri)) {
             bestDistSq = distSq;
             bestTri = t;
             bestCx = triClosest.x;

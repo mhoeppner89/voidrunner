@@ -866,6 +866,24 @@ const segmentSphereHit = (start, end, center, radius) => {
 // hull envelope and capital ships gain accurate kilometre-scale hit detection
 // without the enormous empty corners of a bounding sphere.
 const segmentShipHullHit = (start,end,ship,halfExtents,padding=0) => {
+    // Most projectile sweeps pass nowhere near most ships. Reject those with
+    // the hull's conservative world-axis bounds before the rotated ellipsoid
+    // and frigate-mount tests. Frigate mounts extend beyond the hull bounds, so
+    // their existing exact path must handle the entire sweep.
+    if (ship.capitalClass !== 'frigate') {
+        const radius = Math.max(halfExtents[0], halfExtents[1], halfExtents[2]) + padding;
+        const minX = Math.min(start.x, end.x);
+        const maxX = Math.max(start.x, end.x);
+        const minY = Math.min(start.y, end.y);
+        const maxY = Math.max(start.y, end.y);
+        const minZ = Math.min(start.z, end.z);
+        const maxZ = Math.max(start.z, end.z);
+        const position = ship.position;
+        if (position[0] + radius < minX || position[0] - radius > maxX
+            || position[1] + radius < minY || position[1] - radius > maxY
+            || position[2] + radius < minZ || position[2] - radius > maxZ)
+            return undefined;
+    }
     const hull=segmentEllipsoidHit(start,end,ship,halfExtents,padding);
     const mount=segmentFrigateMountHit(start,end,ship,padding);
     return mount===undefined?hull:hull===undefined?mount:Math.min(hull,mount);
@@ -4094,6 +4112,7 @@ export class GameSession {
         // enough to read before the racers jump out and the course clears.
         race.cleanupAt = this.save.world.time + 5;
         this.save.world.raceRecords[race.course.id] = { ...result, active: false, failed: false };
+        this.save.world.raceOffersDirty = true;
         this.renderer.pulseRaceGate?.(Math.max(0, race.course.gates.length - 1), { centered: true, finish: true });
         this.ui.pushSensor(t('FINISH LINE · RESULTS LOCKED'), 'success', 1800);
         this.ui.pushEvent(t('{course} FINISHED · {rank} · {amount}', { course: race.course.title.toUpperCase(), rank: raceRankLabel(rank), amount: `${payout >= 0 ? '+' : ''}${formatCredits(payout)}` }), payout >= 0 ? 'success' : 'danger', 8000);
@@ -4109,8 +4128,10 @@ export class GameSession {
         // The board clears the live entry and the quest record closes, so a
         // reload can't resurrect a forfeit ticket (see restoreActiveRace).
         const record = this.save.world.raceRecords[race.course.id];
-        if (record?.active)
+        if (record?.active) {
             this.save.world.raceRecords[race.course.id] = recordRaceResult(record, { failed: true, at: this.save.world.time });
+            this.save.world.raceOffersDirty = true;
+        }
         const quest = getQuest(this.save, RACE_QUEST_ID);
         if (quest && quest.completedAt === undefined && quest.stepId !== 'complete')
             quest.completedAt = this.save.world.time;
@@ -4171,8 +4192,10 @@ export class GameSession {
         // the offer stays hidden until this entry resolves. Preserve any
         // earlier results on the same course (best rank/time history).
         const existingRecord = this.save.world.raceRecords[course.id];
-        if (!existingRecord?.active)
+        if (!existingRecord?.active) {
             this.save.world.raceRecords[course.id] = { ...normalizeRaceRecord(existingRecord), active: true };
+            this.save.world.raceOffersDirty = true;
+        }
     }
     // Cockpit weapon readout: mounted gun name plus its ammo pool (or heat
     // state for the energy/heat weapons) for the own-ship monitor line.
@@ -9693,10 +9716,24 @@ export class GameSession {
                 if (other.hull <= 0 || other.poweredDown || other.race || other.jumpPursuit)
                     continue;
                 const otherExtents = this.npcHullExtents(other);
+                const otherRadius = Math.max(otherExtents[0], otherExtents[1], otherExtents[2]);
                 const otherVolume = otherExtents[0] * otherExtents[1] * otherExtents[2];
-                const otherPos = this.tmpP1.set(other.position[0], other.position[1], other.position[2]);
-                const otherQuat = this.tmpQ2.set(other.rotation[0], other.rotation[1], other.rotation[2], other.rotation[3]);
-                if (hullVsHull(shipPos, shipExtents, shipQuat, otherPos, otherExtents, otherQuat, contact)) {
+                const dx = ship.position[0] - other.position[0];
+                const dy = ship.position[1] - other.position[1];
+                const dz = ship.position[2] - other.position[2];
+                const distanceSq = dx * dx + dy * dy + dz * dz;
+                const hardReach = shipRadius + otherRadius;
+                const clearance = hardReach + NPC_SHIP_AVOID_BUFFER;
+                const hardCandidate = distanceSq < hardReach * hardReach;
+                const softCandidate = distanceSq < clearance * clearance;
+                let collided = false;
+                if (hardCandidate) {
+                    const otherPos = this.tmpP1.set(other.position[0], other.position[1], other.position[2]);
+                    const otherQuat = this.tmpQ2.set(other.rotation[0], other.rotation[1], other.rotation[2], other.rotation[3]);
+                    collided = hullVsHull(shipPos, shipExtents, shipQuat, otherPos, otherExtents, otherQuat, contact);
+                }
+                if (collided) {
+                    const otherPos = this.tmpP1;
                     const sv = ship.velocity;
                     const ov = other.velocity;
                     const shipVel0 = [sv[0], sv[1], sv[2]];
@@ -9710,7 +9747,7 @@ export class GameSession {
                     if (otherDmg > 0)
                         this.damageShip(other, otherDmg, ship.id, tuple(shipPos));
                 }
-                else if (softlySeparateNpcPair(ship.position, ship.velocity, other.position, other.velocity, shipRadius, Math.max(otherExtents[0], otherExtents[1], otherExtents[2]), shipVolume, otherVolume)) {
+                else if (softCandidate && softlySeparateNpcPair(ship.position, ship.velocity, other.position, other.velocity, shipRadius, otherRadius, shipVolume, otherVolume)) {
                     // The next pair in this row must see the corrected centre.
                     shipPos.set(ship.position[0], ship.position[1], ship.position[2]);
                 }
@@ -10699,8 +10736,10 @@ export class GameSession {
         ship.hull = 0;
         this.resolveHyperdriveIntercept(ship);
         const explosionScale = (CAPITAL_SHIP_STATS[ship.capitalClass]?.explosionScale ?? (ship.role === 'trader' ? 1.5 : 1)) * npcShipScaleForVariant(npcFlightVariant(ship));
-        this.renderer.spawnExplosion(ship.position, ship.hostile, explosionScale);
-        this.renderer.spawnShipWreck?.(ship, npcFlightVariant(ship), explosionScale);
+        const explosion = this.renderer.spawnExplosion(ship.position, ship.hostile, explosionScale);
+        const wreckAnchor = this.renderer.spawnShipWreck?.(ship, npcFlightVariant(ship), explosionScale);
+        if (explosion && wreckAnchor)
+            explosion.followObject = wreckAnchor;
         const blastDirection = (this.audioDirection ??= new THREE.Vector3()).fromArray(ship.position);
         blastDirection.x -= this.save.player.position[0];blastDirection.y -= this.save.player.position[1];blastDirection.z -= this.save.player.position[2];
         const blastDistance = blastDirection.length();
@@ -12679,21 +12718,53 @@ export class GameSession {
         const vy = velocity.y;
         const vz = velocity.z;
         const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
+        const observer = Boolean(this.arena?.observer);
         let selfShip;
-        if (shipId) {
-            for (const candidate of this.ships) {
+        let actualSelfRadius = selfRadius;
+        // Only observer NPC pairs use the actual self hull or its faction.
+        if (observer && shipId) {
+            for (let i = 0; i < this.ships.length; i += 1) {
+                const candidate = this.ships[i];
                 if (candidate.id === shipId) {
                     selfShip = candidate;
+                    const extents = this.npcHullExtents(candidate);
+                    actualSelfRadius = Math.max(extents[0], extents[1], extents[2]);
                     break;
                 }
             }
         }
-        const actualSelfRadius = selfShip ? Math.max(...this.npcHullExtents(selfShip)) : selfRadius;
-        const consider = (op, ov, otherRadius, npcPair = false) => {
+        // Every range branch below is bounded by this, including large hulls.
+        const maxRange = Math.max(SHIP_AVOID_RANGE, NPC_SHIP_AVOID_RANGE, SHIP_AVOID_MAX_RANGE);
+        const maxRangeSq = maxRange * maxRange;
+        const player = this.save.player;
+        const playerRadius = Math.max(this.playerCollisionRadius?.() ?? PLAYER_RADIUS, PLAYER_RADIUS);
+        // Player first, then live NPC tuples in array order: preserve urgency ties.
+        for (let i = -1; i < this.ships.length; i += 1) {
+            const other = i < 0 ? player : this.ships[i];
+            if (i >= 0 && (other.id === shipId || other.hull <= 0))
+                continue;
+            const op = other.position;
+            const ov = other.velocity;
             const rx = op[0] - px;
             const ry = op[1] - py;
             const rz = op[2] - pz;
             const distSq = rx * rx + ry * ry + rz * rz;
+            if (distSq >= maxRangeSq || distSq < 0.0001)
+                continue;
+            const rvx = ov[0] - vx;
+            const rvy = ov[1] - vy;
+            const rvz = ov[2] - vz;
+            const closing = rx * rvx + ry * rvy + rz * rvz;
+            if (closing >= 0)
+                continue;
+            // Radius-independent rejects must precede the per-pair hull lookup.
+            let otherRadius = playerRadius;
+            if (i >= 0) {
+                const extents = this.npcHullExtents(other);
+                otherRadius = Math.max(extents[0], extents[1], extents[2]);
+            }
+            const sameFaction = selfShip?.faction && other.faction && selfShip.faction === other.faction;
+            const npcPair = i >= 0 && Boolean(observer && selfShip && !sameFaction);
             const largeHullContact = (npcPair ? actualSelfRadius : selfRadius) > SHIP_AVOID_SEPARATION * 2 || otherRadius > SHIP_AVOID_SEPARATION * 2;
             const separation = npcPair
                 ? Math.max(SHIP_AVOID_SEPARATION, actualSelfRadius + otherRadius + NPC_SHIP_AVOID_BUFFER)
@@ -12705,14 +12776,8 @@ export class GameSession {
                 : largeHullContact
                 ? Math.max(SHIP_AVOID_RANGE, Math.min(SHIP_AVOID_MAX_RANGE, separation * 2.2))
                 : SHIP_AVOID_RANGE;
-            if (distSq >= range * range || distSq < 0.0001)
-                return;
-            const rvx = ov[0] - vx;
-            const rvy = ov[1] - vy;
-            const rvz = ov[2] - vz;
-            const closing = rx * rvx + ry * rvy + rz * rvz;
-            if (closing >= 0)
-                return;
+            if (distSq >= range * range)
+                continue;
             const rvSq = rvx * rvx + rvy * rvy + rvz * rvz;
             const relativeSpeed = Math.sqrt(rvSq);
             const horizon = npcPair
@@ -12726,11 +12791,11 @@ export class GameSession {
             const caz = rz + rvz * t;
             const ca = Math.sqrt(cax * cax + cay * cay + caz * caz);
             if (ca >= separation)
-                return;
+                continue;
             const dist = Math.sqrt(distSq);
             const urgency = (1 - ca / separation) * (1 - t / horizon) * clamp(dist / range, 0.35, 1);
             if (urgency <= bestUrgency)
-                return;
+                continue;
             bestUrgency = urgency;
             const invDist = 1 / dist;
             const ax = rx * invDist;
@@ -12761,15 +12826,6 @@ export class GameSession {
             }
             this.tmpShipAvoid.set(ex / len, ey / len, ez / len).multiplyScalar(urgency * (npcPair ? NPC_SHIP_AVOID_STEER : SHIP_AVOID_STEER));
             found = true;
-        };
-        const player = this.save.player;
-        consider(player.position, player.velocity, Math.max(this.playerCollisionRadius?.() ?? PLAYER_RADIUS, PLAYER_RADIUS));
-        for (const other of this.ships) {
-            if (other.id === shipId || other.hull <= 0)
-                continue;
-            const sameFaction = selfShip?.faction && other.faction && selfShip.faction === other.faction;
-            const expandedNpcPair = Boolean(this.arena?.observer && selfShip && !sameFaction);
-            consider(other.position, other.velocity, Math.max(...this.npcHullExtents(other)), expandedNpcPair);
         }
         return found ? this.tmpShipAvoid : undefined;
     }
@@ -13420,6 +13476,7 @@ export class GameSession {
         const prior = normalizeRaceRecord(this.save.world.raceRecords[course.id]);
         this.save.world.raceRecords[course.id] = { ...prior, active: true };
         delete this.save.world.raceRecords[course.id].failed;
+        this.save.world.raceOffersDirty = true;
         const racers = createRaceRacers(course, this.save.world.seed, now);
         const staged = typeof stageRaceRacers === 'function' ? stageRaceRacers(racers, course) : racers;
         const liveRacers = Array.isArray(staged) && staged.length === 3 ? staged : racers;

@@ -3,15 +3,28 @@ import { summarizeFrames } from './benchmark-metrics.js';
 // Shared flight dynamics and ace manoeuvres change the benchmark workload.
 const PROTOCOL = 'voidrunner-phone-v5';
 const SEED = 804140;
-const CHECK = new URLSearchParams(location.search).get('check') === '1';
-const PROFILE = new URLSearchParams(location.search).get('profile') === '1';
+const PARAMS = new URLSearchParams(location.search);
+const CHECK = PARAMS.get('check') === '1';
+const PROFILE = PARAMS.get('profile') === '1';
 const WARMUP_MS = CHECK ? 1000 : 10000;
 const SAMPLE_MS = CHECK ? 3000 : 50000;
-const SCENES = [
+const STRESS_FLEETS = (PARAMS.get('fleet') ?? '').split(',')
+    .map((value) => Number.parseInt(value, 10))
+    .filter((count) => Number.isFinite(count) && count >= 6 && count <= 128);
+const STRESS_ENVIRONMENTS = (PARAMS.get('fleetEnv') ?? 'asteroid-field,debris-field')
+    .split(',')
+    .filter((environment) => environment === 'asteroid-field' || environment === 'debris-field');
+const DEFAULT_SCENES = [
     { name: 'Open-space flight', environment: 'open', scenario: 'free-flight' },
     { name: 'Asteroid combat', environment: 'asteroid-field', scenario: '1v3' },
     { name: 'Debris-field combat', environment: 'debris-field', scenario: '2v3' },
 ];
+const SCENES = STRESS_FLEETS.length
+    ? STRESS_ENVIRONMENTS.flatMap((environment) => STRESS_FLEETS.map((npcShipCount) => ({
+        name: `${environment === 'asteroid-field' ? 'Asteroid' : 'Debris-field'} fleet · ${npcShipCount} ships`,
+        environment, scenario: '2v3', npcShipCount,
+    })))
+    : DEFAULT_SCENES;
 const $ = (id) => document.getElementById(id);
 const round = (n) => Math.round(n * 100) / 100;
 let runtime, ui, report, phase, controller, wakeLock;
@@ -86,11 +99,43 @@ function resetEncounter() {
     runtime.arena = { environment: currentScene.environment, scenario: currentScene.scenario, difficulty: 'veteran' };
     runtime.save.arena = runtime.arena;
     runtime.restartArena();
+    addStressFleet();
     runtime.updateActiveInstance(true);
     ui.clearToasts();
     scenarioOrigin = runtime.save.world.time;
     nextEncounter = scenarioOrigin + 20;
     encounterResets += 1;
+}
+
+function addStressFleet() {
+    const targetCount = currentScene?.npcShipCount;
+    if (!Number.isFinite(targetCount)) return;
+    const player = runtime.save.player.position;
+    const roles = ['pirate', 'escort', 'bounty'];
+    while (runtime.ships.length < targetCount) {
+        const index = runtime.ships.length;
+        const angle = index * 2.399963229728653;
+        const ring = 700 + Math.floor(index / 12) * 360;
+        const vertical = (((index * 7) % 9) - 4) * 85;
+        const position = [
+            player[0] + Math.cos(angle) * ring,
+            player[1] + vertical,
+            player[2] + Math.sin(angle) * ring,
+        ];
+        const ship = runtime.spawnShip(roles[index % roles.length], position, undefined, undefined, { tier: 'veteran' });
+        ship.targetId = 'player';
+    }
+    // This is a sustained AI/render stress run, not a time-to-kill test. Keep
+    // combat from shrinking the requested fleet or ending the player session
+    // before the sample window is over.
+    const stressHull = 1_000_000_000;
+    runtime.save.player.hull = stressHull;
+    for (const ship of runtime.ships) {
+        ship.hull = ship.maxHull = stressHull;
+        ship.shield = ship.maxShield = stressHull;
+        if (ship.combatFit?.resources)
+            ship.combatFit.resources.shield = stressHull;
+    }
 }
 
 function scriptedActions() {
@@ -110,6 +155,8 @@ function snapshot() {
     return {
         simulatedSeconds: round(runtime.save.world.time),
         ships: runtime.ships.length, projectiles: runtime.projectiles.length, pickups: runtime.pickups.length,
+        activeShips: runtime.ships.reduce((count, ship) => count + (ship.hull > 0 ? 1 : 0), 0),
+        stressFleetTarget: currentScene.npcShipCount ?? null,
         shipMeshes: runtime.renderer.shipMeshes.size,
         projectileMeshes: runtime.renderer.projectileMeshes.size,
         pickupMeshes: runtime.renderer.pickupMeshes.size,
@@ -248,6 +295,7 @@ function finishSample(p, complete) {
     report.scenes.push({
         name: currentScene.name, environment: currentScene.environment,
         scenario: currentScene.scenario, round: p.round, complete,
+        stressFleetTarget: currentScene.npcShipCount ?? null,
         ...summarizeFrames(p.intervals, p.work),
         simulatedSeconds: round(runtime.save.world.time - p.simStart),
         scriptedEncounterResets: encounterResets - p.resetsStart,

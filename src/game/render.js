@@ -2666,6 +2666,8 @@ export class SpaceRenderer {
         const materialByKind = { iron: ironMaterial, ice: iceMaterial, dark: darkMaterial };
         this.asteroidMeshes = [];
         groups.forEach((entries, key) => {
+            // Keep dynamic matrix writes contiguous without adding draw calls.
+            entries.sort((a, b) => Number(Boolean(a.node.moving)) - Number(Boolean(b.node.moving)));
             const [shapeStr, kind] = key.split(':');
             const shape = Number(shapeStr);
             const material = materialByKind[kind];
@@ -2758,6 +2760,8 @@ export class SpaceRenderer {
         }
         const root = this.instanceRoots.get('mourning-line');
         grouped.forEach((pieces, key) => {
+            // Sort the batch copy, never the simulation world array.
+            pieces.sort((a, b) => Number(Boolean(a.moving)) - Number(Boolean(b.moving)));
             const [kindRaw, finish] = key.split(':');
             const kind = kindRaw;
             const finishStyle = (() => {
@@ -5166,6 +5170,7 @@ export class SpaceRenderer {
         const effect = createShipExplosion(position, scale);
         this.scene.add(effect.object);
         this.effects.push(effect);
+        return effect;
     }
 
     spawnShipWreck(ship, variant, explosionScale) {
@@ -5179,7 +5184,7 @@ export class SpaceRenderer {
         // Break the rendered hull itself: graveyard assets have displaced parts,
         // different origins, and often belong to an entirely different ship.
         const source = this.shipMeshes?.get(ship.id);
-        if (!source) return; // No visible hull to hand off (e.g. off-screen death).
+        if (!source) return fragments.object; // No visible hull to hand off (e.g. off-screen death).
         source.updateWorldMatrix(true, true);
         const root = new THREE.Group();
         source.getWorldPosition(root.position);
@@ -5198,7 +5203,7 @@ export class SpaceRenderer {
                 bounds.expandByPoint(point.fromBufferAttribute(positions, i).applyMatrix4(matrix));
             pieces.push({ child, matrix });
         });
-        if (!pieces.length) return;
+        if (!pieces.length) return fragments.object;
         const length = Math.max(.01, bounds.max.z - bounds.min.z);
         const sections = Array.from({ length: 3 }, (_, i) => {
             const group = new THREE.Group();
@@ -5261,32 +5266,33 @@ export class SpaceRenderer {
             });
         }
         this.scene.add(root);
-        // Full initial momentum; exponential decay avoids the old instant stop.
+        // Preserve the ship's velocity; wreckage has no space drag.
         const drift = new THREE.Vector3().fromArray(ship.velocity ?? [0, 0, 0]);
         let elapsed = 0;
         const colors = [...materials.values()].map(material => [material, material.color?.clone()]);
         const effect = { object: root, combatWreck: true, life: 180, maxLife: 180, update(dt) {
             const previous = elapsed;
             elapsed += dt;
-            const damping = Math.exp(-dt * .16);
-            root.position.addScaledVector(drift, (1 - damping) / .16);
-            drift.multiplyScalar(damping);
-            // No rotation discontinuity: separation/tumble starts under the blast.
-            const breakup = 1 - Math.exp(-Math.max(0, elapsed - .18) * .8);
+            root.position.addScaledVector(drift, dt);
+            // Separation starts gently under the blast, then the pieces keep
+            // moving apart at a steady speed instead of easing to a stop.
+            const breakupTime = Math.max(0, elapsed - .18);
+            const breakup = 1 - Math.exp(-breakupTime * .8);
             const turnTime = Math.max(0, elapsed - .18) - Math.max(0, previous - .18);
             root.rotateY(turnTime * .012);
             root.rotateZ(turnTime * .007);
             sections.forEach(({ group, origin }, i) => {
                 const side = i - 1;
                 group.position.copy(origin);
-                group.position.x += side * length * .025 * breakup;
-                group.position.z += side * length * .065 * breakup;
+                group.position.x += side * length * .025 * breakupTime;
+                group.position.z += side * length * .065 * breakupTime;
                 group.rotation.set(side * .07 * breakup, side * .1 * breakup, side * .08 * breakup);
             });
             for (const [material, color] of colors) if (color) material.color.copy(color).multiplyScalar(1 - .48 * breakup);
             root.scale.copy(initialScale).multiplyScalar(Math.min(1, Math.max(0, (180 - elapsed) / 8)));
         }};
         this.effects.push(effect);
+        return root;
     }
 
     spawnImpact(position, color = 0xffc36a, heavy = false) {
@@ -5503,6 +5509,8 @@ export class SpaceRenderer {
             if (!effect.presented) { effect.presented = true; continue; }
             effect.life -= dt;
             const ratio = clamp(effect.life / effect.maxLife, 0, 1);
+            if (effect.followObject?.parent)
+                effect.followObject.getWorldPosition(effect.object.position);
             if (effect.update) effect.update(dt);
             else if (effect.points) {
                 const positions = effect.points.geometry.getAttribute('position');

@@ -96,6 +96,7 @@ export function createShipExplosion(position, scale = 1) {
 export function createHullDebris(position, scale = 1, velocity = [0,0,0]) {
     const random=seededRandom(position.join(':')+':hull-shards');
     const root=new THREE.Group();root.position.fromArray(position);
+    const inheritedVelocity=new THREE.Vector3().fromArray(velocity);
     const geometry=new THREE.BoxGeometry(1,1,1);
     const material=new THREE.MeshStandardMaterial({color:0xb1a89c,roughness:.87,metalness:.35});
     const chunks=new THREE.InstancedMesh(geometry,material,12);
@@ -111,9 +112,9 @@ export function createHullDebris(position, scale = 1, velocity = [0,0,0]) {
     }
     let age=0;
     const effect={object:root,life:14,maxLife:14,update(dt){
-        age+=dt;const distance=(1-Math.exp(-age*.22))/.22,fade=Math.min(1,Math.max(0,(14-age)/3));
+        age+=dt;root.position.addScaledVector(inheritedVelocity,dt);const fade=Math.min(1,Math.max(0,(14-age)/3));
         for(let i=0;i<parts.length;i++) {const p=parts[i];
-            matrix.position.set(p.velocity[0]*distance+velocity[0]*age*.3,p.velocity[1]*distance+velocity[1]*age*.3,p.velocity[2]*distance+velocity[2]*age*.3);
+            matrix.position.set(p.velocity[0]*age,p.velocity[1]*age,p.velocity[2]*age);
             matrix.rotation.set(p.spin[0]*age,p.spin[1]*age,p.spin[2]*age);
             matrix.scale.set(p.size[0]*fade,p.size[1]*fade,p.size[2]*fade);matrix.updateMatrix();chunks.setMatrixAt(i,matrix.matrix);
         }chunks.instanceMatrix.needsUpdate=true;

@@ -1,3 +1,4 @@
+import { createMissionOfferRefresher } from './missionOfferRefresh.js';
 import { COMMODITIES, DOCK_LOCATION_IDS, GUILD_RANK_NAMES, LOCATIONS, MISSION_LOCATION_IDS, commodityIds, routeDistanceBetween } from './data.js';
 import { generateWreckNodes, miningClaimCandidates, miningClaimName } from './missionWorldData.js';
 import { cargoFree, SYNDICATE_DEN_FAVOR } from './economy.js';
@@ -457,32 +458,15 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
     }
     return withAuthoredLocalOffer(offers, locationId, save);
 };
-export const refreshMissionOffers = (save, force = false) => {
-    const cycle = missionCycle(save.world.time);
-    const syncAuthored = save.world.localContractOffersDirty === true;
-    for (const locationId of MISSION_LOCATION_IDS) {
-        const existing = save.world.offers[locationId] ?? [];
-        // The cycle lives in the second dash segment of mission ids
-        // (`<location>-<cycle>-<index>-<rand>`), but race offers (pushed
-        // first) id as `race-<course>` — parsing those yielded NaN, which
-        // failed the `!== cycle` guard for every board refresh. Only trust
-        // segments that are actually numeric.
-        const existingCycle = existing
-            .map((offer) => offer.id.split('-')[1])
-            .find((segment) => /^\d+$/.test(segment));
-        if (force || existing.length === 0 || Number(existingCycle) !== cycle) {
-            save.world.offers[locationId] = generateMissionOffers(locationId, save);
-        }
-        else if (syncAuthored) {
-            // Story progress can advance without the procedural board cycle.
-            // Synchronize just the one authored slot while preserving every
-            // ordinary posting and its original deadline.
-            save.world.offers[locationId] = withAuthoredLocalOffer(existing, locationId, save);
-        }
-    }
-    if (syncAuthored)
-        delete save.world.localContractOffersDirty;
-};
+export const refreshMissionOffers = createMissionOfferRefresher({
+    locationIds: MISSION_LOCATION_IDS,
+    generateOffers: generateMissionOffers,
+    syncAuthored: withAuthoredLocalOffer,
+    syncRaces: (existing, locationId, save) => [
+        ...generateMissionOffers(locationId, save).filter(offer => offer.kind === 'race'),
+        ...existing.filter(offer => offer.kind !== 'race'),
+    ],
+});
 export const acceptMission = (save, locationId, missionId) => {
     const offered = save.world.offers[locationId]?.find((mission) => mission.id === missionId);
     if (!offered || offered.status !== 'offered')
