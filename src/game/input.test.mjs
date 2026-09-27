@@ -199,7 +199,7 @@ test('keyboard axes, holds, edge actions, and browser-default prevention', () =>
     assert.equal(input.getActions().utility, false);
 
     const edges = [
-        ['KeyX', 'weaponCycle'], ['KeyL', 'launcherCycle'], ['KeyT', 'targetNext'], ['KeyH', 'targetNearestHostile'],
+        ['KeyX', 'weaponCycle'], ['KeyL', 'launcherCycle'], ['KeyY', 'wingOrder'], ['KeyT', 'targetNext'], ['KeyH', 'targetNearestHostile'],
         ['KeyC', 'cycleMode'], ['KeyN', 'navNext'], ['KeyJ', 'autopilot'], ['KeyB', 'transponder'],
         ['KeyG', 'jettison'], ['Escape', 'pause'], ['KeyK', 'map'],
     ];
@@ -331,7 +331,7 @@ test('gamepad axes, deadzones, held buttons, and edge buttons', () => {
     const input = createInput(new FakeRoot());
     gamepads = [null, makePad({
         axes: [0.12, -0.12, 0.13, -1],
-        pressed: [0, 1, 2, 3, 5, 7, 8, 9, 10, 12, 13, 14, 15],
+        pressed: [0, 1, 2, 3, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15],
     })];
     const first = input.getActions();
     assert.equal(input.usingGamepad, true);
@@ -343,6 +343,7 @@ test('gamepad axes, deadzones, held buttons, and edge buttons', () => {
     assert.equal(first.missile, true);
     assert.equal(first.weaponCycle, true);
     assert.equal(first.launcherCycle, true);
+    assert.equal(first.wingOrder, true, 'stick click orders the wing');
     assert.equal(first.targetNext, true);
     assert.equal(first.cycleMode, true);
     assert.equal(first.autopilot, true);

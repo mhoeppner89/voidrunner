@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Voidrunner · phone menu review</title>
+<style>
+  :root { color-scheme: dark; --bg:#05080d; --panel:#0c1622; --line:rgba(140,180,205,.25); --text:#e6eef3; --muted:#8fa6b6; --gold:#f0c46a; }
+  * { box-sizing: border-box; }
+  body { margin:0; height:100vh; display:flex; font:13px/1.4 system-ui, sans-serif; color:var(--text); background:var(--bg); overflow:hidden; }
+  aside { flex:0 0 260px; min-width:0; padding:12px; overflow:auto; border-right:1px solid var(--line); background:var(--panel); }
+  h1 { margin:0 0 10px; font-size:14px; color:var(--gold); }
+  h2 { margin:14px 0 6px; font-size:11px; letter-spacing:.1em; color:var(--muted); text-transform:uppercase; }
+  button { min-height:34px; width:100%; margin-bottom:5px; color:var(--text); background:#122334; border:1px solid var(--line); border-radius:3px; font:inherit; cursor:pointer; }
+  button.is-active { border-color:var(--gold); color:#fff2cf; background:#2a2416; }
+  #status { margin-top:10px; color:var(--muted); font-size:11px; white-space:pre-wrap; word-break:break-word; }
+  main { flex:1; min-width:0; overflow:auto; padding:14px; }
+  #stage { position:relative; width:max-content; transform-origin:top left; }
+  iframe { display:block; border:1px solid var(--line); background:#000; }
+</style>
+</head>
+<body>
+<aside>
+  <h1>Phone menu review</h1>
+  <h2>Orientation</h2>
+  <button data-orient="portrait" class="is-active">Portrait · 390 × 844</button>
+  <button data-orient="landscape">Landscape · 844 × 390</button>
+  <h2>Screen</h2>
+  <button data-screen="concourse" class="is-active">Concourse</button>
+  <button data-screen="market">Market floor</button>
+  <button data-screen="bar">Bar floor</button>
+  <button data-screen="missions">Mission board</button>
+  <button data-screen="services">Services</button>
+  <button data-screen="ship">Own ship menu (launch)</button>
+  <h2>Zoom</h2>
+  <button id="toggle-zoom">Fit to window</button>
+  <h2>Audit</h2>
+  <button id="run-audit">Scan all screens</button>
+  <div id="status">booting…</div>
+</aside>  <main><div id="stage"><iframe id="game" width="390" height="844" src="/index.html?dev-autostart=1"></iframe></div></main>
+<script>
+const SIZES = { portrait: [390, 844], landscape: [844, 390] };
+const frame = document.getElementById('game');
+const stage = document.getElementById('stage');
+const status = document.getElementById('status');
+let orientation = 'portrait';
+let screen = 'concourse';
+let launched = false;
+const log = (message) => { status.textContent = message; };
+window.__REVIEW__ = { ready: false, error: null, audit: null };
+window.__HOOKS__ = {
+  show: (name) => show(name),
+  scan,
+  setOrientation: async (next) => { orientation = next; applySize(); if (window.__REVIEW__.ready) await show(screen); return next; },
+  audit: () => runAudit(),
+  state: () => ({ orientation, screen, launched, ready: window.__REVIEW__.ready }),
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function waitFor(predicate, label, attempts = 240) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try { if (predicate()) return true; } catch { /* iframe not ready */ }
+    await sleep(100);
+  }
+  throw new Error(`timeout waiting for ${label}`);
+}
+
+let zoom = 'fit';
+
+function fitStage() {
+  const pane = stage.parentElement.clientWidth - 28;
+  const width = Number(frame.getAttribute('width'));
+  const height = Number(frame.getAttribute('height'));
+  const scale = zoom === '1:1' ? 1 : Math.min(1, pane / width);
+  stage.style.transform = `scale(${scale})`;
+  stage.style.height = `${(height * scale).toFixed(1)}px`;
+  stage.parentElement.scrollTop = 0;
+}
+
+function applySize() {
+  const [width, height] = SIZES[orientation];
+  frame.setAttribute('width', String(width));
+  frame.setAttribute('height', String(height));
+  fitStage();
+}
+
+async function boot() {
+  launched = false;
+  window.__REVIEW__.ready = false;
+  applySize();
+  const source = `/index.html?dev-autostart=1&review=${Date.now()}`;
+  log('loading game…');
+  frame.src = source;
+  await waitFor(() => Boolean(frame.contentWindow?.__VOID_PRIVATEER__), 'game hooks', 400);
+  await waitFor(() => Boolean(frame.contentWindow.__VOID_PRIVATEER__.getRuntime?.()?.save?.player?.dockedAt), 'docked career', 400);
+  window.__REVIEW__.ready = true;
+  log(`ready · ${frame.getAttribute('width')}×${frame.getAttribute('height')}`);
+  await show(screen);
+}
+
+function runtime() { return frame.contentWindow.__VOID_PRIVATEER__.getRuntime(); }
+
+// Dock terminals stay reachable after a launch, so the review can move back
+// and forth between the station menus and the flight menu.
+function ensureDocked() {
+  const rt = runtime();
+  rt.ui.hideShipMenu();
+  if (!rt.save.player.dockedAt) {
+    rt.save.player.dockedAt = 'helix';
+    rt.save.player.lastDockedAt = 'helix';
+  }
+  rt.ui.showDock(rt.save, rt.save.player.dockedAt);
+}
+
+const ACTIONS = {
+  concourse: () => { ensureDocked(); runtime().ui.switchToTerminal('concourse'); },
+  market: () => { ensureDocked(); runtime().ui.switchToTerminal('market'); },
+  bar: () => { ensureDocked(); runtime().ui.switchToTerminal('bar', 'people'); },
+  missions: () => { ensureDocked(); runtime().ui.switchToTerminal('bar', 'missions'); },
+  services: () => { ensureDocked(); const ui = runtime().ui; ui.dockTab = 'concourse'; ui.dockTerminal = 'services'; ui.renderDock(); },
+  ship: async () => {
+    if (!launched) {
+      log('launching…');
+      // A fresh career gates departure behind the prologue; skip it so the
+      // reviewed menu is reachable the way a mid-career pilot would see it.
+      if (runtime().save.player.dockedAt) { runtime().skipTutorial(); runtime().ui.hideDock(); }
+      await runtime().launch();
+      await waitFor(() => !runtime().save.player.dockedAt, 'launch', 600);
+      await sleep(1500);
+      launched = true;
+    }
+    runtime().ui.showShipMenu();
+  },
+};
+
+async function show(name) {
+  screen = name;
+  for (const button of document.querySelectorAll('[data-screen]'))
+    button.classList.toggle('is-active', button.dataset.screen === name);
+  if (!window.__REVIEW__.ready) return;
+  log(`showing ${name}…`);
+  try {
+    await ACTIONS[name]();
+    await sleep(name === 'ship' ? 700 : 250);
+    const dock = frame.contentDocument.querySelector('#dock-screen .dock-content, #ship-panel .modal-card');
+    if (dock) dock.scrollTop = 0;
+    log(`${name} · ${orientation}`);
+  } catch (error) {
+    log(`${name} failed: ${error.message}`);
+  }
+}
+
+// Measures what a phone player actually sees: text scale, font faces, tap
+// target heights, and how much of each panel has to be scrolled.
+function scan() {
+  const win = frame.contentWindow;
+  const doc = frame.contentDocument;
+  const visible = (element) => {
+    const style = win.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0;
+  };
+  const roots = [...doc.querySelectorAll('#dock-screen:not(.is-hidden), #ship-panel:not(.is-hidden)')];
+  const texts = [];
+  const faces = new Map();
+  const sizes = new Map();
+  const seen = new Set();
+  for (const root of roots) {
+    const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const value = walker.currentNode.nodeValue.replace(/\s+/g, ' ').trim();
+      const element = walker.currentNode.parentElement;
+      if (!value || !element || seen.has(element) || element.closest('[aria-hidden="true"], .dock-backdrop, .dock-scanlines')) continue;
+      if (!visible(element)) continue;
+      seen.add(element);
+      const style = win.getComputedStyle(element);
+      const size = Math.round(Number.parseFloat(style.fontSize) * 10) / 10;
+      const family = style.fontFamily.split(',')[0].replace(/["']/g, '');
+      texts.push({ size, family, text: value.slice(0, 48) });
+      sizes.set(size, (sizes.get(size) ?? 0) + 1);
+      faces.set(family, (faces.get(family) ?? 0) + 1);
+    }
+  }
+  const controls = roots.flatMap((root) => [...root.querySelectorAll('button, [role="button"], select, input, summary')]).filter(visible);
+  const heights = controls.map((element) => Math.round(element.getBoundingClientRect().height));
+  const scrollAreas = [...doc.querySelectorAll('#dock-screen .dock-content, #ship-panel .modal-card')].map((element) => ({
+    overflow: element.scrollHeight - element.clientHeight,
+    viewport: element.clientHeight,
+  }));
+  return {
+    screen,
+    orientation,
+    viewport: [win.innerWidth, win.innerHeight],
+    textCount: texts.length,
+    minText: texts.length ? Math.min(...texts.map((entry) => entry.size)) : null,
+    under13: texts.filter((entry) => entry.size < 13).length,
+    under11: texts.filter((entry) => entry.size < 11).length,
+    sizes: [...sizes.entries()].sort((a, b) => a[0] - b[0]),
+    faces: [...faces.entries()].sort((a, b) => b[1] - a[1]),
+    controls: controls.length,
+    minControlHeight: heights.length ? Math.min(...heights) : null,
+    controlsUnder44: heights.filter((height) => height < 43.5).length,
+    scrollAreas,
+    rootCount: roots.length,
+  };
+}
+
+async function runAudit() {
+  const results = [];
+  const previousOrientation = orientation;
+  const previousScreen = screen;
+  for (const nextOrientation of ['portrait', 'landscape']) {
+    orientation = nextOrientation;
+    applySize();
+    await sleep(400);
+    for (const name of ['concourse', 'market', 'bar', 'missions', 'services', 'ship']) {
+      await show(name);
+      await sleep(150);
+      results.push(scan());
+    }
+  }
+  orientation = previousOrientation;
+  screen = previousScreen;
+  applySize();
+  await show(screen);
+  window.__REVIEW__.audit = results;
+  log(`audit done · ${results.length} rows`);
+  console.table(results.map((row) => ({ ...row, sizes: undefined, faces: row.faces.map(([name]) => name).join('/'), scroll: row.scrollAreas.map((area) => area.overflow).join(',') })));
+}
+
+document.querySelectorAll('[data-orient]').forEach((button) => button.addEventListener('click', async () => {
+  orientation = button.dataset.orient;
+  for (const other of document.querySelectorAll('[data-orient]')) other.classList.toggle('is-active', other === button);
+  applySize();
+  if (window.__REVIEW__.ready) await show(screen);
+}));
+document.querySelectorAll('[data-screen]').forEach((button) => button.addEventListener('click', () => void show(button.dataset.screen)));
+document.getElementById('run-audit').addEventListener('click', () => void runAudit().catch((error) => log(`audit failed: ${error.message}`)));
+document.getElementById('toggle-zoom').addEventListener('click', (event) => {
+  zoom = zoom === 'fit' ? '1:1' : 'fit';
+  event.target.textContent = zoom === 'fit' ? 'Fit to window' : 'Actual size (1:1)';
+  fitStage();
+});
+window.addEventListener('resize', fitStage);
+
+boot().catch((error) => { window.__REVIEW__.error = error.message; log(`boot failed: ${error.message}`); });
+</script>
+</body>
+</html>

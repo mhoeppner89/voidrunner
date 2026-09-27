@@ -1,3 +1,4 @@
+import { STATION_DOCKS } from './stationDocks.js';
 import {LEAGUE_HULLS} from './leagueContent.js';
 import { GALAXY_LOCATIONS } from './galaxyContent.js';
 import { JUMP_ROUTES, SYSTEMS, systemHops } from './galaxy.js';
@@ -641,7 +642,7 @@ export const EQUIPMENT = {
         category: 'radar',
         price: 5400,
         description: 'Improves target acquisition, scan range, and threat classification.',
-        stat: '+25% target range · +50% scan range',
+        stat: '+50% target range · +50% scan range',
     },
     'cargo-pods': {
         id: 'cargo-pods',
@@ -826,6 +827,9 @@ export const hyperdriveArrivalRadius = (location) => {
         return location.radius + FIELD_ARRIVAL_MARGIN;
     if (location.kind === 'jump-point')
         return JUMP_POINT_ACTIVATION_RADIUS;
+    // Station arrivals should begin outside the landing beacon ring. That
+    // leaves a visible, flyable approach after the local hyperdrive drops out.
+    if (STATION_DOCKS[location.id]) return Math.max(location.radius * 1.05, location.radius + 450);
     // Planets are huge now: exit hyperdrive well clear of the surface so the
     // approach reads as a long glide in (and the low-res surface texture stays
     // out of close-up range). 7km above the surface.

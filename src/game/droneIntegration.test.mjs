@@ -23,7 +23,7 @@ const migrated = hydrateSave(old);
 assert.equal(JSON.stringify(old), before, 'migration does not mutate the input');
 assert.equal(migrated.player.credits, old.player.credits + 3 * 7600);
 assert.equal(migrated.player.cargo.medicine, 50);
-assert.equal(cargoMass(migrated.player), 50);
+assert.equal(cargoMass(migrated.player), 52, 'owned drones reserve cargo space too');
 assert.equal(cargoFree(migrated.player), 0);
 assert.equal(hydrateSave(migrated).player.credits, migrated.player.credits, 'refund exactly once');
 const keyed = structuredClone(old);

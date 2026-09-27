@@ -2,7 +2,9 @@ import {createNewSave,hydrateSave} from './save.js';
 import {HULL_HARDPOINTS,OUTFIT_ITEMS,LOADOUT_KEYS,loadoutFor,createOutfittingState,itemFitsMount,validateLoadout,projectLegacyEquipment,projectLegacyWeaponId} from './outfitting.js';
 import {getEffectiveShipStats} from './shipStats.js';
 import {launcherMagazineEntries,normalizeLauncherMagazines,fillLauncherMagazines} from './weapons.js';
-import {seededRandom} from './random.js';
+import {proceduralCallsign,seededRandom} from './random.js';
+import {ARENA_HULL_OFFER_COUNT,MAX_RUN_WINGMEN,PLAYER_FLYABLE_HULLS,WINGMAN_OFFER_COUNT,isFlyableHull,wingmanFitFor} from './shipPool.js';
+import {WING_ORDERS,WING_ORDER_LABEL,WING_ORDER_HINT,WING_ORDER_SHORT,WING_ORDER_GATE,normalizeWingOrder,nextWingOrder} from './wingOrders.js';
 export const ARENA_RUN_KEY='voidrunner-arena-run-v1';
 export const ARENA_RECORD_KEY='voidrunner-arena-record-v1';
 // Enemy entries: role, pilot tier, gun fit, arrival delay, optional finite ordnance.
@@ -23,14 +25,21 @@ export const RUN_WAVES=[
 ];
 export function newArenaRun(hard=false,seed=Date.now()) {
  const save=createNewSave(seed,{tutorial:false});save.arena={run:true};save.player.credits=0;save.player.cargo={};save.player.throttle=.35;
- save.arenaRun={version:2,totalWaves:RUN_WAVES.length,seed,hard,wave:0,phase:'prepare',rewardChosen:true,hullChosen:true,offers:[],cleared:0,elapsed:0,damage:0,missiles:0};return save;
+ save.arenaRun={version:2,totalWaves:RUN_WAVES.length,seed,hard,wave:0,phase:'prepare',rewardChosen:true,hullChosen:true,offers:[],hullOffers:[],wingmanOffers:[],wingmen:[],wingOrder:'aggressive',cleared:0,elapsed:0,damage:0,missiles:0};return save;
 }
 export function readArenaRun(){try{
  const raw=JSON.parse(window.localStorage.getItem(ARENA_RUN_KEY)),r=raw?.arenaRun;
  if(![1,2].includes(r?.version)||!['prepare','combat','won','lost'].includes(r.phase)||!Number.isInteger(r.wave)||r.wave<0||r.wave>=(r.version===1?8:RUN_WAVES.length))return null;
  // Finished eight-wave records remain finished. Active checkpoints gain waves 9–10.
  if(r.version===1){r.totalWaves=['won','lost'].includes(r.phase)?8:RUN_WAVES.length;r.version=2;}
- const save=hydrateSave(raw);save.arenaRun=r;save.arena={run:true};refreshRunRewardOffers(save);return save;
+ const save=hydrateSave(raw);save.arenaRun=r;save.arena={run:true};
+ // Additive run fields arrive with older checkpoints: a hull stage opened
+ // before the shared pool existed still needs its five fresh offers, and a
+ // malformed wing list must never break the run.
+ if(!Array.isArray(r.wingmen))r.wingmen=[];
+ if(!Array.isArray(r.wingmanOffers))r.wingmanOffers=[];
+ r.wingOrder=normalizeWingOrder(r.wingOrder);
+ refreshRunHullOffers(save);refreshRunWingmanOffers(save);refreshRunRewardOffers(save);return save;
  }catch{return null;}}
 
 export function writeArenaRun(save){try{const clean={...save,player:{...save.player}};delete clean.player.turretRuntime;delete clean.player.prevPosition;delete clean.player.prevRotation;window.localStorage.setItem(ARENA_RUN_KEY,JSON.stringify(clean));return true;}catch{return false;}}
@@ -125,9 +134,68 @@ export function fitRunItem(save,key,index,id){
  p.equipment=projectLegacyEquipment(equipped,state);p.weaponId=projectLegacyWeaponId(equipped);p.outfitting=state;
  normalizeLauncherMagazines(p);return true;
 }
+// Five hulls from the complete flyable pool, drawn once per hull stage and
+// stable across re-renders and reloads. The pilot's current hull is never
+// offered: staying put is the wingman option instead.
+export function runHullOffers(save){
+ const r=save.arenaRun,p=save.player;
+ const rng=seededRandom(`${r.seed}:hull:${r.wave}:${p.shipId}`);
+ return PLAYER_FLYABLE_HULLS.filter(id=>id!==p.shipId).map(id=>({id,sort:rng()})).sort((a,b)=>a.sort-b.sort).slice(0,ARENA_HULL_OFFER_COUNT).map(entry=>entry.id);
+}
+// Keep an already-shown offer list when it is still legal; otherwise fill it
+// from a fresh draw. Runs on load so a checkpoint saved mid-stage renders the
+// same five hulls it showed before.
+export function refreshRunHullOffers(save){
+ const r=save.arenaRun;if(r.phase!=='prepare'||r.hullChosen)return;
+ const valid=(Array.isArray(r.hullOffers)?r.hullOffers:[]).filter(id=>isFlyableHull(id)&&id!==save.player.shipId);
+ for(const id of runHullOffers(save))if(valid.length<ARENA_HULL_OFFER_COUNT&&!valid.includes(id))valid.push(id);
+ r.hullOffers=valid.slice(0,ARENA_HULL_OFFER_COUNT);
+}
+// The sixth hull-stage choice: keep the current ship and add a veteran. Three
+// candidates are drawn from the complete pool and held for the stage, so the
+// pilot chooses who joins the wing instead of taking a blind roll.
+export function runWingmanOffers(save){
+ const r=save.arenaRun;if(r.phase!=='prepare'||r.hullChosen)return [];
+ const rng=seededRandom(`${r.seed}:wingman:${r.wave}`);
+ return PLAYER_FLYABLE_HULLS.map(id=>({id,sort:rng()})).sort((a,b)=>a.sort-b.sort).slice(0,WINGMAN_OFFER_COUNT)
+  .map((entry,index)=>({id:`wingman-${r.wave}-${index}`,hullId:entry.id,fit:wingmanFitFor(entry.id),name:proceduralCallsign(rng)}));
+}
+// Keep an already-shown roster while the stage is open; otherwise draw one.
+// Runs on load so a checkpoint saved mid-stage offers the same three pilots.
+export function refreshRunWingmanOffers(save){
+ const r=save.arenaRun;if(r.phase!=='prepare'||r.hullChosen){r.wingmanOffers=[];return;}
+ const valid=(Array.isArray(r.wingmanOffers)?r.wingmanOffers:[]).filter(candidate=>candidate&&isFlyableHull(candidate.hullId)&&typeof candidate.name==='string');
+ r.wingmanOffers=valid.length?valid.slice(0,WINGMAN_OFFER_COUNT):runWingmanOffers(save);
+}
+// Hire one of the stage's candidates. One hire per stage, at most two veterans
+// per run, and only a name that is actually on offer can be taken.
+export function hireRunWingman(save,id){
+ const r=save.arenaRun;if(r.phase!=='prepare'||r.hullChosen)return null;
+ const list=Array.isArray(r.wingmen)?r.wingmen:[];
+ if(list.filter(wingman=>wingman.alive!==false).length>=MAX_RUN_WINGMEN)return null;
+ if(!(r.wingmanOffers??[]).length)r.wingmanOffers=runWingmanOffers(save);
+ const candidate=r.wingmanOffers.find(entry=>entry.id===id);if(!candidate)return null;
+ const wingman={id:candidate.id,hullId:candidate.hullId,role:'patrol',fit:candidate.fit,name:candidate.name,alive:true,order:normalizeWingOrder(r.wingOrder)};
+ r.wingmen=[...list,wingman];r.wingmanOffers=[];
+ r.hullChosen=true;r.offers=runOffers(save);
+ return wingman;
+}
+// The standing-order vocabulary and the range gates live in wingOrders.js,
+// shared with the campaign's companion. Arena Run re-exports them so the run
+// screen, the HUD wing rail and the saved-run migration keep one import site.
+export {WING_ORDERS,WING_ORDER_LABEL,WING_ORDER_HINT,WING_ORDER_SHORT,WING_ORDER_GATE,normalizeWingOrder,nextWingOrder};
+// A wingman's own standing order, falling back to the run default for
+// checkpoints written before per-wingman orders existed (normalizeWingOrder
+// never returns undefined, so the fallback has to be chosen before it runs).
+export const wingmanOrder=(wingman,run)=>normalizeWingOrder(WING_ORDERS.includes(wingman?.order)?wingman.order:run?.wingOrder);
 export function changeRunHull(save,id){
- const r=save.arenaRun,p=save.player;if(r.phase!=='prepare'||r.hullChosen||![3,6].includes(r.wave)||!['wayfarer','talon','vanguard','prospector','lancer','atlas'].includes(id))return false;
+ const r=save.arenaRun,p=save.player;if(r.phase!=='prepare'||r.hullChosen||![3,6].includes(r.wave)||!PLAYER_FLYABLE_HULLS.includes(id)||!(r.hullOffers??[]).includes(id))return false;
  if(id!==p.shipId){
+  // Snapshot just the fields the transfer rebuilds. A hull whose mounts cannot
+  // take any installed or stored forward gun would strand the sortie
+  // (startRunWave refuses a gunless fit), so an un-fittable swap is undone
+  // rather than accepted.
+  const snapshot=JSON.parse(JSON.stringify({shipId:p.shipId,ownedShips:p.ownedShips,outfitting:p.outfitting,equipment:p.equipment,weaponId:p.weaponId,hull:p.hull,launcherMagazines:p.launcherMagazines,missiles:p.missiles}));
   const fraction=p.hull/getEffectiveShipStats(p).hull,old=loadoutFor(p),oldSpec=HULL_HARDPOINTS[p.shipId],oldFactory=p.outfitting.factory[p.shipId];
   const magazines=launcherMagazineEntries(p),locker={...p.outfitting.locker},factoryLocker={...p.outfitting.factoryLocker};
   for(const key of LOADOUT_KEYS)for(const [i,item] of old[key].entries())if(item){locker[item]=(locker[item]??0)+1;if(oldFactory[key][i])factoryLocker[item]=(factoryLocker[item]??0)+1;}
@@ -155,6 +223,7 @@ export function changeRunHull(save,id){
   const ammo={};for(const e of magazines)ammo[e.launcherId]=(ammo[e.launcherId]??0)+e.rounds;
   for(const e of normalizeLauncherMagazines(p)){const rounds=Math.min(e.capacity,ammo[e.launcherId]??0);p.launcherMagazines[e.mount.id].rounds=rounds;ammo[e.launcherId]-=rounds;}
   normalizeLauncherMagazines(p);
+  if(!loadoutFor(p).guns.some(Boolean)){Object.assign(p,JSON.parse(JSON.stringify(snapshot)));return false;}
  }
- r.hullChosen=true;r.offers=runOffers(save);return true;
+ r.hullChosen=true;r.wingmanOffers=[];r.offers=runOffers(save);return true;
 }

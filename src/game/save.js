@@ -1,5 +1,5 @@
 import { createInitialMarket, normalizeMarketIntel, refreshAllPrices } from './economy.js';
-import { DEFAULT_NAV_LOCATION_BY_SYSTEM, LOCATIONS, MISSION_LOCATION_IDS, SHIPS, commodityIds, navLocationIdsForSystem } from './data.js';
+import { DEFAULT_NAV_LOCATION_BY_SYSTEM, DOCK_LOCATION_IDS, LOCATIONS, MISSION_LOCATION_IDS, SHIPS, commodityIds, navLocationIdsForSystem } from './data.js';
 import { SYSTEM_IDS, getRoute, hasSystem } from './galaxy.js';
 import { refreshMissionOffers } from './missions.js';
 import { normalizeRaceRecord } from './racing.js';
@@ -14,7 +14,14 @@ import { normalizeDroneFleet } from './droneData.js';
 import { normalizeActiveSortie, normalizeSortieHistory } from './careerMetrics.js';
 export const DRONE_TEST_MODE = typeof location !== 'undefined' && new URLSearchParams(location.search).get('drone-test') === '1';
 export const TURRET_TEST_MODE = typeof location !== 'undefined' && new URLSearchParams(location.search).get('turret-test') === '1';
-export const SAVE_KEY = TURRET_TEST_MODE ? 'voidrunner-turret-test-v1' : DRONE_TEST_MODE ? 'voidrunner-drone-test-v16' : 'void-privateer-save-v1';
+const landingPreviewParam = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('dev-landing') : undefined;
+export const LANDING_PREVIEW_ID = DOCK_LOCATION_IDS.includes(landingPreviewParam) && LOCATIONS[landingPreviewParam]?.kind === 'station'
+    ? landingPreviewParam
+    : undefined;
+export const SAVE_KEY = TURRET_TEST_MODE ? 'voidrunner-turret-test-v1'
+    : DRONE_TEST_MODE ? 'voidrunner-drone-test-v16'
+        : LANDING_PREVIEW_ID ? `voidrunner-landing-preview-v1-${LANDING_PREVIEW_ID}`
+            : 'void-privateer-save-v1';
 export const DRONE_MIGRATION_BACKUP_KEY = `${SAVE_KEY}-pre-drones`;
 export const SETTINGS_KEY = 'void-privateer-settings-v1';
 export const SAVE_VERSION = 17;
@@ -97,6 +104,7 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             navTargetId: 'shardbelt',
             dockedAt: 'helix',
             lastDockedAt: 'helix',
+            stationPadIndex: 0,
             reputation: {
                 concord: 0,
                 'frontier-league': 0,
@@ -177,14 +185,18 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             scannedNodes: [],
             danger: 0.8,
             seed,
-        },
-        activeMissions: [],
+        },        activeMissions: [],
+            // Standing order for the wing flying with the player (the campaign's
+        // companion, see campaignWing.js). The Arena Run keeps its own order
+        // inside its own save, so a gauntlet never rewrites a career's
+        // discipline, and hydrateSave default-fills this for older saves.
+        wingOrder: 'aggressive',
         // Reserved quest-state records (see quests.js): the main story arc's
         // flags and choices live here, plain JSON, versioned with the save.
         quests: [],
         settings: defaultSettings(),
     };
-    save.player.droneFleet = normalizeDroneFleet(undefined, save.player.outfitting.loadouts, { grantInitial: true });
+    save.player.droneFleet = normalizeDroneFleet(undefined, save.player.outfitting.loadouts, { grantInitial: true, activeShipId: save.player.shipId });
     normalizeLauncherMagazines(save.player, { fill: true });
     if (options.tutorial === true)
         startTutorialCampaign(save, save.world.time);
@@ -543,6 +555,10 @@ export const hydrateSave = (candidate) => {
         player: {
             ...fallback.player,
             ...(candidate.player ?? {}),
+            stationPadIndex: Number.isSafeInteger(candidate.player?.stationPadIndex)
+                && candidate.player.stationPadIndex >= 0
+                ? candidate.player.stationPadIndex
+                : 0,
             cargo: normalizeCargo(candidate.player?.cargo),
             reputation: { ...fallback.player.reputation, ...(candidate.player?.reputation ?? {}) },
             guildRep: { ...fallback.player.guildRep, ...(candidate.player?.guildRep ?? {}) },
@@ -708,7 +724,7 @@ export const hydrateSave = (candidate) => {
     // Existing empty fleets represent losses, and schema-15 saves with missing
     // data do not receive another grant. Other career/world fields are intact.
     save.player.droneFleet = normalizeDroneFleet(candidate.player?.droneFleet,
-        save.player.outfitting.loadouts, { grantInitial: sourceVersion < 15 });
+        save.player.outfitting.loadouts, { grantInitial: sourceVersion < 15, activeShipId: save.player.shipId });
     if (hadCanonicalOutfitting) {
         save.player.equipment = projectLegacyEquipment(save.player, save.player.outfitting);
         save.player.weaponId = projectLegacyWeaponId(save.player, save.player.shipId, save.player.outfitting.loadouts?.[save.player.shipId]?.fireGroups?.activeGroup);

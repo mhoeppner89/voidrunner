@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v329-0-8-2cs-wayfarer-monitors';
+const CACHE = 'voidrunner-v337-0-8-2da-frigate-retry';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -20,13 +20,17 @@ const CORE_ASSETS = [
   './src/style.css',
   './src/main.js',
   './src/game/cockpitDamage.js',
+  './src/game/explosionFx.js',
+  './src/game/sampleSfx.js',
+  './src/game/sampleSfxManifest.js',
+  './src/game/repairSites.js',
   './src/game/capitalCombat.js',
   './src/game/npcDrones.js',
   './src/game/frigateMounts.js',
   './src/game/audio.js',
-  './src/game/sampleSfx.js',
-  './src/game/sampleSfxManifest.js',
   './src/game/arenaRun.js',
+  './src/game/wingOrders.js',
+  './src/game/shipPool.js',
   './src/game/turretLayouts.js',
   './src/game/turretModels.js',
   './src/game/turretModelData.js',
@@ -35,6 +39,13 @@ const CORE_ASSETS = [
   './src/game/data.js',
   './src/game/leagueContent.js',
   './src/game/blackHole.js',
+  './src/game/stationOccupants.js',
+    './src/game/shipLivery.js',
+    './src/game/stationDocks.js',
+    './src/game/stationTraffic.js',
+    './src/game/playerDocking.js',
+    './src/game/combatTravel.js',
+    './src/game/stationActivity.js',
   './src/game/droneData.js',
   './src/game/droneMining.js',
   './src/game/dronePdc.js',

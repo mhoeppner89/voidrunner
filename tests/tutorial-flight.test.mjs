@@ -23,7 +23,7 @@ function fixture(step='fly-vesper') {
         showPilotLine(...line){radio.push(line);},clearPilotLine(){this.cleared=true;},dismissStory(){},
         showToast(){},pushEvent(){},pushSensor(){},refreshDock(){},hideDock(){},showHud(){}};
     session.audio={play(){},playComms(){},setStationMode(){}};
-    session.renderer={setTarget(){},setUtilityBeam(){},setCockpitVisible(){}};
+    session.renderer={async ensureStationModels(){},setTarget(){},setUtilityBeam(){},setCockpitVisible(){}};
     session.ships=[];session.entityCounter=0;session.persistSave=()=>{};
     session.tmpQ2=new THREE.Quaternion();
     for(const key of ['tmpTutorialGoal','tmpTutorialForward','tmpTutorialRight','tmpTutorialUp','tmpP2','tmpP3'])session[key]=new THREE.Vector3();

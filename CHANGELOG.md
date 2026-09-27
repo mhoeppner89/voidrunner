@@ -1,3 +1,62 @@
+## 0.8.2da — Aligned wing cards, wave-clear beat, dock-prompt and frigate-hull fixes
+
+- The wing tactic cards now share the right screen edge with the flight controls: the rail uses the touch column's own safe-area offsets (8 px in the canopy, 3 px on short landscape phones), so both columns line up; the cards also hang a touch lower from the top edge so they clear the corner glass.
+- The final kill of a wave gets its moment: after the last opponent dies the battlefield holds for two seconds — the death bloom plays out, incoming fire drops to zero — before the run flips to the preparation screen.
+- Fixed a docking prompt leaking into Arena runs: the target monitor no longer offers "LOCK … · DOCK" while a run is active, even when the wave spawns inside a location's approach radius (the asteroid field sits inside the Shardbelt's).
+- Fixed the wave-10 frigate boss staying a placeholder forever after a transient failure: a failed GLB hull fetch now re-arms its variant so the renderer retries on later syncs, and ships spawned during the outage (voxel placeholders) swap to the real hull once the retry resolves.
+- Release identifiers: GAME_VERSION `0.8.2da`, CACHE `voidrunner-v337-0-8-2da-frigate-retry`.
+
+## 0.8.2cz — One tactic card per wingman at the top-right screen edge
+
+- The wing tactics control left the status monitors entirely: a rail of compact cards now hangs off the HUD's top-right screen edge, one card per wingman (at most two), each printing only its stance — AGG / DEF / OFF — above two slim fills for shield (top) and hull (bottom). Tapping a card cycles THAT wingman's order; the Y key cycles the whole crew. The monitors keep their gauge bars and hull outlines to themselves.
+- Each wingman carries its own standing order, so a mixed-tactics wing is legal: one veteran can fly aggressive while the other breaks off. Orders persist per wingman with the run (older checkpoints fall back to the run default), the run default follows the lead wingman for the save migration, and the ship menu and run stage offer one order group per wingman.
+- Rin's card follows her live state: dimmed with a drained shield bar while she is powered down, gone when she is not flying. Cards are keyed per wingman and only repaint when their state changes, so the per-frame publish does no DOM churn.
+- Release identifiers: GAME_VERSION `0.8.2cz`, CACHE `voidrunner-v336-0-8-2cz-wing-tactic-cards`.
+
+## 0.8.2cy — Corner wing switch, gauge bars, and a word for what the target is doing
+
+- The wing switch moved to the top-right corner of BOTH status monitors — the own-ship screen and the target screen — so the control is the same wherever the pilot's eyes are. The survival bars got their full width back and no longer share their row.
+- The monitors read like a gauge cluster now: the shield/energy/hull rows print only their initial (S / E / H) with no numeric readout — exact numbers stay on the docked screens — and the top-down hull schematics return beside the bars on both monitors, slimmed to fit short landscape phones.
+- The target monitor's readout describes the locked ship with one clear word — ATTACKING, FLEEING, EVADE, DEMAND, MINING, PATROL, YIELDING, ADRIFT… — where the old full task line (TRADING — HELIX → VESPER) never fit the slot. Story states first, then combat, then the working legs; it is only published for identified contacts, so an unresolved track reads nothing. The pilot tier still follows after the word.
+- Release identifiers: GAME_VERSION `0.8.2cy`, CACHE `voidrunner-v335-0-8-2cy-corner-wing-switch`.
+
+## 0.8.2cx — Wing switch on the own-ship screen; Rin cannot be killed
+
+- The wing's standing order now lives on the own-ship screen itself: a plaque beside the shield/energy/hull bars shows the wing and its order code (AGG / DEF / OFF) and cycles it on tap, so the order changes without leaving the canopy. It replaced the chip that floated over the canopy, which on short landscape screens sat on top of the hyperdrive plaque.
+- The survival bars read by their initial — S / E / H — and are shorter, which is what frees the monitor column the plaque sits in. The full words stay in the markup, so the rows are still announced as SHIELDS / ENERGY / HULL.
+- The paused ship menu repeats all three orders in full, highlights the standing one, and explains the selected gate.
+- Rin Vek (and any story companion) can no longer be destroyed. At one point of hull she powers down instead: dark, unarmed and no longer a legal target, drifting until the last opponent within 1500 km of the pilot is beaten, then back online with the reactor restarted. Her hull stays at that one point for the rest of the mission, so from the next fight on her shield is the only thing a fight can spend.
+- Release identifiers: GAME_VERSION `0.8.2cx`, CACHE `voidrunner-v334-0-8-2cx-own-ship-wing-switch`.
+
+## 0.8.2cw — Wing orders reach the campaign
+
+- The standing-order system is no longer an Arena Run exclusive: the vocabulary, the range gates and the target doctrine now live in one shared module, and the same cockpit chip and key serve both scenes.
+- Rin Vek takes orders. From the prologue's combat step she can be told to fly aggressive, defensive or break off, with the same rules a hired veteran flies — your own target for defensive, self-defence inside the formation band, and a break-off station on the far side of you from the fight. Before that step she keeps her scripted help so the prologue's one fight cannot stall.
+- The campaign order is remembered on the career save, so a reload keeps the wing's discipline; the Arena Run keeps its own run-scoped order.
+- Release identifiers: GAME_VERSION `0.8.2cw`, CACHE `voidrunner-v333-0-8-2cw-campaign-wing-orders`.
+
+## 0.8.2cv — Range-gated wing orders
+
+- Standing orders are now measured against the pilot rather than the wingman. Aggressive engages hostiles within 1000 km of the pilot and re-forms past 1500 km; defensive engages the pilot's own target within 600 km and re-forms past 1000 km. Break off is unchanged.
+- A wingman never lets itself be shot for free: anything attacking it inside its formation band is a legal target, and it drops that attacker the moment the attacker leaves the band instead of chasing it.
+- The run screen explains the selected order in one line, and saved runs carrying the old engage/hold-formation orders migrate to aggressive/defensive on load.
+- Release identifiers: GAME_VERSION `0.8.2cv`, CACHE `voidrunner-v332-0-8-2cv-range-gated-wing-orders`.
+
+## 0.8.2cu — Veteran roster and wing orders
+
+- The wingman option at a hull stage now puts forward three named veteran pilots, each with the hull they would fly, so the crew that joins the run is chosen rather than rolled. The roster is seeded with the run and held across reloads.
+- Hired wingmen take standing orders in flight: engage, hold formation (station beside the pilot with every weapon held) or break off (run for open space). Cycle with Y, the gamepad stick click, or the cockpit WING chip; the run screen also sets the order from a row of three buttons.
+- Orders persist with the run save, so a reloaded checkpoint keeps the wing's doctrine.
+- Release identifiers: GAME_VERSION `0.8.2cu`, CACHE `voidrunner-v331-0-8-2cu-arena-wing-orders`.
+
+## 0.8.2ct — Arena hull pool and hired wingmen
+
+- Arena Run hull stages now offer five hulls drawn from the complete pool of eleven flyable ships, so the Frontier League hulls can appear mid-run. The current hull is never repeated: the sixth choice keeps your ship and hires a random veteran wingman instead.
+- A hired wingman is a full allied fighter on the Free Merchants' colours with a veteran pilot and role-fitting equipment. It flies with you until it is shot down, and because there are two hull stages a run can end up flying two wingmen.
+- Arena opponents now engage a wingman that draws their fire instead of ignoring it, while still pressing the player by default.
+- The NPC combat observer can stage every player-flyable model, not just the six career hulls: the Frontier League line (Speedster, Legionary, Andromeda, Torsas, Astra) joins the palette from the shared hull pool.
+- Release identifiers: GAME_VERSION `0.8.2ct`, CACHE `voidrunner-v330-0-8-2ct-arena-wingman`.
+
 ## 0.8.2ar — Tutorial value gate
 
 - Mara's final tutorial handoff to Meridian now waits until the player's live combat-value proxy reaches 50,000.

@@ -27,11 +27,11 @@ export const LASER_FX_TUNING = {
     // (glow, head, muzzle, impact flash) give back most of their size and
     // opacity, and close-range attenuation bites much harder.
     coreRadius: 0.2,
-    coreLength: 3.2,
-    glowWidth: 6.5,
+    coreLength: 4.0,
+    glowWidth: 4.0,
     glowLength: 10,
-    glowOpacity: 0.17,
-    headSize: 3.4,
+    glowOpacity: 0.13,
+    headSize: 2.7,
     headOpacity: 0.42,
     muzzleSize: 0.5,
     muzzleLife: 0.06,

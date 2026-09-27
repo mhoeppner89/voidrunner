@@ -766,7 +766,11 @@ export class AudioManager {
         }
     }
 
-    play(effect, intensity = 1, pan = 0, distance = 0) {
+    playCockpit(effect, intensity = 1, pan = 0) {
+        this.play(effect, intensity, pan, 0, true);
+    }
+
+    play(effect, intensity = 1, pan = 0, distance = 0, cockpit = false) {
         if (!this.context || !this.effectsGain || !this.reverbInput || !this.enabled || this.effectsVolume <= 0.001)
             return;
         const now = this.context.currentTime;
@@ -778,9 +782,10 @@ export class AudioManager {
         distance = Number.isFinite(distance) ? Math.max(0,distance) : 0;
         this.effectTimes ??= new Map();
         const spacing = {salvage:1.65,hyperActive:3.6,warning:.65,ui:.035,hit:.065,shield:.065,impact:.035,rock:.035,pdc:.035}[effect] ?? 0;
-        if (now-(this.effectTimes.get(effect) ?? -Infinity)<spacing) return;
-        this.effectTimes.set(effect,now);
-        const strength = clamp(intensity, 0.001, 2);
+        const channel = cockpit ? `cockpit:${effect}` : effect;
+        if (now-(this.effectTimes.get(channel) ?? -Infinity)<spacing) return;
+        this.effectTimes.set(channel,now);
+        const strength = clamp(intensity * (cockpit ? 1.35 : 1), 0.001, 2);
         // Every effect gets its own pan + distance lowpass so simultaneous
         // sounds do not smear into one position (the old single panner).
         const chain = this.eventChain(pan, distance);

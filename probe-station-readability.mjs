@@ -236,7 +236,10 @@ const prepareCareer = async (viewport) => {
     await pause(250);
     await waitFor('Boolean(window.__VOID_PRIVATEER__)', 'reloaded game hooks');
     await waitFor(`document.documentElement.lang === ${JSON.stringify(viewport.language)}`, 'requested language');
-    await evaluate('window.__VOID_PRIVATEER__.newGame()');
+    // newGame() resolves to the live session, whose object graph is circular:
+    // returning it by value fails with "Object reference chain is too long" and
+    // killed this probe before its first check. Return a scoped value instead.
+    await evaluate('(() => { window.__VOID_PRIVATEER__.newGame(); return true; })()');
     await waitFor("window.__VOID_PRIVATEER__.getRuntime?.()?.save?.player?.dockedAt === 'helix'", 'docked career');
     await evaluate(`(() => {
         const rt = window.__VOID_PRIVATEER__.getRuntime();

@@ -165,7 +165,7 @@ export function createMiningDroneSystem({ launchSeconds = 0.25, dockSeconds = 0.
             if (!unit || !alive(fleet, unit)) continue;
             // Also return orphaned work if equipment changes or an idle controller
             // is restored with airborne units. Neither path creates replacement IDs.
-            if (unit.job && (!equipped.has(id) || fleet.controller.phase !== 'running'
+            if (unit.job && (unit.recallRequested || !equipped.has(id) || fleet.controller.phase !== 'running'
                 || unit.job.targetNodeKey !== fleet.controller.targetNodeKey
                 || unit.job.cycleId !== fleet.controller.cycleId)) {
                 events.push(cancelMiningJob(fleet, id, 'inactive-job'));
@@ -192,7 +192,7 @@ export function createMiningDroneSystem({ launchSeconds = 0.25, dockSeconds = 0.
             let arrived = false;
             let navigationFailure = null;
             if (state === 'stowed') {
-                if (fleet.controller.phase !== 'running' || !equipped.has(id) || portBusy) continue;
+                if (unit.recallRequested || fleet.controller.phase !== 'running' || !equipped.has(id) || portBusy) continue;
                 if (!pointValid(anchors?.launch) || !pointValid(anchors?.dock)) {
                     reportBlocked(id, 'missing-bay-anchor', events);
                     continue;

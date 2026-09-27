@@ -21,7 +21,7 @@ export const WEAPONS = {
     pulse:{id:'pulse',nameKey:'PULSE LASER',hudNameKey:'PULSE',kind:'laser',slot:1,
         speed:PROJECTILE_SPEEDS.normal,range:450,cooldown:.17,damageFlat:11.5,energyCost:3.2,assist:1,audioKey:'laser',mountSize:'S'},
     beam:{id:'beam',nameKey:'BEAM EMITTER',hudNameKey:'BEAM',kind:'beam',slot:8,
-        speed:100000,range:350,cooldown:.4,damageFlat:13,energyCost:3.5,assist:1.4,audioKey:'ion',mountSize:'S'},
+        speed:100000,range:350,cooldown:.4,damageFlat:13,energyCost:3.5,assist:1.4,audioKey:'beam',mountSize:'S'},
     'pulse-mk2':{id:'pulse-mk2',nameKey:'PULSE CANNON MK II',hudNameKey:'PULSE MK II',kind:'laser',slot:7,equipmentId:'pulse-mk2',
         speed:PROJECTILE_SPEEDS.normal,range:450,cooldown:.17,damageFlat:13.5,energyCost:3.6,assist:1,audioKey:'laser',mountSize:'M'},
     gauss:{id:'gauss',nameKey:'MAGRAIL',hudNameKey:'MAGRAIL',kind:'gauss',slot:2,
@@ -60,7 +60,7 @@ export const weaponShotDamage=weapon=>weapon.damageFlat??0;
 // Launcher records are kept beside guns because they share target and
 // projectile plumbing, but they use ship-local magazines and their own
 // selection cycle. A swarm canister is one magazine round that opens into
-// four micro-warheads after launch.
+// four micro-warheads simultaneously at launch.
 export const LAUNCHERS = {
     seeker: {
         id: 'seeker',
@@ -285,6 +285,7 @@ export const launcherMagazineEntries = (player, shipId = player?.shipId) => {
 export const normalizeLauncherMagazines = (player, { legacyMissiles, fill = false } = {}) => {
     if (!player || typeof player !== 'object')
         return [];
+    if (!['alternating','together','single'].includes(player.launcherFireMode)) player.launcherFireMode = 'alternating';
     const mounted = mountedLauncherEntries(player);
     const records = magazineRecords(player);
     const hasCanonicalMagazine = mounted.some((entry) => records[entry.mount.id]?.launcherId === entry.launcherId);

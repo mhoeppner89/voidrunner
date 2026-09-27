@@ -1,3 +1,4 @@
+import { PLAYER_RADAR_RANGE } from './combatTravel.js';
 import { EQUIPMENT, SHIPS } from './data.js';
 import { quoteDroneService } from './droneService.js';
 import { HULL_HARDPOINTS, OUTFIT_ITEMS, installedItemIds, loadoutFor } from './outfitting.js';
@@ -17,7 +18,7 @@ export const getEffectiveShipStats = (player) => {
         const item = OUTFIT_ITEMS[id];
         return item?.effects?.[key] ?? fallback;
     };
-    const radarMultiplier = effect('radar-mk2', 'radarMultiplier', 1.25);
+    const radarMultiplier = effect('radar-mk2', 'radarMultiplier', 1.5);
     const scanMultiplier = effect('radar-mk2', 'scanMultiplier', 1.5);
     const cargoBonus = hasOutfitting
         ? installed.reduce((total, id) => total + (OUTFIT_ITEMS[id]?.effects?.cargoCapacity ?? 0), 0)
@@ -50,7 +51,7 @@ export const getEffectiveShipStats = (player) => {
         // Radar (sensor) range decides what appears as a selectable target. A
         // locked ship, asteroid, or wreck resolves automatically within the
         // active scan range.
-        radarRange: has('radar-mk2') ? 1000 * radarMultiplier : 1000,
+        radarRange: has('radar-mk2') ? PLAYER_RADAR_RANGE * radarMultiplier : PLAYER_RADAR_RANGE,
         scanRange: has('radar-mk2') ? 500 * scanMultiplier : 500,
         miningRange: 100,
         salvageRate,

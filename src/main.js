@@ -1,9 +1,11 @@
 import {newArenaRun,readArenaRun,arenaRecord} from './game/arenaRun.js';
 import { AudioManager } from './game/audio.js';
-import { TURRET_TEST_MODE, DRONE_TEST_MODE, createNewSave, defaultSettings, loadGame, loadSettingsPreferences, saveGame, saveSettingsPreferences } from './game/save.js';
+import { TURRET_TEST_MODE, DRONE_TEST_MODE, LANDING_PREVIEW_ID, createNewSave, defaultSettings, loadGame, loadSettingsPreferences, saveGame, saveSettingsPreferences } from './game/save.js';
 import { DOCK_LOCATION_IDS, LOCATIONS, SHIPS } from './game/data.js';
 import { getLanguage, setLanguage, t } from './game/i18n.js';
 import { GameUI } from './game/ui.js';
+import { playerBerth } from './game/playerDocking.js';
+import { stationVisualSurfaceRadius } from './game/stationTraffic.js';
 import { tutorialCampaignSummary } from './game/tutorialCampaign.js';
 import { playerStrengthBreakdown } from './game/playerStrength.js';
 const host = document.querySelector('#app');
@@ -41,6 +43,16 @@ const showTitleScreen = () => {
 };
 const devPreviewParams = new URLSearchParams(location.search);
 const startupProbe = devPreviewParams.has('startup-probe');
+const landingPreviewAtBay = devPreviewParams.get('dev-landing-stage') === 'bay';
+const landingPreviewAtBeacon = devPreviewParams.get('dev-landing-stage') === 'beacon';
+const landingPreviewAtClearance = devPreviewParams.get('dev-landing-stage') === 'clearance';
+const requestedLandingPreviewPad = Number(devPreviewParams.get('dev-landing-pad'));
+const landingPreviewPadNumber = Number.isSafeInteger(requestedLandingPreviewPad) && requestedLandingPreviewPad > 0
+    ? requestedLandingPreviewPad
+    : 1;
+const landingPreviewBerth = LANDING_PREVIEW_ID
+    ? playerBerth(LANDING_PREVIEW_ID, 6, landingPreviewPadNumber - 1) ?? playerBerth(LANDING_PREVIEW_ID, 6)
+    : null;
 const vesperHoverPreview = devPreviewParams.get('vesper-hover') === '1';
 const devAutoStart = devPreviewParams.get('dev-autostart') === '1';
 const debrisCollisionTest = devPreviewParams.get('test') === 'debris-collision';
@@ -48,6 +60,22 @@ const devPreviewLocationParam = devPreviewParams.get('dev-dock');
 const devPreviewLocation = DOCK_LOCATION_IDS.includes(devPreviewLocationParam) ? devPreviewLocationParam : undefined;
 const devPreviewShipParam = devPreviewParams.get('dev-ship');
 const devPreviewShip = SHIPS[devPreviewShipParam] ? devPreviewShipParam : undefined;
+const facingNegativeZ = (x, y, z) => {
+    const length = Math.hypot(x, y, z) || 1;
+    x /= length;
+    y /= length;
+    z /= length;
+    // Quaternion rotating the ship's local -Z forward axis onto the requested direction.
+    let qx = y, qy = -x, qz = 0, qw = 1 - z;
+    const qLength = Math.hypot(qx, qy, qz, qw);
+    if (qLength < 1e-8)
+        return [0, 1, 0, 0];
+    qx /= qLength;
+    qy /= qLength;
+    qz /= qLength;
+    qw /= qLength;
+    return [qx, qy, qz, qw];
+};
 const SHIP_WARM_ASSETS = Object.freeze({
     speedster: ['./assets/models/ships/speedster.glb', './assets/remaster/cockpit-speedster-sprite-v4.png'],
     legionary: ['./assets/models/ships/legionary.glb', './assets/remaster/cockpit-legionary-sprite-v3.png'],
@@ -174,7 +202,10 @@ const beginSession = (mode, arena) => {
     session = undefined;
     previousSession?.dispose();
     ui.clearToasts();
-    const save = arena?.run ? (arena.resume?readArenaRun():newArenaRun(Boolean(arena.hard&&arenaRecord().unlockedHard))) : mode === 'new' || mode === 'arena' || mode === 'observer' ? createNewSave(DRONE_TEST_MODE ? 4242 : undefined, { tutorial: mode === 'new' && !DRONE_TEST_MODE }) : loadGame();
+    const save = arena?.run ? (arena.resume?readArenaRun():newArenaRun(Boolean(arena.hard&&arenaRecord().unlockedHard)))
+        : LANDING_PREVIEW_ID && mode !== 'arena' && mode !== 'observer' ? createNewSave(undefined, { tutorial: false })
+            : mode === 'new' || mode === 'arena' || mode === 'observer' ? createNewSave(DRONE_TEST_MODE ? 4242 : undefined, { tutorial: mode === 'new' && !DRONE_TEST_MODE })
+                : loadGame();
     if (!save) {
         ui.showToast(t('No autosave was found.'), 'warning');
         ui.showTitle(false, titleSave());
@@ -225,6 +256,55 @@ const beginSession = (mode, arena) => {
         save.player.throttle = 0;
         if (devPreviewShip)
             save.player.shipId = devPreviewShip;
+    }
+    if (LANDING_PREVIEW_ID && mode !== 'arena' && mode !== 'observer') {
+        const location = LOCATIONS[LANDING_PREVIEW_ID];
+        const berth = landingPreviewBerth;
+        const outwardX = berth.gate[0] - location.position[0];
+        const outwardY = berth.gate[1] - location.position[1];
+        const outwardZ = berth.gate[2] - location.position[2];
+        const outwardLength = Math.hypot(outwardX, outwardY, outwardZ) || 1;
+        const startDistance = stationVisualSurfaceRadius(LANDING_PREVIEW_ID)
+            + (landingPreviewAtBeacon ? 399 : landingPreviewAtClearance ? 199 : 450);
+        const player = save.player;
+        player.systemId = location.systemId;
+        player.dockedAt = undefined;
+        player.lastDockedAt = LANDING_PREVIEW_ID;
+        if (landingPreviewAtBay) {
+            const toGateX = berth.gate[0] - berth.pad[0];
+            const toGateY = berth.gate[1] - berth.pad[1];
+            const toGateZ = berth.gate[2] - berth.pad[2];
+            const toGateLength = Math.hypot(toGateX, toGateY, toGateZ) || 1;
+            const bayStartDistance = berth.captureRadius + 45;
+            player.position = [
+                berth.pad[0] + toGateX / toGateLength * bayStartDistance,
+                berth.pad[1] + toGateY / toGateLength * bayStartDistance,
+                berth.pad[2] + toGateZ / toGateLength * bayStartDistance,
+            ];
+        }
+        else {
+        player.position = [
+                location.position[0] + outwardX / outwardLength * startDistance,
+                location.position[1] + outwardY / outwardLength * startDistance,
+                location.position[2] + outwardZ / outwardLength * startDistance,
+            ];
+        }
+        player.rotation = facingNegativeZ(
+            (landingPreviewAtBay ? berth.pad[0] : berth.gate[0]) - player.position[0],
+            (landingPreviewAtBay ? berth.pad[1] : berth.gate[1]) - player.position[1],
+            (landingPreviewAtBay ? berth.pad[2] : berth.gate[2]) - player.position[2],
+        );
+        const approachX = berth.gate[0] - player.position[0];
+        const approachY = berth.gate[1] - player.position[1];
+        const approachZ = berth.gate[2] - player.position[2];
+        const approachLength = Math.hypot(approachX, approachY, approachZ) || 1;
+        player.velocity = landingPreviewAtClearance
+            ? [approachX / approachLength * 12, approachY / approachLength * 12, approachZ / approachLength * 12]
+            : [0, 0, 0];
+        player.angularVelocity = [0, 0, 0];
+        player.throttle = 0;
+        player.navTargetId = LANDING_PREVIEW_ID;
+        player.currentTargetId = LANDING_PREVIEW_ID;
     }
     if (mode === 'arena' || mode === 'observer')
         save.arena = arena;
@@ -347,6 +427,7 @@ const actions = {
     startArenaRun: (resume=false,hard=false) => beginSession('arena',{run:true,resume,hard}),
     arenaRunAction: (...args) => session?.arenaRunAction(...args),
     startRunWave: () => session?.startRunWave(),
+    wingOrder: (order, wing) => session?.wingOrderCommand(order, wing),
     startArena: (environment, scenario, difficulty, fit) => beginSession('arena', { environment, scenario, difficulty, fit }),
     startObserver: (environment = 'open') => beginSession('observer', { observer: true, editor: true, environment }),
     observerTogglePause: () => session?.toggleObserverPause(),
@@ -385,12 +466,15 @@ const actions = {
     toggleTurrets: () => session?.toggleTurrets(),
     toggleMiningDrones: () => session?.toggleMiningDrones(),
     abandonDrones: () => session?.abandonDrones(),
+    stowDroneBay: bayId => session?.stowDroneBay(bayId),
+    tradeDrone: (type, sell) => session?.tradeDrone(type, sell),
     setDroneBayMode: (bayId, mode, expected) => session?.setDroneBayMode(bayId, mode, expected),
     setDronePdcPolicy: (policy) => session?.setDronePdcPolicy(policy),
     droneServiceQuote: (options) => session?.droneServiceQuote(options),
     serviceDrones: (options) => session?.serviceDrones(options),
     miningDrones: () => session?.miningDroneHud(),
     cycleCapitalSubtarget: () => session?.cycleCapitalSubtarget(),
+    setLauncherFireMode: mode => session?.setLauncherFireMode(mode),
     launcherCycle: () => session?.cycleLauncher(),
     selectTarget: (kind, id) => session?.selectTarget(kind, id, 'map'),
     reviewServices: () => session?.checkTutorialServices(true),
@@ -539,6 +623,7 @@ window.__VOID_PRIVATEER__ = {
     startArenaRun: (resume=false,hard=false) => beginSession('arena',{run:true,resume,hard}),
     arenaRunAction: (...args) => session?.arenaRunAction(...args),
     startRunWave: () => session?.startRunWave(),
+    wingOrder: (order, wing) => session?.wingOrderCommand(order, wing),
     startArena: (environment, scenario, difficulty, fit) => beginSession('arena', { environment, scenario, difficulty, fit }),
     startObserver: (environment = 'open') => beginSession('observer', { observer: true, editor: true, environment }),
     observerTogglePause: () => session?.toggleObserverPause(),
@@ -780,6 +865,14 @@ else if (debrisCollisionTest) {
         scenario: 'free-flight',
         difficulty: 'rookie',
         testMode: 'debris-collision',
+    });
+}
+else if (LANDING_PREVIEW_ID) {
+    document.title = `Voidrunner — ${LOCATIONS[LANDING_PREVIEW_ID].name} Landing Preview`;
+    beginSession('new').then((runtime) => {
+        if (!runtime)
+            return;
+        window.__STATION_LANDING_PREVIEW_READY__ = true;
     });
 }
 else if (devAutoStart)

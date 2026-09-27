@@ -1,6 +1,7 @@
 import { CanvasSizeCache } from './canvasSizeCache.js';
 import {cockpitDamageMarkup,CANOPY_APERTURES} from './cockpitDamage.js';
-import {RUN_WAVES,readArenaRun,arenaRecord,runScore,runRewardPlan} from './arenaRun.js';
+import {RUN_WAVES,readArenaRun,arenaRecord,runScore,runRewardPlan,runHullOffers,runWingmanOffers,WING_ORDERS,WING_ORDER_LABEL,WING_ORDER_HINT,WING_ORDER_SHORT,normalizeWingOrder,wingmanOrder} from './arenaRun.js';
+import {MAX_RUN_WINGMEN} from './shipPool.js';
 import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, LOCATIONS, SHIPS, SYSTEM_MAP_EXTENT, commodityIds, displaySpeed, routeDistanceBetween } from './data.js';
 import { JUMP_ROUTES, SYSTEMS, planRoute } from './galaxy.js';
 import { bestKnownTradeRoute, cargoCapacity, cargoMass, currentProfitableRoutes, denPrice, knownMarketQuotes, quoteCommodityTrade, SYNDICATE_DEN_FAVOR } from './economy.js';
@@ -422,7 +423,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2cs';
+const GAME_VERSION = '0.8.2da';
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -1259,21 +1260,21 @@ export class GameUI {
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="${t('Own ship status display; tap to open ship menu')}">
             <div class="monitor-damage" aria-hidden="true"></div><div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
             <div class="screen-race-strip" id="screen-race-strip"><span id="screen-race-label"></span><b id="screen-race-value"></b></div>
-            <div class="screen-ship-layout"><div class="screen-flight"><div><span data-short="SPD">${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span data-short="FUEL">${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em><small id="screen-own-launcher"></small><small id="screen-own-drone-pdc" class="is-hidden"></small></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i><em id="screen-own-shield-value">90</em></div><div><span>${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i><em id="screen-own-energy-value">72</em></div><div><span>${t('HULL')}</span><i><b id="screen-own-hull"></b></i><em id="screen-own-hull-value">185</em></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
+            <div class="screen-ship-layout"><div class="screen-flight"><div><span data-short="SPD">${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span data-short="FUEL">${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em><small id="screen-own-launcher"></small><small id="screen-own-drone-pdc" class="is-hidden"></small></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span data-short="S">${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i></div><div><span data-short="E">${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i></div><div><span data-short="H">${t('HULL')}</span><i><b id="screen-own-hull"></b></i></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="${t('Radar display; tap to open navigation map')}">
             <div class="monitor-damage" aria-hidden="true"></div><div class="radar-screen-wrap"><canvas id="radar" width="220" height="220" role="button" tabindex="0" aria-label="${t('Open navigation map')}"></canvas></div>
           </div>
           <div class="cockpit-screen cockpit-screen-target" data-touch-action="targetNext" aria-label="${t('Target status display; tap to cycle targets')}">
             <div class="monitor-damage" aria-hidden="true"></div><div class="screen-heading"><span>${t('TARGET STATUS')}</span><b id="screen-target-name">${t('NO LOCK')}</b></div>
-            <div id="screen-target-distance" class="screen-target-distance">—</div>
+                        <div id="screen-target-distance" class="screen-target-distance">—</div>
             <button type="button" id="capital-subtarget" class="is-hidden" aria-label="Cycle frigate subtarget"></button><div id="screen-target-readout" class="screen-target-readout">—</div>
             <div id="screen-drone-telemetry" class="screen-drone-telemetry is-hidden"><div id="screen-drone-bays"></div><div id="screen-drone-state"></div><div id="screen-drone-cargo"></div><div id="screen-drone-losses"></div></div>
-            <div class="screen-target-layout"><canvas class="hull-outline" id="target-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span>${t('SHIELDS')}</span><i><b id="screen-target-shield"></b></i><em id="screen-target-shield-value">—</em></div><div><span>${t('HULL')}</span><i><b id="screen-target-hull"></b></i><em id="screen-target-hull-value">—</em></div></div></div>
+            <div class="screen-target-layout"><canvas class="hull-outline" id="target-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span data-short="S">${t('SHIELDS')}</span><i><b id="screen-target-shield"></b></i></div><div><span data-short="H">${t('HULL')}</span><i><b id="screen-target-hull"></b></i></div></div></div>
           </div>
           <button type="button" id="hyperdrive-card" class="cockpit-identity" data-touch-action="autopilot" aria-label="${t('Hyperdrive: engage jump to nav point')}"><b>HYPERDRIVE</b></button>
-
           </div>
+          <div class="hud-wing-tactics" id="hud-wing-tactics"></div>
           <div id="target-bracket" class="target-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
           <div id="target-edge-pointer" class="target-edge-pointer is-hidden" aria-hidden="true"><i></i><span></span></div>
           <div class="reticle" aria-hidden="true"><span></span><span></span><span></span><span></span><b></b></div>
@@ -1680,6 +1681,9 @@ export class GameUI {
             event.stopPropagation();
             this.actions?.weaponCycle?.();
         });
+        // The wing rail lives on the HUD layer, clear of the status monitors
+        // and the touch controls, so its buttons need no special tap handling:
+        // the delegated click (data-ui-command) runs the command once.
         const subtarget=this.root.querySelector('#capital-subtarget');
         subtarget?.addEventListener('pointerdown',e=>e.stopPropagation());
         subtarget?.addEventListener('pointerup',e=>e.stopPropagation());
@@ -1794,6 +1798,18 @@ export class GameUI {
             case 'run-fit-toggle':this.runFitOpen=!this.runFitOpen;this.showArenaRun(this.save);break;
             case 'run-action':
                 this.actions?.arenaRunAction(element.dataset.runAction,element.dataset.runValue,element.dataset.runKey,element.dataset.runIndex);break;
+            // One chip, two scenes: the game routes it to whichever wing is
+            // flying (a run's hired veterans, or the campaign companion).
+            case 'wing-order': {
+                // data-wing-index names the wingman; absent means the whole
+                // crew (the Y key and the crew-level controls).
+                const wing=element?.dataset.wingIndex===undefined?undefined:Number(element.dataset.wingIndex);
+                this.actions?.wingOrder(element?.dataset.wingValue,Number.isInteger(wing)?wing:undefined);
+                // The ship menu repeats the control: repaint it so the pressed
+                // order and its hint follow the command immediately.
+                if(this.root.querySelector('#ship-panel:not(.is-hidden)'))this.showShipMenu();
+                break;
+            }
             case 'launch-arena':
                 this.hideArena();
                 this.actions?.startArena(this.arenaEnv, this.arenaScenario, this.arenaDifficulty, this.arenaFit);
@@ -1935,12 +1951,19 @@ export class GameUI {
                 this.hidePause();
                 this.actions?.quitToTitle();
                 break;
+            case 'launcher-fire-mode':
+                this.actions?.setLauncherFireMode?.(element.dataset.launcherMode);
+                this.root.querySelector('.ship-menu-weapons details')?.setAttribute('open', '');
+                break;
             case 'repair':
                 this.actions?.repair();
                 break;
             case 'refuel':
                 this.actions?.refuel();
                 break;
+            case 'drone-stock-buy':
+            case 'drone-stock-sell':
+            case 'drone-bay-stow':
             case 'drone-service':
             case 'drone-bay-mode':
             case 'drone-pdc-policy':
@@ -2436,12 +2459,17 @@ export class GameUI {
         layer.style.setProperty('--vesper-shadow-width', `${(profile.shadowWidth * plateScaleX * concourseShadowScale).toFixed(2)}px`);
         layer.style.setProperty('--vesper-shadow-height', `${(58 * plateScaleY * concourseShadowScale).toFixed(2)}px`);
         layer.style.setProperty('--vesper-shadow-angle', `${anchors.shadowAngle ?? 3}deg`);
-        scene.style.setProperty('--concourse-services-left', anchorX(anchors.services.x));
-        scene.style.setProperty('--concourse-services-top', anchorY(anchors.services.y));
-        scene.style.setProperty('--concourse-market-left', anchorX(anchors.market.x));
-        scene.style.setProperty('--concourse-market-top', anchorY(anchors.market.y));
-        scene.style.setProperty('--concourse-bar-left', anchorX(anchors.bar.x));
-        scene.style.setProperty('--concourse-bar-top', anchorY(anchors.bar.y));
+        // Object-cover can crop an artwork anchor above the usable scene,
+        // especially when the tutorial notice takes a row on landscape phones.
+        // Keep the whole touch target inside the scene, not just its origin.
+        for (const key of ['services', 'market', 'bar']) {
+            const pointer = scene.querySelector(`.concourse-pointer-${key}`);
+            const inset = 6;
+            const x = Math.max(inset, Math.min(parseFloat(anchorX(anchors[key].x)), sceneRect.width - (pointer?.offsetWidth ?? 0) - inset));
+            const y = Math.max(inset, Math.min(parseFloat(anchorY(anchors[key].y)), sceneRect.height - (pointer?.offsetHeight ?? 0) - inset));
+            scene.style.setProperty(`--concourse-${key}-left`, `${x}px`);
+            scene.style.setProperty(`--concourse-${key}-top`, `${y}px`);
+        }
     }
     renderLandingScene() {
         return this.renderConcourse();
@@ -3449,7 +3477,7 @@ export class GameUI {
         const fit = player?.outfitting?.loadouts?.[player.shipId]?.droneBays;
         const bays = droneBayLayoutFor(player?.shipId).map(({ bayId }, index) => {
             const bay = Array.isArray(fit) && fit[index]?.bayId === bayId ? fit[index] : null;
-            const mode = bay?.mode === 'pdc' ? 'pdc' : 'mining';
+            const mode = Object.hasOwn(DRONE_TYPES, bay?.mode) ? bay.mode : 'mining';
             const units = (Array.isArray(bay?.unitIds) ? bay.unitIds : []).slice(0, DRONE_BAY_CAPACITY[mode])
                 .map(id => fleet?.unitsById?.[id]).filter(unit => unit && unit.type === mode);
             return { bayId, mode, units, operational: units.filter(unit => unit.hull > 0 && unit.state !== 'destroyed').length };
@@ -3472,11 +3500,15 @@ export class GameUI {
         const player = this.save?.player;
         if (!player) return;
         const docked = Boolean(player.dockedAt && player.dockedAt === this.dockLocation);
-        if ((command === 'drone-service' || command === 'drone-bay-mode') && !docked) return;
+        if ((command === 'drone-service' || command.startsWith('drone-stock-')) && !docked) return;
         this.droneCommandPending = true;
         let result;
         try {
-            if (command === 'drone-service') {
+            if (command.startsWith('drone-stock-')) {
+                result = await this.actions?.tradeDrone?.(element.dataset.droneType, command === 'drone-stock-sell');
+            } else if (command === 'drone-bay-stow') {
+                result = await this.actions?.stowDroneBay?.(element.dataset.droneBay);
+            } else if (command === 'drone-service') {
                 const quote = this.droneServiceQuotes?.[element?.dataset.droneService];
                 if (quote?.ok && quote.canCommit !== false)
                     result = await this.actions?.serviceDrones?.({ expected: quote, fillSlots: quote.fillSlots });
@@ -3484,8 +3516,7 @@ export class GameUI {
                 const bayId = element?.dataset.droneBay;
                 const mode = element?.dataset.droneMode;
                 const bays = this.droneHudSnapshot().bays ?? [];
-                if (hasLocationService(player.dockedAt, 'outfitting') && bays.some(bay => bay.bayId === bayId)
-                    && (mode === 'mining' || mode === 'pdc')) {
+                if (bays.some(bay => bay.bayId === bayId) && Object.hasOwn(DRONE_TYPES, mode)) {
                     result = this.actions?.setDroneBayMode
                         ? await this.actions.setDroneBayMode(bayId, mode)
                         : await this.actions?.setDroneBayModes?.(bays.map(bay => ({ bayId: bay.bayId, mode: bay.bayId === bayId ? mode : bay.mode })));
@@ -3504,33 +3535,47 @@ export class GameUI {
                     result = await this.actions?.setDronePdcPolicy?.(policy);
             }
             this.droneServiceNotice = result === false || result?.ok === false
-                ? t(result.code === 'stale-quote' ? 'Drone quote changed. Review the new total.' : 'Drone action unavailable. Check stock, credits and dock services.')
+                ? t(result.code === 'cargo-full' ? 'Cargo hold full.' : result.code === 'stale-quote' ? 'Drone quote changed. Review the new total.' : 'Drone action unavailable. Check stock, credits and dock services.')
                 : result == null ? t('Drone controls are not connected yet.') : '';
         } catch {
             this.droneServiceNotice = t('Drone action unavailable. Check stock, credits and dock services.');
         } finally {
             this.droneCommandPending = false;
             if (this.save?.player?.dockedAt && this.dockLocation) this.renderDock();
-            else if ((command === 'drone-pdc-policy' || command === 'drone-toggle' || command === 'drone-abandon')
-                && this.root.querySelector('#ship-panel:not(.is-hidden)')) this.showShipMenu();
+            else if (this.root.querySelector('#ship-panel:not(.is-hidden)')) this.showShipMenu();
         }
     }
     renderDronePolicy(drones) {
         if (!drones.bays?.some(bay => bay.mode === 'pdc')) return '';
         return `<div class="drone-policy" role="group" aria-label="${t('PDC drone policy')}">${['defend', 'stow'].map(policy => `<button type="button" data-ui-command="drone-pdc-policy" data-drone-policy="${policy}" aria-pressed="${drones.pdcPolicy === policy}" ${!this.actions?.setDronePdcPolicy || this.droneCommandPending ? 'disabled' : ''}>${t(policy === 'defend' ? 'PDC DEFEND' : 'PDC STOW')}</button>`).join('')}</div>`;
     }
+    renderDroneBayRows(drones) {
+        const modes = ['wayfarer','prospector'].includes(this.save.player.shipId) ? ['mining','pdc','repair','attack'] : ['pdc','repair','attack'];
+        return drones.bays.map((bay,index) => {
+            const actual = this.save.player.outfitting.loadouts[this.save.player.shipId].droneBays[index];
+            const pending = actual.pendingMode;
+            return `<div class="drone-bay-row"><b>${t('BAY {number}',{number:index+1})} · ${t(bay.mode.toUpperCase())} · ${bay.operational}/${DRONE_BAY_CAPACITY[bay.mode]}</b>
+            <p>${pending ? t('Returning, then {role}. Resume flight to complete.',{role:t(pending.toUpperCase())}) : bay.units.map(u=>`${t(String(u.state).toUpperCase())} · ${t('HULL')} ${Math.ceil(u.hull)}/${DRONE_TYPES[u.type].maxHull}${DRONE_TYPES[u.type].magazineCapacity ? ` · ${t('AMMO')} ${u.ammo}`:''}`).join(' / ') || t('Empty bay')}</p>
+            <div class="drone-policy" role="group" aria-label="${t('BAY {number}',{number:index+1})}">${modes.map(mode=>`<button type="button" data-ui-command="drone-bay-mode" data-drone-bay="${bay.bayId}" data-drone-mode="${mode}" aria-pressed="${bay.mode===mode && !pending}" ${this.droneCommandPending ? 'disabled':''}>${DRONE_BAY_CAPACITY[mode]} ${t(mode.toUpperCase())}</button>`).join('')}
+            <button type="button" data-ui-command="drone-bay-stow" data-drone-bay="${bay.bayId}">${t('STOW')}</button></div></div>`;
+        }).join('');
+    }
+    renderDroneStock(shop = false) {
+        const fleet = this.save.player.droneFleet;
+        return `<details><summary>${t('DRONE CARGO')} · ${Object.keys(fleet?.unitsById ?? {}).length} ${t('mass')}</summary><p>${t('Every owned drone uses 1 cargo space, reserved while deployed. Select a bay role to load stored drones. Switching recalls that bay first.')}</p>${Object.entries(DRONE_TYPES).map(([type,definition])=>{
+            const count = (fleet?.lockerIds ?? []).filter(id=>fleet.unitsById[id]?.type===type).length;
+            return `<div class="drone-bay-row"><b>${t(type.toUpperCase())} · ${count} ${t('spare')}</b>${shop ? `<div class="drone-policy"><button data-ui-command="drone-stock-buy" data-drone-type="${type}">${t('BUY')} · ${formatCredits(definition.replacementPrice)}</button><button data-ui-command="drone-stock-sell" data-drone-type="${type}" ${count?'':'disabled'}>${t('SELL SPARE')} · ${t('up to')} ${formatCredits(Math.floor(definition.replacementPrice*.5))}</button></div>`:''}</div>`;
+        }).join('')}</details>`;
+    }
     renderDroneShipStatus() {
         const drones = this.droneHudSnapshot();
-        if (!drones.bays?.length) return '';
-        return `<section class="ship-menu-drones"><h3>${t('DRONE BAYS')}</h3><details><summary>${t('Fleet condition')}</summary>${drones.bays.map((bay, index) => `<div class="drone-bay-status"><b>${t('BAY {number}', { number: index + 1 })} · ${t(bay.mode === 'pdc' ? '1 PDC' : '2 MINING')} · ${bay.operational ?? 0}/${DRONE_BAY_CAPACITY[bay.mode]}</b>${(bay.units ?? []).map((unit, unitIndex) => `<p>${t('DRONE {number}', { number: unitIndex + 1 })} · ${escapeHtml(t(String(unit.state).toUpperCase()))} · ${t('HULL')} ${Math.ceil(unit.hull)}/${unit.maxHull ?? DRONE_TYPES[bay.mode].maxHull}${unit.type === 'pdc' ? ` · ${t('AMMO')} ${unit.ammo ?? 0}/${DRONE_TYPES.pdc.magazineCapacity}` : ` · ${t('INBOUND')} ${unit.payload?.units ?? 0}`}</p>`).join('')}</div>`).join('')}</details><p>${escapeHtml(drones.readout ?? '')}</p><button type="button" data-ui-command="drone-toggle" ${this.save.player.dockedAt || !drones.action?.ok || !this.actions?.toggleMiningDrones ? 'disabled' : ''}>${t(drones.phase === 'running' ? 'RECALL' : drones.phase === 'recalling' ? 'RETURNING' : 'MINE')}</button>${this.renderDronePolicy(drones)}${drones.bays.some(b => b.units.some(u => u.state !== 'stowed')) ? `<button type="button" data-ui-command="drone-abandon">${t(this.droneAbandonConfirm ? 'CONFIRM: ABANDON DRONES AND ORE' : 'ABANDON DEPLOYED DRONES')}</button>` : ''}${this.droneServiceNotice ? `<p role="status">${escapeHtml(this.droneServiceNotice)}</p>` : ''}</section>`;
+        if (!drones.bays?.length) return Object.keys(this.save.player.droneFleet?.unitsById ?? {}).length ? `<section class="ship-menu-drones">${this.renderDroneStock()}</section>` : '';
+        return `<section class="ship-menu-drones"><h3>${t('DRONE BAYS')}</h3>${this.renderDroneBayRows(drones)}${this.renderDroneStock()}<p>${t('Repair drones restore your hull using energy. Attack drones pursue your selected hostile within 450 km. PDC drones defend against missiles first.')}</p>
+        <button type="button" data-ui-command="drone-toggle" ${this.save.player.dockedAt || !drones.action?.ok ? 'disabled':''}>${t(drones.phase==='running'?'RECALL MINERS':'MINE')}</button>${this.renderDronePolicy(drones)}${this.droneServiceNotice ? `<p role="status">${escapeHtml(this.droneServiceNotice)}</p>`:''}</section>`;
     }
     renderDroneBayConfiguration() {
         const drones = this.droneHudSnapshot();
-        if (!drones.bays?.length) return '';
-        const canConfigure = hasLocationService(this.dockLocation, 'outfitting')
-            && Boolean(this.actions?.setDroneBayMode || this.actions?.setDroneBayModes);
-        const bayRows = drones.bays.map((bay, index) => `<div class="drone-bay-row"><b>${t('BAY {number}', { number: index + 1 })} · ${bay.operational ?? 0}/${DRONE_BAY_CAPACITY[bay.mode] ?? 2}</b><div role="group" aria-label="${t('BAY {number}', { number: index + 1 })}">${(['wayfarer','prospector'].includes(this.save.player.shipId)?['mining','pdc']:['pdc']).map(mode => `<button type="button" data-ui-command="drone-bay-mode" data-drone-bay="${escapeHtml(bay.bayId)}" data-drone-mode="${mode}" aria-pressed="${bay.mode === mode}" ${!canConfigure || this.droneCommandPending ? 'disabled' : ''}>${t(mode === 'mining' ? '2 MINING' : '1 PDC')}</button>`).join('')}</div></div>`).join('');
-        return `<section class="drone-service-card"><h3>${t('DRONE BAYS')}</h3>${bayRows}${this.renderDroneServices(true)}${this.renderDronePolicy(drones)}<p>${t('PDC drones launch automatically in DEFEND mode. They intercept missiles first, then attack hostile ships within 300 km. STOW recalls them.')}</p><p>${t('Each bay holds two mining drones or one PDC drone. Stored drones stay in the locker. Fill empty bays with SERVICE DRONES.')}</p></section>`;
+        return `<section class="drone-service-card"><h3>${t('DRONE BAYS')}</h3>${this.renderDroneBayRows(drones)}${this.renderDroneStock(hasLocationService(this.dockLocation,'outfitting'))}${this.renderDroneServices(true)}<p>${t('Repair drones restore your hull using energy. Attack drones pursue your selected hostile within 450 km. PDC drones defend against missiles first.')}</p></section>`;
     }
     renderDroneServices(compact = false) {
         const drones = this.droneHudSnapshot();
@@ -3545,7 +3590,7 @@ export class GameUI {
             for (const line of quote?.lines ?? []) if (line.kind in totals) totals[line.kind] += line.cost;
             const enabled = valid && quote.canCommit !== false && quote.lines?.length
                 && quote.total <= this.save.player.credits && this.actions?.serviceDrones && !this.droneCommandPending;
-            return `${kind === 'maintain' ? `<details><summary>${t('Service options')}</summary>` : ''}<div class="drone-service-quote"><b>${t(kind === 'full' ? 'Refill, repair and rearm' : 'Repair and rearm existing drones')}</b>${valid ? `<details><summary>${t('Cost breakdown')}</summary><dl><div><dt>${t('Drone replacements')}</dt><dd>${formatCredits(totals.replacement)}</dd></div><div><dt>${t('Drone repairs')}</dt><dd>${formatCredits(totals.repair)}</dd></div><div><dt>${t('PDC ammunition')}</dt><dd>${formatCredits(totals.rounds)}</dd></div></dl></details>` : `<p>${t('Drone service quote unavailable.')}</p>`}<button type="button" data-ui-command="drone-service" data-drone-service="${kind}" ${enabled ? '' : 'disabled'}>${t('SERVICE DRONES')} · ${valid ? formatCredits(quote.total) : '—'}</button></div>${kind === 'maintain' ? '</details>' : ''}`;
+            return `${kind === 'maintain' ? `<details><summary>${t('Service options')}</summary>` : ''}<div class="drone-service-quote"><b>${t(kind === 'full' ? 'Refill, repair and rearm' : 'Repair and rearm existing drones')}</b>${valid ? `<details><summary>${t('Cost breakdown')}</summary><dl><div><dt>${t('Drone replacements')}</dt><dd>${formatCredits(totals.replacement)}</dd></div><div><dt>${t('Drone repairs')}</dt><dd>${formatCredits(totals.repair)}</dd></div><div><dt>${t('Drone ammunition')}</dt><dd>${formatCredits(totals.rounds)}</dd></div></dl></details>` : `<p>${t('Drone service quote unavailable.')}</p>`}<button type="button" data-ui-command="drone-service" data-drone-service="${kind}" ${enabled ? '' : 'disabled'}>${t('SERVICE DRONES')} · ${valid ? formatCredits(quote.total) : '—'}</button></div>${kind === 'maintain' ? '</details>' : ''}`;
         }).join('');
         if (compact) return `<div class="drone-bay-service">${quotes}${this.droneServiceNotice ? `<p role="status">${escapeHtml(this.droneServiceNotice)}</p>` : ''}</div>`;
         return `<article class="service-card drone-service-card"><span class="eyebrow">${t('DRONE BAYS')}</span><h3>${t('Drone service')}</h3><p>${t('Repair and rearm your fleet. Missing drones are filled from storage before buying replacements.')}</p>${quotes}${this.droneServiceNotice ? `<p role="status">${escapeHtml(this.droneServiceNotice)}</p>` : ''}</article>`;
@@ -4335,9 +4380,6 @@ export class GameUI {
                 standoff.title = '';
         }
         this.drawRadar(model.contacts, model.radarRings, model.searchRings, model.radarWarp);
-        setText('#screen-own-shield-value', Math.ceil(model.shield).toString());
-        setText('#screen-own-energy-value', Math.ceil(model.energy).toString());
-        setText('#screen-own-hull-value', Math.ceil(model.hull).toString());
         setBar('#screen-own-shield', percent(model.shield, model.maxShield));
         setBar('#screen-own-energy', percent(model.energy, model.maxEnergy));
         setBar('#screen-own-hull', percent(model.hull, model.maxHull));
@@ -4578,8 +4620,6 @@ export class GameUI {
         if (!target) {
             setText('#screen-target-name', t('NO LOCK'));
             this.el('#screen-target-name').title = '';
-            setText('#screen-target-shield-value', '—');
-            setText('#screen-target-hull-value', '—');
             setBar('#screen-target-shield', 0);
             setBar('#screen-target-hull', 0);
             clearHull();
@@ -4587,8 +4627,6 @@ export class GameUI {
         }
         setText('#screen-target-name', target.name.toUpperCase());
         this.el('#screen-target-name').title = target.name;
-        setText('#screen-target-shield-value', isShip ? Math.ceil(target.shield ?? 0).toString() : '—');
-        setText('#screen-target-hull-value', isShip ? Math.ceil(target.hull ?? 0).toString() : '—');
         setBar('#screen-target-shield', percent(target.shield ?? 0, target.maxShield ?? 0));
         setBar('#screen-target-hull', percent(target.hull ?? 0, target.maxHull ?? 0));
         if (isShip) {
@@ -5423,6 +5461,22 @@ export class GameUI {
             ${this.tutorialSkipControl()}
           </section>`;
     }
+    // The paused ship menu repeats the wing orders: one group per wingman (the
+    // crew the cockpit last published via setWingTactics), so a mixed-tactics
+    // wing can be read and set from the same screen. The section disappears
+    // when nobody is flying on the wing.
+    renderShipWingOrders() {
+        const crew = this.wingTacticsCrew ?? [];
+        if (!crew.length)
+            return '';
+        const groups = crew.slice(0, 2).map((entry) => {
+            const current = normalizeWingOrder(entry.order);
+            const label = entry.name ? `${t('WING')} ${Number(entry.index) + 1} · ${entry.name}` : `${t('WING')} ${Number(entry.index) + 1}`;
+            const buttons = WING_ORDERS.map((order) => `<button type="button" data-ui-command="wing-order" data-wing-value="${order}" data-wing-index="${entry.index}" aria-pressed="${current === order}" class="${current === order ? 'is-selected' : ''}">${t(WING_ORDER_LABEL[order])}</button>`).join('');
+            return `<div class="ship-menu-wing-group"><b>${escapeHtml(label)}</b><div class="wing-order-row" role="group" aria-label="${t('Wing order')}">${buttons}</div><p>${escapeHtml(t(WING_ORDER_HINT[current]))}</p></div>`;
+        }).join('');
+        return `<section class="ship-menu-wing"><h3>${t('WING ORDERS')}</h3>${groups}</section>`;
+    }
     showShipMenu() {
         if (!this.save)
             return;
@@ -5446,7 +5500,8 @@ export class GameUI {
             mass: entry.mass,
             smuggled: entry.smuggled === true,
         }));
-        const allCargo = [...cargoEntries, ...sealed];
+        const droneCount = Object.values(player.droneFleet?.unitsById ?? {}).filter(u=>u.hull>0).length;
+        const allCargo = [...cargoEntries, ...sealed, ...(droneCount ? [{name:'DRONE CARGO',qty:droneCount,mass:droneCount}] : [])];
         const cargoRows = allCargo.length
             ? allCargo.map((entry) => `<div class="cargo-row"><span><b>${escapeHtml(entry.smuggled ? t('{commodity} (syndicate)', { commodity: t(entry.name) }) : t(entry.name))}</b><small>${entry.qty} ${t('UNITS')}</small></span>${entry.id ? `<button data-jettison="${entry.id}">${t('JETTISON')}</button>` : ''}<em>${entry.mass.toFixed(1)} ${t('MASS')}</em></div>`).join('')
             : `<p class="ship-menu-empty">${t('Hold empty. The market is one jump away.')}</p>`;
@@ -5496,6 +5551,7 @@ export class GameUI {
             `<div class="weapon-row launcher-row${entry.selected ? ' is-active' : ''}"><span>${entry.selected ? '▸ ' : ''}${escapeHtml(t(entry.launcher.nameKey))}</span><small>${escapeHtml(t(entry.launcher.ordnanceNameKey))} · ${t('MOUNT {number}', { number: entry.index + 1 })}</small><em>${entry.rounds}/${entry.capacity}</em></div>`
         )).join('') || `<div class="weapon-row is-locked"><span>${t('LAUNCHER')}</span><small>${t('NOT INSTALLED')}</small><em>0/0</em></div>`;
         const tutorialSection = this.renderShipTutorial();
+        const wingSection = this.renderShipWingOrders();
         // The four numbers a pilot checks mid-flight, at the top of the panel
         // instead of scattered through the account and drone sections below.
         const stats = getEffectiveShipStats(player);
@@ -5541,10 +5597,11 @@ export class GameUI {
         ${standoffBanner}
         <div class="ship-status-strip">${statusCells}</div>
         <div class="pause-grid ship-menu-grid">
+          ${wingSection}
           ${tutorialSection}
           <section class="ship-menu-missions"><h3>${t('ACTIVE CONTRACTS · {count}/6', { count: missions.length })}</h3>${missionRows}</section>
           <section class="ship-menu-cargo"><h3>${t('CARGO HOLD · {mass}/{capacity} MASS ({percent}%)', { mass: mass.toFixed(1), capacity, percent: loadPercent })}</h3>${cargoRows}</section>
-          <section class="ship-menu-weapons"><button data-ui-command="transponder-toggle" aria-pressed="${player.transponder !== false}">${t(player.transponder !== false ? 'TRANSPONDER ON' : 'TRANSPONDER OFF')}</button>${loadoutFor(player).turrets?.some(Boolean)?`<button data-ui-command="turret-toggle">${t(player.turretsHeld?'TURRETS HOLD FIRE':'TURRETS ACTIVE')}</button><p>${escapeHtml(t(player.turretsHeld?'TURRETS HOLD FIRE':(player.turretRuntime?.find(s=>s.status==='TURRETS WAITING FOR ENERGY')?.status??'TURRETS READY')))}</p>`:''}<details><summary>${t('WEAPON SYSTEMS')}</summary>${weaponRows}${launcherRows}</details><details><summary>${t('WEAPON GROUP HELP')}</summary><p>${t('Tap the weapon name to cycle populated groups and Fire all. Fire all uses every forward gun; missiles and automatic turrets stay separate. In Outfitting, open a gun’s details to assign A or B. Try beams in A and your other weapon in B to control energy use.')}</p></details></section>
+          <section class="ship-menu-weapons"><button data-ui-command="transponder-toggle" aria-pressed="${player.transponder !== false}">${t(player.transponder !== false ? 'TRANSPONDER ON' : 'TRANSPONDER OFF')}</button>${loadoutFor(player).turrets?.some(Boolean)?`<button data-ui-command="turret-toggle">${t(player.turretsHeld?'TURRETS HOLD FIRE':'TURRETS ACTIVE')}</button><p>${escapeHtml(t(player.turretsHeld?'TURRETS HOLD FIRE':(player.turretRuntime?.find(s=>s.status==='TURRETS WAITING FOR ENERGY')?.status??'TURRETS READY')))}</p>`:''}<details><summary>${t('WEAPON SYSTEMS')}</summary>${weaponRows}${launcherRows}<div class="drone-policy" role="group" aria-label="${t('LAUNCHER FIRING')}">${['alternating','together','single'].map(mode=>`<button data-ui-command="launcher-fire-mode" data-launcher-mode="${mode}" aria-pressed="${(player.launcherFireMode??'alternating')===mode}">${t(mode==='alternating'?'ALTERNATING':mode==='together'?'TOGETHER':'SELECTED RACK ONLY')}</button>`).join('')}</div><p>${t('Alternating fires the next ready rack per press. Together fires all ready racks. L or the launcher readout selects a rack. Each rack reloads independently.')}</p></details><details><summary>${t('WEAPON GROUP HELP')}</summary><p>${t('Tap the weapon name to cycle populated groups and Fire all. Fire all uses every forward gun; missiles and automatic turrets stay separate. In Outfitting, open a gun’s details to assign A or B. Try beams in A and your other weapon in B to control energy use.')}</p></details></section>
           ${this.renderDroneShipStatus()}
           <section class="ship-menu-account"><h3>${t('ACCOUNT')}</h3>
             <div class="ship-account-row"><span>${t('AVAILABLE CREDIT')}</span><b>${formatCredits(player.credits)}</b></div>
@@ -5638,12 +5695,57 @@ export class GameUI {
         el.hidden=seconds<=0;
         if(seconds>0&&(el.dataset.seconds!==String(seconds)||el.dataset.name!==name)){el.dataset.seconds=String(seconds);el.dataset.name=name;el.innerHTML=`<span>${escapeHtml(name)}</span><b>${seconds}</b>`;}
     }
+    // The wing cards hang off the top-right screen edge, one per wingman: the
+    // stance word plus two slim fills for shield (top) and hull (bottom), so a
+    // glance answers "who is hurt and what are they flying". Tapping a card — or
+    // pressing Y for the whole crew — cycles aggressive → defensive → break off
+    // through the shared wing-order command. The list is keyed by crew index:
+    // a card is created once and then only repainted when its state changes, so
+    // the per-frame publish does no DOM churn. The cards also carry the last
+    // crew for the paused ship menu, which is rendered from save state.
+    setWingTactics(crew,count=0){
+        this.wingTacticsCrew=Array.isArray(crew)?crew:[];this.wingOrderCount=count;
+        const rail=this.root.querySelector('#hud-wing-tactics');
+        if(!rail)return;
+        const list=this.wingTacticsCrew.slice(0,2);
+        // Retire cards for wingmen that are gone (dead, or no wing at all).
+        for(const card of [...rail.children])
+            if(!list.some(entry=>String(entry.index)===card.dataset.wingIndex))card.remove?.();
+        for(const entry of list){
+            if(!entry)return;
+            const index=String(entry.index),order=normalizeWingOrder(entry.order);
+            const hullFill=Math.max(0,Math.min(1,(entry.maxHull>0?entry.hull/entry.maxHull:0))*100);
+            const shieldFill=Math.max(0,Math.min(1,(entry.maxShield>0?entry.shield/entry.maxShield:0))*100);
+            const state=`${order}|${Math.round(hullFill)}|${Math.round(shieldFill)}|${entry.poweredDown?1:0}`;
+            let card;
+            for(const existing of rail.children)if(existing.dataset?.wingIndex===index){card=existing;break;}
+            if(!card){
+                // this.root is the document, not an element: createElement is
+                // called on it directly (the test stand-ins expose their own).
+                card=(this.root.createElement??document.createElement.bind(document))('button');
+                card.type='button';
+                card.className='hud-wing-btn';
+                card.dataset.wingIndex=index;
+                card.dataset.uiCommand='wing-order';
+                card.setAttribute('aria-label','');
+                rail.appendChild(card);
+            }
+            if(card.dataset.wingState!==state){
+                card.dataset.wingState=state;
+                card.dataset.wingOrder=order;
+                card.innerHTML=`<i class="hud-wing-shield" aria-hidden="true"><b style="width:${shieldFill}%"></b></i><i class="hud-wing-hull" aria-hidden="true"><b style="width:${hullFill}%"></b></i><b>${t(WING_ORDER_SHORT[order])}</b>`;
+                card.setAttribute('aria-label',`${t('Wing order')} · ${t(WING_ORDER_LABEL[order])} · ${t('Press Y or tap')}`);
+            }
+            card.classList.toggle('is-powered-down',Boolean(entry.poweredDown));
+        }
+    }
     showArenaRun(save) {
         const r=save.arenaRun,p=save.player,stats=getEffectiveShipStats(p),wave=RUN_WAVES[r.wave],fit=loadoutFor(p),spec=HARDPOINT_SPECS[p.shipId];
         const done=r.phase==='won'||r.phase==='lost';
         const command=(action,value,label,extra='')=>`<button data-ui-command="run-action" data-run-action="${action}" data-run-value="${value}" ${extra}>${label}</button>`;
         const names={guns:'GUNS',launchers:'MISSILES',turrets:'TURRETS',power:'POWER',drive:'DRIVE',defense:'DEFENSE',utility:'UTILITY'};
-        const hullText={wayfarer:'Two forward guns and one upper turret.',talon:'Agile fighter with three forward guns and no turret.',vanguard:'Two medium guns and upper and lower turrets; slower handling.',prospector:'One forward gun and an upper rear turret.',lancer:'Two medium guns and one upper medium turret.',atlas:'One forward gun and two turrets; a large, slow hull.'};
+        const hullText={wayfarer:'Two forward guns and one upper turret.',talon:'Agile fighter with three forward guns and no turret.',vanguard:'Two medium guns and upper and lower turrets; slower handling.',prospector:'One forward gun and an upper rear turret.',lancer:'Two medium guns and one upper medium turret.',atlas:'One forward gun and two turrets; a large, slow hull.',
+            speedster:'Two light guns and a launcher rack; blistering speed, thin shielding.',legionary:'Two medium guns and a missile rack; an agile frontline fighter.',andromeda:'Two medium guns, two launcher racks and a turret; a heavy striker.',torsas:'Two forward guns, a launcher and a turret; deep and slow.',astra:'A light and a medium gun mount plus a launcher; a long-range cutter.'};
         const briefs={
             'pulse-cannon':'Efficient fire; lead your target.', 'ripper':'Strong against hull; short range.',
             'gauss-cannon':'Partly bypasses shields; slow firing.', 'ion-blaster':'Strips shields; shared standard lead.',
@@ -5652,13 +5754,27 @@ export class GameUI {
             'thrusters-mk2':'Sharper turns; a small speed penalty.', 'capacitor-bank':'Larger energy reserve; a mild recharge penalty.',
             'sustained-reactor':'Faster recharge; standard reserve.', 'shield-mk2':'More shield protection.', 'recovery-shield':'Faster recovery; slightly less capacity.'
         };
+        const wingFitLabels={varied:'ROLE DEFAULTS',balanced:'BALANCED FIT',assault:'CLOSE ASSAULT',support:'DEFENSIVE SUPPORT',beam:'BEAM FIT'};
         const labelItems=ids=>{const counts={};ids.forEach(id=>counts[id]=(counts[id]??0)+1);return Object.entries(counts).map(([id,n])=>`${n}× ${t(OUTFIT_ITEMS[id].name)}`).join(' · ');};
         let body='',footer='';
         if(done){
             body=`<div class="run-result"><h3>${t(r.phase==='won'?'Run complete':'Run ended')}</h3><b>${t('Score')}: ${runScore(r)}</b><p>${t('Waves cleared')}: ${r.cleared}/${r.totalWaves??RUN_WAVES.length} · ${t('Damage taken')}: ${Math.round(r.damage)}</p></div>`;
             footer=`<button data-ui-command="quit-title">${t('QUIT TO TITLE')}</button><button class="primary" data-ui-command="new-arena-run">${t('New run')}</button>`;
         }else if(!r.hullChosen){
-            body=`<div class="run-stage-label">${t('Choose your hull')}</div><div class="run-offers run-hulls">${Object.keys(hullText).map(id=>command('hull',id,`<b>${SHIPS[id].name}${p.shipId===id?' · '+t('CURRENT'):''}</b><span>${t(hullText[id])}</span>`)).join('')}</div>`;
+            // Five hulls drawn from the complete flyable pool. Staying put is
+            // the veteran-wingman option, so the current hull is never listed.
+            const hulls=(Array.isArray(r.hullOffers)&&r.hullOffers.length?r.hullOffers:runHullOffers(save)).filter(id=>id!==p.shipId);
+            const wingmen=(Array.isArray(r.wingmen)?r.wingmen:[]).filter(w=>w.alive!==false);
+            const wingBrief=wingmen.map(w=>`${t(SHIPS[w.hullId]?.name??w.hullId)} · ${w.name}`).join(' · ');
+            // The wing option is a roster of three named veterans, each with the
+            // hull they would bring, so the pilot chooses instead of taking a roll.
+            const wingFull=wingmen.length>=MAX_RUN_WINGMEN;
+            const candidates=wingFull?[]:(Array.isArray(r.wingmanOffers)&&r.wingmanOffers.length?r.wingmanOffers:runWingmanOffers(save));
+            const wingCards=candidates.map(candidate=>command('wingman',candidate.id,`<b>${escapeHtml(candidate.name)}</b><span>${escapeHtml(SHIPS[candidate.hullId].name)} · ${escapeHtml(t(hullText[candidate.hullId]??SHIPS[candidate.hullId].personality))}</span><small>${escapeHtml(t('Veteran pilot'))} · ${escapeHtml(t(wingFitLabels[candidate.fit]??'ROLE DEFAULTS'))}</small>`)).join('');
+            const wingStage=wingFull?`<div class="run-loadout-summary">${escapeHtml(t('Your wing is already at full strength.'))}</div>`
+                :candidates.length?`<div class="run-stage-label run-wing-label">${t('Or keep {ship} and add one of these veterans',{ship:SHIPS[p.shipId].name})}${wingBrief?` · ${escapeHtml(t('On your wing')+': '+wingBrief)}`:''}</div><div class="run-offers run-wingmen">${wingCards}</div>`
+                :'';
+            body=`<div class="run-stage-label">${t('Choose your hull')}</div><div class="run-offers run-hulls">${hulls.map(id=>command('hull',id,`<b>${escapeHtml(SHIPS[id].name)}</b><span>${escapeHtml(t(hullText[id]??SHIPS[id].personality))}</span>`)).join('')}</div>${wingStage}<div class="run-loadout-summary">${escapeHtml(t('The hulls on offer change with the wave. Keeping your ship adds a veteran wingman instead.'))}</div>`;
             footer=`<button data-ui-command="quit-title">${t('Save and leave')}</button>`;
         }else if(!r.rewardChosen){
             body=`<div class="run-stage-label">${t('Choose one reward')}</div><div class="run-offers">${r.offers.map(id=>{
@@ -5672,6 +5788,8 @@ export class GameUI {
             footer=`<button data-ui-command="quit-title">${t('Save and leave')}</button>${command('equip','',t('Equip and adjust'),selected?'':'disabled')}${command('accept','',t(r.selectedReward==='repair'?'Repair and continue':'Equip and continue'),`class="primary" ${selected?'':'disabled'}`)}`;
         }else{
             body=`<div class="run-loadout-summary">${escapeHtml(labelItems(LOADOUT_KEYS.flatMap(k=>fit[k]).filter(Boolean)))}</div>`;
+            const wingCrew=(Array.isArray(r.wingmen)?r.wingmen:[]).filter(w=>w.alive!==false);
+            if(wingCrew.length)body+=`<div class="run-stage-label">${t('Wing order')}</div>${wingCrew.map((w,i)=>{const current=wingmanOrder(w,r);return `<div class="run-orders run-orders-wing"><b>${t('WING')} ${i+1} · ${escapeHtml(w.name)}</b>${WING_ORDERS.map(order=>`<button data-ui-command="run-action" data-run-action="order" data-run-value="${order}" data-run-index="${i}" class="${current===order?'is-selected':''}" aria-pressed="${current===order}">${t(WING_ORDER_LABEL[order])}</button>`).join('')}</div><small class="run-order-hint">${escapeHtml(t(WING_ORDER_HINT[current]))}</small>`;}).join('')}`;
             if(this.runFitOpen)body+=`<div class="run-fitting">${LOADOUT_KEYS.map(key=>spec[key].map((m,i)=>`<div class="run-slot"><b>${t(names[key])} ${i+1} · ${m.size}</b><span>${fit[key][i]?t(OUTFIT_ITEMS[fit[key][i]].name):t('EMPTY')}</span><div>${command('fit','',t('REMOVE'),`data-run-key="${key}" data-run-index="${i}"`)}${Object.entries(p.outfitting.locker).filter(([id,n])=>n>0&&itemFitsMount(OUTFIT_ITEMS[id],m)).map(([id,n])=>command('fit',id,`${t(OUTFIT_ITEMS[id].name)} ×${n}`,`data-run-key="${key}" data-run-index="${i}"`)).join('')}${key==='guns'&&fit[key][i]?command('group',m.id,t('GROUP')+' '+fit.fireGroups.assignments[m.id]):''}</div></div>`).join('')).join('')}</div>`;
             footer=`<button data-ui-command="quit-title">${t('Save and leave')}</button><button data-ui-command="run-fit-toggle">${t('Adjust fitting')}</button><button class="primary" data-ui-command="run-launch">${t('Start next wave')}</button>`;
         }
@@ -5721,15 +5839,22 @@ export class GameUI {
         const maps = [['open', 'OPEN SPACE'], ['asteroid-field', 'ASTEROID FIELD'], ['debris-field', 'DEBRIS FIELD']];
         const difficultyOptions = [['novice', 'ROOKIE'], ['veteran', 'VETERAN'], ['ace', 'ACE']];
         const fitOptions = [['varied', 'ROLE DEFAULTS'], ['balanced', 'BALANCED FIT'], ['assault', 'CLOSE ASSAULT'], ['support', 'DEFENSIVE SUPPORT'], ['beam', 'BEAM FIT']];
-        const ships = [
-            ['wayfarer', 'WAYFARER', 'BALANCED FIT'],
-            ['vanguard', 'VANGUARD', 'DEFENSIVE SUPPORT'],
-            ['talon', 'TALON', 'CLOSE ASSAULT'],
-            ['prospector', 'PROSPECTOR', 'DEFENSIVE SUPPORT'],
-            ['lancer', 'LANCER', 'BEAM FIT'],
-            ['atlas', 'ATLAS', 'BALANCED FIT'],
-            ['frigate', 'CONCORD FRIGATE', 'CAPITAL HULL'],
-        ];
+        // The staging palette is built from the live observer catalog, so every
+        // hull the session can spawn — all eleven flyable ships and the Concord
+        // frigate — is placeable. The static list is only a fallback for a
+        // caller that opens the panel without a catalog.
+        const paletteFitLabels = { varied: 'ROLE DEFAULTS', balanced: 'BALANCED FIT', assault: 'CLOSE ASSAULT', support: 'DEFENSIVE SUPPORT', beam: 'BEAM FIT' };
+        const ships = Array.isArray(config.catalog) && config.catalog.length
+            ? config.catalog.map((entry) => [entry.id, entry.label, entry.capital ? 'CAPITAL HULL' : paletteFitLabels[entry.defaultFit] ?? paletteFitLabels.varied])
+            : [
+                ['wayfarer', 'WAYFARER', 'BALANCED FIT'],
+                ['vanguard', 'VANGUARD', 'DEFENSIVE SUPPORT'],
+                ['talon', 'TALON', 'CLOSE ASSAULT'],
+                ['prospector', 'PROSPECTOR', 'DEFENSIVE SUPPORT'],
+                ['lancer', 'LANCER', 'BEAM FIT'],
+                ['atlas', 'ATLAS', 'BALANCED FIT'],
+                ['frigate', 'CONCORD FRIGATE', 'CAPITAL HULL'],
+            ];
         this.observerNodes.clear();
         panel.innerHTML = `
       <div class="observer-toolbar">

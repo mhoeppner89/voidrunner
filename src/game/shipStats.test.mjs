@@ -52,7 +52,7 @@ check('wayfarer base max speed', base.maxSpeed, 50);
 check('wayfarer base afterburn speed', base.afterburnSpeed, 75);
 check('wayfarer base acceleration', base.acceleration, 21);
 check('wayfarer base turn authority', base.angularAcceleration, 1.65);
-check('wayfarer base radar range', base.radarRange, 1000);
+check('wayfarer base radar range', base.radarRange, 2000);
 check('wayfarer base scan range', base.scanRange, 500);
 check('mining rate stat retired', base.miningRate, undefined);
 
@@ -125,7 +125,7 @@ check('typed ordnance refill charges for every missing round', refillCost(magazi
 const cargoFit = getEffectiveShipStats(playerWith(['cargo-pods']));
 check('cargo-pods capacity', cargoFit.cargo, 50);
 const radarFit = getEffectiveShipStats(playerWith(['radar-mk2']));
-check('radar-mk2 radar range', radarFit.radarRange, 1250);
+check('radar-mk2 radar range', radarFit.radarRange, 3000);
 check('radar-mk2 scan range', radarFit.scanRange, 750);
 const miningFit = getEffectiveShipStats(playerWith(['mining-mk2']));
 check('mining upgrade retired', miningFit.miningRate, undefined);
@@ -137,7 +137,7 @@ const comboFit = getEffectiveShipStats(playerWith(['engine-mk2', 'shield-mk2', '
 check('combo keeps engine boost', comboFit.maxSpeed, 50 * 1.18);
 check('combo keeps shield boost', comboFit.shield, 140);
 check('combo keeps cargo boost', comboFit.cargo, 50);
-check('combo keeps radar boost', comboFit.radarRange, 1250);
+check('combo keeps radar boost', comboFit.radarRange, 3000);
 
 // A different hull reads its own base block, never the starter's.
 const talonFit = getEffectiveShipStats(playerWith([], { shipId: 'talon' }));

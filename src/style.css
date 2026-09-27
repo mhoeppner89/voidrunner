@@ -3664,12 +3664,14 @@ html[lang="de"] .comms-bar.story::after {
 
 .screen-bars > div {
   display: grid;
-  /* Fixed-width label column so every bar track starts at the same x,
-     regardless of whether the label reads SHIELDS, ARMOR or HULL. The font-size
-     is set here (not just on the label) so the 8ch column is measured in the
-     label's own small type — if it were computed at the inherited 16px it would
-     reserve ~77px and shove the bar track out of the monitor on narrow screens. */
-  grid-template-columns: 8ch minmax(24px, 1fr) auto;
+  /* Fixed-width label column so every bar track starts at the same x. The
+     labels print their initial (S / E / H, see the data-short rule below), so
+     the column only has to hold one letter — that is what makes room for the
+     own monitor's wing-order plaque. The font-size is set here (not just on the
+     label) so the column is measured in the label's own small type — if it were
+     computed at the inherited 16px it would reserve ~77px and shove the bar
+     track out of the monitor on narrow screens. */
+  grid-template-columns: 2ch minmax(24px, 1fr) auto;
   align-items: center;
   gap: 0.18rem;
   min-width: 0;
@@ -4011,17 +4013,21 @@ html[lang="de"] .comms-bar.story::after {
     font-size: 10px;
   }
 
+  /* The schematic stays up on short phones too: it shares the bars' row now,
+   so it costs no extra height — just keep it a slim band. */
   .screen-ship-layout > .hull-outline {
-    display: none;
+    display: block;
+    max-height: 34px;
   }
 
   .screen-ship-layout {
     grid-template-areas:
       "flight"
       "weapon"
+      "hull"
       "bars"
       "ticker";
-    grid-template-rows: auto auto auto 16px;
+    grid-template-rows: auto auto minmax(6px, 0.6fr) auto 16px;
     gap: 0.08rem;
   }
 
@@ -15219,7 +15225,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
    shrinking text or moving the instruments away from the painted bezel. */
 @media (max-height: 520px) and (orientation: landscape) {
   .cockpit-screen-own .screen-ship-layout {
-    grid-template-rows: auto auto auto 12px;
+    grid-template-rows: auto auto minmax(6px, 0.6fr) auto 12px;
     align-content: space-between;
     gap: 0;
     padding: 1px 2px;
@@ -15230,7 +15236,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   .cockpit-screen-own .screen-ticker { padding: 0; line-height: 1; }
   /* A race or standoff already owns the notice band at the monitor foot. */
   .cockpit-screen-own:has(.screen-race-strip.is-visible, .screen-standoff.is-visible) .screen-ship-layout {
-    grid-template-rows: auto auto auto 0;
+    grid-template-rows: auto auto minmax(5px, 0.5fr) auto 0;
     padding-bottom: 14px;
   }
   .cockpit-screen-own:has(.screen-race-strip.is-visible, .screen-standoff.is-visible) .screen-event-ticker { visibility: hidden; }
@@ -15534,9 +15540,23 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .run-fitting{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}.run-slot{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid #45606c;font-size:14px}.run-slot>div{display:flex;flex-wrap:wrap;gap:6px}
 .run-entry{padding:12px;border:1px solid #789dab;background:#142536}.run-entry p{margin:8px 0}.run-entry button{min-height:44px}.run-entry>div{display:flex;gap:8px;flex-wrap:wrap}
 @media(max-height:500px){.run-card{max-height:94dvh;gap:6px;padding:10px}.run-card header h2{font-size:18px}.run-card .run-brief{margin-top:0}.run-offers button{padding:10px}.run-card footer{padding-top:6px}}
-@media(max-width:600px){.run-offers,.run-fitting,.run-hulls{grid-template-columns:1fr}}
+@media(max-width:600px){.run-offers,.run-fitting,.run-hulls,.run-wingmen{grid-template-columns:1fr}}
 
 .run-inbound{position:absolute;z-index:15;pointer-events:none;transform:translate(-50%,-50%);color:#ffdb8e;background:#142536dd;border:1px solid #ffdb8e;padding:6px 10px;font-size:14px}
+/* Wing orders: one tappable cockpit chip above the touch pads, plus the
+   run-screen roster and order rows. */
+/* pointer-events must be re-enabled per HUD control: the hud layer itself is
+   click-through so taps reach the flight canvas underneath. */
+/* The wing cards hang off the HUD's top-right edge (see #hud-wing-tactics
+   below), clear of the monitors and the touch controls. */
+.run-wing-label{margin-top:14px}
+.run-wingmen{grid-template-columns:repeat(3,minmax(0,1fr))}
+.run-orders{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.run-orders button{min-height:40px;padding:8px 12px;border:1px solid #628b9b;background:#142536;color:#e0eaf0;font:inherit}
+.run-orders button.is-selected{border-color:#f0cc83;background:#273b3f;color:#f0cf8e}
+.run-orders-wing{align-items:center}
+.run-orders-wing>b{flex:1 0 100%;font-size:12px;letter-spacing:.06em;color:#b2c8d3;margin-bottom:-4px}
+.run-order-hint{display:block;font-size:12px;line-height:1.4;color:#9fb6c2;margin:-6px 0 12px}
 .arena-card:not(.run-card){display:flex;flex-direction:column;max-height:94dvh;height:auto;overflow:hidden}.arena-menu-scroll{overflow-y:auto;min-height:0;overscroll-behavior:contain}.arena-menu-scroll .arena-grid{overflow:visible}.arena-card:not(.run-card)>header,.arena-card:not(.run-card)>footer{flex:none}.arena-card:not(.run-card) .run-entry{margin:8px 12px}.arena-card.run-card>header h2{font-size:18px}.arena-card.run-card>footer{min-height:44px}
 /* Short, readable reward choices with a stable action row on landscape phones. */
 .run-card{width:min(980px,calc(100vw - 24px));height:min(460px,calc(100dvh - 20px));max-height:calc(100dvh - 20px);padding:14px;gap:10px;background:linear-gradient(135deg,#111e29,#0b121c);border:1px solid #63808d}
@@ -16053,8 +16073,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #ship-panel .ship-status-cell[data-tone="energy"] > i > em { background: var(--void-gold); }
 #ship-panel .ship-status-cell[data-tone="cargo"] > i > em { background: var(--retro-amber); }
 
-#ship-panel .weapon-row span { font-size: 13px; }
-#ship-panel .weapon-row small { font-size: 12px; }
+#ship-panel .weapon-row span { font-size: 13px; }#ship-panel .weapon-row small { font-size: 12px; }
 #ship-panel .weapon-row em { font-size: 12px; }
 #ship-panel .ship-account-row span { font-size: 13px; }
 #ship-panel .ship-account-row span small { font-size: 12px; }
@@ -16063,6 +16082,17 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #ship-panel .event-row span { font-size: 13px; }
 #ship-panel .ship-menu-events summary { min-height: 44px; font-size: 12px; }
 #ship-panel .eyebrow { font-size: 12px; }
+
+/* Wing orders in the paused ship menu: the same three standing orders as the
+   HUD wing cards and the run screen, spelled out where there is room — one
+   group per wingman, so a mixed-tactics wing can be read and set here. */
+#ship-panel .ship-menu-wing { grid-column: 1 / -1; }
+#ship-panel .ship-menu-wing-group { margin-top: 10px; }
+#ship-panel .ship-menu-wing-group > b { display: block; margin-bottom: 4px; color: #b2c8d3; font-size: 12px; letter-spacing: 0.06em; }
+#ship-panel .ship-menu-wing-group > p { margin: 5px 0 0; color: #98b1b6; font-size: 12px; line-height: 1.35; }
+#ship-panel .wing-order-row { display: flex; gap: 6px; }
+#ship-panel .wing-order-row button { flex: 1; min-height: 34px; padding: 4px 6px; font-size: 12px; }
+#ship-panel .wing-order-row button.is-selected { border-color: #f0cc83; color: #ffdb8e; background: rgba(90, 68, 22, 0.45); }
 
 @media (max-height: 640px) and (orientation: landscape) {
   /* A phone pairs the short sections side by side and gives the long ones the
@@ -16303,7 +16333,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   }
   #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-flight small { display:none; }
   #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-ship-layout { padding:3px; }
-  #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-bars > div { grid-template-columns:7ch minmax(12px,1fr) 3ch; gap:2px; }
+  #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-bars > div { grid-template-columns:2ch minmax(12px,1fr) 3ch; gap:2px; }
   #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-bars em { width:auto; }
   #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-target-layout { padding:0 3px 3px; }
   #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-target-readout { letter-spacing:0; }
@@ -16388,32 +16418,57 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .comms-channel .talker-text::-webkit-scrollbar { width:4px; }
 .comms-channel .talker-text::-webkit-scrollbar-thumb { background:var(--void-gold); }
 
-/* Compact flight instruments: numbers and short gauges, no decorative hull
-   diagram. Full ship/loadout details remain in the tappable ship menu. */
+/* Compact flight instruments: numbers and short gauges with the hull
+   schematic beside the bars. Full ship/loadout details remain in the
+   tappable ship menu. */
 #game-shell .screen-ship-layout {
-  grid-template-areas:"flight" "weapon" "bars" "ticker";
-  grid-template-rows:auto auto auto 12px; align-content:space-between;
+  grid-template-rows:auto auto minmax(10px,1fr) 12px; align-content:space-between;
   padding:3px 5px; gap:1px;
 }
-#game-shell #own-hull-outline,
-#game-shell #target-hull-outline { display:none; }
-#game-shell .cockpit-screen-target .screen-target-layout {
-  height:auto; padding:2px 5px; grid-template-rows:auto; gap:0;
-}
 #game-shell .cockpit-screen-target .screen-target-layout.no-bars { display:none; }
-#game-shell .cockpit-screen-target .screen-heading { height:22%; padding:2px 5px 0; }
+#game-shell .cockpit-screen-target .screen-heading { height:22%; padding:2px 5px 0; position:relative; }
 #game-shell .cockpit-screen-target .screen-target-distance { height:19%; padding:0 3px; }
 #game-shell .cockpit-screen-target .screen-target-readout { height:19%; padding:0 3px; letter-spacing:0; }
+/* The heading/distance/readout rows keep their fixed heights; the
+   schematic-and-bars row flexes into what remains. */
+#game-shell .cockpit-screen-target { display:flex; flex-direction:column; }
+#game-shell .cockpit-screen-target > .monitor-damage,
+#game-shell .cockpit-screen-target > #capital-subtarget { flex:0 0 auto; }
+#game-shell .cockpit-screen-target .screen-drone-telemetry { flex:1; }
 #game-shell .screen-bars > div {
-  grid-template-columns:8ch minmax(20px,90px) 3ch;
+  grid-template-columns:2ch minmax(0,1fr);
   justify-content:space-between; column-gap:3px;
 }
-#game-shell .screen-bars em { width:auto; }
+/* The survival bars are labeled by their initial — S / E / H — and carry no
+   numeric readout: the exact numbers stay on the docked screens, while the
+   cockpit monitor reads like a gauge cluster (letter + bar + ticks). The
+   full word stays in the DOM (font-size:0 + a generated initial), so the row
+   is still announced as SHIELDS / ENERGY / HULL, exactly like SPD and FUEL.
+   The bars sit BESIDE the hull schematic as one row on both monitors — the
+   outline is the pilot's shape reference, the bars its status — which frees
+   the vertical room the old stacked layout spent on the outline row. */
+#game-shell .screen-bars span[data-short] { font-size:0; }
+#game-shell .screen-bars span[data-short]::before { content:attr(data-short); font-size:11px; letter-spacing:0; }
+#game-shell .screen-bars em { display:none; }
+#game-shell .screen-ship-layout {
+  grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr);
+  grid-template-areas:"flight flight" "weapon weapon" "outline bars" "ticker ticker";
+}
+#game-shell .screen-ship-layout > .hull-outline { grid-area:outline; width:100%; height:100%; max-height:64px; min-height:0; justify-self:center; }
+#game-shell .screen-ship-layout > .screen-bars { grid-area:bars; align-content:space-between; }
+#game-shell .screen-target-layout {
+  grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr);
+  grid-template-areas:"outline bars";
+}
+#game-shell .screen-target-layout > .hull-outline { grid-area:outline; width:100%; height:100%; max-height:64px; min-height:0; justify-self:center; }
+#game-shell .screen-target-layout > .screen-bars { grid-area:bars; align-content:space-between; }
+#game-shell .screen-target-layout.no-bars { grid-template-columns:minmax(0,1fr); grid-template-areas:"outline"; }
+#game-shell .screen-target-layout.no-bars .screen-bars { display:none; }
 #game-shell .cockpit-screen-target .screen-bars { gap:3px; }
 #game-shell .cockpit-screen-target.has-drone-telemetry .screen-drone-telemetry { height:40%; font-size:10px; line-height:1.05; padding:0 3px; }
 
 @media (max-height:520px) and (orientation:landscape) {
-  #game-shell .screen-bars > div { grid-template-columns:7ch minmax(20px,52px) 3ch; column-gap:2px; font-size:11px; }
+  #game-shell .screen-bars > div { grid-template-columns:2ch minmax(14px,1fr); column-gap:2px; font-size:11px; }
   #game-shell .screen-flight,
   #game-shell .screen-own-weapon { font-size:11px; }
   #game-shell .cockpit-screen-own,
@@ -16435,7 +16490,59 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #game-shell .screen-own-weapon:has(#screen-own-drone-pdc:not(.is-hidden)) { flex-wrap:nowrap; }
 #game-shell #screen-own-drone-pdc:not(.is-hidden) { display:none; }
 
-#game-shell .cockpit-screen-own:has(.screen-race-strip.is-visible,.screen-standoff.is-visible) .screen-ship-layout { grid-template-rows:auto auto auto 0; padding-bottom:16px; }
+#game-shell .cockpit-screen-own:has(.screen-race-strip.is-visible,.screen-standoff.is-visible) .screen-ship-layout { grid-template-rows:auto auto minmax(8px,1fr) auto 0; padding-bottom:16px; }
+
+/* Wing tactic cards hang off the HUD's TOP-RIGHT SCREEN EDGE — one per
+   wingman, at most two. Each card prints only its stance (AGG / DEF / OFF)
+   plus two slim fills: shield on top, hull below, so a glance answers both
+   "what are they flying" and "who is hurt". Tapping a card cycles that
+   wingman's order; Y cycles the whole crew. The rail is empty (and therefore
+   invisible) whenever no wing is flying. */
+#game-shell #hud-wing-tactics {
+  position:absolute; top:calc(var(--safe-top,0px) + 12px); right:max(8px, env(safe-area-inset-right)); z-index:16;
+  display:flex; flex-direction:column; gap:6px; align-items:flex-end;
+  pointer-events:none;
+}
+#game-shell #hud-wing-tactics:empty { display:none; }
+#game-shell #hud-wing-tactics .hud-wing-btn {
+  pointer-events:auto; position:relative;
+  display:flex; flex-direction:column; align-items:stretch; justify-content:center;
+  width:64px; min-height:44px; padding:4px 6px 5px;
+  border:1px solid rgba(124,255,255,.55); border-radius:5px;
+  background:rgba(10,26,34,.82); color:#dff6ff;
+  font-family:var(--pixel-font); line-height:1; letter-spacing:.04em;
+  cursor:pointer; touch-action:manipulation;
+}
+#game-shell #hud-wing-tactics .hud-wing-btn b {
+  order:3; margin-top:3px; font-size:11px; font-weight:700; color:#ffdb8e;
+  text-align:center; white-space:nowrap;
+}
+#game-shell #hud-wing-tactics .hud-wing-btn i {
+  display:block; height:4px; border:1px solid rgba(140,214,230,.4);
+  background:rgba(0,0,0,.55); overflow:hidden;
+}
+#game-shell #hud-wing-tactics .hud-wing-btn i b {
+  display:block; height:100%; margin:0;
+}
+#game-shell #hud-wing-tactics .hud-wing-btn .hud-wing-shield b { background:#59c8e8; }
+#game-shell #hud-wing-tactics .hud-wing-btn .hud-wing-hull b { background:#e8b359; }
+#game-shell #hud-wing-tactics .hud-wing-btn[data-wing-order="aggressive"] { border-color:rgba(255,192,70,.6); }
+#game-shell #hud-wing-tactics .hud-wing-btn[data-wing-order="defensive"] { border-color:rgba(124,255,255,.65); }
+#game-shell #hud-wing-tactics .hud-wing-btn[data-wing-order="breakoff"] { border-color:rgba(160,180,190,.5); }
+#game-shell #hud-wing-tactics .hud-wing-btn.is-powered-down { opacity:.45; filter:saturate(.4); }
+#game-shell #hud-wing-tactics .hud-wing-btn:active { filter:brightness(1.35); }
+/* The coarse-pointer/narrow pass moves the flight controls to a 3px edge
+   offset; the cards hold the same line there so both columns stay aligned. */
+@media (pointer: coarse), (max-width: 900px) {
+  #game-shell #hud-wing-tactics { right:3px; }
+}
+/* Short landscape phones: keep the cards inside the painted canopy without
+   starving the taps — slightly slimmer, still comfortably tappable. */
+@media (max-width:720px) and (orientation:landscape) {
+  #game-shell #hud-wing-tactics { top:calc(var(--safe-top,0px) + 8px); gap:5px; }
+  #game-shell #hud-wing-tactics .hud-wing-btn { width:58px; min-height:40px; padding:3px 5px 4px; }
+}
+
 
 /* Mount drive switches against the console rim. Account for the switch's
    26px minimum height on short phones instead of overlapping the first row. */
@@ -16474,7 +16581,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #game-shell[data-cockpit-ship="wayfarer"] .screen-heading > span { display:none; }
 #game-shell[data-cockpit-ship="wayfarer"] .screen-flight > div { display:flex; justify-content:space-between; gap:2px; }
 #game-shell[data-cockpit-ship="wayfarer"] .screen-flight small { display:none; }
-#game-shell[data-cockpit-ship="wayfarer"] .screen-bars > div { grid-template-columns:7ch minmax(12px,90px) 3ch; gap:2px; }
+#game-shell[data-cockpit-ship="wayfarer"] .screen-bars > div { grid-template-columns:2ch minmax(12px,56px) 3ch; gap:2px; }
 #game-shell[data-cockpit-ship="wayfarer"] .screen-bars > div,
 #game-shell[data-cockpit-ship="wayfarer"] .screen-flight,
 #game-shell[data-cockpit-ship="wayfarer"] .screen-own-weapon { font-size:clamp(11px,.9vw,14px); }
@@ -16482,6 +16589,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
  #game-shell[data-cockpit-ship="wayfarer"] .screen-bars > div,
  #game-shell[data-cockpit-ship="wayfarer"] .screen-flight,
  #game-shell[data-cockpit-ship="wayfarer"] .screen-own-weapon,
- #game-shell[data-cockpit-ship="wayfarer"] .screen-flight span[data-short]::before { font-size:10px; }
+ #game-shell[data-cockpit-ship="wayfarer"] .screen-flight span[data-short]::before,
+ #game-shell[data-cockpit-ship="wayfarer"] .screen-bars span[data-short]::before { font-size:10px; }
  #game-shell[data-cockpit-ship="wayfarer"] .screen-ship-layout { padding:2px 3px; grid-template-rows:auto auto auto 8px; }
 }

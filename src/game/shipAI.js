@@ -1,3 +1,4 @@
+import { stationApproach, reserveStationDock, updateStationDock } from './stationTraffic.js';
 // NPC ship AI hierarchy — task → interaction → behavior.
 //
 // Every ship runs a four-layer decision stack each frame, in this order:
@@ -84,7 +85,7 @@ const staleAt = (ship) => !ship.destination || dist2(ship.position, ship.destina
 // The per-ship route stream, keyed exactly like the old travel-AI re-roll so
 // each bucket is deterministic and the stream never touches aiRng/proxRng.
 const routeRng = (ship, session) => seededRandom(`${session.save.world.seed}:route:${ship.id}:${Math.floor(ship.lifetime / 20)}`);
-const dockPoint = (session, dock, rng) => [
+const dockPoint = (session, dock, rng) => stationApproach(dock) ?? [
     LOCATIONS[dock].position[0] + randomBetween(rng, -30, 30),
     LOCATIONS[dock].position[1] + randomBetween(rng, -20, 20),
     LOCATIONS[dock].position[2] + randomBetween(rng, -30, 30),
@@ -198,6 +199,7 @@ export const createSmuggleTask = (ship, session, port) => {
 // branch order of the old flat dispatch (patrol-engage → search → attack →
 // travel) and slots the task and interaction layers into the travel path.
 export function updateShipAI(session, ship, dt) {
+    if (updateStationDock(session, ship, dt)) return;
     // A captured hull and a powered-down surrender are inert: no task, no
     // interaction — the travel AI bleeds off their momentum.
     if (ship.captured || ship.poweredDown) {
@@ -272,7 +274,7 @@ export function updateShipAI(session, ship, dt) {
     }
     // Task layer: what the ship wants right now, yielding the travel waypoint.
     tickTask(ship, session);
-    session.updateTravelAI(ship, dt);
+    if (!updateStationDock(session, ship, dt)) session.updateTravelAI(ship, dt);
 }
 
 // ---------------------------------------------------------------------------
@@ -383,9 +385,18 @@ const legTick = (ship, session, task, nextLeg) => {
         ship.destination = nextLeg(ship, session, task);
         return;
     }
-    if (staleAt(ship)) {
+    const approach = stationApproach(task.port);
+    if (approach && !ship.stationDockCompleted) {
+        ship.destination = approach;
+        if (ship.stationQueue === task.port || Math.hypot(approach[0]-ship.position[0],approach[1]-ship.position[1],approach[2]-ship.position[2]) < 65) {
+            reserveStationDock(session, ship, task.port);
+        }
+        return;
+    }
+    if (ship.stationDockCompleted || staleAt(ship)) {
+        delete ship.stationDockCompleted;
         task.phase = 'dwell';
-        task.dwellUntil = time + 4 + routeRng(ship, session)() * 6;
+        task.dwellUntil = approach ? time : time + 4 + routeRng(ship, session)() * 6;
         task.dwellPoint = [...ship.position];
         ship.destination = task.dwellPoint;
         // Delivered the inbound hold: the stock lands on the exchange and

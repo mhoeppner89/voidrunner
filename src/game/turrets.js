@@ -149,11 +149,13 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
                         session.fireBeam(ownerId,laser,state.muzzle,state.direction,`${ownerId}-turret-${index}`);
                     }
                     session.renderer.spawnMuzzleFlash?.(state.muzzle.x,state.muzzle.y,state.muzzle.z,pdc?color:0x7cffff);
-                    if(pdc && now>=(state.soundAt??0)){
+                    if(now>=(state.soundAt??0)){
                         const offset=state.scratch.fromArray(actor.position).sub(state.local.fromArray(session.save.player.position));
                         const distance=offset.length();offset.applyQuaternion(state.turn.fromArray(session.save.player.rotation).invert());
-                        session.audio?.playAtDirection?.('pdc',0.25,distance,offset.x);
-                        state.soundAt=now+0.2;
+                        const sound = pdc ? 'pdc' : 'beam';
+                        if (player) session.audio?.playCockpit?.(sound, pdc ? .9 : .8);
+                        else session.audio?.playAtDirection?.(sound, .4, distance, offset.x);
+                        state.soundAt=now+(pdc ? .07 : .2);
                     }
                 }
             }

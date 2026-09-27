@@ -1,11 +1,11 @@
-import { orientDrone } from './droneFlight.js';
+import { orientDrone, rotateDroneTo } from './droneFlight.js';
 import { combatTargetEligible } from './combatTargeting.js';
 import {PDC_RECOVERY_SECONDS} from './pdcFireControl.js';
 import { DRONE_TYPES } from './droneData.js';
 
 export const PDC_DRONE_STEP = 1 / 60;
 export const PDC_DRONE_STATES = Object.freeze(['stowed', 'escorting', 'returning', 'destroyed']);
-const TYPE = DRONE_TYPES.pdc;
+const supportType = type => type === 'pdc' || type === 'attack' || type === 'repair';
 const ZERO = Object.freeze([0, 0, 0]);
 const vector = (v) => v != null && Number.isFinite(v[0])
     && Number.isFinite(v[1]) && Number.isFinite(v[2]);
@@ -22,7 +22,7 @@ function event(type, unit, extra) {
  * the fitting slot and handles wrecks. Never calls this merely because of age. */
 export function destroyPdcDrone(fleet, unitId, reason = 'damage') {
     const unit = Object.hasOwn(fleet.unitsById, unitId) ? fleet.unitsById[unitId] : null;
-    if (!unit || unit.type !== 'pdc' || unit.state === 'destroyed') return null;
+    if (!unit || !supportType(unit.type) || unit.state === 'destroyed') return null;
     unit.hull = 0;
     unit.state = 'destroyed';
     unit.phaseTime = 0;
@@ -39,6 +39,7 @@ function attach(unit, point, fallbackVelocity, dt = 0) {
 
 // Accelerate/brake in the moving anchor frame, reusing canonical arrays.
 function travel(unit, point, fallbackVelocity, dt) {
+    const TYPE = DRONE_TYPES[unit.type];
     const p = unit.position, v = unit.velocity, tv = point.velocity ?? fallbackVelocity;
     const dx = point.position[0] - p[0], dy = point.position[1] - p[1], dz = point.position[2] - p[2];
     const distance = Math.hypot(dx, dy, dz);
@@ -81,6 +82,7 @@ function impactTime(threat, position, velocity, radius) {
 }
 
 function aim(unit, threat, direction) {
+    const TYPE = DRONE_TYPES[unit.type];
     const dx = threat.position[0] - unit.position[0], dy = threat.position[1] - unit.position[1], dz = threat.position[2] - unit.position[2];
     const vx = threat.velocity[0] - unit.velocity[0], vy = threat.velocity[1] - unit.velocity[1], vz = threat.velocity[2] - unit.velocity[2];
     const time = firstRoot(vx * vx + vy * vy + vz * vz - TYPE.projectileSpeed ** 2,
@@ -182,7 +184,7 @@ export function createPdcDroneController() {
         for (const id in fleet.unitsById) {
             if (!Object.hasOwn(fleet.unitsById, id)) continue;
             const unit = fleet.unitsById[id];
-            if (unit.type === 'pdc' && unit.state !== 'destroyed'
+            if (supportType(unit.type) && unit.state !== 'destroyed'
                 && (equipped.has(id) || unit.state !== 'stowed')) orderedIds.push(id);
         }
         orderedIds.sort();
@@ -194,7 +196,8 @@ export function createPdcDroneController() {
                 events.push(destroyPdcDrone(fleet, id));
                 continue;
             }
-            const hasAmmo = Number.isSafeInteger(unit.ammo) && unit.ammo > 0;
+            const TYPE = DRONE_TYPES[unit.type];
+            const hasAmmo = unit.type === 'repair' || Number.isSafeInteger(unit.ammo) && unit.ammo > 0;
             if (hasAmmo) unit.pdcEmptyReported = false;
             else if (!unit.pdcEmptyReported) {
                 unit.pdcEmptyReported = true;
@@ -203,7 +206,7 @@ export function createPdcDroneController() {
             unit.fireCooldown = Math.max(0, (Number.isFinite(unit.fireCooldown) ? unit.fireCooldown : 0) - dt);
             const anchors = context.getBayAnchors ? context.getBayAnchors(unit, context) : context.bayAnchors?.[id];
             const escort = context.getEscortAnchor ? context.getEscortAnchor(unit, context) : context.escortAnchors?.[id];
-            const defend = fleet.pdcPolicy === 'defend' && context.inFlight && equipped.has(id) && hasAmmo;
+            const defend = (unit.type !== 'pdc' || fleet.pdcPolicy === 'defend') && !unit.recallRequested && context.inFlight && equipped.has(id) && hasAmmo;
             if (!defend) recall(unit, events, !hasAmmo ? 'empty' : !equipped.has(id) ? 'unequipped'
                 : !context.inFlight ? 'flight-ended' : 'policy');
             if (unit.state === 'stowed') {
@@ -212,6 +215,7 @@ export function createPdcDroneController() {
                 unit.velocity ??= [0, 0, 0];
                 unit.rotation ??= [0, 0, 0, 1];
                 attach(unit, anchors.dock, context.shipVelocity);
+                unit.repairReturnDone = false;
                 unit.portStage = 'launch';
                 unit.state = 'escorting';
                 unit.phaseTime = 0;
@@ -221,17 +225,31 @@ export function createPdcDroneController() {
             if (!vector(unit.position) || !vector(unit.velocity)) continue;
             unit.phaseTime = (Number.isFinite(unit.phaseTime) ? unit.phaseTime : 0) + dt;
             const returning = unit.state === 'returning';
+            unit.repairing = false;
+            if (unit.type === 'repair' && (returning || !defend || unit.portStage)) { unit.repairAttached = false; unit.repairContactTime = 0; unit.repairWorkTime = 0; unit.repairMoveStage = null; }
             if (returning) unit.recallTime = (Number.isFinite(unit.recallTime) ? unit.recallTime : 0) + dt;
-            const point = returning ? (unit.portStage === 'enter' ? anchors?.dock : anchors?.launch)
+            if (returning && unit.type === 'repair' && !unit.repairReturnDone && !unit.repairReturnStage) {
+                unit.repairReturnStage = 'lift';
+                continue;
+            }
+            const point = returning && unit.repairReturnStage ? escort : returning ? (unit.portStage === 'enter' ? anchors?.dock : anchors?.launch)
                 : unit.portStage === 'launch' ? anchors?.launch : escort;
-            const arrived = pointValid(point) && travel(unit, point, context.shipVelocity, dt);
-            orientDrone(unit, dt, context.shipVelocity, point, returning || unit.portStage === 'launch');
+            const latched = unit.type === 'repair' && unit.repairAttached && defend && !returning;
+            const arrived = pointValid(point) && (latched ? (attach(unit, point, context.shipVelocity, dt), true) : travel(unit, point, context.shipVelocity, dt));
+            if (!latched) orientDrone(unit, dt, context.shipVelocity, point, returning || unit.portStage === 'launch');
             if (!returning && arrived && unit.portStage === 'launch') unit.portStage = null;
             const stepEvent = context.onUnitStep?.(unit, dt, context);
             if (stepEvent) events.push(stepEvent);
             if (fleet.unitsById[id] !== unit || unit.state === 'destroyed') continue;
             if (!Number.isFinite(unit.hull) || unit.hull <= 0) {
                 events.push(destroyPdcDrone(fleet, id));
+                continue;
+            }
+            if (returning && unit.repairReturnStage) {
+                if (arrived) {
+                    if ((unit.repairSite ?? 0) !== 0) unit.repairSite = (unit.repairSite + 1) % 8;
+                    else { unit.repairReturnStage = null; unit.repairReturnDone = true; }
+                }
                 continue;
             }
             if (returning) {
@@ -245,10 +263,42 @@ export function createPdcDroneController() {
                 }
                 continue;
             }
-            if (!defend || unit.state !== 'escorting' || !pointValid(escort) || unit.fireCooldown > 1e-10) continue;
+            if (unit.type === 'repair') {
+                // Lift off before crossing to the next patch so the drone never
+                // slides through the hull. Recall still takes precedence above.
+                if (unit.repairMoveStage && arrived && point === escort) {
+                    if (unit.repairMoveStage === 'lift') {
+                        unit.repairSite = ((unit.repairSite ?? 0) + 1) % 8;
+                        unit.repairMoveStage = 'cross';
+                    } else unit.repairMoveStage = null;
+                    continue;
+                }
+                if (unit.repairMoveStage) continue;
+                if (defend && !unit.portStage && point === escort && arrived && escort.rotation) {
+                    unit.repairAttached = true;
+                    unit.thrust = 0;
+                    if ((unit.repairContactTime ?? 0) > .25) {
+                        for (let axis=0;axis<4;axis++) unit.rotation[axis]=escort.rotation[axis];
+                    } else rotateDroneTo(unit, dt, escort.rotation);
+                    const alignment = Math.abs(unit.rotation.reduce((sum,value,axis)=>sum+value*escort.rotation[axis],0));
+                    if (alignment > .995) unit.repairContactTime = (unit.repairContactTime ?? 0) + dt;
+                    if (unit.repairContactTime > .25) context.repairHull?.(unit, dt);
+                    if (unit.repairing) unit.repairWorkTime = (unit.repairWorkTime ?? 0) + dt;
+                    if (unit.repairWorkTime >= 3) {
+                        unit.repairWorkTime = 0;
+                        unit.repairContactTime = 0;
+                        unit.repairAttached = false;
+                        unit.repairing = false;
+                        unit.repairMoveStage = 'lift';
+                    }
+                }
+                continue;
+            }
+            if (!defend || unit.portStage || unit.state !== 'escorting' || !pointValid(escort) || unit.fireCooldown > 1e-10) continue;
 
             let best = null, bestImpact = Infinity, bestFlight = Infinity;
             for (const threat of context.threats) {
+                if (unit.type !== 'pdc') break;
                 if (context.defenseChannel?.readyAt > context.now) break;
                 if (!threat || !idValid(threat.id) || threat.hostile !== true
                     || (threat.kind !== 'missile' && threat.kind !== 'torpedo')
@@ -278,6 +328,7 @@ export function createPdcDroneController() {
             if (!best) {
                 let nearest = TYPE.attackRange ** 2;
                 for (const ship of context.opponents ?? []) {
+                    if (unit.type === 'attack' && ship?.id !== context.attackTargetId) continue;
                     if (!ship || !idValid(ship.id) || ship.hostile !== true || !combatTargetEligible(ship)
                         || ship.race || !vector(ship.position) || !vector(ship.velocity)) continue;
                     const dx=ship.position[0]-unit.position[0], dy=ship.position[1]-unit.position[1], dz=ship.position[2]-unit.position[2];

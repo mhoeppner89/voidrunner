@@ -12,6 +12,39 @@
 // Player address is informal "du" throughout, matching the frontier voice of
 // the English lines. Values are plain text — never HTML.
 export const DE_CATALOG = {
+    'LAUNCHER FIRING': 'RAKETENFEUER',
+    'ALTERNATING': 'ABWECHSELND',
+    'TOGETHER': 'GEMEINSAM',
+    'SELECTED RACK ONLY': 'NUR GEWÄHLTER WERFER',
+    'LAUNCHERS EMPTY': 'WERFER LEER',
+    'LAUNCHERS RELOADING': 'WERFER LADEN NACH',
+    'MISSILE TARGET OUT OF RANGE': 'RAKETENZIEL AUSSER REICHWEITE',
+    'Alternating fires the next ready rack per press. Together fires all ready racks. L or the launcher readout selects a rack. Each rack reloads independently.': 'Abwechselnd feuert pro Tastendruck der nächste bereite Werfer. Gemeinsam feuern alle bereiten Werfer. L oder die Werferanzeige wählt einen Werfer. Jeder lädt unabhängig nach.',
+
+    'ATTACK DRONE EMPTY · RETURNING': 'ANGRIFFSDROHNE LEER · RÜCKKEHR',
+    'Drone ammunition': 'Drohnenmunition',
+    'Cargo hold full.': 'Frachtraum voll.',
+    'DRONE CARGO': 'DROHNENFRACHT',
+    'ATTACK': 'ANGRIFF',
+    'STOW': 'EINHOLEN',
+    'spare': 'Reserve',
+    'mass': 'Masse',
+    'SELL SPARE': 'RESERVE VERKAUFEN',
+    'up to': 'bis zu',
+    'Empty bay': 'Leere Bucht',
+    'RECALL MINERS': 'ABBAUDROHNEN EINHOLEN',
+    'Returning, then {role}. Resume flight to complete.': 'Rückkehr, danach {role}. Setze den Flug fort, um den Wechsel abzuschließen.',
+    'Drone lost.': 'Drohne verloren.',
+    'Every owned drone uses 1 cargo space, reserved while deployed. Select a bay role to load stored drones. Switching recalls that bay first.': 'Jede Drohne belegt 1 Frachtraum, auch im Einsatz. Wähle eine Buchtrolle, um Reserven zu laden. Beim Wechsel kehren zuerst die Drohnen dieser Bucht zurück.',
+    'Repair drones restore your hull using energy. Attack drones pursue your selected hostile within 450 km. PDC drones defend against missiles first.': 'Reparaturdrohnen reparieren deine Hülle mit Energie. Angriffsdrohnen verfolgen dein gewähltes feindliches Ziel im Umkreis von 450 km. PDC-Drohnen wehren zuerst Raketen ab.',
+
+    '+50% target range · +50% scan range': '+50 % Zielreichweite · +50 % Scanreichweite',
+    'DRIVE RECOVERY · {seconds}s': 'ANTRIEB LÄDT · {seconds}s',
+    'PURSUIT · HOSTILES FOLLOWING': 'VERFOLGUNG · FEINDE FOLGEN',
+    'PURSUERS ARRIVING': 'VERFOLGER TREFFEN EIN',
+    'DEPARTURE · AUTOMATIC': 'START · AUTOMATIK',
+    'LANDING · AUTOMATIC': 'LANDUNG · AUTOMATIK',
+    'DEPARTURE COMPLETE': 'START ABGESCHLOSSEN',
  'Includes a full magazine.': 'Inklusive vollem Magazin.',
  'Restore 50% hull and refill missiles.': 'Stellt 50 % Hülle wieder her und füllt Raketen auf.',
  'More speed; a small turning penalty.': 'Mehr Geschwindigkeit, nur ein kleiner Wendigkeitsverlust.',
@@ -1241,6 +1274,7 @@ export const DE_CATALOG = {
     'Unidentified vessel escaped inspection. Local patrols are alert.': 'Schiff ohne Kennung entkam der Kontrolle. Örtliche Patrouillen sind alarmiert.',
     'PATROL HAIL · TRANSMIT ID · SLOW BELOW {speed}': 'PATROUILLENRUF · ID SENDEN · UNTER {speed} ABBREMSEN',
     'INSPECTION COMPLETE · MANIFEST CLEAR': "KONTROLLE ABGESCHLOSSEN · FRACHT UNBEDENKLICH",
+    'LANDING PERMITTED · {location} · FOLLOW LIGHTS': 'LANDUNG FREI · {location} · DEN LICHTERN FOLGEN',
     'DOCKING DENIED · TRANSPONDER REQUIRED': 'ANDOCKEN VERWEIGERT · TRANSPONDER NÖTIG',
     'TRANSMIT ID TO DOCK': "ZUM ANDOCKEN KENNUNG SENDEN",
     'CONTACT TOO WEAK TO LOCK': 'KONTAKT ZU SCHWACH FÜR ZIELERFASSUNG',
@@ -1818,7 +1852,7 @@ export const DE_CATALOG = {
     'WEAPON': 'WAFFE',
     'Long-Baseline Radar': "Langstreckenradar",
     'Improves target acquisition, scan range, and threat classification.': 'Verbessert Zielerfassung, Scanreichweite und Feindklassifizierung.',
-    '+25% target range · +50% scan range': '+25 % Zielreichweite · +50 % Scanreichweite',
+    '+50% target range · +50% scan range': '+25 % Zielreichweite · +50 % Scanreichweite',
     'RADAR': 'RADAR',
     'External Cargo Pods': 'Externe Frachtcontainer',
     'Armored modular pods mounted along the lower keel.': "Gepanzerte Frachtcontainer für die Unterseite des Schiffs.",
@@ -2285,7 +2319,7 @@ export const DE_CATALOG = {
     'Segmented sacrificial plating around the pressure hull.': "Äußere Panzerplatten nehmen Treffer auf und schützen so die Schiffshülle.",
     '+40 hull integrity': '+40 Hüllenintegrität',
     'A longer baseline sensor array that finds contacts and survey signatures before they find you.': "Ein leistungsfähiges Radarsystem, das Kontakte und Lagerstätten auf größere Entfernung erkennt.",
-    '+25% radar · +50% scan range': '+25 % Radar · +50 % Scanreichweite',
+    '+50% radar · +50% scan range': '+50 % Radar · +50 % Scanreichweite',
     'Armored external pods that add room for a profitable haul without changing the ship’s core hold.': "Gepanzerte Außencontainer schaffen zusätzlichen Frachtraum.",
     'A resonant lance that exposes richer seams while wasting less heat on fractured rock.': "Ein effizienter Abbaustrahl, der Erz schneller aus dem Gestein löst.",
     '+70% mining rate': '+70 % Abbaurate',
@@ -2554,6 +2588,66 @@ Object.assign(DE_CATALOG, {
 
 Object.assign(DE_CATALOG, {'Best score':'Bester Punktestand'});
 
+// 0.8.2cu — Wingman roster and standing orders.
+Object.assign(DE_CATALOG, {
+    "Wing order": "Flügelbefehl",
+    "Wing order: {order}": "Flügelbefehl: {order}",
+    "Or keep {ship} and add one of these veterans": "Oder behalte {ship} und nimm einen dieser Veteranen",
+    "Veteran pilot": "Veteran",
+    "That pilot is no longer on the roster.": "Dieser Pilot steht nicht mehr zur Auswahl.",
+    "Press Y or tap": "Y drücken oder tippen",
+    "WING": "FLÜGEL",
+    "AGGRESSIVE": "AGGRESSIV",
+    "DEFENSIVE": "DEFENSIV",
+    "BREAK OFF": "ABBRECHEN"
+});
+
+// 0.8.2cw — Wing orders reach the campaign.
+Object.assign(DE_CATALOG, {
+    "I am on your wing now. Aggressive, defensive or break off — press Y or tap my wing card at the top right to change my orders.": "Ich fliege jetzt an deinem Flügel. Aggressiv, defensiv oder abdrehen – drücke Y oder tippe oben rechts auf meine Flügelkarte, um meine Befehle zu ändern.",
+    "WING ORDERS · Y or the wing cards at the top right cycle aggressive, defensive and break off": "FLÜGELBEFEHLE · Y oder die Flügelkarten oben rechts wechseln zwischen aggressiv, defensiv und abbrechen",
+    "{name} to {order}": "{name} auf {order}",
+    "{name} breaks to {order}": "{name} dreht ab auf {order}"
+});
+
+// 0.8.2cx — The wing switch moves onto the own-ship monitor, and the ship
+// menu gains the same three orders. Abbreviations are one letter per bar, or
+// the order code the monitor plaque prints in its narrow column.
+Object.assign(DE_CATALOG, {
+    "WING ORDERS": "FLÜGELBEFEHLE",
+    "AGG": "AGGR",
+    "DEF": "DEF",
+    "OFF": "AUS",
+    "Hull breach — I am dark and drifting. Finish them and I will bring the Second Light back up.": "Hüllenbruch – ich bin dunkel und treibe. Mach sie fertig, dann fahre ich die Second Light wieder hoch.",
+    "{name} is disabled. She is out of the fight until the last opponent is beaten.": "{name} ist kampfunfähig. Sie bleibt draußen, bis der letzte Gegner besiegt ist.",
+    "Reactors are back. That one hull weld is all I have left — my shielding has to cover us both.": "Reaktoren laufen wieder. Mehr als diese eine Rumpfnaht habe ich nicht mehr – mein Schild muss uns beide decken."
+});
+
+// 0.8.2cv — Range-gated wing orders.
+Object.assign(DE_CATALOG, {
+    "Engages hostiles within 1000 km of you and returns to formation past 1500 km.": "Greift Gegner innerhalb von 1000 km um dich an und kehrt ab 1500 km in die Formation zurück.",
+    "Engages your target within 600 km and returns to formation past 1000 km.": "Greift dein Ziel innerhalb von 600 km an und kehrt ab 1000 km in die Formation zurück.",
+    "Runs out of the fight and stays clear until you call it back.": "Verlässt den Kampf und bleibt auf Abstand, bis du ihn zurückrufst."
+});
+
+// 0.8.2ct — Arena Run hull pool and hired wingmen.
+Object.assign(DE_CATALOG, {
+    "Keep {ship} · veteran wingman": "{ship} behalten · Veteran als Flügelmann",
+    "A random veteran flies on your wing until shot down, fitted for their hull.": "Ein zufälliger Veteran fliegt an deiner Seite, bis er abgeschossen wird. Seine Ausrüstung passt zu seinem Schiff.",
+    "A second veteran joins your wing; both fly with you until shot down.": "Ein zweiter Veteran stößt zu deinem Flügel; beide fliegen mit, bis sie abgeschossen werden.",
+    "On your wing": "An deiner Seite",
+    "Veteran wingman hired: {ship} · {name}": "Veteran als Flügelmann angeheuert: {ship} · {name}",
+    "Wingman lost: {ship} · {name}": "Flügelmann verloren: {ship} · {name}",
+    "Your wing is already at full strength.": "Dein Flügel ist bereits vollständig.",
+    "That hull cannot take your forward guns. Choose another.": "Dieses Schiff kann deine Bugwaffen nicht aufnehmen. Wähle ein anderes.",
+    "The hulls on offer change with the wave. Keeping your ship adds a veteran wingman instead.": "Die angebotenen Schiffe wechseln mit der Welle. Behältst du dein Schiff, erhältst du stattdessen einen Veteran als Flügelmann.",
+    "Two light guns and a launcher rack; blistering speed, thin shielding.": "Zwei leichte Bugwaffen und ein Raketenmagazin. Extrem schnell, kaum Schild.",
+    "Two medium guns and a missile rack; an agile frontline fighter.": "Zwei mittlere Bugwaffen und ein Raketenmagazin. Wendiger Frontjäger.",
+    "Two medium guns, two launcher racks and a turret; a heavy striker.": "Zwei mittlere Bugwaffen, zwei Raketenmagazine und ein Turm. Schwerer Angreifer.",
+    "Two forward guns, a launcher and a turret; deep and slow.": "Zwei Bugwaffen, ein Raketenmagazin und ein Turm. Großer Laderaum, wenig Tempo.",
+    "A light and a medium gun mount plus a launcher; a long-range cutter.": "Ein leichter und ein mittlerer Waffenplatz plus ein Raketenmagazin. Kutter für weite Strecken."
+});
+
 Object.assign(DE_CATALOG, {"Efficient fire; lead your target.": "Effizientes Dauerfeuer. Du musst vorhalten.", "Strong against hull; short range.": "Stark gegen die Hülle, aber kurze Reichweite.", "Partly bypasses shields; slow firing.": "Durchdringt Schilde teilweise. Feuert langsam.", "Disables exposed systems; short range.": "Legt ungeschützte Systeme kurz lahm. Kurze Reichweite.", "Explosive area damage; slow projectiles.": "Explosionen treffen mehrere Ziele. Langsame Geschosse.", "Automatically intercepts incoming missiles.": "Fängt anfliegende Raketen automatisch ab.", "Automatically fires at your selected hostile.": "Feuert automatisch auf dein ausgewähltes feindliches Ziel.", "More speed; slower turning.": "Höheres Tempo, dafür langsamere Wendemanöver.", "Sharper turns; lower top speed.": "Engere Kurven, dafür weniger Höchstgeschwindigkeit.", "Larger energy reserve; slower recharge.": "Mehr Energievorrat, dafür langsameres Aufladen.", "Faster recharge; smaller reserve.": "Schnelleres Aufladen, dafür weniger Energievorrat.", "More shield protection.": "Verstärkt deine Schilde.", "Faster recovery; weaker shield.": "Erholt sich schneller, hält aber weniger aus.", "Replaces {items}": "Ersetzt {items}", "Fits an empty mount": "Wird auf einem freien Platz eingebaut", "Equip and continue": "Einbauen und weiter", "Equip and adjust": "Einbauen und anpassen", "Repair and continue": "Reparieren und weiter"});
 
 Object.assign(DE_CATALOG, {
@@ -2782,4 +2876,22 @@ Object.assign(DE_CATALOG, {
     'They take the toll and leave. Fight and they open fire.': 'Sie nehmen den Wegzoll und drehen ab. Wer kämpft, bekommt ihr Feuer.',
     'They take the cargo and leave. Fight and they open fire.': 'Sie nehmen die Fracht und drehen ab. Wer kämpft, bekommt ihr Feuer.',
     'Credit short by {credits}. Jettison cargo or fight.': 'Es fehlen {credits} Guthaben. Fracht abwerfen oder kämpfen.',
+});
+
+// 0.8.2cy — The wing switch sits in both monitors' top-right corner, the bars
+// lose their numeric readouts, the hull schematics return, and the target
+// heading prints one clear word for what the locked ship is doing.
+Object.assign(DE_CATALOG, {
+    'ATTACKING': 'GREIFT AN',
+    'EVADE': 'AUSWEICHEN',
+    'BREAKING': 'DREHT AB',
+    'HUNT': 'AUF JAGD',
+    'FLEE': 'AUF DER FLUCHT',
+    'TRADING': 'HANDELT',
+    'ADRIFT': 'TREIBT',
+    'YIELDING': 'GIBT AUF',
+    'OFFLINE': 'AUSGEFALLEN',
+    'MINING': 'BAUT AB',
+    'ARREST': 'FESTNAHME',
+    'TRANSIT': 'UNTERWEGS',
 });

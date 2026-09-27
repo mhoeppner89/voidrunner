@@ -171,8 +171,8 @@ const itemRecords = [
     {
         id: 'radar-mk2', name: 'Long-Baseline Radar', category: 'utility', size: 'S', sizes: ['S', 'M'],
         price: 5400,
-        description: 'A longer baseline sensor array that finds contacts and survey signatures before they find you.', stat: '+25% radar · +50% scan range',
-        effects: { radarMultiplier: 1.25, scanMultiplier: 1.5 }, availability: ['helix', 'azure'],
+        description: 'A longer baseline sensor array that finds contacts and survey signatures before they find you.', stat: '+50% radar · +50% scan range',
+        effects: { radarMultiplier: 1.5, scanMultiplier: 1.5 }, availability: ['helix', 'azure'],
         art: './art/outfitting/radar-mk2.webp',
     },
     {

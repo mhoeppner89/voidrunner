@@ -26,7 +26,7 @@ function inspect(player) {
         const type = DRONE_TYPES[unit.type];
         if (!Number.isFinite(unit.hull) || unit.hull <= 0 || unit.hull > type.maxHull
             || unit.state === 'destroyed'
-            || (unit.type === 'pdc' && (!Number.isSafeInteger(unit.ammo)
+            || (type.magazineCapacity && (!Number.isSafeInteger(unit.ammo)
                 || unit.ammo < 0 || unit.ammo > type.magazineCapacity)))
             return fail('invalid-unit');
         if (/^drone-unit-\d+$/.test(id)) {
@@ -123,7 +123,7 @@ export function quoteDroneService(player, options = {}) {
         if (missingHull > 0) lines.push({ kind: 'repair', unitId: id, type: unit.type,
             quantity: missingHull, unitPrice: DRONE_RULES.repairPricePerHull,
             cost: Math.ceil(missingHull * DRONE_RULES.repairPricePerHull) });
-        if (unit.type === 'pdc' && unit.ammo < type.magazineCapacity) {
+        if (type.magazineCapacity && unit.ammo < type.magazineCapacity) {
             const quantity = type.magazineCapacity - unit.ammo;
             lines.push({ kind: 'rounds', unitId: id, type: unit.type,
                 quantity, unitPrice: type.roundPrice, cost: quantity * type.roundPrice });

@@ -37,8 +37,8 @@ const setPrice = (world, locationId, commodityId, price, supply = 50) => {
     assert.equal(quote.total, 500);
     assert.equal(quote.massDelta, 5);
     assert.equal(quote.postCredits, 500);
-    assert.equal(quote.postCargoMass, 5);
-    assert.equal(quote.postCargoFreeMass, 27);
+    assert.equal(quote.postCargoMass, 7);
+    assert.equal(quote.postCargoFreeMass, 25);
     assert.equal(quote.failureReason, null);
     assert.equal(JSON.stringify({ credits: save.player.credits, cargo: save.player.cargo, item: save.world.market.helix.food }), before, 'quote does not mutate the save');
     const result = buyCommodity(save, 'helix', 'food', 5);

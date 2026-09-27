@@ -1,3 +1,4 @@
+import { createShipExplosion, createHullDebris } from './explosionFx.js';
 import { skipHiddenWorldMatrices, markAttributeSpan } from './renderWork.js';
 import { DRONE_PORTS } from './droneFlight.js';
 import {cockpitDamageStage} from './cockpitDamage.js';
@@ -12,6 +13,11 @@ import { createVoxelShipModel, createVoxelStationModel, paletteForFaction, shipV
 import { clamp, seededRandom } from './random.js';
 import { GRAVEYARD_MODEL_WRECKS, getAsteroidBaseMeshes, getGraveyardGeometry, getWreckNodeGeometry, wreckNodeVisualScale } from './worldData.js';
 import { loadGlb } from './glbLoader.js';
+import { paintShipMaterial, shipPaintFrames } from './shipLivery.js';
+import { addStationOccupants, STATION_OCCUPANTS } from './stationOccupants.js';
+import { addStationActivity, updateStationActivity } from './stationActivity.js';
+import { playerBerth } from './playerDocking.js';
+import { stationVisualSurfaceRadius } from './stationTraffic.js';
 import { LaserFx } from './laserFx.js';
 const tupleToVector = (tuple, out = new THREE.Vector3()) => out.set(tuple[0], tuple[1], tuple[2]);
 const NEG_Z = new THREE.Vector3(0, 0, -1);
@@ -446,6 +452,7 @@ export class SpaceRenderer {
         this.createNebulae(seed, this.sceneQuality);
         this.createFieldDust(seed, this.sceneQuality);
         this.createLocations();
+        this.createLandingGuide();
         // Other systems stay resident for fast jumps, but contribute no pixels.
         for (const root of this.locationMeshes.values()) skipHiddenWorldMatrices(root);
         this.createAsteroids();
@@ -689,6 +696,24 @@ export class SpaceRenderer {
             cache.set(key, texture);
         }
         return texture;
+    }
+    weaponCloudTexture(kind = 'smoke') {
+        const cache=this.radialTextureCache??=new Map(),key=`weapon-cloud:${kind}`;
+        if(cache.has(key))return cache.get(key);
+        const size=128,data=new Uint8Array(size*size*4);
+        const hash=(x,y)=>{let n=Math.imul(x,374761393)^Math.imul(y,668265263);n=Math.imul(n^(n>>>13),1274126177);return ((n^(n>>>16))>>>0)/4294967295;};
+        const noise=(x,y)=>{const ix=Math.floor(x),iy=Math.floor(y);let a=x-ix,b=y-iy;a=a*a*(3-2*a);b=b*b*(3-2*b);return (hash(ix,iy)*(1-a)+hash(ix+1,iy)*a)*(1-b)+(hash(ix,iy+1)*(1-a)+hash(ix+1,iy+1)*a)*b;};
+        for(let y=0;y<size;y++)for(let x=0;x<size;x++) {
+            const u=(x+.5)/size*2-1,v=(y+.5)/size*2-1,r=Math.hypot(u,v);
+            const turbulence=.18+.55*noise(u*3+7,v*3+4)+.3*noise(u*7+13,v*7+9)+.15*noise(u*15+21,v*15+16);
+            const edge=Math.max(0,1-r),i=(y*size+x)*4;
+            let alpha=edge*edge*Math.max(.05,turbulence);
+            if(kind==='ion')alpha=Math.exp(-Math.pow((r-.57-Math.sin(Math.atan2(v,u)*7)*.045)/.075,2))*.65+edge**5*.5;
+            if(kind==='plasma')alpha=edge**1.5*Math.max(.08,turbulence);
+            data[i]=255;data[i+1]=255;data[i+2]=255;data[i+3]=Math.round(Math.min(1,alpha)*255);
+        }
+        const texture=new THREE.DataTexture(data,size,size);texture.magFilter=THREE.LinearFilter;texture.minFilter=THREE.LinearFilter;
+        texture.needsUpdate=true;texture.userData.shared=true;cache.set(key,texture);return texture;
     }
     createGalacticBand() {
         // The artwork carries real per-pixel alpha: its luminous clouds and
@@ -1504,8 +1529,19 @@ export class SpaceRenderer {
             if (this.stationModelLoads.has(id)) continue;
             const root = this.locationMeshes.get(id);
             if (!root) continue;
-            const pending = loadGlb(`assets/models/stations/${id}.glb`).then(model => {
+            const pending = loadGlb(`assets/models/stations/${id}.glb`).then(async model => {
+                try { await addStationOccupants(model, id, undefined, hull => {
+                    // Parked civilian hulls must match the flying entity beside them.
+                    if (hull.startsWith('concord-')) return undefined;
+                    const variant = ({wayfarer:'kestrel',vanguard:'warden',atlas:'atlas-freighter'})[hull] ?? hull;
+                    const spec = GLB_SHIP_CONFIG[variant];
+                    const radius = STATION_OCCUPANTS[id].radius;
+                    const worldScale = LOCATIONS[id].radius * (id === 'blackglass' ? .2 : .95) / radius;
+                    return spec.scale * npcShipScaleForVariant(variant) * (variant === 'atlas-freighter' ? .92 : 1) / worldScale;
+                }); }
+                catch (error) { console.warn(`Station ${id} dock occupants unavailable.`, error); }
                 if (this.disposed) { this.disposeObject(model); return; }
+                addStationActivity(model, id);
                 // Blender authors a 100-unit bounding sphere. Keep every part
                 // within the existing collision envelope and docking distance.
                 model.scale.setScalar(LOCATIONS[id].radius * 0.95 / 100);
@@ -1533,8 +1569,11 @@ export class SpaceRenderer {
                     if (old.name === 'blackglass-moon') continue;
                     root.remove(old); this.disposeObject(old);
                 }
-                // Helix/Rook's primitive fallbacks use a tenfold root scale.
+                // Helix/Rook's primitive fallbacks use a tenfold root scale
+                // and visual-only rotation. The authored GLBs and dock specs
+                // share their own unrotated local frame.
                 root.scale.setScalar(1);
+                root.rotation.set(0, 0, 0);
                 if (id === 'helix') this.helixRotor = null;
                 root.add(model);
                 this.tagTargetable(root, 'location', id);
@@ -3380,6 +3419,12 @@ export class SpaceRenderer {
     ensureGlbShipModel(variant) {
         if (this.glbShipModels.has(variant) || this.glbShipLoading.has(variant))
             return;
+        // A previously failed fetch parked no cache entry; hold the retry back
+        // briefly (and back off per attempt) so an outage cannot turn the
+        // per-frame sync into a request storm.
+        const retryAt = this.glbRetryAt?.get(variant) ?? 0;
+        if (performance.now() < retryAt)
+            return;
         const config = GLB_SHIP_CONFIG[variant];
         if (!config)
             return;
@@ -3391,11 +3436,20 @@ export class SpaceRenderer {
                 }
                 const ready = this.prepareGlbShip(model, config, variant);
                 this.glbShipModels.set(variant, ready);
+                this.glbRetryCount?.delete(variant);
                 return ready;
             })
             .catch((error) => {
+                // A transient failure (offline flurries, captive portals, server
+                // hiccups) must not weld the placeholder shut for the session:
+                // drop the cache entry so the next sync retries the fetch after
+                // the back-off delay.
                 console.warn(`GLB hull ${variant} (${config.path ?? config.file}) failed to load; using voxels.`, error);
-                this.glbShipModels.set(variant, null);
+                this.glbShipModels.delete(variant);
+                this.glbShipLoading.delete(variant);
+                const attempts = (this.glbRetryCount?.get(variant) ?? 0) + 1;
+                (this.glbRetryCount ??= new Map()).set(variant, attempts);
+                (this.glbRetryAt ??= new Map()).set(variant, performance.now() + Math.min(2000 * 2 ** (attempts - 1), 30000));
                 return null;
             });
         this.glbShipLoading.set(variant, promise);
@@ -3425,15 +3479,19 @@ export class SpaceRenderer {
         const tint = new THREE.Color(palette.hull);
         const emissiveMaterials = [];
         const tintedMaterials = new Map();
+        const paintFrames = entity.race ? null : shipPaintFrames(group, variant);
         group.traverse((child) => {
             if (child.material instanceof THREE.MeshStandardMaterial) {
                 const source = child.material;
-                const cached = tintedMaterials.get(source);
+                const paintFrame = paintFrames?.get(child);
+                const paintKey = source.uuid + (paintFrame?.elements.join(',') ?? '');
+                const cached = tintedMaterials.get(paintKey);
                 if (cached) { child.material = cached; return; }
                 const material = source.clone();
-                tintedMaterials.set(source, material);
+                tintedMaterials.set(paintKey, material);
                 const isCanopy = material.name.startsWith('VR_Canopy_');
-                if (!config.preserveColor && !isCanopy)
+                const factionPaint = !entity.race && paintShipMaterial(material, entity.livery ?? entity.faction, paintFrame, variant);
+                if (!factionPaint && entity.livery !== "original" && !config.preserveColor && !isCanopy)
                     material.color.copy(tint).lerp(new THREE.Color(0xffffff), 0.45);
                 if (entity.race && !isCanopy) {
                     // A low self-lit wash keeps the custom race paint readable
@@ -3490,6 +3548,7 @@ export class SpaceRenderer {
     // release per-ship materials and any uncached flare maps. Shared assets remain
     // alive until renderer shutdown.
     disposeGlbShip(mesh) {
+        if (this.deferShaderDisposal(() => this.disposeGlbShip(mesh))) return;
         const ports = mesh.getObjectByName('drone-docking-ports');
         if (ports) { mesh.remove(ports); this.disposeObject(ports); }
         const flareTextures = new Set((mesh.userData.engineFlares ?? []).map(flare => flare.material.map));
@@ -3523,6 +3582,13 @@ export class SpaceRenderer {
                     this.disposeObject(mesh);
                 this.shipMeshes.delete(entity.id);
                 mesh = undefined;
+            }
+            // A ship that spawned while its hull's fetch was failing still
+            // carries the voxel placeholder; once the retried load lands, put
+            // the real hull on it instead of waiting for a respawn.
+            if (mesh && !mesh.userData.glb && this.glbShipModels.get(variant)) {
+                this.swapShipMesh(entity, mesh, this.glbShipModels.get(variant), variant);
+                mesh = this.shipMeshes.get(entity.id);
             }
             if (!mesh) {
                 const ready = this.glbShipModels.get(variant);
@@ -3562,7 +3628,7 @@ export class SpaceRenderer {
             const baseScale = Number(mesh.userData.baseScale ?? 1);
             // Rigid hulls keep a fixed scale. Engine effects carry the animation.
             mesh.scale.setScalar(baseScale);
-            mesh.visible = entity.hull > 0;
+            mesh.visible = entity.hull > 0 && !entity.jumpPursuit;
             const emissiveIntensity = entity.race ? 0.24 + damage * 0.12 : entity.hostile ? 0.18 + damage * 0.28 : damage * 0.12;
             const emissiveMaterials = mesh.userData.emissiveMaterials;
             if (emissiveMaterials) {
@@ -3581,7 +3647,7 @@ export class SpaceRenderer {
                 const baseOpacity = (flares[0]?.userData.baseOpacity ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_OPACITY_ATLAS : ENGINE_FLARE_OPACITY)) * (glow?.flareOpacity ?? 1);
                 const baseSize = (flares[0]?.userData.baseSize ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_SIZE_ATLAS : ENGINE_FLARE_SIZE)) * (glow?.flareScale ?? 1);
                 for (const flare of flares) {
-                    flare.material.opacity = baseOpacity * boost;
+                    flare.material.opacity = entity.stationDock?.phase === "docked" ? 0 : baseOpacity * boost;
                     flare.scale.setScalar(baseSize * (boost > 1 ? 1.08 : 1));
                 }
             }
@@ -3678,8 +3744,8 @@ export class SpaceRenderer {
         }
     }
     createDroneVisual(unit) {
-        const pdc = unit.type === 'pdc';
-        const color = pdc ? 0x69e4f2 : 0xffd05c;
+        const pdc = unit.type === 'pdc' || unit.type === 'attack';
+        const color = unit.type === 'repair' ? 0x68ffb0 : unit.type === 'attack' ? 0xff7860 : pdc ? 0x69e4f2 : 0xffd05c;
         const root = new THREE.Group();
         root.name = `drone:${unit.id}`;
         // Distinct outlines stay legible without labels: miners have two
@@ -3728,11 +3794,16 @@ export class SpaceRenderer {
             }).catch(error => { console.warn('Drone model unavailable', error); return null; }));
         this.droneModels.get(kind).then(template => {
             if (!template || this.disposed || !root.parent) return;
-            for (const child of [...root.children]) if (child !== engine && child !== lamp) {
+            for (const child of [...root.children]) if (child !== engine && child !== lamp && child !== root.userData.miningDebris && child !== root.userData.repairSparks) {
                 root.remove(child); this.disposeObject(child);
             }
             const model = template.clone(true);
             model.traverse(o => { if(o.isMesh) {o.geometry=o.geometry.clone();o.material=o.material.clone();o.raycast=()=>undefined;} });
+            if (unit.type === 'repair' || unit.type === 'attack') {
+                model.traverse(o => { if (!o.isMesh) return;
+                    if (o.material.color) o.material.color.lerp(new THREE.Color(color), .42);
+                });
+            }
             model.scale.setScalar(1.15); root.add(model); lamp.visible=false;
             root.userData.newDroneModel=true;
         });
@@ -3741,14 +3812,14 @@ export class SpaceRenderer {
     // Call with save.player.droneFleet and the live miningDroneContext (not
     // miningDroneHud(), which copies arrays). workPoint is a Point or tuple.
     // Missing/stowed/destroyed units retire on this same reconciliation pass.
-    syncDrones(fleet, miningContext, alpha = 1) {
+    syncDrones(fleet, miningContext, alpha = 1, player) {
         const units = fleet?.unitsById;
         const revision = ++this.droneSyncRevision;
         const now = performance.now() * 0.009;
         if (units) for (const id in units) {
             const unit = units[id];
             if (!unit || !unit.position || unit.hull <= 0 || unit.state === 'stowed' || unit.state === 'destroyed'
-                || (unit.type !== 'mining' && unit.type !== 'pdc')) continue;
+                || !['mining','pdc','repair','attack'].includes(unit.type)) continue;
             let visual = this.droneVisuals[id];
             if (visual && visual.type !== unit.type) {
                 this.removeDroneVisual(id);
@@ -3770,7 +3841,17 @@ export class SpaceRenderer {
             }
             const working = unit.type === 'mining' && unit.state === 'mining';
             const returning = unit.state === 'returning' || unit.state === 'docking';
-            visual.engine.visible = !working;
+            // The exterior hull is omitted in cockpit view. Hide our own close
+            // bay traffic inside that otherwise invisible hull/camera envelope.
+            // External review cameras and NPC drones must remain visible.
+            const ownDrone = !unit.ownerId || unit.ownerId === 'player';
+            root.visible = !(player && this.cockpit?.visible && ownDrone
+                && (returning || unit.state === 'launching' || unit.portStage === 'launch')
+                && root.position.distanceToSquared(this.camera.position) < 36);
+            this.updateMiningDebris(root, working, now / 9);
+            this.updateRepairSparks(root, unit.repairing === true, now / 9);
+
+            visual.engine.visible = !working && !unit.repairAttached;
             visual.glow += ((working ? .1 : .18 + .82 * (unit.thrust ?? 0)) - visual.glow) * .15;
             for (const flare of visual.engine.children) {
                 flare.material.opacity = .18 + .62 * visual.glow;
@@ -3783,6 +3864,72 @@ export class SpaceRenderer {
         }
         for (const id in this.droneVisuals)
             if (this.droneVisuals[id].revision !== revision) this.removeDroneVisual(id);
+    }
+    updateMiningDebris(root, working, time) {
+        let dust = root.userData.miningDebris;
+        if (!working) {
+            root.userData.miningDebrisStarted = undefined;
+            if (dust) dust.visible = false;
+            return;
+        }
+        root.userData.miningDebrisStarted ??= time;
+        const elapsed = Math.max(0, time - root.userData.miningDebrisStarted - 0.3);
+        const buildup = Math.min(1, elapsed / 0.6);
+        if (buildup <= 0) {
+            if (dust) dust.visible = false;
+            return;
+        }
+        if (!dust) {
+            // One small draw call per active miner, no particles or materials
+            // allocated during updates. Local +Y points away from the rock.
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(24 * 3), 3).setUsage(THREE.DynamicDrawUsage));
+            dust = new THREE.Points(geometry, new THREE.PointsMaterial({
+                color: 0xb6a487, size: 0.22, transparent: true, opacity: 0.6,
+                depthWrite: false, sizeAttenuation: true,
+            }));
+            dust.frustumCulled = false;
+            dust.raycast = () => undefined;
+            root.userData.miningDebris = dust;
+            root.add(dust);
+        }
+        dust.visible = true;
+        dust.material.opacity = 0.6 * buildup;
+        dust.geometry.setDrawRange(0, Math.ceil(24 * buildup));
+        const attribute = dust.geometry.attributes.position;
+        for (let i=0;i<24;i++) {
+            const age=((elapsed * .8 + i / 24) % 1) * buildup;
+            const angle=i * 2.399963229728653;
+            const radius=.45 + age * (1.4 + (i % 4) * .22);
+            attribute.setXYZ(i, Math.cos(angle)*radius, -.65 + age*(.65+(i%5)*.23), Math.sin(angle)*radius);
+        }
+        attribute.needsUpdate = true;
+    }
+    updateRepairSparks(root, working, time) {
+        let sparks = root.userData.repairSparks;
+        if (!working) { if (sparks) sparks.visible=false; return; }
+        if (!sparks) {
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(24*2*3),3).setUsage(THREE.DynamicDrawUsage));
+            geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(24*2*3),3).setUsage(THREE.DynamicDrawUsage));
+            sparks = new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,
+                blending:THREE.AdditiveBlending,depthWrite:false,opacity:.95}));
+            sparks.frustumCulled=false; sparks.raycast=()=>undefined;
+            root.userData.repairSparks=sparks; root.add(sparks);
+        }
+        sparks.visible=true;
+        const positions=sparks.geometry.attributes.position,colors=sparks.geometry.attributes.color;
+        // Short ballistic streaks from the belly contact, outward along the hull.
+        for(let i=0;i<24;i++) {
+            const age=(time*2.8+i*.61803398875)%1,angle=i*2.39996323;
+            const speed=.8+(i%5)*.23,brightness=(1-age)*(1-age);
+            for(let end=0;end<2;end++) {
+                const a=Math.max(0,age-end*.055),radius=.55+a*speed;
+                positions.setXYZ(i*2+end,Math.cos(angle)*radius,-.63+a*.3+a*a*.25,Math.sin(angle)*radius);
+                colors.setXYZ(i*2+end,brightness,brightness*(.5+.4*(1-age)),brightness*.16);
+            }
+        }
+        positions.needsUpdate=true;colors.needsUpdate=true;
     }
     removeDroneVisual(id) {
         const visual = this.droneVisuals[id];
@@ -3821,7 +3968,7 @@ export class SpaceRenderer {
                     // core, three times the laser bolt's length so the lane it
                     // owns reads at a glance, plus a cold additive glow at the head.
                     this.laserFx ??= new LaserFx(this.scene, this.effects);
-                    mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 4.8, 3, 6), new THREE.MeshBasicMaterial({ color: 0xcfeeff }));
+                    mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 6.4, 3, 6), new THREE.MeshBasicMaterial({ color: 0xcfeeff }));
                     mesh.geometry.rotateX(Math.PI / 2);
                     const glow = new THREE.Sprite(new THREE.SpriteMaterial({
                         map: this.radialTexture('#eaffff', '#4fb8d8'),
@@ -3829,14 +3976,14 @@ export class SpaceRenderer {
                         blending: THREE.AdditiveBlending,
                         depthWrite: false,
                     }));
-                    glow.scale.setScalar(1.4);
+                    glow.scale.setScalar(1.0);
                     mesh.add(glow);
                 }
                 else if (projectile.kind === 'pdc') {
                     // Point-defense stub: a short COLD white-blue dart — kept
                     // far from the pulse laser's amber so the two streams
                     // never read as the same gun at combat distance.
-                    mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.065, 3.2, 3, 6), new THREE.MeshBasicMaterial({
+                    mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.065, 3.2, 4), new THREE.MeshBasicMaterial({
                         color: projectile.faction === 'player' ? 0xdce9ff : 0xff8a5b,
                     }));
                     mesh.geometry.rotateX(Math.PI / 2);
@@ -3844,40 +3991,44 @@ export class SpaceRenderer {
                 else if (projectile.kind === 'ripper') {
                     // Scattergun pellet: a small warm spark; seven per shell
                     // reads as a cloud without any one pellet drawing attention.
-                    mesh = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 5), new THREE.MeshBasicMaterial({ color: 0xffb066 }));
+                    mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.48, 2, 4), new THREE.MeshBasicMaterial({ color: 0xffb066 }));
                     const glint = new THREE.Sprite(new THREE.SpriteMaterial({
                         map: this.radialTexture('#ffe9c9', '#ff7a2b'),
                         transparent: true,
                         blending: THREE.AdditiveBlending,
                         depthWrite: false,
                     }));
-                    glint.scale.setScalar(0.55);
+                    mesh.geometry.rotateX(Math.PI/2);
+                    glint.scale.setScalar(0.42);
+                    glint.material.opacity=.55;
                     mesh.add(glint);
                 }
                 else if (projectile.kind === 'ion') {
                     // Ion Lance bolt: a cool cyan blob with an arcing halo —
                     // reads as energy discharge rather than a kinetic round.
-                    mesh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshBasicMaterial({ color: 0x69e4f2 }));
+                    mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.2, 0), new THREE.MeshBasicMaterial({ color: 0x69e4f2 }));
                     const arc = new THREE.Sprite(new THREE.SpriteMaterial({
-                        map: this.radialTexture('#d8fbff', '#1f7fa8'),
+                        map: this.weaponCloudTexture('ion'), color: 0x6bdfff,
                         transparent: true,
                         blending: THREE.AdditiveBlending,
                         depthWrite: false,
                     }));
-                    arc.scale.setScalar(1.5);
+                    arc.scale.setScalar(1.25);
+                    arc.material.opacity=.65;
                     mesh.add(arc);
                 }
                 else if (projectile.kind === 'mortar') {
                     // Sunlance orb: big slow ember with a heavy additive halo —
                     // the slowest thing in the sky, so it must look dangerous.
-                    mesh = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff9a3d }));
+                    mesh = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffe2a0 }));
                     const halo = new THREE.Sprite(new THREE.SpriteMaterial({
-                        map: this.radialTexture('#ffd9a0', '#c33d12'),
+                        map: this.weaponCloudTexture('plasma'), color:0xff7729,
                         transparent: true,
                         blending: THREE.AdditiveBlending,
                         depthWrite: false,
                     }));
-                    halo.scale.setScalar(2.6);
+                    halo.scale.setScalar(2.3);
+                    halo.material.opacity=.8;
                     mesh.add(halo);
                 }
                 else {
@@ -3900,15 +4051,12 @@ export class SpaceRenderer {
                     // Engine plume: an additive teardrop behind the nozzle —
                     // tagged so the frame pass can flicker it. Sized so the
                     // missile reads as a moving ember at 30-60 units.
-                    const plume = new THREE.Sprite(new THREE.SpriteMaterial({
-                        map: this.radialTexture('#ffe7b0', '#ff6a1f'),
-                        transparent: true,
-                        blending: THREE.AdditiveBlending,
-                        depthWrite: false,
-                        opacity: 0.95,
+                    const plume = new THREE.Mesh(new THREE.ConeGeometry(.28,2.8,5,1,true),new THREE.MeshBasicMaterial({
+                        color:0xffb66b,transparent:true,blending:THREE.AdditiveBlending,
+                        depthWrite:false,opacity:.4,side:THREE.DoubleSide,forceSinglePass:true,
                     }));
-                    plume.position.z = 1.15;
-                    plume.scale.set(1.25, 3.1, 1);
+                    plume.geometry.rotateX(Math.PI/2);
+                    plume.position.z=1.7;
                     plume.name = 'plume';
                     group.add(plume);
                     mesh = group;
@@ -3936,6 +4084,7 @@ export class SpaceRenderer {
                 // The magrail's long tracer is the worst close-pass offender —
                 // it gets the same treatment.
                 this.laserFx.attenuate(mesh, this.camera.position);
+                if(projectile.weaponId==='pulse-mk2')mesh.scale.multiplyScalar(1.18);
                 if (projectile.visualScale)
                     mesh.scale.multiplyScalar(projectile.visualScale);
             }
@@ -3944,13 +4093,17 @@ export class SpaceRenderer {
                 // frame when one crosses the camera's own space.
                 this.laserFx.attenuate(mesh, this.camera.position);
             }
+            if(projectile.kind==='ion' || projectile.kind==='mortar') {
+                const halo=mesh.children[0];
+                if(halo)halo.material.rotation=this.skyTime*(projectile.kind==='ion'?2.8:.45)+projectile.slot;
+            }
             if (projectile.kind === 'missile') {
                 // Exhaust flicker: the engine plume strobes while the motor
                 // burns. No smoke trail — there is no atmosphere out here to
                 // suspend one (user report); the hot plume is the whole trail.
                 const plume = mesh.getObjectByName('plume');
                 if (plume)
-                    plume.material.opacity = 0.72 + Math.sin(this.skyTime * 47 + projectile.slot * 3.3) * 0.26;
+                    plume.material.opacity = 0.35 + Math.sin(this.skyTime * 47 + projectile.slot * 3.3) * 0.08;
             }
         });
         // Identity can change without a count change. Mark during the existing
@@ -4342,6 +4495,423 @@ export class SpaceRenderer {
     setArmedJumpPoint(id) {
         this.armedJumpPointId = id;
     }
+    createLandingGuide() {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(36 * 3), 3));
+        this.landingGuideDots = new THREE.Points(geometry, new THREE.PointsMaterial({
+            color: 0xffd277,
+            size: 8,
+            sizeAttenuation: false,
+            transparent: true,
+            opacity: 0.94,
+            depthTest: false,
+            depthWrite: false,
+            toneMapped: false,
+            fog: false,
+        }));
+        this.landingGuideDots.frustumCulled = false;
+        this.landingGuideDots.raycast = () => { };
+        this.landingGuideDots.renderOrder = 1000;
+        this.landingGuideDots.name = 'Station landing route dots';
+
+        this.landingPadRingMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffd277,
+            transparent: true,
+            opacity: 0.92,
+            depthWrite: false,
+            toneMapped: false,
+            side: THREE.DoubleSide,
+        });
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.055, 6, 40), this.landingPadRingMaterial);
+        ring.rotation.x = -Math.PI / 2;
+        ring.name = 'Player landing pad ring';
+        ring.raycast = () => { };
+        this.landingPadRing = ring;
+
+        this.landingCandidateRoot = new THREE.Group();
+        this.landingCandidateRoot.name = 'Station landing pad candidates';
+        this.landingCandidateRoot.visible = false;
+        this.landingCandidateRoot.raycast = () => { };
+        this.landingCandidateRingGeometry = new THREE.TorusGeometry(1, 0.12, 4, 24);
+        this.landingCandidateRingMaterial = new THREE.MeshBasicMaterial({
+            color: 0xd6a96c,
+            transparent: true,
+            opacity: 0.32,
+            depthTest: false,
+            depthWrite: false,
+            toneMapped: false,
+            side: THREE.DoubleSide,
+        });
+        this.landingCandidateId = undefined;
+        this.landingCandidateMarkers = [];
+
+        this.landingPadBeaconMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffd277,
+            transparent: true,
+            opacity: 0.82,
+            depthWrite: false,
+            toneMapped: false,
+        });
+        const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.25, 10, 8), this.landingPadBeaconMaterial);
+        beacon.position.y = 12;
+        beacon.name = 'Player landing pad beacon';
+        beacon.raycast = () => { };
+
+        const labelCanvas = document.createElement('canvas');
+        labelCanvas.width = 256;
+        labelCanvas.height = 96;
+        const labelContext = labelCanvas.getContext('2d');
+        this.landingPadLabelCanvas = labelCanvas;
+        this.landingPadLabelContext = labelContext;
+        this.landingPadLabelText = 'PAD 01';
+        labelContext.clearRect(0, 0, labelCanvas.width, labelCanvas.height);
+        labelContext.shadowColor = '#ffd277';
+        labelContext.shadowBlur = 14;
+        labelContext.strokeStyle = 'rgba(255, 210, 119, .92)';
+        labelContext.lineWidth = 5;
+        labelContext.strokeRect(8, 8, 240, 80);
+        labelContext.fillStyle = '#fff4d5';
+        labelContext.font = 'bold 52px monospace';
+        labelContext.textAlign = 'center';
+        labelContext.textBaseline = 'middle';
+        labelContext.fillText('PAD 01', 128, 50);
+        const labelTexture = new THREE.CanvasTexture(labelCanvas);
+        labelTexture.colorSpace = THREE.SRGBColorSpace;
+        labelTexture.userData.shared = false;
+        this.landingPadLabelMaterial = new THREE.MeshBasicMaterial({
+            map: labelTexture,
+            transparent: true,
+            opacity: 0.96,
+            depthWrite: false,
+            toneMapped: false,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending,
+        });
+        const padLabel = new THREE.Mesh(new THREE.PlaneGeometry(28, 10.5), this.landingPadLabelMaterial);
+        padLabel.rotation.x = -Math.PI / 2;
+        padLabel.position.y = 0.4;
+        padLabel.name = 'Lit PAD 01 landing mark';
+        padLabel.raycast = () => { };
+        const padSignTexture = new THREE.CanvasTexture(labelCanvas);
+        padSignTexture.colorSpace = THREE.SRGBColorSpace;
+        this.landingPadLabelTextures = [labelTexture, padSignTexture];
+        this.landingPadSignMaterial = new THREE.SpriteMaterial({
+            map: padSignTexture,
+            color: 0xffd277,
+            transparent: true,
+            opacity: 0.96,
+            depthWrite: false,
+            depthTest: true,
+            toneMapped: false,
+            blending: THREE.AdditiveBlending,
+        });
+        const padSign = new THREE.Sprite(this.landingPadSignMaterial);
+        padSign.scale.set(22, 8.25, 1);
+        padSign.position.y = 28;
+        padSign.name = 'PAD 01 approach beacon sign';
+        padSign.raycast = () => { };
+
+        this.landingPadMarker = new THREE.Group();
+        this.landingPadMarker.name = 'Player landing pad marker';
+        this.landingPadMarker.add(ring, beacon, padLabel, padSign);
+
+        this.landingGateRingMaterial = new THREE.MeshBasicMaterial({
+            color: 0x52d7d0,
+            transparent: true,
+            opacity: 0.82,
+            depthWrite: false,
+            toneMapped: false,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending,
+        });
+        const gateRing = new THREE.Mesh(new THREE.TorusGeometry(5.2, 0.34, 6, 28), this.landingGateRingMaterial);
+        gateRing.name = 'Player approach gate ring';
+        gateRing.raycast = () => { };
+        this.landingGateRing = gateRing;
+        this.landingGateBeaconMaterial = new THREE.MeshBasicMaterial({
+            color: 0x79fff0,
+            transparent: true,
+            opacity: 0.9,
+            depthWrite: false,
+            toneMapped: false,
+            blending: THREE.AdditiveBlending,
+        });
+        const gateBeacon = new THREE.Group();
+        gateBeacon.name = 'Player approach gate beacon';
+        const gatePost = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.7, 14, 8), this.landingGateBeaconMaterial);
+        gatePost.position.y = 7;
+        gatePost.name = 'Approach gate beacon mast';
+        gatePost.raycast = () => { };
+        const gateLamp = new THREE.Mesh(new THREE.SphereGeometry(1.8, 8, 6), this.landingGateBeaconMaterial);
+        gateLamp.position.y = 15;
+        gateLamp.name = 'Approach gate beacon lamp';
+        gateLamp.raycast = () => { };
+        gateBeacon.add(gateRing, gatePost, gateLamp);
+        const gateFlare = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: this.radialTexture('#eaffff', '#4fcfc4'),
+            color: 0x9cfff2,
+            transparent: true,
+            opacity: 0.44,
+            depthTest: false,
+            depthWrite: false,
+            toneMapped: false,
+            blending: THREE.AdditiveBlending,
+        }));
+        gateFlare.position.y = 15;
+        gateFlare.scale.setScalar(9);
+        gateFlare.name = 'Long-range approach beacon glow';
+        gateFlare.raycast = () => { };
+        gateBeacon.add(gateFlare);
+        this.landingGateFlare = gateFlare;
+        this.landingGateMarker = gateBeacon;
+
+        this.landingGuideRoot = new THREE.Group();
+        this.landingGuideRoot.name = 'Player station landing guidance';
+        this.landingGuideRoot.visible = false;
+        this.landingGuideRoot.frustumCulled = false;
+        this.landingGuideRoot.raycast = () => { };
+        this.landingGuideRoot.add(this.landingGuideDots, this.landingCandidateRoot, this.landingPadMarker, this.landingGateMarker);
+        this.scene.add(this.landingGuideRoot);
+        this.landingGuideCenter = new THREE.Vector3();
+        this.landingGuideStart = new THREE.Vector3();
+        this.landingGuideEnd = new THREE.Vector3();
+        this.landingGuideExit = new THREE.Vector3();
+        this.landingGuideStartDirection = new THREE.Vector3();
+        this.landingGuideEndDirection = new THREE.Vector3();
+        this.landingGuideDirection = new THREE.Vector3();
+        this.landingGateForward = new THREE.Vector3(0, 0, 1);
+        this.landingGuideArc = new THREE.Quaternion();
+        this.landingGuideSlerp = new THREE.Quaternion();
+        this.landingGuideIdentity = new THREE.Quaternion();
+        this.landingGuidePad = null;
+        this.landingGuideId = undefined;
+        this.landingGuideHeight = undefined;
+        this.landingGuidePadIndex = undefined;
+    }
+    setLandingGuide(id, playerPosition, height = 2, stopped = false, mode = 'landing', selectedBerth = null, allBerths = null) {
+        if (!id || !playerPosition || !LOCATIONS[id]) {
+            this.landingGuideRoot.visible = false;
+            this.landingGuideDots.visible = false;
+            this.landingCandidateRoot.visible = false;
+            this.landingPadMarker.visible = false;
+            this.landingGateMarker.visible = false;
+            this.landingGuideId = undefined;
+            this.landingGuidePad = null;
+            this.landingGuideMode = undefined;
+            this.landingGuidePadIndex = undefined;
+            return;
+        }
+        const selected = selectedBerth ?? playerBerth(id, height);
+        if (!selected) {
+            this.landingGuideRoot.visible = false;
+            this.landingGuideDots.visible = false;
+            this.landingCandidateRoot.visible = false;
+            this.landingPadMarker.visible = false;
+            this.landingGateMarker.visible = false;
+            this.landingGuideId = undefined;
+            this.landingGuidePad = null;
+            this.landingGuideMode = undefined;
+            this.landingGuidePadIndex = undefined;
+            return;
+        }
+        const padIndex = selected.padIndex ?? 0;
+        const candidates = allBerths?.length ? allBerths : [selected];
+        if (this.landingCandidateId !== id || this.landingCandidateMarkers.length !== candidates.length) {
+            for (const marker of this.landingCandidateMarkers) {
+                marker.label.material.map?.dispose();
+                marker.label.material.dispose();
+            }
+            this.landingCandidateRoot.clear();
+            this.landingCandidateMarkers = candidates.map((candidate) => {
+                const group = new THREE.Group();
+                const label = candidate.label ?? `PAD ${String((candidate.padIndex ?? 0) + 1).padStart(2, '0')}`;
+                group.name = `${label} candidate marker`;
+                group.position.fromArray(candidate.surface ?? candidate.pad);
+                const ring = new THREE.Mesh(this.landingCandidateRingGeometry, this.landingCandidateRingMaterial);
+                ring.rotation.x = -Math.PI / 2;
+                ring.scale.setScalar(Math.max(10, candidate.captureRadius * 0.75));
+                ring.raycast = () => { };
+                const labelCanvas = document.createElement('canvas');
+                labelCanvas.width = 256;
+                labelCanvas.height = 80;
+                const ctx = labelCanvas.getContext('2d');
+                ctx.strokeStyle = 'rgba(214, 169, 108, .82)';
+                ctx.lineWidth = 5;
+                ctx.strokeRect(5, 5, 246, 70);
+                ctx.fillStyle = '#f4dfbd';
+                ctx.font = 'bold 42px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(label, 128, 40);
+                const texture = new THREE.CanvasTexture(labelCanvas);
+                texture.colorSpace = THREE.SRGBColorSpace;
+                const labelSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+                    map: texture,
+                    color: 0xd6a96c,
+                    transparent: true,
+                    opacity: 0.52,
+                    depthTest: false,
+                    depthWrite: false,
+                    toneMapped: false,
+                    blending: THREE.AdditiveBlending,
+                }));
+                labelSprite.scale.set(Math.max(18, candidate.captureRadius * 1.75), Math.max(6, candidate.captureRadius * 0.58), 1);
+                labelSprite.position.y = Math.max(12, height * 2.1);
+                labelSprite.raycast = () => { };
+                group.add(ring, labelSprite);
+                this.landingCandidateRoot.add(group);
+                return { padIndex: candidate.padIndex ?? 0, group, label: labelSprite };
+            });
+            this.landingCandidateId = id;
+        }
+        const activeCandidate = mode !== 'beacon' ? padIndex : -1;
+        for (const marker of this.landingCandidateMarkers) {
+            marker.group.visible = marker.padIndex !== activeCandidate;
+            marker.label.material.opacity = mode === 'beacon' ? 0.5 : 0.28;
+        }
+        this.landingCandidateRoot.visible = mode !== 'departure' && this.landingCandidateMarkers.length > 0;
+        if (id !== this.landingGuideId || height !== this.landingGuideHeight || mode !== this.landingGuideMode || padIndex !== this.landingGuidePadIndex) {
+            this.landingGuideId = id;
+            this.landingGuideHeight = height;
+            this.landingGuideMode = mode;
+            this.landingGuidePadIndex = padIndex;
+            this.landingGuidePad = selected;
+            this.landingGuideCenter.fromArray(LOCATIONS[id].position);
+            this.landingPadMarker.position.fromArray(selected.surface ?? selected.pad);
+            this.landingGateMarker.position.fromArray(selected.gate);
+            this.landingGuideDirection.set(
+                selected.pad[0] - selected.gate[0],
+                selected.pad[1] - selected.gate[1],
+                selected.pad[2] - selected.gate[2],
+            ).normalize();
+            this.landingGateRing.quaternion.setFromUnitVectors(this.landingGateForward, this.landingGuideDirection);
+            this.landingPadRing.scale.setScalar(Math.max(8, selected.captureRadius * 0.62));
+            const label = selected.label ?? `PAD ${String(padIndex + 1).padStart(2, '0')}`;
+            if (label !== this.landingPadLabelText) {
+                const { landingPadLabelCanvas: canvas, landingPadLabelContext: context } = this;
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                context.shadowColor = '#ffd277';
+                context.shadowBlur = 14;
+                context.strokeStyle = 'rgba(255, 210, 119, .92)';
+                context.lineWidth = 5;
+                context.strokeRect(8, 8, 240, 80);
+                context.fillStyle = '#fff4d5';
+                context.font = 'bold 52px monospace';
+                context.textAlign = 'center';
+                context.textBaseline = 'middle';
+                context.fillText(label, 128, 50);
+                for (const texture of this.landingPadLabelTextures)
+                    texture.needsUpdate = true;
+                this.landingPadLabelText = label;
+                this.landingPadMarker.children[2].name = `Lit ${label} landing mark`;
+                this.landingPadMarker.children[3].name = `${label} approach beacon sign`;
+            }
+        }
+
+        const berth = this.landingGuidePad;
+        const location = LOCATIONS[id];
+        this.landingGuideDots.visible = mode !== 'beacon';
+        this.landingPadMarker.visible = mode !== 'beacon';
+        this.landingGateMarker.visible = mode !== 'beacon';
+        const positionAttribute = this.landingGuideDots.geometry.getAttribute('position');
+        const routePositions = positionAttribute.array;
+        // A full cycle takes about 22 seconds. Dots move toward the bay, then
+        // wrap back near the ship to form a slow, continuous stream.
+        const flow = (this.skyTime * 0.045) % 1;
+        this.landingGuideEnd.set(
+            berth.gate[0] - this.landingGuideCenter.x,
+            berth.gate[1] - this.landingGuideCenter.y,
+            berth.gate[2] - this.landingGuideCenter.z,
+        );
+        if (mode === 'beacon') {
+            // At long range, light the selected berth and its approach gate.
+            // The moving dotted route begins only inside the 200 km clearance range.
+        } else if (mode === 'departure') {
+            // Keep a visible lane ahead of the pilot from the pad, through the
+            // same gate used for landing, and out beyond the station hull.
+            this.landingGuideDirection.set(
+                berth.gate[0] - berth.pad[0],
+                berth.gate[1] - berth.pad[1],
+                berth.gate[2] - berth.pad[2],
+            ).normalize();
+            const exitDistance = Math.max(80, Math.hypot(
+                berth.gate[0] - berth.pad[0],
+                berth.gate[1] - berth.pad[1],
+                berth.gate[2] - berth.pad[2],
+            ) * 0.45);
+            const exit = this.landingGuideExit.copy(this.landingGuideEnd)
+                .addScaledVector(this.landingGuideDirection, exitDistance)
+                .add(this.landingGuideCenter);
+            for (let i = 0; i < 36; i++) {
+                const t = (i / 36 + flow) % 1;
+                const offset = i * 3;
+                routePositions[offset] = playerPosition[0] + (exit.x - playerPosition[0]) * t;
+                routePositions[offset + 1] = playerPosition[1] + (exit.y - playerPosition[1]) * t;
+                routePositions[offset + 2] = playerPosition[2] + (exit.z - playerPosition[2]) * t;
+            }
+        } else {
+            this.landingGuideStart.set(
+                playerPosition[0] - this.landingGuideCenter.x,
+                playerPosition[1] - this.landingGuideCenter.y,
+                playerPosition[2] - this.landingGuideCenter.z,
+            );
+            const startRadius = this.landingGuideStart.length();
+            const gateRadius = this.landingGuideEnd.length();
+            if (startRadius < 1e-4) this.landingGuideStart.copy(this.landingGuideEnd);
+            this.landingGuideStartDirection.copy(this.landingGuideStart).normalize();
+            this.landingGuideEndDirection.copy(this.landingGuideEnd).normalize();
+            this.landingGuideArc.setFromUnitVectors(this.landingGuideStartDirection, this.landingGuideEndDirection);
+            const safeRadius = stationVisualSurfaceRadius(id) + Math.max(14, height * 3);
+            const routeStartRadius = Math.max(startRadius, safeRadius);
+            const routeEndRadius = Math.max(gateRadius, safeRadius);
+
+            for (let i = 0; i < 36; i++) {
+                const progress = ((i / 36 + flow) % 1) * 36;
+                const offset = i * 3;
+                if (progress < 26) {
+                    const t = progress / 26;
+                    this.landingGuideSlerp.copy(this.landingGuideIdentity).slerp(this.landingGuideArc, t);
+                    this.landingGuideDirection.copy(this.landingGuideStartDirection).applyQuaternion(this.landingGuideSlerp).normalize();
+                    const radius = routeStartRadius + (routeEndRadius - routeStartRadius) * t;
+                    routePositions[offset] = this.landingGuideCenter.x + this.landingGuideDirection.x * radius;
+                    routePositions[offset + 1] = this.landingGuideCenter.y + this.landingGuideDirection.y * radius;
+                    routePositions[offset + 2] = this.landingGuideCenter.z + this.landingGuideDirection.z * radius;
+                } else {
+                    const t = (progress - 26) / 10;
+                    routePositions[offset] = berth.gate[0] + (berth.pad[0] - berth.gate[0]) * t;
+                    routePositions[offset + 1] = berth.gate[1] + (berth.pad[1] - berth.gate[1]) * t;
+                    routePositions[offset + 2] = berth.gate[2] + (berth.pad[2] - berth.gate[2]) * t;
+                }
+            }
+        }
+        positionAttribute.needsUpdate = mode !== 'beacon';
+
+        const distanceToPad = Math.hypot(
+            playerPosition[0] - berth.pad[0],
+            playerPosition[1] - berth.pad[1],
+            playerPosition[2] - berth.pad[2],
+        );
+        const longRangeBeaconScale = 1 + Math.min(0.75, distanceToPad / 800);
+        this.landingPadMarker.children[3].scale.set(22 * longRangeBeaconScale, 8.25 * longRangeBeaconScale, 1);
+        this.landingGateFlare.scale.setScalar(9 * longRangeBeaconScale);
+        const atPad = distanceToPad <= berth.captureRadius;
+        const color = mode === 'departure' ? 0x52d7d0
+            : atPad ? (stopped ? 0x78efb2 : 0xffb85c) : 0x64f6ae;
+        this.landingGuideDots.material.color.setHex(color);
+        this.landingPadRingMaterial.color.setHex(color);
+        this.landingPadBeaconMaterial.color.setHex(color);
+        this.landingPadLabelMaterial.color.setHex(color);
+        this.landingPadSignMaterial.color.setHex(color);
+        this.landingGateRingMaterial.color.setHex(mode === 'departure' ? 0x52d7d0 : 0x64f6ae);
+        this.landingGateBeaconMaterial.color.setHex(mode === 'departure' ? 0x52d7d0 : 0x64f6ae);
+        const pulse = 0.84 + 0.16 * Math.sin(this.skyTime * 4.2);
+        this.landingPadRingMaterial.opacity = 0.78 + pulse * 0.2;
+        this.landingPadBeaconMaterial.opacity = 0.62 + pulse * 0.3;
+        this.landingPadSignMaterial.opacity = 0.84 + pulse * 0.14;
+        this.landingGateRingMaterial.opacity = 0.7 + pulse * 0.18;
+        this.landingGateBeaconMaterial.opacity = 0.72 + pulse * 0.24;
+        this.landingGuideRoot.visible = true;
+    }
     setSystem(systemId) {
         this.systemId = SYSTEM_RENDER_STYLE[systemId] ? systemId : 'helios-verge';
         const style = SYSTEM_RENDER_STYLE[this.systemId];
@@ -4593,36 +5163,132 @@ export class SpaceRenderer {
         this.utilityBeam.visible = true;
     }
     spawnExplosion(position, hostile = true, scale = 1) {
-        const count = 28;
-        const geometry = new THREE.BufferGeometry();
-        const positions = new Float32Array(count * 3);
-        const velocities = new Float32Array(count * 3);
-        const rng = seededRandom(`${position.join(':')}:${performance.now()}`);
-        for (let index = 0; index < count; index += 1) {
-            const vx = rng() - 0.5;
-            const vy = rng() - 0.5;
-            const vz = rng() - 0.5;
-            const len = Math.hypot(vx, vy, vz) || 1;
-            const speed = (2 + rng() * 9) * scale;
-            velocities[index * 3] = (vx / len) * speed;
-            velocities[index * 3 + 1] = (vy / len) * speed;
-            velocities[index * 3 + 2] = (vz / len) * speed;
-        }
-        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const material = new THREE.PointsMaterial({
-            color: hostile ? 0xff7a3d : 0x7fc9d6,
-            size: 1.8 * scale,
-            sizeAttenuation: true,
-            transparent: true,
-            opacity: 0.95,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-        });
-        const points = new THREE.Points(geometry, material);
-        points.position.set(...position);
-        this.scene.add(points);
-        this.effects.push({ object: points, points, velocities, life: 1.05, maxLife: 1.05 });
+        const effect = createShipExplosion(position, scale);
+        this.scene.add(effect.object);
+        this.effects.push(effect);
     }
+
+    spawnShipWreck(ship, variant, explosionScale) {
+        const fragments = createHullDebris(ship.position, Math.max(.5, explosionScale*.65), ship.velocity);
+        this.scene.add(fragments.object);
+        this.effects.push(fragments);
+        // Cosmetic wrecks keep the existing salvage/drop economy unchanged.
+        // Retain at most eight, and retire each after three minutes.
+        const wrecks = this.effects.filter(effect => effect.combatWreck && effect.life > 0);
+        if (wrecks.length >= 8) wrecks[0].life = 0;
+        // Break the rendered hull itself: graveyard assets have displaced parts,
+        // different origins, and often belong to an entirely different ship.
+        const source = this.shipMeshes?.get(ship.id);
+        if (!source) return; // No visible hull to hand off (e.g. off-screen death).
+        source.updateWorldMatrix(true, true);
+        const root = new THREE.Group();
+        source.getWorldPosition(root.position);
+        source.getWorldQuaternion(root.quaternion);
+        source.getWorldScale(root.scale);
+        const initialScale = root.scale.clone();
+        const inverse = source.matrixWorld.clone().invert();
+        const pieces = [];
+        const bounds = new THREE.Box3();
+        const point = new THREE.Vector3();
+        source.traverseVisible(child => {
+            if (!child.isMesh || !child.geometry?.attributes.position || child.material?.isShaderMaterial) return;
+            const matrix = new THREE.Matrix4().multiplyMatrices(inverse, child.matrixWorld);
+            const positions = child.geometry.attributes.position;
+            for (let i = 0; i < positions.count; i++)
+                bounds.expandByPoint(point.fromBufferAttribute(positions, i).applyMatrix4(matrix));
+            pieces.push({ child, matrix });
+        });
+        if (!pieces.length) return;
+        const length = Math.max(.01, bounds.max.z - bounds.min.z);
+        const sections = Array.from({ length: 3 }, (_, i) => {
+            const group = new THREE.Group();
+            group.position.z = bounds.min.z + length * (i + .5) / 3;
+            root.add(group);
+            return { group, origin: group.position.clone() };
+        });
+        const materials = new Map(), textures = new Map();
+        const damagedMaterial = original => {
+            if (materials.has(original)) return materials.get(original);
+            const material = original.clone();
+            material.userData.shared = false;
+            material.onBeforeCompile = original.onBeforeCompile;
+            material.customProgramCacheKey = original.customProgramCacheKey;
+            material.emissiveIntensity = 0;
+            material.roughness = .95;
+            material.side = THREE.DoubleSide;
+            // Own texture handles while retaining their decoded image. Wreck
+            // cleanup must never dispose a texture used by a surviving ship.
+            for (const [key, value] of Object.entries(material)) if (value?.isTexture) {
+                if (!textures.has(value)) {
+                    const texture = value.clone();
+                    texture.userData.shared = false;
+                    textures.set(value, texture);
+                }
+                material[key] = textures.get(value);
+            }
+            materials.set(original, material);
+            return material;
+        };
+        for (const { child, matrix } of pieces) {
+            const geometry = child.geometry, positions = geometry.attributes.position;
+            const index = geometry.index;
+            const buckets = [[], [], []], groups = [[], [], []];
+            const ranges = geometry.groups.length ? geometry.groups : [{ start: 0, count: index?.count ?? positions.count, materialIndex: 0 }];
+            for (const range of ranges) {
+                const starts = buckets.map(bucket => bucket.length);
+                for (let i = range.start; i < range.start + range.count; i += 3) {
+                    const ids = [0, 1, 2].map(j => index ? index.getX(i + j) : i + j);
+                    let z = 0;
+                    for (const id of ids) z += point.fromBufferAttribute(positions, id).applyMatrix4(matrix).z / 3;
+                    const section = Math.max(0, Math.min(2, Math.floor((z - bounds.min.z) / length * 3)));
+                    buckets[section].push(...ids);
+                }
+                buckets.forEach((bucket, i) => groups[i].push({ start: starts[i], count: bucket.length - starts[i], materialIndex: range.materialIndex }));
+            }
+            buckets.forEach((indices, i) => {
+                if (!indices.length) return;
+                const fragment = geometry.clone();
+                fragment.userData.shared = false;
+                fragment.setIndex(indices);
+                fragment.clearGroups();
+                for (const group of groups[i]) if (group.count) fragment.addGroup(group.start, group.count, group.materialIndex);
+                const material = Array.isArray(child.material) ? child.material.map(damagedMaterial) : damagedMaterial(child.material);
+                const mesh = new THREE.Mesh(fragment, material);
+                mesh.matrixAutoUpdate = false;
+                mesh.matrix.makeTranslation(0, 0, -sections[i].origin.z).multiply(matrix);
+                mesh.raycast = () => undefined;
+                sections[i].group.add(mesh);
+            });
+        }
+        this.scene.add(root);
+        // Full initial momentum; exponential decay avoids the old instant stop.
+        const drift = new THREE.Vector3().fromArray(ship.velocity ?? [0, 0, 0]);
+        let elapsed = 0;
+        const colors = [...materials.values()].map(material => [material, material.color?.clone()]);
+        const effect = { object: root, combatWreck: true, life: 180, maxLife: 180, update(dt) {
+            const previous = elapsed;
+            elapsed += dt;
+            const damping = Math.exp(-dt * .16);
+            root.position.addScaledVector(drift, (1 - damping) / .16);
+            drift.multiplyScalar(damping);
+            // No rotation discontinuity: separation/tumble starts under the blast.
+            const breakup = 1 - Math.exp(-Math.max(0, elapsed - .18) * .8);
+            const turnTime = Math.max(0, elapsed - .18) - Math.max(0, previous - .18);
+            root.rotateY(turnTime * .012);
+            root.rotateZ(turnTime * .007);
+            sections.forEach(({ group, origin }, i) => {
+                const side = i - 1;
+                group.position.copy(origin);
+                group.position.x += side * length * .025 * breakup;
+                group.position.z += side * length * .065 * breakup;
+                group.rotation.set(side * .07 * breakup, side * .1 * breakup, side * .08 * breakup);
+            });
+            for (const [material, color] of colors) if (color) material.color.copy(color).multiplyScalar(1 - .48 * breakup);
+            root.scale.copy(initialScale).multiplyScalar(Math.min(1, Math.max(0, (180 - elapsed) / 8)));
+        }};
+        this.effects.push(effect);
+    }
+
     spawnImpact(position, color = 0xffc36a, heavy = false) {
         // Gauntlet overhaul: layered hit (flash + spark burst + embers) lives in
         // laserFx.js; heavy hits (missiles) add a slower ember afterglow.
@@ -4692,7 +5358,7 @@ export class SpaceRenderer {
         mesh.userData.pitch.rotation.x=Math.atan2(local.y,Math.hypot(local.x,local.z));
         mesh.userData.life=.25;mesh.visible=true;
     }
-    showCombatBeam(id,start,end,color) {
+    showCombatBeam(id,start,end,color,player) {
         this.combatBeams ??= new Map();
         let beam=this.combatBeams.get(id);
         if(!beam) {
@@ -4701,14 +5367,34 @@ export class SpaceRenderer {
                 if(!expired)return;
                 this.combatBeams.delete(expired[0]);beam=expired[1];
             } else {
-                beam=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,1,4),new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.8,depthWrite:false}));
+                beam=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.08,1,4),new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.9,depthWrite:false,blending:THREE.AdditiveBlending}));
                 this.scene.add(beam);
             }
             this.combatBeams.set(id,beam);
         }
-        beam.material.color.setHex(color);beam.visible=true;beam.userData.life=0.09;beam.userData.fresh=true;
-        beam.position.copy(start).lerp(end,0.5);beam.scale.y=start.distanceTo(end);
-        beam.quaternion.setFromUnitVectors(UP_AXIS,new THREE.Vector3().subVectors(end,start).normalize());
+        const data=beam.userData;
+        data.start ??= new THREE.Vector3();
+        data.end ??= new THREE.Vector3();
+        data.localStart ??= new THREE.Vector3();
+        data.direction ??= new THREE.Vector3();
+        data.inverse ??= new THREE.Quaternion();
+        data.start.copy(start);data.end.copy(end);data.playerAttached=Boolean(player);
+        if(player) {
+            data.inverse.fromArray(player.rotation).invert();
+            data.localStart.copy(start).sub(data.direction.fromArray(player.position)).applyQuaternion(data.inverse);
+        }
+        beam.material.color.setHex(color);beam.material.opacity=0.9;
+        beam.visible=true;data.life=0.09;data.fresh=true;
+        this.positionCombatBeam(beam);
+    }
+    positionCombatBeam(beam) {
+        const data=beam.userData;
+        // Match the interpolated cockpit pose, not the last simulation tick.
+        // The far end stays at the actual raycast hit: this is cosmetic only.
+        if(data.playerAttached) data.start.copy(data.localStart).applyQuaternion(this.camera.quaternion).add(this.camera.position);
+        beam.position.copy(data.start).lerp(data.end,0.5);
+        beam.scale.y=data.start.distanceTo(data.end);
+        beam.quaternion.setFromUnitVectors(UP_AXIS,data.direction.subVectors(data.end,data.start).normalize());
     }
     showPdcTracer(start,end,color) {
         // Short moving streaks distinguish PDC rounds from tracking-laser beams.
@@ -4738,6 +5424,49 @@ export class SpaceRenderer {
             tracer.visible=data.life>0;
             const progress=Math.min(1,1-data.life/data.duration);
             tracer.position.copy(data.start).addScaledVector(data.direction,tracer.scale.y/2+(data.distance-tracer.scale.y)*progress);
+        }
+    }
+    spawnRailPlume(start, direction, velocity) {
+        this.railPlumes ??= [];
+        let cloud=this.railPlumes.find(p=>!p.visible);
+        if(!cloud) {
+            if(this.railPlumes.length>=8)return;
+            const geometry=new THREE.BufferGeometry();
+            geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(18*3),3).setUsage(THREE.DynamicDrawUsage));
+            cloud=new THREE.Points(geometry,new THREE.PointsMaterial({
+                map:this.weaponCloudTexture('smoke'), color:0xbac9cf,
+                size:1.1,transparent:true,opacity:.28,depthWrite:false,
+                sizeAttenuation:true,
+            }));
+            cloud.userData.velocity=new THREE.Vector3();
+            cloud.frustumCulled=false;cloud.raycast=()=>undefined;
+            this.scene.add(cloud);this.railPlumes.push(cloud);
+        }
+        cloud.position.copy(start);cloud.quaternion.setFromUnitVectors(FORWARD_AXIS,direction);
+        cloud.userData.velocity.fromArray(velocity);cloud.userData.age=0;cloud.userData.fresh=true;
+        cloud.visible=true;this.shapeRailPlume(cloud);
+    }
+    shapeRailPlume(cloud) {
+        const age=cloud.userData.age,points=cloud.geometry.attributes.position;
+        // A compact discharge cloud followed by sparse expanding puffs along
+        // the shot. No new objects, textures or buffers during animation.
+        for(let i=0;i<18;i++) {
+            const angle=i*2.3999632297,spread=(.12+age*1.65)*(1+(i%3)*.27);
+            points.setXYZ(i,Math.cos(angle)*spread,Math.sin(angle)*spread,1.6+i*.65+(i%3)*.23+age*(3+i*.12));
+        }
+        points.needsUpdate=true;
+        cloud.material.size=1.1+age*3.2;
+        cloud.material.opacity=.28*Math.pow(Math.max(0,1-age/.65),1.5);
+    }
+    updateRailPlumes(dt) {
+        for(const cloud of this.railPlumes??[]) {
+            if(!cloud.visible)continue;
+            if(cloud.userData.fresh)cloud.userData.fresh=false;
+            else cloud.userData.age+=dt;
+            cloud.visible=cloud.userData.age<.65;
+            if(!cloud.visible)continue;
+            cloud.position.addScaledVector(cloud.userData.velocity,dt);
+            this.shapeRailPlume(cloud);
         }
     }
     spawnMuzzleFlash(x, y, z, color = 0xffc35a) {
@@ -4774,7 +5503,8 @@ export class SpaceRenderer {
             if (!effect.presented) { effect.presented = true; continue; }
             effect.life -= dt;
             const ratio = clamp(effect.life / effect.maxLife, 0, 1);
-            if (effect.points) {
+            if (effect.update) effect.update(dt);
+            else if (effect.points) {
                 const positions = effect.points.geometry.getAttribute('position');
                 const vel = effect.velocities;
                 const count = vel.length / 3;
@@ -4851,6 +5581,13 @@ export class SpaceRenderer {
                 }
             }
         }
+        for (const [id, root] of this.locationMeshes) {
+            if (!root.visible || this.camera.position.distanceToSquared(root.position) > (LOCATIONS[id].radius * 8) ** 2) continue;
+            for (const model of root.children) {
+                const activity = model.userData.stationActivity;
+                if (activity) updateStationActivity(activity, this.skyTime);
+            }
+        }
         const mourningVisible = Boolean(this.instanceRoots.get('mourning-line')?.visible);
         if (mourningVisible) {
             for (const piece of this.graveyard) {
@@ -4870,9 +5607,16 @@ export class SpaceRenderer {
         this.pendingWorldVisualDt = 0;
         if (dt <= 0) return;
         this.updatePdcTracers(dt);
+        this.updateRailPlumes(dt);
         for(const beam of this.combatBeams?.values() ?? []) {
-            if(beam.userData.fresh){beam.userData.fresh=false;continue;}
-            beam.userData.life-=dt;beam.visible=beam.userData.life>0;
+            const data=beam.userData;
+            if(data.fresh) data.fresh=false;
+            else data.life-=dt;
+            beam.visible=data.life>0;
+            if(beam.visible) {
+                beam.material.opacity=0.9*Math.min(1,Math.max(0,data.life)/0.035);
+                this.positionCombatBeam(beam);
+            }
         }
         for(const glow of this.capitalCharges?.values()??[]){glow.userData.life-=dt;glow.visible=glow.userData.life>0;}
         for(const [id,mesh] of this.turretMeshes??[]) {
@@ -4903,6 +5647,13 @@ export class SpaceRenderer {
                 beacon.material.opacity = 0.42 + beaconPulse * 0.42;
                 beacon.scale.setScalar(radius * (0.14 + beaconPulse * 0.07));
             });
+        }
+        for (const [id, root] of this.locationMeshes) {
+            if (!root.visible || this.camera.position.distanceToSquared(root.position) > (LOCATIONS[id].radius * 8) ** 2) continue;
+            for (const model of root.children) {
+                const activity = model.userData.stationActivity;
+                if (activity) updateStationActivity(activity, this.skyTime);
+            }
         }
         const mourningVisible = Boolean(this.instanceRoots.get('mourning-line')?.visible);
         const helix = this.locationMeshes.get('helix');
@@ -5153,7 +5904,7 @@ export class SpaceRenderer {
         return true;
     }
     async prepareActiveScene() {
-        if (this.contextLost)
+        if (this.disposed || this.contextLost)
             return;
         let timeoutId;
         let timedOut = false;
@@ -5161,6 +5912,12 @@ export class SpaceRenderer {
             const compile = typeof this.renderer.compileAsync === 'function'
                 ? this.renderer.compileAsync(this.scene, this.camera)
                 : Promise.resolve(this.renderer.compile(this.scene, this.camera));
+            // Keep resources alive until Three finishes its readiness polling,
+            // even when the loading-screen timeout wins the race.
+            this.pendingShaderCompiles ??= new Set();
+            this.pendingShaderCompiles.add(compile);
+            const settled = () => this.pendingShaderCompiles.delete(compile);
+            compile.then(settled, settled);
             const timeout = new Promise((resolve) => {
                 timeoutId = setTimeout(() => {
                     timedOut = true;
@@ -5354,11 +6111,20 @@ export class SpaceRenderer {
         this.contextLost = false;
         this.resize();
     };
+    // Model loading can replace provisional meshes during warmup as well as
+    // during shutdown. Keep those materials valid for the readiness poll.
+    deferShaderDisposal(dispose) {
+        if (!this.pendingShaderCompiles?.size) return false;
+        Promise.allSettled([...this.pendingShaderCompiles]).then(dispose);
+        return true;
+    }
     disposeObject(object) {
+        if (this.deferShaderDisposal(() => this.disposeObject(object))) return;
         object.traverse((child) => {
-            if (!(child instanceof THREE.Mesh || child instanceof THREE.Points || child instanceof THREE.Sprite))
+            if (!(child instanceof THREE.Mesh || child instanceof THREE.Points || child instanceof THREE.Sprite || child instanceof THREE.Line))
                 return;
             const mesh = child;
+            if (mesh.isInstancedMesh) mesh.dispose();
             // Assets flagged userData.shared (laserFx caches) are reused across
             // many live objects — a single bolt's death must not dispose them.
             if (mesh.geometry && !mesh.geometry.userData?.shared)
@@ -5377,7 +6143,18 @@ export class SpaceRenderer {
         });
     }
     dispose() {
+        if (this.disposed) return;
         this.disposed = true;
+        // Hide and detach immediately, but do not invalidate materials that
+        // compileAsync is still polling during a quick session replacement.
+        this.renderer.domElement.remove();
+        if (this.pendingShaderCompiles?.size) {
+            Promise.allSettled([...this.pendingShaderCompiles]).then(() => this.disposeResources());
+        } else {
+            this.disposeResources();
+        }
+    }
+    disposeResources() {
         this.clearDrones();
         window.removeEventListener('resize', this.resize);
         this.containerResizeObserver?.disconnect();

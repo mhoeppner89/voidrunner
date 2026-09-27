@@ -15,16 +15,15 @@ size=512
 rng=np.random.default_rng(829)
 pixels=np.ones((size,size,4),dtype=np.float32)
 a=np.full((size,size),.67,dtype=np.float32)
-for y in range(0,512,64):
- for x in range(0,512,64):
-  w=64;h=64;v=float(rng.uniform(.56,.78));a[y:y+h,x:x+w]=v
-  a[y:y+2,x:x+w]=.16;a[y:y+h,x:x+2]=.16
-  a[y+3:y+4,x+4:x+w-3]=v+.1;a[y+4:y+h-3,x+3:x+4]=v+.07
-  for dx,dy in [(7,7),(56,7),(7,56),(56,56)]:a[y+dy:y+dy+2,x+dx:x+dx+2]=.25
-  if (x//64+y//64)%3==0:
-   for i in range(5):a[y+20+i*4:y+22+i*4,x+36:x+54]=.24
-  for i in range(4):
-   sx=int(rng.integers(9,52));sy=int(rng.integers(8,58));a[y+sy,x+sx:x+sx+int(rng.integers(2,8))]=v+.14
+for y in range(0,512,32):
+ for x in range(0,512,128):
+  w=128;h=32;v=float(rng.uniform(.62,.72));a[y:y+h,x:x+w]=v
+  a[y:y+2,x:x+w]=.38;a[y:y+h,x:x+2]=.38
+  a[y+2:y+3,x+3:x+w-2]=v+.055
+  for dx,dy in [(6,6),(120,6),(6,25),(120,25)]:a[y+dy,x+dx]=.3
+  if (x//128+y//32)%7==0:
+   for i in range(4):a[y+9+i*3:y+10+i*3,x+91:x+115]=.38
+  if (x//128+y//32)%5==0:a[y+9:y+23,x+12:x+28]=v-.065
 for k in range(3):pixels[:,:,k]=a
 image=bpy.data.images.new('Acheron structural panels 512',width=size,height=size)
 image.pixels.foreach_set(pixels.ravel());image.pack()
@@ -74,13 +73,100 @@ def ring(name,r,thick,z,height,material='steel',n=32):
  mesh=bpy.data.meshes.new(name);mesh.from_pydata(verts,[],faces);mesh.update();o=bpy.data.objects.new(name,mesh);scene.collection.objects.link(o);return finish(o,name,material)
 def quad(name,verts,material):
  mesh=bpy.data.meshes.new(name);mesh.from_pydata(verts,[],[(0,1,2,3)]);mesh.update();o=bpy.data.objects.new(name,mesh);scene.collection.objects.link(o);return finish(o,name,material)
+def window_mesh(name,panes,material='warm'):
+ if not panes:return
+ verts=[v for pane in panes for v in pane]
+ me=bpy.data.meshes.new(name);me.from_pydata(verts,[],[tuple(range(i,i+4))for i in range(0,len(verts),4)]);me.update()
+ o=bpy.data.objects.new(name,me);scene.collection.objects.link(o);finish(o,name,material)
 def windows_ring(r,z,rows,count=48,width=1.05,slope=0):
- for row in range(rows):
-  for i in range(count):
-   if (i+row*7)%9 in [0,1,5]:continue
-   a=i*2*math.pi/count;d=width/r
-   quad('Habitation window',[((r+slope*(zz-z))*math.cos(math.pi/32)/math.cos((t%(math.tau/32))-math.pi/32)*math.cos(t),(r+slope*(zz-z))*math.cos(math.pi/32)/math.cos((t%(math.tau/32))-math.pi/32)*math.sin(t),zz)for t,zz in [(a-d,z+row*2),(a+d,z+row*2),(a+d,z+row*2+.65),(a-d,z+row*2+.65)]],'warm')
-def hangar(x,y,z,w=20,h=10,depth=16):
+ panes=[]
+ for row in range(rows*2):
+  for i in range(count*2):
+   if (i+row*7)%11 in [0,1,5,8]:continue
+   a=i*math.tau/(count*2);d=min(.24,width*.3)/r
+   panes.append([((r+slope*(zz-z))*math.cos(math.pi/32)/math.cos((t%(math.tau/32))-math.pi/32)*math.cos(t),(r+slope*(zz-z))*math.cos(math.pi/32)/math.cos((t%(math.tau/32))-math.pi/32)*math.sin(t),zz)for t,zz in [(a-d,z+row*.9),(a+d,z+row*.9),(a+d,z+row*.9+.24),(a-d,z+row*.9+.24)]])
+ window_mesh('Fine habitation decks',panes)
+def scale_details():
+ # Fit small occupied decks directly to structural faces, including rotated modules.
+ bpy.context.view_layer.update();panes=[]
+ names=('gallery','workshop','works module','freight terminal','service block','services','service hut','customs office','inspection block','refinery foundation','barracks','citadel','habitation block','laboratory pressure deck')
+ candidates=[]
+ for o in list(objects):
+  if not any(k in o.name.lower() for k in names):continue
+  for f in o.data.polygons:
+   n=o.matrix_world.to_3x3()@f.normal
+   if abs(n.z)>.12 or f.area<16:continue
+   vs=[o.matrix_world@o.data.vertices[i].co for i in f.vertices]
+   u=Vector((-n.y,n.x,0)).normalized();v=Vector((0,0,1));c=sum(vs,Vector())/len(vs)
+   lo,hi=min((q-c).dot(u)for q in vs),max((q-c).dot(u)for q in vs)
+   bottom,top=min(q.z-c.z for q in vs),max(q.z-c.z for q in vs)
+   # Beveled box side faces are rectangular after excluding their chamfers.
+   for iz in range(int((top-bottom-1)/1.25)):
+    for ix in range(int((hi-lo-1)/1.1)):
+     if (ix*3+iz*7)%13 in [0,1,6,10]:continue
+     center=c+u*(lo+.7+ix*1.1)+v*(bottom+.7+iz*1.25)+n*.035
+     candidates.append([tuple(center+u*dx+v*dy)for dx,dy in [(-.19,-.12),(.19,-.12),(.19,.12),(-.19,.12)]])
+ # Even sampling bounds the cost while retaining decks across every module.
+ stride=max(1,math.ceil(len(candidates)/850));window_mesh('Occupied service decks',candidates[::stride])
+ # Old broad light blocks become small, clustered panes rather than giant windows.
+ for o in list(objects):
+  if o.data.materials[0]!=M['warm'] or len(o.data.polygons)>8:continue
+  if not any(k in o.name.lower()for k in ['window','glazing','bridge light','control light','tavern lamp','watch room','lab interior']):continue
+  o.scale.x*=.38;o.scale.z*=.28
+def cargo_stack(x,y,z,rows=2):
+ # Bottom is seated on the deck; small individual freight containers establish scale.
+ for i in range(rows):
+  for j in range(2 if i==0 else 1):
+   xx=x+(j-.5)*1.8;zz=z+.55+i*1.12
+   box('Freight container',(xx,y,zz),(1.65,3,1.05),'rust' if (i+j)%2 else 'gold',0)
+   for yy in [-1.05,1.05]:box('Container reinforcing band',(xx,y+yy,zz),(1.7,.09,1.09),'steel',0)
+def berth(x,y,z,w=5,d=7):
+ for side in [-1,1]:
+  box('Berth side marking',(x+side*w/2,y,z+.025),(.08,d,.05),'gold',0)
+  box('Berth end marking',(x,y+side*d/2,z+.025),(w,.08,.05),'gold',0)
+def equipment(x,y,z,kind):
+ if kind=='fuel':
+  box('Fuel skid',(x,y,z+.15),(3,4,.3),'steel',0)
+  for side in [-1,1]:
+   cyl('Service gas cylinder',(x+side*.8,y,z+1.3),.6,2.3,'ivory',8)
+  box('Fuel control cabinet',(x,y-1.6,z+.7),(1.1,.65,1.4),'gold',0)
+ elif kind=='rack':
+  for side in [-1,1]:box('Parts rack upright',(x+side*1.5,y,z+1.8),(.18,1.8,3.6),'steel',0)
+  for h in [.2,1.65,3.1]:
+   box('Parts rack shelf',(x,y,z+h),(3.2,1.8,.14),'steel',0)
+   for j in [-1,1]:box('Sealed replacement assembly',(x+j*.8,y,z+h+.4),(1.15,1.3,.65),'ivory',0)
+ elif kind=='military':
+  for j in range(3):
+   box('Armament transport case',(x,y+j*1.25,z+.5),(4.2,1,1),'steel',0)
+   box('Armament case safety band',(x,y+j*1.25,z+1.02),(.3,1,.04),'gold',0)
+ elif kind=='science':
+  box('Clean sample pallet',(x,y,z+.15),(3.2,2.4,.3),'steel',0)
+  for j in [-1,1]:
+   box('Sealed specimen module',(x+j*.85,y,z+.9),(1.4,1.8,1.5),'ivory',.1)
+   box('Specimen status strip',(x+j*.85,y-.91,z+1),(.5,.03,.14),'cool',0)
+ elif kind=='ore':
+  box('Ore skip base',(x,y,z+.15),(4,3,.3),'rust',0)
+  for side in [-1,1]:box('Ore skip side',(x+side*1.9,y,z+.8),(.2,3,1.5),'steel',0)
+  for side in [-1,1]:box('Ore skip end',(x,y+side*1.4,z+.8),(4,.2,1.5),'steel',0)
+  for j in range(5):cyl('Mineral load',(x+(j%3-1)*.9,y+(j//3-.5)*1.1,z+.65),.65,.8,'dark',5)
+ else:cargo_stack(x,y,z,1)
+def apron_activity(x,y,z,w,d,theme):
+ # Authored dock roles; sparse clusters leave room for real ship assets.
+ if theme=='salvage':
+  equipment(x+w*.32,y+d*.24,z,'rack');equipment(x+w*.32,y-d*.13,z,'ore')
+  box('Salvage engine pallet',(x-w*.32,y+d*.27,z+.2),(6,4,.4),'steel',0)
+  for j in [-1,1]:cyl('Recovered drive casing',(x-w*.32+j*1.3,y+d*.27,z+1.1),1,1.8,'steel',10)
+ elif theme=='refinery':
+  for j in range(3):equipment(x+w*.32,y+d*(.23-j*.19),z,'fuel')
+  equipment(x-w*.32,y+d*.25,z,'ore')
+ elif theme=='frontier':
+  equipment(x+w*.3,y+d*.24,z,'fuel');equipment(x+w*.3,y-d*.22,z,'rack')
+ elif theme=='smuggler':
+  cargo_stack(x+w*.32,y+d*.28,z,2);cargo_stack(x-w*.32,y+d*.3,z,1)
+  box('Covered bonded consignment',(x+w*.28,y-d*.24,z+.9),(5,2.5,1.8),'dark',.15)
+ else:
+  equipment(x+w*.3,y+d*.27,z,'rack');equipment(x-w*.32,y+d*.25,z,'fuel')
+def hangar(x,y,z,w=20,h=10,depth=16,theme="freight"):
  # Open toward -Y; floor, deep rear wall and connected jambs form a real recess.
  box('Dock floor',(x,y,z-h/2),(w+4,depth,1.7),'steel')
  box('Dock roof',(x,y,z+h/2),(w+4,depth,2),'ivory')
@@ -90,15 +176,41 @@ def hangar(x,y,z,w=20,h=10,depth=16):
   box('Dock approach light',(x+side*(w/2-.2),y-depth/2-.25,z),( .35,.4,h*.6),'cool',0)
  box('Dock rear bulkhead',(x,y+depth/2-.4,z),(w,1,h),'dark',0)
  for i in range(4):box('Dock floor lane',(x+(i-1.5)*w/5,y,z-h/2+.9),(.35,depth*.85,.04),'gold',0)
+ # Internal galleries reduce the empty opening while preserving the central flight lane.
+ floor=z-h/2+.86
+ box('Hangar service gallery',(x,y+depth*.28,z+h*.23),(w-1,depth*.3,h*.16),'steel',0)
+ for side in [-1,1]:
+  xx=x+side*w*.39
+  box('Hangar personnel door',(xx,y+depth/2-.92,floor+1.1),(1,.06,2.1),'steel',0)
+  box('Personnel door light',(xx,y+depth/2-.97,floor+2.2),(1,.04,.14),'warm',0)
+  box('Dock work light',(x+side*w*.47,y-depth*.15,z+h*.28),(.12,depth*.48,.12),'warm',0)
+ for i in range(max(3,int(w/1.1))):
+  xx=x-w*.43+i*w*.86/max(2,int(w/1.1)-1)
+  box('Dock operations panes',(xx,y+depth*.13-.04,z+h*.23),(.3,.06,.2),'warm',0)
+ if w>=12:
+  if theme=='military':
+   equipment(x-w*.33,y+depth*.1,floor,'military')
+   equipment(x+w*.34,y+depth*.28,floor,'rack')
+  elif theme=='refinery':equipment(x+w*.33,y+depth*.17,floor,'fuel')
+  elif theme=='workshop':
+   equipment(x-w*.33,y+depth*.26,floor,'rack')
+   box('Engine service bench',(x+w*.33,y+depth*.26,floor+.75),(3,3.2,1.5),'steel',0)
+  elif theme=='smuggler':cargo_stack(x+w*.34,y+depth*.26,floor,1)
+  elif theme=='residential':
+   equipment(x-w*.34,y+depth*.23,floor,'science')
+  else:
+   cargo_stack(x-w*.33,y+depth*.23,floor,2)
+   box('Bulk cargo pallet',(x+w*.32,y+depth*.27,floor+.55),(3.4,2.8,1.1),'ivory',0)
 def tower(x,y,z):
  box('Command neck',(x,y,z),(10,10,18),'steel')
  box('Command gallery',(x,y,z+9),(18,13,5),'ivory')
  box('Bridge glazing',(x,y-6.52,z+9),(15,.1,1.5),'dark',0)
- for i in range(7):box('Bridge lights',(x-6+i*2,y-6.59,z+9),(1.1,.1,.45),'warm',0)
+ for i in range(20):box('Bridge lights',(x-7+i*.72,y-6.59,z+9),(.4,.1,.3),'warm',0)
  cyl('Antenna mast',(x,y,z+20),.4,18,'steel',8)
  beam('Antenna spar',(x-5,y,z+22),(x+5,y,z+22),.35)
 exec(open(ROOT+'/scripts/station-mesh-cleanup.py').read())
 def export(id):
+ scale_details()
  # Apply parts, planar UVs aligned to local structural faces, batch by material.
  bpy.context.view_layer.update()
  for o in objects:
@@ -107,12 +219,13 @@ def export(id):
  bpy.context.view_layer.update()
  cleaned=clean_station_surfaces(objects)
  for o in objects:
+  for old_uv in list(o.data.uv_layers):o.data.uv_layers.remove(old_uv)
   uv=o.data.uv_layers.new(name='Structural panel UV')
   for poly in o.data.polygons:
    axis=max(range(3),key=lambda k:abs(poly.normal[k]));axes=[k for k in range(3)if k!=axis]
    for li in poly.loop_indices:
     v=o.data.vertices[o.data.loops[li].vertex_index].co+o.location
-    uv.data[li].uv=(v[axes[0]]/64,v[axes[1]]/64)
+    uv.data[li].uv=(v[axes[0]]/22,v[axes[1]]/22)
  maxr=max((o.matrix_world@v.co).length for o in objects for v in o.data.vertices)
  for o in objects:o.location*=100/maxr;o.scale*=100/maxr
  groups={key:[o for o in objects if o.data.materials[0]==m]for key,m in M.items()}
@@ -144,7 +257,7 @@ for i in range(12):
  o=box('Dock sector armor',(x,y,3),(17,14,9),'ivory');o.rotation_euler.z=a
  o=box('Service deck',(x,y,-4),(18,16,3),'steel');o.rotation_euler.z=a
 # Signature front bay below the city tiers, actually attached to hull.
-hangar(0,-42,-3,24,12,24)
+hangar(0,-42,-3,24,12,24,theme="residential")
 for x in [-14,14]:
  box('Freight transfer trunk',(x,-34,-17),(8,17,14),'steel')
  for z in [-22,-17,-12]:box('Container stack',(x,-43,z),(7,8,3.4),'gold' if z==-17 else 'rust')
@@ -184,7 +297,7 @@ for x in [-39,39]:
  for z in [-13,-2,9]:ring('Tank straps',6.3,1,z,1.1,'gold',16).location.x=x;objects[-1].location.y=29
  beam('Reservoir connector',(x,29,-6),(x*.57,29,-6),4)
 # two exterior service berths, each with supported floor.
-hangar(-34,-69,-4,12,8,20);hangar(34,-69,-4,12,8,20)
+hangar(-34,-69,-4,12,8,20,theme="workshop");hangar(34,-69,-4,12,8,20,theme="refinery")
 report.append(export('league-yard'))
 # CINDERFALL: pressure-shielded habitat above a heavy working refinery.
 cyl('Habitat main drum',(0,0,15),22,35,'ivory',32)
@@ -206,7 +319,7 @@ for side in [-1,1]:
  box('Radiator backing',(side*54,0,23),(23,43,1.8),'dark',.2)
  for j in range(9):box('Heat rejection fins',(side*54,-19+j*4.7,24),(22,.8,2.5),'steel',0)
  for x in [side*43,side*65]:beam('Radiator edge',(x,-22,23),(x,22,23),1.2,'rust')
-hangar(0,-34,-4,20,10,22)
+hangar(0,-34,-4,20,10,22,theme="refinery")
 tower(0,0,46)
 cyl('Ventral heat stack',(0,0,-32),9,30,'steel',16,r2=12)
 for z in [-43,-35,-27]:ring('Heat stack jacket',12,2,z,2,'rust',24)
