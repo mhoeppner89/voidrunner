@@ -10,6 +10,8 @@ import {WEAPONS} from './weapons.js';
 const type=DRONE_TYPES.pdc;
 const anchorKinds=['launch','dock','escort'];
 const weapon=Object.freeze({...WEAPONS.pdc,damageFlat:WEAPONS.pdc.damageFlat*2,speed:type.projectileSpeed});
+const attackType=DRONE_TYPES.attack;
+const attackWeapon=Object.freeze({...WEAPONS.pulse,damageFlat:8,speed:attackType.projectileSpeed,life:1.2});
 const point=()=>({position:[0,0,0],velocity:[0,0,0]});
 export function droneUnits(session){
  const units=session.combinedDroneUnits??=Object.create(null);
@@ -23,18 +25,19 @@ export function damageNpcDrone(session,unit,amount){
  if(!unit.hull){const ship=session.ships.find(s=>s.id===unit.ownerId);if(ship?.droneFleet)destroyPdcDrone(ship.droneFleet,unit.id,'damage');}
 }
 function initialize(session,ship){
- const hull=ship.combatFit?.hullId,count=Math.min(droneBayLayoutFor(hull).length,ship.combatFit?.droneCount??Infinity);
+ const hull=ship.combatFit?.hullId,configuredTypes=ship.combatFit?.droneTypes,count=Math.min(droneBayLayoutFor(hull).length,ship.combatFit?.droneCount??configuredTypes?.length??Infinity);
  if(!count||ship.npcDrones||ship.hull<=0||ship.tutorialEnemy||ship.tutorialCompanion)return;
  const fleet=ship.droneFleet=createDroneFleet(),context={ownerId:ship.id,unitIds:[],threats:[],opponents:[],bayAnchors:{},escortAnchors:{},weaponOwner:{ownerId:ship.id,faction:ship.faction,targetId:ship.targetId}};
  const state=ship.npcDrones={controller:createPdcDroneController(),context,events:[],threatPool:[],opponentPool:[],live:new Map(),q:new THREE.Quaternion(),inverse:new THREE.Quaternion(),p:new THREE.Vector3(),v:new THREE.Vector3(),end:new THREE.Vector3(),local:new THREE.Vector3(),ray:new THREE.Vector3(),omega:new THREE.Vector3(),spin:new THREE.Vector3()};
  for(let i=0;i<count;i++){
-  const id=`${ship.id}-drone-${i}`,unit=createDroneUnit(id,'pdc');unit.ownerId=ship.id;
+  const id=`${ship.id}-drone-${i}`,unit=createDroneUnit(id,configuredTypes?.[i]??'pdc');unit.ownerId=ship.id;
   fleet.unitsById[id]=unit;(session.npcDroneUnits??=Object.create(null))[id]=unit;context.unitIds.push(id);
   context.bayAnchors[id]={launch:point(),dock:point()};context.escortAnchors[id]=point();
  }
  context.canFire=(unit,target,start,direction,time)=>{
-  if(time>weapon.life)return false;
-  state.p.fromArray(start);state.end.fromArray(direction).multiplyScalar(type.projectileSpeed).add(state.v.fromArray(unit.velocity)).multiplyScalar(time).add(state.p);
+  const unitType=DRONE_TYPES[unit.type]??type,shot=unit.type==='attack'?attackWeapon:weapon;
+  if(time>shot.life)return false;
+  state.p.fromArray(start);state.end.fromArray(direction).multiplyScalar(unitType.projectileSpeed).add(state.v.fromArray(unit.velocity)).multiplyScalar(time).add(state.p);
   if(session.lineBlocked(state.p,state.end,ship.id))return false;
   // Reject shots through any friendly hull, including the mothership.
   for(const other of session.ships){
@@ -75,8 +78,8 @@ export function updateNpcDrones(session,dt){
     else s.p.set(0,-ext[1],0);
     s.p.y+=kind==='launch'?-3.5:1;
     if(kind==='escort'){
-     const turret=TURRET_LAYOUTS[ship.combatFit.hullId]?.[0];
-     s.p.set(0,-(turret?.side??1)*(ext[1]+type.escortDistance),(turret?.position[2]??0)*ext[2]);
+     const turret=TURRET_LAYOUTS[ship.combatFit.hullId]?.[0],escortDistance=DRONE_TYPES[fleet.unitsById[id]?.type]?.escortDistance??type.escortDistance;
+     s.p.set(0,-(turret?.side??1)*(ext[1]+escortDistance),(turret?.position[2]??0)*ext[2]);
      if(count>1){const phase=now*rate+i*2*Math.PI/count,r=Math.max(ext[0],ext[1])+type.escortDistance;s.p.set(Math.cos(phase)*r,Math.sin(phase)*r,0);s.v.set(-s.p.y*rate,s.p.x*rate,0);}
     }
     s.p.applyQuaternion(s.q);s.v.applyQuaternion(s.q).add(s.spin.crossVectors(s.omega,s.p));
@@ -87,6 +90,7 @@ export function updateNpcDrones(session,dt){
   c.inFlight=!ship.surrendered&&!ship.standingDown&&!ship.fleeing;c.assignments=session.pdcAssignments;c.defenseChannel=getPdcDefenseChannel(session,ship.id);
   c.opponents.length=0;c.weaponOwner.faction=ship.faction;c.weaponOwner.targetId=ship.targetId;
   const ready=!ship.holdFire&&!ship.pursuitHoldFire&&!ship.pendingMug&&!ship.pendingMugLeaderId;
+  c.attackTargetId=ready?ship.targetId:null;
   if(ready){
    let index=0;const add=(actor,id)=>{const proxy=s.opponentPool[index++]??={};proxy.id=id;proxy.hostile=true;proxy.hull=actor.hull;proxy.position=actor.position;proxy.velocity=actor.velocity;c.opponents.push(proxy);};
    for(const other of session.ships)if(other!==ship&&combatTargetEligible(other)&&session.projectileCanHitShip(c.weaponOwner,other))add(other,other.id);
@@ -110,7 +114,7 @@ export function updateNpcDrones(session,dt){
   s.events.length=0;s.controller.update(fleet,dt,c,s.events);
   for(const e of s.events)if(e.type==='fire'){
    const missile=e.targetKind==='ship'?null:s.live.get(e.threatId);
-   const round=session.spawnGunProjectile(ship.id,weapon,s.p.fromArray(e.start),s.v.fromArray(e.direction),e.inheritedVelocity,e.targetKind==='ship'?e.threatId:undefined,e.unitId);
+   const round=session.spawnGunProjectile(ship.id,fleet.unitsById[e.unitId]?.type==='attack'?attackWeapon:weapon,s.p.fromArray(e.start),s.v.fromArray(e.direction),e.inheritedVelocity,e.targetKind==='ship'?e.threatId:undefined,e.unitId);
    if(round){if(missile)round.targetMissile=missile;const assigned=session.pdcAssignments.get(e.threatId);if(assigned?.defenderId===e.unitId)assigned.round=round;}
    else {fleet.unitsById[e.unitId].ammo+=e.ammoSpent;if(session.pdcAssignments.get(e.threatId)?.defenderId===e.unitId)session.pdcAssignments.delete(e.threatId);}
   }

@@ -8942,15 +8942,22 @@ export class GameSession {
             const fit=ship.combatFit;
             // Give the defining weapon an opportunity to recharge; cheaper
             // repeaters must not consume every regenerated point first.
-            const index=fit.attackOrder.find(i=>{
-                const weapon=WEAPONS[fit.weapons[i]];
-                return this.save.world.time >= fit.fireAt[i] && distance < weaponRange(weapon);
-            }) ?? -1;
+            const equippedIndex=fit.attackOrder?.find?.(i=>WEAPONS[fit.weapons?.[i]])??fit.weapons?.findIndex?.(id=>WEAPONS[id])??-1;
+            const index=fit.attackOrder?.find?.(i=>{
+                const weapon=WEAPONS[fit.weapons?.[i]];
+                return Boolean(weapon) && this.save.world.time >= fit.fireAt?.[i] && distance < weaponRange(weapon);
+            }) ?? equippedIndex;
             ship.combatWeaponIndex=index;
-            const selected=WEAPONS[fit.weapons[index]] ?? WEAPONS[fit.weapons.at(-1)];
-            ship.projectileSpeed=selected.speed;
-            ship.projectileLife=selected.life;
-            ship.fireRange=weaponRange(selected);
+            const selected=WEAPONS[fit.weapons?.[index]];
+            if(selected){
+                ship.projectileSpeed=selected.speed;
+                ship.projectileLife=selected.life;
+                ship.fireRange=weaponRange(selected);
+            }else{
+                ship.projectileSpeed=undefined;
+                ship.projectileLife=undefined;
+                ship.fireRange=0;
+            }
             this.updateNpcOrdnance(ship,targetPosition,dt);
         }
         const aiRng = typeof ship.aiRng === 'function' ? ship.aiRng : FALLBACK_AI_RNG;
@@ -9386,7 +9393,8 @@ export class GameSession {
         const facing = forward.dot(lead);
         // Only short pulse/scatter opportunities widen the trigger window;
         // physical barrel direction and narrow aim assistance remain separate.
-        const forwardWeapon=WEAPONS[ship.combatFit?.weapons[ship.combatWeaponIndex]]??WEAPONS[ship.combatFit?.weapons.at(-1)];
+        const fit=ship.combatFit;
+        const forwardWeapon=WEAPONS[fit?.weapons?.[ship.combatWeaponIndex]]??WEAPONS[fit?.weapons?.[fit?.attackOrder?.[0]]];
         const triggerReady=npcTriggerReady(ship,forwardWeapon,facing,this.save.world.time);
         const fireGate = Math.cos(npcTriggerCone(ship,forwardWeapon,this.save.world.time));
         const fireRange = pilotMod(ship, ship.fireRange ?? tactics?.range ?? ATTACK_FIRE_RANGE, 'fireRangeMul');
@@ -9821,7 +9829,7 @@ export class GameSession {
         const disruption=disruptionFactor(ship,this.save.world.time);
         if (ship.combatFit && !ship.tutorialEnemy && !ship.tutorialCompanion && !ship.capitalClass) {
             const fit=ship.combatFit, index=opportunity?.index??ship.combatWeaponIndex;
-            const weapon=WEAPONS[fit.weapons[index]];
+            const weapon=WEAPONS[fit.weapons?.[index]];
             if (!weapon || this.save.world.time < fit.fireAt[index] || this.save.world.time<(ship.gunBurstPauseUntil??0)) return;
             const anchor=SHIP_MOUNT_ANCHORS[fit.hullId]?.guns[index]??[0,0,-2.5];
             const start=new THREE.Vector3().fromArray(anchor).multiplyScalar(npcShipScaleForVariant(npcFlightVariant(ship))).applyQuaternion(new THREE.Quaternion().fromArray(ship.rotation)).add(vec(ship.position));

@@ -2,11 +2,16 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {session} from './weapon-overhaul.test.mjs';
 import * as THREE from '../vendor/three.module.min.js';
-import {WEAPONS,LAUNCHERS,TRACKING_LASER,weaponRange} from '../src/game/weapons.js';
+import {WEAPONS,LAUNCHERS,TRACKING_LASER,weaponRange,weaponShotDamage} from '../src/game/weapons.js';
 import {OUTFIT_ITEMS,loadoutFor} from '../src/game/outfitting.js';
 import {TURRET_LAYOUTS} from '../src/game/turretLayouts.js';
 const {relativeIntercept,guideMissile,closestHullPoint}=await import('../src/game/weaponFlight.js');
 const V=(...n)=>new THREE.Vector3(...n);
+
+test('missing weapon definitions have no range or shot damage',()=>{
+ assert.equal(weaponRange(undefined),0);
+ assert.equal(weaponShotDamage(undefined),0);
+});
 
 test('weapon ranges end exactly at their limit, including a partial final simulation step',()=>{
  for(const [id,range] of Object.entries({beam:300,pdc:300,ripper:350,pulse:400,'pulse-mk2':400,ion:400,mortar:450,gauss:600})){

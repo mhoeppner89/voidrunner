@@ -55,8 +55,8 @@ for(const weapon of Object.values(WEAPONS)){
     weapon.descriptionKey=weapon.envelopeKey=descriptions[weapon.id];
 }
 export const TRACKING_LASER=Object.freeze({id:'tracking-turret',kind:'beam',range:300,speed:100000,damageFlat:6*WEAPON_DAMAGE_SCALE,energyCost:4,cooldown:.7});
-export const weaponRange=weapon=>weapon.range??weapon.speed*weapon.life;
-export const weaponShotDamage=weapon=>weapon.damageFlat??0;
+export const weaponRange=weapon=>weapon?.range??(weapon?.speed??0)*(weapon?.life??0);
+export const weaponShotDamage=weapon=>weapon?.damageFlat??0;
 // Launcher records are kept beside guns because they share target and
 // projectile plumbing, but they use ship-local magazines and their own
 // selection cycle. A swarm canister is one magazine round that opens into

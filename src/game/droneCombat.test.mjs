@@ -18,6 +18,19 @@ assert.equal(run([ship('near',50),ship('far',100)]).fire.threatId,'near');
 assert.equal(run([ship('blocked',50),ship('clear',100)],[],(_,s)=>s.id!=='blocked').fire.threatId,'clear');
 const missile={id:'missile',kind:'missile',hostile:true,ownerId:'enemy',targetId:'player',position:[150,0,0],velocity:[-100,0,0],life:5};
 result=run([ship('enemy',50)],[missile]);assert.equal(result.fire.targetKind,'missile');assert.equal(result.fire.threatId,'missile');assert.equal(result.assignments.size,1);
+const attackFleet=createDroneFleet();attackFleet.unitsById.strike=createDroneUnit('strike','attack');
+const attackPoint={position:[0,0,0],velocity:[0,0,0]};
+const attackContext={ownerId:'player',unitIds:['strike'],shipPosition:[0,0,0],shipVelocity:[0,0,0],ownerRadius:2,inFlight:true,now:0,
+ threats:[],opponents:[ship('unselected',35),ship('locked',180)],attackTargetId:'locked',assignments:new Map(),
+ bayAnchors:{strike:{launch:attackPoint,dock:attackPoint}},escortAnchors:{strike:attackPoint}};
+const attackController=createPdcDroneController(),attackEvents=[];
+for(let step=0;step<4;step++){attackContext.now=step/60;attackController.update(attackFleet,1/60,attackContext,attackEvents);}
+assert.equal(attackEvents.find(e=>e.type==='fire')?.threatId,'locked','attack drones stay on the mothership selected target');
+assert.equal(attackFleet.unitsById.strike.ammo,179);
+const idleFleet=createDroneFleet();idleFleet.unitsById.strike=createDroneUnit('strike','attack');
+const idleEvents=[];
+for(let step=0;step<4;step++){attackContext.now=step/60;attackController.update(idleFleet,1/60,{...attackContext,attackTargetId:null},idleEvents);}
+assert.equal(idleEvents.some(e=>e.type==='fire'),false,'attack drones wait until the mothership selects a hostile');
 // Orbiting drones cannot shoot through their mothership or intervening ships.
 const rt={save:{player:{position:[0,0,0]}},playerCollisionRadius:()=>5,ships:[],npcHullExtents:()=>[3,3,3]};
 const blocked=GameSession.prototype.pdcDroneShotBlocked.bind(rt);

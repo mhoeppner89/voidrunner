@@ -18,6 +18,13 @@ const OBSERVER_FITS = Object.freeze({
     support: Object.freeze({ guns: ['pulse-cannon', 'pulse-cannon', 'mortar'], turret: 'pdc', launcher: 'seeker-launcher', power: 'capacitor-bank', defense: 'shield-mk2' }),
     beam: Object.freeze({ guns: ['beam-emitter', 'beam-emitter', 'beam-emitter'], turret: 'tracking-turret', launcher: 'seeker-launcher', power: 'sustained-reactor' }),
 });
+// Industrial combat doctrine reflects each ship's job: the Wayfarer has one
+// attack drone, while Prospector and Atlas prioritize point defense.
+const NPC_DRONE_DEFAULTS = Object.freeze({
+    wayfarer: Object.freeze(['attack']),
+    prospector: Object.freeze(['pdc', 'pdc', 'pdc']),
+    atlas: Object.freeze(['pdc', 'attack']),
+});
 export function createEnemyLoadout(ship, index, arenaFit) {
     const hullId = ship.hullId ?? (ship.role === 'bounty' ? 'lancer' : ship.role === 'trader' ? 'atlas' : ship.role === 'miner' ? 'prospector' : ship.role === 'escort' ? 'wayfarer' : ship.role === 'patrol' ? 'vanguard' : 'talon');
     const spec=HULL_HARDPOINTS[hullId], choices=FITS[index % FITS.length];
@@ -50,7 +57,8 @@ export function createEnemyLoadout(ship, index, arenaFit) {
     return {hullId,guns,weapons,turrets,launchers,power:equipmentLoadout.power,drive:equipmentLoadout.drive,defense:equipmentLoadout.defense,utility:equipmentLoadout.utility,fitId:observerFit ? arenaFit : undefined,profile,stats,attackOrder:[...weapons.keys()].filter(i=>weapons[i]).reverse(),resources:{...stats,shield:stats.shield},fireAt:weapons.map(()=>0),
         launcher,
         racks: launchers.some(Boolean) ? launchers.filter(Boolean).map(id=>{const launcher=launcherIdForOutfit(id);return {launcher,missiles:LAUNCHERS[launcher].capacity};}) : undefined,
-        missiles:observerFit ? (LAUNCHERS[launcher]?.capacity ?? 0) : hullId==='lancer'?2:index%3===0?4:0};
+        missiles:observerFit ? (LAUNCHERS[launcher]?.capacity ?? 0) : hullId==='lancer'?2:index%3===0?4:0,
+        droneTypes:NPC_DRONE_DEFAULTS[hullId]};
 }
 
 // Shared by live NPC fitting and controlled balance fixtures.

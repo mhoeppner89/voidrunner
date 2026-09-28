@@ -4,6 +4,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import {fixture} from './combat-variety.test.mjs';
 import {planCombatFlight,combatPursuitDirection,friendlyFiringLaneBlocked} from '../src/game/combatPlanning.js';
 import {combatThrottle,updateCombatIntent,holdingFiringWindow} from '../src/game/combatPiloting.js';
+import {fireCrossfireOpportunity} from '../src/game/combatAwareness.js';
 import {registerHitReaction} from '../src/game/flightDynamics.js';
 import {aceManeuver} from '../src/game/aceManeuvers.js';
 import {SHIPS} from '../src/game/data.js';
@@ -20,6 +21,15 @@ function plan(s,ship,velocity=origin,lead=forward){
  const distance=Math.hypot(...ship.position),closing=-ship.velocity[2]+velocity.z;
  return planCombatFlight(s,ship,origin,velocity,lead,distance,closing);
 }
+test('removed weapon entries leave the NPC firing and crossfire paths harmless',()=>{
+ const {s,ship}=setup('ace',[0,0,200]);
+ ship.combatFit.weapons=['removed-outfit'];ship.combatFit.attackOrder=[0];ship.combatFit.fireAt=[0];ship.combatFit.turrets=[];
+ assert.doesNotThrow(()=>s.updateAttackAI(ship,new THREE.Vector3(0,0,-200),origin,1/60));
+ assert.equal(ship.fireRange,0);assert.equal(s.projectiles.length,0);
+ ship.combatAwareness={outnumbered:true};
+ assert.doesNotThrow(()=>fireCrossfireOpportunity(s,ship));
+ assert.equal(s.projectiles.length,0);
+});
 test('braking uses hull acceleration and future turning room, and cuts an active boost before overshoot',()=>{
  const {s,ship}=setup();ship.velocity=[0,0,-120];ship.combatBoostUntil=2;
  const p=plan(s,ship);assert.equal(p.overshoot,true);
