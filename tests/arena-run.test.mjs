@@ -568,3 +568,17 @@ test('ordinary arena flights suppress landing guidance, docking, and station art
  s.updateAssetWarmup(true);
  assert.deepEqual(predicted,['helix'],'career flights still warm the intended station art');
 });
+
+test('arena wingmen never offer patrol greetings or career recognition, career patrols still do',()=>{
+ const s=fixture(),calls=[];
+ s.save.world.time=20;s.storyLineActive=()=>false;s.chatterOpen=()=>true;
+ s.shipTracksPlayer=()=>true;s.deferentialPilot=()=>false;s.sayPilotLine=(ship,line)=>calls.push(line);
+ const ship={id:'wing-test',role:'patrol',spawnTime:0,proxRng:()=>0,arenaRunWingman:true,recognizesPlayer:true};
+ const pos=new THREE.Vector3();
+ s.maybeNeutralChatter(ship,pos,pos);s.maybeRecognitionLine(ship,pos,pos);s.maybeProximityLine(ship,pos,pos);
+ assert.equal(calls.length,0);assert.equal(s.patrolReplyWindow,undefined);
+ delete ship.arenaRunWingman;
+ s.maybeNeutralChatter(ship,pos,pos);assert.equal(calls.length,0,'ordinary arena NPC also skips patrol chatter');
+ s.arena=undefined;s.maybeNeutralChatter(ship,pos,pos);
+ assert.equal(calls.length,1);assert.equal(s.patrolReplyWindow.shipId,ship.id);
+});

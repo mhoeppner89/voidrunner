@@ -7829,7 +7829,7 @@ export class GameSession {
     // seeded stream so it never perturbs the combat rolls. Allies don't
     // mutter at you; steady pilots stay silent as always.
     maybeProximityLine(ship, position, playerPosition) {
-        if (this.storyLineActive())
+        if (this.arena || ship.arenaRunWingman || this.storyLineActive())
             return;
         // A surrendered pilot pleads once more when the player closes in — a
         // single follow-up to the surrender line, then silence. No proximity
@@ -7877,7 +7877,7 @@ export class GameSession {
     // Concord courtesy. Edge-triggered with a long cooldown and rolled on the
     // prox stream so it never perturbs the combat rolls.
     maybeNeutralChatter(ship, position, playerPosition) {
-        if (this.storyLineActive() || !this.chatterOpen())
+        if (this.arena || ship.arenaRunWingman || this.storyLineActive() || !this.chatterOpen())
             return;
         if (ship.hostile || ship.surrendered || ship.captured || ship.standingDown || this.deferentialPilot(ship) || ship.search || ship.inspection)
             return;
@@ -7967,7 +7967,7 @@ export class GameSession {
     // back wary (wary pool, hostile and fighty). Fires once per ship, rolled
     // on the seeded aiRng like the rest of the chatter.
     maybeRecognitionLine(ship, position, playerPosition) {
-        if (!this.chatterOpen() || ship.saidRecognition || !ship.recognizesPlayer)
+        if (this.arena || ship.arenaRunWingman || !this.chatterOpen() || ship.saidRecognition || !ship.recognizesPlayer)
             return;
         if (playerPosition.distanceTo(position) > PROXIMITY_RANGE)
             return;

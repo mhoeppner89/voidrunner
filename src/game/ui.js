@@ -423,7 +423,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2db';
+const GAME_VERSION = '0.8.2dc';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -805,13 +805,13 @@ const COCKPIT_LAYOUT_BY_SHIP = Object.freeze({
     },
     'vanguard': {
         own: {left: '19.98%', top: '13.00%', width: '18.04%', height: '18.0%'},
-        ownPhone: {left: '17.25%', top: '10.25%', width: '23.5%', height: '23.5%'},
+        ownPhone: {left: '17%', top: '6%', width: '19%', height: '20%'},
         radar: {left: '43.50%', top: '7.90%', width: '13.0%', height: '20.0%'},
-        radarPhone: {left: '43.00%', top: '4.90%', width: '14.0%', height: '26.0%'},
+        radarPhone: {left: '44%', top: '3%', width: '12%', height: '19%'},
         target: {left: '61.98%', top: '13.00%', width: '18.04%', height: '18.0%'},
-        targetPhone: {left: '59.25%', top: '10.25%', width: '23.5%', height: '23.5%'},
+        targetPhone: {left: '64%', top: '6%', width: '19%', height: '20%'},
         hyperdrive: {left: '50%', top: '90%', width: '18%', height: '4%'},
-        hyperdrivePhone: {left: '50%', top: '87%', width: '20%', height: '6%'},
+        hyperdrivePhone: {left: '50%', top: '89%', width: '20%', height: '6%'},
     },
     'talon': {
         own: {left: '37.50%', top: '78.00%', width: '24.6%', height: '18.0%'},

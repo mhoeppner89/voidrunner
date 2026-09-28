@@ -16381,7 +16381,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 /* Comms occupy clear space between the hull's instruments. The idle log
    control is compact; an incoming transmission expands within that lane. */
 #game-shell { --comms-top:12%; --comms-left:50%; --comms-width:60vw; }
-#game-shell[data-cockpit-ship="vanguard"] { --comms-top:48%; --comms-width:56vw; }
+#game-shell[data-cockpit-ship="vanguard"] { --comms-top:73%; --comms-width:50vw; }
 #game-shell[data-cockpit-ship="talon"] { --comms-top:40%; --comms-width:46vw; }
 #game-shell[data-cockpit-ship="prospector"] { --comms-top:17%; --comms-left:59%; --comms-width:44vw; }
 #game-shell[data-cockpit-ship="lancer"] { --comms-top:15%; --comms-width:40vw; }
@@ -16601,4 +16601,26 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
  #game-shell[data-cockpit-ship="wayfarer"] .screen-flight span[data-short]::before,
  #game-shell[data-cockpit-ship="wayfarer"] .screen-bars span[data-short]::before { font-size:10px; }
  #game-shell[data-cockpit-ship="wayfarer"] .screen-ship-layout { padding:2px 3px; grid-template-rows:auto auto auto 8px; }
+}
+
+/* Phone weapon bank: both utility keys retain full-size touch targets.
+   Bound the whole bank to the outer 16% so monitor taps stay accessible. */
+@media (pointer: coarse), (max-width: 900px) {
+  .touch-right { --weapon-key:min(7.7vw, calc(54px * var(--touch-scale,1)), 68px); gap:8px; }
+  .touch-right .touch-fire { width:calc(2 * var(--weapon-key) + 4px); height:calc(var(--weapon-key) * 1.3); }
+  .touch-right .touch-missile,
+  .touch-right .touch-missile.is-mining,
+  .touch-right .touch-launcher-cycle { width:var(--weapon-key); min-width:var(--weapon-key); height:var(--weapon-key); }
+  .touch-controls .touch-boost-right { width:calc(var(--weapon-key) + 8px); height:var(--weapon-key); }
+  #game-shell #hud-wing-tactics .hud-wing-btn { width:clamp(64px,calc(64px * var(--touch-scale,1)),80px); min-height:52px; }
+}
+@media (max-height:520px) and (orientation:landscape) {
+  /* Keep the Wayfarer's readouts inside its painted aperture, clear of the
+     larger outer weapon bank; the cockpit artwork retains the full bezel. */
+  #game-shell[data-cockpit-ship="wayfarer"] .cockpit-screen-target {
+    width:calc(var(--cockpit-target-width) - 2.5vw);
+  }
+}
+#game-shell[data-cockpit-ship="vanguard"] .comms-channel #comms-bar .talker-text {
+  max-height:min(90px,calc(16vh - 20px));
 }
