@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v337-0-8-2da-frigate-retry-perf-mission-surface-batches';
+const CACHE = 'voidrunner-v338-0-8-2db-ship-progression';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,

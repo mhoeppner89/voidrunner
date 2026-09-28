@@ -91,7 +91,7 @@ const servicePlayer = ({ credits = 10000, bays, units = [], lockerIds = [], next
 // Bay identity is fixed by hull. All non-drone hulls deliberately have no bays.
 assert.equal(droneBayLayoutFor('wayfarer').length, 1, 'Wayfarer has one drone bay');
 assert.equal(droneBayLayoutFor('prospector').length, 3, 'Prospector has three drone bays');
-for (const shipId of ['talon', 'vanguard', 'lancer', 'atlas'])
+for (const shipId of ['talon', 'vanguard', 'lancer', 'blade'])
     assert.equal(droneBayLayoutFor(shipId).length, 0, `${shipId} has no drone bays`);
 assert.deepEqual(droneBayLayoutFor('wayfarer').map((bay) => bay.bayId), ['drone-1']);
 assert.deepEqual(droneBayLayoutFor('prospector').map((bay) => bay.bayId), ['drone-1', 'drone-2', 'drone-3']);

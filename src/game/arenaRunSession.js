@@ -10,6 +10,7 @@ import {createEnemyLoadout} from './enemyLoadouts.js';
 import {getEffectiveShipStats} from './shipStats.js';
 import {loadoutFor} from './outfitting.js';
 import {SHIPS} from './data.js';
+import {shipVariantForRole} from './voxelModels.js';
 import {t} from './i18n.js';
 const clone=x=>JSON.parse(JSON.stringify(x));
 // A hired wingman flies patrol doctrine on the Free Merchants' colours. That
@@ -26,6 +27,22 @@ const WINGMAN_OFFSET_SCALE=110;
 // simply keeps leaving the fight until the order changes.
 const WINGMAN_BREAK_DISTANCE=2400;
 export const ArenaRunMethods={
+ preloadRunWaveModels(){
+  const r=this.save.arenaRun,wave=RUN_WAVES[r?.wave];if(!wave)return;
+  const variants=new Set();
+  for(const [role] of wave.enemies){
+   const variant=role==='frigate'?'concord-frigate':shipVariantForRole(role);
+   if(variant)variants.add(variant);
+  }
+  for(const wingman of (r.wingmen??[]).filter(entry=>entry.alive!==false)){
+   const variant=SHIPS[wingman.hullId]?.variant??wingman.hullId;
+   if(variant)variants.add(variant);
+  }
+  // Enemy hulls used to start loading only when their live wave spawn reached
+  // syncShips. Start those fetches during the preparation screen/countdown so
+  // the first appearance of a new model does not interrupt combat.
+  for(const variant of variants)this.renderer?.ensureGlbShipModel?.(variant);
+ },
  setupRun(){
   const r=this.save.arenaRun;
   if(r.phase==='combat'){if(r.checkpoint){this.save.player=clone(r.checkpoint);delete this.save.player.prevPosition;delete this.save.player.prevRotation;}Object.assign(r,r.checkpointStats??{});this._statsDirty=true;r.phase='prepare';r.rewardChosen=true;r.hullChosen=true;
@@ -35,7 +52,7 @@ export const ArenaRunMethods={
   this.setupArena({run:true,environment:RUN_WAVES[r.wave].environment,scenario:'free-flight'},false);
   refreshRunWingmanOffers(this.save);refreshRunRewardOffers(this.save);writeArenaRun(this.save);if(r.wave===0&&r.phase==='prepare')this.startRunWave();else this.showRunPreparation();
  },
- showRunPreparation(){this.ui.setWingTactics?.([],0);this.ui.showArenaRun(this.save);},
+ showRunPreparation(){this.preloadRunWaveModels();this.ui.setWingTactics?.([],0);this.ui.showArenaRun(this.save);},
  arenaRunAction(action,value,key,index){
   const r=this.save.arenaRun;if(!r)return;
   // The wing orders are the one run command that also works mid-wave: each
@@ -64,6 +81,7 @@ export const ArenaRunMethods={
   const r=this.save.arenaRun;if(!r||r.phase!=='prepare'||!r.rewardChosen||!r.hullChosen||!loadoutFor(this.save.player).guns.some(Boolean))return;
   this.clearTransientSpace();this.autopilot=false;this.deathTimer=0;this.afterburning=false;this.playerShieldDelay=0;
   const wave=RUN_WAVES[r.wave];this.arena.environment=wave.environment;
+  this.preloadRunWaveModels();
   this.setupArena({run:true,environment:wave.environment,scenario:'free-flight'},false);this.updateActiveInstance(true);
   this.spawnRunWingmen();
   this.gunCooldown=0;this.mountFireAt={};this.missileCooldown=0;this.ui.runFitNotice='';

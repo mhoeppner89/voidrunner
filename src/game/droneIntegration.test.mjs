@@ -40,9 +40,9 @@ GameSession.prototype.collectPickup.call({ save, setOwnMonitorStatus() {} }, pic
 assert.equal(pickup.life, 10, 'pickup cannot steal reserved space');
 assert.equal(save.player.cargo.food, undefined);
 for (const hull of Object.keys(SHIPS)) {
- assert.equal(droneBayLayoutFor(hull).length > 0, ['wayfarer', 'prospector', 'torsas', 'astra'].includes(hull));
+ assert.equal(droneBayLayoutFor(hull).length > 0, ['wayfarer', 'prospector', 'torsas', 'astra', 'atlas'].includes(hull));
  assert.equal(GameSession.prototype.extractAsteroid.call({}, { remaining: 10 }, 100, 999), false, 'no direct extraction on any hull');
- if (!['wayfarer', 'prospector'].includes(hull)) {
+ if (!['wayfarer', 'prospector', 'torsas', 'astra', 'atlas'].includes(hull)) {
   assert.equal(GameSession.prototype.miningDroneActionState.call({ save: { player: { shipId: hull } } }).code, 'no-bay');
  }
 }
@@ -111,7 +111,7 @@ function measureMiners(hull, limit) {
  const rt = Object.create(GameSession.prototype);
  Object.assign(rt, { save, asteroids: [node], deathTimer: 0, playerStats: () => ({ cargo: 1000 }) });
  let ctx = rt.prepareMiningDroneContext();
- assert.equal(ctx.unitIds.length, limit ?? (hull === 'wayfarer' ? 2 : 6));
+ assert.equal(ctx.unitIds.length, limit ?? droneBayLayoutFor(hull).length * 2);
  assert.equal(new Set(ctx.unitIds.map(id => ctx.bayAnchors[id].launch.position.join(','))).size, ctx.unitIds.length);
  assert.equal(new Set(ctx.unitIds.map(id => ctx.getWorkPoint(save.player.droneFleet.unitsById[id], ctx).position.join(','))).size, ctx.unitIds.length);
  assert.equal(startMining(save.player.droneFleet, ctx).ok, true);
@@ -128,3 +128,5 @@ assert.ok(soloYield > 0);
 assert.ok(pairYield / soloYield >= 1.8 && pairYield / soloYield <= 2.2);
 assert.ok(sixYield / pairYield >= 2.7 && sixYield / pairYield <= 3.3);
 console.log(`120s mining deliveries: one ${soloYield}, pair ${pairYield}, three pairs ${sixYield}`);
+
+for (const hull of ['torsas','astra','atlas']) { const yieldCount=measureMiners(hull); assert.ok(yieldCount>0, hull+' must return ore'); console.log(hull+' 120s mining: '+yieldCount); }

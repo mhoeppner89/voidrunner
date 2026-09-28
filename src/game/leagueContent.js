@@ -1,4 +1,4 @@
-// Frontier League hulls and fleet doctrine. Values are shared by NPC and player fitting.
+// Shared career and NPC hull definitions.
 export const LEAGUE_HULLS = {
   "speedster": {
     "id": "speedster",
@@ -7,7 +7,7 @@ export const LEAGUE_HULLS = {
     "className": "Courier Interceptor",
     "personality": "Fast courier and scout",
     "description": "Fast courier and scout. Built for the Frontier League; available in Acheron.",
-    "price": 31000,
+    "price": 20000,
     "maxSpeed": 84,
     "afterburnSpeed": 140,
     "acceleration": 52,
@@ -21,7 +21,12 @@ export const LEAGUE_HULLS = {
     "fuel": 90,
     "gunDamage": 12,
     "requiredFaction": "frontier-league",
-    "requiredReputation": 0
+    "requiredReputation": 0,
+    "tier": 1,
+    "role": "interceptor",
+    "progressesTo": [
+      "talon"
+    ]
   },
   "legionary": {
     "id": "legionary",
@@ -30,7 +35,7 @@ export const LEAGUE_HULLS = {
     "className": "League Line Fighter",
     "personality": "Agile frontline fighter",
     "description": "Agile frontline fighter. Built for the Frontier League; available in Acheron.",
-    "price": 57000,
+    "price": 45000,
     "maxSpeed": 67,
     "afterburnSpeed": 110,
     "acceleration": 39,
@@ -44,7 +49,12 @@ export const LEAGUE_HULLS = {
     "fuel": 115,
     "gunDamage": 12,
     "requiredFaction": "frontier-league",
-    "requiredReputation": 12
+    "requiredReputation": 0,
+    "tier": 2,
+    "role": "fighter",
+    "progressesTo": [
+      "blade"
+    ]
   },
   "andromeda": {
     "id": "andromeda",
@@ -53,7 +63,7 @@ export const LEAGUE_HULLS = {
     "className": "Heavy Strike Fighter",
     "personality": "Torpedo bomber and heavy striker",
     "description": "Torpedo bomber and heavy striker. Built for the Frontier League; available in Acheron.",
-    "price": 66000,
+    "price": 48000,
     "maxSpeed": 56,
     "afterburnSpeed": 90,
     "acceleration": 31,
@@ -67,7 +77,12 @@ export const LEAGUE_HULLS = {
     "fuel": 135,
     "gunDamage": 12,
     "requiredFaction": "frontier-league",
-    "requiredReputation": 20
+    "requiredReputation": 0,
+    "tier": 2,
+    "role": "bomber",
+    "progressesTo": [
+      "vanguard"
+    ]
   },
   "torsas": {
     "id": "torsas",
@@ -75,8 +90,8 @@ export const LEAGUE_HULLS = {
     "variant": "torsas",
     "className": "Armed Transport",
     "personality": "Defensible convoy transport",
-    "description": "Defensible convoy transport. Built for the Frontier League; available in Acheron.",
-    "price": 43000,
+    "description": "A versatile armed transport with two drone bays, mining capability and a defensive turret. Larger hold and better protection than the Wayfarer.",
+    "price": 45000,
     "maxSpeed": 46,
     "afterburnSpeed": 72,
     "acceleration": 20,
@@ -86,11 +101,16 @@ export const LEAGUE_HULLS = {
     "hull": 260,
     "reactorOutput": 20,
     "energyCapacity": 90,
-    "cargo": 80,
+    "cargo": 64,
     "fuel": 165,
     "gunDamage": 12,
     "requiredFaction": "frontier-league",
-    "requiredReputation": 0
+    "requiredReputation": 0,
+    "tier": 2,
+    "role": "allrounder",
+    "progressesTo": [
+      "astra"
+    ]
   },
   "astra": {
     "id": "astra",
@@ -98,22 +118,24 @@ export const LEAGUE_HULLS = {
     "variant": "astra",
     "className": "Expedition Cutter",
     "personality": "Long-range armed explorer",
-    "description": "Long-range armed explorer. Built for the Frontier League; available in Acheron.",
-    "price": 47000,
+    "description": "An elite expedition cutter with two drone bays, mining capability and medium weapons. Faster and more versatile than a freighter, with less industrial capacity.",
+    "price": 90000,
     "maxSpeed": 60,
     "afterburnSpeed": 96,
     "acceleration": 29,
     "angularAcceleration": 2.7,
     "angularDamping": 3.05,
-    "shield": 110,
-    "hull": 210,
-    "reactorOutput": 25,
-    "energyCapacity": 90,
-    "cargo": 48,
+    "shield": 155,
+    "hull": 280,
+    "reactorOutput": 29,
+    "energyCapacity": 110,
+    "cargo": 88,
     "fuel": 180,
     "gunDamage": 12,
     "requiredFaction": "frontier-league",
-    "requiredReputation": 0
+    "requiredReputation": 0,
+    "tier": 3,
+    "role": "allrounder"
   }
 };
 export const LEAGUE_FITS = {

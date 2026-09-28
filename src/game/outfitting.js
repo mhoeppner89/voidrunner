@@ -250,14 +250,15 @@ const makeMounts = (shipId, guns, launchers, utilitySizes) => {
 // stat, never an installation gate — a demanding gun fit is legal, but it can
 // drain the capacitor faster than the hull replenishes it.
 export const HULL_HARDPOINTS = freeze({
+    blade: makeMounts('blade', [['M',0],['M',1]], [['M',0],['M',1]], ['S']),
     speedster: makeMounts('speedster', [['S',0],['S',1]], [['S',0]], ['S']),
     legionary: makeMounts('legionary', [['M',0],['M',1]], [['M',0]], ['S']),
     andromeda: makeMounts('andromeda', [['M',0],['M',1]], [['M',0],['M',1]], ['S']),
     torsas: makeMounts('torsas', [['S',0],['S',1]], [['S',0]], ['M','S']),
-    astra: makeMounts('astra', [['S',0],['M',1]], [['S',0]], ['M','S']),
+    astra: makeMounts('astra', [['M',0],['M',1]], [['S',0]], ['M','S']),
     wayfarer: makeMounts('wayfarer', [['S', 0], ['S', 1]], [['S', 0]], ['M', 'S']),
     talon: makeMounts('talon', [['S', 0], ['S', 1], ['M', 2]], [['S', 0]], ['S']),
-    vanguard: makeMounts('vanguard', [['M', 0], ['M', 1]], [['M', 0]], ['M', 'S']),
+    vanguard: makeMounts('vanguard', [['M', 0], ['M', 1]], [['M', 0], ['M', 1], ['M', 2]], ['M', 'S']),
     prospector: makeMounts('prospector', [['S', 0]], [['S', 0]], ['M', 'M', 'S']),
     lancer: makeMounts('lancer', [['M', 0], ['M', 1]], [['M', 0], ['M', 1]], ['S']),
     atlas: makeMounts('atlas', [['M', 0]], [['M', 0]], ['M', 'M', 'S', 'S']),

@@ -24,7 +24,7 @@ export const SAVE_KEY = TURRET_TEST_MODE ? 'voidrunner-turret-test-v1'
             : 'void-privateer-save-v1';
 export const DRONE_MIGRATION_BACKUP_KEY = `${SAVE_KEY}-pre-drones`;
 export const SETTINGS_KEY = 'void-privateer-settings-v1';
-export const SAVE_VERSION = 17;
+export const SAVE_VERSION = 18;
 // Test-funds build: a fresh career starts with enough credits to try any ship,
 // outfitting module or trade route without grinding first.
 export const STARTING_CREDITS = 500000;
@@ -94,6 +94,8 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             ammo: Object.fromEntries(Object.entries(AMMO_CAPACITY).map(([ammoId, capacity]) => [ammoId, capacity])),
             shipId: 'wayfarer',
             ownedShips: ['wayfarer'],
+            retainedFleetVersion: 1,
+            storedShips: {},
             cargo: {},
             sealedCargo: [],
             equipment: [],
@@ -701,7 +703,8 @@ export const hydrateSave = (candidate) => {
     });
     // Fleet-era careers keep the active ship. Every other hull is bought back
     // once at the same 50% base-value rule used by the new ship dealer.
-    const fleetCredit = legacyFleet
+    const retainsFleet = candidate.player?.retainedFleetVersion === 1;
+    const fleetCredit = retainsFleet ? 0 : legacyFleet
         .filter((shipId) => shipId !== activeShipId)
         .reduce((total, shipId) => total + Math.round(SHIPS[shipId].price * 0.5), 0);
     const savedCredits = Number(save.player.credits);
@@ -713,11 +716,16 @@ export const hydrateSave = (candidate) => {
     // that already carries canonical state gets a fresh projection now.
     const hadCanonicalOutfitting = Boolean(candidate.player?.outfitting);
     save.player.shipId = activeShipId;
-    save.player.outfitting = collapseOutfittingToSingleShip({
-        ...save.player,
-        ownedShips: legacyFleet,
-    }, activeShipId);
-    save.player.ownedShips = [activeShipId];
+    save.player.retainedFleetVersion = 1;
+    save.player.ownedShips = retainsFleet ? legacyFleet : [activeShipId];
+    save.player.storedShips = {};
+    if (retainsFleet) {
+        for (const id of legacyFleet) {
+            const record=candidate.player?.storedShips?.[id];
+            if(id!==activeShipId && record && LOCATIONS[record.locationId]) save.player.storedShips[id]=JSON.parse(JSON.stringify(record));
+        }
+        save.player.ownedShips=[activeShipId,...Object.keys(save.player.storedShips)];
+    } else save.player.outfitting = collapseOutfittingToSingleShip({...save.player,ownedShips:legacyFleet},activeShipId);
     delete save.player.shipStates;
     save.player.outfitting = normalizeOutfitting(save.player);
     // Read the candidate, never the fallback's freshly granted Wayfarer fleet.

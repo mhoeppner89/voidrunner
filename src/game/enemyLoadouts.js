@@ -21,7 +21,7 @@ const OBSERVER_FITS = Object.freeze({
 export function createEnemyLoadout(ship, index, arenaFit) {
     const hullId = ship.hullId ?? (ship.role === 'bounty' ? 'lancer' : ship.role === 'trader' ? 'atlas' : ship.role === 'miner' ? 'prospector' : ship.role === 'escort' ? 'wayfarer' : ship.role === 'patrol' ? 'vanguard' : 'talon');
     const spec=HULL_HARDPOINTS[hullId], choices=FITS[index % FITS.length];
-    const observerFit = (typeof arenaFit === 'string' ? OBSERVER_FITS[arenaFit] : undefined) ?? LEAGUE_FITS[hullId];
+    const observerFit = arenaFit && typeof arenaFit === 'object' ? undefined : ((typeof arenaFit === 'string' ? OBSERVER_FITS[arenaFit] : undefined) ?? LEAGUE_FITS[hullId] ?? (hullId==='vanguard' ? {guns:['pulse-mk2','pulse-mk2'],launchers:['torpedo-launcher','torpedo-launcher','swarm-launcher'],turret:'pdc',defense:'shield-mk2'} : hullId==='blade' ? {guns:['pulse-mk2','ripper'],launchers:['seeker-launcher','seeker-launcher'],turret:'pdc',power:'sustained-reactor'} : undefined));
     const guns=spec.guns.map((mount,i)=>{
         const item=observerFit?.guns ? observerFit.guns[i] : arenaFit?.guns ? arenaFit.guns[i] : i===spec.guns.length-1?choices[2]:choices[i % choices.length];
         if(!item)return null;
@@ -49,7 +49,7 @@ export function createEnemyLoadout(ship, index, arenaFit) {
     const launcher = observerFit ? launcherIdForOutfit(launchers.find(Boolean)) : hullId==='lancer'?'torpedo':index%3===0?'seeker':undefined;
     return {hullId,guns,weapons,turrets,launchers,power:equipmentLoadout.power,drive:equipmentLoadout.drive,defense:equipmentLoadout.defense,utility:equipmentLoadout.utility,fitId:observerFit ? arenaFit : undefined,profile,stats,attackOrder:[...weapons.keys()].filter(i=>weapons[i]).reverse(),resources:{...stats,shield:stats.shield},fireAt:weapons.map(()=>0),
         launcher,
-        racks: LEAGUE_FITS[hullId] ? launchers.filter(Boolean).map(id=>{const launcher=launcherIdForOutfit(id);return {launcher,missiles:LAUNCHERS[launcher].capacity};}) : undefined,
+        racks: launchers.some(Boolean) ? launchers.filter(Boolean).map(id=>{const launcher=launcherIdForOutfit(id);return {launcher,missiles:LAUNCHERS[launcher].capacity};}) : undefined,
         missiles:observerFit ? (LAUNCHERS[launcher]?.capacity ?? 0) : hullId==='lancer'?2:index%3===0?4:0};
 }
 

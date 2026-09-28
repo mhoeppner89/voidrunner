@@ -50,7 +50,7 @@ import { combinedHullIntegrity, normalizeEnergy, regenerateCombatResources, spen
 import { commitShipTrade, quoteShipTrade } from './shipTrade.js';
 import { TURRET_LAYOUTS } from './turretLayouts.js';
 import { SHIP_MOUNT_ANCHORS } from './shipMounts.js';
-import { createDroneUnit, DRONE_BAY_CAPACITY, DRONE_RULES, DRONE_TYPES, droneBayLayoutFor, normalizeDroneFleet, validateDroneBays } from './droneData.js';
+import { canMineWithHull, createDroneUnit, DRONE_BAY_CAPACITY, DRONE_RULES, DRONE_TYPES, droneBayLayoutFor, normalizeDroneFleet, validateDroneBays } from './droneData.js';
 import { destroyMiningUnit, finishMiningRecall, miningReservedMass, miningStartEligibility, recallMining, startMining } from './droneMining.js';
 import { createMiningDroneSystem } from './droneSystem.js';
 import { createPdcDroneController, destroyPdcDrone } from './dronePdc.js';
@@ -134,7 +134,7 @@ const OBSERVER_MAPS = Object.freeze([
 // airframes. The frigate keeps its authored battery/PDC system instead of
 // receiving a fighter loadout.
 const LEAGUE_OBSERVER_TYPES = Object.freeze(PLAYER_FLYABLE_HULLS
-    .filter((id) => LEAGUE_HULLS[id])
+    .filter((id) => LEAGUE_HULLS[id] || id === 'blade')
     .map((id) => Object.freeze({ id, label: (SHIPS[id]?.name ?? id).toUpperCase(), role: observerRoleFor(id), hullId: id, defaultFit: 'varied' })));
 const OBSERVER_SHIP_TYPES = Object.freeze([
     Object.freeze({ id: 'wayfarer', label: 'WAYFARER', role: 'escort', defaultFit: 'balanced' }),
@@ -703,6 +703,7 @@ const MINER_GOLD_DROP_CHANCE = 0.12;
 // not just what it looks like. Light interceptors turn on a dime; freighters
 // wallow through their turns.
 const HULL_FLIGHT_STATS = {
+    blade: {speed:SHIPS.blade.maxSpeed,afterburnSpeed:SHIPS.blade.afterburnSpeed,turnRate:SHIPS.blade.angularAcceleration,collisionRadius:2,hullHalfExtents:[6.94,1.77,6.96]},
     speedster: {speed:SHIPS.speedster.maxSpeed,afterburnSpeed:SHIPS.speedster.afterburnSpeed,turnRate:SHIPS.speedster.angularAcceleration,collisionRadius:2,hullHalfExtents:[2.0753063410520554, 1.3931982517242432, 5.501492917537689]},
     legionary: {speed:SHIPS.legionary.maxSpeed,afterburnSpeed:SHIPS.legionary.afterburnSpeed,turnRate:SHIPS.legionary.angularAcceleration,collisionRadius:2,hullHalfExtents:[5.0039146661758425, 2.0397572934627535, 6.172646737098694]},
     andromeda: {speed:SHIPS.andromeda.maxSpeed,afterburnSpeed:SHIPS.andromeda.afterburnSpeed,turnRate:SHIPS.andromeda.angularAcceleration,collisionRadius:2,hullHalfExtents:[7.033175075054168, 3.0514688372611998, 7.799801480770111]},
@@ -3078,6 +3079,11 @@ export class GameSession {
             this.ui.clearWarmImageSlot?.('location-next');
     }
     updateAssetWarmup(force = false) {
+        // Arena sorties never dock. Predicting the nearest career station here
+        // can queue its market/outfitting image bundle during the fight, adding
+        // unrelated fetch and decode work to the arena.
+        if (this.arena)
+            return;
         if (this.save.player.dockedAt)
             return;
         if (!force && this.save.world.time < this.nextAssetWarmupAt)
@@ -5665,8 +5671,8 @@ export class GameSession {
         this.miningDroneContext = { unitIds: [], bayAnchors: Object.create(null),
             workPoint: point(), workPoints: Object.create(null), node: null, targetNodeKey: null,
             getWorkPoint: (unit, context) => context.workPoints[unit.id] ?? context.workPoint };
-        this.miningDroneSlots = Array.from({ length: 6 }, (_, i) => ({ portId: Math.floor(i / 2), launch: point(), dock: point(), work: point() }));
-        this.miningDroneBays = Array.from({ length: 3 }, () => ({ launch: point(), dock: point() }));
+        this.miningDroneSlots = Array.from({ length: 8 }, (_, i) => ({ portId: Math.floor(i / 2), launch: point(), dock: point(), work: point() }));
+        this.miningDroneBays = Array.from({ length: 4 }, () => ({ launch: point(), dock: point() }));
     }
     recallMiningDrones(reason = 'stopped') {
         const fleet = this.save?.player?.droneFleet;
@@ -5744,7 +5750,7 @@ export class GameSession {
                 point.position[1] = player.position[1] + offset.y - velocity[1] * dt;
                 point.position[2] = player.position[2] + offset.z - velocity[2] * dt;
             }
-            if (!['wayfarer','prospector'].includes(player.shipId) || bay?.bayId !== layout[index].bayId || bay.mode !== 'mining') continue;
+            if (!canMineWithHull(player.shipId) || bay?.bayId !== layout[index].bayId || bay.mode !== 'mining') continue;
             context.miningBays++;
             for (let slot = 0; slot < DRONE_BAY_CAPACITY.mining; slot++) {
                 const id = bay.unitIds?.[slot];
@@ -5843,7 +5849,7 @@ export class GameSession {
         let result;
         if (phase === 'recalling') result = { ok: false, code: 'recalling' };
         else if (phase === 'running') result = { ok: true, code: 'can-recall' };
-        else if (!['wayfarer','prospector'].includes(player?.shipId)) result = { ok: false, code: 'no-bay' };
+        else if (!canMineWithHull(player?.shipId)) result = { ok: false, code: 'no-bay' };
         else if (!fleet?.controller || !fleet.unitsById || !this.miningDroneSystem) result = { ok: false, code: 'no-stock' };
         else {
             const context = this.prepareMiningDroneContext();
@@ -11906,7 +11912,7 @@ export class GameSession {
     }
     updateStationLandingGuidance() {
         const player = this.save.player;
-        if (this.arena?.run || player.dockedAt || this.deathTimer > 0 || this.playerDocking) {
+        if (this.arena || player.dockedAt || this.deathTimer > 0 || this.playerDocking) {
             this.clearStationLandingGuidance();
             return;
         }
@@ -11989,7 +11995,7 @@ export class GameSession {
         return 0.3 + 0.7 * this.combatCalmFactor();
     }
     autoDockCheck() {
-        if(this.arena?.run)return;
+        if(this.arena)return;
         if (this.save.player.dockedAt || this.deathTimer > 0 || this.playerDocking)
             return;
         const candidate = this.dockCandidate();
@@ -13118,6 +13124,8 @@ export class GameSession {
         return best === undefined ? undefined : { t: best, obstacle: bestObstacle };
     }
     dockCandidate() {
+        if (this.arena)
+            return undefined;
         const locationId = this.currentDockLocationIds().find((id) => id === this.activeInstanceId);
         if (!locationId)
             return undefined;
@@ -13685,7 +13693,7 @@ export class GameSession {
     }
     droneBayModeQuote(bayId, mode) {
         const player = this.save.player;
-        if (!Object.hasOwn(DRONE_TYPES, mode) || mode === 'mining' && !['wayfarer','prospector'].includes(player.shipId)) return { ok: false, code: 'invalid-mode' };
+        if (!Object.hasOwn(DRONE_TYPES, mode) || mode === 'mining' && !canMineWithHull(player.shipId)) return { ok: false, code: 'invalid-mode' };
         if (!droneBayLayoutFor(player.shipId).some(bay => bay.bayId === bayId))
             return { ok: false, code: 'invalid-bay' };
         if (!player.droneFleet?.controller) return { ok: false, code: 'invalid-fleet' };
@@ -13719,7 +13727,7 @@ export class GameSession {
     setDroneBayMode(bayId, mode, expected) {
         const playerNow = this.save.player;
         const bayNow = playerNow.outfitting?.loadouts?.[playerNow.shipId]?.droneBays?.find(b => b.bayId === bayId);
-        if (!bayNow || !Object.hasOwn(DRONE_TYPES, mode) || mode === 'mining' && !['wayfarer','prospector'].includes(playerNow.shipId)) return {ok:false,code:'invalid-mode'};
+        if (!bayNow || !Object.hasOwn(DRONE_TYPES, mode) || mode === 'mining' && !canMineWithHull(playerNow.shipId)) return {ok:false,code:'invalid-mode'};
         if (bayNow.unitIds.some(id => playerNow.droneFleet.unitsById[id]?.state && playerNow.droneFleet.unitsById[id].state !== 'stowed')) {
             bayNow.pendingMode = mode;
             for (const id of bayNow.unitIds) if (playerNow.droneFleet.unitsById[id]) playerNow.droneFleet.unitsById[id].recallRequested = true;
@@ -13916,13 +13924,13 @@ export class GameSession {
         loadout[key][index] = item.id;
         return this.applyOutfitting(shipId, loadout, { locationId: this.save.player.dockedAt });
     }
-    buyShip(shipId) {
+    buyShip(shipId, keepCurrent = false) {
         const dock = this.save.player.dockedAt;
         if (!this.dockHasService('shipyard')) {
             this.ui.showToast(t('No shipyard is available at this dock.'), 'warning');
             return { ok: false, code: 'service-unavailable' };
         }
-        if (!dock || !(LOCATIONS[dock].shipsForSale ?? []).includes(shipId)) {
+        if (!dock || (!(LOCATIONS[dock].shipsForSale ?? []).includes(shipId) && !this.save.player.storedShips?.[shipId])) {
             this.ui.showToast(t('That hull is not for sale at this location.'), 'warning');
             return { ok: false, code: 'not-for-sale' };
         }
@@ -13931,7 +13939,7 @@ export class GameSession {
         if (this.save.player.shipId === shipId)
             return { ok: false, code: 'already-owned' };
         const carriedMass = cargoMass(this.save.player);
-        const quote = quoteShipTrade(this.save.player, shipId, { cargoMass: carriedMass });
+        const quote = quoteShipTrade(this.save.player, shipId, { cargoMass: carriedMass, keepCurrent });
         if (!quote.ok) {
             const message = quote.code === 'reputation-required' ? `Frontier League standing ${quote.requiredReputation} required.` : quote.code === 'insufficient-credits'
                 ? t('Insufficient credits after trade-in.')
@@ -13954,17 +13962,17 @@ export class GameSession {
             this.save.player.outfitting.loadouts, { activeShipId: this.save.player.shipId });
         this._statsDirty = true;
         this.ui.setCockpitShip(shipId);
-        this.initializeCommissionedShipState(this.playerStats());
+        if (!quote.switching) this.initializeCommissionedShipState(this.playerStats());
+        else normalizeLauncherMagazines(this.save.player);
         this.syncWeaponProjection();
-        this.ui.showToast(t('{name} commissioned. Your old hull was credited at 50% value.', { name: ship.name }), 'success', 6200);
+        this.ui.showToast(quote.switching ? `${ship.name} ready. Previous ship stored here.` : quote.keepCurrent ? `${ship.name} commissioned. Previous ship stored here.` : t('{name} commissioned. Your old hull was credited at 50% value.', { name: ship.name }), 'success', 6200);
         this.audio.play('success', 1.4);
         this.ui.refreshDock(this.save);
         this.persistSave();
         return { ok: true, code: 'traded', shipId, quote: result.quote };
     }
     switchShip(shipId) {
-        const player = this.save.player;
-        return player.shipId === shipId && player.ownedShips?.length === 1;
+        return this.buyShip(shipId, true);
     }
     joinGuild(guildId) {
         const result = joinGuild(this.save, guildId, this.save.player.dockedAt);
@@ -14412,7 +14420,7 @@ export class GameSession {
                 // POIs carry no readout card — the target monitor shows name and distance.
             }
         }
-        const dock = this.arena?.run ? undefined : this.dockCandidate();
+        const dock = this.arena ? undefined : this.dockCandidate();
         const dockTargeted = Boolean(dock && this.save.player.currentTargetId === dock);
         // The target monitor teaches the order explicitly: first lock the
         // location, then slow down. Short phrases stay intact on phone glass.

@@ -64,10 +64,10 @@ assert.equal(Object.keys(LEGACY_OUTFIT_ID_MAP).length, 4);
 const expectedCounts = {
     wayfarer: { gun: 2, turret:1,power:1, launcher: 1, drive: 1, defense: 1, utility: 2 },
     talon: { gun: 3, turret:0,power:1, launcher: 1, drive: 1, defense: 1, utility: 1 },
-    vanguard: { gun: 2, turret:2,power:1, launcher: 1, drive: 1, defense: 1, utility: 2 },
+    vanguard: { gun: 2, turret:2,power:1, launcher: 3, drive: 1, defense: 1, utility: 2 },
     prospector: { gun: 1, turret:1,power:1, launcher: 1, drive: 1, defense: 1, utility: 3 },
     lancer: { gun: 2, turret:1,power:1, launcher: 2, drive: 1, defense: 1, utility: 1 },
-    atlas: { gun: 1, turret:2,power:1, launcher: 1, drive: 1, defense: 1, utility: 4 },
+    atlas: { gun: 1, turret:4,power:1, launcher: 1, drive: 1, defense: 1, utility: 4 },
 };
 for (const [shipId, counts] of Object.entries(expectedCounts)) {
     assert.deepEqual(HULL_HARDPOINTS[shipId].slotCounts, counts, `${shipId} hardpoint matrix`);
@@ -283,7 +283,7 @@ assert.equal(hydrated.player.outfitting.schema, OUTFITTING_SCHEMA);
 assert.ok(hydrated.player.outfitting.loadouts.wayfarer.guns.includes('beam-emitter'));
 assert.deepEqual(hydrated.player.ownedShips, ['wayfarer'], 'fleet-era careers retain only their active hull');
 assert.equal(hydrated.player.outfitting.loadouts.talon, undefined, 'discarded hull loadout is removed');
-assert.equal(hydrated.player.credits, 67000, 'discarded Talon is compensated at half base value');
+assert.equal(hydrated.player.credits, 70000, 'discarded Talon is compensated at half base value');
 assert.deepEqual(hydrated.player.equipment, ['pdc-cluster', 'engine-mk2'], 'first legacy load keeps old projection for compatibility');
 
 // Legacy active weapon ids keep Pulse Mk II distinct from the base pulse
@@ -519,7 +519,7 @@ const malformedV9Fleet = hydrateSave({
     world: { seed: 90 },
 });
 assert.deepEqual(malformedV9Fleet.player.ownedShips, ['wayfarer']);
-assert.equal(malformedV9Fleet.player.credits, 67000, 'malformed v9 fleet receives the same half-value buyback');
+assert.equal(malformedV9Fleet.player.credits, 70000, 'malformed v9 fleet receives the same half-value buyback');
 
 const nullDurability = hydrateSave({
     version: 8,
@@ -534,7 +534,7 @@ const badVersion = hydrateSave({
     world: { seed: 92 },
 });
 assert.equal(badVersion.player.hull, 185);
-assert.equal(badVersion.player.credits, 67000);
+assert.equal(badVersion.player.credits, 70000);
 assert.deepEqual(badVersion.player.ownedShips, ['wayfarer']);
 
 const freshFromNull = hydrateSave(null);

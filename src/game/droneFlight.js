@@ -1,6 +1,7 @@
 // Physical port centres in the playable hull frame; mouths face local -Y.
 export const DRONE_PORTS = Object.freeze({
-    torsas: [[0,-3.42,1]], astra: [[0,-2.28,1]],
+    torsas: [[0,-3.53,1.4],[0,-3.53,4.6]], astra: [[0,-2.28,-1.5],[0,-2.28,1.5]],
+    atlas: [[0,-3.93,-5],[0,-4.09,-1.8],[0,-4.08,1.4],[0,-3.9,4.6]],
     wayfarer: [[0, -2.05, -1]],
     prospector: [[0, -2.95, -3.2], [0, -2.95, 0], [0, -2.95, 3.2]],
 });

@@ -18,7 +18,7 @@ import { LOADOUT_KEYS, HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RA
 import { playerStrengthValue } from './playerStrength.js';
 import { guildJoinCost, missionBriefing, missionTitle } from './missions.js';
 import { getTutorialQuest, tutorialCampaignSummary, tutorialDialogue } from './tutorialCampaign.js';
-import { DRONE_BAY_CAPACITY, DRONE_TYPES, droneBayLayoutFor } from './droneData.js';
+import { canMineWithHull, DRONE_BAY_CAPACITY, DRONE_TYPES, droneBayLayoutFor } from './droneData.js';
 const WARM_IMAGE_TIMEOUT_MS = 5000;
 const settleWarmupPromise = (promise, fallback = false) => new Promise((resolve) => {
     let settled = false;
@@ -423,7 +423,8 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2da';
+const GAME_VERSION = '0.8.2db';
+const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
 // flight, a jump, or a saved-game detour. (Guarded for headless imports.)
@@ -1033,7 +1034,7 @@ export class GameUI {
         this.setCockpitShip(save?.player?.shipId);
     }
     setCockpitShip(shipId = 'wayfarer') {
-        const nextId = COCKPIT_ART_BY_SHIP[shipId] ? shipId : 'wayfarer';
+        const nextId = shipId === 'blade' ? 'legionary' : COCKPIT_ART_BY_SHIP[shipId] ? shipId : 'wayfarer';
         if (this.cockpitShipId === nextId && this.root.dataset.cockpitShip === nextId)
             return;
         void this.preloadImageSet('flight-core', [COCKPIT_ART_BY_SHIP[nextId], ...FLIGHT_SCREEN_ART], { priority: 'high' });
@@ -1617,7 +1618,7 @@ export class GameUI {
                 this.actions?.buyEquipment(target.dataset.equipmentId);
             }
             else if (target.dataset.shipId) {
-                this.actions?.buyShip(target.dataset.shipId);
+                this.actions?.buyShip(target.dataset.shipId, target.dataset.keepShip === 'true');
             }
             else if (target.dataset.shipDetail) {
                 this.shipDetailId = target.dataset.shipDetail;
@@ -2402,7 +2403,7 @@ export class GameUI {
                     : t(entry.issuer ?? GUILD_NAMES[entry.guild] ?? 'Local contract desk'))}</small></div>
                 <dl>
                   ${entry.outcome === 'completed' ? `<div><dt>${t('PAYMENT')}</dt><dd>${formatCredits(entry.reward)}</dd></div><div><dt>${t('BOND RETURNED')}</dt><dd>${formatCredits(entry.bond)}</dd></div>${entry.bonus > 0 ? `<div class="is-bonus"><dt>${t('BONUS')}</dt><dd>+${formatCredits(entry.bonus)}</dd></div>` : ''}` : `<div class="is-loss"><dt>${t('BOND LOST')}</dt><dd>${formatCredits(Math.abs(entry.bond))}</dd></div>`}
-                  <div><dt>${t('GUILD REP')}</dt><dd>${entry.repDelta > 0 ? '+' : ''}${entry.repDelta}</dd></div>
+                  <div><dt>RECOMMENDED</dt><dd>T${Math.max(mission.danger >= 2 ? 3 : mission.danger >= 1 ? 2 : 1, this.missionRequiredMass(mission) > 96 ? 3 : this.missionRequiredMass(mission) > 32 ? 2 : 1)} · ${["bounty","escort"].includes(mission.kind) ? "Combat" : mission.kind === "mining" ? "Mining drones" : mission.kind === "salvage" ? "Utility / salvage" : "Cargo / range"}</dd></div><div><dt>${t('GUILD REP')}</dt><dd>${entry.repDelta > 0 ? '+' : ''}${entry.repDelta}</dd></div>
                 </dl>
                 ${entry.rankedUp && entry.rankName ? `<p class="settlement-rank">${t('NEW RANK')} · ${escapeHtml(t(entry.rankName))}</p>` : ''}
               </article>`).join('')}
@@ -3415,7 +3416,7 @@ export class GameUI {
             <div><dt>${t('DEADLINE')}</dt><dd>${this.deadlineLabel(mission)}</dd></div>
             <div><dt>${t('BOND')}</dt><dd>${formatCredits(mission.deposit ?? 0)}</dd></div>
             <div><dt>${t('CARGO')}</dt><dd>${eligibility.requiredMass > 0 ? `${eligibility.requiredMass.toFixed(1)} ${t('MASS')}` : t('NONE')}</dd></div>
-            <div><dt>${t('GUILD REP')}</dt><dd>+${mission.guildRep ?? 0}</dd></div>
+            <div><dt>RECOMMENDED</dt><dd>T${Math.max(mission.danger >= 2 ? 3 : mission.danger >= 1 ? 2 : 1, this.missionRequiredMass(mission) > 96 ? 3 : this.missionRequiredMass(mission) > 32 ? 2 : 1)} · ${["bounty","escort"].includes(mission.kind) ? "Combat" : mission.kind === "mining" ? "Mining drones" : mission.kind === "salvage" ? "Utility / salvage" : "Cargo / range"}</dd></div><div><dt>${t('GUILD REP')}</dt><dd>+${mission.guildRep ?? 0}</dd></div>
             ${mission.kind === 'race' ? `<div><dt>${t('TIER')}</dt><dd>${mission.tier ?? 1}</dd></div><div><dt>${t('PERSONAL BEST')}</dt><dd>${raceBest}</dd></div>` : ''}
           </dl>
           ${complication ? `<section class="mission-complication ${complicationLost ? 'is-lost' : ''}"><span>${complication.kind === 'fragile' ? t('FRAGILE LOAD') : t('EARLY DELIVERY BONUS')}</span><b>${complicationLost ? t('BONUS LOST') : `+${formatCredits(complication.bonus)}`}</b><p>${complication.kind === 'fragile' ? t('Keep structural damage at zero after acceptance.') : t('Deliver within {time} to earn the bonus.', { time: complicationTime })}</p></section>` : ''}
@@ -3550,7 +3551,7 @@ export class GameUI {
         return `<div class="drone-policy" role="group" aria-label="${t('PDC drone policy')}">${['defend', 'stow'].map(policy => `<button type="button" data-ui-command="drone-pdc-policy" data-drone-policy="${policy}" aria-pressed="${drones.pdcPolicy === policy}" ${!this.actions?.setDronePdcPolicy || this.droneCommandPending ? 'disabled' : ''}>${t(policy === 'defend' ? 'PDC DEFEND' : 'PDC STOW')}</button>`).join('')}</div>`;
     }
     renderDroneBayRows(drones) {
-        const modes = ['wayfarer','prospector'].includes(this.save.player.shipId) ? ['mining','pdc','repair','attack'] : ['pdc','repair','attack'];
+        const modes = canMineWithHull(this.save.player.shipId) ? ['mining','pdc','repair','attack'] : ['pdc','repair','attack'];
         return drones.bays.map((bay,index) => {
             const actual = this.save.player.outfitting.loadouts[this.save.player.shipId].droneBays[index];
             const pending = actual.pendingMode;
@@ -4005,7 +4006,7 @@ export class GameUI {
         return this.renderOutfitting();
     }
     renderShipyard() {
-        const stockIds = LOCATIONS[this.dockLocation].shipsForSale ?? [];
+        const stockIds = [...new Set([...(LOCATIONS[this.dockLocation].shipsForSale ?? []), ...Object.keys(this.save.player.storedShips ?? {})])].sort((a,b)=>(SHIPS[a].tier-SHIPS[b].tier)||SHIPS[a].price-SHIPS[b].price);
         if (!stockIds.length)
             return `<div class="shipyard-grid"><p class="market-empty">${t('No hulls for sale at this port.')}</p></div>`;
         const selectedId = stockIds.includes(this.shipDetailId) ? this.shipDetailId : stockIds[0];
@@ -4025,8 +4026,8 @@ export class GameUI {
         const active = this.save.player.shipId === saleId;
         const selected = selectedId === saleId;
         return `<button type="button" class="ship-stock-option ${selected ? 'is-selected' : ''} ${active ? 'is-current' : ''}" data-ship-detail="${saleId}" aria-pressed="${selected}">
-          <span><b>${escapeHtml(ship.name)}</b><small>${escapeHtml(t(ship.personality ?? ''))}</small></span>
-          <strong>${active ? t('CURRENT SHIP') : formatCredits(ship.price)}</strong>
+          <span><b>T${ship.tier} · ${escapeHtml(ship.name)}</b><small>${escapeHtml(t(shipRoleLabel(ship.role)))}</small></span>
+          <strong>${active ? t('CURRENT SHIP') : this.save.player.storedShips?.[saleId] ? 'STORED' : formatCredits(ship.price)}</strong>
         </button>`;
     }
     renderShipCard(saleId) {
@@ -4034,7 +4035,9 @@ export class GameUI {
         const current = SHIPS[this.save.player.shipId] ?? SHIPS.wayfarer;
         const active = this.save.player.shipId === saleId;
         const tradeIn = Math.round(current.price * HULL_TRADE_IN_RATE);
-        const amountDue = ship.price - tradeIn;
+        const stored = this.save.player.storedShips?.[saleId];
+        const amountDue = stored ? 0 : ship.price - tradeIn;
+        const keepQuote = quoteShipTrade(this.save.player, saleId, {keepCurrent:true,cargoMass:cargoMass(this.save.player)});
         const hardpoints = HARDPOINT_SPECS[saleId] ?? { guns: [], launchers: [], utility: [] };
         const carriedMass = cargoMass(this.save.player);
         const quote = active ? { ok: false, code: 'already-owned' } : quoteShipTrade(this.save.player, saleId, { cargoMass: carriedMass });
@@ -4051,35 +4054,36 @@ export class GameUI {
         ];
         const missingCredits = Math.max(0, amountDue - Number(this.save.player.credits ?? 0));
         const excessCargo = Math.max(0, carriedMass - capacity);
-        const blockedMessage = quote.code === 'reputation-required' ? `Frontier League standing ${quote.requiredReputation} required` : quote.code === 'insufficient-credits'
+        const blockedMessage = quote.code === 'stored-elsewhere' ? `Stored at ${LOCATIONS[stored.locationId]?.name ?? stored.locationId}` : quote.code === 'reputation-required' ? `Frontier League standing ${quote.requiredReputation} required` : quote.code === 'insufficient-credits'
             ? t('{credits} MORE NEEDED', { credits: formatCredits(missingCredits) })
             : quote.code === 'cargo-over-capacity'
                 ? t('UNLOAD {mass} CARGO MASS', { mass: formatNumber(excessCargo) })
                 : !quote.ok && !active
                     ? t('TRADE UNAVAILABLE')
                     : '';
-        const actionLabel = amountDue >= 0
+        const actionLabel = stored ? 'SWITCH TO ' + ship.name : amountDue >= 0
             ? t('TRADE FOR {name}', { name: ship.name })
             : t('TRADE FOR {name} · RECEIVE {credits}', { name: ship.name, credits: formatCredits(Math.abs(amountDue)) });
         return `<article class="ship-showroom ${active ? 'is-current' : ''}">
           <section class="ship-showroom-stage" aria-labelledby="ship-showroom-name">
-            <div class="ship-stage-heading"><span>${active ? t('CURRENT SHIP') : t('FOR SALE')}</span><b>${escapeHtml(t(ship.className))}</b></div>
+            <div class="ship-stage-heading"><span>TIER ${ship.tier} · ${escapeHtml(shipRoleLabel(ship.role).toUpperCase())}</span><b>${escapeHtml(t(ship.className))}</b></div>
             <div class="ship-silhouette ship-silhouette-large ${saleId}" data-variant="${ship.variant}" role="img" aria-label="${t('{name} ship preview', { name: ship.name })}"></div>
             <div class="ship-stage-title"><div><h3 id="ship-showroom-name">${escapeHtml(ship.name)}</h3><p>${escapeHtml(t(ship.personality ?? ''))}</p></div><strong>${formatCredits(ship.price)}</strong></div>
           </section>
           <section class="ship-showroom-sheet">
-            <p class="ship-description">${escapeHtml(t(ship.description))}</p>
+            <p class="ship-description">${escapeHtml(t(ship.description))}</p><p class="ship-career-note">${(ship.progressesTo ?? []).length ? `Suggested next ships: ${ship.progressesTo.map(id=>SHIPS[id].name).join(" · ")}` : "Top tier in this role"}</p>${ship.price ? `<p class="ship-career-note">Outfitting budget: ${formatCredits(Math.round(ship.price*.2))}–${formatCredits(Math.round(ship.price*.35))} extra.</p>` : ""}
             <div class="ship-spec-grid">${stats.map(([label, value, delta, digits = 0]) => `<div><span>${t(label)}</span><b>${value}</b>${this.statDelta(delta, digits)}</div>`).join('')}</div>
             <div class="ship-hardpoints">
               <div><span>${t('GUN MOUNTS')}</span><b>${hardpoints.guns.length}</b></div>
               <div><span>${t('MISSILE MOUNTS')}</span><b>${hardpoints.launchers.length}</b></div>
-              <div><span>${t('UTILITY BAYS')}</span><b>${hardpoints.utility.length}</b></div>
+              <div><span>${t('UTILITY BAYS')}</span><b>${hardpoints.utility.length}</b></div><div><span>DRONE BAYS</span><b>${hardpoints.droneBays?.length ?? 0}</b></div><div><span>TURRETS</span><b>${hardpoints.turrets?.length ?? 0}</b></div>
             </div>
             <p class="ship-handling-note">${t('Handling falls up to 24% as the cargo hold fills.')}</p>
             ${active ? `<button class="ship-current-button" type="button" disabled>${t('THIS IS YOUR CURRENT SHIP')}</button>` : `<div class="ship-trade-panel">
-              <div class="ship-trade-numbers"><span><small>${t('LIST PRICE')}</small><b>${formatCredits(ship.price)}</b></span><span><small>${t('TRADE-IN · {name}', { name: current.name })}</small><b>${tradeIn > 0 ? '−' : ''}${formatCredits(tradeIn)}</b></span><strong><small>${amountDue >= 0 ? t('BALANCE TO PAY') : t('CREDIT TO YOU')}</small><b>${formatCredits(Math.abs(amountDue))}</b></strong></div>
-              <p>${t('Your purchased modules move to the locker. Factory-fitted parts stay with the traded hull.')}</p>
+              ${stored ? "" : `<div class="ship-trade-numbers"><span><small>${t('LIST PRICE')}</small><b>${formatCredits(ship.price)}</b></span><span><small>${t('TRADE-IN · {name}', { name: current.name })}</small><b>${tradeIn > 0 ? '−' : ''}${formatCredits(tradeIn)}</b></span><strong><small>${amountDue >= 0 ? t('BALANCE TO PAY') : t('CREDIT TO YOU')}</small><b>${formatCredits(Math.abs(amountDue))}</b></strong></div>`}
+              <p>${stored ? `Stored at ${escapeHtml(LOCATIONS[stored.locationId]?.name ?? stored.locationId)}. Condition and ammunition are retained.` : t('Your purchased modules move to the locker. Factory-fitted parts stay with the traded hull.')}</p>
               <button type="button" class="primary ship-trade-button" data-ship-id="${saleId}" ${quote.ok ? '' : 'disabled'}><span>${actionLabel}</span>${blockedMessage ? `<small>${escapeHtml(blockedMessage)}</small>` : ''}</button>
+              ${stored ? '' : `<button type="button" class="ship-trade-button" data-ship-id="${saleId}" data-keep-ship="true" ${keepQuote.ok ? '' : 'disabled'}>BUY · KEEP ${escapeHtml(current.name.toUpperCase())} · ${formatCredits(ship.price)}</button><p>Your old ship and its equipment stay at this station. Cargo and drones travel with you.</p>`}
             </div>`}
           </section>
         </article>`;
@@ -5744,7 +5748,7 @@ export class GameUI {
         const done=r.phase==='won'||r.phase==='lost';
         const command=(action,value,label,extra='')=>`<button data-ui-command="run-action" data-run-action="${action}" data-run-value="${value}" ${extra}>${label}</button>`;
         const names={guns:'GUNS',launchers:'MISSILES',turrets:'TURRETS',power:'POWER',drive:'DRIVE',defense:'DEFENSE',utility:'UTILITY'};
-        const hullText={wayfarer:'Two forward guns and one upper turret.',talon:'Agile fighter with three forward guns and no turret.',vanguard:'Two medium guns and upper and lower turrets; slower handling.',prospector:'One forward gun and an upper rear turret.',lancer:'Two medium guns and one upper medium turret.',atlas:'One forward gun and two turrets; a large, slow hull.',
+        const hullText={wayfarer:'Two forward guns and one upper turret.',talon:'Agile fighter with three forward guns and no turret.',vanguard:'Heavy bomber: two medium guns, three launcher racks and two side turrets.',prospector:'One forward gun and an upper rear turret.',lancer:'Two medium guns and one upper medium turret.',atlas:'Industrial freighter: one forward gun, four turrets and four drone bays.',blade:'Heavy fighter: two medium guns, two launcher racks and three turrets.',
             speedster:'Two light guns and a launcher rack; blistering speed, thin shielding.',legionary:'Two medium guns and a missile rack; an agile frontline fighter.',andromeda:'Two medium guns, two launcher racks and a turret; a heavy striker.',torsas:'Two forward guns, a launcher and a turret; deep and slow.',astra:'A light and a medium gun mount plus a launcher; a long-range cutter.'};
         const briefs={
             'pulse-cannon':'Efficient fire; lead your target.', 'ripper':'Strong against hull; short range.',

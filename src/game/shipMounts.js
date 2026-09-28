@@ -2,6 +2,7 @@
 // projectile origins; the outfitting preview uses the same coordinates so a
 // module shown on the dealer's ship is the module that fires in space.
 export const SHIP_MOUNT_ANCHORS = Object.freeze({
+    blade: {guns:[[-4.3,-1.44,-.74],[4.3,-1.44,-.74]],launchers:[[-2.8,.2,-1],[2.8,.2,-1]],drive:[[0,0,5.9]],defense:[[0,.5,0]],utility:[[0,-.8,1]]},
     speedster: {"guns": [[-0.55, -0.3, -3.5], [0.55, -0.3, -3.5]], "launchers": [[0, -0.3, -2.5]], "drive": [[0, 0, 4.4]], "defense": [[0, 1, 0]], "utility": [[0, -1, 1]]},
     legionary: {"guns": [[-2.7, -0.2, -2.7], [2.7, -0.2, -2.7]], "launchers": [[0, -0.5, -2.2]], "drive": [[0, 0, 4.960000000000001]], "defense": [[0, 1, 0]], "utility": [[0, -1, 1]]},
     andromeda: {"guns": [[-3, -0.3, -3], [3, -0.3, -3]], "launchers": [[-1, -0.7, -3], [1, -0.7, -3]], "drive": [[0, 0, 6.24]], "defense": [[0, 1, 0]], "utility": [[0, -1, 1]]},
@@ -24,7 +25,7 @@ export const SHIP_MOUNT_ANCHORS = Object.freeze({
     }),
     vanguard: Object.freeze({
         guns: [[-1.05, -0.28, -4.0], [1.05, -0.28, -4.0]],
-        launchers: [[0, -0.4, -2.55]],
+        launchers: [[0, -0.4, -2.55],[-1.8,-.4,-2.55],[1.8,-.4,-2.55]],
         drive: [[0, 0.02, 4.15]], defense: [[0, 0.78, 0.25]],
         utility: [[-2.1, 0.14, 1.2], [2.1, 0.14, 1.2]],
     }),

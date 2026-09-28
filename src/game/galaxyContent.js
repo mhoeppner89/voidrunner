@@ -401,7 +401,7 @@ export const GALAXY_LOCATIONS = {
             luxuries: -10,
             arms: 10,
         },
-        shipsForSale: ['vanguard', 'lancer', 'atlas'],
+        shipsForSale: ['vanguard', 'lancer', 'blade', 'atlas'],
         encounterRate: 0.26,
         people: [
             {

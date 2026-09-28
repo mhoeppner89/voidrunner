@@ -7,8 +7,8 @@ const bays = (count) => freeze(Array.from({ length: count }, (_, index) => {
     return freeze({ bayId, launchAnchorId: `${bayId}-launch`, dockAnchorId: `${bayId}-dock` });
 }));
 export const DRONE_BAY_LAYOUTS = freeze({
-    wayfarer: bays(1), prospector: bays(3), torsas:bays(1), astra:bays(1),
-    talon: emptyBays, vanguard: emptyBays, lancer: emptyBays, atlas: emptyBays,
+    wayfarer: bays(1), prospector: bays(3), torsas:bays(2), astra:bays(2),
+    talon: emptyBays, vanguard: emptyBays, lancer: emptyBays, atlas: bays(4), blade: emptyBays,
 });
 export const droneBayLayoutFor = (shipId) => Object.hasOwn(DRONE_BAY_LAYOUTS, shipId)
     ? DRONE_BAY_LAYOUTS[shipId] : emptyBays;
@@ -34,7 +34,7 @@ export const DRONE_RULES = freeze({ operatingRange: 100, recallSeconds: 15,
 const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const unitId = (value) => typeof value === 'string' && value.length > 0 ? value : null;
 const copy = (value) => JSON.parse(JSON.stringify(value));
-export const canMineWithHull = id => id === 'wayfarer' || id === 'prospector';
+export const canMineWithHull = id => ['wayfarer','prospector','torsas','astra','atlas'].includes(id);
 const validMode = (mode) => Object.hasOwn(DRONE_TYPES, mode);
 
 // Empty positions stay empty: configuration normalization never creates stock.

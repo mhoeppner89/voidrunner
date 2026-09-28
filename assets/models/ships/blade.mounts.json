@@ -1,0 +1,44 @@
+[
+  {
+    "name": "turret_rear_center",
+    "position": [
+      0.0,
+      0.6589999794960022,
+      0.09099999815225601
+    ],
+    "normal": [
+      0,
+      0,
+      1
+    ],
+    "coordinates": "Blender Z-up; nose -Y"
+  },
+  {
+    "name": "turret_ventral_port",
+    "position": [
+      -0.47999998927116394,
+      0.5,
+      -0.12600000202655792
+    ],
+    "normal": [
+      0,
+      0,
+      -1
+    ],
+    "coordinates": "Blender Z-up; nose -Y"
+  },
+  {
+    "name": "turret_ventral_starboard",
+    "position": [
+      0.47999998927116394,
+      0.5,
+      -0.12600000202655792
+    ],
+    "normal": [
+      0,
+      0,
+      -1
+    ],
+    "coordinates": "Blender Z-up; nose -Y"
+  }
+]

@@ -22,6 +22,7 @@ export const WINGMAN_OFFER_COUNT = 3;
 // base hulls need an explicit mapping (the role drives the hull's flight stats
 // and doctrine flags in spawnShip); League hulls carry their own variant id.
 export const HULL_OBSERVER_ROLE = Object.freeze({
+    blade: 'patrol',
     wayfarer: 'escort',
     vanguard: 'patrol',
     talon: 'pirate',
@@ -40,6 +41,7 @@ export const HULL_OBSERVER_ROLE = Object.freeze({
 // archetype; League hulls pass 'varied' so they keep their authored LEAGUE_FITS
 // role fit (an Andromeda wingman arrives with its real torpedo and swarm racks).
 export const HULL_WINGMAN_FIT = Object.freeze({
+    blade: 'assault',
     wayfarer: 'balanced',
     vanguard: 'support',
     talon: 'assault',

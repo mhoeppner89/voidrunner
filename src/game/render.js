@@ -168,6 +168,7 @@ const factionColor = (faction) => {
 // Exported so the shipyard's buy-ship preview (shipPreview.js) loads the same
 // hulls with the same orientation and world scale.
 export const GLB_SHIP_CONFIG = {
+    blade: {file:'blade.glb',preload:false,yaw:Math.PI,scale:7,preserveColor:true,enginePorts:[[.4,.014,-.853],[-.4,.014,-.853],[.615,-.096,-.828],[-.615,-.096,-.828]]},
     speedster: {file:'speedster.glb',preload:false,yaw:-Math.PI/2,scale:5.5,preserveColor:true,enginePorts:[[0.95498,-0.05,0.19],[0.95628,-0.05,-0.19]]},
     legionary: {file:'legionary.glb',preload:false,yaw:Math.PI,scale:6.2,preserveColor:true,enginePorts:[[0.23,0.095,-0.94653],[-0.23,0.095,-0.94515]]},
     andromeda: {file:'andromeda.glb',preload:false,yaw:Math.PI,scale:7.8,preserveColor:true,enginePorts:[[0.75,0.17,-0.99882],[0.4,0.19,-0.98845],[-0.4,0.19,-0.99751],[-0.75,0.17,-0.99744]]},

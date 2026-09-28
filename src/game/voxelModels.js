@@ -486,7 +486,7 @@ const buildAtlasFreighter = () => {
     };
 };
 const SHIP_BUILDERS = {
-    speedster:buildTalon, legionary:buildLancer, andromeda:buildWarden, torsas:buildKestrel, astra:buildKestrel,
+    blade:buildLancer, speedster:buildTalon, legionary:buildLancer, andromeda:buildWarden, torsas:buildKestrel, astra:buildKestrel,
     kestrel: buildKestrel,
     talon: buildTalon,
     warden: buildWarden,

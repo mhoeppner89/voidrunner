@@ -14440,7 +14440,16 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   }
 }
 
+#dock-screen .ship-career-note { margin: 0; font-size: 12px; line-height: 1.35; }
 @media (max-height: 520px) and (orientation: landscape) {
+  #dock-screen .ship-stock-list {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(185px, 220px);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-bottom: 4px;
+  }
   #dock-screen .ship-broker-header {
     display: none;
   }

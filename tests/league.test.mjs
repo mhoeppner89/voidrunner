@@ -22,9 +22,9 @@ test('Acheron has valid dock services and a reachable two-way route',()=>{
  for(const id of LOCATIONS['league-yard'].shipsForSale)assert.ok(SHIPS[id]);
  assert.ok(itemAvailable({},'torpedo-launcher','league-yard'));
 });
-test('civilian hulls are purchasable and military hulls require standing',()=>{
+test('tier-two hulls are purchasable without military standing',()=>{
  const s=fixture(),p=s.save.player;p.dockedAt='league-yard';p.credits=200000;p.cargo={};p.cargoMass=0;p.sealedCargo=[];
- assert.equal(quoteShipTrade(p,'legionary').code,'reputation-required');assert.ok(quoteShipTrade(p,'astra').ok);
+ assert.ok(quoteShipTrade(p,'legionary').ok);assert.ok(quoteShipTrade(p,'astra').ok);
  p.reputation['frontier-league']=20;assert.ok(quoteShipTrade(p,'andromeda').ok);
 });
 test('League opposes Concord and pirates, remains neutral to civilian factions and player',()=>{
@@ -33,8 +33,8 @@ test('League opposes Concord and pirates, remains neutral to civilian factions a
  for(const f of ['free-merchants','frontier-miners','salvage-union','frontier-league'])assert.equal(factionsOpposed('frontier-league',f),false);
  assert.equal(league.hostile,false);assert.equal(league.mugCapable,false);assert.equal(league.routineInspectionDue,false);
 });
-test('Astra and Torsas have PDC bays only; old mining units cannot migrate into them',()=>{
- for(const id of ['astra','torsas']){const bays=normalizeDroneBays(id,[{bayId:'drone-1',mode:'mining',unitIds:['old']}]);assert.equal(bays[0].mode,'pdc');assert.equal(defaultLoadoutFor(id).droneBays[0].mode,'pdc');assert.ok(validateDroneBays(id,[{bayId:'drone-1',mode:'mining',unitIds:[null,null]}],{}).length);}
+test('Astra and Torsas have two mining-capable bays',()=>{
+ for(const id of ['astra','torsas']){const bays=normalizeDroneBays(id,[{bayId:'drone-1',mode:'mining',unitIds:['old']}]);assert.equal(bays.length,2);assert.equal(bays[0].mode,'mining');assert.equal(defaultLoadoutFor(id).droneBays[0].mode,'mining');assert.equal(validateDroneBays(id,normalizeDroneBays(id,[]),{}).length,0);}
 });
 test('League spillover is confined to frontier locations and Andromeda carries both rack types',()=>{
  assert.equal(leagueTrafficChance('acheron','haven'),1);assert.equal(leagueTrafficChance('meridian','argent'),0);assert.equal(leagueTrafficChance('helios-verge','helix'),0);assert.ok(leagueTrafficChance('pale-ring','shepherd')>leagueTrafficChance('helios-verge','cairn'));
