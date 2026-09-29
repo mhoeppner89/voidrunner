@@ -4417,10 +4417,10 @@ export class GameUI {
         this.targetLayout?.classList.toggle('has-capital-target',!!target?.capitalSubtarget);
         if(target?.capitalSubtarget){
             const mount=target.capitalMount;
-            let label=Number.isInteger(mount)?t(mount<4?'BATTERY {n}':'PDC {n}',{n:mount<4?mount+1:mount-3}):t('HULL');
-            if(Number.isInteger(mount)&&!target.capitalShielded)label+=` ${Math.ceil(100*target.capitalSelected/(mount<4?100:65))}%`;
+            let label=Number.isInteger(mount)?t(target.capitalSelectedLabel):t('HULL');
+            if(Number.isInteger(mount))label+=` ${Math.ceil(100*target.capitalSelected/target.capitalSelectedMax)}%`;
             subtarget.textContent=t('AIM: {target}',{target:label})+' ›';
-            subtarget.title=t('Choose a visible main battery or the hull');
+            subtarget.title=t('Choose a visible turret, engine, shield generator or hull');
             subtarget.setAttribute('aria-label',subtarget.title+': '+label);
         }
         const bracket = this.el('#target-bracket');
@@ -4446,7 +4446,7 @@ export class GameUI {
         edgePointer?.classList.toggle('is-hostile', hostile);
         edgePointer?.classList.toggle('is-surrendered', surrendered && !hostile);
         this.el('#screen-target-distance').textContent = `${formatNumber(target.distance)} km`;
-        this.el('#screen-target-readout').textContent = target.capitalSubtarget ? t(target.capitalDisarmed?'BATTERIES DOWN':target.capitalAttack==='CHARGING'?'INCOMING · MOVE':target.capitalAttack==='SALVO'?'SALVO': 'OPENING · FIRE') : target.kind === 'ship' ? (target.readout ?? '—').replace(/\s*·\s*[\d.,]+\s*\/\s*[\d.,]+\s*km\s*$/i, '') : target.readout ?? '—';
+        this.el('#screen-target-readout').textContent = target.capitalSubtarget ? (target.capitalTorpedoWarning?t('TORPEDO LOCK · EVADE'):target.capitalEffect&&target.capitalAttack==='RECOVERING'?t(target.capitalEffect):t(target.capitalDisarmed?'BATTERIES DOWN':target.capitalAttack==='CHARGING'?'INCOMING · MOVE':target.capitalAttack==='SALVO'?'SALVO': 'OPENING · FIRE')) : target.kind === 'ship' ? (target.readout ?? '—').replace(/\s*·\s*[\d.,]+\s*\/\s*[\d.,]+\s*km\s*$/i, '') : target.readout ?? '—';
         this.el('#screen-target-readout').title = target.readout ?? '';
         this.setTargetScreenValue(target);
         this.updateWeaponButtons(target, mode);

@@ -16377,6 +16377,9 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-flight { column-gap:8px; }
 
 .target-bracket,.target-edge-pointer { z-index:4; }
+/* The edge cue must clear the transformed cockpit-instruments stacking
+   context; otherwise the painted frame hides targets near the screen edge. */
+#target-edge-pointer { z-index:6; }
 
 /* Comms occupy clear space between the hull's instruments. The idle log
    control is compact; an incoming transmission expands within that lane. */

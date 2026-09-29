@@ -62,14 +62,14 @@ test('per-gun damage is identical on different hulls and NPCs; plasma rewards di
  const nearest=closestHullPoint(V(0,0,-65),large,[70,40,90],V());assert.ok(Math.abs(nearest.z+80)<1e-5);
 });
 
-test('each missile catches a sprint-engine Talon in a straight chase and obeys turn and acceleration limits',()=>{
+test('fighter missiles catch a sprint-engine Talon; slow torpedoes remain evadable and all obey guidance limits',()=>{
  const s=session(),p=s.save.player;p.shipId='talon';p.ownedShips=['talon'];const fit=loadoutFor(p);fit.drive=['engine-mk2'];p.outfitting.loadouts.talon=fit;
  const targetSpeed=s.playerStats().afterburnSpeed;assert.ok(targetSpeed>114);
  for(const m of Object.values(LAUNCHERS)){
-  assert.ok(m.homingSpeed>targetSpeed);
+  assert.equal(m.homingSpeed>targetSpeed,m.id!=='torpedo');
   const target=V(0,0,-300),position=V(),velocity=V(0,0,-m.speed);let caught=false;
   for(let time=0;time<m.life;time+=1/120){target.z-=targetSpeed/120;guideMissile(velocity,target.clone().sub(position),m,1/120);position.addScaledVector(velocity,1/120);if(position.distanceTo(target)<4){caught=true;break;}}
-  assert.ok(caught,m.id);
+  assert.equal(caught,m.id!=='torpedo',m.id);
   const old=V(0,0,-m.speed),turn=old.clone();guideMissile(turn,V(100,0,100),m,1/60);
   assert.ok(old.angleTo(turn)<=m.homingTurn/60+1e-7);assert.ok(Math.abs(turn.length()-m.speed)<1e-7);
   const slow=V(0,0,-20);guideMissile(slow,V(0,0,-300),m,1/60);assert.ok(slow.length()<=20+m.acceleration/60+1e-7);

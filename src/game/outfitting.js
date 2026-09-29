@@ -136,7 +136,7 @@ const itemRecords = [
     {
         id: 'torpedo-launcher', name: 'Torpedo Tube', category: 'launcher', size: 'M', sizes: ['M'],
         price: 9800, weaponId: 'torpedo',
-        description: 'A heavy tube for deliberate shots against large, slow or already-disabled targets.', stat: '2 torpedoes · 600 km lock · 210 km/s',
+        description: 'A heavy tube for deliberate shots against large, slow or already-disabled targets.', stat: '2 torpedoes · 600 km lock · 115 km/s',
         effects: { weaponId: 'torpedo', tracking: 'low', splashRadius: 20, ammoId: 'missiles' }, availability: ['rook'],
         art: './art/outfitting/torpedo-launcher.webp',
     },

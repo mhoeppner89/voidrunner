@@ -3954,7 +3954,7 @@ export class SpaceRenderer {
         const prevPos = store.prevPos;
         projectiles.forEach((projectile) => {
             let mesh = this.projectileMeshes.get(projectile.slot);
-            if (mesh && (mesh.userData.projectileKind !== projectile.kind || mesh.userData.projectileFaction !== projectile.faction)) {
+            if (mesh && (mesh.userData.projectileKind !== projectile.kind || mesh.userData.projectileFaction !== projectile.faction || mesh.userData.projectileLauncher !== projectile.launcherId)) {
                 this.dynamicRoot.remove(mesh);
                 this.disposeObject(mesh);
                 this.projectileMeshes.delete(projectile.slot);
@@ -4064,11 +4064,16 @@ export class SpaceRenderer {
                     plume.position.z=1.7;
                     plume.name = 'plume';
                     group.add(plume);
+                    if(projectile.launcherId==='torpedo'){
+                        const shield=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshBasicMaterial({color:0x72dfff,transparent:true,opacity:.22,depthWrite:false,wireframe:true}));
+                        shield.scale.set(.75,.75,1.8);shield.name='torpedo-shield';group.add(shield);
+                    }
                     mesh = group;
                 }
                 this.dynamicRoot.add(mesh);
                 mesh.userData.projectileKind = projectile.kind;
                 mesh.userData.projectileFaction = projectile.faction;
+                mesh.userData.projectileLauncher = projectile.launcherId;
                 this.projectileMeshes.set(projectile.slot, mesh);
             }
             const i = projectile.slot * 3;
@@ -4106,6 +4111,8 @@ export class SpaceRenderer {
                 // Exhaust flicker: the engine plume strobes while the motor
                 // burns. No smoke trail — there is no atmosphere out here to
                 // suspend one (user report); the hot plume is the whole trail.
+                const shield=mesh.getObjectByName('torpedo-shield');
+                if(shield)shield.visible=(projectile.shield??0)>0;
                 const plume = mesh.getObjectByName('plume');
                 if (plume)
                     plume.material.opacity = 0.35 + Math.sin(this.skyTime * 47 + projectile.slot * 3.3) * 0.08;

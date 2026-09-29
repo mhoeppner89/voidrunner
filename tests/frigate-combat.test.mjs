@@ -199,3 +199,94 @@ test('frigate repositions around blocked firing lanes without firing through cov
  for(let i=0;i<300;i++){s.save.world.time=i/60;updateFrigateAttack(s,ship,point,new THREE.Vector3(),1/60);}
  assert.ok(Math.abs(ship.position[2])>10);assert.ok(ship.position.every(Number.isFinite));
 });
+
+// Exercise physical impacts, not only metadata: the same projectile path is
+// used by career, arena, arena run, and observer actors.
+function projectileStage(){
+ const {s,ship}=stage();s.save.player.position=[500,500,500];
+ s.tmpAudioOrientation=new THREE.Quaternion();s.tmpAudioLocal=new THREE.Vector3();
+ s.audio={playAtDirection(){}};s.renderer.spawnExplosion=()=>{};
+ s.playerCollisionRadius=()=>2;s.playerStats=()=>({radarRange:1000});
+ return {s,ship};
+}
+test('rear torpedo impacts bypass shields and progressively cripple the engines',async()=>{
+ const {LAUNCHERS}=await import('../src/game/weapons.js');const {s,ship}=projectileStage();
+ const shield=ship.shield,originalSpeed=ship.speed;
+ for(let shot=0;shot<2;shot++){
+  const slot=s.projStore.alloc();s.projStore.setPos(slot,0,0,150);s.projStore.setVel(slot,0,0,-115);
+  s.projectiles.push({id:`tor-${shot}`,slot,kind:'missile',ownerId:'player',launcherId:'torpedo',damage:LAUNCHERS.torpedo.damage,life:2,targetId:ship.id,targetMount:8,homingSpeed:115,homingTurn:.28,acceleration:140,shield:12});
+  s.updateProjectiles(.5);
+  assert.equal(ship.shield,shield);assert.ok(ship.speed<originalSpeed);
+ }
+ assert.equal(ship.capitalMountHull[8],0);assert.ok(ship.speed<=originalSpeed*.16);assert.ok(ship.turnRate<.03);
+ assert.equal(ship.capitalMountHull[0],100);assert.equal(ship.shieldRegen,8);
+});
+test('each generator removes half the recharge without disabling guns or engines',()=>{
+ const {s,ship}=stage();ship.shield=0;const speed=ship.speed;
+ for(const [index,regen] of [[9,4],[10,0]]){
+  const point=frigateMountPosition(ship,index,new THREE.Vector3()).toArray();
+  assert.equal(damageFrigateMount(ship,point,95),index);assert.equal(ship.shieldRegen,regen);
+ }
+ assert.equal(ship.speed,speed);assert.equal(ship.capitalMountHull[8],160);assert.equal(ship.capitalMountHull[2],100);
+ assert.equal(damageFrigateMount(ship,[0,0,-110],200),-1,'a bow strike cannot damage rear engines');
+});
+test('PDC intercept rounds kill ordinary missiles but only chip a torpedo shield',()=>{
+ for(const shield of [0,12]){
+  const {s}=projectileStage();s.ships=[];
+  const slot=s.projStore.alloc();s.projStore.setPos(slot,0,0,0);s.projStore.setVel(slot,0,0,0);
+  const missile={id:'incoming',slot,kind:'missile',ownerId:'enemy',life:10,damage:30,shield};s.projectiles.push(missile);
+  const round=s.projStore.alloc();s.projStore.setPos(round,-5,0,0);s.projStore.setVel(round,100,0,0);
+  s.projectiles.push({id:'intercept',slot:round,kind:'pdc',ownerId:'player',life:1,damage:1.76,targetMissile:missile});
+  s.updateProjectiles(.1);
+  if(shield){assert.ok(missile.life>0);assert.equal(missile.shield,10.24);}else assert.equal(missile.life,0);
+ }
+});
+test('frigate torpedoes have a finite magazine, warning, cooldown, and cover interruption',()=>{
+ const {s,ship}=stage(),point=new THREE.Vector3(380,0,0);s.spawnGunProjectile=()=>{};
+ let warnings=0;for(let i=0;i<120*60;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,point,new THREE.Vector3());if(ship.capitalTorpedoWarning)warnings++;}
+ assert.ok(warnings>180);assert.ok(s.projectiles.length>2&&s.projectiles.length<=6);assert.equal(ship.capitalTorpedoes+s.projectiles.length,6);
+ const other=stage();other.s.lineBlocked=()=>true;
+ for(let i=0;i<1800;i++){other.s.save.world.time=i/60;updateFrigateBatteries(other.s,other.ship,1/60,point,new THREE.Vector3());}
+ assert.equal(other.s.projectiles.length,0);assert.equal(other.ship.capitalTorpedoWarning,false);
+});
+test('stern and generator aim points remain selectable after destruction to show effects',()=>{
+ const {s,ship}=stage();s.save.player.currentTargetId=ship.id;s.save.player.position=[0,0,300];
+ assert.ok(visibleFrigateBatteries(s,ship,s.save.player.position).includes(8));
+ assert.ok(!visibleFrigateBatteries(s,ship,[0,0,-300]).includes(8));
+ s.capitalSubtarget={id:ship.id,index:8};damageFrigateMount(ship,[0,0,112.9],160);
+ assert.equal(s.getTargetRef().mount,8);assert.deepEqual(s.getTargetRef().position,[0,0,112.9]);
+});
+test('torpedo guidance cannot follow a fighter across a sharp crossing turn',async()=>{
+ const {guideMissile}=await import('../src/game/weaponFlight.js');const {LAUNCHERS}=await import('../src/game/weapons.js');
+ const velocity=new THREE.Vector3(0,0,-115),before=velocity.clone();
+ guideMissile(velocity,new THREE.Vector3(100,0,0),LAUNCHERS.torpedo,1);
+ assert.ok(before.angleTo(velocity)<=.280001);assert.ok(velocity.x<33);assert.ok(velocity.z<-100);
+});
+test('final-wave crown pocket has reachable real rock cover and a pursuing frigate',async()=>{
+ const {generateAsteroidField}=await import('../src/game/worldData.js');const {LOCATIONS}=await import('../src/game/data.js');
+ for(const seed of [718,42,2026]){
+  const {s,ship}=stage(),proto=Object.getPrototypeOf(s);
+  s.asteroids=generateAsteroidField(seed,[],[]);s.obstacles=s.asteroidFieldObstacles(s.asteroids);
+  for(const key of ['tmpEntryAnchor','tmpEntryCandidate','tmpEntryPreferredDirection','tmpEntryDirection'])s[key]=new THREE.Vector3();
+  const origin=new THREE.Vector3(...LOCATIONS.shardbelt.position);s.setFieldArenaPosition(origin,'shardbelt',90);
+  assert.ok(s.entryPositionClear(origin,s.obstacles,90),'player starts in a usable pocket');
+  let cover;
+  for(const rock of s.obstacles){
+   const center=new THREE.Vector3(rock.x,rock.y,rock.z),distance=center.distanceTo(origin);
+   if(distance>600||distance<100)continue;
+   const towards=center.clone().sub(origin).normalize(),near=center.clone().addScaledVector(towards,-rock.radius-25),far=center.clone().addScaledVector(towards,rock.radius+200);
+   if(!s.lineBlocked(origin,near)&&s.lineBlocked(near,far)){cover=rock;break;}
+  }
+  assert.ok(cover,`seed ${seed}: a short clear route reaches real mesh cover`);
+  const target=origin.clone();ship.position=origin.clone().add(new THREE.Vector3(0,0,-1000)).toArray();
+  // Use the final-wave spawn search against the generated field, then the
+  // ordinary navigation/avoidance. No fixture rock replaces the level data.
+  s.save.player.position=origin.toArray();s.save.arenaRun={entry:null};s.runEntryPosition=()=>ship.position;
+  s.ui.setRunInbound=()=>{};s.selectTarget=()=>{};
+  assert.equal(s.spawnRunEnemy(['frigate','ace',0,0],0),true);const boss=s.ships.at(-1);boss.holdFire=true;
+  const initial=target.distanceTo(new THREE.Vector3(...boss.position));
+  for(let tick=0;tick<1200;tick++){s.save.world.time+=1/60;updateFrigateAttack(s,boss,target,new THREE.Vector3(),1/60);assert.ok(boss.position.every(Number.isFinite));}
+  assert.ok(target.distanceTo(new THREE.Vector3(...boss.position))<initial-100,'frigate follows the lure toward the field');
+  assert.ok(s.entryPositionClear(new THREE.Vector3(...boss.position),s.obstacles,35),'pursuit does not end inside a rock');
+ }
+});

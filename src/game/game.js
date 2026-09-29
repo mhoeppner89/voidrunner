@@ -7,7 +7,7 @@ import { segmentMeshHit } from './meshQueries.js';
 import {createMiningContacts,updateMiningContacts} from './miningSurface.js';
 import { DRONE_PORTS } from './droneFlight.js';
 import {updateNpcDrones,droneUnits,damageNpcDrone} from './npcDrones.js';
-import {frigateHullDamageScale,equipFrigate,updateFrigateAttack,updateFrigateBatteries,damageFrigateMount,segmentFrigateMountHit,frigateMountPosition,visibleFrigateBatteries} from './capitalCombat.js';
+import {frigateSubsystemLabel,frigateSubsystemEffect,frigateHullDamageScale,equipFrigate,updateFrigateAttack,updateFrigateBatteries,damageFrigateMount,segmentFrigateMountHit,frigateMountPosition,visibleFrigateBatteries} from './capitalCombat.js';
 import {observeIncomingFire, updateCombatIntent, combatThrottle, combatTrackingRate, holdingFiringWindow} from './combatPiloting.js';
 import {planCombatFlight, combatPursuitDirection, friendlyFiringLaneBlocked} from './combatPlanning.js';
 import { combatTargetEligible } from './combatTargeting.js';
@@ -2771,7 +2771,7 @@ export class GameSession {
             if (debrisCollisionTest)
                 stagedForward = this.setDebrisCollisionTestPosition(center);
             else if (environment === 'debris-field' || (config.run && this.save.arenaRun?.wave===9))
-                this.setFieldArenaPosition(center, instanceId);
+                this.setFieldArenaPosition(center, instanceId, config.run && this.save.arenaRun?.wave===9 ? 90 : ARENA_FIELD_SAFE_CLEARANCE);
             else
                 this.setFieldEntryPosition(center, instanceId, FORWARD);
         }
@@ -5229,6 +5229,8 @@ export class GameSession {
                     weaponId: launcher.id,
                     launcherId: launcher.id,
                     ordnanceId: launcher.ordnanceId,
+                    shield: launcher.projectileShield,
+                    targetMount: this.capitalSubtarget?.id===ship.id?this.capitalSubtarget.index:undefined,
                     mountId: mount.id,
                     homingSpeed: launcher.homingSpeed,
                     homingTurn: launcher.homingTurn,
@@ -6923,7 +6925,7 @@ export class GameSession {
         const ship = this.ships.find((entry) => entry.id === id && !entry.claimed && !entry.captured && entry.hull > 0);
         if (ship) {
             const mount=this.capitalSubtarget?.id===id?this.capitalSubtarget.index:undefined;
-            if(Number.isInteger(mount)&&ship.capitalMountHull?.[mount]>0){
+            if(Number.isInteger(mount)&&ship.capitalMountHull?.[mount]>=0){
                 this.capitalTargetPoint??=new THREE.Vector3();this.capitalTargetTuple??=[];
                 return {kind:'ship',id,position:frigateMountPosition(ship,mount,this.capitalTargetPoint).toArray(this.capitalTargetTuple),name:ship.name,mount};
             }
@@ -9822,7 +9824,7 @@ export class GameSession {
             this.projStore.setPosV(slot,muzzle);shot.multiplyScalar(launcher.speed).add(vec(ship.velocity));this.projStore.setVelV(slot,shot);
             this.projectiles.push({id:`p-${++this.projectileCounter}`,kind:'missile',ownerId:ship.id,slot,damage:launcher.damage,life:launcher.life,
                 targetId:ship.targetId,faction:ship.faction,launcherId:launcher.id,homingSpeed:launcher.homingSpeed,homingTurn:launcher.homingTurn,
-                acceleration:launcher.acceleration,splashRadius:launcher.splashRadius,splashMin:launcher.splashMin});
+                shield:launcher.projectileShield,acceleration:launcher.acceleration,splashRadius:launcher.splashRadius,splashMin:launcher.splashMin});
         }
         fit.missiles--;if(fit.activeRack)fit.activeRack.missiles=fit.missiles;fit.lock=0;fit.warned=false;fit.launchAt=time+Math.max(gap,launcher.cooldown)*disruptionFactor(ship,time);
     }
@@ -9914,8 +9916,10 @@ export class GameSession {
                 }
                 else {
                     const targetShip = this.ships.find((entry) => entry.id === projectile.targetId && entry.hull > 0);
-                    if (targetShip)
-                        targetPosition = vec(targetShip.position, this.tmpP4);
+                    if (targetShip){
+                        targetPosition = Number.isInteger(projectile.targetMount)&&targetShip.capitalMountHull?.[projectile.targetMount]>0
+                            ?frigateMountPosition(targetShip,projectile.targetMount,this.tmpP4):vec(targetShip.position,this.tmpP4);
+                    }
                     else {
                         const drone = units[projectile.targetId];
                         if (drone?.hull > 0 && drone.position && drone.state !== 'stowed' && drone.state !== 'destroyed')
@@ -9993,7 +9997,10 @@ export class GameSession {
                     if(hit!==undefined&&hit<bestT){bestT=hit;hitKind='missile';}
                 }
                 if(hitKind==='missile'){
-                    projectile.targetMissile.life=0;projectile.life=0;
+                    const missile=projectile.targetMissile;
+                    if((missile.shield??0)>0)missile.shield=Math.max(0,missile.shield-projectile.damage);
+                    else missile.life=0;
+                    projectile.life=0;
                     this.renderer.spawnImpact(tuple(this.tmpP4.copy(sweepFrom).lerp(end,bestT)),0xdce9ff,false);
                     break;
                 }
@@ -10113,7 +10120,7 @@ export class GameSession {
         const disabledMount=damageFrigateMount(ship,position,applied.hull);
         if(disabledMount>=0&&ship.capitalMountHull[disabledMount]===0){
             this.renderer.spawnExplosion?.(position,true,.45);
-            if(attackerId==='player')this.ui.pushEvent(t(disabledMount<4?'BATTERY {n} DISABLED':'PDC {n} DISABLED',{n:disabledMount<4?disabledMount+1:disabledMount-3}),'info',3500);
+            if(attackerId==='player')this.ui.pushEvent(`${t(frigateSubsystemLabel(disabledMount))} · ${t(frigateSubsystemEffect(ship,disabledMount))}`,'info',3500);
         }
         if (amount > 0) disruptWeapons(ship, weapon, this.save.world.time, shieldBeforeHit);
         if (ship.hull>0 && !ship.tutorialCompanion && !ship.surrendered && !ship.captured && !ship.poweredDown)
@@ -12440,7 +12447,7 @@ export class GameSession {
         }
         return false;
     }
-    setFieldArenaPosition(position, instanceId) {
+    setFieldArenaPosition(position, instanceId, clearance = ARENA_FIELD_SAFE_CLEARANCE) {
         const location = LOCATIONS[instanceId];
         if (!location)
             return false;
@@ -12448,7 +12455,7 @@ export class GameSession {
         this.tmpEntryAnchor.set(location.position[0], location.position[1], location.position[2]);
         for (const [x, y, z] of ARENA_FIELD_START_OFFSETS) {
             this.tmpEntryCandidate.set(this.tmpEntryAnchor.x + x, this.tmpEntryAnchor.y + y, this.tmpEntryAnchor.z + z);
-            if (this.entryPositionClear(this.tmpEntryCandidate, obstacles, ARENA_FIELD_SAFE_CLEARANCE)) {
+            if (this.entryPositionClear(this.tmpEntryCandidate, obstacles, clearance)) {
                 position.copy(this.tmpEntryCandidate);
                 return true;
             }
@@ -14306,6 +14313,10 @@ export class GameSession {
                     name: identified ? ship.name : t('UNRESOLVED CONTACT'),
                     capitalSubtarget: !!ship.capitalMountHull,
                     capitalAttack: ship.capitalAttack,
+                    capitalTorpedoWarning: ship.capitalTorpedoWarning,
+                    capitalSelectedLabel: Number.isInteger(target.mount)?frigateSubsystemLabel(target.mount):undefined,
+                    capitalSelectedMax: target.mount===8?160:target.mount>=9?95:target.mount<4?100:65,
+                    capitalEffect: Number.isInteger(target.mount)?frigateSubsystemEffect(ship,target.mount):undefined,
                     capitalAttackRemaining: ship.capitalAttackRemaining,
                     capitalDisarmed: ship.capitalDisarmed,
                     capitalMount: target.mount,
@@ -14326,7 +14337,7 @@ export class GameSession {
                     // skill tier, prefixed with the recognition marker when the
                     // pilot remembers the player (spared or escaped). Temperament
                     // stays off the HUD: it reads through behavior and comms.
-                    readout: ship.capitalMountHull && identified ? t('BATTERIES {guns}/4 · PDC {pdc}/4',{guns:ship.capitalMountHull.slice(0,4).filter(n=>n>0).length,pdc:ship.capitalMountHull.slice(4).filter(n=>n>0).length}) : ship.captured || ship.surrendered
+                    readout: ship.capitalMountHull && identified ? t('BATTERIES {guns}/4 · PDC {pdc}/4',{guns:ship.capitalMountHull.slice(0,4).filter(n=>n>0).length,pdc:ship.capitalMountHull.slice(4,8).filter(n=>n>0).length}) : ship.captured || ship.surrendered
                         ? surrenderReadout
                         : !identified
                             ? distance > stats.scanRange

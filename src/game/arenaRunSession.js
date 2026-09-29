@@ -280,7 +280,7 @@ export const ArenaRunMethods={
    equipFrigate(ship,true);ship.hostile=true;ship.targetId='player';ship.arenaRunEnemy=true;ship.noSurrender=true;ship.faction='red-talons';
    delete ship.task;delete ship.capitalHome;ship.holdFire=false;ship.playerAwareness=1;
    ship.rotation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),origin.clone().sub(point).normalize()).toArray();
-   this.selectTarget('ship',ship.id);this.ui.pushEvent(t('Frigate entering. Use asteroid cover; select its batteries on the target monitor.'),'warning',6000);return true;
+   this.selectTarget('ship',ship.id);this.ui.pushEvent(t('Frigate entering. Lure it into the rocks, then torpedo its rear engines. Select systems on the target monitor.'),'warning',6000);return true;
   }
   const ship=this.spawnShip(role,point.toArray(),undefined,undefined,{tier:r.hard?(tier==='novice'?'veteran':tier==='veteran'?'ace':tier):tier});
   ship.faction='red-talons';

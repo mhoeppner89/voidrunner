@@ -1,5 +1,6 @@
+import {t} from './i18n.js';
 import {combatTargetEligible} from './combatTargeting.js';
-import {WEAPON_DAMAGE_SCALE} from './weapons.js';
+import {WEAPON_DAMAGE_SCALE,LAUNCHERS} from './weapons.js';
 import * as THREE from 'three';
 import {FRIGATE_MOUNTS,FRIGATE_CLEARANCE} from './frigateMounts.js';
 import {clearTurretArc,shipBlocksRay,updateAutomaticTurrets} from './turrets.js';
@@ -14,8 +15,8 @@ const forward=new THREE.Vector3(0,0,-1);
 export function equipFrigate(ship,boss=false){
  ship.capitalBoss=boss;
  ship.combatFit={hullId:'concord-frigate',turrets:[null,null,null,null,'pdc','pdc','pdc','pdc'],stats:{energyCapacity:240},weapons:[],guns:[],attackOrder:[],fireAt:[],missiles:0};
- ship.energy=240;ship.capitalMountHull=FRIGATE_MOUNTS.map((_,i)=>i<4?100:65);
- {ship.maxShield=650;ship.shield=650;ship.maxHull=1400;ship.hull=1400;ship.shieldRegen=0;ship.turnRate=.24;}
+ ship.energy=240;ship.capitalMountHull=FRIGATE_MOUNTS.map((m,i)=>m.hull??(i<4?100:65));
+ {ship.maxShield=650;ship.shield=650;ship.maxHull=1400;ship.hull=1400;ship.shieldRegen=8;ship.turnRate=.24;ship.capitalBaseSpeed=ship.speed;ship.capitalTorpedoes=6;}
 }
 function stateFor(ship){
  return ship.capitalRuntime??={position:new THREE.Vector3(),normal:new THREE.Vector3(),direction:new THREE.Vector3(),scratch:new THREE.Vector3(),local:new THREE.Vector3(),inverse:new THREE.Quaternion(),q:new THREE.Quaternion(),goal:new THREE.Quaternion(),target:new THREE.Vector3(),velocity:new THREE.Vector3(),lead:new THREE.Vector3(),turn:new THREE.Quaternion(),mounts:FRIGATE_MOUNTS.map(()=>({direction:new THREE.Vector3(),fireAt:0,chargeAt:0,rounds:0}))};
@@ -29,15 +30,52 @@ export function frigateMountPosition(ship,index,out){
 export function damageFrigateMount(ship,position,damage){
  if(ship.capitalClass!=='frigate'||!position||damage<=0||!ship.capitalMountHull)return -1;
  const s=stateFor(ship);s.local.fromArray(position).sub(s.scratch.fromArray(ship.position)).applyQuaternion(s.inverse.fromArray(ship.rotation).invert());
- let nearest=14,index=-1;
+ let nearest=1,index=-1;
  for(let i=0;i<FRIGATE_MOUNTS.length;i++){
   if(ship.capitalMountHull[i]<=0)continue;
-  const m=FRIGATE_MOUNTS[i];if(s.local.getComponent(m.axis)*m.side<0)continue;
+  const m=FRIGATE_MOUNTS[i];if(s.local.getComponent(m.axis)*m.side<(i>=8?FRIGATE_EXTENTS[m.axis]*.65:0))continue;
   let squared=0;for(let a=0;a<3;a++)if(a!==m.axis)squared+=(s.local.getComponent(a)-m.position[a]*FRIGATE_EXTENTS[a])**2;
-  if(Math.sqrt(squared)<nearest){nearest=Math.sqrt(squared);index=i;}
+  const normalized=Math.sqrt(squared)/(m.radius??14);
+  if(normalized<nearest){nearest=normalized;index=i;}
  }
- if(index>=0)ship.capitalMountHull[index]=Math.max(0,ship.capitalMountHull[index]-damage);
+ if(index>=0){ship.capitalMountHull[index]=Math.max(0,ship.capitalMountHull[index]-damage);applyFrigateSubsystemEffects(ship);}
  return index;
+}
+export function applyFrigateSubsystemEffects(ship){
+ const hull=ship.capitalMountHull;if(!hull)return;
+ const engine=Math.max(0,Math.min(1,(hull[8]??160)/160));
+ ship.speed=(ship.capitalBaseSpeed??18)*(.15+.85*engine);
+ ship.turnRate=.24*(.12+.88*engine);
+ ship.shieldRegen=4*((hull[9]??95)/95+(hull[10]??95)/95);
+}
+export function frigateSubsystemLabel(index){return index<4?`BATTERY ${index+1}`:index<8?`PDC ${index-3}`:FRIGATE_MOUNTS[index]?.label??'HULL';}
+export function frigateSubsystemEffect(ship,index){
+ if(index===8)return t('SPEED {speed}% · TURN {turn}%',{speed:Math.round(ship.speed/(ship.capitalBaseSpeed??18)*100),turn:Math.round(ship.turnRate/.24*100)});
+ if(index>=9)return t('RECHARGE {charge}%',{charge:Math.round(ship.shieldRegen/8*100)});
+ return ship.capitalMountHull[index]>0?'OPERATIONAL':'DISABLED';
+}
+// A finite magazine and a separate, interruptible warning give the stern a
+// threat without tracking a fighter through a turn or firing through cover.
+function updateFrigateTorpedoes(session,ship,dt,targetPosition){
+ const s=stateFor(ship),now=session.save.world.time;
+ ship.capitalTorpedoWarning=false;
+ if(s.torpedoTarget!==ship.targetId){s.torpedoTarget=ship.targetId;s.torpedoLock=0;}
+ if(!targetPosition||!ship.targetId||ship.holdFire||ship.pursuitHoldFire||ship.fleeing||ship.patrolMemoryActive||ship.capitalTorpedoes<=0||now<(s.torpedoReadyAt??12)){s.torpedoLock=0;return;}
+ s.position.fromArray(ship.position);s.direction.copy(targetPosition).sub(s.position);
+ const distance=s.direction.length();
+ if(distance<120||distance>600||session.lineBlocked(s.position,targetPosition,ship.id)){s.torpedoLock=0;return;}
+ if(!(s.torpedoLock>0)&&ship.targetId==='player')session.setOwnMonitorStatus?.(t('TORPEDO LOCK · EVADE'),4000);
+ s.torpedoLock=(s.torpedoLock??0)+dt;ship.capitalTorpedoWarning=true;
+ if(s.torpedoLock<3||(!ship.capitalDisarmed&&ship.capitalAttack!=='SALVO'))return;
+ s.direction.normalize();
+ // Launch above the dorsal hull, then rely on the ordinary limited guidance.
+ s.lead.set(0,FRIGATE_EXTENTS[1]+10,0).applyQuaternion(s.q.fromArray(ship.rotation)).add(s.position);
+ if(session.lineBlocked(s.lead,targetPosition,ship.id)){s.torpedoLock=0;return;}
+ const launcher=LAUNCHERS.torpedo,slot=session.projStore.alloc();
+ session.projStore.setPosV(slot,s.lead);
+ s.velocity.copy(s.direction).multiplyScalar(launcher.speed).add(s.scratch.fromArray(ship.velocity));session.projStore.setVelV(slot,s.velocity);
+ session.projectiles.push({id:`p-${++session.projectileCounter}`,slot,kind:'missile',ownerId:ship.id,targetId:ship.targetId,faction:ship.faction,launcherId:'torpedo',damage:launcher.damage,life:launcher.life,homingSpeed:launcher.homingSpeed,homingTurn:launcher.homingTurn,acceleration:launcher.acceleration,shield:launcher.projectileShield});
+ ship.capitalTorpedoes--;s.torpedoLock=0;s.torpedoReadyAt=now+16;ship.capitalTorpedoWarning=false;
 }
 export function updateFrigateBatteries(session,ship,dt,targetPosition,targetVelocity){
  if(!ship.capitalMountHull)equipFrigate(ship,!!ship.capitalBoss);
@@ -70,6 +108,7 @@ export function updateFrigateBatteries(session,ship,dt,targetPosition,targetVelo
   }
   ship.capitalAttack=cycle.phase;ship.capitalAttackRemaining=Math.max(0,cycle.until-now);
  }
+ updateFrigateTorpedoes(session,ship,dt,targetPosition);
  updateAutomaticTurrets(session,ship,ship.id,dt);
  for(let i=4;i<8;i++)if(ship.capitalMountHull[i]<=0){frigateMountPosition(ship,i,s.position);session.renderer.showDisabledCapitalMount?.(`${ship.id}-${i}`,s.position,s.q,ship,i);}
  for(let i=0;i<4;i++){
@@ -251,7 +290,7 @@ export function segmentFrigateMountHit(start,end,ship,padding=0){
  for(let i=0;i<FRIGATE_MOUNTS.length;i++){
   if(ship.capitalMountHull[i]<=0)continue;
   const m=FRIGATE_MOUNTS[i];s.lead.fromArray(m.position).multiply(s.scratch.fromArray(FRIGATE_EXTENTS));
-  s.scratch.copy(s.local).sub(s.lead);const b=2*s.scratch.dot(s.direction),radius=(i<4?6.2:4)+padding,c=s.scratch.lengthSq()-radius*radius,disc=b*b-4*a*c;
+  s.scratch.copy(s.local).sub(s.lead);const b=2*s.scratch.dot(s.direction),radius=(m.radius??(i<4?6.2:4))+padding,c=s.scratch.lengthSq()-radius*radius,disc=b*b-4*a*c;
   if(disc<0)continue;const t=(-b-Math.sqrt(disc))/(2*a);if(t>=0&&t<=1)nearest=Math.min(nearest,t);
  }
  return Number.isFinite(nearest)?nearest:undefined;
@@ -260,8 +299,10 @@ export function segmentFrigateMountHit(start,end,ship,padding=0){
 export function visibleFrigateBatteries(session,ship,observer){
  const s=stateFor(ship),indices=[];s.inverse.fromArray(ship.rotation).invert();
  const point=new THREE.Vector3().fromArray(observer);
- for(let i=0;i<4;i++){if(ship.capitalMountHull[i]<=0)continue;frigateMountPosition(ship,i,s.position);s.clearance=FRIGATE_CLEARANCE[i];
-  if(clearTurretArc(ship,FRIGATE_MOUNTS[i],FRIGATE_EXTENTS,point,s)&&!session.lineBlocked(s.position,point,ship.id))indices.push(i);
+ for(let i=0;i<FRIGATE_MOUNTS.length;i++){frigateMountPosition(ship,i,s.position);s.clearance=FRIGATE_CLEARANCE[i];
+  const m=FRIGATE_MOUNTS[i];
+  const exposed=i<8?clearTurretArc(ship,m,FRIGATE_EXTENTS,point,s):s.local.copy(point).sub(s.position).applyQuaternion(s.inverse).getComponent(m.axis)*m.side>0;
+  if(exposed&&!session.lineBlocked(s.position,point,ship.id))indices.push(i);
  }
  return indices;
 }

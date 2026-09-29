@@ -12,6 +12,18 @@
 // Player address is informal "du" throughout, matching the frontier voice of
 // the English lines. Values are plain text — never HTML.
 export const DE_CATALOG = {
+  "Lure the frigate into the rocks to break its firing line. Approach the stern and aim shielded torpedoes at MAIN ENGINES, then disable turrets and shield generators. Torpedoes bypass shields but turn poorly. Watch battery charges and torpedo locks.": "Locke die Fregatte zwischen die Felsen, um ihre Schusslinie zu brechen. Greife von hinten an und richte geschützte Torpedos auf die HAUPTTRIEBWERKE. Schalte danach Geschütze und Schildgeneratoren aus. Torpedos durchdringen Schilde, drehen aber langsam. Achte auf ladende Batterien und Torpedowarnungen.",
+  "Frigate entering. Lure it into the rocks, then torpedo its rear engines. Select systems on the target monitor.": "Fregatte im Anflug. Locke sie zwischen die Felsen und torpediere die Hecktriebwerke. Wähle Systeme am Zielmonitor.",
+  "Choose a visible turret, engine, shield generator or hull": "Sichtbares Geschütz, Triebwerk, Schildgenerator oder Rumpf wählen",
+  "MAIN ENGINES": "HAUPTTRIEBWERKE",
+  "UPPER GENERATOR": "OBERER GENERATOR",
+  "LOWER GENERATOR": "UNTERER GENERATOR",
+  "TORPEDO LOCK · EVADE": "TORPEDO ERFASST · AUSWEICHEN",
+  "OPERATIONAL": "BETRIEBSBEREIT",
+  "DISABLED": "AUSGEFALLEN",
+  "SPEED {speed}% · TURN {turn}%": "TEMPO {speed}% · DREHUNG {turn}%",
+  "RECHARGE {charge}%": "AUFLADUNG {charge}%",
+
     'LAUNCHER FIRING': 'RAKETENFEUER',
     'ALTERNATING': 'ABWECHSELND',
     'TOGETHER': 'GEMEINSAM',
@@ -2685,7 +2697,7 @@ Object.assign(DE_CATALOG, {
  'High direct damage and efficiency; slow plasma.':'Hoher Direktschaden und gute Effizienz; langsames Plasma.'
 });
 
-Object.assign(DE_CATALOG, {'2 torpedoes · 600 km lock · 210 km/s':'2 Torpedos · 600 km Aufschaltung · 210 km/s'});
+Object.assign(DE_CATALOG, {'2 torpedoes · 600 km lock · 115 km/s':'2 Torpedos · 600 km Aufschaltung · 115 km/s'});
 
 Object.assign(DE_CATALOG, {
     "PDC drones launch automatically in DEFEND mode. They intercept missiles first, then attack hostile ships within 300 km. STOW recalls them.": "PDC-Drohnen starten im Modus PDC ABWEHR automatisch. Sie fangen zuerst Raketen ab und greifen danach feindliche Schiffe innerhalb von 300 km an. VERSTAUEN ruft sie zurück."

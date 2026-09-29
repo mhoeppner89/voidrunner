@@ -116,7 +116,9 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
                 point.z+=Math.cos(phase*.83)*spread*.5;
             }
             const desired=state.desired.copy(point).sub(state.position).normalize();
-            const inArc=(!pdc||flightTime<=PDC_TURRET.life) && distance<=(pdc?PDC_TURRET.range:laser.range)+rangeEpsilon && clearTurretArc(actor,mount,extents,point,state);
+            const localTarget=state.local.copy(point).sub(state.scratch.fromArray(actor.position)).applyQuaternion(state.inverse);
+            const rearAllowed=intercept||!mount.rearBias||localTarget.z>=-localTarget.length()*.2;
+            const inArc=rearAllowed&&(!pdc||flightTime<=PDC_TURRET.life) && distance<=(pdc?PDC_TURRET.range:laser.range)+rangeEpsilon && clearTurretArc(actor,mount,extents,point,state);
             if(inArc) {
                 const angle=state.direction.angleTo(desired),step=(pdc?4.5:1.2)*dt*(pilot?.turretTurn??1);
                 state.turn.setFromUnitVectors(state.direction,desired);
