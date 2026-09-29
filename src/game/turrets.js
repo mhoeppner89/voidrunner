@@ -12,12 +12,26 @@ import {getPdcDefenseChannel,PDC_RECOVERY_SECONDS} from './pdcFireControl.js';
 import {npcGunneryProfile,npcAimErrorFactor} from './npcGunnery.js';
 const laser=TRACKING_LASER;
 export const PDC_TURRET=Object.freeze({...WEAPONS.pdc,damageFlat:2.2*WEAPON_DAMAGE_SCALE,shotInterval:.14,burstPause:2,interceptInterval:PDC_RECOVERY_SECONDS});
+// The Concord frigate is designed to suppress fighters. Its ship-target PDC
+// fire hits much harder, but tracks evasive craft less tightly. Interception
+// rounds still use the standard PDC values so torpedo shields remain useful.
+export const FRIGATE_PDC_TURRET=Object.freeze({...PDC_TURRET,damageFlat:8.8*WEAPON_DAMAGE_SCALE,shieldMul:.30,aimSpread:.028,turnRate:3.8});
 const identity=new THREE.Quaternion();
+const DEG=Math.PI/180;
+const FRIGATE_STERN_BLIND_HALF_ANGLE=55*DEG;
+const FRIGATE_POLAR_BLIND_HALF_ANGLE=12*DEG;
 // Missile positions use Float32 storage; tolerate its rounding at the range edge.
 const rangeEpsilon=0.0001;
 // The forward sector crosses the mounting plane, but never the owner's hull.
 export function clearTurretArc(actor,mount,extents,point,state) {
     const local=state.local.copy(point).sub(state.scratch.fromArray(actor.position)).applyQuaternion(state.inverse);
+    if(actor.capitalClass==='frigate'&&mount.label==='MAIN BATTERY') {
+        const distance=local.length();
+        // The four side-mounted main batteries cover both flanks and forward
+        // approaches, but cannot bear directly aft or straight above/below.
+        if(local.z>distance*Math.cos(FRIGATE_STERN_BLIND_HALF_ANGLE)
+            || Math.abs(local.y)>distance*Math.cos(FRIGATE_POLAR_BLIND_HALF_ANGLE)) return false;
+    }
     const forward=mount.forwardCone && -local.z>local.length()*Math.cos(mount.forwardCone*Math.PI/180);
     if(local.getComponent(mount.axis??1)*mount.side < -1e-6 && !forward)return false;
     const ray=state.scratch.set(local.x-mount.position[0]*extents[0],local.y-mount.position[1]*extents[1],local.z-mount.position[2]*extents[2]);
@@ -49,7 +63,6 @@ export function shipBlocksRay(session,actor,ownerId,target,point,state) {
     return session.ships.some(other=>other!==actor && other.id!==ownerId && other!==target && other.hull>0 && blocks(other.position,Math.max(...session.npcHullExtents(other))));
 }
 function selectedHostile(session,actor,ownerId,player) {
-    if(actor.capitalClass==='frigate'&&actor.capitalAttack==='RECOVERING')return;
     if(actor.patrolMemoryActive || actor.fleeing || actor.holdFire || actor.pursuitHoldFire || actor.combatPlan?.recovery?.active || (player && actor.mode!=='combat'))return;
     const ref=player?session.getTargetRef():{kind:'ship',id:actor.targetId};
     if(!player && actor.targetId==='player' && actor.hostile && session.save.player.hull>0)return session.save.player;
@@ -60,6 +73,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
     const hullId=player?actor.shipId:fit?.hullId,layouts=TURRET_LAYOUTS[hullId]??[],items=fit?.turrets??[];
     if(!items.some(Boolean))return;
     const stats=player?session.playerStats():fit.stats;
+    const frigate=actor.capitalClass==='frigate';
     const extents=session.turretHullExtents(actor,ownerId),now=session.save.world.time;
     const assignments=session.pdcAssignments,defense=getPdcDefenseChannel(session,ownerId);
     if(actor.turretRuntime?.[0] && !(actor.turretRuntime[0].position instanceof THREE.Vector3))actor.turretRuntime=[];
@@ -67,6 +81,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
     for(const [index,mount] of layouts.entries()) {
         const item=OUTFIT_ITEMS[items[index]];if(!item || actor.capitalMountHull?.[index]<=0)continue;
         const pdc=item.turretKind==='pdc';
+        const pdcWeapon=frigate?FRIGATE_PDC_TURRET:PDC_TURRET;
         const state=actor.turretRuntime[index]??= {position:new THREE.Vector3(),normal:new THREE.Vector3(),direction:new THREE.Vector3(),goal:new THREE.Vector3(),scratch:new THREE.Vector3(),desired:new THREE.Vector3(),q:new THREE.Quaternion(),turn:new THREE.Quaternion(),inverse:new THREE.Quaternion(),local:new THREE.Vector3(),fireAt:0};
         if(state.itemId!==item.id){state.itemId=item.id;state.burstRemaining=0;state.interceptAt=0;}
         state.clearance=hullId==='concord-frigate'?FRIGATE_CLEARANCE[index]:TURRET_CLEARANCE[hullId]?.[index];
@@ -109,7 +124,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
             if(!intercept){
                 const key=target.id??'player';
                 if(state.targetId!==key){state.targetId=key;state.acquireAt=now+(pilot?.turretAcquire??.3);}
-                const spread=(pdc ? .020 : .018)*distance*(pilot?.turretError??1)*(pilot ? npcAimErrorFactor(actor) : 1);
+                const spread=(pdc ? (pdcWeapon.aimSpread??.020) : .018)*distance*(pilot?.turretError??1)*(pilot ? npcAimErrorFactor(actor) : 1);
                 const phase=now*2.1+state.phase;
                 point.x+=Math.sin(phase)*spread;
                 point.y+=Math.sin(phase*1.37+1.2)*spread;
@@ -120,12 +135,12 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
             const rearAllowed=intercept||!mount.rearBias||localTarget.z>=-localTarget.length()*.2;
             const inArc=rearAllowed&&(!pdc||flightTime<=PDC_TURRET.life) && distance<=(pdc?PDC_TURRET.range:laser.range)+rangeEpsilon && clearTurretArc(actor,mount,extents,point,state);
             if(inArc) {
-                const angle=state.direction.angleTo(desired),step=(pdc?4.5:1.2)*dt*(pilot?.turretTurn??1);
+                const angle=state.direction.angleTo(desired),step=(pdc?(pdcWeapon.turnRate??4.5):1.2)*dt*(pilot?.turretTurn??1);
                 state.turn.setFromUnitVectors(state.direction,desired);
                 state.turn.slerp(identity,1-Math.min(1,step/Math.max(angle,0.0001)));
                 state.direction.applyQuaternion(state.turn).normalize();
                 const disruption=disruptionFactor(actor,now);
-                const cost=(pdc&&!intercept?PDC_TURRET.energyCost:4)*disruption;
+                const cost=(pdc&&!intercept?pdcWeapon.energyCost:4)*disruption;
                 // Ship bursts also leave the energy for one missile intercept.
                 const reserve=Math.max(12,stats.energyCapacity*0.25)+(pdc&&!intercept?PDC_TURRET.interceptEnergy:0);
                 if(actor.energy<reserve+cost)state.status='TURRETS WAITING FOR ENERGY';
@@ -145,7 +160,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
                         if(!state.burstRemaining)state.burstRemaining=PDC_TURRET.burstSize;
                         state.burstRemaining--;
                         state.fireAt=now+(state.burstRemaining?PDC_TURRET.shotInterval:PDC_TURRET.burstPause)*disruption;
-                        session.spawnGunProjectile(ownerId,PDC_TURRET,state.muzzle,state.direction,actor.velocity??[0,0,0],target.id??'player',`${ownerId}-turret-${index}`);
+                        session.spawnGunProjectile(ownerId,pdcWeapon,state.muzzle,state.direction,actor.velocity??[0,0,0],target.id??'player',`${ownerId}-turret-${index}`);
                     } else {
                         state.fireAt=now+0.7*disruption;
                         session.fireBeam(ownerId,laser,state.muzzle,state.direction,`${ownerId}-turret-${index}`);

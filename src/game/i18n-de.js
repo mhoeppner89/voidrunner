@@ -14,10 +14,10 @@
 export const DE_CATALOG = {
   "Lure the frigate into the rocks to break its firing line. Approach the stern and aim shielded torpedoes at MAIN ENGINES, then disable turrets and shield generators. Torpedoes bypass shields but turn poorly. Watch battery charges and torpedo locks.": "Locke die Fregatte zwischen die Felsen, um ihre Schusslinie zu brechen. Greife von hinten an und richte geschützte Torpedos auf die HAUPTTRIEBWERKE. Schalte danach Geschütze und Schildgeneratoren aus. Torpedos durchdringen Schilde, drehen aber langsam. Achte auf ladende Batterien und Torpedowarnungen.",
   "Frigate entering. Lure it into the rocks, then torpedo its rear engines. Select systems on the target monitor.": "Fregatte im Anflug. Locke sie zwischen die Felsen und torpediere die Hecktriebwerke. Wähle Systeme am Zielmonitor.",
-  "Choose a visible turret, engine, shield generator or hull": "Sichtbares Geschütz, Triebwerk, Schildgenerator oder Rumpf wählen",
+  "Choose a turret, engine, shield generator or hull": "Geschütz, Triebwerk, Schildgenerator oder Rumpf wählen",
   "MAIN ENGINES": "HAUPTTRIEBWERKE",
-  "UPPER GENERATOR": "OBERER GENERATOR",
-  "LOWER GENERATOR": "UNTERER GENERATOR",
+  "UPPER SHIELD GENERATOR": "OBERER SCHILDGENERATOR",
+  "LOWER SHIELD GENERATOR": "UNTERER SCHILDGENERATOR",
   "TORPEDO LOCK · EVADE": "TORPEDO ERFASST · AUSWEICHEN",
   "OPERATIONAL": "BETRIEBSBEREIT",
   "DISABLED": "AUSGEFALLEN",

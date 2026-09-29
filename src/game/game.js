@@ -7,7 +7,7 @@ import { segmentMeshHit } from './meshQueries.js';
 import {createMiningContacts,updateMiningContacts} from './miningSurface.js';
 import { DRONE_PORTS } from './droneFlight.js';
 import {updateNpcDrones,droneUnits,damageNpcDrone} from './npcDrones.js';
-import {frigateSubsystemLabel,frigateSubsystemEffect,frigateHullDamageScale,equipFrigate,updateFrigateAttack,updateFrigateBatteries,damageFrigateMount,segmentFrigateMountHit,frigateMountPosition,visibleFrigateBatteries} from './capitalCombat.js';
+import {frigateSubsystemLabel,frigateSubsystemEffect,frigateHullDamageScale,equipFrigate,updateFrigateAttack,updateFrigateBatteries,damageFrigateMount,segmentFrigateMountHit,frigateMountPosition} from './capitalCombat.js';
 import {observeIncomingFire, updateCombatIntent, combatThrottle, combatTrackingRate, holdingFiringWindow} from './combatPiloting.js';
 import {planCombatFlight, combatPursuitDirection, friendlyFiringLaneBlocked} from './combatPlanning.js';
 import { combatTargetEligible } from './combatTargeting.js';
@@ -6906,7 +6906,10 @@ export class GameSession {
     cycleCapitalSubtarget() {
         const ship=this.ships.find(s=>s.id===this.save.player.currentTargetId&&s.capitalMountHull&&s.hull>0);
         if(!ship)return;
-        const choices=[-1,...visibleFrigateBatteries(this,ship,this.save.player.position)];
+        // A ship lock is enough to cycle its known subsystems. Visibility and
+        // line of sight govern whether a shot can hit them, not whether the
+        // pilot can inspect/select them on the target monitor.
+        const choices=[-1,...ship.capitalMountHull.map((_,index)=>index)];
         const current=this.capitalSubtarget?.id===ship.id?this.capitalSubtarget.index:-1;
         const index=choices[(choices.indexOf(current)+1)%choices.length];
         this.capitalSubtarget=index>=0?{id:ship.id,index}:undefined;
@@ -10127,7 +10130,7 @@ export class GameSession {
             registerHitReaction(ship,this.save.world.time,applied.shield+remaining);
         if(applied.shield+remaining>0&&attackerId){ship.combatThreatId=attackerId;ship.combatThreatUntil=this.save.world.time+2;}
         const hullDamaged = remaining > 0;
-        ship.shieldDelay = 4.5;
+        ship.shieldDelay = ship.capitalClass === 'frigate' ? 0 : 4.5;
         if(amount>0&&weapon.range)ship.observedWeaponRange=Math.max(ship.observedWeaponRange??0,weapon.range);
         // Rin is a story companion, not a disposable traffic roll. Damage is
         // real enough to drain shields and force the player to protect them,

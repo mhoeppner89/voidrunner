@@ -4,6 +4,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import {equipFrigate,updateFrigateBatteries,updateFrigateAttack,frigateMountPosition,damageFrigateMount,FRIGATE_GUN,FRIGATE_BOSS_GUN,FRIGATE_EXTENTS,visibleFrigateBatteries} from '../src/game/capitalCombat.js';
 import {WEAPON_DAMAGE_SCALE} from '../src/game/weapons.js';
 import {FRIGATE_MOUNTS} from '../src/game/frigateMounts.js';
+import {clearTurretArc,updateAutomaticTurrets,FRIGATE_PDC_TURRET,PDC_TURRET} from '../src/game/turrets.js';
 import {cockpitDamageStage} from '../src/game/cockpitDamage.js';
 import {fixture} from './combat-variety.test.mjs';
 function stage(){const s=fixture();s.tmpAvoidance=new THREE.Vector3();s.save.player.dockedAt=undefined;s.save.player.position=[180,0,0];s.save.player.velocity=[0,0,0];s.save.player.hull=185;const ship=s.spawnCapitalShip('concord-frigate',[0,0,0],'rook','Boss');equipFrigate(ship,true);ship.rotation=[0,0,0,1];ship.targetId='player';ship.hostile=true;ship.holdFire=false;return {s,ship};}
@@ -50,6 +51,30 @@ test('cover and stand-offs prevent main battery fire',()=>{for(const held of [fa
 test('exposed turret damage disables only the hit assembly',()=>{const {s,ship}=stage();const pos=frigateMountPosition(ship,2,new THREE.Vector3()).toArray();assert.equal(damageFrigateMount(ship,pos,100),2);assert.equal(ship.capitalMountHull[2],0);assert.equal(ship.capitalMountHull[0],100);assert.equal(damageFrigateMount(ship,[0,0,0],20),-1);let shown=[];s.renderer.showTurret=(id)=>shown.push(id);updateFrigateBatteries(s,ship,1/60);assert.ok(!shown.includes(`${ship.id}-main-2`));assert.equal(shown.length,7);});
 test('hostile patrols keep the player target; friendly patrols still defend against hostiles',()=>{const {s,ship}=stage();ship.playerAwareness=1;s.shipTracksPlayer=()=>true;s.resolveShipTarget(ship);assert.equal(ship.targetId,'player');ship.faction='red-talons';const friend=s.spawnShip('patrol',[0,0,50]);friend.hostile=false;s.resolveShipTarget(friend);assert.equal(friend.targetId,ship.id);});
 test('all four frigate PDC mounts share one missile recovery channel',()=>{const {s,ship}=stage();ship.targetId=null;s.save.player.position=[900,900,900];s.pdcAssignments=new Map();let launches=0;const fire=s.spawnGunProjectile.bind(s);s.spawnGunProjectile=(...args)=>{launches++;return fire(...args);};for(let i=0;i<4;i++){const slot=s.projStore.alloc();s.projStore.setPos(slot,0,170+i*2,-36);s.projStore.setVel(slot,0,-260,0);s.projectiles.push({id:'incoming'+i,slot,kind:'missile',ownerId:'player',targetId:ship.id,life:4,damage:42});}for(let i=0;i<30;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60);}assert.equal(launches,1);});
+test('frigate main batteries cover both flanks but leave stern and small top/bottom blind spots',()=>{
+ const sides=FRIGATE_MOUNTS.slice(0,4).map(m=>m.side);assert.deepEqual(sides,[-1,-1,1,1]);
+ const actor={capitalClass:'frigate',position:[0,0,0],rotation:[0,0,0,1]},state={local:new THREE.Vector3(),scratch:new THREE.Vector3(),inverse:new THREE.Quaternion(),clearance:new Float32Array(73*37).fill(1e6)};
+ const covers=(mount,point)=>clearTurretArc(actor,mount,FRIGATE_EXTENTS,new THREE.Vector3(...point),state);
+ assert.ok(covers(FRIGATE_MOUNTS[0],[-350,0,-350]),'port battery covers a forward port approach');
+ assert.ok(covers(FRIGATE_MOUNTS[2],[350,0,-350]),'starboard battery covers a forward starboard approach');
+ assert.ok(!covers(FRIGATE_MOUNTS[0],[0,0,400]),'main batteries cannot cover directly aft');
+ assert.ok(!covers(FRIGATE_MOUNTS[2],[0,500,-30]),'main batteries cannot bear straight above');
+ assert.ok(!covers(FRIGATE_MOUNTS[0],[0,-500,-30]),'main batteries cannot bear straight below');
+ assert.ok(covers(FRIGATE_MOUNTS[2],[100,200,-200]),'the dorsal blind spot stays narrow');
+});
+test('frigate anti-fighter PDC hits harder and less precisely while interception stays standard',()=>{
+ assert.ok(FRIGATE_PDC_TURRET.damageFlat>=PDC_TURRET.damageFlat*4);
+ assert.ok(FRIGATE_PDC_TURRET.damageFlat*FRIGATE_PDC_TURRET.shieldMul>=PDC_TURRET.damageFlat*PDC_TURRET.shieldMul*7);
+ assert.ok(FRIGATE_PDC_TURRET.aimSpread>(PDC_TURRET.aimSpread??.020));
+ assert.ok(FRIGATE_PDC_TURRET.turnRate<4.5);
+});
+test('frigate PDCs keep engaging during main-battery recovery with the heavy ship-target round',()=>{
+ const {s,ship}=stage();ship.capitalAttack='RECOVERING';s.lineBlocked=()=>false;const fired=[];
+ s.spawnGunProjectile=(owner,weapon)=>{fired.push(weapon);};
+ for(let i=0;i<10*60;i++){s.save.world.time=i/60;updateAutomaticTurrets(s,ship,ship.id,1/60);}
+ assert.ok(fired.length>0,'PDCs should remain active during main-gun recovery');
+ assert.ok(fired.every(weapon=>weapon===FRIGATE_PDC_TURRET));
+});
 test('a real beam hit destroys an exposed assembly only after shields are down',()=>{const {s,ship}=stage();const pos=frigateMountPosition(ship,2,new THREE.Vector3()),start=pos.clone().add(new THREE.Vector3(100,0,0)),dir=new THREE.Vector3(-1,0,0),beam={id:'beam',kind:'beam',range:250,damageFlat:110};s.fireBeam('player',beam,start,dir,'test');assert.equal(ship.capitalMountHull[2],100);ship.shield=0;s.fireBeam('player',beam,start,dir,'test');assert.equal(ship.capitalMountHull[2],0);assert.ok(ship.hull<1400);});
 test('frigate approach remains continuous across the old range threshold and keeps its broadside',()=>{
  const {s,ship}=stage();ship.holdFire=true;let previous;
@@ -113,25 +138,31 @@ test('physical asteroid cover blocks battery fire and breaking cover restarts th
  for(let i=300;i<360;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,new THREE.Vector3(180,0,0),new THREE.Vector3());}assert.equal(shots,0);
  for(let i=360;i<600;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,new THREE.Vector3(180,0,0),new THREE.Vector3());}assert.ok(shots>0);
 });
-test('subtarget selection moves beam assistance to the battery and skips destroyed mounts',()=>{
+test('subtarget cycling reaches every frigate component without visibility or line of sight',()=>{
  const {s,ship}=stage();s.save.settings.aimAssist=true;s.save.player.currentTargetId=ship.id;
- s.cycleCapitalSubtarget();const target=s.getTargetRef();assert.ok(visibleFrigateBatteries(s,ship,s.save.player.position).includes(target.mount));
+ s.lineBlocked=()=>{throw new Error('subtarget cycling must not check line of sight');};
+ const selected=[];
+ for(let i=0;i<FRIGATE_MOUNTS.length;i++){s.cycleCapitalSubtarget();selected.push(s.getTargetRef().mount);}
+ assert.deepEqual(selected,FRIGATE_MOUNTS.map((_,index)=>index));
+ assert.equal(FRIGATE_MOUNTS[9].label,'UPPER SHIELD GENERATOR');assert.equal(FRIGATE_MOUNTS[10].label,'LOWER SHIELD GENERATOR');
+ s.lineBlocked=()=>false;
+ const target=s.getTargetRef();
  const point=frigateMountPosition(ship,target.mount,new THREE.Vector3()),muzzle=point.clone().add(new THREE.Vector3(-100,0,0));
  const aim=s.weaponAimDirection(muzzle,[0,0,0],{kind:'beam',range:500},target,new THREE.Vector3(1,0,0),new THREE.Vector3());
  assert.ok(aim.distanceTo(point.clone().sub(muzzle).normalize())<1e-8);
- ship.capitalMountHull[target.mount]=0;s.cycleCapitalSubtarget();const next=s.getTargetRef();assert.ok(next.mount===undefined||ship.capitalMountHull[next.mount]>0);
 });
 
 test('main battery extents match the live capital hull and PDC scale',()=>{const {s,ship}=stage();assert.deepEqual(FRIGATE_EXTENTS,s.npcHullExtents(ship));});
 
 test('boss recovery is a shared, three-and-a-half-second anti-ship ceasefire',()=>{
  const {s,ship}=stage(),shots=[],phases=[];
- s.spawnGunProjectile=(id,w)=>shots.push({phase:ship.capitalAttack,time:s.save.world.time,main:w===FRIGATE_BOSS_GUN});
+ s.spawnGunProjectile=(id,w)=>shots.push({phase:ship.capitalAttack,time:s.save.world.time,main:w===FRIGATE_BOSS_GUN,pdc:w?.id==='pdc'});
  for(let i=0;i<1200;i++){
   s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,new THREE.Vector3(180,0,0),new THREE.Vector3());
   if(phases.at(-1)?.phase!==ship.capitalAttack)phases.push({phase:ship.capitalAttack,time:i/60});
  }
- assert.ok(shots.some(x=>x.main));assert.ok(shots.every(x=>x.phase!=='RECOVERING'));
+ assert.ok(shots.some(x=>x.main));assert.ok(shots.filter(x=>x.main).every(x=>x.phase!=='RECOVERING'));
+ assert.ok(shots.some(x=>x.pdc&&x.phase==='RECOVERING'),'PDCs cover the main battery recovery window');
  assert.ok(shots.filter(x=>x.main).every(x=>x.phase==='SALVO'));
  for(let i=1;i<phases.length-1;i++)if(phases[i].phase==='RECOVERING')assert.ok(phases[i+1].time-phases[i].time>=3.49);
 });
@@ -157,9 +188,9 @@ test('ion shield damage does not multiply the fitted hull shield capacity',async
 });
 
 test('destroying all main batteries ends attack warnings and anti-ship salvos',()=>{
- const {s,ship}=stage();ship.capitalMountHull.fill(0,0,4);let shots=0;s.spawnGunProjectile=()=>shots++;
+ const {s,ship}=stage();ship.capitalMountHull.fill(0,0,4);let mainShots=0,pdcShots=0;s.spawnGunProjectile=(owner,weapon)=>{if(weapon===FRIGATE_GUN)mainShots++;else if(weapon?.id==='pdc')pdcShots++;};
  for(let i=0;i<900;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,new THREE.Vector3(180,0,0),new THREE.Vector3());}
- assert.equal(ship.capitalDisarmed,true);assert.equal(ship.capitalAttack,'RECOVERING');assert.equal(shots,0);
+ assert.equal(ship.capitalDisarmed,true);assert.equal(ship.capitalAttack,'RECOVERING');assert.equal(mainShots,0);assert.ok(pdcShots>0,'working PDCs remain independent of destroyed main batteries');
 });
 
 test('frigate closes from outside battery range then holds distance without running down its target',()=>{
@@ -179,7 +210,7 @@ test('frigate opens distance from a close target and pursues a retreating one wi
  assert.ok(ship.position[0]>start+100);assert.ok(point.distanceTo(new THREE.Vector3(...ship.position))<500);
 });
 test('opposite broadsides shoot distinct active enemies and respect shared recovery',()=>{
- const {s,ship}=stage();const enemy=s.spawnShip('pirate',[-380,0,0]);enemy.instanceId=ship.instanceId;enemy.pendingMug=false;enemy.holdFire=false;enemy.targetId=ship.id;
+ const {s,ship}=stage();s.lineBlocked=()=>false;const enemy=s.spawnShip('pirate',[-380,0,0]);enemy.instanceId=ship.instanceId;enemy.pendingMug=false;enemy.holdFire=false;enemy.targetId=ship.id;enemy.velocity=[0,0,0];
  s.save.player.position=[380,0,0];const shots=[];s.spawnGunProjectile=(owner,w,p,d,v,target)=>{if(w===FRIGATE_GUN)shots.push({target,phase:ship.capitalAttack});};
  for(let i=0;i<1200;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,new THREE.Vector3(...s.save.player.position),new THREE.Vector3());}
  assert.ok(shots.some(x=>x.target==='player'));assert.ok(shots.some(x=>x.target===enemy.id));assert.ok(shots.every(x=>x.phase==='SALVO'));
@@ -219,16 +250,24 @@ test('rear torpedo impacts bypass shields and progressively cripple the engines'
   assert.equal(ship.shield,shield);assert.ok(ship.speed<originalSpeed);
  }
  assert.equal(ship.capitalMountHull[8],0);assert.ok(ship.speed<=originalSpeed*.16);assert.ok(ship.turnRate<.03);
- assert.equal(ship.capitalMountHull[0],100);assert.equal(ship.shieldRegen,8);
+ assert.equal(ship.capitalMountHull[0],100);assert.equal(ship.shieldRegen,16);
 });
-test('each generator removes half the recharge without disabling guns or engines',()=>{
+test('each shield generator supplies 100% recharge without disabling guns or engines',()=>{
  const {s,ship}=stage();ship.shield=0;const speed=ship.speed;
- for(const [index,regen] of [[9,4],[10,0]]){
+ assert.equal(ship.shieldRegen,16,'two active generators provide 200% recharge');
+ for(const [index,regen] of [[9,8],[10,0]]){
   const point=frigateMountPosition(ship,index,new THREE.Vector3()).toArray();
   assert.equal(damageFrigateMount(ship,point,95),index);assert.equal(ship.shieldRegen,regen);
  }
  assert.equal(ship.speed,speed);assert.equal(ship.capitalMountHull[8],160);assert.equal(ship.capitalMountHull[2],100);
  assert.equal(damageFrigateMount(ship,[0,0,-110],200),-1,'a bow strike cannot damage rear engines');
+});
+test('frigate shields begin recharging immediately after a hit',()=>{
+ const {s,ship}=stage();ship.shield=ship.maxShield;
+ s.damageShip(ship,10,'player',undefined,{id:'pulse'});
+ assert.equal(ship.shieldDelay,0);
+ const afterHit=ship.shield;s.maybePilotLine=()=>{};s.updateShips(1/60);
+ assert.ok(ship.shield>afterHit,'shield starts recharging on the next simulation step');
 });
 test('PDC intercept rounds kill ordinary missiles but only chip a torpedo shield',()=>{
  for(const shield of [0,12]){
@@ -241,13 +280,30 @@ test('PDC intercept rounds kill ordinary missiles but only chip a torpedo shield
   if(shield){assert.ok(missile.life>0);assert.equal(missile.shield,10.24);}else assert.equal(missile.life,0);
  }
 });
+test('frigate PDC salvo pressure materially cuts a stationary player shield during main recovery',()=>{
+ const {s,ship}=projectileStage();s.save.player.position=[180,0,0];s.save.player.shield=80;s.save.player.maxShield=80;ship.capitalAttack='RECOVERING';s.maybeHitTaunt=()=>{};
+ for(let i=0;i<20*60;i++){s.save.world.time=i/60;updateAutomaticTurrets(s,ship,ship.id,1/60);s.updateProjectiles(1/60);}
+ assert.ok(s.save.player.shield<65,`frigate PDCs should apply meaningful shield pressure, remaining ${s.save.player.shield}`);
+});
 test('frigate torpedoes have a finite magazine, warning, cooldown, and cover interruption',()=>{
  const {s,ship}=stage(),point=new THREE.Vector3(380,0,0);s.spawnGunProjectile=()=>{};
- let warnings=0;for(let i=0;i<120*60;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,point,new THREE.Vector3());if(ship.capitalTorpedoWarning)warnings++;}
- assert.ok(warnings>180);assert.ok(s.projectiles.length>2&&s.projectiles.length<=6);assert.equal(ship.capitalTorpedoes+s.projectiles.length,6);
+ let warnings=0,launches=[];for(let i=0;i<120*60;i++){s.save.world.time=i/60;const before=s.projectiles.length;updateFrigateBatteries(s,ship,1/60,point,new THREE.Vector3());if(ship.capitalTorpedoWarning)warnings++;if(s.projectiles.length>before)launches.push(s.projectiles.length-before);}
+ assert.ok(warnings>180);assert.deepEqual(launches,[2,2,2]);assert.equal(ship.capitalTorpedoes,0);assert.equal(s.projectiles.length,6);
+ for(let i=0;i<s.projectiles.length;i+=2){const a=s.projStore.getPos(s.projectiles[i].slot,new THREE.Vector3()),b=s.projStore.getPos(s.projectiles[i+1].slot,new THREE.Vector3());assert.ok(a.y>FRIGATE_EXTENTS[1]);assert.equal(a.y,b.y);assert.ok(Math.abs(a.x+b.x)<1e-6,'paired launch ports are symmetric');}
  const other=stage();other.s.lineBlocked=()=>true;
  for(let i=0;i<1800;i++){other.s.save.world.time=i/60;updateFrigateBatteries(other.s,other.ship,1/60,point,new THREE.Vector3());}
  assert.equal(other.s.projectiles.length,0);assert.equal(other.ship.capitalTorpedoWarning,false);
+});
+test('frigate torpedoes reserve salvos for capital ships and slower hulls',()=>{
+ const {s,ship}=stage(),point=new THREE.Vector3(380,0,0);s.spawnGunProjectile=()=>{};s.save.player.shipId='talon';
+ for(let i=0;i<45*60;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,point,new THREE.Vector3());}
+ assert.equal(s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length,0);assert.equal(ship.capitalTorpedoWarning,false);
+ s.save.player.shipId='atlas';ship.capitalTorpedoes=2;ship.capitalRuntime.torpedoReadyAt=0;ship.capitalRuntime.torpedoLock=0;
+ for(let i=0;i<35*60&&s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length<2;i++){s.save.world.time=45+i/60;updateFrigateBatteries(s,ship,1/60,point,new THREE.Vector3());}
+ assert.equal(s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length,2,'a slow industrial hull should draw a paired salvo');
+ const capital=s.spawnCapitalShip('concord-frigate',[380,0,0],'rook','Capital target');ship.targetId=capital.id;ship.capitalTorpedoes=2;ship.capitalRuntime.torpedoReadyAt=0;ship.capitalRuntime.torpedoLock=0;
+ for(let i=0;i<35*60&&s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length<4;i++){s.save.world.time=80+i/60;updateFrigateBatteries(s,ship,1/60,new THREE.Vector3(...capital.position),new THREE.Vector3());}
+ assert.equal(s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length,4,'capital hulls should draw paired salvos regardless of speed');
 });
 test('stern and generator aim points remain selectable after destruction to show effects',()=>{
  const {s,ship}=stage();s.save.player.currentTargetId=ship.id;s.save.player.position=[0,0,300];

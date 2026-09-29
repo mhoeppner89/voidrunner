@@ -118,7 +118,7 @@ export const FRIGATE_CLEARANCE = [[0.0003,0.0003,0.0003,0.0003,0.0003,0.0003,0.0
 // Damageable systems share the mount transform/hit path; they have no weapon seat.
 FRIGATE_MOUNTS.push(
  {position:[0,0,1],axis:2,side:1,label:'MAIN ENGINES',hull:160,radius:18,effect:'SPEED / TURN'},
- {position:[0,1,0],axis:1,side:1,label:'UPPER GENERATOR',hull:95,radius:12,effect:'SHIELD RECHARGE'},
- {position:[0,-1,0],axis:1,side:-1,label:'LOWER GENERATOR',hull:95,radius:12,effect:'SHIELD RECHARGE'}
+ {position:[0,1,0],axis:1,side:1,label:'UPPER SHIELD GENERATOR',hull:95,radius:12,effect:'SHIELD RECHARGE'},
+ {position:[0,-1,0],axis:1,side:-1,label:'LOWER SHIELD GENERATOR',hull:95,radius:12,effect:'SHIELD RECHARGE'}
 );
 for(let i=4;i<8;i++)FRIGATE_MOUNTS[i].rearBias=true;

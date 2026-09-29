@@ -4420,7 +4420,7 @@ export class GameUI {
             let label=Number.isInteger(mount)?t(target.capitalSelectedLabel):t('HULL');
             if(Number.isInteger(mount))label+=` ${Math.ceil(100*target.capitalSelected/target.capitalSelectedMax)}%`;
             subtarget.textContent=t('AIM: {target}',{target:label})+' ›';
-            subtarget.title=t('Choose a visible turret, engine, shield generator or hull');
+            subtarget.title=t('Choose a turret, engine, shield generator or hull');
             subtarget.setAttribute('aria-label',subtarget.title+': '+label);
         }
         const bracket = this.el('#target-bracket');

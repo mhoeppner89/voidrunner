@@ -6,6 +6,7 @@ import {FRIGATE_MOUNTS,FRIGATE_CLEARANCE} from './frigateMounts.js';
 import {clearTurretArc,shipBlocksRay,updateAutomaticTurrets} from './turrets.js';
 import {disruptionFactor} from './weaponDamage.js';
 import {relativeIntercept} from './weaponFlight.js';
+import {SHIPS} from './data.js';
 // Live capital hulls render at twice their authored scale. PDCs use the same
 // extents through npcHullExtents; main batteries and assembly hits must agree.
 export const FRIGATE_EXTENTS=[37.46,44.92,112.9];
@@ -16,10 +17,10 @@ export function equipFrigate(ship,boss=false){
  ship.capitalBoss=boss;
  ship.combatFit={hullId:'concord-frigate',turrets:[null,null,null,null,'pdc','pdc','pdc','pdc'],stats:{energyCapacity:240},weapons:[],guns:[],attackOrder:[],fireAt:[],missiles:0};
  ship.energy=240;ship.capitalMountHull=FRIGATE_MOUNTS.map((m,i)=>m.hull??(i<4?100:65));
- {ship.maxShield=650;ship.shield=650;ship.maxHull=1400;ship.hull=1400;ship.shieldRegen=8;ship.turnRate=.24;ship.capitalBaseSpeed=ship.speed;ship.capitalTorpedoes=6;}
+ {ship.maxShield=650;ship.shield=650;ship.maxHull=1400;ship.hull=1400;ship.shieldRegen=16;ship.turnRate=.24;ship.capitalBaseSpeed=ship.speed;ship.capitalTorpedoes=6;}
 }
 function stateFor(ship){
- return ship.capitalRuntime??={position:new THREE.Vector3(),normal:new THREE.Vector3(),direction:new THREE.Vector3(),scratch:new THREE.Vector3(),local:new THREE.Vector3(),inverse:new THREE.Quaternion(),q:new THREE.Quaternion(),goal:new THREE.Quaternion(),target:new THREE.Vector3(),velocity:new THREE.Vector3(),lead:new THREE.Vector3(),turn:new THREE.Quaternion(),mounts:FRIGATE_MOUNTS.map(()=>({direction:new THREE.Vector3(),fireAt:0,chargeAt:0,rounds:0}))};
+ return ship.capitalRuntime??={position:new THREE.Vector3(),normal:new THREE.Vector3(),direction:new THREE.Vector3(),scratch:new THREE.Vector3(),local:new THREE.Vector3(),inverse:new THREE.Quaternion(),q:new THREE.Quaternion(),goal:new THREE.Quaternion(),target:new THREE.Vector3(),velocity:new THREE.Vector3(),lead:new THREE.Vector3(),torpedoStarts:[new THREE.Vector3(),new THREE.Vector3()],turn:new THREE.Quaternion(),mounts:FRIGATE_MOUNTS.map(()=>({direction:new THREE.Vector3(),fireAt:0,chargeAt:0,rounds:0}))};
 }
 export function frigateMountPosition(ship,index,out){
  const s=stateFor(ship),m=FRIGATE_MOUNTS[index];s.q.fromArray(ship.rotation);
@@ -46,7 +47,9 @@ export function applyFrigateSubsystemEffects(ship){
  const engine=Math.max(0,Math.min(1,(hull[8]??160)/160));
  ship.speed=(ship.capitalBaseSpeed??18)*(.15+.85*engine);
  ship.turnRate=.24*(.12+.88*engine);
- ship.shieldRegen=4*((hull[9]??95)/95+(hull[10]??95)/95);
+ // Each generator supplies one full base recharge increment (8/s): one
+ // surviving generator yields 100%, and both yield 200% total recharge.
+ ship.shieldRegen=8*((hull[9]??95)/95+(hull[10]??95)/95);
 }
 export function frigateSubsystemLabel(index){return index<4?`BATTERY ${index+1}`:index<8?`PDC ${index-3}`:FRIGATE_MOUNTS[index]?.label??'HULL';}
 export function frigateSubsystemEffect(ship,index){
@@ -60,7 +63,10 @@ function updateFrigateTorpedoes(session,ship,dt,targetPosition){
  const s=stateFor(ship),now=session.save.world.time;
  ship.capitalTorpedoWarning=false;
  if(s.torpedoTarget!==ship.targetId){s.torpedoTarget=ship.targetId;s.torpedoLock=0;}
- if(!targetPosition||!ship.targetId||ship.holdFire||ship.pursuitHoldFire||ship.fleeing||ship.patrolMemoryActive||ship.capitalTorpedoes<=0||now<(s.torpedoReadyAt??12)){s.torpedoLock=0;return;}
+ const targetActor=ship.targetId==='player'?session.save.player:session.ships.find(actor=>actor.id===ship.targetId);
+ const targetHull=SHIPS[targetActor?.shipId??targetActor?.combatFit?.hullId];
+ const torpedoTarget=!!targetActor&&(!!targetActor.capitalClass||targetActor.role==='trader'||targetActor.role==='miner'||targetHull?.role==='industrial'||(targetHull?.maxSpeed??Infinity)<=50);
+ if(!targetPosition||!ship.targetId||!torpedoTarget||ship.holdFire||ship.pursuitHoldFire||ship.fleeing||ship.patrolMemoryActive||ship.capitalTorpedoes<2||now<(s.torpedoReadyAt??12)){s.torpedoLock=0;return;}
  s.position.fromArray(ship.position);s.direction.copy(targetPosition).sub(s.position);
  const distance=s.direction.length();
  if(distance<120||distance>600||session.lineBlocked(s.position,targetPosition,ship.id)){s.torpedoLock=0;return;}
@@ -68,14 +74,20 @@ function updateFrigateTorpedoes(session,ship,dt,targetPosition){
  s.torpedoLock=(s.torpedoLock??0)+dt;ship.capitalTorpedoWarning=true;
  if(s.torpedoLock<3||(!ship.capitalDisarmed&&ship.capitalAttack!=='SALVO'))return;
  s.direction.normalize();
- // Launch above the dorsal hull, then rely on the ordinary limited guidance.
- s.lead.set(0,FRIGATE_EXTENTS[1]+10,0).applyQuaternion(s.q.fromArray(ship.rotation)).add(s.position);
- if(session.lineBlocked(s.lead,targetPosition,ship.id)){s.torpedoLock=0;return;}
- const launcher=LAUNCHERS.torpedo,slot=session.projStore.alloc();
- session.projStore.setPosV(slot,s.lead);
- s.velocity.copy(s.direction).multiplyScalar(launcher.speed).add(s.scratch.fromArray(ship.velocity));session.projStore.setVelV(slot,s.velocity);
- session.projectiles.push({id:`p-${++session.projectileCounter}`,slot,kind:'missile',ownerId:ship.id,targetId:ship.targetId,faction:ship.faction,launcherId:'torpedo',damage:launcher.damage,life:launcher.life,homingSpeed:launcher.homingSpeed,homingTurn:launcher.homingTurn,acceleration:launcher.acceleration,shield:launcher.projectileShield});
- ship.capitalTorpedoes--;s.torpedoLock=0;s.torpedoReadyAt=now+16;ship.capitalTorpedoWarning=false;
+ // Fire a paired dorsal salvo from separated ports, then rely on the normal
+ // limited guidance. Both ports need clear launch lanes; do not half-fire.
+ s.q.fromArray(ship.rotation);
+ for(let i=0;i<2;i++){
+  s.torpedoStarts[i].set(i===0?-9:9,FRIGATE_EXTENTS[1]+10,0).applyQuaternion(s.q).add(s.position);
+  if(session.lineBlocked(s.torpedoStarts[i],targetPosition,ship.id)){s.torpedoLock=0;return;}
+ }
+ const launcher=LAUNCHERS.torpedo;
+ for(let i=0;i<2;i++){
+  const slot=session.projStore.alloc();session.projStore.setPosV(slot,s.torpedoStarts[i]);
+  s.velocity.copy(s.direction).multiplyScalar(launcher.speed).add(s.scratch.fromArray(ship.velocity));session.projStore.setVelV(slot,s.velocity);
+  session.projectiles.push({id:`p-${++session.projectileCounter}`,slot,kind:'missile',ownerId:ship.id,targetId:ship.targetId,faction:ship.faction,launcherId:'torpedo',damage:launcher.damage,life:launcher.life,homingSpeed:launcher.homingSpeed,homingTurn:launcher.homingTurn,acceleration:launcher.acceleration,shield:launcher.projectileShield});
+ }
+ ship.capitalTorpedoes-=2;s.torpedoLock=0;s.torpedoReadyAt=now+16;ship.capitalTorpedoWarning=false;
 }
 export function updateFrigateBatteries(session,ship,dt,targetPosition,targetVelocity){
  if(!ship.capitalMountHull)equipFrigate(ship,!!ship.capitalBoss);
