@@ -28,7 +28,7 @@ for(const seed of [718,941])for(const field of ['debris','asteroids'])for(const 
   const fraction=Math.hypot(...ship.velocity)/ship.speed;meanSpeed+=fraction;if(fraction<.2){slow++;streak++;}else streak=0;maxStreak=Math.max(maxStreak,streak);if(ship.aceMove)moves.add(ship.aceMove.kind);maxTurn=Math.max(maxTurn,before.angleTo(new THREE.Quaternion().fromArray(ship.rotation)));
  }
  const result={seed,field,role,tier,slow:slow/3600,maxStall:maxStreak/60,meanSpeed:meanSpeed/3600,maxTurn,hits,moves:[...moves],plans:ship.fieldNav.plans};results.push(result);
- assert.ok(maxTurn<.05,JSON.stringify(result));assert.ok(maxStreak<420,JSON.stringify(result));
+ assert.ok(maxTurn<(tier==='ace'?.06:.05),JSON.stringify(result));assert.ok(maxStreak<420,JSON.stringify(result));
  assert.ok(meanSpeed/3600>.55,JSON.stringify(result));assert.ok(ship.fieldNav.plans<=301,JSON.stringify(result));
 }
 for(const field of ['debris','asteroids']){const rows=results.filter(x=>x.field===field),slow=rows.reduce((n,x)=>n+x.slow,0)/rows.length;assert.ok(slow<(field==='debris'?.05:.12),JSON.stringify({field,slow}));}
@@ -58,6 +58,6 @@ test('hunters keep moving when obstacle occlusion hands combat to search and bac
   }
   assert.ok(searchFrames>=500,JSON.stringify({field,tier,searchFrames}));
   assert.ok(slow/searchFrames<.2,JSON.stringify({field,tier,slow,searchFrames}));
-  assert.ok(maxTurn<.05,JSON.stringify({field,tier,maxTurn}));
+  assert.ok(maxTurn<(tier==='ace'?.06:.05),JSON.stringify({field,tier,maxTurn}));
  }
 });

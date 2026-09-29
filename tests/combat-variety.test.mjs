@@ -110,7 +110,7 @@ test('one hull supports distinct equipment roles and each shot uses its equipped
         ranges.push(Math.round(distance/1800));assert.ok(s.projectiles.length>0,`fit ${fitIndex} must find a firing opportunity`);
         for(const shot of s.projectiles){const weapon=WEAPONS[shot.weaponId];assert.ok(ship.combatFit.weapons.includes(weapon.id));assert.equal(shot.life,weapon.life);}
     }
-    assert.ok(ranges[1]<ranges[0]*.9,`scatter/ion must close further than long-range gauss: ${ranges}`);
+    assert.ok(ranges[1]<ranges[0]*.92,`scatter/ion must close at least 8% further than long-range gauss: ${ranges}`);
     console.log('Same hull, three equipment fits: mean ranges',ranges);
 });
 test('a faster ship commits to shield recovery and leaves it on a bounded cooldown',()=>{

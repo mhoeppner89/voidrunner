@@ -69,7 +69,7 @@ export function combatThrottle(ship,now,distance,closing,targetRadial,noseDot,pr
   if(recovery.mode==='cover'&&recovery.coverDistance<100)return ship.speed*.25;
   return ship.burning?ship.afterburnSpeed:ship.speed;
  }
- if(!ship.fleeing&&!ship.covering&&ship.combatPlan?.finishing&&distance<220){ship.burning=false;return clamp(targetRadial+(distance-75)*.5,ship.speed*.25,ship.speed);}
+ if(ship.combatIntent==='hunt'&&!ship.fleeing&&!ship.covering&&ship.combatPlan?.finishing&&distance<220){ship.burning=false;return clamp(targetRadial+(distance-75)*.5,ship.speed*.25,ship.speed);}
  if(!ship.fleeing&&!ship.covering&&ship.pilot?.tier==='ace'&&crossfire?.outnumbered&&distance<600){ship.burning=Boolean(canBoost&&ship.fuel>2);return ship.burning?ship.afterburnSpeed:ship.speed;}
  if(crossfire?.active){ship.burning=Boolean(canBoost&&ship.fuel>2);return ship.burning?ship.afterburnSpeed:ship.speed;}
  const hunting=ship.combatIntent==='hunt';
@@ -79,7 +79,7 @@ export function combatThrottle(ship,now,distance,closing,targetRadial,noseDot,pr
  const main=ship.combatFit.weapons?.at(-1);
  const artillery=main==='gauss'&&!threatened;
  const matching=artillery&&hunting&&ship.combatPlan?.aimingRun;
- const speedFloor=ship.speed*(matching?.25+.4*clamp((distance/preferred-.65)/.35,0,1):hunting&&!threatened&&distance<preferred*.65?.35:.65);
+ const speedFloor=ship.speed*(matching?.25+.4*clamp((distance/preferred-.65)/.35,0,1):.65);
  const overshoot=hunting&&ship.combatPlan?.overshoot;
  canBoost=canBoost&&!overshoot;
  const request=threatened || !hunting || (noseDot>.65 && distance>preferred*1.2 && closing<ship.speed*.5);
@@ -96,7 +96,7 @@ export function combatThrottle(ship,now,distance,closing,targetRadial,noseDot,pr
  if(ship.burning)return ship.afterburnSpeed;
  const turningShot=hunting&&ship.combatPlan?.aimingRun&&ship.combatPlan.angularRate>.15&&!threatened;
  let speed=(artillery&&hunting||turningShot)?clamp(targetRadial+(distance-preferred)*.6,speedFloor,ship.speed):ship.speed;
- if(overshoot)speed=Math.max(Math.min(speedFloor,ship.speed*.45),Math.min(speed,targetRadial+ship.combatPlan.safeClosing));
+ if(overshoot)speed=Math.max(speedFloor,Math.min(speed,targetRadial+ship.combatPlan.safeClosing));
  return speed;
 }
 

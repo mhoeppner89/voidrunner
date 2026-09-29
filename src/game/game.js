@@ -9197,7 +9197,8 @@ export class GameSession {
             // Commit across the attacker's line instead of simply continuing
             // straight toward it. Once safe, hunting resumes without a long run.
             const plan=ship.combatPlan;
-            if(ship.combatIntent==='reposition'&&this.save.world.time<plan.reapproachUntil)desired.copy(plan.reapproach);
+            if(ship.combatIntent==='reposition'&&this.save.world.time<(plan.passUntil??0))desired.copy(plan.passDirection);
+            else if(ship.combatIntent==='reposition'&&this.save.world.time<plan.reapproachUntil)desired.copy(plan.reapproach);
             else if(plan.escape.lengthSq()>.5)desired.copy(plan.escape);
             else desired.copy(velocity).normalize().addScaledVector(direct,-.85).addScaledVector(lateral,.95).normalize();
         }

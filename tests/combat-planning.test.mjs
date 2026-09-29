@@ -107,17 +107,18 @@ test('allies share one pressure pilot, choose different flanks, and withhold rou
  assert.equal(friendlyFiringLaneBlocked(s,wings[0],new THREE.Vector3(...wings[0].position),forward,450),false);
  leader.combatIntent='evade';s.save.world.time=.6;plan(s,wings[0]);assert.notEqual(wings[0].combatPlan.teamLeaderId,leader.id);
 });
-test('moving-target pursuit retains forward firing opportunities through turns and capacitor recovery',()=>{
+test('moving-target pursuit retains firing opportunities without falling into a low-speed hover',()=>{
  for(const tier of ['veteran','ace']){
   const {s,ship}=setup(tier,[0,0,300]);ship.velocity=[0,0,-60];ship.combatFit.turrets=[];ship.combatFit.missiles=0;
   const fit=ship.combatFit;fit.attackOrder=[0];ship.energy=fit.stats.energyCapacity;
-  const target=new THREE.Vector3(),velocity=new THREE.Vector3(),nose=new THREE.Vector3(),q=new THREE.Quaternion();let aligned=0,close=0,error=0,samples=0;
+  const target=new THREE.Vector3(),velocity=new THREE.Vector3(),nose=new THREE.Vector3(),q=new THREE.Quaternion();let aligned=0,close=0,slowClose=0,error=0,speedRatio=0,samples=0;
   for(let i=0;i<1800;i++){
    const t=i/60;s.save.world.time=t;target.set(160*Math.sin(t*.375),20*Math.sin(t*.55),160*(1-Math.cos(t*.375)));velocity.set(60*Math.cos(t*.375),11*Math.cos(t*.55),60*Math.sin(t*.375));
    target.toArray(s.save.player.position);velocity.toArray(s.save.player.velocity);
    ship.fireCooldown-=1/60;regenerateCombatResources(ship,fit.resources,1/60,100);s.updateAttackAI(ship,target,velocity,1/60);
-   if(i>=300){samples++;nose.set(0,0,-1).applyQuaternion(q.fromArray(ship.rotation));const angle=nose.angleTo(s.tmpNpcGunLead);error+=angle;if(angle<Math.PI/45)aligned++;if(target.distanceTo(nose.fromArray(ship.position))<120)close++;}
+   if(i>=300){samples++;nose.set(0,0,-1).applyQuaternion(q.fromArray(ship.rotation));const angle=nose.angleTo(s.tmpNpcGunLead),range=target.distanceTo(nose.fromArray(ship.position)),ratio=Math.hypot(...ship.velocity)/ship.speed;error+=angle;speedRatio+=ratio;if(angle<Math.PI/45)aligned++;if(range<120){close++;if(ratio<.25)slowClose++;}}
   }
-  assert.ok(aligned/samples>.8,`${tier} aligned ${aligned/samples}`);assert.ok(error/samples<3*Math.PI/180,`${tier} mean angle ${error/samples}`);assert.ok(close/samples<.3,`${tier} close fraction ${close/samples}`);assert.ok(s.projectiles.length>30);
+  assert.ok(aligned/samples>.8,`${tier} aligned ${aligned/samples}`);assert.ok(error/samples<3*Math.PI/180,`${tier} mean angle ${error/samples}`);
+  assert.ok(speedRatio/samples>.55,`${tier} mean speed ${speedRatio/samples}`);assert.ok(close>0&&slowClose/close<.08,`${tier} slow-close fraction ${slowClose}/${close}`);assert.ok(s.projectiles.length>30);
  }
 });

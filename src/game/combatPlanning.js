@@ -8,7 +8,7 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const UP=new THREE.Vector3(0,1,0),FORWARD=new THREE.Vector3(0,0,-1);
 
 function state() {
- return {next:0,plans:0,q:new THREE.Quaternion(),position:new THREE.Vector3(),nose:new THREE.Vector3(),travel:new THREE.Vector3(),relative:new THREE.Vector3(),direct:new THREE.Vector3(),targetVelocity:new THREE.Vector3(),targetNose:new THREE.Vector3(),threatPosition:new THREE.Vector3(),threatNose:new THREE.Vector3(),right:new THREE.Vector3(),up:new THREE.Vector3(),candidate:new THREE.Vector3(),end:new THREE.Vector3(),delta:new THREE.Vector3(),escape:new THREE.Vector3(),reapproach:new THREE.Vector3(),offset:new THREE.Vector3(),teamAxis:new THREE.Vector3(),teamUp:new THREE.Vector3(),lastProgress:0,bestFacing:-1,bestRangeError:Infinity,reapproachUntil:0};
+ return {next:0,plans:0,q:new THREE.Quaternion(),position:new THREE.Vector3(),nose:new THREE.Vector3(),travel:new THREE.Vector3(),relative:new THREE.Vector3(),direct:new THREE.Vector3(),targetVelocity:new THREE.Vector3(),targetNose:new THREE.Vector3(),threatPosition:new THREE.Vector3(),threatNose:new THREE.Vector3(),right:new THREE.Vector3(),up:new THREE.Vector3(),candidate:new THREE.Vector3(),end:new THREE.Vector3(),delta:new THREE.Vector3(),escape:new THREE.Vector3(),passDirection:new THREE.Vector3(),reapproach:new THREE.Vector3(),offset:new THREE.Vector3(),teamAxis:new THREE.Vector3(),teamUp:new THREE.Vector3(),lastProgress:0,bestFacing:-1,bestRangeError:Infinity,reapproachUntil:0};
 }
 function basis(direction,right,up) {
  right.crossVectors(direction,UP);if(right.lengthSq()<.001)right.set(1,0,0);else right.normalize();
@@ -88,7 +88,7 @@ function chooseEscape(session,ship,s,now,novice) {
 
 export function planCombatFlight(session,ship,targetPosition,targetVelocity,lead,distance,closing) {
  const now=session.save.world.time,s=ship.combatPlan??=state();
- if(s.targetId!==ship.targetId){s.targetId=ship.targetId;s.next=0;s.lastProgress=now;s.bestFacing=-1;s.bestRangeError=Infinity;s.reapproachUntil=0;ship.fireCommitUntil=0;}
+ if(s.targetId!==ship.targetId){s.targetId=ship.targetId;s.next=0;s.lastProgress=now;s.bestFacing=-1;s.bestRangeError=Infinity;s.reapproachUntil=0;s.passUntil=0;ship.repositionUntil=0;ship.fireCommitUntil=0;}
  if(now<s.next)return s;
  const novice=ship.pilot?.tier==='novice',ace=ship.pilot?.tier==='ace';
  s.next=now+(novice?.3:.2);s.plans++;
@@ -119,6 +119,11 @@ export function planCombatFlight(session,ship,targetPosition,targetVelocity,lead
  const angle=Math.acos(clamp(s.nose.dot(s.delta),-1,1));
  s.turnTime=Math.max(Math.sqrt(2*angle/stats.angularAcceleration),angle/(stats.angularAcceleration/stats.angularDamping));
  s.clearance=novice?Math.max(24,Math.min(180,preferred*.35)):Math.max(24,Math.min(preferred*.35,60,ship.speed/turnAuthority*.45));
+ // Begin the crossing turn before the NPC contact bubble can remove all
+ // closing velocity. Hull sizes matter even for stationary, unthreatened foes.
+ const ownRadius=Math.max(...session.npcHullExtents(ship));
+ const targetRadius=target?Math.max(...(ship.targetId==='player'?session.playerHullExtents():session.npcHullExtents(target))):ownRadius;
+ s.clearance=Math.max(s.clearance,ownRadius+targetRadius+24+Math.max(12,ship.speed*.25));
  const room=Math.max(0,distance-Math.max(s.clearance,preferred*.55)),reaction=novice?.3:ace?.1:.18;
  const deceleration=stats.acceleration*1.25;
  s.brakingDistance=Math.max(0,closing)**2/(2*deceleration)+Math.max(0,closing)*(reaction+Math.min(1.5,s.turnTime)*.35);
@@ -158,8 +163,19 @@ export function planCombatFlight(session,ship,targetPosition,targetVelocity,lead
  s.delta.copy(s.threatPosition).sub(s.position).normalize();basis(s.delta,s.right,s.up);
  planShieldRecovery(session,ship,s,target,now,distance);
  planCrossfire(session,ship,s,now,distance);
- const needsBreak=now<(ship.evasiveUntil??0)||s.overshoot||distance<s.clearance;
+ const closePass=distance<s.clearance||closing>10&&distance<s.clearance+Math.min(65,closing*.65);
+ const needsBreak=now<(ship.evasiveUntil??0)||s.overshoot||closePass;
  if(needsBreak&&now>=(s.escapePlannedUntil??0))chooseEscape(session,ship,s,now,novice);
+ // Hold a world-space exit heading through the merge. Re-aiming this vector
+ // every planning tick turns a clearance maneuver into an orbit at contact range.
+ if(closePass&&now>=(s.passUntil??0)&&!s.recovery.active&&!ship.covering&&!ship.fleeing){
+  // Preserve most of the existing velocity heading, adding an evasive bend
+  // instead of asking the pilot to snap onto a perpendicular escape vector.
+  const momentum=s.travel.lengthSq()>.5?s.passDirection.copy(s.travel).normalize():s.passDirection.copy(s.nose);
+  momentum.multiplyScalar(.65).addScaledVector(s.escape,.35).addScaledVector(s.direct,-.18).normalize();
+  s.passUntil=now+clamp(s.clearance/Math.max(30,ship.speed)+.65,1.3,2.3);
+  ship.repositionUntil=Math.max(ship.repositionUntil??0,s.passUntil);
+ }
 
  const rangeError=Math.abs(distance-preferred);
  if(now-(ship.lastCombatShotAt??-Infinity)<.6||facing>s.bestFacing+.08||rangeError<s.bestRangeError-Math.max(25,preferred*.15)){
