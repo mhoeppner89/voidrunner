@@ -7,6 +7,33 @@ import {FRIGATE_MOUNTS} from '../src/game/frigateMounts.js';
 import {cockpitDamageStage} from '../src/game/cockpitDamage.js';
 import {fixture} from './combat-variety.test.mjs';
 function stage(){const s=fixture();s.tmpAvoidance=new THREE.Vector3();s.save.player.dockedAt=undefined;s.save.player.position=[180,0,0];s.save.player.velocity=[0,0,0];s.save.player.hull=185;const ship=s.spawnCapitalShip('concord-frigate',[0,0,0],'rook','Boss');equipFrigate(ship,true);ship.rotation=[0,0,0,1];ship.targetId='player';ship.hostile=true;ship.holdFire=false;return {s,ship};}
+test('live ship updates route frigate combat in career, arena, arena run, and spectator modes',()=>{
+ for(const mode of ['career','arena','arena-run','spectator']){
+  const {s,ship}=stage();s.save.player.position=[440,0,0];
+  s.arena=mode==='career'?undefined:mode==='spectator'?{observer:true,environment:'open',started:true}:mode==='arena-run'?{run:true}:{environment:'open',started:true};
+  if(mode==='arena-run')s.save.arenaRun={phase:'combat',countdown:0};
+  ship.playerAwareness=1;
+  s.resolveNpcCollisions=()=>{};s.playerStats=()=>({radarRange:1000});
+  s.maybeRecognitionLine=()=>{};s.maybeProximityLine=()=>{};s.maybePilotLine=()=>{};s.maybeNeutralChatter=()=>{};
+  s.getAvoidanceVector=()=>s.tmpAvoidance.set(0,0,0);
+  let attackUpdates=0,mainShots=0;const updateAttack=s.updateAttackAI.bind(s);
+  s.updateAttackAI=(...args)=>{attackUpdates++;return updateAttack(...args);};
+  s.spawnGunProjectile=(_owner,weapon)=>{if(weapon===FRIGATE_BOSS_GUN)mainShots++;};
+  if(mode==='spectator'){
+   const opponent=s.spawnCapitalShip('concord-frigate',[0,0,-420],'rook','Opponent');equipFrigate(opponent,true);
+   s.arena.observer=true;s.observerStarted=true;s.observerAimError=1;s.tmpObserverDirection=new THREE.Vector3();
+   s.applyObserverShipState(ship,{id:'blue-boss',shipType:'frigate',team:'blue'});
+   s.applyObserverShipState(opponent,{id:'red-boss',shipType:'frigate',team:'red'});
+   ship.targetId=opponent.id;opponent.targetId=ship.id;opponent.hostile=true;
+  }
+  for(let tick=0;tick<8*60;tick++){s.save.world.time+=1/60;s.updateShips(1/60);}
+  assert.ok(attackUpdates>0,`${mode}: frigate AI receives a live attack update`);
+  assert.ok(ship.capitalRuntime?.navigation,`${mode}: frigate navigation state is initialized`);
+  assert.ok(ship.capitalRuntime.navigation.desired.toArray().every(Number.isFinite),`${mode}: desired motion stays finite`);
+  assert.ok(mainShots>0,`${mode}: frigate broadside completes its warning and fires`);
+  if(mode==='spectator')assert.equal(ship.targetId,s.ships.find(other=>other!==ship).id,'observer frigates keep an opposing-team target');
+ }
+});
 test('cockpit stages have exact boundaries and repair without permanent corruption',()=>{for(const [f,stage] of [[1,0],[.75,0],[.749,1],[.5,1],[.499,2],[.25,2],[.249,3],[.1,3],[.099,4],[1,0]])assert.equal(cockpitDamageStage(f),stage);});
 test('frigate main batteries get a capital-only damage lift without changing weapon scaling',()=>{
  assert.equal(FRIGATE_GUN,FRIGATE_BOSS_GUN);
@@ -33,6 +60,49 @@ test('frigate approach remains continuous across the old range threshold and kee
  }
  const side=ship.capitalRuntime.attackSide;
  for(let i=0;i<900;i++){s.save.world.time=i/60;updateFrigateAttack(s,ship,new THREE.Vector3(0,0,-650),new THREE.Vector3(),1/60);assert.equal(ship.capitalRuntime.attackSide,side);assert.ok(ship.rotation.every(Number.isFinite));}
+});
+
+test('frigate rolls its broadside onto an off-plane target with turn-rate-limited attitude changes',()=>{
+ const {s,ship}=stage();ship.holdFire=true;s.getAvoidanceVector=()=>s.tmpAvoidance.set(0,0,0);
+ const point=new THREE.Vector3(250,300,100).normalize().multiplyScalar(414),velocity=new THREE.Vector3();
+ let previous=new THREE.Quaternion(...ship.rotation);
+ for(let i=0;i<1800;i++){
+  s.save.world.time=i/60;updateFrigateAttack(s,ship,point,velocity,1/60);
+  const rotation=new THREE.Quaternion(...ship.rotation);
+  assert.ok(previous.angleTo(rotation)<=ship.turnRate/60+1e-5,'capital attitude must obey its authored turn rate');
+  previous.copy(rotation);
+ }
+ const radial=point.clone().sub(new THREE.Vector3(...ship.position)).normalize();
+ const right=new THREE.Vector3(1,0,0).applyQuaternion(new THREE.Quaternion(...ship.rotation));
+ assert.ok(Math.abs(right.dot(radial))>.995,`broadside alignment ${right.dot(radial)}`);
+ assert.ok(Math.hypot(...ship.velocity)<=ship.speed+.001);
+});
+
+test('frigate reserves speed for range control before matching lateral target motion',()=>{
+ const {s,ship}=stage();ship.holdFire=true;s.getAvoidanceVector=()=>s.tmpAvoidance.set(0,0,0);
+ const point=new THREE.Vector3(600,0,0),lateralVelocity=new THREE.Vector3(0,0,18);
+ updateFrigateAttack(s,ship,point,lateralVelocity,1/60);
+ const desired=ship.capitalRuntime.navigation.desired;
+ assert.ok(desired.x>17.9,`frigate should close at hull speed outside its firing band: ${desired.x}`);
+ assert.ok(desired.length()<=ship.speed+.001);
+});
+
+test('frigate checks secondary-target cover with world-space vectors before splitting broadsides',()=>{
+ const {s,ship}=stage();ship.holdFire=true;ship.speed=0;ship.turnRate=0;
+ const enemy=s.spawnShip('pirate',[-300,240,0]);enemy.instanceId=ship.instanceId;enemy.pendingMug=false;
+ s.projectileCanHitShip=()=>true;
+ let checkedSecondary=false;
+ s.lineBlocked=(start,end)=>{
+  assert.ok(end?.isVector3,'line-of-sight endpoints must be Three.js vectors');
+  if(Math.abs(end.x-enemy.position[0])<1e-6&&Math.abs(end.y-enemy.position[1])<1e-6)checkedSecondary=true;
+  return false;
+ };
+ const point=new THREE.Vector3(380,0,0);
+ updateFrigateAttack(s,ship,point,new THREE.Vector3(),1/60);
+ const targetAxis=point.clone().normalize(),otherAxis=new THREE.Vector3(...enemy.position).normalize();
+ const expected=targetAxis.sub(otherAxis).normalize();
+ assert.ok(checkedSecondary,'opposite hostile should be evaluated for a split firing posture');
+ assert.ok(ship.capitalRuntime.navigation.axis.dot(expected)>.999);
 });
 
 test('physical asteroid cover blocks battery fire and breaking cover restarts the warning',()=>{

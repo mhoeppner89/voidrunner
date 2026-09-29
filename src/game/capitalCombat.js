@@ -149,7 +149,7 @@ export function updateFrigateBatteries(session,ship,dt,targetPosition,targetVelo
 const newIdentity=new THREE.Quaternion();
 // Separate steering scratch from battery scratch: battery transforms overwrite stateFor vectors.
 function navigationFor(ship){
- return stateFor(ship).navigation??={radial:new THREE.Vector3(),tangent:new THREE.Vector3(),axis:new THREE.Vector3(),other:new THREE.Vector3(),desired:new THREE.Vector3(),heading:new THREE.Vector3(),velocity:new THREE.Vector3(),position:new THREE.Vector3(),q:new THREE.Quaternion(),goal:new THREE.Quaternion(),until:0};
+ return stateFor(ship).navigation??={radial:new THREE.Vector3(),tangent:new THREE.Vector3(),axis:new THREE.Vector3(),other:new THREE.Vector3(),desired:new THREE.Vector3(),heading:new THREE.Vector3(),right:new THREE.Vector3(),velocity:new THREE.Vector3(),position:new THREE.Vector3(),q:new THREE.Quaternion(),goal:new THREE.Quaternion(),roll:new THREE.Quaternion()};
 }
 function secondaryEnemy(session,ship,actor){
  const probe=stateFor(ship).enemyProbe??={ownerId:ship.id};probe.faction=ship.faction;probe.targetId=ship.targetId;
@@ -158,40 +158,74 @@ function secondaryEnemy(session,ship,actor){
   &&session.projectileCanHitShip(probe,actor);
 }
 export function updateFrigateAttack(session,ship,targetPosition,targetVelocity,dt){
- const s=stateFor(ship),n=navigationFor(ship),now=session.save.world.time;
+ const s=stateFor(ship),n=navigationFor(ship);
  n.position.fromArray(ship.position);n.q.fromArray(ship.rotation);
  n.radial.copy(targetPosition).sub(n.position);const distance=n.radial.length();
  if(distance<1e-6)n.radial.set(1,0,0);else n.radial.multiplyScalar(1/distance);
  if(s.attackSide===undefined||s.attackTarget!==ship.targetId){
   s.attackTarget=ship.targetId;s.local.copy(n.radial).applyQuaternion(s.inverse.copy(n.q).invert());
-  s.attackSide=s.local.x>=0?-1:1;n.until=0;
+  s.attackSide=s.local.x>=0?1:-1;
  }
  const preferred=FRIGATE_GUN.range*.69,band=FRIGATE_GUN.range*.06;
- // Re-evaluate headings slowly. Opposite threats can use both broadsides;
- // clustered threats do not tempt the frigate into the middle of the group.
- if(now>=n.until){
-  n.axis.copy(n.radial);let best=0,opponent;
-  for(const actor of session.ships){
-   if(!secondaryEnemy(session,ship,actor))continue;
-   n.other.fromArray(actor.position).sub(n.position);const d=n.other.length();
-   if(d<1||d>FRIGATE_GUN.range||session.lineBlocked(n.position,n.other.fromArray(actor.position),ship.id))continue;
-   n.other.fromArray(actor.position).sub(n.position).normalize();const opposition=-n.radial.dot(n.other);
-   if(opposition>Math.max(.35,best)){best=opposition;opponent=actor;}
-  }
-  if(opponent){n.other.fromArray(opponent.position).sub(n.position).normalize();n.axis.sub(n.other).normalize();}
-  n.tangent.crossVectors(worldUp,n.axis);
-  if(n.tangent.lengthSq()<.001)n.tangent.set(1,0,0);else n.tangent.normalize();
-  n.tangent.multiplyScalar(s.attackSide);
-  n.heading.copy(n.tangent);n.goal.setFromUnitVectors(forward,n.heading);n.until=now+2;
+ // Aim a broadside at the primary. If a valid enemy is substantially
+ // opposite it, bisect the pair so one can fall on each side of the hull.
+ n.axis.copy(n.radial);
+ let best=.35,opponent;
+ for(const actor of session.ships){
+  if(!secondaryEnemy(session,ship,actor))continue;
+  n.other.fromArray(actor.position);const d=n.other.distanceTo(n.position);
+  if(d<1||d>FRIGATE_GUN.range||session.lineBlocked(n.position,n.other,ship.id))continue;
+  n.other.sub(n.position).multiplyScalar(1/d);
+  const opposition=-n.radial.dot(n.other);
+  if(opposition>best){best=opposition;opponent=actor;}
  }
- // Keep a dead band instead of a threshold-driven forward/reverse throttle.
- // Lateral station-keeping lets the hull stay broadside without ramming the target.
+ if(opponent){
+  n.other.fromArray(opponent.position).sub(n.position).normalize();
+  n.axis.sub(n.other);
+  if(n.axis.lengthSq()>.001)n.axis.normalize();else n.axis.copy(n.radial);
+ }
+ n.axis.multiplyScalar(s.attackSide);
+
+ // Preserve the current direction of travel where possible instead of
+ // selecting a new world-up orbit direction every few seconds.
+ n.heading.copy(forward).applyQuaternion(n.q);
+ n.heading.addScaledVector(n.axis,-n.heading.dot(n.axis));
+ if(n.heading.lengthSq()<.001){
+  n.heading.crossVectors(worldUp,n.axis);
+  if(n.heading.lengthSq()<.001){
+   n.heading.set(Math.abs(n.axis.x)<.8?1:0,Math.abs(n.axis.x)<.8?0:1,0);
+   n.heading.addScaledVector(n.axis,-n.heading.dot(n.axis));
+  }
+ }
+ n.heading.normalize();
+
+ // Set forward along the selected heading and roll until one broadside is
+ // aligned with the chosen target axis. The hull still turns at turnRate.
+ n.goal.setFromUnitVectors(forward,n.heading);
+ n.right.set(1,0,0).applyQuaternion(n.goal);
+ n.tangent.crossVectors(n.right,n.axis);
+ n.roll.setFromAxisAngle(
+  n.heading,
+  Math.atan2(n.tangent.dot(n.heading),n.right.dot(n.axis))
+ );
+ n.goal.premultiply(n.roll);
+
  const error=distance-preferred;
- const radialSpeed=Math.max(-ship.speed,Math.min(ship.speed,(Math.abs(error)>band?error-Math.sign(error)*band:0)*.12));
- if(targetVelocity?.isVector3)n.desired.copy(targetVelocity);else n.desired.fromArray(targetVelocity??zeroVelocity);
- n.desired.clampLength(0,ship.speed*.65).addScaledVector(n.radial,radialSpeed);
+ const correction=Math.max(-ship.speed,Math.min(ship.speed,(Math.abs(error)>band?error-Math.sign(error)*band:0)*.12));
+
+ // Range control gets first claim on the speed budget. Then match only the
+ // observed tangential motion, bounded by the remaining speed capacity.
+ if(targetVelocity?.isVector3)n.other.copy(targetVelocity);else n.other.fromArray(targetVelocity??zeroVelocity);
+ const observedRadial=Math.max(-ship.speed*.65,Math.min(ship.speed*.65,n.other.dot(n.radial)));
+ const radialSpeed=Math.max(-ship.speed,Math.min(ship.speed,observedRadial+correction));
+ n.desired.copy(n.radial).multiplyScalar(radialSpeed);
+ n.other.addScaledVector(n.radial,-n.other.dot(n.radial));
+ n.other.clampLength(0,Math.sqrt(Math.max(0,ship.speed*ship.speed-radialSpeed*radialSpeed)));
+ n.desired.add(n.other);
+ // Keep a dead band instead of a threshold-driven forward/reverse throttle.
+ // Lateral station-keeping lets the hull hold a broadside without ramming.
  const blocked=session.lineBlocked(n.position,targetPosition,ship.id);
- if(blocked)n.desired.addScaledVector(n.tangent,ship.speed*.7);
+ if(blocked)n.desired.addScaledVector(n.heading,ship.speed*.8);
  n.desired.clampLength(0,ship.speed);
  if(session.getAvoidanceVector){
   n.other.copy(n.desired);if(n.other.lengthSq()<.001)n.other.copy(n.heading);else n.other.normalize();
