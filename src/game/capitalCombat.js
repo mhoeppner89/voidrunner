@@ -17,7 +17,7 @@ export function equipFrigate(ship,boss=false){
  ship.capitalBoss=boss;
  ship.combatFit={hullId:'concord-frigate',turrets:[null,null,null,null,'pdc','pdc','pdc','pdc'],stats:{energyCapacity:240},weapons:[],guns:[],attackOrder:[],fireAt:[],missiles:0};
  ship.energy=240;ship.capitalMountHull=FRIGATE_MOUNTS.map((m,i)=>m.hull??(i<4?100:65));
- {ship.maxShield=650;ship.shield=650;ship.maxHull=1400;ship.hull=1400;ship.shieldRegen=16;ship.turnRate=.24;ship.capitalBaseSpeed=ship.speed;ship.capitalTorpedoes=6;}
+ {ship.maxShield=650;ship.shield=650;ship.maxHull=1400;ship.hull=1400;ship.shieldRegen=32;ship.turnRate=.24;ship.capitalBaseSpeed=ship.speed;ship.capitalTorpedoes=6;}
 }
 function stateFor(ship){
  return ship.capitalRuntime??={position:new THREE.Vector3(),normal:new THREE.Vector3(),direction:new THREE.Vector3(),scratch:new THREE.Vector3(),local:new THREE.Vector3(),inverse:new THREE.Quaternion(),q:new THREE.Quaternion(),goal:new THREE.Quaternion(),target:new THREE.Vector3(),velocity:new THREE.Vector3(),lead:new THREE.Vector3(),torpedoStarts:[new THREE.Vector3(),new THREE.Vector3()],turn:new THREE.Quaternion(),mounts:FRIGATE_MOUNTS.map(()=>({direction:new THREE.Vector3(),fireAt:0,chargeAt:0,rounds:0}))};
@@ -47,9 +47,9 @@ export function applyFrigateSubsystemEffects(ship){
  const engine=Math.max(0,Math.min(1,(hull[8]??160)/160));
  ship.speed=(ship.capitalBaseSpeed??18)*(.15+.85*engine);
  ship.turnRate=.24*(.12+.88*engine);
- // Each generator supplies one full base recharge increment (8/s): one
+ // Each generator supplies one full base recharge increment (16/s): one
  // surviving generator yields 100%, and both yield 200% total recharge.
- ship.shieldRegen=8*((hull[9]??95)/95+(hull[10]??95)/95);
+ ship.shieldRegen=16*((hull[9]??95)/95+(hull[10]??95)/95);
 }
 export function frigateSubsystemLabel(index){return index<4?`BATTERY ${index+1}`:index<8?`PDC ${index-3}`:FRIGATE_MOUNTS[index]?.label??'HULL';}
 export function frigateSubsystemEffect(ship,index){

@@ -15,7 +15,7 @@ export const PDC_TURRET=Object.freeze({...WEAPONS.pdc,damageFlat:2.2*WEAPON_DAMA
 // The Concord frigate is designed to suppress fighters. Its ship-target PDC
 // fire hits much harder, but tracks evasive craft less tightly. Interception
 // rounds still use the standard PDC values so torpedo shields remain useful.
-export const FRIGATE_PDC_TURRET=Object.freeze({...PDC_TURRET,damageFlat:8.8*WEAPON_DAMAGE_SCALE,shieldMul:.30,aimSpread:.028,turnRate:3.8});
+export const FRIGATE_PDC_TURRET=Object.freeze({...PDC_TURRET,damageFlat:35.2*WEAPON_DAMAGE_SCALE,shieldMul:.30,aimSpread:.028,turnRate:3.8});
 const identity=new THREE.Quaternion();
 const DEG=Math.PI/180;
 const FRIGATE_STERN_BLIND_HALF_ANGLE=55*DEG;

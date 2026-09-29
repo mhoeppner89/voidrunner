@@ -63,8 +63,8 @@ test('frigate main batteries cover both flanks but leave stern and small top/bot
  assert.ok(covers(FRIGATE_MOUNTS[2],[100,200,-200]),'the dorsal blind spot stays narrow');
 });
 test('frigate anti-fighter PDC hits harder and less precisely while interception stays standard',()=>{
- assert.ok(FRIGATE_PDC_TURRET.damageFlat>=PDC_TURRET.damageFlat*4);
- assert.ok(FRIGATE_PDC_TURRET.damageFlat*FRIGATE_PDC_TURRET.shieldMul>=PDC_TURRET.damageFlat*PDC_TURRET.shieldMul*7);
+ assert.equal(FRIGATE_PDC_TURRET.damageFlat,PDC_TURRET.damageFlat*16,'frigate ship-target damage is 4x its previous 4x baseline');
+ assert.equal(FRIGATE_PDC_TURRET.damageFlat*FRIGATE_PDC_TURRET.shieldMul,PDC_TURRET.damageFlat*PDC_TURRET.shieldMul*32);
  assert.ok(FRIGATE_PDC_TURRET.aimSpread>(PDC_TURRET.aimSpread??.020));
  assert.ok(FRIGATE_PDC_TURRET.turnRate<4.5);
 });
@@ -250,12 +250,12 @@ test('rear torpedo impacts bypass shields and progressively cripple the engines'
   assert.equal(ship.shield,shield);assert.ok(ship.speed<originalSpeed);
  }
  assert.equal(ship.capitalMountHull[8],0);assert.ok(ship.speed<=originalSpeed*.16);assert.ok(ship.turnRate<.03);
- assert.equal(ship.capitalMountHull[0],100);assert.equal(ship.shieldRegen,16);
+ assert.equal(ship.capitalMountHull[0],100);assert.equal(ship.shieldRegen,32);
 });
-test('each shield generator supplies 100% recharge without disabling guns or engines',()=>{
+test('two shield generators double recharge to 32 per second and remain independently damageable',()=>{
  const {s,ship}=stage();ship.shield=0;const speed=ship.speed;
- assert.equal(ship.shieldRegen,16,'two active generators provide 200% recharge');
- for(const [index,regen] of [[9,8],[10,0]]){
+ assert.equal(ship.shieldRegen,32,'the doubled full rate is 32 shield per second');
+ for(const [index,regen] of [[9,16],[10,0]]){
   const point=frigateMountPosition(ship,index,new THREE.Vector3()).toArray();
   assert.equal(damageFrigateMount(ship,point,95),index);assert.equal(ship.shieldRegen,regen);
  }
@@ -281,7 +281,7 @@ test('PDC intercept rounds kill ordinary missiles but only chip a torpedo shield
  }
 });
 test('frigate PDC salvo pressure materially cuts a stationary player shield during main recovery',()=>{
- const {s,ship}=projectileStage();s.save.player.position=[180,0,0];s.save.player.shield=80;s.save.player.maxShield=80;ship.capitalAttack='RECOVERING';s.maybeHitTaunt=()=>{};
+ const {s,ship}=projectileStage();s.save.player.position=[180,0,0];s.save.player.shield=80;s.save.player.maxShield=80;s.save.player.hull=10000;s.audio.play=()=>{};ship.capitalAttack='RECOVERING';s.maybeHitTaunt=()=>{};
  for(let i=0;i<20*60;i++){s.save.world.time=i/60;updateAutomaticTurrets(s,ship,ship.id,1/60);s.updateProjectiles(1/60);}
  assert.ok(s.save.player.shield<65,`frigate PDCs should apply meaningful shield pressure, remaining ${s.save.player.shield}`);
 });
