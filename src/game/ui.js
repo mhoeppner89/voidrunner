@@ -423,7 +423,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2dc';
+const GAME_VERSION = '0.8.2dr';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -3963,7 +3963,7 @@ export class GameUI {
                 } else {body+=`<p>${escapeHtml(t(item.stat))}</p>`;}
             } else if(item.category==='launcher'){
                 const launcher=LAUNCHERS[item.weaponId],previous=LAUNCHERS[old?.weaponId];
-                body+=metric('LOCK RANGE (km)',previous?.lockRange,launcher.lockRange)+metric('PROJECTILE SPEED (km/s)',previous?.speed,launcher.speed)+metric('WARHEAD DAMAGE',previous?.damage,launcher.damage);
+                body+=metric('LOCK RANGE (km)',previous?.lockRange,launcher.lockRange)+metric('PROJECTILE SPEED (km/s)',previous?.speed,launcher.speed)+metric('SHIELD DAMAGE',previous?previous.damage*(1-(previous.shieldBypass??0))*(previous.shieldMul??1):undefined,launcher.damage*(1-(launcher.shieldBypass??0))*(launcher.shieldMul??1))+metric('HULL DAMAGE',previous?previous.damage*(previous.hullMul??1):undefined,launcher.damage*(launcher.hullMul??1));
             } else {
                 for(const [key,label] of [['hull','HULL INTEGRITY'],['shield','SHIELD'],['reactorOutput','REACTOR'],['energyCapacity','CAPACITOR'],['maxSpeed','SPEED'],['cargo','CARGO'],['angularAcceleration','TURNING'],['burnFuelMultiplier','BOOST FUEL USE'],['shieldRechargeMultiplier','SHIELD RECOVERY']])
                     if(stats[key]!==after[key])body+=metric(label,stats[key],after[key]);

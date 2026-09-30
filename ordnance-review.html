@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Voidrunner · Ordnance review</title><link rel="icon" href="/favicon.svg">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0a1421;color:#d9e4ed;font:14px system-ui}header{padding:18px 24px;display:flex;justify-content:space-between;gap:20px;border-bottom:1px solid #304052}header strong{color:#e5bc60;font-size:19px}a{color:#dcb557}main{display:grid;grid-template-columns:1fr 300px;height:calc(100dvh - 74px)}#view{min-width:0;position:relative;touch-action:none}canvas{display:block;width:100%;height:100%}#hint{position:absolute;bottom:18px;left:22px;color:#9db0c1;pointer-events:none}aside{padding:22px;background:#101e2e;overflow:auto}button,select{border:1px solid #536478;border-radius:3px;color:#f1d28c;background:#152c43;padding:10px;font:inherit;cursor:pointer}select{width:100%}button{margin:12px 5px 0 0}h1{font-size:22px;margin:24px 0 8px}p{line-height:1.55;color:#b6c8d7}dl{display:grid;grid-template-columns:1fr auto;gap:12px}dd{margin:0;color:#fff}dt{color:#98b0c5}.badge{color:#63d9ee;font-size:12px}hr{border:0;border-top:1px solid #304052;margin:24px 0}@media(max-width:700px){main{grid-template-columns:1fr;height:auto}#view{height:58dvh}aside{padding:16px}header{padding:12px;font-size:12px}header strong{font-size:15px}}
+</style></head><body>
+<header><strong>VOIDRUNNER / ORDNANCE</strong><a href="/game.html">Open game →</a></header>
+<main><div id="view"><div id="hint">Drag to rotate · Scroll to zoom</div></div><aside>
+<label for="kind">Weapon model</label><select id="kind"><option value="seeker">Anti-hull seeker</option><option value="shield-seeker">Anti-shield seeker</option><option value="swarm">Anti-hull cluster rocket</option><option value="shield-swarm">Anti-shield cluster rocket</option><option value="torpedo">Heavy torpedo</option><option value="all">Compare all · same scale</option></select>
+<button id="spin">Pause rotation</button><button id="wire">Wireframe</button><button id="reset">Reset view</button>
+<h1 id="title"></h1><span class="badge">BLENDER SOURCE · 128 × 128 TEXTURE</span><p id="description"></p><dl id="stats"></dl><hr><p>Anti-hull: gold / orange identification bands.<br>Anti-shield: cyan bands and induction strips.</p><p><a id="download">Download GLB</a> · <a href="/assets/models/ordnance/ordnance.blend">Blender source</a></p>
+</aside></main>
+<script type="importmap">{"imports":{"three":"/vendor/three.module.min.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {createOrdnanceModel} from './src/game/ordnanceModels.js';
+import {ORDNANCE_MODEL_DATA} from './src/game/ordnanceModelData.js';
+import {LAUNCHERS} from './src/game/weapons.js';
+const view=document.querySelector('#view'),scene=new THREE.Scene();scene.background=new THREE.Color(0x0d1928);
+const camera=new THREE.PerspectiveCamera(35,1,.05,100),renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.setSize(view.clientWidth,view.clientHeight);view.append(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xdbeaff,0x5e6a79,2.4));const key=new THREE.DirectionalLight(0xffedcf,3.5);key.position.set(-3,6,-4);scene.add(key);const rim=new THREE.DirectionalLight(0x7db5ff,2.5);rim.position.set(4,2,4);scene.add(rim);
+const group=new THREE.Group();scene.add(group);
+let yaw=.7,pitch=.42,distance=6.5,spin=true,wire=false,drag=null;
+const names={seeker:'Anti-hull seeker','shield-seeker':'Anti-shield seeker',swarm:'Anti-hull cluster rocket','shield-swarm':'Anti-shield cluster rocket',torpedo:'Heavy torpedo'};
+function show(){
+ group.clear();const id=document.querySelector('#kind').value,all=id==='all',ids=all?Object.keys(names):[id];
+ ids.forEach((kind,i)=>{const mesh=createOrdnanceModel(kind);mesh.position.x=all?(i-2)*1.1:0;mesh.material.wireframe=wire;group.add(mesh);});
+ const l=LAUNCHERS[id],d=ORDNANCE_MODEL_DATA[id];distance=all?11:Math.max(5,d.length*2.6);
+ document.querySelector('#title').textContent=all?'Ordnance lineup':names[id];
+ document.querySelector('#description').textContent=all?'All five models at their actual relative size. The cluster canister fires four of the smaller rockets.':id==='torpedo'?'A slow armored torpedo for large targets, with its own protective shield and a shield-bypassing warhead.':l.volley===4?'Four rockets per canister. More targets for point defense, with 80 total damage against their intended defense layer.':'One guided warhead. 100 damage against its intended defense layer, balanced by being easier to intercept.';
+ document.querySelector('#stats').innerHTML=all?'':[['Hull damage',l.damage*(l.hullMul??1)],['Shield damage',l.shieldBypass===1?'Bypasses':l.damage*(l.shieldMul??1)],['Rockets per shot',l.volley],['Triangles',d.triangles],['Length',d.length+' units']].map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('');
+ const link=document.querySelector('#download');link.href='/assets/models/ordnance/'+(all?'seeker':id)+'.glb';link.download='';
+ window.__ORDNANCE_REVIEW__={kind:id,triangles:ids.map(k=>ORDNANCE_MODEL_DATA[k].triangles)};
+}
+document.querySelector('#kind').onchange=show;document.querySelector('#spin').onclick=e=>{spin=!spin;e.target.textContent=spin?'Pause rotation':'Resume rotation';};document.querySelector('#wire').onclick=()=>{wire=!wire;group.traverse(o=>{if(o.isMesh)o.material.wireframe=wire;});};document.querySelector('#reset').onclick=()=>{yaw=.7;pitch=.42;show();};
+view.onpointerdown=e=>{drag=[e.clientX,e.clientY];view.setPointerCapture(e.pointerId);};view.onpointermove=e=>{if(!drag)return;yaw-=(e.clientX-drag[0])*.008;pitch=THREE.MathUtils.clamp(pitch+(e.clientY-drag[1])*.008,-1.4,1.4);drag=[e.clientX,e.clientY];};view.onpointerup=()=>drag=null;view.onpointercancel=()=>drag=null;view.onwheel=e=>{e.preventDefault();distance=THREE.MathUtils.clamp(distance*Math.exp(e.deltaY*.001),2,25);};
+new ResizeObserver(()=>{camera.aspect=view.clientWidth/view.clientHeight;camera.updateProjectionMatrix();renderer.setSize(view.clientWidth,view.clientHeight);}).observe(view);
+show();let previous=performance.now();function animate(now){if(spin&&!drag)yaw+=(now-previous)*.00018;previous=now;camera.position.set(Math.sin(yaw)*Math.cos(pitch)*distance,Math.sin(pitch)*distance,Math.cos(yaw)*Math.cos(pitch)*distance);camera.lookAt(0,0,0);renderer.render(scene,camera);requestAnimationFrame(animate);}requestAnimationFrame(animate);
+</script></body></html>

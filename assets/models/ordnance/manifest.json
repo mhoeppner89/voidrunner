@@ -1,0 +1,37 @@
+{
+  "seeker": {
+    "polygons": 94,
+    "triangles": 244,
+    "length": 2.4,
+    "texture": "128 \u00d7 128 shared atlas",
+    "bytes": 36428
+  },
+  "shield-seeker": {
+    "polygons": 118,
+    "triangles": 292,
+    "length": 2.4,
+    "texture": "128 \u00d7 128 shared atlas",
+    "bytes": 39796
+  },
+  "swarm": {
+    "polygons": 94,
+    "triangles": 244,
+    "length": 1.45,
+    "texture": "128 \u00d7 128 shared atlas",
+    "bytes": 36428
+  },
+  "shield-swarm": {
+    "polygons": 118,
+    "triangles": 292,
+    "length": 1.45,
+    "texture": "128 \u00d7 128 shared atlas",
+    "bytes": 39796
+  },
+  "torpedo": {
+    "polygons": 116,
+    "triangles": 296,
+    "length": 3.8,
+    "texture": "128 \u00d7 128 shared atlas",
+    "bytes": 39812
+  }
+}

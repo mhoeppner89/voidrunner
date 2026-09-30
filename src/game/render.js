@@ -1,3 +1,4 @@
+import { createOrdnanceModel } from './ordnanceModels.js';
 import { createShipExplosion, createHullDebris } from './explosionFx.js';
 import { skipHiddenWorldMatrices, markAttributeSpan } from './renderWork.js';
 import { DRONE_PORTS } from './droneFlight.js';
@@ -3566,7 +3567,7 @@ export class SpaceRenderer {
             const materials = Array.isArray(child.material) ? child.material : [child.material];
             materials.forEach((material) => { if (material) ownedMaterials.add(material); });
         });
-        for (const material of ownedMaterials) material.dispose();
+        for (const material of ownedMaterials) if(!material.userData?.shared)material.dispose();
     }
     syncShips(entities, alpha = 0) {
         const revision = ++this.shipSyncRevision;
@@ -4037,22 +4038,22 @@ export class SpaceRenderer {
                     mesh.add(halo);
                 }
                 else {
-                    // Missile overhaul: pale hull, twin stabilizer fins read at
-                    // distance, and a hot exhaust plume at the tail that the
-                    // per-frame pass flickers while the engine burns.
+                    // Same Blender-authored, textured geometry as the ordnance review.
                     const group = new THREE.Group();
-                    const body = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.7, 6), new THREE.MeshStandardMaterial({ color: 0xf2ead8, roughness: 0.55, metalness: 0.1 }));
-                    body.rotation.x = -Math.PI / 2;
+                    const body = createOrdnanceModel(projectile.launcherId);
                     group.add(body);
+                    const exhaust = new THREE.Group();
+                    exhaust.name = 'ordnance-exhaust';
+                    group.add(exhaust);
                     const flare = new THREE.Sprite(new THREE.SpriteMaterial({
                         map: this.radialTexture('#fff1ad', '#ff5029'),
                         transparent: true,
                         blending: THREE.AdditiveBlending,
                         depthWrite: false,
                     }));
-                    flare.position.z = 0.55;
-                    flare.scale.setScalar(2);
-                    group.add(flare);
+                    flare.position.z = body.userData.length*.49;
+                    flare.scale.setScalar(projectile.launcherId==='torpedo'?1.6:(projectile.launcherId?.includes('swarm') ? .5 : .8));
+                    exhaust.add(flare);
                     // Engine plume: an additive teardrop behind the nozzle —
                     // tagged so the frame pass can flicker it. Sized so the
                     // missile reads as a moving ember at 30-60 units.
@@ -4061,13 +4062,9 @@ export class SpaceRenderer {
                         depthWrite:false,opacity:.4,side:THREE.DoubleSide,forceSinglePass:true,
                     }));
                     plume.geometry.rotateX(Math.PI/2);
-                    plume.position.z=1.7;
+                    plume.position.z=body.userData.length*.5+1.4;
                     plume.name = 'plume';
-                    group.add(plume);
-                    if(projectile.launcherId==='torpedo'){
-                        const shield=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshBasicMaterial({color:0x72dfff,transparent:true,opacity:.22,depthWrite:false,wireframe:true}));
-                        shield.scale.set(.75,.75,1.8);shield.name='torpedo-shield';group.add(shield);
-                    }
+                    exhaust.add(plume);
                     mesh = group;
                 }
                 this.dynamicRoot.add(mesh);
@@ -4101,7 +4098,8 @@ export class SpaceRenderer {
             if (projectile.kind === 'missile' && this.laserFx) {
                 // Same treatment for missiles: the plume must not wash the
                 // frame when one crosses the camera's own space.
-                this.laserFx.attenuate(mesh, this.camera.position);
+                const exhaust = mesh.getObjectByName('ordnance-exhaust');
+                if (exhaust) this.laserFx.attenuate(mesh, this.camera.position, exhaust.scale);
             }
             if(projectile.kind==='ion' || projectile.kind==='mortar') {
                 const halo=mesh.children[0];
@@ -4111,8 +4109,6 @@ export class SpaceRenderer {
                 // Exhaust flicker: the engine plume strobes while the motor
                 // burns. No smoke trail — there is no atmosphere out here to
                 // suspend one (user report); the hot plume is the whole trail.
-                const shield=mesh.getObjectByName('torpedo-shield');
-                if(shield)shield.visible=(projectile.shield??0)>0;
                 const plume = mesh.getObjectByName('plume');
                 if (plume)
                     plume.material.opacity = 0.35 + Math.sin(this.skyTime * 47 + projectile.slot * 3.3) * 0.08;

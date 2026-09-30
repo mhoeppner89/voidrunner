@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v339-0-8-2dc-arena-cockpit';
+const CACHE = 'voidrunner-v356-0-8-2dr-ordnance-release';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -34,6 +34,9 @@ const CORE_ASSETS = [
   './src/game/turretLayouts.js',
   './src/game/turretModels.js',
   './src/game/turretModelData.js',
+  './src/game/ordnanceModels.js',
+  './src/game/ordnanceModelData.js',
+  './assets/models/ordnance/ordnance-atlas.png',
   './src/game/pdcFireControl.js',
   './src/game/combatResources.js',
   './src/game/data.js',

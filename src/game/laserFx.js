@@ -231,13 +231,13 @@ export class LaserFx {
     // Camera-distance attenuation for one bolt group: allocation-free — reads
     // numbers off the already-set mesh position and the camera. Call after the
     // renderer positions the bolt each frame.
-    attenuate(group, cameraPosition) {
+    attenuate(group, cameraPosition, targetScale = group.scale) {
         const dx = cameraPosition.x - group.position.x;
         const dy = cameraPosition.y - group.position.y;
         const dz = cameraPosition.z - group.position.z;
         const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
         const tuning = LASER_FX_TUNING;
-        group.scale.setScalar(clamp(dist / tuning.attenuationRange, tuning.attenuationMin, tuning.attenuationMax));
+        targetScale.setScalar(clamp(dist / tuning.attenuationRange, tuning.attenuationMin, tuning.attenuationMax));
     }
     // Cloned per-event material so updateEffects can fade opacity without
     // cross-talk between simultaneous flashes; the underlying map stays shared.

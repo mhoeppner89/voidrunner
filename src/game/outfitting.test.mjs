@@ -35,12 +35,12 @@ const capablePlayer = (overrides = {}) => ({
     ...overrides,
 });
 
-assert.equal(OUTFIT_ITEM_IDS.length, 22, 'registry includes the beam emitter');
-assert.equal(new Set(OUTFIT_ITEM_IDS).size, 22, 'registry ids are unique');
+assert.equal(OUTFIT_ITEM_IDS.length, 24, 'registry includes both anti-shield racks');
+assert.equal(new Set(OUTFIT_ITEM_IDS).size, 24, 'registry ids are unique');
 assert.deepEqual(OUTFIT_ITEM_IDS, [
     'tracking-turret','capacitor-bank','sustained-reactor','recovery-shield','beam-emitter',
     'pulse-cannon', 'pulse-mk2', 'gauss-cannon', 'pdc', 'ripper', 'ion-blaster', 'mortar',
-    'seeker-launcher', 'swarm-launcher', 'torpedo-launcher',
+    'seeker-launcher', 'swarm-launcher', 'shield-seeker-launcher', 'shield-swarm-launcher', 'torpedo-launcher',
     'engine-mk2', 'thrusters-mk2', 'shield-mk2', 'armor-mk2',
     'radar-mk2', 'cargo-pods', 'salvage-mk2',
 ]);

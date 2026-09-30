@@ -70,7 +70,8 @@ export const LAUNCHERS = {
         homingSpeed: 260,
         homingTurn: 1.8,
         acceleration: 520, lockRange: 800,
-        damage: 42,
+        damage: 62.5,
+        hullMul: 2,
         life: 8,
         cooldown: 1.1,
         capacity: 4,
@@ -90,7 +91,8 @@ export const LAUNCHERS = {
         homingSpeed: 300,
         homingTurn: 2.4,
         acceleration: 650, lockRange: 700,
-        damage: 15,
+        damage: 12.5,
+        hullMul: 2,
         life: 6.4,
         cooldown: 1.3,
         capacity: 12,
@@ -101,6 +103,22 @@ export const LAUNCHERS = {
         volley: 4,
         spreadRad: 0.07,
         audioKey: 'missile',
+    },
+    'shield-seeker': {
+        id: 'shield-seeker', nameKey: 'ANTI-SHIELD MISSILE RACK', category: 'launcher',
+        speed: 260, homingSpeed: 260, homingTurn: 1.8,
+        acceleration: 520, lockRange: 800, damage: 62.5, shieldMul: 2,
+        life: 8, cooldown: 1.1, capacity: 4,
+        ordnanceId: 'shield-seeker-missile', ordnanceNameKey: 'ANTI-SHIELD MISSILE',
+        shortCode: 'ASM', unitCost: 240, volley: 1, spreadRad: 0, audioKey: 'missile',
+    },
+    'shield-swarm': {
+        id: 'shield-swarm', nameKey: 'ANTI-SHIELD SWARM RACK', category: 'launcher',
+        speed: 300, homingSpeed: 300, homingTurn: 2.4,
+        acceleration: 650, lockRange: 700, damage: 12.5, shieldMul: 2,
+        life: 6.4, cooldown: 1.3, capacity: 12,
+        ordnanceId: 'shield-swarm-canister', ordnanceNameKey: 'ANTI-SHIELD SWARM CANISTER',
+        shortCode: 'ASW', unitCost: 240, volley: 4, spreadRad: .07, audioKey: 'missile',
     },
     torpedo: {
         id: 'torpedo',
@@ -132,7 +150,7 @@ for (const launcher of Object.values(LAUNCHERS)) {
     if (launcher.splashMin != null) launcher.splashMin *= WEAPON_DAMAGE_SCALE;
 }
 export const WEAPON_ORDER = ['pulse', 'gauss', 'pdc', 'ripper', 'ion', 'mortar', 'pulse-mk2', 'beam'];
-export const LAUNCHER_ORDER = ['seeker', 'swarm', 'torpedo'];
+export const LAUNCHER_ORDER = ['seeker', 'shield-seeker', 'swarm', 'shield-swarm', 'torpedo'];
 // Ammo pool capacities keyed by ammoId (null-ammo weapons are energy-pooled
 // or heat-gated and never run dry — pressure comes from cadence/heat).
 export const AMMO_CAPACITY = Object.freeze({});

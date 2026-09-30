@@ -47,7 +47,7 @@ export function arenaRecord(){try{return JSON.parse(window.localStorage.getItem(
 export function recordArenaRun(save){const r=save.arenaRun,old=arenaRecord();try{window.localStorage.setItem(ARENA_RECORD_KEY,JSON.stringify({unlockedHard:old.unlockedHard||r.phase==='won',best:Math.max(old.best??0,runScore(r)),last:{cleared:r.cleared,score:runScore(r)}}));}catch{}}
 export const runScore=r=>Math.max(0,Math.round(r.cleared*1000+(r.phase==='won'?2000:0)-r.elapsed*2-r.damage*2-r.missiles*20));
 const rewardPools={
- offense:['pulse-cannon','ripper','gauss-cannon','ion-blaster','mortar','pulse-mk2','swarm-launcher','torpedo-launcher'],
+ offense:['pulse-cannon','ripper','gauss-cannon','ion-blaster','mortar','pulse-mk2','shield-seeker-launcher','swarm-launcher','shield-swarm-launcher','torpedo-launcher'],
  survival:['pdc','tracking-turret','shield-mk2','recovery-shield'],
  handling:['engine-mk2','thrusters-mk2','capacitor-bank','sustained-reactor'],
 };

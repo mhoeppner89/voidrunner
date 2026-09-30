@@ -122,15 +122,29 @@ const itemRecords = [
         // Factory fit: every hull can launch the existing missile stock on a
         // new career without buying a launcher first.
         price: 1800, weaponId: 'seeker', factoryFit: true,
-        description: 'A compact guided rack that gives a new pilot a forgiving first missile lock.', stat: '4 seekers · 800 km lock · 260 km/s',
+        description: 'Guided anti-hull seekers deal double damage to exposed hull. One powerful warhead is vulnerable to point defense.', stat: '4 seekers · 100 hull / 50 shield · 800 km lock',
         effects: { weaponId: 'seeker', tracking: 'high', ammoId: 'missiles' }, availability: ['helix', 'rook', 'vesper', 'azure'],
         art: './art/outfitting/seeker-launcher.webp',
     },
     {
         id: 'swarm-launcher', name: 'Swarm Missile Rack', category: 'launcher', size: 'M', sizes: ['M'],
         price: 6200, weaponId: 'swarm',
-        description: 'A medium rack that fills the approach with several fast, imperfectly tracking warheads.', stat: '12 canisters · 4 warheads · 300 km/s',
+        description: 'Four fast anti-hull micro-warheads overwhelm point defense. Each canister deals less damage than one seeker.', stat: '12 canisters · 4 × 20 hull / 10 shield · 300 km/s',
         effects: { weaponId: 'swarm', volley: 4, tracking: 'medium', ammoId: 'missiles' }, availability: ['rook', 'azure'],
+        art: './art/outfitting/swarm-launcher.webp',
+    },
+    {
+        id: 'shield-seeker-launcher', name: 'Anti-Shield Missile Rack', category: 'launcher', size: 'S', sizes: ['S', 'M'],
+        price: 3200, weaponId: 'shield-seeker',
+        description: 'Guided ion warheads deal double shield damage. Swap to anti-hull seekers after shields collapse.', stat: '4 missiles · 100 shield / 50 hull · 800 km lock',
+        effects: { weaponId: 'shield-seeker', shieldDamageMultiplier: 2, ammoId: 'missiles' }, availability: ['helix', 'rook', 'vesper', 'azure'],
+        art: './art/outfitting/seeker-launcher.webp',
+    },
+    {
+        id: 'shield-swarm-launcher', name: 'Anti-Shield Swarm Rack', category: 'launcher', size: 'M', sizes: ['M'],
+        price: 6200, weaponId: 'shield-swarm',
+        description: 'Four fast ion micro-warheads overwhelm point defense and strip shields. Each canister deals less damage than one anti-shield seeker.', stat: '12 canisters · 4 × 20 shield / 10 hull · 300 km/s',
+        effects: { weaponId: 'shield-swarm', shieldDamageMultiplier: 2, volley: 4, ammoId: 'missiles' }, availability: ['rook', 'azure'],
         art: './art/outfitting/swarm-launcher.webp',
     },
     {
