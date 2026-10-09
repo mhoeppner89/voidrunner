@@ -271,6 +271,9 @@ export const HULL_HARDPOINTS = freeze({
     torsas: makeMounts('torsas', [['S',0],['S',1]], [['S',0]], ['M','S']),
     astra: makeMounts('astra', [['M',0],['M',1]], [['S',0]], ['M','S']),
     wayfarer: makeMounts('wayfarer', [['S', 0], ['S', 1]], [['S', 0]], ['M', 'S']),
+    scrapper: makeMounts('scrapper', [['S',0],['S',1],['S',2],['S',3]], [['S',0]], ['S']),
+    demon: makeMounts('demon', [['S',0],['S',1],['S',2],['S',3]], [['S',0]], ['S']),
+    mule: makeMounts('mule', [['S',0],['S',1]], [['S',0]], ['M','S']),
     talon: makeMounts('talon', [['S', 0], ['S', 1], ['M', 2]], [['S', 0]], ['S']),
     vanguard: makeMounts('vanguard', [['M', 0], ['M', 1]], [['M', 0], ['M', 1], ['M', 2]], ['M', 'S']),
     prospector: makeMounts('prospector', [['S', 0]], [['S', 0]], ['M', 'M', 'S']),
@@ -489,7 +492,7 @@ const standardFit = (shipId, loadout) => {
     // one exists and seeker preserves the existing missile control. Factory
     // copies are bundled in the hull state, not an infinite global stock.
     if(shipId==='wayfarer'||shipId==='torsas'){place('beam-emitter');place('beam-emitter');}
-    else if(shipId==='speedster'){place('pulse-cannon');place('pulse-cannon');}
+    else if(['speedster','scrapper','demon','mule'].includes(shipId)){for(const _ of spec.guns)place('pulse-cannon');if(shipId==='mule'){place('pdc',()=>true,['turrets']);place('pdc',()=>true,['turrets']);}}
     else {place('pulse-cannon');place('gauss-cannon');}
     place('seeker-launcher', () => true, ['launchers']);
     // Alternate the guns that are actually installed, rather than alternating
@@ -948,7 +951,7 @@ export const itemAvailable = (player, itemOrId, locationId = player?.dockedAt) =
     const item = itemFor(itemOrId);
     if (!item)
         return false;
-    if (item.availability?.length && locationId && LOCATIONS[locationId]?.faction !== 'frontier-league' && !item.availability.includes(locationId))
+    if (item.availability?.length && locationId && LOCATIONS[locationId]?.faction !== 'alliance' && !item.availability.includes(locationId))
         return false;
     if (item.requiredGuild && guildRank(player, item.requiredGuild) < (item.requiredRank ?? 0))
         return false;

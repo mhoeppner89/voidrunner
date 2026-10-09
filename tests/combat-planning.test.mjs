@@ -12,7 +12,7 @@ import {regenerateCombatResources} from '../src/game/combatResources.js';
 
 const origin=new THREE.Vector3(),forward=new THREE.Vector3(0,0,-1);
 function setup(tier='ace',position=[0,0,240]){
- const s=fixture(),ship=s.spawnShip('pirate',position,undefined,undefined,{tier,temperament:'steady'});
+ const s=fixture(),ship=s.spawnShip('pirate',position,undefined,undefined,{tier,temperament:'steady'},{hullId:'talon'});
  ship.rotation=[0,0,0,1];ship.velocity=[0,0,-76];ship.targetId='player';ship.combatIntent='hunt';
  ship.combatFit.profile.range=235;ship.combatFit.weapons=['pulse'];ship.combatFit.fireAt=[0];ship.combatWeaponIndex=0;
  s.npcFlightStats(ship);return {s,ship};
@@ -36,7 +36,7 @@ test('braking uses hull acceleration and future turning room, and cuts an active
  const fastHull=p.brakingDistance;
  const speed=combatThrottle(ship,0,240,120,0,1,235,true);
  assert.equal(ship.burning,false);assert.ok(speed>=ship.speed*.45&&speed<=ship.speed&&speed<120);
- ship.combatFit.stats=SHIPS.lancer;s.save.world.time=.3;plan(s,ship);assert.ok(p.brakingDistance>fastHull);
+ ship.combatFit.stats=SHIPS.vanguard;s.save.world.time=.3;plan(s,ship);assert.ok(p.brakingDistance>fastHull);
  ship.position[2]=1000;s.save.world.time=.6;plan(s,ship);assert.equal(p.overshoot,false);
 });
 test('pursuit cuts off distant targets and records lag pursuit without spoiling an available firing line',()=>{

@@ -6,7 +6,7 @@ import { HARDPOINT_SPECS, OUTFIT_ITEMS, itemAvailable, installedItemIds } from '
 export const SORTIE_LEDGER_VERSION = 1;
 const HISTORY_LIMIT = 8;
 const GUILDS = Object.freeze(['merchant', 'bounty', 'mining', 'salvage', 'syndicate']);
-const FACTIONS = Object.freeze(['concord', 'free-merchants', 'frontier-miners', 'salvage-union', 'red-talons']);
+const FACTIONS = Object.freeze(['concord','alliance','independents','pirates']);
 const UPGRADE_CATEGORIES = new Set(['power', 'drive', 'defense', 'utility']);
 const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 const whole = (value, fallback = 0) => Math.max(0, Math.floor(finite(value, fallback)));

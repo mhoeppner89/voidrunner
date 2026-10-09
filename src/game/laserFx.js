@@ -78,7 +78,7 @@ export const LASER_FX_TUNING = {
 // near-white hot tint of the faction color; glow and head ride the pure hue.
 const LASER_FACTION_COLORS = {
     player: { bolt: 0xffc35a, core: 0xfff3d2 },
-    'red-talons': { bolt: 0xff4b39, core: 0xffe2d8 },
+    'pirates': { bolt: 0xff4b39, core: 0xffe2d8 },
     patrol: { bolt: 0x75cfff, core: 0xe6f9ff },
 };
 

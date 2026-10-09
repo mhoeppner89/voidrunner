@@ -1,3 +1,4 @@
+import {migrateFactionReputation,migrateFactionTags} from './factions.js';
 import { createInitialMarket, normalizeMarketIntel, refreshAllPrices } from './economy.js';
 import { DEFAULT_NAV_LOCATION_BY_SYSTEM, DOCK_LOCATION_IDS, LOCATIONS, MISSION_LOCATION_IDS, SHIPS, commodityIds, navLocationIdsForSystem } from './data.js';
 import { SYSTEM_IDS, getRoute, hasSystem } from './galaxy.js';
@@ -24,7 +25,7 @@ export const SAVE_KEY = TURRET_TEST_MODE ? 'voidrunner-turret-test-v1'
             : 'void-privateer-save-v1';
 export const DRONE_MIGRATION_BACKUP_KEY = `${SAVE_KEY}-pre-drones`;
 export const SETTINGS_KEY = 'void-privateer-settings-v1';
-export const SAVE_VERSION = 18;
+export const SAVE_VERSION = 19;
 // Test-funds build: a fresh career starts with enough credits to try any ship,
 // outfitting module or trade route without grinding first.
 export const STARTING_CREDITS = 500000;
@@ -107,14 +108,7 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             dockedAt: 'helix',
             lastDockedAt: 'helix',
             stationPadIndex: 0,
-            reputation: {
-                concord: 0,
-                'frontier-league': 0,
-                'free-merchants': 4,
-                'frontier-miners': 0,
-                'salvage-union': 0,
-                'red-talons': -12,
-            },
+            reputation: {concord:12,alliance:0,independents:4,pirates:-12},
             guildRep: {
                 merchant: 0,
                 bounty: 0,
@@ -481,7 +475,7 @@ const normalizeMissionSettlements = (candidate) => {
             outcome: entry.outcome === 'failed' ? 'failed' : 'completed',
             ...(entry.outcome === 'failed' && entry.reason === 'discarded' ? { reason: 'discarded' } : {}),
             guild: typeof entry.guild === 'string' ? entry.guild : 'merchant',
-            faction: typeof entry.faction === 'string' ? entry.faction : 'free-merchants',
+            faction: typeof entry.faction === 'string' ? entry.faction : 'independents',
             reward: number('reward'),
             bond: number('bond'),
             bonus: number('bonus'),
@@ -508,6 +502,7 @@ export const hydrateSave = (candidate) => {
     const sourceVersion = Number.isFinite(parsedVersion) ? parsedVersion : 1;
     // Copy the input: hydration must never mutate an imported save.
     candidate = JSON.parse(JSON.stringify(candidate));
+    migrateFactionTags(candidate);
     // Preserve progress in careers saved before the tutorial map-step rename.
     for (const quest of Array.isArray(candidate.quests) ? candidate.quests : [])
         if (quest?.id === 'the-spare-key' && quest.stepId === 'plot-meridian') quest.stepId = 'galaxy-map';
@@ -562,7 +557,7 @@ export const hydrateSave = (candidate) => {
                 ? candidate.player.stationPadIndex
                 : 0,
             cargo: normalizeCargo(candidate.player?.cargo),
-            reputation: { ...fallback.player.reputation, ...(candidate.player?.reputation ?? {}) },
+            reputation: migrateFactionReputation(candidate.player?.reputation,fallback.player.reputation),
             guildRep: { ...fallback.player.guildRep, ...(candidate.player?.guildRep ?? {}) },
             guildRank: { ...fallback.player.guildRank, ...(candidate.player?.guildRank ?? {}) },
             stats: { ...fallback.player.stats, ...(candidate.player?.stats ?? {}) },

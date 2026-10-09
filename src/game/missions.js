@@ -1,3 +1,5 @@
+import {planRoute,SYSTEMS} from './galaxy.js';
+import {careerCombatHull} from './careerDanger.js';
 import { createMissionOfferRefresher } from './missionOfferRefresh.js';
 import { COMMODITIES, DOCK_LOCATION_IDS, GUILD_RANK_NAMES, LOCATIONS, MISSION_LOCATION_IDS, commodityIds, routeDistanceBetween } from './data.js';
 import { generateWreckNodes, miningClaimCandidates, miningClaimName } from './missionWorldData.js';
@@ -9,6 +11,13 @@ import { RACE_COURSES, raceBriefingLine, raceOffersForLocation, raceCourseUnlock
 import { LOCAL_CONTRACT_CHAIN_IDS, findNextLocalContractStage, localContractToMissionOffer } from './localContracts.js';
 import { tutorialContentUnlocked } from './tutorialCampaign.js';
 import { recordSortieCredit, recordSortieMission } from './careerMetrics.js';
+export function contractRegionDanger(originId, destinationId) {
+    const origin=LOCATIONS[originId], destination=LOCATIONS[destinationId];
+    if (!origin || !destination) return 0;
+    const route=planRoute(origin.systemId,destination.systemId);
+    return Math.max(origin.security.danger,destination.security.danger,
+        ...(route?.systemPath ?? []).map(id => SYSTEMS[id].security.danger));
+}
 const GUILD_NAMES_FALLBACK = (guild) => guild === 'merchant' ? 'Merchant Guild' : guild === 'bounty' ? 'Bounty Registry' : guild === 'mining' ? 'Prospectors Guild' : guild === 'syndicate' ? 'Red Talon Syndicate' : 'Salvage Union';
 const merchantIssuers = ['Kestrel Freight', 'Orison Combine', 'Free Haulers Desk', 'Sable Route Logistics', 'Guild Dispatch'];
 const bountyIssuers = ['Concord Warrant Desk', 'Frontier Security Office', 'Bounty Hunters Registry', 'Civil Claims Bureau'];
@@ -210,7 +219,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             unlockLabel,
             guild: 'merchant',
             guildRep: 4 + raceCourse.tier,
-            faction: 'free-merchants',
+            faction: 'independents',
             // Entry fee + payout ladder go through t() so the German board
             // stops appending an English sentence with EN ordinals; the rank
             // list itself is language-neutral ("1: 4200").
@@ -228,7 +237,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
     }
     if (!LOCATIONS[locationId].services?.missions)
         return withAuthoredLocalOffer(offers, locationId, save);
-    const dangerBase = clamp(save.world.danger, 0.2, 3.5);
+    const dangerBase = clamp(save.world.danger, 0.2, 3.5) * .35;
     const claimedNodeIds = new Set();
     const postedSalvageNodeIds = new Set();
     const activeSalvageNodeIds = new Set(save.activeMissions
@@ -244,7 +253,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             // the station you're standing at" and the encounter can never
             // trigger, because the spawn check sits inside the approach path.
             const targetZone = pick(rng, DOCK_LOCATION_IDS.filter((id) => id !== locationId));
-            const danger = dangerBase + randomBetween(rng, 0.35, 1.4) + rank * 0.25;
+            const danger = dangerBase + LOCATIONS[targetZone].security.danger * 1.6 + randomBetween(rng, 0.35, 1.4) + rank * 0.25;
             const targetName = proceduralCallsign(rng);
             const reward = bountyReward(danger, rank, targetZone);
             const deposit = Math.round(reward * 0.05);
@@ -262,7 +271,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
                 : danger + rankEdge >= 1.3 ? 'veteran'
                 : rng() < 0.05 + rank * 0.08 ? 'veteran'
                 : undefined;
-            const pilot = rollPilot(rng, clamp(0.35 + (danger + rankEdge) * 0.3, 0.2, 1), 'red-talons', pinnedTier ? { tier: pinnedTier } : undefined);
+            const pilot = rollPilot(rng, clamp(0.35 + (danger + rankEdge) * 0.3, 0.2, 1), 'pirates', pinnedTier ? { tier: pinnedTier } : undefined);
             // The profile rides in the briefing so players can read a warrant's
             // habits before they accept: the callsign, its tier, and its
             // temperament are stable for the whole contract.
@@ -281,6 +290,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
                 deposit,
                 danger,
                 pilot,
+                hullId:careerCombatHull('pirates','bounty',LOCATIONS[targetZone].security,rng),
                 deadline: save.world.time + randomInt(rng, 300, 620),
                 status: 'offered',
                 guild: 'bounty',
@@ -305,7 +315,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             const distance = routeDistanceBetween(locationId, destination);
             const quantity = randomInt(rng, 3, 8);
             const rank = save.player.guildRank.syndicate ?? 0;
-            const danger = dangerBase + randomBetween(rng, 0.3, 1.1);
+            const danger = dangerBase + contractRegionDanger(locationId,destination) * 1.6 + randomBetween(rng, 0.3, 1.1);
             const reward = Math.round(contractReward(distance, quantity, danger, rank) * 1.3);
             offers.push({
                 id,
@@ -322,7 +332,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
                 status: 'offered',
                 guild: 'syndicate',
                 guildRep: 8 + Math.floor(distance / 160) + Math.floor(quantity / 2),
-                faction: 'red-talons',
+                faction: 'pirates',
                 briefing: t('{quantity} units of {commodity} that the manifest cannot show. Collect the sealed crate, run dark, and deliver to {station}. A patrol that resolves you seizes the crate and fines you — stay off the cordon.', { quantity, commodity: t(COMMODITIES[commodity].name), station: LOCATIONS[destination].name }),
             });
             continue;
@@ -357,7 +367,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
                     status: 'offered',
                     guild: 'mining',
                     guildRep: 6 + Math.floor(quantity / 3) + (save.player.guildRank.mining >= 1 ? 1 : 0),
-                    faction: 'frontier-miners',
+                    faction: 'independents',
                     briefing: t('{station} holds the papers on the {claim} in the Shardbelt. Cut the whole seam — {quantity} units — and deliver it back. No deadline: the claim is yours until it runs dry. Bought ore won\'t clear the manifest.', { station: LOCATIONS[locationId].name, claim: t(claimName), quantity }),
                 });
                 continue;
@@ -372,7 +382,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
         const destination = chooseDestination(rng, locationId);
         const distance = routeDistanceBetween(locationId, destination);
         const rank = save.player.guildRank.merchant;
-        const danger = dangerBase + randomBetween(rng, 0.05, 0.8);
+        const danger = dangerBase + contractRegionDanger(locationId,destination) * 1.6 + randomBetween(rng, 0.05, 0.8);
         const quantity = kind === 'transport' ? randomInt(rng, 2, 5) : randomInt(rng, 3, Math.min(10, 6 + rank * 2));
         const commodity = kind === 'transport' ? undefined : chooseCommodity(rng);
         const reward = contractReward(distance, quantity, danger, rank) * (kind === 'transport' ? 1.15 : 1);
@@ -396,6 +406,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             cargoLabel,
             quantity,
             reward: Math.round(reward),
+            danger,
             deposit,
             // Express runs pay a premium (1.15x reward, +3 guild rep) but the
             // client is buying urgency: the clock is only ~60% of a delivery's,
@@ -426,7 +437,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
         if (target) {
             postedSalvageNodeIds.add(target.id);
             const rank = save.player.guildRank.salvage ?? 0;
-            const danger = dangerBase + randomBetween(rng, 0.2, 0.9);
+            const danger = dangerBase + LOCATIONS['mourning-line'].security.danger * 1.6 + randomBetween(rng, 0.2, 0.9);
             const quantity = randomInt(rng, 1, Math.min(salvageUnitsRemaining(target.remaining), 2 + rank));
             const reward = salvageReward(quantity, target.salvage, danger, rank);
             offers.push({
@@ -451,7 +462,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
                 status: 'offered',
                 guild: 'salvage',
                 guildRep: 7 + Math.floor(quantity / 2) + rank,
-                faction: 'salvage-union',
+                faction: 'independents',
                 briefing: t('Recover {quantity} units of {commodity} from {wreck} in the Mourning Line and bring them back to {station}. Only components cut from that deposit count; market cargo cannot clear the claim.', { quantity, commodity: t(COMMODITIES[target.salvage].name), wreck: target.name, station: LOCATIONS[locationId].name }),
             });
         }
@@ -704,7 +715,7 @@ export const completeBountyMission = (save, missionId) => {
         save.player.guildRep.bounty += ACE_WARRANT_REP;
     save.player.guildRep.bounty += 2;
     const message = awardMission(save, mission);
-    save.player.reputation['red-talons'] = clamp(save.player.reputation['red-talons'] - 4, -100, 100);
+    save.player.reputation['pirates'] = clamp(save.player.reputation['pirates'] - 4, -100, 100);
     return {
         ok: true,
         message: aceKill ? `${message} ${t('Ace warrant confirmed — {rep} registry rep.', { rep: ACE_WARRANT_REP })}` : message,

@@ -115,7 +115,7 @@ test('beam damages the first hull only, respects obstacles and has bounded reusa
 test('explosions hit the direct victim once, include the player and stop at a wall',()=>{
  for(const wall of [false,true]){
   const s=session();s.save.player.position=[15,0,-20];
-  const target={id:'target',role:'pirate',faction:'red-talons',hull:100,position:[0,0,-20],rotation:[0,0,0,1]};
+  const target={id:'target',hullId:'talon',variant:'talon',role:'pirate',faction:'pirates',hull:100,position:[0,0,-20],rotation:[0,0,0,1]};
   const bystander={...target,id:'behind',position:[-15,0,-20]};s.ships=[target,bystander];
   if(wall)s.obstacles=[{id:'wall',x:-10,y:0,z:-20,radius:5,losRadius:5}];
   const damage=new Map();s.damageShip=(ship,n)=>damage.set(ship.id,(damage.get(ship.id)??0)+n);s.damagePlayer=n=>damage.set('player',(damage.get('player')??0)+n);
@@ -131,7 +131,7 @@ test('enemy fittings obey mounts and finite missiles need a continuous lock and 
   fit.guns.forEach((id,index)=>assert.ok(itemFitsMount(OUTFIT_ITEMS[id],HULL_HARDPOINTS[fit.hullId].guns[index])));
  }
  const s=session(),ship=s.spawnShip('pirate',[0,0,180],undefined,undefined,{tier:'ace',temperament:'steady'});
- ship.rotation=[0,0,0,1];ship.targetId='player';ship.combatFit=createEnemyLoadout(ship,0);ship.combatFit.missiles=1;
+ ship.rotation=[0,0,0,1];ship.targetId='player';ship.combatFit=createEnemyLoadout(ship,0);ship.combatFit.missiles=1;ship.combatFit.racks?.forEach(r=>r.missiles=1);
  for(let i=0;i<90;i++){s.save.world.time=i/60;s.updateNpcOrdnance(ship,new THREE.Vector3(),1/60);}
  assert.equal(s.projectiles.length,0);assert.equal(ship.combatFit.warned,true);
  s.obstacles=[{x:0,y:0,z:90,radius:20,losRadius:20}];s.updateNpcOrdnance(ship,new THREE.Vector3(),1/60);assert.equal(ship.combatFit.lock,0);assert.equal(ship.combatFit.warned,false);s.obstacles=[];
@@ -141,7 +141,7 @@ test('enemy fittings obey mounts and finite missiles need a continuous lock and 
 test('novices lock slowly and every subsequent missile requires a fresh warned lock',()=>{
  for(const tier of ['novice','veteran','ace']){
   const s=session(),ship=s.spawnShip('pirate',[0,0,180],undefined,undefined,{tier,temperament:'steady'});
-  ship.rotation=[0,0,0,1];ship.targetId='player';ship.combatFit=createEnemyLoadout(ship,0);ship.combatFit.missiles=2;
+  ship.rotation=[0,0,0,1];ship.targetId='player';ship.combatFit=createEnemyLoadout(ship,0);ship.combatFit.missiles=2;ship.combatFit.racks?.forEach(r=>r.missiles=2);
   const warnings=[],launches=[];s.setOwnMonitorStatus=()=>warnings.push(s.save.world.time);
   for(let i=0;i<2400;i++){
    s.save.world.time=i/60;const before=s.projectiles.length;

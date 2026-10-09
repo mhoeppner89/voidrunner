@@ -1,3 +1,4 @@
+import {FLEET_TURRET_CLEARANCE} from './fleetTurretClearance.js';
 import {FRIGATE_CLEARANCE} from './frigateMounts.js';
 import { combatTargetEligible } from './combatTargeting.js';
 import { disruptionFactor } from './weaponDamage.js';
@@ -33,7 +34,7 @@ export function clearTurretArc(actor,mount,extents,point,state) {
             || Math.abs(local.y)>distance*Math.cos(FRIGATE_POLAR_BLIND_HALF_ANGLE)) return false;
     }
     const forward=mount.forwardCone && -local.z>local.length()*Math.cos(mount.forwardCone*Math.PI/180);
-    if(local.getComponent(mount.axis??1)*mount.side < -1e-6 && !forward)return false;
+    if((mount.normal ? local.x*mount.normal[0]+local.y*mount.normal[1]+local.z*mount.normal[2] : local.getComponent(mount.axis??1)*mount.side) < -1e-6 && !forward)return false;
     const ray=state.scratch.set(local.x-mount.position[0]*extents[0],local.y-mount.position[1]*extents[1],local.z-mount.position[2]*extents[2]);
     const az=Math.atan2(ray.x,-ray.z)*180/Math.PI,el=Math.atan2(ray.y,Math.hypot(ray.x,ray.z))*180/Math.PI;
     if(state.clearance){
@@ -84,14 +85,17 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
         const pdcWeapon=frigate?FRIGATE_PDC_TURRET:PDC_TURRET;
         const state=actor.turretRuntime[index]??= {position:new THREE.Vector3(),normal:new THREE.Vector3(),direction:new THREE.Vector3(),goal:new THREE.Vector3(),scratch:new THREE.Vector3(),desired:new THREE.Vector3(),q:new THREE.Quaternion(),turn:new THREE.Quaternion(),inverse:new THREE.Quaternion(),local:new THREE.Vector3(),fireAt:0};
         if(state.itemId!==item.id){state.itemId=item.id;state.burstRemaining=0;state.interceptAt=0;}
-        state.clearance=hullId==='concord-frigate'?FRIGATE_CLEARANCE[index]:TURRET_CLEARANCE[hullId]?.[index];
+        state.clearance=hullId==='concord-frigate'?FRIGATE_CLEARANCE[index]:(FLEET_TURRET_CLEARANCE[hullId]??TURRET_CLEARANCE[hullId])?.[index];
         state.muzzle??=new THREE.Vector3();state.lead??=new THREE.Vector3();
         state.targetPosition??=[0,0,0];state.targetVelocity??=[0,0,0];
         state.phase??=Array.from(ownerId).reduce((hash,c)=>(hash*31+c.charCodeAt(0))>>>0, index+1)%628/100;
         state.q.fromArray(actor.rotation);state.inverse.copy(state.q).invert();
         state.position.set(...mount.position).multiply(state.scratch.fromArray(extents)).applyQuaternion(state.q).add(state.scratch.fromArray(actor.position));
-        state.normal.set(0,0,0).setComponent(mount.axis??1,mount.side).applyQuaternion(state.q);
-        if(state.direction.lengthSq()<0.1)state.direction.copy(state.normal);
+        if(mount.normal)state.normal.fromArray(mount.normal).applyQuaternion(state.q);else state.normal.set(0,0,0).setComponent(mount.axis??1,mount.side).applyQuaternion(state.q);
+        if(state.direction.lengthSq()<0.1) {
+            if(mount.restDirection)state.direction.fromArray(mount.restDirection).applyQuaternion(state.q);
+            else state.direction.copy(state.normal);
+        }
         const disabled=actor.turretsHeld || actor.dockedAt || (player && session.autopilot);
         state.status=disabled?'TURRETS HOLD FIRE':'TURRETS READY';
         let target,point,intercept=false;

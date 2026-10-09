@@ -6,7 +6,7 @@ export const LEAGUE_HULLS = {
     "variant": "speedster",
     "className": "Courier Interceptor",
     "personality": "Fast courier and scout",
-    "description": "Fast courier and scout. Built for the Frontier League; available in Acheron.",
+    "description": "Fast courier and scout. Built for the Alliance; available in Acheron.",
     "price": 20000,
     "maxSpeed": 84,
     "afterburnSpeed": 140,
@@ -20,7 +20,7 @@ export const LEAGUE_HULLS = {
     "cargo": 12,
     "fuel": 90,
     "gunDamage": 12,
-    "requiredFaction": "frontier-league",
+    "requiredFaction": "alliance",
     "requiredReputation": 0,
     "tier": 1,
     "role": "interceptor",
@@ -32,9 +32,9 @@ export const LEAGUE_HULLS = {
     "id": "legionary",
     "name": "Legionary",
     "variant": "legionary",
-    "className": "League Line Fighter",
+    "className": "Alliance Line Fighter",
     "personality": "Agile frontline fighter",
-    "description": "Agile frontline fighter. Built for the Frontier League; available in Acheron.",
+    "description": "Agile frontline fighter. Built for the Alliance; available in Acheron.",
     "price": 45000,
     "maxSpeed": 67,
     "afterburnSpeed": 110,
@@ -48,7 +48,7 @@ export const LEAGUE_HULLS = {
     "cargo": 20,
     "fuel": 115,
     "gunDamage": 12,
-    "requiredFaction": "frontier-league",
+    "requiredFaction": "alliance",
     "requiredReputation": 0,
     "tier": 2,
     "role": "fighter",
@@ -62,7 +62,7 @@ export const LEAGUE_HULLS = {
     "variant": "andromeda",
     "className": "Heavy Strike Fighter",
     "personality": "Torpedo bomber and heavy striker",
-    "description": "Torpedo bomber and heavy striker. Built for the Frontier League; available in Acheron.",
+    "description": "Torpedo bomber and heavy striker. Built for the Alliance; available in Acheron.",
     "price": 48000,
     "maxSpeed": 56,
     "afterburnSpeed": 90,
@@ -76,7 +76,7 @@ export const LEAGUE_HULLS = {
     "cargo": 24,
     "fuel": 135,
     "gunDamage": 12,
-    "requiredFaction": "frontier-league",
+    "requiredFaction": "alliance",
     "requiredReputation": 0,
     "tier": 2,
     "role": "bomber",
@@ -104,7 +104,7 @@ export const LEAGUE_HULLS = {
     "cargo": 64,
     "fuel": 165,
     "gunDamage": 12,
-    "requiredFaction": "frontier-league",
+    "requiredFaction": "alliance",
     "requiredReputation": 0,
     "tier": 2,
     "role": "allrounder",
@@ -132,7 +132,7 @@ export const LEAGUE_HULLS = {
     "cargo": 88,
     "fuel": 180,
     "gunDamage": 12,
-    "requiredFaction": "frontier-league",
+    "requiredFaction": "alliance",
     "requiredReputation": 0,
     "tier": 3,
     "role": "allrounder"
@@ -182,11 +182,11 @@ export const LEAGUE_FITS = {
     "launcher": "seeker-launcher"
   }
 };
-export const LEAGUE_ID = "frontier-league";
-export const factionsOpposed = (a,b) => Boolean(a && b && a !== b && (a === "red-talons" || b === "red-talons" || a === LEAGUE_ID && b === "concord" || a === "concord" && b === LEAGUE_ID));
+export const LEAGUE_ID = "alliance";
+export {factionsOpposed} from './factions.js';
 // Spillover follows remote locations, never the protected starting docks.
 export function leagueTrafficChance(systemId, locationId) {
  if(systemId === "acheron") return 1;
  if(systemId === "pale-ring") return locationId === "nacre" ? .15 : .35;
- return systemId === "helios-verge" && ["cairn","mourning-line"].includes(locationId) ? .15 : 0;
+ return systemId === "helios-verge" && ["cairn","mourning-line"].includes(locationId) ? .03 : 0;
 }

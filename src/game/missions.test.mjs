@@ -37,7 +37,7 @@ const fixture = (overrides = {}) => ({
     status: 'offered',
     guild: 'merchant',
     guildRep: 6,
-    faction: 'free-merchants',
+    faction: 'independents',
     ...overrides,
 });
 
@@ -93,7 +93,7 @@ const projection = (offers) => offers.map((offer) => ({
     const smuggle = denOffers.find((offer) => offer.kind === 'smuggle');
     assert.ok(smuggle, 'the den board opens restricted runs at the favor threshold');
     assert.equal(smuggle.guild, 'syndicate');
-    assert.equal(smuggle.faction, 'red-talons');
+    assert.equal(smuggle.faction, 'pirates');
     assert.equal(smuggle.destination === 'rook', false, 'dark runs avoid the patrol bastion');
 
     const unchanged = JSON.stringify(first.world.offers.helix);
@@ -169,7 +169,7 @@ const projection = (offers) => offers.map((offer) => ({
     const save = fresh(206);
     const offer = postOffer(save, 'helix', fixture({ id: 'helix-0-0-discard' }));
     save.player.guildRep.merchant = 12;
-    save.player.reputation['free-merchants'] = 20;
+    save.player.reputation['independents'] = 20;
     const startingCredits = save.player.credits;
     assert.equal(acceptMission(save, 'helix', offer.id).ok, true);
     assert.equal(save.player.sealedCargo.some((cargo) => cargo.missionId === offer.id), true);
@@ -182,7 +182,7 @@ const projection = (offers) => offers.map((offer) => ({
     assert.equal(save.player.sealedCargo.some((cargo) => cargo.missionId === offer.id), false);
     assert.equal(save.player.credits, creditsAfterBond, 'discarding does not return or charge the bond again');
     assert.equal(save.player.guildRep.merchant, 9);
-    assert.equal(save.player.reputation['free-merchants'], 17);
+    assert.equal(save.player.reputation['independents'], 17);
     assert.equal(save.world.failedMissionIds.includes(offer.id), true);
     const settlement = save.world.missionSettlements.at(-1);
     assert.equal(settlement.id, offer.id);
@@ -257,7 +257,7 @@ const projection = (offers) => offers.map((offer) => ({
             commodity: 'medicine',
             quantity: 2,
             guild: 'merchant',
-            faction: 'free-merchants',
+            faction: 'independents',
             guildRep: 20,
             reward: 1200,
             deposit: 150,
@@ -269,7 +269,7 @@ const projection = (offers) => offers.map((offer) => ({
             commodity: undefined,
             quantity: 3,
             guild: 'merchant',
-            faction: 'free-merchants',
+            faction: 'independents',
             guildRep: 6,
             reward: 1800,
             deposit: 210,
@@ -279,6 +279,7 @@ const projection = (offers) => offers.map((offer) => ({
         const save = fresh(210 + index);
         const offer = postOffer(save, 'helix', fixture(fields));
         const startingCredits = save.player.credits;
+        const startingCargoMass = cargoMass(save.player);
         const accepted = acceptMission(save, 'helix', offer.id);
         assert.equal(accepted.ok, true, `${fields.kind} accepts`);
         assert.equal(save.player.credits, startingCredits - fields.deposit);
@@ -290,7 +291,7 @@ const projection = (offers) => offers.map((offer) => ({
         assert.equal(save.player.sealedCargo[0].units, fields.quantity);
         assert.equal(save.player.sealedCargo[0].mass, 1);
         assert.equal(Boolean(save.player.sealedCargo[0].smuggled), false);
-        assert.equal(cargoMass(save.player), fields.quantity * (1));
+        assert.equal(cargoMass(save.player), startingCargoMass + fields.quantity);
 
         assert.deepEqual(completeMissionsAtDock(save, 'helix'), []);
         assert.equal(save.activeMissions.length, 1);
@@ -305,7 +306,7 @@ const projection = (offers) => offers.map((offer) => ({
         assert.deepEqual(save.world.completedMissionIds, [fields.id]);
         assert.equal(save.player.stats.contracts, 1);
         assert.equal(save.player.guildRep.merchant, fields.guildRep);
-        assert.equal(save.player.reputation['free-merchants'], 4 + Math.max(1, Math.floor(fields.guildRep / 3)));
+        assert.equal(save.player.reputation['independents'], 4 + Math.max(1, Math.floor(fields.guildRep / 3)));
         const settlement = save.world.missionSettlements.at(-1);
         assert.deepEqual({
             id: settlement?.id,
@@ -349,7 +350,7 @@ const projection = (offers) => offers.map((offer) => ({
     assert.equal(save.activeMissions.length, 0);
     assert.deepEqual(save.world.completedMissionIds, [offer.id]);
     assert.equal(save.player.guildRep.syndicate, offer.guildRep);
-    assert.equal(save.player.reputation['red-talons'], -12 + Math.max(1, Math.floor(offer.guildRep / 3)));
+    assert.equal(save.player.reputation['pirates'], -12 + Math.max(1, Math.floor(offer.guildRep / 3)));
 }
 
 // Procurement is retained only as a legacy completion branch. Acceptance does
@@ -407,7 +408,7 @@ const projection = (offers) => offers.map((offer) => ({
     assert.equal(save.player.stats.contracts, 1);
     assert.deepEqual(save.world.completedMissionIds, [active.id]);
     assert.equal(save.player.guildRep.mining, active.guildRep);
-    assert.equal(save.player.reputation['frontier-miners'], Math.max(1, Math.floor(active.guildRep / 3)));
+    assert.equal(save.player.reputation['independents'], 4 + Math.max(1, Math.floor(active.guildRep / 3)));
 }
 
 // Bounty completion records the named kill and pinned pilot profile, awards
@@ -430,7 +431,7 @@ const projection = (offers) => offers.map((offer) => ({
         deposit: 130,
         guild: 'bounty',
         guildRep: 8,
-        faction: 'red-talons',
+        faction: 'pirates',
     }));
     const startingCredits = save.player.credits;
     assert.equal(acceptMission(save, 'helix', offer.id).ok, true);
@@ -454,7 +455,7 @@ const projection = (offers) => offers.map((offer) => ({
     });
     assert.equal(save.player.guildRep.bounty, 20, 'ace bonus + kill rep + contract rep reaches Deputy');
     assert.equal(save.player.guildRank.bounty, 1);
-    assert.equal(save.player.reputation['red-talons'], -14, 'award rep is followed by the kill penalty');
+    assert.equal(save.player.reputation['pirates'], -14, 'award rep is followed by the kill penalty');
 }
 
 // Expiry removes active contracts and their sealed cargo, records only the ID,
@@ -466,7 +467,7 @@ const projection = (offers) => offers.map((offer) => ({
         id: 'helix-0-0-expired',
         deadline: 10,
         guildRep: 20,
-        faction: 'free-merchants',
+        faction: 'independents',
     }));
     const startingCredits = save.player.credits;
     assert.equal(acceptMission(save, 'helix', offer.id).ok, true);
@@ -479,7 +480,7 @@ const projection = (offers) => offers.map((offer) => ({
     assert.equal(save.player.sealedCargo.length, 0);
     assert.deepEqual(save.world.failedMissionIds, [offer.id]);
     assert.equal(save.player.guildRep.merchant, 0, 'failure standing is clamped at zero');
-    assert.equal(save.player.reputation['free-merchants'], 1);
+    assert.equal(save.player.reputation['independents'], 1);
     assert.equal(save.player.stats.contracts, 0);
     assert.deepEqual(save.world.missionSettlements.map(({ id, title, issuer, outcome, guild, faction, reward, bond, bonus, total, repDelta, factionDelta, at }) => ({
         id, title, issuer, outcome, guild, faction, reward, bond, bonus, total, repDelta, factionDelta, at,
@@ -559,14 +560,14 @@ const projection = (offers) => offers.map((offer) => ({
     const salvage = fresh(272);
     salvage.player.credits = guildJoinCost('salvage');
     assert.equal(joinGuild(salvage, 'salvage').ok, true);
-    assert.equal(awardCareerProgress(salvage, 'salvage', 19, 'salvage-union') !== undefined, true);
+    assert.equal(awardCareerProgress(salvage, 'salvage', 19, 'independents') !== undefined, true);
     assert.equal(salvage.player.guildRep.salvage, 20);
     assert.equal(salvage.player.guildRank.salvage, 1);
-    assert.equal(salvage.player.reputation['salvage-union'], 4);
+    assert.equal(salvage.player.reputation['independents'], 8);
     const generatedSalvage = generateMissionOffers('rook', salvage).find((offer) => offer.kind === 'salvage');
     assert.ok(generatedSalvage, 'Helios mission boards post a salvage recovery job');
     assert.equal(generatedSalvage.guild, 'salvage');
-    assert.equal(generatedSalvage.faction, 'salvage-union');
+    assert.equal(generatedSalvage.faction, 'independents');
     assert.equal(generatedSalvage.targetZone, 'mourning-line');
     assert.equal(typeof generatedSalvage.targetNodeId, 'string');
     assert.equal(typeof generatedSalvage.targetName, 'string');
@@ -618,7 +619,7 @@ const projection = (offers) => offers.map((offer) => ({
     assert.deepEqual(salvage.world.completedMissionIds, [activeSalvage.id]);
     assert.equal(salvage.player.stats.contracts, 1);
     assert.equal(salvage.player.guildRep.salvage, 20 + activeSalvage.guildRep);
-    assert.equal(salvage.player.reputation['salvage-union'], 4 + Math.max(1, Math.floor(activeSalvage.guildRep / 3)));
+    assert.equal(salvage.player.reputation['independents'], 8 + Math.max(1, Math.floor(activeSalvage.guildRep / 3)));
 
     const expired = fresh(273);
     const expiredOffer = postOffer(expired, 'rook', generateMissionOffers('rook', expired).find((offer) => offer.kind === 'salvage'));
@@ -629,7 +630,7 @@ const projection = (offers) => offers.map((offer) => ({
     assert.equal(expired.player.credits, expiredCredits - expiredOffer.deposit, 'an expired salvage bond is kept');
     assert.equal(expired.activeMissions.length, 0);
     assert.deepEqual(expired.world.failedMissionIds, [expiredOffer.id]);
-    assert.equal(expired.player.reputation['salvage-union'], -3);
+    assert.equal(expired.player.reputation['independents'], 1);
 
     const fractional = fresh(274);
     const fractionalOffer = generateMissionOffers('rook', fractional).find((offer) => offer.kind === 'salvage');

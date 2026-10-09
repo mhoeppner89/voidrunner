@@ -11,7 +11,7 @@ export function combatProfile(ship) {
     const variant = ship.variant;
     if (variant === 'lancer' || (!variant && ship.role === 'bounty')) return PROFILES.gunship;
     if (variant === 'kestrel' || (!variant && ship.role === 'escort')) return PROFILES.interceptor;
-    if (variant === 'talon' || variant === 'warden' || (!variant && (ship.role === 'pirate' || ship.role === 'patrol'))) return PROFILES.fighter;
+    if (variant === 'talon' || variant === 'scrapper' || variant === 'warden' || (!variant && (ship.role === 'pirate' || ship.role === 'patrol'))) return PROFILES.fighter;
     return undefined;
 }
 export function interceptTime(rx, ry, rz, vx, vy, vz, speed) {

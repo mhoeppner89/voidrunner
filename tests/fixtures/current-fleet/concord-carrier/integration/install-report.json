@@ -1,0 +1,28 @@
+{
+  "installedSha256": "d215c83fa4cb5fac9fdcb525b0ff27e947d692a0cf1c6917751cf98e612a479f",
+  "nativeSha256": "6150e9e31262feed83a550abbe79f23957aa5318f02b5854b9025ef72818187b",
+  "hullTriangles": 19490,
+  "armamentTriangles": 4488,
+  "totalTriangles": 23978,
+  "halfExtents": [
+    209.06460441489827,
+    119.7327401720047,
+    452.17793918001655
+  ],
+  "gameBounds": [
+    [
+      -418.12920882979654,
+      -269.8011575709386,
+      -904.3558783600331
+    ],
+    [
+      418.1292088297964,
+      233.30939062258005,
+      898.9405894837142
+    ]
+  ],
+  "mounts": 14,
+  "engines": 3,
+  "windows": 5767,
+  "gameplayStatsUnchanged": true
+}

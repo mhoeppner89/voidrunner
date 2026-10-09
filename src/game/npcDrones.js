@@ -1,3 +1,4 @@
+import {FLEET_EQUIPMENT,droneDock} from './fleetEquipmentData.js';
 import {DRONE_PORTS} from './droneFlight.js';
 import * as THREE from 'three';
 import {createPdcDroneController,destroyPdcDrone} from './dronePdc.js';
@@ -73,10 +74,10 @@ export function updateNpcDrones(session,dt){
    if(unit.rotation){unit.prevRotation??=[...unit.rotation];for(let k=0;k<4;k++)unit.prevRotation[k]=unit.rotation[k];}
    for(const kind of anchorKinds){
     const anchor=kind==='escort'?c.escortAnchors[id]:c.bayAnchors[id][kind];s.v.set(0,0,0);
-    const port=DRONE_PORTS[ship.combatFit.hullId]?.[i];
-    if(port)s.p.fromArray(port).multiplyScalar(ext[2]/(({wayfarer:6.09,prospector:6.7,torsas:8,astra:6.4}[ship.combatFit.hullId]??6.7)));
+    const port=droneDock(ship.combatFit.hullId,unit.type,i)?.position??DRONE_PORTS[ship.combatFit.hullId]?.[i];
+    if(port)s.p.fromArray(port).multiplyScalar(ext[2]/(FLEET_EQUIPMENT[ship.combatFit.hullId]?.extents[2]??6.7));
     else s.p.set(0,-ext[1],0);
-    s.p.y+=kind==='launch'?-3.5:1;
+    s.p.y+=kind==='launch'?-3.5:0;
     if(kind==='escort'){
      const turret=TURRET_LAYOUTS[ship.combatFit.hullId]?.[0],escortDistance=DRONE_TYPES[fleet.unitsById[id]?.type]?.escortDistance??type.escortDistance;
      s.p.set(0,-(turret?.side??1)*(ext[1]+escortDistance),(turret?.position[2]??0)*ext[2]);

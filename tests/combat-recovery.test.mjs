@@ -13,8 +13,8 @@ import {updateShipAI} from '../src/game/shipAI.js';
 
 const zero=new THREE.Vector3(),forward=new THREE.Vector3(0,0,-1);
 function setup(tier='veteran',role='pirate'){
- const s=fixture(),ship=s.spawnShip(role,[0,0,180],undefined,undefined,{tier,temperament:'steady'});
- ship.combatFit=createEnemyLoadout(ship,3);ship.combatFit.missiles=0;ship.combatFit.turrets=[];
+ const s=fixture(),ship=s.spawnShip(role,[0,0,180],undefined,undefined,{tier,temperament:'steady'},{hullId:role==='bounty'?'lancer':'talon'});
+ ship.combatFit=createEnemyLoadout(ship,3,'beam');ship.combatFit.missiles=0;ship.combatFit.racks?.forEach(r=>r.missiles=0);ship.combatFit.turrets=[];
  ship.rotation=[0,1,0,0];ship.velocity=[0,0,60];ship.shield=8;ship.shieldDelay=4.5;ship.targetId='player';ship.noSurrender=true;
  s.npcFlightStats(ship);return {s,ship};
 }
@@ -64,6 +64,9 @@ test('recovery limits stop a pursued ace repeating unsuccessful escapes indefini
 });
 test('a slower hull can seek real cover; losing sight does not cancel recovery or reveal hidden movement',()=>{
  const {s,ship}=setup('veteran','bounty');s.save.player.shipId='talon';
+ // Bounty fittings currently carry an extreme speed bonus; pin this fixture
+ // below the target so it exercises the cover route instead of range withdrawal.
+ ship.combatFit.stats.maxSpeed=30;ship.combatFit.stats.afterburnSpeed=45;
  s.obstacles=[{id:'cover',x:120,y:0,z:160,radius:60,collisionRadius:60,losRadius:60}];
  const r=plan(s,ship).recovery;assert.equal(r.active,true);assert.equal(r.mode,'cover');
  assert.equal(s.lineBlocked(zero,r.cover),true);const seen=r.targetPosition.toArray();
@@ -88,7 +91,7 @@ test('under fire, slow coasting is rejected and a shield withdrawal cancels a dr
  ship.combatPlan={recovery:{active:true}};assert.equal(aceManeuver(ship,.2,180,1,0,240,true),undefined);
 });
 test('withdrawing NPC turrets conserve offensive energy but still intercept a missile',()=>{
- const s=session(),ship=s.spawnShip('escort',[0,0,0],undefined,undefined,{tier:'veteran'});
+ const s=session(),ship=s.spawnShip('escort',[0,0,0],undefined,undefined,{tier:'veteran'},{hullId:'wayfarer'});
  ship.rotation=[0,0,0,1];ship.velocity=[0,0,0];ship.hostile=true;ship.targetId='player';ship.combatFit.turrets=['pdc'];ship.combatPlan={recovery:{active:true}};
  s.save.player.position=[0,200,0];
  for(let i=0;i<90;i++){s.save.world.time=i/60;ship.energy=70;s.updateTurrets(ship,ship.id,1/60);}

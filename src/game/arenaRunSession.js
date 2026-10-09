@@ -17,7 +17,7 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 // faction opposes the arena's Red Talon opponents (so a wingman fights them and
 // can be shot at), while the hidden player actor is never a legal target for
 // it: neither guns nor missiles can pick the pilot up as a victim.
-const WINGMAN_FACTION='free-merchants';
+const WINGMAN_FACTION='independents';
 // Formation slots in the player's own frame — starboard, port, then astern —
 // as [right, up, back] multiples of the base offset.
 const WINGMAN_OFFSETS=[[-1,0.55,0.8],[1,0.55,0.8],[0,0.9,1.5]];
@@ -30,8 +30,8 @@ export const ArenaRunMethods={
  preloadRunWaveModels(){
   const r=this.save.arenaRun,wave=RUN_WAVES[r?.wave];if(!wave)return;
   const variants=new Set();
-  for(const [role] of wave.enemies){
-   const variant=role==='frigate'?'concord-frigate':shipVariantForRole(role);
+  for(const [role,,,,fit] of wave.enemies){
+   const variant=role==='frigate'?'concord-frigate':SHIPS[fit?.hullId]?.variant??shipVariantForRole(role);
    if(variant)variants.add(variant);
   }
   for(const wingman of (r.wingmen??[]).filter(entry=>entry.alive!==false)){
@@ -277,13 +277,13 @@ export const ArenaRunMethods={
    }
    if(!clear)return false;
    const ship=this.spawnCapitalShip('concord-frigate',point.toArray(),'rook',t('Arena frigate'));
-   equipFrigate(ship,true);ship.hostile=true;ship.targetId='player';ship.arenaRunEnemy=true;ship.noSurrender=true;ship.faction='red-talons';
+   equipFrigate(ship,true);ship.hostile=true;ship.targetId='player';ship.arenaRunEnemy=true;ship.noSurrender=true;ship.faction='pirates';
    delete ship.task;delete ship.capitalHome;ship.holdFire=false;ship.playerAwareness=1;
    ship.rotation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),origin.clone().sub(point).normalize()).toArray();
    this.selectTarget('ship',ship.id);this.ui.pushEvent(t('Frigate entering. Lure it into the rocks, then torpedo its rear engines. Select systems on the target monitor.'),'warning',6000);return true;
   }
-  const ship=this.spawnShip(role,point.toArray(),undefined,undefined,{tier:r.hard?(tier==='novice'?'veteran':tier==='veteran'?'ace':tier):tier});
-  ship.faction='red-talons';
+  const ship=this.spawnShip(role,point.toArray(),undefined,undefined,{tier:r.hard?(tier==='novice'?'veteran':tier==='veteran'?'ace':tier):tier},{faction:'pirates',hullId:ordnance?.hullId??(role==='bounty'?'lancer':undefined)});
+  ship.faction='pirates';
   ship.hostile=true;ship.targetId='player';ship.arenaRunEnemy=true;ship.noSurrender=true;ship.combatFit=createEnemyLoadout(ship,fitIndex,ordnance);
   ship.combatFit.launcher=ordnance?.launcher;ship.combatFit.missiles=ordnance?.missiles??0;
   if(r.wave===0&&!r.hard){ship.combatFit.guns=['beam-emitter',null,null];ship.combatFit.weapons=['beam'];ship.combatFit.attackOrder=[0];ship.combatFit.fireAt=[this.save.world.time+4];ship.combatFit.missiles=0;ship.combatFit.turrets=[];}

@@ -229,7 +229,7 @@ export function createMiningDroneSystem({ launchSeconds = 0.25, dockSeconds = 0.
                 }
             }
 
-            const landing = point?.rotation && (state === 'mining' || state === 'outbound' && Math.hypot(unit.position[0]-point.position[0],unit.position[1]-point.position[1],unit.position[2]-point.position[2])<3);
+            const landing = point?.rotation && (state === 'mining' || state === 'docking' || state === 'outbound' && Math.hypot(unit.position[0]-point.position[0],unit.position[1]-point.position[1],unit.position[2]-point.position[2])<3);
             if (landing) rotateDroneTo(unit,dt,point.rotation);
             else orientDrone(unit, dt, context.shipVelocity, point, state === 'launching' || state === 'docking');
             // No economic commit precedes the caller's collision/damage decision.

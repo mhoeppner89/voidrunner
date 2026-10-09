@@ -10,8 +10,8 @@ const ship = (id, faction, position, changes = {}) => ({
     maxHull: 100,
     shield: 100,
     maxShield: 100,
-    hostile: faction === 'red-talons',
-    role: faction === 'red-talons' ? 'pirate' : 'patrol',
+    hostile: faction === 'pirates',
+    role: faction === 'pirates' ? 'pirate' : 'patrol',
     ...changes,
 });
 
@@ -26,9 +26,9 @@ const fixture = (arena = { observer: true }) => {
     runtime.deferentialPilot = () => false;
     runtime.shipTracksPlayer = () => true;
     runtime.projectileCanHitShip = (projectile, target) => {
-        if (projectile.faction === 'red-talons')
-            return target.faction !== 'red-talons';
-        return target.faction === 'red-talons';
+        if (projectile.faction === 'pirates')
+            return target.faction !== 'pirates';
+        return target.faction === 'pirates';
     };
     return runtime;
 };
@@ -36,8 +36,8 @@ const fixture = (arena = { observer: true }) => {
 {
     const runtime = fixture();
     const blue = ship('blue-1', 'concord', [0, 0, 0], { observerTeam: 'blue', role: 'escort', hostile: false, targetId: 'red-dead' });
-    const redDead = ship('red-dead', 'red-talons', [0, 0, 10], { observerTeam: 'red', hull: 0 });
-    const redLive = ship('red-live', 'red-talons', [0, 0, 40], { observerTeam: 'red' });
+    const redDead = ship('red-dead', 'pirates', [0, 0, 10], { observerTeam: 'red', hull: 0 });
+    const redLive = ship('red-live', 'pirates', [0, 0, 40], { observerTeam: 'red' });
     runtime.ships = [blue, redDead, redLive];
     runtime.resolveShipTarget(blue);
     assert.equal(blue.targetId, 'red-live', 'observer ships retarget the nearest living opposing ship');
@@ -46,8 +46,8 @@ const fixture = (arena = { observer: true }) => {
 {
     const runtime = fixture();
     const blue = ship('blue-1', 'concord', [0, 0, 0], { observerTeam: 'blue', role: 'escort', hostile: false, targetId: 'red-current' });
-    const redCurrent = ship('red-current', 'red-talons', [0, 0, 15], { observerTeam: 'red' });
-    const redAttacker = ship('red-attacker', 'red-talons', [0, 0, 60], { observerTeam: 'red', targetId: blue.id });
+    const redCurrent = ship('red-current', 'pirates', [0, 0, 15], { observerTeam: 'red' });
+    const redAttacker = ship('red-attacker', 'pirates', [0, 0, 60], { observerTeam: 'red', targetId: blue.id });
     runtime.ships = [blue, redCurrent, redAttacker];
     runtime.resolveShipTarget(blue);
     assert.equal(blue.targetId, redAttacker.id, 'an active attacker outranks the previous observer lock');
@@ -56,8 +56,8 @@ const fixture = (arena = { observer: true }) => {
 {
     const runtime = fixture();
     const blue = ship('blue-1', 'concord', [0, 0, 0], { observerTeam: 'blue', role: 'escort', hostile: false, targetId: 'red-current', combatThreatId: 'red-threat', combatThreatUntil: 2 });
-    const redCurrent = ship('red-current', 'red-talons', [0, 0, 10], { observerTeam: 'red' });
-    const redThreat = ship('red-threat', 'red-talons', [0, 0, 80], { observerTeam: 'red' });
+    const redCurrent = ship('red-current', 'pirates', [0, 0, 10], { observerTeam: 'red' });
+    const redThreat = ship('red-threat', 'pirates', [0, 0, 80], { observerTeam: 'red' });
     runtime.ships = [blue, redCurrent, redThreat];
     runtime.resolveShipTarget(blue);
     assert.equal(blue.targetId, redThreat.id, 'a recent damage source has the highest target priority');
@@ -65,7 +65,7 @@ const fixture = (arena = { observer: true }) => {
 
 {
     const runtime = fixture(null);
-    const pirate = ship('pirate', 'red-talons', [0, 0, 0], { role: 'pirate', hostile: true });
+    const pirate = ship('pirate', 'pirates', [0, 0, 0], { role: 'pirate', hostile: true });
     const patrol = ship('patrol', 'concord', [0, 0, 40], { role: 'patrol', hostile: false });
     runtime.save.player.position = [0, 0, 100];
     runtime.ships = [pirate, patrol];
@@ -75,8 +75,8 @@ const fixture = (arena = { observer: true }) => {
 
 {
     const runtime = fixture(null);
-    const trader = ship('trader', 'free-merchants', [0, 0, 0], { role: 'trader', hostile: false });
-    const pirate = ship('pirate', 'red-talons', [0, 0, 40], { role: 'pirate', hostile: true, targetId: trader.id });
+    const trader = ship('trader', 'independents', [0, 0, 0], { role: 'trader', hostile: false });
+    const pirate = ship('pirate', 'pirates', [0, 0, 40], { role: 'pirate', hostile: true, targetId: trader.id });
     trader.combatThreatId = pirate.id;
     trader.combatThreatUntil = 2;
     runtime.ships = [trader, pirate];
@@ -87,7 +87,7 @@ const fixture = (arena = { observer: true }) => {
 {
     const runtime = fixture();
     const blue = ship('blue-1', 'concord', [0, 0, 0], { observerTeam: 'blue', role: 'escort', hostile: false, targetId: 'red-dead' });
-    const redDead = ship('red-dead', 'red-talons', [0, 0, 10], { observerTeam: 'red', hull: 0 });
+    const redDead = ship('red-dead', 'pirates', [0, 0, 10], { observerTeam: 'red', hull: 0 });
     runtime.ships = [blue, redDead];
     const target = runtime.resolveShipTarget(blue);
     assert.equal(target, undefined, 'observer ships do not fall back to the hidden player');
@@ -127,7 +127,7 @@ const fixture = (arena = { observer: true }) => {
     runtime.save = { world: { time: 6000 } };
     runtime.ships = [
         ship('blue-live', 'concord', [0, 0, 0], { observerTeam: 'blue' }),
-        ship('red-live', 'red-talons', [0, 0, 80], { observerTeam: 'red' }),
+        ship('red-live', 'pirates', [0, 0, 80], { observerTeam: 'red' }),
     ];
     runtime.updateObserverBattleState();
     assert.equal(runtime.observerResult, undefined, 'observer combat has no elapsed-time result while both sides survive');

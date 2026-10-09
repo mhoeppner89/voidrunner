@@ -767,7 +767,7 @@ export const createRaceRacers = (course, _seed, worldTime) => {
             name: definition.name,
             role: 'trader',
             variant: definition.variant,
-            faction: 'free-merchants',
+            faction: 'independents',
             // Race paint is renderer-only identity metadata. It makes the
             // named field readable against dark rocks without changing
             // faction, targeting, collision, or combat rules.

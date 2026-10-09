@@ -138,7 +138,7 @@ test('a hired wingman flies allied with role-fitting equipment and is lost for g
  s.arenaRunAction('wingman',r.wingmanOffers[0].id);const hired=r.wingmen[0];assert.ok(hired);
  s.startRunWave();s.tickArenaRun(3);
  const wing=s.ships.find(ship=>ship.arenaRunWingman);assert.ok(wing,'the wingman joins the wave');
- assert.equal(wing.arenaRunWingmanId,hired.id);assert.equal(wing.hostile,false);assert.equal(wing.faction,'free-merchants');assert.equal(wing.noSurrender,true);
+ assert.equal(wing.arenaRunWingmanId,hired.id);assert.equal(wing.hostile,false);assert.equal(wing.faction,'independents');assert.equal(wing.noSurrender,true);
  assert.equal(wing.pilot.tier,'veteran');assert.equal(wing.hullId,hired.hullId);assert.equal(wing.variant,SHIPS[hired.hullId].variant);
  assert.equal(wing.combatFit.hullId,hired.hullId);assert.ok(wing.shield>0&&wing.hull>0);
  assert.ok(wing.combatFit.weapons.length>0,'the hired veteran arrives armed');
@@ -149,7 +149,7 @@ test('a hired wingman flies allied with role-fitting equipment and is lost for g
  // own shots never clip the pilot.
  const enemy=s.ships.find(ship=>ship.arenaRunEnemy);
  assert.equal(s.projectileCanHitShip({ownerId:wing.id,faction:wing.faction,targetId:undefined},enemy),true,'the wingman can shoot the wave');
- assert.equal(s.projectileCanHitShip({ownerId:enemy.id,faction:'red-talons',targetId:undefined},wing),true,'opponents can shoot the wingman');
+ assert.equal(s.projectileCanHitShip({ownerId:enemy.id,faction:'pirates',targetId:undefined},wing),true,'opponents can shoot the wingman');
  assert.equal(s.projectileCanHitShip({ownerId:'player',faction:'player',targetId:undefined},wing),false,'the pilot cannot clip their own wingman');
  // Park the wave inside the aggressive gate first: outside it the doctrine has
  // the wingman hold station, which is covered by its own test below.

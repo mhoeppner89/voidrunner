@@ -12,6 +12,18 @@
 // Player address is informal "du" throughout, matching the frontier voice of
 // the English lines. Values are plain text — never HTML.
 export const DE_CATALOG = {
+    'Concord':'Concord', 'Alliance':'Allianz', 'Independents':'Unabhängige', 'Pirates':'Piraten',
+    'BOUNTY HUNTER':'KOPFGELDJÄGER', 'Independent guild':'Unabhängige Gilde',
+    'Strong local presence':'Stark vor Ort vertreten', 'Local presence':'Vor Ort vertreten', 'Preferred ships':'Bevorzugte Schiffe',
+
+    'Transport': 'Transporter',
+    'Twin-hull Interceptor': 'Doppelrumpf-Abfangjäger',
+    'Armored Medium Freighter': 'Gepanzerter mittlerer Frachter',
+    'Fast close-range interceptor': 'Schneller Abfangjäger für den Nahkampf',
+    'Protected convoy freighter': 'Geschützter Konvoifrachter',
+    'A compact twin-hull interceptor with four forward guns, seeker missiles and powerful paired engines.': 'Ein kompakter Doppelrumpf-Abfangjäger mit vier Frontwaffen, Suchraketen und zwei starken Triebwerken.',
+    'An armored transport with a substantial hold, three drives and two defensive PDC positions. Less cargo and industry capacity than Atlas.': 'Ein gepanzerter Transporter mit großem Frachtraum, drei Triebwerken und zwei PDC-Stellungen. Weniger Fracht- und Industriekapazität als die Atlas.',
+
   "Lure the frigate into the rocks to break its firing line. Approach the stern and aim shielded torpedoes at MAIN ENGINES, then disable turrets and shield generators. Torpedoes bypass shields but turn poorly. Watch battery charges and torpedo locks.": "Locke die Fregatte zwischen die Felsen, um ihre Schusslinie zu brechen. Greife von hinten an und richte geschützte Torpedos auf die HAUPTTRIEBWERKE. Schalte danach Geschütze und Schildgeneratoren aus. Torpedos durchdringen Schilde, drehen aber langsam. Achte auf ladende Batterien und Torpedowarnungen.",
   "Frigate entering. Lure it into the rocks, then torpedo its rear engines. Select systems on the target monitor.": "Fregatte im Anflug. Locke sie zwischen die Felsen und torpediere die Hecktriebwerke. Wähle Systeme am Zielmonitor.",
   "Choose a turret, engine, shield generator or hull": "Geschütz, Triebwerk, Schildgenerator oder Rumpf wählen",
@@ -91,6 +103,7 @@ export const DE_CATALOG = {
  'Two Vanguards cover each other. Use wrecks to isolate one and escape their turret arcs.': 'Zwei Vanguards decken sich gegenseitig. Nutze Wracks, um eines zu isolieren und den Geschützen zu entkommen.',
  'A veteran enters first. The ace arrives after twelve seconds, giving you a short window to isolate one through the wrecks.': 'Zuerst kommt ein Veteran. Nach zwölf Sekunden trifft das Ass ein, sodass du kurz Zeit hast, eines der Schiffe zwischen den Wracks zu isolieren.',
 
+ 'BATTERIES {guns}/4 · PDC {pdc}/6': 'BATTERIEN {guns}/4 · PDC {pdc}/6',
  'BATTERIES {guns}/4 · PDC {pdc}/4': 'BATTERIEN {guns}/4 · PDC {pdc}/4',
 
  'Wave {wave} of {total}': 'Welle {wave} von {total}',
@@ -661,6 +674,8 @@ export const DE_CATALOG = {
     'Visit ports or ask around at the bar.': 'Besuch andere Häfen oder hör dich in der Bar um.',
     'LIVE ROUTE TIP · CURRENT BOARD': "HANDELSTIPP · AKTUELLE ANGEBOTE",
     'Load {commodity} here at {buyPrice}. {destination} is paying {sellPrice} — about {profit} per unit if the board holds.': "Kaufe hier {commodity} für {buyPrice}. In {destination} werden {sellPrice} gezahlt. Bleiben die Preise stabil, verdienst du etwa {profit} pro Einheit.",
+    'DANGER': 'GEFAHR',
+    'MODERATE': 'MITTEL',
     'LOW': 'NIEDRIG',
     'MEDIUM': 'MITTEL',
     'HIGH': 'HOCH',
@@ -1099,7 +1114,6 @@ export const DE_CATALOG = {
     'Sector chart': 'Sektorkarte',
     'ROUTE NETWORK': 'ROUTENNETZ',
     '{count} SYSTEMS · {jumps} JUMPS': '{count} SYSTEME · {jumps} SPRÜNGE',
-    'Frontier League': 'Frontier-Liga',
     'BLACK HOLE': 'SCHWARZES LOCH',
     'Helios Verge System': 'Helios-Verge-System',
     'Helios star': 'Stern Helios',
@@ -1778,10 +1792,10 @@ export const DE_CATALOG = {
     'Nacre is asking for fresh samples, while Boreal’s water tanks are finally running full.': 'Nacre verlangt nach frischen Proben, während Boreals Wassertanks endlich voll laufen.',
     'Haven stays open because everybody here has repaired something for somebody else.': 'Haven bleibt offen, weil hier jeder schon einmal etwas für jemand anderen repariert hat.',
     'We trade water, food and machine parts under Acheron’s shadow. No parade, no gatekeeping—just fair weights and a berth if you need one.': 'Wir handeln mit Wasser, Nahrung und Maschinenteilen im Schatten von Acheron. Keine Paraden, keine Kontrollen – nur ehrliche Gewichte und einen Liegeplatz, wenn du einen brauchst.',
-    'Unity builds the League’s hard ships. Haven keeps the crews fed and the civilian hulls moving. If you want their trust, start with work that helps people.': 'Unity baut die harten Schiffe der Liga. Haven hält die Crews satt und die zivilen Rümpfe in Bewegung. Wenn du ihr Vertrauen willst, fang mit Arbeit an, die Menschen hilft.',
+    'Unity builds the Alliance’s hard ships. Haven keeps the crews fed and the civilian hulls moving. If you want their trust, start with work that helps people.': 'Unity baut die harten Schiffe der Allianz. Haven hält die Crews satt und die zivilen Rümpfe in Bewegung. Wenn du ihr Vertrauen willst, fang mit Arbeit an, die Menschen hilft.',
     'A hull tells you what its builders believe. Ours are compact, repairable and built to come home.': 'Ein Rumpf verrät, woran seine Konstrukteure glauben. Unsere sind kompakt, reparierbar und darauf gebaut, nach Hause zu kommen.',
-    'Unity does not sell military hulls on a handshake. Earn League standing, then choose the ship that matches the work you are willing to do.': 'Unity verkauft keine Militärrümpfe per Handschlag. Verdien dir Ansehen bei der Liga und wähle dann das Schiff, das zu der Arbeit passt, die du machen willst.',
-    'The League’s ships are in these bays, not in some admiral’s story. Look closely at the Speedster, Legionary, Andromeda, Torsas and Astra before you decide.': 'Die Schiffe der Liga stehen in diesen Buchten, nicht in der Geschichte irgendeines Admirals. Sieh dir Speedster, Legionary, Andromeda, Torsas und Astra genau an, bevor du dich entscheidest.',
+    'Unity does not sell military hulls on a handshake. Earn Alliance standing, then choose the ship that matches the work you are willing to do.': 'Unity verkauft keine Militärrümpfe per Handschlag. Verdien dir Ansehen bei der Allianz und wähle dann das Schiff, das zu der Arbeit passt, die du machen willst.',
+    'The Alliance’s ships are in these bays, not in some admiral’s story. Look closely at the Speedster, Legionary, Andromeda, Torsas and Astra before you decide.': 'Die Schiffe der Allianz stehen in diesen Buchten, nicht in der Geschichte irgendeines Admirals. Sieh dir Speedster, Legionary, Andromeda, Torsas und Astra genau an, bevor du dich entscheidest.',
     'If the floor is warm, the habitat is earning its keep.': 'Wenn der Boden warm ist, trägt sich das Habitat selbst.',
     'Cinderfall turns Shattered Crown ore into the parts Haven trades and Unity bolts onto hulls. We are not pretty, but we are why the frontier keeps moving.': 'Cinderfall macht aus Erz aus der Shattered Crown die Teile, mit denen Haven handelt und die Unity an Rümpfe schraubt. Schön sind wir nicht, aber ohne uns steht die Frontier still.',
     'Bring ore, food or a willingness to work. Leave the speeches to the officers at Unity.': 'Bring Erz, Nahrung oder die Bereitschaft zu arbeiten. Die Reden überlass den Offizieren in Unity.',
@@ -2913,3 +2927,5 @@ Object.assign(DE_CATALOG, {
     'ARREST': 'FESTNAHME',
     'TRANSIT': 'UNTERWEGS',
 });
+
+Object.assign(DE_CATALOG, {'DISARMED':'ENTWAFFNET'});

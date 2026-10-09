@@ -489,6 +489,9 @@ const SHIP_BUILDERS = {
     blade:buildLancer, speedster:buildTalon, legionary:buildLancer, andromeda:buildWarden, torsas:buildKestrel, astra:buildKestrel,
     kestrel: buildKestrel,
     talon: buildTalon,
+    demon: buildTalon,
+    mule: buildAtlasFreighter,
+    scrapper: buildTalon,
     warden: buildWarden,
     prospector: buildProspector,
     lancer: buildLancer,
@@ -503,7 +506,7 @@ export const shipVariantForRole = (role) => {
         case 'patrol':
             return 'warden';
         case 'pirate':
-            return 'talon';
+            return 'scrapper';
         case 'bounty':
             return 'lancer';
         case 'escort':
@@ -526,7 +529,7 @@ export const paletteForFaction = (faction, hostile) => {
         };
     }
     switch (faction) {
-        case 'frontier-league': return {hull:0xd0d1c1,dark:0x25313b,accent:0xe5bb47,canopy:0x142330,engine:0x81dafa,warning:0xffbb55,window:0xb5e9ff};
+        case 'alliance': return {hull:0xd0d1c1,dark:0x25313b,accent:0xe5bb47,canopy:0x142330,engine:0x81dafa,warning:0xffbb55,window:0xb5e9ff};
         case 'concord':
             return {
                 hull: 0x839ba4,
@@ -537,37 +540,8 @@ export const paletteForFaction = (faction, hostile) => {
                 warning: 0xe7794a,
                 window: 0x9be9ef,
             };
-        case 'frontier-miners':
-            return {
-                hull: 0x9a8a68,
-                dark: 0x342d24,
-                accent: 0xd6aa4d,
-                canopy: 0x7dcfc6,
-                engine: 0xe8bd59,
-                warning: 0xe46d43,
-                window: 0xa5ddd0,
-            };
-        case 'salvage-union':
-            return {
-                hull: 0x738c86,
-                dark: 0x25322f,
-                accent: 0x79b4a6,
-                canopy: 0x86d8c7,
-                engine: 0x73d6c3,
-                warning: 0xd88045,
-                window: 0xa7e7d8,
-            };
-        case 'free-merchants':
-            return {
-                hull: 0x97876b,
-                dark: 0x302b24,
-                accent: 0xd39b52,
-                canopy: 0x65d7c3,
-                engine: 0x6ad9f1,
-                warning: 0xdf7140,
-                window: 0x98e7d4,
-            };
-        case 'red-talons':
+        case 'independents': return {hull:0x93999d,dark:0x293239,accent:0xb5a481,canopy:0x65c0d0,engine:0x6ad9f1,warning:0xdf7140,window:0x98d7e4};
+        case 'pirates':
             return {
                 hull: 0x71443d,
                 dark: 0x241818,

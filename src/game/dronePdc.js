@@ -215,6 +215,7 @@ export function createPdcDroneController() {
                 unit.velocity ??= [0, 0, 0];
                 unit.rotation ??= [0, 0, 0, 1];
                 attach(unit, anchors.dock, context.shipVelocity);
+                if(anchors.dock.rotation)for(let axis=0;axis<4;axis++)unit.rotation[axis]=anchors.dock.rotation[axis];
                 unit.repairReturnDone = false;
                 unit.portStage = 'launch';
                 unit.state = 'escorting';
@@ -252,6 +253,7 @@ export function createPdcDroneController() {
                 }
                 continue;
             }
+            if(returning&&point?.rotation)rotateDroneTo(unit,dt,point.rotation);
             if (returning) {
                 if (arrived && unit.portStage !== 'enter') { unit.portStage = 'enter'; continue; }
                 if (arrived) {

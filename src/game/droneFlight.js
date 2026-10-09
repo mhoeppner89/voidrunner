@@ -1,10 +1,6 @@
+import {FLEET_EQUIPMENT} from './fleetEquipmentData.js';
 // Physical port centres in the playable hull frame; mouths face local -Y.
-export const DRONE_PORTS = Object.freeze({
-    torsas: [[0,-3.53,1.4],[0,-3.53,4.6]], astra: [[0,-2.28,-1.5],[0,-2.28,1.5]],
-    atlas: [[0,-3.93,-5],[0,-4.09,-1.8],[0,-4.08,1.4],[0,-3.9,4.6]],
-    wayfarer: [[0, -2.05, -1]],
-    prospector: [[0, -2.95, -3.2], [0, -2.95, 0], [0, -2.95, 3.2]],
-});
+export const DRONE_PORTS = Object.freeze(Object.fromEntries(Object.entries(FLEET_EQUIPMENT).filter(([,h])=>h.docks.pdc?.length).map(([id,h])=>[id,h.docks.pdc.map(d=>d.position)])));
 
 // Turn local -Z toward travel, with bounded angular speed. Kept in simulation
 // so interpolation and NPC drones use exactly the same orientation.

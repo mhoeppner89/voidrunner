@@ -1,3 +1,4 @@
+import {careerRegion,routePiratePressure} from './careerDanger.js';
 // Galaxy data and navigation helpers.
 //
 // This module deliberately owns no rendering or game-state code.  It is a
@@ -93,7 +94,7 @@ const SYSTEM_DEFINITIONS = {
             'verge-redwake-point',
         ],
     },
-    acheron: {id:'acheron',name:'Acheron',displayName:'Acheron',shortName:'ACHERON',visible:true,visibleFromStart:true,discoveryRequired:false,character:'Frontier League stronghold around a black hole',economicRole:'independent shipbuilding and frontier exports',locations:['haven','league-yard','cinderfall','acheron-belt','acheron-pale-point']},
+    acheron: {id:'acheron',name:'Acheron',displayName:'Acheron',shortName:'ACHERON',visible:true,visibleFromStart:true,discoveryRequired:false,character:'Alliance stronghold around a black hole',economicRole:'independent shipbuilding and frontier exports',locations:['haven','league-yard','cinderfall','acheron-belt','acheron-pale-point']},
 };
 
 // The location catalogue is intentionally independent of data.js.  Existing
@@ -189,8 +190,10 @@ Object.assign(LOCATION_DEFINITIONS, {
 
 // `locationIds` is the integration-facing name.  Keep `locations` as a
 // readable alias for consumers that treat a system record as a catalogue.
-for (const system of Object.values(SYSTEM_DEFINITIONS))
+for (const system of Object.values(SYSTEM_DEFINITIONS)) {
     system.locationIds = system.locations.slice();
+    system.security = careerRegion(system.id);
+}
 
 // Public definitions are frozen so a caller cannot accidentally alter route
 // topology for the rest of a session.  They remain ordinary JSON data.
@@ -622,7 +625,8 @@ const pressureDetails = (routeReference, cargoInput, options = {}) => {
     if (proximity === undefined)
         proximity = args.options.atJumpPoint === false ? 0.55 : 1;
     proximity = clamp01(proximity);
-    const pressure = clamp01(basePressure * routeMultiplier * proximity);
+    const regionalPressure = routePiratePressure(route, args.options.arrivalSystemId);
+    const pressure = clamp01(basePressure * routeMultiplier * proximity * regionalPressure);
     return {
         routeId: route.id,
         route,
@@ -631,6 +635,7 @@ const pressureDetails = (routeReference, cargoInput, options = {}) => {
         proximity,
         basePressure,
         routeMultiplier,
+        regionalPressure,
         pressure,
         risk: pressure,
         interceptChance: pressure,

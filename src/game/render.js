@@ -1,10 +1,21 @@
-import { createOrdnanceModel } from './ordnanceModels.js';
+import {FLEET_EQUIPMENT,equipmentHullId,droneDock} from './fleetEquipmentData.js';
+import {applyFleetPaint} from './fleetPaint.js';
+import {resolveFleetPaint,fleetPaintPath} from './fleetPaintCatalog.js';
+import {TURRET_LAYOUTS} from './turretLayouts.js';
+import {createCapitalEngineExhaust,updateCapitalEngineExhaust} from './capitalEngineExhaust.js';
+import {createBattleshipArmament} from './battleshipModels.js';
+import {bindCarrierArmament} from './carrierModels.js';
+import {CRUISER_MOUNTS,CRUISER_ARMAMENT_COUNT} from './cruiserModelData.js';
+import {createCruiserTurret,createCruiserPdc,createCruiserEngineDamage,updateCruiserEngineDamage} from './cruiserModels.js';
 import { createShipExplosion, createHullDebris } from './explosionFx.js';
+import { createOrdnanceModel } from './ordnanceModels.js';
 import { skipHiddenWorldMatrices, markAttributeSpan } from './renderWork.js';
 import { DRONE_PORTS } from './droneFlight.js';
 import {cockpitDamageStage} from './cockpitDamage.js';
 import { wreckSectionDelta } from './missionWorldData.js';
-import {createTurretModel} from './turretModels.js';
+import {createTurretModel,paintFrigateTurret} from './turretModels.js';
+import {createFrigateSystems,updateFrigateSystems,setFrigateComponentDamage,frigateEngineFraction} from './frigateComponents.js';
+import {FRIGATE_MOUNTS} from './frigateMounts.js';
 import * as THREE from 'three';
 import { createRingVolume } from './ringVolume.js';
 import { createRingParticles } from './ringParticles.js';
@@ -150,13 +161,9 @@ const factionColor = (faction) => {
     switch (faction) {
         case 'concord':
             return 0x6eb4d0;
-        case 'free-merchants':
-            return 0xd39b52;
-        case 'frontier-miners':
-            return 0xbba06c;
-        case 'salvage-union':
-            return 0x76a69b;
-        case 'red-talons':
+        case 'alliance': return 0xc9a348;
+        case 'independents': return 0x9bafb5;
+        case 'pirates':
             return 0xcf4d3c;
     }
 };
@@ -170,46 +177,43 @@ const factionColor = (faction) => {
 // hulls with the same orientation and world scale.
 export const GLB_SHIP_CONFIG = {
     blade: {file:'blade.glb',preload:false,yaw:Math.PI,scale:7,preserveColor:true,enginePorts:[[.4,.014,-.853],[-.4,.014,-.853],[.615,-.096,-.828],[-.615,-.096,-.828]]},
-    speedster: {file:'speedster.glb',preload:false,yaw:-Math.PI/2,scale:5.5,preserveColor:true,enginePorts:[[0.95498,-0.05,0.19],[0.95628,-0.05,-0.19]]},
-    legionary: {file:'legionary.glb',preload:false,yaw:Math.PI,scale:6.2,preserveColor:true,enginePorts:[[0.23,0.095,-0.94653],[-0.23,0.095,-0.94515]]},
-    andromeda: {file:'andromeda.glb',preload:false,yaw:Math.PI,scale:7.8,preserveColor:true,enginePorts:[[0.75,0.17,-0.99882],[0.4,0.19,-0.98845],[-0.4,0.19,-0.99751],[-0.75,0.17,-0.99744]]},
-    torsas: {file:'torsas.glb',preload:false,yaw:Math.PI,scale:8,preserveColor:true,enginePorts:[[0.26,0,-0.9416],[-0.26,0,-0.94243],[0.16,0.18,-0.5042],[-0.16,0.18,-0.50363]]},
-    astra: {file:'astra.glb',preload:false,yaw:Math.PI,scale:6.4,preserveColor:true,enginePorts:[[0.2,0.32,-0.85589],[-0.2,0.32,-0.8542],[0.57,-0.05,-0.85452],[-0.57,-0.05,-0.8535],[0.57,-0.3,-0.85646],[-0.57,-0.3,-0.85323],[0.19,-0.32,-0.8533],[-0.19,-0.32,-0.85367]]},
-    kestrel: { file: 'wayfarer.glb', yaw: Math.PI / 2, scale: 6.1, enginePorts: [[-0.85, 0, -0.06], [-0.85, 0, 0.06]] },
-    warden: { file: 'vanguard.glb', yaw: Math.PI / 2, scale: 5.9, enginePorts: [[-0.85, 0, -0.3], [-0.85, 0, 0.3]] },
-    talon: { file: 'talon.glb', yaw: Math.PI / 2, scale: 5.65, enginePorts: [[-0.85, 0, -0.12], [-0.85, 0, 0.12]] },
-    prospector: { file: 'prospector.glb', yaw: Math.PI / 2, scale: 6.7, enginePorts: [[-0.9, 0, -0.3], [-0.9, 0, 0.3]] },
-    lancer: { file: 'lancer.glb', yaw: Math.PI / 2, scale: 6.65, enginePorts: [[-0.85, 0, -0.22], [-0.85, 0, 0], [-0.85, 0, 0.22]] },
-    'atlas-freighter': { file: 'atlas.glb', yaw: Math.PI / 2, scale: 13.4, enginePorts: [[-0.9, 0, -0.25], [-0.9, 0, 0.25]] },
+    speedster: {"file":"speedster.glb","preload":false,"yaw":-1.5707963267948966,"scale":5.5,"preserveColor":true,"enginePorts":[[1.0001183,0.03203719975870786,-0.2366122063879456],[1.0001183,-0.1416319903051757,-0.2366122063879456],[1.0001183,0.03203719975870786,0.2366060063879455],[1.0001183,-0.1416319903051757,0.2366060063879455]],"baseScale":1},
+    legionary: {"file":"legionary.glb","preload":false,"yaw":3.141592653589793,"scale":6.2,"preserveColor":true,"enginePorts":[[-0.22998502814076316,0.09499940654455041,-0.9942740614435436],[0.23022086814076315,0.09499940654455041,-0.9942740614435436]],"baseScale":1},
+    andromeda: {"file":"andromeda.glb","preload":false,"yaw":3.141592653589793,"scale":7.8,"preserveColor":true,"enginePorts":[[-0.737764712970642,0.17231140209561419,-1.0000058],[-0.39315525525100903,0.1924181090281994,-1.0000058],[0.3945235052510089,0.1924181090281994,-1.0000058],[0.7391329629706419,0.17231140209561419,-1.0000058]],"baseScale":1.02},
+    torsas: {"file":"torsas.glb","preload":false,"yaw":3.141592653589793,"scale":8,"preserveColor":true,"enginePorts":[[-0.15821532570958222,0.15638847918536986,-0.5108093776],[-0.26014211857273023,0.0025420379585170405,-0.9997417],[0.15755787570958213,0.15638847918536986,-0.5108093776],[0.2594846685727301,0.0025420379585170405,-0.9997417]],"baseScale":1},
+    astra: {"file":"astra.glb","preload":false,"yaw":3.141592653589793,"scale":6.4,"preserveColor":true,"enginePorts":[[-0.1989281777886161,0.33521115527140183,-0.9999958],[0.2011804477886162,0.33521115527140183,-0.9999958],[-0.569028656447556,-0.04264054431568204,-0.9999958],[0.571280926447556,-0.04264054431568204,-0.9999958],[-0.569028656447556,-0.29794574673938723,-0.9999958],[0.571280926447556,-0.29794574673938723,-0.9999958],[-0.18892546214918532,-0.3183701629332837,-0.9999958],[0.19117773214918532,-0.3183701629332837,-0.9999958]],"baseScale":1},
+    kestrel: {"file":"wayfarer.glb","yaw":1.5707963267948966,"scale":6.1,"enginePorts":[[-1.001,0.133,0.085],[-1.001,0.133,-0.085],[-1.001,-0.224,0.085],[-1.001,-0.224,-0.085]],"preserveColor":true,"baseScale":1},
+    warden: {"file":"vanguard.glb","yaw":1.5707963267948966,"scale":5.9,"enginePorts":[[-0.995,-0.285,0.34],[-0.995,0.105,0.34],[-0.995,-0.285,-0.34],[-0.995,0.105,-0.34]],"preserveColor":true,"baseScale":1,"engineColor":16747300,"turretPaintVariant":"concord-frigate"},
+    demon: {file:'demon.glb',preload:false,yaw:Math.PI,scale:5.5,preserveColor:true,baseScale:1,enginePorts:[[-0.29970022419864606, -0.042723221321174176, -1.0006376673489266], [0.29970022419864606, -0.042723221321174176, -1.0006376673489266]],flareSize:1.2},
+    mule: {file:'mule.glb',preload:false,yaw:Math.PI,scale:10.4,preserveColor:true,baseScale:1,enginePorts:[[-0.25681445152655075, -0.040394084538264555, -1.0009852216810482], [0, 0.06403941365283917, -1.0009852216810482], [0.25681445152655075, -0.040394084538264555, -1.0009852216810482]],flareSize:2.6},
+    scrapper: {file:'scrapper.glb',yaw:Math.PI,scale:6.5,preserveColor:true,enginePorts:[[-.181,-.016,-.813],[.181,-.016,-.813]]},
+    talon: {"file":"talon.glb","yaw":1.5707963267948966,"scale":5.65,"enginePorts":[[-0.917,-0.148,0.221],[-0.919,-0.026,0.183],[-0.917,-0.148,-0.221],[-0.919,-0.026,-0.183]],"preserveColor":true,"baseScale":1},
+    prospector: {"file":"prospector.glb","yaw":1.5707963267948966,"scale":6.7,"enginePorts":[[-0.9579181385095029,-0.27000001072883606,0.27900001406669617],[-0.9579181385095029,-0.27000001072883606,0],[-0.9579181385095029,-0.27000001072883606,-0.27900001406669617],[-0.9579181385095029,0.09399999678134918,0.27900001406669617],[-0.9579181385095029,0.09399999678134918,0],[-0.9579181385095029,0.09399999678134918,-0.27900001406669617]],"preserveColor":true,"baseScale":1.04},
+    lancer: {"file":"lancer.glb","yaw":1.5707963267948966,"scale":6.65,"enginePorts":[[-0.967,0.016,0.235],[-0.537,-0.075,0.444],[-0.967,0.016,-0.235],[-0.537,-0.075,-0.444]],"preserveColor":true,"baseScale":1.02},
+    'atlas-freighter': {"file":"atlas.glb","yaw":1.5707963267948966,"scale":13.4,"enginePorts":[[-0.962998153751814,-0.1940000057220459,0.20100000500679016],[-0.962998153751814,-0.1940000057220459,-0.20100000500679016],[-0.962998153751814,-0.014000000432133675,0.20100000500679016],[-0.962998153751814,-0.014000000432133675,-0.20100000500679016],[-0.962998153751814,0.16599999368190765,0.20100000500679016],[-0.962998153751814,0.16599999368190765,-0.20100000500679016]],"preserveColor":true,"baseScale":0.92},
     // Capital hulls preserve their authored Concord paint and load only when
     // one actually enters the scene. Carrier and cruiser were normalized to a
     // two-unit longitudinal axis during export; their scales are measured from
     // the shipped battleship bounds for exact 0.8x and 0.5x visible lengths.
     'concord-frigate': {
         path: 'assets/models/capital/concord-frigate.glb', yaw: -Math.PI / 2, scale: 56.5,
-        enginePorts: [[0.89, -0.07, -0.22], [0.9, -0.07, 0], [0.89, -0.07, 0.22]],
+        enginePorts: [[0.9975, -0.164375, -0.216875], [0.9975, -0.089375, 0], [0.9975, -0.164375, 0.216875]],
         preload: false, preserveColor: true, placeholderVariant: 'warden', placeholderScale: 10,
         flareSize: 3.4, flareOpacity: 0.2,
     },
-    'concord-battleship': {
-        path: 'assets/models/capital/concord-battleship.glb', yaw: -Math.PI / 2, scale: 565,
-        enginePorts: [[0.9, -0.14, -0.25], [0.9, 0.11, -0.25], [0.9, -0.14, 0.25], [0.9, 0.11, 0.25]],
-        preload: false, preserveColor: true, placeholderVariant: 'warden', placeholderScale: 100,
-        flareSize: 15, flareOpacity: 0.18,
-    },
-    'concord-carrier': {
-        path: 'assets/models/capital/concord-carrier.glb', yaw: -Math.PI / 2, scale: 451.2754,
-        enginePorts: [[0.92, -0.08, -0.34], [0.94, -0.08, 0], [0.92, -0.08, 0.34]],
-        preload: false, preserveColor: true, placeholderVariant: 'warden', placeholderScale: 80,
-        flareSize: 13, flareOpacity: 0.18,
-    },
+    'concord-battleship': {"path":"assets/models/capital/concord-battleship.glb","armamentPaintPath":"assets/models/capital/concord-battleship-armament.glb","yaw":-1.5707963267948966,"scale":565,"enginePorts":[[0.9186068738625113,-0.05027645453810692,0.14330829679965973],[0.9186068738625113,-0.2333288937807083,0.14330829679965973],[0.9186068738625113,-0.05027645453810692,-0.14330829679965973],[0.9186068738625113,-0.2333288937807083,-0.14330829679965973]],"preload":false,"preserveColor":true,"placeholderVariant":"warden","placeholderScale":100,"flareSize":76.76229269594602,"flareOpacity":0.18,"baseScale":1},
+    'concord-carrier': {"path":"assets/models/capital/concord-carrier.glb","yaw":-1.5707963267948966,"scale":451.2754,"enginePorts":[[0.926,-0.089,0.171],[0.926,-0.089,-0.171],[0.926,-0.182,0]],"preload":false,"preserveColor":true,"placeholderVariant":"warden","placeholderScale":80,"baseScale":1},
     'concord-cruiser': {
         path: 'assets/models/capital/concord-cruiser.glb', yaw: -Math.PI / 2, scale: 282.0471,
-        enginePorts: [[0.93, -0.27, -0.18], [0.93, 0.27, -0.18], [0.93, -0.27, 0.18], [0.93, 0.27, 0.18]],
+        enginePorts: [[.994,-.173,.176],[.994,.173,.176],[.994,-.173,-.176],[.994,.173,-.176]],
         preload: false, preserveColor: true, placeholderVariant: 'warden', placeholderScale: 50,
         flareSize: 8, flareOpacity: 0.19,
     },
 };
+for(const [id,hull] of Object.entries(FLEET_EQUIPMENT)) {
+ const key=hull.variant;const config=GLB_SHIP_CONFIG[key];
+ if(config)Object.assign(config,{enginePorts:hull.config.enginePorts,baseScale:hull.config.baseScale??1});
+}
 // In-flight hull scaling stays separate from the source GLB calibration so
 // shipyard previews retain their framing. Combat fighters are 80% of the first
 // enlarged pass (1.6x legacy); civilian traffic, Concord frigates/capitals, and
@@ -219,6 +223,7 @@ export const NPC_CAPITAL_SCALE = 2;
 const NPC_FIGHTER_VARIANTS = new Set(['speedster','legionary','andromeda','astra',
     'kestrel',
     'talon',
+    'scrapper', 'demon',
     'lancer',
     'warden',
 ]);
@@ -1539,7 +1544,7 @@ export class SpaceRenderer {
                     const spec = GLB_SHIP_CONFIG[variant];
                     const radius = STATION_OCCUPANTS[id].radius;
                     const worldScale = LOCATIONS[id].radius * (id === 'blackglass' ? .2 : .95) / radius;
-                    return spec.scale * npcShipScaleForVariant(variant) * (variant === 'atlas-freighter' ? .92 : 1) / worldScale;
+                    return spec.scale * npcShipScaleForVariant(variant) * (spec.baseScale ?? (variant === 'atlas-freighter' ? .92 : 1)) / worldScale;
                 }); }
                 catch (error) { console.warn(`Station ${id} dock occupants unavailable.`, error); }
                 if (this.disposed) { this.disposeObject(model); return; }
@@ -3374,7 +3379,7 @@ export class SpaceRenderer {
         const model = createVoxelShipModel(voxelVariant, palette);
         const group = model.group;
         const placeholderScale = config?.placeholderScale ?? 1;
-        const baseScale = (variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1) * placeholderScale * npcShipScaleForVariant(variant);
+        const baseScale = (config?.baseScale ?? (variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1)) * placeholderScale * npcShipScaleForVariant(variant);
         const engineColor = palette.engine;
         const engineFlareTexture = this.radialTexture(cssHex(engineColor), cssHex(engineColor));
         const flares = [];
@@ -3435,10 +3440,29 @@ export class SpaceRenderer {
         if (!config)
             return;
         const promise = loadGlb(config.path ?? `assets/models/ships/${config.file}`)
-            .then((model) => {
+            .then(async (model) => {
+                if (config.armamentPaintPath) {
+                    try {
+                        const paint = await loadGlb(config.armamentPaintPath);
+                        paint.visible = false;
+                        paint.traverse(o => { if (o.isMesh) o.raycast = () => {}; });
+                        model.add(paint);
+                    } catch (error) {
+                        this.disposeObject(model);
+                        throw error;
+                    }
+                }
                 if (this.disposed) {
                     this.disposeObject(model);
                     return null;
+                }
+                if(variant==='scrapper') {
+                    this.glbShipPaintModels??=new Map();
+                    for(const paint of ['concord','alliance','independents']) {
+                        const alternate=await loadGlb(fleetPaintPath(variant,paint));
+                        this.prepareGlbShip(alternate,config,variant);
+                        this.glbShipPaintModels.set(`${variant}:${paint}`,alternate);
+                    }
                 }
                 const ready = this.prepareGlbShip(model, config, variant);
                 this.glbShipModels.set(variant, ready);
@@ -3475,29 +3499,38 @@ export class SpaceRenderer {
     // world size if they lived on the same object. Geometry and textures stay
     // shared with the cached model.
     createGlbShipMesh(entity, model, config, variantOverride) {
+        if (config.turretPaintVariant) this.ensureGlbShipModel(config.turretPaintVariant);
         const wrapper = new THREE.Group();
-        const group = model.clone(true);
+        const paint=resolveFleetPaint(variantOverride ?? shipVariantForEntity(entity),entity);
+        const group = (this.glbShipPaintModels?.get(`${variantOverride ?? shipVariantForEntity(entity)}:${paint.startsWith('independent-')?'independents':paint}`) ?? model).clone(true);
         wrapper.add(group);
         const variant = variantOverride ?? shipVariantForEntity(entity);
-        const ports = this.createDronePorts(variant === 'kestrel' ? 'wayfarer' : variant);
-        ports.scale.setScalar(npcShipScaleForVariant(variant)); wrapper.add(ports);
+        const ports = this.createDronePorts(equipmentHullId(variant));
+        ports.scale.setScalar(npcShipScaleForVariant(variant)/(config.baseScale??1)); wrapper.add(ports);
         const palette = paletteForEntity(entity);
         const tint = new THREE.Color(palette.hull);
         const emissiveMaterials = [];
         const tintedMaterials = new Map();
-        const paintFrames = entity.race ? null : shipPaintFrames(group, variant);
+
         group.traverse((child) => {
             if (child.material instanceof THREE.MeshStandardMaterial) {
                 const source = child.material;
-                const paintFrame = paintFrames?.get(child);
-                const paintKey = source.uuid + (paintFrame?.elements.join(',') ?? '');
+
+                const paintKey = source.uuid;
                 const cached = tintedMaterials.get(paintKey);
                 if (cached) { child.material = cached; return; }
                 const material = source.clone();
+                if((variant==='concord-battleship'||variant==='concord-carrier')&&source.emissive&&(source.emissive.r+source.emissive.g+source.emissive.b)>0)
+                    material.userData.minimumEmissiveIntensity=source.emissiveIntensity;
                 tintedMaterials.set(paintKey, material);
                 const isCanopy = material.name.startsWith('VR_Canopy_');
-                const factionPaint = !entity.race && paintShipMaterial(material, entity.livery ?? entity.faction, paintFrame, variant);
-                if (!factionPaint && entity.livery !== "original" && !config.preserveColor && !isCanopy)
+                if((variant==='concord-battleship'&&isCanopy)||(variant==='concord-carrier'&&source.name.startsWith('Carrier habitation glazing'))){
+                    // Small window stand-offs need a depth bias with the flight
+                    // camera's very wide near/far range, especially at distance.
+                    material.polygonOffset=true;material.polygonOffsetFactor=-1;material.polygonOffsetUnits=-4;
+                }
+                const factionPaint = false; // The complete hull is painted once below, after material ownership is established.
+                if (!factionPaint && entity.faction !== 'independents' && entity.livery !== "original" && !config.preserveColor && !isCanopy)
                     material.color.copy(tint).lerp(new THREE.Color(0xffffff), 0.45);
                 if (entity.race && !isCanopy) {
                     // A low self-lit wash keeps the custom race paint readable
@@ -3507,14 +3540,22 @@ export class SpaceRenderer {
                     material.emissiveIntensity = 0.24;
                 }
                 child.material = material;
+                if(variant==='concord-battleship'&&source.name==='Battleship armament atlas')wrapper.userData.battleshipArmorMaterial=material;
+                if (config.engineColor && material.emissiveMap)
+                    material.userData.minimumEmissiveIntensity = source.emissiveIntensity;
+                if(variant==='concord-cruiser'&&!wrapper.userData.cruiserArmorMaterial)wrapper.userData.cruiserArmorMaterial=material;
+                if(variant==='concord-frigate'&&!wrapper.userData.frigateArmorMaterial)wrapper.userData.frigateArmorMaterial=material;
                 emissiveMaterials.push(material);
             }
         });
+        if(!entity.race)applyFleetPaint(group,variant,entity);
+        wrapper.userData.livery=group.userData.livery;
+        emissiveMaterials.length=0;group.traverse(o=>{if(o.isMesh)for(const m of Array.isArray(o.material)?o.material:[o.material])if(m&&!emissiveMaterials.includes(m))emissiveMaterials.push(m);});
         const baseScale = config.baseScale ?? (variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1);
-        const engineColor = palette.engine;
+        const engineColor = config.engineColor ?? palette.engine;
         const engineFlareTexture = this.radialTexture(cssHex(engineColor), cssHex(engineColor));
         const flares = [];
-        for (const port of config.enginePorts) {
+        for (const port of (variant==='concord-cruiser'||variant==='concord-frigate'||variant==='concord-battleship'||variant==='concord-carrier'?[]:config.enginePorts)) {
             const flareOpacity = config.flareOpacity ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_OPACITY_ATLAS : ENGINE_FLARE_OPACITY);
             const flareWorldSize = config.flareSize ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_SIZE_ATLAS : ENGINE_FLARE_SIZE);
             const flare = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -3531,12 +3572,19 @@ export class SpaceRenderer {
             flares.push(flare);
             group.add(flare);
         }
+        if(variant==='concord-battleship'){
+            wrapper.userData.battleshipArmament=createBattleshipArmament(wrapper.userData.battleshipArmorMaterial);
+            wrapper.add(wrapper.userData.battleshipArmament);
+        }
+        if(variant==='concord-carrier')wrapper.userData.carrierArmament=bindCarrierArmament(group);
+        if(variant==='mule')wrapper.userData.embeddedTurrets=FLEET_EQUIPMENT.mule.turrets.map(t=>{const gun=group.getObjectByName(t.embedded);gun.userData.yaw=group.getObjectByName(t.embedded.replace('.Root','.Yaw'));gun.userData.pitch=group.getObjectByName(t.embedded.replace('.Root','.Pitch'));gun.userData.inverse=new THREE.Quaternion();gun.userData.local=new THREE.Vector3();return gun;});
         this.tagTargetable(wrapper, 'ship', entity.id);
         wrapper.userData.baseScale = baseScale;
         wrapper.userData.variant = variant;
         wrapper.userData.engineFlares = flares;
         wrapper.userData.emissiveMaterials = emissiveMaterials;
         wrapper.userData.glb = true;
+        if(variant==='concord-cruiser'||variant==='concord-frigate'||variant==='concord-battleship'||variant==='concord-carrier'){wrapper.userData.capitalExhaust=createCapitalEngineExhaust(variant);wrapper.add(wrapper.userData.capitalExhaust);}
         return wrapper;
     }
     // Replace a voxel placeholder with the real hull once its GLB resolves.
@@ -3570,7 +3618,7 @@ export class SpaceRenderer {
         for (const material of ownedMaterials) if(!material.userData?.shared)material.dispose();
     }
     syncShips(entities, alpha = 0) {
-        const revision = ++this.shipSyncRevision;
+        const revision = ++this.shipSyncRevision,exhaustTime=performance.now()*.001;
         entities.forEach((entity) => {
             let mesh = this.shipMeshes.get(entity.id);
             const variant = shipVariantForEntity(entity);
@@ -3617,7 +3665,7 @@ export class SpaceRenderer {
             }
             if (mesh.userData.dronePorts === undefined)
                 mesh.userData.dronePorts = mesh.getObjectByName('drone-docking-ports') ?? null;
-            this.syncDronePorts(mesh.userData.dronePorts, entity.droneFleet);
+            this.syncDronePorts(mesh.userData.dronePorts, entity.droneFleet, entity);
             mesh.userData.syncRevision = revision;
             mesh.position.set(...entity.position);
             if (entity.prevPosition && alpha >= 0) {
@@ -3630,6 +3678,15 @@ export class SpaceRenderer {
                 this.tmpCurQuat.copy(mesh.quaternion);
                 mesh.quaternion.copy(this.tmpPrevQuat).slerp(this.tmpCurQuat, alpha);
             }
+            if(entity.capitalClass==='cruiser'&&entity.capitalMountHull&&mesh.userData.glb){
+                if(!mesh.userData.cruiserSystems){mesh.userData.cruiserSystems=createCruiserEngineDamage();mesh.add(mesh.userData.cruiserSystems);}
+                updateCruiserEngineDamage(mesh.userData.cruiserSystems,entity);
+            }
+            if(entity.capitalClass==='frigate'&&entity.capitalMountHull&&mesh.userData.glb){
+                if(!mesh.userData.frigateSystems){mesh.userData.frigateSystems=createFrigateSystems(entity.id);mesh.add(mesh.userData.frigateSystems);}
+                updateFrigateSystems(mesh.userData.frigateSystems,entity);
+            }
+            if(mesh.userData.capitalExhaust)updateCapitalEngineExhaust(mesh.userData.capitalExhaust,entity,exhaustTime);
             const damage = 1 - entity.hull / entity.maxHull;
             const baseScale = Number(mesh.userData.baseScale ?? 1);
             // Rigid hulls keep a fixed scale. Engine effects carry the animation.
@@ -3639,7 +3696,7 @@ export class SpaceRenderer {
             const emissiveMaterials = mesh.userData.emissiveMaterials;
             if (emissiveMaterials) {
                 for (const material of emissiveMaterials)
-                    material.emissiveIntensity = emissiveIntensity;
+                    material.emissiveIntensity = Math.max(material.userData.minimumEmissiveIntensity ?? 0, entity.capitalClass==='cruiser'&&material.emissiveMap?Math.max(.7,emissiveIntensity):emissiveIntensity);
             }
             const rimMaterial = mesh.userData.rimMaterial;
             if (rimMaterial?.uniforms) {
@@ -3652,8 +3709,10 @@ export class SpaceRenderer {
                 const boost = entity.burning ? ENGINE_FLARE_BURNING_BOOST : entity.race ? 1.65 : entity.hostile && entity.targetId ? ENGINE_FLARE_HOSTILE_BOOST : 1;
                 const baseOpacity = (flares[0]?.userData.baseOpacity ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_OPACITY_ATLAS : ENGINE_FLARE_OPACITY)) * (glow?.flareOpacity ?? 1);
                 const baseSize = (flares[0]?.userData.baseSize ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_SIZE_ATLAS : ENGINE_FLARE_SIZE)) * (glow?.flareScale ?? 1);
-                for (const flare of flares) {
-                    flare.material.opacity = entity.stationDock?.phase === "docked" ? 0 : baseOpacity * boost;
+                for (let flareIndex=0;flareIndex<flares.length;flareIndex++) {
+                    const flare=flares[flareIndex];
+                    const output=entity.capitalClass==='frigate'?frigateEngineFraction(entity,flareIndex):entity.capitalClass==='cruiser'?(entity.capitalMountHull?.[CRUISER_ARMAMENT_COUNT+flareIndex]??300)/300:1;
+                    flare.material.opacity = entity.stationDock?.phase === "docked" ? 0 : baseOpacity * boost * output;
                     flare.scale.setScalar(baseSize * (boost > 1 ? 1.08 : 1));
                 }
             }
@@ -3679,7 +3738,8 @@ export class SpaceRenderer {
             if(!hull||!hull.visible){mesh.visible=false;continue;}
             mesh.position.copy(a.position).applyQuaternion(hull.quaternion).add(hull.position);
             mesh.quaternion.copy(hull.quaternion);
-            if(a.axis===0)mesh.rotateZ(-a.side*Math.PI/2);else if(a.side<0)mesh.rotateX(Math.PI);
+            if(a.surfaceRotation)mesh.quaternion.multiply(a.surfaceRotation);
+            else if(a.axis===0)mesh.rotateZ(-a.side*Math.PI/2);else if(a.side<0)mesh.rotateX(Math.PI);
             const direction=a.renderDirection.copy(a.previousDirection).lerp(a.direction,Math.max(0,Math.min(1,alpha))).normalize().applyQuaternion(hull.quaternion);
             const local=mesh.userData.local.copy(direction).applyQuaternion(mesh.userData.inverse.copy(mesh.quaternion).invert());
             mesh.userData.yaw.rotation.y=Math.atan2(-local.x,-local.z);
@@ -3692,61 +3752,33 @@ export class SpaceRenderer {
         }
     }
     createDronePorts(hullId) {
-        const group = new THREE.Group(); group.name = 'drone-docking-ports';
-        for (const port of DRONE_PORTS[hullId] ?? []) {
-            const bay = new THREE.Group(); bay.position.fromArray(port); group.add(bay);
-            const box = (x,y,z,w,h,d,color) => {
-                const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), new THREE.MeshStandardMaterial({color,roughness:.72,metalness:.65}));
-                m.position.set(x,y,z); m.raycast=()=>undefined; bay.add(m); return m;
-            };
-            const wayfarer = hullId === 'wayfarer';
-            if (wayfarer) {
-                // The Wayfarer belly narrows above the mouth: a sloped collar
-                // reaches the actual hull instead of leaving wide vertical walls.
-                const ring = (x,z,cut,y) => [[-x+cut,y,-z],[x-cut,y,-z],[x,y,-z+cut],[x,y,z-cut],[x-cut,y,z],[-x+cut,y,z],[-x,y,z-cut],[-x,y,-z+cut]];
-                const upper=ring(.82,1.58,.2,.62), lower=ring(1.12,1.4,.23,-.22), inner=ring(1.04,1.25,.14,-.23);
-                const vertices=[],uvs=[];
-                const quad=(a,b,c,d)=>{for(const [v,u,w] of [[a,0,0],[b,1,0],[c,1,1],[a,0,0],[c,1,1],[d,0,1]]){vertices.push(...v);uvs.push(u,w);}};
-                for(let i=0;i<8;i++){const j=(i+1)%8;quad(upper[i],upper[j],lower[j],lower[i]);quad(lower[i],lower[j],inner[j],inner[i]);}
-                const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geometry.computeVertexNormals();
-                const paint=(base,stripe)=>{
-                    const canvas=document.createElement('canvas');canvas.width=canvas.height=128;const ctx=canvas.getContext('2d');
-                    ctx.fillStyle=base;ctx.fillRect(0,0,128,128);
-                    if(stripe){ctx.fillStyle='#233b50';ctx.fillRect(0,76,128,39);ctx.fillStyle='#af8130';ctx.fillRect(0,73,128,4);}
-                    const rng=seededRandom('wayfarer-drone-port');
-                    for(let i=0;i<360;i++){ctx.fillStyle=i%3?'rgba(29,23,16,.18)':'rgba(224,209,172,.26)';ctx.fillRect(rng()*128,rng()*128,1+rng()*4,1);}
-                    ctx.strokeStyle='#655b49';ctx.lineWidth=2;ctx.strokeRect(3,3,122,122);
-                    for(const x of [9,119])for(const y of [10,118]){ctx.fillStyle='#303132';ctx.fillRect(x-1,y-1,3,3);}
-                    const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;return texture;
-                };
-                const shell=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({map:paint('#b8ac90',true),roughness:.8,metalness:.35,side:THREE.DoubleSide}));shell.raycast=()=>undefined;bay.add(shell);
-                box(0,-.18,0,2.1,.06,2.48,0x050a0e);
-                bay.userData.doors=[-1,1].map(side=>{const door=box(side*.525,-.245,0,1.05,.035,2.48,0xffffff);door.material.map=paint('#233747',false);door.material.roughness=.78;return door;});
-                // Short service markings replace the oversized gold rails.
-                for(const x of [-1.065,1.065])box(x,-.25,.35,.055,.02,.38,0xb88c36);
-            } else {
-                box(-1.12,.2,0,.14,.7,2.8,0x26343c); box(1.12,.2,0,.14,.7,2.8,0x26343c);
-                box(0,.2,-1.32,2.38,.7,.16,0x26343c); box(0,.2,1.32,2.38,.7,.16,0x26343c);
-                box(0,-.08,0,2.12,.1,2.5,0x050a0e);
-                for (const x of [-1.13,1.13]) box(x,-.15,0,.15,.06,1.4,0xc4a457);
-                bay.userData.doors = [-1,1].map(side => box(side*.525,-.145,0,1.05,.06,2.48,0x35414a));
-            }
-            bay.userData.open = 0;
-        }
-        return group;
+        const group=new THREE.Group();group.name='drone-docking-ports';group.userData.hullId=hullId;
+        group.userData.dockVisuals=new Map();return group;
     }
-    syncDronePorts(ports, fleet) {
-        if (!ports) return;
-        let active = false;
-        const units = fleet?.unitsById;
-        if (units) for (const id in units) if (units[id].state !== 'stowed' && units[id].state !== 'destroyed') {active=true;break;}
-        for (const bay of ports.children) {
-            bay.userData.open += ((active ? 1 : 0) - bay.userData.open) * .18;
-            for (let i=0;i<2;i++) {
-                const door=bay.userData.doors[i], open=bay.userData.open;
-                door.scale.x=Math.max(.001,1-open);
-                door.position.x=(i===0?-1:1)*(.525+.525*open);
+    syncDronePorts(ports, fleet, actor) {
+        if(!ports)return;
+        const hull=FLEET_EQUIPMENT[ports.userData.hullId];if(!hull)return;
+        const ids=actor?.npcDrones?.context.unitIds;
+        if(ids&&ports.userData.unitCount!==ids.length){ports.userData.unitCount=ids.length;ports.userData.npcBays=ids.map(id=>({mode:fleet?.unitsById?.[id]?.type,unitIds:[id]}));}
+        const bays=ids?ports.userData.npcBays:actor?.outfitting?.loadouts?.[actor.shipId]?.droneBays;
+        const revision=ports.userData.revision=(ports.userData.revision??0)+1;
+        for(let bay=0;bay<(bays?.length??0);bay++)for(let slot=0;slot<(bays[bay].unitIds?.length??0);slot++) {
+            const id=bays[bay].unitIds[slot],unit=fleet?.unitsById?.[id];if(!unit||unit.hull<=0||unit.state!=='stowed')continue;
+            const dock=droneDock(ports.userData.hullId,unit.type,bay,slot);if(!dock)continue;
+            let visual=ports.userData.dockVisuals.get(id);
+            if(!visual){
+                visual=this.createDroneVisual(unit);ports.add(visual.root);ports.userData.dockVisuals.set(id,visual);
+                visual.root.position.fromArray(dock.position);
+                visual.root.quaternion.copy(droneDockRotation(dock.normal));
+                visual.engine.visible=false;visual.beam.visible=false;visual.lamp.visible=false;
+                const pad=new THREE.Mesh(new THREE.BoxGeometry(.64,.045,.92),new THREE.MeshStandardMaterial({color:0x273743,metalness:.65,roughness:.6}));
+                pad.position.fromArray(dock.point);pad.quaternion.copy(visual.root.quaternion);pad.raycast=()=>{};
+                ports.add(pad);visual.pad=pad;
             }
+            visual.revision=revision;
+        }
+        for(const[id,v]of ports.userData.dockVisuals)if(v.revision!==revision) {
+            ports.remove(v.root,v.pad);this.disposeObject(v.root);this.disposeObject(v.pad);ports.userData.dockVisuals.delete(id);
         }
     }
     createDroneVisual(unit) {
@@ -3807,7 +3839,7 @@ export class SpaceRenderer {
             model.traverse(o => { if(o.isMesh) {o.geometry=o.geometry.clone();o.material=o.material.clone();o.raycast=()=>undefined;} });
             if (unit.type === 'repair' || unit.type === 'attack') {
                 model.traverse(o => { if (!o.isMesh) return;
-                    if (o.material.color) o.material.color.lerp(new THREE.Color(color), .42);
+                    if (o.material.color) o.material.color.lerp(new THREE.Color(color), .25);
                 });
             }
             model.scale.setScalar(1.15); root.add(model); lamp.visible=false;
@@ -5314,11 +5346,8 @@ export class SpaceRenderer {
     }
     showDisabledCapitalMount(id,position,rotation,actor,index) {
         this.showTurret(id,position,(this.tmpDisabledDirection??=new THREE.Vector3()).set(0,1,0).applyQuaternion(rotation),index<4?'M':'S',index<4?'laser':'pdc',rotation,index===0||index===1||index>5?-1:1,0,index<4?112.9/18:112.9/22,index<4?0:1,actor);
-        const mesh=this.turretMeshes.get(id);mesh.userData.yaw.visible=false;
-        for(const child of mesh.children)if(child.isMesh){
-            this.destroyedMountMaterial??=new THREE.MeshStandardMaterial({color:0x221915,roughness:1});
-            child.material=this.destroyedMountMaterial;
-        }
+        // Keep the wrecked armored pedestal and yaw housing attached; damage
+        // hides barrels and chars its own materials without affecting other guns.
     }
     showCapitalCharge(id,position,amount,actor) {
         this.capitalCharges??=new Map();
@@ -5338,13 +5367,20 @@ export class SpaceRenderer {
         // The cockpit camera is at the ship origin and its exterior hull is
         // omitted. Drawing own-ship turrets would expose them through the canopy.
         if(id.startsWith('player-'))return;
+        const embedded=this.shipMeshes?.get(actor?.id)?.userData.embeddedTurrets?.[Number(id.split('-').at(-1))];
+        if(embedded){
+            embedded.updateWorldMatrix(true,false);
+            const local=embedded.userData.local.copy(direction).applyQuaternion(embedded.getWorldQuaternion(embedded.userData.inverse).invert());
+            embedded.userData.yaw.rotation.y=Math.atan2(-local.x,-local.z);
+            embedded.userData.pitch.rotation.x=Math.atan2(local.y,Math.hypot(local.x,local.z));return;
+        }
         this.turretMeshes??=new Map();
         let mesh=this.turretMeshes.get(id);
         if(mesh && (mesh.name!==`${kind}-${size}` || mesh.userData.pedestal!==pedestal)) {
             this.scene.remove(mesh);this.turretMeshes.delete(id);mesh=null;
         }
         if(!mesh) {
-            mesh=createTurretModel(kind,size,pedestal);
+            mesh=kind==='capital'?createCruiserTurret():actor?.capitalClass==='cruiser'&&kind==='pdc'?createCruiserPdc():createTurretModel(kind,size,pedestal);
             this.scene.add(mesh);this.turretMeshes.set(id,mesh);
         }
         if(actor){
@@ -5354,14 +5390,37 @@ export class SpaceRenderer {
             a.direction.copy(direction).applyQuaternion(a.q);if(a.previousDirection.lengthSq()<.1)a.previousDirection.copy(a.direction);
             a.axis=axis;a.side=side;
         }
+        const paintVariant = GLB_SHIP_CONFIG[this.shipMeshes?.get(actor?.id)?.userData.variant]?.turretPaintVariant;
+        const paintModel = paintVariant && this.glbShipModels.get(paintVariant);
+        if (paintModel) {
+            if (!paintModel.userData.turretArmorMaterial)
+                paintModel.traverse(o => { if (!paintModel.userData.turretArmorMaterial && o.material?.map) paintModel.userData.turretArmorMaterial = o.material; });
+            paintFrigateTurret(mesh, paintModel.userData.turretArmorMaterial);
+        }
+        const reviewedMount=TURRET_LAYOUTS[actor?.combatFit?.hullId]?.[Number(id.split('-').at(-1))];
+        if(reviewedMount?.reviewed&&reviewedMount.normal) {
+            mesh.userData.surfaceRotation??=droneDockRotation(reviewedMount.normal,reviewedMount.restDirection);
+            if(mesh.userData.attachment)mesh.userData.attachment.surfaceRotation=mesh.userData.surfaceRotation;
+            if(!mesh.userData.fleetPainted){
+                const hullMesh=this.shipMeshes?.get(actor.id);let armor;
+                hullMesh?.traverse(o=>{if(!armor&&o.isMesh&&o.material?.map&&!/glass|canopy|window/i.test(o.material.name))armor=o.material;});
+                paintFrigateTurret(mesh,armor);applyFleetPaint(mesh,actor.combatFit.hullId,actor);mesh.userData.fleetPainted=true;
+            }
+        }
         if(actor?.capitalMountHull){
             mesh.userData.targetKind='ship';mesh.userData.targetId=actor.id;
             mesh.userData.targetMount=Number(id.split('-').at(-1));
+            const i=mesh.userData.targetMount,m=(actor.capitalClass==='cruiser'?CRUISER_MOUNTS:FRIGATE_MOUNTS)[i];
+            if(m.normal&&!mesh.userData.surfaceRotation)mesh.userData.surfaceRotation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3().fromArray(m.normal));
+            if(mesh.userData.attachment)mesh.userData.attachment.surfaceRotation=mesh.userData.surfaceRotation;
+            paintFrigateTurret(mesh,this.shipMeshes.get(actor.id)?.userData[actor.capitalClass==='cruiser'?'cruiserArmorMaterial':'frigateArmorMaterial']);
+            setFrigateComponentDamage(mesh,actor.capitalMountHull[i],m.hull??(i<4?100:65));
         }
         mesh.scale.setScalar((size==='M'?1.3:1)*hullScale);
         mesh.position.copy(position);
         if(rotation)mesh.quaternion.copy(rotation);else mesh.quaternion.identity();
-        if(axis===0)mesh.rotateZ(-side*Math.PI/2);
+        if(mesh.userData.surfaceRotation)mesh.quaternion.multiply(mesh.userData.surfaceRotation);
+        else if(axis===0)mesh.rotateZ(-side*Math.PI/2);
         else if(side<0)mesh.rotateX(Math.PI);
         const local=mesh.userData.local.copy(direction).applyQuaternion(mesh.userData.inverse.copy(mesh.quaternion).invert());
         mesh.userData.yaw.rotation.y=Math.atan2(-local.x,-local.z);
@@ -5633,7 +5692,7 @@ export class SpaceRenderer {
         for(const glow of this.capitalCharges?.values()??[]){glow.userData.life-=dt;glow.visible=glow.userData.life>0;}
         for(const [id,mesh] of this.turretMeshes??[]) {
             mesh.userData.life-=dt;
-            if(mesh.userData.life<=0){this.scene.remove(mesh);this.turretMeshes.delete(id);}
+            if(mesh.userData.life<=0){this.scene.remove(mesh);this.disposeObject(mesh);this.turretMeshes.delete(id);}
         }
         this.updateHyperdriveFx(dt);
         if (this.starShimmer) {
@@ -6060,7 +6119,9 @@ export class SpaceRenderer {
     projectTargetToScreen(kind, id, fallbackPosition, mount) {
         let renderedPosition;
         if (kind === 'ship' && Number.isInteger(mount)) {
-            renderedPosition=this.turretMeshes?.get(`${id}-${mount<4?'main-':''}${mount}`)?.position;
+            const component=this.shipMeshes.get(id)?.userData.frigateSystems?.userData.components.get(mount);
+            renderedPosition=this.turretMeshes?.get(`${id}-main-${mount}`)?.position
+                ?? (mount<8?this.turretMeshes?.get(`${id}-${mount}`)?.position:component?.getWorldPosition(this.tmpPosition));
         } else if (kind === 'ship') {
             renderedPosition = this.shipMeshes.get(id)?.position;
         }
@@ -6216,8 +6277,16 @@ export class SpaceRenderer {
         this.radialTextureCache?.clear();
         this.starTextureCache?.clear();
         this.screenTextures.length = 0;
+        for(const model of this.glbShipPaintModels?.values()??[])this.disposeObject(model);
         for (const pending of this.droneModels?.values() ?? []) pending.then(model => { if(model)this.disposeObject(model); });
         this.renderer.dispose();
         this.renderer.domElement.remove();
     }
+}
+
+function droneDockRotation(normal,forward=[0,0,-1]) {
+ const n=new THREE.Vector3(...normal).normalize(),f=new THREE.Vector3(...forward);
+ const z=f.clone().negate().addScaledVector(n,f.dot(n));if(z.lengthSq()<.01)z.set(0,0,1).addScaledVector(n,-n.z);if(z.lengthSq()<.01)z.set(1,0,0);
+ z.normalize();const x=n.clone().cross(z).normalize();z.crossVectors(x,n);
+ return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x,n,z));
 }

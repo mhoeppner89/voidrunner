@@ -25,8 +25,8 @@ export function fixture(offset=0){
     s.forEachObstacleAlongSegment=(a,b,fn)=>s.obstacles.forEach(fn);
     return s;
 }
-function spawn(s,role='pirate',tier='ace',pos=[0,0,180]){
-    const ship=s.spawnShip(role,pos,undefined,undefined,{tier,temperament:'steady'});
+function spawn(s,role='pirate',tier='ace',pos=[0,0,180],hullId='talon'){
+    const ship=s.spawnShip(role,pos,undefined,undefined,{tier,temperament:'steady'},{hullId});
     ship.rotation=[0,0,0,1];ship.velocity=[0,0,-ship.speed];ship.targetId='player';ship.fireCooldown=0;return ship;
 }
 function step(s,ship,dt=1/60){s.save.world.time+=dt;ship.fireCooldown-=dt;regenerateCombatResources(ship,ship.combatFit.resources,dt,100);s.updateAttackAI(ship,new THREE.Vector3().fromArray(s.save.player.position),new THREE.Vector3().fromArray(s.save.player.velocity),dt);}
@@ -58,7 +58,7 @@ test('sustained hits never postpone a pending reaction, and a later attack gets 
 });
 test('veterans drift, aces also reverse; both recover through normal flight controls',()=>{
     for(const tier of ['veteran','ace'])for(const move of ['drift-pass','boost-reversal']) {
-        const s=fixture(),ship=spawn(s,'pirate',tier,[0,0,120]);ship.combatFit=createEnemyLoadout(ship,3);s.npcFlightStats(ship);ship.combatFit.missiles=0;ship.fireCommitReadyAt=100;s.fireNpcGun=()=>{};
+        const s=fixture(),ship=spawn(s,'pirate',tier,[0,0,120]);ship.combatFit=createEnemyLoadout(ship,3,'beam');s.npcFlightStats(ship);ship.combatFit.missiles=0;ship.combatFit.racks?.forEach(r=>r.missiles=0);ship.fireCommitReadyAt=100;s.fireNpcGun=()=>{};
         ship.velocity=move==='drift-pass'?[60,0,-45]:[0,0,76];
         if(move==='boost-reversal'){ship.rotation=[0,1,0,0];ship.attackPhase='extend';}
         const before=new THREE.Vector3(...ship.velocity);step(s,ship);
@@ -72,7 +72,7 @@ test('veterans drift, aces also reverse; both recover through normal flight cont
     }
 });
 test('an obstacle on the drift path cancels the ace commitment and starts its recovery interval',()=>{
-    const s=fixture(),ship=spawn(s,'pirate','ace',[0,0,120]);ship.combatFit=createEnemyLoadout(ship,3);s.npcFlightStats(ship);ship.combatFit.missiles=0;ship.fireCommitReadyAt=100;s.fireNpcGun=()=>{};
+    const s=fixture(),ship=spawn(s,'pirate','ace',[0,0,120]);ship.combatFit=createEnemyLoadout(ship,3,'beam');s.npcFlightStats(ship);ship.combatFit.missiles=0;ship.combatFit.racks?.forEach(r=>r.missiles=0);ship.fireCommitReadyAt=100;s.fireNpcGun=()=>{};
     ship.velocity=[60,0,-45];step(s,ship);assert.equal(ship.aceMove?.kind,'drift-pass');
     s.obstacles=[{id:'rock',x:ship.position[0]+30,y:0,z:ship.position[2]-22.5,radius:15,collisionRadius:15,losRadius:15}];
     ship.aceClearanceAt=0;step(s,ship);
@@ -104,7 +104,8 @@ test('intercept handles equal projectile speed and weapon-specific crossing velo
 test('one hull supports distinct equipment roles and each shot uses its equipped weapon',()=>{
     const ranges=[];
     for(let fitIndex=0;fitIndex<3;fitIndex++){
-        const s=fixture(),ship=spawn(s,'pirate','ace',[0,0,750]);ship.combatFit=createEnemyLoadout(ship,fitIndex);ship.combatFit.missiles=0;
+        // Keep this calibrated three-bay equipment probe on its original Talon hull.
+        const s=fixture(),ship=spawn(s,'pirate','ace',[0,0,750],'talon');ship.combatFit=createEnemyLoadout(ship,fitIndex,['balanced','assault','support'][fitIndex]);ship.combatFit.missiles=0;ship.combatFit.racks?.forEach(r=>r.missiles=0);
         let distance=0;
         for(let i=0;i<1800;i++){step(s,ship);distance+=Math.hypot(...ship.position);assert.ok(ship.position.every(Number.isFinite));}
         ranges.push(Math.round(distance/1800));assert.ok(s.projectiles.length>0,`fit ${fitIndex} must find a firing opportunity`);
@@ -123,7 +124,7 @@ test('a faster ship commits to shield recovery and leaves it on a bounded cooldo
  assert.ok(Math.hypot(...ship.velocity)>ship.speed*.4);
 });
 test('legacy rookie profiles normalize and tutorial/capital weapons retain authored limits',()=>{
-    const pilot=rollPilot(()=>0.5,0.5,'red-talons',{tier:'rookie',temperament:'steady'});
+    const pilot=rollPilot(()=>0.5,0.5,'pirates',{tier:'rookie',temperament:'steady'});
     assert.equal(pilot.tier,'novice');assert.equal(pilot.aim,0.42);
     for(const flag of ['tutorialEnemy','tutorialCompanion','capitalClass']){
         const s=fixture(),ship=spawn(s);ship[flag]=true;ship.gunDamage=3;
@@ -134,7 +135,7 @@ test('legacy rookie profiles normalize and tutorial/capital weapons retain autho
 
 function incomingProbe(tier, dodge=false) {
     const s=fixture();const ships=['pirate','escort','bounty'].map((role,i)=>spawn(s,role,tier,[Math.sin(i*2.1)*220,0,Math.cos(i*2.1)*220]));
-    ships.forEach((ship,i)=>{ship.combatFit=createEnemyLoadout(ship,i);ship.combatFit.missiles=0;});
+    ships.forEach((ship,i)=>{ship.combatFit=createEnemyLoadout(ship,i);ship.combatFit.missiles=0;ship.combatFit.racks?.forEach(r=>r.missiles=0);});
     let hits=0,damage=0;
     const start=new THREE.Vector3(),end=new THREE.Vector3(),vel=new THREE.Vector3(),to=new THREE.Vector3(),segment=new THREE.Vector3();
     for(let i=0;i<1800;i++){
@@ -178,9 +179,9 @@ test('observer loadout presets fit real hull mounts and alter only equipment sta
         support:{gun:'mortar',turret:'pdc'},
         beam:{gun:'beam-emitter',turret:'tracking-turret'},
     };
-    const baseline=createEnemyLoadout({role:'pirate',pilot:{tier:'veteran'},maxShield:58},0);
+    const baseline=createEnemyLoadout({role:'pirate',hullId:'talon',pilot:{tier:'veteran'},maxShield:58},0);
     for(const [id,choice] of Object.entries(expected)){
-        const fit=createEnemyLoadout({role:'pirate',pilot:{tier:'veteran'},maxShield:58},0,id);
+        const fit=createEnemyLoadout({role:'pirate',hullId:'talon',pilot:{tier:'veteran'},maxShield:58},0,id);
         const turretFit=createEnemyLoadout({role:'patrol',pilot:{tier:'veteran'},maxShield:75},0,id);
         assert.equal(fit.fitId,id);
         assert.ok(fit.guns.includes(choice.gun),`${id} should mount its defining gun`);
@@ -189,5 +190,5 @@ test('observer loadout presets fit real hull mounts and alter only equipment sta
         if(id==='assault')assert.ok(fit.stats.maxSpeed>baseline.stats.maxSpeed,'the assault engine should affect NPC flight speed');
         else assert.equal(fit.stats.maxSpeed,baseline.stats.maxSpeed,'the preset must use the real hull stat path');
     }
-    assert.notEqual(createEnemyLoadout({role:'pirate',pilot:{tier:'veteran'},maxShield:58},0,'support').stats.energyCapacity,baseline.stats.energyCapacity);
+    assert.notEqual(createEnemyLoadout({role:'pirate',hullId:'talon',pilot:{tier:'veteran'},maxShield:58},0,'support').stats.energyCapacity,baseline.stats.energyCapacity);
 });

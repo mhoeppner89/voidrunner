@@ -1,0 +1,481 @@
+{
+  "preview": [
+    {
+      "id": "andromeda",
+      "paint": "original",
+      "turrets": 1,
+      "painted": 0
+    },
+    {
+      "id": "andromeda",
+      "paint": "alliance",
+      "turrets": 1,
+      "painted": 16
+    },
+    {
+      "id": "andromeda",
+      "paint": "independent-surveyor",
+      "turrets": 1,
+      "painted": 16
+    },
+    {
+      "id": "andromeda",
+      "paint": "independent-hauler",
+      "turrets": 1,
+      "painted": 16
+    },
+    {
+      "id": "andromeda",
+      "paint": "independent-courier",
+      "turrets": 1,
+      "painted": 16
+    },
+    {
+      "id": "astra",
+      "paint": "original",
+      "turrets": 0,
+      "painted": 0
+    },
+    {
+      "id": "astra",
+      "paint": "alliance",
+      "turrets": 0,
+      "painted": 2
+    },
+    {
+      "id": "astra",
+      "paint": "independent-surveyor",
+      "turrets": 0,
+      "painted": 2
+    },
+    {
+      "id": "astra",
+      "paint": "independent-hauler",
+      "turrets": 0,
+      "painted": 2
+    },
+    {
+      "id": "astra",
+      "paint": "independent-courier",
+      "turrets": 0,
+      "painted": 2
+    },
+    {
+      "id": "atlas",
+      "paint": "original",
+      "turrets": 4,
+      "painted": 0
+    },
+    {
+      "id": "atlas",
+      "paint": "concord",
+      "turrets": 4,
+      "painted": 57
+    },
+    {
+      "id": "atlas",
+      "paint": "independent-surveyor",
+      "turrets": 4,
+      "painted": 57
+    },
+    {
+      "id": "atlas",
+      "paint": "independent-hauler",
+      "turrets": 4,
+      "painted": 57
+    },
+    {
+      "id": "atlas",
+      "paint": "independent-courier",
+      "turrets": 4,
+      "painted": 57
+    },
+    {
+      "id": "blade",
+      "paint": "original",
+      "turrets": 3,
+      "painted": 0
+    },
+    {
+      "id": "blade",
+      "paint": "independent-surveyor",
+      "turrets": 3,
+      "painted": 42
+    },
+    {
+      "id": "blade",
+      "paint": "independent-hauler",
+      "turrets": 3,
+      "painted": 42
+    },
+    {
+      "id": "blade",
+      "paint": "independent-courier",
+      "turrets": 3,
+      "painted": 42
+    },
+    {
+      "id": "blade",
+      "paint": "neutral",
+      "turrets": 3,
+      "painted": 42
+    },
+    {
+      "id": "demon",
+      "paint": "original",
+      "turrets": 0,
+      "painted": 0
+    },
+    {
+      "id": "demon",
+      "paint": "independent-surveyor",
+      "turrets": 0,
+      "painted": 1
+    },
+    {
+      "id": "demon",
+      "paint": "independent-hauler",
+      "turrets": 0,
+      "painted": 1
+    },
+    {
+      "id": "demon",
+      "paint": "independent-courier",
+      "turrets": 0,
+      "painted": 1
+    },
+    {
+      "id": "lancer",
+      "paint": "original",
+      "turrets": 1,
+      "painted": 0
+    },
+    {
+      "id": "lancer",
+      "paint": "alliance",
+      "turrets": 1,
+      "painted": 32
+    },
+    {
+      "id": "lancer",
+      "paint": "independent-surveyor",
+      "turrets": 1,
+      "painted": 32
+    },
+    {
+      "id": "lancer",
+      "paint": "independent-hauler",
+      "turrets": 1,
+      "painted": 32
+    },
+    {
+      "id": "lancer",
+      "paint": "independent-courier",
+      "turrets": 1,
+      "painted": 32
+    },
+    {
+      "id": "lancer",
+      "paint": "neutral",
+      "turrets": 1,
+      "painted": 32
+    },
+    {
+      "id": "legionary",
+      "paint": "original",
+      "turrets": 1,
+      "painted": 0
+    },
+    {
+      "id": "legionary",
+      "paint": "alliance",
+      "turrets": 1,
+      "painted": 15
+    },
+    {
+      "id": "legionary",
+      "paint": "independent-surveyor",
+      "turrets": 1,
+      "painted": 15
+    },
+    {
+      "id": "legionary",
+      "paint": "independent-hauler",
+      "turrets": 1,
+      "painted": 15
+    },
+    {
+      "id": "legionary",
+      "paint": "independent-courier",
+      "turrets": 1,
+      "painted": 15
+    },
+    {
+      "id": "mule",
+      "paint": "original",
+      "turrets": 0,
+      "painted": 0
+    },
+    {
+      "id": "mule",
+      "paint": "independent-surveyor",
+      "turrets": 0,
+      "painted": 29
+    },
+    {
+      "id": "mule",
+      "paint": "independent-hauler",
+      "turrets": 0,
+      "painted": 29
+    },
+    {
+      "id": "mule",
+      "paint": "independent-courier",
+      "turrets": 0,
+      "painted": 29
+    },
+    {
+      "id": "mule",
+      "paint": "neutral",
+      "turrets": 0,
+      "painted": 29
+    },
+    {
+      "id": "prospector",
+      "paint": "original",
+      "turrets": 1,
+      "painted": 0
+    },
+    {
+      "id": "prospector",
+      "paint": "independent-surveyor",
+      "turrets": 1,
+      "painted": 16
+    },
+    {
+      "id": "prospector",
+      "paint": "independent-hauler",
+      "turrets": 1,
+      "painted": 16
+    },
+    {
+      "id": "prospector",
+      "paint": "independent-courier",
+      "turrets": 1,
+      "painted": 16
+    },
+    {
+      "id": "prospector",
+      "paint": "neutral",
+      "turrets": 1,
+      "painted": 16
+    },
+    {
+      "id": "scrapper",
+      "paint": "original",
+      "turrets": 0,
+      "painted": 0
+    },
+    {
+      "id": "scrapper",
+      "paint": "concord",
+      "turrets": 0,
+      "painted": 0
+    },
+    {
+      "id": "scrapper",
+      "paint": "alliance",
+      "turrets": 0,
+      "painted": 1
+    },
+    {
+      "id": "scrapper",
+      "paint": "independent-surveyor",
+      "turrets": 0,
+      "painted": 1
+    },
+    {
+      "id": "scrapper",
+      "paint": "independent-hauler",
+      "turrets": 0,
+      "painted": 1
+    },
+    {
+      "id": "scrapper",
+      "paint": "independent-courier",
+      "turrets": 0,
+      "painted": 1
+    },
+    {
+      "id": "speedster",
+      "paint": "original",
+      "turrets": 0,
+      "painted": 0
+    },
+    {
+      "id": "speedster",
+      "paint": "alliance",
+      "turrets": 0,
+      "painted": 1
+    },
+    {
+      "id": "speedster",
+      "paint": "independent-surveyor",
+      "turrets": 0,
+      "painted": 1
+    },
+    {
+      "id": "speedster",
+      "paint": "independent-hauler",
+      "turrets": 0,
+      "painted": 1
+    },
+    {
+      "id": "speedster",
+      "paint": "independent-courier",
+      "turrets": 0,
+      "painted": 1
+    },
+    {
+      "id": "talon",
+      "paint": "original",
+      "turrets": 0,
+      "painted": 0
+    },
+    {
+      "id": "talon",
+      "paint": "independent-surveyor",
+      "turrets": 0,
+      "painted": 1
+    },
+    {
+      "id": "talon",
+      "paint": "independent-hauler",
+      "turrets": 0,
+      "painted": 1
+    },
+    {
+      "id": "talon",
+      "paint": "independent-courier",
+      "turrets": 0,
+      "painted": 1
+    },
+    {
+      "id": "talon",
+      "paint": "neutral",
+      "turrets": 0,
+      "painted": 1
+    },
+    {
+      "id": "torsas",
+      "paint": "original",
+      "turrets": 1,
+      "painted": 0
+    },
+    {
+      "id": "torsas",
+      "paint": "alliance",
+      "turrets": 1,
+      "painted": 15
+    },
+    {
+      "id": "torsas",
+      "paint": "independent-surveyor",
+      "turrets": 1,
+      "painted": 15
+    },
+    {
+      "id": "torsas",
+      "paint": "independent-hauler",
+      "turrets": 1,
+      "painted": 15
+    },
+    {
+      "id": "torsas",
+      "paint": "independent-courier",
+      "turrets": 1,
+      "painted": 15
+    },
+    {
+      "id": "vanguard",
+      "paint": "original",
+      "turrets": 2,
+      "painted": 0
+    },
+    {
+      "id": "vanguard",
+      "paint": "independent-surveyor",
+      "turrets": 2,
+      "painted": 27
+    },
+    {
+      "id": "vanguard",
+      "paint": "independent-hauler",
+      "turrets": 2,
+      "painted": 27
+    },
+    {
+      "id": "vanguard",
+      "paint": "independent-courier",
+      "turrets": 2,
+      "painted": 27
+    },
+    {
+      "id": "vanguard",
+      "paint": "neutral",
+      "turrets": 2,
+      "painted": 27
+    },
+    {
+      "id": "wayfarer",
+      "paint": "original",
+      "turrets": 1,
+      "painted": 0
+    },
+    {
+      "id": "wayfarer",
+      "paint": "independent-bands",
+      "turrets": 1,
+      "painted": 0
+    },
+    {
+      "id": "wayfarer",
+      "paint": "independent-repairs",
+      "turrets": 1,
+      "painted": 0
+    },
+    {
+      "id": "wayfarer",
+      "paint": "independent-split",
+      "turrets": 1,
+      "painted": 0
+    },
+    {
+      "id": "wayfarer",
+      "paint": "neutral",
+      "turrets": 1,
+      "painted": 14
+    }
+  ],
+  "errors": [],
+  "modes": [
+    {
+      "mode": "career",
+      "ship": "wayfarer",
+      "liveShips": 3,
+      "paintSelection": "independent-split"
+    },
+    {
+      "mode": "arena",
+      "ship": "wayfarer",
+      "liveShips": 1,
+      "paintSelection": "independent-split"
+    },
+    {
+      "mode": "arena-run",
+      "ship": "wayfarer",
+      "liveShips": 1,
+      "paintSelection": "independent-split"
+    }
+  ]
+}

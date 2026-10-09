@@ -15,14 +15,14 @@ export const GALAXY_LOCATIONS = {
             120000
         ],
         "radius": 700,
-        "faction": "frontier-league",
+        "faction": "alliance",
         "guilds": [
             "merchant",
             "bounty"
         ],
         "accent": "#73c9d1",
         "secondary": "#173b4a",
-        "description": "A civilian freeport built from repaired modules and shared work. Its open markets face Acheron’s distant black hole, and its people keep the League supplied without asking who you used to be.",
+        "description": "A civilian freeport built from repaired modules and shared work. Its open markets face Acheron’s distant black hole, and its people keep the Alliance supplied without asking who you used to be.",
         "services": {
             "fuel": true,
             "repair": true,
@@ -51,12 +51,12 @@ export const GALAXY_LOCATIONS = {
                 "id": "haven-factor",
                 "name": "Iona Rell",
                 "role": "Freeport liaison",
-                "affiliation": "Frontier League",
+                "affiliation": "Alliance",
                 "portraitSeed": 311,
                 "lines": [
                     "Haven stays open because everybody here has repaired something for somebody else.",
                     "We trade water, food and machine parts under Acheron’s shadow. No parade, no gatekeeping—just fair weights and a berth if you need one.",
-                    "Unity builds the League’s hard ships. Haven keeps the crews fed and the civilian hulls moving. If you want their trust, start with work that helps people."
+                    "Unity builds the Alliance’s hard ships. Haven keeps the crews fed and the civilian hulls moving. If you want their trust, start with work that helps people."
                 ]
             }
         ]
@@ -73,14 +73,14 @@ export const GALAXY_LOCATIONS = {
             30000
         ],
         "radius": 900,
-        "faction": "frontier-league",
+        "faction": "alliance",
         "guilds": [
             "merchant",
             "bounty"
         ],
         "accent": "#dfbd63",
         "secondary": "#1c2d41",
-        "description": "The League’s disciplined shipworks: a ring of drydocks, test bays and supply halls where the frontier hulls are assembled and refitted beneath Acheron’s distant shadow.",
+        "description": "The Alliance’s disciplined shipworks: a ring of drydocks, test bays and supply halls where the frontier hulls are assembled and refitted beneath Acheron’s distant shadow.",
         "services": {
             "fuel": true,
             "repair": true,
@@ -111,12 +111,12 @@ export const GALAXY_LOCATIONS = {
                 "id": "league-yard-factor",
                 "name": "Commander Soren Vale",
                 "role": "Shipworks commander",
-                "affiliation": "Frontier League",
+                "affiliation": "Alliance",
                 "portraitSeed": 312,
                 "lines": [
                     "A hull tells you what its builders believe. Ours are compact, repairable and built to come home.",
-                    "Unity does not sell military hulls on a handshake. Earn League standing, then choose the ship that matches the work you are willing to do.",
-                    "The League’s ships are in these bays, not in some admiral’s story. Look closely at the Speedster, Legionary, Andromeda, Torsas and Astra before you decide."
+                    "Unity does not sell military hulls on a handshake. Earn Alliance standing, then choose the ship that matches the work you are willing to do.",
+                    "The Alliance’s ships are in these bays, not in some admiral’s story. Look closely at the Speedster, Legionary, Andromeda, Torsas and Astra before you decide."
                 ]
             }
         ]
@@ -133,7 +133,7 @@ export const GALAXY_LOCATIONS = {
             -150000
         ],
         "radius": 600,
-        "faction": "frontier-league",
+        "faction": "alliance",
         "guilds": [
             "merchant",
             "bounty"
@@ -169,7 +169,7 @@ export const GALAXY_LOCATIONS = {
                 "id": "cinderfall-factor",
                 "name": "Mika Dorn",
                 "role": "Foundry liaison",
-                "affiliation": "Frontier League",
+                "affiliation": "Alliance",
                 "portraitSeed": 313,
                 "lines": [
                     "If the floor is warm, the habitat is earning its keep.",
@@ -191,11 +191,11 @@ export const GALAXY_LOCATIONS = {
             -115000
         ],
         "radius": 3400,
-        "faction": "frontier-league",
+        "faction": "alliance",
         "guilds": [],
         "accent": "#c4934b",
         "secondary": "#2a2331",
-        "description": "The Shattered Crown is a mineral-rich belt of broken rock and old machinery. League scouts mark safe lanes while Cinderfall crews take the risks that keep its furnaces fed.",
+        "description": "The Shattered Crown is a mineral-rich belt of broken rock and old machinery. Alliance scouts mark safe lanes while Cinderfall crews take the risks that keep its furnaces fed.",
         "services": {
             "fuel": false,
             "repair": false,
@@ -218,7 +218,7 @@ export const GALAXY_LOCATIONS = {
         position: [-158000, 22000, 146000],
         radius: 520,
         dockRadius: 980,
-        faction: 'salvage-union',
+        faction: 'independents',
         guilds: ['salvage'],
         accent: '#c98a52',
         secondary: '#3d2e2b',
@@ -495,7 +495,7 @@ export const GALAXY_LOCATIONS = {
         position: [-178000, -26000, 142000],
         radius: 5480,
         dockRadius: 7920,
-        faction: 'red-talons',
+        faction: 'pirates',
         guilds: ['syndicate', 'merchant'],
         accent: '#d26759',
         secondary: '#4c2025',
@@ -534,7 +534,7 @@ export const GALAXY_LOCATIONS = {
             luxuries: 16,
             arms: 48,
         },
-        shipsForSale: ['talon', 'vanguard', 'prospector'],
+        shipsForSale: ['scrapper', 'demon', 'talon', 'vanguard', 'prospector'],
         encounterRate: 0.62,
         people: [
             {
@@ -587,7 +587,7 @@ export const GALAXY_LOCATIONS = {
         position: [188000, 14000, -160000],
         radius: 1260,
         dockRadius: 1860,
-        faction: 'free-merchants',
+        faction: 'independents',
         guilds: ['merchant'],
         accent: '#c48a62',
         secondary: '#473338',
@@ -678,7 +678,7 @@ export const GALAXY_LOCATIONS = {
         position: [-48000, -18000, 212000],
         radius: 820,
         dockRadius: 1320,
-        faction: 'free-merchants',
+        faction: 'independents',
         guilds: [],
         accent: '#d18c55',
         secondary: '#492b2b',
@@ -704,7 +704,7 @@ export const GALAXY_LOCATIONS = {
         kind: 'field',
         position: [118000, 18000, -62000],
         radius: 3420,
-        faction: 'red-talons',
+        faction: 'pirates',
         accent: '#9a6c61',
         secondary: '#39252b',
         description: 'A broken asteroid region where raiders, bounty targets, and patient pilots use the rocks to disappear.',
@@ -811,7 +811,7 @@ export const GALAXY_LOCATIONS = {
         position: [-182000, -30000, 156000],
         radius: 11800,
         dockRadius: 17000,
-        faction: 'frontier-miners',
+        faction: 'independents',
         guilds: ['mining', 'merchant'],
         accent: '#a6cdd6',
         secondary: '#314b5b',
@@ -928,7 +928,7 @@ export const GALAXY_LOCATIONS = {
         kind: 'rings',
         position: [120000, 0, 92000],
         radius: 3650,
-        faction: 'frontier-miners',
+        faction: 'independents',
         accent: '#c0d5d4',
         secondary: '#445964',
         description: 'A vast field of ice, dust, and rock with shifting corridors, lost probes, hidden caches, and unreliable sensors.',

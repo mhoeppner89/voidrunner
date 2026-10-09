@@ -10,7 +10,7 @@ export const ARENA_RECORD_KEY='voidrunner-arena-record-v1';
 // Enemy entries: role, pilot tier, gun fit, arrival delay, optional finite ordnance.
 // Omitted ordnance means no missiles, independently of the normal flight loadout.
 // Each wave specifies guns and turrets explicitly, independent of world presets.
-const enemy=(role,tier,guns,delay=0,ordnance={})=>[role,tier,0,delay,{guns,turrets:['pdc','pdc'],...ordnance}];
+const enemy=(role,tier,guns,delay=0,ordnance={})=>[role,tier,0,delay,{guns,turrets:['pdc','pdc'],hullId:({pirate:'talon',escort:'wayfarer',bounty:'lancer',patrol:'vanguard'})[role],...ordnance}];
 export const RUN_WAVES=[
  {name:'First contact',hint:'One hesitant pilot. Take your time and watch your energy.',environment:'open',enemies:[enemy('pirate','novice',['beam-emitter',null,null])]},
  {name:'Second contact',hint:'A second novice joins after twelve seconds. Watch the entry marker.',environment:'open',enemies:[enemy('pirate','novice',['pulse-cannon','pulse-cannon',null]),enemy('escort','novice',['pulse-cannon','beam-emitter'],12)]},

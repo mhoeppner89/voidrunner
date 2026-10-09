@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v356-0-8-2dr-ordnance-release';
+const CACHE = 'voidrunner-v381-0-8-2eq-current-fleet';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -20,13 +20,30 @@ const CORE_ASSETS = [
   './src/style.css',
   './src/main.js',
   './src/game/cockpitDamage.js',
+  './src/game/fleetPaintCatalog.js',
+  './src/game/fleetEquipmentData.js',
+  './src/game/fleetTurretClearance.js',
+  './src/game/fleetPaint.js',
+  './src/game/independentPaints.js',
+  './src/game/wayfarerLiveries.js',
   './src/game/explosionFx.js',
+  './src/game/capitalEngineExhaust.js',
+  './src/game/battleshipModels.js',
+  './src/game/battleshipModelData.js',
+  './src/game/carrierModels.js',
+  './src/game/carrierModelData.js',
   './src/game/sampleSfx.js',
   './src/game/sampleSfxManifest.js',
   './src/game/repairSites.js',
   './src/game/capitalCombat.js',
   './src/game/npcDrones.js',
   './src/game/frigateMounts.js',
+  './src/game/frigateComponents.js',
+  './src/game/frigateCollisionData.js',
+  './src/game/cruiserCombat.js',
+  './src/game/cruiserModels.js',
+  './src/game/cruiserModelData.js',
+  './src/game/cruiserCollisionData.js',
   './src/game/audio.js',
   './src/game/arenaRun.js',
   './src/game/wingOrders.js',
@@ -40,6 +57,8 @@ const CORE_ASSETS = [
   './src/game/pdcFireControl.js',
   './src/game/combatResources.js',
   './src/game/data.js',
+  './src/game/factions.js',
+  './src/game/careerDanger.js',
   './src/game/leagueContent.js',
   './src/game/blackHole.js',
   './src/game/stationOccupants.js',

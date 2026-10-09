@@ -11,6 +11,7 @@ export const SENSOR_CLOSE_VISUAL_RANGE = 70;
 const BASE_SIGNATURE_BY_VARIANT = Object.freeze({
     kestrel: 105,
     talon: 125,
+    scrapper: 105, demon:140, mule:235,
     lancer: 155,
     warden: 180,
     prospector: 210,

@@ -47,13 +47,13 @@ test('finishing a sortie persists a bounded debrief and preserves negative stand
     beginSortie(save, 'helix');
     save.world.time = 90;
     save.player.guildRep.merchant -= 3;
-    save.player.reputation['red-talons'] -= 4;
+    save.player.reputation['pirates'] -= 4;
     const finished = finishSortie(save, 'helix', 'loss');
 
     assert.equal(save.world.sortie, null);
     assert.equal(save.world.sortieHistory.length, 1);
     assert.equal(finished.guildRepDelta.merchant, -3);
-    assert.equal(finished.reputationDelta['red-talons'], -4);
+    assert.equal(finished.reputationDelta['pirates'], -4);
     assert.equal(finished.completedAt, 90);
 });
 

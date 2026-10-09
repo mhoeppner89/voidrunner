@@ -1,8 +1,7 @@
 import { SHIPS } from './data.js';
 
-// Every hull the player can own and fly: the six career-yard hulls followed by
-// the five Frontier League hulls. Derived from SHIPS so a hull added to the
-// data table automatically joins the Arena Run offers and the observer palette.
+// Every hull the player can own and fly: career-yard, League and pirate hulls.
+// Derived from SHIPS so new hulls join Arena Run offers and the observer palette.
 // The Concord frigate is an authored capital, never player-flyable, and lives
 // outside this pool.
 export const PLAYER_FLYABLE_HULLS = Object.freeze(Object.keys(SHIPS));
@@ -22,6 +21,7 @@ export const WINGMAN_OFFER_COUNT = 3;
 // base hulls need an explicit mapping (the role drives the hull's flight stats
 // and doctrine flags in spawnShip); League hulls carry their own variant id.
 export const HULL_OBSERVER_ROLE = Object.freeze({
+    scrapper:'pirate', demon:'pirate', mule:'trader',
     blade: 'patrol',
     wayfarer: 'escort',
     vanguard: 'patrol',
@@ -41,6 +41,7 @@ export const HULL_OBSERVER_ROLE = Object.freeze({
 // archetype; League hulls pass 'varied' so they keep their authored LEAGUE_FITS
 // role fit (an Andromeda wingman arrives with its real torpedo and swarm racks).
 export const HULL_WINGMAN_FIT = Object.freeze({
+    scrapper:'varied', demon:'varied', mule:'varied',
     blade: 'assault',
     wayfarer: 'balanced',
     vanguard: 'support',

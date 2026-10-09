@@ -1,0 +1,6076 @@
+{
+  "ship": "concord-battleship",
+  "candidate": "candidate.glb",
+  "coordinateFrames": {
+    "blender": "X longitudinal, Y lateral, Z up; bow -X",
+    "rawGLB": "[Blender X, Blender Z, -Blender Y]; bow -X",
+    "runtime": "[-GLB Z, GLB Y, GLB X] × 1130; bow -Z",
+    "scaleSource": "GLB_SHIP_CONFIG scale 565 × npcShipScaleForVariant 2 × baseScale 1",
+    "yawRadians": -1.5707963267948966,
+    "runtimeScale": 1130,
+    "pivot": [
+      0,
+      0,
+      0
+    ]
+  },
+  "boundsGLB": [
+    [
+      -0.9919999837875366,
+      -0.3959999978542328,
+      -0.5339125990867615
+    ],
+    [
+      0.9998502731323242,
+      0.40138548612594604,
+      0.5339125990867615
+    ]
+  ],
+  "boundsRuntime": [
+    [
+      -603.3212369680405,
+      -447.47999757528305,
+      -1120.9599816799164
+    ],
+    [
+      603.3212369680405,
+      453.56559932231903,
+      1129.8308086395264
+    ]
+  ],
+  "sizeRuntime": [
+    1206.642473936081,
+    901.0455968976021,
+    2250.7907903194427
+  ],
+  "engines": [
+    {
+      "id": 0,
+      "source": "retained frozen engine",
+      "positionGLB": [
+        0.9186068738625113,
+        -0.05027645453810692,
+        0.14330829679965973
+      ],
+      "axisGLB": [
+        1,
+        0,
+        0
+      ],
+      "positionBlender": [
+        0.9186068738625113,
+        -0.14330829679965973,
+        -0.05027645453810692
+      ],
+      "positionRuntime": [
+        -161.9383753836155,
+        -56.81239362806082,
+        1038.0257674646377
+      ],
+      "axisRuntime": [
+        0,
+        0,
+        1
+      ],
+      "positionPreview": [
+        -0.14330829679965973,
+        -0.05027645453810692,
+        0.9186068738625113
+      ],
+      "radiiGLB": [
+        0.08491404059286063,
+        0.08491404059286063
+      ],
+      "radiiRuntime": [
+        95.95286586993251,
+        95.95286586993251
+      ],
+      "radiiPreview": [
+        0.08491404059286063,
+        0.08491404059286063
+      ],
+      "glowCoreRadiusRaw": 0.02605,
+      "mouthClearance": {
+        "clear": true,
+        "samples": 17,
+        "source": "runtime-qa.json"
+      },
+      "supportPart": "Battleship exhaust blue core",
+      "aperture": {
+        "name": "Battleship rooted engine casing",
+        "center": [
+          0.9797921180725098,
+          -0.05027645425871015,
+          0.14330829229205846
+        ],
+        "outward": [
+          1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.08491404059286063,
+        "radiusV": 0.08491404059286063,
+        "minDepth": 0.050842433233261056,
+        "maxDepth": 0.07400296735763544,
+        "coordinateFrame": "raw GLB",
+        "positionRuntime": [
+          -161.93837029002606,
+          -56.812393312342465,
+          1107.165093421936
+        ],
+        "outwardRuntime": [
+          0,
+          0,
+          1
+        ],
+        "ellipseRadiiRuntime": [
+          95.95286586993251,
+          95.95286586993251
+        ]
+      },
+      "glow": {
+        "positionGLB": [
+          0.9782921180725098,
+          -0.05027645425871015,
+          0.14330829229205846
+        ],
+        "positionRuntime": [
+          -161.93837029002606,
+          -56.812393312342465,
+          1105.470093421936
+        ],
+        "positionPreview": [
+          -0.14330829229205846,
+          -0.05027645425871015,
+          0.9782921180725098
+        ],
+        "axisGLB": [
+          1,
+          0,
+          0
+        ],
+        "axisRuntime": [
+          0,
+          0,
+          1
+        ],
+        "radiiGLB": [
+          0.07642263653357458,
+          0.07642263653357458
+        ],
+        "radiiRuntime": [
+          86.35757928293927,
+          86.35757928293927
+        ],
+        "radiiPreview": [
+          0.07642263653357458,
+          0.07642263653357458
+        ],
+        "lipInsetMetres": 1.695,
+        "mouthDiameterCoverage": 0.9,
+        "widthRatioToFrozenCore": 2.9336904619414423,
+        "shader": "battleship-exhaust.js; soft radial face and two faint crossed plumes",
+        "preservePhysicalEngineAndSocket": true
+      }
+    },
+    {
+      "id": 1,
+      "source": "retained frozen engine",
+      "positionGLB": [
+        0.9186068738625113,
+        -0.2333288937807083,
+        0.14330829679965973
+      ],
+      "axisGLB": [
+        1,
+        0,
+        0
+      ],
+      "positionBlender": [
+        0.9186068738625113,
+        -0.14330829679965973,
+        -0.2333288937807083
+      ],
+      "positionRuntime": [
+        -161.9383753836155,
+        -263.6616499722004,
+        1038.0257674646377
+      ],
+      "axisRuntime": [
+        0,
+        0,
+        1
+      ],
+      "positionPreview": [
+        -0.14330829679965973,
+        -0.2333288937807083,
+        0.9186068738625113
+      ],
+      "radiiGLB": [
+        0.0849140418682774,
+        0.0849140418682774
+      ],
+      "radiiRuntime": [
+        95.95286731115347,
+        95.95286731115347
+      ],
+      "radiiPreview": [
+        0.0849140418682774,
+        0.0849140418682774
+      ],
+      "glowCoreRadiusRaw": 0.02605,
+      "mouthClearance": {
+        "clear": true,
+        "samples": 17,
+        "source": "runtime-qa.json"
+      },
+      "supportPart": "Battleship exhaust blue core.001",
+      "aperture": {
+        "name": "Battleship rooted engine casing.001",
+        "center": [
+          0.9797921180725098,
+          -0.2333288937807083,
+          0.14330829229205846
+        ],
+        "outward": [
+          1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.0849140418682774,
+        "radiusV": 0.0849140418682774,
+        "minDepth": 0.050842433233261056,
+        "maxDepth": 0.07400296735763544,
+        "coordinateFrame": "raw GLB",
+        "positionRuntime": [
+          -161.93837029002606,
+          -263.6616499722004,
+          1107.165093421936
+        ],
+        "outwardRuntime": [
+          0,
+          0,
+          1
+        ],
+        "ellipseRadiiRuntime": [
+          95.95286731115347,
+          95.95286731115347
+        ]
+      },
+      "glow": {
+        "positionGLB": [
+          0.9782921180725098,
+          -0.2333288937807083,
+          0.14330829229205846
+        ],
+        "positionRuntime": [
+          -161.93837029002606,
+          -263.6616499722004,
+          1105.470093421936
+        ],
+        "positionPreview": [
+          -0.14330829229205846,
+          -0.2333288937807083,
+          0.9782921180725098
+        ],
+        "axisGLB": [
+          1,
+          0,
+          0
+        ],
+        "axisRuntime": [
+          0,
+          0,
+          1
+        ],
+        "radiiGLB": [
+          0.07642263768144966,
+          0.07642263768144966
+        ],
+        "radiiRuntime": [
+          86.35758058003812,
+          86.35758058003812
+        ],
+        "radiiPreview": [
+          0.07642263768144966,
+          0.07642263768144966
+        ],
+        "lipInsetMetres": 1.695,
+        "mouthDiameterCoverage": 0.9,
+        "widthRatioToFrozenCore": 2.933690506005745,
+        "shader": "battleship-exhaust.js; soft radial face and two faint crossed plumes",
+        "preservePhysicalEngineAndSocket": true
+      }
+    },
+    {
+      "id": 2,
+      "source": "retained frozen engine",
+      "positionGLB": [
+        0.9186068738625113,
+        -0.05027645453810692,
+        -0.14330829679965973
+      ],
+      "axisGLB": [
+        1,
+        0,
+        0
+      ],
+      "positionBlender": [
+        0.9186068738625113,
+        0.14330829679965973,
+        -0.05027645453810692
+      ],
+      "positionRuntime": [
+        161.9383753836155,
+        -56.81239362806082,
+        1038.0257674646377
+      ],
+      "axisRuntime": [
+        0,
+        0,
+        1
+      ],
+      "positionPreview": [
+        0.14330829679965973,
+        -0.05027645453810692,
+        0.9186068738625113
+      ],
+      "radiiGLB": [
+        0.08491404059286063,
+        0.08491404059286063
+      ],
+      "radiiRuntime": [
+        95.95286586993251,
+        95.95286586993251
+      ],
+      "radiiPreview": [
+        0.08491404059286063,
+        0.08491404059286063
+      ],
+      "glowCoreRadiusRaw": 0.02605,
+      "mouthClearance": {
+        "clear": true,
+        "samples": 17,
+        "source": "runtime-qa.json"
+      },
+      "supportPart": "Battleship exhaust blue core.002",
+      "aperture": {
+        "name": "Battleship rooted engine casing.002",
+        "center": [
+          0.9797921180725098,
+          -0.05027645425871015,
+          -0.14330829229205846
+        ],
+        "outward": [
+          1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.08491404059286063,
+        "radiusV": 0.08491404059286063,
+        "minDepth": 0.050842433233261056,
+        "maxDepth": 0.07400296735763544,
+        "coordinateFrame": "raw GLB",
+        "positionRuntime": [
+          161.93837029002606,
+          -56.812393312342465,
+          1107.165093421936
+        ],
+        "outwardRuntime": [
+          0,
+          0,
+          1
+        ],
+        "ellipseRadiiRuntime": [
+          95.95286586993251,
+          95.95286586993251
+        ]
+      },
+      "glow": {
+        "positionGLB": [
+          0.9782921180725098,
+          -0.05027645425871015,
+          -0.14330829229205846
+        ],
+        "positionRuntime": [
+          161.93837029002606,
+          -56.812393312342465,
+          1105.470093421936
+        ],
+        "positionPreview": [
+          0.14330829229205846,
+          -0.05027645425871015,
+          0.9782921180725098
+        ],
+        "axisGLB": [
+          1,
+          0,
+          0
+        ],
+        "axisRuntime": [
+          0,
+          0,
+          1
+        ],
+        "radiiGLB": [
+          0.07642263653357458,
+          0.07642263653357458
+        ],
+        "radiiRuntime": [
+          86.35757928293927,
+          86.35757928293927
+        ],
+        "radiiPreview": [
+          0.07642263653357458,
+          0.07642263653357458
+        ],
+        "lipInsetMetres": 1.695,
+        "mouthDiameterCoverage": 0.9,
+        "widthRatioToFrozenCore": 2.9336904619414423,
+        "shader": "battleship-exhaust.js; soft radial face and two faint crossed plumes",
+        "preservePhysicalEngineAndSocket": true
+      }
+    },
+    {
+      "id": 3,
+      "source": "retained frozen engine",
+      "positionGLB": [
+        0.9186068738625113,
+        -0.2333288937807083,
+        -0.14330829679965973
+      ],
+      "axisGLB": [
+        1,
+        0,
+        0
+      ],
+      "positionBlender": [
+        0.9186068738625113,
+        0.14330829679965973,
+        -0.2333288937807083
+      ],
+      "positionRuntime": [
+        161.9383753836155,
+        -263.6616499722004,
+        1038.0257674646377
+      ],
+      "axisRuntime": [
+        0,
+        0,
+        1
+      ],
+      "positionPreview": [
+        0.14330829679965973,
+        -0.2333288937807083,
+        0.9186068738625113
+      ],
+      "radiiGLB": [
+        0.08491404186827742,
+        0.08491404186827742
+      ],
+      "radiiRuntime": [
+        95.95286731115348,
+        95.95286731115348
+      ],
+      "radiiPreview": [
+        0.08491404186827742,
+        0.08491404186827742
+      ],
+      "glowCoreRadiusRaw": 0.02605,
+      "mouthClearance": {
+        "clear": true,
+        "samples": 17,
+        "source": "runtime-qa.json"
+      },
+      "supportPart": "Battleship exhaust blue core.003",
+      "aperture": {
+        "name": "Battleship rooted engine casing.003",
+        "center": [
+          0.9797921180725098,
+          -0.2333288937807083,
+          -0.14330829229205846
+        ],
+        "outward": [
+          1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.08491404186827742,
+        "radiusV": 0.08491404186827742,
+        "minDepth": 0.050842433233261056,
+        "maxDepth": 0.07400296735763544,
+        "coordinateFrame": "raw GLB",
+        "positionRuntime": [
+          161.93837029002606,
+          -263.6616499722004,
+          1107.165093421936
+        ],
+        "outwardRuntime": [
+          0,
+          0,
+          1
+        ],
+        "ellipseRadiiRuntime": [
+          95.95286731115348,
+          95.95286731115348
+        ]
+      },
+      "glow": {
+        "positionGLB": [
+          0.9782921180725098,
+          -0.2333288937807083,
+          -0.14330829229205846
+        ],
+        "positionRuntime": [
+          161.93837029002606,
+          -263.6616499722004,
+          1105.470093421936
+        ],
+        "positionPreview": [
+          0.14330829229205846,
+          -0.2333288937807083,
+          0.9782921180725098
+        ],
+        "axisGLB": [
+          1,
+          0,
+          0
+        ],
+        "axisRuntime": [
+          0,
+          0,
+          1
+        ],
+        "radiiGLB": [
+          0.07642263768144968,
+          0.07642263768144968
+        ],
+        "radiiRuntime": [
+          86.35758058003813,
+          86.35758058003813
+        ],
+        "radiiPreview": [
+          0.07642263768144968,
+          0.07642263768144968
+        ],
+        "lipInsetMetres": 1.695,
+        "mouthDiameterCoverage": 0.9,
+        "widthRatioToFrozenCore": 2.9336905060057457,
+        "shader": "battleship-exhaust.js; soft radial face and two faint crossed plumes",
+        "preservePhysicalEngineAndSocket": true
+      }
+    }
+  ],
+  "mainCannons": [
+    {
+      "id": 0,
+      "label": "Forward port main cannon",
+      "kind": "fixed-heavy-battery",
+      "size": "existing",
+      "axis": 1,
+      "side": 1,
+      "positionGLB": [
+        -0.273863133303887,
+        -0.007322798222303389,
+        0.22292402386665344
+      ],
+      "directionGLB": [
+        -1,
+        0,
+        0
+      ],
+      "positionBlender": [
+        -0.27386313676834106,
+        -0.22292402386665344,
+        -0.007322798017412424
+      ],
+      "pivotBlender": [
+        -0.11237692770858605,
+        -0.22292402262489,
+        -0.03816315531730652
+      ],
+      "previous": {
+        "positionGLB": [
+          -0.273863133303887,
+          0.02267720177769661,
+          0.22292402386665344
+        ],
+        "positionRuntime": [
+          -251.9041469693184,
+          25.62523800879717,
+          -309.4653406333923
+        ],
+        "positionPreview": [
+          -0.22292402386665344,
+          0.02267720177769661,
+          -0.273863133303887
+        ]
+      },
+      "deltaBlender": [
+        0,
+        0,
+        -0.03
+      ],
+      "verticalReductionMetres": 33.9,
+      "parts": [
+        "Battleship battery bearing",
+        "Battleship low rounded battery armor",
+        "Battleship angular heavy barrel",
+        "Battleship black muzzle"
+      ],
+      "positionRuntime": [
+        -251.9041469693184,
+        -8.27476199120283,
+        -309.4653406333923
+      ],
+      "directionRuntime": [
+        0,
+        0,
+        -1
+      ],
+      "positionPreview": [
+        -0.22292402386665344,
+        -0.007322798222303389,
+        -0.273863133303887
+      ],
+      "directionPreview": [
+        0,
+        0,
+        -1
+      ],
+      "pivotGLB": [
+        -0.11237692770858605,
+        -0.03816315531730652,
+        0.22292402262489
+      ],
+      "pivotRuntime": [
+        -251.9041455661257,
+        -43.124365508556366,
+        -126.98592831070223
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "radialBundleMetres": [
+          0,
+          3.164,
+          5.8759999999999994
+        ],
+        "samples": 17,
+        "rayDistanceMetres": 4520,
+        "source": "runtime-qa.json"
+      }
+    },
+    {
+      "id": 1,
+      "label": "Forward starboard main cannon",
+      "kind": "fixed-heavy-battery",
+      "size": "existing",
+      "axis": 1,
+      "side": 1,
+      "positionGLB": [
+        -0.273863133303887,
+        -0.007322798222303389,
+        -0.22292402386665344
+      ],
+      "directionGLB": [
+        -1,
+        0,
+        0
+      ],
+      "positionBlender": [
+        -0.27386313676834106,
+        0.22292402386665344,
+        -0.007322798017412424
+      ],
+      "pivotBlender": [
+        -0.11237692770858605,
+        0.22292402262489,
+        -0.03816315531730652
+      ],
+      "previous": {
+        "positionGLB": [
+          -0.273863133303887,
+          0.02267720177769661,
+          -0.22292402386665344
+        ],
+        "positionRuntime": [
+          251.9041469693184,
+          25.62523800879717,
+          -309.4653406333923
+        ],
+        "positionPreview": [
+          0.22292402386665344,
+          0.02267720177769661,
+          -0.273863133303887
+        ]
+      },
+      "deltaBlender": [
+        0,
+        0,
+        -0.03
+      ],
+      "verticalReductionMetres": 33.9,
+      "parts": [
+        "Battleship battery bearing.001",
+        "Battleship low rounded battery armor.001",
+        "Battleship angular heavy barrel.001",
+        "Battleship black muzzle.001"
+      ],
+      "positionRuntime": [
+        251.9041469693184,
+        -8.27476199120283,
+        -309.4653406333923
+      ],
+      "directionRuntime": [
+        0,
+        0,
+        -1
+      ],
+      "positionPreview": [
+        0.22292402386665344,
+        -0.007322798222303389,
+        -0.273863133303887
+      ],
+      "directionPreview": [
+        0,
+        0,
+        -1
+      ],
+      "pivotGLB": [
+        -0.11237692770858605,
+        -0.03816315531730652,
+        -0.22292402262489
+      ],
+      "pivotRuntime": [
+        251.9041455661257,
+        -43.124365508556366,
+        -126.98592831070223
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "radialBundleMetres": [
+          0,
+          3.164,
+          5.8759999999999994
+        ],
+        "samples": 17,
+        "rayDistanceMetres": 4520,
+        "source": "runtime-qa.json"
+      }
+    },
+    {
+      "id": 2,
+      "label": "Aft port main cannon",
+      "kind": "fixed-heavy-battery",
+      "size": "existing",
+      "axis": 1,
+      "side": 1,
+      "positionGLB": [
+        0.20453060086638528,
+        -0.007322798222303389,
+        0.24591537197923238
+      ],
+      "directionGLB": [
+        -0.984807753012208,
+        0,
+        0.17364817766693033
+      ],
+      "positionBlender": [
+        0.20453059673309326,
+        -0.24591536819934845,
+        -0.007322798017412424
+      ],
+      "pivotBlender": [
+        0.36400532722473145,
+        -0.22292402262489,
+        -0.03816315531730652
+      ],
+      "previous": {
+        "positionGLB": [
+          0.20453060086638528,
+          0.02267720177769661,
+          0.24591537197923238
+        ],
+        "positionRuntime": [
+          -277.8843703365326,
+          25.62523800879717,
+          231.11957897901536
+        ],
+        "positionPreview": [
+          -0.24591537197923238,
+          0.02267720177769661,
+          0.20453060086638528
+        ]
+      },
+      "deltaBlender": [
+        0,
+        0,
+        -0.03
+      ],
+      "verticalReductionMetres": 33.9,
+      "parts": [
+        "Battleship battery bearing.002",
+        "Battleship low rounded battery armor.002",
+        "Battleship angular heavy barrel.002",
+        "Battleship black muzzle.002"
+      ],
+      "positionRuntime": [
+        -277.8843703365326,
+        -8.27476199120283,
+        231.11957897901536
+      ],
+      "directionRuntime": [
+        -0.17364817766693033,
+        0,
+        -0.984807753012208
+      ],
+      "positionPreview": [
+        -0.24591537197923238,
+        -0.007322798222303389,
+        0.20453060086638528
+      ],
+      "directionPreview": [
+        -0.17364817766693033,
+        0,
+        -0.984807753012208
+      ],
+      "pivotGLB": [
+        0.36400532722473145,
+        -0.03816315531730652,
+        0.22292402262489
+      ],
+      "pivotRuntime": [
+        -251.9041455661257,
+        -43.124365508556366,
+        411.32601976394653
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "radialBundleMetres": [
+          0,
+          3.164,
+          5.8759999999999994
+        ],
+        "samples": 17,
+        "rayDistanceMetres": 4520,
+        "source": "runtime-qa.json"
+      }
+    },
+    {
+      "id": 3,
+      "label": "Aft starboard main cannon",
+      "kind": "fixed-heavy-battery",
+      "size": "existing",
+      "axis": 1,
+      "side": 1,
+      "positionGLB": [
+        0.20453058596522408,
+        -0.007322798222303389,
+        -0.24591534217691
+      ],
+      "directionGLB": [
+        -0.984807753012208,
+        0,
+        -0.17364817766693033
+      ],
+      "positionBlender": [
+        0.20453058183193207,
+        0.24591533839702606,
+        -0.007322798017412424
+      ],
+      "pivotBlender": [
+        0.36400532722473145,
+        0.22292402262489,
+        -0.03816315531730652
+      ],
+      "previous": {
+        "positionGLB": [
+          0.20453058596522408,
+          0.02267720177769661,
+          -0.24591534217691
+        ],
+        "positionRuntime": [
+          277.8843366599083,
+          25.62523800879717,
+          231.1195621407032
+        ],
+        "positionPreview": [
+          0.24591534217691,
+          0.02267720177769661,
+          0.20453058596522408
+        ]
+      },
+      "deltaBlender": [
+        0,
+        0,
+        -0.03
+      ],
+      "verticalReductionMetres": 33.9,
+      "parts": [
+        "Battleship battery bearing.003",
+        "Battleship low rounded battery armor.003",
+        "Battleship angular heavy barrel.003",
+        "Battleship black muzzle.003"
+      ],
+      "positionRuntime": [
+        277.8843366599083,
+        -8.27476199120283,
+        231.1195621407032
+      ],
+      "directionRuntime": [
+        0.17364817766693033,
+        0,
+        -0.984807753012208
+      ],
+      "positionPreview": [
+        0.24591534217691,
+        -0.007322798222303389,
+        0.20453058596522408
+      ],
+      "directionPreview": [
+        0.17364817766693033,
+        0,
+        -0.984807753012208
+      ],
+      "pivotGLB": [
+        0.36400532722473145,
+        -0.03816315531730652,
+        -0.22292402262489
+      ],
+      "pivotRuntime": [
+        251.9041455661257,
+        -43.124365508556366,
+        411.32601976394653
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "radialBundleMetres": [
+          0,
+          3.164,
+          5.8759999999999994
+        ],
+        "samples": 17,
+        "rayDistanceMetres": 4520,
+        "source": "runtime-qa.json"
+      }
+    }
+  ],
+  "hangar": {
+    "openingBlender": [
+      [
+        -0.299,
+        -0.092,
+        -0.329
+      ],
+      [
+        0.254,
+        0.092,
+        -0.329
+      ]
+    ],
+    "ceilingZBlender": -0.236,
+    "depthRaw": 0.093,
+    "lengthMetres": 624.8900000000001,
+    "widthMetres": 207.92,
+    "depthMetres": 105.09,
+    "cavity": "Closed exact boolean subtraction from the original citadel",
+    "coamingThicknessRaw": 0.0168,
+    "openingGLB": [
+      [
+        -0.299,
+        -0.329,
+        0.092
+      ],
+      [
+        0.254,
+        -0.329,
+        -0.092
+      ]
+    ],
+    "openingRuntime": [
+      [
+        -103.96,
+        -371.77000000000004,
+        -337.87
+      ],
+      [
+        103.96,
+        -371.77000000000004,
+        287.02
+      ]
+    ],
+    "outwardAxisGLB": [
+      0,
+      -1,
+      0
+    ],
+    "outwardAxisRuntime": [
+      0,
+      -1,
+      0
+    ]
+  },
+  "collisionImplications": {
+    "externalBoundsRetained": true,
+    "mainGunsInsidePreviousEnvelope": true,
+    "hangarWithinPreviousHull": true,
+    "note": "Existing external collision envelope remains conservative. Recess is visual geometry; docking gameplay and an enterable collision volume require a separate integration change.",
+    "armament": "All attachment seats conform to the hull. Articulated weapons use separate component bounds; do not enlarge the ship envelope for firing barrels. Preserve targetable component roles during supervisor integration."
+  },
+  "sharedChangesRequired": [
+    "Install the validated candidate hull through the supervisor.",
+    "Use these four lowered heavy-cannon sockets.",
+    "Add the 20 Cruiser batteries and 20 PDCs at armament positions, axis/side and exact native Cruiser sizes. runtime-components.js demonstrates their root/yaw/pitch transforms.",
+    "Keep all four physical engine sockets; position broad soft glow faces using engines[].glow at the measured nozzle lips."
+  ],
+  "armament": [
+    {
+      "index": 0,
+      "label": "BATTERY 01 · dorsal fore port",
+      "cluster": "dorsal fore port",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        -0.5,
+        -0.14,
+        -0.10162104225158691
+      ],
+      "positionGLB": [
+        -0.5,
+        -0.10162104225158691,
+        0.14
+      ],
+      "seat": "BATTERY 01 · dorsal fore port supported deck seat",
+      "host": "Battleship uninterrupted tapered citadel",
+      "yawRadians": 0.1,
+      "pitchRadians": 0.3490658503988659,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          -0.5735303163528442,
+          -0.15765908360481262,
+          -0.05268651619553566
+        ],
+        [
+          -0.5755729079246521,
+          -0.13730113208293915,
+          -0.05268651619553566
+        ]
+      ],
+      "directionBlender": [
+        -0.934998095035553,
+        -0.09381263703107834,
+        0.34202006459236145
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -158.20000000000002,
+        -114.8317777442932,
+        -565
+      ],
+      "positionPreview": [
+        -0.14,
+        -0.10162104225158691,
+        -0.5
+      ],
+      "muzzlesGLB": [
+        [
+          -0.5735303163528442,
+          -0.05268651619553566,
+          0.15765908360481262
+        ],
+        [
+          -0.5755729079246521,
+          -0.05268651619553566,
+          0.13730113208293915
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -178.15476447343826,
+          -59.535763300955296,
+          -648.089257478714
+        ],
+        [
+          -155.15027925372124,
+          -59.535763300955296,
+          -650.3973859548569
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.15765908360481262,
+          -0.05268651619553566,
+          -0.5735303163528442
+        ],
+        [
+          -0.13730113208293915,
+          -0.05268651619553566,
+          -0.5755729079246521
+        ]
+      ],
+      "directionGLB": [
+        -0.934998095035553,
+        0.34202006459236145,
+        0.09381263703107834
+      ],
+      "directionRuntime": [
+        -0.09381263703107834,
+        0.34202006459236145,
+        -0.934998095035553
+      ],
+      "directionPreview": [
+        -0.09381263703107834,
+        0.34202006459236145,
+        -0.934998095035553
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          10,
+          30
+        ]
+      }
+    },
+    {
+      "index": 1,
+      "label": "BATTERY 02 · dorsal fore port",
+      "cluster": "dorsal fore port",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        -0.365,
+        -0.14,
+        -0.08218968963623047
+      ],
+      "positionGLB": [
+        -0.365,
+        -0.08218968963623047,
+        0.14
+      ],
+      "seat": "BATTERY 02 · dorsal fore port supported deck seat",
+      "host": "Battleship uninterrupted tapered citadel",
+      "yawRadians": 0.1,
+      "pitchRadians": 0.3490658503988659,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          -0.4385303258895874,
+          -0.15765908360481262,
+          -0.033255163580179214
+        ],
+        [
+          -0.44057294726371765,
+          -0.13730113208293915,
+          -0.033255163580179214
+        ]
+      ],
+      "directionBlender": [
+        -0.934998095035553,
+        -0.09381263703107834,
+        0.34202006459236145
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -158.20000000000002,
+        -92.87434928894042,
+        -412.45
+      ],
+      "positionPreview": [
+        -0.14,
+        -0.08218968963623047,
+        -0.365
+      ],
+      "muzzlesGLB": [
+        [
+          -0.4385303258895874,
+          -0.033255163580179214,
+          0.15765908360481262
+        ],
+        [
+          -0.44057294726371765,
+          -0.033255163580179214,
+          0.13730113208293915
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -178.15476447343826,
+          -37.57833484560251,
+          -495.53926825523376
+        ],
+        [
+          -155.15027925372124,
+          -37.57833484560251,
+          -497.84743040800095
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.15765908360481262,
+          -0.033255163580179214,
+          -0.4385303258895874
+        ],
+        [
+          -0.13730113208293915,
+          -0.033255163580179214,
+          -0.44057294726371765
+        ]
+      ],
+      "directionGLB": [
+        -0.934998095035553,
+        0.34202006459236145,
+        0.09381263703107834
+      ],
+      "directionRuntime": [
+        -0.09381263703107834,
+        0.34202006459236145,
+        -0.934998095035553
+      ],
+      "directionPreview": [
+        -0.09381263703107834,
+        0.34202006459236145,
+        -0.934998095035553
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          10,
+          30
+        ]
+      }
+    },
+    {
+      "index": 2,
+      "label": "BATTERY 03 · dorsal aft port",
+      "cluster": "dorsal aft port",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        0.52,
+        -0.205,
+        0.04190789604187012
+      ],
+      "positionGLB": [
+        0.52,
+        0.04190789604187012,
+        0.205
+      ],
+      "seat": "BATTERY 03 · dorsal aft port supported deck seat",
+      "host": "Battleship continuous swept shoulder pod",
+      "yawRadians": 0.18,
+      "pitchRadians": 0.5235987755982988,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          0.4538949728012085,
+          -0.2274271845817566,
+          0.10343888401985168
+        ],
+        [
+          0.45023199915885925,
+          -0.20729756355285645,
+          0.10343888401985168
+        ]
+      ],
+      "directionBlender": [
+        -0.8520335555076599,
+        -0.15504421293735504,
+        0.5000001192092896
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -231.64999999999998,
+        47.35592252731323,
+        587.6
+      ],
+      "positionPreview": [
+        -0.205,
+        0.04190789604187012,
+        0.52
+      ],
+      "muzzlesGLB": [
+        [
+          0.4538949728012085,
+          0.10343888401985168,
+          0.2274271845817566
+        ],
+        [
+          0.45023199915885925,
+          0.10343888401985168,
+          0.20729756355285645
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -256.99271857738495,
+          116.8859389424324,
+          512.9013192653656
+        ],
+        [
+          -234.24624681472778,
+          116.8859389424324,
+          508.76215904951096
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.2274271845817566,
+          0.10343888401985168,
+          0.4538949728012085
+        ],
+        [
+          -0.20729756355285645,
+          0.10343888401985168,
+          0.45023199915885925
+        ]
+      ],
+      "directionGLB": [
+        -0.8520335555076599,
+        0.5000001192092896,
+        0.15504421293735504
+      ],
+      "directionRuntime": [
+        -0.15504421293735504,
+        0.5000001192092896,
+        -0.8520335555076599
+      ],
+      "directionPreview": [
+        -0.15504421293735504,
+        0.5000001192092896,
+        -0.8520335555076599
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          19.999999999999996,
+          40
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "label": "BATTERY 04 · dorsal aft port",
+      "cluster": "dorsal aft port",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        0.645,
+        -0.205,
+        0.01703010940551758
+      ],
+      "positionGLB": [
+        0.645,
+        0.01703010940551758,
+        0.205
+      ],
+      "seat": "BATTERY 04 · dorsal aft port supported deck seat",
+      "host": "Battleship continuous swept shoulder pod",
+      "yawRadians": 0.18,
+      "pitchRadians": 0.5235987755982988,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          0.5788949728012085,
+          -0.2274271845817566,
+          0.07856109738349915
+        ],
+        [
+          0.5752320289611816,
+          -0.20729756355285645,
+          0.07856109738349915
+        ]
+      ],
+      "directionBlender": [
+        -0.8520335555076599,
+        -0.15504421293735504,
+        0.5000001192092896
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -231.64999999999998,
+        19.244023628234864,
+        728.85
+      ],
+      "positionPreview": [
+        -0.205,
+        0.01703010940551758,
+        0.645
+      ],
+      "muzzlesGLB": [
+        [
+          0.5788949728012085,
+          0.07856109738349915,
+          0.2274271845817566
+        ],
+        [
+          0.5752320289611816,
+          0.07856109738349915,
+          0.20729756355285645
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -256.99271857738495,
+          88.77404004335403,
+          654.1513192653656
+        ],
+        [
+          -234.24624681472778,
+          88.77404004335403,
+          650.0121927261353
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.2274271845817566,
+          0.07856109738349915,
+          0.5788949728012085
+        ],
+        [
+          -0.20729756355285645,
+          0.07856109738349915,
+          0.5752320289611816
+        ]
+      ],
+      "directionGLB": [
+        -0.8520335555076599,
+        0.5000001192092896,
+        0.15504421293735504
+      ],
+      "directionRuntime": [
+        -0.15504421293735504,
+        0.5000001192092896,
+        -0.8520335555076599
+      ],
+      "directionPreview": [
+        -0.15504421293735504,
+        0.5000001192092896,
+        -0.8520335555076599
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          19.999999999999996,
+          40
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "label": "BATTERY 05 · ventral fore port",
+      "cluster": "ventral fore port",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 1,
+      "side": -1,
+      "positionBlender": [
+        -0.6,
+        -0.082,
+        -0.32505380058288574
+      ],
+      "positionGLB": [
+        -0.6,
+        -0.32505380058288574,
+        0.082
+      ],
+      "seat": "BATTERY 05 · ventral fore port supported deck seat",
+      "host": "Battleship uninterrupted tapered citadel",
+      "yawRadians": -0.15,
+      "pitchRadians": 0.3490658503988659,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          -0.6756134033203125,
+          -0.08308158814907074,
+          -0.3739883303642273
+        ],
+        [
+          -0.6725558638572693,
+          -0.10331202298402786,
+          -0.3739883303642273
+        ]
+      ],
+      "directionBlender": [
+        -0.9291408658027649,
+        -0.14042603969573975,
+        -0.34202006459236145
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -92.66000000000001,
+        -367.3107946586609,
+        -678
+      ],
+      "positionPreview": [
+        -0.082,
+        -0.32505380058288574,
+        -0.6
+      ],
+      "muzzlesGLB": [
+        [
+          -0.6756134033203125,
+          -0.3739883303642273,
+          0.08308158814907074
+        ],
+        [
+          -0.6725558638572693,
+          -0.3739883303642273,
+          0.10331202298402786
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -93.88219460844994,
+          -422.60681331157684,
+          -763.4431457519531
+        ],
+        [
+          -116.74258597195148,
+          -422.60681331157684,
+          -759.9881261587143
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.08308158814907074,
+          -0.3739883303642273,
+          -0.6756134033203125
+        ],
+        [
+          -0.10331202298402786,
+          -0.3739883303642273,
+          -0.6725558638572693
+        ]
+      ],
+      "directionGLB": [
+        -0.9291408658027649,
+        -0.34202006459236145,
+        0.14042603969573975
+      ],
+      "directionRuntime": [
+        -0.14042603969573975,
+        -0.34202006459236145,
+        -0.9291408658027649
+      ],
+      "directionPreview": [
+        -0.14042603969573975,
+        -0.34202006459236145,
+        -0.9291408658027649
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          10,
+          30
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "label": "BATTERY 06 · ventral fore port",
+      "cluster": "ventral fore port",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 1,
+      "side": -1,
+      "positionBlender": [
+        -0.465,
+        -0.082,
+        -0.33049999618530274
+      ],
+      "positionGLB": [
+        -0.465,
+        -0.33049999618530274,
+        0.082
+      ],
+      "seat": "BATTERY 06 · ventral fore port supported deck seat",
+      "host": "Battleship uninterrupted tapered citadel",
+      "yawRadians": -0.15,
+      "pitchRadians": 0.3490658503988659,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          -0.5406133532524109,
+          -0.08308158814907074,
+          -0.3794345259666443
+        ],
+        [
+          -0.5375558137893677,
+          -0.10331202298402786,
+          -0.3794345259666443
+        ]
+      ],
+      "directionBlender": [
+        -0.9291408658027649,
+        -0.14042603969573975,
+        -0.34202006459236145
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -92.66000000000001,
+        -373.4649956893921,
+        -525.45
+      ],
+      "positionPreview": [
+        -0.082,
+        -0.33049999618530274,
+        -0.465
+      ],
+      "muzzlesGLB": [
+        [
+          -0.5406133532524109,
+          -0.3794345259666443,
+          0.08308158814907074
+        ],
+        [
+          -0.5375558137893677,
+          -0.3794345259666443,
+          0.10331202298402786
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -93.88219460844994,
+          -428.76101434230804,
+          -610.8930891752243
+        ],
+        [
+          -116.74258597195148,
+          -428.76101434230804,
+          -607.4380695819855
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.08308158814907074,
+          -0.3794345259666443,
+          -0.5406133532524109
+        ],
+        [
+          -0.10331202298402786,
+          -0.3794345259666443,
+          -0.5375558137893677
+        ]
+      ],
+      "directionGLB": [
+        -0.9291408658027649,
+        -0.34202006459236145,
+        0.14042603969573975
+      ],
+      "directionRuntime": [
+        -0.14042603969573975,
+        -0.34202006459236145,
+        -0.9291408658027649
+      ],
+      "directionPreview": [
+        -0.14042603969573975,
+        -0.34202006459236145,
+        -0.9291408658027649
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          10,
+          30
+        ]
+      }
+    },
+    {
+      "index": 6,
+      "label": "BATTERY 07 · ventral aft port",
+      "cluster": "ventral aft port",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 1,
+      "side": -1,
+      "positionBlender": [
+        0.375,
+        -0.105,
+        -0.32690297508239746
+      ],
+      "positionGLB": [
+        0.375,
+        -0.32690297508239746,
+        0.105
+      ],
+      "seat": "BATTERY 07 · ventral aft port supported deck seat",
+      "host": "Battleship uninterrupted tapered citadel",
+      "yawRadians": -0.18,
+      "pitchRadians": 0.3490658503988659,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          0.29945310950279236,
+          -0.10834915935993195,
+          -0.375837504863739
+        ],
+        [
+          0.3031160831451416,
+          -0.1284787654876709,
+          -0.375837504863739
+        ]
+      ],
+      "directionBlender": [
+        -0.924510657787323,
+        -0.16823285818099976,
+        -0.34202006459236145
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -118.64999999999999,
+        -369.4003618431091,
+        423.75
+      ],
+      "positionPreview": [
+        -0.105,
+        -0.32690297508239746,
+        0.375
+      ],
+      "muzzlesGLB": [
+        [
+          0.29945310950279236,
+          -0.375837504863739,
+          0.10834915935993195
+        ],
+        [
+          0.3031160831451416,
+          -0.375837504863739,
+          0.1284787654876709
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -122.4345500767231,
+          -424.6963804960251,
+          338.38201373815536
+        ],
+        [
+          -145.18100500106812,
+          -424.6963804960251,
+          342.52117395401
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.10834915935993195,
+          -0.375837504863739,
+          0.29945310950279236
+        ],
+        [
+          -0.1284787654876709,
+          -0.375837504863739,
+          0.3031160831451416
+        ]
+      ],
+      "directionGLB": [
+        -0.924510657787323,
+        -0.34202006459236145,
+        0.16823285818099976
+      ],
+      "directionRuntime": [
+        -0.16823285818099976,
+        -0.34202006459236145,
+        -0.924510657787323
+      ],
+      "directionPreview": [
+        -0.16823285818099976,
+        -0.34202006459236145,
+        -0.924510657787323
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          10,
+          30
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "label": "BATTERY 08 · ventral aft port",
+      "cluster": "ventral aft port",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 1,
+      "side": -1,
+      "positionBlender": [
+        0.52,
+        -0.105,
+        -0.32255302810668945
+      ],
+      "positionGLB": [
+        0.52,
+        -0.32255302810668945,
+        0.105
+      ],
+      "seat": "BATTERY 08 · ventral aft port supported deck seat",
+      "host": "Battleship uninterrupted tapered citadel",
+      "yawRadians": -0.18,
+      "pitchRadians": 0.3490658503988659,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          0.44445309042930603,
+          -0.10834915935993195,
+          -0.371487557888031
+        ],
+        [
+          0.4481160640716553,
+          -0.1284787654876709,
+          -0.371487557888031
+        ]
+      ],
+      "directionBlender": [
+        -0.924510657787323,
+        -0.16823285818099976,
+        -0.34202006459236145
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -118.64999999999999,
+        -364.4849217605591,
+        587.6
+      ],
+      "positionPreview": [
+        -0.105,
+        -0.32255302810668945,
+        0.52
+      ],
+      "muzzlesGLB": [
+        [
+          0.44445309042930603,
+          -0.371487557888031,
+          0.10834915935993195
+        ],
+        [
+          0.4481160640716553,
+          -0.371487557888031,
+          0.1284787654876709
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -122.4345500767231,
+          -419.78094041347504,
+          502.2319921851158
+        ],
+        [
+          -145.18100500106812,
+          -419.78094041347504,
+          506.37115240097046
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.10834915935993195,
+          -0.371487557888031,
+          0.44445309042930603
+        ],
+        [
+          -0.1284787654876709,
+          -0.371487557888031,
+          0.4481160640716553
+        ]
+      ],
+      "directionGLB": [
+        -0.924510657787323,
+        -0.34202006459236145,
+        0.16823285818099976
+      ],
+      "directionRuntime": [
+        -0.16823285818099976,
+        -0.34202006459236145,
+        -0.924510657787323
+      ],
+      "directionPreview": [
+        -0.16823285818099976,
+        -0.34202006459236145,
+        -0.924510657787323
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          10,
+          30
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "label": "BATTERY 09 · broadside port",
+      "cluster": "broadside port",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 0,
+      "side": -1,
+      "positionBlender": [
+        -0.165,
+        -0.2767310037612915,
+        -0.17
+      ],
+      "positionGLB": [
+        -0.165,
+        -0.17,
+        0.2767310037612915
+      ],
+      "seat": "BATTERY 09 · broadside port supported deck seat",
+      "host": "Battleship continuous swept shoulder pod",
+      "yawRadians": 0,
+      "pitchRadians": 1.1344640137963142,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          -0.1986972689628601,
+          -0.3706587553024292,
+          -0.18023008108139038
+        ],
+        [
+          -0.1986972689628601,
+          -0.3706587553024292,
+          -0.1597699075937271
+        ]
+      ],
+      "directionBlender": [
+        -0.42261824011802673,
+        -0.9063078165054321,
+        6.84243346427138e-8
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -312.7060342502594,
+        -192.10000000000002,
+        -186.45000000000002
+      ],
+      "positionPreview": [
+        -0.2767310037612915,
+        -0.17,
+        -0.165
+      ],
+      "muzzlesGLB": [
+        [
+          -0.1986972689628601,
+          -0.18023008108139038,
+          0.3706587553024292
+        ],
+        [
+          -0.1986972689628601,
+          -0.1597699075937271,
+          0.3706587553024292
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -418.844393491745,
+          -203.65999162197113,
+          -224.52791392803192
+        ],
+        [
+          -418.844393491745,
+          -180.53999558091164,
+          -224.52791392803192
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.3706587553024292,
+          -0.18023008108139038,
+          -0.1986972689628601
+        ],
+        [
+          -0.3706587553024292,
+          -0.1597699075937271,
+          -0.1986972689628601
+        ]
+      ],
+      "directionGLB": [
+        -0.42261824011802673,
+        6.84243346427138e-8,
+        0.9063078165054321
+      ],
+      "directionRuntime": [
+        -0.9063078165054321,
+        6.84243346427138e-8,
+        -0.42261824011802673
+      ],
+      "directionPreview": [
+        -0.9063078165054321,
+        6.84243346427138e-8,
+        -0.42261824011802673
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          55,
+          75
+        ]
+      }
+    },
+    {
+      "index": 9,
+      "label": "BATTERY 10 · broadside port",
+      "cluster": "broadside port",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 0,
+      "side": -1,
+      "positionBlender": [
+        0.235,
+        -0.31478845024108887,
+        -0.17
+      ],
+      "positionGLB": [
+        0.235,
+        -0.17,
+        0.31478845024108887
+      ],
+      "seat": "BATTERY 10 · broadside port supported deck seat",
+      "host": "Battleship continuous swept shoulder pod",
+      "yawRadians": 0,
+      "pitchRadians": 1.1344640137963142,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          0.20130273699760437,
+          -0.40871620178222656,
+          -0.18023008108139038
+        ],
+        [
+          0.20130273699760437,
+          -0.40871620178222656,
+          -0.1597699075937271
+        ]
+      ],
+      "directionBlender": [
+        -0.42261824011802673,
+        -0.9063078165054321,
+        6.84243346427138e-8
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -355.7109487724304,
+        -192.10000000000002,
+        265.55
+      ],
+      "positionPreview": [
+        -0.31478845024108887,
+        -0.17,
+        0.235
+      ],
+      "muzzlesGLB": [
+        [
+          0.20130273699760437,
+          -0.18023008108139038,
+          0.40871620178222656
+        ],
+        [
+          0.20130273699760437,
+          -0.1597699075937271,
+          0.40871620178222656
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -461.849308013916,
+          -203.65999162197113,
+          227.47209280729294
+        ],
+        [
+          -461.849308013916,
+          -180.53999558091164,
+          227.47209280729294
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.40871620178222656,
+          -0.18023008108139038,
+          0.20130273699760437
+        ],
+        [
+          -0.40871620178222656,
+          -0.1597699075937271,
+          0.20130273699760437
+        ]
+      ],
+      "directionGLB": [
+        -0.42261824011802673,
+        6.84243346427138e-8,
+        0.9063078165054321
+      ],
+      "directionRuntime": [
+        -0.9063078165054321,
+        6.84243346427138e-8,
+        -0.42261824011802673
+      ],
+      "directionPreview": [
+        -0.9063078165054321,
+        6.84243346427138e-8,
+        -0.42261824011802673
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          55,
+          75
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "label": "PDC 11 · bow guard port",
+      "cluster": "bow guard port",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        -0.755,
+        -0.075,
+        -0.13639987564086914
+      ],
+      "positionGLB": [
+        -0.755,
+        -0.13639987564086914,
+        0.075
+      ],
+      "seat": "PDC 11 · bow guard port supported deck seat",
+      "host": "Battleship twin pointed upper prow",
+      "yawRadians": 0.7,
+      "pitchRadians": 0.7853981633974483,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          -0.7657987475395203,
+          -0.08867757022380829,
+          -0.1095946803689003
+        ],
+        [
+          -0.7703139781951904,
+          -0.08331690728664398,
+          -0.1095946803689003
+        ]
+      ],
+      "directionBlender": [
+        -0.5408250093460083,
+        -0.45553067326545715,
+        0.7071068286895752
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -84.75,
+        -154.13185947418214,
+        -853.15
+      ],
+      "positionPreview": [
+        -0.075,
+        -0.13639987564086914,
+        -0.755
+      ],
+      "muzzlesGLB": [
+        [
+          -0.7657987475395203,
+          -0.1095946803689003,
+          0.08867757022380829
+        ],
+        [
+          -0.7703139781951904,
+          -0.1095946803689003,
+          0.08331690728664398
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -100.20565435290337,
+          -123.84198881685734,
+          -865.3525847196579
+        ],
+        [
+          -94.1481052339077,
+          -123.84198881685734,
+          -870.4547953605652
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.08867757022380829,
+          -0.1095946803689003,
+          -0.7657987475395203
+        ],
+        [
+          -0.08331690728664398,
+          -0.1095946803689003,
+          -0.7703139781951904
+        ]
+      ],
+      "directionGLB": [
+        -0.5408250093460083,
+        0.7071068286895752,
+        0.45553067326545715
+      ],
+      "directionRuntime": [
+        -0.45553067326545715,
+        0.7071068286895752,
+        -0.5408250093460083
+      ],
+      "directionPreview": [
+        -0.45553067326545715,
+        0.7071068286895752,
+        -0.5408250093460083
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          35,
+          55
+        ]
+      }
+    },
+    {
+      "index": 11,
+      "label": "PDC 12 · bow guard port",
+      "cluster": "bow guard port",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        -0.635,
+        -0.075,
+        -0.11630738830566406
+      ],
+      "positionGLB": [
+        -0.635,
+        -0.11630738830566406,
+        0.075
+      ],
+      "seat": "PDC 12 · bow guard port supported deck seat",
+      "host": "Battleship twin pointed upper prow",
+      "yawRadians": 0.7,
+      "pitchRadians": 0.7853981633974483,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          -0.6457987427711487,
+          -0.08867757022380829,
+          -0.08950218558311462
+        ],
+        [
+          -0.6503139734268188,
+          -0.08331690728664398,
+          -0.08950218558311462
+        ]
+      ],
+      "directionBlender": [
+        -0.5408250093460083,
+        -0.45553067326545715,
+        0.7071068286895752
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -84.75,
+        -131.4273487854004,
+        -717.55
+      ],
+      "positionPreview": [
+        -0.075,
+        -0.11630738830566406,
+        -0.635
+      ],
+      "muzzlesGLB": [
+        [
+          -0.6457987427711487,
+          -0.08950218558311462,
+          0.08867757022380829
+        ],
+        [
+          -0.6503139734268188,
+          -0.08950218558311462,
+          0.08331690728664398
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -100.20565435290337,
+          -101.13746970891953,
+          -729.752579331398
+        ],
+        [
+          -94.1481052339077,
+          -101.13746970891953,
+          -734.8547899723053
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.08867757022380829,
+          -0.08950218558311462,
+          -0.6457987427711487
+        ],
+        [
+          -0.08331690728664398,
+          -0.08950218558311462,
+          -0.6503139734268188
+        ]
+      ],
+      "directionGLB": [
+        -0.5408250093460083,
+        0.7071068286895752,
+        0.45553067326545715
+      ],
+      "directionRuntime": [
+        -0.45553067326545715,
+        0.7071068286895752,
+        -0.5408250093460083
+      ],
+      "directionPreview": [
+        -0.45553067326545715,
+        0.7071068286895752,
+        -0.5408250093460083
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          35,
+          55
+        ]
+      }
+    },
+    {
+      "index": 12,
+      "label": "PDC 13 · bridge guard port",
+      "cluster": "bridge guard port",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        0.035,
+        -0.282,
+        -0.04125035858154297
+      ],
+      "positionGLB": [
+        0.035,
+        -0.04125035858154297,
+        0.282
+      ],
+      "seat": "PDC 13 · bridge guard port supported deck seat",
+      "host": "Battleship continuous swept shoulder pod",
+      "yawRadians": 0.8,
+      "pitchRadians": 0.7853981633974483,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          0.025620661675930023,
+          -0.2966873049736023,
+          -0.014445161446928978
+        ],
+        [
+          0.020592819899320602,
+          -0.2918041944503784,
+          -0.014445161446928978
+        ]
+      ],
+      "directionBlender": [
+        -0.4926460385322571,
+        -0.5072473287582397,
+        0.7071068286895752
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -318.65999999999997,
+        -46.612905197143554,
+        39.550000000000004
+      ],
+      "positionPreview": [
+        -0.282,
+        -0.04125035858154297,
+        0.035
+      ],
+      "muzzlesGLB": [
+        [
+          0.025620661675930023,
+          -0.014445161446928978,
+          0.2966873049736023
+        ],
+        [
+          0.020592819899320602,
+          -0.014445161446928978,
+          0.2918041944503784
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -335.2566546201706,
+          -16.323032435029745,
+          28.951347693800926
+        ],
+        [
+          -329.7387397289276,
+          -16.323032435029745,
+          23.26988648623228
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.2966873049736023,
+          -0.014445161446928978,
+          0.025620661675930023
+        ],
+        [
+          -0.2918041944503784,
+          -0.014445161446928978,
+          0.020592819899320602
+        ]
+      ],
+      "directionGLB": [
+        -0.4926460385322571,
+        0.7071068286895752,
+        0.5072473287582397
+      ],
+      "directionRuntime": [
+        -0.5072473287582397,
+        0.7071068286895752,
+        -0.4926460385322571
+      ],
+      "directionPreview": [
+        -0.5072473287582397,
+        0.7071068286895752,
+        -0.4926460385322571
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          35,
+          55
+        ]
+      }
+    },
+    {
+      "index": 13,
+      "label": "PDC 14 · bridge guard port",
+      "cluster": "bridge guard port",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        0.285,
+        -0.282,
+        -0.033857236862182616
+      ],
+      "positionGLB": [
+        0.285,
+        -0.033857236862182616,
+        0.282
+      ],
+      "seat": "PDC 14 · bridge guard port supported deck seat",
+      "host": "Battleship continuous swept shoulder pod",
+      "yawRadians": 0.8,
+      "pitchRadians": 0.7853981633974483,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          0.2756206691265106,
+          -0.2966873049736023,
+          -0.007052039727568626
+        ],
+        [
+          0.2705928087234497,
+          -0.2918041944503784,
+          -0.007052039727568626
+        ]
+      ],
+      "directionBlender": [
+        -0.4926460385322571,
+        -0.5072473287582397,
+        0.7071068286895752
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -318.65999999999997,
+        -38.25867765426636,
+        322.04999999999995
+      ],
+      "positionPreview": [
+        -0.282,
+        -0.033857236862182616,
+        0.285
+      ],
+      "muzzlesGLB": [
+        [
+          0.2756206691265106,
+          -0.007052039727568626,
+          0.2966873049736023
+        ],
+        [
+          0.2705928087234497,
+          -0.007052039727568626,
+          0.2918041944503784
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -335.2566546201706,
+          -7.968804892152548,
+          311.451356112957
+        ],
+        [
+          -329.7387397289276,
+          -7.968804892152548,
+          305.76987385749817
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.2966873049736023,
+          -0.007052039727568626,
+          0.2756206691265106
+        ],
+        [
+          -0.2918041944503784,
+          -0.007052039727568626,
+          0.2705928087234497
+        ]
+      ],
+      "directionGLB": [
+        -0.4926460385322571,
+        0.7071068286895752,
+        0.5072473287582397
+      ],
+      "directionRuntime": [
+        -0.5072473287582397,
+        0.7071068286895752,
+        -0.4926460385322571
+      ],
+      "directionPreview": [
+        -0.5072473287582397,
+        0.7071068286895752,
+        -0.4926460385322571
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          35,
+          55
+        ]
+      }
+    },
+    {
+      "index": 14,
+      "label": "PDC 15 · engine guard port",
+      "cluster": "engine guard port",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        0.615,
+        -0.24,
+        0.013596285820007324
+      ],
+      "positionGLB": [
+        0.615,
+        0.013596285820007324,
+        0.24
+      ],
+      "seat": "PDC 15 · engine guard port supported deck seat",
+      "host": "Battleship continuous swept shoulder pod",
+      "yawRadians": 2.2,
+      "pitchRadians": 0.7853981633974483,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          0.6278794407844543,
+          -0.2517392337322235,
+          0.040401484817266464
+        ],
+        [
+          0.622212827205658,
+          -0.2558639347553253,
+          0.040401484817266464
+        ]
+      ],
+      "directionBlender": [
+        0.4161331057548523,
+        -0.5716931819915771,
+        0.7071068286895752
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -271.2,
+        15.363802976608277,
+        694.95
+      ],
+      "positionPreview": [
+        -0.24,
+        0.013596285820007324,
+        0.615
+      ],
+      "muzzlesGLB": [
+        [
+          0.6278794407844543,
+          0.040401484817266464,
+          0.2517392337322235
+        ],
+        [
+          0.622212827205658,
+          0.040401484817266464,
+          0.2558639347553253
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -284.46533411741257,
+          45.653677843511105,
+          709.5037680864334
+        ],
+        [
+          -289.1262462735176,
+          45.653677843511105,
+          703.1004947423935
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.2517392337322235,
+          0.040401484817266464,
+          0.6278794407844543
+        ],
+        [
+          -0.2558639347553253,
+          0.040401484817266464,
+          0.622212827205658
+        ]
+      ],
+      "directionGLB": [
+        0.4161331057548523,
+        0.7071068286895752,
+        0.5716931819915771
+      ],
+      "directionRuntime": [
+        -0.5716931819915771,
+        0.7071068286895752,
+        0.4161331057548523
+      ],
+      "directionPreview": [
+        -0.5716931819915771,
+        0.7071068286895752,
+        0.4161331057548523
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          35,
+          55
+        ]
+      }
+    },
+    {
+      "index": 15,
+      "label": "PDC 16 · engine guard port",
+      "cluster": "engine guard port",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        0.73,
+        -0.24,
+        0.021486987113952638
+      ],
+      "positionGLB": [
+        0.73,
+        0.021486987113952638,
+        0.24
+      ],
+      "seat": "PDC 16 · engine guard port supported deck seat",
+      "host": "Battleship continuous swept shoulder pod",
+      "yawRadians": 2.2,
+      "pitchRadians": 0.7853981633974483,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          0.7428794503211975,
+          -0.2517392337322235,
+          0.04829218238592148
+        ],
+        [
+          0.7372128367424011,
+          -0.2558639347553253,
+          0.04829218238592148
+        ]
+      ],
+      "directionBlender": [
+        0.4161331057548523,
+        -0.5716931819915771,
+        0.7071068286895752
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -271.2,
+        24.28029543876648,
+        824.9
+      ],
+      "positionPreview": [
+        -0.24,
+        0.021486987113952638,
+        0.73
+      ],
+      "muzzlesGLB": [
+        [
+          0.7428794503211975,
+          0.04829218238592148,
+          0.2517392337322235
+        ],
+        [
+          0.7372128367424011,
+          0.04829218238592148,
+          0.2558639347553253
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -284.46533411741257,
+          54.57016609609127,
+          839.4537788629532
+        ],
+        [
+          -289.1262462735176,
+          54.57016609609127,
+          833.0505055189133
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.2517392337322235,
+          0.04829218238592148,
+          0.7428794503211975
+        ],
+        [
+          -0.2558639347553253,
+          0.04829218238592148,
+          0.7372128367424011
+        ]
+      ],
+      "directionGLB": [
+        0.4161331057548523,
+        0.7071068286895752,
+        0.5716931819915771
+      ],
+      "directionRuntime": [
+        -0.5716931819915771,
+        0.7071068286895752,
+        0.4161331057548523
+      ],
+      "directionPreview": [
+        -0.5716931819915771,
+        0.7071068286895752,
+        0.4161331057548523
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          35,
+          55
+        ]
+      }
+    },
+    {
+      "index": 16,
+      "label": "PDC 17 · hangar guard port",
+      "cluster": "hangar guard port",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 1,
+      "side": -1,
+      "positionBlender": [
+        -0.225,
+        -0.119,
+        -0.32324527645111084
+      ],
+      "positionGLB": [
+        -0.225,
+        -0.32324527645111084,
+        0.119
+      ],
+      "seat": "PDC 17 · hangar guard port supported deck seat",
+      "host": "Battleship uninterrupted tapered citadel",
+      "yawRadians": -1.5707963267948966,
+      "pitchRadians": 0.7853981633974483,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          -0.22850441932678223,
+          -0.13607068359851837,
+          -0.3500504791736603
+        ],
+        [
+          -0.22149556875228882,
+          -0.13607068359851837,
+          -0.3500504791736603
+        ]
+      ],
+      "directionBlender": [
+        3.0908616110991716e-8,
+        -0.7071067690849304,
+        -0.7071067690849304
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -134.47,
+        -365.26716238975524,
+        -254.25
+      ],
+      "positionPreview": [
+        -0.119,
+        -0.32324527645111084,
+        -0.225
+      ],
+      "muzzlesGLB": [
+        [
+          -0.22850441932678223,
+          -0.3500504791736603,
+          0.13607068359851837
+        ],
+        [
+          -0.22149556875228882,
+          -0.3500504791736603,
+          0.13607068359851837
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -153.75987246632576,
+          -395.5570414662361,
+          -258.2099938392639
+        ],
+        [
+          -153.75987246632576,
+          -395.5570414662361,
+          -250.28999269008636
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.13607068359851837,
+          -0.3500504791736603,
+          -0.22850441932678223
+        ],
+        [
+          -0.13607068359851837,
+          -0.3500504791736603,
+          -0.22149556875228882
+        ]
+      ],
+      "directionGLB": [
+        3.0908616110991716e-8,
+        -0.7071067690849304,
+        0.7071067690849304
+      ],
+      "directionRuntime": [
+        -0.7071067690849304,
+        -0.7071067690849304,
+        3.0908616110991716e-8
+      ],
+      "directionPreview": [
+        -0.7071067690849304,
+        -0.7071067690849304,
+        3.0908616110991716e-8
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          35,
+          55
+        ]
+      }
+    },
+    {
+      "index": 17,
+      "label": "PDC 18 · hangar guard port",
+      "cluster": "hangar guard port",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 1,
+      "side": -1,
+      "positionBlender": [
+        0.22,
+        -0.119,
+        -0.32614587688446045
+      ],
+      "positionGLB": [
+        0.22,
+        -0.32614587688446045,
+        0.119
+      ],
+      "seat": "PDC 18 · hangar guard port supported deck seat",
+      "host": "Battleship uninterrupted tapered citadel",
+      "yawRadians": -1.5707963267948966,
+      "pitchRadians": 0.7853981633974483,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          0.2164955735206604,
+          -0.13607068359851837,
+          -0.3529510796070099
+        ],
+        [
+          0.2235044240951538,
+          -0.13607068359851837,
+          -0.3529510796070099
+        ]
+      ],
+      "directionBlender": [
+        3.0908616110991716e-8,
+        -0.7071067690849304,
+        -0.7071067690849304
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -134.47,
+        -368.5448408794403,
+        248.6
+      ],
+      "positionPreview": [
+        -0.119,
+        -0.32614587688446045,
+        0.22
+      ],
+      "muzzlesGLB": [
+        [
+          0.2164955735206604,
+          -0.3529510796070099,
+          0.13607068359851837
+        ],
+        [
+          0.2235044240951538,
+          -0.3529510796070099,
+          0.13607068359851837
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -153.75987246632576,
+          -398.8347199559212,
+          244.63999807834625
+        ],
+        [
+          -153.75987246632576,
+          -398.8347199559212,
+          252.5599992275238
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.13607068359851837,
+          -0.3529510796070099,
+          0.2164955735206604
+        ],
+        [
+          -0.13607068359851837,
+          -0.3529510796070099,
+          0.2235044240951538
+        ]
+      ],
+      "directionGLB": [
+        3.0908616110991716e-8,
+        -0.7071067690849304,
+        0.7071067690849304
+      ],
+      "directionRuntime": [
+        -0.7071067690849304,
+        -0.7071067690849304,
+        3.0908616110991716e-8
+      ],
+      "directionPreview": [
+        -0.7071067690849304,
+        -0.7071067690849304,
+        3.0908616110991716e-8
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          35,
+          55
+        ]
+      }
+    },
+    {
+      "index": 18,
+      "label": "PDC 19 · flank guard port",
+      "cluster": "flank guard port",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 0,
+      "side": -1,
+      "positionBlender": [
+        -0.375,
+        -0.21049784564971924,
+        -0.205
+      ],
+      "positionGLB": [
+        -0.375,
+        -0.205,
+        0.21049784564971924
+      ],
+      "seat": "PDC 19 · flank guard port supported deck seat",
+      "host": "Battleship continuous swept shoulder pod",
+      "yawRadians": 0,
+      "pitchRadians": 1.1344640137963142,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          -0.38520267605781555,
+          -0.24211207032203674,
+          -0.20850442349910736
+        ],
+        [
+          -0.38520267605781555,
+          -0.24211207032203674,
+          -0.20149557292461395
+        ]
+      ],
+      "directionBlender": [
+        -0.42261824011802673,
+        -0.9063078165054321,
+        6.84243346427138e-8
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -237.86256558418273,
+        -231.64999999999998,
+        -423.75
+      ],
+      "positionPreview": [
+        -0.21049784564971924,
+        -0.205,
+        -0.375
+      ],
+      "muzzlesGLB": [
+        [
+          -0.38520267605781555,
+          -0.20850442349910736,
+          0.24211207032203674
+        ],
+        [
+          -0.38520267605781555,
+          -0.20149557292461395,
+          0.24211207032203674
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -273.5866394639015,
+          -235.60999855399132,
+          -435.2790239453316
+        ],
+        [
+          -273.5866394639015,
+          -227.68999740481377,
+          -435.2790239453316
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.24211207032203674,
+          -0.20850442349910736,
+          -0.38520267605781555
+        ],
+        [
+          -0.24211207032203674,
+          -0.20149557292461395,
+          -0.38520267605781555
+        ]
+      ],
+      "directionGLB": [
+        -0.42261824011802673,
+        6.84243346427138e-8,
+        0.9063078165054321
+      ],
+      "directionRuntime": [
+        -0.9063078165054321,
+        6.84243346427138e-8,
+        -0.42261824011802673
+      ],
+      "directionPreview": [
+        -0.9063078165054321,
+        6.84243346427138e-8,
+        -0.42261824011802673
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          55,
+          75
+        ]
+      }
+    },
+    {
+      "index": 19,
+      "label": "PDC 20 · flank guard port",
+      "cluster": "flank guard port",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 0,
+      "side": -1,
+      "positionBlender": [
+        0.585,
+        -0.30785666847229004,
+        -0.205
+      ],
+      "positionGLB": [
+        0.585,
+        -0.205,
+        0.30785666847229004
+      ],
+      "seat": "PDC 20 · flank guard port supported deck seat",
+      "host": "Battleship continuous swept shoulder pod",
+      "yawRadians": 0,
+      "pitchRadians": 1.1344640137963142,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          0.5747972726821899,
+          -0.33947092294692993,
+          -0.20850442349910736
+        ],
+        [
+          0.5747972726821899,
+          -0.33947092294692993,
+          -0.20149557292461395
+        ]
+      ],
+      "directionBlender": [
+        -0.42261824011802673,
+        -0.9063078165054321,
+        6.84243346427138e-8
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        -347.87803537368774,
+        -231.64999999999998,
+        661.05
+      ],
+      "positionPreview": [
+        -0.30785666847229004,
+        -0.205,
+        0.585
+      ],
+      "muzzlesGLB": [
+        [
+          0.5747972726821899,
+          -0.20850442349910736,
+          0.33947092294692993
+        ],
+        [
+          0.5747972726821899,
+          -0.20149557292461395,
+          0.33947092294692993
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          -383.6021429300308,
+          -235.60999855399132,
+          649.5209181308746
+        ],
+        [
+          -383.6021429300308,
+          -227.68999740481377,
+          649.5209181308746
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          -0.33947092294692993,
+          -0.20850442349910736,
+          0.5747972726821899
+        ],
+        [
+          -0.33947092294692993,
+          -0.20149557292461395,
+          0.5747972726821899
+        ]
+      ],
+      "directionGLB": [
+        -0.42261824011802673,
+        6.84243346427138e-8,
+        0.9063078165054321
+      ],
+      "directionRuntime": [
+        -0.9063078165054321,
+        6.84243346427138e-8,
+        -0.42261824011802673
+      ],
+      "directionPreview": [
+        -0.9063078165054321,
+        6.84243346427138e-8,
+        -0.42261824011802673
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          55,
+          75
+        ]
+      }
+    },
+    {
+      "index": 20,
+      "label": "BATTERY 21 · dorsal fore starboard",
+      "cluster": "dorsal fore starboard",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        -0.5,
+        0.14,
+        -0.10162104225158691
+      ],
+      "positionGLB": [
+        -0.5,
+        -0.10162104225158691,
+        -0.14
+      ],
+      "seat": "BATTERY 21 · dorsal fore starboard supported deck seat",
+      "host": "Battleship uninterrupted tapered citadel",
+      "yawRadians": -0.1,
+      "pitchRadians": 0.3490658503988659,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          -0.5755729079246521,
+          0.13730113208293915,
+          -0.05268651619553566
+        ],
+        [
+          -0.5735303163528442,
+          0.15765908360481262,
+          -0.05268651619553566
+        ]
+      ],
+      "directionBlender": [
+        -0.934998095035553,
+        0.09381263703107834,
+        0.34202006459236145
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        158.20000000000002,
+        -114.8317777442932,
+        -565
+      ],
+      "positionPreview": [
+        0.14,
+        -0.10162104225158691,
+        -0.5
+      ],
+      "muzzlesGLB": [
+        [
+          -0.5755729079246521,
+          -0.05268651619553566,
+          -0.13730113208293915
+        ],
+        [
+          -0.5735303163528442,
+          -0.05268651619553566,
+          -0.15765908360481262
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          155.15027925372124,
+          -59.535763300955296,
+          -650.3973859548569
+        ],
+        [
+          178.15476447343826,
+          -59.535763300955296,
+          -648.089257478714
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.13730113208293915,
+          -0.05268651619553566,
+          -0.5755729079246521
+        ],
+        [
+          0.15765908360481262,
+          -0.05268651619553566,
+          -0.5735303163528442
+        ]
+      ],
+      "directionGLB": [
+        -0.934998095035553,
+        0.34202006459236145,
+        -0.09381263703107834
+      ],
+      "directionRuntime": [
+        0.09381263703107834,
+        0.34202006459236145,
+        -0.934998095035553
+      ],
+      "directionPreview": [
+        0.09381263703107834,
+        0.34202006459236145,
+        -0.934998095035553
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          10,
+          30
+        ]
+      }
+    },
+    {
+      "index": 21,
+      "label": "BATTERY 22 · dorsal fore starboard",
+      "cluster": "dorsal fore starboard",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        -0.365,
+        0.14,
+        -0.08218968963623047
+      ],
+      "positionGLB": [
+        -0.365,
+        -0.08218968963623047,
+        -0.14
+      ],
+      "seat": "BATTERY 22 · dorsal fore starboard supported deck seat",
+      "host": "Battleship uninterrupted tapered citadel",
+      "yawRadians": -0.1,
+      "pitchRadians": 0.3490658503988659,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          -0.44057294726371765,
+          0.13730113208293915,
+          -0.033255163580179214
+        ],
+        [
+          -0.4385303258895874,
+          0.15765908360481262,
+          -0.033255163580179214
+        ]
+      ],
+      "directionBlender": [
+        -0.934998095035553,
+        0.09381263703107834,
+        0.34202006459236145
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        158.20000000000002,
+        -92.87434928894042,
+        -412.45
+      ],
+      "positionPreview": [
+        0.14,
+        -0.08218968963623047,
+        -0.365
+      ],
+      "muzzlesGLB": [
+        [
+          -0.44057294726371765,
+          -0.033255163580179214,
+          -0.13730113208293915
+        ],
+        [
+          -0.4385303258895874,
+          -0.033255163580179214,
+          -0.15765908360481262
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          155.15027925372124,
+          -37.57833484560251,
+          -497.84743040800095
+        ],
+        [
+          178.15476447343826,
+          -37.57833484560251,
+          -495.53926825523376
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.13730113208293915,
+          -0.033255163580179214,
+          -0.44057294726371765
+        ],
+        [
+          0.15765908360481262,
+          -0.033255163580179214,
+          -0.4385303258895874
+        ]
+      ],
+      "directionGLB": [
+        -0.934998095035553,
+        0.34202006459236145,
+        -0.09381263703107834
+      ],
+      "directionRuntime": [
+        0.09381263703107834,
+        0.34202006459236145,
+        -0.934998095035553
+      ],
+      "directionPreview": [
+        0.09381263703107834,
+        0.34202006459236145,
+        -0.934998095035553
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          10,
+          30
+        ]
+      }
+    },
+    {
+      "index": 22,
+      "label": "BATTERY 23 · dorsal aft starboard",
+      "cluster": "dorsal aft starboard",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        0.52,
+        0.205,
+        0.04190789604187012
+      ],
+      "positionGLB": [
+        0.52,
+        0.04190789604187012,
+        -0.205
+      ],
+      "seat": "BATTERY 23 · dorsal aft starboard supported deck seat",
+      "host": "Battleship continuous swept shoulder pod.001",
+      "yawRadians": -0.18,
+      "pitchRadians": 0.5235987755982988,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          0.45023199915885925,
+          0.20729756355285645,
+          0.10343888401985168
+        ],
+        [
+          0.4538949728012085,
+          0.2274271845817566,
+          0.10343888401985168
+        ]
+      ],
+      "directionBlender": [
+        -0.8520335555076599,
+        0.15504421293735504,
+        0.5000001192092896
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        231.64999999999998,
+        47.35592252731323,
+        587.6
+      ],
+      "positionPreview": [
+        0.205,
+        0.04190789604187012,
+        0.52
+      ],
+      "muzzlesGLB": [
+        [
+          0.45023199915885925,
+          0.10343888401985168,
+          -0.20729756355285645
+        ],
+        [
+          0.4538949728012085,
+          0.10343888401985168,
+          -0.2274271845817566
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          234.24624681472778,
+          116.8859389424324,
+          508.76215904951096
+        ],
+        [
+          256.99271857738495,
+          116.8859389424324,
+          512.9013192653656
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.20729756355285645,
+          0.10343888401985168,
+          0.45023199915885925
+        ],
+        [
+          0.2274271845817566,
+          0.10343888401985168,
+          0.4538949728012085
+        ]
+      ],
+      "directionGLB": [
+        -0.8520335555076599,
+        0.5000001192092896,
+        -0.15504421293735504
+      ],
+      "directionRuntime": [
+        0.15504421293735504,
+        0.5000001192092896,
+        -0.8520335555076599
+      ],
+      "directionPreview": [
+        0.15504421293735504,
+        0.5000001192092896,
+        -0.8520335555076599
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          19.999999999999996,
+          40
+        ]
+      }
+    },
+    {
+      "index": 23,
+      "label": "BATTERY 24 · dorsal aft starboard",
+      "cluster": "dorsal aft starboard",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        0.645,
+        0.205,
+        0.01703010940551758
+      ],
+      "positionGLB": [
+        0.645,
+        0.01703010940551758,
+        -0.205
+      ],
+      "seat": "BATTERY 24 · dorsal aft starboard supported deck seat",
+      "host": "Battleship continuous swept shoulder pod.001",
+      "yawRadians": -0.18,
+      "pitchRadians": 0.5235987755982988,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          0.5752320289611816,
+          0.20729756355285645,
+          0.07856109738349915
+        ],
+        [
+          0.5788949728012085,
+          0.2274271845817566,
+          0.07856109738349915
+        ]
+      ],
+      "directionBlender": [
+        -0.8520335555076599,
+        0.15504421293735504,
+        0.5000001192092896
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        231.64999999999998,
+        19.244023628234864,
+        728.85
+      ],
+      "positionPreview": [
+        0.205,
+        0.01703010940551758,
+        0.645
+      ],
+      "muzzlesGLB": [
+        [
+          0.5752320289611816,
+          0.07856109738349915,
+          -0.20729756355285645
+        ],
+        [
+          0.5788949728012085,
+          0.07856109738349915,
+          -0.2274271845817566
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          234.24624681472778,
+          88.77404004335403,
+          650.0121927261353
+        ],
+        [
+          256.99271857738495,
+          88.77404004335403,
+          654.1513192653656
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.20729756355285645,
+          0.07856109738349915,
+          0.5752320289611816
+        ],
+        [
+          0.2274271845817566,
+          0.07856109738349915,
+          0.5788949728012085
+        ]
+      ],
+      "directionGLB": [
+        -0.8520335555076599,
+        0.5000001192092896,
+        -0.15504421293735504
+      ],
+      "directionRuntime": [
+        0.15504421293735504,
+        0.5000001192092896,
+        -0.8520335555076599
+      ],
+      "directionPreview": [
+        0.15504421293735504,
+        0.5000001192092896,
+        -0.8520335555076599
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          19.999999999999996,
+          40
+        ]
+      }
+    },
+    {
+      "index": 24,
+      "label": "BATTERY 25 · ventral fore starboard",
+      "cluster": "ventral fore starboard",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 1,
+      "side": -1,
+      "positionBlender": [
+        -0.6,
+        0.082,
+        -0.32505380058288574
+      ],
+      "positionGLB": [
+        -0.6,
+        -0.32505380058288574,
+        -0.082
+      ],
+      "seat": "BATTERY 25 · ventral fore starboard supported deck seat",
+      "host": "Battleship uninterrupted tapered citadel",
+      "yawRadians": 0.15,
+      "pitchRadians": 0.3490658503988659,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          -0.6725558638572693,
+          0.10331201553344727,
+          -0.3739883303642273
+        ],
+        [
+          -0.6756134033203125,
+          0.08308158069849014,
+          -0.3739883303642273
+        ]
+      ],
+      "directionBlender": [
+        -0.9291408658027649,
+        0.14042598009109497,
+        -0.34202006459236145
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        92.66000000000001,
+        -367.3107946586609,
+        -678
+      ],
+      "positionPreview": [
+        0.082,
+        -0.32505380058288574,
+        -0.6
+      ],
+      "muzzlesGLB": [
+        [
+          -0.6725558638572693,
+          -0.3739883303642273,
+          -0.10331201553344727
+        ],
+        [
+          -0.6756134033203125,
+          -0.3739883303642273,
+          -0.08308158069849014
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          116.74257755279541,
+          -422.60681331157684,
+          -759.9881261587143
+        ],
+        [
+          93.88218618929386,
+          -422.60681331157684,
+          -763.4431457519531
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.10331201553344727,
+          -0.3739883303642273,
+          -0.6725558638572693
+        ],
+        [
+          0.08308158069849014,
+          -0.3739883303642273,
+          -0.6756134033203125
+        ]
+      ],
+      "directionGLB": [
+        -0.9291408658027649,
+        -0.34202006459236145,
+        -0.14042598009109497
+      ],
+      "directionRuntime": [
+        0.14042598009109497,
+        -0.34202006459236145,
+        -0.9291408658027649
+      ],
+      "directionPreview": [
+        0.14042598009109497,
+        -0.34202006459236145,
+        -0.9291408658027649
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          10,
+          30
+        ]
+      }
+    },
+    {
+      "index": 25,
+      "label": "BATTERY 26 · ventral fore starboard",
+      "cluster": "ventral fore starboard",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 1,
+      "side": -1,
+      "positionBlender": [
+        -0.465,
+        0.082,
+        -0.33049999618530274
+      ],
+      "positionGLB": [
+        -0.465,
+        -0.33049999618530274,
+        -0.082
+      ],
+      "seat": "BATTERY 26 · ventral fore starboard supported deck seat",
+      "host": "Battleship uninterrupted tapered citadel",
+      "yawRadians": 0.15,
+      "pitchRadians": 0.3490658503988659,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          -0.5375558137893677,
+          0.10331201553344727,
+          -0.3794345259666443
+        ],
+        [
+          -0.5406133532524109,
+          0.08308158069849014,
+          -0.3794345259666443
+        ]
+      ],
+      "directionBlender": [
+        -0.9291408658027649,
+        0.14042598009109497,
+        -0.34202006459236145
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        92.66000000000001,
+        -373.4649956893921,
+        -525.45
+      ],
+      "positionPreview": [
+        0.082,
+        -0.33049999618530274,
+        -0.465
+      ],
+      "muzzlesGLB": [
+        [
+          -0.5375558137893677,
+          -0.3794345259666443,
+          -0.10331201553344727
+        ],
+        [
+          -0.5406133532524109,
+          -0.3794345259666443,
+          -0.08308158069849014
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          116.74257755279541,
+          -428.76101434230804,
+          -607.4380695819855
+        ],
+        [
+          93.88218618929386,
+          -428.76101434230804,
+          -610.8930891752243
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.10331201553344727,
+          -0.3794345259666443,
+          -0.5375558137893677
+        ],
+        [
+          0.08308158069849014,
+          -0.3794345259666443,
+          -0.5406133532524109
+        ]
+      ],
+      "directionGLB": [
+        -0.9291408658027649,
+        -0.34202006459236145,
+        -0.14042598009109497
+      ],
+      "directionRuntime": [
+        0.14042598009109497,
+        -0.34202006459236145,
+        -0.9291408658027649
+      ],
+      "directionPreview": [
+        0.14042598009109497,
+        -0.34202006459236145,
+        -0.9291408658027649
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          10,
+          30
+        ]
+      }
+    },
+    {
+      "index": 26,
+      "label": "BATTERY 27 · ventral aft starboard",
+      "cluster": "ventral aft starboard",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 1,
+      "side": -1,
+      "positionBlender": [
+        0.375,
+        0.105,
+        -0.32690297508239746
+      ],
+      "positionGLB": [
+        0.375,
+        -0.32690297508239746,
+        -0.105
+      ],
+      "seat": "BATTERY 27 · ventral aft starboard supported deck seat",
+      "host": "Battleship uninterrupted tapered citadel",
+      "yawRadians": 0.18,
+      "pitchRadians": 0.3490658503988659,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          0.3031160831451416,
+          0.1284787654876709,
+          -0.375837504863739
+        ],
+        [
+          0.29945310950279236,
+          0.10834914445877075,
+          -0.375837504863739
+        ]
+      ],
+      "directionBlender": [
+        -0.924510657787323,
+        0.16823279857635498,
+        -0.34202006459236145
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        118.64999999999999,
+        -369.4003618431091,
+        423.75
+      ],
+      "positionPreview": [
+        0.105,
+        -0.32690297508239746,
+        0.375
+      ],
+      "muzzlesGLB": [
+        [
+          0.3031160831451416,
+          -0.375837504863739,
+          -0.1284787654876709
+        ],
+        [
+          0.29945310950279236,
+          -0.375837504863739,
+          -0.10834914445877075
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          145.18100500106812,
+          -424.6963804960251,
+          342.52117395401
+        ],
+        [
+          122.43453323841095,
+          -424.6963804960251,
+          338.38201373815536
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.1284787654876709,
+          -0.375837504863739,
+          0.3031160831451416
+        ],
+        [
+          0.10834914445877075,
+          -0.375837504863739,
+          0.29945310950279236
+        ]
+      ],
+      "directionGLB": [
+        -0.924510657787323,
+        -0.34202006459236145,
+        -0.16823279857635498
+      ],
+      "directionRuntime": [
+        0.16823279857635498,
+        -0.34202006459236145,
+        -0.924510657787323
+      ],
+      "directionPreview": [
+        0.16823279857635498,
+        -0.34202006459236145,
+        -0.924510657787323
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          10,
+          30
+        ]
+      }
+    },
+    {
+      "index": 27,
+      "label": "BATTERY 28 · ventral aft starboard",
+      "cluster": "ventral aft starboard",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 1,
+      "side": -1,
+      "positionBlender": [
+        0.52,
+        0.105,
+        -0.32255302810668945
+      ],
+      "positionGLB": [
+        0.52,
+        -0.32255302810668945,
+        -0.105
+      ],
+      "seat": "BATTERY 28 · ventral aft starboard supported deck seat",
+      "host": "Battleship uninterrupted tapered citadel",
+      "yawRadians": 0.18,
+      "pitchRadians": 0.3490658503988659,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          0.4481160640716553,
+          0.1284787654876709,
+          -0.371487557888031
+        ],
+        [
+          0.44445309042930603,
+          0.10834914445877075,
+          -0.371487557888031
+        ]
+      ],
+      "directionBlender": [
+        -0.924510657787323,
+        0.16823279857635498,
+        -0.34202006459236145
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        118.64999999999999,
+        -364.4849217605591,
+        587.6
+      ],
+      "positionPreview": [
+        0.105,
+        -0.32255302810668945,
+        0.52
+      ],
+      "muzzlesGLB": [
+        [
+          0.4481160640716553,
+          -0.371487557888031,
+          -0.1284787654876709
+        ],
+        [
+          0.44445309042930603,
+          -0.371487557888031,
+          -0.10834914445877075
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          145.18100500106812,
+          -419.78094041347504,
+          506.37115240097046
+        ],
+        [
+          122.43453323841095,
+          -419.78094041347504,
+          502.2319921851158
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.1284787654876709,
+          -0.371487557888031,
+          0.4481160640716553
+        ],
+        [
+          0.10834914445877075,
+          -0.371487557888031,
+          0.44445309042930603
+        ]
+      ],
+      "directionGLB": [
+        -0.924510657787323,
+        -0.34202006459236145,
+        -0.16823279857635498
+      ],
+      "directionRuntime": [
+        0.16823279857635498,
+        -0.34202006459236145,
+        -0.924510657787323
+      ],
+      "directionPreview": [
+        0.16823279857635498,
+        -0.34202006459236145,
+        -0.924510657787323
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          10,
+          30
+        ]
+      }
+    },
+    {
+      "index": 28,
+      "label": "BATTERY 29 · broadside starboard",
+      "cluster": "broadside starboard",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 0,
+      "side": 1,
+      "positionBlender": [
+        -0.165,
+        0.2767310037612915,
+        -0.17
+      ],
+      "positionGLB": [
+        -0.165,
+        -0.17,
+        -0.2767310037612915
+      ],
+      "seat": "BATTERY 29 · broadside starboard supported deck seat",
+      "host": "Battleship continuous swept shoulder pod.001",
+      "yawRadians": 0,
+      "pitchRadians": 1.1344640137963142,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          -0.1986972689628601,
+          0.3706587553024292,
+          -0.1597699224948883
+        ],
+        [
+          -0.1986972689628601,
+          0.3706587553024292,
+          -0.18023009598255157
+        ]
+      ],
+      "directionBlender": [
+        -0.42261824011802673,
+        0.9063078165054321,
+        -3.96159727245049e-8
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        312.7060342502594,
+        -192.10000000000002,
+        -186.45000000000002
+      ],
+      "positionPreview": [
+        0.2767310037612915,
+        -0.17,
+        -0.165
+      ],
+      "muzzlesGLB": [
+        [
+          -0.1986972689628601,
+          -0.1597699224948883,
+          -0.3706587553024292
+        ],
+        [
+          -0.1986972689628601,
+          -0.18023009598255157,
+          -0.3706587553024292
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          418.844393491745,
+          -180.54001241922379,
+          -224.52791392803192
+        ],
+        [
+          418.844393491745,
+          -203.66000846028328,
+          -224.52791392803192
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.3706587553024292,
+          -0.1597699224948883,
+          -0.1986972689628601
+        ],
+        [
+          0.3706587553024292,
+          -0.18023009598255157,
+          -0.1986972689628601
+        ]
+      ],
+      "directionGLB": [
+        -0.42261824011802673,
+        -3.96159727245049e-8,
+        -0.9063078165054321
+      ],
+      "directionRuntime": [
+        0.9063078165054321,
+        -3.96159727245049e-8,
+        -0.42261824011802673
+      ],
+      "directionPreview": [
+        0.9063078165054321,
+        -3.96159727245049e-8,
+        -0.42261824011802673
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          55,
+          75
+        ]
+      }
+    },
+    {
+      "index": 29,
+      "label": "BATTERY 30 · broadside starboard",
+      "cluster": "broadside starboard",
+      "kind": "battery",
+      "type": "M",
+      "modelFactory": "createCruiserTurret",
+      "size": 34,
+      "axis": 0,
+      "side": 1,
+      "positionBlender": [
+        0.235,
+        0.31478845024108887,
+        -0.17
+      ],
+      "positionGLB": [
+        0.235,
+        -0.17,
+        -0.31478845024108887
+      ],
+      "seat": "BATTERY 30 · broadside starboard supported deck seat",
+      "host": "Battleship continuous swept shoulder pod.001",
+      "yawRadians": 0,
+      "pitchRadians": 1.1344640137963142,
+      "elevationPivotLocal": 0.72,
+      "muzzlesBlender": [
+        [
+          0.20130273699760437,
+          0.40871620178222656,
+          -0.1597699224948883
+        ],
+        [
+          0.20130273699760437,
+          0.40871620178222656,
+          -0.18023009598255157
+        ]
+      ],
+      "directionBlender": [
+        -0.42261824011802673,
+        0.9063078165054321,
+        -3.96159727245049e-8
+      ],
+      "footRadiusMetres": 24.136000000000003,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        355.7109487724304,
+        -192.10000000000002,
+        265.55
+      ],
+      "positionPreview": [
+        0.31478845024108887,
+        -0.17,
+        0.235
+      ],
+      "muzzlesGLB": [
+        [
+          0.20130273699760437,
+          -0.1597699224948883,
+          -0.40871620178222656
+        ],
+        [
+          0.20130273699760437,
+          -0.18023009598255157,
+          -0.40871620178222656
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          461.849308013916,
+          -180.54001241922379,
+          227.47209280729294
+        ],
+        [
+          461.849308013916,
+          -203.66000846028328,
+          227.47209280729294
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.40871620178222656,
+          -0.1597699224948883,
+          0.20130273699760437
+        ],
+        [
+          0.40871620178222656,
+          -0.18023009598255157,
+          0.20130273699760437
+        ]
+      ],
+      "directionGLB": [
+        -0.42261824011802673,
+        -3.96159727245049e-8,
+        -0.9063078165054321
+      ],
+      "directionRuntime": [
+        0.9063078165054321,
+        -3.96159727245049e-8,
+        -0.42261824011802673
+      ],
+      "directionPreview": [
+        0.9063078165054321,
+        -3.96159727245049e-8,
+        -0.42261824011802673
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          55,
+          75
+        ]
+      }
+    },
+    {
+      "index": 30,
+      "label": "PDC 31 · bow guard starboard",
+      "cluster": "bow guard starboard",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        -0.755,
+        0.075,
+        -0.13639987564086914
+      ],
+      "positionGLB": [
+        -0.755,
+        -0.13639987564086914,
+        -0.075
+      ],
+      "seat": "PDC 31 · bow guard starboard supported deck seat",
+      "host": "Battleship twin pointed upper prow.001",
+      "yawRadians": -0.7,
+      "pitchRadians": 0.7853981633974483,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          -0.7703139781951904,
+          0.08331690728664398,
+          -0.1095946803689003
+        ],
+        [
+          -0.7657987475395203,
+          0.08867757022380829,
+          -0.1095946803689003
+        ]
+      ],
+      "directionBlender": [
+        -0.5408250093460083,
+        0.45553067326545715,
+        0.7071068286895752
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        84.75,
+        -154.13185947418214,
+        -853.15
+      ],
+      "positionPreview": [
+        0.075,
+        -0.13639987564086914,
+        -0.755
+      ],
+      "muzzlesGLB": [
+        [
+          -0.7703139781951904,
+          -0.1095946803689003,
+          -0.08331690728664398
+        ],
+        [
+          -0.7657987475395203,
+          -0.1095946803689003,
+          -0.08867757022380829
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          94.1481052339077,
+          -123.84198881685734,
+          -870.4547953605652
+        ],
+        [
+          100.20565435290337,
+          -123.84198881685734,
+          -865.3525847196579
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.08331690728664398,
+          -0.1095946803689003,
+          -0.7703139781951904
+        ],
+        [
+          0.08867757022380829,
+          -0.1095946803689003,
+          -0.7657987475395203
+        ]
+      ],
+      "directionGLB": [
+        -0.5408250093460083,
+        0.7071068286895752,
+        -0.45553067326545715
+      ],
+      "directionRuntime": [
+        0.45553067326545715,
+        0.7071068286895752,
+        -0.5408250093460083
+      ],
+      "directionPreview": [
+        0.45553067326545715,
+        0.7071068286895752,
+        -0.5408250093460083
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          35,
+          55
+        ]
+      }
+    },
+    {
+      "index": 31,
+      "label": "PDC 32 · bow guard starboard",
+      "cluster": "bow guard starboard",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        -0.635,
+        0.075,
+        -0.11630738830566406
+      ],
+      "positionGLB": [
+        -0.635,
+        -0.11630738830566406,
+        -0.075
+      ],
+      "seat": "PDC 32 · bow guard starboard supported deck seat",
+      "host": "Battleship twin pointed upper prow.001",
+      "yawRadians": -0.7,
+      "pitchRadians": 0.7853981633974483,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          -0.6503139734268188,
+          0.08331690728664398,
+          -0.08950218558311462
+        ],
+        [
+          -0.6457987427711487,
+          0.08867757022380829,
+          -0.08950218558311462
+        ]
+      ],
+      "directionBlender": [
+        -0.5408250093460083,
+        0.45553067326545715,
+        0.7071068286895752
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        84.75,
+        -131.4273487854004,
+        -717.55
+      ],
+      "positionPreview": [
+        0.075,
+        -0.11630738830566406,
+        -0.635
+      ],
+      "muzzlesGLB": [
+        [
+          -0.6503139734268188,
+          -0.08950218558311462,
+          -0.08331690728664398
+        ],
+        [
+          -0.6457987427711487,
+          -0.08950218558311462,
+          -0.08867757022380829
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          94.1481052339077,
+          -101.13746970891953,
+          -734.8547899723053
+        ],
+        [
+          100.20565435290337,
+          -101.13746970891953,
+          -729.752579331398
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.08331690728664398,
+          -0.08950218558311462,
+          -0.6503139734268188
+        ],
+        [
+          0.08867757022380829,
+          -0.08950218558311462,
+          -0.6457987427711487
+        ]
+      ],
+      "directionGLB": [
+        -0.5408250093460083,
+        0.7071068286895752,
+        -0.45553067326545715
+      ],
+      "directionRuntime": [
+        0.45553067326545715,
+        0.7071068286895752,
+        -0.5408250093460083
+      ],
+      "directionPreview": [
+        0.45553067326545715,
+        0.7071068286895752,
+        -0.5408250093460083
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          35,
+          55
+        ]
+      }
+    },
+    {
+      "index": 32,
+      "label": "PDC 33 · bridge guard starboard",
+      "cluster": "bridge guard starboard",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        0.035,
+        0.282,
+        -0.04125035858154297
+      ],
+      "positionGLB": [
+        0.035,
+        -0.04125035858154297,
+        -0.282
+      ],
+      "seat": "PDC 33 · bridge guard starboard supported deck seat",
+      "host": "Battleship continuous swept shoulder pod.001",
+      "yawRadians": -0.8,
+      "pitchRadians": 0.7853981633974483,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          0.020592819899320602,
+          0.2918041944503784,
+          -0.014445161446928978
+        ],
+        [
+          0.025620661675930023,
+          0.2966873049736023,
+          -0.014445161446928978
+        ]
+      ],
+      "directionBlender": [
+        -0.4926460385322571,
+        0.5072473287582397,
+        0.7071068286895752
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        318.65999999999997,
+        -46.612905197143554,
+        39.550000000000004
+      ],
+      "positionPreview": [
+        0.282,
+        -0.04125035858154297,
+        0.035
+      ],
+      "muzzlesGLB": [
+        [
+          0.020592819899320602,
+          -0.014445161446928978,
+          -0.2918041944503784
+        ],
+        [
+          0.025620661675930023,
+          -0.014445161446928978,
+          -0.2966873049736023
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          329.7387397289276,
+          -16.323032435029745,
+          23.26988648623228
+        ],
+        [
+          335.2566546201706,
+          -16.323032435029745,
+          28.951347693800926
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.2918041944503784,
+          -0.014445161446928978,
+          0.020592819899320602
+        ],
+        [
+          0.2966873049736023,
+          -0.014445161446928978,
+          0.025620661675930023
+        ]
+      ],
+      "directionGLB": [
+        -0.4926460385322571,
+        0.7071068286895752,
+        -0.5072473287582397
+      ],
+      "directionRuntime": [
+        0.5072473287582397,
+        0.7071068286895752,
+        -0.4926460385322571
+      ],
+      "directionPreview": [
+        0.5072473287582397,
+        0.7071068286895752,
+        -0.4926460385322571
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          35,
+          55
+        ]
+      }
+    },
+    {
+      "index": 33,
+      "label": "PDC 34 · bridge guard starboard",
+      "cluster": "bridge guard starboard",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        0.285,
+        0.282,
+        -0.033857236862182616
+      ],
+      "positionGLB": [
+        0.285,
+        -0.033857236862182616,
+        -0.282
+      ],
+      "seat": "PDC 34 · bridge guard starboard supported deck seat",
+      "host": "Battleship continuous swept shoulder pod.001",
+      "yawRadians": -0.8,
+      "pitchRadians": 0.7853981633974483,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          0.2705928087234497,
+          0.2918041944503784,
+          -0.007052039727568626
+        ],
+        [
+          0.2756206691265106,
+          0.2966873049736023,
+          -0.007052039727568626
+        ]
+      ],
+      "directionBlender": [
+        -0.4926460385322571,
+        0.5072473287582397,
+        0.7071068286895752
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        318.65999999999997,
+        -38.25867765426636,
+        322.04999999999995
+      ],
+      "positionPreview": [
+        0.282,
+        -0.033857236862182616,
+        0.285
+      ],
+      "muzzlesGLB": [
+        [
+          0.2705928087234497,
+          -0.007052039727568626,
+          -0.2918041944503784
+        ],
+        [
+          0.2756206691265106,
+          -0.007052039727568626,
+          -0.2966873049736023
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          329.7387397289276,
+          -7.968804892152548,
+          305.76987385749817
+        ],
+        [
+          335.2566546201706,
+          -7.968804892152548,
+          311.451356112957
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.2918041944503784,
+          -0.007052039727568626,
+          0.2705928087234497
+        ],
+        [
+          0.2966873049736023,
+          -0.007052039727568626,
+          0.2756206691265106
+        ]
+      ],
+      "directionGLB": [
+        -0.4926460385322571,
+        0.7071068286895752,
+        -0.5072473287582397
+      ],
+      "directionRuntime": [
+        0.5072473287582397,
+        0.7071068286895752,
+        -0.4926460385322571
+      ],
+      "directionPreview": [
+        0.5072473287582397,
+        0.7071068286895752,
+        -0.4926460385322571
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          35,
+          55
+        ]
+      }
+    },
+    {
+      "index": 34,
+      "label": "PDC 35 · engine guard starboard",
+      "cluster": "engine guard starboard",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        0.615,
+        0.24,
+        0.013596285820007324
+      ],
+      "positionGLB": [
+        0.615,
+        0.013596285820007324,
+        -0.24
+      ],
+      "seat": "PDC 35 · engine guard starboard supported deck seat",
+      "host": "Battleship continuous swept shoulder pod.001",
+      "yawRadians": -2.2,
+      "pitchRadians": 0.7853981633974483,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          0.622212827205658,
+          0.2558639347553253,
+          0.040401484817266464
+        ],
+        [
+          0.6278794407844543,
+          0.2517392337322235,
+          0.040401484817266464
+        ]
+      ],
+      "directionBlender": [
+        0.4161331057548523,
+        0.5716931819915771,
+        0.7071068286895752
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        271.2,
+        15.363802976608277,
+        694.95
+      ],
+      "positionPreview": [
+        0.24,
+        0.013596285820007324,
+        0.615
+      ],
+      "muzzlesGLB": [
+        [
+          0.622212827205658,
+          0.040401484817266464,
+          -0.2558639347553253
+        ],
+        [
+          0.6278794407844543,
+          0.040401484817266464,
+          -0.2517392337322235
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          289.1262462735176,
+          45.653677843511105,
+          703.1004947423935
+        ],
+        [
+          284.46533411741257,
+          45.653677843511105,
+          709.5037680864334
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.2558639347553253,
+          0.040401484817266464,
+          0.622212827205658
+        ],
+        [
+          0.2517392337322235,
+          0.040401484817266464,
+          0.6278794407844543
+        ]
+      ],
+      "directionGLB": [
+        0.4161331057548523,
+        0.7071068286895752,
+        -0.5716931819915771
+      ],
+      "directionRuntime": [
+        0.5716931819915771,
+        0.7071068286895752,
+        0.4161331057548523
+      ],
+      "directionPreview": [
+        0.5716931819915771,
+        0.7071068286895752,
+        0.4161331057548523
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          35,
+          55
+        ]
+      }
+    },
+    {
+      "index": 35,
+      "label": "PDC 36 · engine guard starboard",
+      "cluster": "engine guard starboard",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 1,
+      "side": 1,
+      "positionBlender": [
+        0.73,
+        0.24,
+        0.021486987113952638
+      ],
+      "positionGLB": [
+        0.73,
+        0.021486987113952638,
+        -0.24
+      ],
+      "seat": "PDC 36 · engine guard starboard supported deck seat",
+      "host": "Battleship continuous swept shoulder pod.001",
+      "yawRadians": -2.2,
+      "pitchRadians": 0.7853981633974483,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          0.7372128367424011,
+          0.2558639347553253,
+          0.04829218238592148
+        ],
+        [
+          0.7428794503211975,
+          0.2517392337322235,
+          0.04829218238592148
+        ]
+      ],
+      "directionBlender": [
+        0.4161331057548523,
+        0.5716931819915771,
+        0.7071068286895752
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        271.2,
+        24.28029543876648,
+        824.9
+      ],
+      "positionPreview": [
+        0.24,
+        0.021486987113952638,
+        0.73
+      ],
+      "muzzlesGLB": [
+        [
+          0.7372128367424011,
+          0.04829218238592148,
+          -0.2558639347553253
+        ],
+        [
+          0.7428794503211975,
+          0.04829218238592148,
+          -0.2517392337322235
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          289.1262462735176,
+          54.57016609609127,
+          833.0505055189133
+        ],
+        [
+          284.46533411741257,
+          54.57016609609127,
+          839.4537788629532
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.2558639347553253,
+          0.04829218238592148,
+          0.7372128367424011
+        ],
+        [
+          0.2517392337322235,
+          0.04829218238592148,
+          0.7428794503211975
+        ]
+      ],
+      "directionGLB": [
+        0.4161331057548523,
+        0.7071068286895752,
+        -0.5716931819915771
+      ],
+      "directionRuntime": [
+        0.5716931819915771,
+        0.7071068286895752,
+        0.4161331057548523
+      ],
+      "directionPreview": [
+        0.5716931819915771,
+        0.7071068286895752,
+        0.4161331057548523
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          35,
+          55
+        ]
+      }
+    },
+    {
+      "index": 36,
+      "label": "PDC 37 · hangar guard starboard",
+      "cluster": "hangar guard starboard",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 1,
+      "side": -1,
+      "positionBlender": [
+        -0.225,
+        0.119,
+        -0.32324527645111084
+      ],
+      "positionGLB": [
+        -0.225,
+        -0.32324527645111084,
+        -0.119
+      ],
+      "seat": "PDC 37 · hangar guard starboard supported deck seat",
+      "host": "Battleship uninterrupted tapered citadel",
+      "yawRadians": 1.5707963267948966,
+      "pitchRadians": 0.7853981633974483,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          -0.22149556875228882,
+          0.13607068359851837,
+          -0.3500504791736603
+        ],
+        [
+          -0.22850441932678223,
+          0.13607068359851837,
+          -0.3500504791736603
+        ]
+      ],
+      "directionBlender": [
+        -5.338507236274381e-8,
+        0.7071066498756409,
+        -0.70710688829422
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        134.47,
+        -365.26716238975524,
+        -254.25
+      ],
+      "positionPreview": [
+        0.119,
+        -0.32324527645111084,
+        -0.225
+      ],
+      "muzzlesGLB": [
+        [
+          -0.22149556875228882,
+          -0.3500504791736603,
+          -0.13607068359851837
+        ],
+        [
+          -0.22850441932678223,
+          -0.3500504791736603,
+          -0.13607068359851837
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          153.75987246632576,
+          -395.5570414662361,
+          -250.28999269008636
+        ],
+        [
+          153.75987246632576,
+          -395.5570414662361,
+          -258.2099938392639
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.13607068359851837,
+          -0.3500504791736603,
+          -0.22149556875228882
+        ],
+        [
+          0.13607068359851837,
+          -0.3500504791736603,
+          -0.22850441932678223
+        ]
+      ],
+      "directionGLB": [
+        -5.338507236274381e-8,
+        -0.70710688829422,
+        -0.7071066498756409
+      ],
+      "directionRuntime": [
+        0.7071066498756409,
+        -0.70710688829422,
+        -5.338507236274381e-8
+      ],
+      "directionPreview": [
+        0.7071066498756409,
+        -0.70710688829422,
+        -5.338507236274381e-8
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          35,
+          55
+        ]
+      }
+    },
+    {
+      "index": 37,
+      "label": "PDC 38 · hangar guard starboard",
+      "cluster": "hangar guard starboard",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 1,
+      "side": -1,
+      "positionBlender": [
+        0.22,
+        0.119,
+        -0.32614587688446045
+      ],
+      "positionGLB": [
+        0.22,
+        -0.32614587688446045,
+        -0.119
+      ],
+      "seat": "PDC 38 · hangar guard starboard supported deck seat",
+      "host": "Battleship uninterrupted tapered citadel",
+      "yawRadians": 1.5707963267948966,
+      "pitchRadians": 0.7853981633974483,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          0.2235044240951538,
+          0.13607068359851837,
+          -0.3529510796070099
+        ],
+        [
+          0.2164955735206604,
+          0.13607068359851837,
+          -0.3529510796070099
+        ]
+      ],
+      "directionBlender": [
+        -5.338507236274381e-8,
+        0.7071066498756409,
+        -0.70710688829422
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        134.47,
+        -368.5448408794403,
+        248.6
+      ],
+      "positionPreview": [
+        0.119,
+        -0.32614587688446045,
+        0.22
+      ],
+      "muzzlesGLB": [
+        [
+          0.2235044240951538,
+          -0.3529510796070099,
+          -0.13607068359851837
+        ],
+        [
+          0.2164955735206604,
+          -0.3529510796070099,
+          -0.13607068359851837
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          153.75987246632576,
+          -398.8347199559212,
+          252.5599992275238
+        ],
+        [
+          153.75987246632576,
+          -398.8347199559212,
+          244.63999807834625
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.13607068359851837,
+          -0.3529510796070099,
+          0.2235044240951538
+        ],
+        [
+          0.13607068359851837,
+          -0.3529510796070099,
+          0.2164955735206604
+        ]
+      ],
+      "directionGLB": [
+        -5.338507236274381e-8,
+        -0.70710688829422,
+        -0.7071066498756409
+      ],
+      "directionRuntime": [
+        0.7071066498756409,
+        -0.70710688829422,
+        -5.338507236274381e-8
+      ],
+      "directionPreview": [
+        0.7071066498756409,
+        -0.70710688829422,
+        -5.338507236274381e-8
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          35,
+          55
+        ]
+      }
+    },
+    {
+      "index": 38,
+      "label": "PDC 39 · flank guard starboard",
+      "cluster": "flank guard starboard",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 0,
+      "side": 1,
+      "positionBlender": [
+        -0.375,
+        0.21049784564971924,
+        -0.205
+      ],
+      "positionGLB": [
+        -0.375,
+        -0.205,
+        -0.21049784564971924
+      ],
+      "seat": "PDC 39 · flank guard starboard supported deck seat",
+      "host": "Battleship continuous swept shoulder pod.001",
+      "yawRadians": 0,
+      "pitchRadians": 1.1344640137963142,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          -0.38520267605781555,
+          0.24211207032203674,
+          -0.20149557292461395
+        ],
+        [
+          -0.38520267605781555,
+          0.24211207032203674,
+          -0.20850442349910736
+        ]
+      ],
+      "directionBlender": [
+        -0.42261824011802673,
+        0.9063078165054321,
+        -3.96159727245049e-8
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        237.86256558418273,
+        -231.64999999999998,
+        -423.75
+      ],
+      "positionPreview": [
+        0.21049784564971924,
+        -0.205,
+        -0.375
+      ],
+      "muzzlesGLB": [
+        [
+          -0.38520267605781555,
+          -0.20149557292461395,
+          -0.24211207032203674
+        ],
+        [
+          -0.38520267605781555,
+          -0.20850442349910736,
+          -0.24211207032203674
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          273.5866394639015,
+          -227.68999740481377,
+          -435.2790239453316
+        ],
+        [
+          273.5866394639015,
+          -235.60999855399132,
+          -435.2790239453316
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.24211207032203674,
+          -0.20149557292461395,
+          -0.38520267605781555
+        ],
+        [
+          0.24211207032203674,
+          -0.20850442349910736,
+          -0.38520267605781555
+        ]
+      ],
+      "directionGLB": [
+        -0.42261824011802673,
+        -3.96159727245049e-8,
+        -0.9063078165054321
+      ],
+      "directionRuntime": [
+        0.9063078165054321,
+        -3.96159727245049e-8,
+        -0.42261824011802673
+      ],
+      "directionPreview": [
+        0.9063078165054321,
+        -3.96159727245049e-8,
+        -0.42261824011802673
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          55,
+          75
+        ]
+      }
+    },
+    {
+      "index": 39,
+      "label": "PDC 40 · flank guard starboard",
+      "cluster": "flank guard starboard",
+      "kind": "pdc",
+      "type": "pdc-S",
+      "modelFactory": "createCruiserPdc",
+      "size": 22,
+      "axis": 0,
+      "side": 1,
+      "positionBlender": [
+        0.585,
+        0.30785666847229004,
+        -0.205
+      ],
+      "positionGLB": [
+        0.585,
+        -0.205,
+        -0.30785666847229004
+      ],
+      "seat": "PDC 40 · flank guard starboard supported deck seat",
+      "host": "Battleship continuous swept shoulder pod.001",
+      "yawRadians": 0,
+      "pitchRadians": 1.1344640137963142,
+      "elevationPivotLocal": 0.5,
+      "muzzlesBlender": [
+        [
+          0.5747972726821899,
+          0.33947092294692993,
+          -0.20149557292461395
+        ],
+        [
+          0.5747972726821899,
+          0.33947092294692993,
+          -0.20850442349910736
+        ]
+      ],
+      "directionBlender": [
+        -0.42261824011802673,
+        0.9063078165054321,
+        -3.96159727245049e-8
+      ],
+      "footRadiusMetres": 11.476,
+      "articulation": "root → yaw(Y) → pitch(X), pitch position Y = elevationPivotLocal; root rotation Z as on Cruiser",
+      "positionRuntime": [
+        347.87803537368774,
+        -231.64999999999998,
+        661.05
+      ],
+      "positionPreview": [
+        0.30785666847229004,
+        -0.205,
+        0.585
+      ],
+      "muzzlesGLB": [
+        [
+          0.5747972726821899,
+          -0.20149557292461395,
+          -0.33947092294692993
+        ],
+        [
+          0.5747972726821899,
+          -0.20850442349910736,
+          -0.33947092294692993
+        ]
+      ],
+      "muzzlesRuntime": [
+        [
+          383.6021429300308,
+          -227.68999740481377,
+          649.5209181308746
+        ],
+        [
+          383.6021429300308,
+          -235.60999855399132,
+          649.5209181308746
+        ]
+      ],
+      "muzzlesPreview": [
+        [
+          0.33947092294692993,
+          -0.20149557292461395,
+          0.5747972726821899
+        ],
+        [
+          0.33947092294692993,
+          -0.20850442349910736,
+          0.5747972726821899
+        ]
+      ],
+      "directionGLB": [
+        -0.42261824011802673,
+        -3.96159727245049e-8,
+        -0.9063078165054321
+      ],
+      "directionRuntime": [
+        0.9063078165054321,
+        -3.96159727245049e-8,
+        -0.42261824011802673
+      ],
+      "directionPreview": [
+        0.9063078165054321,
+        -3.96159727245049e-8,
+        -0.42261824011802673
+      ],
+      "muzzleClearance": {
+        "clear": true,
+        "samples": 18,
+        "bothTubes": true,
+        "poses": "authored rest pose and 9 nearby aiming poses; live fire must also use the existing turret-clearance guard",
+        "source": "runtime-qa.json"
+      },
+      "verifiedAimSector": {
+        "clear": true,
+        "yawDeltaDegrees": [
+          -10,
+          10
+        ],
+        "elevationDegrees": [
+          55,
+          75
+        ]
+      }
+    }
+  ],
+  "armamentCounts": {
+    "retainedFixedHeavy": 4,
+    "cruiserBatteries": 20,
+    "PDCs": 20,
+    "attachmentTriangles": 14880
+  },
+  "crewWindows": {
+    "count": 634,
+    "heightMetres": 2.486,
+    "widthMetres": 6.554,
+    "groups": [
+      "lower",
+      "lower-forward",
+      "upper",
+      "lower-2",
+      "lower-3",
+      "upper-operations",
+      "outer-hull-crew",
+      "forecastle"
+    ]
+  },
+  "armamentSource": {
+    "data": "cruiser-armament-source.json",
+    "factories": "/src/game/cruiserModels.js",
+    "paintSource": "weapon-paint.glb",
+    "poseFactory": "runtime-components.js",
+    "sameCruiserSizes": true,
+    "batteryScale": 34,
+    "pdcScale": 22,
+    "editableNativeIncluded": true,
+    "exportedAsSeparateRuntimeAttachments": true
+  },
+  "verification": {
+    "qa": "runtime-qa.json",
+    "sha256": "12d7937fae9be197f8ae74b3eebc11591626d0b66cc946229c4d551a7c3eb90b",
+    "engineApertureSamples": 68,
+    "engineMouthsClear": true,
+    "muzzleSamples": 68,
+    "allMuzzlesClear": true,
+    "hangarSamples": 319,
+    "hangarOpenAndRecessed": true,
+    "allSecondaryMuzzlesClear": true,
+    "secondaryMuzzleSamples": 720,
+    "allGlowFacesVisible": true,
+    "glowSamples": 256,
+    "allAimSectorsClear": true,
+    "aimSectorRays": 720
+  }
+}

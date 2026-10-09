@@ -4,6 +4,7 @@ import {
     SHIELD_RECHARGE_RATE,
     combinedHullIntegrity,
     normalizeEnergy,
+    passiveShieldRechargeRate,
     regenerateCombatResources,
     spendEnergy,
 } from './combatResources.js';
@@ -11,6 +12,11 @@ import {
 assert.equal(combinedHullIntegrity(100, 85), 185, 'legacy hull and armor combine without loss');
 assert.equal(normalizeEnergy(undefined, 72), 72, 'missing legacy energy starts full');
 assert.equal(normalizeEnergy(90, 72), 72, 'energy clamps to capacitor');
+assert.equal(SHIELD_RECHARGE_RATE, 10.6, 'non-frigate shields recharge at double the former base rate');
+assert.equal(passiveShieldRechargeRate(8, 'cruiser'), 16, 'non-frigate capital recharge doubles');
+assert.equal(passiveShieldRechargeRate(8, 'carrier'), 16, 'carrier recharge doubles');
+assert.equal(passiveShieldRechargeRate(32, 'frigate'), 32, 'frigate recharge stays on its own rate');
+assert.equal(passiveShieldRechargeRate(undefined, undefined), 7.6, 'ordinary passive recharge doubles too');
 
 const firing = { energy: 8 };
 assert.equal(spendEnergy(firing, 5), true, 'affordable shot fires');
@@ -25,10 +31,10 @@ assert.equal(delayed.shield, 10, 'shield delay prevents recharge');
 assert.equal(delayed.energy, 12, 'delayed shield leaves reactor output in capacitor');
 
 const recharging = { energy: 0, shield: 10 };
-const rechargeTick = regenerateCombatResources(recharging, { reactorOutput: 12, energyCapacity: 50, shield: 30 }, 1, 0);
+const rechargeTick = regenerateCombatResources(recharging, { reactorOutput: 16, energyCapacity: 50, shield: 30 }, 1, 0);
 assert.ok(Math.abs(rechargeTick.shieldRestored - SHIELD_RECHARGE_RATE) < 1e-9);
 assert.ok(Math.abs(rechargeTick.shieldEnergySpent - SHIELD_RECHARGE_RATE * SHIELD_ENERGY_PER_POINT) < 1e-9);
-assert.ok(Math.abs(recharging.energy - (12 - SHIELD_RECHARGE_RATE * SHIELD_ENERGY_PER_POINT)) < 1e-9);
+assert.ok(Math.abs(recharging.energy - (16 - SHIELD_RECHARGE_RATE * SHIELD_ENERGY_PER_POINT)) < 1e-9);
 
 const starved = { energy: 1, shield: 0 };
 regenerateCombatResources(starved, { reactorOutput: 0, energyCapacity: 20, shield: 20 }, 1, 0);

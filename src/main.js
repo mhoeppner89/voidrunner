@@ -497,6 +497,7 @@ const actions = {
     buyShip: (shipId, keepCurrent) => session?.buyShip(shipId, keepCurrent),
     switchShip: (shipId) => session?.switchShip(shipId),
     joinGuild: (guildId) => session?.joinGuild(guildId),
+    setShipPaint: paint => session?.setShipPaint(paint),
     saveNow: () => session?.saveNow(),
     resumeFlight: () => session?.resumeFlight(),
     quitToTitle: () => session?.quitToTitle(),

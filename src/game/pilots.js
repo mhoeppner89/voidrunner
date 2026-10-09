@@ -93,15 +93,16 @@ export const TIER_WEIGHTS = [
     { threat: 0.55, weights: [0.32, 0.46, 0.22] },
     { threat: 1, weights: [0.14, 0.46, 0.4] },
 ];
-// Temperament weights per faction: concord patrols lean steady, red-talons lean
+// Temperament weights per faction: concord patrols lean steady, pirates lean
 // aggressive, salvagers/civilians lean timid.
 export const TEMPERAMENT_WEIGHTS = {
-    'free-merchants': { timid: 0.35, steady: 0.3, aggressive: 0.15, flamboyant: 0.2 },
-    'frontier-miners': { timid: 0.25, steady: 0.45, aggressive: 0.15, flamboyant: 0.15 },
+
+    'independents': { timid: 0.35, steady: 0.3, aggressive: 0.15, flamboyant: 0.2 },
+    alliance: { timid:.15,steady:.45,aggressive:.25,flamboyant:.15 },
     concord: { timid: 0.12, steady: 0.58, aggressive: 0.12, flamboyant: 0.18 },
     // Pirates mostly want to mug and be on their way, so the bloodthirsty
     // aggressive temperament is the minority — steady is the common pirate.
-    'red-talons': { timid: 0.16, steady: 0.4, aggressive: 0.24, flamboyant: 0.2 },
+    'pirates': { timid: 0.16, steady: 0.4, aggressive: 0.24, flamboyant: 0.2 },
 };
 const TIER_IDS = ['novice', 'veteran', 'ace'];
 const TEMPERAMENT_IDS = ['timid', 'steady', 'aggressive', 'flamboyant'];
@@ -130,11 +131,11 @@ export const rollPilot = (rng, threat, faction, override) => {
         if (override.aim !== undefined)
             return override;
         const tier = override.tier === 'rookie' ? 'novice' : (TIERS[override.tier] ? override.tier : 'veteran');
-        const temperament = override.temperament ?? weightedPick(rng, TEMPERAMENT_WEIGHTS[faction] ?? TEMPERAMENT_WEIGHTS['free-merchants']);
+        const temperament = override.temperament ?? weightedPick(rng, TEMPERAMENT_WEIGHTS[faction] ?? TEMPERAMENT_WEIGHTS['independents']);
         return { tier, temperament, ...TIERS[tier], ...TEMPERAMENTS[temperament] };
     }
     const tier = TIER_IDS[weightedPickIndex(rng, tierWeights(threat))];
-    const temperament = weightedPick(rng, TEMPERAMENT_WEIGHTS[faction] ?? TEMPERAMENT_WEIGHTS['free-merchants']);
+    const temperament = weightedPick(rng, TEMPERAMENT_WEIGHTS[faction] ?? TEMPERAMENT_WEIGHTS['independents']);
     return { tier, temperament, ...TIERS[tier], ...TEMPERAMENTS[temperament] };
 };
 const weightedPickIndex = (rng, weights) => {

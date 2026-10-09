@@ -1,0 +1,2787 @@
+{
+  "id": "concord-carrier",
+  "status": "installed and verified locally",
+  "outputDirectory": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier",
+  "previewUrl": "http://127.0.0.1:4173/docs/ship-revisions/20261002/concord-carrier/preview.html",
+  "files": {
+    "hull-only.glb": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/hull-only.glb",
+      "sha256": "a1df064d6ba71c6c55d6468fc3a3a9b796ee69602cae9eb23d8442e433b7b054",
+      "bytes": 3252844,
+      "sceneTriangles": 19490,
+      "uniqueTriangles": 19490,
+      "vertices": 39414,
+      "uniquePrimitives": 9,
+      "sceneDrawPrimitives": 9,
+      "materials": 9,
+      "uniqueMeshes": 1,
+      "embeddedImages": 12,
+      "validationErrors": 0,
+      "validationWarnings": 0
+    },
+    "armament.glb": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/armament.glb",
+      "sha256": "f28005fc48ab27cbc7586674a67e76f48c451a6943b2b68228346296fdf2356e",
+      "bytes": 1982920,
+      "sceneTriangles": 4488,
+      "uniqueTriangles": 856,
+      "vertices": 1638,
+      "uniquePrimitives": 17,
+      "sceneDrawPrimitives": 88,
+      "materials": 3,
+      "uniqueMeshes": 8,
+      "embeddedImages": 8,
+      "validationErrors": 0,
+      "validationWarnings": 0
+    },
+    "candidate.glb": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/candidate.glb",
+      "sha256": "d215c83fa4cb5fac9fdcb525b0ff27e947d692a0cf1c6917751cf98e612a479f",
+      "bytes": 4227480,
+      "sceneTriangles": 23978,
+      "uniqueTriangles": 20346,
+      "vertices": 41052,
+      "uniquePrimitives": 26,
+      "sceneDrawPrimitives": 97,
+      "materials": 10,
+      "uniqueMeshes": 9,
+      "embeddedImages": 16,
+      "validationErrors": 0,
+      "validationWarnings": 0
+    },
+    "concord-carrier.blend": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/concord-carrier.blend",
+      "sha256": "6150e9e31262feed83a550abbe79f23957aa5318f02b5854b9025ef72818187b",
+      "bytes": 8044916
+    },
+    "runtime-handoff.json": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/runtime-handoff.json",
+      "sha256": "9517b75571c62a217f6ec24c42689711c155c1f5efc85b9369a49c3c2b95444d",
+      "bytes": 97022
+    },
+    "review.md": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/review.md",
+      "sha256": "dfad881b822e2145740a961db17c67bf622ef82183e9c3566a51c5a806fb2be7",
+      "bytes": 8912
+    },
+    "preview.html": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/preview.html",
+      "sha256": "306a3e083ee7bda3769c3b7ff925ba24d01d7771665bca49412eaee5ca88a53a",
+      "bytes": 16034
+    },
+    "window-before.glb": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/window-before.glb",
+      "sha256": "b68f06f2c0beaab458bbe93b9c8283caef5f713d7df5b04e38aa827da1da5522",
+      "bytes": 3548420
+    },
+    "hangars-before.glb": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/hangars-before.glb",
+      "sha256": "da5619011b8b25f61b4714062e8d509690860011ff42f742188b510d63c06bbc",
+      "bytes": 3884596
+    },
+    "underside-before.glb": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/underside-before.glb",
+      "sha256": "6d3de2de6d0879b7ee0f06195c9c308cdef517afc664a7ff50fba53932d44ce9",
+      "bytes": 4018884
+    },
+    "texture-scale-before.glb": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/texture-scale-before.glb",
+      "sha256": "12eebf696bd0289d57cca9a2bef039345ad56d1a2722e873095811e369c0ab7b",
+      "bytes": 4106840
+    },
+    "window-density-before.glb": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/window-density-before.glb",
+      "sha256": "88c1e2c62ec87a6eef10c8f808ae6d0ad5683582e76150b22c156e35f0916a5e",
+      "bytes": 4202068
+    },
+    "texture-scale-spec.json": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/texture-scale-spec.json",
+      "sha256": "844d4494bd99ea0eb721622eb7a76daf68a6c914ce2f4741bee1a51098665fbb",
+      "bytes": 636
+    },
+    "texture-scale-verification.json": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/texture-scale-verification.json",
+      "sha256": "4036332706a2f717628543012e6d096c29592811ac0e66acaabec416f7a7f4c9",
+      "bytes": 161751
+    },
+    "window-verification.json": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/window-verification.json",
+      "sha256": "b8e25a751a477f4ff83fc30a9a90943652af032d1f198c27991fc0155be57d02",
+      "bytes": 1970340
+    },
+    "evidence/user-request-20261003.png": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/evidence/user-request-20261003.png",
+      "sha256": "b73e381831437fb62c160238231b79d3bbf4b2e89d6c80d2fad8574d5542c608",
+      "bytes": 178537
+    },
+    "evidence/user-request-window-housings-20261003.png": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/evidence/user-request-window-housings-20261003.png",
+      "sha256": "a1a204686828a18a6001149f3c36560b44de842138854161e08474c0584b4ae7",
+      "bytes": 178765
+    },
+    "textures/carrier-scale-navy-color-1024.png": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/textures/carrier-scale-navy-color-1024.png",
+      "sha256": "af484510f80aee9658443672d872f3df178a4062f9299b78065cda9547e5beac",
+      "bytes": 457134
+    },
+    "textures/carrier-scale-ivory-color-1024.png": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/textures/carrier-scale-ivory-color-1024.png",
+      "sha256": "cc634e3ea14f8005412b69209db7d374d32a22b1b8b4c967de7945d4ec352db5",
+      "bytes": 526956
+    },
+    "textures/carrier-scale-normal-1024.png": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/textures/carrier-scale-normal-1024.png",
+      "sha256": "ed727ac9bead42bf13699e5085a8c806696b45e4615b91e04d4c908600db6cbc",
+      "bytes": 20769
+    },
+    "textures/carrier-scale-orm-256.png": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/textures/carrier-scale-orm-256.png",
+      "sha256": "adb2e6445515e36817ce7f262298008b43e2875329bca8f52906163cd946bd0a",
+      "bytes": 2079
+    },
+    "textures/carrier-windows-color-256.png": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/textures/carrier-windows-color-256.png",
+      "sha256": "040abf0d525b07a40ea2ba57c360b398a9b958297cc00e8e912d6115527f68ed",
+      "bytes": 762
+    },
+    "textures/carrier-windows-normal-256.png": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/textures/carrier-windows-normal-256.png",
+      "sha256": "26a3ee7c212d36042b00aae0b3d6e65fe79fa3279b8377521e75d857399b81c9",
+      "bytes": 432
+    },
+    "textures/carrier-windows-orm-256.png": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/textures/carrier-windows-orm-256.png",
+      "sha256": "50fc8356dc28cc1322f3fac72960e6142bb18f129eb05704e43c20c71f38b1c7",
+      "bytes": 385
+    },
+    "textures/carrier-windows-emission-256.png": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/textures/carrier-windows-emission-256.png",
+      "sha256": "673af3a902a960dfd869a29d8e317141cc15c6f8e71cbaca992b9a2338841e41",
+      "bytes": 368
+    }
+  },
+  "frozenInputs": {
+    "glb": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/input/current.glb",
+      "sha256": "613a6be2fe20d2835b924e75c502bd4c98bc58dd9ce11a09bcd489b037926d8f",
+      "bytes": 2474892
+    },
+    "blender": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/input/current.blend",
+      "sha256": "6c8caca0665a994b9593061d6958ff20e5dae88fd15d5f91c487f7e661f502dc",
+      "bytes": 5788935
+    }
+  },
+  "references": [
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/.freebuff/carrier-faithful/before/concord-carrier.glb",
+      "sha256": "bf05a3d8a558c3dd7d934d912cfe157316c0cfb1294bddc181d5e0eeeca4d184",
+      "bytes": 7253204
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/assets/models/capital/concord-frigate.glb",
+      "sha256": "6c3d0d2c2d1d96a177b5613210ee18e7dbd08bed10646e9ef4c8b11778f84be7",
+      "bytes": 1289232
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/assets/models/capital/concord-cruiser.glb",
+      "sha256": "4dc291f6b4143db2aa645bcef42020ecde948d838ec5fd66d2dcaa8426950a15",
+      "bytes": 1501456
+    }
+  ],
+  "conceptImage": null,
+  "armamentReference": {
+    "factoryModule": "/Users/mhoeppner/Desktop/Voidrunner/src/game/cruiserModels.js",
+    "geometryModule": "/Users/mhoeppner/Desktop/Voidrunner/src/game/cruiserModelData.js",
+    "frozenGeometryCopy": {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/cruiser-armament-source.json",
+      "sha256": "35ac33545b97f08f25a26914a81314da79961634ea5051b69a58195a9da10888",
+      "bytes": 121176
+    }
+  },
+  "changes": {
+    "hangars": 6,
+    "additionalHangars": [
+      {
+        "id": "Port forward",
+        "x": -0.385,
+        "z": -0.048,
+        "length": 0.116,
+        "height": 0.053,
+        "chamfer": 0.006,
+        "back": 0.17,
+        "rim": 0.008,
+        "skin": "recess",
+        "side": -1,
+        "rawBlenderOpening": [
+          [
+            -0.437,
+            -0.0745
+          ],
+          [
+            -0.333,
+            -0.0745
+          ],
+          [
+            -0.327,
+            -0.06849999999999999
+          ],
+          [
+            -0.327,
+            -0.027500000000000004
+          ],
+          [
+            -0.333,
+            -0.021500000000000002
+          ],
+          [
+            -0.437,
+            -0.021500000000000002
+          ],
+          [
+            -0.443,
+            -0.027500000000000004
+          ],
+          [
+            -0.443,
+            -0.06849999999999999
+          ]
+        ],
+        "rawGlbMouthCenter": [
+          -0.385,
+          -0.048,
+          0.23455250000000005
+        ],
+        "runtimeMouthCenter": [
+          -211.69554651700005,
+          -43.3224384,
+          -347.482058
+        ],
+        "rawGlbInwardAxis": [
+          0,
+          0,
+          -1
+        ],
+        "runtimeInwardAxis": [
+          1,
+          0,
+          0
+        ],
+        "openingRuntimeSize": [
+          104.69589280000001,
+          47.8351924
+        ],
+        "rawGlbBackWallCenter": [
+          -0.385,
+          -0.048,
+          0.17
+        ],
+        "runtimeBackWallCenter": [
+          -153.433636,
+          -43.3224384,
+          -347.482058
+        ],
+        "mouthWidthAtCenter": 0.23455250000000005,
+        "backWall": -0.17,
+        "frameBackEmbedding": 0.01
+      },
+      {
+        "id": "Starboard forward",
+        "x": -0.385,
+        "z": -0.048,
+        "length": 0.116,
+        "height": 0.053,
+        "chamfer": 0.006,
+        "back": 0.17,
+        "rim": 0.008,
+        "skin": "recess",
+        "side": 1,
+        "rawBlenderOpening": [
+          [
+            -0.437,
+            -0.0745
+          ],
+          [
+            -0.333,
+            -0.0745
+          ],
+          [
+            -0.327,
+            -0.06849999999999999
+          ],
+          [
+            -0.327,
+            -0.027500000000000004
+          ],
+          [
+            -0.333,
+            -0.021500000000000002
+          ],
+          [
+            -0.437,
+            -0.021500000000000002
+          ],
+          [
+            -0.443,
+            -0.027500000000000004
+          ],
+          [
+            -0.443,
+            -0.06849999999999999
+          ]
+        ],
+        "rawGlbMouthCenter": [
+          -0.385,
+          -0.048,
+          -0.23455250000000005
+        ],
+        "runtimeMouthCenter": [
+          211.69554651700005,
+          -43.3224384,
+          -347.482058
+        ],
+        "rawGlbInwardAxis": [
+          0,
+          0,
+          1
+        ],
+        "runtimeInwardAxis": [
+          -1,
+          0,
+          0
+        ],
+        "openingRuntimeSize": [
+          104.69589280000001,
+          47.8351924
+        ],
+        "rawGlbBackWallCenter": [
+          -0.385,
+          -0.048,
+          -0.17
+        ],
+        "runtimeBackWallCenter": [
+          153.433636,
+          -43.3224384,
+          -347.482058
+        ],
+        "mouthWidthAtCenter": 0.23455250000000005,
+        "backWall": 0.17,
+        "frameBackEmbedding": 0.01
+      },
+      {
+        "id": "Port aft",
+        "x": 0.607,
+        "z": -0.129,
+        "length": 0.172,
+        "height": 0.08,
+        "chamfer": 0.01,
+        "back": 0.26,
+        "rim": 0.01,
+        "skin": "flank",
+        "side": -1,
+        "rawBlenderOpening": [
+          [
+            0.531,
+            -0.169
+          ],
+          [
+            0.6829999999999999,
+            -0.169
+          ],
+          [
+            0.693,
+            -0.159
+          ],
+          [
+            0.693,
+            -0.09899999999999999
+          ],
+          [
+            0.6829999999999999,
+            -0.089
+          ],
+          [
+            0.531,
+            -0.089
+          ],
+          [
+            0.521,
+            -0.09899999999999999
+          ],
+          [
+            0.521,
+            -0.159
+          ]
+        ],
+        "rawGlbMouthCenter": [
+          0.607,
+          -0.129,
+          0.36644666666666664
+        ],
+        "runtimeMouthCenter": [
+          -330.7367321573333,
+          -116.4290532,
+          547.8483355999999
+        ],
+        "rawGlbInwardAxis": [
+          0,
+          0,
+          -1
+        ],
+        "runtimeInwardAxis": [
+          1,
+          0,
+          0
+        ],
+        "openingRuntimeSize": [
+          155.23873759999998,
+          72.204064
+        ],
+        "rawGlbBackWallCenter": [
+          0.607,
+          -0.129,
+          0.26
+        ],
+        "runtimeBackWallCenter": [
+          -234.663208,
+          -116.4290532,
+          547.8483355999999
+        ],
+        "mouthWidthAtCenter": 0.36644666666666664,
+        "backWall": -0.26,
+        "frameBackEmbedding": 0.01
+      },
+      {
+        "id": "Starboard aft",
+        "x": 0.607,
+        "z": -0.129,
+        "length": 0.172,
+        "height": 0.08,
+        "chamfer": 0.01,
+        "back": 0.26,
+        "rim": 0.01,
+        "skin": "flank",
+        "side": 1,
+        "rawBlenderOpening": [
+          [
+            0.531,
+            -0.169
+          ],
+          [
+            0.6829999999999999,
+            -0.169
+          ],
+          [
+            0.693,
+            -0.159
+          ],
+          [
+            0.693,
+            -0.09899999999999999
+          ],
+          [
+            0.6829999999999999,
+            -0.089
+          ],
+          [
+            0.531,
+            -0.089
+          ],
+          [
+            0.521,
+            -0.09899999999999999
+          ],
+          [
+            0.521,
+            -0.159
+          ]
+        ],
+        "rawGlbMouthCenter": [
+          0.607,
+          -0.129,
+          -0.36644666666666664
+        ],
+        "runtimeMouthCenter": [
+          330.7367321573333,
+          -116.4290532,
+          547.8483355999999
+        ],
+        "rawGlbInwardAxis": [
+          0,
+          0,
+          1
+        ],
+        "runtimeInwardAxis": [
+          -1,
+          0,
+          0
+        ],
+        "openingRuntimeSize": [
+          155.23873759999998,
+          72.204064
+        ],
+        "rawGlbBackWallCenter": [
+          0.607,
+          -0.129,
+          -0.26
+        ],
+        "runtimeBackWallCenter": [
+          234.663208,
+          -116.4290532,
+          547.8483355999999
+        ],
+        "mouthWidthAtCenter": 0.36644666666666664,
+        "backWall": 0.26,
+        "frameBackEmbedding": 0.01
+      }
+    ],
+    "engineArmorFix": {
+      "paintAndUVUnchanged": true,
+      "nozzleCoreAndMouthUnchanged": true,
+      "outerRadiusRatio": [
+        1.016,
+        1.03
+      ],
+      "minimumBeforeClearanceRaw": 0.00029662754968740046,
+      "minimumAfterClearanceRaw": 0.001168821007013321,
+      "footprintSamples": 1680
+    },
+    "entranceLengthRaw": [
+      0.55,
+      0.32
+    ],
+    "entranceHeightRaw": [
+      0.13,
+      0.092
+    ],
+    "entranceAreaReductionPercent": 59.54125874125874,
+    "batteries": 4,
+    "pdcs": 10,
+    "ventralBatteries": 2,
+    "ventralPDCs": 4,
+    "underside": {
+      "basePanelAtlasRepeatRaw": 0.2,
+      "baseTexelDensityPerRuntimeMetre": 2.8364054411120128,
+      "keelPlates": 17,
+      "thermalCassettes": 8,
+      "supportChecks": [
+        {
+          "name": "Ventral keel armor 01 1",
+          "cornersRaw": [
+            [
+              -0.824999988079071,
+              -0.0689999982714653,
+              -0.19505448639392853
+            ],
+            [
+              -0.7599999904632568,
+              -0.0689999982714653,
+              -0.20000000298023224
+            ],
+            [
+              -0.7599999904632568,
+              0.0689999982714653,
+              -0.20000000298023224
+            ],
+            [
+              -0.824999988079071,
+              0.0689999982714653,
+              -0.19505448639392853
+            ],
+            [
+              -0.824999988079071,
+              -0.0689999982714653,
+              -0.2030544877052307
+            ],
+            [
+              -0.7599999904632568,
+              -0.0689999982714653,
+              -0.20800000429153442
+            ],
+            [
+              -0.7599999904632568,
+              0.0689999982714653,
+              -0.20800000429153442
+            ],
+            [
+              -0.824999988079071,
+              0.0689999982714653,
+              -0.2030544877052307
+            ]
+          ],
+          "frontOffsetRaw": 0.005,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Ventral keel armor 01 2",
+          "cornersRaw": [
+            [
+              -0.7599999904632568,
+              -0.0689999982714653,
+              -0.20000000298023224
+            ],
+            [
+              -0.7350000143051147,
+              -0.0689999982714653,
+              -0.2018749862909317
+            ],
+            [
+              -0.7350000143051147,
+              0.0689999982714653,
+              -0.2018749862909317
+            ],
+            [
+              -0.7599999904632568,
+              0.0689999982714653,
+              -0.20000000298023224
+            ],
+            [
+              -0.7599999904632568,
+              -0.0689999982714653,
+              -0.20800000429153442
+            ],
+            [
+              -0.7350000143051147,
+              -0.0689999982714653,
+              -0.2098749876022339
+            ],
+            [
+              -0.7350000143051147,
+              0.0689999982714653,
+              -0.2098749876022339
+            ],
+            [
+              -0.7599999904632568,
+              0.0689999982714653,
+              -0.20800000429153442
+            ]
+          ],
+          "frontOffsetRaw": 0.005,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Ventral keel armor 02 1",
+          "cornersRaw": [
+            [
+              -0.675000011920929,
+              -0.0689999982714653,
+              -0.20637495815753937
+            ],
+            [
+              -0.6399999856948853,
+              -0.0689999982714653,
+              -0.20900000631809235
+            ],
+            [
+              -0.6399999856948853,
+              0.0689999982714653,
+              -0.20900000631809235
+            ],
+            [
+              -0.675000011920929,
+              0.0689999982714653,
+              -0.20637501776218414
+            ],
+            [
+              -0.675000011920929,
+              -0.0689999982714653,
+              -0.21437495946884155
+            ],
+            [
+              -0.6399999856948853,
+              -0.0689999982714653,
+              -0.21700000762939453
+            ],
+            [
+              -0.6399999856948853,
+              0.0689999982714653,
+              -0.21700000762939453
+            ],
+            [
+              -0.675000011920929,
+              0.0689999982714653,
+              -0.21437501907348633
+            ]
+          ],
+          "frontOffsetRaw": 0.005,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Ventral keel armor 02 2",
+          "cornersRaw": [
+            [
+              -0.6399999856948853,
+              -0.0689999982714653,
+              -0.20900000631809235
+            ],
+            [
+              -0.5849999785423279,
+              -0.0689999982714653,
+              -0.21449996531009674
+            ],
+            [
+              -0.5849999785423279,
+              0.0689999982714653,
+              -0.21449996531009674
+            ],
+            [
+              -0.6399999856948853,
+              0.0689999982714653,
+              -0.20900000631809235
+            ],
+            [
+              -0.6399999856948853,
+              -0.0689999982714653,
+              -0.21700000762939453
+            ],
+            [
+              -0.5849999785423279,
+              -0.0689999982714653,
+              -0.22249996662139893
+            ],
+            [
+              -0.5849999785423279,
+              0.0689999982714653,
+              -0.22249996662139893
+            ],
+            [
+              -0.6399999856948853,
+              0.0689999982714653,
+              -0.21700000762939453
+            ]
+          ],
+          "frontOffsetRaw": 0.005,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Ventral keel armor 04 1",
+          "cornersRaw": [
+            [
+              -0.3149999976158142,
+              -0.0689999982714653,
+              -0.22899998724460602
+            ],
+            [
+              -0.3100000023841858,
+              -0.0689999982714653,
+              -0.2290000468492508
+            ],
+            [
+              -0.3100000023841858,
+              0.0689999982714653,
+              -0.2290000468492508
+            ],
+            [
+              -0.3149999976158142,
+              0.0689999982714653,
+              -0.22899998724460602
+            ],
+            [
+              -0.3149999976158142,
+              -0.0689999982714653,
+              -0.2369999885559082
+            ],
+            [
+              -0.3100000023841858,
+              -0.0689999982714653,
+              -0.23700004816055298
+            ],
+            [
+              -0.3100000023841858,
+              0.0689999982714653,
+              -0.23700004816055298
+            ],
+            [
+              -0.3149999976158142,
+              0.0689999982714653,
+              -0.2369999885559082
+            ]
+          ],
+          "frontOffsetRaw": 0.005,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Ventral keel armor 04 2",
+          "cornersRaw": [
+            [
+              -0.3100000023841858,
+              -0.0689999982714653,
+              -0.2290000468492508
+            ],
+            [
+              -0.27000001072883606,
+              -0.0689999982714653,
+              -0.2329999953508377
+            ],
+            [
+              -0.27000001072883606,
+              0.0689999982714653,
+              -0.2329999953508377
+            ],
+            [
+              -0.3100000023841858,
+              0.0689999982714653,
+              -0.2290000468492508
+            ],
+            [
+              -0.3100000023841858,
+              -0.0689999982714653,
+              -0.23700004816055298
+            ],
+            [
+              -0.27000001072883606,
+              -0.0689999982714653,
+              -0.2409999966621399
+            ],
+            [
+              -0.27000001072883606,
+              0.0689999982714653,
+              -0.2409999966621399
+            ],
+            [
+              -0.3100000023841858,
+              0.0689999982714653,
+              -0.23700004816055298
+            ]
+          ],
+          "frontOffsetRaw": 0.005,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Ventral keel armor 04 3",
+          "cornersRaw": [
+            [
+              -0.27000001072883606,
+              -0.0689999982714653,
+              -0.2329999953508377
+            ],
+            [
+              -0.22499999403953552,
+              -0.0689999982714653,
+              -0.2374999076128006
+            ],
+            [
+              -0.22499999403953552,
+              0.0689999982714653,
+              -0.23750002682209015
+            ],
+            [
+              -0.27000001072883606,
+              0.0689999982714653,
+              -0.2329999953508377
+            ],
+            [
+              -0.27000001072883606,
+              -0.0689999982714653,
+              -0.2409999966621399
+            ],
+            [
+              -0.22499999403953552,
+              -0.0689999982714653,
+              -0.24549990892410278
+            ],
+            [
+              -0.22499999403953552,
+              0.0689999982714653,
+              -0.24550002813339233
+            ],
+            [
+              -0.27000001072883606,
+              0.0689999982714653,
+              -0.2409999966621399
+            ]
+          ],
+          "frontOffsetRaw": 0.005,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Ventral keel armor 05 1",
+          "cornersRaw": [
+            [
+              -0.0949999988079071,
+              -0.0689999982714653,
+              -0.2432812601327896
+            ],
+            [
+              -0.03999999910593033,
+              -0.0689999982714653,
+              -0.24500007927417755
+            ],
+            [
+              -0.03999999910593033,
+              0.0689999982714653,
+              -0.24500007927417755
+            ],
+            [
+              -0.0949999988079071,
+              0.0689999982714653,
+              -0.2432812601327896
+            ],
+            [
+              -0.0949999988079071,
+              -0.0689999982714653,
+              -0.2512812614440918
+            ],
+            [
+              -0.03999999910593033,
+              -0.0689999982714653,
+              -0.25300008058547974
+            ],
+            [
+              -0.03999999910593033,
+              0.0689999982714653,
+              -0.25300008058547974
+            ],
+            [
+              -0.0949999988079071,
+              0.0689999982714653,
+              -0.2512812614440918
+            ]
+          ],
+          "frontOffsetRaw": 0.005,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Ventral keel armor 05 2",
+          "cornersRaw": [
+            [
+              -0.03999999910593033,
+              -0.0689999982714653,
+              -0.24500007927417755
+            ],
+            [
+              -0.004999999888241291,
+              -0.0689999982714653,
+              -0.24623526632785797
+            ],
+            [
+              -0.004999999888241291,
+              0.0689999982714653,
+              -0.24623526632785797
+            ],
+            [
+              -0.03999999910593033,
+              0.0689999982714653,
+              -0.24500007927417755
+            ],
+            [
+              -0.03999999910593033,
+              -0.0689999982714653,
+              -0.25300008058547974
+            ],
+            [
+              -0.004999999888241291,
+              -0.0689999982714653,
+              -0.25423526763916016
+            ],
+            [
+              -0.004999999888241291,
+              0.0689999982714653,
+              -0.25423526763916016
+            ],
+            [
+              -0.03999999910593033,
+              0.0689999982714653,
+              -0.25300008058547974
+            ]
+          ],
+          "frontOffsetRaw": 0.005,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Ventral keel armor 06 1",
+          "cornersRaw": [
+            [
+              0.07500000298023224,
+              -0.0689999982714653,
+              -0.24905885756015778
+            ],
+            [
+              0.12999999523162842,
+              -0.0689999982714653,
+              -0.2510000169277191
+            ],
+            [
+              0.12999999523162842,
+              0.0689999982714653,
+              -0.2510000169277191
+            ],
+            [
+              0.07500000298023224,
+              0.0689999982714653,
+              -0.24905885756015778
+            ],
+            [
+              0.07500000298023224,
+              -0.0689999982714653,
+              -0.25705885887145996
+            ],
+            [
+              0.12999999523162842,
+              -0.0689999982714653,
+              -0.2590000033378601
+            ],
+            [
+              0.12999999523162842,
+              0.0689999982714653,
+              -0.2590000033378601
+            ],
+            [
+              0.07500000298023224,
+              0.0689999982714653,
+              -0.25705885887145996
+            ]
+          ],
+          "frontOffsetRaw": 0.005,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Ventral keel armor 06 2",
+          "cornersRaw": [
+            [
+              0.12999999523162842,
+              -0.0689999982714653,
+              -0.2510000169277191
+            ],
+            [
+              0.16500000655651093,
+              -0.0689999982714653,
+              -0.25138893723487854
+            ],
+            [
+              0.16500000655651093,
+              0.0689999982714653,
+              -0.25138893723487854
+            ],
+            [
+              0.12999999523162842,
+              0.0689999982714653,
+              -0.2510000169277191
+            ],
+            [
+              0.12999999523162842,
+              -0.0689999982714653,
+              -0.2590000033378601
+            ],
+            [
+              0.16500000655651093,
+              -0.0689999982714653,
+              -0.25938892364501953
+            ],
+            [
+              0.16500000655651093,
+              0.0689999982714653,
+              -0.25938892364501953
+            ],
+            [
+              0.12999999523162842,
+              0.0689999982714653,
+              -0.2590000033378601
+            ]
+          ],
+          "frontOffsetRaw": 0.005,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Ventral keel armor 07 1",
+          "cornersRaw": [
+            [
+              0.38499999046325684,
+              -0.0689999982714653,
+              -0.25381824374198914
+            ],
+            [
+              0.44999998807907104,
+              -0.0689999982714653,
+              -0.2550000846385956
+            ],
+            [
+              0.44999998807907104,
+              0.0689999982714653,
+              -0.2550000846385956
+            ],
+            [
+              0.38499999046325684,
+              0.0689999982714653,
+              -0.25381824374198914
+            ],
+            [
+              0.38499999046325684,
+              -0.0689999982714653,
+              -0.2618182301521301
+            ],
+            [
+              0.44999998807907104,
+              -0.0689999982714653,
+              -0.2630000710487366
+            ],
+            [
+              0.44999998807907104,
+              0.0689999982714653,
+              -0.2630000710487366
+            ],
+            [
+              0.38499999046325684,
+              0.0689999982714653,
+              -0.2618182301521301
+            ]
+          ],
+          "frontOffsetRaw": 0.005,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Ventral keel armor 07 2",
+          "cornersRaw": [
+            [
+              0.44999998807907104,
+              -0.0689999982714653,
+              -0.2550000846385956
+            ],
+            [
+              0.4749999940395355,
+              -0.0689999982714653,
+              -0.25499996542930603
+            ],
+            [
+              0.4749999940395355,
+              0.0689999982714653,
+              -0.25499996542930603
+            ],
+            [
+              0.44999998807907104,
+              0.0689999982714653,
+              -0.2550000846385956
+            ],
+            [
+              0.44999998807907104,
+              -0.0689999982714653,
+              -0.2630000710487366
+            ],
+            [
+              0.4749999940395355,
+              -0.0689999982714653,
+              -0.262999951839447
+            ],
+            [
+              0.4749999940395355,
+              0.0689999982714653,
+              -0.262999951839447
+            ],
+            [
+              0.44999998807907104,
+              0.0689999982714653,
+              -0.2630000710487366
+            ]
+          ],
+          "frontOffsetRaw": 0.005,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Ventral keel armor 08 1",
+          "cornersRaw": [
+            [
+              0.574999988079071,
+              -0.0689999982714653,
+              -0.2539999783039093
+            ],
+            [
+              0.6499999761581421,
+              -0.0689999982714653,
+              -0.25300005078315735
+            ],
+            [
+              0.6499999761581421,
+              0.0689999982714653,
+              -0.25300005078315735
+            ],
+            [
+              0.574999988079071,
+              0.0689999982714653,
+              -0.2539999783039093
+            ],
+            [
+              0.574999988079071,
+              -0.0689999982714653,
+              -0.2619999647140503
+            ],
+            [
+              0.6499999761581421,
+              -0.0689999982714653,
+              -0.26100003719329834
+            ],
+            [
+              0.6499999761581421,
+              0.0689999982714653,
+              -0.26100003719329834
+            ],
+            [
+              0.574999988079071,
+              0.0689999982714653,
+              -0.2619999647140503
+            ]
+          ],
+          "frontOffsetRaw": 0.005,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Ventral keel armor 08 2",
+          "cornersRaw": [
+            [
+              0.6499999761581421,
+              -0.0689999982714653,
+              -0.25300005078315735
+            ],
+            [
+              0.6650000214576721,
+              -0.0689999982714653,
+              -0.2531154453754425
+            ],
+            [
+              0.6650000214576721,
+              0.0689999982714653,
+              -0.25311538577079773
+            ],
+            [
+              0.6499999761581421,
+              0.0689999982714653,
+              -0.25300005078315735
+            ],
+            [
+              0.6499999761581421,
+              -0.0689999982714653,
+              -0.26100003719329834
+            ],
+            [
+              0.6650000214576721,
+              -0.0689999982714653,
+              -0.2611154317855835
+            ],
+            [
+              0.6650000214576721,
+              0.0689999982714653,
+              -0.2611153721809387
+            ],
+            [
+              0.6499999761581421,
+              0.0689999982714653,
+              -0.26100003719329834
+            ]
+          ],
+          "frontOffsetRaw": 0.005,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Ventral keel armor 09 1",
+          "cornersRaw": [
+            [
+              0.6949999928474426,
+              -0.0689999982714653,
+              -0.25334611535072327
+            ],
+            [
+              0.7799999713897705,
+              -0.0689999982714653,
+              -0.2539999783039093
+            ],
+            [
+              0.7799999713897705,
+              0.0689999982714653,
+              -0.2539999783039093
+            ],
+            [
+              0.6949999928474426,
+              0.0689999982714653,
+              -0.25334611535072327
+            ],
+            [
+              0.6949999928474426,
+              -0.0689999982714653,
+              -0.26134610176086426
+            ],
+            [
+              0.7799999713897705,
+              -0.0689999982714653,
+              -0.2619999647140503
+            ],
+            [
+              0.7799999713897705,
+              0.0689999982714653,
+              -0.2619999647140503
+            ],
+            [
+              0.6949999928474426,
+              0.0689999982714653,
+              -0.26134610176086426
+            ]
+          ],
+          "frontOffsetRaw": 0.005,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Ventral keel armor 09 2",
+          "cornersRaw": [
+            [
+              0.7799999713897705,
+              -0.0689999982714653,
+              -0.2539999783039093
+            ],
+            [
+              0.7850000262260437,
+              -0.0689999982714653,
+              -0.25318750739097595
+            ],
+            [
+              0.7850000262260437,
+              0.0689999982714653,
+              -0.25318750739097595
+            ],
+            [
+              0.7799999713897705,
+              0.0689999982714653,
+              -0.2539999783039093
+            ],
+            [
+              0.7799999713897705,
+              -0.0689999982714653,
+              -0.2619999647140503
+            ],
+            [
+              0.7850000262260437,
+              -0.0689999982714653,
+              -0.26118749380111694
+            ],
+            [
+              0.7850000262260437,
+              0.0689999982714653,
+              -0.26118749380111694
+            ],
+            [
+              0.7799999713897705,
+              0.0689999982714653,
+              -0.2619999647140503
+            ]
+          ],
+          "frontOffsetRaw": 0.005,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Port ventral thermal cassette 1 1",
+          "cornersRaw": [
+            [
+              -0.6710000038146973,
+              -0.1340000033378601,
+              -0.20460714399814606
+            ],
+            [
+              -0.6399999856948853,
+              -0.1340000033378601,
+              -0.20727486908435822
+            ],
+            [
+              -0.6399999856948853,
+              -0.09000000357627869,
+              -0.20856137573719025
+            ],
+            [
+              -0.6710000038146973,
+              -0.09000000357627869,
+              -0.2058936506509781
+            ],
+            [
+              -0.6710000038146973,
+              -0.1340000033378601,
+              -0.2146071493625641
+            ],
+            [
+              -0.6399999856948853,
+              -0.1340000033378601,
+              -0.21727487444877625
+            ],
+            [
+              -0.6399999856948853,
+              -0.09000000357627869,
+              -0.21856138110160828
+            ],
+            [
+              -0.6710000038146973,
+              -0.09000000357627869,
+              -0.21589365601539612
+            ]
+          ],
+          "frontOffsetRaw": 0.007,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Port ventral thermal cassette 1 2",
+          "cornersRaw": [
+            [
+              -0.6399999856948853,
+              -0.1340000033378601,
+              -0.20727486908435822
+            ],
+            [
+              -0.609000027179718,
+              -0.1340000033378601,
+              -0.21037478744983673
+            ],
+            [
+              -0.609000027179718,
+              -0.09000000357627869,
+              -0.21166135370731354
+            ],
+            [
+              -0.6399999856948853,
+              -0.09000000357627869,
+              -0.20856137573719025
+            ],
+            [
+              -0.6399999856948853,
+              -0.1340000033378601,
+              -0.21727487444877625
+            ],
+            [
+              -0.609000027179718,
+              -0.1340000033378601,
+              -0.22037479281425476
+            ],
+            [
+              -0.609000027179718,
+              -0.09000000357627869,
+              -0.22166135907173157
+            ],
+            [
+              -0.6399999856948853,
+              -0.09000000357627869,
+              -0.21856138110160828
+            ]
+          ],
+          "frontOffsetRaw": 0.007,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Port ventral thermal cassette 1 service flange 1",
+          "cornersRaw": [
+            [
+              -0.6669999957084656,
+              -0.09600000083446503,
+              -0.20606239140033722
+            ],
+            [
+              -0.6399999856948853,
+              -0.09600000083446503,
+              -0.20838595926761627
+            ],
+            [
+              -0.6399999856948853,
+              -0.09099999815225601,
+              -0.20853210985660553
+            ],
+            [
+              -0.6669999957084656,
+              -0.09099999815225601,
+              -0.20620860159397125
+            ],
+            [
+              -0.6669999957084656,
+              -0.09600000083446503,
+              -0.21706239879131317
+            ],
+            [
+              -0.6399999856948853,
+              -0.09600000083446503,
+              -0.21938596665859222
+            ],
+            [
+              -0.6399999856948853,
+              -0.09099999815225601,
+              -0.21953211724758148
+            ],
+            [
+              -0.6669999957084656,
+              -0.09099999815225601,
+              -0.2172086089849472
+            ]
+          ],
+          "frontOffsetRaw": 0.008,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Port ventral thermal cassette 1 service flange 2",
+          "cornersRaw": [
+            [
+              -0.6399999856948853,
+              -0.09600000083446503,
+              -0.20838595926761627
+            ],
+            [
+              -0.6129999756813049,
+              -0.09600000083446503,
+              -0.21108593046665192
+            ],
+            [
+              -0.6129999756813049,
+              -0.09099999815225601,
+              -0.21123214066028595
+            ],
+            [
+              -0.6399999856948853,
+              -0.09099999815225601,
+              -0.20853210985660553
+            ],
+            [
+              -0.6399999856948853,
+              -0.09600000083446503,
+              -0.21938596665859222
+            ],
+            [
+              -0.6129999756813049,
+              -0.09600000083446503,
+              -0.22208593785762787
+            ],
+            [
+              -0.6129999756813049,
+              -0.09099999815225601,
+              -0.2222321480512619
+            ],
+            [
+              -0.6399999856948853,
+              -0.09099999815225601,
+              -0.21953211724758148
+            ]
+          ],
+          "frontOffsetRaw": 0.008,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Starboard ventral thermal cassette 1 1",
+          "cornersRaw": [
+            [
+              -0.6710000038146973,
+              0.09000000357627869,
+              -0.2058936506509781
+            ],
+            [
+              -0.6399999856948853,
+              0.09000000357627869,
+              -0.20856137573719025
+            ],
+            [
+              -0.6399999856948853,
+              0.1340000033378601,
+              -0.20727486908435822
+            ],
+            [
+              -0.6710000038146973,
+              0.1340000033378601,
+              -0.2046070247888565
+            ],
+            [
+              -0.6710000038146973,
+              0.09000000357627869,
+              -0.21589365601539612
+            ],
+            [
+              -0.6399999856948853,
+              0.09000000357627869,
+              -0.21856138110160828
+            ],
+            [
+              -0.6399999856948853,
+              0.1340000033378601,
+              -0.21727487444877625
+            ],
+            [
+              -0.6710000038146973,
+              0.1340000033378601,
+              -0.21460703015327454
+            ]
+          ],
+          "frontOffsetRaw": 0.007,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Starboard ventral thermal cassette 1 2",
+          "cornersRaw": [
+            [
+              -0.6399999856948853,
+              0.09000000357627869,
+              -0.20856137573719025
+            ],
+            [
+              -0.609000027179718,
+              0.09000000357627869,
+              -0.21166135370731354
+            ],
+            [
+              -0.609000027179718,
+              0.1340000033378601,
+              -0.21037478744983673
+            ],
+            [
+              -0.6399999856948853,
+              0.1340000033378601,
+              -0.20727486908435822
+            ],
+            [
+              -0.6399999856948853,
+              0.09000000357627869,
+              -0.21856138110160828
+            ],
+            [
+              -0.609000027179718,
+              0.09000000357627869,
+              -0.22166135907173157
+            ],
+            [
+              -0.609000027179718,
+              0.1340000033378601,
+              -0.22037479281425476
+            ],
+            [
+              -0.6399999856948853,
+              0.1340000033378601,
+              -0.21727487444877625
+            ]
+          ],
+          "frontOffsetRaw": 0.007,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Starboard ventral thermal cassette 1 service flange 1",
+          "cornersRaw": [
+            [
+              -0.6669999957084656,
+              0.12800000607967377,
+              -0.2051267772912979
+            ],
+            [
+              -0.6399999856948853,
+              0.12800000607967377,
+              -0.20745034515857697
+            ],
+            [
+              -0.6399999856948853,
+              0.13300000131130219,
+              -0.20730407536029816
+            ],
+            [
+              -0.6669999957084656,
+              0.13300000131130219,
+              -0.2049805074930191
+            ],
+            [
+              -0.6669999957084656,
+              0.12800000607967377,
+              -0.21612678468227386
+            ],
+            [
+              -0.6399999856948853,
+              0.12800000607967377,
+              -0.21845035254955292
+            ],
+            [
+              -0.6399999856948853,
+              0.13300000131130219,
+              -0.2183040827512741
+            ],
+            [
+              -0.6669999957084656,
+              0.13300000131130219,
+              -0.21598051488399506
+            ]
+          ],
+          "frontOffsetRaw": 0.008,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Starboard ventral thermal cassette 1 service flange 2",
+          "cornersRaw": [
+            [
+              -0.6399999856948853,
+              0.12800000607967377,
+              -0.20745034515857697
+            ],
+            [
+              -0.6129999756813049,
+              0.12800000607967377,
+              -0.2101503163576126
+            ],
+            [
+              -0.6129999756813049,
+              0.13300000131130219,
+              -0.21000398695468903
+            ],
+            [
+              -0.6399999856948853,
+              0.13300000131130219,
+              -0.20730407536029816
+            ],
+            [
+              -0.6399999856948853,
+              0.12800000607967377,
+              -0.21845035254955292
+            ],
+            [
+              -0.6129999756813049,
+              0.12800000607967377,
+              -0.22115032374858856
+            ],
+            [
+              -0.6129999756813049,
+              0.13300000131130219,
+              -0.22100399434566498
+            ],
+            [
+              -0.6399999856948853,
+              0.13300000131130219,
+              -0.2183040827512741
+            ]
+          ],
+          "frontOffsetRaw": 0.008,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Port ventral thermal cassette 2 1",
+          "cornersRaw": [
+            [
+              -0.09099999815225601,
+              -0.24699999392032623,
+              -0.2416108399629593
+            ],
+            [
+              -0.03999999910593033,
+              -0.24699999392032623,
+              -0.24320460855960846
+            ],
+            [
+              -0.03999999910593033,
+              -0.2029999941587448,
+              -0.24366392195224762
+            ],
+            [
+              -0.09099999815225601,
+              -0.2029999941587448,
+              -0.24207009375095367
+            ],
+            [
+              -0.09099999815225601,
+              -0.24699999392032623,
+              -0.2516108453273773
+            ],
+            [
+              -0.03999999910593033,
+              -0.24699999392032623,
+              -0.2532046139240265
+            ],
+            [
+              -0.03999999910593033,
+              -0.2029999941587448,
+              -0.25366392731666565
+            ],
+            [
+              -0.09099999815225601,
+              -0.2029999941587448,
+              -0.2520700991153717
+            ]
+          ],
+          "frontOffsetRaw": 0.007,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Port ventral thermal cassette 2 2",
+          "cornersRaw": [
+            [
+              -0.03999999910593033,
+              -0.24699999392032623,
+              -0.24320460855960846
+            ],
+            [
+              -0.028999999165534973,
+              -0.24699999392032623,
+              -0.24358852207660675
+            ],
+            [
+              -0.028999999165534973,
+              -0.2029999941587448,
+              -0.24404777586460114
+            ],
+            [
+              -0.03999999910593033,
+              -0.2029999941587448,
+              -0.24366392195224762
+            ],
+            [
+              -0.03999999910593033,
+              -0.24699999392032623,
+              -0.2532046139240265
+            ],
+            [
+              -0.028999999165534973,
+              -0.24699999392032623,
+              -0.2535885274410248
+            ],
+            [
+              -0.028999999165534973,
+              -0.2029999941587448,
+              -0.25404778122901917
+            ],
+            [
+              -0.03999999910593033,
+              -0.2029999941587448,
+              -0.25366392731666565
+            ]
+          ],
+          "frontOffsetRaw": 0.007,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Port ventral thermal cassette 2 service flange 1",
+          "cornersRaw": [
+            [
+              -0.08699999749660492,
+              -0.20900000631809235,
+              -0.2421324998140335
+            ],
+            [
+              -0.03999999910593033,
+              -0.20900000631809235,
+              -0.24360127747058868
+            ],
+            [
+              -0.03999999910593033,
+              -0.20399999618530273,
+              -0.24365343153476715
+            ],
+            [
+              -0.08699999749660492,
+              -0.20399999618530273,
+              -0.24218465387821198
+            ],
+            [
+              -0.08699999749660492,
+              -0.20900000631809235,
+              -0.25313249230384827
+            ],
+            [
+              -0.03999999910593033,
+              -0.20900000631809235,
+              -0.25460126996040344
+            ],
+            [
+              -0.03999999910593033,
+              -0.20399999618530273,
+              -0.2546534240245819
+            ],
+            [
+              -0.08699999749660492,
+              -0.20399999618530273,
+              -0.25318464636802673
+            ]
+          ],
+          "frontOffsetRaw": 0.008,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Port ventral thermal cassette 2 service flange 2",
+          "cornersRaw": [
+            [
+              -0.03999999910593033,
+              -0.20900000631809235,
+              -0.24360127747058868
+            ],
+            [
+              -0.032999999821186066,
+              -0.20900000631809235,
+              -0.24384553730487823
+            ],
+            [
+              -0.032999999821186066,
+              -0.20399999618530273,
+              -0.24389775097370148
+            ],
+            [
+              -0.03999999910593033,
+              -0.20399999618530273,
+              -0.24365343153476715
+            ],
+            [
+              -0.03999999910593033,
+              -0.20900000631809235,
+              -0.25460126996040344
+            ],
+            [
+              -0.032999999821186066,
+              -0.20900000631809235,
+              -0.254845529794693
+            ],
+            [
+              -0.032999999821186066,
+              -0.20399999618530273,
+              -0.25489774346351624
+            ],
+            [
+              -0.03999999910593033,
+              -0.20399999618530273,
+              -0.2546534240245819
+            ]
+          ],
+          "frontOffsetRaw": 0.008,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Starboard ventral thermal cassette 2 1",
+          "cornersRaw": [
+            [
+              -0.09099999815225601,
+              0.2029999941587448,
+              -0.24207009375095367
+            ],
+            [
+              -0.03999999910593033,
+              0.2029999941587448,
+              -0.24366392195224762
+            ],
+            [
+              -0.03999999910593033,
+              0.24699999392032623,
+              -0.24320460855960846
+            ],
+            [
+              -0.09099999815225601,
+              0.24699999392032623,
+              -0.24161089956760406
+            ],
+            [
+              -0.09099999815225601,
+              0.2029999941587448,
+              -0.2520700991153717
+            ],
+            [
+              -0.03999999910593033,
+              0.2029999941587448,
+              -0.25366392731666565
+            ],
+            [
+              -0.03999999910593033,
+              0.24699999392032623,
+              -0.2532046139240265
+            ],
+            [
+              -0.09099999815225601,
+              0.24699999392032623,
+              -0.2516109049320221
+            ]
+          ],
+          "frontOffsetRaw": 0.007,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Starboard ventral thermal cassette 2 2",
+          "cornersRaw": [
+            [
+              -0.03999999910593033,
+              0.2029999941587448,
+              -0.24366392195224762
+            ],
+            [
+              -0.028999999165534973,
+              0.2029999941587448,
+              -0.24404777586460114
+            ],
+            [
+              -0.028999999165534973,
+              0.24699999392032623,
+              -0.24358852207660675
+            ],
+            [
+              -0.03999999910593033,
+              0.24699999392032623,
+              -0.24320460855960846
+            ],
+            [
+              -0.03999999910593033,
+              0.2029999941587448,
+              -0.25366392731666565
+            ],
+            [
+              -0.028999999165534973,
+              0.2029999941587448,
+              -0.25404778122901917
+            ],
+            [
+              -0.028999999165534973,
+              0.24699999392032623,
+              -0.2535885274410248
+            ],
+            [
+              -0.03999999910593033,
+              0.24699999392032623,
+              -0.2532046139240265
+            ]
+          ],
+          "frontOffsetRaw": 0.007,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Starboard ventral thermal cassette 2 service flange 1",
+          "cornersRaw": [
+            [
+              -0.08699999749660492,
+              0.2409999966621399,
+              -0.24179847538471222
+            ],
+            [
+              -0.03999999910593033,
+              0.2409999966621399,
+              -0.2432672530412674
+            ],
+            [
+              -0.03999999910593033,
+              0.2460000067949295,
+              -0.24321509897708893
+            ],
+            [
+              -0.08699999749660492,
+              0.2460000067949295,
+              -0.24174626171588898
+            ],
+            [
+              -0.08699999749660492,
+              0.2409999966621399,
+              -0.252798467874527
+            ],
+            [
+              -0.03999999910593033,
+              0.2409999966621399,
+              -0.25426724553108215
+            ],
+            [
+              -0.03999999910593033,
+              0.2460000067949295,
+              -0.2542150914669037
+            ],
+            [
+              -0.08699999749660492,
+              0.2460000067949295,
+              -0.25274625420570374
+            ]
+          ],
+          "frontOffsetRaw": 0.008,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Starboard ventral thermal cassette 2 service flange 2",
+          "cornersRaw": [
+            [
+              -0.03999999910593033,
+              0.2409999966621399,
+              -0.2432672530412674
+            ],
+            [
+              -0.032999999821186066,
+              0.2409999966621399,
+              -0.24351145327091217
+            ],
+            [
+              -0.032999999821186066,
+              0.2460000067949295,
+              -0.24345935881137848
+            ],
+            [
+              -0.03999999910593033,
+              0.2460000067949295,
+              -0.24321509897708893
+            ],
+            [
+              -0.03999999910593033,
+              0.2409999966621399,
+              -0.25426724553108215
+            ],
+            [
+              -0.032999999821186066,
+              0.2409999966621399,
+              -0.25451144576072693
+            ],
+            [
+              -0.032999999821186066,
+              0.2460000067949295,
+              -0.25445935130119324
+            ],
+            [
+              -0.03999999910593033,
+              0.2460000067949295,
+              -0.2542150914669037
+            ]
+          ],
+          "frontOffsetRaw": 0.008,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Port ventral thermal cassette 3 1",
+          "cornersRaw": [
+            [
+              0.3490000069141388,
+              -0.25699999928474426,
+              -0.2512088119983673
+            ],
+            [
+              0.41100001335144043,
+              -0.25699999928474426,
+              -0.2522546350955963
+            ],
+            [
+              0.41100001335144043,
+              -0.21299999952316284,
+              -0.252742737531662
+            ],
+            [
+              0.3490000069141388,
+              -0.21299999952316284,
+              -0.2516784965991974
+            ],
+            [
+              0.3490000069141388,
+              -0.25699999928474426,
+              -0.26120880246162415
+            ],
+            [
+              0.41100001335144043,
+              -0.25699999928474426,
+              -0.26225462555885315
+            ],
+            [
+              0.41100001335144043,
+              -0.21299999952316284,
+              -0.2627427279949188
+            ],
+            [
+              0.3490000069141388,
+              -0.21299999952316284,
+              -0.2616784870624542
+            ]
+          ],
+          "frontOffsetRaw": 0.007,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Port ventral thermal cassette 3 service flange 1",
+          "cornersRaw": [
+            [
+              0.3529999852180481,
+              -0.21899999678134918,
+              -0.2516820728778839
+            ],
+            [
+              0.40700000524520874,
+              -0.21899999678134918,
+              -0.2526026666164398
+            ],
+            [
+              0.40700000524520874,
+              -0.21400000154972076,
+              -0.25265875458717346
+            ],
+            [
+              0.3529999852180481,
+              -0.21400000154972076,
+              -0.2517353594303131
+            ],
+            [
+              0.3529999852180481,
+              -0.21899999678134918,
+              -0.2626820504665375
+            ],
+            [
+              0.40700000524520874,
+              -0.21899999678134918,
+              -0.2636026442050934
+            ],
+            [
+              0.40700000524520874,
+              -0.21400000154972076,
+              -0.263658732175827
+            ],
+            [
+              0.3529999852180481,
+              -0.21400000154972076,
+              -0.2627353370189667
+            ]
+          ],
+          "frontOffsetRaw": 0.008,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Starboard ventral thermal cassette 3 1",
+          "cornersRaw": [
+            [
+              0.3490000069141388,
+              0.21299999952316284,
+              -0.2516784965991974
+            ],
+            [
+              0.41100001335144043,
+              0.21299999952316284,
+              -0.252742737531662
+            ],
+            [
+              0.41100001335144043,
+              0.25699999928474426,
+              -0.2522546350955963
+            ],
+            [
+              0.3490000069141388,
+              0.25699999928474426,
+              -0.2512088119983673
+            ],
+            [
+              0.3490000069141388,
+              0.21299999952316284,
+              -0.2616784870624542
+            ],
+            [
+              0.41100001335144043,
+              0.21299999952316284,
+              -0.2627427279949188
+            ],
+            [
+              0.41100001335144043,
+              0.25699999928474426,
+              -0.26225462555885315
+            ],
+            [
+              0.3490000069141388,
+              0.25699999928474426,
+              -0.26120880246162415
+            ]
+          ],
+          "frontOffsetRaw": 0.007,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Starboard ventral thermal cassette 3 service flange 1",
+          "cornersRaw": [
+            [
+              0.3529999852180481,
+              0.25099998712539673,
+              -0.2513403594493866
+            ],
+            [
+              0.40700000524520874,
+              0.25099998712539673,
+              -0.25225117802619934
+            ],
+            [
+              0.40700000524520874,
+              0.25600001215934753,
+              -0.25219783186912537
+            ],
+            [
+              0.3529999852180481,
+              0.25600001215934753,
+              -0.25128695368766785
+            ],
+            [
+              0.3529999852180481,
+              0.25099998712539673,
+              -0.26234033703804016
+            ],
+            [
+              0.40700000524520874,
+              0.25099998712539673,
+              -0.2632511556148529
+            ],
+            [
+              0.40700000524520874,
+              0.25600001215934753,
+              -0.26319780945777893
+            ],
+            [
+              0.3529999852180481,
+              0.25600001215934753,
+              -0.2622869312763214
+            ]
+          ],
+          "frontOffsetRaw": 0.008,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Port ventral thermal cassette 4 1",
+          "cornersRaw": [
+            [
+              0.6690000295639038,
+              -0.1940000057220459,
+              -0.2514176666736603
+            ],
+            [
+              0.7310000061988831,
+              -0.1940000057220459,
+              -0.2517031729221344
+            ],
+            [
+              0.7310000061988831,
+              -0.15000000596046448,
+              -0.25240692496299744
+            ],
+            [
+              0.6690000295639038,
+              -0.15000000596046448,
+              -0.2520351707935333
+            ],
+            [
+              0.6690000295639038,
+              -0.1940000057220459,
+              -0.2614176571369171
+            ],
+            [
+              0.7310000061988831,
+              -0.1940000057220459,
+              -0.26170316338539124
+            ],
+            [
+              0.7310000061988831,
+              -0.15000000596046448,
+              -0.2624069154262543
+            ],
+            [
+              0.6690000295639038,
+              -0.15000000596046448,
+              -0.26203516125679016
+            ]
+          ],
+          "frontOffsetRaw": 0.007,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Port ventral thermal cassette 4 service flange 1",
+          "cornersRaw": [
+            [
+              0.6729999780654907,
+              -0.15600000321865082,
+              -0.2519693076610565
+            ],
+            [
+              0.7269999980926514,
+              -0.15600000321865082,
+              -0.25227871537208557
+            ],
+            [
+              0.7269999980926514,
+              -0.1509999930858612,
+              -0.2523598372936249
+            ],
+            [
+              0.6729999780654907,
+              -0.1509999930858612,
+              -0.25203946232795715
+            ],
+            [
+              0.6729999780654907,
+              -0.15600000321865082,
+              -0.2629692852497101
+            ],
+            [
+              0.7269999980926514,
+              -0.15600000321865082,
+              -0.26327869296073914
+            ],
+            [
+              0.7269999980926514,
+              -0.1509999930858612,
+              -0.26335981488227844
+            ],
+            [
+              0.6729999780654907,
+              -0.1509999930858612,
+              -0.2630394399166107
+            ]
+          ],
+          "frontOffsetRaw": 0.008,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Starboard ventral thermal cassette 4 1",
+          "cornersRaw": [
+            [
+              0.6690000295639038,
+              0.15000000596046448,
+              -0.2520351707935333
+            ],
+            [
+              0.7310000061988831,
+              0.15000000596046448,
+              -0.25240686535835266
+            ],
+            [
+              0.7310000061988831,
+              0.1940000057220459,
+              -0.2517031729221344
+            ],
+            [
+              0.6690000295639038,
+              0.1940000057220459,
+              -0.2514176666736603
+            ],
+            [
+              0.6690000295639038,
+              0.15000000596046448,
+              -0.26203516125679016
+            ],
+            [
+              0.7310000061988831,
+              0.15000000596046448,
+              -0.2624068558216095
+            ],
+            [
+              0.7310000061988831,
+              0.1940000057220459,
+              -0.26170316338539124
+            ],
+            [
+              0.6690000295639038,
+              0.1940000057220459,
+              -0.2614176571369171
+            ]
+          ],
+          "frontOffsetRaw": 0.007,
+          "backEmbeddingRaw": 0.003
+        },
+        {
+          "name": "Starboard ventral thermal cassette 4 service flange 1",
+          "cornersRaw": [
+            [
+              0.6729999780654907,
+              0.18799999356269836,
+              -0.2515203654766083
+            ],
+            [
+              0.7269999980926514,
+              0.18799999356269836,
+              -0.25176897644996643
+            ],
+            [
+              0.7269999980926514,
+              0.19300000369548798,
+              -0.251698762178421
+            ],
+            [
+              0.6729999780654907,
+              0.19300000369548798,
+              -0.2514500916004181
+            ],
+            [
+              0.6729999780654907,
+              0.18799999356269836,
+              -0.26252034306526184
+            ],
+            [
+              0.7269999980926514,
+              0.18799999356269836,
+              -0.26276895403862
+            ],
+            [
+              0.7269999980926514,
+              0.19300000369548798,
+              -0.2626987397670746
+            ],
+            [
+              0.6729999780654907,
+              0.19300000369548798,
+              -0.26245006918907166
+            ]
+          ],
+          "frontOffsetRaw": 0.008,
+          "backEmbeddingRaw": 0.003
+        }
+      ]
+    },
+    "hangarSurfaceFix": {
+      "innerFrameTaperRaw": 0.0015,
+      "reason": "Remove coincident frame/cavity inner planes while retaining backed external surrounds."
+    },
+    "physicalEnginesRetained": 3,
+    "unchangedRetainedMeshObjects": 145,
+    "windows": {
+      "physicalCalibrationRuntimeLength": 1803.296467843747,
+      "windowPanes": 5767,
+      "closedBankMeshes": 295,
+      "conformedSegments": 1404,
+      "atlasPanesPerRepeat": 8,
+      "supportSamples": 63180,
+      "widthRuntime": [
+        1.5,
+        1.875
+      ],
+      "heightRuntime": [
+        0.8,
+        1
+      ],
+      "centrePitchRuntime": [
+        4.8,
+        6
+      ],
+      "backEmbeddingRaw": 0.00024,
+      "frontOffsetRaw": 0.00012,
+      "atlasResolution": [
+        256,
+        128
+      ],
+      "zones": {
+        "Bow habitation face": 17,
+        "Bridge foundation": 554,
+        "Bridge observation decks": 320,
+        "Bridge observation ends": 160,
+        "Command spine": 616,
+        "Habitation lower flank": 1204,
+        "Habitation upper flank": 2650,
+        "Upper command tower": 174,
+        "Upper command tower ends": 72
+      }
+    },
+    "windowFollowUp": "User requested removal of the old navigation-window housings and more tiny windows around the carrier.",
+    "removedNavigationWindowHousings": [
+      "Shoulder frame",
+      "Shoulder frame.001",
+      "Shoulder frame.002",
+      "Shoulder frame.003",
+      "Shoulder frame.004",
+      "Shoulder frame.005",
+      "Shoulder frame.006",
+      "Shoulder frame.007",
+      "Shoulder frame.008",
+      "Shoulder frame.009"
+    ],
+    "oversizedGlazingObjectsReplaced": 124,
+    "textureScaleFollowUp": "User requested textures appropriate to the 1.8 km carrier scale.",
+    "textureScale": {
+      "repeatMetres": 128,
+      "textureResolution": [
+        1024,
+        1024
+      ],
+      "texelsPerMetre": 8,
+      "constructionSectionMetres": 64,
+      "armorPlateMetres": 8,
+      "accessCoverMetres": [
+        1.2,
+        2
+      ],
+      "ventilationGrilleMetres": [
+        3,
+        1
+      ],
+      "identificationMarkMetres": 0.5,
+      "armorSeamWidthMetres": 0.09,
+      "constructionSeamWidthMetres": 0.3,
+      "palette": [
+        "Concord navy",
+        "Concord ivory"
+      ],
+      "wearDetailMetresPerPixel": 0.125,
+      "generatedFiles": [
+        "carrier-scale-navy-color-1024.png",
+        "carrier-scale-ivory-color-1024.png",
+        "carrier-scale-normal-1024.png",
+        "carrier-scale-orm-256.png"
+      ],
+      "mappedFaces": 7249,
+      "mappedObjectCount": 388,
+      "actualSurfaceTexelDensityRange": [
+        6.125529134990778,
+        8.000765190751968
+      ],
+      "geometryPreserved": true,
+      "projection": "Physical projection baked to UVs: hull uses world coordinates, shared gun parts use their local metric coordinates. Textures remain attached when joints move.",
+      "brassGunAccentsRetained": true
+    },
+    "undersideFollowUp": "User requested hangar flicker repair, improved underside texture quality and underside guns.",
+    "hangarAndFlickerFollowUp": "User requested engine-armor flicker repair and additional hangars at both marked positions on each side.",
+    "removedConvertedBayOverlays": [
+      "Port hangar face.001",
+      "Starboard hangar face.001",
+      "Forward recessed maintenance bay",
+      "Recess support",
+      "Recess support.001",
+      "Forward recessed maintenance bay.001",
+      "Recess support.002",
+      "Recess support.003"
+    ]
+  },
+  "measurements": {
+    "bounds": {
+      "rawGlb": [
+        [
+          -1.0019999742507935,
+          -0.2989318072795868,
+          -0.4632749855518341
+        ],
+        [
+          0.9959999918937683,
+          0.25850000977516174,
+          0.4632749855518341
+        ]
+      ],
+      "runtime": [
+        [
+          -418.1292088297963,
+          -269.80114180563686,
+          -904.355878360033
+        ],
+        [
+          418.1292088297963,
+          233.30939062258005,
+          898.9405894837141
+        ]
+      ],
+      "runtimeSize": [
+        836.2584176595926,
+        503.1105324282169,
+        1803.296467843747
+      ],
+      "collisionImplications": "The primary hull, pivot and calibration are unchanged. Removing the navigation housings reduces full width by 0.3973 m to 836.2584 m; full length remains 1803.2965 m. Full height remains 503.1105 m, including ventral armament. Use hull-only geometry for hull collision and mounted-gun geometry separately. The six lateral apertures remain open; forward launch aprons and fitted underside details belong to the hull. Window banks are flush surface detail."
+    },
+    "rawToRuntime": {
+      "blender": "X aft, Y starboard, Z up",
+      "rawGlb": "X aft, Y up, Z port; glTF Y-up export",
+      "runtime": "X starboard, Y up, Z aft",
+      "rawToRuntime": "[-rawZ * 902.5508, rawY * 902.5508, rawX * 902.5508]",
+      "yaw": -1.5707963267948966,
+      "reviewScale": 451.2754,
+      "npcCapitalScale": 2,
+      "effectiveRuntimeScale": 902.5508,
+      "recenter": false
+    },
+    "minSampledMuzzleClearanceRuntime": 12.282973138888925
+  },
+  "verification": {
+    "nativeMeshCount": 934,
+    "nativeTriangles": 23978,
+    "nativePackedImages": 24,
+    "allNativeMeshesValid": true,
+    "finitePositionsAndUVs": true,
+    "revisedAndNewSolidsClosed": true,
+    "frameFootprintSamples": 1200,
+    "weaponFootprintSamples": 2702,
+    "muzzleRays": 560,
+    "exhaustExitRays": 384,
+    "glTFErrors": 0,
+    "glTFWarnings": 0,
+    "browserErrors": [],
+    "browserFailedRequests": [],
+    "browserCandidateHash": "d215c83fa4cb5fac9fdcb525b0ff27e947d692a0cf1c6917751cf98e612a479f",
+    "matchedNeutralAndTexturedViews": 26,
+    "articulatedJointsTested": 28,
+    "originalInputHashesUnchanged": true,
+    "nativeSourceRendered": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/evidence/native-blender-render.png",
+    "criticalVisualReview": "All ten navigation-window housings are absent, with denser tiny panes on both sides, command decks and the bow; full-footprint checks keep rows clear of hangars and sensors. Measured texture scale and all paint surfaces passed matched before/after and close views with metric rulers. Passed matched neutral/textured views, both sides, all hangar inner edges from high/low angles, underside plating and thermal cassettes, and dorsal/ventral articulated guns. Native renders from above and below match the final GLB.",
+    "removedNavigationWindowHousings": [
+      "Shoulder frame",
+      "Shoulder frame.001",
+      "Shoulder frame.002",
+      "Shoulder frame.003",
+      "Shoulder frame.004",
+      "Shoulder frame.005",
+      "Shoulder frame.006",
+      "Shoulder frame.007",
+      "Shoulder frame.008",
+      "Shoulder frame.009"
+    ],
+    "windowsClearOfHangarsAndSensors": true,
+    "windowFootprintSamples": 11400,
+    "pressureShellOutward": true,
+    "additionalHangarEntryRays": 100,
+    "launchApronFootprintSamples": 30,
+    "engineArmorFootprintSamples": 1680,
+    "minimumEngineArmorClearanceRuntime": 1.0549203349366785,
+    "hullWithin20000TriangleBudget": true,
+    "hangarInnerEdgeSamples": 1200,
+    "minimumHangarInnerSurfaceDistanceRuntime": 1.7963642129871993,
+    "undersideFootprintSamples": 615,
+    "nativeUndersideRendered": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/evidence/native-blender-underside.png",
+    "textureScale": {
+      "repeatMetres": 128,
+      "actualSurfaceTexelDensityRange": [
+        6.125529134990778,
+        8.000765190751968
+      ],
+      "mappedFaces": 7249,
+      "geometryPreservedAcrossSave": true,
+      "armorPlateMetres": 8,
+      "accessCoverMetres": [
+        1.2,
+        2.0
+      ]
+    },
+    "originalRuntimeImagesStillUsed": 4,
+    "retainedFrozenRuntimeTexturesByteIdentical": true,
+    "retainedTextureScope": "The four remaining original runtime images; armor maps are intentionally replaced by the physical-scale PBR set.",
+    "allPreviousGeometryPreservedByTexturePass": true,
+    "windowCountsSymmetric": {
+      "Habitation upper flank": {
+        "port": 1325,
+        "starboard": 1325
+      },
+      "Habitation lower flank": {
+        "port": 602,
+        "starboard": 602
+      },
+      "Command spine": {
+        "port": 308,
+        "starboard": 308
+      },
+      "Bridge foundation": {
+        "port": 277,
+        "starboard": 277
+      },
+      "Bridge observation decks": {
+        "port": 160,
+        "starboard": 160
+      },
+      "Upper command tower": {
+        "port": 87,
+        "starboard": 87
+      }
+    }
+  },
+  "verificationReports": [
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/native-verification.json",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/geometry-verification.json",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/export-verification.json",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/after-browser-report.json",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/texture-scale-verification.json",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/window-verification.json"
+  ],
+  "evidenceDirectory": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/evidence",
+  "runtimeIntegration": {
+    "owner": "carrier integration",
+    "applied": true,
+    "instruction": "Use measured runtime-handoff.json, retain the named pivots and avoid adding duplicate weapons. Hull-only and armament exports are supplied separately. Gameplay balance is unchanged.",
+    "limits": "PDCs tested at plus/minus 35 degrees around a 45 degree outboard rest pose; batteries at plus/minus 55 degrees; elevation 0\u201340 degrees.",
+    "paintNote": "The 128 m repeat PBR maps and physical UVs are baked into the final hull and armament exports. Do not restore the old large hatch atlas on these meshes.",
+    "runtimeOptions": [
+      "Combine hull-only.glb and armament.glb under the same carrier parent with identical calibration/yaw. The armament export already contains all measured mount transforms.",
+      "Use candidate.glb once, retain the named yaw/pitch nodes, and avoid duplicate factory guns."
+    ],
+    "version": "0.8.2ep",
+    "installedPath": "assets/models/capital/concord-carrier.glb",
+    "report": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/integration/game-check.json"
+  },
+  "reproductionScripts": [
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/build.py",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/package.mjs",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/verify.py",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/capture.mjs",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/make-handoff.py",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/windows.py",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/window-textures.py",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/render-native.py",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/update-review.py",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/extra-hangars.py",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/engine-armor.py",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/underside.py",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/mount-transforms.mjs",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/evidence-sheets.py",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/carrier-textures.py",
+    "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/concord-carrier/texture-mapping.py"
+  ],
+  "windowGeometryNote": "Small individual panes are baked on narrow closed window banks conformed to the existing hull. No extra runtime attachments or code are needed."
+}

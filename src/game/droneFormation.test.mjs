@@ -16,7 +16,7 @@ function fixture(shipId,count) {
 }
 const single=fixture('wayfarer',1), s=single.preparePdcDroneContext();
 const anchor=s.escortAnchors['pdc-0'];
-near(anchor.position[0],100);assert.ok(anchor.position[1]<185,'single drone opposite top turret');
+near(anchor.position[0],100);assert.ok(anchor.position[1]>215,'single drone opposite belly turret');
 const fixed=[...anchor.position];single.save.world.time=3;single.preparePdcDroneContext();assert.deepEqual(anchor.position,fixed);
 for(const count of [2,3]) {
  const rt=fixture('prospector',count), p=rt.save.player;
@@ -35,4 +35,4 @@ for(const count of [2,3]) {
  for(let i=0;i<600;i++){rt.save.world.time+=1/60;const c=rt.preparePdcDroneContext(1/60);rt.pdcDroneController.update(p.droneFleet,1/60,c,[]);}
  assert.ok(Object.values(p.droneFleet.unitsById).every(u=>u.state==='stowed'),'orbiting drones return to bays');
 }
-console.log('PDC formation: single opposite turret; 2/3 evenly spaced; quarter orbit; ship rotation; physical tracking and recall passed.');
+console.log('PDC formation: single opposite belly turret; 2/3 evenly spaced; quarter orbit; ship rotation; physical tracking and recall passed.');

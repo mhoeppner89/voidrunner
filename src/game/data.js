@@ -1,16 +1,11 @@
+export {GUILD_FACTIONS} from './factions.js';
 import { STATION_DOCKS } from './stationDocks.js';
 import {LEAGUE_HULLS} from './leagueContent.js';
 import { GALAXY_LOCATIONS } from './galaxyContent.js';
 import { JUMP_ROUTES, SYSTEMS, systemHops } from './galaxy.js';
+import {careerRegion} from './careerDanger.js';
 
-export const FACTION_NAMES = {
-    concord: 'Concord Patrol',
-    'frontier-league': 'Frontier League',
-    'free-merchants': 'Free Merchants Compact',
-    'frontier-miners': 'Frontier Miners Cooperative',
-    'salvage-union': 'Salvage Union',
-    'red-talons': 'Red Talon Syndicate',
-};
+export {FACTION_NAMES} from './factions.js';
 export const GUILD_NAMES = {
     merchant: 'Merchant Guild',
     bounty: 'Bounty Hunters Registry',
@@ -350,12 +345,12 @@ const HELIOS_LOCATIONS = {
         position: [18000, -8000, -176000],
         radius: 880,
         dockRadius: 1420,
-        faction: 'free-merchants',
+        faction: 'independents',
         guilds: ['merchant'],
         accent: '#d89a43',
         secondary: '#623b24',
         description: 'A rotating freeport built around a refinery spindle. Busy, loud, and commercially neutral.',
-        shipsForSale: ['speedster', 'talon', 'legionary', 'andromeda', 'atlas'],
+        shipsForSale: ['speedster', 'talon', 'legionary', 'andromeda', 'mule', 'atlas'],
         economy: { food: 1.08, water: 1.05, medicine: 1.12, electronics: 0.92, machinery: 0.96, ore: 0.9, scrap: 0.92, luxuries: 1.15, arms: 1.08 },
         marketBias: { electronics: 18, machinery: 12, ore: 20, scrap: 18, food: -10, medicine: -8 },
         people: helixPeople,
@@ -388,7 +383,7 @@ const HELIOS_LOCATIONS = {
         // Landing engages 5km above the surface, so the surface texture is
         // never seen at close range.
         dockRadius: 20250,
-        faction: 'frontier-miners',
+        faction: 'independents',
         guilds: ['mining'],
         accent: '#d77742',
         secondary: '#4f281f',
@@ -408,7 +403,7 @@ const HELIOS_LOCATIONS = {
         // Landing engages 5km above the surface, so the surface texture is
         // never seen at close range.
         dockRadius: 22400,
-        faction: 'free-merchants',
+        faction: 'independents',
         guilds: ['merchant'],
         accent: '#65c5b8',
         secondary: '#173d42',
@@ -425,7 +420,7 @@ const HELIOS_LOCATIONS = {
         kind: 'field',
         position: [18000, -8000, -196000],
         radius: 2340,
-        faction: 'frontier-miners',
+        faction: 'independents',
         accent: '#b6a67a',
         secondary: '#332f29',
         description: 'A dense mineral field with slow-drifting fragments, massive cover, and a navigable rock crown.',
@@ -441,7 +436,7 @@ const HELIOS_LOCATIONS = {
         // Twelve full-scale Concord wrecks and their cleared approach lanes
         // form a broad battlefield around this exact navigation centre.
         radius: 5000,
-        faction: 'salvage-union',
+        faction: 'independents',
         accent: '#a2b9b0',
         secondary: '#293738',
         description: 'A battlefield graveyard of shattered hulls, unstable reactors, and salvage claims with flexible ownership.',
@@ -500,7 +495,7 @@ for (const route of JUMP_ROUTES) {
             kind: 'jump-point',
             position: JUMP_POINT_POSITIONS[id],
             radius: 460,
-            faction: systemId === 'acheron' ? 'frontier-league' : systemId === 'redwake' ? 'red-talons' : 'concord',
+            faction: systemId === 'acheron' ? 'alliance' : systemId === 'redwake' ? 'pirates' : 'concord',
             accent: systemId === 'redwake' ? '#d26759' : '#80bad0',
             secondary: '#202c38',
             description: `A stabilized jump approach linking ${SYSTEMS[systemId].name} with ${destinationSystem.name}.`,
@@ -513,11 +508,13 @@ for (const route of JUMP_ROUTES) {
     }
 }
 
-export const LOCATIONS = Object.freeze({
-    ...HELIOS_WITH_SYSTEM,
-    ...GALAXY_LOCATIONS,
-    ...jumpPointLocations,
-});
+export const LOCATIONS = Object.freeze(Object.fromEntries(Object.entries({
+    ...HELIOS_WITH_SYSTEM, ...GALAXY_LOCATIONS, ...jumpPointLocations,
+}).map(([id,location])=>[id,{...location,
+    security:careerRegion(location.systemId,id),
+    encounterRate:careerRegion(location.systemId,id).jumpChance,
+    guildPresence:Object.freeze(Object.fromEntries((location.guilds??[]).map((guild,i)=>[guild,i===0?1:.45]))),
+}])));
 
 // Local coordinates are reused in each system. Only the active system is
 // rendered and simulated, while these anchors keep each navigation chart
@@ -715,6 +712,31 @@ export const SHIPS = {
         fuel: 130,
         gunDamage: 15,
     },
+    scrapper: {
+        id: 'scrapper', name: 'Scrapper', className: 'Four-gun Pirate Fighter', variant: 'scrapper',
+        role: 'fighter', tier: 1, price: 18000, progressesTo: ['legionary'],
+        personality: 'Split-wing pirate raider',
+        description: 'A patched charcoal-and-red fighter with four wingtip cannons and twin engine booms.',
+        maxSpeed: 62, afterburnSpeed: 100, acceleration: 32,
+        angularAcceleration: 3.5, angularDamping: 3.1, lateralMultiplier: 1.05,
+        shield: 75, hull: 150, reactorOutput: 19, energyCapacity: 65, cargo: 12, fuel: 85, gunDamage: 10,
+    },
+    demon: {
+        id:'demon', name:'Demon', className:'Twin-hull Interceptor', variant:'demon',
+        role:'interceptor', tier:2, price:44000, progressesTo:['lancer'],
+        personality:'Fast close-range interceptor',
+        description:'A compact twin-hull interceptor with four forward guns, seeker missiles and powerful paired engines.',
+        maxSpeed:78, afterburnSpeed:132, acceleration:47, angularAcceleration:4.2, angularDamping:3.1, lateralMultiplier:1.15,
+        shield:130, hull:195, reactorOutput:27, energyCapacity:85, cargo:14, fuel:100, gunDamage:12,
+    },
+    mule: {
+        id:'mule', name:'Mule', className:'Armored Medium Freighter', variant:'mule',
+        role:'transport', tier:2, price:62000, progressesTo:['atlas'],
+        personality:'Protected convoy freighter',
+        description:'An armored transport with a substantial hold, three drives and two defensive PDC positions. Less cargo and industry capacity than Atlas.',
+        maxSpeed:40, afterburnSpeed:60, acceleration:16, angularAcceleration:1.1, angularDamping:2.6,
+        shield:120, hull:300, reactorOutput:22, energyCapacity:95, cargo:128, fuel:180, gunDamage:8,
+    },
     talon: {
         id: 'talon',
         progressesTo: ["lancer"],
@@ -879,17 +901,8 @@ export const spawnClearance = (location) => {
         return location.radius + FIELD_ENTRY_MARGIN;
     return (location.dockRadius ?? location.radius) + 120;
 };
-// Per-destination chance that a hyperdrive jump draws an encounter. Safe sectors
-// (the civilized core around the starting station) sit at 20%; frontier and
-// pirate-hunted destinations climb from there.
-export const SECTOR_ENCOUNTER_RATE = {
-    helix: 0.2,
-    rook: 0.2,
-    azure: 0.3,
-    vesper: 0.35,
-    shardbelt: 0.45,
-    'mourning-line': 0.5,
-};
+// Compatibility catalogue; the central region policy also covers all new POIs.
+export const SECTOR_ENCOUNTER_RATE = Object.freeze(Object.fromEntries(Object.entries(LOCATIONS).map(([id,location])=>[id,location.encounterRate])));
 export const sectorEncounterChance = (id) => LOCATIONS[id]?.encounterRate ?? SECTOR_ENCOUNTER_RATE[id] ?? 0.3;
 export const locationInstanceRadius = (id) => {
     const location = LOCATIONS[id];

@@ -86,10 +86,10 @@ export async function buildGlbScene(arrayBuffer) {
         // this request to the device's supported anisotropy level.
         texture.anisotropy = 8;
         const sampler = json.samplers?.[definition.sampler];
-        if (sampler?.wrapS !== undefined)
-            texture.wrapS = wrapping(sampler.wrapS);
-        if (sampler?.wrapT !== undefined)
-            texture.wrapT = wrapping(sampler.wrapT);
+        // glTF defaults to REPEAT even when the sampler or its wrap fields
+        // are omitted. Blender commonly omits these default-valued fields.
+        texture.wrapS = wrapping(sampler?.wrapS ?? 10497);
+        texture.wrapT = wrapping(sampler?.wrapT ?? 10497);
         texture.needsUpdate = true;
         return texture;
     });
@@ -97,13 +97,21 @@ export async function buildGlbScene(arrayBuffer) {
     const materials = (json.materials ?? []).map((definition) => {
         const pbr = definition.pbrMetallicRoughness ?? {};
         const factor = pbr.baseColorFactor ?? [1, 1, 1, 1];
-        const material = new THREE.MeshStandardMaterial({
+        const clearcoat = definition.extensions?.KHR_materials_clearcoat;
+        const Material = clearcoat ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
+        const material = new Material({
             color: new THREE.Color(factor[0], factor[1], factor[2]),
             opacity: factor[3] ?? 1,
             roughness: pbr.roughnessFactor ?? 1,
             metalness: pbr.metallicFactor ?? 1,
             side: definition.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
         });
+        // Original custom canopies use constant clearcoat factors. Preserve
+        // that reflective layer while ordinary hulls keep the standard shader.
+        if (clearcoat) {
+            material.clearcoat = clearcoat.clearcoatFactor ?? 0;
+            material.clearcoatRoughness = clearcoat.clearcoatRoughnessFactor ?? 0;
+        }
         if (pbr.baseColorTexture !== undefined) {
             const texture = textures[pbr.baseColorTexture.index];
             if (pbr.baseColorTexture.texCoord && pbr.baseColorTexture.texCoord > 0)
@@ -123,6 +131,16 @@ export async function buildGlbScene(arrayBuffer) {
                 material.metalnessMap = texture;
             }
         }
+        if (definition.occlusionTexture !== undefined) {
+            const texture = textures[definition.occlusionTexture.index];
+            if (texture && !definition.occlusionTexture.texCoord) {
+                // The approved hull packs AO in the red channel of its ORM
+                // map. Keep color slots in sRGB when an image is shared.
+                material.aoMap = texture.colorSpace === THREE.NoColorSpace ? texture : texture.clone();
+                material.aoMap.colorSpace = THREE.NoColorSpace;
+                material.aoMapIntensity = definition.occlusionTexture.strength ?? 1;
+            }
+        }
         const emissiveFactor = definition.emissiveFactor;
         if (emissiveFactor)
             material.emissive.setRGB(emissiveFactor[0], emissiveFactor[1], emissiveFactor[2]);
@@ -138,6 +156,12 @@ export async function buildGlbScene(arrayBuffer) {
             material.alphaTest = definition.alphaCutoff ?? 0.5;
         else if (definition.alphaMode === 'BLEND' || material.opacity < 1)
             material.transparent = true;
+        if (definition.normalTexture) {
+            material.normalMap = textures[definition.normalTexture.index];
+            material.normalMap.colorSpace = THREE.NoColorSpace;
+            const scale = definition.normalTexture.scale ?? 1;
+            material.normalScale.set(scale, scale);
+        }
         material.name = definition.name ?? '';
         return material;
     });
@@ -177,6 +201,8 @@ export async function buildGlbScene(arrayBuffer) {
         geometry.setAttribute('position', new THREE.BufferAttribute(position, 3));
         if (primitive.attributes.NORMAL !== undefined)
             geometry.setAttribute('normal', new THREE.BufferAttribute(readAccessor(primitive.attributes.NORMAL), 3));
+        if (primitive.attributes.TANGENT !== undefined)
+            geometry.setAttribute('tangent', new THREE.BufferAttribute(readAccessor(primitive.attributes.TANGENT), 4));
         if (primitive.attributes.TEXCOORD_0 !== undefined)
             geometry.setAttribute('uv', new THREE.BufferAttribute(readAccessor(primitive.attributes.TEXCOORD_0), 2));
         if (primitive.indices !== undefined)
