@@ -2,7 +2,7 @@ import {FLEET_PAINTS,fleetHullId} from './fleetPaintCatalog.js';
 import {GUILD_SHIP_PREFERENCES} from './factions.js';
 import { CanvasSizeCache } from './canvasSizeCache.js';
 import {cockpitDamageMarkup,CANOPY_APERTURES} from './cockpitDamage.js';
-import {RUN_WAVES,readArenaRun,arenaRecord,runScore,runRewardPlan,runHullOffers,runWingmanOffers,WING_ORDERS,WING_ORDER_LABEL,WING_ORDER_HINT,WING_ORDER_SHORT,normalizeWingOrder,wingmanOrder} from './arenaRun.js';
+import {RUN_WAVES,HULL_STAGES,waveAct,readArenaRun,arenaRecord,runScore,runRewardPlan,runHullOffers,runWingmanOffers,WING_ORDERS,WING_ORDER_LABEL,WING_ORDER_HINT,WING_ORDER_SHORT,normalizeWingOrder,wingmanOrder} from './arenaRun.js';
 import {MAX_RUN_WINGMEN} from './shipPool.js';
 import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, LOCATIONS, SHIPS, SYSTEM_MAP_EXTENT, commodityIds, displaySpeed, routeDistanceBetween } from './data.js';
 import { JUMP_ROUTES, SYSTEMS, planRoute } from './galaxy.js';
@@ -425,7 +425,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2es';
+const GAME_VERSION = '0.8.2et';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -5796,7 +5796,7 @@ export class GameUI {
             const wingStage=wingFull?`<div class="run-loadout-summary">${escapeHtml(t('Your wing is already at full strength.'))}</div>`
                 :candidates.length?`<div class="run-stage-label run-wing-label">${t('Or keep {ship} and add one of these veterans',{ship:SHIPS[p.shipId].name})}${wingBrief?` · ${escapeHtml(t('On your wing')+': '+wingBrief)}`:''}</div><div class="run-offers run-wingmen">${wingCards}</div>`
                 :'';
-            body=`<div class="run-stage-label">${t('Choose your hull')}</div><div class="run-offers run-hulls">${hulls.map(id=>command('hull',id,`<b>${escapeHtml(SHIPS[id].name)}</b><span>${escapeHtml(t(hullText[id]??SHIPS[id].personality))}</span>`)).join('')}</div>${wingStage}<div class="run-loadout-summary">${escapeHtml(t('The hulls on offer change with the wave. Keeping your ship adds a veteran wingman instead.'))}</div>`;
+            body=`<div class="run-stage-label">${t('Choose your hull')}</div><div class="run-offers run-hulls">${hulls.map(id=>command('hull',id,`<b>${escapeHtml(SHIPS[id].name)}</b><span>${escapeHtml(t('TIER'))} ${SHIPS[id].tier} · ${escapeHtml(t(hullText[id]??SHIPS[id].personality))}</span>`)).join('')}</div>${wingStage}<div class="run-loadout-summary">${escapeHtml(t('The hulls on offer change with the wave. Keeping your ship adds a veteran wingman instead.'))}</div>`;
             footer=`<button data-ui-command="quit-title">${t('Save and leave')}</button>`;
         }else if(!r.rewardChosen){
             body=`<div class="run-stage-label">${t('Choose one reward')}</div><div class="run-offers">${r.offers.map(id=>{
@@ -5815,7 +5815,7 @@ export class GameUI {
             if(this.runFitOpen)body+=`<div class="run-fitting">${LOADOUT_KEYS.map(key=>spec[key].map((m,i)=>`<div class="run-slot"><b>${t(names[key])} ${i+1} · ${m.size}</b><span>${fit[key][i]?t(OUTFIT_ITEMS[fit[key][i]].name):t('EMPTY')}</span><div>${command('fit','',t('REMOVE'),`data-run-key="${key}" data-run-index="${i}"`)}${Object.entries(p.outfitting.locker).filter(([id,n])=>n>0&&itemFitsMount(OUTFIT_ITEMS[id],m)).map(([id,n])=>command('fit',id,`${t(OUTFIT_ITEMS[id].name)} ×${n}`,`data-run-key="${key}" data-run-index="${i}"`)).join('')}${key==='guns'&&fit[key][i]?command('group',m.id,t('GROUP')+' '+fit.fireGroups.assignments[m.id]):''}</div></div>`).join('')).join('')}</div>`;
             footer=`<button data-ui-command="quit-title">${t('Save and leave')}</button><button data-ui-command="run-fit-toggle">${t('Adjust fitting')}</button><button class="primary" data-ui-command="run-launch">${t('Start next wave')}</button>`;
         }
-        this.root.querySelector('#arena-panel').innerHTML=`<div class="modal-card arena-card run-card"><header><div><h2>${t('Arena Run')} · ${done?`${r.cleared}/${r.totalWaves??RUN_WAVES.length}`:t('Wave {wave} of {total}',{wave:r.wave+1,total:RUN_WAVES.length})}${r.hard?' · '+t('HARD'):''}</h2><span>${escapeHtml(SHIPS[p.shipId].name)} · ${t('HULL')} ${Math.round(p.hull/stats.hull*100)}%</span></div>${done?'':`<details class="run-next"><summary>${t('Next')}: ${t(wave.name)}</summary><p>${t(wave.hint)}</p></details>`}</header><div class="run-scroll">${this.runFitNotice?`<p role="status">${escapeHtml(this.runFitNotice)}</p>`:''}${body}</div><footer>${footer}</footer></div>`;
+        this.root.querySelector('#arena-panel').innerHTML=`<div class="modal-card arena-card run-card"><header><div><h2>${t('Arena Run')} · ${t(waveAct(r.wave).name)} · ${done?`${r.cleared}/${r.totalWaves??RUN_WAVES.length}`:t('Wave {wave} of {total}',{wave:r.wave+1,total:RUN_WAVES.length})}${r.hard?' · '+t('HARD'):''}</h2><span>${escapeHtml(SHIPS[p.shipId].name)} · ${t('HULL')} ${Math.round(p.hull/stats.hull*100)}%</span></div>${done?'':`<details class="run-next"><summary>${t('Next')}: ${t(wave.name)}</summary><p>${t(wave.hint)}</p></details>`}</header><div class="run-scroll">${this.runFitNotice?`<p role="status">${escapeHtml(this.runFitNotice)}</p>`:''}${body}</div><footer>${footer}</footer></div>`;
         this.root.querySelector('#arena-panel').classList.remove('is-hidden');this.updateOrientationNotice();
     }
 
@@ -5829,7 +5829,7 @@ export class GameUI {
         panel.innerHTML = `
       <div class="modal-card arena-card">
         <header><div><span class="eyebrow">${t('TRAINING SIMULATION')}</span><h2>${t('Dogfight Arena')}</h2></div><button data-ui-command="close-arena">${t('CLOSE')}</button></header>
-        <div class="arena-menu-scroll"><section class="run-entry"><b>${t('Arena Run')}</b>${record.best?`<span> · ${t('Best score')}: ${record.best}</span>`:''}<p>${t('Ten waves. Choose equipment between fights.')}</p><div><button data-ui-command="new-arena-run">${t(savedRun?'New run — replace saved run':'New run')}</button>${savedRun?`<button data-ui-command="resume-arena-run">${t('Resume saved run')}</button>`:''}${record.unlockedHard?`<button data-ui-command="hard-arena-run">${t('Hard Run')}</button>`:''}</div></section><section class="run-entry observer-entry"><b>${t('NPC COMBAT VIEW')}</b><p>${t('Watch NPC-only fights with live game-time tracking and unit lifebars.')}</p><button data-ui-command="observer-start">${t('OPEN OBSERVER')}</button></section>
+        <div class="arena-menu-scroll"><section class="run-entry"><b>${t('Arena Run')}</b>${record.best?`<span> · ${t('Best score')}: ${record.best}</span>`:''}<p>${t('Five acts, twenty-four waves. Choose equipment between fights.')}</p><div><button data-ui-command="new-arena-run">${t(savedRun?'New run — replace saved run':'New run')}</button>${savedRun?`<button data-ui-command="resume-arena-run">${t('Resume saved run')}</button>`:''}${record.unlockedHard?`<button data-ui-command="hard-arena-run">${t('Hard Run')}</button>`:''}</div></section><section class="run-entry observer-entry"><b>${t('NPC COMBAT VIEW')}</b><p>${t('Watch NPC-only fights with live game-time tracking and unit lifebars.')}</p><button data-ui-command="observer-start">${t('OPEN OBSERVER')}</button></section>
         <div class="arena-grid">
           <section>
             <h3>${t('ARENA')}</h3>

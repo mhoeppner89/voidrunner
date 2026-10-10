@@ -1,6 +1,6 @@
 import {equipFrigate} from './capitalCombat.js';
 import * as THREE from 'three';
-import {RUN_WAVES,writeArenaRun,recordArenaRun,recoverRun,runOffers,runHullOffers,refreshRunRewardOffers,runWingmanOffers,refreshRunWingmanOffers,hireRunWingman,chooseRunReward,fitRunItem,changeRunHull,wingmanOrder} from './arenaRun.js';
+import {RUN_WAVES,HULL_STAGE_WAVES,runEnemyFit,writeArenaRun,recordArenaRun,recoverRun,runOffers,runHullOffers,refreshRunRewardOffers,runWingmanOffers,refreshRunWingmanOffers,hireRunWingman,chooseRunReward,fitRunItem,changeRunHull,wingmanOrder} from './arenaRun.js';
 // One wing doctrine for the whole game: the range gates, the pilot's-mark
 // preference, self-defence and hysteresis all live in wingOrders.js, so the
 // arena wing and the campaign companion can differ only in how they fly.
@@ -18,6 +18,17 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 // can be shot at), while the hidden player actor is never a legal target for
 // it: neither guns nor missiles can pick the pilot up as a victim.
 const WINGMAN_FACTION='independents';
+// A wingman must be able to shoot the wave it escorts the pilot through, and
+// faction opposition is what legalises NPC-on-NPC fire (see
+// GameSession.projectileCanHitShip). Each act fields a different faction, so the
+// hired wing flies under a flag opposed to the wave's: the Free Merchants stay
+// the default, and the military acts get the other side of their own rivalry.
+const WING_FACTION_OPPOSES={pirates:'independents',independents:'pirates',alliance:'concord',concord:'alliance'};
+const wingFactionFor=(run)=>{
+ const wave=RUN_WAVES[run?.wave];
+ const faction=wave?.enemies?.find(spec=>spec.faction)?.faction;
+ return WING_FACTION_OPPOSES[faction]??WINGMAN_FACTION;
+};
 // Formation slots in the player's own frame — starboard, port, then astern —
 // as [right, up, back] multiples of the base offset.
 const WINGMAN_OFFSETS=[[-1,0.55,0.8],[1,0.55,0.8],[0,0.9,1.5]];
@@ -30,8 +41,8 @@ export const ArenaRunMethods={
  preloadRunWaveModels(){
   const r=this.save.arenaRun,wave=RUN_WAVES[r?.wave];if(!wave)return;
   const variants=new Set();
-  for(const [role,,,,fit] of wave.enemies){
-   const variant=role==='frigate'?'concord-frigate':SHIPS[fit?.hullId]?.variant??shipVariantForRole(role);
+  for(const spec of wave.enemies){
+   const variant=spec.role==='frigate'?'concord-frigate':SHIPS[spec.hullId]?.variant??spec.hullId;
    if(variant)variants.add(variant);
   }
   for(const wingman of (r.wingmen??[]).filter(entry=>entry.alive!==false)){
@@ -50,7 +61,7 @@ export const ArenaRunMethods={
    // the crew that started it, exactly like the player checkpoint above.
    if(Array.isArray(r.checkpointWingmen))r.wingmen=clone(r.checkpointWingmen);delete r.checkpointWingmen;}
   this.setupArena({run:true,environment:RUN_WAVES[r.wave].environment,scenario:'free-flight'},false);
-  refreshRunWingmanOffers(this.save);refreshRunRewardOffers(this.save);writeArenaRun(this.save);if(r.wave===0&&r.phase==='prepare')this.startRunWave();else this.showRunPreparation();
+  refreshRunWingmanOffers(this.save);refreshRunRewardOffers(this.save);writeArenaRun(this.save);if(r.wave===0&&r.phase==='prepare'&&r.hullChosen)this.startRunWave();else this.showRunPreparation();
  },
  showRunPreparation(){this.preloadRunWaveModels();this.ui.setWingTactics?.([],0);this.ui.showArenaRun(this.save);},
  arenaRunAction(action,value,key,index){
@@ -114,7 +125,7 @@ export const ArenaRunMethods={
    this.wingmanPosition(index+attempt,point);
    if(attempt===WINGMAN_OFFSETS.length-1||this.entryPositionClear(point,obstacles,26))break;
   }
-  const ship=this.spawnShip('patrol',point.toArray(),undefined,wingman.name,{tier:'veteran',temperament:'steady'},{faction:WINGMAN_FACTION});
+  const ship=this.spawnShip('patrol',point.toArray(),undefined,wingman.name,{tier:'veteran',temperament:'steady'},{faction:wingFactionFor(this.save.arenaRun)});
   // spawnShip keys the hull off the role; a hired veteran may fly any hull in
   // the pool, so patch the render variant (GLB/voxel key) and the fitting hull
   // id (hardpoint, turret-layout and mount-anchor key) before its real loadout
@@ -156,6 +167,17 @@ export const ArenaRunMethods={
   }
  },
  livingWingmanId(id){return Boolean(id)&&this.ships.some(ship=>ship.id===id&&ship.arenaRunWingman&&ship.hull>0);},
+ // The nearest legal mark for a wave opponent: the pilot, or a living wingman
+ // that has closed closer. Squared distances only — this runs per enemy per tick.
+ arenaThreatTarget(ship){
+  const p=this.save.player;let best='player',bestDistance=(ship.position[0]-p.position[0])**2+(ship.position[1]-p.position[1])**2+(ship.position[2]-p.position[2])**2;
+  for(const wing of this.ships){
+   if(!wing.arenaRunWingman||wing.hull<=0)continue;
+   const distance=(ship.position[0]-wing.position[0])**2+(ship.position[1]-wing.position[1])**2+(ship.position[2]-wing.position[2])**2;
+   if(distance<bestDistance){bestDistance=distance;best=wing.id;}
+  }
+  return best;
+ },
  // Standing orders are keep-doing-it doctrine rather than a one-shot command:
  // they are re-applied every frame, so a wingman that drifts back into the
  // fight after an order change is pulled back to station on the next tick, and
@@ -264,7 +286,7 @@ export const ArenaRunMethods={
   return null;
  },
  spawnRunEnemy(spec,index){
-  const r=this.save.arenaRun,[role,tier,fitIndex,,ordnance]=spec;
+  const r=this.save.arenaRun,{hullId,faction='pirates',role='pirate',tier='novice'}=spec;
   const origin=new THREE.Vector3().fromArray(this.save.player.position);
   const cached=r.entry;
   const entry=cached && origin.distanceTo(new THREE.Vector3().fromArray(cached))>=1000 ? cached : this.runEntryPosition(index);if(!entry)return false;
@@ -282,11 +304,13 @@ export const ArenaRunMethods={
    ship.rotation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),origin.clone().sub(point).normalize()).toArray();
    this.selectTarget('ship',ship.id);this.ui.pushEvent(t('Frigate entering. Lure it into the rocks, then torpedo its rear engines. Select systems on the target monitor.'),'warning',6000);return true;
   }
-  const ship=this.spawnShip(role,point.toArray(),undefined,undefined,{tier:r.hard?(tier==='novice'?'veteran':tier==='veteran'?'ace':tier):tier},{faction:'pirates',hullId:ordnance?.hullId??(role==='bounty'?'lancer':undefined)});
-  ship.faction='pirates';
-  ship.hostile=true;ship.targetId='player';ship.arenaRunEnemy=true;ship.noSurrender=true;ship.combatFit=createEnemyLoadout(ship,fitIndex,ordnance);
-  ship.combatFit.launcher=ordnance?.launcher;ship.combatFit.missiles=ordnance?.missiles??0;
-  if(r.wave===0&&!r.hard){ship.combatFit.guns=['beam-emitter',null,null];ship.combatFit.weapons=['beam'];ship.combatFit.attackOrder=[0];ship.combatFit.fireAt=[this.save.world.time+4];ship.combatFit.missiles=0;ship.combatFit.turrets=[];}
+  const ship=this.spawnShip(role,point.toArray(),undefined,undefined,{tier:r.hard?(tier==='novice'?'veteran':tier==='veteran'?'ace':tier):tier},{faction,hullId});
+  ship.faction=faction;
+  ship.hostile=true;ship.authorizedTarget=true;ship.dark=false;ship.mugCapable=false;ship.targetId='player';ship.arenaRunEnemy=true;ship.noSurrender=true;
+  // The opponent flies its hull's real stock fit unless the wave overrides a
+  // mount, so an Arena Run Concord Blade is the same Blade the career spawns.
+  ship.combatFit=createEnemyLoadout(ship,index,runEnemyFit(spec));
+  ship.combatFit.missiles=spec.missiles??0;
   ship.energy=ship.combatFit.stats.energyCapacity;
   ship.rotation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),origin.clone().sub(point).normalize()).toArray();
   if(!this.ships.some(s=>s.id===this.save.player.currentTargetId&&s.hull>0))this.selectTarget('ship',ship.id);
@@ -300,10 +324,13 @@ export const ArenaRunMethods={
   // Arena opponents never flee, surrender or hold fire, and they press the
   // player by default — but a lock onto a living wingman is left alone so the
   // hired veteran can actually draw fire.
-  for(const ship of this.ships)if(ship.arenaRunEnemy){ship.fleeing=false;ship.holdFire=false;if(!this.livingWingmanId(ship.targetId))ship.targetId='player';}
-  while(r.nextEnemy<wave.enemies.length&&elapsed>=wave.enemies[r.nextEnemy][3]){if(!this.spawnRunEnemy(wave.enemies[r.nextEnemy],r.nextEnemy))break;r.nextEnemy++;}
-  const next=wave.enemies[r.nextEnemy];if(next&&r.warned!==r.nextEnemy&&elapsed>=next[3]-4){r.warned=r.nextEnemy;r.entry=this.runEntryPosition(r.nextEnemy);this.ui.pushEvent(t('Reinforcement ahead in four seconds.'),'warning',4000);}
-  if(r.entry&&next&&this.renderer.camera){this.runMarkerVector??=new THREE.Vector3();this.runMarkerVector.fromArray(r.entry).project(this.renderer.camera);this.ui.setRunInbound?.({x:this.runMarkerVector.x,y:this.runMarkerVector.y,behind:this.runMarkerVector.z>1,seconds:Math.max(0,Math.ceil(next[3]-elapsed))});}
+  // An opponent keeps whatever living target it already has and otherwise
+  // takes the nearest of the pilot and a live wingman. That is what lets a
+  // hired veteran actually draw fire instead of the pilot tanking every shot.
+  for(const ship of this.ships)if(ship.arenaRunEnemy){ship.fleeing=false;ship.holdFire=false;const alive=ship.targetId==='player'?this.save.player.hull>0:this.livingWingmanId(ship.targetId);if(!alive)ship.targetId=this.arenaThreatTarget(ship);}
+  while(r.nextEnemy<wave.enemies.length&&elapsed>=wave.enemies[r.nextEnemy].delay){if(!this.spawnRunEnemy(wave.enemies[r.nextEnemy],r.nextEnemy))break;r.nextEnemy++;}
+  const next=wave.enemies[r.nextEnemy];if(next&&r.warned!==r.nextEnemy&&elapsed>=next.delay-4){r.warned=r.nextEnemy;r.entry=this.runEntryPosition(r.nextEnemy);this.ui.pushEvent(t('Reinforcement ahead in four seconds.'),'warning',4000);}
+  if(r.entry&&next&&this.renderer.camera){this.runMarkerVector??=new THREE.Vector3();this.runMarkerVector.fromArray(r.entry).project(this.renderer.camera);this.ui.setRunInbound?.({x:this.runMarkerVector.x,y:this.runMarkerVector.y,behind:this.runMarkerVector.z>1,seconds:Math.max(0,Math.ceil(next.delay-elapsed))});}
   if(this.save.player.hull<=0)return;
   this.syncRunWingmen();
   if(r.nextEnemy===wave.enemies.length&&!this.ships.some(s=>s.arenaRunEnemy&&s.hull>0&&!s.surrendered)){
@@ -316,7 +343,7 @@ export const ArenaRunMethods={
    r.missiles+=Math.max(0,r.waveMissiles-(this.save.player.missiles??0));r.cleared=r.wave+1;
    this.clearTransientSpace();this.save.player.velocity=[0,0,0];
    if(r.cleared===RUN_WAVES.length){r.phase='won';recordArenaRun(this.save);}
-   else{recoverRun(this.save);r.wave++;if(r.wave===9){const p=this.save.player;p.hull=getEffectiveShipStats(p).hull;recoverRun(this.save,true);}r.phase='prepare';r.rewardChosen=false;r.selectedReward=null;this.ui.runFitOpen=false;r.hullChosen=![3,6].includes(r.wave);r.hullOffers=r.hullChosen?[]:runHullOffers(this.save);r.wingmanOffers=r.hullChosen?[]:runWingmanOffers(this.save);r.offers=r.hullChosen?runOffers(this.save):[];}
+   else{recoverRun(this.save);r.wave++;if(r.wave===RUN_WAVES.length-1){const p=this.save.player;p.hull=getEffectiveShipStats(p).hull;recoverRun(this.save,true);}r.phase='prepare';r.rewardChosen=false;r.selectedReward=null;this.ui.runFitOpen=false;r.hullChosen=!HULL_STAGE_WAVES.includes(r.wave);r.hullOffers=r.hullChosen?[]:runHullOffers(this.save);r.wingmanOffers=r.hullChosen?[]:runWingmanOffers(this.save);r.offers=r.hullChosen?runOffers(this.save):[];}
    delete r.checkpoint;delete r.checkpointWingmen;writeArenaRun(this.save);this.showRunPreparation();
   }
  },

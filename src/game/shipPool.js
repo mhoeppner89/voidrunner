@@ -1,4 +1,6 @@
 import { SHIPS } from './data.js';
+import { FACTION_FLEETS } from './factions.js';
+import { LEAGUE_HULLS } from './leagueContent.js';
 
 // Every hull the player can own and fly: career-yard, League and pirate hulls.
 // Derived from SHIPS so new hulls join Arena Run offers and the observer palette.
@@ -55,6 +57,28 @@ export const HULL_WINGMAN_FIT = Object.freeze({
     torsas: 'varied',
     astra: 'varied',
 });
+
+// Which factions fly a hull, derived from the live traffic rules rather than a
+// second hand-kept table. `FACTION_FLEETS` is what spawns ships in the world, so
+// inverting it (plus the League hulls' own faction) is the single source of
+// truth for "who flies what" — Arena Run draws its hull-stage pools from here so
+// the arena and the career agree on which hull belongs to which fleet.
+export const HULL_FACTIONS = Object.freeze((()=>{
+    const map={};
+    for(const [faction,fleets] of Object.entries(FACTION_FLEETS))
+        for(const hulls of Object.values(fleets))
+            for(const hull of hulls)(map[hull]??=[]).push(faction);
+    for(const [hull,data] of Object.entries(LEAGUE_HULLS)){
+        if(!data.requiredFaction)continue;
+        map[hull]??=[];
+        if(!map[hull].includes(data.requiredFaction))map[hull].push(data.requiredFaction);
+    }
+    return map;
+})());
+
+// A hull's career tier (1 entry, 2 mid, 3 elite): the band an Arena Run hull
+// stage offers from, so switching the ship is also climbing the combat tier.
+export const hullTier = (hullId) => SHIPS[hullId]?.tier;
 
 export const observerRoleFor = (hullId) => HULL_OBSERVER_ROLE[hullId] ?? 'escort';
 export const wingmanFitFor = (hullId) => HULL_WINGMAN_FIT[hullId] ?? 'balanced';
