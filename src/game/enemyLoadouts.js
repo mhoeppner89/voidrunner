@@ -12,7 +12,12 @@ export const HULL_NPC_FITS = Object.freeze({
  talon:{guns:['pulse-cannon','pulse-cannon','ion-blaster'],launcher:'shield-seeker-launcher'},
  lancer:{guns:['pulse-mk2','ion-blaster'],launchers:['seeker-launcher','shield-seeker-launcher'],turret:'pdc',drive:'thrusters-mk2'},
  prospector:{guns:['pulse-cannon'],turret:'pdc',launcher:'seeker-launcher'},
- atlas:{guns:['gauss-cannon'],turret:'pdc',launcher:'seeker-launcher',defense:'shield-mk2'},
+ // A hauler mans the turret mounts its civilian crew can actually crew (`false`
+ // leaves a reviewed hardpoint empty) and keeps its regulation point defence.
+ // The hull keeps every mount; the stock NPC fit fills fewer of them, which is
+ // what puts a tier-3 hauler at the tier-2 combat level instead of ahead of it
+ // (see .freebuff/balance/main-loadouts.mjs).
+ atlas:{guns:['gauss-cannon'],turrets:['pdc','pdc',false,false],launcher:'seeker-launcher',defense:'shield-mk2'},
  vanguard:{guns:['pulse-mk2','mortar'],launchers:['torpedo-launcher','torpedo-launcher','swarm-launcher'],turret:'pdc',defense:'shield-mk2'},
  blade:{guns:['pulse-mk2','gauss-cannon'],launchers:['seeker-launcher','shield-seeker-launcher'],turret:'pdc',power:'sustained-reactor'},
 });
@@ -26,11 +31,17 @@ const OBSERVER_FITS = Object.freeze({
     support: Object.freeze({ guns: ['pulse-cannon', 'pulse-cannon', 'mortar'], turret: 'pdc', launcher: 'seeker-launcher', power: 'capacitor-bank', defense: 'shield-mk2' }),
     beam: Object.freeze({ guns: ['beam-emitter', 'beam-emitter', 'beam-emitter'], turret: 'tracking-turret', launcher: 'seeker-launcher', power: 'sustained-reactor' }),
 });
-// Industrial combat doctrine reflects each ship's job: the Wayfarer has one
-// attack drone, while Prospector and Atlas prioritize point defense.
+// Industrial combat doctrine reflects each ship's job and its crew: the
+// Wayfarer flies one attack drone, the Atlas keeps two regulation PDC escorts,
+// and the Prospector mans one of its three bays with a PDC — like the Atlas's
+// manned turrets, a civilian crew crews what it can afford to lose. A stock NPC
+// hauler's anti-fighter power is set by this list, and it is the strongest
+// balance lever in the hauler-versus-fighter band: three Prospector PDC drones
+// beat both tier-1 combat hulls 7/8, one drone leaves the pair roughly even
+// (measured by .freebuff/balance/main-loadouts.mjs).
 const NPC_DRONE_DEFAULTS = Object.freeze({
     wayfarer: Object.freeze(['attack']),
-    prospector: Object.freeze(['pdc', 'pdc', 'pdc']),
+    prospector: Object.freeze(['pdc']),
     atlas: Object.freeze(['pdc', 'pdc']),
 });
 export function createEnemyLoadout(ship, index, arenaFit) {
