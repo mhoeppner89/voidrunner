@@ -89,7 +89,10 @@ export const ArenaRunMethods={
   if(action==='accept'){this.ui.runFitOpen=false;this.startRunWave();}else this.showRunPreparation();
  },
  startRunWave(){
-  const r=this.save.arenaRun;if(!r||r.phase!=='prepare'||!r.rewardChosen||!r.hullChosen||!loadoutFor(this.save.player).guns.some(Boolean))return;
+  const r=this.save.arenaRun; if(!r||r.phase!=='prepare'||!r.rewardChosen||!loadoutFor(this.save.player).guns.some(Boolean))return;
+  const DECISION_WAVES_SET={0:1,4:1,8:1,12:1,16:1,20:1,24:1};
+  const pendingDecision = DECISION_WAVES_SET[r.wave] && !((r.decisions||{})[r.wave]);
+  if(pendingDecision)return;
   this.clearTransientSpace();this.autopilot=false;this.deathTimer=0;this.afterburning=false;this.playerShieldDelay=0;
   const wave=RUN_WAVES[r.wave];this.arena.environment=wave.environment;
   this.preloadRunWaveModels();

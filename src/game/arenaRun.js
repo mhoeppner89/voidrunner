@@ -35,72 +35,82 @@ export const RUN_ACTS=[
  {
   id:'talons',name:'Red Talons',faction:'pirates',
   waves:[
-   {name:'First contact',hint:'One hesitant pilot. Take your time and watch your energy.',environment:'open',enemies:[enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice',guns:['beam-emitter',null,null,null],turrets:[]})]},
-   {name:'Cutthroat pair',hint:'A second novice joins after twelve seconds. Watch the entry marker.',environment:'open',enemies:[enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice'}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice',delay:12})]},
-   {name:'Red Talon runner',hint:'An agile veteran. Turn early and fire during the close pass.',environment:'open',enemies:[enemy('speedster',{faction:'pirates',role:'escort',tier:'veteran',missiles:2})]},
-   {name:'Demon wing',hint:'A veteran twin-hull enters first. Its novice wing arrives after twenty seconds. Use wrecks against their seekers.',environment:'debris-field',enemies:[enemy('demon',{faction:'pirates',role:'pirate',tier:'veteran',missiles:2}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice',delay:20})]},
+   {name:'First contact',hint:'Choose your starting hull. One novice.',environment:'open',enemies:[enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice'})]},
+   {name:'Scavengers',hint:'Two novice scavengers.',environment:'open',enemies:[enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice'}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice',delay:8})]},
+   {name:'Cut loose',hint:'A veteran runner.',environment:'debris-field',enemies:[enemy('demon',{faction:'pirates',role:'pirate',tier:'veteran',missiles:1})]},
+   {name:'Hit and run',hint:'Agile escort pair.',environment:'asteroid-field',enemies:[enemy('speedster',{faction:'pirates',role:'escort',tier:'veteran'}),enemy('speedster',{faction:'pirates',role:'escort',tier:'novice',delay:6})]},
+   {name:'Tier climb',hint:'Upgrade to a tier-2 hull.',environment:'open',enemies:[enemy('demon',{faction:'pirates',role:'pirate',tier:'veteran',missiles:2}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice',delay:10})]},
   ],
  },
  {
   id:'merchants',name:'Free Merchants',faction:'independents',
   waves:[
-   {name:'Convoy escort',hint:'An armed transport with a freighter behind it. Isolate the escort first.',environment:'open',enemies:[enemy('wayfarer',{faction:'independents',role:'escort',tier:'veteran',missiles:2}),enemy('mule',{faction:'independents',role:'trader',tier:'novice'})]},
-   {name:'Mining claim',hint:'A rock hauler under escort. Its drones are faster than its guns.',environment:'asteroid-field',enemies:[enemy('prospector',{faction:'independents',role:'miner',tier:'veteran'}),enemy('wayfarer',{faction:'independents',role:'escort',tier:'veteran',delay:8})]},
-   {name:'Heavy hauler',hint:'A deep and slow transport. Close on it before its escort settles in.',environment:'open',enemies:[enemy('torsas',{faction:'independents',role:'trader',tier:'veteran',missiles:3}),enemy('wayfarer',{faction:'independents',role:'escort',tier:'novice',delay:6}),enemy('wayfarer',{faction:'independents',role:'escort',tier:'novice',delay:18})]},
-   {name:'Freighter screen',hint:'A veteran freighter with two screening escorts. Break the screen, then the hull.',environment:'debris-field',enemies:[enemy('mule',{faction:'independents',role:'trader',tier:'veteran'}),enemy('speedster',{faction:'independents',role:'escort',tier:'veteran',delay:8}),enemy('speedster',{faction:'independents',role:'escort',tier:'veteran',delay:20})]},
-   {name:'Merchant gunship',hint:'An ace cutter and a pirate veteran in the same sky. Keep them apart.',environment:'debris-field',enemies:[enemy('torsas',{faction:'independents',role:'trader',tier:'ace',missiles:3}),enemy('demon',{faction:'pirates',role:'pirate',tier:'veteran',delay:10,missiles:2})]},
+   {name:'Freight lane',hint:'Armed convoy.',environment:'open',enemies:[enemy('wayfarer',{faction:'independents',role:'escort',tier:'veteran',missiles:1}),enemy('mule',{faction:'independents',role:'trader',tier:'novice'})]},
+   {name:'Claim jumpers',hint:'Prospector under escort.',environment:'asteroid-field',enemies:[enemy('prospector',{faction:'independents',role:'miner',tier:'veteran'}),enemy('wayfarer',{faction:'independents',role:'escort',tier:'novice',delay:8})]},
+   {name:'Haul trouble',hint:'Heavy haulers and escort.',environment:'debris-field',enemies:[enemy('torsas',{faction:'independents',role:'trader',tier:'veteran',missiles:2}),enemy('atlas',{faction:'independents',role:'trader',tier:'veteran',delay:6}),enemy('speedster',{faction:'independents',role:'escort',tier:'novice',delay:12})]},
+   {name:'Crossfire',hint:'Mixed skirmish.',environment:'open',enemies:[enemy('speedster',{faction:'independents',role:'escort',tier:'veteran'}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'veteran',delay:8,missiles:1})]},
+   {name:'Rookie wing',hint:'Choose your first wingman (Tier 1).',environment:'debris-field',enemies:[enemy('mule',{faction:'independents',role:'trader',tier:'veteran'}),enemy('wayfarer',{faction:'independents',role:'escort',tier:'novice',delay:8})]},
   ],
  },
  {
   id:'league',name:'Frontier League',faction:'alliance',
   waves:[
-   {name:'League line',hint:'An Alliance line fighter. It will try to keep you at arm’s length.',environment:'open',enemies:[enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',missiles:2})]},
-   {name:'League pair',hint:'A line fighter and a courier working together. Separate the fast one.',environment:'open',enemies:[enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran'}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:10})]},
-   {name:'Strike package',hint:'A torpedo bomber. Break its run before it can line you up.',environment:'open',enemies:[enemy('andromeda',{faction:'alliance',role:'bounty',tier:'veteran',missiles:2}),enemy('legionary',{faction:'alliance',role:'patrol',tier:'novice',delay:12})]},
-   {name:'League honorguard',hint:'A pursuit hunter and its line escort. Do not let the hunter sit behind you.',environment:'debris-field',enemies:[enemy('lancer',{faction:'alliance',role:'patrol',tier:'veteran',missiles:3}),enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',delay:8})]},
-   {name:'Expedition cutter',hint:'An ace cutter with a long reach and an escort. Close the range fast.',environment:'asteroid-field',enemies:[enemy('astra',{faction:'alliance',role:'escort',tier:'ace',missiles:2}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:10})]},
+   {name:'Patrol shift',hint:'League line.',environment:'open',enemies:[enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',missiles:1})]},
+   {name:'Courier run',hint:'Pair working together.',environment:'asteroid-field',enemies:[enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran'}),enemy('speedster',{faction:'alliance',role:'escort',tier:'novice',delay:10})]},
+   {name:'Strike',hint:'Bomber package.',environment:'open',enemies:[enemy('andromeda',{faction:'alliance',role:'bounty',tier:'veteran',missiles:2})]},
+   {name:'Honorguard',hint:'Hunter and escort.',environment:'debris-field',enemies:[enemy('lancer',{faction:'alliance',role:'patrol',tier:'veteran',missiles:2}),enemy('legionary',{faction:'alliance',role:'patrol',tier:'novice',delay:8})]},
+   {name:'Veteran wing',hint:'Upgrade your first wingman to Tier 2.',environment:'asteroid-field',enemies:[enemy('astra',{faction:'alliance',role:'escort',tier:'veteran',missiles:1}),enemy('speedster',{faction:'alliance',role:'escort',tier:'novice',delay:10})]},
   ],
  },
  {
   id:'concord',name:'Concord Frontier Fleet',faction:'concord',
   waves:[
-   {name:'Concord patrol',hint:'A Concord courier. Fast, thin, and quick to break off.',environment:'open',enemies:[enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',missiles:2})]},
-   {name:'Blade flight',hint:'A heavy fighter with a courier on its wing. Punish the courier first.',environment:'open',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',missiles:3}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:10})]},
-   {name:'Vanguard battery',hint:'A heavy bomber carrying torpedoes and swarms. Stay out of its forward arc.',environment:'open',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('mule',{faction:'concord',role:'trader',tier:'novice',delay:12})]},
-   {name:'Fleet screen',hint:'An ace hunter screened by a heavy fighter. Kill the screen or the hunter, not neither.',environment:'debris-field',enemies:[enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',missiles:3}),enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',delay:8})]},
-   {name:'Concord line',hint:'Two ace heavies. Use the rocks, break their firing line, and take them one at a time.',environment:'asteroid-field',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'ace',missiles:3}),enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',delay:12,missiles:2})]},
+   {name:'Show of force',hint:'Concord courier.',environment:'open',enemies:[enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',missiles:1})]},
+   {name:'Blade dance',hint:'Heavy fighter and courier.',environment:'debris-field',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'novice',delay:10})]},
+   {name:'Battery test',hint:'Vanguard with support.',environment:'open',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'veteran',missiles:2})]},
+   {name:'Screened',hint:'Hunter screened by blade.',environment:'asteroid-field',enemies:[enemy('lancer',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'novice',delay:8})]},
+   {name:'Heavy metal',hint:'Choose a tier-3 hull.',environment:'open',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('vanguard',{faction:'concord',role:'patrol',tier:'novice',delay:10,missiles:1})]},
   ],
  },
  {
   id:'capital',name:'Concord Capital',faction:'concord',
   waves:[
-   {name:'Capital approach',hint:'Two aces on the picket line. Break them before the capital arrives.',environment:'debris-field',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',delay:12,missiles:3})]},
-   {name:'Supply line',hint:'A loaded freighter column. Cut the escorts off the hulls and clean up.',environment:'open',enemies:[enemy('atlas',{faction:'concord',role:'trader',tier:'veteran'}),enemy('mule',{faction:'concord',role:'trader',tier:'veteran',delay:8}),enemy('wayfarer',{faction:'concord',role:'escort',tier:'veteran',delay:16})]},
-   {name:'Vanguard pair',hint:'A veteran enters first. The ace arrives after twelve seconds, giving you a short window to isolate one through the wrecks.',environment:'debris-field',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',delay:12,missiles:2})]},
-   {name:'Fleet reserve',hint:'A heavy fighter, a hunter and a bomber at once. Fight them in the rocks, never in the open.',environment:'open',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'ace',missiles:3}),enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',delay:8,missiles:3}),enemy('vanguard',{faction:'concord',role:'patrol',tier:'veteran',delay:18,missiles:2})]},
-   {name:'The frigate',hint:'Lure the frigate into the rocks to break its firing line. Approach the stern and aim shielded torpedoes at MAIN ENGINES, then disable turrets and shield generators. Torpedoes bypass shields but turn poorly. Watch battery charges and torpedo locks.',environment:'asteroid-field',enemies:[enemy('concord-frigate',{faction:'concord',role:'frigate',tier:'ace'})]},
+   {name:'Picket',hint:'Two heavies.',environment:'debris-field',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('lancer',{faction:'concord',role:'patrol',tier:'novice',delay:10,missiles:2})]},
+   {name:'Reserves',hint:'Mixed heavy pack.',environment:'asteroid-field',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('lancer',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'novice',delay:12,missiles:1})]},
+   {name:'Ace screen',hint:'Ace pair.',environment:'open',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:8,missiles:2})]},
+   {name:'Elite guard',hint:'Upgrade your first wingman to Tier 3.',environment:'debris-field',enemies:[enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',delay:8,missiles:2})]},
+   {name:'The line',hint:'Choose your second wingman (Tier 3). Frigate with two blade escorts, all aces.',environment:'asteroid-field',enemies:[enemy('concord-frigate',{faction:'concord',role:'frigate',tier:'ace'}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:4,missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:8,missiles:2})]},
   ],
  },
 ];
 export const RUN_WAVES=RUN_ACTS.flatMap(act=>act.waves);
 export const waveActIndex=(wave)=>RUN_ACTS.findIndex(act=>act.waves.includes(RUN_WAVES[wave]));
 export const waveAct=(wave)=>RUN_ACTS[waveActIndex(wave)];
-// Hull stages are pinned to tier climbs, not random draws: the run opens with a
-// tier-1 pick, and each later stage offers the next tier from the faction blocs
-// the pilot has just fought. Keeping the current ship is always the veteran-winger
-// option instead.
-export const HULL_STAGES=Object.freeze({
- 0:Object.freeze({tier:1,factions:null,label:'Choose your starting hull'}),
- 9:Object.freeze({tier:2,factions:Object.freeze(['pirates','independents']),label:'Choose a tier-2 hull'}),
- 14:Object.freeze({tier:3,factions:Object.freeze(['alliance','concord']),label:'Choose a tier-3 hull'}),
+// Decision stages: hull choices and wingman hires/upgrades happen at separate waves.
+// - wave 0: choose tier 1 hull (3 possibilities)
+// - wave 4: choose tier 2 hull (3 possibilities)
+// - wave 8: choose first wingman, tier 1 (3 possibilities)
+// - wave 12: upgrade first wingman to tier 2 (3 possibilities)
+// - wave 16: choose tier 3 hull (3 possibilities)
+// - wave 20: upgrade first wingman to tier 3 (3 possibilities)
+// - wave 24: choose second wingman, tier 3 (3 possibilities)
+export const DECISION_STAGES=Object.freeze({
+ 0:Object.freeze({type:'hull',tier:1,factions:null,label:'Choose your starting hull'}),
+ 4:Object.freeze({type:'hull',tier:2,factions:null,label:'Choose a tier-2 hull'}),
+ 8:Object.freeze({type:'wingman-hire',wingIndex:0,tier:1,factions:null,label:'Choose your first wingman (Tier 1)'}),
+ 12:Object.freeze({type:'wingman-upgrade',wingIndex:0,tier:2,factions:null,label:'Upgrade your first wingman to Tier 2'}),
+ 16:Object.freeze({type:'hull',tier:3,factions:null,label:'Choose a tier-3 hull'}),
+ 20:Object.freeze({type:'wingman-upgrade',wingIndex:0,tier:3,factions:null,label:'Upgrade your first wingman to Tier 3'}),
+ 24:Object.freeze({type:'wingman-hire',wingIndex:1,tier:3,factions:null,label:'Choose your second wingman (Tier 3)'}),
 });
+export const HULL_STAGES=Object.freeze(Object.fromEntries(
+  Object.entries(DECISION_STAGES).filter(([_,s])=>s.type==='hull').map(([w,s])=>[w,{tier:s.tier,factions:s.factions??null,label:s.label}])
+));
 export const HULL_STAGE_WAVES=Object.freeze(Object.keys(HULL_STAGES).map(Number));
+export const DECISION_WAVES=Object.freeze(Object.keys(DECISION_STAGES).map(Number).sort((a,b)=>a-b));
 export function newArenaRun(hard=false,seed=Date.now()) {
  const save=createNewSave(seed,{tutorial:false});save.arena={run:true};save.player.credits=0;save.player.cargo={};save.player.throttle=.35;
- // A fresh run opens on its starting-hull stage: the pilot picks a tier-1 ship
- // (or keeps the Wayfarer) before the first wave, and wingmen are hired at the
- // later stages only.
- save.arenaRun={version:3,totalWaves:RUN_WAVES.length,seed,hard,wave:0,phase:'prepare',rewardChosen:true,hullChosen:false,offers:[],hullOffers:[],wingmanOffers:[],wingmen:[],wingOrder:'aggressive',cleared:0,elapsed:0,damage:0,missiles:0};return save;
+ save.arenaRun={version:3,totalWaves:RUN_WAVES.length,seed,hard,wave:0,phase:'prepare',rewardChosen:true,hullChosen:false,decisions:{},offers:[],hullOffers:[],wingmanOffers:[],wingmen:[],wingOrder:'aggressive',cleared:0,elapsed:0,damage:0,missiles:0};return save;
 }
 const OLD_WAVE_TOTALS={1:8,2:10};
 // Map an old checkpoint's wave index onto the same fractional position in the
@@ -123,6 +133,7 @@ export function readArenaRun(){try{
  // malformed wing list must never break the run.
  if(!Array.isArray(r.wingmen))r.wingmen=[];
  if(!Array.isArray(r.wingmanOffers))r.wingmanOffers=[];
+ if(!r.decisions||typeof r.decisions!=='object')r.decisions={};
  r.wingOrder=normalizeWingOrder(r.wingOrder);
  refreshRunHullOffers(save);refreshRunWingmanOffers(save);refreshRunRewardOffers(save);return save;
  }catch{return null;}}
@@ -236,8 +247,16 @@ export function runHullOffers(save){
 // Keep an already-shown offer list when it is still legal; otherwise fill it
 // from a fresh draw. Runs on load so a checkpoint saved mid-stage renders the
 // same hulls it showed before.
+export function isPendingDecision(save){
+ const w=save.arenaRun?.wave; const d=DECISION_STAGES[w]; if(!d)return false;
+ save.arenaRun.decisions=save.arenaRun.decisions||{};
+ return !save.arenaRun.decisions[w];
+}
+export function isPendingHullDecision(save){ const w=save.arenaRun?.wave; const d=DECISION_STAGES[w]; if(!d||d.type!=='hull')return false; save.arenaRun.decisions=save.arenaRun.decisions||{}; return !save.arenaRun.decisions[w]; }
+export function isPendingWingmanDecision(save){ const w=save.arenaRun?.wave; const d=DECISION_STAGES[w]; if(!d||d.type!=='wingman-hire'&&d.type!=='wingman-upgrade')return false; save.arenaRun.decisions=save.arenaRun.decisions||{}; return !save.arenaRun.decisions[w]; }
+export function markDecision(save,wave){ const r=save.arenaRun; r.decisions=r.decisions||{}; if(wave===undefined)wave=r.wave; r.decisions[wave]=true; }
 export function refreshRunHullOffers(save){
- const r=save.arenaRun;if(r.phase!=='prepare'||r.hullChosen)return;
+ const r=save.arenaRun;if(r.phase!=='prepare'||!isPendingHullDecision(save))return;
  const valid=(Array.isArray(r.hullOffers)?r.hullOffers:[]).filter(id=>isFlyableHull(id)&&id!==save.player.shipId);
  for(const id of runHullOffers(save))if(valid.length<ARENA_HULL_OFFER_COUNT&&!valid.includes(id))valid.push(id);
  r.hullOffers=valid.slice(0,ARENA_HULL_OFFER_COUNT);
@@ -246,29 +265,48 @@ export function refreshRunHullOffers(save){
 // candidates are drawn from the complete pool and held for the stage, so the
 // pilot chooses who joins the wing instead of taking a blind roll.
 export function runWingmanOffers(save){
- const r=save.arenaRun;if(r.phase!=='prepare'||r.hullChosen)return [];
+ const r=save.arenaRun; const stage=DECISION_STAGES[r.wave];
+ if(r.phase!=='prepare'||!isPendingWingmanDecision(save))return [];
  const rng=seededRandom(`${r.seed}:wingman:${r.wave}`);
- return PLAYER_FLYABLE_HULLS.map(id=>({id,sort:rng()})).sort((a,b)=>a.sort-b.sort).slice(0,WINGMAN_OFFER_COUNT)
-  .map((entry,index)=>({id:`wingman-${r.wave}-${index}`,hullId:entry.id,fit:wingmanFitFor(entry.id),name:proceduralCallsign(rng)}));
+ let pool=PLAYER_FLYABLE_HULLS;
+ if(stage?.tier)pool=pool.filter(id=>hullTier(id)===stage.tier);
+ if(!pool.length)pool=PLAYER_FLYABLE_HULLS;
+ return pool.map(id=>({id,sort:rng()})).sort((a,b)=>a.sort-b.sort).slice(0,WINGMAN_OFFER_COUNT)
+  .map((entry,index)=>({id:`wingman-${r.wave}-${index}`,hullId:entry.id,fit:wingmanFitFor(entry.id),name:proceduralCallsign(rng),upgrade:stage?.type==='wingman-upgrade'}));
 }
 // Keep an already-shown roster while the stage is open; otherwise draw one.
 // Runs on load so a checkpoint saved mid-stage offers the same three pilots.
 export function refreshRunWingmanOffers(save){
- const r=save.arenaRun;if(r.phase!=='prepare'||r.hullChosen){r.wingmanOffers=[];return;}
+ const r=save.arenaRun;if(r.phase!=='prepare'||!isPendingWingmanDecision(save)){r.wingmanOffers=[];return;}
  const valid=(Array.isArray(r.wingmanOffers)?r.wingmanOffers:[]).filter(candidate=>candidate&&isFlyableHull(candidate.hullId)&&typeof candidate.name==='string');
  r.wingmanOffers=valid.length?valid.slice(0,WINGMAN_OFFER_COUNT):runWingmanOffers(save);
 }
 // Hire one of the stage's candidates. One hire per stage, at most two veterans
 // per run, and only a name that is actually on offer can be taken.
+export function upgradeRunWingman(save,wingIndex,candidate){
+ const r=save.arenaRun; const list=Array.isArray(r.wingmen)?r.wingmen:[];
+ if(!list[wingIndex])return null;
+ const wingman=list[wingIndex];
+ wingman.hullId=candidate.hullId; wingman.fit=candidate.fit;
+ // keep name/id mostly same, but allow new id if provided
+ if(candidate.id)wingman.id=candidate.id;
+ return wingman;
+}
 export function hireRunWingman(save,id){
- const r=save.arenaRun;if(r.phase!=='prepare'||r.hullChosen)return null;
+ const r=save.arenaRun; const stage=DECISION_STAGES[r.wave];
+ if(r.phase!=='prepare'||!isPendingWingmanDecision(save))return null;
  const list=Array.isArray(r.wingmen)?r.wingmen:[];
- if(list.filter(wingman=>wingman.alive!==false).length>=MAX_RUN_WINGMEN)return null;
  if(!(r.wingmanOffers??[]).length)r.wingmanOffers=runWingmanOffers(save);
  const candidate=r.wingmanOffers.find(entry=>entry.id===id);if(!candidate)return null;
+ if(stage?.type==='wingman-upgrade' && typeof stage.wingIndex==='number'){
+  const upgraded=upgradeRunWingman(save,stage.wingIndex,candidate);
+  if(upgraded){ r.wingmanOffers=[]; markDecision(save); r.offers=runOffers(save); return upgraded; }
+  return null;
+ }
+ if(list.filter(wingman=>wingman.alive!==false).length>=MAX_RUN_WINGMEN)return null;
  const wingman={id:candidate.id,hullId:candidate.hullId,role:'patrol',fit:candidate.fit,name:candidate.name,alive:true,order:normalizeWingOrder(r.wingOrder)};
  r.wingmen=[...list,wingman];r.wingmanOffers=[];
- r.hullChosen=true;r.offers=runOffers(save);
+ markDecision(save);r.offers=runOffers(save);
  return wingman;
 }
 // The standing-order vocabulary and the range gates live in wingOrders.js,
@@ -280,7 +318,7 @@ export {WING_ORDERS,WING_ORDER_LABEL,WING_ORDER_HINT,WING_ORDER_SHORT,WING_ORDER
 // never returns undefined, so the fallback has to be chosen before it runs).
 export const wingmanOrder=(wingman,run)=>normalizeWingOrder(WING_ORDERS.includes(wingman?.order)?wingman.order:run?.wingOrder);
 export function changeRunHull(save,id){
- const r=save.arenaRun,p=save.player;if(r.phase!=='prepare'||r.hullChosen||!HULL_STAGES[r.wave]||!PLAYER_FLYABLE_HULLS.includes(id)||!(r.hullOffers??[]).includes(id))return false;
+ const r=save.arenaRun,p=save.player;if(r.phase!=='prepare'||!isPendingHullDecision(save)||!PLAYER_FLYABLE_HULLS.includes(id)||!(r.hullOffers??[]).includes(id))return false;
  if(id!==p.shipId){
   // Snapshot just the fields the transfer rebuilds. A hull whose mounts cannot
   // take any installed or stored forward gun would strand the sortie
@@ -316,5 +354,5 @@ export function changeRunHull(save,id){
   normalizeLauncherMagazines(p);
   if(!loadoutFor(p).guns.some(Boolean)){Object.assign(p,JSON.parse(JSON.stringify(snapshot)));return false;}
  }
- r.hullChosen=true;r.wingmanOffers=[];r.offers=runOffers(save);return true;
+ markDecision(save);r.wingmanOffers=[];r.offers=runOffers(save);return true;
 }

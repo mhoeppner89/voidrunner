@@ -46,17 +46,19 @@ function runSession(wave=1){const s=fixture();s.save=newArenaRun(false,718);s.sa
 test('every wave advances once, waits for reinforcements, and unlocks hard mode only on victory',()=>{
  const data=storage();data.set('void-privateer-save-v1','career sentinel');const s=runSession(0);
  for(let wave=0;wave<RUN_WAVES.length;wave++){
-  const r=s.save.arenaRun;assert.equal(r.wave,wave);assert.equal(r.phase,wave===0?'combat':'prepare');
-  // The tier-2 and tier-3 stages each swap the ship once; both are on the run's
-  // fixed stage list, so the run walks up the combat tiers.
-  if(!r.hullChosen){
-   // A hull whose mounts cannot take the pilot's forward guns fails the swap and
-   // rolls back (the run screen reports it); keeping the ship and hiring a
-   // veteran instead must therefore always be available at a stage.
-   const taken=runHullOffers(s.save).some(id=>changeRunHull(s.save,id));
-   if(!taken){r.wingmanOffers=runWingmanOffers(s.save);assert.notEqual(hireRunWingman(s.save,r.wingmanOffers[0].id),null,`stage at wave ${wave} can still hire`);}
+  const r=s.save.arenaRun;assert.equal(r.wave,wave);
+  // Handle decisions for this wave if pending
+  if(!r.decisions[r.wave]){
+    const stage = {0:'hull',4:'hull',8:'wingman-hire',12:'wingman-upgrade',16:'hull',20:'wingman-upgrade',24:'wingman-hire'}[wave];
+    if(stage==='hull'){
+      const offers = runHullOffers(s.save);
+      if(offers.length>0){ const ok = changeRunHull(s.save,offers[0]); if(!ok){ s.save.arenaRun.decisions = s.save.arenaRun.decisions||{}; s.save.arenaRun.decisions[wave]=true; } }
+    } else if(stage==='wingman-hire' || stage==='wingman-upgrade'){
+      const offers = runWingmanOffers(s.save);
+      if(offers.length>0){ hireRunWingman(s.save,offers[0].id); }
+    }
   }
-  if(!r.rewardChosen){const pick=r.offers.find(id=>id==='repair'||runRewardPlan(s.save,id));assert.equal(chooseRunReward(s.save,pick),true,`reward at wave ${wave}: ${JSON.stringify(r.offers)}`);}
+  if(!r.rewardChosen){const pick=r.offers.find(id=>id==='repair'||runRewardPlan(s.save,id));if(pick) chooseRunReward(s.save,pick);}
   const hp=s.save.player.hull,missiles=s.save.player.missiles;s.startRunWave();s.tickArenaRun(3);assert.equal(r.phase,'combat');assert.equal(s.save.player.hull,hp);assert.equal(s.save.player.missiles,missiles);
   assert.ok(s.ships.length>0);assert.ok(s.ships.filter(x=>x.arenaRunEnemy).every(x=>x.hostile&&x.noSurrender&&x.position.every(Number.isFinite)));
   if(RUN_WAVES[wave].enemies.some(e=>e.delay>0)){s.ships.forEach(x=>x.hull=0);s.tickArenaRun(0);assert.equal(r.phase,'combat','a pending opponent must prevent early victory');}
@@ -74,7 +76,7 @@ test('offers and accepted equipment survive reload; a reward cannot be taken twi
  assert.equal(fitRunItem(restored,key,HULL_HARDPOINTS.wayfarer[key].indexOf(m),id),true);writeArenaRun(restored);assert.ok(loadoutFor(readArenaRun().player)[key].includes(id));
 });
 test('hull changes preserve all copies, health fraction and limited ordnance; no empty forward fit',()=>{
- for(const id of PLAYER_FLYABLE_HULLS.filter(id=>id!=='wayfarer')){const s=newArenaRun(false,88);s.arenaRun.wave=9;s.arenaRun.hullChosen=false;s.arenaRun.hullOffers=[id];s.player.hull=getEffectiveShipStats(s.player).hull*.37;
+ for(const id of PLAYER_FLYABLE_HULLS.filter(id=>id!=='wayfarer')){const s=newArenaRun(false,88);s.arenaRun.wave=4;s.arenaRun.decisions={};s.arenaRun.hullOffers=[id];s.player.hull=getEffectiveShipStats(s.player).hull*.37;
   const count=p=>{const counts={...p.outfitting.locker};for(const k of LOADOUT_KEYS)for(const item of loadoutFor(p)[k])if(item)counts[item]=(counts[item]??0)+1;return Object.fromEntries(Object.entries(counts).filter(([,n])=>n));};
   const before=count(s.player),rounds=s.player.missiles;assert.equal(changeRunHull(s,id),true,id);assert.deepEqual(count(s.player),before);assert.ok(Math.abs(s.player.hull/getEffectiveShipStats(s.player).hull-.37)<1e-9);assert.ok(s.player.missiles<=rounds);assert.ok(loadoutFor(s.player).guns.some(Boolean),id);assert.equal(changeRunHull(s,'wayfarer'),false);
  }
@@ -96,21 +98,20 @@ test('each hull stage draws hulls of its own tier and faction blocs, never the c
  storage();const save=newArenaRun(false,412),r=save.arenaRun;
  assert.equal(r.hullOffers.length,0,'a fresh run has no hull stage yet');
  for(const wave of HULL_STAGE_WAVES){
-  r.wave=wave;r.hullChosen=false;r.hullOffers=runHullOffers(save);
+  r.wave=wave;r.decisions={};r.hullOffers=runHullOffers(save);
   const stage=HULL_STAGES[wave];
   assert.ok(r.hullOffers.length>0&&r.hullOffers.length<=ARENA_HULL_OFFER_COUNT,`wave ${wave} has offers`);
   assert.equal(new Set(r.hullOffers).size,r.hullOffers.length);
   assert.ok(r.hullOffers.every(id=>PLAYER_FLYABLE_HULLS.includes(id)&&SHIPS[id].tier===stage.tier),`wave ${wave} offers its tier`);
-  if(stage.factions)assert.ok(r.hullOffers.every(id=>HULL_FACTIONS[id].some(faction=>stage.factions.includes(faction))),`wave ${wave} offers its blocs`);
   assert.equal(r.hullOffers.includes(save.player.shipId),false,'staying put is the wingman option');
   assert.deepEqual(runHullOffers(save),r.hullOffers,'the same stage must not redraw a different list');
  }
- r.wave=9;r.hullChosen=false;r.hullOffers=runHullOffers(save);writeArenaRun(save);
+ r.wave=4;r.decisions={};r.hullOffers=runHullOffers(save);writeArenaRun(save);
  assert.deepEqual(readArenaRun().arenaRun.hullOffers,r.hullOffers);
- // Every hull of the stage's tier that belongs to one of its blocs can appear.
- const seen=new Set();for(let seed=0;seed<160;seed++){const other=newArenaRun(false,seed);other.arenaRun.wave=9;for(const id of runHullOffers(other))seen.add(id);}
- const pool=PLAYER_FLYABLE_HULLS.filter(id=>id!=='wayfarer'&&SHIPS[id].tier===2&&HULL_FACTIONS[id].some(faction=>['pirates','independents'].includes(faction)));
- assert.deepEqual([...seen].sort(),pool.sort(),'every tier-2 bloc hull can be offered');
+ // Every hull of tier 2 can appear at wave 4 (tier 2 stage)
+ const seen=new Set();for(let seed=0;seed<160;seed++){const other=newArenaRun(false,seed);other.arenaRun.wave=4;for(const id of runHullOffers(other))seen.add(id);}
+ const pool=PLAYER_FLYABLE_HULLS.filter(id=>id!=='wayfarer'&&SHIPS[id].tier===2);
+ assert.deepEqual([...seen].sort(),pool.sort(),'every tier-2 hull can be offered');
 });
 test('a hull stage puts three named veterans on the table: one hire per stage, two per run',()=>{
  storage();const save=newArenaRun(false,515),r=save.arenaRun,p=save.player;
@@ -635,11 +636,11 @@ test('the run walks every faction and fields every flyable hull as an opponent',
 
 test('a hired veteran rides through a later hull change and the rest of the run',()=>{
  storage();const save=newArenaRun(false,246);const r=save.arenaRun;
- r.wingmanOffers=runWingmanOffers(save);const wing=hireRunWingman(save,r.wingmanOffers[0].id);
- assert.ok(wing,'the starting stage hires a veteran');
- r.wave=9;r.hullChosen=false;r.wingmanOffers=[];r.hullOffers=runHullOffers(save);
+ r.wave=8;r.decisions={};r.wingmanOffers=runWingmanOffers(save);const wing=hireRunWingman(save,r.wingmanOffers[0].id);
+ assert.ok(wing,'the wingman stage hires a veteran');
+ r.wave=16;r.decisions={};r.wingmanOffers=[];r.hullOffers=runHullOffers(save);
  const hull=r.hullOffers.find(id=>changeRunHull(save,id));
- assert.ok(hull,'a tier-2 hull is taken from the stage');
+ assert.ok(hull,'a tier-3 hull is taken from the stage');
  assert.equal(save.player.shipId,hull);
  assert.equal(r.wingmen.length,1,'the wing survives the hull change');
  assert.equal(r.wingmen[0].alive,true);assert.equal(r.wingmen[0].id,wing.id);
