@@ -16692,3 +16692,84 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 
 .observer-unit-bars > i[hidden] { display: none; }
 #observer-preset-hull { display: block; margin-top: 6px; color: #b9c9bf; font-size: .48rem; }
+
+/* Desktop instruments scale with their physical screen, rather than keeping
+   the compact phone type size inside a much larger cockpit aperture. */
+@media (min-width:901px) and (min-height:521px) and (pointer:fine) {
+  #game-shell .cockpit-screen-own,
+  #game-shell .cockpit-screen-target {
+    container-type:size;
+    font-family:"Courier New",monospace;
+    text-shadow:none;
+    animation:none;
+    background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(80,187,219,.025) 3px 4px),linear-gradient(145deg,#071c2e,#03101e);
+    box-shadow:inset 0 0 0 1px rgba(78,184,215,.25),inset 0 0 18px rgba(0,0,0,.5);
+  }
+  #game-shell .cockpit-screen-own :is(.screen-flight,.screen-own-weapon,.screen-bars,.screen-event-ticker),
+  #game-shell .cockpit-screen-target :is(.screen-heading,.screen-target-distance,.screen-target-readout,.screen-bars) {
+    font-family:"Courier New",monospace;
+  }
+  #game-shell .cockpit-screen-own .screen-flight small { display:none; }
+  #game-shell .cockpit-screen-own::before,
+  #game-shell .cockpit-screen-target::before { display:none; }
+  #game-shell .cockpit-screen-own::after,
+  #game-shell .cockpit-screen-target::after { border-color:rgba(62,165,197,.15); }
+  #game-shell .cockpit-screen-own .screen-ship-layout {
+    padding:6px 8px;
+    grid-template-columns:minmax(0,.7fr) minmax(0,1.3fr);
+    grid-template-rows:auto auto minmax(0,1fr) 16px;
+    gap:4px;
+  }
+  #game-shell .cockpit-screen-own .screen-flight {
+    font-size:clamp(12px,7cqh,16px); gap:5px 12px; padding-bottom:4px;
+  }
+  #game-shell .cockpit-screen-own .screen-flight > div { justify-content:space-between; gap:4px; }
+  #game-shell .cockpit-screen-own .screen-flight b { font-size:clamp(16px,11cqh,24px); font-variant-numeric:tabular-nums; }
+  #game-shell .cockpit-screen-own .screen-flight span[data-short]::before { font-size:clamp(12px,7cqh,14px); }
+  #game-shell .cockpit-screen-own .screen-own-weapon {
+    font-size:clamp(12px,7cqh,15px); margin:0; padding:3px 0;
+    letter-spacing:0; border:0; border-bottom:1px solid rgba(48,161,195,.25);
+    font-family:inherit; text-shadow:none;
+  }
+  #game-shell .cockpit-screen-own .screen-event-ticker { font:11px/16px "Courier New",monospace; padding:0; opacity:.8; }
+  #game-shell .cockpit-screen-own .hull-outline,
+  #game-shell .cockpit-screen-target .hull-outline {
+    max-height:100%; align-self:center; filter:none;
+  }
+  #game-shell .cockpit-screen-own .screen-bars,
+  #game-shell .cockpit-screen-target .screen-bars { align-content:center; gap:clamp(6px,6cqh,13px); }
+  #game-shell .cockpit-screen-own .screen-bars > div,
+  #game-shell .cockpit-screen-target .screen-bars > div {
+    grid-template-columns:7ch minmax(0,1fr); column-gap:5px;
+    font-size:clamp(12px,7cqh,14px);
+  }
+  #game-shell .cockpit-screen-own .screen-bars span[data-short],
+  #game-shell .cockpit-screen-target .screen-bars span[data-short] { font-size:inherit; letter-spacing:0; }
+  #game-shell .cockpit-screen-own .screen-bars span[data-short]::before,
+  #game-shell .cockpit-screen-target .screen-bars span[data-short]::before { content:none; }
+  #game-shell .cockpit-screen-own .screen-bars i,
+  #game-shell .cockpit-screen-target .screen-bars i { height:clamp(6px,4cqh,9px); box-shadow:none; }
+  #game-shell .cockpit-screen-target:not(.has-capital-target) .screen-heading {
+    height:auto; min-height:22%; padding:6px 8px 3px; align-items:center;
+  }
+  #game-shell .cockpit-screen-target .screen-heading > span { display:none; }
+  #game-shell .cockpit-screen-target:not(.has-capital-target) .screen-heading b {
+    font-family:inherit; font-size:clamp(12px,8cqh,18px); text-align:left; letter-spacing:0; width:100%;
+  }
+  #game-shell .cockpit-screen-target:not(.has-capital-target) .screen-target-distance {
+    height:18%; padding:0 8px; justify-content:flex-start;
+    font:700 clamp(16px,11cqh,24px)/1 "Courier New",monospace; letter-spacing:0; text-shadow:none;
+  }
+  #game-shell .cockpit-screen-target:not(.has-capital-target) .screen-target-readout {
+    height:15%; padding:0 8px; justify-content:flex-start;
+    font:clamp(12px,7cqh,14px)/1.2 "Courier New",monospace; text-shadow:none;
+  }
+  #game-shell .cockpit-screen-target:not(.has-capital-target) .screen-target-layout {
+    flex:1; height:auto; min-height:0; padding:3px 8px 8px;
+    grid-template-columns:minmax(0,.7fr) minmax(0,1.3fr); gap:8px;
+  }
+  #game-shell .cockpit-screen-target .screen-target-layout.has-capital-target .screen-bars > div {
+    grid-template-columns:7ch minmax(0,1fr); column-gap:5px;
+  }
+
+}

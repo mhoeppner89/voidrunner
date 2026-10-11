@@ -129,6 +129,8 @@ test('renderer shutdown releases postprocessing and cached resources', () => {
     globalThis.window = { removeEventListener() {} };
     r.scene = new THREE.Scene();
     r.scene.environment = new THREE.Texture();
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial());
+    r.scene.add(sprite);
     r.shipMeshes = new Map();
     r.glbShipModels = new Map([['talon', model()]]);
     r.glbShipLoading = new Map();
@@ -142,7 +144,7 @@ test('renderer shutdown releases postprocessing and cached resources', () => {
     r.bloomQuad = new THREE.Mesh(new THREE.PlaneGeometry(), r.bloomCompositeMaterial);
     r.renderer = { domElement: { removeEventListener() {}, remove() {} }, dispose() {} };
     const glow = r.radialTexture('#ffffff', '#123456');
-    const resources = [glow, r.scene.environment, r.bloomSceneTarget, ...r.bloomBlurTargets,
+    const resources = [sprite.geometry, sprite.material, glow, r.scene.environment, r.bloomSceneTarget, ...r.bloomBlurTargets,
         r.bloomBrightMaterial, r.bloomBlurMaterial, r.bloomCompositeMaterial, r.bloomQuad.geometry,
         r.glbShipModels.get('talon').children[0].geometry];
     const counts = resources.map(watch);

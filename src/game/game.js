@@ -1,6 +1,6 @@
 import {FLEET_PAINTS} from './fleetPaintCatalog.js';
 import {FLEET_EQUIPMENT,droneDock} from './fleetEquipmentData.js';
-import {canonicalFaction,preferredNpcHull} from './factions.js';
+import {canonicalFaction,preferredNpcHull,FACTION_NAMES} from './factions.js';
 import {CRUISER_MOUNTS} from './cruiserModelData.js';
 import {CRUISER_GUN,equipCruiser,updateCruiserAttack,updateCruiserBatteries,damageCruiserMount,segmentCruiserMountHit,segmentCruiserHullHit,cruiserMountPosition,cruiserSubsystemLabel,cruiserSubsystemExplosionScale} from './cruiserCombat.js';
 import { REPAIR_SITES } from './repairSites.js';
@@ -12091,7 +12091,7 @@ export class GameSession {
     }
     flightLoadScale() {
         const player = this.save.player;
-        const capacity = cargoCapacity(player);
+        const capacity = this.playerStats().cargo;
         if (capacity <= 0)
             return 1;
         return 1 - 0.10 * clamp(cargoMass(player) / capacity, 0, 1);
@@ -14619,7 +14619,7 @@ export class GameSession {
                 owned: weaponOwned(this.save.player, id),
             })),
             cargo: cargoMass(this.save.player),
-            cargoCapacity: cargoCapacity(this.save.player),
+            cargoCapacity: stats.cargo,
             credits: this.save.player.credits,
             mode: this.save.player.mode,
             shipName: SHIPS[this.save.player.shipId].name,
@@ -14637,7 +14637,7 @@ export class GameSession {
             // otherwise produce READY and INTERRUPTED on the same card.
             gateArmed: Boolean(this.armedJumpPointId),
             hyperdriveReady: !this.armedJumpPointId && !this.autopilot && this.hyperdriveFx === 'none' && !this.hyperdriveBlockReason(),
-            loadPercent: Math.round((cargoMass(this.save.player) / Math.max(1, cargoCapacity(this.save.player))) * 100),
+            loadPercent: Math.round((cargoMass(this.save.player) / Math.max(1, stats.cargo)) * 100),
             // Handling reflects the cargo-load penalty on turn/acceleration.
             handlingPercent: Math.round(this.flightLoadScale() * 100),
             zone: this.zoneLabel(this.getWorldZone(player)),

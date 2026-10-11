@@ -3981,6 +3981,144 @@ export class SpaceRenderer {
     clearDrones() {
         for (const id in this.droneVisuals) this.removeDroneVisual(id);
     }
+    retireProjectileMesh(mesh) {
+        this.dynamicRoot.remove(mesh);
+        // Keep a bounded stock of inactive visuals. Their GPU buffers/materials
+        // survive between salvos instead of being destroyed for every round.
+        const key = mesh.userData.projectilePoolKey;
+        const pools = this.projectilePools ??= new Map();
+        const pool = pools.get(key) ?? [];
+        if (pool.length < 12 && (this.pooledProjectileCount ?? 0) < 96) {
+            if (!pools.has(key)) pools.set(key, pool);
+            pool.push(mesh);
+            this.pooledProjectileCount = (this.pooledProjectileCount ?? 0) + 1;
+        } else this.disposeObject(mesh);
+    }
+    clearProjectilePools() {
+        for (const pool of this.projectilePools?.values() ?? [])
+            for (const mesh of pool) this.disposeObject(mesh);
+        this.projectilePools?.clear();
+        this.pooledProjectileCount = 0;
+    }
+    takeProjectileMesh(projectile) {
+        const key = `${projectile.kind}|${projectile.faction ?? ''}|${projectile.launcherId ?? ''}`;
+        const mesh = this.projectilePools?.get(key)?.pop();
+        if (mesh) {
+            this.pooledProjectileCount--;
+            mesh.scale.setScalar(1);
+            mesh.quaternion.identity();
+        }
+        return mesh;
+    }
+    createProjectileMesh(projectile) {
+        let mesh;
+        if (projectile.kind === 'laser') {
+            // Gauntlet overhaul: hot core + crossed additive glow pair
+            // + head sprite (see laserFx.js). Shared assets per faction;
+            // the per-bolt cost is just the small group wrapper.
+            this.laserFx ??= new LaserFx(this.scene, this.effects);
+            mesh = this.laserFx.boltFor(projectile.faction);
+        }
+        else if (projectile.kind === 'gauss') {
+            // Magrail slug: a long hypervelocity tracer — thin white-blue
+            // core, three times the laser bolt's length so the lane it
+            // owns reads at a glance, plus a cold additive glow at the head.
+            this.laserFx ??= new LaserFx(this.scene, this.effects);
+            mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 6.4, 3, 6), new THREE.MeshBasicMaterial({ color: 0xcfeeff }));
+            mesh.geometry.rotateX(Math.PI / 2);
+            const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+                map: this.radialTexture('#eaffff', '#4fb8d8'),
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+            }));
+            glow.scale.setScalar(1.0);
+            mesh.add(glow);
+        }
+        else if (projectile.kind === 'pdc') {
+            // Point-defense stub: a short COLD white-blue dart — kept
+            // far from the pulse laser's amber so the two streams
+            // never read as the same gun at combat distance.
+            mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.065, 3.2, 4), new THREE.MeshBasicMaterial({
+                color: projectile.faction === 'player' ? 0xdce9ff : 0xff8a5b,
+            }));
+            mesh.geometry.rotateX(Math.PI / 2);
+        }
+        else if (projectile.kind === 'ripper') {
+            // Scattergun pellet: a small warm spark; seven per shell
+            // reads as a cloud without any one pellet drawing attention.
+            mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.48, 2, 4), new THREE.MeshBasicMaterial({ color: 0xffb066 }));
+            const glint = new THREE.Sprite(new THREE.SpriteMaterial({
+                map: this.radialTexture('#ffe9c9', '#ff7a2b'),
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+            }));
+            mesh.geometry.rotateX(Math.PI/2);
+            glint.scale.setScalar(0.42);
+            glint.material.opacity=.55;
+            mesh.add(glint);
+        }
+        else if (projectile.kind === 'ion') {
+            // Ion Lance bolt: a cool cyan blob with an arcing halo —
+            // reads as energy discharge rather than a kinetic round.
+            mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.2, 0), new THREE.MeshBasicMaterial({ color: 0x69e4f2 }));
+            const arc = new THREE.Sprite(new THREE.SpriteMaterial({
+                map: this.weaponCloudTexture('ion'), color: 0x6bdfff,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+            }));
+            arc.scale.setScalar(1.25);
+            arc.material.opacity=.65;
+            mesh.add(arc);
+        }
+        else if (projectile.kind === 'mortar') {
+            // Sunlance orb: big slow ember with a heavy additive halo —
+            // the slowest thing in the sky, so it must look dangerous.
+            mesh = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffe2a0 }));
+            const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+                map: this.weaponCloudTexture('plasma'), color:0xff7729,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+            }));
+            halo.scale.setScalar(2.3);
+            halo.material.opacity=.8;
+            mesh.add(halo);
+        }
+        else {
+            // Same Blender-authored, textured geometry as the ordnance review.
+            const group = new THREE.Group();
+            const body = createOrdnanceModel(projectile.launcherId);
+            group.add(body);
+            const exhaust = new THREE.Group();
+            exhaust.name = 'ordnance-exhaust';
+            group.add(exhaust);
+            const flare = new THREE.Sprite(new THREE.SpriteMaterial({
+                map: this.radialTexture('#fff1ad', '#ff5029'),
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+            }));
+            flare.position.z = body.userData.length*.49;
+            flare.scale.setScalar(projectile.launcherId==='torpedo'?1.6:(projectile.launcherId?.includes('swarm') ? .5 : .8));
+            exhaust.add(flare);
+            // Engine plume: an additive teardrop behind the nozzle —
+            // tagged so the frame pass can flicker it. Sized so the
+            // missile reads as a moving ember at 30-60 units.
+            const plume = new THREE.Mesh(new THREE.ConeGeometry(.28,2.8,5,1,true),new THREE.MeshBasicMaterial({
+                color:0xffb66b,transparent:true,blending:THREE.AdditiveBlending,
+                depthWrite:false,opacity:.4,side:THREE.DoubleSide,forceSinglePass:true,
+            }));
+            plume.geometry.rotateX(Math.PI/2);
+            plume.position.z=body.userData.length*.5+1.4;
+            plume.name = 'plume';
+            exhaust.add(plume);
+            mesh = group;
+        }
+        return mesh;
+    }
     syncProjectiles(projectiles, store, alpha = 0) {
         const revision = ++this.projectileSyncRevision;
         const pos = store.pos;
@@ -3989,121 +4127,17 @@ export class SpaceRenderer {
         projectiles.forEach((projectile) => {
             let mesh = this.projectileMeshes.get(projectile.slot);
             if (mesh && (mesh.userData.projectileKind !== projectile.kind || mesh.userData.projectileFaction !== projectile.faction || mesh.userData.projectileLauncher !== projectile.launcherId)) {
-                this.dynamicRoot.remove(mesh);
-                this.disposeObject(mesh);
+                this.retireProjectileMesh(mesh);
                 this.projectileMeshes.delete(projectile.slot);
                 mesh = undefined;
             }
             if (!mesh) {
-                if (projectile.kind === 'laser') {
-                    // Gauntlet overhaul: hot core + crossed additive glow pair
-                    // + head sprite (see laserFx.js). Shared assets per faction;
-                    // the per-bolt cost is just the small group wrapper.
-                    this.laserFx ??= new LaserFx(this.scene, this.effects);
-                    mesh = this.laserFx.boltFor(projectile.faction);
-                }
-                else if (projectile.kind === 'gauss') {
-                    // Magrail slug: a long hypervelocity tracer — thin white-blue
-                    // core, three times the laser bolt's length so the lane it
-                    // owns reads at a glance, plus a cold additive glow at the head.
-                    this.laserFx ??= new LaserFx(this.scene, this.effects);
-                    mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 6.4, 3, 6), new THREE.MeshBasicMaterial({ color: 0xcfeeff }));
-                    mesh.geometry.rotateX(Math.PI / 2);
-                    const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-                        map: this.radialTexture('#eaffff', '#4fb8d8'),
-                        transparent: true,
-                        blending: THREE.AdditiveBlending,
-                        depthWrite: false,
-                    }));
-                    glow.scale.setScalar(1.0);
-                    mesh.add(glow);
-                }
-                else if (projectile.kind === 'pdc') {
-                    // Point-defense stub: a short COLD white-blue dart — kept
-                    // far from the pulse laser's amber so the two streams
-                    // never read as the same gun at combat distance.
-                    mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.065, 3.2, 4), new THREE.MeshBasicMaterial({
-                        color: projectile.faction === 'player' ? 0xdce9ff : 0xff8a5b,
-                    }));
-                    mesh.geometry.rotateX(Math.PI / 2);
-                }
-                else if (projectile.kind === 'ripper') {
-                    // Scattergun pellet: a small warm spark; seven per shell
-                    // reads as a cloud without any one pellet drawing attention.
-                    mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.48, 2, 4), new THREE.MeshBasicMaterial({ color: 0xffb066 }));
-                    const glint = new THREE.Sprite(new THREE.SpriteMaterial({
-                        map: this.radialTexture('#ffe9c9', '#ff7a2b'),
-                        transparent: true,
-                        blending: THREE.AdditiveBlending,
-                        depthWrite: false,
-                    }));
-                    mesh.geometry.rotateX(Math.PI/2);
-                    glint.scale.setScalar(0.42);
-                    glint.material.opacity=.55;
-                    mesh.add(glint);
-                }
-                else if (projectile.kind === 'ion') {
-                    // Ion Lance bolt: a cool cyan blob with an arcing halo —
-                    // reads as energy discharge rather than a kinetic round.
-                    mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.2, 0), new THREE.MeshBasicMaterial({ color: 0x69e4f2 }));
-                    const arc = new THREE.Sprite(new THREE.SpriteMaterial({
-                        map: this.weaponCloudTexture('ion'), color: 0x6bdfff,
-                        transparent: true,
-                        blending: THREE.AdditiveBlending,
-                        depthWrite: false,
-                    }));
-                    arc.scale.setScalar(1.25);
-                    arc.material.opacity=.65;
-                    mesh.add(arc);
-                }
-                else if (projectile.kind === 'mortar') {
-                    // Sunlance orb: big slow ember with a heavy additive halo —
-                    // the slowest thing in the sky, so it must look dangerous.
-                    mesh = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffe2a0 }));
-                    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
-                        map: this.weaponCloudTexture('plasma'), color:0xff7729,
-                        transparent: true,
-                        blending: THREE.AdditiveBlending,
-                        depthWrite: false,
-                    }));
-                    halo.scale.setScalar(2.3);
-                    halo.material.opacity=.8;
-                    mesh.add(halo);
-                }
-                else {
-                    // Same Blender-authored, textured geometry as the ordnance review.
-                    const group = new THREE.Group();
-                    const body = createOrdnanceModel(projectile.launcherId);
-                    group.add(body);
-                    const exhaust = new THREE.Group();
-                    exhaust.name = 'ordnance-exhaust';
-                    group.add(exhaust);
-                    const flare = new THREE.Sprite(new THREE.SpriteMaterial({
-                        map: this.radialTexture('#fff1ad', '#ff5029'),
-                        transparent: true,
-                        blending: THREE.AdditiveBlending,
-                        depthWrite: false,
-                    }));
-                    flare.position.z = body.userData.length*.49;
-                    flare.scale.setScalar(projectile.launcherId==='torpedo'?1.6:(projectile.launcherId?.includes('swarm') ? .5 : .8));
-                    exhaust.add(flare);
-                    // Engine plume: an additive teardrop behind the nozzle —
-                    // tagged so the frame pass can flicker it. Sized so the
-                    // missile reads as a moving ember at 30-60 units.
-                    const plume = new THREE.Mesh(new THREE.ConeGeometry(.28,2.8,5,1,true),new THREE.MeshBasicMaterial({
-                        color:0xffb66b,transparent:true,blending:THREE.AdditiveBlending,
-                        depthWrite:false,opacity:.4,side:THREE.DoubleSide,forceSinglePass:true,
-                    }));
-                    plume.geometry.rotateX(Math.PI/2);
-                    plume.position.z=body.userData.length*.5+1.4;
-                    plume.name = 'plume';
-                    exhaust.add(plume);
-                    mesh = group;
-                }
+                mesh = this.takeProjectileMesh(projectile) ?? this.createProjectileMesh(projectile);
                 this.dynamicRoot.add(mesh);
                 mesh.userData.projectileKind = projectile.kind;
                 mesh.userData.projectileFaction = projectile.faction;
                 mesh.userData.projectileLauncher = projectile.launcherId;
+                mesh.userData.projectilePoolKey = `${projectile.kind}|${projectile.faction ?? ''}|${projectile.launcherId ?? ''}`;
                 this.projectileMeshes.set(projectile.slot, mesh);
             }
             const i = projectile.slot * 3;
@@ -4151,8 +4185,7 @@ export class SpaceRenderer {
         // update pass, then retire unseen meshes without building live arrays.
         for (const [key, mesh] of this.projectileMeshes) {
             if (mesh.userData.syncRevision !== revision) {
-                this.dynamicRoot.remove(mesh);
-                this.disposeObject(mesh);
+                this.retireProjectileMesh(mesh);
                 this.projectileMeshes.delete(key);
             }
         }
@@ -5385,7 +5418,11 @@ export class SpaceRenderer {
                         void main(){surface=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
                     fragmentShader: `uniform float fade; uniform float interior; uniform vec3 hits[4]; uniform float ages[4]; varying vec3 surface;
                         void main(){vec3 direction=normalize(surface);float glow=0.;float core=0.;
-                        for(int i=0;i<4;i++){float age=ages[i];float life=max(0.,1.-age/.25);
+                        for(int i=0;i<4;i++){float age=ages[i];
+                        // Unused/expired contacts must not run four expensive
+                        // ripple calculations across every shield fragment.
+                        if(age>=.25)continue;
+                        float life=max(0.,1.-age/.25);
                         float angle=acos(clamp(dot(direction,hits[i]),-1.,1.));
                         float radius=.10+age*3.5;
                         float ring=exp(-pow((angle-radius)/(.035+age*.12),2.));
@@ -6079,12 +6116,50 @@ export class SpaceRenderer {
         }
         return true;
     }
+    prepareCombatWarmup() {
+        if (this.combatWarmupRoot) return this.combatWarmupRoot;
+        const root = this.combatWarmupRoot = new THREE.Group();
+        // Visible to compileAsync, outside every gameplay camera's frustum.
+        // Retain the small representatives so their programs stay resident.
+        root.position.set(1e9, 1e9, 1e9);
+        for (const kind of ['laser', 'gauss', 'pdc', 'ripper', 'ion', 'mortar', 'missile']) {
+            const launchers = kind === 'missile' ? ['seeker', 'swarm', 'torpedo'] : [undefined];
+            for (const launcherId of launchers) {
+                const mesh = this.createProjectileMesh({kind, faction:'player', launcherId});
+                root.add(mesh);
+            }
+        }
+        this.laserFx ??= new LaserFx(this.scene, this.effects);
+        const first = this.effects.length;
+        this.laserFx.muzzleFlash(0,0,0);
+        this.laserFx.impact([0,0,0],0xffc36a,true);
+        this.laserFx.rockImpact([0,0,1],[0,0,0]);
+        for (const effect of this.effects.splice(first)) root.add(effect.object);
+        root.add(createShipExplosion([0,0,0]).object);
+        const actor = {id:'combat-warmup',position:[0,0,0],rotation:[0,0,0,1],hull:1,shield:1};
+        this.flashShield(actor,[1,1,1],.25,false,[0,0,1],[0,0,10]);
+        root.add(this.shieldFields.get(actor.id));
+        this.shieldFields.delete(actor.id);
+        const textures = new Set();
+        root.traverse(object => {
+            for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+                if (!material) continue;
+                for (const value of Object.values(material))
+                    if (value?.isTexture && value.image?.width > 0) textures.add(value);
+            }
+        });
+        for (const texture of textures) this.renderer.initTexture?.(texture);
+        return root;
+    }
     async prepareActiveScene() {
         if (this.disposed || this.contextLost)
             return;
         let timeoutId;
         let timedOut = false;
+        let combatWarmup;
         try {
+            combatWarmup = this.prepareCombatWarmup();
+            this.scene.add(combatWarmup);
             const compile = typeof this.renderer.compileAsync === 'function'
                 ? this.renderer.compileAsync(this.scene, this.camera)
                 : Promise.resolve(this.renderer.compile(this.scene, this.camera));
@@ -6110,6 +6185,7 @@ export class SpaceRenderer {
             console.warn('Flight-scene shader warm-up was interrupted.', error);
         }
         finally {
+            if (combatWarmup) this.scene.remove(combatWarmup);
             if (timeoutId !== undefined)
                 clearTimeout(timeoutId);
         }
@@ -6305,7 +6381,10 @@ export class SpaceRenderer {
             if (mesh.isInstancedMesh) mesh.dispose();
             // Assets flagged userData.shared (laserFx caches) are reused across
             // many live objects — a single bolt's death must not dispose them.
-            if (mesh.geometry && !mesh.geometry.userData?.shared)
+            // Three.Sprite uses one global quad geometry, also used by live
+            // engine glows. Retiring a muzzle flash must not invalidate it.
+            if (mesh.isSprite) this.spriteGeometry = mesh.geometry;
+            if (!mesh.isSprite && mesh.geometry && !mesh.geometry.userData?.shared)
                 mesh.geometry.dispose();
             const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
             materials.forEach((material) => {
@@ -6347,6 +6426,9 @@ export class SpaceRenderer {
             }
         }
         this.shipMeshes.clear();
+        this.clearProjectilePools();
+        if (this.combatWarmupRoot) this.disposeObject(this.combatWarmupRoot);
+        this.combatWarmupRoot = null;
         this.disposeObject(this.scene);
         this.scene.environment?.dispose();
         for (const model of this.glbShipModels.values()) {
@@ -6387,6 +6469,10 @@ export class SpaceRenderer {
         this.screenTextures.length = 0;
         for(const model of this.glbShipPaintModels?.values()??[])this.disposeObject(model);
         for (const pending of this.droneModels?.values() ?? []) pending.then(model => { if(model)this.disposeObject(model); });
+        // Release Three's shared sprite quad once at session shutdown, after
+        // all our sprites are gone; this also removes its WebGL listeners.
+        this.spriteGeometry?.dispose();
+        this.spriteGeometry = null;
         this.renderer.dispose();
         this.renderer.domElement.remove();
     }
