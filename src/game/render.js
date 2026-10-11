@@ -30,7 +30,8 @@ import { paintShipMaterial, shipPaintFrames } from './shipLivery.js';
 import { addStationOccupants, STATION_OCCUPANTS } from './stationOccupants.js';
 import { addStationActivity, updateStationActivity } from './stationActivity.js';
 import { playerBerth } from './playerDocking.js';
-import { stationVisualSurfaceRadius } from './stationTraffic.js';
+import { buildStationCollider } from './stationCollision.js';
+import { stationModelOffsetZ, stationVisualSurfaceRadius } from './stationTraffic.js';
 import { LaserFx } from './laserFx.js';
 const tupleToVector = (tuple, out = new THREE.Vector3()) => out.set(tuple[0], tuple[1], tuple[2]);
 const NEG_Z = new THREE.Vector3(0, 0, -1);
@@ -1530,6 +1531,7 @@ export class SpaceRenderer {
     }
     ensureStationModels(systemId = this.systemId) {
         this.stationModelLoads ??= new Map();
+        this.stationColliders ??= new Map();
         for (const id of ['helix', 'rook', 'cairn', 'argent', 'gatehouse-twelve',
             'blackglass', 'cinder', 'torchwell', 'nacre', 'shepherd',
             'haven', 'league-yard', 'cinderfall']) {
@@ -1538,6 +1540,12 @@ export class SpaceRenderer {
             const root = this.locationMeshes.get(id);
             if (!root) continue;
             const pending = loadGlb(`assets/models/stations/${id}.glb`).then(async model => {
+                if (this.disposed) { this.disposeObject(model); return; }
+                // Use the exact rendered transform for physical surfaces.
+                // Build before adding parked ships and decorative activity.
+                model.scale.setScalar(LOCATIONS[id].radius * (id === 'blackglass' ? .2 : .95) / 100);
+                model.position.z = stationModelOffsetZ(id);
+                const collider = buildStationCollider(model, LOCATIONS[id].position);
                 try { await addStationOccupants(model, id, undefined, hull => {
                     // Parked civilian hulls must match the flying entity beside them.
                     if (hull.startsWith('concord-')) return undefined;
@@ -1550,15 +1558,7 @@ export class SpaceRenderer {
                 catch (error) { console.warn(`Station ${id} dock occupants unavailable.`, error); }
                 if (this.disposed) { this.disposeObject(model); return; }
                 addStationActivity(model, id);
-                // Blender authors a 100-unit bounding sphere. Keep every part
-                // within the existing collision envelope and docking distance.
-                model.scale.setScalar(LOCATIONS[id].radius * 0.95 / 100);
                 model.name = `station-${id}`;
-                if (id === 'blackglass') {
-                    // Front galleries clear the moon; rear anchors enter the rock.
-                    model.scale.setScalar(LOCATIONS[id].radius * 0.2 / 100);
-                    model.position.z = LOCATIONS[id].radius * 0.835;
-                }
                 model.userData.stationAsset = id;
                 model.traverse(node => {
                     if (!node.isMesh) return;
@@ -1584,6 +1584,7 @@ export class SpaceRenderer {
                 root.rotation.set(0, 0, 0);
                 if (id === 'helix') this.helixRotor = null;
                 root.add(model);
+                this.stationColliders.set(id, collider);
                 this.tagTargetable(root, 'location', id);
                 this.renderRevision = (this.renderRevision ?? 0) + 1;
             }).catch(error => {
@@ -6437,6 +6438,7 @@ export class SpaceRenderer {
         }
         this.glbShipModels.clear();
         this.glbShipLoading.clear();
+        this.stationColliders?.clear();
         this.bloomSceneTarget?.dispose();
         this.ringVolumeTarget?.dispose();
         this.ringParticles?.dispose();

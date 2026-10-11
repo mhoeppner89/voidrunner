@@ -10,6 +10,17 @@ export function stationVisualSurfaceRadius(id) {
     return location.radius * (id === 'blackglass' ? .2 : .95);
 }
 
+export function stationModelOffsetZ(id) {
+    return id === 'blackglass' ? LOCATIONS[id].radius * .835 : 0;
+}
+
+// Blackglass's station is attached to the moon's near surface, not its center.
+export function stationSurfaceDistance(id, position) {
+    const location = LOCATIONS[id];
+    return Math.max(0, Math.hypot((position[0]??position.x)-location.position[0], (position[1]??position.y)-location.position[1],
+        (position[2]??position.z)-location.position[2]-stationModelOffsetZ(id)) - stationVisualSurfaceRadius(id));
+}
+
 // The same model transform as render.ensureStationModels, including Blackglass's moon offset.
 function berthFromSpec(id, laneSpec, height = 2, radialGate = false) {
     const spec = STATION_DOCKS[id], location = LOCATIONS[id];
@@ -17,15 +28,16 @@ function berthFromSpec(id, laneSpec, height = 2, radialGate = false) {
     const [x,y,z,,length] = laneSpec;
     const scale = location.radius * (id === 'blackglass' ? .2 : .95) / spec.radius;
     const pad = [location.position[0]+x*scale, location.position[1]+(z+(id==='cairn'?.12:0))*scale+height+.25,
-        location.position[2]+(-y+length*.28)*scale+(id==='blackglass'?location.radius*.835:0)];
+        location.position[2]+(-y+length*.28)*scale+stationModelOffsetZ(id)];
     let gate;
     if (radialGate) {
-        const dx = pad[0] - location.position[0], dy = pad[1] - location.position[1], dz = pad[2] - location.position[2];
+        const center = [location.position[0],location.position[1],location.position[2]+stationModelOffsetZ(id)];
+        const dx = pad[0] - center[0], dy = pad[1] - center[1], dz = pad[2] - center[2];
         const radius = Math.hypot(dx,dy,dz) || 1;
         const approach = spec.approachVector;
         const gateRadius = approach
             ? Math.max(radius + 100, stationVisualSurfaceRadius(id) + 120)
-            : Math.max(radius + 100, location.radius * 1.15 + 100);
+            : Math.max(radius + 100, stationVisualSurfaceRadius(id) * 1.15 + 100);
         if (approach) {
             // Convert Blender's Z-up vector into the runtime's Y-up frame.
             // Keeping the berth's perpendicular offset preserves its authored
@@ -39,12 +51,16 @@ function berthFromSpec(id, laneSpec, height = 2, radialGate = false) {
             const perpendicular = relative.map((value, i) => value - axis[i] * along);
             const perpendicularSq = perpendicular[0] ** 2 + perpendicular[1] ** 2 + perpendicular[2] ** 2;
             const gateAlong = Math.sqrt(Math.max(0, gateRadius ** 2 - perpendicularSq));
-            gate = perpendicular.map((value, i) => location.position[i] + value + axis[i] * gateAlong);
+            gate = perpendicular.map((value, i) => center[i] + value + axis[i] * gateAlong);
         }
         else {
-            gate = [location.position[0] + dx / radius * gateRadius,
-                location.position[1] + dy / radius * gateRadius,
-                location.position[2] + dz / radius * gateRadius];
+            // A radial vertical component puts a lower-deck gate underneath
+            // the station and sends the route through its floor. Approach
+            // horizontally at the authored deck height instead.
+            const horizontal = Math.hypot(dx,dz);
+            const reach = Math.sqrt(Math.max(0,gateRadius**2-dy**2));
+            gate = [center[0] + (horizontal ? dx/horizontal : 0)*reach,
+                pad[1], center[2] + (horizontal ? dz/horizontal : 1)*reach];
         }
     } else {
         gate = [...pad];

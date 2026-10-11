@@ -6,7 +6,8 @@ import {CRUISER_GUN,equipCruiser,updateCruiserAttack,updateCruiserBatteries,dama
 import { REPAIR_SITES } from './repairSites.js';
 import { prepareLocalPursuit, updateLocalPursuit, driveRecoveryRemaining, PLAYER_RADAR_RANGE, PIRATE_ARRIVAL_MIN } from './combatTravel.js';
 import { beginPlayerDocking, landingCaptureReady, LANDING_CAPTURE_SPEED, nearestPlayerBerth, playerBerth, playerBerths, preparePlayerLaunch, stepPlayerDocking } from './playerDocking.js';
-import { stationApproach, reserveStationDock, stationVisualSurfaceRadius } from './stationTraffic.js';
+import { stationApproach, reserveStationDock, stationVisualSurfaceRadius, stationSurfaceDistance } from './stationTraffic.js';
+import { hullVsStation } from './stationCollision.js';
 import { indexObstacleCells, visitObstacleCells } from './obstacleQueries.js';
 import { segmentMeshHit } from './meshQueries.js';
 import {createMiningContacts,updateMiningContacts} from './miningSurface.js';
@@ -4661,9 +4662,8 @@ export class GameSession {
         if (dock) {
             const departure = this.departureClearance?.id === dock.id ? this.departureClearance : undefined;
             if (departure) {
-                const centerDistance = Math.hypot(position.x - dock.x, position.y - dock.y, position.z - dock.z);
                 const hullReach = Math.max(hullExtents[0], hullExtents[1], hullExtents[2]);
-                if (centerDistance > dock.collisionRadius + hullReach + 12)
+                if (stationSurfaceDistance(dock.id,position) > hullReach + 12)
                     this.departureClearance = undefined;
             }
             const denied = this.save.player.transponder === false && this.darkDockPolicy(dock.id) === 'deny';
@@ -4674,9 +4674,29 @@ export class GameSession {
                 ? this.stationLandingBerth
                 : undefined;
             const clearanceLane = departure ?? landing;
-            if ((!clearanceLane || !withinBerthCorridor(position, clearanceLane))
-                && hullVsSphere(position, hullExtents, shipQuatInv, dock.x, dock.y, dock.z, dock.collisionRadius, contact))
-                resolveContact(LOCATIONS[dock.id].name);
+            let inClearLane = Boolean(clearanceLane && withinBerthCorridor(position,clearanceLane));
+            // Clearance belongs to the station, not just the nearest pad.
+            // Changing between marked approaches must not close a live lane.
+            if (landing && !inClearLane) for (const berth of this.stationLandingBerths ?? []) {
+                if (withinBerthCorridor(position,berth)) { inClearLane=true;break; }
+            }
+            if (!inClearLane) {
+                if (dock.stationCollider) {
+                    // Real concave surfaces leave hangars/platform approaches
+                    // clear. Several contacts handle wall/floor corners.
+                    for (let pass=0;pass<3;pass++) {
+                        if (!hullVsStation(position,hullExtents,shipQuatInv,dock.stationCollider,contact)) break;
+                        resolveContact(LOCATIONS[dock.id].name);
+                    }
+                } else if (hullVsSphere(position,hullExtents,shipQuatInv,dock.x,dock.y,dock.z,dock.collisionRadius,contact)) {
+                    resolveContact(LOCATIONS[dock.id].name);
+                }
+            }
+            // Blackglass's host moon remains solid; it is not part of the
+            // station GLB, and landing clearance must never open the moon.
+            if (dock.stationCollider && dock.id === 'blackglass'
+                && hullVsSphere(position,hullExtents,shipQuatInv,dock.x,dock.y,dock.z,LOCATIONS.blackglass.radius*.82,contact))
+                resolveContact(LOCATIONS.blackglass.name);
         }
         else {
             const margin = MAX_FIELD_OBSTACLE_RADIUS;
@@ -12032,11 +12052,10 @@ export class GameSession {
             this.clearStationLandingGuidance();
             return;
         }
-        const p = player.position, center = location.position;
-        const centerDistance = Math.hypot(p[0] - center[0], p[1] - center[1], p[2] - center[2]);
-        const surfaceDistance = Math.max(0, centerDistance - stationVisualSurfaceRadius(id));
+        const p = player.position;
+        const surfaceDistance = stationSurfaceDistance(id,p);
         // Reveal every authored pad at 400 km. Grant clearance automatically
-        // and select the nearest pad once the ship enters the final 200 km.
+        // in the final 200 km; the pilot may still approach a different pad.
         if (surfaceDistance > STATION_LANDING_BEACON_RANGE) {
             this.clearStationLandingGuidance();
             return;
@@ -12044,17 +12063,21 @@ export class GameSession {
         const height = this.playerHullExtents()[1];
         if (this.stationLandingBeaconId !== id || !this.stationLandingBerths?.length) {
             this.stationLandingBerths = playerBerths(id, height);
-            this.stationLandingBerth = nearestPlayerBerth(id, p, height);
+            this.stationLandingBerth = nearestPlayerBerth(id, p, height, this.stationLandingBerths);
             if (!this.stationLandingBerth) {
                 this.clearStationLandingGuidance();
                 return;
             }
             this.stationLandingBeaconId = id;
         }
-        else if (surfaceDistance > STATION_LANDING_CLEARANCE_RANGE) {
-            // Let the pilot change their approach while the pads are only
-            // candidate beacons; lock the nearest one at automatic clearance.
-            this.stationLandingBerth = nearestPlayerBerth(id, p, height);
+        else {
+            const nearest = nearestPlayerBerth(id,p,height,this.stationLandingBerths);
+            const pad = this.stationLandingBerth.pad;
+            const currentDistance = Math.hypot(p[0]-pad[0],p[1]-pad[1],p[2]-pad[2]);
+            const nearestDistance = Math.hypot(p[0]-nearest.pad[0],p[1]-nearest.pad[1],p[2]-nearest.pad[2]);
+            // Small hysteresis keeps adjacent beacons from flickering while
+            // allowing the marked berth to follow a deliberate pad change.
+            if (currentDistance > nearestDistance + 10) this.stationLandingBerth = nearest;
         }
         const permitted = !(player.transponder === false && this.darkDockPolicy(id) === 'deny');
         if (surfaceDistance <= STATION_LANDING_CLEARANCE_RANGE) {
@@ -12213,6 +12236,7 @@ export class GameSession {
             radius: location.radius,
             losRadius: location.kind === 'planet' ? location.radius + 2 : location.radius * 0.73,
             collisionRadius: this.locationCollisionRadius(location),
+            stationCollider: this.renderer?.stationColliders?.get(dockLocation),
         };
     }
     asteroidFieldObstacles(nodes = []) {
@@ -12655,6 +12679,8 @@ export class GameSession {
     surfaceDistance(position, target) {
         if (!target)
             return 0;
+        if (target.kind === 'location' && LOCATIONS[target.id]?.kind === 'station')
+            return stationSurfaceDistance(target.id,position);
         const tp = target.position;
         return Math.max(0, Math.hypot(position.x - tp[0], position.y - tp[1], position.z - tp[2]) - this.targetSurfaceRadius(target));
     }

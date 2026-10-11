@@ -28,8 +28,7 @@ export function playerBerth(id, height = 2, padIndex = 0) {
     return playerBerths(id, height)[padIndex] ?? null;
 }
 
-export function nearestPlayerBerth(id, position, height = 2) {
-    const berths = playerBerths(id, height);
+export function nearestPlayerBerth(id, position, height = 2, berths = playerBerths(id, height)) {
     let nearest, nearestDistance = Infinity;
     for (const berth of berths) {
         const distance = Math.hypot(
