@@ -861,6 +861,10 @@ export const SHIPS = {
 },
     ...LEAGUE_HULLS,
 };
+// A larger finite reserve lets fighter exchanges span several passes.
+export const SHIP_SHIELD_CAPACITY_MULTIPLIER = 1.75;
+for (const [id, ship] of Object.entries(SHIPS))
+    SHIPS[id] = {...ship, shield: ship.shield * SHIP_SHIELD_CAPACITY_MULTIPLIER};
 export const LOCATION_ORDER = Object.freeze([
     'haven','league-yard','cinderfall','acheron-belt',
     'helix', 'rook', 'azure', 'shardbelt', 'vesper', 'mourning-line', 'cairn',

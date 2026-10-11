@@ -28,7 +28,7 @@ import {selectCombatFocus,fireCrossfireOpportunity} from './combatAwareness.js';
 import { aceManeuver } from './aceManeuvers.js';
 import { integrateFlightTurn, integrateFlightVelocity, steerFlightTurn, registerHitReaction } from './flightDynamics.js';
 import { createEnemyLoadout } from './enemyLoadouts.js';
-import { weaponDamage, disruptWeapons, disruptionFactor } from './weaponDamage.js';
+import { activationWeaponDamage, disruptWeapons, disruptionFactor } from './weaponDamage.js';
 import { combatProfile, interceptTime } from './combatTactics.js';
 import * as THREE from 'three';
 import { AudioManager } from './audio.js';
@@ -67,7 +67,7 @@ import { steerToward } from './npcNav.js';
 import { PILOT_LINES, pilotMod, rollPilot, TIER_LABELS } from './pilots.js';
 import { setLanguage, t } from './i18n.js';
 import { MUG_CHANCE, SMUGGLE_CHANCE, createSmuggleTask, createTask, rebasePatrolTask, rollNpcCargo, updateShipAI } from './shipAI.js';
-import {LEAGUE_HULLS,leagueTrafficChance,factionsOpposed} from './leagueContent.js';
+import {leagueTrafficChance,factionsOpposed} from './leagueContent.js';
 import { PLAYER_FLYABLE_HULLS, observerRoleFor } from './shipPool.js';
 import { paletteForFaction, playerShipVariant, shipVariantForRole } from './voxelModels.js';
 import { SENSOR_CLOSE_VISUAL_RANGE, SENSOR_CONTACT_THRESHOLD, SENSOR_HORIZON, SENSOR_IDENTIFY_THRESHOLD, SENSOR_TRACK_THRESHOLD, addEmissionHeat, awarenessState, npcPhysicalSignatureRangeValues, physicalSignatureRangeValues, signatureBand, stepDriveHeat, stepEmissionHeat, stepSensorAwareness } from './sensors.js';
@@ -133,27 +133,10 @@ const OBSERVER_MAPS = Object.freeze([
     Object.freeze({ id: 'asteroid-field', label: 'ASTEROID FIELD', instanceId: 'shardbelt' }),
     Object.freeze({ id: 'debris-field', label: 'DEBRIS FIELD', instanceId: 'mourning-line' }),
 ]);
-// Every player-flyable silhouette, so the editor can stage any model the
-// player can meet in flight, plus the capital exception. The six career hulls
-// derive their flight stats and fittings from their authored role; the five
-// Alliance hulls declare a hullId because no role maps onto their
-// airframes. The frigate keeps its authored battery/PDC system instead of
-// receiving a fighter loadout.
-const LEAGUE_OBSERVER_TYPES = Object.freeze(PLAYER_FLYABLE_HULLS
-    .filter((id) => LEAGUE_HULLS[id] || id === 'blade')
-    .map((id) => Object.freeze({ id, label: (SHIPS[id]?.name ?? id).toUpperCase(), role: observerRoleFor(id), hullId: id, defaultFit: 'varied' })));
+// Use shipping hull identities and stock fittings, including every capital model.
 const OBSERVER_SHIP_TYPES = Object.freeze([
-    Object.freeze({ id: 'wayfarer', label: 'WAYFARER', role: 'escort', defaultFit: 'balanced' }),
-    Object.freeze({ id: 'vanguard', label: 'VANGUARD', role: 'patrol', defaultFit: 'support' }),
-    Object.freeze({ id: 'talon', label: 'TALON', hullId:'talon', role: 'pirate', defaultFit: 'assault' }),
-    Object.freeze({ id: 'scrapper', label:'SCRAPPER', hullId:'scrapper', role:'pirate', defaultFit:'varied' }),
-    Object.freeze({ id:'demon',label:'DEMON',hullId:'demon',role:'pirate',defaultFit:'varied' }),
-    Object.freeze({ id:'mule',label:'MULE',hullId:'mule',role:'trader',defaultFit:'varied' }),
-    Object.freeze({ id: 'prospector', label: 'PROSPECTOR', role: 'miner', defaultFit: 'support' }),
-    Object.freeze({ id: 'lancer', label: 'LANCER', role: 'bounty', defaultFit: 'beam' }),
-    Object.freeze({ id: 'atlas', label: 'ATLAS', role: 'trader', defaultFit: 'balanced' }),
-    ...LEAGUE_OBSERVER_TYPES,
-    Object.freeze({ id: 'frigate', label: 'CONCORD FRIGATE', role: 'patrol', capitalVariant: 'concord-frigate', defaultFit: undefined }),
+    ...PLAYER_FLYABLE_HULLS.map(id => Object.freeze({ id, label: SHIPS[id].name.toUpperCase(), role: observerRoleFor(id), hullId: id, defaultFit: 'varied' })),
+    ...['frigate', 'cruiser', 'battleship', 'carrier'].map(id => Object.freeze({ id, label: `CONCORD ${id.toUpperCase()}`, role: 'patrol', capitalVariant: `concord-${id}` })),
 ]);
 const OBSERVER_FITS = Object.freeze(['varied', 'balanced', 'assault', 'support', 'beam']);
 const OBSERVER_AIM_ERROR_MIN = 1;
@@ -2398,8 +2381,7 @@ export class GameSession {
     spawnObserverDraftUnit(entry) {
         const type = this.observerShipType(entry.shipType);
         const world = this.observerWorldPosition(entry, this.observerPlacementWorld);
-        // A hullId pins the airframe for hulls no authored role maps onto
-        // (the Alliance line); base hulls stay role-derived.
+        // Pin every airframe independently of its faction or authored role.
         const ship = type.capitalVariant
             ? this.spawnCapitalShip(type.capitalVariant, world.toArray(), undefined, undefined)
             : this.spawnShip(type.role, world.toArray(), undefined, undefined, { tier: entry.tier ?? this.observerDifficulty }, type.hullId ? { hullId: type.hullId } : {});
@@ -2488,6 +2470,33 @@ export class GameSession {
         this.observerPendingShip = shipType;
         this.ui.updateObserverView(this.observerViewModel());
     }
+    observerPreset(preset) {
+        if (!this.observerEditor) return false;
+        const counts = { '1v1': [1, 1], '2v1': [2, 1], '3v3': [3, 3] }[preset];
+        if (!counts) return false;
+        const shipType = this.observerPendingShip ?? 'wayfarer';
+        const type = this.observerShipType(shipType);
+        const fit = type.capitalVariant ? 'varied' : this.observerPendingFit;
+        this.observerClearFormation();
+        this.observerPendingShip = shipType;
+        // Capital formations need clearance for their physical hulls.
+        const spacing = type.capitalVariant ? 1000 : 180;
+        const distance = type.capitalVariant ? 1500 : 650;
+        counts.forEach((count, side) => {
+            for (let i = 0; i < count; i++) {
+                const entry = { id: `observer-unit-${++this.observerUnitCounter}`, shipType,
+                    team: side ? 'red' : 'blue', tier: this.observerDifficulty, fit,
+                    position: [side ? distance : -distance, 0, (i - (count - 1) / 2) * spacing] };
+                this.observerDraft.push(entry);
+                this.spawnObserverDraftUnit(entry);
+            }
+        });
+        this.observerCameraPan.set(0, 0, 0);
+        this.observerZoom = type.capitalVariant ? 3800 : 1600;
+        this.observerCameraAutoFrame = false;
+        this.ui.updateObserverView(this.observerViewModel());
+        return true;
+    }
     observerDraftPositionAt(clientX, clientY, out = this.observerPlacementLocal) {
         const world = this.renderer.observerWorldPointFromScreen(clientX, clientY, this.observerMapOrigin.y, this.observerPlacementWorld);
         if (!world)
@@ -2512,7 +2521,7 @@ export class GameSession {
             shipType: this.observerPendingShip,
             team: this.observerTeam,
             tier: this.observerDifficulty,
-            fit: this.observerPendingShip === 'frigate' ? 'varied' : this.observerPendingFit,
+            fit: this.observerShipType(this.observerPendingShip).capitalVariant ? 'varied' : this.observerPendingFit,
             position: [local.x, local.y, local.z],
         };
         this.observerDraft.push(entry);
@@ -2645,8 +2654,9 @@ export class GameSession {
         if (minX !== Infinity) {
             this.observerFocus.set((minX + maxX) * 0.5, (minY + maxY) * 0.5, (minZ + maxZ) * 0.5);
             if (this.observerCameraAutoFrame) {
-                const span = Math.max(maxX - minX, maxZ - minZ) + 360;
-                this.observerZoom = clamp(span * 0.95, 900, 2600);
+                const hullMargin = this.ships.reduce((radius, ship) => Math.max(radius, ship.hull > 0 ? ship.collisionRadius ?? 0 : 0), 0);
+                const span = Math.max(maxX - minX, maxZ - minZ) + hullMargin * 2 + 360;
+                this.observerZoom = clamp(span * 0.95, 900, OBSERVER_MAX_ZOOM);
                 this.observerCameraAutoFrame = false;
             }
         }
@@ -2699,7 +2709,7 @@ export class GameSession {
                 role: ship.role,
                 shipType: ship.observerShipType,
                 fit: ship.observerFit ?? 'varied',
-                hullId: ship.observerShipType === 'frigate' ? 'frigate' : ship.combatFit?.hullId,
+                hullId: ship.capitalClass ?? ship.combatFit?.hullId,
                 tier: ship.pilot?.tier,
                 capital: Boolean(ship.capitalClass),
                 shield: Math.max(0, ship.shield),
@@ -4970,11 +4980,15 @@ export class GameSession {
         }
         end.lerpVectors(start,end,nearest);
         const color=weapon.kind==='pdc'?(ownerId==='player'?0xdce9ff:0xff8a5b):(ownerId==='player'?0x7cffff:0xff7050);
-        if (victim || droneVictim || nearest < 1)
-            this.renderer.spawnImpact(tuple(end), color, false);
+        const hullHit = tuple(end);
+        const impactActor = victim === 'player' ? this.save.player : victim;
+        if (impactActor && this.renderer.weaponImpact) {
+            const impact = this.renderer.weaponImpact(impactActor, victim === 'player' ? this.playerHullExtents() : this.npcHullExtents(victim), end, start, weapon, color);
+            if (impact?.isVector3) end.copy(impact);
+        } else if (victim || droneVictim || nearest < 1) this.renderer.spawnImpact(hullHit, color, false);
         if(droneVictim){if(droneVictim.ownerId)damageNpcDrone(this,droneVictim,weapon.damageFlat);else this.damagePdcDrone(droneVictim.id,weapon.damageFlat,'beam fire');}
-        else if(victim==='player')this.damagePlayer(weapon.damageFlat,weapon.kind==='pdc'?'weapons fire':'beam fire',false,weapon);
-        else if(victim)this.damageShip(victim,weapon.damageFlat,ownerId,tuple(end),weapon);
+        else if(victim==='player')this.damagePlayer(weapon.damageFlat,weapon.kind==='pdc'?'weapons fire':'beam fire',false,weapon,hullHit,start);
+        else if(victim)this.damageShip(victim,weapon.damageFlat,ownerId,hullHit,weapon,start);
         if(weapon.kind==='pdc')this.renderer.showPdcTracer?.(start,end,color);
         else this.renderer.showCombatBeam?.(`${ownerId}:${beamId}`,start,end,color,ownerId==='player'?this.save.player:undefined);
     }
@@ -10053,15 +10067,19 @@ export class GameSession {
                     const playerPosition = vec(this.save.player.position, this.tmpP5);
                     const playerOrientation = quat(this.save.player.rotation, this.tmpAudioOrientation);
                     const localHit = this.tmpAudioLocal.copy(hitPosition).sub(playerPosition).applyQuaternion(playerOrientation.invert());
-                    this.renderer.spawnImpact(tuple(hitPosition), projectile.kind === 'missile' ? 0xff7a42 : projectile.kind === 'gauss' ? 0xbfe9ff : projectile.kind === 'ion' ? 0x8fe4f0 : projectile.kind === 'mortar' ? 0xffa04d : 0xffcb62, projectile.kind === 'missile' || projectile.kind === 'mortar');
+                    const impactWeapon = WEAPONS[projectile.weaponId] ?? (projectile.weaponId===CRUISER_GUN.id ? CRUISER_GUN : LAUNCHERS[projectile.launcherId]);
+                    const impactActor = hitKind === 'player' ? this.save.player : hitKind === 'ship' ? hitShip : null;
+                    if (impactActor && this.renderer.weaponImpact)
+                        this.renderer.weaponImpact(impactActor, hitKind === 'player' ? this.playerHullExtents() : this.npcHullExtents(hitShip), hitPosition, sweepFrom, impactWeapon, projectile.kind === 'missile' ? 0xff7a42 : projectile.kind === 'gauss' ? 0xbfe9ff : projectile.kind === 'ion' ? 0x8fe4f0 : projectile.kind === 'mortar' ? 0xffa04d : 0xffcb62, projectile.kind === 'missile' || projectile.kind === 'mortar');
+                    else this.renderer.spawnImpact(tuple(hitPosition), projectile.kind === 'missile' ? 0xff7a42 : projectile.kind === 'gauss' ? 0xbfe9ff : projectile.kind === 'ion' ? 0x8fe4f0 : projectile.kind === 'mortar' ? 0xffa04d : 0xffcb62, projectile.kind === 'missile' || projectile.kind === 'mortar');
                     if (hitKind === 'player') {
-                        this.damagePlayer(projectile.damage, projectile.kind === 'missile' ? 'missile strike' : 'weapons fire', true, WEAPONS[projectile.weaponId]??(projectile.weaponId===CRUISER_GUN.id?CRUISER_GUN:LAUNCHERS[projectile.launcherId]));
+                        this.damagePlayer(projectile.damage, projectile.kind === 'missile' ? 'missile strike' : 'weapons fire', true, WEAPONS[projectile.weaponId]??(projectile.weaponId===CRUISER_GUN.id?CRUISER_GUN:LAUNCHERS[projectile.launcherId]), tuple(hitPosition), sweepFrom);
                         // A landed shot is a moment worth talking about: ace and
                         // flamboyant pilots get a seeded chance to rub it in.
                         this.maybeHitTaunt(projectile.ownerId);
                     }
                     else if (hitKind === 'ship' && hitShip)
-                        this.damageShip(hitShip, projectile.damage, projectile.ownerId, tuple(hitPosition), WEAPONS[projectile.weaponId]??(projectile.weaponId===CRUISER_GUN.id?CRUISER_GUN:LAUNCHERS[projectile.launcherId]));
+                        this.damageShip(hitShip, projectile.damage, projectile.ownerId, tuple(hitPosition), WEAPONS[projectile.weaponId]??(projectile.weaponId===CRUISER_GUN.id?CRUISER_GUN:LAUNCHERS[projectile.launcherId]), sweepFrom);
                     else if (hitKind === 'drone' && hitDrone)
                         hitDrone.ownerId?damageNpcDrone(this,hitDrone,projectile.damage):this.damagePdcDrone(hitDrone.id, projectile.damage, isMissile ? 'missile strike' : 'weapons fire');
                     if(projectile.kind==='mortar' || (projectile.kind==='missile'&&projectile.splashRadius>0)){
@@ -10149,7 +10167,7 @@ export class GameSession {
         }
         return false;
     }
-    damageShip(ship, amount, attackerId, position, weapon = {}) {
+    damageShip(ship, amount, attackerId, position, weapon = {}, origin) {
         // A captured hull is still a hull: it takes damage like any other
         // ship. It stays inert — no AI, no retaliation, no comms (the pilot is
         // already in cuffs, so the reaction block below is skipped for it) —
@@ -10157,8 +10175,11 @@ export class GameSession {
         // on !ship.surrendered / !ship.hostile, so it cannot re-engage or
         // double its bounty — only die, and drop scrap on the way out.
         const shieldBeforeHit = ship.shield;
-        const applied = weaponDamage(ship.shield, amount, weapon);
+        const applied = activationWeaponDamage(ship, attackerId==='environment'?0:ship.maxShield, amount, weapon, this.save.world.time);
         ship.shield -= applied.shield;
+        if (applied.activationRemaining > 0 && ship.shield > 0)
+            this.renderer.flashShield?.(ship, this.npcHullExtents(ship), applied.activationRemaining, false, position, origin);
+
         const remaining = applied.hull*(ship.capitalClass==='frigate'?frigateHullDamageScale(weapon):1);
         ship.hull -= remaining;
         const disabledMount=(ship.capitalClass==='cruiser'?damageCruiserMount:damageFrigateMount)(ship,position,applied.hull);
@@ -10864,13 +10885,16 @@ export class GameSession {
         if (this.save.player.currentTargetId === ship.id)
             this.save.player.currentTargetId = undefined;
     }
-    damagePlayer(amount, source, feedback = true, weapon = {}) {
+    damagePlayer(amount, source, feedback = true, weapon = {}, position, origin) {
         if (this.deathTimer > 0 || amount <= 0)
             return;
         const incomingAmount = this.save.settings.easyMode ? amount * 0.5 : amount;
         const shieldBeforeHit = this.save.player.shield;
-        const applied = weaponDamage(this.save.player.shield, incomingAmount, weapon);
+        const applied = activationWeaponDamage(this.save.player, (source==='weapons fire'||source==='beam fire'||source==='missile strike'||source==='blast damage')?this.playerStats().shield:0, incomingAmount, weapon, this.save.world.time);
         this.save.player.shield -= applied.shield;
+        if (applied.activationRemaining > 0 && this.save.player.shield > 0)
+            this.renderer.flashShield?.(this.save.player, this.playerHullExtents(), applied.activationRemaining, true, position, origin);
+
         const remaining = applied.hull;
         if (disruptWeapons(this.save.player, weapon, this.save.world.time, shieldBeforeHit))
             this.setOwnMonitorStatus(t('WEAPONS DISRUPTED'), 1000);

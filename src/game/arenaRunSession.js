@@ -1,6 +1,6 @@
 import {equipFrigate} from './capitalCombat.js';
 import * as THREE from 'three';
-import {RUN_WAVES,HULL_STAGE_WAVES,runEnemyFit,writeArenaRun,recordArenaRun,recoverRun,runOffers,runHullOffers,refreshRunRewardOffers,runWingmanOffers,refreshRunWingmanOffers,hireRunWingman,chooseRunReward,fitRunItem,changeRunHull,wingmanOrder} from './arenaRun.js';
+import {RUN_WAVES,DECISION_WAVES,runEnemyFit,writeArenaRun,recordArenaRun,recoverRun,runOffers,runHullOffers,refreshRunHullOffers,refreshRunRewardOffers,runWingmanOffers,refreshRunWingmanOffers,hireRunWingman,chooseRunReward,fitRunItem,changeRunHull,wingmanOrder} from './arenaRun.js';
 // One wing doctrine for the whole game: the range gates, the pilot's-mark
 // preference, self-defence and hysteresis all live in wingOrders.js, so the
 // arena wing and the campaign companion can differ only in how they fly.
@@ -61,7 +61,7 @@ export const ArenaRunMethods={
    // the crew that started it, exactly like the player checkpoint above.
    if(Array.isArray(r.checkpointWingmen))r.wingmen=clone(r.checkpointWingmen);delete r.checkpointWingmen;}
   this.setupArena({run:true,environment:RUN_WAVES[r.wave].environment,scenario:'free-flight'},false);
-  refreshRunWingmanOffers(this.save);refreshRunRewardOffers(this.save);writeArenaRun(this.save);if(r.wave===0&&r.phase==='prepare'&&r.hullChosen)this.startRunWave();else this.showRunPreparation();
+  refreshRunHullOffers(this.save);refreshRunWingmanOffers(this.save);refreshRunRewardOffers(this.save);writeArenaRun(this.save);this.showRunPreparation();
  },
  showRunPreparation(){this.preloadRunWaveModels();this.ui.setWingTactics?.([],0);this.ui.showArenaRun(this.save);},
  arenaRunAction(action,value,key,index){
@@ -86,12 +86,11 @@ export const ArenaRunMethods={
   if(action==='group'&&r.rewardChosen){const fit=this.save.player.outfitting.loadouts[this.save.player.shipId];if(Object.hasOwn(fit.fireGroups.assignments,value))fit.fireGroups.assignments[value]=fit.fireGroups.assignments[value]==='A'?'B':'A';}
   this._statsDirty=true;const p=this.save.player,stats=this.playerStats();p.shield=Math.min(p.shield,stats.shield);p.hull=Math.min(p.hull,stats.hull);p.energy=Math.min(p.energy,stats.energyCapacity);p.fuel=Math.min(p.fuel,stats.fuel);p.turretRuntime=[];
   this.syncWeaponProjection();writeArenaRun(this.save);if(action==='equip')this.ui.runFitOpen=true;
-  if(action==='accept'){this.ui.runFitOpen=false;this.startRunWave();}else this.showRunPreparation();
+  if(action==='accept'&&r.rewardChosen){this.ui.runFitOpen=false;this.startRunWave();}else this.showRunPreparation();
  },
  startRunWave(){
   const r=this.save.arenaRun; if(!r||r.phase!=='prepare'||!r.rewardChosen||!loadoutFor(this.save.player).guns.some(Boolean))return;
-  const DECISION_WAVES_SET={0:1,4:1,8:1,12:1,16:1,20:1,24:1};
-  const pendingDecision = DECISION_WAVES_SET[r.wave] && !((r.decisions||{})[r.wave]);
+  const pendingDecision=DECISION_WAVES.includes(r.wave)&&!(r.decisions??{})[r.wave];
   if(pendingDecision)return;
   this.clearTransientSpace();this.autopilot=false;this.deathTimer=0;this.afterburning=false;this.playerShieldDelay=0;
   const wave=RUN_WAVES[r.wave];this.arena.environment=wave.environment;
@@ -346,7 +345,7 @@ export const ArenaRunMethods={
    r.missiles+=Math.max(0,r.waveMissiles-(this.save.player.missiles??0));r.cleared=r.wave+1;
    this.clearTransientSpace();this.save.player.velocity=[0,0,0];
    if(r.cleared===RUN_WAVES.length){r.phase='won';recordArenaRun(this.save);}
-   else{recoverRun(this.save);r.wave++;if(r.wave===RUN_WAVES.length-1){const p=this.save.player;p.hull=getEffectiveShipStats(p).hull;recoverRun(this.save,true);}r.phase='prepare';r.rewardChosen=false;r.selectedReward=null;this.ui.runFitOpen=false;r.hullChosen=!HULL_STAGE_WAVES.includes(r.wave);r.hullOffers=r.hullChosen?[]:runHullOffers(this.save);r.wingmanOffers=r.hullChosen?[]:runWingmanOffers(this.save);r.offers=r.hullChosen?runOffers(this.save):[];}
+   else{recoverRun(this.save);r.wave++;if(r.wave===RUN_WAVES.length-1){const p=this.save.player;p.hull=getEffectiveShipStats(p).hull;recoverRun(this.save,true);}r.phase='prepare';r.rewardChosen=false;r.selectedReward=null;this.ui.runFitOpen=false;r.hullChosen=!DECISION_WAVES.includes(r.wave);r.hullOffers=r.hullChosen?[]:runHullOffers(this.save);r.wingmanOffers=r.hullChosen?[]:runWingmanOffers(this.save);r.offers=r.hullChosen?runOffers(this.save):[];}
    delete r.checkpoint;delete r.checkpointWingmen;writeArenaRun(this.save);this.showRunPreparation();
   }
  },

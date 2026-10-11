@@ -2992,6 +2992,10 @@ Object.assign(DE_CATALOG, {
     'Remove unit': 'Einheit entfernen',
     'The player is not spawned; weapons, movement and pilot skill use the live combat rules.': 'Der Spieler wird nicht gespawnt; Waffen, Bewegung und Pilotenfähigkeiten nutzen die echten Gefechtsregeln.',
     'START OBSERVATION': 'BEOBACHTUNG STARTEN',
+    'STOCK LOADOUT': 'STANDARD-AUSRÜSTUNG',
+    'QUICK MATCH': 'SCHNELLER TEST',
+    'REPLACES FORMATION': 'ERSETZT AUFSTELLUNG',
+    'BARS: SHIELD / HULL': 'BALKEN: SCHILD / HÜLLE',
     'ROLE DEFAULTS': 'ROLLEN-STANDARD',
     'BLUE FIT': 'BLAUE AUSRÜSTUNG',
     'RED FIT': 'ROTE AUSRÜSTUNG',
@@ -3036,3 +3040,32 @@ Object.assign(DE_CATALOG, {
 });
 
 Object.assign(DE_CATALOG, {'DISARMED':'ENTWAFFNET'});
+
+Object.assign(DE_CATALOG, {
+    'Choose your starting weapons': 'Wähle deine Startwaffen',
+    'Choose your second equipment set': 'Wähle deine zweite Ausrüstung',
+    'Choose your starting hull': 'Wähle dein Startschiff',
+    'Choose a veteran wingman': 'Wähle einen erfahrenen Flügelmann',
+    'Choose one of these three options. Equipment choices follow.': 'Wähle eine dieser drei Optionen. Danach folgt die Ausrüstung.',
+    'Refuel and recharge': 'Auftanken und aufladen',
+    'Reload missiles': 'Raketen nachladen',
+    'Refill fuel and capacitor.': 'Treibstoff und Kondensator auffüllen.',
+    'Refill launcher magazines.': 'Raketenmagazine auffüllen.',
+    'Choose a tier-2 hull': 'Wähle ein Schiff der Stufe 2',
+    'Choose a tier-3 hull': 'Wähle ein Schiff der Stufe 3',
+    'Choose your first wingman (Tier 1)': 'Wähle deinen ersten Flügelmann (Stufe 1)',
+    'Upgrade your first wingman to Tier 2': 'Verbessere deinen ersten Flügelmann auf Stufe 2',
+    'Upgrade your first wingman to Tier 3': 'Verbessere deinen ersten Flügelmann auf Stufe 3',
+    'Choose your second wingman (Tier 3)': 'Wähle deinen zweiten Flügelmann (Stufe 3)',
+});
+
+Object.assign(DE_CATALOG, {
+ 'HULL CHOICE':'SCHIFF AUSWÄHLEN', 'WINGMAN CHOICE':'FLÜGELMANN AUSWÄHLEN',
+ 'WEAPONS · 1/2':'WAFFEN · 1/2', 'EQUIPMENT · 2/2':'AUSRÜSTUNG · 2/2',
+ 'EQUIPMENT CHOICE':'AUSRÜSTUNG AUSWÄHLEN', 'READY TO LAUNCH':'STARTBEREIT',
+ 'Next: equipment 2/2':'Weiter: Ausrüstung 2/2', 'Equip and launch':'Einbauen und starten',
+ 'Repair and launch':'Reparieren und starten', 'Five acts. Choose equipment between fights.':'Fünf Akte. Wähle Ausrüstung zwischen den Kämpfen.',
+ 'Two forward guns and one belly turret.':'Zwei Bugwaffen und ein Geschützturm unter dem Rumpf.',
+});
+
+Object.assign(DE_CATALOG, {'Choose a replacement wingman (Tier {tier})':'Wähle einen Ersatz-Flügelmann (Stufe {tier})'});

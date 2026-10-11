@@ -10,7 +10,7 @@ export const PLAYER_FLYABLE_HULLS = Object.freeze(Object.keys(SHIPS));
 
 // How many hulls the Arena Run offers at a hull stage. The sixth choice keeps
 // the current ship and hires a veteran wingman instead.
-export const ARENA_HULL_OFFER_COUNT = 5;
+export const ARENA_HULL_OFFER_COUNT = 3;
 
 // A run can end up with two wingmen: one hire per hull stage (waves 3 and 6).
 export const MAX_RUN_WINGMEN = 2;

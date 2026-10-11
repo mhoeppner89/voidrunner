@@ -4,7 +4,9 @@
 // Apply a broad recharge lift to every flyable hull and non-frigate NPC ship.
 // Capital frigates use their separate, subsystem-controlled recharge rate.
 export const NON_FRIGATE_SHIELD_RECHARGE_MULTIPLIER = 2;
-export const SHIELD_RECHARGE_RATE = 5.3 * NON_FRIGATE_SHIELD_RECHARGE_MULTIPLIER;
+// Flyable hulls share this rate in player and NPC combat; capitals retain
+// their separate passive/subsystem rates. Damage should persist between passes.
+export const SHIELD_RECHARGE_RATE = 5.3;
 export const SHIELD_ENERGY_PER_POINT = 1.25;
 
 const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;

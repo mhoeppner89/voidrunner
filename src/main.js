@@ -201,6 +201,7 @@ const beginSession = (mode, arena) => {
     const previousSession = session;
     session = undefined;
     previousSession?.dispose();
+    if (mode !== 'observer') ui.hideObserverView();
     ui.clearToasts();
     const save = arena?.run ? (arena.resume?readArenaRun():newArenaRun(Boolean(arena.hard&&arenaRecord().unlockedHard)))
         : LANDING_PREVIEW_ID && mode !== 'arena' && mode !== 'observer' ? createNewSave(undefined, { tutorial: false })
@@ -439,6 +440,7 @@ const actions = {
     observerSetAimError: (value) => session?.observerSetAimError(value),
     observerSelectShip: (shipType) => session?.observerSelectShip(shipType),
     observerSelectFit: (fit) => session?.observerSelectFit(fit),
+    observerPreset: (preset) => session?.observerPreset(preset),
     observerZoomIn: () => session?.observerZoomIn(),
     observerZoomOut: () => session?.observerZoomOut(),
     observerCenterCamera: () => session?.observerCenterCamera(),
@@ -636,6 +638,7 @@ window.__VOID_PRIVATEER__ = {
     observerSetAimError: (value) => session?.observerSetAimError(value),
     observerSelectShip: (shipType) => session?.observerSelectShip(shipType),
     observerSelectFit: (fit) => session?.observerSelectFit(fit),
+    observerPreset: (preset) => session?.observerPreset(preset),
     observerZoomIn: () => session?.observerZoomIn(),
     observerZoomOut: () => session?.observerZoomOut(),
     observerCenterCamera: () => session?.observerCenterCamera(),
@@ -876,5 +879,7 @@ else if (LANDING_PREVIEW_ID) {
         window.__STATION_LANDING_PREVIEW_READY__ = true;
     });
 }
+else if (devPreviewParams.get('mode') === 'observer')
+    beginSession('observer', { observer: true, editor: true, environment: 'open' });
 else if (devAutoStart)
     beginSession('new');

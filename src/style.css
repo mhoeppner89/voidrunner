@@ -10010,14 +10010,12 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 
 .observer-unit {
   --observer-team: var(--void-cyan);
-  --observer-lift: 0px;
   position: absolute;
   width: 128px;
-  transform: translate(-50%, calc(-100% - 9px - var(--observer-lift)));
+  transform: translate(-50%, calc(-100% - 9px));
   color: #d8e7df;
   text-align: center;
   pointer-events: none;
-  transition: left 80ms linear, top 80ms linear;
 }
 
 .observer-unit[data-team="red"] {
@@ -10140,7 +10138,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 
   .observer-editor-options button,
   .observer-ship-palette button {
-    min-height: 36px;
+    min-height: 44px;
   }
 
   .observer-ship-palette {
@@ -10179,7 +10177,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   }
 
   .observer-actions button {
-    min-height: 38px;
+    min-height: 44px;
   }
 
   .observer-legend {
@@ -15546,7 +15544,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .run-card small{font-size:12px;line-height:1.4}.run-scroll{overflow-y:auto;min-height:0;overscroll-behavior:contain;flex:1;padding-right:4px}
 .run-offers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .run-offers button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:10px;padding:14px;border:1px solid #628b9b;background:#142536;min-width:0;white-space:normal}
-.run-offers button b{color:#f0cf8e}.run-offers button span{font-weight:normal}.run-hulls{grid-template-columns:repeat(2,minmax(0,1fr))}
+.run-offers button b{color:#f0cf8e}.run-offers button span{font-weight:normal}.run-hulls{grid-template-columns:repeat(3,minmax(0,1fr))}
 .run-card footer{flex:none;display:flex;justify-content:space-between;gap:12px}.run-card button{min-height:44px;white-space:normal}
 .run-fitting{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}.run-slot{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid #45606c;font-size:14px}.run-slot>div{display:flex;flex-wrap:wrap;gap:6px}
 .run-entry{padding:12px;border:1px solid #789dab;background:#142536}.run-entry p{margin:8px 0}.run-entry button{min-height:44px}.run-entry>div{display:flex;gap:8px;flex-wrap:wrap}
@@ -15575,7 +15573,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .run-card header span{font-size:13px;color:#aec4cd}.run-card .run-next{max-width:45%;font-size:13px;position:relative;text-align:right}
 .run-next summary{cursor:pointer;padding:8px;min-height:32px}.run-next p{position:absolute;right:0;top:24px;z-index:2;width:min(360px,70vw);padding:14px;background:#192b38;border:1px solid #63808d;text-align:left;box-shadow:0 8px 24px #000a}
 .run-stage-label{font-size:13px;color:#b2c8d3;margin:0 0 8px}.run-card .run-scroll{display:flex;flex-direction:column;padding:0;gap:0}
-.run-card .run-offers{flex:1;align-items:stretch;gap:12px}.run-card .run-offers button{justify-content:flex-start;gap:10px;padding:14px;background:#152632;border:1px solid #46616e;border-radius:9px;box-shadow:none}
+.run-card .run-offers{flex:1 0 auto;align-items:stretch;gap:12px}.run-card .run-offers button{justify-content:flex-start;gap:10px;padding:14px;background:#152632;border:1px solid #46616e;border-radius:9px;box-shadow:none}
 .run-card .run-offers button.is-selected{background:#273b3f;border:2px solid #f0cc83;padding:13px}
 .run-card .run-offers b{font-size:17px;line-height:1.25}.run-card .run-offers span{font-size:15px;line-height:1.35;color:#e0eaf0}.run-card .run-offers small{margin-top:auto;color:#acc3ce;font-size:13px;line-height:1.3}
 .run-card footer{padding-top:8px;border-top:1px solid #354956;align-items:center;gap:8px}.run-card footer button{font-size:14px;padding:8px 12px}.run-card footer .primary{margin-left:auto;min-width:150px;background:#c8a765;color:#121b21;border-color:#f0cc83;font-weight:700}.run-card footer button:disabled{opacity:.45}
@@ -16684,3 +16682,13 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #game-shell[data-cockpit-ship="vanguard"] .comms-channel #comms-bar .talker-text {
   max-height:min(90px,calc(16vh - 20px));
 }
+
+/* Arena Run preparation: clear stage progress without covering flight. */
+.run-progress{display:grid;grid-template-columns:1fr auto;gap:4px 12px;flex:none;font-size:11px;color:var(--void-gold)}
+.run-progress progress{grid-column:1/-1;width:100%;height:4px;accent-color:var(--void-gold)}
+.run-equipped{font-size:12px;color:#e4cf9f;margin-bottom:6px}
+.run-card .run-offers button:focus-visible{outline:2px solid #f0cc83;outline-offset:2px}
+.run-card .run-loadout-summary{flex-shrink:0}
+
+.observer-unit-bars > i[hidden] { display: none; }
+#observer-preset-hull { display: block; margin-top: 6px; color: #b9c9bf; font-size: .48rem; }

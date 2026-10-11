@@ -110,7 +110,9 @@ export const HULL_STAGE_WAVES=Object.freeze(Object.keys(HULL_STAGES).map(Number)
 export const DECISION_WAVES=Object.freeze(Object.keys(DECISION_STAGES).map(Number).sort((a,b)=>a-b));
 export function newArenaRun(hard=false,seed=Date.now()) {
  const save=createNewSave(seed,{tutorial:false});save.arena={run:true};save.player.credits=0;save.player.cargo={};save.player.throttle=.35;
- save.arenaRun={version:3,totalWaves:RUN_WAVES.length,seed,hard,wave:0,phase:'prepare',rewardChosen:true,hullChosen:false,decisions:{},offers:[],hullOffers:[],wingmanOffers:[],wingmen:[],wingOrder:'aggressive',cleared:0,elapsed:0,damage:0,missiles:0};return save;
+ for(const key of LOADOUT_KEYS){save.player.outfitting.loadouts[save.player.shipId][key].fill(null);save.player.outfitting.factory[save.player.shipId][key].fill(false);}
+ save.player.equipment=[];save.player.weaponId=null;save.player.launcherMagazines={};save.player.missiles=0;
+ save.arenaRun={openingPicks:0,version:3,totalWaves:RUN_WAVES.length,seed,hard,wave:0,phase:'prepare',rewardChosen:false,hullChosen:false,decisions:{},offers:[],hullOffers:[],wingmanOffers:[],wingmen:[],wingOrder:'aggressive',cleared:0,elapsed:0,damage:0,missiles:0};save.arenaRun.hullOffers=runHullOffers(save);return save;
 }
 const OLD_WAVE_TOTALS={1:8,2:10};
 // Map an old checkpoint's wave index onto the same fractional position in the
@@ -150,8 +152,9 @@ const rewardPools={
 const rewardWave={'pulse-mk2':3,'swarm-launcher':3,'torpedo-launcher':5,'mortar':2,'gauss-cannon':2};
 export function runOffers(save){
  const r=save.arenaRun,p=save.player,fit=loadoutFor(p),owned=LOADOUT_KEYS.flatMap(k=>fit[k]).filter(Boolean);
+ if(r.wave===0&&r.openingPicks===0)return ['pulse-cannon','beam-emitter','ripper'].filter(id=>runRewardPlan(save,id));
  const rng=seededRandom(`${r.seed}:reward:${r.wave}:${p.shipId}`);
- const eligible=id=>r.wave>=(rewardWave[id]??1)&&runRewardPlan(save,id)&&!p.outfitting.locker[id]&&(OUTFIT_ITEMS[id].category==='gun'||!owned.includes(id));
+ const eligible=id=>(r.wave===0||r.wave>=(rewardWave[id]??1))&&runRewardPlan(save,id)&&!p.outfitting.locker[id]&&(OUTFIT_ITEMS[id].category==='gun'||!owned.includes(id));
  const candidates=Object.fromEntries(Object.entries(rewardPools).map(([key,ids])=>[key,ids.filter(eligible).map(id=>({id,sort:rng()})).sort((a,b)=>a.sort-b.sort).map(x=>x.id)]));
  const offers=[];
  // Offer a heavy boss weapon where mounts permit it; small hulls get
@@ -166,8 +169,8 @@ export function runOffers(save){
  if(p.hull<=getEffectiveShipStats(p).hull*.8)offers.splice(2,1,'repair');
  // A long run can own every upgrade a hull can take, leaving nothing eligible.
  // The stage must never be empty: startRunWave needs a chosen reward, so offer a
- // repair as the always-available choice instead of stranding the sortie.
- if(!offers.length)offers.push('repair');
+ // three service choices instead of stranding the sortie.
+ for(const id of ['repair','rearm','resupply'])if(offers.length<3&&!offers.includes(id))offers.push(id);
  return offers;
 }
 // Preserve the two already-offered items when an old checkpoint has an unnecessary repair.
@@ -176,18 +179,18 @@ export function refreshRunRepairOffer(save){const r=save.arenaRun;if(r.phase!=='
 }
 export function refreshRunRewardOffers(save){
  const r=save.arenaRun;if(r.phase!=='prepare'||r.rewardChosen||!r.hullChosen)return;
- const highHull=save.player.hull>getEffectiveShipStats(save.player).hull*.8;
- const valid=(r.offers??[]).filter(id=>runRewardPlan(save,id)&&!(highHull&&id==='repair'));
- for(const id of runOffers(save))if(valid.length<3&&!valid.includes(id))valid.push(id);
- const bossOffer=runOffers(save)[0];if(r.wave===RUN_WAVES.length-1&&['torpedo-launcher','mortar','ripper'].includes(bossOffer)&&!valid.includes(bossOffer))valid[0]=bossOffer;
- r.offers=valid;if(!valid.includes(r.selectedReward))r.selectedReward=null;
+ const highHull=save.player.hull>getEffectiveShipStats(save.player).hull*.8, fresh=runOffers(save);
+ const valid=[...new Set(r.offers??[])].filter(id=>runRewardPlan(save,id)&&!(highHull&&id==='repair'&&!fresh.includes('repair')));
+ for(const id of fresh)if(valid.length<3&&!valid.includes(id))valid.push(id);
+ const bossOffer=fresh[0];if(r.wave===RUN_WAVES.length-1&&['torpedo-launcher','mortar','ripper'].includes(bossOffer)&&!valid.includes(bossOffer))valid[0]=bossOffer;
+ r.offers=valid.slice(0,3);if(!valid.includes(r.selectedReward))r.selectedReward=null;
 }
 export function recoverRun(save,extra=false){const p=save.player,stats=getEffectiveShipStats(p),r=save.arenaRun;p.hull=Math.min(stats.hull,p.hull+stats.hull*(extra?.5:r.hard?.1:.3));p.shield=stats.shield;p.energy=stats.energyCapacity;p.fuel=stats.fuel;
  if(extra)fillLauncherMagazines(p);else {for(const entry of normalizeLauncherMagazines(p))if(entry.rounds<entry.capacity)p.launcherMagazines[entry.mount.id].rounds++;normalizeLauncherMagazines(p);}
 }
 // A reward is a complete, mount-checked replacement plan, not a loose gun.
 export function runRewardPlan(save,id){
- if(id==='repair')return {id,count:1,changes:[],replaced:[]};
+ if(['repair','rearm','resupply'].includes(id))return {id,count:1,changes:[],replaced:[]};
  const p=save.player,item=OUTFIT_ITEMS[id],spec=HULL_HARDPOINTS[p.shipId];if(!item||id==='ion-blaster'&&spec.guns.length<2)return null;
  const fit=loadoutFor(p),key=LOADOUT_KEYS.find(k=>spec[k].some(m=>itemFitsMount(item,m)));if(!key)return null;
  let indices=spec[key].map((m,i)=>itemFitsMount(item,m)?i:-1).filter(i=>i>=0);
@@ -205,6 +208,8 @@ export function chooseRunReward(save,id){
  refreshRunRepairOffer(save);const r=save.arenaRun;if(r.phase!=='prepare'||r.rewardChosen||!r.hullChosen||!r.offers.includes(id))return false;
  const plan=runRewardPlan(save,id);if(!plan)return false;
  if(id==='repair')recoverRun(save,true);
+ else if(id==='rearm')fillLauncherMagazines(save.player);
+ else if(id==='resupply'){const stats=getEffectiveShipStats(save.player);save.player.fuel=stats.fuel;save.player.energy=stats.energyCapacity;}
  else{
   // Commit the complete fit together so a pair cannot fail halfway through.
   const p=save.player,state=JSON.parse(JSON.stringify(p.outfitting)),fit=state.loadouts[p.shipId];
@@ -215,7 +220,8 @@ export function chooseRunReward(save,id){
   const equipped={...p,outfitting:state};p.equipment=projectLegacyEquipment(equipped,state);p.weaponId=projectLegacyWeaponId(equipped);p.outfitting=state;normalizeLauncherMagazines(p);
   if(OUTFIT_ITEMS[id].category==='launcher'){for(const entry of launcherMagazineEntries(p))if(plan.changes.some(c=>c.key==='launchers'&&HULL_HARDPOINTS[p.shipId].launchers[c.index].id===entry.mount.id)){p.launcherMagazines[entry.mount.id].rounds=entry.capacity;p.activeLauncherMountId=entry.mount.id;}normalizeLauncherMagazines(p);}
  }
- r.rewardChosen=true;r.selectedReward=null;return true;
+ if(r.wave===0&&r.openingPicks!==undefined){r.openingPicks++;r.rewardChosen=r.openingPicks>=2;}else r.rewardChosen=true;
+ r.selectedReward=null;if(!r.rewardChosen)r.offers=runOffers(save);return true;
 }
 export function fitRunItem(save,key,index,id){
  const r=save.arenaRun;if(!save.arena?.run||r.phase!=='prepare'||!r.rewardChosen)return false;
@@ -242,7 +248,7 @@ export function runHullOffers(save){
  if(!stage)return [];
  const inBloc=id=>!stage.factions||(HULL_FACTIONS[id]??[]).some(faction=>stage.factions.includes(faction));
  const rng=seededRandom(`${r.seed}:hull:${r.wave}:${p.shipId}`);
- return PLAYER_FLYABLE_HULLS.filter(id=>id!==p.shipId&&hullTier(id)===stage.tier&&inBloc(id)).map(id=>({id,sort:rng()})).sort((a,b)=>a.sort-b.sort).slice(0,ARENA_HULL_OFFER_COUNT).map(entry=>entry.id);
+ return PLAYER_FLYABLE_HULLS.filter(id=>(r.wave===0||id!==p.shipId)&&hullTier(id)===stage.tier&&inBloc(id)).map(id=>({id,sort:rng()})).sort((a,b)=>a.sort-b.sort).slice(0,ARENA_HULL_OFFER_COUNT).map(entry=>entry.id);
 }
 // Keep an already-shown offer list when it is still legal; otherwise fill it
 // from a fresh draw. Runs on load so a checkpoint saved mid-stage renders the
@@ -254,10 +260,10 @@ export function isPendingDecision(save){
 }
 export function isPendingHullDecision(save){ const w=save.arenaRun?.wave; const d=DECISION_STAGES[w]; if(!d||d.type!=='hull')return false; save.arenaRun.decisions=save.arenaRun.decisions||{}; return !save.arenaRun.decisions[w]; }
 export function isPendingWingmanDecision(save){ const w=save.arenaRun?.wave; const d=DECISION_STAGES[w]; if(!d||d.type!=='wingman-hire'&&d.type!=='wingman-upgrade')return false; save.arenaRun.decisions=save.arenaRun.decisions||{}; return !save.arenaRun.decisions[w]; }
-export function markDecision(save,wave){ const r=save.arenaRun; r.decisions=r.decisions||{}; if(wave===undefined)wave=r.wave; r.decisions[wave]=true; }
+export function markDecision(save,wave){ const r=save.arenaRun; r.decisions=r.decisions||{}; if(wave===undefined)wave=r.wave; r.decisions[wave]=true; if(wave===r.wave)r.hullChosen=true; }
 export function refreshRunHullOffers(save){
  const r=save.arenaRun;if(r.phase!=='prepare'||!isPendingHullDecision(save))return;
- const valid=(Array.isArray(r.hullOffers)?r.hullOffers:[]).filter(id=>isFlyableHull(id)&&id!==save.player.shipId);
+ const valid=(Array.isArray(r.hullOffers)?r.hullOffers:[]).filter(id=>isFlyableHull(id)&&(r.wave===0||id!==save.player.shipId));
  for(const id of runHullOffers(save))if(valid.length<ARENA_HULL_OFFER_COUNT&&!valid.includes(id))valid.push(id);
  r.hullOffers=valid.slice(0,ARENA_HULL_OFFER_COUNT);
 }
@@ -279,17 +285,21 @@ export function runWingmanOffers(save){
 export function refreshRunWingmanOffers(save){
  const r=save.arenaRun;if(r.phase!=='prepare'||!isPendingWingmanDecision(save)){r.wingmanOffers=[];return;}
  const valid=(Array.isArray(r.wingmanOffers)?r.wingmanOffers:[]).filter(candidate=>candidate&&isFlyableHull(candidate.hullId)&&typeof candidate.name==='string');
- r.wingmanOffers=valid.length?valid.slice(0,WINGMAN_OFFER_COUNT):runWingmanOffers(save);
+ for(const candidate of runWingmanOffers(save))if(valid.length<WINGMAN_OFFER_COUNT&&!valid.some(entry=>entry.id===candidate.id))valid.push(candidate);
+ r.wingmanOffers=valid.slice(0,WINGMAN_OFFER_COUNT);
 }
 // Hire one of the stage's candidates. One hire per stage, at most two veterans
 // per run, and only a name that is actually on offer can be taken.
 export function upgradeRunWingman(save,wingIndex,candidate){
  const r=save.arenaRun; const list=Array.isArray(r.wingmen)?r.wingmen:[];
- if(!list[wingIndex])return null;
- const wingman=list[wingIndex];
- wingman.hullId=candidate.hullId; wingman.fit=candidate.fit;
- // keep name/id mostly same, but allow new id if provided
- if(candidate.id)wingman.id=candidate.id;
+ let wingman=list[wingIndex];
+ if(!wingman||wingman.alive===false){
+  wingman={id:candidate.id,name:candidate.name,role:'patrol',alive:true,order:normalizeWingOrder(r.wingOrder)};
+  list[wingIndex]=wingman;r.wingmen=list;
+ }
+ wingman.hullId=candidate.hullId;wingman.fit=candidate.fit;
+ // A surviving pilot keeps their name and identity when changing hulls.
+
  return wingman;
 }
 export function hireRunWingman(save,id){
@@ -305,7 +315,7 @@ export function hireRunWingman(save,id){
  }
  if(list.filter(wingman=>wingman.alive!==false).length>=MAX_RUN_WINGMEN)return null;
  const wingman={id:candidate.id,hullId:candidate.hullId,role:'patrol',fit:candidate.fit,name:candidate.name,alive:true,order:normalizeWingOrder(r.wingOrder)};
- r.wingmen=[...list,wingman];r.wingmanOffers=[];
+ list[stage.wingIndex??list.length]=wingman;r.wingmen=list;r.wingmanOffers=[];
  markDecision(save);r.offers=runOffers(save);
  return wingman;
 }
@@ -352,7 +362,7 @@ export function changeRunHull(save,id){
   const ammo={};for(const e of magazines)ammo[e.launcherId]=(ammo[e.launcherId]??0)+e.rounds;
   for(const e of normalizeLauncherMagazines(p)){const rounds=Math.min(e.capacity,ammo[e.launcherId]??0);p.launcherMagazines[e.mount.id].rounds=rounds;ammo[e.launcherId]-=rounds;}
   normalizeLauncherMagazines(p);
-  if(!loadoutFor(p).guns.some(Boolean)){Object.assign(p,JSON.parse(JSON.stringify(snapshot)));return false;}
+  if(r.wave!==0&&!loadoutFor(p).guns.some(Boolean)){Object.assign(p,JSON.parse(JSON.stringify(snapshot)));return false;}
  }
  markDecision(save);r.wingmanOffers=[];r.offers=runOffers(save);return true;
 }

@@ -1,3 +1,4 @@
+import {SHIELD_ACTIVATION_WINDOW} from './weaponDamage.js';
 import {FLEET_EQUIPMENT,equipmentHullId,droneDock} from './fleetEquipmentData.js';
 import {applyFleetPaint} from './fleetPaint.js';
 import {resolveFleetPaint,fleetPaintPath} from './fleetPaintCatalog.js';
@@ -1849,7 +1850,7 @@ export class SpaceRenderer {
         const light = new THREE.MeshBasicMaterial({ color: accent.clone().lerp(new THREE.Color(0xffffff), 0.24), fog: false });
         const unitBox = new THREE.BoxGeometry(1, 1, 1, 1, 1, 1);
         const unitBeam = new THREE.CylinderGeometry(1, 1, 1, 10, 1, false);
-        const unitSphere = new THREE.SphereGeometry(1, 20, 12);
+        const unitSphere = new THREE.SphereGeometry(1, 32, 20);
         const geometryCache = new Map();
         const cachedGeometry = (key, create) => {
             if (!geometryCache.has(key))
@@ -5331,6 +5332,108 @@ export class SpaceRenderer {
         return root;
     }
 
+    shieldImpactPoint(actor, extents, impact, origin, out = this.shieldImpactWorld ??= new THREE.Vector3()) {
+        const local = this.shieldImpactLocal ??= new THREE.Vector3();
+        const ray = this.shieldImpactRay ??= new THREE.Vector3();
+        const inverse = this.shieldImpactInverse ??= new THREE.Quaternion();
+        const center = this.shieldImpactCenter ??= new THREE.Vector3();
+        center.fromArray(actor.position);
+        inverse.fromArray(actor.rotation).invert();
+        if (impact?.isVector3) local.copy(impact); else local.fromArray(impact ?? actor.position);
+        local.sub(center).applyQuaternion(inverse);
+        const sx=extents[0]*1.8, sy=extents[1]*1.8, sz=extents[2]*1.8;
+        if (origin) {
+            if (origin.isVector3) ray.copy(origin); else ray.fromArray(origin);
+            ray.sub(center).applyQuaternion(inverse);
+            ray.set((local.x-ray.x)/sx,(local.y-ray.y)/sy,(local.z-ray.z)/sz);
+        }
+        local.set(local.x/sx,local.y/sy,local.z/sz);
+        const aa=origin ? ray.lengthSq() : 0;
+        const bb=local.dot(ray), cc=local.lengthSq()-1;
+        const discriminant=bb*bb-aa*cc;
+        if (aa>1e-12 && discriminant>=0) local.addScaledVector(ray,(-bb-Math.sqrt(discriminant))/aa);
+        else if (local.lengthSq()>1e-12) local.normalize();
+        else local.set(0,0,1);
+        return out.set(local.x*sx,local.y*sy,local.z*sz).applyQuaternion(inverse.invert()).add(center);
+    }
+    weaponImpact(actor, extents, impact, origin, weapon, color, heavy = false) {
+        const shielded=actor?.shield>0 && (weapon?.shieldBypass ?? 0)<1;
+        const point=shielded ? this.shieldImpactPoint(actor,extents,impact,origin) : impact;
+        this.spawnImpact(point?.isVector3 ? point.toArray() : point,color,heavy);
+        return point;
+    }
+    flashShield(actor, extents, remaining, player = false, impact, origin) {
+        this.shieldFields ??= new Map();
+        const id = player ? 'player' : actor.id;
+        let field = this.shieldFields.get(id);
+        if (!field) {
+            // Bounded reusable shells: one draw per active shield, shared geometry,
+            // no particles, lights, textures or postprocessing pass.
+            if (this.shieldFields.size >= 64) {
+                for (const [oldId, candidate] of this.shieldFields) {
+                    if (!candidate.visible) { this.shieldFields.delete(oldId); field = candidate; break; }
+                }
+                if (!field) return;
+            } else {
+                this.shieldFieldGeometry ??= new THREE.SphereGeometry(1, 20, 12);
+                this.shieldFieldGeometry.userData.shared = true;
+                field = new THREE.Mesh(this.shieldFieldGeometry, new THREE.ShaderMaterial({
+                    uniforms: {fade: {value: 1}, interior: {value: 0},
+                        hits: {value: Array.from({length:4},()=>new THREE.Vector3(0,0,1))},
+                        ages: {value: [1,1,1,1]}},
+                    vertexShader: `varying vec3 surface;
+                        void main(){surface=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+                    fragmentShader: `uniform float fade; uniform float interior; uniform vec3 hits[4]; uniform float ages[4]; varying vec3 surface;
+                        void main(){vec3 direction=normalize(surface);float glow=0.;float core=0.;
+                        for(int i=0;i<4;i++){float age=ages[i];float life=max(0.,1.-age/.25);
+                        float angle=acos(clamp(dot(direction,hits[i]),-1.,1.));
+                        float radius=.10+age*3.5;
+                        float ring=exp(-pow((angle-radius)/(.035+age*.12),2.));
+                        float spot=exp(-angle*angle/(.018+age*.28));
+                        glow+=(spot*.40+ring*.60)*life;core+=exp(-angle*angle/.009)*life;}
+                        float a=min(.8,glow)*fade; a*=mix(1.,.16,interior);
+                        gl_FragColor=vec4(mix(vec3(.10,.58,1.),vec3(.75,.96,1.),min(1.,core)),a);}`,
+                    transparent: true, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true,
+                    blending: THREE.AdditiveBlending,
+                }));
+                field.raycast = () => {};
+                this.scene.add(field);
+            }
+            this.shieldFields.set(id, field);
+        }
+        field.userData.actor = actor;
+        field.userData.player = player;
+        field.userData.remaining = remaining;
+        field.userData.duration = SHIELD_ACTIVATION_WINDOW;
+        // An ellipsoid enclosing the box corners follows the ship's orientation.
+        field.scale.set(extents[0] * 1.8, extents[1] * 1.8, extents[2] * 1.8);
+        const slot = field.visible ? (field.userData.hitCursor ?? 0) % 4 : 0;
+        if (!field.visible) field.material.uniforms.ages.value.fill(1);
+        field.userData.hitCursor = slot + 1;
+        const point = this.shieldImpactPoint(actor, extents, impact, origin);
+        const hit = field.material.uniforms.hits.value[slot];
+        hit.copy(point).sub(this.shieldImpactCenter).applyQuaternion(this.shieldImpactInverse.fromArray(actor.rotation).invert());
+        hit.set(hit.x / field.scale.x, hit.y / field.scale.y, hit.z / field.scale.z).normalize();
+        field.material.uniforms.ages.value[slot] = 0;
+        field.material.uniforms.interior.value = player ? 1 : 0;
+        field.visible = true;
+        this.updateShieldField(field, 0);
+    }
+    updateShieldField(field, dt) {
+        const data = field.userData;
+        data.remaining -= dt;
+        const ages=field.material.uniforms.ages.value;
+        for(let i=0;i<4;i++) ages[i]+=dt;
+        const actor = data.actor;
+        if (data.remaining <= 0 || actor.hull <= 0 || actor.shield <= 0) {
+            field.visible = false;
+            return;
+        }
+        const hull = data.player ? null : this.shipMeshes.get(actor.id);
+        if (hull) { field.position.copy(hull.position); field.quaternion.copy(hull.quaternion); }
+        else { field.position.fromArray(actor.position); field.quaternion.fromArray(actor.rotation); }
+        field.material.uniforms.fade.value = Math.min(1, data.remaining / data.duration);
+    }
     spawnImpact(position, color = 0xffc36a, heavy = false) {
         // Gauntlet overhaul: layered hit (flash + spark burst + embers) lives in
         // laserFx.js; heavy hits (missiles) add a slower ember afterglow.
@@ -5805,6 +5908,8 @@ export class SpaceRenderer {
         }
         if (mourningVisible)
             this.updateWreckNodeInstances(dt);
+        for (const field of this.shieldFields?.values() ?? [])
+            if (field.visible) this.updateShieldField(field, dt);
         this.updateEffects(dt);
     }
     createBloomPipeline() {
@@ -6269,6 +6374,9 @@ export class SpaceRenderer {
         this.turretMeshes?.clear();
         for(const glow of this.capitalCharges?.values()??[]){this.scene.remove(glow);glow.material.dispose();}
         this.capitalCharges?.clear();
+        for (const field of this.shieldFields?.values() ?? []) { this.scene.remove(field); field.material.dispose(); }
+        this.shieldFields?.clear();
+        this.shieldFieldGeometry?.dispose();
         this.laserFx?.dispose();
         this.laserFx = null;
         this.pixelTextures.forEach((texture) => texture.dispose());

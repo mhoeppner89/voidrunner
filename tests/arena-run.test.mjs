@@ -59,7 +59,9 @@ test('every wave advances once, waits for reinforcements, and unlocks hard mode 
     }
   }
   if(!r.rewardChosen){const pick=r.offers.find(id=>id==='repair'||runRewardPlan(s.save,id));if(pick) chooseRunReward(s.save,pick);}
-  const hp=s.save.player.hull,missiles=s.save.player.missiles;s.startRunWave();s.tickArenaRun(3);assert.equal(r.phase,'combat');assert.equal(s.save.player.hull,hp);assert.equal(s.save.player.missiles,missiles);
+  const hp=s.save.player.hull,missiles=s.save.player.missiles;s.startRunWave();
+  if(r.phase!=='combat'){throw new Error('startRunWave did not leave combat at wave ' + wave);}
+  s.tickArenaRun(3);assert.equal(r.phase,'combat');assert.equal(s.save.player.hull,hp);assert.equal(s.save.player.missiles,missiles);
   assert.ok(s.ships.length>0);assert.ok(s.ships.filter(x=>x.arenaRunEnemy).every(x=>x.hostile&&x.noSurrender&&x.position.every(Number.isFinite)));
   if(RUN_WAVES[wave].enemies.some(e=>e.delay>0)){s.ships.forEach(x=>x.hull=0);s.tickArenaRun(0);assert.equal(r.phase,'combat','a pending opponent must prevent early victory');}
   s.save.world.time=r.startedAt+40;s.tickArenaRun(40);assert.equal(r.nextEnemy,RUN_WAVES[wave].enemies.length);
@@ -134,13 +136,13 @@ test('a hull stage puts three named veterans on the table: one hire per stage, t
  assert.equal(restored.arenaRun.offers.length,3,'the reward stage still offers three choices');
  assert.deepEqual(restored.arenaRun.wingmanOffers,[],'the closed stage stops advertising pilots');
  assert.equal(hireRunWingman(restored,roster[0].id),null,'one hire per stage');
- restored.arenaRun.wave=6;restored.arenaRun.hullChosen=false;
+ restored.arenaRun.wave=8;restored.arenaRun.hullChosen=false;
  assert.ok(hireRunWingman(restored,runWingmanOffers(restored)[0].id),'the second hull stage hires again');
  assert.equal(restored.arenaRun.wingmen.length,MAX_RUN_WINGMEN);
- restored.arenaRun.wave=9;restored.arenaRun.hullChosen=false;
+ restored.arenaRun.wave=6;restored.arenaRun.hullChosen=false;
  assert.equal(hireRunWingman(restored,runWingmanOffers(restored)[0].id),null,'the wing is capped at two');
  // A stale or corrupt roster is replaced rather than trusted.
- restored.arenaRun.wave=6;restored.arenaRun.hullChosen=false;restored.arenaRun.wingmanOffers=[{id:'stale',hullId:'not-a-hull',name:'stale'}];
+ restored.arenaRun.wave=8;restored.arenaRun.hullChosen=false;restored.arenaRun.wingmanOffers=[{id:'stale',hullId:'not-a-hull',name:'stale'}];
  refreshRunWingmanOffers(restored);
  assert.equal(restored.arenaRun.wingmanOffers.length,WINGMAN_OFFER_COUNT);assert.ok(restored.arenaRun.wingmanOffers.every(candidate=>PLAYER_FLYABLE_HULLS.includes(candidate.hullId)));
  // Every pool hull can turn up on a roster, so no hull is barred from the wing.
@@ -334,7 +336,7 @@ test('preparation screens render in both languages and every wave briefing is tr
  // untranslated keys, on a localized preparation screen.
  setLanguage('de');const stage=newArenaRun(false,77),stageRoot=uiRoot(),stageUi=Object.create(GameUI.prototype),stagePanel=()=>stageRoot.querySelector('#arena-panel');
  stageUi.root=stageRoot;stageUi.updateOrientationNotice=()=>{};stageUi.save=stage;
- stage.arenaRun.wave=9;stage.arenaRun.hullChosen=false;stage.arenaRun.hullOffers=runHullOffers(stage);stage.arenaRun.wingmanOffers=runWingmanOffers(stage);stageUi.showArenaRun(stage);
+ stage.arenaRun.wave=7;stage.arenaRun.hullChosen=false;stage.arenaRun.hullOffers=runHullOffers(stage);stage.arenaRun.wingmanOffers=runWingmanOffers(stage);stageUi.showArenaRun(stage);
  assert.match(stagePanel().innerHTML,/Oder behalte/);assert.match(stagePanel().innerHTML,/Schiffe wechseln mit der Welle/);
  for(const order of WING_ORDERS){assert.ok(DE_CATALOG[WING_ORDER_LABEL[order]],WING_ORDER_LABEL[order]);assert.ok(DE_CATALOG[WING_ORDER_HINT[order]],WING_ORDER_HINT[order]);}
  // The roster is a real choice: one button per named veteran, each with a hull.
@@ -477,7 +479,7 @@ test('hull changes retain equipped guns and groups ahead of stored beams, includ
  fit.guns=['pulse-cannon','ripper'];fit.fireGroups.activeGroup='B';
  const mounts=HULL_HARDPOINTS[p.shipId].guns;fit.fireGroups.assignments[mounts[0].id]='A';fit.fireGroups.assignments[mounts[1].id]='B';
  p.outfitting.locker={'beam-emitter':4,...p.outfitting.locker};
- Object.assign(save.arenaRun,{wave:9,hullChosen:false,hullOffers:['lancer']});assert.equal(changeRunHull(save,'lancer'),true);
+ Object.assign(save.arenaRun,{wave:4,hullChosen:false,hullOffers:['lancer']});assert.equal(changeRunHull(save,'lancer'),true);
  assert.deepEqual(loadoutFor(p).guns,['pulse-cannon','ripper']);
  const after=loadoutFor(p);assert.equal(after.fireGroups.activeGroup,'B');assert.equal(after.fireGroups.assignments[HULL_HARDPOINTS.lancer.guns[1].id],'B');
  writeArenaRun(save);assert.deepEqual(loadoutFor(readArenaRun().player).guns,after.guns);
@@ -515,7 +517,7 @@ test('arena opponents fly the fit their hull authors, and the run ends on the fr
 });
 test('the last kill gets a two-second beat before the run flips to prepare',()=>{
  storage();const s=runSession(0),r=s.save.arenaRun;
- s.startRunWave();s.tickArenaRun(3);assert.ok(s.ships.some(ship=>ship.arenaRunEnemy));
+ s.startRunWave();s.tickArenaRun(6);assert.ok(s.ships.some(ship=>ship.arenaRunEnemy));
  s.ships.forEach(ship=>{if(ship.arenaRunEnemy)ship.hull=0;});
  s.tickArenaRun(0);assert.equal(r.phase,'combat','the kill beat holds the battlefield');
  s.save.world.time+=1.9;s.tickArenaRun(1.9);assert.equal(r.phase,'combat');
@@ -560,9 +562,9 @@ test('arena run clears landing systems and preloads the next wave hulls before c
  let landed=false;s.dockAt=()=>{landed=true;};s.dockCandidate=()=>'helix';s.autoDockCheck();
  assert.equal(landed,false,'Arena Run cannot auto-dock');
  s.updateAssetWarmup(true);
- assert.deepEqual(predicted,[],'Arena Run does not fetch station market and outfitting art');
+ assert.deepEqual([...new Set(preloaded)].sort(),['speedster','scrapper','demon'],'preparation loads the next enemies and hired wing hull');
  s.showRunPreparation();
- assert.deepEqual([...new Set(preloaded)].sort(),['kestrel','mule','speedster'],'preparation loads the next enemies and hired wing hull');
+ assert.deepEqual([...new Set(preloaded)].sort(),['speedster','scrapper','demon'],'preparation loads the next enemies and hired wing hull');
  preloaded.length=0;
  s.startRunWave();
  assert.equal(r.countdown,3,'hull loading starts before the combat countdown');
@@ -573,6 +575,7 @@ test('arena run clears landing systems and preloads the next wave hulls before c
  assert.deepEqual(bossPreloads,['concord-frigate'],'the final-wave model starts loading in preparation');
 });
 test('ordinary arena flights suppress landing guidance, docking, and station art warm-up',()=>{
+ setLanguage('en');
  const s=fixture();
  s.arena={environment:'asteroid-field',scenario:'1v3'};
  s.save.player.position=[...LOCATIONS.helix.position];s.save.player.navTargetId='helix';

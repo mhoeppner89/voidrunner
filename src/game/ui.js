@@ -2,7 +2,7 @@ import {FLEET_PAINTS,fleetHullId} from './fleetPaintCatalog.js';
 import {GUILD_SHIP_PREFERENCES} from './factions.js';
 import { CanvasSizeCache } from './canvasSizeCache.js';
 import {cockpitDamageMarkup,CANOPY_APERTURES} from './cockpitDamage.js';
-import {RUN_WAVES,HULL_STAGES,waveAct,readArenaRun,arenaRecord,runScore,runRewardPlan,runHullOffers,runWingmanOffers,WING_ORDERS,WING_ORDER_LABEL,WING_ORDER_HINT,WING_ORDER_SHORT,normalizeWingOrder,wingmanOrder} from './arenaRun.js';
+import {RUN_WAVES,HULL_STAGES,DECISION_STAGES,isPendingDecision,waveAct,readArenaRun,arenaRecord,runScore,runRewardPlan,runHullOffers,runWingmanOffers,WING_ORDERS,WING_ORDER_LABEL,WING_ORDER_HINT,WING_ORDER_SHORT,normalizeWingOrder,wingmanOrder} from './arenaRun.js';
 import {MAX_RUN_WINGMEN} from './shipPool.js';
 import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, LOCATIONS, SHIPS, SYSTEM_MAP_EXTENT, commodityIds, displaySpeed, routeDistanceBetween } from './data.js';
 import { JUMP_ROUTES, SYSTEMS, planRoute } from './galaxy.js';
@@ -425,7 +425,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2et';
+const GAME_VERSION = '0.8.2fa';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -1832,6 +1832,9 @@ export class GameUI {
                 break;
             case 'observer-ship':
                 this.actions?.observerSelectShip(element?.dataset.observerShip);
+                break;
+            case 'observer-preset':
+                this.actions?.observerPreset(element?.dataset.observerPreset);
                 break;
             case 'observer-fit':
                 this.actions?.observerSelectFit(element?.dataset.observerFit);
@@ -5766,7 +5769,7 @@ export class GameUI {
         const done=r.phase==='won'||r.phase==='lost';
         const command=(action,value,label,extra='')=>`<button data-ui-command="run-action" data-run-action="${action}" data-run-value="${value}" ${extra}>${label}</button>`;
         const names={guns:'GUNS',launchers:'MISSILES',turrets:'TURRETS',power:'POWER',drive:'DRIVE',defense:'DEFENSE',utility:'UTILITY'};
-        const hullText={wayfarer:'Two forward guns and one upper turret.',talon:'Agile fighter with three forward guns and no turret.',vanguard:'Heavy bomber: two medium guns, three launcher racks and two side turrets.',prospector:'One forward gun and an upper rear turret.',lancer:'Two medium guns and one upper medium turret.',atlas:'Industrial freighter: one forward gun, four turrets and four drone bays.',blade:'Heavy fighter: two medium guns, two launcher racks and three turrets.',
+        const hullText={wayfarer:'Two forward guns and one belly turret.',talon:'Agile fighter with three forward guns and no turret.',vanguard:'Heavy bomber: two medium guns, three launcher racks and two side turrets.',prospector:'One forward gun and an upper rear turret.',lancer:'Two medium guns and one upper medium turret.',atlas:'Industrial freighter: one forward gun, four turrets and four drone bays.',blade:'Heavy fighter: two medium guns, two launcher racks and three turrets.',
             speedster:'Two light guns and a launcher rack; blistering speed, thin shielding.',legionary:'Two medium guns and a missile rack; an agile frontline fighter.',andromeda:'Two medium guns, two launcher racks and a turret; a heavy striker.',torsas:'Two forward guns, a launcher and a turret; deep and slow.',astra:'A light and a medium gun mount plus a launcher; a long-range cutter.'};
         const briefs={
             'pulse-cannon':'Efficient fire; lead your target.', 'ripper':'Strong against hull; short range.',
@@ -5776,38 +5779,33 @@ export class GameUI {
             'thrusters-mk2':'Sharper turns; a small speed penalty.', 'capacitor-bank':'Larger energy reserve; a mild recharge penalty.',
             'sustained-reactor':'Faster recharge; standard reserve.', 'shield-mk2':'More shield protection.', 'recovery-shield':'Faster recovery; slightly less capacity.'
         };
-        const wingFitLabels={varied:'ROLE DEFAULTS',balanced:'BALANCED FIT',assault:'CLOSE ASSAULT',support:'DEFENSIVE SUPPORT',beam:'BEAM FIT'};
+
         const labelItems=ids=>{const counts={};ids.forEach(id=>counts[id]=(counts[id]??0)+1);return Object.entries(counts).map(([id,n])=>`${n}× ${t(OUTFIT_ITEMS[id].name)}`).join(' · ');};
         let body='',footer='';
         if(done){
             body=`<div class="run-result"><h3>${t(r.phase==='won'?'Run complete':'Run ended')}</h3><b>${t('Score')}: ${runScore(r)}</b><p>${t('Waves cleared')}: ${r.cleared}/${r.totalWaves??RUN_WAVES.length} · ${t('Damage taken')}: ${Math.round(r.damage)}</p></div>`;
             footer=`<button data-ui-command="quit-title">${t('QUIT TO TITLE')}</button><button class="primary" data-ui-command="new-arena-run">${t('New run')}</button>`;
-        }else if(!r.hullChosen){
-            // Five hulls drawn from the complete flyable pool. Staying put is
-            // the veteran-wingman option, so the current hull is never listed.
-            const hulls=(Array.isArray(r.hullOffers)&&r.hullOffers.length?r.hullOffers:runHullOffers(save)).filter(id=>id!==p.shipId);
-            const wingmen=(Array.isArray(r.wingmen)?r.wingmen:[]).filter(w=>w.alive!==false);
-            const wingBrief=wingmen.map(w=>`${t(SHIPS[w.hullId]?.name??w.hullId)} · ${w.name}`).join(' · ');
-            // The wing option is a roster of three named veterans, each with the
-            // hull they would bring, so the pilot chooses instead of taking a roll.
-            const wingFull=wingmen.length>=MAX_RUN_WINGMEN;
-            const candidates=wingFull?[]:(Array.isArray(r.wingmanOffers)&&r.wingmanOffers.length?r.wingmanOffers:runWingmanOffers(save));
-            const wingCards=candidates.map(candidate=>command('wingman',candidate.id,`<b>${escapeHtml(candidate.name)}</b><span>${escapeHtml(SHIPS[candidate.hullId].name)} · ${escapeHtml(t(hullText[candidate.hullId]??SHIPS[candidate.hullId].personality))}</span><small>${escapeHtml(t('Veteran pilot'))} · ${escapeHtml(t(wingFitLabels[candidate.fit]??'ROLE DEFAULTS'))}</small>`)).join('');
-            const wingStage=wingFull?`<div class="run-loadout-summary">${escapeHtml(t('Your wing is already at full strength.'))}</div>`
-                :candidates.length?`<div class="run-stage-label run-wing-label">${t('Or keep {ship} and add one of these veterans',{ship:SHIPS[p.shipId].name})}${wingBrief?` · ${escapeHtml(t('On your wing')+': '+wingBrief)}`:''}</div><div class="run-offers run-wingmen">${wingCards}</div>`
-                :'';
-            body=`<div class="run-stage-label">${t('Choose your hull')}</div><div class="run-offers run-hulls">${hulls.map(id=>command('hull',id,`<b>${escapeHtml(SHIPS[id].name)}</b><span>${escapeHtml(t('TIER'))} ${SHIPS[id].tier} · ${escapeHtml(t(hullText[id]??SHIPS[id].personality))}</span>`)).join('')}</div>${wingStage}<div class="run-loadout-summary">${escapeHtml(t('The hulls on offer change with the wave. Keeping your ship adds a veteran wingman instead.'))}</div>`;
+        }else if(isPendingDecision(save)){
+            const stage=DECISION_STAGES[r.wave],isHull=stage.type==='hull';
+            const hulls=isHull?(r.hullOffers?.length?r.hullOffers:runHullOffers(save)):[];
+            const candidates=isHull?[]:(r.wingmanOffers?.length?r.wingmanOffers:runWingmanOffers(save));
+            const currentWing=r.wingmen?.[stage.wingIndex],upgrading=stage.type==='wingman-upgrade'&&currentWing?.alive!==false&&Boolean(currentWing);
+            const stageLabel=stage.type==='wingman-upgrade'&&!upgrading?t('Choose a replacement wingman (Tier {tier})',{tier:stage.tier}):t(stage.label);
+            const hullDetail=id=>`<span>${escapeHtml(t(hullText[id]??SHIPS[id].personality))}</span><small>${escapeHtml(t('TIER'))} ${SHIPS[id].tier} · ${HARDPOINT_SPECS[id].guns.length} ${t('GUNS')} · ${t('SHIELD')} ${SHIPS[id].shield} · ${t('HULL')} ${SHIPS[id].hull}</small>`;
+            const cards=isHull?hulls.map(id=>command('hull',id,`<b>${escapeHtml(SHIPS[id].name)}</b>${hullDetail(id)}`)).join('')
+                :candidates.map(candidate=>command('wingman',candidate.id,`<b>${escapeHtml(SHIPS[candidate.hullId].name)}</b><span>${escapeHtml(upgrading?currentWing.name:candidate.name)} · ${escapeHtml(t('Veteran pilot'))}</span>${hullDetail(candidate.hullId)}`)).join('');
+            body=`<div class="run-stage-label">${stageLabel}</div><div class="run-offers ${isHull?'run-hulls':'run-wingmen'}">${cards}</div><div class="run-loadout-summary">${escapeHtml(t('Choose one of these three options. Equipment choices follow.'))}</div>`;
             footer=`<button data-ui-command="quit-title">${t('Save and leave')}</button>`;
         }else if(!r.rewardChosen){
-            body=`<div class="run-stage-label">${t('Choose one reward')}</div><div class="run-offers">${r.offers.map(id=>{
+            body=`${r.wave===0&&r.openingPicks===1?`<div class="run-equipped">${escapeHtml(labelItems(fit.guns.filter(Boolean)))}</div>`:''}<div class="run-stage-label">${t(r.wave===0&&r.openingPicks===0?'Choose your starting weapons':r.wave===0&&r.openingPicks===1?'Choose your second equipment set':'Choose one reward')}</div><div class="run-offers">${r.offers.map(id=>{
                 const plan=runRewardPlan(save,id);if(!plan)return '';
-                const title=id==='repair'?t('Field repairs'):`${plan.count}× ${t(OUTFIT_ITEMS[id].name)}`;
-                const detail=id==='repair'?t('Restore 50% hull and refill missiles.'):t(briefs[id]??OUTFIT_ITEMS[id].description)+(OUTFIT_ITEMS[id]?.category==='launcher'?' '+t('Includes a full magazine.'): '');
+                const title=id==='resupply'?t('Refuel and recharge'):id==='rearm'?t('Reload missiles'):id==='repair'?t('Field repairs'):`${plan.count}× ${t(OUTFIT_ITEMS[id].name)}`;
+                const detail=id==='resupply'?t('Refill fuel and capacitor.'):id==='rearm'?t('Refill launcher magazines.'):id==='repair'?t('Restore 50% hull and refill missiles.'):t(briefs[id]??OUTFIT_ITEMS[id].description)+(OUTFIT_ITEMS[id]?.category==='launcher'?' '+t('Includes a full magazine.'): '');
                 const replacement=plan.replaced.length?t('Replaces {items}',{items:labelItems(plan.replaced)}):t('Fits an empty mount');
-                return command('reward',id,`<b>${escapeHtml(title)}</b><span>${escapeHtml(detail)}</span>${id==='repair'?'':`<small>${escapeHtml(replacement)}</small>`}`,`class="${r.selectedReward===id?'is-selected':''}" aria-pressed="${r.selectedReward===id}"`);
+                return command('reward',id,`<b>${escapeHtml(title)}</b><span>${escapeHtml(detail)}</span>${['repair','rearm','resupply'].includes(id)?'':`<small>${escapeHtml(replacement)}</small>`}`,`class="${r.selectedReward===id?'is-selected':''}" aria-pressed="${r.selectedReward===id}"`);
             }).join('')}</div>`;
             const selected=r.offers.includes(r.selectedReward)&&runRewardPlan(save,r.selectedReward);
-            footer=`<button data-ui-command="quit-title">${t('Save and leave')}</button>${command('equip','',t('Equip and adjust'),selected?'':'disabled')}${command('accept','',t(r.selectedReward==='repair'?'Repair and continue':'Equip and continue'),`class="primary" ${selected?'':'disabled'}`)}`;
+            footer=`<button data-ui-command="quit-title">${t('Save and leave')}</button>${r.wave===0&&r.openingPicks===0?'':command('equip','',t('Equip and adjust'),selected?'':'disabled')}${command('accept','',t(r.wave===0&&r.openingPicks===0?'Next: equipment 2/2':r.selectedReward==='repair'?'Repair and launch':'Equip and launch'),`class="primary" ${selected?'':'disabled'}`)}`;
         }else{
             body=`<div class="run-loadout-summary">${escapeHtml(labelItems(LOADOUT_KEYS.flatMap(k=>fit[k]).filter(Boolean)))}</div>`;
             const wingCrew=(Array.isArray(r.wingmen)?r.wingmen:[]).filter(w=>w.alive!==false);
@@ -5815,7 +5813,8 @@ export class GameUI {
             if(this.runFitOpen)body+=`<div class="run-fitting">${LOADOUT_KEYS.map(key=>spec[key].map((m,i)=>`<div class="run-slot"><b>${t(names[key])} ${i+1} · ${m.size}</b><span>${fit[key][i]?t(OUTFIT_ITEMS[fit[key][i]].name):t('EMPTY')}</span><div>${command('fit','',t('REMOVE'),`data-run-key="${key}" data-run-index="${i}"`)}${Object.entries(p.outfitting.locker).filter(([id,n])=>n>0&&itemFitsMount(OUTFIT_ITEMS[id],m)).map(([id,n])=>command('fit',id,`${t(OUTFIT_ITEMS[id].name)} ×${n}`,`data-run-key="${key}" data-run-index="${i}"`)).join('')}${key==='guns'&&fit[key][i]?command('group',m.id,t('GROUP')+' '+fit.fireGroups.assignments[m.id]):''}</div></div>`).join('')).join('')}</div>`;
             footer=`<button data-ui-command="quit-title">${t('Save and leave')}</button><button data-ui-command="run-fit-toggle">${t('Adjust fitting')}</button><button class="primary" data-ui-command="run-launch">${t('Start next wave')}</button>`;
         }
-        this.root.querySelector('#arena-panel').innerHTML=`<div class="modal-card arena-card run-card"><header><div><h2>${t('Arena Run')} · ${t(waveAct(r.wave).name)} · ${done?`${r.cleared}/${r.totalWaves??RUN_WAVES.length}`:t('Wave {wave} of {total}',{wave:r.wave+1,total:RUN_WAVES.length})}${r.hard?' · '+t('HARD'):''}</h2><span>${escapeHtml(SHIPS[p.shipId].name)} · ${t('HULL')} ${Math.round(p.hull/stats.hull*100)}%</span></div>${done?'':`<details class="run-next"><summary>${t('Next')}: ${t(wave.name)}</summary><p>${t(wave.hint)}</p></details>`}</header><div class="run-scroll">${this.runFitNotice?`<p role="status">${escapeHtml(this.runFitNotice)}</p>`:''}${body}</div><footer>${footer}</footer></div>`;
+        const step=done?'':isPendingDecision(save)?t(DECISION_STAGES[r.wave].type==='hull'?'HULL CHOICE':'WINGMAN CHOICE'):!r.rewardChosen?t(r.wave===0&&r.openingPicks===0?'WEAPONS · 1/2':r.wave===0&&r.openingPicks===1?'EQUIPMENT · 2/2':'EQUIPMENT CHOICE'):t('READY TO LAUNCH');
+        this.root.querySelector('#arena-panel').innerHTML=`<div class="modal-card arena-card run-card"><header><div><h2>${t('Arena Run')} · ${t(waveAct(r.wave).name)} · ${done?`${r.cleared}/${r.totalWaves??RUN_WAVES.length}`:t('Wave {wave} of {total}',{wave:r.wave+1,total:RUN_WAVES.length})}${r.hard?' · '+t('HARD'):''}</h2><span>${escapeHtml(SHIPS[p.shipId].name)} · ${t('HULL')} ${Math.round(p.hull/stats.hull*100)}%</span></div>${done?'':`<details class="run-next"><summary>${t('Next')}: ${t(wave.name)}</summary><p>${t(wave.hint)}</p></details>`}</header>${done?'':`<div class="run-progress" aria-label="${t('Waves cleared')}"><span>${escapeHtml(step)}</span><span>${r.cleared}/${RUN_WAVES.length} ${t('Waves cleared')}</span><progress value="${r.cleared}" max="${RUN_WAVES.length}"></progress></div>`}<div class="run-scroll">${this.runFitNotice?`<p role="status">${escapeHtml(this.runFitNotice)}</p>`:''}${body}</div><footer>${footer}</footer></div>`;
         this.root.querySelector('#arena-panel').classList.remove('is-hidden');this.updateOrientationNotice();
     }
 
@@ -5829,7 +5828,7 @@ export class GameUI {
         panel.innerHTML = `
       <div class="modal-card arena-card">
         <header><div><span class="eyebrow">${t('TRAINING SIMULATION')}</span><h2>${t('Dogfight Arena')}</h2></div><button data-ui-command="close-arena">${t('CLOSE')}</button></header>
-        <div class="arena-menu-scroll"><section class="run-entry"><b>${t('Arena Run')}</b>${record.best?`<span> · ${t('Best score')}: ${record.best}</span>`:''}<p>${t('Five acts, twenty-four waves. Choose equipment between fights.')}</p><div><button data-ui-command="new-arena-run">${t(savedRun?'New run — replace saved run':'New run')}</button>${savedRun?`<button data-ui-command="resume-arena-run">${t('Resume saved run')}</button>`:''}${record.unlockedHard?`<button data-ui-command="hard-arena-run">${t('Hard Run')}</button>`:''}</div></section><section class="run-entry observer-entry"><b>${t('NPC COMBAT VIEW')}</b><p>${t('Watch NPC-only fights with live game-time tracking and unit lifebars.')}</p><button data-ui-command="observer-start">${t('OPEN OBSERVER')}</button></section>
+        <div class="arena-menu-scroll"><section class="run-entry"><b>${t('Arena Run')}</b>${record.best?`<span> · ${t('Best score')}: ${record.best}</span>`:''}<p>${t('Five acts. Choose equipment between fights.')}</p><div><button data-ui-command="new-arena-run">${t(savedRun?'New run — replace saved run':'New run')}</button>${savedRun?`<button data-ui-command="resume-arena-run">${t('Resume saved run')}</button>`:''}${record.unlockedHard?`<button data-ui-command="hard-arena-run">${t('Hard Run')}</button>`:''}</div></section><section class="run-entry observer-entry"><b>${t('NPC COMBAT VIEW')}</b><p>${t('Watch NPC-only fights with live game-time tracking and unit lifebars.')}</p><button data-ui-command="observer-start">${t('OPEN OBSERVER')}</button></section>
         <div class="arena-grid">
           <section>
             <h3>${t('ARENA')}</h3>
@@ -5860,22 +5859,13 @@ export class GameUI {
             return;
         const maps = [['open', 'OPEN SPACE'], ['asteroid-field', 'ASTEROID FIELD'], ['debris-field', 'DEBRIS FIELD']];
         const difficultyOptions = [['novice', 'ROOKIE'], ['veteran', 'VETERAN'], ['ace', 'ACE']];
-        const fitOptions = [['varied', 'ROLE DEFAULTS'], ['balanced', 'BALANCED FIT'], ['assault', 'CLOSE ASSAULT'], ['support', 'DEFENSIVE SUPPORT'], ['beam', 'BEAM FIT']];
-        // The staging palette is built from the live observer catalog, so every
-        // hull the session can spawn — all eleven flyable ships and the Concord
-        // frigate — is placeable. The static list is only a fallback for a
-        // caller that opens the panel without a catalog.
-        const paletteFitLabels = { varied: 'ROLE DEFAULTS', balanced: 'BALANCED FIT', assault: 'CLOSE ASSAULT', support: 'DEFENSIVE SUPPORT', beam: 'BEAM FIT' };
+        const fitOptions = [['varied', 'STOCK LOADOUT'], ['balanced', 'BALANCED FIT'], ['assault', 'CLOSE ASSAULT'], ['support', 'DEFENSIVE SUPPORT'], ['beam', 'BEAM FIT']];
+        const paletteFitLabels = { varied: 'STOCK LOADOUT', balanced: 'BALANCED FIT', assault: 'CLOSE ASSAULT', support: 'DEFENSIVE SUPPORT', beam: 'BEAM FIT' };
         const ships = Array.isArray(config.catalog) && config.catalog.length
             ? config.catalog.map((entry) => [entry.id, entry.label, entry.capital ? 'CAPITAL HULL' : paletteFitLabels[entry.defaultFit] ?? paletteFitLabels.varied])
             : [
-                ['wayfarer', 'WAYFARER', 'BALANCED FIT'],
-                ['vanguard', 'VANGUARD', 'DEFENSIVE SUPPORT'],
-                ['talon', 'TALON', 'CLOSE ASSAULT'],
-                ['prospector', 'PROSPECTOR', 'DEFENSIVE SUPPORT'],
-                ['lancer', 'LANCER', 'BEAM FIT'],
-                ['atlas', 'ATLAS', 'BALANCED FIT'],
-                ['frigate', 'CONCORD FRIGATE', 'CAPITAL HULL'],
+                ...Object.entries(SHIPS).map(([id, ship]) => [id, ship.name.toUpperCase(), 'STOCK LOADOUT']),
+                ...['frigate', 'cruiser', 'battleship', 'carrier'].map(id => [id, `CONCORD ${id.toUpperCase()}`, 'CAPITAL HULL']),
             ];
         this.observerNodes.clear();
         panel.innerHTML = `
@@ -5889,6 +5879,7 @@ export class GameUI {
       <aside id="observer-editor" class="observer-editor">
         <div class="observer-editor-card">
           <div class="observer-editor-title"><div><span class="eyebrow">${t('STAGING EDITOR')}</span><b>${t('BUILD YOUR FIGHT')}</b></div><small>${t('Choose a side and ship, then tap the map to place it.')}</small></div>
+          <section class="observer-editor-section"><h3>${t('QUICK MATCH')}</h3><div class="observer-editor-options">${['1v1','2v1','3v3'].map(id => `<button data-ui-command="observer-preset" data-observer-preset="${id}">${id}</button>`).join('')}</div><small id="observer-preset-hull"></small></section>
           <section class="observer-editor-section"><h3>${t('MAP')}</h3><div class="observer-editor-options">${maps.map(([id, label]) => `<button data-ui-command="observer-map" data-observer-map="${id}">${t(label)}</button>`).join('')}</div></section>
           <section class="observer-editor-section"><h3>${t('SIDE')}</h3><div class="observer-editor-options observer-team-options"><button data-ui-command="observer-team" data-observer-team="blue">${t('BLUE')}</button><button data-ui-command="observer-team" data-observer-team="red">${t('RED')}</button></div></section>
           <section class="observer-editor-section"><h3>${t('PILOTS')}</h3><div class="observer-editor-options observer-difficulty-options">${difficultyOptions.map(([id, label]) => `<button data-ui-command="observer-difficulty" data-observer-difficulty="${id}">${t(label)}</button>`).join('')}</div></section>
@@ -5900,7 +5891,7 @@ export class GameUI {
           <div class="observer-editor-footer"><span id="observer-counts"></span><div><button data-ui-command="observer-clear">${t('CLEAR FORMATION')}</button><button id="observer-start" class="primary" data-ui-command="observer-start-battle">${t('START BATTLE')}</button></div></div>
         </div>
       </aside>
-      <div class="observer-legend" aria-label="${t('Teams')}"><span><i data-team="blue"></i>${t('BLUE')}</span><span><i data-team="red"></i>${t('RED')}</span></div>
+      <div class="observer-legend" aria-label="${t('Teams')}"><span><i data-team="blue"></i>${t('BLUE')}</span><span><i data-team="red"></i>${t('RED')}</span><span>${t('BARS: SHIELD / HULL')}</span></div>
       <div id="observer-units" class="observer-units" aria-label="${t('Observed combat units')}"></div>`;
         panel.dataset.observerEnvironment = config.environment ?? 'open';
         panel.classList.remove('is-hidden');
@@ -5935,7 +5926,7 @@ export class GameUI {
         const counts = panel.querySelector('#observer-counts');
         const hint = panel.querySelector('#observer-editor-hint');
         const start = panel.querySelector('#observer-start');
-        const fitLabels = { varied: 'ROLE DEFAULTS', balanced: 'BALANCED FIT', assault: 'CLOSE ASSAULT', support: 'DEFENSIVE SUPPORT', beam: 'BEAM FIT' };
+        const fitLabels = { varied: 'STOCK LOADOUT', balanced: 'BALANCED FIT', assault: 'CLOSE ASSAULT', support: 'DEFENSIVE SUPPORT', beam: 'BEAM FIT' };
         const catalog = model.catalog ?? [];
         const pending = catalog.find((entry) => entry.id === model.pendingShip);
         const pendingLabel = pending?.label ?? model.pendingShip;
@@ -5991,6 +5982,8 @@ export class GameUI {
         panel.querySelectorAll('[data-observer-difficulty]').forEach((button) => button.classList.toggle('selected', button.dataset.observerDifficulty === model.difficulty));
         panel.querySelectorAll('[data-observer-fit]').forEach((button) => button.classList.toggle('selected', button.dataset.observerFit === model.pendingFit));
         panel.querySelectorAll('[data-observer-ship]').forEach((button) => button.classList.toggle('selected', button.dataset.observerShip === model.pendingShip));
+        const presetHull = panel.querySelector('#observer-preset-hull');
+        if (presetHull) presetHull.textContent = `${t(pendingLabel ?? 'WAYFARER')} · ${t(fitLabels[model.pendingFit] ?? fitLabels.varied)} · ${t('REPLACES FORMATION')}`;
         if (counts)
             counts.textContent = `${t('BLUE')} ${blueCount} · ${t('RED')} ${redCount}`;
         if (hint) {
@@ -6006,8 +5999,10 @@ export class GameUI {
         const layer = panel.querySelector('#observer-units');
         if (!layer)
             return;
+        const legend = panel.querySelector('.observer-legend');
+        const toolbar = panel.querySelector('.observer-toolbar');
+        if (legend && toolbar) legend.style.top = `${toolbar.getBoundingClientRect().bottom - panel.getBoundingClientRect().top + 8}px`;
         const seen = new Set();
-        const placements = [];
         for (const ship of model.ships ?? []) {
             seen.add(ship.id);
             let node = this.observerNodes.get(ship.id);
@@ -6032,7 +6027,6 @@ export class GameUI {
             node.classList.toggle('is-selected', editor && model.selectedShipId === ship.draftId);
             node.style.left = `${x.toFixed(1)}px`;
             node.style.top = `${y.toFixed(1)}px`;
-            node.style.setProperty('--observer-lift', '0px');
             node.classList.toggle('is-offscreen', !projection?.visible);
             const label = node.querySelector('.observer-unit-label b');
             if (label)
@@ -6052,37 +6046,7 @@ export class GameUI {
                         : `${ship.tier?.toUpperCase() ?? ''} · ${ship.hullId ?? ship.role ?? ''}`
                     : t('DESTROYED');
             }
-            if (projection?.visible) {
-                const width = node.offsetWidth || 128;
-                const height = node.offsetHeight || 54;
-                const halfWidth = width * 0.5;
-                const gap = 6;
-                let lift = 0;
-                for (let pass = 0; pass < placements.length; pass += 1) {
-                    const top = y - 12 - height - lift;
-                    const bottom = y - 12 - lift;
-                    let moved = false;
-                    for (const other of placements) {
-                        const horizontal = x - halfWidth < other.right + gap && x + halfWidth > other.left - gap;
-                        const vertical = top < other.bottom + gap && bottom > other.top - gap;
-                        if (horizontal && vertical) {
-                            const required = other.bottom + gap - top;
-                            if (required > 0) {
-                                // Move the marker away from the other ship's
-                                // anchor. A lower ship needs its marker nudged
-                                // down; always lifting would make that overlap
-                                // worse when formations pass vertically.
-                                lift += y >= other.anchorY ? -required : required;
-                                moved = true;
-                            }
-                        }
-                    }
-                    if (!moved)
-                        break;
-                }
-                node.style.setProperty('--observer-lift', `${lift.toFixed(1)}px`);
-                placements.push({ left: x - halfWidth, right: x + halfWidth, top: y - 12 - height - lift, bottom: y - 12 - lift, anchorY: y });
-            }
+
         }
         for (const [id, node] of this.observerNodes) {
             if (seen.has(id))
