@@ -1,6 +1,10 @@
-# Item presentation — 0.8.2fv
+# Item presentation — 0.8.2fz
 
-All 27 equipment and 10 commodity icons now combine a metal casing with an item-specific accent. Pulse/beam hardware uses cyan/mint, magnetic weapons use brass, ion uses violet and plasma uses amber. Cargo has separate water, food, medical, electronic, machine, mineral, gold, scrap, luxury and arms finishes. Rarity remains on labels, card borders, tier diamonds and modifier marks.
+Equipment names now use one shared formatter in career and Arena Run. Every label identifies its hardware type and technology tier I–III. Rarity remains independent of tier; names such as Bastion retain the underlying type. Legacy “mk2” IDs do not imply a technology tier.
+
+Energy Storage/Energiespeicher increases stored energy; Reactor Upgrade/Reaktorupgrade increases energy regeneration. Shield Capacity Booster/Schildverstärker and Shield Generator/Schildgenerator distinguish capacity from regeneration. All missile names explicitly say missiles, rockets or torpedoes. Unmounted utility details show their actual rolled stat bonuses with concrete labels.
+
+All 26 equipment and 10 commodity icons now combine a metal casing with an item-specific accent. Pulse/beam hardware uses cyan/mint, magnetic weapons use brass, ion uses violet and plasma uses amber. Cargo has separate water, food, medical, electronic, machine, mineral, gold, scrap, luxury and arms finishes. Rarity remains on labels, card borders, tier diamonds and modifier marks.
 
 Hardware is inset by a shared transform to retain clear margins around every stroke. Recharge/tracking arrows are separated from casing detail; the seven modifier marks have dedicated corner space. No clip paths, raster images, gradients, filters or animations are used.
 
@@ -32,9 +36,9 @@ Run `node --import ./tests/helpers/offline-imports.mjs tools/playtest/icon-galle
 
 ## Earlier stat and layout changes — 0.8.2fr
 
-27 equipment types and all 10 commodities use transparent inline SVG symbols. They appear in Arena Run rewards, replacement previews, fitting and loadout summaries, career equipment lists/details, trading and cargo/loot rows. Shapes distinguish weapon and utility kinds; bottom diamonds identify tiers; corner marks identify career affixes. Existing rarity colors remain white/green/blue. Retired item bitmaps are no longer warmed when opening a station shop.
+26 equipment types and all 10 commodities use transparent inline SVG symbols. They appear in Arena Run rewards, replacement previews, fitting and loadout summaries, career equipment lists/details, trading and cargo/loot rows. Shapes distinguish weapon and utility kinds; bottom diamonds identify tiers; corner marks identify career affixes. Existing rarity colors remain white/green/blue. Retired item bitmaps are no longer warmed when opening a station shop.
 
-The old “Capacitor / Kondensator” stat was `energyCapacity`, the maximum stored energy. It now reads **Energy capacity / Energiekapazität**. **Energy recharge / Energieladung** shows reactor output per second. Shield recharge is shown as its nominal per-second rate, turn acceleration in degrees/s², speed in km/s and ranges in km.
+The old “Capacitor / Kondensator” stat was `energyCapacity`, the maximum stored energy. It now reads **Energy capacity / Energiekapazität**. **Energy regeneration / Energieregeneration** shows reactor output per second. Shield regeneration is shown as its nominal per-second rate, turn acceleration in degrees/s², speed in km/s and ranges in km.
 
 Arena utility previews show the actual fitted outcome. Primary effects show values and percentage changes; indirect changes from replacing an installed item remain visible as compact trade-offs. The former three-stat cutoff is removed. The shield-focused and hull-focused swarm launchers show separate shield/hull damage with the four-rocket volley count. Lower boost-fuel consumption is correctly marked as a benefit.
 
@@ -46,3 +50,19 @@ Arena utility previews show the actual fitted outcome. Primary effects show valu
 - Full icon palette screenshot inspected, including all equipment, commodities and tier/modifier examples. `git diff --check` passes.
 
 The earlier scratch palette was removed during repository cleanup; the current review and captures are under `output/item-icons-review`.
+
+## Naming editor — 0.8.2fz
+
+`npm run review:names` generates the self-contained `output/equipment-names-review/index.html`. Edit German/English equipment names, stat terms, affixes and unique names; preview tiers I–III and inspect item effects. Drafts persist in browser storage, and JSON import/export transfers edits for applying to source. This page does not write game files or change live saves. Empty/duplicate names are flagged and cannot be exported.
+
+Approved names from the exported review live in `src/game/equipmentNaming.js`, including German overrides for legacy translation aliases. The reinforced pulse entry is retired; its save IDs migrate to the single pulse-laser family.
+
+## Pulse family — 0.8.2fz
+
+| Tier | Damage / shot | Energy / shot |
+| --- | ---: | ---: |
+| I | 9.2 | 3.2 |
+| II | 10.8 | 3.6 |
+| III | 12.4 | 4 |
+
+All tiers retain 450 km range and 0.17 s cadence. Former reinforced base items become II; higher-tier reinforced records become III. Migration changes the base/tier once and preserves item identity, rarity, affixes and ownership. Hidden runtime references for non-inventory modes carry the same stats as career records; they are not separate catalog families.

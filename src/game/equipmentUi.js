@@ -1,6 +1,6 @@
 import {PDC_TURRET} from './turrets.js';
 import {TRACKING_LASER,weaponForOutfit,launcherForOutfit} from './weapons.js';
-import {modifiedWeapon,EQUIPMENT_RARITIES,EQUIPMENT_AFFIXES,NAMED_EQUIPMENT,resolveEquipmentDefinition,registerEquipmentDefinition} from './equipmentCatalog.js';
+import {modifiedWeapon,equipmentName,EQUIPMENT_RARITIES,resolveEquipmentDefinition,registerEquipmentDefinition} from './equipmentCatalog.js';
 import {OUTFIT_ITEMS,BASE_OUTFIT_ITEMS,itemAvailable} from './outfitting.js';
 import {inventoryMounts,mountItemId,normalizeEquipmentInventory,shopEquipmentTiers} from './equipmentInventory.js';
 import {getEffectiveShipStats} from './shipStats.js';
@@ -8,15 +8,15 @@ import {cargoMass} from './economy.js';
 import {COMMODITIES,LOCATIONS} from './data.js';
 import {t} from './i18n.js';
 import {equipmentIcon,commodityIcon} from './itemIcons.js';
-import {equipmentStatChanges} from './equipmentStatPresentation.js';
+import {equipmentStatChanges,equipmentEffectStats} from './equipmentStatPresentation.js';
 
 const html=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(n,digits=1)=>Number(n??0).toFixed(digits).replace(/(\.\d*?[1-9])0+$|\.0+$/,'$1');
 const button=(action,label,data='',disabled=false)=>`<button type="button" data-inventory-action="${action}" ${data} ${disabled?'disabled':''}>${html(t(label))}</button>`;
 const quality=d=>Object.hasOwn(EQUIPMENT_RARITIES,d?.rarity)?d.rarity:'common';
 const rarityStyle=d=>`data-rarity="${quality(d)}" style="--item-color:var(--loot-${quality(d)})"`;
-const itemName=d=>d?.baseId?[...(d.rarity==='named'?[NAMED_EQUIPMENT[d.baseId]?.name??t(BASE_OUTFIT_ITEMS[d.baseId].name)]:(d.affixIds??[]).map(id=>t(EQUIPMENT_AFFIXES[id].name))),...(d.rarity==='named'?[]:[t(BASE_OUTFIT_ITEMS[d.baseId].name)])].join(' ')+` · ${['I','II','III'][d.tier-1]}`:t(d?.name);
-const itemLabel=d=>!d?.baseId?itemName(d):(d.rarity==='named'?NAMED_EQUIPMENT[d.baseId]?.name??t(BASE_OUTFIT_ITEMS[d.baseId].name):t(BASE_OUTFIT_ITEMS[d.baseId].name))+` · ${['I','II','III'][d.tier-1]}`;
+const itemName=d=>equipmentName(d);
+const itemLabel=d=>equipmentName(d,{affixes:false});
 const flight=d=>!d?undefined:d.category==='turret'?modifiedWeapon(d.turretKind==='pdc'?PDC_TURRET:TRACKING_LASER,d):weaponForOutfit(d.id)??launcherForOutfit(d.id);
 const tabLabels={cargo:'CARGO',storage:'STORAGE',shop:'SHOP',remote:'Elsewhere',loot:'Loot',drones:'Drones'};
 
@@ -46,7 +46,7 @@ export function renderEquipmentInventory(ui){
  const cargoSummary=view==='cargo'?Object.entries(player.cargo??{}).filter(([id,n])=>COMMODITIES[id]&&n>0).map(([id,n])=>`<div class="inventory-commodity">${commodityIcon(id)}<b>${number(n)}× ${html(t(COMMODITIES[id].name))}</b><small>${number(n*COMMODITIES[id].mass)} ${t('MASS')}</small></div>`).join('')+(player.sealedCargo??[]).map(c=>`<div class="inventory-commodity"><b>${html(c.label)} · ${number(c.units)}</b><small>${t('MISSION CARGO')}</small></div>`).join(''):'';
  let demand=0,salvo=0;
  for(const id of [...fit.guns,...fit.launchers,...fit.turrets].filter(Boolean)){const w=flight(OUTFIT_ITEMS[id]);if(w){const interval=w.burstSize?((w.shotInterval??w.cooldown)*w.burstSize+(w.burstPause??0))/w.burstSize:w.cooldown;if(interval>0)demand+=(w.energyCost??0)/interval;salvo+=w.energyCost??0;}}
- const budgetMarkup=`<dl class="inventory-readouts"><div><dt>${t('Energy capacity')}</dt><dd>${number(stats.energyCapacity)}</dd></div><div><dt>${t('Energy recharge')}</dt><dd>${number(stats.reactorOutput)}/s</dd></div><div class="${demand>stats.reactorOutput?'power-demand-high':''}"><dt>${t('Weapon draw')}</dt><dd>${number(demand)}/s</dd></div><div><dt>${t('Cargo')}</dt><dd>${number(cargoMass(player))}/${number(stats.cargo)}</dd></div></dl>`;
+ const budgetMarkup=`<dl class="inventory-readouts"><div><dt>${t('Energy capacity')}</dt><dd>${number(stats.energyCapacity)}</dd></div><div><dt>${t('Energy regeneration')}</dt><dd>${number(stats.reactorOutput)}/s</dd></div><div class="${demand>stats.reactorOutput?'power-demand-high':''}"><dt>${t('Weapon draw')}</dt><dd>${number(demand)}/s</dd></div><div><dt>${t('Cargo')}</dt><dd>${number(cargoMass(player))}/${number(stats.cargo)}</dd></div></dl>`;
  let panel='';
  if(item){
   const w=flight(item),before=flight(old),rare=EQUIPMENT_RARITIES[quality(item)];
@@ -59,7 +59,7 @@ export function renderEquipmentInventory(ui){
    for(const row of equipmentStatChanges(stats,after,item,true)){
     values+=`<div class="inventory-stat" data-stat="${row.key}"><span>${html(t(row.label))}</span><b>${item.id===old?.id?'':`<small>${number(row.before)} → </small>`}${number(row.after)}${row.unit?`<small class="stat-unit">${row.unit}</small>`:''}</b></div>`;
    }
-  }else values=`<p class="inventory-hint">${html(t(item.stat??'Select a mount.'))}</p>`;
+  }else values=equipmentEffectStats(item).map(row=>`<div class="inventory-stat" data-stat="${row.key}"><span>${html(t(row.label))}</span><b>${row.value>0?'+':''}${number(row.value)}${row.unit}</b></div>`).join('')||`<p class="inventory-hint">${html(t('Select a mount.'))}</p>`;
   let actions='';
   if(record.loot)actions=button('recover','Recover',`data-item-id="${html(record.id)}" data-wreck-id="${html(wreck.id)}"`)+button('select-loot','Priority',`data-item-id="${html(record.id)}"`);
   else if(record.shop)actions=button('buy','BUY',`data-base-id="${html(record.baseId)}" data-tier="${record.tier}"`,player.credits<item.price);

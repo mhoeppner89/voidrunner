@@ -9,7 +9,7 @@ import { normalizeRaceRecord } from './racing.js';
 import { clamp } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
 import { AMMO_CAPACITY, LEGACY_GUN_AMMO, WEAPON_ORDER, WEAPONS, normalizeLauncherMagazines } from './weapons.js';
-import { HULL_HARDPOINTS, collapseOutfittingToSingleShip, createOutfittingState, normalizeOutfitting, projectLegacyEquipment, projectLegacyWeaponId } from './outfitting.js';
+import { HULL_HARDPOINTS, canonicalOutfitId,collapseOutfittingToSingleShip, createOutfittingState, normalizeOutfitting, projectLegacyEquipment, projectLegacyWeaponId } from './outfitting.js';
 import { combinedHullIntegrity, normalizeEnergy } from './combatResources.js';
 import { normalizeQuestStates } from './quests.js';
 import { startTutorialCampaign } from './tutorialCampaign.js';
@@ -746,6 +746,10 @@ export const hydrateSave = (candidate) => {
         save.player.weaponId = projectLegacyWeaponId(save.player, save.player.shipId, save.player.outfitting.loadouts?.[save.player.shipId]?.fireGroups?.activeGroup);
     }
     delete save.player.turretRuntime;
+    if(save.arenaRun){
+     save.arenaRun.offers=[...new Set((save.arenaRun.offers??[]).map(canonicalOutfitId))];
+     if(save.arenaRun.selectedReward)save.arenaRun.selectedReward=canonicalOutfitId(save.arenaRun.selectedReward);
+    }
     normalizeEquipmentInventory(save.player,{disabled:Boolean(save.arena)});
     normalizeCareerLoot(save.world,save.player);
     save.version = SAVE_VERSION;

@@ -1,4 +1,4 @@
-import {equipmentRecord, equipmentBaseId} from './equipmentCatalog.js';
+import {equipmentRecord, equipmentBaseId,registerEquipmentDefinition,resolveEquipmentDefinition} from './equipmentCatalog.js';
 import { TURRET_LAYOUTS } from './turretLayouts.js';
 import { createDefaultDroneBays, droneBayLayoutFor, normalizeDroneBays, validateDroneBays } from './droneData.js';
 /*
@@ -50,76 +50,69 @@ const freezeItem = (item) => {
 // that replaced a historical id lets save migration and old UI callers keep
 // working without adding aliases to the 18-item shop roster.
 const itemRecords = [
-    { id:'tracking-turret', name:'Tracking Laser Turret', category:'turret', size:'S', sizes:['S','M'], price:4200,
+    { id:'tracking-turret', name:"Laser Turret", category:'turret', size:'S', sizes:['S','M'], price:4200,
       description:'Instant supporting fire at your selected hostile within 300 km. Reserves energy for forward guns; the hull limits its firing arc.', stat:'300 km · 4.8 damage · 4 energy · 0.7 s interval',
       turretKind:'laser',effects:{turretKind:'laser'},availability:['helix','rook','vesper'],art:'./art/outfitting/pulse-cannon.webp' },
-    { id:'capacitor-bank', name:'Large Capacitor', category:'power', size:'M', sizes:['M'], price:3600,
+    { id:'capacitor-bank', name:"Energy Storage", category:'power', size:'M', sizes:['M'], price:3600,
       description:'Longer firing bursts with only a modest recovery penalty.',stat:'+50% capacity · −10% output',
       effects:{capacityMultiplier:1.5,outputMultiplier:0.9},availability:['helix','rook','vesper'],art:'./art/outfitting/engine-mk2.webp' },
-    { id:'sustained-reactor', name:'High-Output Reactor', category:'power', size:'M', sizes:['M'], price:3600,
+    { id:'sustained-reactor', name:"Reactor Upgrade", category:'power', size:'M', sizes:['M'], price:3600,
       description:'Supports sustained fire without sacrificing the normal capacitor reserve.',stat:'+35% output · standard capacity',
       effects:{capacityMultiplier:1,outputMultiplier:1.35},availability:['helix','rook','vesper'],art:'./art/outfitting/engine-mk2.webp' },
-    { id:'recovery-shield', name:'Fast-Recovery Shield', category:'defense', size:'M', sizes:['M'], price:5800,
+    { id:'recovery-shield', name:"Shield Generator", category:'defense', size:'M', sizes:['M'], price:5800,
       description:'Recovers quickly after breaking contact while giving up only a small amount of reserve.',stat:'−10% capacity · +50% recovery',
       effects:{shieldMultiplier:0.9,rechargeMultiplier:1.5},availability:['helix','rook','vesper'],art:'./art/outfitting/shield-mk2.webp' },
     {
-        id: 'beam-emitter', name: 'Beam Emitter', category: 'gun', size: 'S', sizes: ['S', 'M'],
+        id: 'beam-emitter', name: "Beam Laser Cannon", category: 'gun', size: 'S', sizes: ['S', 'M'],
         price: 2400, energyCost: 3.5, weaponId: 'beam', factoryFit: true,
         description: "Instant beam pulses make aiming easy. Moderate damage and efficient sustained fire; 350 km range.", stat: '350 km · 10.4 damage · 3.5 energy · 0.4 s interval',
         effects: {weaponId: 'beam'}, availability: ['helix', 'rook', 'vesper'],
         art: './art/outfitting/ion-blaster.webp',
     },
     {
-        id: 'pulse-cannon', name: 'Pulse Cannon', category: 'gun', size: 'S', sizes: ['S', 'M'],
+        id: 'pulse-cannon', name: "Pulse Laser", category: 'gun', size: 'S', sizes: ['S', 'M'],
         price: 1200, energyCost: 3.2, weaponId: 'pulse', factoryFit: true,
         description: "Normal-speed fire. Shares its lead with pulse, ion and scatterguns. 450 km range.", stat: '450 km · 9.2 damage · 3.2 energy',
         effects: { weaponId: 'pulse', damageMultiplier: 1 }, availability: ['helix', 'rook', 'vesper', 'azure'],
         art: './art/outfitting/pulse-cannon.webp',
     },
     {
-        id: 'pulse-mk2', name: 'High-Output Pulse Cannon', category: 'gun', size: 'M', sizes: ['M'],
-        price: 10200, energyCost: 3.6, weaponId: 'pulse',
-        description: "Stronger normal-speed pulse fire. Shares the standard lead; uses more energy. 450 km range.", stat: '450 km · 10.8 damage · 3.6 energy',
-        effects: { weaponId: 'pulse', damageMultiplier: 27/23, upgradedFrom: 'pulse-cannon' }, availability: ['rook', 'vesper'],
-        requiredGuild: 'bounty', requiredRank: 1, art: './art/outfitting/pulse-mk2.webp',
-    },
-    {
-        id: 'gauss-cannon', name: 'Gauss Cannon', category: 'gun', size: 'M', sizes: ['M'],
+        id: 'gauss-cannon', name: "Gauss Cannon", category: 'gun', size: 'M', sizes: ['M'],
         price: 5200, energyCost: 14, weaponId: 'gauss', factoryFit: true,
         description: "Very fast precision shots bypass 15% of shields. Slow firing; 600 km range.", stat: '600 km · 27.2 damage · 15% shield bypass',
         effects: { weaponId: 'gauss', damage: 27.2 }, availability: ['helix', 'rook'],
         art: './art/outfitting/gauss-cannon.webp',
     },
     {
-        id: 'pdc', name: 'Point-Defence Turret', category: 'turret', size: 'S', sizes: ['S', 'M'],
+        id: 'pdc', name: "Point-Defence Turret", category: 'turret', size: 'S', sizes: ['S', 'M'],
         price: 3600, energyCost: 4, turretKind: 'pdc',
         description: "Missiles first; shared 2.5 s interception recovery with escort drones. Ten-round bursts at selected hostiles; 15% shield damage. 300 km range against ships and missiles.", stat: '300 km · 1.76 damage · 10-round bursts · 15% shield damage',
         effects: { turretKind: 'pdc' }, availability: ['helix', 'rook', 'vesper'],
         legacyEquipmentId: 'pdc-cluster', art: './art/outfitting/pdc.webp',
     },
     {
-        id: 'ripper', name: 'Ripper Scattergun', category: 'gun', size: 'S', sizes: ['S', 'M'],
+        id: 'ripper', name: "Scatter Cannon", category: 'gun', size: 'S', sizes: ['S', 'M'],
         price: 3600, energyCost: 9, weaponId: 'ripper',
         description: "Normal-speed pellet spread deals extra hull damage. Shares the standard lead; 350 km range.", stat: '350 km · 7 pellets · 9 energy',
         effects: { weaponId: 'ripper', pellets: 7, effectiveRange: 350 }, availability: ['helix', 'rook'],
         legacyEquipmentId: 'ripper-scattergun', art: './art/outfitting/ripper.webp',
     },
     {
-        id: 'ion-blaster', name: 'Ion Projector', category: 'gun', size: 'M', sizes: ['M'],
+        id: 'ion-blaster', name: "Ion Cannon", category: 'gun', size: 'M', sizes: ['M'],
         price: 5600, energyCost: 9, weaponId: 'ion',
         description: "Normal-speed shots strip shields and briefly halve exposed weapon fire rate and double energy per shot. Shares the standard lead; 400 km range.", stat: '400 km · ×12 vs shields · 9 energy',
         effects: { weaponId: 'ion', shieldDamageMultiplier: 12, jamSeconds: 1 }, availability: ['rook', 'vesper'],
         legacyEquipmentId: 'ion-lance', art: './art/outfitting/ion-blaster.webp',
     },
     {
-        id: 'mortar', name: 'Sunlance Plasma Mortar', category: 'gun', size: 'M', sizes: ['M'],
+        id: 'mortar', name: "Sunlance Plasma Cannon", category: 'gun', size: 'M', sizes: ['M'],
         price: 7200, energyCost: 16, weaponId: 'mortar',
         description: "Slow plasma rewards accurate direct hits with high damage and energy efficiency. Small blast; 500 km range.", stat: '500 km · 56 direct damage · 16 energy',
         effects: { weaponId: 'mortar', splashRadius: 18 }, availability: ['rook'],
         legacyEquipmentId: 'sunlance-mortar', art: './art/outfitting/mortar.webp',
     },
     {
-        id: 'seeker-launcher', name: 'Seeker Missile Rack', category: 'launcher', size: 'S', sizes: ['S', 'M'],
+        id: 'seeker-launcher', name: "Seeking Missiles", category: 'launcher', size: 'S', sizes: ['S', 'M'],
         // Factory fit: every hull can launch the existing missile stock on a
         // new career without buying a launcher first.
         price: 1800, weaponId: 'seeker', factoryFit: true,
@@ -128,77 +121,77 @@ const itemRecords = [
         art: './art/outfitting/seeker-launcher.webp',
     },
     {
-        id: 'swarm-launcher', name: 'Swarm Missile Rack', category: 'launcher', size: 'M', sizes: ['M'],
+        id: 'swarm-launcher', name: "Swarm Rockets", category: 'launcher', size: 'M', sizes: ['M'],
         price: 6200, weaponId: 'swarm',
         description: 'Four fast anti-hull micro-warheads overwhelm point defense. Each canister deals less damage than one seeker.', stat: '12 canisters · 4 × 20 hull / 10 shield · 300 km/s',
         effects: { weaponId: 'swarm', volley: 4, tracking: 'medium', ammoId: 'missiles' }, availability: ['rook', 'azure'],
         art: './art/outfitting/swarm-launcher.webp',
     },
     {
-        id: 'shield-seeker-launcher', name: 'Anti-Shield Missile Rack', category: 'launcher', size: 'S', sizes: ['S', 'M'],
+        id: 'shield-seeker-launcher', name: "Anti-Shield Seeking Missiles", category: 'launcher', size: 'S', sizes: ['S', 'M'],
         price: 3200, weaponId: 'shield-seeker',
         description: 'Guided ion warheads deal double shield damage. Swap to anti-hull seekers after shields collapse.', stat: '4 missiles · 100 shield / 50 hull · 800 km lock',
         effects: { weaponId: 'shield-seeker', shieldDamageMultiplier: 2, ammoId: 'missiles' }, availability: ['helix', 'rook', 'vesper', 'azure'],
         art: './art/outfitting/seeker-launcher.webp',
     },
     {
-        id: 'shield-swarm-launcher', name: 'Anti-Shield Swarm Rack', category: 'launcher', size: 'M', sizes: ['M'],
+        id: 'shield-swarm-launcher', name: "Anti-Shield Swarm Rockets", category: 'launcher', size: 'M', sizes: ['M'],
         price: 6200, weaponId: 'shield-swarm',
         description: 'Four fast ion micro-warheads overwhelm point defense and strip shields. Each canister deals less damage than one anti-shield seeker.', stat: '12 canisters · 4 × 20 shield / 10 hull · 300 km/s',
         effects: { weaponId: 'shield-swarm', shieldDamageMultiplier: 2, volley: 4, ammoId: 'missiles' }, availability: ['rook', 'azure'],
         art: './art/outfitting/swarm-launcher.webp',
     },
     {
-        id: 'torpedo-launcher', name: 'Torpedo Tube', category: 'launcher', size: 'M', sizes: ['M'],
+        id: 'torpedo-launcher', name: "Torpedo Launcher", category: 'launcher', size: 'M', sizes: ['M'],
         price: 9800, weaponId: 'torpedo',
         description: 'A heavy tube for deliberate shots against large, slow or already-disabled targets.', stat: '2 torpedoes · 600 km lock · 115 km/s',
         effects: { weaponId: 'torpedo', tracking: 'low', splashRadius: 20, ammoId: 'missiles' }, availability: ['rook'],
         art: './art/outfitting/torpedo-launcher.webp',
     },
     {
-        id: 'engine-mk2', name: 'Sprint Engine', category: 'drive', size: 'M', sizes: ['M'],
+        id: 'engine-mk2', name: "Speed Booster", category: 'drive', size: 'M', sizes: ['M'],
         price: 8400,
         description: 'Higher speed for long passes, with a small turning and boost-fuel tradeoff.', stat: '+18% speed · −8% turning · +25% boost fuel',
         effects: { speedMultiplier: 1.18, accelerationMultiplier: 1.1, turnMultiplier:0.92, burnFuelMultiplier:1.25 }, availability: ['helix', 'vesper', 'azure'],
         art: './art/outfitting/engine-mk2.webp',
     },
     {
-        id: 'thrusters-mk2', name: 'Manoeuvring Thrusters', category: 'drive', size: 'M', sizes: ['M'],
+        id: 'thrusters-mk2', name: "Turning Thrusters", category: 'drive', size: 'M', sizes: ['M'],
         price: 7200,
         description: 'Stronger turning and drift correction with only a small top-speed tradeoff.', stat: '+35% turning · −6% speed',
         effects: { turnMultiplier: 1.35, speedMultiplier:0.94, lateralMultiplier:1.25 }, availability: ['rook', 'vesper'],
         art: './art/outfitting/thrusters-mk2.webp',
     },
     {
-        id: 'shield-mk2', name: 'Dual-Layer Shield Grid', category: 'defense', size: 'M', sizes: ['M'],
+        id: 'shield-mk2', name: "Shield Capacity Booster", category: 'defense', size: 'M', sizes: ['M'],
         price: 9600,
         description: 'Absorbs more damage and recharges at the standard rate.', stat: '+45 shield capacity · standard recovery',
         effects: { shieldCapacity: 45 }, availability: ['helix', 'rook'],
         art: './art/outfitting/shield-mk2.webp',
     },
     {
-        id: 'armor-mk2', name: 'Ablative Hull Weave', category: 'defense', size: 'M', sizes: ['M'],
+        id: 'armor-mk2', name: "Hull Reinforcement", category: 'defense', size: 'M', sizes: ['M'],
         price: 6500,
         description: 'Segmented plates reinforce the pressure hull without adding another cockpit damage layer.', stat: '+40 hull integrity',
         effects: { hullCapacity: 40 }, availability: ['rook', 'vesper'],
         art: './art/outfitting/armor-mk2.webp',
     },
     {
-        id: 'radar-mk2', name: 'Long-Baseline Radar', category: 'utility', size: 'S', sizes: ['S', 'M'],
+        id: 'radar-mk2', name: "Radar & Scanner", category: 'utility', size: 'S', sizes: ['S', 'M'],
         price: 5400,
         description: 'A longer baseline sensor array that finds contacts and survey signatures before they find you.', stat: '+50% radar · +50% scan range',
         effects: { radarMultiplier: 1.5, scanMultiplier: 1.5 }, availability: ['helix', 'azure'],
         art: './art/outfitting/radar-mk2.webp',
     },
     {
-        id: 'cargo-pods', name: 'External Cargo Pods', category: 'utility', size: 'M', sizes: ['M'],
+        id: 'cargo-pods', name: "Cargo Expansion", category: 'utility', size: 'M', sizes: ['M'],
         price: 4800,
         description: 'Armored external pods that add room for a profitable haul without changing the ship’s core hold.', stat: '+18 cargo mass',
         effects: { cargoCapacity: 18 }, availability: ['helix', 'azure'],
         requiredGuild: 'merchant', requiredRank: 1, art: './art/outfitting/cargo-pods.webp',
     },
     {
-        id: 'salvage-mk2', name: 'Phase-Locked Tractor', category: 'utility', size: 'M', sizes: ['M'],
+        id: 'salvage-mk2', name: "Salvage Tractor", category: 'utility', size: 'M', sizes: ['M'],
         price: 8100,
         description: 'A phase-locked tractor that holds unstable wreckage together while it is pulled aboard.', stat: '+70% salvage rate · 170u range',
         effects: { salvageRate: 1.7, salvageRange: 170 }, availability: ['rook'],
@@ -207,16 +200,25 @@ const itemRecords = [
 ];
 
 itemRecords.push(
- {id:'frigate-battery',name:'Capital Anti-Fighter Cannon',category:'gun',tier:3,lootOnly:true,price:18000,mass:8,energyCost:12,weaponId:'frigate-battery',description:'A heavy anti-fighter cannon recovered from a frigate. Slow single shots retain the capital battery’s range and impact.',effects:{weaponId:'frigate-battery'},art:'./art/outfitting/pulse-cannon.webp'},
- {id:'cruiser-battery',name:'Capital Rail Battery',category:'gun',tier:3,lootOnly:true,price:34000,mass:24,energyCost:45,weaponId:'cruiser-battery',description:'A recovered heavy rail barrel. Long range and high impact, with the cruiser’s seven-second reload; each shot consumes a large share of a small ship’s capacitor.',effects:{weaponId:'cruiser-battery'},art:'./art/outfitting/gauss-cannon.webp'},
- {id:'capital-shield-generator',name:'Capital Shield Generator',category:'defense',tier:3,lootOnly:true,price:22000,mass:12,description:'Adds 200 shield capacity and doubles recovery demand. The reactor must supply the additional shield energy.',effects:{shieldCapacity:200,rechargeMultiplier:2},art:'./art/outfitting/shield-mk2.webp'}
+ {id:'frigate-battery',name:"Capital Anti-Fighter Cannon",category:'gun',tier:3,lootOnly:true,price:18000,mass:8,energyCost:12,weaponId:'frigate-battery',description:'A heavy anti-fighter cannon recovered from a frigate. Slow single shots retain the capital battery’s range and impact.',effects:{weaponId:'frigate-battery'},art:'./art/outfitting/pulse-cannon.webp'},
+ {id:'cruiser-battery',name:"Capital Rail Cannon",category:'gun',tier:3,lootOnly:true,price:34000,mass:24,energyCost:45,weaponId:'cruiser-battery',description:'A recovered heavy rail barrel. Long range and high impact, with the cruiser’s seven-second reload; each shot consumes a large share of a small ship’s capacitor.',effects:{weaponId:'cruiser-battery'},art:'./art/outfitting/gauss-cannon.webp'},
+ {id:'capital-shield-generator',name:"Capital Shield Booster",category:'defense',tier:3,lootOnly:true,price:22000,mass:12,description:'Adds 200 shield capacity and doubles recovery demand. The reactor must supply the additional shield energy.',effects:{shieldCapacity:200,rechargeMultiplier:2},art:'./art/outfitting/shield-mk2.webp'}
 );
 export const BASE_OUTFIT_ITEMS = freeze(Object.fromEntries(itemRecords.map(freezeItem).map((item) => [item.id, item])));
+// Stable references for non-inventory modes. These are tiers of one catalog
+// family, not extra shop entries; career items retain their physical item IDs.
+for(const tier of [2,3]){
+ const definition=resolveEquipmentDefinition(BASE_OUTFIT_ITEMS['pulse-cannon'],{id:`pulse-cannon-t${tier}`,baseId:'pulse-cannon',tier,rarity:'common',affixes:[]});
+ delete definition.rarity;definition.factoryFit=false;
+ registerEquipmentDefinition(definition.id,definition);
+ if(tier===2)registerEquipmentDefinition('pulse-mk2',{...definition,id:'pulse-mk2',legacyOnly:true});
+}
 export const OUTFIT_ITEMS = new Proxy(BASE_OUTFIT_ITEMS,{get:(target,id)=>equipmentRecord(id)??target[id]});
 export const OUTFIT_ITEM_IDS = freeze(itemRecords.map((item) => item.id));
 
 // Historical ids remain accepted at the boundary, never in the shop registry.
 export const LEGACY_OUTFIT_ID_MAP = freeze({
+    'pulse-mk2': 'pulse-cannon-t2',
     'pdc-cluster': 'pdc',
     'ripper-scattergun': 'ripper',
     'ion-lance': 'ion-blaster',
@@ -303,12 +305,9 @@ const canonicalLegacyEquipment = (value) => {
 export const canonicalOutfitId = canonicalId;
 export const outfitItem = (id) => OUTFIT_ITEMS[canonicalId(id)];
 
-// Pulse Mk II deliberately shares the base pulse weapon implementation, but
-// its old active-weapon id is still meaningful. Keep that distinction at the
-// migration boundary instead of letting a registry lookup collapse it back to
-// the ordinary pulse cannon.
+// The obsolete active-weapon ID migrates to a tier-II pulse item.
 const outfitIdForWeapon = (weaponId) => weaponId === 'pdc' ? 'pdc' : weaponId === 'pulse-mk2'
-    ? 'pulse-mk2'
+    ? 'pulse-cannon-t2'
     : Object.values(OUTFIT_ITEMS).find((item) => item.weaponId === weaponId)?.id;
 
 export const itemFitsMount = (itemOrId, mountOrCategory, size) => {
@@ -907,10 +906,6 @@ export const projectLegacyWeaponId = (player, shipId = player?.shipId, group) =>
             continue;
         const itemId = canonicalId(loadout.guns[index]);
         const item = outfitItem(itemId);
-        // Pulse Mk II uses the pulse implementation in combat, but old save
-        // state and weapon cycling must retain its distinct mounted identity.
-        if (equipmentBaseId(itemId) === 'pulse-mk2')
-            return 'pulse-mk2';
         const weaponId = item?.weaponId ?? item?.effects?.weaponId;
         if (weaponId)
             return weaponId;

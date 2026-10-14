@@ -19,10 +19,10 @@ test('run equipment grades cover real items without changing their stats',()=>{
  for(const [id,quality]of Object.entries(RUN_EQUIPMENT_RARITY)){assert(OUTFIT_ITEMS[id]);assert(['common','uncommon','rare'].includes(quality));assert.equal(OUTFIT_ITEMS[id].rarity,undefined);}
 });
 test('run rewards and fitted summaries use the same quality colors and retain selection actions',()=>{
- const s=ready();Object.assign(s.arenaRun,{wave:5,offers:['ripper','gauss-cannon','pulse-mk2'],rewardChosen:false});const markup=panel(s);
+ const s=ready();Object.assign(s.arenaRun,{wave:5,offers:['ripper','gauss-cannon','pulse-cannon-t3'],rewardChosen:false});const markup=panel(s);
  for(const q of ['common','uncommon','rare'])assert.match(markup,new RegExp(`data-rarity="${q}"`));
  assert.equal((markup.match(/data-run-action="reward"/g)||[]).length,3);assert.match(markup,/run-replacement/);assert.doesNotMatch(markup,/lead your target|Fits an empty mount/);
- s.arenaRun.rewardChosen=true;s.player.outfitting.loadouts[s.player.shipId].guns[0]='pulse-mk2';assert.match(panel(s),/run-item-label[^>]*data-rarity="rare"/);
+ s.arenaRun.rewardChosen=true;s.player.outfitting.loadouts[s.player.shipId].guns[0]='pulse-cannon-t3';assert.match(panel(s),/run-item-label[^>]*data-rarity="rare"/);
 });
 test('launcher rewards use a free shared bay before replacing a forward gun',()=>{
  const s=ready(),fit=s.player.outfitting.loadouts[s.player.shipId];fit.guns[1]=null;

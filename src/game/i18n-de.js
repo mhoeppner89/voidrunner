@@ -1,3 +1,4 @@
+import {EQUIPMENT_NAMING} from './equipmentNaming.js';
 // German catalog. Keys are the canonical English source strings used across
 // the game; values are the German translations. A missing key renders the
 // English key itself (see i18n.js), so the game stays playable while entries
@@ -12,10 +13,36 @@
 // Player address is informal "du" throughout, matching the frontier voice of
 // the English lines. Values are plain text — never HTML.
 export const DE_CATALOG = {
+    'Energy Storage':'Energiespeicher',
+    'Regeneration Reactor':'Regenerationsreaktor',
+    'Fast-Recharge Shield':'Regenerationsschild',
+    'Beam Laser':'Strahllaser',
+    'Pulse Laser':'Pulslaser',
+    'High-Power Pulse Laser':'Verstärkter Pulslaser',
+    'Magrail Cannon':'Magrailkanone',
+    'Missile-Defence Turret':'Raketenabwehrturm',
+    'Scatter Cannon':'Streukanone',
+    'Ion Cannon':'Ionenkanone',
+    'Sunlance Plasma Cannon':'Sunlance-Plasmakanone',
+    'Hull-Seeking Missiles':'Hüllensuchraketen',
+    'Swarm Rockets':'Schwarmraketen',
+    'Shield-Seeking Missiles':'Schildsuchraketen',
+    'Shield Swarm Rockets':'Schild-Schwarmraketen',
+    'Torpedo Launcher':'Torpedowerfer',
+    'Speed Engine':'Sprintantrieb',
+    'Turning Thrusters':'Manövrierdüsen',
+    'Shield Capacity Booster':'Schildverstärker',
+    'Hull Reinforcement':'Hüllenverstärkung',
+    'Radar & Scanner':'Radar & Scanner',
+    'Cargo Expansion':'Frachterweiterung',
+    'Salvage Tractor':'Bergungstraktor',
+    'Capital Rail Cannon':'Großschiff-Magrailkanone',
+    'Capital Shield Booster':'Großschiff-Schildverstärker',
+
     'Shield damage':'Schildschaden', 'Hull damage':'Hüllenschaden', 'Acceleration':'Beschl.',
-    'Energy capacity':'Energiekapazität', 'Energy recharge':'Energieladung',
+    'Energy capacity':'Energiekapazität', 'Energy regeneration':'Energieregeneration',
     'Energy bank':'Energiespeicher', 'Max speed':'Max. Tempo', 'Turn accel.':'Drehbeschl.',
-    'Shield recharge':'Schildladung', 'Shield capacity':'Schildkapazität', 'Hull integrity':'Hüllenintegrität',
+    'Shield regeneration':'Schildregeneration', 'Shield capacity':'Schildkapazität', 'Hull integrity':'Hüllenintegrität',
     'Sprint engine':'Sprintantrieb', 'Shield grid':'Schildgitter', 'Drift correction':'Driftkorrektur',
     'Boost fuel use':'Boost-Verbrauch', 'Cargo capacity':'Frachtkapazität', 'Radar range':'Radarreichweite',
     'Scan range':'Scanreichweite', 'Salvage range':'Bergungsreichweite', 'Salvage rate':'Bergungstempo',
@@ -30,7 +57,7 @@ export const DE_CATALOG = {
     'Trade':'Handel', 'Equipment':'Ausrüstung', 'Shipyard':'Werft', 'Mining':'Abbau', 'Repair':'Reparatur', 'Attack':'Angriff',
     'Items':'Teile', 'Details':'Details', 'Remove':'Ausbauen', 'Store':'Einlagern', 'Priority':'Priorität', 'Loot':'Beute', 'Drones':'Drohnen', 'Power':'Leistung', 'Elsewhere':'Auswärts', 'Sort inventory':'Inventar sortieren', 'Select an item':'Teil auswählen',
     'Shield recovery multiplier':'Schildregeneration ×', 'Radar range':'Radarreichweite', 'Scan range':'Scanreichweite', 'Salvage range':'Bergungsreichweite', 'Salvage rate':'Bergungsrate', 'Boost fuel multiplier':'Schubverbrauch ×', 'Lateral thrust multiplier':'Seitenschub ×',
-    'Capital Anti-Fighter Cannon':'Schwere Abfangkanone', 'Capital Rail Battery':'Schweres Schienengeschütz', 'Capital Shield Generator':'Großschiff-Schildgenerator',
+    'Capital Anti-Fighter Cannon': 'Großschiff-Abfangkanone', 'Capital Rail Battery':'Schweres Schienengeschütz', 'Capital Shield Generator':'Großschiff-Schildgenerator',
     'Aim correction':'Zielkorrektur (%)',
     'WEAPON MOUNTS':'WAFFENHALTERUNGEN', 'Inventory section':'Inventarbereich',
     'Efficient':'Effizient', 'Precise':'Präzise', 'Rapid':'Schnellfeuer', 'Long-range':'Langstrecke', 'Lightweight':'Leichtbau', 'Tuned':'Abgestimmt', 'Compact':'Kompakt', 'All items':'Alle Teile', 'Invalid equipment action.':'Ungültige Ausrüstungsaktion.',
@@ -2607,7 +2634,7 @@ Object.assign(DE_CATALOG, {
     "SHIP SYSTEMS": "SCHIFFSSYSTEME",
     "This group can fire continuously.": "Diese Feuergruppe kann dauerhaft feuern.",
     "About {seconds}s of continuous group fire.": "Etwa {seconds} s Dauerfeuer mit dieser Gruppe.",
-    "From full energy, with shields idle and missile defence inactive.": "Bei voller Energie, ohne Schildaufladung und aktive Raketenabwehr.",
+    "From full energy, with shields idle and missile defence inactive.": "Bei voller Energie, ohne Schildregeneration und aktive Raketenabwehr.",
     "SHOT INTERVAL": "SCHUSSABSTAND",
     "25% shield bypass · 14 energy / shot": "25 % Schildumgehung · 14 Energie pro Schuss",
     "25 damage/s · 28 energy/s": "25 Schaden/s · 28 Energie/s",
@@ -2618,7 +2645,7 @@ Object.assign(DE_CATALOG, {'CHARGING':'LÄDT','Ion Projector':'Ionenprojektor','
 
 Object.assign(DE_CATALOG, {'LOADOUT':'WAFFEN','BALANCED FIT':'ALLROUNDER','CLOSE ASSAULT':'NAHKAMPF','DEFENSIVE SUPPORT':'ABWEHR UND PLASMA','BEAM FIT':'STRAHLWAFFE'});
 
-Object.assign(DE_CATALOG, {"TURRETS": "GESCHÜTZTÜRME", "POWER": "ENERGIEVERSORGUNG", "FIRE ALL": "ALLE WAFFEN", "Point-Defence Turret": "Nahabwehrturm", "Tracking Laser Turret": "Laserturm", "Large Capacitor": "Großer Energiespeicher", "High-Output Reactor": "Hochleistungsreaktor", "Fast-Recovery Shield": "Schnellladender Schild", "Sprint Engine": "Sprintantrieb", "Manoeuvring Thrusters": "Manövriertriebwerke", "TOP TURRET": "OBERER GESCHÜTZTURM", "LOWER TURRET": "UNTERER GESCHÜTZTURM", "REAR TOP TURRET": "OBERER HECKTURM", "FORWARD LOWER TURRET": "UNTERER BUGTURM", "TURRETS HOLD FIRE": "TÜRME: FEUER EINGESTELLT", "TURRETS ACTIVE": "TÜRME: AUTOMATIK AKTIV", "TURRETS READY": "TÜRME: BEREIT", "TURRETS WAITING FOR ENERGY": "TÜRME: WARTEN AUF ENERGIE", "WEAPON GROUP HELP": "FEUERGRUPPEN", "UNDERSTOOD": "VERSTANDEN", "TURNING": "WENDIGKEIT", "BOOST FUEL USE": "NACHBRENNER-VERBRAUCH", "SHIELD RECOVERY": "SCHILDREGENERATION", "Tap the weapon name to cycle populated groups and Fire all. Fire all uses every forward gun; missiles and automatic turrets stay separate. In Outfitting, open a gun’s details to assign A or B. Try beams in A and your other weapon in B to control energy use.": "Tippe auf den Waffennamen, um zwischen belegten Feuergruppen und ALLE WAFFEN zu wechseln. ALLE WAFFEN feuert sämtliche Bugwaffen ab. Raketen und automatische Geschütztürme werden separat gesteuert. In der Schiffsausrüstung kannst du unter den Waffendetails A oder B zuweisen. Mit Strahllasern in A und einer anderen Waffe in B lässt sich der Energieverbrauch gezielt steuern.", "Automatically fires at your selected hostile target. Reserves energy for forward guns; the hull limits its firing arc.": "Feuert automatisch auf dein ausgewähltes feindliches Ziel. Hält Energie für die Bugwaffen zurück. Der Schiffsrumpf begrenzt das Schussfeld.", "Longer firing bursts, but slower energy recovery.": "Ermöglicht längere Feuerstöße, lädt jedoch langsamer nach.", "Supports sustained fire, with a smaller burst reserve.": "Liefert mehr Energie für anhaltendes Feuer, speichert jedoch weniger für kurze Belastungsspitzen.", "Recovers quickly after breaking contact, but absorbs less damage.": "Regeneriert nach einer Feuerpause schnell, hält jedoch weniger Schaden aus.", "Higher speed for long passes, with weaker turning and greater boost fuel use.": "Höhere Geschwindigkeit für weite Angriffspässe. Dafür sinkt die Wendigkeit und der Nachbrenner verbraucht mehr Treibstoff.", "Stronger turning and drift correction, with a lower top speed.": "Verbessert Wendigkeit und Driftkorrektur, senkt jedoch die Höchstgeschwindigkeit.", "Absorbs more damage, but takes longer to recover after a fight.": "Hält mehr Schaden aus, regeneriert jedoch langsamer."});
+Object.assign(DE_CATALOG, {"TURRETS": "GESCHÜTZTÜRME", "POWER": "ENERGIEVERSORGUNG", "FIRE ALL": "ALLE WAFFEN", "Point-Defence Turret": "Nahabwehrturm", "Tracking Laser Turret": "Zielverfolgungs-Laserturm", "Large Capacitor": "Großer Energiespeicher", "High-Output Reactor": "Hochleistungsreaktor", "Fast-Recovery Shield": "Regenerationsschild", "Sprint Engine": "Sprintantrieb", "Manoeuvring Thrusters": "Manövriertriebwerke", "TOP TURRET": "OBERER GESCHÜTZTURM", "LOWER TURRET": "UNTERER GESCHÜTZTURM", "REAR TOP TURRET": "OBERER HECKTURM", "FORWARD LOWER TURRET": "UNTERER BUGTURM", "TURRETS HOLD FIRE": "TÜRME: FEUER EINGESTELLT", "TURRETS ACTIVE": "TÜRME: AUTOMATIK AKTIV", "TURRETS READY": "TÜRME: BEREIT", "TURRETS WAITING FOR ENERGY": "TÜRME: WARTEN AUF ENERGIE", "WEAPON GROUP HELP": "FEUERGRUPPEN", "UNDERSTOOD": "VERSTANDEN", "TURNING": "WENDIGKEIT", "BOOST FUEL USE": "NACHBRENNER-VERBRAUCH", "SHIELD RECOVERY": "SCHILDREGENERATION", "Tap the weapon name to cycle populated groups and Fire all. Fire all uses every forward gun; missiles and automatic turrets stay separate. In Outfitting, open a gun’s details to assign A or B. Try beams in A and your other weapon in B to control energy use.": "Tippe auf den Waffennamen, um zwischen belegten Feuergruppen und ALLE WAFFEN zu wechseln. ALLE WAFFEN feuert sämtliche Bugwaffen ab. Raketen und automatische Geschütztürme werden separat gesteuert. In der Schiffsausrüstung kannst du unter den Waffendetails A oder B zuweisen. Mit Strahllasern in A und einer anderen Waffe in B lässt sich der Energieverbrauch gezielt steuern.", "Automatically fires at your selected hostile target. Reserves energy for forward guns; the hull limits its firing arc.": "Feuert automatisch auf dein ausgewähltes feindliches Ziel. Hält Energie für die Bugwaffen zurück. Der Schiffsrumpf begrenzt das Schussfeld.", "Longer firing bursts, but slower energy recovery.": "Ermöglicht längere Feuerstöße, lädt jedoch langsamer nach.", "Supports sustained fire, with a smaller burst reserve.": "Liefert mehr Energie für anhaltendes Feuer, speichert jedoch weniger für kurze Belastungsspitzen.", "Recovers quickly after breaking contact, but absorbs less damage.": "Regeneriert nach einer Feuerpause schnell, hält jedoch weniger Schaden aus.", "Higher speed for long passes, with weaker turning and greater boost fuel use.": "Höhere Geschwindigkeit für weite Angriffspässe. Dafür sinkt die Wendigkeit und der Nachbrenner verbraucht mehr Treibstoff.", "Stronger turning and drift correction, with a lower top speed.": "Verbessert Wendigkeit und Driftkorrektur, senkt jedoch die Höchstgeschwindigkeit.", "Absorbs more damage, but takes longer to recover after a fight.": "Hält mehr Schaden aus, regeneriert jedoch langsamer."});
 
 Object.assign(DE_CATALOG, {
     'A heavy escort with broad turret coverage and substantial cargo space. Its mass limits acceleration and turning.': 'Ein schweres Begleitschiff mit großem Schussfeld für seine Türme und reichlich Frachtraum. Seine Masse begrenzt Beschleunigung und Wendigkeit.',
@@ -3122,7 +3149,7 @@ Object.assign(DE_CATALOG, {
     'Choose your starting hull': 'Wähle dein Startschiff',
     'Choose a veteran wingman': 'Wähle einen erfahrenen Flügelmann',
     'Choose one of these three options. Equipment choices follow.': 'Wähle eine dieser drei Optionen. Danach folgt die Ausrüstung.',
-    'Refuel and recharge': 'Auftanken und aufladen',
+    'Refuel and recharge': 'Auftanken und regenerieren',
     'Reload missiles': 'Raketen nachladen',
     'Refill fuel and capacitor.': 'Treibstoff und Kondensator auffüllen.',
     'Refill launcher magazines.': 'Raketenmagazine auffüllen.',
@@ -3144,3 +3171,10 @@ Object.assign(DE_CATALOG, {
 });
 
 Object.assign(DE_CATALOG, {'Choose a replacement wingman (Tier {tier})':'Wähle einen Ersatz-Flügelmann (Stufe {tier})'});
+
+// Approved review names take precedence over historical catalog aliases.
+for (const group of ['equipment','terms','affixes','named'])
+ Object.assign(DE_CATALOG,Object.fromEntries(Object.values(EQUIPMENT_NAMING[group]).map(({en,de})=>[en,de])));
+
+// The gun's cockpit shorthand matches its approved Gauss equipment name.
+DE_CATALOG.MAGRAIL='GAUSSKANONE';

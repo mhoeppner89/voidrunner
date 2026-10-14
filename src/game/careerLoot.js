@@ -4,7 +4,7 @@ import {registerInventoryDefinitions} from './equipmentInventory.js';
 import {weaponForOutfit} from './weapons.js';
 import {OUTFIT_ITEMS,BASE_OUTFIT_ITEMS,LOADOUT_KEYS} from './outfitting.js';
 import {createEquipmentRecord,rollEquipmentRecord,receiveEquipment,ITEM_SURVIVAL_CHANCE,CARGO_SURVIVAL_CHANCE} from './equipmentInventory.js';
-import {equipmentBaseId,forgetEquipmentDefinition} from './equipmentCatalog.js';
+import {equipmentBaseId,migratePulseRecord,forgetEquipmentDefinition} from './equipmentCatalog.js';
 import {seededRandom} from './random.js';
 import {getEffectiveShipStats} from './shipStats.js';
 import {cargoFree} from './economy.js';
@@ -19,7 +19,7 @@ export function equipCareerItems(session,ship){
  const rng=seededRandom(ship.lootKey),region=session.careerRegionAt(ship.position),tier=region.danger>=2.1?3:region.danger>=1.15?2:1;
  ship.equipmentRecords=[];
  for(const key of LOADOUT_KEYS)for(let i=0;i<(fit[key]?.length??0);i++)if(fit[key][i]){
-  const baseId=equipmentBaseId(fit[key][i]),item=rollEquipmentRecord(baseId,rng,tier,`${ship.lootKey}-${key}-${i}`);if(!item)continue;
+  const baseId=equipmentBaseId(fit[key][i]),item=rollEquipmentRecord(baseId,rng,Math.max(tier,OUTFIT_ITEMS[fit[key][i]]?.tier??1),`${ship.lootKey}-${key}-${i}`);if(!item)continue;
   fit[key][i]=item.id;ship.equipmentRecords.push({item,key,index:i});
  }
  fit.weaponDefinitions=fit.gunIndices.map(i=>weaponForOutfit(fit.guns[i]));
@@ -106,7 +106,7 @@ export function normalizeCareerLoot(world, player) {
   for(const entry of raw.contents) {
    if(!entry||typeof entry.id!=='string'||used.has(entry.id))continue;
    if(entry.kind==='equipment') {
-    const item=entry.item;
+    const item=migratePulseRecord(entry.item);
     if(!item||item.id!==entry.id||!Object.hasOwn(BASE_OUTFIT_ITEMS,item.baseId)||!item.id.startsWith('eq-')&&!item.id.startsWith('loot-'))continue;
     registerInventoryDefinitions({items:{[item.id]:item}});
    } else if(entry.kind==='cargo') {

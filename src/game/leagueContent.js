@@ -149,7 +149,7 @@ export const LEAGUE_FITS = {
   },
   "legionary": {
     "guns": [
-      "pulse-mk2",
+      "pulse-cannon-t2",
       "ripper"
     ],
     "launcher": "seeker-launcher",
@@ -157,7 +157,7 @@ export const LEAGUE_FITS = {
   },
   "andromeda": {
     "guns": [
-      "pulse-mk2",
+      "pulse-cannon-t2",
       "gauss-cannon"
     ],
     "launchers": [

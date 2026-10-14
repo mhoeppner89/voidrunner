@@ -1,4 +1,4 @@
-import {EQUIPMENT_RARITIES,modifiedWeapon} from './equipmentCatalog.js';
+import {EQUIPMENT_RARITIES,equipmentName,modifiedWeapon} from './equipmentCatalog.js';
 import {PDC_TURRET} from './turrets.js';
 import {renderEquipmentInventory,bindEquipmentInventory} from './equipmentUi.js';
 import {FLEET_PAINTS,fleetHullId} from './fleetPaintCatalog.js';
@@ -430,7 +430,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2fv';
+const GAME_VERSION = '0.8.2fz';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -3786,7 +3786,7 @@ export class GameUI {
         const quote = this.outfittingQuote(draft);
         if (!quote.ok)
             return this.setOutfittingNotice(this.outfittingErrorLabel(quote.code), 'warning');
-        this.runOutfittingTransaction(draft, {}, t('{name} installed. Removed hardware was returned to your locker.', { name: t(item.name) }));
+        this.runOutfittingTransaction(draft, {}, t('{name} installed. Removed hardware was returned to your locker.', { name: equipmentName(item) }));
     }
     removeSelectedOutfittingItem() {
         const actual = loadoutFor(this.save.player, this.save.player.shipId);
@@ -3799,7 +3799,7 @@ export class GameUI {
         const quote = this.outfittingQuote(draft);
         if (!quote.ok)
             return this.setOutfittingNotice(this.outfittingErrorLabel(quote.code), 'warning');
-        this.runOutfittingTransaction(draft, {}, t('{name} moved to your locker.', { name: t(OUTFIT_ITEMS[itemId]?.name ?? itemId) }));
+        this.runOutfittingTransaction(draft, {}, t('{name} moved to your locker.', { name: equipmentName(OUTFIT_ITEMS[itemId]) || itemId }));
     }
     sellSelectedOutfittingItem() {
         const item = OUTFIT_ITEMS[this.outfittingItemId];
@@ -3809,7 +3809,7 @@ export class GameUI {
         const quote = this.outfittingQuote(actual, { sales: { [item.id]: 1 } });
         if (!quote.ok)
             return this.setOutfittingNotice(this.outfittingErrorLabel(quote.code), 'warning');
-        this.runOutfittingTransaction(actual, { sales: { [item.id]: 1 } }, t('{name} sold for {credits}.', { name: t(item.name), credits: formatCredits(quote.resale) }));
+        this.runOutfittingTransaction(actual, { sales: { [item.id]: 1 } }, t('{name} sold for {credits}.', { name: equipmentName(item), credits: formatCredits(quote.resale) }));
     }
     setOutfittingFireGroup(group) {
         if (group !== 'A' && group !== 'B')
@@ -3876,7 +3876,7 @@ export class GameUI {
         const ownership = locker > 0 ? t('LOCKER ×{count}', { count: locker }) : installed > 0 ? t('INSTALLED') : formatCredits(item.price);
         return `<button type="button" class="dealer-item-tile ${selected ? 'is-selected' : ''} ${available || locker || installed ? '' : 'is-locked'}" data-outfit-item="${item.id}" aria-pressed="${selected}">
           <figure class="outfit-item-art-wrap">${equipmentIcon(item,"outfit-item-art")}</figure>
-          <span><b>${escapeHtml(t(item.name))}</b><small>${escapeHtml(ownership)}</small></span>
+          <span><b>${escapeHtml(equipmentName(item))}</b><small>${escapeHtml(ownership)}</small></span>
         </button>`;
     }
     renderOutfitting() {
@@ -3903,21 +3903,21 @@ export class GameUI {
         if(stage==='overview') {
             body=rows.map(x=>{
                 const item=OUTFIT_ITEMS[loadout[x.key]?.[x.index]];
-                return `<button type="button" class="fit-slot" data-outfit-slot="${x.mount.id}"><span>${escapeHtml(labelFor(x))}</span><b>${item?escapeHtml(t(item.name)):t('ADD EQUIPMENT')}</b><small>${item?escapeHtml(weaponDetails(item)):t('Choose a compatible module.')}</small></button>`;
+                return `<button type="button" class="fit-slot" data-outfit-slot="${x.mount.id}"><span>${escapeHtml(labelFor(x))}</span><b>${item?escapeHtml(equipmentName(item)):t('ADD EQUIPMENT')}</b><small>${item?escapeHtml(weaponDetails(item)):t('Choose a compatible module.')}</small></button>`;
             }).join('');
             action=`<button data-outfit-view="locker">${t('STORED EQUIPMENT')}</button>`;
         } else if(stage==='equipment') {
             heading=labelFor(selected);
             const candidates=OUTFIT_ITEM_IDS.map(id=>OUTFIT_ITEMS[id]).filter(item=>itemFitsMount(item,selected.mount) && (stored[item.id]>0 || itemAvailable(player,item,this.dockLocation)))
                 .sort((a,b)=>(stored[b.id]>0)-(stored[a.id]>0) || a.price-b.price);
-            body=candidates.map(item=>`<button type="button" class="fit-slot" data-outfit-item="${item.id}"><b>${escapeHtml(t(item.name))}</b><small>${escapeHtml(weaponDetails(item))}</small><strong>${stored[item.id]>0?t('OWNED'):formatCredits(item.price)}</strong></button>`).join('') || `<p>${t('No compatible equipment is available here.')}</p>`;
+            body=candidates.map(item=>`<button type="button" class="fit-slot" data-outfit-item="${item.id}"><b>${escapeHtml(equipmentName(item))}</b><small>${escapeHtml(weaponDetails(item))}</small><strong>${stored[item.id]>0?t('OWNED'):formatCredits(item.price)}</strong></button>`).join('') || `<p>${t('No compatible equipment is available here.')}</p>`;
             const fitted=OUTFIT_ITEMS[loadout[selected.key]?.[selected.index]];
             if(fitted)body+=`<details><summary>${t('CURRENTLY FITTED')}: ${escapeHtml(t(fitted.name))}</summary><button data-outfit-action="remove">${t('REMOVE')} · ${t('TO LOCKER')}</button>${selected.key==='guns'?`<p>${t('FIRE GROUP')} ${loadout.fireGroups?.assignments?.[selected.mount.id] ?? 'A'}</p><button data-outfit-group="A">${t('GROUP')} A</button><button data-outfit-group="B">${t('GROUP')} B</button>`:''}</details>`;
             action=back('overview');
         } else if(stage==='fit') {
             const item=OUTFIT_ITEMS[this.outfittingItemId],old=OUTFIT_ITEMS[loadout[selected.key]?.[selected.index]];
             if(!item || !itemFitsMount(item,selected.mount)){this.outfittingStage='equipment';return this.renderOutfitting();}
-            heading=t(item.name);
+            heading=equipmentName(item);
             const draft=JSON.parse(JSON.stringify(loadout));draft[selected.key][selected.index]=item.id;
             const quote=this.outfittingQuote(draft),w=flightEquipment(item),before=flightEquipment(old);
             const after=this.outfittingStatsFor(player.shipId,draft);
@@ -3926,7 +3926,7 @@ export class GameUI {
             // instead of printing it.
             const statText=v=>typeof v==='number'?String(Math.round(v*1000)/1000):(v ?? '—');
             const metric=(label,a,b)=>`<div class="fit-comparison"><span>${t(label)}</span><b>${statText(a)} → ${statText(b)}</b></div>`;
-            body=`<p>${escapeHtml(weaponDetails(item))}</p><p>${t('REPLACES')}: <b>${old?escapeHtml(t(old.name)):t('EMPTY')}</b></p>`;
+            body=`<p>${escapeHtml(weaponDetails(item))}</p><p>${t('REPLACES')}: <b>${old?escapeHtml(equipmentName(old)):t('EMPTY')}</b></p>`;
             if(w){
                 body+=metric('RANGE (km)',before?Math.round(weaponRange(before)):undefined,Math.round(weaponRange(w)));
                 body+=metric('PROJECTILE SPEED (km/s)',before?(before.kind==='beam'?t('INSTANT'):before.speed):undefined,w.kind==='beam'?t('INSTANT'):w.speed);
@@ -3945,7 +3945,7 @@ export class GameUI {
                     body+=metric(row.label,row.before+(row.unit?' '+row.unit:''),row.after+(row.unit?' '+row.unit:''));
                 body+=sortieImpactMarkup(item,stats,after);
             }
-            if(old && old.id!==item.id)body+=`<p>${t('{name} returns to your locker.',{name:t(old.name)})}</p>`;
+            if(old && old.id!==item.id)body+=`<p>${t('{name} returns to your locker.',{name:equipmentName(old)})}</p>`;
             // A failed quote reports what the staged fit would cost rather
             // than omitting it, so the action can never advertise a free locker
             // install for a module the pilot has to buy.
@@ -3957,10 +3957,10 @@ export class GameUI {
             action=back('equipment')+`<button class="primary" data-outfit-action="install" ${!quote.ok || old?.id===item.id?'disabled':''}>${stagedCost>0?t('BUY & INSTALL')+' · '+formatCredits(stagedCost):t('INSTALL FROM LOCKER')+' · '+t('NO CHARGE')}</button>`;
         } else {
             heading=t('STORED EQUIPMENT');
-            body=Object.entries(stored).filter(([id,n])=>n>0 && OUTFIT_ITEMS[id]).map(([id,n])=>`<button class="fit-slot" data-outfit-item="${id}"><b>${escapeHtml(t(OUTFIT_ITEMS[id].name))} ×${n}</b><small>${t('SELECT')}</small></button>`).join('') || `<p>${t('Your locker is empty.')}</p>`;
+            body=Object.entries(stored).filter(([id,n])=>n>0 && OUTFIT_ITEMS[id]).map(([id,n])=>`<button class="fit-slot" data-outfit-item="${id}"><b>${escapeHtml(equipmentName(OUTFIT_ITEMS[id]))} ×${n}</b><small>${t('SELECT')}</small></button>`).join('') || `<p>${t('Your locker is empty.')}</p>`;
             const item=OUTFIT_ITEMS[this.outfittingItemId];
             action=`<button data-outfit-view="guns">${t('BACK')}</button>`;
-            if(item && stored[item.id]>0)action+=`<button data-outfit-action="sell">${t('SELL ONE')} · ${escapeHtml(t(item.name))} · +${formatCredits(Math.round(item.price*RESALE_RATE))}</button>`;
+            if(item && stored[item.id]>0)action+=`<button data-outfit-action="sell">${t('SELL ONE')} · ${escapeHtml(equipmentName(item))} · +${formatCredits(Math.round(item.price*RESALE_RATE))}</button>`;
         }
         const notice=this.outfittingNotice;
         // The fitting screen trades the dock header for working height, so it
@@ -4113,7 +4113,7 @@ export class GameUI {
             const representative = this.guildRepresentative(id);
             const cost = guildJoinCost(id);
             const affordable = this.save.player.credits >= cost;
-            const nextItems = Object.values(OUTFIT_ITEMS).filter((item) => item.requiredGuild === id && item.requiredRank === rank + 1).map((item) => t(item.name));
+            const nextItems = Object.values(OUTFIT_ITEMS).filter((item) => item.requiredGuild === id && item.requiredRank === rank + 1).map((item) => equipmentName(item));
             const benefits = GUILD_BENEFIT_KEYS[id] ?? [];
             return `<article class="guild-card guild-${id}">
             <header class="guild-card-head">${representative ? this.portraitImage(representative.id, representative.name) : '<span class="guild-terminal-avatar">◇</span>'}<div><span class="eyebrow">${escapeHtml(t(GUILD_NAMES[id]))}</span><h3>${joined ? t(GUILD_RANK_NAMES[id][rank]) : t('NOT REGISTERED')}</h3><small>${representative ? `${escapeHtml(representative.name)} · ${escapeHtml(t(representative.role))}` : t('AUTOMATED DESK')}</small></div></header>
@@ -5757,13 +5757,12 @@ export class GameUI {
         const command=(action,value,label,extra='')=>`<button type="button" data-ui-command="run-action" data-run-action="${action}" data-run-value="${value}" ${extra}>${label}</button>`;
         const quality=id=>OUTFIT_ITEMS[id]?.rarity??RUN_EQUIPMENT_RARITY[id]??'common';
         const paint=id=>`data-rarity="${quality(id)}" style="--item-color:var(--loot-${quality(id)})"`;
-        const shortNames={'pulse-cannon':'Pulse laser','pulse-mk2':'Pulse laser II','beam-emitter':'Beam','ripper':'Ripper','gauss-cannon':'Magrail','ion-blaster':'Ion','mortar':'Plasma','pdc':'PDC','tracking-turret':'Laser turret','capacitor-bank':'Energy bank','sustained-reactor':'Reactor','recovery-shield':'Recovery shield','engine-mk2':'Sprint engine','thrusters-mk2':'Thrusters','shield-mk2':'Shield grid','seeker-launcher':'Seeker','shield-seeker-launcher':'Shield seeker','swarm-launcher':'Swarm','shield-swarm-launcher':'Shield swarm','torpedo-launcher':'Torpedo'};
-        const name=id=>t(shortNames[id]??OUTFIT_ITEMS[id].name);
+        const name=id=>equipmentName(OUTFIT_ITEMS[id],{affixes:false});
         const image=id=>equipmentIcon(OUTFIT_ITEMS[id],'run-item-image');
         const itemLabel=id=>`<span class="run-item-label" ${paint(id)}>${escapeHtml(name(id))}</span>`;
         const labelItems=ids=>{
             const counts={};ids.forEach(id=>counts[id]=(counts[id]??0)+1);
-            return Object.entries(counts).map(([id,n])=>`<span class="run-item-chip" ${paint(id)} title="${escapeHtml(t(OUTFIT_ITEMS[id].name))}">${image(id)}${itemLabel(id)}${n>1?`<b>×${n}</b>`:''}</span>`).join('');
+            return Object.entries(counts).map(([id,n])=>`<span class="run-item-chip" ${paint(id)} title="${escapeHtml(equipmentName(OUTFIT_ITEMS[id]))}">${image(id)}${itemLabel(id)}${n>1?`<b>×${n}</b>`:''}</span>`).join('');
         };
         const formatter=new Intl.NumberFormat(getLanguage(),{maximumFractionDigits:1});
         const number=value=>formatter.format(Number(value));
@@ -5808,7 +5807,7 @@ export class GameUI {
                 const service=['repair','rearm','resupply'].includes(id);
                 const title=id==='resupply'?t('Refuel and recharge'):id==='rearm'?t('Reload missiles'):id==='repair'?t('Field repairs'):name(id);
                 const visual=service?`<span class="run-art"><span class="run-service-icon">${id==='repair'?'✚':id==='rearm'?'⟐':'⚡'}</span></span><span class="run-metrics">${id==='repair'?metric('HULL',50,'+ %')+metric('MISSILES',100,'%'):id==='rearm'?metric('MISSILES',100,'%'):metric('ENERGY',100,'%')+metric('FUEL',100,'%')}</span>`:`<span class="run-art">${image(id)}${plan.count>1?`<em class="run-quantity">×${plan.count}</em>`:''}</span>${metrics(id)}<span class="run-replacement" aria-label="${t('REPLACES')}">${[...new Set(plan.replaced)].map(image).join('')||'<span class="run-empty-mount">+</span>'}<i>→</i>${image(id)}</span>`;
-                return command('reward',id,`<b>${escapeHtml(title)}</b>${visual}<span class="run-selected-mark" aria-hidden="true">✓</span>`,`class="${r.selectedReward===id?'is-selected':''}" ${service?'data-service="true"':paint(id)} title="${escapeHtml(service?title:t(OUTFIT_ITEMS[id].name))}" aria-label="${escapeHtml((service?'':plan.count+'× ')+title+(service?'':' · '+t(EQUIPMENT_RARITIES[quality(id)].name)))}" aria-pressed="${r.selectedReward===id}"`);
+                return command('reward',id,`<b>${escapeHtml(title)}</b>${visual}<span class="run-selected-mark" aria-hidden="true">✓</span>`,`class="${r.selectedReward===id?'is-selected':''}" ${service?'data-service="true"':paint(id)} title="${escapeHtml(service?title:equipmentName(OUTFIT_ITEMS[id]))}" aria-label="${escapeHtml((service?'':plan.count+'× ')+title+(service?'':' · '+t(EQUIPMENT_RARITIES[quality(id)].name)))}" aria-pressed="${r.selectedReward===id}"`);
             }).join('')}</div>`;
             const selected=r.offers.includes(r.selectedReward)&&runRewardPlan(save,r.selectedReward);
             footer=`${leave}${r.wave===0&&r.openingPicks===0?'':command('equip','',t('Fitting'),selected?'':'disabled')}${command('accept','',t(r.wave===0&&r.openingPicks===0?'NEXT':'LAUNCH'),`class="primary" ${selected?'':'disabled'}`)}`;

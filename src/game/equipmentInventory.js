@@ -1,5 +1,5 @@
 import {BASE_OUTFIT_ITEMS,OUTFIT_ITEMS,HULL_HARDPOINTS,LOADOUT_KEYS,normalizeOutfitting,normalizeLoadout,projectLegacyEquipment,projectLegacyWeaponId,itemAvailable} from './outfitting.js';
-import {resolveEquipmentDefinition,registerEquipmentDefinition,equipmentBaseId,forgetEquipmentDefinition,EQUIPMENT_RARITIES,EQUIPMENT_AFFIXES,NAMED_EQUIPMENT} from './equipmentCatalog.js';
+import {resolveEquipmentDefinition,migratePulseRecord,runtimeEquipmentId,registerEquipmentDefinition,equipmentBaseId,forgetEquipmentDefinition,EQUIPMENT_RARITIES,EQUIPMENT_AFFIXES,NAMED_EQUIPMENT} from './equipmentCatalog.js';
 import {getEffectiveShipStats} from './shipStats.js';
 import {normalizeLauncherMagazines,launcherMagazineEntries,mountedLauncherEntries} from './weapons.js';
 import {LOCATIONS,COMMODITIES} from './data.js';
@@ -9,7 +9,7 @@ export const ITEM_SURVIVAL_CHANCE=.18;
 export const CARGO_SURVIVAL_CHANCE=.55;
 export function registerInventoryDefinitions(inventory){
  for(const [id,record] of Object.entries(inventory?.items??{})){
-  const base=BASE_OUTFIT_ITEMS[record?.baseId];if(!Object.hasOwn(BASE_OUTFIT_ITEMS,record?.baseId)||!base||record.id!==id||!id.startsWith('eq-')&&!id.startsWith('loot-'))continue;
+  migratePulseRecord(record);const base=BASE_OUTFIT_ITEMS[record?.baseId];if(!Object.hasOwn(BASE_OUTFIT_ITEMS,record?.baseId)||!base||record.id!==id||!id.startsWith('eq-')&&!id.startsWith('loot-'))continue;
   record.tier=Math.max(base.tier??1,Math.min(3,Math.floor(Number(record.tier)||1)));
   if(!EQUIPMENT_RARITIES[record.rarity])record.rarity='common';
   if(record.rarity==='named'&&!NAMED_EQUIPMENT[record.baseId])record.rarity='rare';
@@ -18,7 +18,7 @@ export function registerInventoryDefinitions(inventory){
  }
 }
 export function createEquipmentRecord(baseId,{id,tier=1,rarity='common',affixes=[],factory=false,location={kind:'cargo'}}={}){
- baseId=equipmentBaseId(baseId);if(!Object.hasOwn(BASE_OUTFIT_ITEMS,baseId))return null;
+ tier=Math.max(tier,OUTFIT_ITEMS[baseId]?.tier??1);baseId=equipmentBaseId(baseId);if(!Object.hasOwn(BASE_OUTFIT_ITEMS,baseId))return null;
  const item={id:id??`eq-${globalThis.crypto?.randomUUID?.()??Date.now()+'-'+Math.random().toString(36).slice(2)}`,baseId,tier,rarity,affixes:[...affixes],factory,location:{...location}};
  registerInventoryDefinitions({items:{[item.id]:item}});return item;
 }
@@ -46,7 +46,7 @@ export function refreshInventoryProjection(player){
  player.equipment=projectLegacyEquipment(player);player.weaponId=projectLegacyWeaponId(player);
 }
 export function normalizeEquipmentInventory(player,{disabled=false}={}){
- if(disabled){registerInventoryDefinitions(player.inventory);for(const fit of Object.values(player.outfitting?.loadouts??{}))for(const key of LOADOUT_KEYS)fit[key]=(fit[key]??[]).map(id=>id?equipmentBaseId(id):null);const stock={};for(const [id,n] of Object.entries(player.outfitting?.locker??{})){const base=equipmentBaseId(id);stock[base]=(stock[base]??0)+n;}if(player.outfitting)player.outfitting.locker=stock;delete player.inventory;delete player._inventoryCargoMass;return;}
+ if(disabled){registerInventoryDefinitions(player.inventory);for(const fit of Object.values(player.outfitting?.loadouts??{}))for(const key of LOADOUT_KEYS)fit[key]=(fit[key]??[]).map(id=>id?runtimeEquipmentId(id):null);const stock={};for(const [id,n] of Object.entries(player.outfitting?.locker??{})){const base=runtimeEquipmentId(id);stock[base]=(stock[base]??0)+n;}if(player.outfitting)player.outfitting.locker=stock;delete player.inventory;delete player._inventoryCargoMass;return;}
  const had=Boolean(player.inventory?.version===1);
  player.inventory=had?player.inventory:{version:1,items:{}};
  if(!player.inventory.items||typeof player.inventory.items!=='object'||Array.isArray(player.inventory.items))player.inventory.items={};registerInventoryDefinitions(player.inventory);
@@ -54,7 +54,7 @@ export function normalizeEquipmentInventory(player,{disabled=false}={}){
  const retain=(raw,location,factory)=>{
   if(player.inventory.items[raw]){if(seen.has(raw))return null;seen.add(raw);return raw;}
   const base=equipmentBaseId(raw);if(!BASE_OUTFIT_ITEMS[base])return null;
-  const item=createEquipmentRecord(base,{location,factory});player.inventory.items[item.id]=item;seen.add(item.id);return item.id;
+  const item=createEquipmentRecord(raw,{location,factory});player.inventory.items[item.id]=item;seen.add(item.id);return item.id;
  };
  for(const [shipId,fit] of Object.entries(state.loadouts))for(const key of LOADOUT_KEYS)for(let i=0;i<fit[key].length;i++)if(fit[key][i])fit[key][i]=retain(fit[key][i],{kind:'installed',shipId,mountId:HULL_HARDPOINTS[shipId][key][i].id},state.factory?.[shipId]?.[key]?.[i]===true);
  for(const [raw,n] of Object.entries(state.locker))for(let i=0;i<n;i++)retain(raw,{kind:'station',stationId:player.dockedAt??player.lastDockedAt??'helix'},i<(state.factoryLocker?.[raw]??0));
@@ -115,6 +115,7 @@ export function equipmentAction(player,action,{id,baseId,tier=1,mountId,stationI
  return {ok:true,id,credit,code:action==='buy'?'Purchased into station storage.':'Equipment updated.'};
 }
 export function receiveEquipment(player,record){
+ migratePulseRecord(record);
  if(!record?.id||!record.id.startsWith('eq-')&&!record.id.startsWith('loot-')||!Object.hasOwn(BASE_OUTFIT_ITEMS,record.baseId)||player.inventory?.items?.[record.id])return {ok:false,code:'invalid-item'};
  registerInventoryDefinitions({items:{[record.id]:record}});
  const mass=OUTFIT_ITEMS[record.id].mass;if(cargoMass(player)+mass>getEffectiveShipStats(player).cargo+1e-6)return {ok:false,code:'cargo-full'};

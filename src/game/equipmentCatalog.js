@@ -1,3 +1,4 @@
+import {t} from './i18n.js';
 // Resolved item definitions are cached on inventory changes, never rolled or
 // allocated in flight. The fixed shop catalogue remains independently iterable.
 const resolved = new Map();
@@ -22,10 +23,33 @@ export const NAMED_EQUIPMENT = Object.freeze({
  'torpedo-launcher':{name:'Siegebreaker',damage:1.12,cooldown:1.2,energy:1.15},
  'shield-mk2':{name:'Bastion',effect:1.18,mass:1.3},
 });
+// Technology tier is independent of rarity and of the hardware model name.
+// Named loot still shows its hardware type; affixes stay out of compact lists.
+export function equipmentName(item, {affixes = true} = {}) {
+ if (!item) return '';
+ const tier = Math.max(1, Math.min(3, Math.trunc(item.tier ?? 1)));
+ const base = t(item.baseName ?? item.name);
+ const nickname = item.rarity === 'named' ? NAMED_EQUIPMENT[item.baseId]?.name : undefined;
+ const modifiers = affixes ? (item.affixIds ?? []).map(id => EQUIPMENT_AFFIXES[id]).filter(Boolean).map(a => t(a.name)) : [];
+ return [`${base}\u00a0${['I', 'II', 'III'][tier - 1]}`, ...(nickname ? [t(nickname)] : []), ...modifiers].join(' · ');
+}
+export function migratePulseRecord(record){
+ if(record?.baseId==='pulse-mk2'){
+  record.baseId='pulse-cannon';record.tier=Math.min(3,Math.max(1,Math.floor(Number(record.tier)||1))+1);
+  if(record.rarity==='named')record.rarity='rare';
+ }
+ return record;
+}
+export const runtimeEquipmentId=id=>{
+ const item=equipmentRecord(id),base=equipmentBaseId(id);
+ return base==='pulse-cannon'&&(item?.tier??1)>1?`pulse-cannon-t${Math.min(3,item.tier)}`:base;
+};
 export function resolveEquipmentDefinition(base, record) {
  const tier=Math.max(base.tier??1,Math.min(3,record.tier??1)),rarity=EQUIPMENT_RARITIES[record.rarity]??EQUIPMENT_RARITIES.common;
  const extra=Math.max(0,tier-(base.tier??1));
- const modifiers={damage:1+extra*.1,energy:1+extra*.14,cooldown:1,range:1,accuracy:1,mass:1,effect:1+extra*.1};
+ // Tier II exactly replaces the former reinforced pulse's base performance.
+ const pulse=base.id==='pulse-cannon';
+ const modifiers={damage:1+extra*(pulse?4/23:.1),energy:1+extra*(pulse ? .125 : .14),cooldown:1,range:1,accuracy:1,mass:1,effect:1+extra*.1};
  const affixes=(record.affixes??[]).map(id=>EQUIPMENT_AFFIXES[id]).filter(a=>a?.categories.includes(base.category));
  for(const a of affixes)for(const key of Object.keys(modifiers))modifiers[key]*=a[key]??1;
  const named=record.rarity==='named'?NAMED_EQUIPMENT[record.baseId]:undefined;
@@ -36,7 +60,7 @@ export function resolveEquipmentDefinition(base, record) {
   else if(['cargoCapacity','shieldCapacity','hullCapacity','salvageRange','salvageRate','radarMultiplier','scanMultiplier'].includes(key))effects[key]=value*modifiers.effect;
  }
  const name=named?.name??[...affixes.map(a=>a.name),base.name].join(' ');
- return {...base,id:record.id,baseId:base.id,tier,rarity:record.rarity,affixIds:[...(record.affixes??[])],name:`${name} · ${['I','II','III'][tier-1]}`,effects,modifiers,
+ return {...base,id:record.id,baseId:base.id,baseName:base.name,tier,rarity:record.rarity,affixIds:[...(record.affixes??[])],name:`${name} · ${['I','II','III'][tier-1]}`,effects,modifiers,
   energyCost:(base.energyCost??0)*modifiers.energy,mass:(base.mass??(base.category==='gun'?2:base.category==='launcher'?3:1))*modifiers.mass,
   price:Math.round(base.price*(1+extra*.35)*rarity.value),factoryFit:base.factoryFit};
 }

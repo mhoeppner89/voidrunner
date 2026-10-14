@@ -13,7 +13,8 @@
     "audit:collisions": "node --import ./tests/helpers/offline-imports.mjs tools/assets/audit-ship-collisions.mjs",
     "benchmark:collisions": "node --import ./tests/helpers/offline-imports.mjs tools/assets/benchmark-ship-collisions.mjs",
     "verify:sources": "node tools/maintenance/verify-sources.mjs",
-    "test:icons": "node --import ./tests/helpers/offline-imports.mjs tools/playtest/icon-gallery.mjs && node tools/playtest/check-icon-gallery.mjs"
+    "test:icons": "node --import ./tests/helpers/offline-imports.mjs tools/playtest/icon-gallery.mjs && node tools/playtest/check-icon-gallery.mjs",
+    "review:names": "node --import ./tests/helpers/offline-imports.mjs tools/playtest/equipment-names.mjs"
   },
   "version": "0.8.2-a",
   "devDependencies": {

@@ -37,11 +37,11 @@ const capablePlayer = (overrides = {}) => ({
     ...overrides,
 });
 
-assert.equal(OUTFIT_ITEM_IDS.length, 27, 'registry includes the shop roster and three capital salvage modules');
-assert.equal(new Set(OUTFIT_ITEM_IDS).size, 27, 'registry ids are unique');
+assert.equal(OUTFIT_ITEM_IDS.length, 26, 'registry includes the shop roster and three capital salvage modules');
+assert.equal(new Set(OUTFIT_ITEM_IDS).size, 26, 'registry ids are unique');
 assert.deepEqual(OUTFIT_ITEM_IDS, [
     'tracking-turret','capacitor-bank','sustained-reactor','recovery-shield','beam-emitter',
-    'pulse-cannon', 'pulse-mk2', 'gauss-cannon', 'pdc', 'ripper', 'ion-blaster', 'mortar',
+    'pulse-cannon', 'gauss-cannon', 'pdc', 'ripper', 'ion-blaster', 'mortar',
     'seeker-launcher', 'swarm-launcher', 'shield-seeker-launcher', 'shield-swarm-launcher', 'torpedo-launcher',
     'engine-mk2', 'thrusters-mk2', 'shield-mk2', 'armor-mk2',
     'radar-mk2', 'cargo-pods', 'salvage-mk2',
@@ -66,7 +66,7 @@ all(OUTFIT_ITEM_IDS, (id) => {
         && item.availability.length > 0
         && typeof item.stat === 'string' && item.stat.length > 0;
 }, 'every item has fitting, balance, effects, availability, copy, and simplified art metadata');
-assert.equal(Object.keys(LEGACY_OUTFIT_ID_MAP).length, 4);
+assert.equal(Object.keys(LEGACY_OUTFIT_ID_MAP).length, 5);
 
 const expectedCounts = {
     wayfarer: { gun: 2, turret:1,power:1, launcher: 1, drive: 1, defense: 1, utility: 2 },
@@ -255,7 +255,7 @@ const legacyPlayer = {
 };
 const migrated = migrateLegacyOutfitting(legacyPlayer);
 assert.equal(migrated.loadouts.wayfarer.guns.filter((id) => id === 'beam-emitter').length, 2);
-assert.ok(migrated.loadouts.wayfarer.guns.includes('pulse-mk2'), 'a legacy weapon stays fitted alongside the factory beams');
+assert.ok(migrated.loadouts.wayfarer.guns.includes('pulse-cannon-t2'), 'a legacy weapon stays fitted alongside the factory beams');
 assert.equal(migrated.loadouts.talon.guns.includes('gauss-cannon'), true);
 assert.equal((migrated.locker.pdc ?? 0) + migrated.loadouts.wayfarer.turrets.filter((id) => id === 'pdc').length, 2);
 assert.ok(migrated.loadouts.wayfarer.utility.includes('engine-mk2'));
@@ -264,7 +264,7 @@ assert.ok(migrated.loadouts.wayfarer.utility.includes('cargo-pods'));
 const normalizedMigrated = normalizeOutfitting({ ...legacyPlayer, outfitting: migrated });
 assert.deepEqual(normalizedMigrated.loadouts.talon.fireGroups.activeGroup, 'A');
 const projection = projectLegacyEquipment({ ...legacyPlayer, outfitting: migrated }, migrated);
-assert.ok(projection.includes('pulse-mk2'));
+assert.ok(projection.includes('pulse-cannon-t2'));
 assert.ok(projection.includes('beam-emitter'));
 assert.ok(projection.includes('pdc'));
 assert.ok(projection.includes('pdc-cluster'));
@@ -314,7 +314,7 @@ assert.ok(hydrated.player.equipment.includes('engine-mk2'), 'legacy utility gear
 const activeMk2 = migrateLegacyOutfitting({
     shipId: 'wayfarer', ownedShips: ['wayfarer'], equipment: [], weaponId: 'pulse-mk2',
 });
-assert.ok(activeMk2.loadouts.wayfarer.guns.includes('pulse-mk2'), 'active-only pulse-mk2 survives migration as a fitted weapon');
+assert.ok(activeMk2.loadouts.wayfarer.guns.includes('pulse-cannon-t2'), 'active-only pulse-mk2 survives migration as a fitted weapon');
 const mountedMk2 = capablePlayer({shipId:'talon',ownedShips:['talon'],
     outfitting: createOutfittingState(['talon']),
 });
@@ -323,8 +323,8 @@ mountedMk2.outfitting.loadouts.talon.fireGroups.activeGroup = 'B';
 for (const mount of HULL_HARDPOINTS.talon.weapons)
     mountedMk2.outfitting.loadouts.talon.fireGroups.assignments[mount.id] = 'A';
 mountedMk2.outfitting.loadouts.talon.fireGroups.assignments['talon-weapon-2'] = 'B';
-assert.equal(projectLegacyWeaponId(mountedMk2, 'talon'), 'pulse-mk2');
-assert.equal(projectLegacyWeaponId(mountedMk2, 'talon', 'B'), 'pulse-mk2');
+assert.equal(projectLegacyWeaponId(mountedMk2, 'talon'), 'pulse');
+assert.equal(projectLegacyWeaponId(mountedMk2, 'talon', 'B'), 'pulse');
 
 // A full legacy gun rack cannot evict factory baseline ownership. Unmounted
 // copies are mirrored in the ordinary locker and the factory-only ledger, so
@@ -337,7 +337,7 @@ const fullLegacy = migrateLegacyOutfitting({
 assert.ok(fullLegacy.loadouts.wayfarer.guns.includes('beam-emitter'), 'current hull receives the compatible baseline');
 assert.equal(fullLegacy.locker.pdc,1,'extra legacy PDC remains usable');
 assert.equal(fullLegacy.factoryLocker.pdc??0,0,'paid PDC remains sellable');
-assert.ok(fullLegacy.loadouts.wayfarer.guns.includes('pulse-mk2'), 'the active paid pulse-mk2 remains fitted');
+assert.ok(fullLegacy.loadouts.wayfarer.guns.includes('pulse-cannon-t2'), 'the active paid pulse-mk2 remains fitted');
 assert.equal(fullLegacy.factoryLocker['gauss-cannon'] ?? 0, 1, 'legacy gauss remains bound in storage');
 
 // Unknown sidecar ids are intentionally opaque to fitting, but remain visible
@@ -425,8 +425,8 @@ assert.ok(Array.isArray(malformedEquipmentSave.player.equipment));
 const malformedEquipmentIds = [
     ...LOADOUT_KEYS.flatMap((key) => malformedEquipmentSave.player.outfitting.loadouts.wayfarer[key]),
     ...Object.keys(malformedEquipmentSave.player.outfitting.locker),
-].filter(Boolean).map(equipmentBaseId);
-assert.ok(malformedEquipmentIds.includes('pulse-mk2'), 'malformed flat equipment cannot erase an independently saved active weapon');
+].filter(Boolean).map(id=>OUTFIT_ITEMS[id]);
+assert.ok(malformedEquipmentIds.some(item=>item?.baseId==='pulse-cannon'&&item.tier===2), 'malformed flat equipment cannot erase an independently saved active weapon');
 
 // A complete factory ledger is required before saved flags are trusted. An
 // empty/malformed ledger must not turn a paid duplicate starter gun into

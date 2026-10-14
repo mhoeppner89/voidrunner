@@ -124,3 +124,47 @@ test('multiple launchers spend one energy charge per canister and cannot overdra
  s.fireMissile();assert.equal(s.projectiles.length,8);assert.equal(p.energy,2);
  p.energy=60;s.save.world.time=100;s.fireMissile();assert.equal(s.projectiles.length,20);assert.equal(p.energy,18);
 });
+
+test('pulse tiers replace reinforced variants without changing tier-II NPC firepower',async()=>{
+ const {WEAPONS,WEAPON_ORDER}=await import('../../src/game/weapons.js'),{equipmentName,resolveEquipmentDefinition,modifiedWeapon}=await import('../../src/game/equipmentCatalog.js'),{setLanguage,getLanguage}=await import('../../src/game/i18n.js');
+ assert(!Object.hasOwn(BASE_OUTFIT_ITEMS,'pulse-mk2'));assert(!WEAPON_ORDER.includes('pulse-mk2'));
+ const previous=getLanguage();try{setLanguage('de');for(const [tier,damage,energy]of [[1,9.2,3.2],[2,10.8,3.6],[3,12.4,4]]){
+  const item=resolveEquipmentDefinition(BASE_OUTFIT_ITEMS['pulse-cannon'],{id:'probe',baseId:'pulse-cannon',tier,rarity:'common',affixes:[]}),weapon=modifiedWeapon(WEAPONS.pulse,item);
+  assert(Math.abs(weapon.damageFlat-damage)<1e-8);assert(Math.abs(weapon.energyCost-energy)<1e-8);assert.equal(weapon.cooldown,.17);assert.equal(weapon.range,450);assert.equal(equipmentName(item),'Pulslaser\u00a0'+['I','II','III'][tier-1]);
+ }}finally{setLanguage(previous);}
+ const ship={hullId:'lancer',position:[0,0,0],pilot:{tier:'veteran'}};ship.combatFit=createEnemyLoadout(ship,0);
+ assert.equal(ship.combatFit.guns[0],'pulse-cannon-t2');assert.equal(ship.combatFit.weapons[0],'pulse');assert(Math.abs(ship.combatFit.weaponDefinitions[0].damageFlat-10.8)<1e-8);
+ const session={save:make(),arena:false,careerRegionAt:()=>({danger:.5})};equipCareerItems(session,ship);
+ const pulse=ship.equipmentRecords.find(({item})=>item.baseId==='pulse-cannon').item;assert.equal(pulse.tier,2,'low-danger career does not discard the NPC weapon tier');
+});
+
+test('reinforced career items migrate once with their identity, affixes and storage intact',()=>{
+ const save=make(),p=save.player,basePulse=Object.values(p.inventory.items).find(item=>item.baseId==='beam-emitter');
+ basePulse.baseId='pulse-mk2';basePulse.tier=1;basePulse.rarity='rare';basePulse.affixes=['efficient','precise'];basePulse.factory=false;
+ const stored={id:'eq-old-tiered-pulse',baseId:'pulse-mk2',tier:2,rarity:'uncommon',affixes:['light'],factory:false,location:{kind:'station',stationId:'rook'}};p.inventory.items[stored.id]=stored;
+ save.world.combatWrecks={'wreck-old-pulse':{id:'wreck-old-pulse',systemId:p.systemId,position:[0,0,0],contents:[{id:'loot-old-pulse',kind:'equipment',item:{id:'loot-old-pulse',baseId:'pulse-mk2',tier:3,rarity:'rare',affixes:['rapid','longRange'],factory:false,location:{kind:'wreck'}}}]}};
+ const first=hydrateSave(JSON.parse(JSON.stringify(save))),second=hydrateSave(JSON.parse(JSON.stringify(first)));
+ for(const migrated of [first,second]){
+  const item=migrated.player.inventory.items[basePulse.id];assert.equal(item.baseId,'pulse-cannon');assert.equal(item.tier,2);assert.equal(item.rarity,'rare');assert.deepEqual(item.affixes,['efficient','precise']);assert.deepEqual(item.location,basePulse.location);assert.equal(item.factory,false);
+  const locker=migrated.player.inventory.items[stored.id];assert.equal(locker.tier,3);assert.equal(locker.baseId,'pulse-cannon');assert.deepEqual(locker.location,stored.location);assert.deepEqual(locker.affixes,['light']);
+  const loot=migrated.world.combatWrecks['wreck-old-pulse'].contents[0].item;assert.equal(loot.baseId,'pulse-cannon');assert.equal(loot.tier,3);assert.deepEqual(loot.affixes,['rapid','longRange']);
+ }
+});
+
+test('Arena checkpoint migration keeps earned pulse tiers and converts old offers',async()=>{
+ const {newArenaRun,readArenaRun,writeArenaRun,chooseRunReward,markDecision}=await import('../../src/game/arenaRun.js');
+ const save=newArenaRun(false,987);Object.assign(save.arenaRun,{wave:4,phase:'prepare',hullChosen:true,rewardChosen:false,offers:['pulse-mk2','ripper','gauss-cannon'],selectedReward:'pulse-mk2'});markDecision(save);
+ save.player.outfitting.loadouts.wayfarer.guns[0]='pulse-mk2';save.player.outfitting.locker['pulse-mk2']=2;
+ const storage=new Map(),previous=globalThis.window;globalThis.window={localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)}};
+ try{assert(writeArenaRun(save));const loaded=readArenaRun();assert(loaded);assert(loaded.player.outfitting.loadouts.wayfarer.guns.includes('pulse-cannon-t2'));assert.equal(loaded.player.outfitting.locker['pulse-cannon-t2'],2);assert(!loaded.arenaRun.offers.includes('pulse-mk2'));
+  loaded.arenaRun.offers=['pulse-cannon-t3'];loaded.arenaRun.selectedReward=null;assert(chooseRunReward(loaded,'pulse-cannon-t3'));assert(loaded.player.outfitting.loadouts.wayfarer.guns.includes('pulse-cannon-t3'));assert(writeArenaRun(loaded));assert(readArenaRun().player.outfitting.loadouts.wayfarer.guns.includes('pulse-cannon-t3'));
+ }finally{globalThis.window=previous;}
+});
+
+test('resuming an interrupted Arena wave migrates the restored checkpoint loadout',async()=>{
+ const {newArenaRun}=await import('../../src/game/arenaRun.js'),{ArenaRunMethods}=await import('../../src/game/arenaRunSession.js');const save=newArenaRun(false,888);
+ const checkpoint=JSON.parse(JSON.stringify(save.player));checkpoint.outfitting.loadouts.wayfarer.guns[0]='pulse-mk2';checkpoint.outfitting.locker['pulse-mk2']=1;
+ Object.assign(save.arenaRun,{phase:'combat',checkpoint,checkpointStats:{elapsed:4}});
+ const session={save,setupArena(){},showRunPreparation(){}};ArenaRunMethods.setupRun.call(session);
+ assert.equal(save.player.outfitting.loadouts.wayfarer.guns[0],'pulse-cannon-t2');assert.equal(save.player.outfitting.locker['pulse-cannon-t2'],1);assert.equal(save.arenaRun.phase,'prepare');
+});

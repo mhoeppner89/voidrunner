@@ -1,6 +1,6 @@
 import {normalizeEquipmentInventory} from './equipmentInventory.js';
 import {createNewSave,hydrateSave} from './save.js';
-import {HULL_HARDPOINTS,OUTFIT_ITEMS,LOADOUT_KEYS,loadoutFor,createOutfittingState,itemFitsMount,validateLoadout,projectLegacyEquipment,projectLegacyWeaponId} from './outfitting.js';
+import {HULL_HARDPOINTS,OUTFIT_ITEMS,canonicalOutfitId,LOADOUT_KEYS,loadoutFor,createOutfittingState,itemFitsMount,validateLoadout,projectLegacyEquipment,projectLegacyWeaponId} from './outfitting.js';
 import {getEffectiveShipStats} from './shipStats.js';
 import {launcherMagazineEntries,normalizeLauncherMagazines,fillLauncherMagazines} from './weapons.js';
 import {proceduralCallsign,seededRandom} from './random.js';
@@ -123,7 +123,7 @@ export function readArenaRun(){try{
  const raw=JSON.parse(window.localStorage.getItem(ARENA_RUN_KEY)),r=raw?.arenaRun;
  const totals={...OLD_WAVE_TOTALS,3:RUN_WAVES.length};
  if(![1,2,3].includes(r?.version)||!['prepare','combat','won','lost'].includes(r.phase)||!Number.isInteger(r.wave)||r.wave<0||r.wave>=totals[r.version])return null;
- const save=hydrateSave(raw);save.arenaRun=r;save.arena={run:true};normalizeEquipmentInventory(save.player,{disabled:true});
+ const save=hydrateSave(raw);save.arenaRun=r;r.offers=[...new Set((r.offers??[]).map(canonicalOutfitId))];if(r.selectedReward)r.selectedReward=canonicalOutfitId(r.selectedReward);save.arena={run:true};normalizeEquipmentInventory(save.player,{disabled:true});
  // Finished short runs stay finished with their old totals; an active one moves
  // into the current five-act run at the same fraction of the way through.
  if(r.version<3){
@@ -151,14 +151,14 @@ export const RUN_EQUIPMENT_RARITY=Object.freeze({
  'pulse-cannon':'common','beam-emitter':'common','ripper':'common','seeker-launcher':'common','pdc':'common',
  'gauss-cannon':'uncommon','ion-blaster':'uncommon','mortar':'uncommon','tracking-turret':'uncommon',
  'engine-mk2':'uncommon','thrusters-mk2':'uncommon','capacitor-bank':'uncommon','sustained-reactor':'uncommon','shield-mk2':'uncommon','shield-seeker-launcher':'uncommon',
- 'pulse-mk2':'rare','swarm-launcher':'rare','shield-swarm-launcher':'rare','torpedo-launcher':'rare','recovery-shield':'rare',
+ 'pulse-cannon-t2':'uncommon','pulse-cannon-t3':'rare','swarm-launcher':'rare','shield-swarm-launcher':'rare','torpedo-launcher':'rare','recovery-shield':'rare',
 });
 const rewardPools={
- offense:['pulse-cannon','ripper','gauss-cannon','ion-blaster','mortar','pulse-mk2','shield-seeker-launcher','swarm-launcher','shield-swarm-launcher','torpedo-launcher'],
+ offense:['pulse-cannon','ripper','gauss-cannon','ion-blaster','mortar','pulse-cannon-t2','pulse-cannon-t3','shield-seeker-launcher','swarm-launcher','shield-swarm-launcher','torpedo-launcher'],
  survival:['pdc','tracking-turret','shield-mk2','recovery-shield'],
  handling:['engine-mk2','thrusters-mk2','capacitor-bank','sustained-reactor'],
 };
-const rewardWave={'pulse-mk2':3,'swarm-launcher':3,'torpedo-launcher':5,'mortar':2,'gauss-cannon':2};
+const rewardWave={'pulse-cannon-t2':3,'pulse-cannon-t3':8,'swarm-launcher':3,'torpedo-launcher':5,'mortar':2,'gauss-cannon':2};
 export function runOffers(save){
  const r=save.arenaRun,p=save.player,fit=loadoutFor(p),owned=LOADOUT_KEYS.flatMap(k=>fit[k]).filter(Boolean);
  if(r.wave===0&&r.openingPicks===0)return ['pulse-cannon','beam-emitter','ripper'].filter(id=>runRewardPlan(save,id));

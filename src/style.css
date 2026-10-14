@@ -17619,7 +17619,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .inventory-stat .stat-unit { margin-left:4px; color:var(--void-muted); }
 .run-card .run-utility-metrics, .run-card .run-weapon-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 12px; }
 .run-card .run-metrics .stat-unit { margin-left:3px; font:400 11px/1.1 var(--ui-font); color:var(--void-muted); }
-.run-card .run-utility-metrics small { overflow-wrap:normal; white-space:normal; }
+.run-card .run-utility-metrics small { overflow-wrap:anywhere; white-space:normal; }
 @media(max-height:500px),(max-width:900px) {
  .run-card .run-utility-metrics, .run-card .run-weapon-metrics { gap:4px 8px; padding-top:6px; }
  .run-card .run-utility-metrics small, .run-card .run-weapon-metrics small { font-size:10px; }
@@ -17660,3 +17660,14 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
  .run-card .run-tradeoffs em { font-size:10px; }
 }
 .inventory-loot-commodity { display:flex; align-items:center; gap:10px; }
+
+/* Full equipment names retain their tier on compact reward cards. */
+@media (max-height:500px) and (orientation:landscape) {
+ .run-card[data-run-view="rewards"] .run-offers button > b { font-size:14px; line-height:1.15; flex-shrink:0; }
+ .run-card[data-run-view="rewards"] .run-art { min-height:18px; }
+ .run-card[data-run-view="rewards"] .run-offers button { gap:3px; }
+ .run-card[data-run-view="rewards"] .run-metrics:not(.run-utility-metrics):not(.run-weapon-metrics) { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+ .run-card[data-run-view="rewards"] .run-metrics:not(.run-utility-metrics):not(.run-weapon-metrics) small { font-size:10px; white-space:normal; }
+ .run-card[data-run-view="rewards"] .run-replacement { height:18px; }
+ .run-card[data-run-view="rewards"] .run-replacement .run-item-image { width:18px; height:18px; }
+}

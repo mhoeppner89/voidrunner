@@ -1,5 +1,5 @@
 import {LEAGUE_FITS} from './leagueContent.js';
-import {HULL_HARDPOINTS, OUTFIT_ITEMS, itemFitsMount,normalizeLoadout} from './outfitting.js';
+import {HULL_HARDPOINTS, OUTFIT_ITEMS,canonicalOutfitId, itemFitsMount,normalizeLoadout} from './outfitting.js';
 import {LAUNCHERS, WEAPONS, launcherIdForOutfit, weaponRange, weaponIdForOutfit,weaponForOutfit} from './weapons.js';
 import {getEffectiveShipStats} from './shipStats.js';
 // Approved hulls have a recognizable stock fit; explicit observer/scenario fits override it.
@@ -10,7 +10,7 @@ export const HULL_NPC_FITS = Object.freeze({
  mule:{guns:['pulse-cannon','pulse-cannon'],turret:'pdc',launcher:'seeker-launcher'},
  wayfarer:{guns:['beam-emitter','beam-emitter'],turret:'pdc',launcher:'seeker-launcher'},
  talon:{guns:['pulse-cannon','pulse-cannon','ion-blaster'],launcher:'shield-seeker-launcher'},
- lancer:{guns:['pulse-mk2','ion-blaster'],launchers:['seeker-launcher','shield-seeker-launcher'],turret:'pdc',drive:'thrusters-mk2'},
+ lancer:{guns:['pulse-cannon-t2','ion-blaster'],launchers:['seeker-launcher','shield-seeker-launcher'],turret:'pdc',drive:'thrusters-mk2'},
  prospector:{guns:['pulse-cannon'],turret:'pdc',launcher:'seeker-launcher'},
  // A hauler mans the turret mounts its civilian crew can actually crew (`false`
  // leaves a reviewed hardpoint empty) and keeps its regulation point defence.
@@ -18,8 +18,8 @@ export const HULL_NPC_FITS = Object.freeze({
  // what puts a tier-3 hauler at the tier-2 combat level instead of ahead of it
  // (see .freebuff/balance/main-loadouts.mjs).
  atlas:{guns:['gauss-cannon'],turrets:['pdc','pdc',false,false],launcher:'seeker-launcher',defense:'shield-mk2'},
- vanguard:{guns:['pulse-mk2','mortar'],launchers:['torpedo-launcher','torpedo-launcher','swarm-launcher'],turret:'pdc',defense:'shield-mk2'},
- blade:{guns:['pulse-mk2','gauss-cannon'],launchers:['seeker-launcher','shield-seeker-launcher'],turret:'pdc',power:'sustained-reactor'},
+ vanguard:{guns:['pulse-cannon-t2','mortar'],launchers:['torpedo-launcher','torpedo-launcher','swarm-launcher'],turret:'pdc',defense:'shield-mk2'},
+ blade:{guns:['pulse-cannon-t2','gauss-cannon'],launchers:['seeker-launcher','shield-seeker-launcher'],turret:'pdc',power:'sustained-reactor'},
 });
 // Observer presets are deliberately expressed as real outfitting item ids.
 // createEnemyLoadout still checks every choice against the active hull's
@@ -52,7 +52,7 @@ export function createEnemyLoadout(ship, index, arenaFit) {
     const guns=spec.guns.map((mount,i)=>{
         const item=observerFit?.guns?.[i];
         if(!item)return null;
-        return itemFitsMount(OUTFIT_ITEMS[item],mount)?item:'pulse-cannon';
+        return itemFitsMount(OUTFIT_ITEMS[item],mount)?canonicalOutfitId(item):'pulse-cannon';
     });
     const turrets=spec.turrets.map((mount,i)=>{
         const item=observerFit?.turrets?.[i] ?? observerFit?.turret ?? null;
@@ -91,7 +91,7 @@ export function profileForWeapons(weapons,tier='veteran') {
     // Tactical pass spacing is distinct from maximum weapon reach. Scatter/ion
     // fits still close to exploit pellet density; longer reach must not make
     // every fighter hang back like artillery. Firing uses weaponRange directly.
-    const preferred={pulse:235,'pulse-mk2':250,beam:240,gauss:tier==='ace'?510:tier==='novice'?300:410,mortar:300,ion:85,ripper:85};
+    const preferred={pulse:235,beam:240,gauss:tier==='ace'?510:tier==='novice'?300:410,mortar:300,ion:85,ripper:85};
     const range=Math.min(weaponRange(main),preferred[main.id]??240);
     const role=range>=300?'gunship':range<100?'interceptor':'fighter';
     return {role,range,projectileSpeed:main.speed,life:main.life,interval:main.cooldown,

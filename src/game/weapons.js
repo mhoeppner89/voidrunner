@@ -21,10 +21,8 @@ export const PROJECTILE_SPEEDS=Object.freeze({normal:500,gauss:1200,plasma:300})
 export const WEAPONS = {
     pulse:{id:'pulse',nameKey:'PULSE LASER',hudNameKey:'PULSE',kind:'laser',slot:1,
         speed:PROJECTILE_SPEEDS.normal,range:450,cooldown:.17,damageFlat:11.5,energyCost:3.2,assist:1,audioKey:'laser',mountSize:'S'},
-    beam:{id:'beam',nameKey:'BEAM EMITTER',hudNameKey:'BEAM',kind:'beam',slot:8,
+    beam:{id:'beam',nameKey:'BEAM EMITTER',hudNameKey:'BEAM',kind:'beam',slot:7,
         speed:100000,range:350,cooldown:.4,damageFlat:13,energyCost:3.5,assist:1.4,audioKey:'beam',mountSize:'S'},
-    'pulse-mk2':{id:'pulse-mk2',nameKey:'PULSE CANNON MK II',hudNameKey:'PULSE MK II',kind:'laser',slot:7,equipmentId:'pulse-mk2',
-        speed:PROJECTILE_SPEEDS.normal,range:450,cooldown:.17,damageFlat:13.5,energyCost:3.6,assist:1,audioKey:'laser',mountSize:'M'},
     gauss:{id:'gauss',nameKey:'MAGRAIL',hudNameKey:'MAGRAIL',kind:'gauss',slot:2,
         speed:PROJECTILE_SPEEDS.gauss,range:600,cooldown:1.1,damageFlat:34,energyCost:14,shieldBypass:.15,assist:.5,audioKey:'gauss',mountSize:'M'},
     pdc:{id:'pdc',nameKey:'POINT-DEFENSE CLUSTER',hudNameKey:'PDC',kind:'pdc',slot:3,equipmentId:'pdc-cluster',
@@ -41,7 +39,6 @@ WEAPONS['frigate-battery']={id:'frigate-battery',nameKey:'CAPITAL ANTI-FIGHTER C
 WEAPONS['cruiser-battery']={id:'cruiser-battery',nameKey:'CAPITAL RAIL BATTERY',hudNameKey:'CAP RAIL',kind:'gauss',speed:900,range:1900,cooldown:7,damageFlat:200,energyCost:45,shieldMul:.8,hullMul:1.3,assist:.3,audioKey:'gauss'};
 const descriptions={
     pulse:'Normal-speed fire. Shares its lead with pulse, ion and scatterguns. 450 km range.',
-    'pulse-mk2':'Stronger normal-speed pulse fire. Shares the standard lead; uses more energy. 450 km range.',
     gauss:'Very fast precision shots bypass 15% of shields. Slow firing; 600 km range.',
     ripper:'Normal-speed pellet spread deals extra hull damage. Shares the standard lead; 350 km range.',
     ion:'Normal-speed shots strip shields and briefly halve exposed weapon fire rate and double energy per shot. Shares the standard lead; 400 km range.',
@@ -57,6 +54,8 @@ for(const weapon of Object.values(WEAPONS)){
     weapon.ammoId=null;weapon.pierce=0;
     weapon.descriptionKey=weapon.envelopeKey=descriptions[weapon.id];
 }
+// Read-only compatibility for old weapon-ID callers; no separate roster entry.
+WEAPONS['pulse-mk2']={...WEAPONS.pulse,id:'pulse',nameKey:'Pulse Laser II',hudNameKey:'PULSE II',damageFlat:WEAPONS.pulse.damageFlat*27/23,energyCost:WEAPONS.pulse.energyCost*1.125,legacyOnly:true};
 export const TRACKING_LASER=Object.freeze({id:'tracking-turret',kind:'beam',range:300,speed:100000,damageFlat:6*WEAPON_DAMAGE_SCALE,energyCost:4,cooldown:.7});
 export const weaponRange=weapon=>weapon?.range??(weapon?.speed??0)*(weapon?.life??0);
 export const weaponShotDamage=weapon=>weapon?.damageFlat??0;
@@ -152,7 +151,7 @@ for (const launcher of Object.values(LAUNCHERS)) {
     launcher.damage *= WEAPON_DAMAGE_SCALE;
     if (launcher.splashMin != null) launcher.splashMin *= WEAPON_DAMAGE_SCALE;
 }
-export const WEAPON_ORDER = ['pulse', 'gauss', 'pdc', 'ripper', 'ion', 'mortar', 'pulse-mk2', 'beam'];
+export const WEAPON_ORDER = ['pulse', 'gauss', 'pdc', 'ripper', 'ion', 'mortar', 'beam'];
 export const LAUNCHER_ORDER = ['seeker', 'shield-seeker', 'swarm', 'shield-swarm', 'torpedo'];
 // Ammo pool capacities keyed by ammoId (null-ammo weapons are energy-pooled
 // or heat-gated and never run dry — pressure comes from cadence/heat).
@@ -161,7 +160,7 @@ export const AMMO_UNIT_COST = Object.freeze({});
 // Migration only: obsolete ammunition is exchanged once, at its former price.
 export const LEGACY_GUN_AMMO = Object.freeze({slugs: [48,26], shells: [36,18], cells: [60,22], pods: [10,40]});
 export const ammoCapacity = (ammoId) => (ammoId ? AMMO_CAPACITY[ammoId] ?? 0 : 0);
-export const weaponForSlot = (slot) => WEAPONS[WEAPON_ORDER[slot - 1]];
+export const weaponForSlot = (slot) => slot===8?WEAPONS.beam:WEAPONS[WEAPON_ORDER[slot - 1]];
 export const launcherForId = (id) => LAUNCHERS[id];
 
 const legacyEquipmentForWeapon = Object.freeze({
@@ -176,10 +175,6 @@ const legacyEquipmentForWeapon = Object.freeze({
 export const weaponIdForOutfit = (itemOrId) => {
     const rawId = typeof itemOrId === 'string' ? itemOrId : itemOrId?.id;
     const id = canonicalOutfitId(rawId);
-    // Pulse Mk II intentionally has effects.weaponId === 'pulse' for old
-    // catalog callers; its item id is the authoritative distinction.
-    if (equipmentBaseId(id) === 'pulse-mk2')
-        return 'pulse-mk2';
     const item = OUTFIT_ITEMS[id];
     if(item?.category==='turret')return undefined;
     const candidate = item?.weaponId ?? item?.effects?.weaponId;

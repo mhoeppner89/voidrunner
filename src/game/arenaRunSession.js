@@ -1,3 +1,4 @@
+import {normalizeEquipmentInventory} from './equipmentInventory.js';
 import {equipFrigate} from './capitalCombat.js';
 import * as THREE from 'three';
 import {RUN_WAVES,DECISION_WAVES,runEnemyFit,writeArenaRun,recordArenaRun,recoverRun,runOffers,runHullOffers,refreshRunHullOffers,refreshRunRewardOffers,runWingmanOffers,refreshRunWingmanOffers,hireRunWingman,chooseRunReward,fitRunItem,changeRunHull,wingmanOrder} from './arenaRun.js';
@@ -56,7 +57,7 @@ export const ArenaRunMethods={
  },
  setupRun(){
   const r=this.save.arenaRun;
-  if(r.phase==='combat'){if(r.checkpoint){this.save.player=clone(r.checkpoint);delete this.save.player.prevPosition;delete this.save.player.prevRotation;}Object.assign(r,r.checkpointStats??{});this._statsDirty=true;r.phase='prepare';r.rewardChosen=true;r.hullChosen=true;
+  if(r.phase==='combat'){if(r.checkpoint){this.save.player=clone(r.checkpoint);normalizeEquipmentInventory(this.save.player,{disabled:true});delete this.save.player.prevPosition;delete this.save.player.prevRotation;}Object.assign(r,r.checkpointStats??{});this._statsDirty=true;r.phase='prepare';r.rewardChosen=true;r.hullChosen=true;
    // Wingman losses belong to the interrupted attempt: a resumed wave restores
    // the crew that started it, exactly like the player checkpoint above.
    if(Array.isArray(r.checkpointWingmen))r.wingmen=clone(r.checkpointWingmen);delete r.checkpointWingmen;}

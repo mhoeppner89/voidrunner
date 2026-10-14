@@ -148,7 +148,7 @@ check('talon base speed', talonFit.maxSpeed, SHIPS.talon.maxSpeed);
 
 // Guild-gated gear unlocks only with the required rank.
 const freshGates = playerWith([]);
-checkTrue('pulse-mk2 locked at bounty rank 0', !equipmentUnlocked(freshGates, 'pulse-mk2'));
+checkTrue('tier-II pulse uses normal tier availability instead of the old guild gate', equipmentUnlocked(freshGates, 'pulse-cannon-t2'));
 const bountyPilot = playerWith([], { guildRank: { merchant: 0, bounty: 1, mining: 0, salvage: 0, syndicate: 0 } });
 checkTrue('pulse-mk2 unlocks at bounty rank 1', equipmentUnlocked(bountyPilot, 'pulse-mk2'));
 const merchantPilot = playerWith([], { guildRank: { merchant: 1, bounty: 0, mining: 0, salvage: 0, syndicate: 0 } });
@@ -192,7 +192,7 @@ const migrated = hydrateSave({
     world: { seed: 1234 },
 });
 const migratedRack = migrated.player.equipment.map(equipmentBaseId);
-for (const id of ['shield-mk2','pulse-mk2','cargo-pods','engine-mk2'])
+for (const id of ['shield-mk2','pulse-cannon','cargo-pods','engine-mk2'])
     checkTrue('migration preserves ' + id, migratedRack.includes(id));
 check('migrated shield resolves', getEffectiveShipStats(migrated.player).shield, 237.5);
 check('migrated pulse-mk2 does not globally buff hull damage', getEffectiveShipStats(migrated.player).gunDamage, 10);

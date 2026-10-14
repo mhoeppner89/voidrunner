@@ -1,3 +1,27 @@
+## 0.8.2fz — One pulse-laser progression
+
+- Consolidated the reinforced pulse variant into Pulslaser I–III. Tier II matches the former reinforced base laser: 10.8 damage, 3.6 energy; tier III has 12.4 damage and costs 4 energy.
+- Existing reinforced items migrate upward one tier, capped at III, retaining their physical IDs, rarity, affixes, factory state and storage/mount positions. Arena checkpoints and wreck loot migrate too.
+- Arena rewards offer pulse II from wave 4 and III from wave 9, using the same weapon family and tier icons. NPC fits retain tier-II pulse firepower across career, Arena Run and spectator battles.
+- Shops now sell the pulse family's normal technology tiers and prices; its old separate bounty gate is retired. The old ID remains compatibility-only.
+
+## 0.8.2fy — Approved equipment names
+
+- Applied the exported German/English naming review across all 27 equipment types and the stat, affix and unique-name catalogs.
+- Approved names override old translation aliases. Item IDs, tiers, stats and save compatibility are preserved.
+
+## 0.8.2fx — Regeneration terminology and naming editor
+
+- Energy and shield recovery use “Regeneration” in labels; the reactor is now Regenerationsreaktor.
+- Added a standalone bilingual naming editor for equipment, stat labels, affixes and named loot, with tier previews, local drafts and JSON import/export.
+
+## 0.8.2fw — Clear equipment names
+
+- Shared concrete equipment names and visible technology tiers across career shops, inventory, fitting and Arena Run.
+- Distinguish stored energy, energy recharge, shield capacity and shield recharge; all weapons identify their weapon type.
+- Named loot retains its equipment type and tier. Rarity and affix details remain separate from technology tier.
+- Tier markers use the actual item tier, including legacy base equipment; no fitting or balance changes.
+
 ## 0.8.2fv — Colored equipment and cargo symbols
 
 - Added metal casings, family-specific energy accents and commodity material colors to all 37 icons; rarity stays on tier and upgrade markers.

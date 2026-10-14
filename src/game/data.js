@@ -593,11 +593,11 @@ export const EQUIPMENT = {
     },
     'pulse-mk2': {
         id: 'pulse-mk2',
-        name: 'Kestrel Pulse Cannons',
+        name: 'Pulse Laser II',
         category: 'weapon',
         price: 10200,
         description: 'Tighter pulse timing and higher-energy emitter chambers.',
-        stat: '+35% gun damage',
+        stat: 'Tier II pulse laser',
         requiredGuild: 'bounty',
         requiredRank: 1,
     },

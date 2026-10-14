@@ -4190,7 +4190,6 @@ export class SpaceRenderer {
                 // The magrail's long tracer is the worst close-pass offender —
                 // it gets the same treatment.
                 this.laserFx.attenuate(mesh, this.camera.position);
-                if(projectile.weaponId==='pulse-mk2')mesh.scale.multiplyScalar(1.18);
                 if (projectile.visualScale)
                     mesh.scale.multiplyScalar(projectile.visualScale);
             }

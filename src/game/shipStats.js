@@ -14,7 +14,7 @@ export const getEffectiveShipStats = (player) => {
     const hasOutfitting = Boolean(player?.outfitting?.loadouts?.[player.shipId] && HULL_HARDPOINTS[player.shipId]);
     const installed = hasOutfitting ? installedItemIds(player, player.shipId) : (player?.equipment ?? []);
     const count = (id) => installed.reduce((total, installedId) => total + (equipmentBaseId(installedId) === id ? 1 : 0), 0);
-    const has = (id) => count(id) > 0 || (!hasOutfitting && (id === 'pulse-mk2' ? installed.includes('pulse-mk2') : false));
+    const has = (id) => count(id) > 0;
     const effect = (id, key, fallback = 0) => {
         const item = installed.map(i=>OUTFIT_ITEMS[i]).find(i=>equipmentBaseId(i?.id)===id);
         return item?.effects?.[key] ?? OUTFIT_ITEMS[id]?.effects?.[key] ?? fallback;

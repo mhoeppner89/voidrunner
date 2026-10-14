@@ -3,7 +3,6 @@
 const glyph=(body,facet,detail,core='')=>({body,facet,detail,core});
 const SYMBOLS={
  'pulse-cannon':glyph('M19 26h26l3 6v13l-5 5H21l-5-5V32zM23 26V9h6v17m6 0V9h6v17','M19 26h26l-5 6H24zM41 32h7v13l-5 5h-2z','M23 14h6m6 0h6M24 36h12m-12 7h7','M26 37h5v5h-5z'),
- 'pulse-mk2':glyph('M17 27h30l4 7v11l-7 5H20l-7-5V34zM21 27V6h8v21m6 0V6h8v21','M17 27h30l-7 7H24zM44 34h7v11l-7 5z','M21 12h8m6 0h8M21 19h8m6 0h8M24 39h16','M26 38h12v5H26z'),
  'beam-emitter':glyph('M21 25l11-5 11 5 5 14-7 11H23l-7-11zM25 23l-5-12 5-5 7 12 7-12 5 5-5 12','M32 20l11 5 5 14-7 11h-9V33z','M23 40h18M32 14V3m-5 6h10M24 44h6','M27 29h10v8H27z'),
  'gauss-cannon':glyph('M23 31h18l5 7v9l-6 3H24l-6-3v-9zM24 31V5h5v26m6 0V5h5v26','M41 31l5 7v9l-6 3h-8V38z','M24 10h16m-16 7h16m-16 7h16M24 42h10M32 5V2','M29 35h6v8h-6z'),
  ripper:glyph('M18 30l7-7h14l7 7v14l-8 6H26l-8-6zM22 28l-4-9 5-7h18l5 7-4 9','M39 23l7 7v14l-8 6h-6V33z','M23 17h18M25 39h14M24 44h8M12 17l-5-3m45 3 5-3','M27 20h10l-5 8z'),
@@ -45,7 +44,6 @@ const COMMODITY_SYMBOLS={
 
 const SIGNALS={
  'pulse-cannon':'M24 9h4m8 0h4M26 14h1m10 0h1',
- 'pulse-mk2':'M22 7h6m8 0h6M22 19h6m8 0h6',
  'beam-emitter':'M32 4v13M27 7l3 7m7-7-3 7',
  'gauss-cannon':'M26 7v17m12-17v17',
  ripper:'M25 17h14M12 17l-4-3m44 3 4-3',
@@ -75,7 +73,7 @@ const SIGNALS={
 // Body paint is independent of rarity. Rarity stays on the tier/affix markers.
 const STEEL={body:'#203b50',face:'#496b83',edge:'#a9c5d5',line:'#799aaf'};
 const ACCENTS={
- 'pulse-cannon':'#72e7f0','pulse-mk2':'#72e7f0','beam-emitter':'#8bf3db','gauss-cannon':'#e8bd72',ripper:'#f0a176','ion-blaster':'#b8a3f5',mortar:'#ffb279',
+ 'pulse-cannon':'#72e7f0','beam-emitter':'#8bf3db','gauss-cannon':'#e8bd72',ripper:'#f0a176','ion-blaster':'#b8a3f5',mortar:'#ffb279',
  'seeker-launcher':'#edb875','swarm-launcher':'#edb875','shield-seeker-launcher':'#89c5ff','shield-swarm-launcher':'#89c5ff','torpedo-launcher':'#ea9488',
  pdc:'#f0c781','tracking-turret':'#83e9e0','capacitor-bank':'#76ddd2','sustained-reactor':'#efc877','shield-mk2':'#79bdf4','recovery-shield':'#78e3cb','capital-shield-generator':'#8fc5f6',
  'armor-mk2':'#d9b37a','engine-mk2':'#f6b372','thrusters-mk2':'#7fd5ee','radar-mk2':'#83e2c9','cargo-pods':'#d3b37b','salvage-mk2':'#91dfd1','frigate-battery':'#e1ba82','cruiser-battery':'#f0b777',
@@ -101,8 +99,8 @@ const fallback=glyph('M12 20l20-10 20 10v24L32 54 12 44z','M32 10l20 10-20 10-20
 const html=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const svg=(shape,attributes,paint,signal='',extra='')=>`<svg ${attributes} style="${paint}" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><g class="item-hardware" transform="translate(3 3) scale(.9)"><path d="${shape.body}" class="item-surface"/><path d="${shape.facet}" class="item-facet"/><path d="${shape.detail}" class="item-engraving"/>${shape.core?`<path d="${shape.core}" class="item-core"/>`:''}${signal?`<path d="${signal}" class="item-signal"/>`:''}</g>${extra}</svg>`;
 export function equipmentIcon(item,className=''){
- const base=item?.baseId??item?.id,key=SYMBOLS[base]?base:undefined;
- const tier=Math.max(1,Math.min(3,item?.tier??(base?.includes('mk2')?2:1)));
+ const raw=item?.baseId??item?.id,legacyTier=raw==='pulse-mk2'||raw==='pulse-cannon-t2'?2:raw==='pulse-cannon-t3'?3:1,base=legacyTier>1?'pulse-cannon':raw,key=SYMBOLS[base]?base:undefined;
+ const tier=Math.max(1,Math.min(3,item?.tier??legacyTier));
  const pips=Array.from({length:tier},(_,i)=>{const x=32-(tier-1)*5+i*10;return `M${x} 56l3 3-3 3-3-3z`;}).join('');
  const affixes=(item?.affixIds??[]).filter(id=>AFFIX_MARKS[id]).slice(0,2);
  const marks=affixes.map((id,i)=>`<path class="item-affix-mark" data-affix="${id}" transform="translate(${i?3:51} 3) scale(.65)" d="${AFFIX_MARKS[id]}"/>`).join('');

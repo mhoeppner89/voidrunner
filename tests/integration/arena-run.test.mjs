@@ -511,14 +511,14 @@ test('hull changes retain equipped guns and groups ahead of stored beams, includ
  const after=loadoutFor(p);assert.equal(after.fireGroups.activeGroup,'B');assert.equal(after.fireGroups.assignments[HULL_HARDPOINTS.lancer.guns[1].id],'B');
  writeArenaRun(save);assert.deepEqual(loadoutFor(readArenaRun().player).guns,after.guns);
 });
-test('staged rewards include Mk II and compatible missile upgrades with ammunition',()=>{
+test('staged rewards include tier-II pulse and compatible missile upgrades with ammunition',()=>{
  storage();const seen=new Set();
  for(let seed=0;seed<80;seed++){
   const save=newArenaRun(false,seed);save.player.shipId='lancer';save.player.ownedShips=['lancer'];save.player.outfitting=createOutfittingState(['lancer']);
   Object.assign(save.arenaRun,{wave:6,rewardChosen:false});
   for(const id of runOffers(save))seen.add(id);
  }
- for(const id of ['pulse-mk2','swarm-launcher','torpedo-launcher'])assert.ok(seen.has(id),id);
+ for(const id of ['pulse-cannon-t2','swarm-launcher','torpedo-launcher'])assert.ok(seen.has(id),id);
  const save=newArenaRun(false,903);save.player.shipId='lancer';save.player.ownedShips=['lancer'];save.player.outfitting=createOutfittingState(['lancer']);
  Object.assign(save.arenaRun,{wave:6,hullChosen:true,rewardChosen:false,offers:['torpedo-launcher']});
  assert.equal(chooseRunReward(save,'torpedo-launcher'),true);

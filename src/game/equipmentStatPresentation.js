@@ -4,9 +4,9 @@ import {SHIELD_RECHARGE_RATE} from './combatResources.js';
 // actual staged ship stats, including losses caused by replaced equipment.
 export const EQUIPMENT_STAT_FIELDS=[
  {key:'energyCapacity',label:'Energy capacity',effects:['capacityMultiplier']},
- {key:'reactorOutput',label:'Energy recharge',unit:'/s',effects:['outputMultiplier']},
+ {key:'reactorOutput',label:'Energy regeneration',unit:'/s',effects:['outputMultiplier']},
  {key:'shield',label:'Shield capacity',effects:['shieldCapacity','shieldMultiplier']},
- {key:'shieldRechargeMultiplier',label:'Shield recharge',unit:'/s',scale:SHIELD_RECHARGE_RATE,effects:['rechargeMultiplier']},
+ {key:'shieldRechargeMultiplier',label:'Shield regeneration',unit:'/s',scale:SHIELD_RECHARGE_RATE,effects:['rechargeMultiplier']},
  {key:'hull',label:'Hull integrity',effects:['hullCapacity']},
  {key:'maxSpeed',label:'Max speed',unit:'km/s',convert:displaySpeed,effects:['speedMultiplier']},
  {key:'acceleration',label:'Acceleration',unit:'km/s²',convert:displaySpeed,effects:['accelerationMultiplier']},
@@ -24,4 +24,16 @@ export function equipmentStatChanges(before,after,item,includeUnchanged=false){
  return EQUIPMENT_STAT_FIELDS.filter(f=>Number.isFinite(before[f.key])&&Number.isFinite(after[f.key])&&(Math.abs(after[f.key]-before[f.key])>.001||includeUnchanged&&f.effects.some(key=>item?.effects?.[key]!=null)))
   .map(field=>({...field,before:convert(field,before[field.key]),after:convert(field,after[field.key]),delta:before[field.key]?(after[field.key]/before[field.key]-1)*100:undefined,improved:field.lowerBetter?after[field.key]<before[field.key]:after[field.key]>before[field.key],primary:field.effects.some(key=>item?.effects?.[key]!=null)}))
   .sort((a,b)=>Number(b.primary)-Number(a.primary));
+}
+
+// Unmounted shop/loot utilities show their actual bonuses, without guessing a
+// mount or presenting the ship's current total as the item's own effect.
+export function equipmentEffectStats(item){
+ return EQUIPMENT_STAT_FIELDS.flatMap(field=>{
+  const effect=field.effects.find(key=>typeof item?.effects?.[key]==='number');
+  if(!effect)return [];
+  const ratio=effect.endsWith('Multiplier')||effect==='salvageRate';
+  const value=ratio?(item.effects[effect]-1)*100:item.effects[effect];
+  return [{key:field.key,label:field.label,value,unit:ratio?'%':['salvageRange'].includes(effect)?' km':''}];
+ });
 }
