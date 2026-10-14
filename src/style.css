@@ -24,6 +24,10 @@
   --void-cobalt: #0d3d86;
   --void-cyan: #69e4f2;
   --void-gold: #ffd05c;
+  --loot-common: #f1f4f7;
+  --loot-uncommon: #72df95;
+  --loot-rare: #79b8ff;
+  --loot-named: #e5bc61;
   --drone-miner: var(--void-gold);
   --drone-pdc: var(--void-cyan);
   --void-cream: #fff3cf;
@@ -43,6 +47,7 @@
   --display-font: Impact, "Arial Narrow", Haettenschweiler, sans-serif;
   /* Docked UI type floors. Station interfaces scroll or reflow before these
      values are reduced; dense pixel text below this scale is not readable. */
+  --ui-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --station-label: 13px;
   --station-control: 14px;
   --station-body: 15px;
@@ -6587,12 +6592,14 @@ button.primary,
 
 .commodity-art {
   position: relative;
-  overflow: hidden;
+  display: grid;
+  place-items: center;
   aspect-ratio: 4 / 3;
   margin: 0;
-  border: 1px solid color-mix(in srgb, var(--commodity-accent), transparent 38%);
-  background: radial-gradient(circle at 55% 40%, color-mix(in srgb, var(--commodity-accent), transparent 68%), #071019 70%);
-  box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.72);
+  color: var(--commodity-accent, var(--void-cyan));
+  border: 0;
+  background: none;
+  box-shadow: none;
 }
 
 .commodity-art img {
@@ -11038,9 +11045,9 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .outfit-item-card.is-installed { border-color: rgba(255, 208, 92, 0.58); }
 .outfit-item-card.is-incompatible { opacity: 0.56; }
 .outfit-item-card.is-locked { border-style: dashed; }
-.outfit-item-art-wrap { position: relative; display: grid; place-items: center; width: 64px; height: 64px; margin: 0; overflow: hidden; border: 1px solid rgba(113, 202, 222, 0.28); background: radial-gradient(circle, rgba(14, 78, 113, 0.74), rgba(2, 13, 27, 0.98)); }
+.outfit-item-art-wrap { position: relative; display: grid; place-items: center; width: 64px; height: 64px; margin: 0; overflow: hidden; border: 0; background: none; }
 .outfit-item-art-wrap > span { position: absolute; z-index: 0; color: rgba(177, 226, 233, 0.42); font-family: var(--pixel-font); font-size: 0.65rem; letter-spacing: 0.08em; }
-.outfit-item-art { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: contain; image-rendering: auto; filter: drop-shadow(0 0 6px rgba(68, 205, 231, 0.28)); }
+.outfit-item-art { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: contain; image-rendering: auto; color: var(--item-color, var(--void-cyan)); }
 .outfit-item-art-wrap.is-missing .outfit-item-art { display: none; }
 .outfit-item-copy { min-width: 0; }
 .outfit-item-topline { display: flex; justify-content: space-between; gap: 0.22rem; color: #83c9da; font-size: 0.4rem; letter-spacing: 0.06em; }
@@ -15203,12 +15210,18 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   .tutorial-notice-actions button { min-width: 104px; padding-inline: 8px; font-size: 12.9px; }
 }
 
-@media (max-width: 620px), (orientation: portrait) {
+@media (orientation: portrait) {
   #dock-screen .tutorial-dock-notice { grid-template-columns: 36px minmax(0, 1fr); }
   #dock-screen .tutorial-dock-notice > .avatar { width: 34px; height: 40px; }
   .tutorial-notice-actions { grid-column: 1 / -1; }
   .tutorial-notice-actions button { flex: 1; }
   .tutorial-skip-confirm { grid-template-columns: 1fr; }
+}
+@media (max-width: 620px) and (orientation: landscape) {
+  #dock-screen .tutorial-dock-notice { grid-template-columns: 34px minmax(0, 1fr) auto; }
+  #dock-screen .tutorial-dock-notice > .avatar { width:34px; height:40px; }
+  .tutorial-notice-actions { max-width:132px; }
+  .tutorial-notice-actions button { min-width:104px; }
 }
 
 /* Keep the compact plaque easy to tap without painting over the canopy. */
@@ -15870,6 +15883,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   place-items: center;
   padding: 0;
   font-size: 15px;
+  margin-left: 0;
 }
 
 /* "Where am I" — the screen the pilot opened, now that the panels below no
@@ -15922,6 +15936,11 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 @media (max-width: 700px) {
   #dock-screen .dock-header { flex-wrap: wrap; row-gap: 6px; }
   #dock-screen .dock-screen-tabs { order: 3; flex: 1 0 100%; }
+}
+@media (max-width:700px) and (orientation:landscape) {
+  #dock-screen:has(.dock-screen-tabs) .dock-header { flex-wrap:nowrap; }
+  #dock-screen:has(.dock-screen-tabs) .dock-heading { display:none; }
+  #dock-screen .dock-screen-tabs { order:0; flex:1 1 auto; }
 }
 
 /* Sentences keep the readable face; only short labels keep the lettering. */
@@ -16115,6 +16134,11 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   #ship-panel .pause-grid section { padding: 8px 10px; }
   #ship-panel .pause-grid h3 { margin-bottom: 6px; }
   #ship-panel .ship-status-strip { gap: 5px; padding: 0 10px 6px; }
+}
+
+@media (max-width: 680px) and (orientation: landscape) and (max-height: 520px) {
+  #ship-panel .ship-menu-drones,
+  #ship-panel .ship-menu-cargo { grid-column: 1 / -1; }
 }
 
 /* The header chevron is the way back to the market floor, on every layout; the
@@ -16773,3 +16797,861 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   }
 
 }
+
+/* Loot and equipment: rarity edges, focused details, independent scrolling. */
+.equipment-inventory {
+  height:100%; min-height:0; display:flex; flex-direction:column;
+  padding:12px; overflow:hidden; color:var(--void-cream); background:rgba(5,18,34,.98);
+}
+.equipment-inventory > header { display:flex; align-items:center; gap:12px; flex-shrink:0; margin-bottom:10px; }
+.equipment-inventory h2 { flex:1; font-size:18px; margin:0; color:var(--void-gold); }
+.equipment-inventory h3 { font-size:16px; margin:8px 0; }
+.equipment-inventory button, .equipment-inventory select {
+  min-height:44px; padding:8px 12px; font-size:13px; line-height:1.35;
+  border:1px solid #456378; background:#102840; color:var(--void-cream);
+  touch-action:manipulation; white-space:normal; overflow-wrap:anywhere;
+}
+.equipment-inventory button:disabled { opacity:.45; }
+.equipment-inventory button:focus-visible, .equipment-inventory select:focus-visible { outline:2px solid var(--void-gold); outline-offset:-3px; }
+.equipment-inventory button.selected, .equipment-inventory button[aria-pressed="true"] { border-color:var(--void-gold); background:#284363; }
+.inventory-budget { display:flex; align-items:center; gap:12px; color:var(--void-muted); font-size:13px; }
+.inventory-budget > span { white-space:nowrap; }
+.inventory-budget details { position:relative; }
+.inventory-budget summary { cursor:pointer; min-height:44px; display:flex; align-items:center; color:var(--void-muted); }
+.inventory-budget details p { position:absolute; z-index:3; right:0; top:100%; margin:0; padding:12px; width:235px; background:#06152c; border:1px solid #456378; line-height:1.6; }
+.inventory-notice { margin:0 0 8px; font-size:13px; color:var(--danger); }
+.inventory-layout { flex:1; display:grid; grid-template-columns:220px minmax(0,1fr); gap:14px; min-height:0; overflow:hidden; }
+.inventory-mounts { overflow:auto; display:flex; flex-direction:column; gap:6px; padding-right:4px; }
+.inventory-mounts > button { flex-shrink:0; text-align:left; }
+.inventory-mount { display:flex; flex-direction:column; gap:4px; border-left:3px solid var(--item-color,var(--loot-common)) !important; }
+.inventory-mount small { font-size:11px; color:var(--void-muted); }
+.inventory-mount b { color:var(--item-color); font-weight:500; line-height:1.4; }
+.inventory-stock { min-width:0; min-height:0; display:flex; flex-direction:column; }
+.inventory-stock nav { display:flex; gap:6px; flex-shrink:0; margin-bottom:10px; }
+.inventory-stock nav > select:last-child { margin-left:auto; max-width:120px; }
+.inventory-tab-buttons { display:flex; gap:4px; }
+.inventory-tab-select { display:none; }
+.inventory-stock-body { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(270px,34%); gap:12px; overflow:hidden; }
+.inventory-items { overflow:auto; display:grid; align-content:start; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:8px; padding:0 4px 4px 0; }
+.equipment-inventory .inventory-item { display:flex; text-align:left; align-items:center; gap:10px; min-height:72px; border-left:3px solid var(--item-color); }
+.inventory-item .item-icon { width:40px; height:40px; object-fit:contain; flex-shrink:0; }
+.inventory-item > span { display:flex; flex-direction:column; min-width:0; gap:5px; flex:1; }
+.inventory-item b { color:var(--item-color); font-weight:500; line-height:1.4; }
+.inventory-item small { color:var(--void-muted); font-size:11px; }
+.rarity-mark { color:var(--item-color); font-size:10px; font-style:normal; }
+.inventory-comparison { min-width:0; overflow:auto; padding:12px; border:1px solid #385367; border-top:3px solid var(--item-color,var(--void-gold)); background:#081b2f; }
+.inventory-empty { display:flex; justify-content:center; align-items:center; color:var(--void-muted); border-top-width:1px; font-size:13px; }
+.inventory-detail-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; color:var(--item-color); font-size:12px; }
+.inventory-detail-heading button { display:none; }
+.inventory-comparison h3 { color:var(--item-color); line-height:1.4; }
+.inventory-item-meta { color:var(--void-muted); font-size:12px; margin-bottom:10px; }
+.inventory-stats { display:grid; gap:0 12px; margin-bottom:10px; }
+.inventory-stat { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 0; font-size:13px; border-bottom:1px solid #233c50; }
+.inventory-stat > span { color:var(--void-muted); }
+.inventory-stat small { font-size:11px; color:var(--void-muted); font-weight:400; }
+.inventory-stat b { white-space:nowrap; }
+.inventory-actions { display:flex; flex-wrap:wrap; gap:6px; padding:6px 0; background:#081b2f; }
+.inventory-actions button:first-child { border-color:var(--void-gold); color:var(--void-gold); }
+.inventory-fire-group { display:flex; align-items:center; gap:6px; margin-top:8px; font-size:12px; color:var(--void-muted); }
+.inventory-description { margin-top:8px; font-size:13px; color:var(--void-muted); }
+.inventory-description summary { cursor:pointer; padding:8px 0; }
+.inventory-description p, .inventory-hint { font-size:13px; line-height:1.5; color:var(--void-muted); }
+.inventory-commodity { display:flex; flex-direction:column; gap:6px; padding:12px; border:1px solid #385367; font-size:13px; }
+.inventory-commodity small { color:var(--void-muted); font-size:11px; }
+.inventory-focused .inventory-layout { grid-template-columns:1fr; }
+.inventory-focused .inventory-mounts { display:none; }
+.inventory-focused .inventory-stock-body:not(:has(.inventory-comparison)) { grid-template-columns:1fr; }
+.inventory-loot-list, .inventory-drone-list { overflow:auto; padding-right:4px; }
+.inventory-loot-list > h3 { color:var(--void-muted); margin:0 0 8px; }
+.inventory-loot { display:flex; align-items:center; gap:10px; padding:8px; margin-bottom:8px; background:#0b2237; border:1px solid #385367; border-left:3px solid var(--item-color); }
+.inventory-loot > .inventory-item, .inventory-loot > span { flex:1; min-width:0; }
+.equipment-inventory .inventory-loot > .inventory-item { padding:0; border:0; background:transparent; min-height:52px; }
+.inventory-loot > span { display:flex; flex-direction:column; gap:5px; font-size:13px; }
+.inventory-loot small { font-size:11px; color:var(--void-muted); }
+.inventory-loot-actions { display:flex; gap:6px; flex-shrink:0; }
+.inventory-drone-list .drone-bay-row { padding:12px; margin:0 0 10px; background:#0b2237; }
+.inventory-drone-list details { margin-top:10px; font-size:13px; }
+.inventory-drone-list summary { cursor:pointer; min-height:44px; padding:12px; color:var(--void-gold); }
+#market-point-content:has(.equipment-inventory) { height:100%; overflow:hidden; }
+#ship-panel > .equipment-inventory { height:100%; max-height:100dvh; }
+@media(max-width:1150px) {
+  .inventory-tab-select { display:block; max-width:150px; }
+  .inventory-tab-buttons { display:none; }
+}
+@media(max-height:500px),(max-width:800px) {
+  .equipment-inventory { padding:8px; }
+  .equipment-inventory > header { gap:8px; margin-bottom:6px; }
+  .equipment-inventory h2 { font-size:13px; }
+  .equipment-inventory h3 { font-size:15px; }
+  .inventory-budget { gap:10px; font-size:12px; }
+  .inventory-budget summary { font-size:12px; }
+  .inventory-layout { grid-template-columns:154px minmax(0,1fr); gap:8px; }
+  .inventory-mount { padding:6px 8px !important; font-size:12px !important; }
+  .inventory-mount b { font-size:12px; }
+  .inventory-stock nav { margin-bottom:6px; }
+  .inventory-tab-select { display:block; max-width:135px; }
+  .inventory-tab-buttons { display:none; }
+  .inventory-stock-body { display:block; }
+  .inventory-items { height:100%; grid-template-columns:repeat(auto-fill,minmax(205px,1fr)); }
+  .inventory-empty { display:none; }
+  .inventory-stock.has-detail .inventory-items, .inventory-stock.has-detail .inventory-loot-list { display:none; }
+  .inventory-comparison { height:100%; padding:8px 10px; }
+  .inventory-detail-heading button { display:block; }
+  .inventory-comparison h3 { margin:5px 0; }
+  .inventory-item-meta { margin-bottom:6px; }
+  .inventory-stats { grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 16px; margin-bottom:6px; }
+  .inventory-stat { font-size:12px; padding:5px 0; }
+  .inventory-loot-list, .inventory-drone-list { height:100%; }
+  .inventory-loot { padding:6px 8px; }
+  .inventory-loot-actions button { min-width:85px; }
+  #market-point-content:has(.equipment-inventory) { height:100%; }
+}
+@media(max-width:600px) {
+  .equipment-inventory h2 { display:none; }
+  .equipment-inventory > header > b { margin-left:auto; font-size:12px; }
+  .inventory-layout { grid-template-columns:112px minmax(0,1fr); }
+  .inventory-stock nav { flex-wrap:wrap; }
+  .inventory-stock nav > select:last-child { max-width:90px; }
+  .inventory-stat { flex-wrap:wrap; }
+  .inventory-loot { flex-wrap:wrap; }
+  .inventory-loot-actions { width:100%; }
+  .inventory-items { grid-template-columns:1fr; }
+}
+.equipment-inventory select { height:44px; min-height:44px; appearance:none; padding-right:28px; background-image:linear-gradient(45deg,transparent 50%,var(--void-muted) 50%),linear-gradient(135deg,var(--void-muted) 50%,transparent 50%); background-position:calc(100% - 15px) 19px,calc(100% - 10px) 19px; background-size:5px 5px; background-repeat:no-repeat; }
+.inventory-item b, .inventory-mount b { text-transform:none; font-family:Inter,ui-sans-serif,system-ui,sans-serif; }
+.inventory-loot .inventory-item .item-icon { width:32px; height:32px; }
+.equipment-inventory .inventory-loot > .inventory-item { min-height:44px; }
+@media(max-height:500px),(max-width:800px) {
+  .inventory-layout:has(.inventory-stock.has-detail) { grid-template-columns:1fr; }
+  .inventory-layout:has(.inventory-stock.has-detail) > .inventory-mounts { display:none; }
+  .inventory-stock.has-detail > nav { display:none; }
+  .inventory-mount b { display:block; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+}
+.inventory-comparison:not(.inventory-empty) { display:flex; flex-direction:column; overflow:hidden; }
+.inventory-detail-heading { flex-shrink:0; }
+.inventory-detail-scroll { flex:1; min-height:0; overflow:auto; padding-right:4px; }
+.inventory-actions { flex-shrink:0; border-top:1px solid #233c50; margin-top:6px; }
+.inventory-items { grid-auto-rows:max-content; }
+#dock-screen .equipment-inventory .inventory-item { min-height:72px; height:auto; }
+#dock-screen .equipment-inventory .inventory-loot > .inventory-item { min-height:44px; }
+.inventory-description summary { min-height:44px; }
+/* Quiet menus: optional help, picture-led run choices, shared rarity palette. */
+.ui-details { color:var(--void-muted); font-size:13px; }
+.ui-details > summary { min-height:44px; padding:12px 0; cursor:pointer; }
+.visual-bar-key { display:flex; gap:4px; }
+.visual-bar-key i { width:24px; height:4px; }
+.visual-bar-key i[data-tone="shield"] { background:var(--loot-rare); }
+.visual-bar-key i[data-tone="hull"] { background:var(--loot-uncommon); }
+.observer-legend .visual-bar-key i[data-tone="shield"] { background:var(--void-cyan); }
+.observer-legend .visual-bar-key i[data-tone="hull"] { background:linear-gradient(90deg,var(--void-cyan) 50%,var(--retro-red) 50%); }
+.observer-actions button { min-width:44px; font-size:16px; }
+@media(max-height:500px),(max-width:900px) {
+ .observer-toolbar { min-height:0; padding:4px; gap:4px; }
+ .observer-heading { min-width:70px; flex:1; }
+ .observer-heading .eyebrow, .observer-heading small, .observer-clock small,
+ .observer-camera-tools span, .observer-status:not([data-state="complete"]) { display:none; }
+ .observer-heading b { margin:0; font-size:12px; letter-spacing:0; }
+ .observer-clock { min-width:60px; }
+ .observer-clock strong { margin:0; font-size:16px; letter-spacing:0; }
+ .observer-camera-tools { padding:0; gap:2px; margin-left:0; }
+ .observer-camera-tools button { min-width:44px; min-height:44px; padding:0; font-size:20px; }
+ .observer-actions { width:auto; padding:0; gap:2px; }
+ .observer-actions button { min-width:44px; min-height:44px; padding:0 4px; font-size:16px; letter-spacing:0; }
+ .observer-status { min-width:0; font-size:12px; }
+ .observer-editor-title { display:none; }
+ .observer-editor-section { margin-top:8px; padding-top:8px; }
+ .observer-editor-section h3 { font-size:11px; }
+ .observer-editor-options button, .observer-ship-palette button { font-size:12px; padding:4px; }
+ .observer-ship-palette button b { font-size:12px; }
+ .observer-ship-palette button small, #observer-preset-hull { font-size:10px; }
+ .observer-editor-footer { bottom:0; margin-bottom:0; padding:6px; gap:4px; }
+ .observer-editor-footer > span { font-size:10px; padding:4px; }
+ .observer-editor-footer button { min-height:44px; padding:4px 6px; font-size:12px; }
+ .observer-editor-hint, .observer-aim-control output { font-size:12px; }
+ .observer-legend { gap:8px; padding:4px; font-size:10px; }
+ .observer-editor:not(.is-hidden) ~ .observer-legend { display:none; }
+}
+
+/* Choice screens: the item is the focus; actions and the current wave stay anchored. */
+.run-card { width:min(980px,calc(100vw - 24px)); height:min(560px,calc(100dvh - 24px)); padding:18px; gap:10px; border:1px solid var(--console-edge); border-top:2px solid var(--void-gold); background:linear-gradient(140deg,var(--console-recess),var(--void-navy)); box-shadow:0 20px 80px #000a; font-family:var(--ui-font); text-shadow:none; }
+.run-card > header { align-items:center; padding:0 0 10px; flex-wrap:nowrap; }
+.run-title { display:flex; align-items:center; gap:14px; }
+.arena-card.run-card > header h2 { font:600 20px/1.1 var(--ui-font); letter-spacing:0; text-transform:none; color:var(--void-cream); }
+.run-card .run-wave { padding-left:14px; border-left:1px solid var(--console-edge); color:var(--void-gold); font:600 22px/1 var(--pixel-font); }
+.run-card .run-wave small { font-size:13px; color:var(--void-muted); }
+.run-card .run-ship-status { display:flex; align-items:center; gap:10px; font:500 13px/1 var(--ui-font); }
+.run-health { display:inline-block; width:64px; height:5px; overflow:hidden; background:var(--console-edge); border-radius:0; }
+.run-health > i { display:block; height:100%; background:var(--loot-uncommon); }
+.run-stage { display:flex; align-items:center; justify-content:space-between; gap:10px; flex:1; min-width:0; padding:0 12px; }
+.run-stage > b { font:500 13px/1.3 var(--ui-font); color:var(--void-muted); }
+.run-card .run-next { max-width:45%; font:400 13px/1.3 var(--ui-font); color:var(--void-muted); }
+.run-card .run-next summary { min-height:28px; padding:4px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.run-next p { top:20px; color:var(--void-cream); font:400 14px/1.5 var(--ui-font); }
+.run-card .run-progress { display:flex; gap:3px; height:3px; }
+.run-progress > i { flex:1; background:var(--console-edge); }
+.run-progress > i.is-cleared { background:var(--void-gold); }
+.run-progress > i.is-current { background:var(--void-cyan); }
+.run-card .run-scroll { gap:10px; overflow:hidden; }
+.run-card[data-run-view="ready"] .run-scroll, .run-card[data-run-view="result"] .run-scroll { overflow:auto; }
+.run-card .run-offers { min-height:0; flex:1; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+.run-card .run-offers button { position:relative; display:flex; gap:8px; min-height:0; padding:16px; border:1px solid var(--console-edge); border-top:3px solid var(--item-color,var(--void-cyan)); border-radius:4px; background:radial-gradient(ellipse at 50% 42%,color-mix(in srgb,var(--item-color,var(--void-cyan)),transparent 93%),transparent 65%),var(--console-recess); color:var(--void-cream); text-transform:none; letter-spacing:0; font-family:var(--ui-font); transition:border-color .12s,background-color .12s; }
+.run-card .run-offers button[data-rarity] { border-left-width:1px; }
+.run-card .run-offers button.is-selected { padding:16px; border:1px solid var(--item-color,var(--void-gold)); border-top-width:3px; background-color:var(--console-face); box-shadow:inset 0 0 0 1px var(--item-color,var(--void-gold)); }
+.run-card .run-offers button > b { width:100%; padding-right:16px; font:600 22px/1.2 var(--ui-font); color:var(--item-color,var(--void-cream)); }
+.run-card .run-art { position:relative; display:grid; place-items:center; width:100%; min-height:0; flex:1; }
+.run-card .run-art > .run-item-image { position:absolute; inset:0; margin:auto; width:100%; height:100%; max-width:132px; max-height:132px; object-fit:contain; image-rendering:auto; }
+.run-card .run-quantity { position:absolute; right:0; bottom:4px; font:500 13px/1 var(--pixel-font); font-style:normal; color:var(--void-muted); }
+.run-card .run-metrics { display:flex; width:100%; justify-content:space-between; gap:8px; padding-top:10px; border-top:1px solid var(--console-edge); }
+.run-metrics i { display:flex; flex-direction:column; min-width:0; gap:3px; font-style:normal; }
+.run-card .run-metrics small { margin:0; color:var(--void-muted); font:400 12px/1.2 var(--ui-font); }
+.run-card .run-metrics b { color:var(--void-cream); font:500 21px/1.2 var(--ui-font); font-variant-numeric:tabular-nums; }
+.run-card .run-metrics em { color:var(--void-muted); font:400 11px/1 var(--ui-font); }
+.run-card .run-metrics em.up { color:var(--loot-uncommon); }
+.run-card .run-metrics em.down { color:var(--retro-red); }
+.run-item-image { color:var(--item-color,var(--void-cyan)); }
+.run-card .run-replacement { display:flex; align-items:center; gap:6px; height:34px; flex-shrink:0; margin-top:4px; }
+.run-card .run-replacement .run-item-image { width:28px; height:28px; object-fit:contain; }
+.run-replacement i { color:var(--void-muted); font-style:normal; }
+.run-empty-mount { display:grid; place-items:center; width:28px; height:28px; border:1px dashed var(--console-edge); color:var(--void-muted); }
+.run-selected-mark { display:none; position:absolute; right:10px; top:12px; color:var(--item-color,var(--void-gold)); }
+.is-selected > .run-selected-mark { display:block; }
+.run-service-icon { font-size:60px; color:var(--void-gold); }
+.run-card .run-hull-image { width:100%; height:170px; min-height:0; flex:1; color:var(--void-cyan); }
+.run-card .run-hull-role, .run-card .run-pilot { font:400 13px/1.2 var(--ui-font); color:var(--void-muted); }
+.run-mount-counts { display:flex; gap:12px; color:var(--void-muted); }
+.run-mount-counts i { font:500 14px/1.2 var(--ui-font); }
+.run-card > footer { border-top:1px solid var(--console-edge); padding:10px 0 0; gap:8px; flex-wrap:nowrap; }
+.run-card > footer button { padding:8px 14px; border:1px solid var(--console-edge); box-shadow:none; background:var(--console-face); font:500 14px/1 var(--ui-font); letter-spacing:0; text-transform:none; }
+.run-card > footer > button:first-child { min-width:44px; padding:0; font-size:20px; }
+.run-card > footer .primary { min-width:150px; color:var(--console-recess); background:var(--void-gold); border-color:var(--void-gold); }
+.run-card button:focus-visible { outline:2px solid var(--void-gold); outline-offset:2px; }
+.run-card .run-loadout-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:0; max-height:none; }
+.run-item-label { color:var(--item-color,var(--loot-common)); font:500 14px/1.3 var(--ui-font); }
+.run-item-chip { display:flex; align-items:center; min-width:0; gap:10px; padding:10px; border-left:3px solid var(--item-color); background:var(--console-face); }
+.run-item-chip .run-item-image { width:44px; height:44px; object-fit:contain; }
+.run-item-chip > b { margin-left:auto; font:500 13px/1 var(--ui-font); }
+.run-crew { margin-top:10px; font:400 14px/1.4 var(--ui-font); }
+.run-crew summary { min-height:44px; padding:12px 0; cursor:pointer; color:var(--void-muted); }
+.run-card .run-orders button { font:500 13px/1 var(--ui-font); letter-spacing:0; text-transform:none; }
+.run-fit-layout { display:grid; grid-template-columns:230px minmax(0,1fr); gap:12px; flex:1; min-height:0; }
+.run-mount-list { overflow:auto; display:flex; flex-direction:column; gap:6px; padding:2px; }
+.run-card .run-mount-list button { display:flex; text-align:left; align-items:center; gap:8px; padding:8px; min-width:0; border:1px solid var(--console-edge); border-left:3px solid var(--item-color); background:var(--console-recess); text-transform:none; letter-spacing:0; box-shadow:none; }
+.run-mount-list button[aria-pressed="true"] { outline:1px solid var(--void-gold); background:var(--console-face); }
+.run-mount-list button > span { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.run-mount-list .run-item-image { width:34px; height:34px; flex-shrink:0; object-fit:contain; }
+.run-mount-list .run-item-label { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.run-mount-list small { font:400 11px/1.2 var(--ui-font); color:var(--void-muted); }
+.run-mount-list b { font:500 13px/1.2 var(--ui-font); color:var(--void-muted); }
+.run-fit-stock { display:flex; flex-direction:column; min-height:0; min-width:0; border:1px solid var(--console-edge); background:var(--console-recess); }
+.run-fit-stock > header { display:flex; align-items:center; gap:6px; margin:0; padding:8px; }
+.run-fit-stock > header > div { flex:1; display:flex; flex-direction:column; gap:3px; min-width:0; }
+.run-fit-stock > header button { min-width:44px; padding:4px; font:500 18px/1 var(--ui-font); }
+.run-fit-stock > header small { font:400 12px/1.2 var(--ui-font); }
+.run-card .run-fit-stock .run-item-label { color:var(--item-color); }
+.run-locker-list { flex:1; min-height:0; overflow:auto; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:start; gap:8px; padding:8px; }
+.run-locker-list button { display:flex; align-items:center; gap:8px; padding:8px; border:1px solid var(--console-edge); border-left:3px solid var(--item-color); background:var(--console-face); min-width:0; text-transform:none; letter-spacing:0; }
+.run-locker-list .run-item-image { width:44px; height:44px; object-fit:contain; flex-shrink:0; }
+.run-locker-list button > b { font:500 12px/1 var(--ui-font); margin-left:auto; }
+.run-empty-stock { color:var(--void-muted); margin:auto; grid-column:1/-1; font:400 14px/1.4 var(--ui-font); }
+.run-card .run-notice { flex-shrink:0; margin:0; color:var(--retro-red); font:400 13px/1.3 var(--ui-font); }
+@media(max-height:520px) and (orientation:landscape) {
+ .run-card { height:calc(100dvh - 20px); padding:10px 12px; gap:6px; }
+ .run-card > header { padding-bottom:6px; }
+ .arena-card.run-card > header h2 { font-size:17px; }
+ .run-card .run-wave { font-size:18px; }
+ .run-card .run-offers { gap:10px; }
+ .run-card .run-offers button, .run-card .run-offers button.is-selected { padding:10px; gap:5px; }
+ .run-card .run-offers button > b { font-size:17px; }
+ .run-card .run-art > .run-item-image { max-width:90px; max-height:90px; }
+ .run-card .run-metrics { padding-top:6px; gap:5px; }
+ .run-card .run-metrics b { font-size:17px; }
+ .run-card .run-metrics small { font-size:12px; }
+ .run-card .run-hull-image { height:80px; }
+ .run-card .run-replacement { height:24px; margin:0; }
+ .run-card .run-replacement .run-item-image { width:24px; height:24px; }
+ .run-card > footer { padding-top:6px; }
+ .run-fit-layout { grid-template-columns:180px minmax(0,1fr); gap:8px; }
+ .run-card .run-mount-list button { padding:5px; }
+ .run-card .run-loadout-summary { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+ .run-item-chip { padding:6px; }
+}
+@media(max-width:600px) and (orientation:landscape) {
+ .run-card .run-ship-status { font-size:12px; }
+ .run-health { width:36px; }
+ .run-title { gap:8px; }
+ .run-card .run-wave { padding-left:8px; }
+ .run-card .run-offers { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+ .run-card .run-offers button, .run-card .run-offers button.is-selected { padding:8px; }
+ .run-card .run-art > .run-item-image { max-width:65px; max-height:65px; }
+ .run-card .run-offers button > b { font-size:15px; }
+ .run-card .run-metrics b { font-size:15px; }
+ .run-card .run-metrics small { font-size:11px; }
+ .run-fit-layout { grid-template-columns:140px minmax(0,1fr); }
+ .run-locker-list { grid-template-columns:1fr; }
+ .run-card .run-loadout-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .arena-card.run-card > header h2, .run-card .run-ship-status { display:none; }
+ .run-stage { padding:0; }
+}
+@media(orientation:portrait) and (max-width:700px) {
+ .run-card { height:calc(100dvh - 24px); }
+ .run-card .run-offers { grid-template-columns:1fr; overflow:auto; }
+ .run-card .run-offers button { flex:none; min-height:240px; }
+ .run-card .run-art { min-height:100px; }
+ .run-card .run-loadout-summary { grid-template-columns:1fr; }
+ .run-fit-layout { grid-template-columns:130px minmax(0,1fr); }
+ .run-locker-list { grid-template-columns:1fr; }
+ .run-card .run-ship-status { display:none; }
+}
+@media(prefers-reduced-motion:reduce) { .run-card .run-offers button { transition:none; } }
+/* Shipyard: full names in the stock strip, model and scrollable specs beside
+   one fixed transaction row. No purchase action disappears below the phone. */
+/* Size terminals from the dock's available space, including tutorial notices
+   and wrapped headers. Their transaction rows stay outside the inner scroll. */
+#dock-screen .market-menu-screen:has(.ship-broker, .equipment-inventory, .commodity-exchange) { display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+#dock-screen .market-menu-screen:has(.ship-broker, .equipment-inventory, .commodity-exchange) #market-point-content { flex:1; min-height:0; height:100%; }
+#dock-screen .ship-broker { height:100%; min-height:0; grid-template-rows:auto minmax(0,1fr); }
+#dock-screen .ship-stock-list { display:flex; flex-wrap:nowrap; overflow-x:auto; padding:2px 2px 6px; gap:8px; }
+#dock-screen .ship-stock-option { flex:0 0 170px; display:grid; gap:6px; padding:8px 12px; box-shadow:none; }
+#dock-screen .ship-stock-option b { font:600 16px/1.2 var(--ui-font); letter-spacing:0; color:var(--void-cream); }
+#dock-screen .ship-stock-option strong { font:500 13px/1.2 var(--ui-font); }
+#dock-screen .ship-stock-option small { font:400 12px/1.2 var(--ui-font); }
+#dock-screen .ship-showroom { min-height:0; height:100%; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); align-items:stretch; border-width:1px; }
+#dock-screen .ship-showroom-stage { min-height:0; height:100%; grid-template-rows:auto minmax(0,1fr) auto; }
+#dock-screen .ship-showroom-stage .ship-silhouette { min-height:0; max-height:none; }
+#dock-screen .ship-stage-heading { gap:6px; }
+#dock-screen .ship-stage-heading span { font:500 12px/1.2 var(--ui-font); letter-spacing:0; }
+#dock-screen .ship-stage-heading b { display:none; }
+#dock-screen .ship-stage-title h3 { font:600 30px/1.1 var(--ui-font); letter-spacing:0; text-transform:none; text-shadow:none; }
+#dock-screen .ship-stage-title p { display:none; }
+#dock-screen .ship-stage-title > strong { font:500 16px/1 var(--ui-font); }
+#dock-screen .ship-showroom-sheet { display:flex; flex-direction:column; min-height:0; padding:12px; overflow:hidden; }
+#dock-screen .ship-sheet-scroll { overflow:auto; min-height:0; flex:1; padding-right:4px; }
+#dock-screen .ship-sheet-scroll > .ship-spec-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+#dock-screen .ship-spec-grid > div { border:0; border-bottom:1px solid var(--console-edge); padding:6px 0; min-height:60px; background:none; }
+#dock-screen .ship-spec-grid span { font:400 12px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; }
+#dock-screen .ship-spec-grid > div > b { font:500 20px/1.4 var(--ui-font); }
+#dock-screen .ship-spec-grid .stat-delta { position:absolute; right:0; bottom:8px; font:400 12px/1.2 var(--ui-font); }
+#dock-screen .ship-hardpoints { grid-template-columns:repeat(4,minmax(0,1fr)); margin-top:10px; }
+#dock-screen .ship-hardpoints > div { justify-content:center; padding:6px; gap:8px; }
+#dock-screen .ship-hardpoints span { font-size:18px; }
+#dock-screen .ship-hardpoints b { font:500 15px/1.2 var(--ui-font); }
+#dock-screen .ship-details > summary { min-height:44px; padding:12px 0; font:400 13px/1.3 var(--ui-font); }
+#dock-screen .ship-trade-panel { flex-shrink:0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; padding-top:8px; border-top:1px solid var(--console-edge); }
+#dock-screen .ship-trade-numbers { grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+#dock-screen .ship-trade-numbers > span, #dock-screen .ship-trade-numbers > strong { padding:0; display:flex; gap:5px; align-items:baseline; background:none; border:0; }
+#dock-screen .ship-trade-numbers > span:first-child { display:none; }
+#dock-screen .ship-trade-numbers small { font:400 11px/1.2 var(--ui-font); letter-spacing:0; }
+#dock-screen .ship-trade-numbers b { font:500 13px/1.2 var(--ui-font); }
+#dock-screen .ship-trade-button { padding:7px; font:500 13px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; box-shadow:none; }
+#dock-screen .ship-trade-button > span { font:600 14px/1.2 var(--ui-font); }
+#dock-screen .ship-trade-button > small { color:var(--void-muted); font:400 11px/1.2 var(--ui-font); }
+#dock-screen .ship-trade-button.primary:disabled > small { color:var(--retro-red); }
+@media(max-height:520px) and (orientation:landscape) {
+ #dock-screen:has(.ship-broker) .dock-content { overflow:hidden; }
+ #dock-screen .ship-broker { gap:6px; }
+ #dock-screen .ship-stock-option { flex-basis:128px; min-height:44px; padding:5px 8px; gap:2px; }
+ #dock-screen .ship-stock-option b { font-size:14px; }
+ #dock-screen .ship-stock-option small { display:none; }
+ #dock-screen .ship-showroom { grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); }
+ #dock-screen .ship-showroom-stage { padding:8px; border-right-width:1px; }
+ #dock-screen .ship-stage-title h3 { font-size:24px; }
+ #dock-screen .ship-stage-title > strong { font-size:13px; }
+ #dock-screen .ship-showroom-sheet { padding:6px 8px; gap:4px; }
+ #dock-screen .ship-sheet-scroll > .ship-spec-grid { gap:3px 10px; }
+ #dock-screen .ship-spec-grid > div { min-height:48px; padding:3px 0; }
+ #dock-screen .ship-spec-grid > div > b { font-size:16px; }
+ #dock-screen .ship-hardpoints { margin-top:4px; }
+ #dock-screen .ship-hardpoints > div { padding:3px; }
+ #dock-screen .ship-trade-panel { padding-top:5px; gap:4px; }
+ #dock-screen .ship-trade-numbers small { font-size:10px; }
+ #dock-screen .ship-trade-numbers b { font-size:12px; }
+ #dock-screen .ship-trade-button, #dock-screen .ship-current-button { min-height:44px; }
+ #dock-screen .ship-trade-button > span { font-size:13px; }
+ #dock-screen .dock-wallet span { display:none; }
+}
+@media(max-width:600px) and (orientation:landscape) {
+ #dock-screen .ship-showroom { grid-template-columns:minmax(0,.65fr) minmax(0,1.35fr); }
+ #dock-screen .ship-stage-title { flex-direction:column; align-items:flex-start; gap:4px; }
+ #dock-screen .ship-stage-heading span { font-size:11px; }
+}
+@media(max-height:360px) and (orientation:landscape) {
+ /* The selected stock card already names the ship. Give its preview the room
+    taken by a second name and price when a tutorial notice is also visible. */
+ #dock-screen .ship-stage-title { display:none; }
+}
+@media(orientation:portrait) and (max-width:700px) {
+ #dock-screen .market-menu-screen:has(.ship-broker, .commodity-exchange) { overflow:auto; }
+ #dock-screen .market-menu-screen:has(.ship-broker, .commodity-exchange) #market-point-content { height:auto; flex:none; }
+ #dock-screen .ship-broker { height:auto; }
+ #dock-screen .ship-showroom { height:auto; grid-template-columns:1fr; }
+ #dock-screen .ship-showroom-stage { height:260px; }
+ #dock-screen .ship-showroom-sheet { overflow:visible; }
+ #dock-screen .ship-sheet-scroll { overflow:visible; }
+}
+/* Contracts: the route and terms carry the decision; acceptance stays visible. */
+#dock-screen .mission-dossier-wrap { overflow:hidden; min-height:0; }
+#dock-screen .mission-dossier { display:flex; flex-direction:column; height:100%; max-height:100%; padding:12px; gap:8px; overflow:hidden; }
+#dock-screen .mission-dossier-header { display:flex; align-items:center; gap:12px; flex-shrink:0; padding:0 0 8px; }
+#dock-screen .mission-dossier-header > div { min-width:0; flex:1; }
+#dock-screen .mission-dossier-header h3 { margin:3px 0 0; font:600 22px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; }
+#dock-screen .mission-dossier-header span { font:400 12px/1.3 var(--ui-font); letter-spacing:0; }
+#dock-screen .mission-dossier-header > strong { font:500 20px/1.3 var(--ui-font); white-space:nowrap; }
+#dock-screen .mission-dossier-header .mission-list-back { width:44px; min-width:44px; min-height:44px; padding:0; margin:0; }
+#dock-screen .mission-dossier-scroll { overflow:auto; flex:1; min-height:0; padding-right:4px; }
+#dock-screen .mission-route-strip { margin:0 0 8px; padding:8px; border-width:0 0 1px; background:none; }
+#dock-screen .mission-route-strip b { font:500 15px/1.3 var(--ui-font); }
+#dock-screen .mission-route-strip em { font:400 12px/1.3 var(--ui-font); letter-spacing:0; }
+#dock-screen .mission-terms { margin:0; display:flex; flex-wrap:wrap; gap:12px; }
+#dock-screen .mission-terms > div { flex:1; min-width:90px; padding:6px 0; border:0; background:none; }
+#dock-screen .mission-terms dt { font:400 12px/1.2 var(--ui-font); letter-spacing:0; }
+#dock-screen .mission-terms dd { margin:4px 0 0; font:500 17px/1.2 var(--ui-font); letter-spacing:0; }
+#dock-screen .mission-objective { padding:8px 0; border:0; background:none; margin-top:6px; }
+#dock-screen .mission-objective b { font:500 14px/1.4 var(--ui-font); letter-spacing:0; }
+#dock-screen .mission-details summary { min-height:44px; padding:12px 0; font:400 13px/1.3 var(--ui-font); }
+#dock-screen .mission-dossier-actions { flex-shrink:0; margin:0; padding:8px 0 0; }
+#dock-screen .mission-dossier-actions button { font:500 14px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; min-height:44px; }
+#dock-screen .mission-row-copy b { font:500 16px/1.3 var(--ui-font); letter-spacing:0; }
+#dock-screen .mission-row-copy small, #dock-screen .mission-row-copy em { font:400 12px/1.3 var(--ui-font); letter-spacing:0; }
+#dock-screen .mission-row-value strong { font:500 16px/1.3 var(--ui-font); letter-spacing:0; }
+#dock-screen .mission-row-value small { font:400 12px/1.3 var(--ui-font); }
+@media(max-height:520px) and (orientation:landscape) {
+ #dock-screen .mission-dossier { padding:8px; gap:4px; }
+ #dock-screen .mission-dossier-header { gap:8px; padding-bottom:4px; }
+ #dock-screen .mission-dossier-header h3 { font-size:17px; }
+ #dock-screen .mission-dossier-header > strong { font-size:17px; }
+ #dock-screen .mission-dossier-header span { font-size:11px; }
+ #dock-screen .mission-route-strip { margin:0 0 5px; padding:4px 0; }
+ #dock-screen .mission-terms { gap:8px; }
+ #dock-screen .mission-terms > div { min-width:70px; padding:4px 0; }
+ #dock-screen .mission-terms dd { font-size:15px; }
+ #dock-screen .mission-objective { margin:2px 0 0; padding:5px 0; }
+ #dock-screen .mission-dossier-actions { padding-top:4px; }
+}
+/* One navigation bar belongs to the screen, not to each nested content panel.
+   Equipment details use the width for identity, stats and actions. */
+#dock-screen .equipment-inventory[data-inventory-context="station"] { padding:8px 12px; }
+.equipment-inventory.has-detail .inventory-layout { grid-template-columns:1fr; }
+.equipment-inventory.has-detail .inventory-mounts,
+.equipment-inventory.has-detail .inventory-stock > nav,
+.equipment-inventory.has-detail .inventory-items,
+.equipment-inventory.has-detail .inventory-loot-list { display:none; }
+.equipment-inventory.has-detail .inventory-stock-body { display:block; height:100%; }
+.equipment-inventory.has-detail .inventory-comparison { height:100%; padding:12px; }
+.equipment-inventory .inventory-detail-scroll { display:grid; grid-template-columns:minmax(0,.95fr) minmax(0,1.15fr) minmax(0,.85fr); gap:18px; height:100%; min-height:0; overflow:auto; }
+.inventory-identity, .inventory-stat-block, .inventory-context { min-width:0; }
+.inventory-identity { display:flex; flex-direction:column; align-items:flex-start; }
+.inventory-detail-heading { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; width:100%; }
+.equipment-inventory .inventory-detail-heading button { display:block; padding:7px 10px; font:500 13px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; }
+.equipment-inventory .inventory-detail-heading > span { font:400 12px/1.3 var(--ui-font); }
+.inventory-detail-art { width:72px; height:72px; object-fit:contain; margin:4px 0; color:var(--item-color,var(--void-cyan)); }
+.equipment-inventory .inventory-comparison h3 { font:600 18px/1.3 var(--ui-font); letter-spacing:0; text-transform:none; margin:4px 0 8px; }
+.inventory-item-meta { font:400 12px/1.4 var(--ui-font); }
+.inventory-stat-block { align-self:start; padding-top:6px; }
+.equipment-inventory .inventory-stats { display:flex; flex-direction:column; gap:0; margin:0 0 10px; }
+.equipment-inventory .inventory-stat { padding:9px 0; font:400 13px/1.3 var(--ui-font); }
+.inventory-stat b { font-weight:500; }
+.inventory-context { display:flex; flex-direction:column; gap:12px; }
+.inventory-readouts { display:flex; flex-direction:column; gap:10px; margin:0; }
+.inventory-readouts > div { display:flex; justify-content:space-between; gap:8px; }
+.inventory-readouts dt { color:var(--void-muted); font:400 13px/1.3 var(--ui-font); }
+.inventory-readouts dd { margin:0; color:var(--void-cream); font:500 13px/1.3 var(--ui-font); white-space:nowrap; }
+.inventory-readouts .power-demand-high dd { color:var(--void-gold); }
+.equipment-inventory .inventory-context .inventory-actions { display:flex; flex-direction:column; align-items:stretch; margin:0; padding:10px 0 0; gap:6px; }
+.equipment-inventory .inventory-actions button { font:500 13px/1.3 var(--ui-font); letter-spacing:0; text-transform:none; }
+.inventory-description { margin-top:0; }
+.equipment-inventory .inventory-description > summary { min-height:44px; font:400 13px/1.3 var(--ui-font); padding:12px 0; }
+.inventory-description p { font:400 13px/1.4 var(--ui-font); }
+.equipment-inventory .inventory-overview { display:block; padding:12px; }
+.equipment-inventory .inventory-overview .inventory-readouts { gap:16px; }
+#dock-screen .equipment-inventory:has(.inventory-stock.has-detail) .inventory-stock { height:100%; }
+@media(max-height:520px) and (orientation:landscape) {
+ .equipment-inventory .inventory-detail-scroll { gap:16px; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(0,.85fr); }
+ .equipment-inventory.has-detail .inventory-comparison { padding:10px; }
+ .inventory-detail-art { display:none; }
+ .equipment-inventory .inventory-comparison h3 { font-size:16px; }
+ .equipment-inventory .inventory-stat { padding:7px 0; font-size:12px; }
+ .inventory-stat-block { padding-top:0; }
+ .inventory-context { gap:8px; }
+ .inventory-readouts { gap:8px; }
+ .inventory-readouts dt, .inventory-readouts dd { font-size:12px; }
+ .inventory-fire-group { flex-wrap:wrap; }
+ .inventory-fire-group > span { flex:1 0 100%; }
+ .inventory-detail-heading { margin-bottom:0; }
+ .inventory-detail-heading > span { width:100%; }
+ .inventory-item-meta { font-size:11px; }
+ .equipment-inventory .inventory-context .inventory-actions { padding-top:6px; }
+ .equipment-inventory .inventory-overview { display:none; }
+}
+@media(max-width:600px) and (orientation:landscape) {
+ .equipment-inventory .inventory-detail-scroll { gap:10px; grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) minmax(0,1fr); }
+ .equipment-inventory .inventory-stat { flex-wrap:wrap; gap:2px; }
+ .equipment-inventory .inventory-stat > span { font-size:11px; }
+ .equipment-inventory .inventory-context .inventory-actions { gap:4px; }
+ .equipment-inventory .inventory-actions button { padding:5px; }
+}
+@media(max-width:550px) and (orientation:portrait) {
+ .equipment-inventory .inventory-detail-scroll { display:block; }
+ .inventory-stat-block, .inventory-context { margin-top:12px; }
+}
+.equipment-inventory[data-inventory-context="flight"] > header h2 { display:block; font:600 15px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; }
+#dock-screen .ship-hardpoints > div { flex-direction:column; gap:2px; }
+#dock-screen .ship-hardpoints span { font:400 11px/1.2 var(--ui-font); text-align:center; }
+.run-card .run-mount-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; width:100%; }
+.run-mount-counts i { display:flex; flex-direction:column; gap:2px; min-width:0; font-style:normal; }
+.run-card .run-mount-counts small { margin:0; font:400 11px/1.1 var(--ui-font); color:var(--void-muted); white-space:normal; overflow-wrap:anywhere; }
+.run-card .run-mount-counts b { font:500 15px/1.1 var(--ui-font); color:var(--void-cream); }
+#dock-screen .guild-card { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(140px,.8fr); grid-template-areas:"identity meter action" "info benefits warning" "info next registry"; gap:10px 18px; align-content:start; padding:14px; }
+#dock-screen .guild-card-head { grid-area:identity; min-width:0; }
+#dock-screen .guild-card-head h3 { font:500 17px/1.25 var(--ui-font); letter-spacing:0; }
+#dock-screen .guild-card-head .eyebrow { font:600 14px/1.3 var(--ui-font); letter-spacing:0; }
+#dock-screen .guild-card-head small { font:400 12px/1.3 var(--ui-font); }
+.guild-info { grid-area:info; min-width:0; font:400 13px/1.4 var(--ui-font); }
+.guild-info > summary { min-height:44px; padding:12px 0; cursor:pointer; color:var(--void-muted); }
+#dock-screen .guild-meter { grid-area:meter; align-self:center; margin:0; }
+#dock-screen .guild-benefits { grid-area:benefits; padding:6px 0; background:none; border:0; }
+#dock-screen .guild-next { grid-area:next; padding:6px 0; background:none; border:0; }
+#dock-screen .guild-card > button { grid-area:action; align-self:start; font:500 14px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; min-height:44px; }
+.guild-cost-warning { grid-area:warning; }
+.bounty-registry { grid-area:registry; }
+@media(max-height:520px) and (orientation:landscape) {
+ #dock-screen .guild-card { gap:6px 12px; padding:10px; }
+ #dock-screen .guild-card-head h3 { font-size:15px; }
+ #dock-screen .guild-card-head .eyebrow { font-size:13px; }
+ #dock-screen .guild-benefits b, #dock-screen .guild-next p { font:400 13px/1.4 var(--ui-font); }
+}
+@media(max-width:600px) { #dock-screen .guild-card { grid-template-columns:minmax(0,1fr) minmax(0,1fr); grid-template-areas:"identity action" "info warning" "meter meter" "benefits next" "registry registry"; } }
+/* Trading uses the same three-part detail layout. Cargo shortcuts and market
+   commentary are optional; the quote and transaction stay in the first view. */
+#dock-screen .commodity-exchange { display:flex; flex-direction:column; height:100%; min-height:0; padding:0; }
+#dock-screen .commodity-market-shell { height:100%; min-height:0; align-items:stretch; }
+#dock-screen .commodity-catalog { min-height:0; max-height:none; height:100%; overflow:auto; }
+#dock-screen .commodity-card-copy b { font:500 14px/1.3 var(--ui-font); letter-spacing:0; }
+#dock-screen .commodity-card-copy small, #dock-screen .commodity-card-copy em, #dock-screen .commodity-card-price small { font:400 12px/1.3 var(--ui-font); letter-spacing:0; }
+#dock-screen .commodity-card-price b { font:500 14px/1.3 var(--ui-font); letter-spacing:0; }
+#dock-screen .trade-ticket { display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1fr) minmax(0,1.15fr); align-content:start; align-items:start; gap:16px; height:100%; min-height:0; padding:12px; overflow:auto; }
+#dock-screen .trade-ticket-hero { display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:0; border:0; background:none; }
+#dock-screen .trade-ticket-hero .commodity-art { width:100%; height:150px; min-height:0; }
+#dock-screen .trade-ticket-hero h3 { font:600 19px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; margin:6px 0; }
+#dock-screen .trade-ticket-hero .eyebrow { font:400 12px/1.3 var(--ui-font); letter-spacing:0; }
+#dock-screen .trade-ticket .commodity-list-back { padding:7px 10px; font:500 13px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; margin:0; }
+#dock-screen .trade-market-readout { display:flex; flex-direction:column; gap:8px; padding:0; margin:0; border:0; }
+#dock-screen .trade-market-readout > div { min-height:0; padding:7px 0; background:none; border:0; border-bottom:1px solid var(--console-edge); }
+#dock-screen .trade-market-readout span { font:400 12px/1.3 var(--ui-font); letter-spacing:0; }
+#dock-screen .trade-market-readout b { font:500 16px/1.3 var(--ui-font); letter-spacing:0; white-space:normal; overflow:visible; text-overflow:clip; }
+#dock-screen .trade-market-readout small { font:400 11px/1.3 var(--ui-font); letter-spacing:0; }
+.trade-controls { min-width:0; }
+.trade-capacity { display:flex; justify-content:space-between; color:var(--void-muted); font:400 13px/1.3 var(--ui-font); margin-bottom:8px; }
+.trade-capacity b { color:var(--void-cream); }
+#dock-screen .trade-quantity { display:flex; flex-direction:column; align-items:stretch; gap:4px; padding:0; margin:0 0 8px; background:none; border:0; }
+#dock-screen .trade-quantity > span { font:400 12px/1.3 var(--ui-font); letter-spacing:0; }
+#dock-screen .trade-quantity > div { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px; }
+#dock-screen .trade-quantity button { min-width:44px; padding:4px; font:500 16px/1 var(--ui-font); letter-spacing:0; }
+#dock-screen .trade-quantity output { display:grid; place-items:center; min-width:32px; padding:0 4px; font:500 16px/1.2 var(--ui-font); }
+#dock-screen .trade-actions-ticket { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; margin:0; }
+#dock-screen .trade-actions-ticket button { padding:6px; font:500 13px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; }
+#dock-screen .trade-actions-ticket button > span { font:500 13px/1.2 var(--ui-font); }
+#dock-screen .trade-actions-ticket button > small { font:400 11px/1.3 var(--ui-font); }
+.trade-notes, .market-cargo { min-width:0; font:400 13px/1.3 var(--ui-font); }
+.trade-notes > summary, .market-cargo > summary { min-height:44px; padding:12px 0; cursor:pointer; color:var(--void-muted); }
+#dock-screen .market-cargo .cargo-sale-grid { display:flex; flex-direction:column; gap:6px; }
+#dock-screen .market-cargo .cargo-sale-item { grid-template-columns:1fr; }
+@media(max-height:520px) and (orientation:landscape) {
+ #dock-screen .commodity-exchange { height:100%; }
+ #dock-screen .trade-ticket { padding:8px; gap:14px; grid-template-columns:minmax(0,.85fr) minmax(0,1fr) minmax(0,1.2fr); }
+ #dock-screen .trade-ticket-hero .commodity-art { height:72px; }
+ #dock-screen .trade-ticket-hero { gap:5px; }
+ #dock-screen .trade-ticket-hero h3 { font-size:17px; }
+ #dock-screen .trade-market-readout { gap:4px; }
+ #dock-screen .trade-market-readout > div { display:grid; grid-template-columns:1fr auto; gap:2px 6px; padding:6px 0; }
+ #dock-screen .trade-market-readout small { grid-column:1/-1; }
+ #dock-screen .trade-quantity > div { gap:2px; }
+ #dock-screen .trade-quantity { margin-bottom:4px; }
+ #dock-screen .trade-quantity button { min-width:44px; }
+ #dock-screen .trade-quantity output { min-width:24px; }
+ #dock-screen .trade-actions-ticket button { min-height:44px; padding:5px; }
+ #dock-screen .trade-capacity { margin-bottom:5px; }
+}
+@media(max-width:600px) and (orientation:landscape) {
+ #dock-screen .commodity-exchange { height:100%; }
+ #dock-screen .trade-market-readout > div > b { grid-column:1/-1; }
+ #dock-screen .trade-ticket { gap:10px; grid-template-columns:minmax(0,.85fr) minmax(0,1fr) minmax(0,1.45fr); }
+ #dock-screen .trade-ticket-hero .commodity-art { display:none; }
+ #dock-screen .trade-market-readout small { display:none; }
+ #dock-screen .trade-ticket-hero .eyebrow { display:none; }
+ #dock-screen .trade-actions-ticket button > small { font-size:10px; }
+}
+@media(max-width:550px) and (orientation:portrait) { #dock-screen .commodity-exchange { height:auto; } #dock-screen .trade-ticket { display:block; height:auto; } }
+/* Settings are grouped under one header, rather than seven expanded sections. */
+#pause-panel .pause-card { display:flex; flex-direction:column; width:min(1050px,calc(100vw - 24px)); height:min(540px,calc(100dvh - 24px)); padding:0; overflow:hidden; }
+#pause-panel .pause-card > header { position:relative; display:flex; align-items:center; gap:10px; flex-shrink:0; padding:8px 12px; margin:0; min-height:60px; }
+#pause-panel .pause-card h2 { font:600 19px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; margin:0 auto 0 0; }
+.settings-tabs { display:flex; gap:4px; }
+#pause-panel .settings-tabs button { min-height:44px; padding:6px 10px; font:500 13px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; }
+.settings-tabs button[aria-selected="true"] { border-color:var(--void-gold); color:var(--void-gold); }
+#pause-panel .pause-card > header > button { min-height:44px; padding:6px 10px; font:500 13px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; }
+.settings-content { min-height:0; flex:1; overflow:auto; padding:12px; }
+.settings-pane[hidden] { display:none; }
+#pause-panel .settings-pane .pause-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); padding:0; gap:16px; }
+#pause-panel .settings-pane .pause-grid section { min-width:0; padding:8px 12px; }
+#pause-panel .settings-pane label { min-height:44px; margin:0; font:400 14px/1.3 var(--ui-font); }
+#pause-panel .settings-pane select, #pause-panel .settings-pane button { min-height:44px; font:400 13px/1.2 var(--ui-font); }
+#pause-panel .settings-pane input[type="range"] { min-width:0; }
+#pause-panel .settings-pane[data-settings-pane="audio"] .pause-grid { grid-template-columns:minmax(0,500px); }
+.pause-menu-actions { position:relative; flex-shrink:0; font:500 13px/1.2 var(--ui-font); }
+.pause-menu-actions > summary { min-height:44px; padding:12px 4px; cursor:pointer; color:var(--void-muted); }
+.pause-menu-actions > div { display:flex; flex-direction:column; gap:4px; position:absolute; right:0; top:100%; width:190px; padding:8px; z-index:20; background:var(--console-recess); border:1px solid var(--console-edge); }
+.pause-menu-actions button { min-height:44px; font:500 13px/1.2 var(--ui-font); }
+@media(max-height:520px) and (orientation:landscape) {
+ #pause-panel .pause-card > header { padding:4px 8px; min-height:52px; gap:6px; }
+ #pause-panel .pause-card h2 { font-size:16px; }
+ .settings-content { padding:6px 8px; }
+ #pause-panel .settings-pane .pause-grid { gap:8px; }
+ #pause-panel .settings-pane .pause-grid section { padding:4px 8px; }
+ #pause-panel .settings-pane label { font-size:13px; }
+ #pause-panel .settings-pane .tilt-actions { margin:0; padding:0; }
+ #pause-panel .settings-pane .tilt-actions button { font-size:12px; }
+}
+@media(max-width:600px) {
+ #pause-panel .settings-tabs button { padding:4px 6px; font-size:12px; }
+ #pause-panel .pause-card h2 { font-size:14px; }
+ #pause-panel .pause-card > header { flex-wrap:wrap; }
+ #pause-panel .settings-pane .pause-grid { grid-template-columns:1fr; }
+}
+#map-panel .map-card > footer:empty { display:none; }
+#map-panel .sector-system-map .map-node b { font:600 12px/1.2 var(--ui-font); white-space:nowrap; overflow-wrap:normal; }
+#map-panel .sector-system-map .map-node.kind-jump-point { width:100px; min-width:100px; }
+#map-panel .contact-row b { font-family:var(--ui-font); letter-spacing:0; }
+#dock-screen .service-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); align-items:start; gap:8px; padding:10px; }
+#dock-screen .service-grid .service-card { display:flex; flex-direction:column; gap:8px; min-height:0; padding:12px; }
+#dock-screen .service-grid .service-card h3 { margin:0; font:600 15px/1.25 var(--ui-font); letter-spacing:0; text-transform:none; }
+#dock-screen .service-grid .service-card > button { order:2; min-height:44px; font:500 13px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; }
+#dock-screen .service-grid .service-bars { margin:0; }
+#dock-screen .service-grid .service-bars label { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px; font:400 12px/1.3 var(--ui-font); }
+#dock-screen .service-grid .service-bars label i { grid-column:1/-1; grid-row:2; height:4px; }
+#dock-screen .service-grid .service-bars label em { grid-column:2; grid-row:1; font:500 12px/1.3 var(--ui-font); }
+#dock-screen .service-grid details > summary { min-height:44px; padding:12px 0; font:400 13px/1.3 var(--ui-font); }
+#dock-screen .service-grid .drone-service-quote > b { display:none; }
+#dock-screen .service-grid .drone-service-quote button { min-height:44px; font:500 13px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; }
+.service-recovery { grid-column:1/-1; }
+#ship-panel .ship-card > header { padding:8px 12px; min-height:60px; gap:10px; }
+#ship-panel .ship-card > header h2 { font:600 19px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; }
+#ship-panel .ship-card > header > div { margin-right:auto; }
+#ship-panel .ship-card > header button { min-height:44px; font:500 13px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; }
+@media(max-height:520px) and (orientation:landscape) {
+ #dock-screen .service-grid { padding:6px 8px; gap:6px; }
+ #dock-screen .service-grid .service-card { padding:8px; gap:6px; }
+ #dock-screen .service-grid .service-card h3 { font-size:14px; }
+ #ship-panel .ship-card > header { min-height:52px; padding:4px 8px; }
+ #ship-panel .ship-status-strip { margin:0; padding:0 8px 6px; }
+ #ship-panel .ship-status-cell { padding:6px; }
+ #ship-panel .ship-status-cell span { font:400 12px/1.2 var(--ui-font); }
+ #ship-panel .ship-status-cell b { font:500 17px/1.2 var(--ui-font); }
+ #ship-panel .pause-grid.ship-menu-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+ #ship-panel .ship-menu-missions:not(:has(.ship-mission-card)) { grid-column:auto; }
+ #ship-panel .ship-menu-empty { display:inline; margin:0; font-size:12px; }
+}
+@media(max-width:600px) { #dock-screen .service-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } #ship-panel .pause-grid.ship-menu-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+#ship-panel .ship-menu-weapons label { flex-direction:column; align-items:stretch; gap:4px; padding-bottom:8px; }
+#ship-panel .ship-menu-weapons select { width:100%; min-width:0; max-width:100%; height:44px; min-height:44px; font:400 13px/1.3 var(--ui-font); }
+#ship-panel .ship-menu-grid { align-items:start; }
+#ship-panel .ship-menu-grid > details { min-width:0; padding:0 10px; }
+#ship-panel .ship-menu-grid > details > summary { min-height:44px; padding:12px 0; font:400 13px/1.3 var(--ui-font); cursor:pointer; }
+#ship-panel .ship-menu-grid section > h3 { font:600 13px/1.3 var(--ui-font); letter-spacing:0; text-transform:none; }
+#ship-panel .ship-menu-weapons details > summary { min-height:44px; padding:12px 0; font:400 13px/1.3 var(--ui-font); }
+#ship-panel .ship-menu-grid button { min-height:44px; font:500 12px/1.3 var(--ui-font); letter-spacing:0; text-transform:none; }
+#ship-panel .ship-menu-drones .drone-bay-row { padding:6px 0; margin:0; }
+#ship-panel .ship-menu-drones .drone-bay-row > b { font:600 13px/1.3 var(--ui-font); letter-spacing:0; }
+#ship-panel .ship-menu-drones .drone-bay-row > p { font:400 12px/1.3 var(--ui-font); margin:5px 0; }
+#ship-panel .ship-menu-drones .drone-policy { gap:4px; }
+#chat-panel .comms-card > header { min-height:52px; padding:4px 12px; }
+#chat-panel .comms-card > header h2 { font:600 16px/1.3 var(--ui-font); letter-spacing:0; text-transform:none; }
+#chat-panel .comms-card > header button { min-height:44px; font:500 13px/1.3 var(--ui-font); }
+#chat-panel .comms-card > header > div { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; }
+#chat-panel .comms-card > header small { font:400 12px/1.3 var(--ui-font); color:var(--void-muted); }
+.title-actions button { font:500 15px/1.3 var(--ui-font); letter-spacing:0; }
+@media(max-height:520px) and (orientation:landscape) {
+ .title-card { grid-template-rows:auto auto auto; grid-template-areas:"utilities actions" "title actions" "tagline actions"; align-content:center; height:min(300px,calc(100dvh - 24px)); }
+ .title-card h1 { font-size:clamp(40px,14vh,70px); }
+ .title-actions button { font:500 14px/1.2 var(--ui-font); }
+}
+/* Arena is a two-mode hub now: progression and observation. */
+#arena-panel .arena-card.arena-hub {
+  width: min(800px, calc(100vw - 24px));
+  height: auto;
+  min-height: 340px;
+  max-height: min(580px, calc(100dvh - 24px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+  border-color: rgba(105, 228, 242, 0.42);
+  background: linear-gradient(145deg, rgba(10, 28, 56, 0.98), rgba(2, 10, 22, 0.98));
+}
+#arena-panel .arena-hub > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 60px;
+  margin: 0;
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(105, 228, 242, 0.24);
+  background: linear-gradient(90deg, rgba(13, 61, 134, 0.35), transparent 70%);
+}
+#arena-panel .arena-hub > header h2 {
+  margin: 0;
+  color: var(--void-cream);
+  font: 650 20px/1.2 var(--ui-font);
+  letter-spacing: 0.03em;
+  text-transform: none;
+}
+#arena-panel .arena-hub button {
+  min-height: 44px;
+  padding: 7px 10px;
+  font: 550 13px/1.2 var(--ui-font);
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: normal;
+}
+#arena-panel .arena-mode-grid {
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: stretch;
+  gap: 14px;
+  padding: 14px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+#arena-panel .arena-mode-card {
+  --arena-accent: var(--void-gold);
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  min-width: 0;
+  min-height: 230px;
+  padding: 16px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--arena-accent) 42%, transparent);
+  background: linear-gradient(145deg, rgba(21, 48, 82, 0.82), rgba(3, 14, 31, 0.94));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.055), 0 8px 18px rgba(0, 0, 0, 0.2);
+}
+#arena-panel .arena-mode-card::before {
+  position: absolute;
+  z-index: -1;
+  top: -48px;
+  right: -36px;
+  width: 150px;
+  height: 150px;
+  border: 1px solid color-mix(in srgb, var(--arena-accent) 24%, transparent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 14px color-mix(in srgb, var(--arena-accent) 5%, transparent), 0 0 0 30px color-mix(in srgb, var(--arena-accent) 4%, transparent);
+  content: "";
+}
+#arena-panel .arena-observer-mode { --arena-accent: var(--void-cyan); }
+#arena-panel .arena-mode-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 54px;
+}
+#arena-panel .arena-mode-mark {
+  width: 54px;
+  height: 54px;
+  fill: none;
+  stroke: var(--arena-accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
+  filter: drop-shadow(0 0 9px color-mix(in srgb, var(--arena-accent) 38%, transparent));
+}
+#arena-panel .arena-mode-record {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 208, 92, 0.26);
+  color: var(--void-muted);
+  font: 500 11px/1.2 var(--ui-font);
+}
+#arena-panel .arena-mode-record b { color: var(--void-gold); font-variant-numeric: tabular-nums; }
+#arena-panel .arena-mode-copy h3 {
+  margin: 0;
+  color: var(--void-cream);
+  font: 650 21px/1.2 var(--ui-font);
+  letter-spacing: 0;
+  text-transform: none;
+}
+#arena-panel .arena-mode-actions { display: grid; gap: 8px; margin-top: auto; }
+#arena-panel .arena-mode-secondary { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+#arena-panel .arena-mode-card button { border-color: rgba(168, 199, 220, 0.32); background: rgba(5, 20, 43, 0.84); color: var(--void-cream); }
+#arena-panel .arena-mode-card button.primary { border-color: color-mix(in srgb, var(--arena-accent) 76%, white); background: linear-gradient(180deg, color-mix(in srgb, var(--arena-accent) 18%, #12345e), rgba(3, 14, 31, 0.96)); color: var(--arena-accent); box-shadow: inset 0 1px rgba(255, 255, 255, 0.1), 0 4px 0 rgba(0, 0, 0, 0.3); }
+#arena-panel .arena-mode-card button:hover:not(:disabled),
+#arena-panel .arena-mode-card button:focus-visible:not(:disabled) { border-color: var(--arena-accent); color: white; }
+@media (max-width: 560px) {
+  #arena-panel .arena-card.arena-hub { min-height: 0; }
+  #arena-panel .arena-mode-grid { grid-template-columns: 1fr; gap: 10px; padding: 10px; }
+  #arena-panel .arena-mode-card { min-height: 205px; padding: 14px; }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  #arena-panel .arena-card.arena-hub { min-height: 0; height: min(500px, calc(100dvh - 12px)); max-height: calc(100dvh - 12px); }
+  #arena-panel .arena-hub > header { min-height: 50px; padding: 4px 12px; }
+  #arena-panel .arena-mode-grid { gap: 8px; padding: 8px; }
+  #arena-panel .arena-mode-card { min-height: 205px; padding: 12px; gap: 10px; }
+  #arena-panel .arena-mode-mark { width: 46px; height: 46px; }
+}
+
+/* Shared transparent symbols: shape = item kind, ticks = tier, corner = affix. */
+.item-icon { display:block; width:40px; height:40px; flex-shrink:0; color:var(--item-color,currentColor); }
+.item-tier-mark { stroke-width:3; }
+.item-affix-mark { stroke-width:2.5; }
+.commodity-art > .commodity-icon { width:min(72%,110px); height:80%; color:var(--commodity-accent,var(--void-cyan)); }
+.inventory-commodity { position:relative; padding-left:52px; }
+.inventory-commodity > .commodity-icon { position:absolute; left:6px; top:50%; transform:translateY(-50%); color:var(--void-cyan); }
+.inventory-stat .stat-unit { margin-left:4px; color:var(--void-muted); }
+.run-card .run-utility-metrics, .run-card .run-weapon-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 12px; }
+.run-card .run-metrics .stat-unit { margin-left:3px; font:400 11px/1.1 var(--ui-font); color:var(--void-muted); }
+.run-card .run-utility-metrics small { overflow-wrap:normal; white-space:normal; }
+@media(max-height:500px),(max-width:900px) {
+ .run-card .run-utility-metrics, .run-card .run-weapon-metrics { gap:4px 8px; padding-top:6px; }
+ .run-card .run-utility-metrics small, .run-card .run-weapon-metrics small { font-size:10px; }
+ .run-card .run-utility-metrics b, .run-card .run-weapon-metrics b { font-size:16px; }
+ .run-card .run-utility-metrics em { font-size:10px; }
+ .run-card .run-metrics .stat-unit { font-size:9px; }
+}
+
+.run-card .run-tradeoffs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px 12px; width:100%; }
+.run-card .run-tradeoffs i { display:flex; flex-direction:column; gap:2px; font-style:normal; min-width:0; }
+.run-card .run-tradeoffs small { margin:0; font:400 11px/1.2 var(--ui-font); color:var(--void-muted); }
+.run-card .run-tradeoffs em { font:500 12px/1.2 var(--ui-font); }
+.run-card .run-tradeoffs em.up { color:var(--loot-uncommon); }
+.run-card .run-tradeoffs em.down { color:var(--retro-red); }
+@media(max-height:500px),(max-width:900px) {
+ .run-card .run-tradeoffs { gap:3px 8px; }
+ .run-card .run-tradeoffs small { font-size:10px; }
+ .run-card .run-tradeoffs em { font-size:11px; }
+}
+@media(min-width:601px) {
+ .run-card[data-run-view="rewards"] .run-art { min-height:40px; }
+}
+@media(max-width:600px) and (orientation:landscape) {
+ .run-card[data-run-view="rewards"] .run-offers button { padding:5px 6px; gap:3px; }
+ .run-card[data-run-view="rewards"] .run-art { display:contents; }
+ .run-card[data-run-view="rewards"] .run-art > .run-quantity { top:10px; right:8px; bottom:auto; }
+ .run-card[data-run-view="rewards"] .run-offers button > b { padding-left:32px; min-height:24px; }
+ .run-card[data-run-view="rewards"] .run-art > .run-item-image { inset:auto; top:5px; left:6px; width:26px; height:26px; }
+ .run-card .run-utility-metrics { grid-template-columns:1fr; padding-top:4px; }
+ .run-card .run-utility-metrics i { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:4px; align-items:baseline; }
+ .run-card .run-utility-metrics small { font-size:9px; }
+ .run-card .run-utility-metrics b { font-size:13px; }
+ .run-card .run-utility-metrics em { font-size:9px; }
+ .run-card[data-run-view="rewards"] .run-replacement { height:16px; margin-top:0; }
+ .run-card[data-run-view="rewards"] .run-replacement .run-item-image { width:16px; height:16px; }
+ .run-card .run-tradeoffs { gap:2px 6px; }
+ .run-card .run-tradeoffs small { font-size:9px; }
+ .run-card .run-tradeoffs em { font-size:10px; }
+}
+.inventory-loot-commodity { display:flex; align-items:center; gap:10px; }

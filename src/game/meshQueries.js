@@ -10,6 +10,11 @@ export function invalidateMeshQueryCache(vertices) {
     trees.delete(vertices);
 }
 
+// Cold-start warmup for baked ship surfaces; no BVH construction in combat.
+export function prepareMeshQueryIndex(vertices, indices) {
+    return meshTree(vertices, indices);
+}
+
 function meshTree(vertices, indices, stats) {
     let byIndex = trees.get(vertices);
     if (!byIndex) trees.set(vertices, byIndex = new WeakMap());

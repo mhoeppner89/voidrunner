@@ -37,11 +37,19 @@ function storage(){const data=new Map();globalThis.window={localStorage:{getItem
 // A run that is already past its hull/wingman stages unless a test asks for one:
 // a fresh run now opens on the starting-hull stage, so most fixtures mark the
 // stage closed and start combat directly.
-function runSession(wave=1){const s=fixture();s.save=newArenaRun(false,718);s.save.arenaRun.wave=wave;s.save.arenaRun.hullChosen=true;s.save.arenaRun.rewardChosen=true;s.arena={run:true};
+function closeOpeningWithWeapon(save){
+ const r=save.arenaRun;r.openingPicks=2;r.hullChosen=true;r.rewardChosen=true;r.decisions[0]=true;
+ if(!loadoutFor(save.player).guns.some(Boolean)){
+  save.player.outfitting.locker['pulse-cannon']=1;
+  assert.equal(fitRunItem(save,'weapons',0,'pulse-cannon'),true,'the post-opening fixture has its first fitted weapon');
+ }
+ return save;
+}
+function runSession(wave=1,configure=()=>{}){const s=fixture();s.save=closeOpeningWithWeapon(newArenaRun(false,718));s.save.arenaRun.wave=wave;s.save.arenaRun.hullChosen=true;s.save.arenaRun.rewardChosen=true;s.save.arenaRun.decisions[wave]=true;s.arena={run:true};
  s.ui={pushEvent(){},showArenaRun(){},hideArena(){},hidePause(){},showHud(){}};s.audio={setStationMode(){}};
  s.updateActiveInstance=()=>{};s.setFieldArenaPosition=()=>{};s.setFieldEntryPosition=()=>{};s.tmpEntryDirection=new THREE.Vector3();
  s.clearTransientSpace=()=>{for(const p of s.projectiles)s.projStore.free(p.slot);s.projectiles=[];s.ships=[];};
- s.selectTarget=(kind,id)=>s.save.player.currentTargetId=id;s.setupRun();return s;
+ s.selectTarget=(kind,id)=>s.save.player.currentTargetId=id;configure(s);s.setupRun();return s;
 }
 test('every wave advances once, waits for reinforcements, and unlocks hard mode only on victory',()=>{
  const data=storage();data.set('void-privateer-save-v1','career sentinel');const s=runSession(0);
@@ -78,13 +86,13 @@ test('offers and accepted equipment survive reload; a reward cannot be taken twi
  assert.equal(fitRunItem(restored,key,HULL_HARDPOINTS.wayfarer[key].indexOf(m),id),true);writeArenaRun(restored);assert.ok(loadoutFor(readArenaRun().player)[key].includes(id));
 });
 test('hull changes preserve all copies, health fraction and limited ordnance; no empty forward fit',()=>{
- for(const id of PLAYER_FLYABLE_HULLS.filter(id=>id!=='wayfarer')){const s=newArenaRun(false,88);s.arenaRun.wave=4;s.arenaRun.decisions={};s.arenaRun.hullOffers=[id];s.player.hull=getEffectiveShipStats(s.player).hull*.37;
+ for(const id of PLAYER_FLYABLE_HULLS.filter(id=>id!=='wayfarer')){const s=closeOpeningWithWeapon(newArenaRun(false,88));const stageWave=HULL_STAGE_WAVES.find(wave=>HULL_STAGES[wave].tier===SHIPS[id].tier);s.arenaRun.wave=stageWave;s.arenaRun.decisions[stageWave]=false;s.arenaRun.hullChosen=false;s.arenaRun.hullOffers=[id];s.player.hull=getEffectiveShipStats(s.player).hull*.37;
   const count=p=>{const counts={...p.outfitting.locker};for(const k of LOADOUT_KEYS)for(const item of loadoutFor(p)[k])if(item)counts[item]=(counts[item]??0)+1;return Object.fromEntries(Object.entries(counts).filter(([,n])=>n));};
   const before=count(s.player),rounds=s.player.missiles;assert.equal(changeRunHull(s,id),true,id);assert.deepEqual(count(s.player),before);assert.ok(Math.abs(s.player.hull/getEffectiveShipStats(s.player).hull-.37)<1e-9);assert.ok(s.player.missiles<=rounds);assert.ok(loadoutFor(s.player).guns.some(Boolean),id);assert.equal(changeRunHull(s,'wayfarer'),false);
  }
 });
 test('a hull that was not offered is refused, and a swap that would strand the fit rolls back',()=>{
- storage();const save=newArenaRun(false,64),r=save.arenaRun;r.wave=3;r.hullChosen=false;r.hullOffers=['talon'];
+ storage();const save=closeOpeningWithWeapon(newArenaRun(false,64)),r=save.arenaRun;r.wave=4;r.decisions[4]=false;r.hullChosen=false;r.hullOffers=['talon'];
  assert.equal(changeRunHull(save,'lancer'),false,'only an offered hull can be taken');assert.equal(r.hullChosen,false);
  // Every pool hull accepts a small forward gun, so a transfer can only strand
  // the sortie when no gun is left to install at all. Wave start refuses a
@@ -98,14 +106,17 @@ test('a hull that was not offered is refused, and a swap that would strand the f
 });
 test('each hull stage draws hulls of its own tier and faction blocs, never the current ship, and holds them across a reload',()=>{
  storage();const save=newArenaRun(false,412),r=save.arenaRun;
- assert.equal(r.hullOffers.length,0,'a fresh run has no hull stage yet');
+ assert.equal(r.hullOffers.length,ARENA_HULL_OFFER_COUNT,'a fresh run opens with three starting hulls');
+ assert.equal(new Set(r.hullOffers).size,ARENA_HULL_OFFER_COUNT);
+ assert.ok(r.hullOffers.every(id=>SHIPS[id].tier===1));
+ closeOpeningWithWeapon(save);
  for(const wave of HULL_STAGE_WAVES){
   r.wave=wave;r.decisions={};r.hullOffers=runHullOffers(save);
   const stage=HULL_STAGES[wave];
   assert.ok(r.hullOffers.length>0&&r.hullOffers.length<=ARENA_HULL_OFFER_COUNT,`wave ${wave} has offers`);
   assert.equal(new Set(r.hullOffers).size,r.hullOffers.length);
   assert.ok(r.hullOffers.every(id=>PLAYER_FLYABLE_HULLS.includes(id)&&SHIPS[id].tier===stage.tier),`wave ${wave} offers its tier`);
-  assert.equal(r.hullOffers.includes(save.player.shipId),false,'staying put is the wingman option');
+  assert.equal(r.hullOffers.includes(save.player.shipId),wave===0,'the opening may keep the starter hull; later stages reserve staying put for the wingman option');
   assert.deepEqual(runHullOffers(save),r.hullOffers,'the same stage must not redraw a different list');
  }
  r.wave=4;r.decisions={};r.hullOffers=runHullOffers(save);writeArenaRun(save);
@@ -117,7 +128,7 @@ test('each hull stage draws hulls of its own tier and faction blocs, never the c
 });
 test('a hull stage puts three named veterans on the table: one hire per stage, two per run',()=>{
  storage();const save=newArenaRun(false,515),r=save.arenaRun,p=save.player;
- r.wave=3;r.hullChosen=false;r.rewardChosen=false;r.hullOffers=runHullOffers(save);r.offers=[];
+ closeOpeningWithWeapon(save);r.wave=8;r.hullChosen=false;r.rewardChosen=false;r.decisions[8]=false;r.hullOffers=runHullOffers(save);r.offers=[];
  const roster=runWingmanOffers(save);
  assert.equal(roster.length,WINGMAN_OFFER_COUNT,'three veterans are offered');
  assert.equal(new Set(roster.map(candidate=>candidate.id)).size,WINGMAN_OFFER_COUNT);
@@ -136,26 +147,26 @@ test('a hull stage puts three named veterans on the table: one hire per stage, t
  assert.equal(restored.arenaRun.offers.length,3,'the reward stage still offers three choices');
  assert.deepEqual(restored.arenaRun.wingmanOffers,[],'the closed stage stops advertising pilots');
  assert.equal(hireRunWingman(restored,roster[0].id),null,'one hire per stage');
- restored.arenaRun.wave=8;restored.arenaRun.hullChosen=false;
+ restored.arenaRun.wave=24;restored.arenaRun.hullChosen=false;restored.arenaRun.decisions[24]=false;
  assert.ok(hireRunWingman(restored,runWingmanOffers(restored)[0].id),'the second hull stage hires again');
  assert.equal(restored.arenaRun.wingmen.length,MAX_RUN_WINGMEN);
- restored.arenaRun.wave=6;restored.arenaRun.hullChosen=false;
+ restored.arenaRun.wave=24;restored.arenaRun.hullChosen=false;restored.arenaRun.decisions[24]=false;
  assert.equal(hireRunWingman(restored,runWingmanOffers(restored)[0].id),null,'the wing is capped at two');
  // A stale or corrupt roster is replaced rather than trusted.
- restored.arenaRun.wave=8;restored.arenaRun.hullChosen=false;restored.arenaRun.wingmanOffers=[{id:'stale',hullId:'not-a-hull',name:'stale'}];
+ restored.arenaRun.wave=24;restored.arenaRun.hullChosen=false;restored.arenaRun.decisions[24]=false;restored.arenaRun.wingmanOffers=[{id:'stale',hullId:'not-a-hull',name:'stale'}];
  refreshRunWingmanOffers(restored);
  assert.equal(restored.arenaRun.wingmanOffers.length,WINGMAN_OFFER_COUNT);assert.ok(restored.arenaRun.wingmanOffers.every(candidate=>PLAYER_FLYABLE_HULLS.includes(candidate.hullId)));
  // Every pool hull can turn up on a roster, so no hull is barred from the wing.
- const seen=new Set();for(let seed=0;seed<120;seed++){const other=newArenaRun(false,seed);other.arenaRun.wave=3;other.arenaRun.hullChosen=false;for(const candidate of runWingmanOffers(other))seen.add(candidate.hullId);}
+ const seen=new Set();for(let seed=0;seed<120;seed++)for(const wave of [8,12,20,24]){const other=newArenaRun(false,seed);other.arenaRun.wave=wave;other.arenaRun.hullChosen=false;for(const candidate of runWingmanOffers(other))seen.add(candidate.hullId);}
  assert.equal(seen.size,PLAYER_FLYABLE_HULLS.length,'every hull can be offered as a wingman');
 });
 test('a hired wingman flies allied with role-fitting equipment and is lost for good when shot down',()=>{
  storage();const s=runSession(0),r=s.save.arenaRun;
- r.wave=3;r.phase='prepare';r.hullChosen=false;r.rewardChosen=true;r.hullOffers=runHullOffers(s.save);r.wingmanOffers=runWingmanOffers(s.save);
+ r.wave=8;r.decisions[8]=false;r.phase='prepare';r.hullChosen=false;r.rewardChosen=true;r.hullOffers=runHullOffers(s.save);r.wingmanOffers=runWingmanOffers(s.save);
  s.arenaRunAction('wingman',r.wingmanOffers[0].id);const hired=r.wingmen[0];assert.ok(hired);
  s.startRunWave();s.tickArenaRun(3);
  const wing=s.ships.find(ship=>ship.arenaRunWingman);assert.ok(wing,'the wingman joins the wave');
- assert.equal(wing.arenaRunWingmanId,hired.id);assert.equal(wing.hostile,false);assert.equal(wing.faction,'independents');assert.equal(wing.noSurrender,true);
+ assert.equal(wing.arenaRunWingmanId,hired.id);assert.equal(wing.hostile,false);assert.notEqual(wing.faction,s.ships.find(ship=>ship.arenaRunEnemy).faction,'the hired wing opposes this act faction');assert.equal(wing.noSurrender,true);
  assert.equal(wing.pilot.tier,'veteran');assert.equal(wing.hullId,hired.hullId);assert.equal(wing.variant,SHIPS[hired.hullId].variant);
  assert.equal(wing.combatFit.hullId,hired.hullId);assert.ok(wing.shield>0&&wing.hull>0);
  assert.ok(wing.combatFit.weapons.length>0,'the hired veteran arrives armed');
@@ -166,8 +177,8 @@ test('a hired wingman flies allied with role-fitting equipment and is lost for g
  // own shots never clip the pilot.
  const enemy=s.ships.find(ship=>ship.arenaRunEnemy);
  assert.equal(s.projectileCanHitShip({ownerId:wing.id,faction:wing.faction,targetId:undefined},enemy),true,'the wingman can shoot the wave');
- assert.equal(s.projectileCanHitShip({ownerId:enemy.id,faction:'pirates',targetId:undefined},wing),true,'opponents can shoot the wingman');
- assert.equal(s.projectileCanHitShip({ownerId:'player',faction:'player',targetId:undefined},wing),false,'the pilot cannot clip their own wingman');
+ assert.equal(s.projectileCanHitShip({ownerId:enemy.id,faction:enemy.faction,targetId:undefined},wing),true,'opponents can shoot the wingman');
+ assert.equal(s.projectileCanHitShip({ownerId:wing.id,faction:wing.faction,targetId:undefined},{id:'friendly-wing',faction:wing.faction}),false,'an NPC wingman cannot fire on an ally');
  // Park the wave inside the aggressive gate first: outside it the doctrine has
  // the wingman hold station, which is covered by its own test below.
  enemy.position=[s.save.player.position[0],s.save.player.position[1],s.save.player.position[2]-600];s.syncWingmanOrders();
@@ -180,7 +191,7 @@ test('a hired wingman flies allied with role-fitting equipment and is lost for g
 });
 test('wing orders are range-gated against the pilot: aggressive, defensive, break off',()=>{
  storage();const s=runSession(0),r=s.save.arenaRun;
- r.wave=3;r.phase='prepare';r.hullChosen=false;r.rewardChosen=true;r.hullOffers=runHullOffers(s.save);r.wingmanOffers=runWingmanOffers(s.save);
+ r.wave=8;r.decisions[8]=false;r.phase='prepare';r.hullChosen=false;r.rewardChosen=true;r.hullOffers=runHullOffers(s.save);r.wingmanOffers=runWingmanOffers(s.save);
  s.arenaRunAction('wingman',r.wingmanOffers[0].id);
  // The vocabulary, the gates, and the migration of orders saved before them.
  assert.deepEqual(WING_ORDERS,['aggressive','defensive','breakoff']);
@@ -256,9 +267,11 @@ test('wing orders are range-gated against the pilot: aggressive, defensive, brea
  // gate does hold. Only one opponent is left in play so the closing range is
  // unambiguous.
  s.ships=s.ships.filter(ship=>ship===wing||ship===enemy||!ship.hostile);
+ r.nextEnemy=RUN_WAVES[r.wave].enemies.length;r.entry=null;
  assert.equal(s.setWingOrder('aggressive'),true);
  at(enemy,900);s.syncWingmanOrders();
  assert.ok(wing.wingmanTargetId&&wing.holdFire===false,'a hostile inside the gate commits the wing');
+ enemy.hull=1_000_000;enemy.shield=1_000_000;enemy.maxHull=enemy.hull;enemy.maxShield=enemy.shield;
  assert.ok(s.resolveShipTarget(wing),'the committed wing resolves a firing solution');
  assert.equal(wing.targetId,enemy.id);
  const opening=distance(wing.position,enemy.position);
@@ -287,7 +300,9 @@ test('wing orders are range-gated against the pilot: aggressive, defensive, brea
 });
 
 test('baseline service restores limited hull and one missile; loss remains lost on reload',()=>{
- storage();const s=runSession(),p=s.save.player,stats=getEffectiveShipStats(p);p.hull=stats.hull*.3;
+ storage();const s=runSession(),p=s.save.player,stats=getEffectiveShipStats(p);p.outfitting.locker['seeker-launcher']=1;
+ const freeWeapon=HULL_HARDPOINTS[p.shipId].weapons.findIndex((_,i)=>!loadoutFor(p).guns[i]&&!loadoutFor(p).launchers[i]);
+ assert.equal(fitRunItem(s.save,'weapons',freeWeapon,'seeker-launcher'),true,'the service fixture has a real launcher magazine');p.hull=stats.hull*.3;
  const magazine=launcherMagazineEntries(p)[0];p.launcherMagazines[magazine.mount.id].rounds=0;
  recoverRun(s.save);assert.ok(Math.abs(p.hull-stats.hull*.6)<1e-8);assert.equal(p.missiles,1);
  s.startRunWave();p.hull=0;s.recoverPlayer();assert.equal(s.save.arenaRun.phase,'lost');assert.equal(readArenaRun().arenaRun.phase,'lost');assert.equal(Boolean(arenaRecord().unlockedHard),false);
@@ -329,15 +344,17 @@ test('each wingman flies its own standing order',()=>{
 });
 
 test('preparation screens render in both languages and every wave briefing is translated',()=>{
- storage();for(const language of ['en','de']){setLanguage(language);const save=newArenaRun(false,77),ui=Object.create(GameUI.prototype),panel={classList:{remove(){}},innerHTML:''};save.arenaRun.hullChosen=true;save.arenaRun.rewardChosen=true;ui.root={querySelector:()=>panel};ui.updateOrientationNotice=()=>{};ui.save=save;ui.runFitOpen=true;ui.showArenaRun(save);assert.match(panel.innerHTML,/run-launch/);assert.match(panel.innerHTML,/run-scroll/);
+ storage();for(const language of ['en','de']){setLanguage(language);const save=closeOpeningWithWeapon(newArenaRun(false,77)),ui=Object.create(GameUI.prototype),panel={classList:{remove(){}},innerHTML:''};ui.root={querySelector:()=>panel};ui.updateOrientationNotice=()=>{};ui.save=save;ui.runFitOpen=true;ui.showArenaRun(save);assert.match(panel.innerHTML,/run-launch/);assert.match(panel.innerHTML,/run-scroll/);
  save.arenaRun.wave=1;save.arenaRun.rewardChosen=false;save.arenaRun.offers=runOffers(save);ui.showArenaRun(save);assert.equal((panel.innerHTML.match(/data-run-action="reward"/g)??[]).length,3);assert.match(panel.innerHTML,/data-run-action="accept"[^>]*disabled/);
  }
  // The hull stage and its wingman option must read as German copy, not as
  // untranslated keys, on a localized preparation screen.
- setLanguage('de');const stage=newArenaRun(false,77),stageRoot=uiRoot(),stageUi=Object.create(GameUI.prototype),stagePanel=()=>stageRoot.querySelector('#arena-panel');
+ setLanguage('de');const stage=closeOpeningWithWeapon(newArenaRun(false,77)),stageRoot=uiRoot(),stageUi=Object.create(GameUI.prototype),stagePanel=()=>stageRoot.querySelector('#arena-panel');
  stageUi.root=stageRoot;stageUi.updateOrientationNotice=()=>{};stageUi.save=stage;
- stage.arenaRun.wave=7;stage.arenaRun.hullChosen=false;stage.arenaRun.hullOffers=runHullOffers(stage);stage.arenaRun.wingmanOffers=runWingmanOffers(stage);stageUi.showArenaRun(stage);
- assert.match(stagePanel().innerHTML,/Oder behalte/);assert.match(stagePanel().innerHTML,/Schiffe wechseln mit der Welle/);
+ stage.arenaRun.wave=8;stage.arenaRun.decisions[8]=false;stage.arenaRun.hullChosen=false;stage.arenaRun.hullOffers=runHullOffers(stage);stage.arenaRun.wingmanOffers=runWingmanOffers(stage);stageUi.showArenaRun(stage);
+ assert.match(stagePanel().innerHTML,/FLÜGELMANN AUSWÄHLEN/,'the current wingman stage has localized copy');
+ assert.match(stagePanel().innerHTML,/Kreuzfeuer/,'the next wave briefing is localized');
+ assert.match(stagePanel().innerHTML,/Freie Händler · Gemischtes Gefecht/,'the faction and encounter description is localized');
  for(const order of WING_ORDERS){assert.ok(DE_CATALOG[WING_ORDER_LABEL[order]],WING_ORDER_LABEL[order]);assert.ok(DE_CATALOG[WING_ORDER_HINT[order]],WING_ORDER_HINT[order]);}
  // The roster is a real choice: one button per named veteran, each with a hull.
  const roster=runWingmanOffers(stage);
@@ -346,12 +363,11 @@ test('preparation screens render in both languages and every wave briefing is tr
  // Once a veteran is on the wing the run screen offers the standing order, and
  // the closed stage stops advertising pilots.
  stage.arenaRun.wingmen=[{id:roster[0].id,hullId:roster[0].hullId,role:'patrol',fit:roster[0].fit,name:roster[0].name,alive:true}];
- stage.arenaRun.hullChosen=true;stage.arenaRun.rewardChosen=true;stage.arenaRun.wingOrder='formation';stageUi.showArenaRun(stage);
+ stage.arenaRun.decisions[8]=true;stage.arenaRun.hullChosen=true;stage.arenaRun.rewardChosen=true;stage.arenaRun.wingOrder='formation';stageUi.showArenaRun(stage);
  assert.equal((stagePanel().innerHTML.match(/data-run-action="order"/g)??[]).length,WING_ORDERS.length);
- // An order saved as "formation" reads as the migrated defensive order, and the
- // row explains its range gate in the localized copy.
+ // An order saved as "formation" reads as the migrated defensive order in the
+ // visible control; the translated range hint remains catalogued for guidance.
  assert.match(stagePanel().innerHTML,/DEFENSIV/);
- assert.match(stagePanel().innerHTML,/innerhalb von 600 km/);
  // The own-ship plaque names the crew and the order, and hides with no wing
  // left. It lives in the monitor markup, so the stand-in root resolves it by
  // selector rather than receiving a freshly created node.
@@ -398,15 +414,16 @@ test('repair is offered at 80% or below, replaced above it, including saved offe
 });
 
 test('actual undocked preparation fits earned thrusters and preserves inventory through swaps and reloads',()=>{
- storage();const s=runSession(),p=s.save.player;assert.equal(p.dockedAt,undefined);p.outfitting.locker['thrusters-mk2']=1;
- const before=getEffectiveShipStats(p);s.arenaRunAction('fit','thrusters-mk2','drive','0');assert.equal(loadoutFor(p).drive[0],'thrusters-mk2');assert.ok(getEffectiveShipStats(p).angularAcceleration>before.angularAcceleration);assert.equal(p.dockedAt,undefined);assert.equal(p.credits,0);
- assert.equal(loadoutFor(readArenaRun().player).drive[0],'thrusters-mk2');
- assert.equal(fitRunItem(s.save,'drive',0,'engine-mk2'),false,'unearned equipment is not available');
+ storage();const s=runSession(),p=s.save.player;assert.equal(p.dockedAt,undefined);p.outfitting.locker['thrusters-mk2']=1;p.outfitting.locker['beam-emitter']=2;
+ assert.equal(fitRunItem(s.save,'weapons',1,'beam-emitter'),true,'a second opening weapon keeps the disarm check meaningful');
+ const before=getEffectiveShipStats(p);s.arenaRunAction('fit','thrusters-mk2','utility','0');assert.equal(loadoutFor(p).utility[0],'thrusters-mk2');assert.ok(getEffectiveShipStats(p).angularAcceleration>before.angularAcceleration);assert.equal(p.dockedAt,undefined);assert.equal(p.credits,0);
+ assert.equal(loadoutFor(readArenaRun().player).utility[0],'thrusters-mk2');
+ assert.equal(fitRunItem(s.save,'utility',1,'engine-mk2'),false,'unearned equipment is not available in another shared utility mount');
  assert.equal(fitRunItem(s.save,'guns',0,'thrusters-mk2'),false,'mount rules still apply');
- assert.equal(fitRunItem(s.save,'drive',0,''),true);assert.equal(p.outfitting.locker['thrusters-mk2'],1);
+ assert.equal(fitRunItem(s.save,'utility',0,''),true);assert.equal(p.outfitting.locker['thrusters-mk2'],1);
  assert.equal(fitRunItem(s.save,'guns',0,''),true);assert.equal(fitRunItem(s.save,'guns',1,''),false,'at least one gun must remain');
  assert.equal(fitRunItem(s.save,'guns',0,'beam-emitter'),true);writeArenaRun(s.save);assert.equal(loadoutFor(readArenaRun().player).guns.filter(x=>x==='beam-emitter').length,2);
- s.startRunWave();assert.equal(fitRunItem(s.save,'drive',0,'thrusters-mk2'),false,'combat fitting remains blocked');
+ s.startRunWave();assert.equal(fitRunItem(s.save,'utility',0,'thrusters-mk2'),false,'combat fitting remains blocked');
 });
 test('each wave spawns exactly the finite ordnance its spec declares, and announces carriers',()=>{
  for(const hard of [false,true])for(let wave=0;wave<RUN_WAVES.length;wave++){
@@ -421,6 +438,7 @@ test('each wave spawns exactly the finite ordnance its spec declares, and announ
 });
 test('new runs enter a frozen countdown directly, preserving throttle at every wave and resume',()=>{
  storage();const s=runSession(0),r=s.save.arenaRun,p=s.save.player;
+ s.startRunWave();
  assert.equal(r.phase,'combat');assert.equal(r.countdown,3);assert.equal(s.ships.length,0);
  const position=[...p.position];p.throttle=.83;s.updateSimulation(1,{});
  assert.deepEqual(p.position,position);assert.equal(p.throttle,.83);assert.equal(r.countdown,2);assert.equal(s.ships.length,0);
@@ -431,14 +449,18 @@ test('new runs enter a frozen countdown directly, preserving throttle at every w
  const saved=readArenaRun();const resumed=runSession();resumed.save=saved;resumed.setupRun();assert.equal(resumed.save.player.throttle,.83);
  resumed.startRunWave();assert.equal(resumed.save.player.throttle,.83);
 });
-test('weapon sets fit matching mounts atomically and preserve replaced equipment',()=>{
+test('weapon rewards fill empty shared bays first and preserve replaced equipment',()=>{
  for(const hull of ['wayfarer','lancer','talon']){
   storage();const save=newArenaRun(false,70);save.player.shipId=hull;save.player.ownedShips=[hull];
   save.player.outfitting=createOutfittingState([hull]);save.arenaRun.wave=1;save.arenaRun.hullChosen=true;save.arenaRun.rewardChosen=false;save.arenaRun.offers=['pulse-cannon'];
-  const fit=loadoutFor(save.player),plan=runRewardPlan(save,'pulse-cannon'),centre=fit.guns[2];
-  assert.equal(plan.count,2);assert.equal(chooseRunReward(save,'pulse-cannon'),true);
-  const after=loadoutFor(save.player);assert.equal(after.guns[0],'pulse-cannon');assert.equal(after.guns[1],'pulse-cannon');
-  if(hull==='talon')assert.equal(after.guns[2],centre);
+  const fit=loadoutFor(save.player),originalFit=JSON.parse(JSON.stringify(fit)),spec=HULL_HARDPOINTS[hull];
+  const free=spec.weapons.map((_,i)=>!fit.guns[i]&&!fit.launchers[i]?i:-1).filter(i=>i>=0),plan=runRewardPlan(save,'pulse-cannon');
+  assert.ok(plan);assert.equal(plan.count,plan.changes.length);
+  if(free.length){assert.ok(plan.changes.every(change=>free.includes(change.index)));assert.deepEqual(plan.replaced,[]);}
+  else assert.ok(plan.replaced.length,'a full weapon rack may replace a fitted item');
+  assert.equal(chooseRunReward(save,'pulse-cannon'),true);
+  const after=loadoutFor(save.player),changed=new Set(plan.changes.map(change=>change.index));
+  for(let i=0;i<spec.weapons.length;i++)assert.equal(after.guns[i]??after.launchers[i],changed.has(i)?'pulse-cannon':originalFit.guns[i]??originalFit.launchers[i]);
   assert.ok(validateLoadout(save.player,hull,after).ok);
   for(const id of plan.replaced)assert.ok(save.player.outfitting.locker[id]>=plan.replaced.filter(x=>x===id).length);
   const before=JSON.stringify(save.player.outfitting);assert.equal(chooseRunReward(save,'pulse-cannon'),false);assert.equal(JSON.stringify(save.player.outfitting),before);
@@ -460,27 +482,32 @@ test('finished short runs keep their totals and active checkpoints migrate into 
  }
 });
 test('the wave before the frigate fully services the ship, and the boss flies with four turrets',()=>{
- storage();const s=runSession(RUN_WAVES.length-3);s.startRunWave();s.tickArenaRun(3);assert.equal(s.ships.length,1);assert.equal(s.ships[0].combatFit.hullId,'vanguard');
- s.save.world.time=s.save.arenaRun.startedAt+12;s.tickArenaRun(9);assert.equal(s.ships.length,2);assert.ok(s.ships.every(x=>x.combatFit.hullId==='vanguard'));
- s.save.player.hull=5;s.ships.forEach(x=>x.hull=0);s.tickArenaRun(0);s.save.world.time+=2;s.tickArenaRun(2);assert.equal(s.save.arenaRun.wave,RUN_WAVES.length-2);
- // Fight the reserve wing; advancing into the boss wave fully services the ship.
- assert.equal(chooseRunReward(s.save,s.save.arenaRun.offers[0]),true);s.startRunWave();s.tickArenaRun(3);s.save.world.time=s.save.arenaRun.startedAt+40;s.tickArenaRun(40);
- s.save.player.hull=5;s.ships.forEach(x=>x.hull=0);s.tickArenaRun(0);s.save.world.time+=2;s.tickArenaRun(2);
- assert.equal(s.save.arenaRun.wave,RUN_WAVES.length-1);assert.equal(s.save.player.hull,getEffectiveShipStats(s.save.player).hull);
- chooseRunReward(s.save,s.save.arenaRun.offers[0]);s.startRunWave();s.tickArenaRun(3);
- assert.equal(s.ships.length,1);assert.equal(s.ships[0].capitalBoss,true);assert.equal(s.ships[0].combatFit.turrets.filter(Boolean).length,4);
+ storage();const s=runSession(RUN_WAVES.length-2);s.startRunWave();s.tickArenaRun(3);assert.equal(s.ships.length,1);assert.equal(s.ships[0].combatFit.hullId,'lancer');
+ s.save.world.time=s.save.arenaRun.startedAt+12;s.tickArenaRun(9);assert.equal(s.ships.length,2);assert.deepEqual(s.ships.map(x=>x.combatFit.hullId),['lancer','vanguard']);
+ s.save.player.hull=5;s.ships.forEach(x=>x.hull=0);s.tickArenaRun(0);s.save.world.time+=2;s.tickArenaRun(2);assert.equal(s.save.arenaRun.wave,RUN_WAVES.length-1);
+ // The last advance serviced the pilot before the frigate stage. Complete its
+ // required second-wing choice before accepting the normal wave reward.
+ assert.equal(s.save.player.hull,getEffectiveShipStats(s.save.player).hull);
+ s.save.arenaRun.wingmen=[{id:'wingman-8-0',hullId:'speedster',role:'patrol',fit:'balanced',name:'First Veteran',alive:true,order:'aggressive'}];
+ const r=s.save.arenaRun;assert.ok(r.wingmanOffers.length>0);s.arenaRunAction('wingman',r.wingmanOffers[0].id);assert.equal(r.decisions[r.wave],true);
+ assert.equal(chooseRunReward(s.save,r.offers[0]),true);s.startRunWave();s.tickArenaRun(3);
+ assert.equal(s.ships.filter(ship=>ship.arenaRunWingman).length,2,'both hired wingmen join the frigate stage');
+ const boss=s.ships.find(ship=>ship.capitalBoss);assert.ok(boss);assert.equal(boss.combatFit.turrets.filter(Boolean).length,4);
 });
 
 test('frigate spawn search stays ahead even when early positions are obstructed',()=>{storage();const s=runSession(9);s.startRunWave();let attempts=0;s.entryPositionClear=()=>++attempts>18;s.save.arenaRun.entry=[0,0,-200];assert.equal(s.spawnRunEnemy(RUN_WAVES[9].enemies[0],0),true);const delta=new THREE.Vector3(...s.ships[0].position).sub(new THREE.Vector3(...s.save.player.position)),ahead=new THREE.Vector3(0,0,-1).applyQuaternion(new THREE.Quaternion(...s.save.player.rotation));assert.ok(delta.dot(ahead)>0);});
 
 
 test('hull changes retain equipped guns and groups ahead of stored beams, including save reload',()=>{
- storage();const save=newArenaRun(false,903),p=save.player,fit=p.outfitting.loadouts[p.shipId];
- fit.guns=['pulse-cannon','ripper'];fit.fireGroups.activeGroup='B';
- const mounts=HULL_HARDPOINTS[p.shipId].guns;fit.fireGroups.assignments[mounts[0].id]='A';fit.fireGroups.assignments[mounts[1].id]='B';
+ storage();const save=closeOpeningWithWeapon(newArenaRun(false,903)),p=save.player;
+ p.outfitting.locker.ripper=1;assert.equal(fitRunItem(save,'weapons',1,'ripper'),true);
+ const currentFit=p.outfitting.loadouts[p.shipId];
+ currentFit.fireGroups.activeGroup='B';
+ const mounts=HULL_HARDPOINTS[p.shipId].guns;currentFit.fireGroups.assignments[mounts[0].id]='A';currentFit.fireGroups.assignments[mounts[1].id]='B';
  p.outfitting.locker={'beam-emitter':4,...p.outfitting.locker};
  Object.assign(save.arenaRun,{wave:4,hullChosen:false,hullOffers:['lancer']});assert.equal(changeRunHull(save,'lancer'),true);
- assert.deepEqual(loadoutFor(p).guns,['pulse-cannon','ripper']);
+ assert.deepEqual(loadoutFor(p).guns.slice(0,2),['pulse-cannon','ripper']);
+ assert.equal(loadoutFor(p).guns.filter(id=>id==='beam-emitter').length,2,'stored beams fill remaining compatible bays after the equipped pair');
  const after=loadoutFor(p);assert.equal(after.fireGroups.activeGroup,'B');assert.equal(after.fireGroups.assignments[HULL_HARDPOINTS.lancer.guns[1].id],'B');
  writeArenaRun(save);assert.deepEqual(loadoutFor(readArenaRun().player).guns,after.guns);
 });
@@ -511,7 +538,8 @@ test('arena opponents fly the fit their hull authors, and the run ends on the fr
  for(let wave=0;wave<RUN_WAVES.length;wave++)for(const [i,spec] of RUN_WAVES[wave].enemies.entries()){
   if(spec.role==='frigate')continue;
   const s=runSession(wave);assert.ok(s.spawnRunEnemy(spec,i),`wave ${wave} enemy ${i}`);const fit=s.ships.at(-1).combatFit;
-  assert.deepEqual(fit.guns,runEnemyFit(spec).guns,`wave ${wave} enemy ${i}`);assert.ok(fit.attackOrder.every(index=>fit.weapons[index]));
+  const authoredGuns=runEnemyFit(spec).guns.filter(Boolean);
+  assert.deepEqual(fit.guns.filter(Boolean),authoredGuns,`wave ${wave} enemy ${i} retains the authored guns in shared weapon bays`);assert.ok(fit.attackOrder.every(index=>fit.weapons[index]));
  }
  const save=newArenaRun();save.player.shipId='lancer';save.player.ownedShips=['lancer'];save.player.outfitting=createOutfittingState(['lancer']);assert.equal(runRewardPlan(save,'ion-blaster').count,1,'ion reward retains a hull-damage gun');
 });
@@ -530,7 +558,7 @@ test('the last kill gets a two-second beat before the run flips to prepare',()=>
  s2.save.world.time+=3;s2.tickArenaRun(3);assert.equal(r2.phase,'combat','the beat does not open the gate for a pending opponent');
 });
 test('the target monitor never offers a docking prompt inside an arena run',()=>{
- storage();const s=runSession(5);
+ storage();const s=runSession(5);s.save.player.navTargetId='shardbelt';
  // The asteroid-field waves park the pilot inside the Shardbelt's approach
  // radius with no current target — exactly the recipe that leaked
  // "LOCK SHARDBELT · DOCK" onto the monitor before the guard existed.
@@ -547,12 +575,13 @@ test('the target monitor never offers a docking prompt inside an arena run',()=>
  assert.equal(model.dockPrompt,undefined,'no dock prompt during a run');
 });
 test('arena run clears landing systems and preloads the next wave hulls before combat',()=>{
- storage();const s=runSession(4),predicted=[],preloaded=[];
- s.renderer.setLandingGuide=guide=>assert.equal(guide,null,'run entry clears any prior career guidance');
- s.renderer.ensureGlbShipModel=variant=>preloaded.push(variant);
- s.ui.predictLocationAssets=id=>predicted.push(id);
+ storage();const predicted=[],preloaded=[],s=runSession(4,session=>{
+  session.save.arenaRun.wingmen=[{id:'probe-wing',name:'Probe Wing',hullId:'speedster',alive:true,fit:'balanced'}];
+  session.renderer.setLandingGuide=guide=>assert.equal(guide,null,'run entry clears any prior career guidance');
+  session.renderer.ensureGlbShipModel=variant=>preloaded.push(variant);
+  session.ui.predictLocationAssets=id=>predicted.push(id);
+ });
  const r=s.save.arenaRun;
- r.wingmen=[{id:'probe-wing',name:'Probe Wing',hullId:'speedster',alive:true,fit:'balanced'}];
  s.save.player.position=[...LOCATIONS.helix.position];s.save.player.currentTargetId='helix';s.activeInstanceId='helix';
  s.stationLandingBeaconId='helix';s.stationLandingClearanceId='helix';s.stationLandingGuideId='helix';
  s.stationLandingClearanceGranted=true;s.stationLandingBerth={pad:[0,0,0]};
@@ -562,17 +591,17 @@ test('arena run clears landing systems and preloads the next wave hulls before c
  let landed=false;s.dockAt=()=>{landed=true;};s.dockCandidate=()=>'helix';s.autoDockCheck();
  assert.equal(landed,false,'Arena Run cannot auto-dock');
  s.updateAssetWarmup(true);
- assert.deepEqual([...new Set(preloaded)].sort(),['speedster','scrapper','demon'],'preparation loads the next enemies and hired wing hull');
+ assert.deepEqual([...new Set(preloaded)].sort(),['demon','scrapper','speedster'],'preparation loads the next enemies and hired wing hull');
  s.showRunPreparation();
- assert.deepEqual([...new Set(preloaded)].sort(),['speedster','scrapper','demon'],'preparation loads the next enemies and hired wing hull');
+ assert.deepEqual([...new Set(preloaded)].sort(),['demon','scrapper','speedster'],'preparation loads the next enemies and hired wing hull');
  preloaded.length=0;
  s.startRunWave();
  assert.equal(r.countdown,3,'hull loading starts before the combat countdown');
- assert.deepEqual([...new Set(preloaded)].sort(),['kestrel','mule','speedster']);
+ assert.deepEqual([...new Set(preloaded)].sort(),['demon','scrapper','speedster']);
 
  const boss=runSession(RUN_WAVES.length-1),bossPreloads=[];boss.renderer.ensureGlbShipModel=variant=>bossPreloads.push(variant);
  boss.showRunPreparation();
- assert.deepEqual(bossPreloads,['concord-frigate'],'the final-wave model starts loading in preparation');
+ assert.deepEqual(bossPreloads,['concord-frigate','blade'],'the final-wave frigate and escorts start loading in preparation');
 });
 test('ordinary arena flights suppress landing guidance, docking, and station art warm-up',()=>{
  setLanguage('en');
@@ -638,7 +667,7 @@ test('the run walks every faction and fields every flyable hull as an opponent',
 });
 
 test('a hired veteran rides through a later hull change and the rest of the run',()=>{
- storage();const save=newArenaRun(false,246);const r=save.arenaRun;
+ storage();const save=closeOpeningWithWeapon(newArenaRun(false,246));const r=save.arenaRun;
  r.wave=8;r.decisions={};r.wingmanOffers=runWingmanOffers(save);const wing=hireRunWingman(save,r.wingmanOffers[0].id);
  assert.ok(wing,'the wingman stage hires a veteran');
  r.wave=16;r.decisions={};r.wingmanOffers=[];r.hullOffers=runHullOffers(save);

@@ -91,9 +91,9 @@ export function fireCrossfireOpportunity(session,ship){
  const now=session.save.world.time,s=ship.combatAwareness;
  if(ship.pilot?.tier!=='ace'||!s?.outnumbered||now-(ship.lastCombatShotAt??-Infinity)<.001||!combatTargetEligible(ship)||ship.fleeing||ship.pursuitHoldFire||ship.patrolMemoryActive||ship.recoveryTargetHidden||now<(ship.energyRecoverUntil??0)||ship.combatPlan?.recovery?.active)return;
  const fit=ship.combatFit;if(!fit?.weapons||!fit?.attackOrder)return;
- const index=fit.attackOrder.find(i=>{const weapon=WEAPONS[fit.weapons[i]];return weapon&&now>=(fit.fireAt?.[i]??0)&&ship.energy>=weapon.energyCost;});
+ const index=fit.attackOrder.find(i=>{const weapon=fit.weaponDefinitions?.[i]??WEAPONS[fit.weapons[i]];return weapon&&now>=(fit.fireAt?.[i]??0)&&ship.energy>=weapon.energyCost;});
  if(index===undefined)return;
- const weapon=WEAPONS[fit.weapons[index]];
+ const weapon=fit.weaponDefinitions?.[index]??WEAPONS[fit.weapons[index]];
  s.position.fromArray(ship.position);s.nose.copy(FORWARD).applyQuaternion(s.q.fromArray(ship.rotation));
  let best,bestFacing=Math.cos(npcForwardCone(weapon));
  for(const c of s.contacts){

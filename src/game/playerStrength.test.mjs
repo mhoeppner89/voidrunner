@@ -17,13 +17,13 @@ test('combat-strength proxy uses full hull and equipment value, half cash, and n
     player.outfitting.locker['torpedo-launcher'] = 1;
 
     const breakdown = playerStrengthBreakdown(player);
-    assert.equal(breakdown.shipValue, 48500);
+    assert.equal(breakdown.shipValue, 95000);
     assert.equal(breakdown.installedEquipmentValue, 10200 + 5200 + 1800 + 4800 + 5400);
-    assert.equal(breakdown.storedEquipmentValue, 9800);
+    assert.equal(breakdown.storedEquipmentValue, 16400);
     assert.equal(breakdown.cashValue, 500);
     assert.equal(breakdown.cargoValue, 0);
-    assert.equal(breakdown.total, 86200);
-    assert.equal(playerStrengthValue(player), 86200);
+    assert.equal(breakdown.total, 139300);
+    assert.equal(playerStrengthValue(player), 139300);
     assert.equal(player.cargo.gold, 999, 'cargo remains outside the proxy and unchanged');
 });
 

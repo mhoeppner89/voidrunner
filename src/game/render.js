@@ -1532,6 +1532,7 @@ export class SpaceRenderer {
     ensureStationModels(systemId = this.systemId) {
         this.stationModelLoads ??= new Map();
         this.stationColliders ??= new Map();
+        this.stationDockObstacles ??= new Map();
         for (const id of ['helix', 'rook', 'cairn', 'argent', 'gatehouse-twelve',
             'blackglass', 'cinder', 'torchwell', 'nacre', 'shepherd',
             'haven', 'league-yard', 'cinderfall']) {
@@ -1557,6 +1558,17 @@ export class SpaceRenderer {
                 }); }
                 catch (error) { console.warn(`Station ${id} dock occupants unavailable.`, error); }
                 if (this.disposed) { this.disposeObject(model); return; }
+                // Traffic shares bays with authored parked ships. Save their
+                // actual bounds so incoming hulls stop in front of them.
+                const dockObstacles=[];
+                model.updateMatrixWorld(true);
+                model.traverse(node => {
+                    if (!node.userData.stationOccupant) return;
+                    const box=new THREE.Box3().setFromObject(node);
+                    const origin=LOCATIONS[id].position;
+                    dockObstacles.push({min:box.min.toArray().map((v,i)=>v+origin[i]),max:box.max.toArray().map((v,i)=>v+origin[i])});
+                });
+                this.stationDockObstacles.set(id,dockObstacles);
                 addStationActivity(model, id);
                 model.name = `station-${id}`;
                 model.userData.stationAsset = id;
@@ -3001,6 +3013,7 @@ export class SpaceRenderer {
         const materialFor = (node) => (node.salvage === 'arms' || node.salvage === 'electronics' ? techMaterial : bulkMaterial);
         const groups = new Map();
         this.wreckNodes.forEach((node, nodeIndex) => {
+            if(node.combatLoot){this.addCombatLootNode(node);return;}
             const geometryIndex = node.shape % geometries.length;
             const tier = materialFor(node) === techMaterial ? 'tech' : 'bulk';
             const key = `${geometryIndex}:${tier}`;
@@ -3028,6 +3041,24 @@ export class SpaceRenderer {
             entries.forEach((entry) => this.wreckNodeMeshes.set(entry.node.id, mesh));
         });
         this.updateWreckNodeInstances();
+    }
+    addCombatLootNode(node) {
+        this.combatLootMeshes??=new Map();if(this.combatLootMeshes.has(node.id))return;
+        this.combatLootGeometry??=new THREE.IcosahedronGeometry(1,0);this.combatLootGeometry.userData.shared=true;
+        this.combatLootMaterial??=new THREE.MeshStandardMaterial({color:0x727b88,roughness:.85,metalness:.6});this.combatLootMaterial.userData.shared=true;
+        const mesh=new THREE.Mesh(this.combatLootGeometry,this.combatLootMaterial);
+        mesh.scale.setScalar(node.radius);mesh.position.fromArray(node.position);mesh.userData.lootNode=node;
+        this.tagTargetable(mesh,'wreck',node.id);this.scene.add(mesh);this.combatLootMeshes.set(node.id,mesh);
+    }
+    removeCombatLootNode(id) {
+        const mesh=this.combatLootMeshes?.get(id);if(mesh){this.scene.remove(mesh);this.combatLootMeshes.delete(id);}
+    }
+    updateCombatLootNodes() {
+        for(const mesh of this.combatLootMeshes?.values()??[]){const node=mesh.userData.lootNode;
+            const dx=node.position[0]-this.camera.position.x,dy=node.position[1]-this.camera.position.y,dz=node.position[2]-this.camera.position.z;
+            mesh.visible=node.remaining>0&&node.systemId===this.systemId&&dx*dx+dy*dy+dz*dz<WRECK_RENDER_DISTANCE_SQ;
+            if(mesh.visible)mesh.position.fromArray(node.position);
+        }
     }
     updateWreckNodeInstances(dt = 0) {
         const cam = this.camera.position;
@@ -5082,6 +5113,7 @@ export class SpaceRenderer {
         }
         if (this.activeInstanceId === 'mourning-line')
             targets.push(...this.wreckBatches.map(({ mesh }) => mesh));
+        targets.push(...[...(this.combatLootMeshes?.values()??[])].filter(m=>m.visible));
         targets.push(...this.pickupMeshes.values());
         const hits = this.raycaster.intersectObjects(targets, true);
         for (const hit of hits) {
@@ -5508,7 +5540,10 @@ export class SpaceRenderer {
         // The cockpit camera is at the ship origin and its exterior hull is
         // omitted. Drawing own-ship turrets would expose them through the canopy.
         if(id.startsWith('player-'))return;
-        const embedded=this.shipMeshes?.get(actor?.id)?.userData.embeddedTurrets?.[Number(id.split('-').at(-1))];
+        const mountIndex=Number(id.split('-').at(-1));
+        const reviewedMount=TURRET_LAYOUTS[actor?.combatFit?.hullId]?.[mountIndex];
+        const footprintScale=reviewedMount?.footprintScale??1;
+        const embedded=this.shipMeshes?.get(actor?.id)?.userData.embeddedTurrets?.[mountIndex];
         if(embedded){
             embedded.updateWorldMatrix(true,false);
             const local=embedded.userData.local.copy(direction).applyQuaternion(embedded.getWorldQuaternion(embedded.userData.inverse).invert());
@@ -5517,11 +5552,11 @@ export class SpaceRenderer {
         }
         this.turretMeshes??=new Map();
         let mesh=this.turretMeshes.get(id);
-        if(mesh && (mesh.name!==`${kind}-${size}` || mesh.userData.pedestal!==pedestal)) {
+        if(mesh && (mesh.name!==`${kind}-${size}` || mesh.userData.pedestal!==pedestal || (mesh.userData.footprintScale??1)!==footprintScale)) {
             this.scene.remove(mesh);this.turretMeshes.delete(id);mesh=null;
         }
         if(!mesh) {
-            mesh=kind==='capital'?createCruiserTurret():actor?.capitalClass==='cruiser'&&kind==='pdc'?createCruiserPdc():createTurretModel(kind,size,pedestal);
+            mesh=kind==='capital'?createCruiserTurret():actor?.capitalClass==='cruiser'&&kind==='pdc'?createCruiserPdc():createTurretModel(kind,size,pedestal,footprintScale);
             this.scene.add(mesh);this.turretMeshes.set(id,mesh);
         }
         if(actor){
@@ -5538,7 +5573,6 @@ export class SpaceRenderer {
                 paintModel.traverse(o => { if (!paintModel.userData.turretArmorMaterial && o.material?.map) paintModel.userData.turretArmorMaterial = o.material; });
             paintFrigateTurret(mesh, paintModel.userData.turretArmorMaterial);
         }
-        const reviewedMount=TURRET_LAYOUTS[actor?.combatFit?.hullId]?.[Number(id.split('-').at(-1))];
         if(reviewedMount?.reviewed&&reviewedMount.normal) {
             mesh.userData.surfaceRotation??=droneDockRotation(reviewedMount.normal,reviewedMount.restDirection);
             if(mesh.userData.attachment)mesh.userData.attachment.surfaceRotation=mesh.userData.surfaceRotation;
@@ -6192,6 +6226,7 @@ export class SpaceRenderer {
         }
     }
     render() {
+        this.updateCombatLootNodes();
         if (this.contextLost)
             return;
         this.updateWorldVisuals();
@@ -6414,6 +6449,7 @@ export class SpaceRenderer {
     }
     disposeResources() {
         this.clearDrones();
+        this.combatLootMeshes?.clear();this.combatLootGeometry?.dispose();this.combatLootMaterial?.dispose();
         window.removeEventListener('resize', this.resize);
         this.containerResizeObserver?.disconnect();
         this.renderer.domElement.removeEventListener('webglcontextlost', this.onContextLost);
@@ -6439,6 +6475,7 @@ export class SpaceRenderer {
         this.glbShipModels.clear();
         this.glbShipLoading.clear();
         this.stationColliders?.clear();
+        this.stationDockObstacles?.clear();
         this.bloomSceneTarget?.dispose();
         this.ringVolumeTarget?.dispose();
         this.ringParticles?.dispose();

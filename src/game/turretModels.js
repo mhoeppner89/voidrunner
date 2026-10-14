@@ -31,9 +31,12 @@ export function paintFrigateTurret(root,hullMaterial){
     root.traverse(o=>{if(!o.isMesh)return;if(o.userData.damageMaterial){o.userData.damageMaterial.dispose();delete o.userData.damageMaterial;}o.material=material;o.userData.healthyMaterial=material;});
     root.userData.armorAtlas=hullMaterial.map;delete root.userData.healthFraction;
 }
-const supportGeometry = new THREE.CylinderGeometry(.38,.46,1,12);
+// A short tapered seat bridges the turret foot to the fitted hull surface.
+// The slightly wider hull-side end follows the curved lower wings without
+// changing the approved turret pivot or its firing axis.
+const supportGeometry = new THREE.CylinderGeometry(.42,.48,1,12);
 supportGeometry.userData.shared=true;
-export function createTurretModel(kind, size, pedestal=0) {
+export function createTurretModel(kind, size, pedestal=0, footprintScale=1) {
     if (!templates.has(kind)) templates.set(kind, TURRET_MODEL_DATA[kind].map((part,index) => {
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(part.positions, 3));
@@ -53,13 +56,18 @@ export function createTurretModel(kind, size, pedestal=0) {
         return {...part,geometry,material};
     }));
     const root = new THREE.Group(), yaw = new THREE.Group(), pitch = new THREE.Group();
-    root.name = `${kind}-${size}`; root.userData.pedestal=pedestal; root.add(yaw); yaw.add(pitch);
+    root.name = `${kind}-${size}`; root.userData.pedestal=pedestal;root.userData.footprintScale=footprintScale; root.add(yaw); yaw.add(pitch);
     for (const part of templates.get(kind)) {
         const mesh = new THREE.Mesh(part.geometry, part.material);
-        (part.part === 'base' ? root : part.part === 'yaw' ? yaw : pitch).add(mesh);
+        if(part.part==='base'){
+            mesh.userData.turretBaseFoot=true;
+            mesh.scale.x=mesh.scale.z=footprintScale;
+            root.add(mesh);
+        }else (part.part === 'yaw' ? yaw : pitch).add(mesh);
     }
     if(pedestal>0){
         const support=new THREE.Mesh(supportGeometry,templates.get(kind)[0].material);
+        support.userData.turretSeatConnector=true;
         support.position.y=-.59-pedestal/2;support.scale.y=pedestal;root.add(support);
     }
     root.scale.setScalar(size === 'M' ? 1.3 : 1);

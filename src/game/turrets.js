@@ -1,3 +1,4 @@
+import {modifiedWeapon} from './equipmentCatalog.js';
 import {FLEET_TURRET_CLEARANCE} from './fleetTurretClearance.js';
 import {FRIGATE_CLEARANCE} from './frigateMounts.js';
 import { combatTargetEligible } from './combatTargeting.js';
@@ -82,7 +83,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
     for(const [index,mount] of layouts.entries()) {
         const item=OUTFIT_ITEMS[items[index]];if(!item || actor.capitalMountHull?.[index]<=0)continue;
         const pdc=item.turretKind==='pdc';
-        const pdcWeapon=frigate?FRIGATE_PDC_TURRET:PDC_TURRET;
+        const interceptWeapon=modifiedWeapon(PDC_TURRET,item),pdcWeapon=modifiedWeapon(frigate?FRIGATE_PDC_TURRET:PDC_TURRET,item),laser=modifiedWeapon(TRACKING_LASER,item);
         const state=actor.turretRuntime[index]??= {position:new THREE.Vector3(),normal:new THREE.Vector3(),direction:new THREE.Vector3(),goal:new THREE.Vector3(),scratch:new THREE.Vector3(),desired:new THREE.Vector3(),q:new THREE.Quaternion(),turn:new THREE.Quaternion(),inverse:new THREE.Quaternion(),local:new THREE.Vector3(),fireAt:0};
         if(state.itemId!==item.id){state.itemId=item.id;state.burstRemaining=0;state.interceptAt=0;}
         state.clearance=hullId==='concord-frigate'?FRIGATE_CLEARANCE[index]:(FLEET_TURRET_CLEARANCE[hullId]??TURRET_CLEARANCE[hullId])?.[index];
@@ -100,7 +101,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
         state.status=disabled?'TURRETS HOLD FIRE':'TURRETS READY';
         let target,point,intercept=false;
         if(!disabled && pdc && now>=defense.readyAt) {
-            let nearest=PDC_TURRET.range;
+            let nearest=pdcWeapon.range;
             for(const p of session.projectiles) {
                 if((p.kind!=='missile'&&p.kind!=='torpedo')||p.life<=0||p.ownerId===ownerId||p.targetId!==ownerId||(assignments?assignments.get(p.id)?.until:p.pdcAssignedUntil)>now)continue;
                 const pos=session.projStore.getPos(p.slot,state.goal),distance=pos.distanceTo(state.position);
@@ -128,7 +129,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
             if(!intercept){
                 const key=target.id??'player';
                 if(state.targetId!==key){state.targetId=key;state.acquireAt=now+(pilot?.turretAcquire??.3);}
-                const spread=(pdc ? (pdcWeapon.aimSpread??.020) : .018)*distance*(pilot?.turretError??1)*(pilot ? npcAimErrorFactor(actor) : 1);
+                const spread=(pdc ? (pdcWeapon.aimSpread??.020) : .018)*distance*(pilot?.turretError??1)*(pilot ? npcAimErrorFactor(actor) : 1)/((pdc?pdcWeapon:laser).gunneryAccuracy??1);
                 const phase=now*2.1+state.phase;
                 point.x+=Math.sin(phase)*spread;
                 point.y+=Math.sin(phase*1.37+1.2)*spread;
@@ -137,16 +138,16 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
             const desired=state.desired.copy(point).sub(state.position).normalize();
             const localTarget=state.local.copy(point).sub(state.scratch.fromArray(actor.position)).applyQuaternion(state.inverse);
             const rearAllowed=intercept||!mount.rearBias||localTarget.z>=-localTarget.length()*.2;
-            const inArc=rearAllowed&&(!pdc||flightTime<=PDC_TURRET.life) && distance<=(pdc?PDC_TURRET.range:laser.range)+rangeEpsilon && clearTurretArc(actor,mount,extents,point,state);
+            const inArc=rearAllowed&&(!pdc||flightTime<=pdcWeapon.life) && distance<=(pdc?pdcWeapon.range:laser.range)+rangeEpsilon && clearTurretArc(actor,mount,extents,point,state);
             if(inArc) {
                 const angle=state.direction.angleTo(desired),step=(pdc?(pdcWeapon.turnRate??4.5):1.2)*dt*(pilot?.turretTurn??1);
                 state.turn.setFromUnitVectors(state.direction,desired);
                 state.turn.slerp(identity,1-Math.min(1,step/Math.max(angle,0.0001)));
                 state.direction.applyQuaternion(state.turn).normalize();
                 const disruption=disruptionFactor(actor,now);
-                const cost=(pdc&&!intercept?pdcWeapon.energyCost:4)*disruption;
+                const cost=(intercept?interceptWeapon.interceptEnergy:pdc?pdcWeapon.energyCost:laser.energyCost)*disruption;
                 // Ship bursts also leave the energy for one missile intercept.
-                const reserve=Math.max(12,stats.energyCapacity*0.25)+(pdc&&!intercept?PDC_TURRET.interceptEnergy:0);
+                const reserve=Math.max(12,stats.energyCapacity*0.25)+(pdc&&!intercept?interceptWeapon.interceptEnergy:0);
                 if(actor.energy<reserve+cost)state.status='TURRETS WAITING FOR ENERGY';
                 else if((intercept||now>=state.acquireAt) && state.direction.dot(desired)>Math.cos(0.001) && now>=(intercept?state.interceptAt:state.fireAt) && !session.lineBlocked(state.position,point,ownerId) && !shipBlocksRay(session,actor,ownerId,target,point,state) && spendEnergy(actor,cost)) {
                     const color=player?0xdce9ff:0xff8a5b;
@@ -154,7 +155,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
                     if(intercept) {
                         state.interceptAt=now+PDC_TURRET.interceptInterval*disruption;
                         defense.readyAt=state.interceptAt;
-                        const round=session.spawnGunProjectile(ownerId,PDC_TURRET,state.muzzle,state.direction,actor.velocity??[0,0,0],undefined,`${ownerId}-turret-${index}`);
+                        const round=session.spawnGunProjectile(ownerId,interceptWeapon,state.muzzle,state.direction,actor.velocity??[0,0,0],undefined,`${ownerId}-turret-${index}`);
                         if(round){
                             round.targetMissile=target;
                             if(assignments)assignments.set(target.id,{defenderId:`${ownerId}-turret-${index}`,until:now+flightTime+.12,round});
@@ -163,10 +164,10 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
                     } else if(pdc) {
                         if(!state.burstRemaining)state.burstRemaining=PDC_TURRET.burstSize;
                         state.burstRemaining--;
-                        state.fireAt=now+(state.burstRemaining?PDC_TURRET.shotInterval:PDC_TURRET.burstPause)*disruption;
+                        state.fireAt=now+(state.burstRemaining?pdcWeapon.shotInterval:pdcWeapon.burstPause)*disruption;
                         session.spawnGunProjectile(ownerId,pdcWeapon,state.muzzle,state.direction,actor.velocity??[0,0,0],target.id??'player',`${ownerId}-turret-${index}`);
                     } else {
-                        state.fireAt=now+0.7*disruption;
+                        state.fireAt=now+laser.cooldown*disruption;
                         session.fireBeam(ownerId,laser,state.muzzle,state.direction,`${ownerId}-turret-${index}`);
                     }
                     session.renderer.spawnMuzzleFlash?.(state.muzzle.x,state.muzzle.y,state.muzzle.z,pdc?color:0x7cffff);

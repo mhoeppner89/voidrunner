@@ -29,12 +29,18 @@ test('equal-count ship replacement removes old mesh and remains stable', () => {
     const current = r.shipMeshes.get('b'); r.syncShips([ship('b')]); assert.equal(r.shipMeshes.get('b'), current);
     r.syncShips([]); assert.equal(r.dynamicRoot.children.length, 0);
 });
-test('equal-count projectile replacement disposes the old slot', () => {
+test('equal-count projectile replacement pools the old slot visual for reuse', () => {
     const r = renderer();
     r.syncProjectiles([{ slot: 0, kind: 'pdc', faction: 'player' }], store);
     const old = r.projectileMeshes.get(0); let disposed = 0; old.geometry.addEventListener('dispose', () => disposed++);
     r.syncProjectiles([{ slot: 1, kind: 'pdc', faction: 'player' }], store);
-    assert.deepEqual([...r.projectileMeshes.keys()], [1]); assert.equal(disposed, 1); assert.equal(old.parent, null);
+    assert.deepEqual([...r.projectileMeshes.keys()], [1]); assert.equal(disposed, 0); assert.equal(old.parent, null);
+    assert.equal(r.projectilePools.get('pdc|player|')?.includes(old),true,'the retired mesh remains available in its matching pool');
+    const replacement=r.projectileMeshes.get(1);
+    r.syncProjectiles([], store);
+    r.syncProjectiles([{ slot: 2, kind: 'pdc', faction: 'player' }], store);
+    assert.equal(r.projectileMeshes.get(2),replacement,'a retired mesh is reused when a matching visual is needed');
+    assert.equal(disposed,0);
 });
 test('recycled projectile slots refresh kind and faction but reuse matching visuals', () => {
     const r = renderer(); const sync = (kind, faction) => r.syncProjectiles([{ slot: 0, kind, faction }], store);
@@ -42,7 +48,7 @@ test('recycled projectile slots refresh kind and faction but reuse matching visu
     sync('pdc', 'pirate'); assert.notEqual(r.projectileMeshes.get(0), old);
     assert.equal(r.projectileMeshes.get(0).material.color.getHex(), 0xff8a5b);
     sync('ripper', 'pirate'); const current = r.projectileMeshes.get(0);
-    assert.equal(current.geometry.type, 'SphereGeometry'); sync('ripper', 'pirate'); assert.equal(r.projectileMeshes.get(0), current);
+    assert.equal(current.geometry.type, 'CapsuleGeometry'); sync('ripper', 'pirate'); assert.equal(r.projectileMeshes.get(0), current);
 });
 test('pickup replacement updates target identity, source geometry and live slots', () => {
     const r = renderer(); const sync = (id, source, slot = 0) => r.syncPickups([{ id, source, slot }], store);

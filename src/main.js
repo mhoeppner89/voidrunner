@@ -495,6 +495,8 @@ const actions = {
     repair: () => session?.repair(),
     refuel: () => session?.refuel(),
     buyEquipment: (equipmentId) => session?.buyEquipment(equipmentId),
+    orphanDrones:()=>Object.values(session?.npcDroneUnits??{}).filter(u=>u.orphaned&&u.hull>0),
+    inventoryCommand:(action,args)=>session?.inventoryCommand(action,args),
     applyOutfitting: (shipId, draft, options) => session?.applyOutfitting(shipId, draft, options),
     buyShip: (shipId, keepCurrent) => session?.buyShip(shipId, keepCurrent),
     switchShip: (shipId) => session?.switchShip(shipId),

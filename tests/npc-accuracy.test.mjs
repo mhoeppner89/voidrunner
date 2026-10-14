@@ -9,6 +9,10 @@ import {npcShotDirection,npcTriggerReady,observeNpcTargetMotion,applyNpcTurnLead
 const DEG=Math.PI/180,tiers=['novice','veteran','ace'];
 const direction=degrees=>new THREE.Vector3(Math.sin(degrees*DEG),0,-Math.cos(degrees*DEG));
 function pilot(tier){return {id:'accuracy',pilot:{tier},rotation:[0,0,0,1],targetId:'player',aiRng:seededRandom('accuracy-'+tier)};}
+function installWeapon(ship,index,id){
+ const fit=ship.combatFit,physical=fit.gunIndices?.[index]??index;
+ fit.gunIndices[index]=physical;fit.guns[physical]=id;fit.weapons[index]=id;fit.weaponDefinitions[index]=WEAPONS[id];fit.fireAt[index]=0;
+}
 test('global NPC aim error defaults across targets, while observer actors can tune it',()=>{
  assert.equal(npcAimErrorFactor(pilot('novice')),1.5);
  assert.equal(npcAimErrorFactor({...pilot('veteran'),targetId:'other'}),1.5);
@@ -18,7 +22,7 @@ test('global NPC aim error defaults across targets, while observer actors can tu
 });
 function firingSample(tier,id,range,count=2000){
  const s=fixture(),ship=s.spawnShip('pirate',[0,0,0],undefined,undefined,{tier});
- ship.rotation=[0,0,0,1];ship.velocity=[0,0,0];ship.targetId='player';ship.combatWeaponIndex=2;ship.combatFit.weapons[2]=id;ship.aiRng=seededRandom(`sample-${tier}-${id}`);
+ ship.rotation=[0,0,0,1];ship.velocity=[0,0,0];ship.targetId='player';ship.combatWeaponIndex=2;installWeapon(ship,2,id);ship.aiRng=seededRandom(`sample-${tier}-${id}`);
  s.save.player.shipId='talon';s.save.player.position=[0,0,-range];let shots=0,hits=0;
  const delta=new THREE.Vector3(),closest=new THREE.Vector3();
  function measure(owner,w,start,ray){shots++;delta.fromArray(s.save.player.position).sub(start);const along=delta.dot(ray);closest.copy(delta).addScaledVector(ray,-along);if(along>=0&&along<=w.range&&closest.length()<=s.playerCollisionRadius()+(w.kind==='beam'?0:.25))hits++;}
@@ -56,11 +60,14 @@ test('target changes and lost alignment cannot keep a speculative burst alive',(
 });
 test('a speculative shot is held when an ally crosses the actual barrel line',()=>{
  const s=fixture(),ship=s.spawnShip('pirate',[0,0,0],undefined,undefined,{tier:'veteran'});
- ship.rotation=[0,0,0,1];ship.velocity=[0,0,0];ship.targetId='player';ship.aiRng=()=>0;ship.combatWeaponIndex=2;ship.combatFit.weapons[2]='pulse';ship.energy=100;
- s.save.player.position=direction(6).multiplyScalar(100).toArray();npcTriggerReady(ship,WEAPONS.pulse,1,0);npcTriggerReady(ship,WEAPONS.pulse,Math.cos(6*DEG),.1);
- const ally=s.spawnShip('pirate',[0,0,-50]);ally.faction=ship.faction;s.save.world.time=.1;
- s.fireNpcGun(ship,direction(6));assert.equal(s.projectiles.length,0);assert.equal(ship.energy,100);
- ally.position[0]=50;s.fireNpcGun(ship,direction(6));assert.equal(s.projectiles.length,1);assert.ok(ship.energy<100);
+ ship.rotation=[0,0,0,1];ship.velocity=[0,0,0];ship.targetId='player';ship.aiRng=()=>0;ship.combatWeaponIndex=2;installWeapon(ship,2,'pulse');ship.energy=100;
+ s.save.player.position=direction(6.5).multiplyScalar(100).toArray();npcTriggerReady(ship,WEAPONS.pulse,1,0);npcTriggerReady(ship,WEAPONS.pulse,Math.cos(6.5*DEG),.1);
+ let shot;const spawn=s.spawnGunProjectile.bind(s);s.spawnGunProjectile=(owner,w,start,ray,...rest)=>{shot={start:start.clone(),ray:ray.clone()};return spawn(owner,w,start,ray,...rest);};s.save.world.time=.1;
+ s.fireNpcGun(ship,direction(6.5));assert.equal(s.projectiles.length,1);assert.ok(shot,'the approaching speculative pulse fires before the ally is placed');
+ const distance=shot.start.distanceTo(new THREE.Vector3().fromArray(s.save.player.position));
+ const ally=s.spawnShip('pirate',shot.start.clone().addScaledVector(shot.ray,distance*.5).toArray());ally.faction=ship.faction;
+ const energy=ship.energy;s.save.world.time=.28;s.fireNpcGun(ship,direction(6.5));assert.equal(s.projectiles.length,1);assert.equal(ship.energy,energy);
+ ally.position[0]+=50;s.save.player.position=direction(3).multiplyScalar(100).toArray();s.save.world.time=.5;s.fireNpcGun(ship,direction(3));assert.equal(s.projectiles.length,2);assert.ok(ship.energy<energy);
 });
 test('observed turn compensation reduces curved-path lead error, remains bounded, and forgets hidden targets',()=>{
  const p=pilot('ace'),velocity=new THREE.Vector3();
@@ -84,9 +91,9 @@ test('NPC PDC and laser turret fire both improve with pilot skill',()=>{
  for(const item of ['pdc','tracking-turret']){
   const rates=[];
   for(const tier of tiers){
-   const s=fixture(),ship=s.spawnShip('escort',[0,0,0],undefined,undefined,{tier});
+   const s=fixture(),ship=s.spawnShip('escort',[0,0,0],undefined,undefined,{tier},{hullId:'wayfarer'});
    ship.id='turret-accuracy';ship.rotation=[0,0,0,1];ship.velocity=[0,0,0];ship.targetId='player';ship.hostile=true;ship.combatFit.turrets=[item];
-   s.save.player.position=[0,250,0];let shots=0,hits=0,firstShot;
+   s.save.player.position=[0,-250,0];let shots=0,hits=0,firstShot;
    const delta=new THREE.Vector3();
    function measure(owner,w,start,ray){firstShot??=s.save.world.time;shots++;delta.fromArray(s.save.player.position).sub(start);if(delta.addScaledVector(ray,-delta.dot(ray)).length()<1.5+(item==='pdc'?.25:0))hits++;}
    s.fireBeam=measure;s.spawnGunProjectile=measure;
@@ -101,13 +108,14 @@ test('NPC PDC and laser turret fire both improve with pilot skill',()=>{
 test('NPC pilot skill does not degrade the precise missile-interception solution or shared recovery',()=>{
  const shots=[];
  for(const tier of tiers){
-  const s=fixture(),ship=s.spawnShip('escort',[0,0,0],undefined,undefined,{tier});
-  ship.id='defender';ship.rotation=[0,0,0,1];ship.velocity=[0,0,0];ship.combatFit.turrets=['pdc'];s.save.player.position=[1000,0,0];
-  const slot=s.projStore.alloc();s.projStore.setPos(slot,0,280,0);s.projStore.setVel(slot,0,-260,0);
-  s.projectiles.push({id:'incoming',slot,kind:'missile',life:8,ownerId:'enemy',targetId:ship.id});
+  const s=fixture(),ship=s.spawnShip('escort',[0,0,0],undefined,undefined,{tier},{hullId:'wayfarer'});
+  ship.id='defender';ship.rotation=[0,0,0,1];ship.velocity=[0,0,0];ship.combatFit.turrets=['pdc'];ship.combatPlan={recovery:{active:true}};s.save.player.position=[0,200,0];
+  for(let i=0;i<90;i++){s.save.world.time=i/60;ship.energy=70;s.updateTurrets(ship,ship.id,1/60);}
+  const slot=s.projStore.alloc();s.projStore.setPos(slot,0,-150,0);s.projStore.setVel(slot,0,260,0);
+  s.projectiles.push({id:'incoming',slot,kind:'missile',life:3,ownerId:'player',targetId:ship.id});s.save.player.position=[1000,1000,0];
   let first;
   s.spawnGunProjectile=(owner,w,start,ray)=>{first??={at:s.save.world.time,ray:ray.toArray(),position:start.toArray()};return {};};
-  for(let i=0;i<90&&!first;i++){s.save.world.time=i/60;ship.energy=100;s.updateTurrets(ship,ship.id,1/60);}
+  for(let i=0;i<90&&!first;i++){s.save.world.time=2+i/60;ship.energy=70;s.updateTurrets(ship,ship.id,1/60);}
   assert.ok(first);const channel=s.pdcDefenseChannels.get(ship.id);assert.ok(Math.abs(channel.readyAt-first.at-2.5)<1e-9);shots.push(first);
  }
  assert.deepEqual(shots[0],shots[1]);assert.deepEqual(shots[1],shots[2]);

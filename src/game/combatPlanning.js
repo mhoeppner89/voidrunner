@@ -134,7 +134,7 @@ export function planCombatFlight(session,ship,targetPosition,targetVelocity,lead
 
  // Preserve a short, affordable firing opportunity. A heavy incoming hit always
  // cancels this; novices retain their unconditional light-hit break behavior.
- const weapon=WEAPONS[ship.combatFit.weapons?.[ship.combatWeaponIndex]];
+ const weapon=ship.combatFit.weaponDefinitions?.[ship.combatWeaponIndex]??WEAPONS[ship.combatFit.weapons?.[ship.combatWeaponIndex]];
  const trackingWeapon=weapon??mainWeapon;
  s.aimingRun=s.visible&&trackingWeapon&&distance<weaponRange(trackingWeapon)&&facing>.35;
  const effectiveReserve=ship.shield+ship.hull*.4;

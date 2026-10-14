@@ -1,3 +1,4 @@
+import {modifiedWeapon,equipmentBaseId} from './equipmentCatalog.js';
 // Weapon registry — the single source of truth for player primary weapons.
 // Each entry describes one weapon's sim personality: projectile speed, fire
 // cadence, damage profile, projectile lifetime, aim-assist generosity, ammo
@@ -36,6 +37,8 @@ export const WEAPONS = {
     mortar:{id:'mortar',nameKey:'SUNLANCE PLASMA MORTAR',hudNameKey:'PLASMA MORTAR',kind:'mortar',slot:6,equipmentId:'sunlance-mortar',
         speed:PROJECTILE_SPEEDS.plasma,range:500,cooldown:1.5,damageFlat:70,energyCost:16,splashRadius:18,splashMin:4,splashDamage:21,assist:.35,audioKey:'mortar',mountSize:'M'},
 };
+WEAPONS['frigate-battery']={id:'frigate-battery',nameKey:'CAPITAL ANTI-FIGHTER CANNON',hudNameKey:'CAP CANNON',kind:'laser',speed:520,range:600,cooldown:1.4,damageFlat:72,energyCost:12,assist:.7,audioKey:'laser'};
+WEAPONS['cruiser-battery']={id:'cruiser-battery',nameKey:'CAPITAL RAIL BATTERY',hudNameKey:'CAP RAIL',kind:'gauss',speed:900,range:1900,cooldown:7,damageFlat:200,energyCost:45,shieldMul:.8,hullMul:1.3,assist:.3,audioKey:'gauss'};
 const descriptions={
     pulse:'Normal-speed fire. Shares its lead with pulse, ion and scatterguns. 450 km range.',
     'pulse-mk2':'Stronger normal-speed pulse fire. Shares the standard lead; uses more energy. 450 km range.',
@@ -175,7 +178,7 @@ export const weaponIdForOutfit = (itemOrId) => {
     const id = canonicalOutfitId(rawId);
     // Pulse Mk II intentionally has effects.weaponId === 'pulse' for old
     // catalog callers; its item id is the authoritative distinction.
-    if (id === 'pulse-mk2')
+    if (equipmentBaseId(id) === 'pulse-mk2')
         return 'pulse-mk2';
     const item = OUTFIT_ITEMS[id];
     if(item?.category==='turret')return undefined;
@@ -191,12 +194,14 @@ export const launcherIdForOutfit = (itemOrId) => {
 };
 export const weaponForOutfit = (itemOrId) => {
     const id = weaponIdForOutfit(itemOrId);
-    return id ? WEAPONS[id] : undefined;
+    return id ? modifiedWeapon(WEAPONS[id],OUTFIT_ITEMS[typeof itemOrId==='string'?itemOrId:itemOrId?.id]) : undefined;
 };
 export const launcherForOutfit = (itemOrId) => {
     const id = launcherIdForOutfit(itemOrId);
-    return id ? LAUNCHERS[id] : undefined;
+    return id ? modifiedWeapon(LAUNCHERS[id],OUTFIT_ITEMS[typeof itemOrId==='string'?itemOrId:itemOrId?.id]) : undefined;
 };
+
+for(const [id,cost] of Object.entries({seeker:10,swarm:14,torpedo:28,'shield-seeker':12,'shield-swarm':16}))LAUNCHERS[id].energyCost=cost;
 
 const directLoadout = (player, shipId = player?.shipId) => {
     const loadout = player?.outfitting?.loadouts?.[shipId];
@@ -235,7 +240,7 @@ export const mountedGunEntries = (player, shipId = player?.shipId) => {
         const itemId = loadout.guns?.[index];
         const weaponId = weaponIdForOutfit(itemId);
         if (weaponId && WEAPONS[weaponId])
-            result.push({ index, mount, itemId, weaponId, weapon: WEAPONS[weaponId], group: loadout.fireGroups?.assignments?.[mount.id] === 'B' ? 'B' : 'A' });
+            result.push({ index, mount, itemId, weaponId, weapon: weaponForOutfit(itemId), group: loadout.fireGroups?.assignments?.[mount.id] === 'B' ? 'B' : 'A' });
     }
     return result;
 };
@@ -251,7 +256,7 @@ export const mountedLauncherEntries = (player, shipId = player?.shipId) => {
         const itemId = loadout.launchers?.[index];
         const launcherId = launcherIdForOutfit(itemId);
         if (launcherId && LAUNCHERS[launcherId])
-            result.push({ index, mount, itemId, launcherId, launcher: LAUNCHERS[launcherId] });
+            result.push({ index, mount, itemId, launcherId, launcher: launcherForOutfit(itemId) });
     }
     return result;
 };

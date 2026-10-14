@@ -1,3 +1,5 @@
+import {normalizeCareerLoot} from './careerLoot.js';
+import {normalizeEquipmentInventory,registerInventoryDefinitions,captureEquipmentAmmo} from './equipmentInventory.js';
 import {migrateFactionReputation,migrateFactionTags} from './factions.js';
 import { createInitialMarket, normalizeMarketIntel, refreshAllPrices } from './economy.js';
 import { DEFAULT_NAV_LOCATION_BY_SYSTEM, DOCK_LOCATION_IDS, LOCATIONS, MISSION_LOCATION_IDS, SHIPS, commodityIds, navLocationIdsForSystem } from './data.js';
@@ -7,7 +9,7 @@ import { normalizeRaceRecord } from './racing.js';
 import { clamp } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
 import { AMMO_CAPACITY, LEGACY_GUN_AMMO, WEAPON_ORDER, WEAPONS, normalizeLauncherMagazines } from './weapons.js';
-import { collapseOutfittingToSingleShip, createOutfittingState, normalizeOutfitting, projectLegacyEquipment, projectLegacyWeaponId } from './outfitting.js';
+import { HULL_HARDPOINTS, collapseOutfittingToSingleShip, createOutfittingState, normalizeOutfitting, projectLegacyEquipment, projectLegacyWeaponId } from './outfitting.js';
 import { combinedHullIntegrity, normalizeEnergy } from './combatResources.js';
 import { normalizeQuestStates } from './quests.js';
 import { startTutorialCampaign } from './tutorialCampaign.js';
@@ -23,9 +25,10 @@ export const SAVE_KEY = TURRET_TEST_MODE ? 'voidrunner-turret-test-v1'
     : DRONE_TEST_MODE ? 'voidrunner-drone-test-v16'
         : LANDING_PREVIEW_ID ? `voidrunner-landing-preview-v1-${LANDING_PREVIEW_ID}`
             : 'void-privateer-save-v1';
+export const INVENTORY_MIGRATION_BACKUP_KEY=`${SAVE_KEY}-pre-inventory`;
 export const DRONE_MIGRATION_BACKUP_KEY = `${SAVE_KEY}-pre-drones`;
 export const SETTINGS_KEY = 'void-privateer-settings-v1';
-export const SAVE_VERSION = 19;
+export const SAVE_VERSION = 20;
 // Test-funds build: a fresh career starts with enough credits to try any ship,
 // outfitting module or trade route without grinding first.
 export const STARTING_CREDITS = 500000;
@@ -193,6 +196,7 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
         settings: defaultSettings(),
     };
     save.player.droneFleet = normalizeDroneFleet(undefined, save.player.outfitting.loadouts, { grantInitial: true, activeShipId: save.player.shipId });
+    normalizeEquipmentInventory(save.player);
     normalizeLauncherMagazines(save.player, { fill: true });
     if (options.tutorial === true)
         startTutorialCampaign(save, save.world.time);
@@ -324,6 +328,7 @@ export const saveGame = (save) => {
     if (!storageAvailable())
         return false;
     try {
+        captureEquipmentAmmo(save.player);
         save.updatedAt = Date.now();
         // Never persist a corrupted state: if the player's position or velocity
         // has gone non-finite (a crash glitch), keep the last good autosave
@@ -578,7 +583,8 @@ export const hydrateSave = (candidate) => {
                 : fallback.player.equipment,
             // Keep legacy saves on the migration path instead of inheriting
             // the fallback's seeded wayfarer state.
-            outfitting: candidate.player?.outfitting ?? undefined,
+            inventory: candidate.player?.inventory ? JSON.parse(JSON.stringify(candidate.player.inventory)) : undefined,
+            outfitting: candidate.player?.outfitting ? JSON.parse(JSON.stringify(candidate.player.outfitting)) : undefined,
             ownedShips: candidate.player?.ownedShips ?? fallback.player.ownedShips,
             sealedCargo: normalizeSealedCargo(candidate.player?.sealedCargo),
             discovered: candidate.player?.discovered ?? fallback.player.discovered,
@@ -709,6 +715,13 @@ export const hydrateSave = (candidate) => {
     // flat list on the first load so older callers still see the exact ids
     // they wrote; commitOutfitting refreshes it from canonical state. A save
     // that already carries canonical state gets a fresh projection now.
+    registerInventoryDefinitions(save.player.inventory);
+    if(parsedVersion<20){
+        const racks={};for(const [id,magazine] of Object.entries(save.player.launcherMagazines??{})){const match=id.match(/^(.+)-launcher-(\d+)$/);const spec=match?HULL_HARDPOINTS[match[1]]:undefined;racks[spec?`${match[1]}-weapon-${spec.stockGunCount+Number(match[2])}`:id]=magazine;}
+        save.player.launcherMagazines=racks;
+        const active=save.player.activeLauncherMountId?.match(/^(.+)-launcher-(\d+)$/);if(active&&HULL_HARDPOINTS[active[1]])save.player.activeLauncherMountId=`${active[1]}-weapon-${HULL_HARDPOINTS[active[1]].stockGunCount+Number(active[2])}`;
+    }
+
     const hadCanonicalOutfitting = Boolean(candidate.player?.outfitting);
     save.player.shipId = activeShipId;
     save.player.retainedFleetVersion = 1;
@@ -733,6 +746,8 @@ export const hydrateSave = (candidate) => {
         save.player.weaponId = projectLegacyWeaponId(save.player, save.player.shipId, save.player.outfitting.loadouts?.[save.player.shipId]?.fireGroups?.activeGroup);
     }
     delete save.player.turretRuntime;
+    normalizeEquipmentInventory(save.player,{disabled:Boolean(save.arena)});
+    normalizeCareerLoot(save.world,save.player);
     save.version = SAVE_VERSION;
     const stats = getEffectiveShipStats(save.player);
     if (sourceVersion < 9) {
@@ -806,6 +821,7 @@ export const loadGame = () => {
             return undefined;
         const parsed = JSON.parse(raw);
         backupBeforeDroneMigration(raw, parsed);
+        if(Number(parsed.version??1)<20&&!window.localStorage.getItem(INVENTORY_MIGRATION_BACKUP_KEY))window.localStorage.setItem(INVENTORY_MIGRATION_BACKUP_KEY,raw);
         return hydrateSave(parsed);
     }
     catch (error) {

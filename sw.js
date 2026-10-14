@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v394-0-8-2fd-station-collision';
+const CACHE = 'voidrunner-v410-0-8-2fs-fitted-collisions';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -66,6 +66,12 @@ const CORE_ASSETS = [
     './src/game/stationDocks.js',
     './src/game/stationTraffic.js',
     './src/game/stationCollision.js',
+    './src/game/collisionSat.js',
+    './src/game/shipCollisionData.js',
+    './src/game/shipCollision.js',
+    './src/game/shipLanding.js',
+    './src/game/meshQueries.js',
+    './src/game/surfaceMeshCandidates.js',
     './src/game/playerDocking.js',
     './src/game/combatTravel.js',
     './src/game/stationActivity.js',
@@ -91,6 +97,12 @@ const CORE_ASSETS = [
   './src/game/missions.js',
   './src/game/missionOfferRefresh.js',
   './src/game/outfitting.js',
+  './src/game/equipmentCatalog.js',
+  './src/game/equipmentInventory.js',
+  './src/game/equipmentUi.js',
+  './src/game/itemIcons.js',
+  './src/game/equipmentStatPresentation.js',
+  './src/game/careerLoot.js',
   './src/game/pilots.js',
   './src/game/quests.js',
   './src/game/random.js',

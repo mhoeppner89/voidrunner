@@ -116,7 +116,9 @@ test('Helix beacon lane clears the station hull while off-lane contact still col
     assert.ok(inside.distanceTo(before) < 1e-9, 'the marked hangar lane stays clear');
 
     session.stationLandingBeaconId = undefined;
-    const offLane = new THREE.Vector3(...berth.pad);
+    // Test a solid fallback wall, not an open pad with invented oversized hulls.
+    const offLane = new THREE.Vector3(...location.position);
+    offLane.x += dock.collisionRadius*.95;
     const offLaneBefore = offLane.clone();
     session.resolvePlayerCollisions(offLane, velocity);
     assert.ok(offLane.distanceTo(offLaneBefore) > 0, 'the station hull still blocks an unmarked approach');

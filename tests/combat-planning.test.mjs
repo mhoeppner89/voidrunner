@@ -23,7 +23,7 @@ function plan(s,ship,velocity=origin,lead=forward){
 }
 test('removed weapon entries leave the NPC firing and crossfire paths harmless',()=>{
  const {s,ship}=setup('ace',[0,0,200]);
- ship.combatFit.weapons=['removed-outfit'];ship.combatFit.attackOrder=[0];ship.combatFit.fireAt=[0];ship.combatFit.turrets=[];
+ ship.combatFit.weapons=['removed-outfit'];ship.combatFit.weaponDefinitions=[undefined];ship.combatFit.guns=['removed-outfit'];ship.combatFit.gunIndices=[0];ship.combatFit.attackOrder=[0];ship.combatFit.fireAt=[0];ship.combatFit.turrets=[];
  assert.doesNotThrow(()=>s.updateAttackAI(ship,new THREE.Vector3(0,0,-200),origin,1/60));
  assert.equal(ship.fireRange,0);assert.equal(s.projectiles.length,0);
  ship.combatAwareness={outnumbered:true};
@@ -67,11 +67,11 @@ test('trained pilots choose the open vertical escape when both sides and the low
 test('trained pilots briefly finish an affordable shot, but heavy fire and novice reflexes still cause a break',()=>{
  for(const tier of ['novice','veteran','ace']){
   const {s,ship}=setup(tier,[0,0,235]);ship.velocity=[0,0,0];plan(s,ship);
-  registerHitReaction(ship,0,tier==='novice'?.33:14);
+  registerHitReaction(ship,0,tier==='novice'?1:14);
   updateCombatIntent(ship,.31,235,0);
   assert.equal(holdingFiringWindow(ship,.31),tier!=='novice');
   assert.equal(ship.combatIntent,tier==='novice'?'evade':'hunt');
-  registerHitReaction(ship,.32,90);updateCombatIntent(ship,.6,235,0);assert.equal(ship.combatIntent,'evade');
+  registerHitReaction(ship,.32,ship.shield+ship.hull);updateCombatIntent(ship,.6,235,0);assert.equal(ship.combatIntent,'evade');
  }
 });
 test('drifts end after recovering a useful firing attitude, and unsafe paths cancel immediately',()=>{

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createNewSave } from './save.js';
 import { GameSession } from './game.js';
+import {createEquipmentRecord,normalizeEquipmentInventory,refreshInventoryProjection} from './equipmentInventory.js';
 import {
     beginSortie,
     finishSortie,
@@ -66,6 +67,27 @@ test('owned locker hardware is the next fit before a later purchase', () => {
     assert.equal(next?.affordable, true);
 });
 
+test('career upgrades use outfitting compatibility for size-less utility mounts', () => {
+    const save = createNewSave(0x45, { tutorial: true });
+    const next = nextMeaningfulUpgrade(save, 'helix');
+
+    assert.equal(next?.id, 'capacitor-bank', 'a size-less utility mount should still expose a compatible upgrade');
+    assert.equal(next.category, 'power');
+    assert.equal(next.available, true);
+});
+
+test('upgrade advice finds owned inventory copies and excludes unrelated runtime loot',()=>{
+    const save=createNewSave(44,{tutorial:false});
+    normalizeEquipmentInventory(save.player);
+    const owned=createEquipmentRecord('radar-mk2',{location:{kind:'station',stationId:'helix'}});
+    save.player.inventory.items[owned.id]=owned;
+    // Merely registering another actor's drop must never offer it to the player.
+    createEquipmentRecord('capacitor-bank',{tier:1,rarity:'uncommon'});
+    refreshInventoryProjection(save.player);
+    const next=nextMeaningfulUpgrade(save,'helix');
+    assert.equal(next.id,owned.id);assert.equal(next.owned,true);
+});
+
 test('mission-linked pressure follows claims and keeps dark sealed routes quieter', () => {
     const runtime = Object.create(GameSession.prototype);
     runtime.save = { activeMissions: [], player: { sealedCargo: [], transponder: true } };
@@ -86,4 +108,20 @@ test('mission-linked pressure follows claims and keeps dark sealed routes quiete
     runtime.save.player.transponder = false;
     assert.equal(runtime.missionEncounterPressure().kind, 'sealed-route-dark');
     assert.ok(runtime.missionEncounterPressure().level < 1);
+});
+
+test('mining claim dispute safely skips combat-loot nodes', () => {
+    const runtime = Object.create(GameSession.prototype);
+    runtime.save = {
+        activeMissions: [{ kind: 'mining', claimNodeId: 'loot-node', mined: 3, quantity: 5 }],
+        player: { position: [0, 0, 0] },
+    };
+    runtime.asteroids = [{ id: 'loot-node', combatLoot: true }];
+    runtime.claimDisputesTriggered = new Set();
+    runtime.hostilesNear = () => {
+        throw new Error('combat-loot claim must stop before encounter checks');
+    };
+
+    assert.doesNotThrow(() => runtime.recordClaimMining('loot-node', 1));
+    assert.deepEqual([...runtime.claimDisputesTriggered], []);
 });

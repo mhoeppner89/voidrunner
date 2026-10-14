@@ -1,6 +1,6 @@
 import {LEAGUE_FITS} from './leagueContent.js';
-import {HULL_HARDPOINTS, OUTFIT_ITEMS, itemFitsMount} from './outfitting.js';
-import {LAUNCHERS, WEAPONS, launcherIdForOutfit, weaponRange, weaponIdForOutfit} from './weapons.js';
+import {HULL_HARDPOINTS, OUTFIT_ITEMS, itemFitsMount,normalizeLoadout} from './outfitting.js';
+import {LAUNCHERS, WEAPONS, launcherIdForOutfit, weaponRange, weaponIdForOutfit,weaponForOutfit} from './weapons.js';
 import {getEffectiveShipStats} from './shipStats.js';
 // Approved hulls have a recognizable stock fit; explicit observer/scenario fits override it.
 export const HULL_NPC_FITS = Object.freeze({
@@ -59,23 +59,26 @@ export function createEnemyLoadout(ship, index, arenaFit) {
         return item && itemFitsMount(OUTFIT_ITEMS[item],mount) ? item : null;
     });
     const launchers=spec.launchers.map((mount,i)=>{
-        const item=observerFit?.launchers?.[i] ?? observerFit?.launcher;
+        const rackIndex=i-spec.stockGunCount;if(rackIndex<0||rackIndex>=spec.stockLauncherCount)return null;
+        const item=observerFit?.launchers?.[rackIndex] ?? observerFit?.launcher;
         return item && itemFitsMount(OUTFIT_ITEMS[item],mount) ? item : null;
     });
-    const weapons=guns.filter(Boolean).map(weaponIdForOutfit);
+    const gunIndices=guns.flatMap((id,i)=>id?[i]:[]);
+    const weapons=gunIndices.map(i=>weaponIdForOutfit(guns[i]));
     // Weapon choice defines close-range interceptor versus ranged fighter doctrine.
     const profile=profileForWeapons(weapons.filter(Boolean),ship.pilot?.tier);
-    const equipmentLoadout={guns,launchers,turrets,
+    const equipmentLoadout={mountSchema:4,guns,launchers,turrets,
         power:spec.power.map((mount)=>observerFit?.power && itemFitsMount(OUTFIT_ITEMS[observerFit.power],mount)?observerFit.power:null),
         drive:spec.drive.map((mount)=>observerFit?.drive && itemFitsMount(OUTFIT_ITEMS[observerFit.drive],mount)?observerFit.drive:null),
         defense:spec.defense.map((mount)=>observerFit?.defense && itemFitsMount(OUTFIT_ITEMS[observerFit.defense],mount)?observerFit.defense:null),
         utility:spec.utility.map((mount)=>observerFit?.utility && itemFitsMount(OUTFIT_ITEMS[observerFit.utility],mount)?observerFit.utility:null),
         fireGroups:{activeGroup:'ALL',assignments:Object.fromEntries(spec.guns.map((mount)=>[mount.id,'A']))}};
+    equipmentLoadout.utility=[observerFit?.utility,observerFit?.power,observerFit?.drive,observerFit?.defense].filter(Boolean);while(equipmentLoadout.utility.length<spec.utility.length)equipmentLoadout.utility.push(null);
     const stats=observerFit
-        ? getEffectiveShipStats({shipId:hullId,outfitting:{schema:3,locker:{},loadouts:{[hullId]:equipmentLoadout}}})
+        ? getEffectiveShipStats({shipId:hullId,outfitting:{schema:4,locker:{},loadouts:{[hullId]:equipmentLoadout}}})
         : getEffectiveShipStats({shipId:hullId,equipment:[]});
     const launcher = explicit && arenaFit.launcher && LAUNCHERS[arenaFit.launcher] ? arenaFit.launcher : launcherIdForOutfit(launchers.find(Boolean));
-    return {hullId,guns,weapons,turrets,launchers,power:equipmentLoadout.power,drive:equipmentLoadout.drive,defense:equipmentLoadout.defense,utility:equipmentLoadout.utility,fitId:explicit ? 'scenario' : OBSERVER_FITS[arenaFit]?arenaFit:`${hullId}-standard`,profile,stats,attackOrder:[...weapons.keys()].filter(i=>weapons[i]).reverse(),resources:{...stats,shield:stats.shield},fireAt:weapons.map(()=>0),
+    return {hullId,guns,weapons,gunIndices,weaponDefinitions:gunIndices.map(i=>weaponForOutfit(guns[i])),turrets,launchers,power:equipmentLoadout.power,drive:equipmentLoadout.drive,defense:equipmentLoadout.defense,utility:equipmentLoadout.utility,fitId:explicit ? 'scenario' : OBSERVER_FITS[arenaFit]?arenaFit:`${hullId}-standard`,profile,stats,attackOrder:[...weapons.keys()].filter(i=>weapons[i]).reverse(),resources:{...stats,shield:stats.shield},fireAt:weapons.map(()=>0),
         launcher,
         racks: launchers.some(Boolean) ? launchers.filter(Boolean).map(id=>{const launcher=launcherIdForOutfit(id);return {launcher,missiles:LAUNCHERS[launcher].capacity};}) : undefined,
         missiles:explicit ? (arenaFit.missiles??(LAUNCHERS[launcher]?.capacity??0)) : (LAUNCHERS[launcher]?.capacity??0),

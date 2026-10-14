@@ -1,3 +1,4 @@
+import {equipmentRecord, equipmentBaseId} from './equipmentCatalog.js';
 import { TURRET_LAYOUTS } from './turretLayouts.js';
 import { createDefaultDroneBays, droneBayLayoutFor, normalizeDroneBays, validateDroneBays } from './droneData.js';
 /*
@@ -17,7 +18,7 @@ export const OUTFIT_CATEGORIES = Object.freeze(['gun', 'launcher', 'turret', 'po
 // must never enter item pricing, legacy equipment, or factory-item ledgers.
 export const LOADOUT_KEYS = Object.freeze(['guns', 'launchers', 'turrets', 'power', 'drive', 'defense', 'utility']);
 export const RESALE_RATE = 0.7;
-export const OUTFITTING_SCHEMA = 3;
+export const OUTFITTING_SCHEMA = 4;
 
 const freeze = (value) => Object.freeze(value);
 const simplifiedOutfitArt = (path) => {
@@ -27,8 +28,8 @@ const simplifiedOutfitArt = (path) => {
         : path;
 };
 const freezeItem = (item) => {
-    const sizes = freeze([...item.sizes]);
-    const availability = freeze([...item.availability]);
+    const sizes = freeze([...(item.sizes??[])]);
+    const availability = freeze([...(item.availability??[])]);
     const art = simplifiedOutfitArt(item.art);
     return freeze({
         ...item,
@@ -205,7 +206,13 @@ const itemRecords = [
     },
 ];
 
-export const OUTFIT_ITEMS = freeze(Object.fromEntries(itemRecords.map(freezeItem).map((item) => [item.id, item])));
+itemRecords.push(
+ {id:'frigate-battery',name:'Capital Anti-Fighter Cannon',category:'gun',tier:3,lootOnly:true,price:18000,mass:8,energyCost:12,weaponId:'frigate-battery',description:'A heavy anti-fighter cannon recovered from a frigate. Slow single shots retain the capital battery’s range and impact.',effects:{weaponId:'frigate-battery'},art:'./art/outfitting/pulse-cannon.webp'},
+ {id:'cruiser-battery',name:'Capital Rail Battery',category:'gun',tier:3,lootOnly:true,price:34000,mass:24,energyCost:45,weaponId:'cruiser-battery',description:'A recovered heavy rail barrel. Long range and high impact, with the cruiser’s seven-second reload; each shot consumes a large share of a small ship’s capacitor.',effects:{weaponId:'cruiser-battery'},art:'./art/outfitting/gauss-cannon.webp'},
+ {id:'capital-shield-generator',name:'Capital Shield Generator',category:'defense',tier:3,lootOnly:true,price:22000,mass:12,description:'Adds 200 shield capacity and doubles recovery demand. The reactor must supply the additional shield energy.',effects:{shieldCapacity:200,rechargeMultiplier:2},art:'./art/outfitting/shield-mk2.webp'}
+);
+export const BASE_OUTFIT_ITEMS = freeze(Object.fromEntries(itemRecords.map(freezeItem).map((item) => [item.id, item])));
+export const OUTFIT_ITEMS = new Proxy(BASE_OUTFIT_ITEMS,{get:(target,id)=>equipmentRecord(id)??target[id]});
 export const OUTFIT_ITEM_IDS = freeze(itemRecords.map((item) => item.id));
 
 // Historical ids remain accepted at the boundary, never in the shop registry.
@@ -218,45 +225,16 @@ export const LEGACY_OUTFIT_ID_MAP = freeze({
 
 const mount = (id, category, size) => freeze({ id, category, size });
 const makeMounts = (shipId, guns, launchers, utilitySizes) => {
-    const spec = {
-        shipId,
-        guns: guns.map(([size, index]) => mount(`${shipId}-gun-${index}`, 'gun', size)),
-        launchers: launchers.map(([size, index]) => mount(`${shipId}-launcher-${index}`, 'launcher', size)),
-        turrets: (TURRET_LAYOUTS[shipId] ?? []).map((slot,index)=>({...mount(`${shipId}-turret-${index}`,'turret',slot.size),...slot})),
-        power: [mount(`${shipId}-power-0`,'power','M')],
-        drive: [mount(`${shipId}-drive-0`, 'drive', 'M')],
-        defense: [mount(`${shipId}-defense-0`, 'defense', 'M')],
-        utility: utilitySizes.map((size, index) => mount(`${shipId}-utility-${index}`, 'utility', size)),
-        // Physical unit records are separate from generic item-id sockets.
-        droneBays: droneBayLayoutFor(shipId),
-    };
-    spec.mounts = {
-        gun: spec.guns,
-        turret: spec.turrets, power:spec.power,
-        launcher: spec.launchers,
-        drive: spec.drive,
-        defense: spec.defense,
-        utility: spec.utility,
-    };
-    spec.slotCounts = {
-        gun: spec.guns.length,
-        turret:spec.turrets.length,power:1,
-        launcher: spec.launchers.length,
-        drive: spec.drive.length,
-        defense: spec.defense.length,
-        utility: spec.utility.length,
-    };
-    spec.hardpoints = {
-        turrets: { S: spec.turrets.filter(slot => slot.size === 'S').length, M: spec.turrets.filter(slot => slot.size === 'M').length },
-        power: spec.power.length,
-        guns: { S: spec.guns.filter((slot) => slot.size === 'S').length, M: spec.guns.filter((slot) => slot.size === 'M').length },
-        launchers: { S: spec.launchers.filter((slot) => slot.size === 'S').length, M: spec.launchers.filter((slot) => slot.size === 'M').length },
-        drive: spec.drive.length,
-        defense: spec.defense.length,
-        utility: spec.utility.length,
-    };
-    spec.utilitySizes = [...utilitySizes];
-    return freeze(spec);
+    const weapons=Array.from({length:guns.length+launchers.length},(_,i)=>freeze({id:`${shipId}-weapon-${i}`,category:'weapon'}));
+    const utility=Array.from({length:utilitySizes.length+3},(_,i)=>freeze({id:`${shipId}-utility-${i}`,category:'utility'}));
+    const turrets=(TURRET_LAYOUTS[shipId]??[]).map((slot,index)=>({...slot,id:`${shipId}-turret-${index}`,category:'turret',size:undefined}));
+    // guns/launchers are runtime views of the SAME physical weapon mounts.
+    // Only one view may hold an item at a given index.
+    return freeze({shipId,weapons,guns:weapons,launchers:weapons,turrets,utility,power:[],drive:[],defense:[],
+        stockGunCount:guns.length,stockLauncherCount:launchers.length,legacyUtilityCount:utilitySizes.length,
+        droneBays:droneBayLayoutFor(shipId),mounts:{weapon:weapons,turret:turrets,utility},
+        slotCounts:{weapon:weapons.length,turret:turrets.length,utility:utility.length},
+        hardpoints:{weapons:weapons.length,turrets:turrets.length,utility:utility.length},utilitySizes:[]});
 };
 
 // The mounts themselves are the fitting limit: a hull carries what its bays
@@ -284,7 +262,7 @@ export const HARDPOINT_SPECS = HULL_HARDPOINTS;
 export const UNIQUE_OUTFIT_IDS = freeze(['radar-mk2', 'salvage-mk2']);
 const FACTORY_BASELINE_IDS = freeze(['pulse-cannon', 'gauss-cannon', 'seeker-launcher', 'beam-emitter']);
 
-const categoryKey = (category) => category === 'gun' ? 'guns' : category === 'launcher' ? 'launchers' : category === 'turret' ? 'turrets' : category;
+const categoryKey = (category) => category === 'gun' ? 'guns' : category === 'launcher' ? 'launchers' : category === 'turret' ? 'turrets' : ['power','drive','defense'].includes(category)?'utility':category;
 const canonicalId = (id) => LEGACY_OUTFIT_ID_MAP[id] ?? id;
 const itemFor = (itemOrId) => typeof itemOrId === 'string' ? OUTFIT_ITEMS[canonicalId(itemOrId)] : itemOrId?.id ? OUTFIT_ITEMS[canonicalId(itemOrId.id)] ?? itemOrId : undefined;
 const clone = (value) => JSON.parse(JSON.stringify(value));
@@ -338,8 +316,7 @@ export const itemFitsMount = (itemOrId, mountOrCategory, size) => {
     const mountValue = typeof mountOrCategory === 'object' ? mountOrCategory : { category: mountOrCategory, size };
     if (!item || !mountValue)
         return false;
-    return item.category === mountValue.category
-        && (item.sizes ?? [item.size]).includes(mountValue.size);
+    return mountValue.category==='weapon' ? ['gun','launcher'].includes(item.category) : mountValue.category==='utility' ? ['power','drive','defense','utility'].includes(item.category) : item.category===mountValue.category;
 };
 
 const specFor = (shipId) => HULL_HARDPOINTS[shipId];
@@ -350,7 +327,7 @@ const emptyFactoryFlags = (shipId) => {
         return { guns: [], launchers: [], turrets:[], power:[], drive: [], defense: [], utility: [] };
     return {
         guns: spec.guns.map(() => false),
-        turrets:spec.turrets.map(()=>false),power:[false],
+        turrets:spec.turrets.map(()=>false),power:[],
         launchers: spec.launchers.map(() => false),
         drive: spec.drive.map(() => false),
         defense: spec.defense.map(() => false),
@@ -430,13 +407,13 @@ const emptyLoadout = (shipId) => {
         return { guns: [], launchers: [], turrets:[], power:[], drive: [], defense: [], utility: [], droneBays: [] };
     return {
         guns: spec.guns.map(() => null),
-        turrets:spec.turrets.map(()=>null),power:[null],
+        turrets:spec.turrets.map(()=>null),power:[],
         launchers: spec.launchers.map(() => null),
         drive: spec.drive.map(() => null),
         defense: spec.defense.map(() => null),
         utility: spec.utility.map(() => null),
         droneBays: createDefaultDroneBays(shipId),
-        fireGroups: defaultFireGroups(shipId),
+        mountSchema:4,fireGroups: defaultFireGroups(shipId),
     };
 };
 
@@ -456,6 +433,9 @@ export const normalizeLoadout = (shipId, source = {}) => {
     const spec = specFor(shipId);
     if (!spec)
         return result;
+    if(source.mountSchema!==4 && (source.guns?.length??0)<=spec.stockGunCount && (source.launchers?.length??0)<=spec.stockLauncherCount){
+        source={...source,guns:[...(source.guns??[])],launchers:[...Array(spec.stockGunCount).fill(null),...(source.launchers??[])],utility:[...(source.utility??[]),...(source.power??[]),...(source.drive??[]),...(source.defense??[])],power:[],drive:[],defense:[],mountSchema:4};
+    }
     for (const key of LOADOUT_KEYS) {
         const mounts = spec[key];
         const values = rawSlots(source, key, mounts);
@@ -464,6 +444,11 @@ export const normalizeLoadout = (shipId, source = {}) => {
             const item = itemFor(id);
             return item && itemFitsMount(item, slot) ? item.id : null;
         });
+    }
+    for(let i=0;i<spec.weapons.length;i++) {
+        if(itemFor(result.guns[i])?.category!=='gun')result.guns[i]=null;
+        if(itemFor(result.launchers[i])?.category!=='launcher')result.launchers[i]=null;
+        if(result.guns[i])result.launchers[i]=null;
     }
     // Every gun mount has a stable A/B assignment so the flight layer can
     // resolve a fire group without inventing defaults at runtime.
@@ -480,7 +465,7 @@ const standardFit = (shipId, loadout) => {
         const item = OUTFIT_ITEMS[id];
         for (const key of categories) {
             for (let index = 0; index < spec[key].length; index += 1) {
-                if (!predicate(spec[key][index], index) || loadout[key][index] || !itemFitsMount(item, spec[key][index]))
+                if (!predicate(spec[key][index], index) || loadout[key][index] || (['guns','launchers'].includes(key) && (loadout.guns[index]||loadout.launchers[index])) || !itemFitsMount(item, spec[key][index]))
                     continue;
                 loadout[key][index] = id;
                 return true;
@@ -492,7 +477,7 @@ const standardFit = (shipId, loadout) => {
     // one exists and seeker preserves the existing missile control. Factory
     // copies are bundled in the hull state, not an infinite global stock.
     if(shipId==='wayfarer'||shipId==='torsas'){place('beam-emitter');place('beam-emitter');}
-    else if(['speedster','scrapper','demon','mule'].includes(shipId)){for(const _ of spec.guns)place('pulse-cannon');if(shipId==='mule'){place('pdc',()=>true,['turrets']);place('pdc',()=>true,['turrets']);}}
+    else if(['speedster','scrapper','demon','mule'].includes(shipId)){for(let i=0;i<spec.stockGunCount;i++)place('pulse-cannon');if(shipId==='mule'){place('pdc',()=>true,['turrets']);place('pdc',()=>true,['turrets']);}}
     else {place('pulse-cannon');place('gauss-cannon');}
     place('seeker-launcher', () => true, ['launchers']);
     // Alternate the guns that are actually installed, rather than alternating
@@ -777,7 +762,7 @@ export const migrateLegacyOutfitting = (player = {}) => {
 };
 
 const validCanonicalOutfitting = (source) => {
-    if (!isRecord(source) || ![1,2,OUTFITTING_SCHEMA].includes(source.schema) || !isRecord(source.locker) || !isRecord(source.loadouts))
+    if (!isRecord(source) || ![1,2,3,OUTFITTING_SCHEMA].includes(source.schema) || !isRecord(source.locker) || !isRecord(source.loadouts))
         return false;
     if (source.factoryLocker !== undefined && !isRecord(source.factoryLocker))
         return false;
@@ -800,6 +785,17 @@ export const normalizeOutfitting = (player = {}) => {
         : migrateLegacyOutfitting(player);
     const ships = ownedShipIds(player);
     const state = { schema: OUTFITTING_SCHEMA, locker: normalizeLocker(source.locker), factoryLocker: normalizeLocker(source.factoryLocker, true), loadouts: {}, factory: {} };
+    if(source.schema<4) for(const shipId of ships) {
+        const old=source.loadouts?.[shipId],spec=specFor(shipId);if(!old||!spec)continue;
+        const migrated={...old,mountSchema:4,guns:spec.guns.map(()=>null),launchers:spec.launchers.map(()=>null),utility:spec.utility.map(()=>null),power:[],drive:[],defense:[]};
+        const flags=emptyFactoryFlags(shipId);let u=0;
+        for(const key of ['guns','launchers'])for(const [i,id] of (old[key]??[]).entries()){const at=key==='guns'?i:spec.stockGunCount+i;if(id&&at<spec.weapons.length&&(key!=='guns'||i<spec.stockGunCount)){migrated[key][at]=id;flags[key][at]=source.factory?.[shipId]?.[key]?.[i]===true;}}
+        for(const key of ['utility','power','drive','defense'])for(const [i,id] of (old[key]??[]).entries())if(id&&u<spec.utility.length){migrated.utility[u]=id;flags.utility[u]=source.factory?.[shipId]?.[key]?.[i]===true;u++;}
+        const assignments={...old.fireGroups?.assignments};for(let i=0;i<spec.stockGunCount;i++){const g=assignments?.[`${shipId}-gun-${i}`];if(g)assignments[spec.guns[i].id]=g;}
+        const kept={};for(const key of LOADOUT_KEYS)for(const id of migrated[key]??[])if(id)kept[id]=(kept[id]??0)+1;
+        for(const key of LOADOUT_KEYS)for(const [i,id] of (old[key]??[]).entries())if(id&&OUTFIT_ITEMS[id]){if(kept[id]>0)kept[id]--;else{state.locker[id]=(state.locker[id]??0)+1;if(source.factory?.[shipId]?.[key]?.[i]===true&&OUTFIT_ITEMS[id].factoryFit){state.factoryLocker[id]=(state.factoryLocker[id]??0)+1;}}}
+        migrated.fireGroups={...old.fireGroups,assignments};source.loadouts[shipId]=migrated;source.factory??={};source.factory[shipId]=flags;
+    }
     for (const shipId of ships) {
         const hasSavedLoadout = Boolean(source.loadouts?.[shipId]);
         state.loadouts[shipId] = normalizeLoadout(shipId, source.loadouts?.[shipId] ?? {});
@@ -807,7 +803,7 @@ export const normalizeOutfitting = (player = {}) => {
             standardFit(shipId, state.loadouts[shipId]);
         state.factory[shipId] = conservativeFactoryFlags(shipId, state.loadouts[shipId], source.factory?.[shipId]);
         // Preserve every displaced copy, including duplicates, exactly once.
-        if(source.schema<OUTFITTING_SCHEMA) for(const key of LOADOUT_KEYS) {
+        if(source.schema<3) for(const key of LOADOUT_KEYS) {
             const used=new Set(),remaining={};for(const id of state.loadouts[shipId][key])if(id)remaining[id]=(remaining[id]??0)+1;
             for(const [index,raw] of rawSlots(source.loadouts?.[shipId], key, specFor(shipId)[key]).entries()) {
                 const id=canonicalId(raw);if(!OUTFIT_ITEMS[id])continue;
@@ -824,15 +820,17 @@ export const normalizeOutfitting = (player = {}) => {
     // stock; modern commits keep the projection exact, so this does not revive
     // legitimately sold equipment.
     const represented = new Set(Object.keys(state.locker));
+    for(const id of Object.keys(state.locker))represented.add(equipmentBaseId(id));
     for (const loadout of Object.values(state.loadouts))
-        for (const id of allItemsInLoadout(loadout))
-            represented.add(id);
+        for (const id of allItemsInLoadout(loadout)) {
+            represented.add(id);represented.add(equipmentBaseId(id));
+        }
     for (const rawId of Array.isArray(player.equipment) ? player.equipment : []) {
         const id = canonicalId(rawId);
         if (!OUTFIT_ITEMS[id] || represented.has(id))
             continue;
         state.locker[id] = (state.locker[id] ?? 0) + 1;
-        represented.add(id);
+        represented.add(id);represented.add(equipmentBaseId(id));
     }
     const activeWeaponItemId = outfitIdForWeapon(player.weaponId);
     if (activeWeaponItemId
@@ -888,7 +886,8 @@ export const projectLegacyEquipment = (player, state = player?.outfitting) => {
         // the transition.
         if (!ids.includes(id))
             ids.push(id);
-        const legacyId = legacyIdFor[id];
+        const baseId=equipmentBaseId(id);if(!ids.includes(baseId))ids.push(baseId);
+        const legacyId = legacyIdFor[baseId];
         if (legacyId && !ids.includes(legacyId))
             ids.push(legacyId);
     }
@@ -910,7 +909,7 @@ export const projectLegacyWeaponId = (player, shipId = player?.shipId, group) =>
         const item = outfitItem(itemId);
         // Pulse Mk II uses the pulse implementation in combat, but old save
         // state and weapon cycling must retain its distinct mounted identity.
-        if (itemId === 'pulse-mk2')
+        if (equipmentBaseId(itemId) === 'pulse-mk2')
             return 'pulse-mk2';
         const weaponId = item?.weaponId ?? item?.effects?.weaponId;
         if (weaponId)
@@ -995,11 +994,12 @@ export const validateLoadout = (player = {}, shipId = player.shipId, draft = {},
                 addError(errors, 'invalid-item', { itemId: id, slot: key, index });
         }
     }
+    for(let i=0;i<spec.weapons.length;i++)if(raw.guns?.[i]&&raw.launchers?.[i])addError(errors,'occupied-weapon-mount',{index:i});
     const usage = outfittingUsage(player, shipId, normalized);
     const cargoMassValue = options.cargoMass ?? options.currentCargoMass ?? options.holdMass ?? player.cargoMass;
     if (Number.isFinite(Number(cargoMassValue)) && Number(cargoMassValue) > usage.cargoCapacity)
         addError(errors, 'cargo-over-capacity', { cargoMass: Number(cargoMassValue), capacity: usage.cargoCapacity });
-    const counts = itemCount(allItemsInLoadout(normalized));
+    const counts = itemCount(allItemsInLoadout(normalized).map(equipmentBaseId));
     for (const id of UNIQUE_OUTFIT_IDS)
         if ((counts[id] ?? 0) > 1)
             addError(errors, 'duplicate-unique-module', { itemId: id, count: counts[id] });

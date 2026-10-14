@@ -23,6 +23,7 @@ export function droneUnits(session){
 export function damageNpcDrone(session,unit,amount){
  if(unit.hull<=0||!Number.isFinite(amount)||amount<=0)return;
  unit.hull=Math.max(0,unit.hull-amount);
+ if(unit.orphaned&&session.save.world.orphanDrones?.[unit.id]){session.save.world.orphanDrones[unit.id].hull=unit.hull;if(!unit.hull)delete session.save.world.orphanDrones[unit.id];}
  if(!unit.hull){const ship=session.ships.find(s=>s.id===unit.ownerId);if(ship?.droneFleet)destroyPdcDrone(ship.droneFleet,unit.id,'damage');}
 }
 function initialize(session,ship){
@@ -31,7 +32,7 @@ function initialize(session,ship){
  const fleet=ship.droneFleet=createDroneFleet(),context={ownerId:ship.id,unitIds:[],threats:[],opponents:[],bayAnchors:{},escortAnchors:{},weaponOwner:{ownerId:ship.id,faction:ship.faction,targetId:ship.targetId}};
  const state=ship.npcDrones={controller:createPdcDroneController(),context,events:[],threatPool:[],opponentPool:[],live:new Map(),q:new THREE.Quaternion(),inverse:new THREE.Quaternion(),p:new THREE.Vector3(),v:new THREE.Vector3(),end:new THREE.Vector3(),local:new THREE.Vector3(),ray:new THREE.Vector3(),omega:new THREE.Vector3(),spin:new THREE.Vector3()};
  for(let i=0;i<count;i++){
-  const id=`${ship.id}-drone-${i}`,unit=createDroneUnit(id,configuredTypes?.[i]??'pdc');unit.ownerId=ship.id;
+  const id=`${ship.lootKey??ship.id}-drone-${i}`,unit=createDroneUnit(id,configuredTypes?.[i]??'pdc');unit.ownerId=ship.id;
   fleet.unitsById[id]=unit;(session.npcDroneUnits??=Object.create(null))[id]=unit;context.unitIds.push(id);
   context.bayAnchors[id]={launch:point(),dock:point()};context.escortAnchors[id]=point();
  }
@@ -63,10 +64,16 @@ function initialize(session,ship){
 export function updateNpcDrones(session,dt){
  const registry=session.npcDroneUnits??=Object.create(null),now=session.save.world.time;
  session.pdcAssignments??=new Map();
+ const savedOrphans=session.save.world.orphanDrones;
+ for(const id in registry){const unit=registry[id];if(!unit.orphaned)continue;const rec=savedOrphans?.[id];
+  if(rec?.systemId!==session.save.player.systemId){delete registry[id];continue;}
+  if(unit.hull>0&&unit.position){for(let i=0;i<3;i++)unit.position[i]+=(unit.velocity?.[i]??0)*dt;rec.position=unit.position;rec.hull=unit.hull;}
+ }
+ if(savedOrphans)for(const id in savedOrphans){const rec=savedOrphans[id];if(rec.systemId===session.save.player.systemId&&!registry[id]&&DRONE_TYPES[rec.type]&&rec.hull>0){const unit=createDroneUnit(rec.id,rec.type);Object.assign(unit,{...rec,orphaned:true,state:'orphaned',ownerId:'orphan'});registry[id]=unit;}}
  for(const ship of session.ships){
   initialize(session,ship);const s=ship.npcDrones;if(!s)continue;
   const fleet=ship.droneFleet,c=s.context;
-  if(ship.hull<=0||ship.captured||ship.poweredDown){for(const id of c.unitIds)destroyPdcDrone(fleet,id,'owner-lost');continue;}
+  if(ship.hull<=0||ship.captured||ship.poweredDown){for(const id of c.unitIds)if(!fleet.unitsById[id]?.orphaned)destroyPdcDrone(fleet,id,'owner-lost');continue;}
   s.q.fromArray(ship.rotation);s.omega.copy(ship.flightAngularVelocity??s.omega.set(0,0,0)).applyQuaternion(s.q);const ext=session.npcHullExtents(ship),count=c.unitIds.length,rate=2*Math.PI/type.escortOrbitSeconds;
   for(let i=0;i<count;i++){
    const id=c.unitIds[i],unit=fleet.unitsById[id];

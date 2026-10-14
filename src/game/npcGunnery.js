@@ -69,7 +69,7 @@ export function npcShotDirection(ship,weapon,targetDirection,out,now=0,distance=
  const s=aimState(ship),rotation=s.rotation.fromArray(ship.rotation);
  out.set(0,0,-1).applyQuaternion(rotation);
  if(out.dot(targetDirection)<Math.cos(npcTriggerCone(ship,weapon,now)))return false;
- const rng=ship.aiRng??Math.random,p=npcGunneryProfile(ship),beam=weapon?.kind==='beam',gauss=weapon?.id==='gauss',aimError=npcAimErrorFactor(ship);
+ const rng=ship.aiRng??Math.random,p=npcGunneryProfile(ship),beam=weapon?.kind==='beam',gauss=weapon?.kind==='gauss',aimError=npcAimErrorFactor(ship)/(weapon?.gunneryAccuracy??1);
  let spread=p.spread*aimError;
  if(beam){out.copy(targetDirection);spread=(rng()<p.beamSlip?p.beamWide:p.beam)*aimError;}
  else {

@@ -2,6 +2,8 @@ import { SHIPS } from './data.js';
 import { getEffectiveShipStats, repairCost, refillCost, equipmentUnlocked } from './shipStats.js';
 import { createNewSave, hydrateSave, STARTING_CREDITS } from './save.js';
 import { createOutfittingState } from './outfitting.js';
+import { loadoutFor } from './outfitting.js';
+import { equipmentBaseId } from './equipmentCatalog.js';
 import {
     clearLauncherMagazines,
     fillLauncherMagazines,
@@ -40,10 +42,10 @@ const playerWith = (equipment, overrides = {}) => ({
 
 // A bare wayfarer with an empty loadout resolves to the hull's own stat block.
 const base = getEffectiveShipStats(playerWith([]));
-check('wayfarer base shield', base.shield, 95);
+check('wayfarer base shield', base.shield, 192.5);
 check('wayfarer base hull integrity', base.hull, 190);
-check('wayfarer base reactor output', base.reactorOutput, 18);
-check('wayfarer base energy capacity', base.energyCapacity, 72);
+check('wayfarer base reactor output', base.reactorOutput, 12);
+check('wayfarer base energy capacity', base.energyCapacity, 60);
 check('wayfarer base cargo', base.cargo, 32);
 check('wayfarer base fuel', base.fuel, 100);
 check('wayfarer base gun damage', base.gunDamage, 10);
@@ -61,11 +63,11 @@ const engineFit = getEffectiveShipStats(playerWith(['engine-mk2']));
 check('engine-mk2 max speed', engineFit.maxSpeed, 50 * 1.18);
 check('engine-mk2 afterburn', engineFit.afterburnSpeed, 75 * 1.18);
 check('engine-mk2 acceleration', engineFit.acceleration, 21 * 1.1);
-check('engine-mk2 reactor output', engineFit.reactorOutput, 18);
+check('engine-mk2 reactor output', engineFit.reactorOutput, 12);
 const thrusterFit = getEffectiveShipStats(playerWith(['thrusters-mk2']));
 check('thrusters-mk2 turn authority', thrusterFit.angularAcceleration, 1.65 * 1.35);
 const shieldFit = getEffectiveShipStats(playerWith(['shield-mk2']));
-check('shield-mk2 capacity', shieldFit.shield, 140);
+check('shield-mk2 capacity', shieldFit.shield, 237.5);
 const armorFit = getEffectiveShipStats(playerWith(['armor-mk2']));
 check('hull weave capacity', armorFit.hull, 230);
 const pulseFit = getEffectiveShipStats(playerWith(['pulse-mk2']));
@@ -135,7 +137,7 @@ check('salvage-mk2 range', salvageFit.salvageRange, 170);
 // Modifiers compose when several pieces are fitted at once.
 const comboFit = getEffectiveShipStats(playerWith(['engine-mk2', 'shield-mk2', 'cargo-pods', 'radar-mk2']));
 check('combo keeps engine boost', comboFit.maxSpeed, 50 * 1.18);
-check('combo keeps shield boost', comboFit.shield, 140);
+check('combo keeps shield boost', comboFit.shield, 237.5);
 check('combo keeps cargo boost', comboFit.cargo, 50);
 check('combo keeps radar boost', comboFit.radarRange, 3000);
 
@@ -153,14 +155,18 @@ const merchantPilot = playerWith([], { guildRank: { merchant: 1, bounty: 0, mini
 checkTrue('cargo-pods unlocks at merchant rank 1', equipmentUnlocked(merchantPilot, 'cargo-pods'));
 checkTrue('engine-mk2 has no guild gate', equipmentUnlocked(freshGates, 'engine-mk2'));
 
-// A fresh career starts with an empty equipment rack and resolves cleanly.
+// A fresh career starts with its approved factory weapons and resolves cleanly.
 const fresh = createNewSave(1234);
-check('fresh save equipment empty', fresh.player.equipment.length, 0);
+const freshLoadout = loadoutFor(fresh.player);
+check('fresh save starts with two factory beam emitters',
+    freshLoadout.guns.filter(id => equipmentBaseId(id) === 'beam-emitter').length, 2);
+checkTrue('fresh save starts with its factory seeker rack',
+    freshLoadout.launchers.some(id => equipmentBaseId(id) === 'seeker-launcher'));
 check('fresh save starts on wayfarer', fresh.player.shipId, 'wayfarer');
 check('fresh save docks at helix', fresh.player.dockedAt, 'helix');
 check('fresh save starting credits', fresh.player.credits, STARTING_CREDITS);
 check('fresh save resolves wayfarer stats', getEffectiveShipStats(fresh.player).cargo, 32);
-check('fresh save resolves wayfarer shield', getEffectiveShipStats(fresh.player).shield, 95);
+check('fresh save resolves wayfarer shield', getEffectiveShipStats(fresh.player).shield, 192.5);
 check('fresh save starts at full energy', fresh.player.energy, 72);
 const freshMagazines = launcherMagazineEntries(fresh.player);
 check('fresh save has one explicit launcher magazine', freshMagazines.length, 1);
@@ -185,14 +191,16 @@ const migrated = hydrateSave({
     },
     world: { seed: 1234 },
 });
-check('migration preserves equipment rack', migrated.player.equipment.join(','), 'shield-mk2,pulse-mk2,cargo-pods,engine-mk2');
-check('migrated shield resolves', getEffectiveShipStats(migrated.player).shield, 140);
+const migratedRack = migrated.player.equipment.map(equipmentBaseId);
+for (const id of ['shield-mk2','pulse-mk2','cargo-pods','engine-mk2'])
+    checkTrue('migration preserves ' + id, migratedRack.includes(id));
+check('migrated shield resolves', getEffectiveShipStats(migrated.player).shield, 237.5);
 check('migrated pulse-mk2 does not globally buff hull damage', getEffectiveShipStats(migrated.player).gunDamage, 10);
 check('migrated cargo resolves', getEffectiveShipStats(migrated.player).cargo, 50);
 check('migrated engine resolves', getEffectiveShipStats(migrated.player).maxSpeed, 50 * 1.18);
 check('legacy armor and hull combine', migrated.player.hull, 185);
 check('legacy armor field is removed', Object.hasOwn(migrated.player, 'armor'), false);
-check('legacy save receives full capacitor', migrated.player.energy, 72);
+check('legacy save receives the current full capacitor', migrated.player.energy, 60);
 
 // Repair and refill costs scale with what is actually missing.
 const serviceFit = createOutfittingState(['wayfarer']);

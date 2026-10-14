@@ -139,7 +139,7 @@ const fallbackKestrelProfile = () => {
 const fallbackProfile = fallbackKestrelProfile();
 
 // A top-down hull schematic for the cockpit monitors: prefer the silhouette
-// baked from the GLB hull and retain the old capital/unknown fallbacks.
+// baked from the shipping GLB hull; unknown variants retain the legacy fallback.
 export const shipTopDownProfile = (variant) => {
     if (profileCache.has(variant))
         return profileCache.get(variant);
@@ -152,6 +152,9 @@ export const shipTopDownProfile = (variant) => {
             maxZ: glb.rows - 1,
             edges: glb.edges,
             cells: glb.cells,
+            ...glb.bounds,
+            contours: glb.contours,
+            details: glb.details,
         };
         profileCache.set(variant, glbProfile);
         return glbProfile;
@@ -163,4 +166,12 @@ export const shipTopDownProfile = (variant) => {
     }
     profileCache.set(variant, fallbackProfile);
     return fallbackProfile;
+};
+
+// Shared by menu SVGs and cockpit canvases; no renderer or model loading.
+export const shipProfilePath = (profile, details = false) => {
+    const contours = details ? profile.details : profile.contours;
+    if (contours) return contours.map(({ points, closed }) =>
+        points.map(([x, z], i) => `${i ? 'L' : 'M'}${x} ${z}`).join('') + (closed ? 'Z' : '')).join('');
+    return details ? '' : profile.edges.map(([x1,z1,x2,z2]) => `M${x1} ${z1}L${x2} ${z2}`).join('');
 };

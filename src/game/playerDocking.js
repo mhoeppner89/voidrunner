@@ -28,6 +28,12 @@ export function playerBerth(id, height = 2, padIndex = 0) {
     return playerBerths(id, height)[padIndex] ?? null;
 }
 
+// Inject the flight-only route fitter after GameSession is loaded. Keep the
+// title/dock module graph free of the complete collision buffers and warmup.
+let berthResolver;
+export function setPlayerBerthResolver(resolver){berthResolver=resolver;}
+function sessionBerths(session,id){return berthResolver?berthResolver(session,id):playerBerths(id,session.playerHullExtents()[1]);}
+
 export function nearestPlayerBerth(id, position, height = 2, berths = playerBerths(id, height)) {
     let nearest, nearestDistance = Infinity;
     for (const berth of berths) {
@@ -71,7 +77,7 @@ export function beginPlayerDocking(session, id, selectedBerth = session.stationL
     const p = session.save.player;
     const berth = selectedBerth?.id === id
         ? selectedBerth
-        : playerBerth(id, session.playerHullExtents()[1], p.stationPadIndex ?? 0);
+        : sessionBerths(session,id).find(b=>b.padIndex===(p.stationPadIndex??0))??sessionBerths(session,id)[0];
     if (!landingCaptureReady(p.position, p.velocity, berth)) return false;
     direction.set(
         berth.pad[0] - berth.gate[0],
@@ -128,8 +134,10 @@ export function stepPlayerDocking(session, dt) {
 export function preparePlayerLaunch(session, id) {
     const p = session.save.player;
     const height = session.playerHullExtents()[1];
-    const berth = playerBerth(id, height, p.stationPadIndex ?? 0) ?? playerBerth(id, height, 0);
+    const candidates=sessionBerths(session,id);
+    const berth = candidates.find(b=>b.padIndex===(p.stationPadIndex??0))??candidates[0];
     if (!berth) return null;
+    p.stationPadIndex=berth.padIndex;
     direction.set(
         berth.gate[0] - berth.pad[0],
         berth.gate[1] - berth.pad[1],

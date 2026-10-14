@@ -12,6 +12,75 @@
 // Player address is informal "du" throughout, matching the frontier voice of
 // the English lines. Values are plain text — never HTML.
 export const DE_CATALOG = {
+    'Shield damage':'Schildschaden', 'Hull damage':'Hüllenschaden', 'Acceleration':'Beschl.',
+    'Energy capacity':'Energiekapazität', 'Energy recharge':'Energieladung',
+    'Energy bank':'Energiespeicher', 'Max speed':'Max. Tempo', 'Turn accel.':'Drehbeschl.',
+    'Shield recharge':'Schildladung', 'Shield capacity':'Schildkapazität', 'Hull integrity':'Hüllenintegrität',
+    'Sprint engine':'Sprintantrieb', 'Shield grid':'Schildgitter', 'Drift correction':'Driftkorrektur',
+    'Boost fuel use':'Boost-Verbrauch', 'Cargo capacity':'Frachtkapazität', 'Radar range':'Radarreichweite',
+    'Scan range':'Scanreichweite', 'Salvage range':'Bergungsreichweite', 'Salvage rate':'Bergungstempo',
+
+    'Hull paint':'Lackierung',
+    'More':'Mehr', 'Controls':'Steuerung',
+    'Market intel':'Marktinfos', '{total} · {mass} mass':'{total} · {mass} Masse',
+    'Weapons':'Waffen', 'Turrets':'Türme', 'Weapon draw':'Waffenlast',
+    'ACCEPT':'Annehmen', 'Exchange':'Tauschen',
+    'Speed':'Tempo', 'Accel.':'Beschl.', 'Turning':'Wendigkeit', 'Shield':'Schild', 'Hull':'Hülle', 'Cargo':'Fracht', 'Fighter':'Jäger', 'All-rounder':'Allrounder',
+    'Pulse laser':'Pulslaser', 'Pulse laser II':'Pulslaser II', 'Beam':'Strahl', 'Ripper':'Ripper', 'Magrail':'Magrail', 'Ion':'Ion', 'Plasma':'Plasma', 'Laser turret':'Laserturm', 'Reactor':'Reaktor', 'Recovery shield':'Regenerationsschild', 'Engine II':'Antrieb II', 'Thrusters':'Steuerdüsen', 'Shield II':'Schild II', 'Seeker':'Suchrakete', 'Shield seeker':'Schildsuchrakete', 'Swarm':'Schwarm', 'Shield swarm':'Schildschwarm', 'Torpedo':'Torpedo', 'Fitting':'Einbau', 'Keep':'Behalten', 'Buy':'Kaufen',
+    'Trade':'Handel', 'Equipment':'Ausrüstung', 'Shipyard':'Werft', 'Mining':'Abbau', 'Repair':'Reparatur', 'Attack':'Angriff',
+    'Items':'Teile', 'Details':'Details', 'Remove':'Ausbauen', 'Store':'Einlagern', 'Priority':'Priorität', 'Loot':'Beute', 'Drones':'Drohnen', 'Power':'Leistung', 'Elsewhere':'Auswärts', 'Sort inventory':'Inventar sortieren', 'Select an item':'Teil auswählen',
+    'Shield recovery multiplier':'Schildregeneration ×', 'Radar range':'Radarreichweite', 'Scan range':'Scanreichweite', 'Salvage range':'Bergungsreichweite', 'Salvage rate':'Bergungsrate', 'Boost fuel multiplier':'Schubverbrauch ×', 'Lateral thrust multiplier':'Seitenschub ×',
+    'Capital Anti-Fighter Cannon':'Schwere Abfangkanone', 'Capital Rail Battery':'Schweres Schienengeschütz', 'Capital Shield Generator':'Großschiff-Schildgenerator',
+    'Aim correction':'Zielkorrektur (%)',
+    'WEAPON MOUNTS':'WAFFENHALTERUNGEN', 'Inventory section':'Inventarbereich',
+    'Efficient':'Effizient', 'Precise':'Präzise', 'Rapid':'Schnellfeuer', 'Long-range':'Langstrecke', 'Lightweight':'Leichtbau', 'Tuned':'Abgestimmt', 'Compact':'Kompakt', 'All items':'Alle Teile', 'Invalid equipment action.':'Ungültige Ausrüstungsaktion.',
+
+  "EQUIPMENT & CARGO": "AUSRÜSTUNG & FRACHT",
+  "Weapon": "Waffe",
+  "Turret": "Geschützturm",
+  "Utility": "System",
+  "Capacitor": "Kondensator",
+  "Recharge": "Regeneration",
+  "Salvo": "Salve",
+  "Demand": "Leistungsbedarf",
+  "Drone bays": "Drohnenbuchten",
+  "Name": "Name",
+  "Tier": "Technikstufe",
+  "Mass": "Masse",
+  "STORAGE": "LAGER",
+  "SHOP": "HÄNDLER",
+  "REMOTE": "ANDERE STATIONEN",
+  "ALL ITEMS": "ALLE TEILE",
+  "Common": "Standard",
+  "Uncommon": "Ungewöhnlich",
+  "Rare": "Selten",
+  "Named": "Einzigartig",
+  "No equipment here.": "Keine Ausrüstung vorhanden.",
+  "Choose an item to compare it with the selected mount.": "Wähle ein Teil, um es mit dem gewählten Einbauplatz zu vergleichen.",
+  "Buy into station storage": "Kaufen und einlagern",
+  "Purchased into station storage.": "Gekauft und im Stationslager abgelegt.",
+  "Equipment updated.": "Ausrüstung aktualisiert.",
+  "Remove to station storage": "Ausbauen und einlagern",
+  "Store at this station": "Hier einlagern",
+  "Load into cargo": "In die Fracht laden",
+  "Install": "Einbauen",
+  "Bundled — no resale": "Werksausrüstung — nicht verkäuflich",
+  "Damage": "Schaden",
+  "Energy per shot": "Energie pro Schuss",
+  "Shot interval": "Schussintervall",
+  "Range": "Reichweite",
+  "WRECK CONTENTS": "WRACKINHALT",
+  "Recover": "Bergen",
+  "Salvage first": "Zuerst bergen",
+  "UNMANNED DRONES": "VERWAISTE DROHNEN",
+  "Cargo hold is full.": "Frachtraum ist voll.",
+  "Wreck is outside salvage range.": "Wrack außerhalb der Bergungsreichweite.",
+  "Recovered into cargo.": "In die Fracht geborgen.",
+  "Select a mount.": "Wähle einen Einbauplatz.",
+  "Not enough credits.": "Nicht genug Credits.",
+  "Equipment unavailable.": "Ausrüstung nicht verfügbar.",
+  "Equipment recovered into cargo.": "Ausrüstung in die Fracht geborgen.",
+
     'Concord':'Concord', 'Alliance':'Allianz', 'Independents':'Unabhängige', 'Pirates':'Piraten',
     'BOUNTY HUNTER':'KOPFGELDJÄGER', 'Independent guild':'Unabhängige Gilde',
     'Strong local presence':'Stark vor Ort vertreten', 'Local presence':'Vor Ort vertreten', 'Preferred ships':'Bevorzugte Schiffe',
@@ -2547,7 +2616,7 @@ Object.assign(DE_CATALOG, {
 
 Object.assign(DE_CATALOG, {'CHARGING':'LÄDT','Ion Projector':'Ionenprojektor','ION PROJECTOR':'IONENPROJEKTOR','ION':'IONEN','7 pellets · 9 energy / shot':'7 Teilgeschosse · 9 Energie pro Schuss','Blast radius 26 · 14 energy / shot':'Explosionsradius 26 · 14 Energie pro Schuss'});
 
-Object.assign(DE_CATALOG, {'YOUR WEAPON FIT':'DEINE BEWAFFNUNG','BALANCED FIT':'ALLROUNDER','CLOSE ASSAULT':'NAHKAMPF','DEFENSIVE SUPPORT':'ABWEHR UND PLASMA','BEAM FIT':'STRAHLWAFFE'});
+Object.assign(DE_CATALOG, {'LOADOUT':'WAFFEN','BALANCED FIT':'ALLROUNDER','CLOSE ASSAULT':'NAHKAMPF','DEFENSIVE SUPPORT':'ABWEHR UND PLASMA','BEAM FIT':'STRAHLWAFFE'});
 
 Object.assign(DE_CATALOG, {"TURRETS": "GESCHÜTZTÜRME", "POWER": "ENERGIEVERSORGUNG", "FIRE ALL": "ALLE WAFFEN", "Point-Defence Turret": "Nahabwehrturm", "Tracking Laser Turret": "Laserturm", "Large Capacitor": "Großer Energiespeicher", "High-Output Reactor": "Hochleistungsreaktor", "Fast-Recovery Shield": "Schnellladender Schild", "Sprint Engine": "Sprintantrieb", "Manoeuvring Thrusters": "Manövriertriebwerke", "TOP TURRET": "OBERER GESCHÜTZTURM", "LOWER TURRET": "UNTERER GESCHÜTZTURM", "REAR TOP TURRET": "OBERER HECKTURM", "FORWARD LOWER TURRET": "UNTERER BUGTURM", "TURRETS HOLD FIRE": "TÜRME: FEUER EINGESTELLT", "TURRETS ACTIVE": "TÜRME: AUTOMATIK AKTIV", "TURRETS READY": "TÜRME: BEREIT", "TURRETS WAITING FOR ENERGY": "TÜRME: WARTEN AUF ENERGIE", "WEAPON GROUP HELP": "FEUERGRUPPEN", "UNDERSTOOD": "VERSTANDEN", "TURNING": "WENDIGKEIT", "BOOST FUEL USE": "NACHBRENNER-VERBRAUCH", "SHIELD RECOVERY": "SCHILDREGENERATION", "Tap the weapon name to cycle populated groups and Fire all. Fire all uses every forward gun; missiles and automatic turrets stay separate. In Outfitting, open a gun’s details to assign A or B. Try beams in A and your other weapon in B to control energy use.": "Tippe auf den Waffennamen, um zwischen belegten Feuergruppen und ALLE WAFFEN zu wechseln. ALLE WAFFEN feuert sämtliche Bugwaffen ab. Raketen und automatische Geschütztürme werden separat gesteuert. In der Schiffsausrüstung kannst du unter den Waffendetails A oder B zuweisen. Mit Strahllasern in A und einer anderen Waffe in B lässt sich der Energieverbrauch gezielt steuern.", "Automatically fires at your selected hostile target. Reserves energy for forward guns; the hull limits its firing arc.": "Feuert automatisch auf dein ausgewähltes feindliches Ziel. Hält Energie für die Bugwaffen zurück. Der Schiffsrumpf begrenzt das Schussfeld.", "Longer firing bursts, but slower energy recovery.": "Ermöglicht längere Feuerstöße, lädt jedoch langsamer nach.", "Supports sustained fire, with a smaller burst reserve.": "Liefert mehr Energie für anhaltendes Feuer, speichert jedoch weniger für kurze Belastungsspitzen.", "Recovers quickly after breaking contact, but absorbs less damage.": "Regeneriert nach einer Feuerpause schnell, hält jedoch weniger Schaden aus.", "Higher speed for long passes, with weaker turning and greater boost fuel use.": "Höhere Geschwindigkeit für weite Angriffspässe. Dafür sinkt die Wendigkeit und der Nachbrenner verbraucht mehr Treibstoff.", "Stronger turning and drift correction, with a lower top speed.": "Verbessert Wendigkeit und Driftkorrektur, senkt jedoch die Höchstgeschwindigkeit.", "Absorbs more damage, but takes longer to recover after a fight.": "Hält mehr Schaden aus, regeneriert jedoch langsamer."});
 
@@ -2619,6 +2688,12 @@ Object.assign(DE_CATALOG, {
 });
 
 Object.assign(DE_CATALOG, {'Best score':'Bester Punktestand'});
+
+Object.assign(DE_CATALOG, {
+    'Arena': 'Arena',
+    'Spectator': 'Beobachter',
+    'Hard Run': 'Schwere Serie',
+});
 
 // 0.8.2cu — Wingman roster and standing orders.
 Object.assign(DE_CATALOG, {

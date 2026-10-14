@@ -1,3 +1,4 @@
+import {equipmentRecord} from './equipmentCatalog.js';
 import { COMMODITIES, LOCATIONS, MARKET_LOCATION_IDS, commodityIds } from './data.js';
 import { clamp, randomBetween, seededRandom } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
@@ -86,7 +87,7 @@ const safeCargoNumber = (value) => {
 export const cargoMass = (player) => {
     // All owned drones reserve one cargo unit, including deployed ones. Launching
     // cannot create free cargo space and returning never strands a drone.
-    let mass = 0;
+    let mass = Number(player?._inventoryCargoMass) || Object.values(player?.inventory?.items??{}).reduce((n,item)=>n+(item.location?.kind==='cargo'?(equipmentRecord(item.id)?.mass??1):0),0);
     const drones = player?.droneFleet?.unitsById;
     for (const id in drones) if (drones[id]?.hull > 0 && drones[id].state !== 'destroyed') mass++;
     for (const item of Array.isArray(player?.sealedCargo) ? player.sealedCargo : []) {

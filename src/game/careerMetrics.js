@@ -1,4 +1,5 @@
-import { HARDPOINT_SPECS, OUTFIT_ITEMS, itemAvailable, installedItemIds } from './outfitting.js';
+import { HARDPOINT_SPECS, BASE_OUTFIT_ITEMS, OUTFIT_ITEMS, itemAvailable, itemFitsMount, installedItemIds } from './outfitting.js';
+import {equipmentBaseId} from './equipmentCatalog.js';
 
 // Career pacing is measured in real game-time seconds. The ledger is deliberately
 // small and JSON-safe so it can live in the normal career save without carrying
@@ -24,12 +25,12 @@ const statSnapshot = (player = {}) => ({
 });
 
 const compatibleWithShip = (item, shipId) => {
-    const category = item?.category === 'gun' ? 'guns'
-        : item?.category === 'launcher' ? 'launchers'
-            : item?.category;
-    return Boolean(category && (HARDPOINT_SPECS[shipId]?.[category] ?? []).some((mount) => (
-        (item.sizes ?? [item.size]).includes(mount.size)
-    )));
+    const category = ['power', 'drive', 'defense', 'utility'].includes(item?.category) ? 'utility'
+        : item?.category === 'gun' ? 'guns'
+            : item?.category === 'launcher' ? 'launchers'
+                : item?.category === 'turret' ? 'turrets'
+                    : item?.category;
+    return Boolean(category && (HARDPOINT_SPECS[shipId]?.[category] ?? []).some((mount) => itemFitsMount(item, mount)));
 };
 
 // Find the next upgrade that can materially change a career sortie. Factory
@@ -41,9 +42,13 @@ export const nextMeaningfulUpgrade = (save, locationId = save?.player?.dockedAt 
     const player = save?.player;
     if (!player?.shipId)
         return null;
-    const installed = new Set(installedItemIds(player, player.shipId));
+    const installed = new Set(installedItemIds(player, player.shipId).map(equipmentBaseId));
     const locker = player.outfitting?.locker ?? {};
-    const candidates = Object.values(OUTFIT_ITEMS)
+    // Runtime definitions also include other ships' loot and shop previews.
+    // Recommend a catalog upgrade or a copy actually accessible to this pilot.
+    const ownedByBase = new Map(Object.entries(locker).filter(([, n]) => whole(n) > 0)
+        .map(([id]) => [equipmentBaseId(id), id]));
+    const candidates = Object.values(BASE_OUTFIT_ITEMS)
         .filter((item) => UPGRADE_CATEGORIES.has(item.category)
             && !item.factoryFit
             && !installed.has(item.id)
@@ -53,10 +58,11 @@ export const nextMeaningfulUpgrade = (save, locationId = save?.player?.dockedAt 
             const requiredRank = finite(item.requiredRank);
             const locked = Boolean(item.requiredGuild && rank < requiredRank);
             const available = !locked && itemAvailable(player, item, locationId);
-            const owned = whole(locker[item.id]) > 0;
-            const price = whole(item.price);
+            const ownedId = ownedByBase.get(item.id);
+            const owned = Boolean(ownedId);
+            const price = whole(OUTFIT_ITEMS[ownedId]?.price ?? item.price);
             return {
-                id: item.id,
+                id: ownedId ?? item.id,
                 name: item.name,
                 category: item.category,
                 price,

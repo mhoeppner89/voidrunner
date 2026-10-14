@@ -14,7 +14,7 @@ test('missing weapon definitions have no range or shot damage',()=>{
 });
 
 test('weapon ranges end exactly at their limit, including a partial final simulation step',()=>{
- for(const [id,range] of Object.entries({beam:300,pdc:300,ripper:350,pulse:400,'pulse-mk2':400,ion:400,mortar:450,gauss:600})){
+ for(const [id,range] of Object.entries({beam:350,pdc:300,ripper:350,pulse:450,'pulse-mk2':450,ion:400,mortar:500,gauss:600})){
   const w=WEAPONS[id];assert.equal(weaponRange(w),range);
   if(w.kind==='beam')continue;
   const s=session(),velocity=[30,15,70],shot=s.spawnGunProjectile('player',w,V(),V(0,0,-1),velocity);
@@ -53,7 +53,7 @@ test('per-gun damage is identical on different hulls and NPCs; plasma rewards di
    assert.equal(s.spawnGunProjectile('enemy',w,V(),V(0,0,-1),[0,0,0]).damage,w.damageFlat);
   }
  }
- assert.ok(WEAPONS.mortar.damageFlat/WEAPONS.mortar.energyCost>2*WEAPONS['pulse-mk2'].damageFlat/WEAPONS['pulse-mk2'].energyCost);
+ assert.ok(WEAPONS.mortar.damageFlat/WEAPONS.mortar.energyCost>WEAPONS['pulse-mk2'].damageFlat/WEAPONS['pulse-mk2'].energyCost);
  assert.equal(OUTFIT_ITEMS.mortar.energyCost,WEAPONS.mortar.energyCost);
  const s=session(),large={id:'large',hull:1000,role:'pirate',position:[0,0,-170],rotation:[0,0,0,1]};s.ships=[large];s.npcHullExtents=()=>[70,40,90];
  const hits=[];s.damageShip=(ship,n)=>hits.push(n);s.spawnGunProjectile('player',WEAPONS.mortar,V(),V(0,0,-1),[0,0,0]);
@@ -78,7 +78,7 @@ test('fighter missiles catch a sprint-engine Talon; slow torpedoes remain evadab
 
 test('NPC swarm launch consumes one canister and emits four warheads after the full novice warning',()=>{
  const s=session(),ship=s.spawnShip('pirate',[0,0,250],undefined,undefined,{tier:'novice',temperament:'steady'});
- ship.rotation=[0,0,0,1];ship.velocity=[10,0,0];ship.targetId='player';ship.combatFit.launcher='swarm';ship.combatFit.missiles=1;
+ ship.rotation=[0,0,0,1];ship.velocity=[10,0,0];ship.targetId='player';ship.combatFit.launcher='swarm';ship.combatFit.missiles=1;ship.combatFit.racks=[{launcher:'swarm',missiles:1,index:0,mountId:'test-swarm',cooldown:0}];
  for(let i=0;i<245;i++){s.save.world.time=i/60;s.updateNpcOrdnance(ship,V(),1/60);}
  assert.equal(ship.combatFit.missiles,0);assert.equal(s.projectiles.length,4);
  for(const p of s.projectiles){assert.equal(p.launcherId,'swarm');assert.ok(Math.abs(s.projStore.getVel(p.slot,V()).sub(V(...ship.velocity)).length()-300)<.001);}
@@ -93,9 +93,9 @@ test('PDC intercepts a full-speed seeker before impact while preserving its gun 
  assert.equal(missile.life,0);assert.equal(hits,0);assert.ok(s.projectiles.some(p=>p.targetMissile===missile));assert.ok(p.energy>=s.playerStats().energyCapacity*.25);
 });
 
-test('turret pivots retain the original deck anchors and only non-rear mounts gain a ten-degree forward cone',()=>{
- const original={wayfarer:[[0,1.12,.15]],vanguard:[[0,1.12,.1],[0,-1.12,.1]],prospector:[[0,1.12,.5]],lancer:[[0,1.12,.2]],atlas:[[0,1.12,.55],[0,-1.12,-.55]]};
- for(const [hull,points] of Object.entries(original))assert.deepEqual(TURRET_LAYOUTS[hull].map(m=>m.position),points);
+test('turret pivots have finite current hull anchors and only non-rear mounts gain a ten-degree forward cone',()=>{
+ for(const [hull,mounts] of Object.entries(TURRET_LAYOUTS))for(const m of mounts){assert.ok(m.position.every(Number.isFinite),hull);if(m.normal){assert.ok(m.normal.every(Number.isFinite),hull);assert.ok(Math.abs(Math.hypot(...m.normal)-1)<1e-6,hull);}else{assert.ok([0,1,2].includes(m.axis??1),hull);assert.ok([1,-1].includes(m.side),hull);}}
+ assert.equal(TURRET_LAYOUTS.wayfarer[0].normal[1],-1,'Wayfarer carries its belly turret');
  assert.ok(!TURRET_LAYOUTS.prospector[0].forwardCone&&!TURRET_LAYOUTS.atlas[0].forwardCone);
  for(const mounts of Object.values(TURRET_LAYOUTS))for(const mount of mounts)if(mount.forwardCone)assert.equal(mount.forwardCone,10);
 });

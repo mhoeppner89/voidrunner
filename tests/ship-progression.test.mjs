@@ -10,7 +10,10 @@ const career=()=>{const s=createNewSave();s.player.credits=500000;return s};
 test('career paths, industrial bays and physical ports agree',()=>{
  for(const [id,tier,role] of [['speedster',1,'interceptor'],['talon',2,'interceptor'],['lancer',3,'interceptor'],['legionary',2,'fighter'],['blade',3,'fighter'],['andromeda',2,'bomber'],['vanguard',3,'bomber'],['wayfarer',1,'allrounder'],['torsas',2,'allrounder'],['astra',3,'allrounder'],['prospector',2,'industrial'],['atlas',3,'industrial']]){assert.equal(SHIPS[id].tier,tier);assert.equal(SHIPS[id].role,role);}
  for(const [id,count] of [['wayfarer',1],['torsas',2],['astra',2],['prospector',3],['atlas',4]]){assert.ok(canMineWithHull(id));assert.equal(droneBayLayoutFor(id).length,count);assert.equal(DRONE_PORTS[id].length,count);}
- assert.equal(HULL_HARDPOINTS.atlas.turrets.length,4);assert.equal(HULL_HARDPOINTS.blade.turrets.length,3);assert.equal(HULL_HARDPOINTS.vanguard.launchers.length,3);
+ assert.equal(HULL_HARDPOINTS.atlas.turrets.length,4);assert.equal(HULL_HARDPOINTS.blade.turrets.length,3);
+ assert.strictEqual(HULL_HARDPOINTS.vanguard.guns,HULL_HARDPOINTS.vanguard.launchers);
+ assert.equal(HULL_HARDPOINTS.vanguard.weapons.length,5);
+ assert.ok(HULL_HARDPOINTS.vanguard.weapons.every(mount=>mount.size===undefined),'Vanguard weapon bays are shared and sizeless');
  assert.equal(createEnemyLoadout({hullId:'vanguard',role:'patrol'},0).racks.length,3);
 });
 test('keep, reload and switch preserve hull, ammunition and equipment without free repairs',()=>{

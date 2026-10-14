@@ -12,6 +12,7 @@ const {generateAsteroidField,generateWreckNodes} = await import('../src/game/wor
 const {loadoutFor,quoteOutfitting} = await import('../src/game/outfitting.js');
 const {cargoCapacity} = await import('../src/game/economy.js');
 const {repairCost,refillCost} = await import('../src/game/shipStats.js');
+const {equipmentBaseId} = await import('../src/game/equipmentCatalog.js');
 
 function fixture(step, saved) {
     const save=saved ?? createNewSave(73201,{tutorial:true});
@@ -75,7 +76,12 @@ test('Rin supplies one radar and the actual locker fitting costs nothing and adv
     assert.equal(quote.ok,true,quote.code);const credits=save.player.credits;
     assert.equal(session.applyOutfitting(quote).ok,true);
     assert.equal(save.player.credits,credits);assert.equal(quest.stepId,'launch-helix');
-    assert.ok(loadoutFor(save.player).utility.includes('radar-mk2'));
+    const radarId=loadoutFor(save.player).utility.find(id => equipmentBaseId(id) === 'radar-mk2');
+    assert.ok(radarId?.startsWith('eq-'), 'the radar fitting is a generated inventory item');
+    quest.stepId='fit-upgrade';delete quest.flags.radarProvided;
+    session.ensureTutorialEquipment();
+    assert.equal(quest.stepId,'launch-helix','an equipped generated radar recovers the lesson after state restoration');
+    assert.equal(save.player.outfitting.locker['radar-mk2']??0,0,'an installed radar does not trigger a duplicate gift');
     const restored=fixture('launch-helix',hydrateSave(JSON.parse(JSON.stringify(save))));
     restored.session.ensureTutorialEquipment();assert.equal(restored.save.player.outfitting.locker['radar-mk2']??0,0);
 });

@@ -11,7 +11,7 @@ test('small impacts and beam hits remain audible without vibration feedback',()=
 });
 test('own PDC missile interception emits cockpit audio at useful gain',()=>{
  const s=session(),p=s.save.player;p.mode='mining';p.outfitting.loadouts.wayfarer.turrets=['pdc'];const calls=[];s.audio.playCockpit=(...a)=>calls.push(a);
- const slot=s.projStore.alloc();s.projStore.setPos(slot,0,280,0);s.projStore.setVel(slot,0,-260,0);
+ const slot=s.projStore.alloc();s.projStore.setPos(slot,0,-280,0);s.projStore.setVel(slot,0,260,0);
  s.projectiles.push({id:'incoming',slot,kind:'missile',ownerId:'enemy',targetId:'player',life:8,damage:42});
  for(let i=0;i<100&&!calls.length;i++){s.save.world.time=i/60;s.updateTurrets(p,'player',1/60);}
  assert.equal(calls[0]?.[0],'pdc');assert.ok(calls[0][1]>=.8);
@@ -22,7 +22,7 @@ test('cockpit routing explicitly requests its separate priority channel',()=>{
 
 test('own laser turret emits cockpit beam sound when firing',()=>{
  const s=session(),p=s.save.player;p.outfitting.loadouts.wayfarer.turrets=['tracking-turret'];
- s.ships=[{id:'target',hostile:true,hull:100,position:[0,50,0],velocity:[0,0,0]}];s.getTargetRef=()=>({kind:'ship',id:'target'});
+ s.ships=[{id:'target',hostile:true,hull:100,position:[0,-50,0],velocity:[0,0,0]}];s.getTargetRef=()=>({kind:'ship',id:'target'});
  let shots=0;const calls=[];s.fireBeam=()=>shots++;s.audio.playCockpit=(...a)=>calls.push(a);
  for(let i=0;i<180;i++){s.save.world.time=i/60;p.energy=100;s.updateTurrets(p,'player',1/60);}
  assert.ok(shots>0);assert.ok(calls.some(([effect,gain])=>effect==='beam'&&gain>=.8));

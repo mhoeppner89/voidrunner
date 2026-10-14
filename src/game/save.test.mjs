@@ -86,7 +86,7 @@ assert.equal(legacySilent.settings.effects, 0.68);
 // rounds by loading the fitted magazines in mount order without inventing a
 // second ordnance type.
 const legacyLauncherFit = createOutfittingState(['lancer']);
-legacyLauncherFit.loadouts.lancer.launchers = ['swarm-launcher', 'torpedo-launcher'];
+legacyLauncherFit.loadouts.lancer.launchers = [null,null,'swarm-launcher','torpedo-launcher'];
 const legacyOrdnance = hydrateSave({
     version: 9,
     player: canonicalPlayer({
@@ -339,7 +339,7 @@ const roundTrip = createNewSave(125);
 roundTrip.player.dockedAt = undefined;
 roundTrip.player.position = [1234, -56, 7890];
 roundTrip.player.velocity = [4, 5, 6];
-roundTrip.player.launcherMagazines['wayfarer-launcher-0'].rounds = 2;
+roundTrip.player.launcherMagazines['wayfarer-weapon-2'].rounds = 2;
 roundTrip.player.missiles = 2;
 roundTrip.player.prevPosition = new Float64Array([1, 2, 3]);
 roundTrip.player.prevRotation = new Float64Array([0, 0, 0, 1]);
@@ -387,7 +387,7 @@ const loaded = loadGame();
 assert.deepEqual(loaded.player.position, [1234, -56, 7890]);
 assert.deepEqual(loaded.player.velocity, [4, 5, 6]);
 assert.equal(launcherMagazineEntries(loaded.player)[0].rounds, 2);
-assert.equal(loaded.player.activeLauncherMountId, 'wayfarer-launcher-0');
+assert.equal(loaded.player.activeLauncherMountId, 'wayfarer-weapon-2');
 assert.equal(loaded.player.dockedAt, undefined);
 assert.equal(loaded.settings.quality, 'high');
 assert.equal(loaded.activeMissions[0].id, 'round-trip-mission');

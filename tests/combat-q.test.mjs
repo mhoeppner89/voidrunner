@@ -4,7 +4,7 @@ import {fixture} from './combat-variety.test.mjs';
 import {session} from './weapon-overhaul.test.mjs';
 import {combatTargetEligible} from '../src/game/combatTargeting.js';
 import {disruptWeapons,disruptionFactor,weaponDamage} from '../src/game/weaponDamage.js';
-import {WEAPONS} from '../src/game/weapons.js';
+import {WEAPONS,WEAPON_DAMAGE_SCALE} from '../src/game/weapons.js';
 import {loadoutFor} from '../src/game/outfitting.js';
 test('automatic engagement waits through a demand and stops at surrender or stand-down',()=>{
  const ship={hull:100,hostile:true};assert.ok(combatTargetEligible(ship));
@@ -19,12 +19,12 @@ test('patrol excludes itself, remembers only seen coordinates, expires memory an
  e.standingDown=false;s.canSee=()=>true;s.resolveShipTarget(p);s.canSee=()=>false;s.save.world.time+=4.1;assert.equal(s.resolveShipTarget(p),undefined);
 });
 test('ion strips shields but disruption slows mounted player guns instead of stopping them',()=>{
- assert.equal(weaponDamage(100,5,WEAPONS.ion).shield,40);
+ assert.equal(weaponDamage(100,5,WEAPONS.ion).shield,5*WEAPONS.ion.shieldMul);
  const s=session(),p=s.save.player,fit=loadoutFor(p);fit.guns=['pulse-cannon',null];fit.fireGroups.activeGroup='ALL';p.outfitting.loadouts[p.shipId]=fit;p.energy=100;p.shield=0;s.save.world.time=1;
  assert.ok(disruptWeapons(p,WEAPONS.ion,1));assert.equal(disruptionFactor(p,1),2);
  s.fireMountedPlayerGuns();assert.ok(s.projectiles.length>0);assert.ok(Math.abs(p.energy-93.6)<1e-6);
  assert.ok(Math.abs(Object.values(s.mountFireAt)[0]-1.34)<1e-6);
- assert.equal(disruptionFactor(p,1.81),1);
+ assert.equal(disruptionFactor(p,1+WEAPONS.ion.jamSeconds+.01),1);
 });
 
 test('ion disruption halves NPC gun cadence and doubles each shot cost',()=>{
@@ -67,7 +67,7 @@ test('veteran forward guns reacquire stationary and crossing targets on later pa
 
 test('mounted automatic turret respects a demand and resumes against the hostile after it ends',()=>{
  const s=session(),p=s.save.player;p.mode='combat';p.outfitting.loadouts[p.shipId].turrets=['tracking-turret'];
- const enemy={id:'pirate',hostile:true,hull:100,pendingMug:true,position:[0,80,0],velocity:[0,0,0]};s.ships=[enemy];s.getTargetRef=()=>({kind:'ship',id:enemy.id});let shots=0;s.fireBeam=()=>shots++;
+ const enemy={id:'pirate',hostile:true,hull:100,pendingMug:true,position:[0,-80,0],velocity:[0,0,0]};s.ships=[enemy];s.getTargetRef=()=>({kind:'ship',id:enemy.id});let shots=0;s.fireBeam=()=>shots++;
  for(let i=0;i<120;i++){s.save.world.time=i/60;p.energy=100;s.updateTurrets(p,'player',1/60);}assert.equal(shots,0);
  enemy.pendingMug=false;
  for(let i=120;i<240;i++){s.save.world.time=i/60;p.energy=100;s.updateTurrets(p,'player',1/60);}assert.ok(shots>0);
@@ -96,6 +96,6 @@ test('ion disruption requires shields down before the hit, for player and NPC',(
 
 test('slower PDC rounds retain nominal anti-ship DPS',async()=>{
  const {PDC_TURRET}=await import('../src/game/turrets.js');const {DRONE_TYPES}=await import('../src/game/droneData.js');
- assert.ok(Math.abs(PDC_TURRET.damageFlat*10/(9*PDC_TURRET.shotInterval+PDC_TURRET.burstPause)-11/(9*.07+1))<1e-9);
- const s=fixture();s.initializePdcDrones();assert.ok(Math.abs(s.pdcDroneWeapon.damageFlat/DRONE_TYPES.pdc.shotInterval-.8/.2)<1e-9);
+ assert.ok(Math.abs(PDC_TURRET.damageFlat*10/(9*PDC_TURRET.shotInterval+PDC_TURRET.burstPause)-11*WEAPON_DAMAGE_SCALE/(9*.07+1))<1e-9);
+ const s=fixture();s.initializePdcDrones();assert.ok(Math.abs(s.pdcDroneWeapon.damageFlat/DRONE_TYPES.pdc.shotInterval-WEAPONS.pdc.damageFlat*2/DRONE_TYPES.pdc.shotInterval)<1e-9);
 });

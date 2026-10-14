@@ -1,3 +1,5 @@
+import {normalizeEquipmentInventory,captureEquipmentAmmo} from './equipmentInventory.js';
+import {cargoMass as inventoryCargoMass} from './economy.js';
 import { COMMODITIES, LOCATIONS, SHIPS, commodityIds } from './data.js';
 import {
     commissionOutfittingForShip,
@@ -18,7 +20,7 @@ const actualCargoMass = (player = {}) => {
         mass += Math.max(0, finite(item?.units));
     for (const id of commodityIds)
         mass += Math.max(0, finite(player.cargo?.[id])) * COMMODITIES[id].mass;
-    return Math.max(mass, Math.max(0, finite(player.cargoMass)));
+    return Math.max(mass,inventoryCargoMass(player), Math.max(0, finite(player.cargoMass)));
 };
 const resolvedCargoMass = (player, requested) => Math.max(actualCargoMass(player), Math.max(0, finite(requested)));
 export const shipResources = player => Object.fromEntries(['shield','hull','energy','fuel','ammo','missiles','launcherMagazines','activeLauncherMountId','launcherFireMode'].filter(k=>player[k]!==undefined).map(k=>[k,clone(player[k])]));
@@ -31,6 +33,7 @@ const context = (player, cargoMass) => ({
     sealedCargo: clone(player?.sealedCargo ?? null),
     cargoMass: finite(cargoMass),
     outfitting: clone(player?.outfitting ?? null),
+    inventory: clone(player?.inventory ?? null),
     equipment: clone(player?.equipment ?? null),
     storedShips: clone(player?.storedShips ?? null),
     resources: shipResources(player),
@@ -126,6 +129,8 @@ export const commitShipTrade = (player, quote, options = {}) => {
         return fresh;
     if (fresh.beforeFingerprint !== quote.beforeFingerprint)
         return { ok: false, code: 'stale-quote' };
+    captureEquipmentAmmo(player);
+    if(player.inventory&&!fresh.keepCurrent)for(const [id,item] of Object.entries(player.inventory.items))if(item.location.kind==='installed'&&item.location.shipId===player.shipId){if(item.factory)delete player.inventory.items[id];else item.location={kind:'station',stationId:player.dockedAt};}
     const targetState = fresh.switching ? clone(player.storedShips[fresh.targetShipId].resources) : null;
     player.storedShips = {...(player.storedShips ?? {})};
     if (fresh.keepCurrent) player.storedShips[player.shipId] = {locationId:player.dockedAt,resources:shipResources(player)};
@@ -140,5 +145,6 @@ export const commitShipTrade = (player, quote, options = {}) => {
     player.weaponId = fresh.weaponId;
     delete player.shipStates;
     if (targetState) Object.assign(player,targetState);
+    if(player.inventory)normalizeEquipmentInventory(player);
     return { ok: true, code: 'traded', quote: fresh };
 };

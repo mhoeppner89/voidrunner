@@ -1,3 +1,4 @@
+import {equipmentBaseId} from '../src/game/equipmentCatalog.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {session} from './weapon-overhaul.test.mjs';
@@ -7,25 +8,25 @@ import {getEffectiveShipStats} from '../src/game/shipStats.js';
 import {regenerateCombatResources} from '../src/game/combatResources.js';
 
 test('new starter is two beams and an empty turret; displaced duplicate weapons survive repeated reloads',()=>{
- const fresh=createNewSave(8);assert.deepEqual(fresh.player.outfitting.loadouts.wayfarer.guns,['beam-emitter','beam-emitter']);
+ const fresh=createNewSave(8);assert.deepEqual(fresh.player.outfitting.loadouts.wayfarer.guns.filter(Boolean).map(equipmentBaseId),['beam-emitter','beam-emitter']);
  assert.deepEqual(fresh.player.outfitting.loadouts.wayfarer.turrets,[null]);assert.equal(fresh.player.outfitting.loadouts.wayfarer.fireGroups.activeGroup,'ALL');
  const old=createNewSave(8);old.version=13;old.player.shipId='lancer';old.player.ownedShips=['lancer'];old.player.outfitting=createOutfittingState(['lancer']);
- old.player.outfitting.schema=1;old.player.outfitting.loadouts.lancer.guns=['gauss-cannon','gauss-cannon','gauss-cannon'];
+ delete old.player.inventory;old.player.outfitting.schema=1;old.player.outfitting.loadouts.lancer.guns=['gauss-cannon','gauss-cannon','gauss-cannon'];
  old.player.outfitting.factory.lancer.guns=[false,false,false];
  const a=hydrateSave(old),b=hydrateSave(JSON.parse(JSON.stringify(a)));
- for(const save of [a,b]){assert.equal(save.player.outfitting.locker['gauss-cannon'],1);assert.deepEqual(save.player.outfitting.loadouts.lancer.guns,['gauss-cannon','gauss-cannon']);}
+ for(const save of [a,b]){assert.equal(Object.values(save.player.inventory.items).filter(i=>i.baseId==='gauss-cannon'&&i.location.kind==='station').length,1);assert.deepEqual(save.player.outfitting.loadouts.lancer.guns.filter(Boolean).map(equipmentBaseId),['gauss-cannon','gauss-cannon']);}
 });
 
 test('Fire all cycles with populated groups only and low energy cannot starve one gun',()=>{
  const s=session(),p=s.save.player,fit=p.outfitting.loadouts.wayfarer;
- fit.fireGroups.assignments['wayfarer-gun-1']='B';
+ fit.fireGroups.assignments['wayfarer-weapon-1']='B';
  for(const group of ['A','B','ALL','A']){s.cycleWeapon();assert.equal(s.activeFireGroup(),group);}
- fit.fireGroups.assignments['wayfarer-gun-1']='A';s.cycleWeapon();assert.equal(s.activeFireGroup(),'ALL');
+ fit.fireGroups.assignments['wayfarer-weapon-1']='A';s.cycleWeapon();assert.equal(s.activeFireGroup(),'ALL');
  const counts={};s.fireBeam=(owner,w,start,dir,id)=>counts[id]=(counts[id]??0)+1;
  p.energy=0;s.gunCooldown=0;
  for(let i=0;i<600;i++){s.save.world.time=i/60;regenerateCombatResources(p,s.playerStats(),1/60);s.fireMountedPlayerGuns();}
- assert.ok(counts['wayfarer-gun-0']>5);assert.ok(counts['wayfarer-gun-1']>5);
- assert.ok(Math.abs(counts['wayfarer-gun-0']-counts['wayfarer-gun-1'])<=1);
+ assert.ok(counts['wayfarer-weapon-0']>5);assert.ok(counts['wayfarer-weapon-1']>5);
+ assert.ok(Math.abs(counts['wayfarer-weapon-0']-counts['wayfarer-weapon-1'])<=1);
 });
 
 function missile(s,position,targetId='player') {
@@ -35,26 +36,26 @@ function missile(s,position,targetId='player') {
 function tick(s,count=90){for(let i=0;i<count;i++){s.save.world.time+=1/60;s.updateTurrets(s.save.player,'player',1/60);s.updateProjectiles(1/60);}}
 test('PDC obeys its hemisphere, finite cadence, energy reserve and hold-fire control',()=>{
  const s=session(),p=s.save.player;p.outfitting.loadouts.wayfarer.turrets=['pdc'];p.mode='mining';
- const above=missile(s,[0,60,0]),below=missile(s,[0,-60,0]),other=missile(s,[0,30,0],'ally');
+ const above=missile(s,[0,-60,0]),below=missile(s,[0,60,0]),other=missile(s,[0,30,0],'ally');
  tick(s);assert.equal(above.life,0);assert.ok(below.life>0);assert.ok(other.life>0);
- const one=missile(s,[0,40,0]),two=missile(s,[0,50,0]);tick(s,1);assert.ok(one.life>0||two.life>0);
- p.turretsHeld=true;const held=missile(s,[0,20,0]);tick(s);assert.ok(held.life>0);
+ const one=missile(s,[0,-40,0]),two=missile(s,[0,-50,0]);tick(s,1);assert.ok(one.life>0||two.life>0);
+ p.turretsHeld=true;const held=missile(s,[0,-20,0]);tick(s);assert.ok(held.life>0);
  p.turretsHeld=false;p.energy=18;tick(s);assert.ok(held.life>0);assert.equal(p.turretRuntime[0].status,'TURRETS WAITING FOR ENERGY');
 });
 test('tracking turret requires a selected hostile and clear sight; banking changes coverage',()=>{
  const s=session(),p=s.save.player;p.outfitting.loadouts.wayfarer.turrets=['tracking-turret'];
- const ship={id:'target',hostile:false,hull:100,position:[0,70,0]};s.ships=[ship];s.getTargetRef=()=>({kind:'ship',id:ship.id});let fired=0;s.fireBeam=()=>fired++;
+ const ship={id:'target',hostile:false,hull:100,position:[0,-70,0]};s.ships=[ship];s.getTargetRef=()=>({kind:'ship',id:ship.id});let fired=0;s.fireBeam=()=>fired++;
  tick(s);assert.equal(fired,0);ship.hostile=true;s.lineBlocked=()=>true;tick(s);assert.equal(fired,0);
  s.lineBlocked=()=>false;tick(s);assert.ok(fired>0);const before=fired;
  p.rotation=[0,0,1,0];tick(s);assert.equal(fired,before);
 });
 test('power, shield and engine alternatives keep their roles without crippling penalties',()=>{
  const p=createNewSave(8).player,base=getEffectiveShipStats(p),fit=p.outfitting.loadouts.wayfarer;
- fit.power=['capacitor-bank'];let stats=getEffectiveShipStats(p);assert.ok(stats.energyCapacity>base.energyCapacity&&stats.reactorOutput<base.reactorOutput&&stats.reactorOutput>=base.reactorOutput*.9);
- fit.power=['sustained-reactor'];stats=getEffectiveShipStats(p);assert.equal(stats.energyCapacity,base.energyCapacity);assert.ok(stats.reactorOutput>base.reactorOutput);
- fit.drive=['engine-mk2'];stats=getEffectiveShipStats(p);assert.ok(stats.maxSpeed>base.maxSpeed&&stats.angularAcceleration<base.angularAcceleration&&stats.angularAcceleration>=base.angularAcceleration*.92&&stats.burnFuelMultiplier>1);
- fit.drive=['thrusters-mk2'];stats=getEffectiveShipStats(p);assert.ok(stats.maxSpeed<base.maxSpeed&&stats.maxSpeed>=base.maxSpeed*.94&&stats.angularAcceleration>base.angularAcceleration&&stats.lateralMultiplier>1);
- fit.defense=['recovery-shield'];stats=getEffectiveShipStats(p);assert.ok(stats.shield<base.shield&&stats.shield>=base.shield*.9&&stats.shieldRechargeMultiplier>1);
+ fit.utility[0]='capacitor-bank';let stats=getEffectiveShipStats(p);assert.ok(stats.energyCapacity>base.energyCapacity&&stats.reactorOutput<base.reactorOutput&&stats.reactorOutput>=base.reactorOutput*.9);
+ fit.utility[0]='sustained-reactor';stats=getEffectiveShipStats(p);assert.equal(stats.energyCapacity,base.energyCapacity);assert.ok(stats.reactorOutput>base.reactorOutput);
+ fit.utility[1]='engine-mk2';stats=getEffectiveShipStats(p);assert.ok(stats.maxSpeed>base.maxSpeed&&stats.angularAcceleration<base.angularAcceleration&&stats.angularAcceleration>=base.angularAcceleration*.92&&stats.burnFuelMultiplier>1);
+ fit.utility[1]='thrusters-mk2';stats=getEffectiveShipStats(p);assert.ok(stats.maxSpeed<base.maxSpeed&&stats.maxSpeed>=base.maxSpeed*.94&&stats.angularAcceleration>base.angularAcceleration&&stats.lateralMultiplier>1);
+ fit.utility[2]='recovery-shield';stats=getEffectiveShipStats(p);assert.ok(stats.shield<base.shield&&stats.shield>=base.shield*.9&&stats.shieldRechargeMultiplier>1);
 });
 
 

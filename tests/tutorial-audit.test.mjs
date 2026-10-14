@@ -139,7 +139,8 @@ test('replacement delivery respects capacity and only replaces units still owed'
     const {cargoCapacity,cargoMass}=await import('../src/game/economy.js');
     const {COMMODITIES}=await import('../src/game/data.js');
     const {save,session,quest}=fixture('sell-supplies');save.player.dockedAt='vesper';
-    save.player.cargo.ore=Math.floor(cargoCapacity(save.player)/COMMODITIES.ore.mass);
+    const fixedCargoMass=cargoMass({...save.player,cargo:{}});
+    save.player.cargo.ore=Math.floor((cargoCapacity(save.player)-fixedCargoMass)/COMMODITIES.ore.mass);
     session.ensureTutorialDelivery();
     assert.ok(cargoMass(save.player)<=cargoCapacity(save.player));
     save.player.cargo={};quest.flags.suppliesSold=1;

@@ -1,3 +1,4 @@
+import {equipmentBaseId} from './equipmentCatalog.js';
 import { PLAYER_RADAR_RANGE } from './combatTravel.js';
 import { EQUIPMENT, SHIPS } from './data.js';
 import { quoteDroneService } from './droneService.js';
@@ -12,11 +13,11 @@ export const getEffectiveShipStats = (player) => {
     // unit probes that construct a minimal player object by hand.
     const hasOutfitting = Boolean(player?.outfitting?.loadouts?.[player.shipId] && HULL_HARDPOINTS[player.shipId]);
     const installed = hasOutfitting ? installedItemIds(player, player.shipId) : (player?.equipment ?? []);
-    const count = (id) => installed.reduce((total, installedId) => total + (installedId === id ? 1 : 0), 0);
+    const count = (id) => installed.reduce((total, installedId) => total + (equipmentBaseId(installedId) === id ? 1 : 0), 0);
     const has = (id) => count(id) > 0 || (!hasOutfitting && (id === 'pulse-mk2' ? installed.includes('pulse-mk2') : false));
     const effect = (id, key, fallback = 0) => {
-        const item = OUTFIT_ITEMS[id];
-        return item?.effects?.[key] ?? fallback;
+        const item = installed.map(i=>OUTFIT_ITEMS[i]).find(i=>equipmentBaseId(i?.id)===id);
+        return item?.effects?.[key] ?? OUTFIT_ITEMS[id]?.effects?.[key] ?? fallback;
     };
     const radarMultiplier = effect('radar-mk2', 'radarMultiplier', 1.5);
     const scanMultiplier = effect('radar-mk2', 'scanMultiplier', 1.5);
@@ -30,15 +31,18 @@ export const getEffectiveShipStats = (player) => {
     const salvageRate = has('salvage-mk2') ? effect('salvage-mk2', 'salvageRate', 1.7) : 1;
     const salvageRange = has('salvage-mk2') ? effect('salvage-mk2', 'salvageRange', 170) : 100;
     const selectedEffects=installed.map(id=>OUTFIT_ITEMS[id]?.effects??{});
-    const product=(key)=>selectedEffects.reduce((value,e)=>value*(e[key]??1),1);
+    const product=(key)=>{let n=0;return selectedEffects.reduce((value,e)=>e[key]==null?value:value*(1+(e[key]-1)/Math.sqrt(++n)),1);};
+    const equipmentMass=installed.reduce((n,id)=>n+(OUTFIT_ITEMS[id]?.mass??0),0);
+    const spec=HULL_HARDPOINTS[player.shipId],allowance=spec?spec.stockGunCount*2+spec.stockLauncherCount*3+spec.turrets.length+spec.utility.length:8;
+    const handling=Math.max(.65,1/(1+Math.max(0,equipmentMass-allowance)*.012));
     return {
         ...base,
-        maxSpeed: base.maxSpeed * product('speedMultiplier'),
-        afterburnSpeed: base.afterburnSpeed * product('speedMultiplier'),
-        acceleration: base.acceleration * product('accelerationMultiplier'),
-        angularAcceleration: base.angularAcceleration * product('turnMultiplier'),
-        shield: (base.shield + (has('shield-mk2') ? effect('shield-mk2', 'shieldCapacity', 45) : 0))*product('shieldMultiplier'),
-        hull: base.hull + (has('armor-mk2') ? effect('armor-mk2', 'hullCapacity', 40) : 0),
+        maxSpeed: base.maxSpeed * product('speedMultiplier') * handling,
+        afterburnSpeed: base.afterburnSpeed * product('speedMultiplier') * handling,
+        acceleration: base.acceleration * product('accelerationMultiplier') * handling,
+        angularAcceleration: base.angularAcceleration * product('turnMultiplier') * handling,
+        shield: (base.shield + selectedEffects.reduce((n,e)=>n+(e.shieldCapacity??0),0))*product('shieldMultiplier'),
+        hull: base.hull + selectedEffects.reduce((n,e)=>n+(e.hullCapacity??0),0),
         reactorOutput: base.reactorOutput * product('outputMultiplier'),
         energyCapacity: base.energyCapacity * product('capacityMultiplier'),
         burnFuelMultiplier:product('burnFuelMultiplier'),lateralMultiplier:(base.lateralMultiplier??1)*product('lateralMultiplier'),shieldRechargeMultiplier:product('rechargeMultiplier'),
@@ -47,6 +51,7 @@ export const getEffectiveShipStats = (player) => {
         // the hull's base gunDamage untouched prevents an installed gun from
         // silently buffing every other active mount.
         gunDamage: base.gunDamage,
+        equipmentMass:installed.reduce((n,id)=>n+(OUTFIT_ITEMS[id]?.mass??0),0),
         missileCapacity,
         // Radar (sensor) range decides what appears as a selectable target. A
         // locked ship, asteroid, or wreck resolves automatically within the

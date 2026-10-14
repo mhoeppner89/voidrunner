@@ -9,7 +9,9 @@ const {GameSession} = await import('../src/game/game.js');
 const {createNewSave, hydrateSave} = await import('../src/game/save.js');
 const {getTutorialQuest} = await import('../src/game/tutorialCampaign.js');
 const {HARDPOINT_SPECS, OUTFIT_ITEMS, loadoutFor} = await import('../src/game/outfitting.js');
-const {formatCredits} = await import('../src/game/random.js');
+const {renderEquipmentInventory,bindEquipmentInventory} = await import('../src/game/equipmentUi.js');
+const {normalizeEquipmentInventory,inventoryMounts} = await import('../src/game/equipmentInventory.js');
+const {equipmentBaseId} = await import('../src/game/equipmentCatalog.js');
 const {setLanguage} = await import('../src/game/i18n.js');
 
 function confirmationFixture(hasSave = true) {
@@ -74,85 +76,65 @@ test('confirmation keeps keyboard focus inside, Escape cancels, and first career
     assert.equal(ui.newCareerConfirm,false);
 });
 
-test('slot-first phone fitting installs the owned radar in three selections in both languages',()=>{
-    for (const language of ['en','de']) {
+// Exercise the same delegated inventory clicks as the phone UI, including the
+// individual equipment IDs used by current career saves.
+function inventoryFixture(save, session) {
+    const ui = Object.create(GameUI.prototype), handlers = {};
+    ui.save=save;ui.dockLocation='helix';
+    ui.root={querySelector:()=>null,addEventListener:(name,handler)=>{handlers[name]=handler;}};
+    let markup='';
+    ui.refreshDock=()=>{markup=renderEquipmentInventory(ui);};
+    ui.actions={inventoryCommand:(...args)=>session.inventoryCommand(...args)};
+    bindEquipmentInventory(ui);
+    const click=dataset=>handlers.click({target:{closest:()=>({dataset})}});
+    ui.refreshDock();
+    return {ui,click,markup:()=>markup};
+}
+function inventorySession(save){
+    const session=Object.create(GameSession.prototype);session.save=save;
+    session.persistSave=()=>{};session.syncWeaponProjection=()=>{};
+    session.ui={showToast(){},refreshDock(){}};session.audio={play(){}};
+    session.applyTutorialTransition=()=>{};
+    return session;
+}
+
+test('phone inventory installs the gifted radar without a charge in both languages',()=>{
+    for(const language of ['en','de']){
         setLanguage(language);
-        const save = createNewSave(842,{tutorial:true});
-        const quest = getTutorialQuest(save);
-        quest.stepId = 'fit-upgrade';
-        const session = Object.create(GameSession.prototype);
-        session.save = save;
-        session.persistSave = ()=>{};
-        session.audio = {play(){}};
-        session.ui = {showToast(){},refreshDock(){}};
-        session.ensureTutorialEquipment();
-        const ui = Object.create(GameUI.prototype);
-        ui.save = save;
-        ui.dockLocation = 'helix';
-        ui.root = {querySelector:()=>null};
-        ui.resetOutfittingDrafts();
-        let markup;
-        ui.renderMarketPoint = ()=>{markup=ui.renderOutfitting();};
-        ui.actions = {applyOutfitting:(...args)=>session.applyOutfitting(...args)};
-        ui.setOutfittingView('systems');
-        assert.match(markup,/simple-fit-scroll/);
-        const loadout=loadoutFor(save.player);
-        const mount=HARDPOINT_SPECS[save.player.shipId].utility[loadout.utility.indexOf(null)];
-        ui.selectOutfittingMount(mount.id);
-        assert.match(markup,/data-outfit-item="radar-mk2"/);
-        assert.doesNotMatch(markup,/data-outfit-item="gauss-cannon"/);
-        ui.installOutfittingItem('radar-mk2');
-        assert.equal(ui.outfittingStage,'fit');
-        assert.match(markup,/data-outfit-action="install"\s*>/);
-        ui.handleCommand('outfit-stage',{dataset:{outfitStage:'equipment'}});
-        ui.handleCommand('outfit-stage',{dataset:{outfitStage:'fit'}});
-        assert.equal(ui.outfittingItemId,'radar-mk2');
-        assert.equal(ui.outfittingMountId,mount.id);
-        const credits = save.player.credits;
-        ui.handleOutfittingAction('install');
-        assert.equal(ui.outfittingNotice.tone,'success');
-        assert.equal(quest.stepId,'launch-helix');
+        const save=createNewSave(842,{tutorial:true}),quest=getTutorialQuest(save);
+        quest.stepId='fit-upgrade';const session=inventorySession(save);
+        session.ensureTutorialEquipment();normalizeEquipmentInventory(save.player);
+        const radar=Object.values(save.player.inventory.items).find(i=>i.baseId==='radar-mk2');
+        assert.ok(radar,'Rin provides one actual equipment item');
+        const fit=loadoutFor(save.player),mount=inventoryMounts(save.player.shipId).find(s=>s.key==='utility'&&!fit.utility[s.index]);
+        const {ui,click,markup}=inventoryFixture(save,session);
+        click({inventoryMount:mount.mount.id});click({inventoryAction:'tab',tab:'storage'});
+        assert.match(markup(),new RegExp('data-inventory-id="'+radar.id+'"'));
+        click({inventoryId:radar.id});
+        assert.match(markup(),/data-inventory-action="install"/);
+        assert.doesNotMatch(markup(),/data-inventory-action="buy"/);
+        const credits=save.player.credits;
+        click({inventoryAction:'install',itemId:radar.id,mountId:mount.mount.id});
+        assert.equal(ui.inventoryNotice,undefined);assert.equal(quest.stepId,'launch-helix');
         assert.equal(save.player.credits,credits);
-        const restored = hydrateSave(JSON.parse(JSON.stringify(save)));
-        assert.ok(loadoutFor(restored.player).utility.includes('radar-mk2'));
+        const restored=hydrateSave(JSON.parse(JSON.stringify(save)));
+        assert.ok(loadoutFor(restored.player).utility.some(id=>equipmentBaseId(id)==='radar-mk2'));
     }
 });
 
-// Rin's spare radar is a prologue gift. A pilot who never received it (skipped
-// prologue, or still early in chapter one) has to buy the 5.400 cr module on
-// 3.500 starting credits: the fit stage must quote that price and the shortfall
-// instead of advertising a free install from an empty locker with a disabled
-// button that contradicts the status line.
-test('an unowned, unaffordable module is quoted at its price instead of a free locker fit',()=>{
-    for (const language of ['en','de']) {
-        setLanguage(language);
-        const save = createNewSave(842,{tutorial:true});
-        const price = OUTFIT_ITEMS['radar-mk2'].price;
-        assert.ok(save.player.credits < price,'fit the fixture: starting credits cannot cover the radar');
-        assert.ok(!(save.player.outfitting.locker?.['radar-mk2'] > 0),'fit the fixture: the locker holds no spare radar');
-        let commits = 0;
-        const ui = Object.create(GameUI.prototype);
-        ui.save = save;
-        ui.dockLocation = 'helix';
-        ui.root = {querySelector:()=>null};
-        ui.resetOutfittingDrafts();
-        let markup;
-        ui.renderMarketPoint = ()=>{markup=ui.renderOutfitting();};
-        ui.actions = {applyOutfitting(){commits++;}};
-        ui.setOutfittingView('systems');
-        const loadout=loadoutFor(save.player);
-        const mount=HARDPOINT_SPECS[save.player.shipId].utility[loadout.utility.indexOf(null)];
-        ui.selectOutfittingMount(mount.id);
-        ui.installOutfittingItem('radar-mk2');
-        assert.equal(ui.outfittingStage,'fit');
-        const action = markup.match(/<button[^>]*data-outfit-action="install"[^>]*>([^<]*)<\/button>/);
-        assert.ok(action,`${language}: the fit stage renders an install action`);
-        assert.ok(action[0].includes('disabled'),`${language}: an unaffordable fit disables the action`);
-        assert.ok(action[1].includes(formatCredits(price)),`${language}: the action names the purchase price, got "${action[1]}"`);
-        assert.ok(!action[1].includes('NO CHARGE') && !action[1].includes('KOSTENLOS'),`${language}: a purchase is never advertised as free, got "${action[1]}"`);
-        assert.match(markup,/You need|Dir fehlen noch/,`${language}: the status names the shortfall`);
-        ui.handleOutfittingAction('install');
-        assert.equal(commits,0,`${language}: an unaffordable fitting cannot commit`);
-        assert.equal(ui.outfittingNotice?.tone,'warning',`${language}: the pilot is told why`);
+test('phone shop disables an unaffordable radar purchase and never treats it as owned stock',()=>{
+    for(const language of ['en','de']){
+        setLanguage(language);const save=createNewSave(842,{tutorial:true});
+        const session=inventorySession(save),{ui,click,markup}=inventoryFixture(save,session);
+        ui.inventoryTab='shop';ui.refreshDock();
+        click({inventoryId:'shop-radar-mk2-2'});
+        const action=markup().match(/<button[^>]*data-inventory-action="buy"[^>]*>/);
+        assert.ok(action,'shop item has a purchase action');assert.ok(action[0].includes('disabled'));
+        assert.doesNotMatch(markup(),/data-inventory-action="install"/);
+        assert.match(markup(),new RegExp(String(OUTFIT_ITEMS['shop-radar-mk2-2'].price)));
+        const credits=save.player.credits,items=Object.keys(save.player.inventory.items);
+        click({inventoryAction:'buy',baseId:'radar-mk2',tier:'2'});
+        assert.equal(save.player.credits,credits);assert.deepEqual(Object.keys(save.player.inventory.items),items);
+        assert.equal(ui.inventoryNotice,'Not enough credits.');
     }
 });

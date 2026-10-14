@@ -134,6 +134,8 @@ test('renderer shutdown releases postprocessing and cached resources', () => {
     r.shipMeshes = new Map();
     r.glbShipModels = new Map([['talon', model()]]);
     r.glbShipLoading = new Map();
+    r.stationColliders = new Map([['helix',{}]]);
+    r.stationDockObstacles = new Map([['helix',[]]]);
     r.dynamicRoot = new THREE.Group();
     r.screenTextures = [];
     r.bloomSceneTarget = new THREE.WebGLRenderTarget(2, 2);
@@ -151,6 +153,8 @@ test('renderer shutdown releases postprocessing and cached resources', () => {
     r.dispose();
     assert.deepEqual(counts.map(count => count()), resources.map(() => 1));
     assert.equal(r.radialTextureCache.size, 0);
+    assert.equal(r.stationColliders.size, 0);
+    assert.equal(r.stationDockObstacles.size, 0);
 });
 
 test('shared source materials are tinted once per ship and released once', () => {

@@ -135,7 +135,7 @@ for (const [id,hull] of Object.entries(FLEET_EQUIPMENT)) {
  const old=TURRET_LAYOUTS[id]??[];
  TURRET_LAYOUTS[id]=hull.turrets.map((t,index)=>{
   const axis=t.normal.reduce((best,v,i)=>Math.abs(v)>Math.abs(t.normal[best])?i:best,0);
-  return {size:t.size,pedestal:0,hullHalfLength:hull.extents[2]/t.scale,
+  return {size:t.size,pedestal:t.pedestal??0,footprintScale:t.footprintScale??1,hullHalfLength:hull.extents[2]/t.scale,
    position:t.position.map((v,i)=>v/hull.extents[i]),normal:t.normal,axis,side:Math.sign(t.normal[axis]),
    forwardCone:old[index]?.forwardCone??0,label:old[index]?.label??'DEFENSE TURRET',
    embedded:t.embedded,restDirection:axis===2?[0,0,Math.sign(t.normal[2])]:[0,0,-1],reviewed:true};

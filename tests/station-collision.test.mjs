@@ -1,46 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import * as THREE from 'three';
+import {stationModel} from './helpers/station-model.mjs';
 import {buildStationCollider,hullVsStation} from '../src/game/stationCollision.js';
 import {GameSession} from '../src/game/game.js';
 import {LOCATIONS} from '../src/game/data.js';
 import {STATION_DOCKS} from '../src/game/stationDocks.js';
 import {playerBerths} from '../src/game/playerDocking.js';
+import {fittedPlayerBerths} from '../src/game/shipLanding.js';
 import {stationModelOffsetZ,stationSurfaceDistance,stationVisualSurfaceRadius} from '../src/game/stationTraffic.js';
 
-// Geometry-only GLB reader: test the shipping vertices and node transforms,
-// without a browser/image decoder or an invented collision proxy.
-function stationModel(id) {
-    const b=fs.readFileSync(new URL(`../assets/models/stations/${id}.glb`,import.meta.url));
-    const jsonLength=b.readUInt32LE(12), gltf=JSON.parse(b.toString('utf8',20,20+jsonLength));
-    const binary=20+jsonLength+8;
-    function attribute(index,size) {
-        const a=gltf.accessors[index],view=gltf.bufferViews[a.bufferView];
-        const bytes=({5126:4,5125:4,5123:2,5121:1})[a.componentType];
-        const values=a.componentType===5126?new Float32Array(a.count*size):new Uint32Array(a.count*size);
-        for(let i=0;i<a.count;i++) for(let j=0;j<size;j++) {
-            const offset=binary+(view.byteOffset??0)+(a.byteOffset??0)+i*(view.byteStride??size*bytes)+j*bytes;
-            values[i*size+j]=a.componentType===5126?b.readFloatLE(offset):bytes===4?b.readUInt32LE(offset):bytes===2?b.readUInt16LE(offset):b.readUInt8(offset);
-        }
-        return new THREE.BufferAttribute(values,size);
-    }
-    const nodes=gltf.nodes.map(node=>{
-        const group=new THREE.Group();
-        if(node.matrix){group.matrix.fromArray(node.matrix);group.matrixAutoUpdate=false;}
-        else {if(node.translation)group.position.fromArray(node.translation);if(node.rotation)group.quaternion.fromArray(node.rotation);if(node.scale)group.scale.fromArray(node.scale);}
-        if(node.mesh!==undefined) for(const p of gltf.meshes[node.mesh].primitives) {
-            assert.equal(p.mode??4,4);
-            const geo=new THREE.BufferGeometry();geo.setAttribute('position',attribute(p.attributes.POSITION,3));if(p.indices!==undefined)geo.setIndex(attribute(p.indices,1));
-            group.add(new THREE.Mesh(geo,new THREE.MeshBasicMaterial()));
-        }
-        return group;
-    });
-    gltf.nodes.forEach((n,i)=>{for(const c of n.children??[])nodes[i].add(nodes[c]);});
-    const root=new THREE.Group();for(const i of gltf.scenes[gltf.scene??0].nodes)root.add(nodes[i]);
-    root.scale.setScalar(stationVisualSurfaceRadius(id)/100);root.position.z=stationModelOffsetZ(id);
-    return root;
-}
 const inverse=new THREE.Quaternion();
 function hits(collider,position,hull=[1,1,1],q=inverse){return hullVsStation(new THREE.Vector3(...position),hull,q,collider,{});}
 
@@ -84,13 +53,14 @@ for(const id of Object.keys(STATION_DOCKS))test(`${id}: every authored landing a
         assert.ok(hullVsStation(center,[.5,.5,.5],inverse,collider,{}),'visible hull face is physical');
         break;
     }
-    for(const berth of playerBerths(id,6)) {
+    for(const berth of fittedPlayerBerths(id,'kestrel',collider)) {
         assert.ok(Math.abs(berth.gate[1]-berth.pad[1])<1e-8,'approach keeps the authored deck height');
         const session=Object.create(GameSession.prototype);
-        Object.assign(session,{save:{player:{position:[...berth.gate],velocity:[0,0,0],rotation:[0,0,0,1],systemId:location.systemId,currentTargetId:id,transponder:true}},
+        Object.assign(session,{save:{player:{position:[...berth.gate],velocity:[0,0,0],rotation:[0,0,0,1],shipId:'wayfarer',systemId:location.systemId,currentTargetId:id,transponder:true}},
             activeInstanceId:id,currentDockLocationIds:()=>[id],playerHullExtents:()=>[12,6,22],tmpCollide:new THREE.Vector3(),ui:{pushEvent(){},showToast(){}},
             renderer:{stationColliders:new Map([[id,collider]]),setLandingGuide(){}},collisionMessageCooldown:0,damagePlayer(){throw Error('route damages player');}});
-        session.stationLandingBeaconId=id;session.stationLandingBerths=playerBerths(id,6);session.stationLandingBerth=berth;
+        session.stationLandingBeaconId=id;session.stationLandingBerths=fittedPlayerBerths(id,'kestrel',collider);session.stationLandingBerth=berth;
+        const facing=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),new THREE.Vector3(...berth.pad).sub(new THREE.Vector3(...berth.gate)).normalize());session.save.player.rotation=facing.toArray();
         for(let i=0;i<=60;i++) {
             const t=i/60,position=new THREE.Vector3().fromArray(berth.gate).lerp(new THREE.Vector3(...berth.pad),t);
             session.save.player.position=position.toArray();session.updateStationLandingGuidance();

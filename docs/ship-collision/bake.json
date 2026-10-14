@@ -1,0 +1,344 @@
+[
+  {
+    "variant": "blade",
+    "path": "assets/models/ships/blade.glb",
+    "sha256": "4402a376db9474cb032403ae4b9391e55aa537ef325f8455d4135c1bd86badaf",
+    "triangles": 4878,
+    "vertices": 2720,
+    "boxes": 1318,
+    "grid": [
+      128,
+      48,
+      128
+    ],
+    "extent": [
+      6.940500140190125,
+      1.8479999899864197,
+      6.984974622726441
+    ]
+  },
+  {
+    "variant": "speedster",
+    "path": "assets/models/ships/speedster.glb",
+    "sha256": "368d8996cfeb3d17ae8ea513a63643b9cde65c30b424f9ec24bdf54f451dcab4",
+    "triangles": 4992,
+    "vertices": 2664,
+    "boxes": 1021,
+    "grid": [
+      49,
+      48,
+      128
+    ],
+    "extent": [
+      2.073163509368898,
+      1.3948832750320435,
+      5.50065040588379
+    ]
+  },
+  {
+    "variant": "legionary",
+    "path": "assets/models/ships/legionary.glb",
+    "sha256": "769ee8c0f07798c5e8af6ab9e89820bff7ddcbe1974eff36a82a7a2e7238ac9d",
+    "triangles": 4918,
+    "vertices": 2713,
+    "boxes": 1058,
+    "grid": [
+      104,
+      48,
+      128
+    ],
+    "extent": [
+      5.0001681804657,
+      2.039808475971222,
+      6.181082057952882
+    ]
+  },
+  {
+    "variant": "andromeda",
+    "path": "assets/models/ships/andromeda.glb",
+    "sha256": "0ff4f965b0c06f33f80cc029d27142787944a54e96da499f2195ac4a3c2591db",
+    "triangles": 4873,
+    "vertices": 2516,
+    "boxes": 2103,
+    "grid": [
+      117,
+      51,
+      128
+    ],
+    "extent": [
+      7.047774839401246,
+      3.0739824056625364,
+      7.800045561790467
+    ]
+  },
+  {
+    "variant": "torsas",
+    "path": "assets/models/ships/torsas.glb",
+    "sha256": "f79ff6399cbff4c12552c5c0e0681ae890f00858503f251b94401bf90cd60774",
+    "triangles": 4870,
+    "vertices": 2585,
+    "boxes": 842,
+    "grid": [
+      48,
+      50,
+      128
+    ],
+    "extent": [
+      2.8965511322021493,
+      3.1280972957611084,
+      7.999852180480957
+    ]
+  },
+  {
+    "variant": "astra",
+    "path": "assets/models/ships/astra.glb",
+    "sha256": "4c7ec4c5b2951eef9f5666ba63ade0dbaf1f94b21e7d741b3d8ed01989797dc2",
+    "triangles": 4316,
+    "vertices": 2230,
+    "boxes": 2012,
+    "grid": [
+      87,
+      58,
+      128
+    ],
+    "extent": [
+      4.272951507568361,
+      3.064586448669434,
+      6.400000000000001
+    ]
+  },
+  {
+    "variant": "kestrel",
+    "path": "assets/models/ships/wayfarer.glb",
+    "sha256": "aa426f3507dcd274e292155b588b381dcafd4929eace886a457da85710eed6d7",
+    "triangles": 4832,
+    "vertices": 2602,
+    "boxes": 2222,
+    "grid": [
+      48,
+      50,
+      128
+    ],
+    "extent": [
+      1.409100037813188,
+      2.4217000901699066,
+      6.093900078535079
+    ]
+  },
+  {
+    "variant": "warden",
+    "path": "assets/models/ships/vanguard.glb",
+    "sha256": "788dcb673e649fabcd52d8cc3c6fd6bd8720344c83db1a41321fa47608d99119",
+    "triangles": 4674,
+    "vertices": 2453,
+    "boxes": 3475,
+    "grid": [
+      104,
+      68,
+      128
+    ],
+    "extent": [
+      4.779000014066697,
+      3.17419992685318,
+      5.94129981994629
+    ]
+  },
+  {
+    "variant": "demon",
+    "path": "assets/models/ships/demon.glb",
+    "sha256": "f933286fb0dd18ea550f10b2f53d0559996c6437187526c1eebab7874e70a1aa",
+    "triangles": 1778,
+    "vertices": 1092,
+    "boxes": 1694,
+    "grid": [
+      128,
+      48,
+      119
+    ],
+    "extent": [
+      5.9270498156547555,
+      1.2730882987380028,
+      5.500000000000001
+    ]
+  },
+  {
+    "variant": "mule",
+    "path": "assets/models/ships/mule.glb",
+    "sha256": "39084a9454936c23dd056a541595233ad7363bfde398f635d96c9af75ee5733b",
+    "triangles": 6180,
+    "vertices": 3530,
+    "boxes": 920,
+    "grid": [
+      49,
+      48,
+      128
+    ],
+    "extent": [
+      3.918538600694611,
+      2.148308777809143,
+      10.4
+    ]
+  },
+  {
+    "variant": "scrapper",
+    "path": "assets/models/ships/scrapper.glb",
+    "sha256": "aadffa9a082edf820ca053c261ec2700ff6a225d49dc470fffb1e0dce277f44e",
+    "triangles": 4604,
+    "vertices": 2592,
+    "boxes": 1117,
+    "grid": [
+      128,
+      48,
+      109
+    ],
+    "extent": [
+      6.57150024175644,
+      1.7452500015497208,
+      5.62899997830391
+    ]
+  },
+  {
+    "variant": "talon",
+    "path": "assets/models/ships/talon.glb",
+    "sha256": "69ca47f34c934569f6f411b86a37296f16cbab5f0adb83185227840736395b41",
+    "triangles": 4996,
+    "vertices": 2729,
+    "boxes": 1144,
+    "grid": [
+      128,
+      48,
+      119
+    ],
+    "extent": [
+      5.582199862599374,
+      1.380769632011652,
+      5.181049975752832
+    ]
+  },
+  {
+    "variant": "prospector",
+    "path": "assets/models/ships/prospector.glb",
+    "sha256": "2ecaac1b17d0019cbd36e8b426822907846804adbaea3d7c20d83077d9f623c0",
+    "triangles": 4996,
+    "vertices": 2702,
+    "boxes": 1554,
+    "grid": [
+      48,
+      48,
+      128
+    ],
+    "extent": [
+      3.3078487608432794,
+      2.7526304514408113,
+      10.977578213691713
+    ]
+  },
+  {
+    "variant": "lancer",
+    "path": "assets/models/ships/lancer.glb",
+    "sha256": "02c1f282cb1d4f9fc971643f7924dd0d02210c2d2719ff57a179a9e29670eeec",
+    "triangles": 4912,
+    "vertices": 2608,
+    "boxes": 1193,
+    "grid": [
+      128,
+      48,
+      124
+    ],
+    "extent": [
+      6.7897833169698725,
+      2.0484659062027935,
+      6.559161051750183
+    ]
+  },
+  {
+    "variant": "atlas-freighter",
+    "path": "assets/models/ships/atlas.glb",
+    "sha256": "a9a294c25cef0bc1e4829e271fc6bef61430c3a3dceee386070167402440e45e",
+    "triangles": 4994,
+    "vertices": 2691,
+    "boxes": 1226,
+    "grid": [
+      48,
+      48,
+      128
+    ],
+    "extent": [
+      4.368400067090991,
+      4.609600156545639,
+      13.694799399375917
+    ]
+  },
+  {
+    "variant": "concord-frigate",
+    "path": "assets/models/capital/concord-frigate.glb",
+    "sha256": "6c3d0d2c2d1d96a177b5613210ee18e7dbd08bed10646e9ef4c8b11778f84be7",
+    "triangles": 3821,
+    "vertices": 2239,
+    "boxes": 978,
+    "grid": [
+      48,
+      53,
+      128
+    ],
+    "extent": [
+      18.71562567353249,
+      22.246875673532486,
+      56.35875013470651
+    ]
+  },
+  {
+    "variant": "concord-battleship",
+    "path": "assets/models/capital/concord-battleship.glb",
+    "sha256": "12d7937fae9be197f8ae74b3eebc11591626d0b66cc946229c4d551a7c3eb90b",
+    "triangles": 18704,
+    "vertices": 11130,
+    "boxes": 1063,
+    "grid": [
+      69,
+      52,
+      128
+    ],
+    "extent": [
+      301.66061848402035,
+      226.78279966115952,
+      564.9154043197633
+    ]
+  },
+  {
+    "variant": "concord-carrier",
+    "path": "assets/models/capital/concord-carrier.glb",
+    "sha256": "d215c83fa4cb5fac9fdcb525b0ff27e947d692a0cf1c6917751cf98e612a479f",
+    "triangles": 23978,
+    "vertices": 13561,
+    "boxes": 1182,
+    "grid": [
+      60,
+      48,
+      128
+    ],
+    "extent": [
+      209.06460441489827,
+      134.9005787854693,
+      452.17793918001655
+    ]
+  },
+  {
+    "variant": "concord-cruiser",
+    "path": "assets/models/capital/concord-cruiser.glb",
+    "sha256": "4dc291f6b4143db2aa645bcef42020ecde948d838ec5fd66d2dcaa8426950a15",
+    "triangles": 6076,
+    "vertices": 3284,
+    "boxes": 1401,
+    "grid": [
+      48,
+      75,
+      128
+    ],
+    "extent": [
+      98.7869983888865,
+      155.40795183101892,
+      282.0471
+    ]
+  }
+]

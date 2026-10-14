@@ -9,16 +9,13 @@ import { FrameBudget } from './frameBudget.js';
 import { TURRET_LAYOUTS } from './turretLayouts.js';
 import { createTurretModel, paintFrigateTurret } from './turretModels.js';
 
-// Showroom presence: how much of its card each hull should fill. The fit-to-
-// frame camera would otherwise render every hull at the same on-screen scale,
-// hiding the size gap between classes. The atlas is a bulk freighter — nearly
-// twice the fitted bulk of the fighters — so its preview zooms in to read as
-// the titan it is. Tuned against the reference renders; kept away from the
-// clipping edge of the rotating hull.
-const PREVIEW_FRAME_ZOOM = {
-    'atlas-freighter': 0.58,
+// A bounding sphere fits every turntable angle, including wide hulls on a
+// narrow card. Keep a little margin for turrets and the perspective near side.
+export const previewCameraDistance = (radius, fov, aspect) => {
+    const verticalHalf = THREE.MathUtils.degToRad(fov * .5);
+    const horizontalHalf = Math.atan(Math.tan(verticalHalf) * Math.max(aspect, .0001));
+    return Math.max(radius, .01) * 1.08 / Math.sin(Math.min(verticalHalf, horizontalHalf));
 };
-const DEFAULT_PREVIEW_FRAME_ZOOM = 0.54;
 
 // A lightweight turntable renderer for the selected showroom hull. The old
 // card grid created several small WebGL contexts; the broker now keeps one
@@ -133,17 +130,19 @@ export class ShipPreview {
     frameModel() {
         // Center the model on the pivot origin, then pull the camera back to a
         // 3/4 top-front showroom angle that fits the whole hull in frame.
+        const rotation = this.pivot.rotation.y;
+        this.pivot.rotation.y = 0;
         const box = new THREE.Box3().setFromObject(this.pivot);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
         this.model.position.sub(center);
-        const radius = size.length() * 0.5;
-        const fovHalf = THREE.MathUtils.degToRad(this.camera.fov * 0.5);
-        const tanHalf = Math.tan(fovHalf);
+        this.modelRadius = size.length() * 0.5;
+        this.pivot.rotation.y = rotation;
+        this.updateCameraFraming();
+    }
+    updateCameraFraming() {
         const aspect = this.container.clientWidth / Math.max(1, this.container.clientHeight);
-        const fit = Math.min(tanHalf, tanHalf * aspect);
-        const zoom = PREVIEW_FRAME_ZOOM[this.variant] ?? DEFAULT_PREVIEW_FRAME_ZOOM;
-        const distance = (radius / Math.max(fit, 0.0001)) * 1.06 * zoom;
+        const distance = previewCameraDistance(this.modelRadius ?? 1, this.camera.fov, aspect);
         const azimuth = Math.PI / 3;
         const elevation = Math.PI / 6;
         this.camera.position.set(
@@ -161,6 +160,7 @@ export class ShipPreview {
         this.renderer.setSize(width, height, false);
         this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
+        this.updateCameraFraming();
     }
     tick = (now) => {
         if (this.disposed)
@@ -199,7 +199,7 @@ export const loadPreviewGlb = async (variant,options={}) => {
   let armor;model.traverse(o=>{if(!armor&&o.material?.map&&!/glass|canopy|window/i.test(o.material.name))armor=o.material;});
   for(const [i,t]of (hull?.turrets??[]).entries()) {
    if(t.embedded||options.fit&&!options.fit.turrets?.[i])continue;
-   const turret=createTurretModel(t.kind,t.size,0);turret.name=`equipped-turret-${i}`;
+   const turret=createTurretModel(t.kind,t.size,t.pedestal??0,t.footprintScale??1);turret.name=`equipped-turret-${i}`;
    turret.position.fromArray(t.position);turret.quaternion.copy(equipmentRotation(t.normal));turret.scale.multiplyScalar(t.scale);
    if(hullId==='legionary'||hullId==='blade'&&Math.abs(t.normal[2])>.9)turret.userData.pitch.rotation.x=Math.PI/2;
    if(armor)paintFrigateTurret(turret,armor);assembly.add(turret);

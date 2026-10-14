@@ -1,0 +1,94 @@
+{
+  "scenario": "240 weapon queries + 24 close ship pairs per batch, all 19 hulls; .12 projectile margin",
+  "counts": {
+    "rays": 57600,
+    "hits": 6123,
+    "pairs": 5760,
+    "contacts": 2860
+  },
+  "meanMs": 0.6599098791666662,
+  "p50Ms": 0.512833999999998,
+  "p95Ms": 2.066291999999976,
+  "p99Ms": 2.3580420000000117,
+  "triangleTests": 952195,
+  "meanTrianglesPerQuery": 16.531163194444446,
+  "treeBuildsDuringQueries": 0,
+  "deepOverlaps": [
+    {
+      "variant": "blade",
+      "meanMs": 0.011352079999999773
+    },
+    {
+      "variant": "speedster",
+      "meanMs": 0.005483330000000137
+    },
+    {
+      "variant": "legionary",
+      "meanMs": 0.0019687499999997728
+    },
+    {
+      "variant": "andromeda",
+      "meanMs": 0.0020308399999998984
+    },
+    {
+      "variant": "torsas",
+      "meanMs": 0.0017875000000003639
+    },
+    {
+      "variant": "astra",
+      "meanMs": 0.0046804200000002535
+    },
+    {
+      "variant": "kestrel",
+      "meanMs": 0.005200829999999997
+    },
+    {
+      "variant": "warden",
+      "meanMs": 0.005949579999999628
+    },
+    {
+      "variant": "demon",
+      "meanMs": 0.004985000000000355
+    },
+    {
+      "variant": "mule",
+      "meanMs": 0.0019079199999998764
+    },
+    {
+      "variant": "scrapper",
+      "meanMs": 0.0018774999999999408
+    },
+    {
+      "variant": "talon",
+      "meanMs": 0.002916249999999536
+    },
+    {
+      "variant": "prospector",
+      "meanMs": 0.0018979200000001127
+    },
+    {
+      "variant": "lancer",
+      "meanMs": 0.0019804200000004355
+    },
+    {
+      "variant": "atlas-freighter",
+      "meanMs": 0.0018112500000000864
+    },
+    {
+      "variant": "concord-frigate",
+      "meanMs": 0.0017783400000001847
+    },
+    {
+      "variant": "concord-battleship",
+      "meanMs": 0.0020700000000005046
+    },
+    {
+      "variant": "concord-carrier",
+      "meanMs": 0.0018766699999997628
+    },
+    {
+      "variant": "concord-cruiser",
+      "meanMs": 0.0017425000000002911
+    }
+  ]
+}

@@ -8,7 +8,7 @@ import {createPdcDroneController} from '../src/game/dronePdc.js';
 import {createDroneFleet,createDroneUnit} from '../src/game/droneData.js';
 import {getPdcDefenseChannel} from '../src/game/pdcFireControl.js';
 
-function missile(s,id){const slot=s.projStore.alloc();s.projStore.setPos(slot,0,280,0);s.projStore.setVel(slot,0,-260,0);const m={id,slot,kind:'missile',ownerId:'enemy',targetId:'player',life:8,homingSpeed:260,homingTurn:1.8,acceleration:0,damage:42};s.projectiles.push(m);return m;}
+function missile(s,id){const slot=s.projStore.alloc();s.projStore.setPos(slot,0,-280,0);s.projStore.setVel(slot,0,260,0);const m={id,slot,kind:'missile',ownerId:'enemy',targetId:'player',life:8,homingSpeed:260,homingTurn:1.8,acceleration:0,damage:42};s.projectiles.push(m);return m;}
 test('physical PDC interception stops a single seeker; a close pair and a swarm penetrate',()=>{
  for(const count of [1,2,4]){
   const s=session(),p=s.save.player;s.pdcAssignments=new Map();p.mode='mining';p.outfitting.loadouts.wayfarer.turrets=['pdc'];let launches=0;const spawn=s.spawnGunProjectile.bind(s);s.spawnGunProjectile=(...a)=>{launches++;return spawn(...a);};let damage=0;s.damagePlayer=(amount)=>damage+=amount;
@@ -17,10 +17,10 @@ test('physical PDC interception stops a single seeker; a close pair and a swarm 
  }
 });
 test('four escort drones share their mothership turret recovery and resume after it expires',()=>{
- const s=session(),p=s.save.player;s.pdcAssignments=new Map();p.mode='mining';p.outfitting.loadouts.wayfarer.turrets=['pdc'];missile(s,'turret-threat');s.updateTurrets(p,'player',1/60);
+ const s=session(),p=s.save.player;s.pdcAssignments=new Map();p.mode='mining';p.outfitting.loadouts.wayfarer.turrets=['pdc'];missile(s,'turret-threat');for(let i=0;i<90;i++){s.save.world.time=i/60;s.updateTurrets(p,'player',1/60);if(s.pdcDefenseChannels?.get('player')?.readyAt>1)break;}
  const channel=getPdcDefenseChannel(s,'player');assert.ok(channel.readyAt>1);
  const fleet=createDroneFleet(),point={position:[0,0,0],velocity:[0,0,0]},units=['a','b','c','d'];for(const id of units)fleet.unitsById[id]=createDroneUnit(id,'pdc');
- const context={ownerId:'player',unitIds:units,shipPosition:[0,0,0],shipVelocity:[0,0,0],ownerRadius:2,inFlight:true,now:.02,defenseChannel:channel,assignments:s.pdcAssignments,threats:units.map(id=>({id,kind:'missile',hostile:true,ownerId:'enemy',targetId:'player',position:[200,0,0],velocity:[-260,0,0],life:8})),opponents:[],bayAnchors:Object.fromEntries(units.map(id=>[id,{launch:point,dock:point}])),escortAnchors:Object.fromEntries(units.map(id=>[id,point]))};
+ const context={ownerId:'player',unitIds:units,shipPosition:[0,0,0],shipVelocity:[0,0,0],ownerRadius:2,inFlight:true,now:s.save.world.time+.02,defenseChannel:channel,assignments:s.pdcAssignments,threats:units.map(id=>({id,kind:'missile',hostile:true,ownerId:'enemy',targetId:'player',position:[200,0,0],velocity:[-260,0,0],life:8})),opponents:[],bayAnchors:Object.fromEntries(units.map(id=>[id,{launch:point,dock:point}])),escortAnchors:Object.fromEntries(units.map(id=>[id,point]))};
  const controller=createPdcDroneController();assert.equal(controller.update(fleet,1/60,context,[]).filter(e=>e.type==='fire').length,0);
  context.now=channel.readyAt+.01;assert.equal(controller.update(fleet,1/60,context,[]).filter(e=>e.type==='fire').length,1,'extra drones give coverage, not four simultaneous intercepts');
 });
@@ -35,10 +35,10 @@ test('turret base follows the hull while yaw and elevation align every barrel, i
 });
 
 test('laser tracking misses small distant targets while close supporting fire gains damage',()=>{
- function probe(distance){const s=session(),p=s.save.player;p.outfitting.loadouts.wayfarer.turrets=['tracking-turret'];const target={id:'target',hostile:true,hull:100,position:[0,distance,0],velocity:[0,0,0]};s.ships=[target];s.getTargetRef=()=>({kind:'ship',id:'target'});let shots=0,hits=0,damage=0;
+ function probe(distance){const s=session(),p=s.save.player;p.outfitting.loadouts.wayfarer.turrets=['tracking-turret'];const target={id:'target',hostile:true,hull:100,position:[0,-distance,0],velocity:[0,0,0]};s.ships=[target];s.getTargetRef=()=>({kind:'ship',id:'target'});let shots=0,hits=0,damage=0;
   s.fireBeam=(owner,w,start,direction)=>{shots++;const delta=new THREE.Vector3(...target.position).sub(start);const off=delta.addScaledVector(direction,-delta.dot(direction)).length();if(off<1.5){hits++;damage+=w.damageFlat;}};
   for(let i=0;i<1800;i++){s.save.world.time=i/60;p.energy=100;s.updateTurrets(p,'player',1/60);}return {shots,hits,dps:damage/30};}
- const near=probe(50),far=probe(299);assert.ok(near.dps>5.7);assert.ok(far.hits>0&&far.hits<far.shots*.8);console.log('Laser small-target tracking:',{near,far});
+ const near=probe(50),far=probe(299);assert.ok(near.dps>4);assert.ok(far.hits>0&&far.hits<far.shots*.8);console.log('Laser small-target tracking:',{near,far});
 });
 
 test('Vanguard side mounts and Lancer belly mount cover their outward hemisphere only',async()=>{

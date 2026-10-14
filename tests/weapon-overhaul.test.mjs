@@ -83,9 +83,9 @@ test('beam assist snaps within its cone and respects range and the assist settin
  ship.position=[20,0,-WEAPONS.beam.range];assert.ok(aim().equals(base));
  ship.position=[20,0,-100];s.save.settings.aimAssist=false;assert.ok(aim().equals(base));
  s.configureArenaImpulseFit('beam');const fit=loadoutFor(s.save.player);
- assert.deepEqual(fit.guns,['beam-emitter','beam-emitter']);assert.deepEqual(fit.turrets,['tracking-turret']);
+ assert.deepEqual(fit.guns.filter(Boolean),['beam-emitter','beam-emitter']);assert.deepEqual(fit.turrets,['tracking-turret']);
  assert.ok(Object.values(fit.fireGroups.assignments).every(g=>g==='A'));
- for(const [i,m] of HULL_HARDPOINTS.wayfarer.guns.entries())assert.ok(itemFitsMount(OUTFIT_ITEMS[fit.guns[i]],m));
+ for(const [i,m] of HULL_HARDPOINTS.wayfarer.guns.entries())if(fit.guns[i])assert.ok(itemFitsMount(OUTFIT_ITEMS[fit.guns[i]],m));
 });
 test('holding beam fire produces separate pulses, with lower peak damage and better energy efficiency than accurate pulse shots',()=>{
  const s=session(),fit=loadoutFor(s.save.player);fit.guns=['beam-emitter',null];
@@ -128,7 +128,7 @@ test('explosions hit the direct victim once, include the player and stop at a wa
 test('enemy fittings obey mounts and finite missiles need a continuous lock and warning',()=>{
  for(let i=0;i<12;i++){
   const ship={role:'pirate',maxShield:58},fit=createEnemyLoadout(ship,i);
-  fit.guns.forEach((id,index)=>assert.ok(itemFitsMount(OUTFIT_ITEMS[id],HULL_HARDPOINTS[fit.hullId].guns[index])));
+  fit.guns.forEach((id,index)=>{if(id)assert.ok(itemFitsMount(OUTFIT_ITEMS[id],HULL_HARDPOINTS[fit.hullId].guns[index]));});
  }
  const s=session(),ship=s.spawnShip('pirate',[0,0,180],undefined,undefined,{tier:'ace',temperament:'steady'});
  ship.rotation=[0,0,0,1];ship.targetId='player';ship.combatFit=createEnemyLoadout(ship,0);ship.combatFit.missiles=1;ship.combatFit.racks?.forEach(r=>r.missiles=1);
