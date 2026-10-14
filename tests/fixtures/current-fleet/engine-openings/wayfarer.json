@@ -1,0 +1,1293 @@
+{
+  "id": "wayfarer",
+  "glbPath": "assets/models/ships/wayfarer.glb",
+  "glbSha256": "aa426f3507dcd274e292155b588b381dcafd4929eace886a457da85710eed6d7",
+  "descriptorSha256": "dcb31317fff8b302cb25d2e3304d6283fe3464a18c64e629a1a831974e461f65",
+  "coordinateFrame": "Unscaled GLB space",
+  "epsilon": 0.000002191142357979122,
+  "method": "Double-sided first-hit rays at center and eight angles on 35% and 65% aperture radii. The measured aperture plane is the aft lip, not the glow socket. Whole-base fit is also visually reviewed.",
+  "mouths": [
+    {
+      "name": "Lower pod_port_exhaust",
+      "center": [
+        -0.9990000128746033,
+        -0.2240000069141388,
+        0.08499999693594873
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.06299999705515802,
+      "radiusV": 0.06299999356269836,
+      "minDepth": 0.041,
+      "maxDepth": 0.5620000064373016,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2240000069141388,
+            0.08499999693594873
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2240000069141388,
+            0.10704999590525403
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2084083039821263,
+            0.10059170073230089
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.20195000916719436,
+            0.08499999693594873
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2084083039821263,
+            0.06940829313959657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2240000069141388,
+            0.06294999796664343
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2395917098461513,
+            0.06940829313959657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.24605000466108323,
+            0.08499999693594873
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2395917098461513,
+            0.10059170073230089
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2240000069141388,
+            0.12594999502180143
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.037364323210956306,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.19504398718325844,
+            0.11395601827203133
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.042116909719291294,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.18305001109838487,
+            0.08499999693594873
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.19504398718325844,
+            0.05604397559986614
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2240000069141388,
+            0.044049998850096014
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.25295602664501915,
+            0.056043975599866125
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2649500027298927,
+            0.08499999693594872
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.25295602664501915,
+            0.11395601827203132
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.0421169027700228,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": false
+    },
+    {
+      "name": "Lower pod_starboard_exhaust",
+      "center": [
+        -0.9990000128746033,
+        -0.2240000069141388,
+        -0.08499999693594873
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.06299999705515802,
+      "radiusV": 0.06299999356269836,
+      "minDepth": 0.041,
+      "maxDepth": 0.5620000064373016,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2240000069141388,
+            -0.08499999693594873
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2240000069141388,
+            -0.06294999796664343
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2084083039821263,
+            -0.06940829313959657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.20195000916719436,
+            -0.08499999693594873
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2084083039821263,
+            -0.10059170073230089
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2240000069141388,
+            -0.10704999590525403
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2395917098461513,
+            -0.10059170073230089
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.24605000466108323,
+            -0.08499999693594873
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2395917098461513,
+            -0.06940829313959657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2240000069141388,
+            -0.044049998850096014
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.19504398718325844,
+            -0.05604397559986613
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.18305001109838487,
+            -0.08499999693594873
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.19504398718325844,
+            -0.11395601827203132
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.042116909719291405,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2240000069141388,
+            -0.12594999502180143
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.037364323210956306,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.25295602664501915,
+            -0.11395601827203133
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04211690277002269,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.2649500027298927,
+            -0.08499999693594874
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            -0.25295602664501915,
+            -0.05604397559986614
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": false
+    },
+    {
+      "name": "Upper pod_port_exhaust",
+      "center": [
+        -0.9990000128746033,
+        0.13300000131130219,
+        0.08499999693594873
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.06299999705515802,
+      "radiusV": 0.06299999356269836,
+      "minDepth": 0.041,
+      "maxDepth": 0.5620000064373016,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.13300000131130219,
+            0.08499999693594873
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.13300000131130219,
+            0.10704999590525403
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.1485917042433147,
+            0.10059170073230089
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.15504999905824662,
+            0.08499999693594873
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.1485917042433147,
+            0.06940829313959657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.13300000131130219,
+            0.06294999796664343
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.11740829837928969,
+            0.06940829313959657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.11095000356435776,
+            0.08499999693594873
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.11740829837928968,
+            0.10059170073230089
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.13300000131130219,
+            0.12594999502180143
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.037364323210956306,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.16195602104218254,
+            0.11395601827203133
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.0421169073222746,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.1739499971270561,
+            0.08499999693594873
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.16195602104218254,
+            0.05604397559986614
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.13300000131130219,
+            0.044049998850096014
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.10404398158042183,
+            0.056043975599866125
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.09205000549554825,
+            0.08499999693594872
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.10404398158042183,
+            0.11395601827203132
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04211690852078311,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": false
+    },
+    {
+      "name": "Upper pod_starboard_exhaust",
+      "center": [
+        -0.9990000128746033,
+        0.13300000131130219,
+        -0.08499999693594873
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.06299999705515802,
+      "radiusV": 0.06299999356269836,
+      "minDepth": 0.041,
+      "maxDepth": 0.5620000064373016,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.13300000131130219,
+            -0.08499999693594873
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.13300000131130219,
+            -0.06294999796664343
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.1485917042433147,
+            -0.06940829313959657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.15504999905824662,
+            -0.08499999693594873
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.1485917042433147,
+            -0.10059170073230089
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.13300000131130219,
+            -0.10704999590525403
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.11740829837928969,
+            -0.10059170073230089
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.11095000356435776,
+            -0.08499999693594873
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.11740829837928968,
+            -0.06940829313959657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.13300000131130219,
+            -0.044049998850096014
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.16195602104218254,
+            -0.05604397559986613
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.1739499971270561,
+            -0.08499999693594873
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.16195602104218254,
+            -0.11395601827203132
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.0421169073222746,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.13300000131130219,
+            -0.12594999502180143
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.037364323210956306,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.10404398158042183,
+            -0.11395601827203133
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04211690852078311,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.09205000549554825,
+            -0.08499999693594874
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.9990000128746033,
+            0.10404398158042183,
+            -0.05604397559986614
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.05300003290176394,
+          "inwardHitMaterial": "Wayfarer Concord authored PBR",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": false
+    }
+  ],
+  "allOutwardClear": true,
+  "allRecessesVisible": false
+}

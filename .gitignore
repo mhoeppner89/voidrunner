@@ -17,12 +17,7 @@ __pycache__/
 glb_models/
 obj_models/
 
-# Docs kept out of the repo; only the game + hosting live here.
-AGENTS.md
-progress.md
-RELEASE_NOTES_v0.3.0.md
-README.md
-PLAYABLE_README.md
+# Current specifications, README and maintenance instructions are versioned.
 *.webp
 !art/commodities/*.webp
 !art/outfitting/*.webp
@@ -58,3 +53,9 @@ PLAYABLE_README.md
 
 # Shipped planet and moon surface maps
 !assets/textures/worlds/*.webp
+
+# Editable Blender sources and original references are local, never deployed.
+/authoring/models/
+/authoring/references/
+*.blend1
+*.blend2

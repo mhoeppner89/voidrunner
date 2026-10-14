@@ -1,0 +1,1224 @@
+{
+  "id": "vanguard",
+  "glbSha256": "b6b20b84ffcae96cf32196a3bccc3a8edbd8cfd3b996a2149d5cc72ff5e84846",
+  "descriptorSha256": "8b48100f771ab1516bb6a87734b107768dab21ee5db6db33ea326b559974d013",
+  "coordinateFrame": "Unscaled GLB space",
+  "epsilon": 0.00000276177046327793,
+  "method": "Double-sided first-hit rays at center and eight angles on 35% and 65% aperture radii. The measured aperture plane is the aft lip, not the glow socket. Whole-base fit is also visually reviewed.",
+  "mouths": [
+    {
+      "name": "Port lower drive_exhaust",
+      "center": [
+        -0.9950000047683716,
+        -0.2850000001490116,
+        0.28300000727176666
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.13536898791790009,
+      "radiusV": 0.14647619798779488,
+      "minDepth": 0.038,
+      "maxDepth": 0.6649999916553497,
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.2850000001490116,
+            0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.2850000001490116,
+            0.33037915304303167
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.24874899064115402,
+            0.3165021225334541
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.2337333308532834,
+            0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.24874899064115402,
+            0.24949789201007921
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.2850000001490116,
+            0.23562086150050163
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.3212510096568692,
+            0.24949789201007921
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.3362666694447398,
+            0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.3212510096568692,
+            0.3165021225334541
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.2850000001490116,
+            0.37098984941840174
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.2176766967772761,
+            0.3452182213291862
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.18979047145694494,
+            0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.2176766967772761,
+            0.22078179321434713
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.2850000001490116,
+            0.19501016512513158
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.35232330352074714,
+            0.22078179321434713
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.3802095288410783,
+            0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.35232330352074714,
+            0.34521822132918617
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "Port upper drive_exhaust",
+      "center": [
+        -0.9950000047683716,
+        0.09400000423192978,
+        0.28300000727176666
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.13536898791790009,
+      "radiusV": 0.12495598942041397,
+      "minDepth": 0.038,
+      "maxDepth": 0.6649999916553497,
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.09400000423192978,
+            0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.09400000423192978,
+            0.33037915304303167
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.12492503384609699,
+            0.3165021225334541
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.13773460052907466,
+            0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.124925033846097,
+            0.24949789201007921
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.09400000423192978,
+            0.23562086150050163
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.06307497461776257,
+            0.24949789201007921
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.05026540793478489,
+            0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.06307497461776256,
+            0.3165021225334541
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.09400000423192978,
+            0.37098984941840174
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.15143220208681177,
+            0.3452182213291862
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.17522139735519887,
+            0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.15143220208681177,
+            0.22078179321434713
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.09400000423192979,
+            0.19501016512513158
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.0365678063770478,
+            0.22078179321434713
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.0127786111086607,
+            0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.03656780637704778,
+            0.34521822132918617
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "Starboard lower drive_exhaust",
+      "center": [
+        -0.9950000047683716,
+        -0.2850000001490116,
+        -0.28300000727176666
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.13536898791790009,
+      "radiusV": 0.14647619798779488,
+      "minDepth": 0.038,
+      "maxDepth": 0.6649999916553497,
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.2850000001490116,
+            -0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.2850000001490116,
+            -0.23562086150050163
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.24874899064115402,
+            -0.24949789201007921
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.2337333308532834,
+            -0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.24874899064115402,
+            -0.3165021225334541
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.2850000001490116,
+            -0.33037915304303167
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.3212510096568692,
+            -0.3165021225334541
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.3362666694447398,
+            -0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.3212510096568692,
+            -0.24949789201007924
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.2850000001490116,
+            -0.19501016512513158
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.2176766967772761,
+            -0.22078179321434713
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.18979047145694494,
+            -0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.2176766967772761,
+            -0.34521822132918617
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.2850000001490116,
+            -0.37098984941840174
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.35232330352074714,
+            -0.3452182213291862
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.3802095288410783,
+            -0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            -0.35232330352074714,
+            -0.22078179321434716
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "Starboard upper drive_exhaust",
+      "center": [
+        -0.9950000047683716,
+        0.09400000423192978,
+        -0.28300000727176666
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.13536898791790009,
+      "radiusV": 0.12495598942041397,
+      "minDepth": 0.038,
+      "maxDepth": 0.6649999916553497,
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.09400000423192978,
+            -0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.09400000423192978,
+            -0.23562086150050163
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.12492503384609699,
+            -0.24949789201007921
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.13773460052907466,
+            -0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.124925033846097,
+            -0.3165021225334541
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.09400000423192978,
+            -0.33037915304303167
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.06307497461776257,
+            -0.3165021225334541
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.05026540793478489,
+            -0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.06307497461776256,
+            -0.24949789201007924
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.09400000423192978,
+            -0.19501016512513158
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.15143220208681177,
+            -0.22078179321434713
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.17522139735519887,
+            -0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.15143220208681177,
+            -0.34521822132918617
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.09400000423192979,
+            -0.37098984941840174
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.0365678063770478,
+            -0.3452182213291862
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.0127786111086607,
+            -0.28300000727176666
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.9950000047683716,
+            0.03656780637704778,
+            -0.22078179321434716
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Vanguard Concord authored PBR",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    }
+  ],
+  "allOutwardClear": true,
+  "allRecessesVisible": true
+}

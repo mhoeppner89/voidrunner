@@ -14,7 +14,7 @@ All 19 shipped hulls were checked. Their collision models are **not consistently
 
 ## Method and limits
 
-Loaded each current shipping GLB with the runtime yaw, GLB scale, NPC scale and base scale. Compared runtime bounds and cast 72 × 72 full-depth, double-sided rays from top, side and front: **295,488 geometry rays**, plus 15 live beam cases. SHA-256 hashes, exact bounds, all three view metrics and reproduction coordinates are in [the JSON results](../.freebuff/ship-collision-audit/results.json).
+Loaded each current shipping GLB with the runtime yaw, GLB scale, NPC scale and base scale. Compared runtime bounds and cast 72 × 72 full-depth, double-sided rays from top, side and front: **295,488 geometry rays**, plus 15 live beam cases. SHA-256 hashes, exact bounds, all three view metrics and reproduction coordinates are in [the JSON results](../output/ship-collision-audit/results.json).
 
 Yellow in the overlay means visible hull missed by the proxy; red means proxy covering empty space. “Missed” uses actual model silhouette area as its denominator; “empty” uses proxy silhouette area. These are orthographic sampling measurements, **not combat miss rates or damage probabilities**. Shield presentation, missile/bolt padding, separate mounted equipment and moving turret poses are excluded. The hull's integral GLB details are included. No station geometry was modified.
 
@@ -51,6 +51,6 @@ The focused regression runs passed: **74 + 67 test executions**, covering ship c
 3. Correct carrier/cruiser bounds from current geometry and fix the diagonal sphere contact approximation. Add whole-fleet geometry checks so later model changes cannot silently drift.
 4. Keep collision proxies cached and allocation-free; avoid traversing rendered meshes in combat hot paths.
 
-Reproduce: `node --import ./src/game/offlineImportHooks.mjs scripts/audit-ship-collisions.mjs`.
+Reproduce: `node --import ./tests/helpers/offline-imports.mjs tools/assets/audit-ship-collisions.mjs`.
 
-[Open the visual overlay](http://127.0.0.1:4192/.freebuff/ship-collision-audit/index.html).
+[Open the visual overlay](http://127.0.0.1:4192/output/ship-collision-audit/index.html).

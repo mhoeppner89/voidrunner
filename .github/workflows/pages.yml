@@ -24,10 +24,16 @@ jobs:
         uses: actions/configure-pages@v5
         with:
           enablement: true
-      - name: Upload packaged v0.3.0 runtime
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Package game runtime
+        run: npm run build
+      - name: Upload game runtime
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: dist
 
   deploy:
     environment:

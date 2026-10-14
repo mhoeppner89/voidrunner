@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-14",
+  "runtime": "0.8.2ft",
+  "baselineApproxGiB": 15,
+  "finalKiB": 5778824,
+  "gitKiB": 4803256,
+  "gitHistoryRewritten": false,
+  "preservedHullDroneSources": 21,
+  "additionalNativeLibraries": 6,
+  "fullSuiteTests": 684,
+  "fullSuiteFailures": 0,
+  "browserPlatforms": [
+    "desktop Chrome",
+    "Android Chrome emulation",
+    "iPhone WebKit emulation"
+  ],
+  "spectatorHullCount": 19,
+  "browserErrors": [],
+  "offlineShellVerified": true,
+  "notes": [
+    "Fresh clean-folder suite and runtime packaging passed without ignored authoring sources or old development output.",
+    "Shared test constructors were extracted so importing them does not register whole suites.",
+    "Historical rebuild-construction checks were replaced by current shipping geometry and local source integrity checks.",
+    "Title-shell cache dependencies were completed, including both Three.js modules and essential cockpit art."
+  ]
+}

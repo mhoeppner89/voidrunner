@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v410-0-8-2fs-fitted-collisions';
+const CACHE = 'voidrunner-v413-0-8-2fv-colored-item-icons';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -19,6 +19,16 @@ const CORE_ASSETS = [
   './manifest.webmanifest',
   './src/style.css',
   './src/main.js',
+  './vendor/three.module.min.js',
+  './vendor/three.core.min.js',
+  './src/game/adventureDialogues.js',
+  './src/game/combatTactics.js',
+  './src/game/enemyLoadouts.js',
+  './src/game/npcGunnery.js',
+  './src/game/turretClearance.js',
+  './src/game/turrets.js',
+  './src/game/weaponDamage.js',
+  './src/game/weaponFlight.js',
   './src/game/cockpitDamage.js',
   './src/game/fleetPaintCatalog.js',
   './src/game/fleetEquipmentData.js',
@@ -120,6 +130,7 @@ const CORE_ASSETS = [
   './src/game/canvasSizeCache.js',
   './src/game/weapons.js',
   './art/title-cockpit.webp',
+  './assets/remaster/cockpit-wayfarer-sprite.png',
 ];
 
 // Cache core files independently. A transient failure for one request must

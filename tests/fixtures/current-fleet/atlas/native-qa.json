@@ -1,0 +1,866 @@
+{
+  "parts": 151,
+  "allComponentsClosed": true,
+  "allComponentsOutward": true,
+  "badComponents": [],
+  "images": [
+    {
+      "name": "frigate_emission_128.png",
+      "packed": true,
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "name": "frigate_orm_128.png",
+      "packed": true,
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "name": "hull-ivory-albedo-512.png",
+      "packed": true,
+      "size": [
+        512,
+        512
+      ]
+    },
+    {
+      "name": "hull-ivory-normal-512.png",
+      "packed": true,
+      "size": [
+        512,
+        512
+      ]
+    },
+    {
+      "name": "hull-ivory-orm-128.png",
+      "packed": true,
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "name": "hull-navy-albedo-512.png",
+      "packed": true,
+      "size": [
+        512,
+        512
+      ]
+    },
+    {
+      "name": "hull-navy-normal-512.png",
+      "packed": true,
+      "size": [
+        512,
+        512
+      ]
+    },
+    {
+      "name": "hull-navy-orm-128.png",
+      "packed": true,
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "name": "industrial-albedo-512.png",
+      "packed": true,
+      "size": [
+        512,
+        512
+      ]
+    },
+    {
+      "name": "industrial-normal-512.png",
+      "packed": true,
+      "size": [
+        512,
+        512
+      ]
+    }
+  ],
+  "allImagesPacked": true,
+  "volumes": [
+    {
+      "name": "Atlas uninterrupted pressure hull",
+      "signedVolume": 0.37602691877215094,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo 1 flank -1 sealed cassette",
+      "signedVolume": 0.0012131377215152481,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp",
+      "signedVolume": 0.00010092964297891146,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.001",
+      "signedVolume": 0.00010092907953955663,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail",
+      "signedVolume": 1.3086647490923037e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.001",
+      "signedVolume": 1.3086627967039154e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo 1 flank 1 sealed cassette",
+      "signedVolume": 0.0012131377215152486,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.002",
+      "signedVolume": 0.00010092964297891143,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.003",
+      "signedVolume": 0.00010092907953955658,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.002",
+      "signedVolume": 1.3086647490923037e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.003",
+      "signedVolume": 1.3086627967039154e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo bay 1 contoured upper armor",
+      "signedVolume": 0.007904253391048978,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo bay 1 contoured belly armor",
+      "signedVolume": 0.007586887504392384,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "External load bearing blue rib",
+      "signedVolume": 0.00044536809403185904,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo continuous feed line",
+      "signedVolume": 6.659575287692773e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "External load bearing blue rib.001",
+      "signedVolume": 0.0004453680940318588,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo continuous feed line.001",
+      "signedVolume": 6.659575771556477e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo 2 flank -1 sealed cassette",
+      "signedVolume": 0.0012131379408428906,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.004",
+      "signedVolume": 0.00010092889172643779,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.005",
+      "signedVolume": 0.00010092926735267487,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.004",
+      "signedVolume": 1.3086649782890895e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.005",
+      "signedVolume": 1.308663025900312e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo 2 flank 1 sealed cassette",
+      "signedVolume": 0.001213137940842891,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.006",
+      "signedVolume": 0.0001009288917264377,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.007",
+      "signedVolume": 0.00010092926735267487,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.006",
+      "signedVolume": 1.3086649782890895e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.007",
+      "signedVolume": 1.3086630259003134e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo bay 2 contoured upper armor",
+      "signedVolume": 0.00790425269888212,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo bay 2 contoured belly armor",
+      "signedVolume": 0.007586886832107678,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "External load bearing blue rib.002",
+      "signedVolume": 0.00044536809403185817,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo continuous feed line.002",
+      "signedVolume": 6.659575578013036e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "External load bearing blue rib.003",
+      "signedVolume": 0.0004453680940318584,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo continuous feed line.003",
+      "signedVolume": 6.659575771556485e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo 3 flank -1 sealed cassette",
+      "signedVolume": 0.0012131379788511934,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.008",
+      "signedVolume": 0.00010092926735267413,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.009",
+      "signedVolume": 0.00010092926735267403,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.009",
+      "signedVolume": 1.3086629399516575e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo 3 flank 1 sealed cassette",
+      "signedVolume": 0.0012131379788511937,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.010",
+      "signedVolume": 0.00010092926735267413,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.011",
+      "signedVolume": 0.000100929267352674,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.011",
+      "signedVolume": 1.3086629399516588e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo bay 3 contoured upper armor",
+      "signedVolume": 0.007904252698882123,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo bay 3 contoured belly armor",
+      "signedVolume": 0.005136810046006525,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "External load bearing blue rib.004",
+      "signedVolume": 0.0004453671468808293,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo continuous feed line.004",
+      "signedVolume": 6.659574682118056e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "External load bearing blue rib.005",
+      "signedVolume": 0.0004453671468808292,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo continuous feed line.005",
+      "signedVolume": 6.659574682114693e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo 4 flank -1 sealed cassette",
+      "signedVolume": 0.00121313798727767,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.012",
+      "signedVolume": 0.00010092924387603426,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.013",
+      "signedVolume": 0.00010092926735267413,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.012",
+      "signedVolume": 1.3086648296693594e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.013",
+      "signedVolume": 1.3086628772807776e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo 4 flank 1 sealed cassette",
+      "signedVolume": 0.0012131379872776704,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.014",
+      "signedVolume": 0.00010092924387603422,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.015",
+      "signedVolume": 0.00010092926735267416,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.014",
+      "signedVolume": 1.3086648296693594e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.015",
+      "signedVolume": 1.3086628772807814e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo bay 4 contoured upper armor",
+      "signedVolume": 0.007904253055780658,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo bay 4 contoured belly armor",
+      "signedVolume": 0.005136810245147774,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "External load bearing blue rib.006",
+      "signedVolume": 0.00044536735407011606,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo continuous feed line.006",
+      "signedVolume": 6.659575175771387e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "External load bearing blue rib.007",
+      "signedVolume": 0.0004453673540701161,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo continuous feed line.007",
+      "signedVolume": 6.659575175767984e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo 5 flank -1 sealed cassette",
+      "signedVolume": 0.00121313794084289,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.016",
+      "signedVolume": 0.00010092926735267408,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.017",
+      "signedVolume": 0.00010092907953955438,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.016",
+      "signedVolume": 1.30866497828908e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.017",
+      "signedVolume": 1.308663025900312e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo 5 flank 1 sealed cassette",
+      "signedVolume": 0.0012131379408428897,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.018",
+      "signedVolume": 0.00010092926735267408,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.019",
+      "signedVolume": 0.00010092907953955433,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.018",
+      "signedVolume": 1.30866497828908e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.019",
+      "signedVolume": 1.308663025900312e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo bay 5 contoured upper armor",
+      "signedVolume": 0.007904253391048978,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo bay 5 contoured belly armor",
+      "signedVolume": 0.007586886159822975,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "External load bearing blue rib.008",
+      "signedVolume": 0.0004453674625978384,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo continuous feed line.008",
+      "signedVolume": 6.659574137397166e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "External load bearing blue rib.009",
+      "signedVolume": 0.00044536746259783846,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo continuous feed line.009",
+      "signedVolume": 6.659574137393798e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo 6 flank -1 sealed cassette",
+      "signedVolume": 0.001213137940842891,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.020",
+      "signedVolume": 0.00010092907953955547,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.021",
+      "signedVolume": 0.00010092964297890931,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.020",
+      "signedVolume": 1.3086649782890813e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.021",
+      "signedVolume": 1.3086630259003215e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo 6 flank 1 sealed cassette",
+      "signedVolume": 0.001213137940842891,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.022",
+      "signedVolume": 0.00010092907953955544,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo vertical blue clamp.023",
+      "signedVolume": 0.00010092964297890931,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.022",
+      "signedVolume": 1.3086649782890827e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo brass latch rail.023",
+      "signedVolume": 1.3086630259003202e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo bay 6 contoured upper armor",
+      "signedVolume": 0.007904252006715268,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo bay 6 contoured belly armor",
+      "signedVolume": 0.007586888848961793,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "External load bearing blue rib.010",
+      "signedVolume": 0.0004453680940318571,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo continuous feed line.010",
+      "signedVolume": 6.659573592676261e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "External load bearing blue rib.011",
+      "signedVolume": 0.00044536809403185725,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Cargo continuous feed line.011",
+      "signedVolume": 6.659573592672899e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas faceted ivory command bow",
+      "signedVolume": 0.07850797960668382,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas upper bridge tier",
+      "signedVolume": 0.006518909927424614,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas navy cheek buttress",
+      "signedVolume": 0.003597037182207455,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Bridge service hatch",
+      "signedVolume": 2.4685867011765193e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Command hull vent",
+      "signedVolume": 4.321531592110476e-06,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas navy cheek buttress.001",
+      "signedVolume": 0.003597037182207454,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Bridge service hatch.001",
+      "signedVolume": 2.4685867011764654e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Command hull vent.001",
+      "signedVolume": 4.321531592110464e-06,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas recessed chin",
+      "signedVolume": 0.002636438686210132,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Forward chin running light",
+      "signedVolume": 3.6849908001527166e-06,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Forward chin running light.001",
+      "signedVolume": 3.684990800152715e-06,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas engine bank bulkhead",
+      "signedVolume": 0.048745063259279714,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas navy bow chin armor",
+      "signedVolume": 0.004530212671600902,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas forward corner lamp",
+      "signedVolume": 1.158139653529264e-06,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas forward corner lamp.001",
+      "signedVolume": 1.1581396535292267e-06,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas raised aft service house",
+      "signedVolume": 0.005456560054248836,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas stern repair door",
+      "signedVolume": 7.274601906796334e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas deck cooling grille",
+      "signedVolume": 0.0001729612940366956,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas deck cooling grille.001",
+      "signedVolume": 0.00017296121199572725,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas deck cooling grille.002",
+      "signedVolume": 0.00017296114257644632,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Bridge mast base",
+      "signedVolume": 9.338734174482513e-06,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Bridge antenna",
+      "signedVolume": 8.281908767093704e-07,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Bridge mast base.001",
+      "signedVolume": 1.0705623480678103e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Bridge antenna.001",
+      "signedVolume": 7.196834098758811e-07,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas integrated chin gun socket",
+      "signedVolume": 0.0001180890837687953,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas single angular forward gun",
+      "signedVolume": 2.7466874170823996e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas original custom canopy 01",
+      "signedVolume": 4.9417467537994856e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas original custom canopy 02",
+      "signedVolume": 5.2197995533195e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas original custom canopy 03",
+      "signedVolume": 5.039288275338546e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas original custom canopy 04",
+      "signedVolume": 4.9776699874421254e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas original custom canopy 05",
+      "signedVolume": 5.039288275338554e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas original custom canopy 06",
+      "signedVolume": 5.219799553319513e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas original custom canopy 07",
+      "signedVolume": 4.94174674415483e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas original custom canopy 08",
+      "signedVolume": 4.981606966195023e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas original custom canopy 09",
+      "signedVolume": 4.297168461916609e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas original custom canopy 10",
+      "signedVolume": 4.9816069661950394e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Bridge mast base \u00b7 central source fitting",
+      "signedVolume": 8.707842184563864e-06,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Bridge antenna \u00b7 central source fitting",
+      "signedVolume": 8.281908767093526e-07,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source drive -1/0 rooted engine casing",
+      "signedVolume": 0.007584573767380967,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source drive -1/0 exhaust core",
+      "signedVolume": 7.914860370766499e-06,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source drive 1/0 rooted engine casing",
+      "signedVolume": 0.0075845737820580735,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source drive 1/0 exhaust core",
+      "signedVolume": 7.914860370766445e-06,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source central pressure coupling 0 rooted engine casing",
+      "signedVolume": 0.004212052663580147,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source central pressure coupling 0 pressure coupling floor",
+      "signedVolume": 1.0537532999473846e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source drive -1/1 rooted engine casing",
+      "signedVolume": 0.009435837233328293,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source drive -1/1 exhaust core",
+      "signedVolume": 9.846738606451838e-06,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source drive 1/1 rooted engine casing",
+      "signedVolume": 0.00943583724554254,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source drive 1/1 exhaust core",
+      "signedVolume": 9.846738606452001e-06,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source central pressure coupling 1 rooted engine casing",
+      "signedVolume": 0.004533879797411082,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source central pressure coupling 1 pressure coupling floor",
+      "signedVolume": 1.1342666527331389e-05,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source drive -1/2 rooted engine casing",
+      "signedVolume": 0.0070123644168162596,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source drive -1/2 exhaust core",
+      "signedVolume": 7.317731394602744e-06,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source drive 1/2 rooted engine casing",
+      "signedVolume": 0.0070123644284585075,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source drive 1/2 exhaust core",
+      "signedVolume": 7.317731394602337e-06,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source central pressure coupling 2 rooted engine casing",
+      "signedVolume": 0.00400408252958064,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Atlas source central pressure coupling 2 pressure coupling floor",
+      "signedVolume": 1.0017242597952654e-05,
+      "nonManifoldEdges": 0
+    }
+  ],
+  "existingGeometryUnchangedFromPreviousNative": true,
+  "addedComponents": [],
+  "activeGunMuzzles": [
+    {
+      "name": "Single active forward gun muzzle",
+      "originGLB": [
+        0.9943295736965772,
+        -0.23673319816589355,
+        2.611274929620322e-08
+      ],
+      "directionGLB": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "startOffset": 0,
+      "forwardRayClear": true,
+      "hit": null
+    }
+  ]
+}

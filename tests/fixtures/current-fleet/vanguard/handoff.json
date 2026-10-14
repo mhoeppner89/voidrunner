@@ -1,0 +1,866 @@
+{
+  "id": "vanguard",
+  "title": "Vanguard \u2014 fitted side turrets",
+  "status": "Complete and verified; awaiting supervising integration",
+  "authority": {
+    "request": "add the fitting turrets on the sides",
+    "preservedHullSHA256": "788dcb673e649fabcd52d8cc3c6fd6bd8720344c83db1a41321fa47608d99119",
+    "preservedNativeHullSHA256": "8602d94fa6f431597ec266fcae76ab7eec002a7e1107f7f17a499a74a7bf29c0",
+    "frozenInputUnchanged": true
+  },
+  "previewURL": "http://127.0.0.1:4173/docs/ship-revisions/20261002/vanguard/preview.html?source=concept&output=equipped&revision=89ee70970ae3",
+  "candidate": "docs/ship-revisions/20261002/vanguard/candidate.glb",
+  "candidateSHA256": "788dcb673e649fabcd52d8cc3c6fd6bd8720344c83db1a41321fa47608d99119",
+  "native": "docs/ship-revisions/20261002/vanguard/vanguard.blend",
+  "nativeSHA256": "8602d94fa6f431597ec266fcae76ab7eec002a7e1107f7f17a499a74a7bf29c0",
+  "triangles": 4674,
+  "vertices": 9836,
+  "primitives": 2,
+  "materials": 2,
+  "namedNativeParts": 74,
+  "fileBytes": 1487104,
+  "textures": [
+    {
+      "name": "vanguard-emission-512",
+      "width": 512,
+      "height": 512,
+      "bytes": 21152,
+      "mimeType": "image/png",
+      "slots": [
+        "emissiveTexture"
+      ]
+    },
+    {
+      "name": "vanguard-normal-1024",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 224816,
+      "mimeType": "image/png",
+      "slots": [
+        "normalTexture"
+      ]
+    },
+    {
+      "name": "vanguard-albedo-1024",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 695969,
+      "mimeType": "image/jpeg",
+      "slots": [
+        "baseColorTexture"
+      ]
+    },
+    {
+      "name": "vanguard-surface-512",
+      "width": 512,
+      "height": 512,
+      "bytes": 40717,
+      "mimeType": "image/png",
+      "slots": [
+        "metallicRoughnessTexture"
+      ]
+    }
+  ],
+  "verification": {
+    "nativePassed": true,
+    "fullMountInterfaces": 73,
+    "fullMountSamples": 36036,
+    "gltfErrors": 0,
+    "gltfWarnings": 0,
+    "runtimePassed": true,
+    "browserPassed": true,
+    "captures": 38,
+    "servedSHA256": "788dcb673e649fabcd52d8cc3c6fd6bd8720344c83db1a41321fa47608d99119",
+    "refinementScopePassed": true,
+    "preservedMeshShapes": 64,
+    "changedMeshShapes": 8,
+    "overallBoundsUnchanged": true,
+    "addedCradles": 2,
+    "restoredSmallVents": 14,
+    "launcherHullClearancePassed": true,
+    "minimumLauncherHullClearanceBlender": 0.012034669518470764,
+    "sideTurretAddition": {
+      "defaultOn": true,
+      "nativePassed": true,
+      "exportPassed": true,
+      "actualPoseFitPassed": true,
+      "movingSurfaceSamples": 18592,
+      "clippingSamples": 0,
+      "browserPassed": true,
+      "captures": 19,
+      "equippedBrowserPassed": true
+    }
+  },
+  "runtimeHandoff": "docs/ship-revisions/20261002/vanguard/runtime-handoff.json",
+  "limits": "Only the visible concept view is specified. Reverse and underside geometry is inferred with manufactured symmetry. The rooftop reserve outlet preserves the existing third launcher group.",
+  "files": [
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/build-report.json",
+      "sha256": "2a4ad7c4b52d029df556d2daccebfae296c8d476d03734087887e69a94194313",
+      "bytes": 25912
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/build.py",
+      "sha256": "2f27b1fe952dfc7fcf43d64e098abd97e5ae9ac9ba4804a4254b4ad3ba5b93b2",
+      "bytes": 327
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/candidate.glb",
+      "sha256": "788dcb673e649fabcd52d8cc3c6fd6bd8720344c83db1a41321fa47608d99119",
+      "bytes": 1487104
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/capture-turrets.mjs",
+      "sha256": "4e6ce9af378757c6ce6a4cc4a8114e876ea00dea201fa60dfc65429df27c2ce9",
+      "bytes": 4376
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/capture.mjs",
+      "sha256": "8e564d4ec44ec961f0be51d45f6b72bd6b146cf787fe8e5ee2568974f68f874f",
+      "bytes": 7853
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/check-equipped.mjs",
+      "sha256": "0850c2d709e1ffa27739397ff66315b4ac47fe5053e05d23aac4b3c7a81fd975",
+      "bytes": 2246
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/compose.py",
+      "sha256": "0d9df99ac6fbee5dced2299968699f2c7fde631e5b002dd6812c430e8188ffd3",
+      "bytes": 1293
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/concept-rebuild/analysis.md",
+      "sha256": "be1dfe3bda1426615c2e04e81e18ae103a37d80724c2e282d0f440f13545144a",
+      "bytes": 2114
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/concept-rebuild/bake-paint.py",
+      "sha256": "02e0340d95ca51612060882c6dd7d6ed8ea057f77e0fa4e3fe81d0102b58ddbc",
+      "bytes": 10447
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/concept-rebuild/build-report.json",
+      "sha256": "2a4ad7c4b52d029df556d2daccebfae296c8d476d03734087887e69a94194313",
+      "bytes": 25912
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/concept-rebuild/handoff.py",
+      "sha256": "29e89e15ae8b27c336a8c08c537fe2c84818a838adeffec8a02c1dfa2a1a5a04",
+      "bytes": 3994
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/concept-rebuild/rebuild.py",
+      "sha256": "831e6fe5f2c5a43e05670ff4a0ce95f76e832b711c68c1feb76a7a60e13a6e7f",
+      "bytes": 27959
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/concept-rebuild/reference.png",
+      "sha256": "70fec9e3947e7421e72537c7529b1ebb41560c1afcb9600486778767737c2718",
+      "bytes": 1290943
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/concept-rebuild/refinement-verify.py",
+      "sha256": "1103a21004115aab893c917ea8f3d478a184acd153a9fd1d08a04c2f06433141",
+      "bytes": 2308
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/concept-rebuild/shape-spec.json",
+      "sha256": "f0c2946e9bac04b44e290cb40ccac5afc949dcea3abb8ae9044e490a6ae4e9f5",
+      "bytes": 3013
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/concept-rebuild/textures.py",
+      "sha256": "8e68260f9054987d1f4c263eb97d369b730991d2d7b7edb4787f9aaa1c331e23",
+      "bytes": 4183
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/concept-rebuild/textures/vanguard-albedo-1024.png",
+      "sha256": "3d314fc4c6a2888382622424096c65a89d958826b5e4d12518cb4d1874b11f33",
+      "bytes": 1590380
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/concept-rebuild/textures/vanguard-emission-512.png",
+      "sha256": "50bf35d432651e1a7481f5ccdf2c97c0fa90db9fb1c0f3c33ccc83dbc5c318d0",
+      "bytes": 30934
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/concept-rebuild/textures/vanguard-normal-1024.png",
+      "sha256": "e5aac9811ff5a8dfa4aca30ebde2ee48f0416744337690d9821432377437687d",
+      "bytes": 348548
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/concept-rebuild/textures/vanguard-surface-512.png",
+      "sha256": "b70a97b1af2d35b3108186dc8d34e4dd9c1e82da19e19a18b9145d0a12ae8d75",
+      "bytes": 68960
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/concept-rebuild/verify.py",
+      "sha256": "8314a4890b0941158bc0aeb57eee298cf0ceb06142ffc3c83b66d75b0758e9ab",
+      "bytes": 7021
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/equipped-browser-qa.json",
+      "sha256": "8740c73f5e3d44cd620e9c1e191f71ae781bbdce3f11bed1af16db7e10e49da8",
+      "bytes": 215
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/equipped-native-qa.json",
+      "sha256": "d04a19765200d479837ee929ba0d943c9ebc29a04f7f28f1917b237881d0054a",
+      "bytes": 305
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/export-qa.json",
+      "sha256": "c290583c297076c2b6b8c66487465079f40c31bbc62b1735708437a7c2c9ab6e",
+      "bytes": 2712
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/finalize-turrets.py",
+      "sha256": "805873867b2d5df134aad2e1a90d166bbd6d58588e4a38daba08d72961d5e35b",
+      "bytes": 7441
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/finalize.py",
+      "sha256": "1d764df6d8c5c8115d8cc6f5321f16b33c9e5dededea00ce456fe957d7dfb0c3",
+      "bytes": 16332
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/geometry-current.json",
+      "sha256": "363e202e9ba031b74c527e7a3f77279eacef37cefd03133f4518d40be64da511",
+      "bytes": 444350
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/gltf-validation.json",
+      "sha256": "ae9c90001fb8646c993a86e5b7967cfc16f9018bcf10e0cc761b78f36b071efd",
+      "bytes": 3816
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/input-inspection.json",
+      "sha256": "16c567eeb38ef9391607f3cf6eef49e5bba981b5ec7dff7bb22687494a31f3bf",
+      "bytes": 48176
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/native-qa.json",
+      "sha256": "7b02b78f784a52cbd136e7c1fb2ad62d8582794cb045216f863e80ed441ee240",
+      "bytes": 147402
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/package-turrets.mjs",
+      "sha256": "f86c241849008e2b3449ee2c3e31152f690f57feaeee380d3cff4cdc31a4a809",
+      "bytes": 3666
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/package.mjs",
+      "sha256": "dc1cfa0b304b4fb11c457f9fb2f701107af9461750605e3d574bcda2654c6cf6",
+      "bytes": 3699
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/preview.html",
+      "sha256": "613c2a57b35f4b16e084735d7c7df0c0e705f6a74a36dcc56cfc5cd66d88ac76",
+      "bytes": 4586
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/preview.js",
+      "sha256": "84e38e8aa4e977af0a7bea7b1fc6380685e9eecd7492b1d25b12e46019716b47",
+      "bytes": 12845
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/refinement-qa.json",
+      "sha256": "388ed6ae968b40a225ba318a56da4538640bbde84be21cc6f6864a57131f9922",
+      "bytes": 3859
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/review.md",
+      "sha256": "c6cc244aa3f869b84b24e58832c20006d10421eda0a8c030a21f6c96abc0bc14",
+      "bytes": 11378
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/runtime-handoff.json",
+      "sha256": "82e5daa4e249a880060f7254b4eec94288ac587bf78a1b480a46dfe1829cf357",
+      "bytes": 30688
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/runtime-qa.json",
+      "sha256": "f2e4f02aec1f5d94c37a3949052686fae7a26da8451e82096332e8579ad362b7",
+      "bytes": 210979
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/runtime-verify.mjs",
+      "sha256": "b15d86f919cd2a9caa37fd9a6855ac14a5ca1c35d065c8d12efba9ae5d1141d6",
+      "bytes": 9159
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/save-equipped.py",
+      "sha256": "dd28dea43360645f3beaea39339fa4721ffff9e27091877f4b8f789308482ba3",
+      "bytes": 1360
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/side-turrets-validation.json",
+      "sha256": "050c814e22e115cc3f6e6a669c33b9196b7e79005d4fe9e32cc3b54c682646e9",
+      "bytes": 2067
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/side-turrets.glb",
+      "sha256": "cb17dd9d62969c1c84c1f0366102dfc0e8035269dac247c92d017730cb1e973c",
+      "bytes": 960284
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/turret-export-qa.json",
+      "sha256": "7fd2ce005c3fd1037be099dbe731d1f31074054cae9c8af3cda35a4a94d4472f",
+      "bytes": 882
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/turret-fit-qa.json",
+      "sha256": "6428a1c2f766e323ba965cae5ccba4b7b2c668fab3d7c17a0f415ce8d84c0191",
+      "bytes": 696
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/turret-geometry.json",
+      "sha256": "667a2f9ceade4ed9febed556a1bc1640f14f7551f853230dc2502e21a11a75b9",
+      "bytes": 620727
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/vanguard-equipped-validation.json",
+      "sha256": "7321dc9d45d4943d990f3d154e608842bbbeb2dd22fe0145bce60940b42bfae1",
+      "bytes": 3297
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/vanguard-equipped.blend",
+      "sha256": "efd9b4594154afe90ee49c2734bff053111ca010cc31ae9e9bdc6b89a381b5d0",
+      "bytes": 3126234
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/vanguard-equipped.glb",
+      "sha256": "89ee70970ae3c7562b1b04dbda23b1ef07d22531337b34f599ba38ab69f1db2d",
+      "bytes": 2442440
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/vanguard-raw.glb",
+      "sha256": "1580a943659ee6f0d8df0326452d3b2a445ca4f98f46f6e97aba7ffd6aabb970",
+      "bytes": 2543508
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/vanguard.blend",
+      "sha256": "8602d94fa6f431597ec266fcae76ab7eec002a7e1107f7f17a499a74a7bf29c0",
+      "bytes": 2232598
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/verify-turrets.py",
+      "sha256": "7f5ab67fb2a3b1a09656b0b09a02515c4284c05cb90f833c7a09096384ff8b38",
+      "bytes": 2365
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/verify.py",
+      "sha256": "24676baa5d2b9c1404971a65fecee9a354b9192ef27339dc836c665673d3f350",
+      "bytes": 209
+    }
+  ],
+  "references": [
+    {
+      "path": "/Users/mhoeppner/Desktop/glb_models/references/vanguard.png",
+      "sha256": "70fec9e3947e7421e72537c7529b1ebb41560c1afcb9600486778767737c2718",
+      "bytes": 1290943
+    },
+    {
+      "path": "docs/fleet-rebuild/before/vanguard.glb",
+      "sha256": "8fd108631bdb439d508651fe7fda9bc587596b303db48952d9b9c42ba4bf5811",
+      "bytes": 787468
+    },
+    {
+      "path": "assets/models/capital/concord-frigate.glb",
+      "sha256": "6c3d0d2c2d1d96a177b5613210ee18e7dbd08bed10646e9ef4c8b11778f84be7",
+      "bytes": 1289232
+    },
+    {
+      "path": "assets/models/capital/concord-cruiser.glb",
+      "sha256": "4dc291f6b4143db2aa645bcef42020ecde948d838ec5fd66d2dcaa8426950a15",
+      "bytes": 1501456
+    },
+    {
+      "path": "assets/models/ships/wayfarer.glb",
+      "sha256": "251a05dd0db2c455f348a990b19ff528c3f1c40f595e2e631af072e228c5c358",
+      "bytes": 950200
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/input/current.glb",
+      "sha256": "257af9cab80af19d77887bda19863a53e49f5d795627e9ff113111309f9ad633",
+      "bytes": 919436
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/input/current.blend",
+      "sha256": "352f3cf706266df9d658b5ffbf331f6562a8af620a7df944c940e3d141853e48",
+      "bytes": 621437
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/approved-concept/candidate.glb",
+      "sha256": "4fe7b34a72747a5f39dcbb26becc40ac320488c88a63c83441953ebc011e7944",
+      "bytes": 1463872
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/approved-concept/vanguard.blend",
+      "sha256": "df61af1cff587dc18d22c9c6a21bb86ce4785149d427a9c816dc69e82cb27f88",
+      "bytes": 2267214
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/approved-concept/acceptance.json",
+      "sha256": "f4d13fbda4503f65a9628bfa18d608b5334d6219acdd87ecd7f48a103fd1d5cc",
+      "bytes": 279
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/approved-concept/geometry-current.json",
+      "sha256": "07e99ceece6289f80262c22516455a58a97eb68063b382833cf93059331923c3",
+      "bytes": 411953
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/concept-rebuild/user-correction-annotation.png",
+      "sha256": "6b4c81a2e3d12b6d20b7ffcf8d885bf05441ddb8c19944288b464a311ca199e5",
+      "bytes": 457187
+    }
+  ],
+  "evidence": [
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/approved-neutral-bottom.png",
+      "sha256": "a12ae41ad1094166f8f43918335eaccb0af8de7dd7eb6d142008666f598ac6df",
+      "bytes": 85577
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/approved-neutral-front.png",
+      "sha256": "9f85a680924b42f3a5b23812f19345612b908baffca1fd47a7e37d92c0ef5b91",
+      "bytes": 94756
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/approved-neutral-rear.png",
+      "sha256": "421faacaa39409adfee59968b4be79ee0151aa031c284dd53d0e7092c8c02666",
+      "bytes": 86942
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/approved-neutral-sheet.png",
+      "sha256": "8c4008649f4f5f4f3f0a23cec822c7a155519ba9209bd5d4b6150ed15083704a",
+      "bytes": 120545
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/approved-neutral-side.png",
+      "sha256": "75c70d4b41f762f5ace66744561f501a31bf481fce481d6867291564e7dca1e0",
+      "bytes": 82822
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/approved-neutral-three-quarter.png",
+      "sha256": "c6b12dd1676aa6341158f07cf9ab8a47448ccce29a961a3537cf29634148b16a",
+      "bytes": 119882
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/approved-neutral-top.png",
+      "sha256": "dbbfa8efe4970025fff26080e62211d39cfb08adc9ae838f75d00493913db1ef",
+      "bytes": 90473
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/approved-textured-bottom.png",
+      "sha256": "9f1dbc252296866106d27be5012b2f5c193a8e82cf2f04a565cddaf62694fa1c",
+      "bytes": 357104
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/approved-textured-front.png",
+      "sha256": "130d837c3aba706907fd732e0c1339ff4ecf706b0cf18b2fa637d08bcdd3d04e",
+      "bytes": 326580
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/approved-textured-rear.png",
+      "sha256": "cf2501235e77133435c043f833c167603205a4a08e4818d1a63544234c17a0b0",
+      "bytes": 301624
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/approved-textured-sheet.png",
+      "sha256": "23e6b77823c834744ea3b9f6691ab1be2fe88428e39bcb60f8b28c5202933b8c",
+      "bytes": 339062
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/approved-textured-side.png",
+      "sha256": "85bc210efb3e5a924901e2fd772dffb80c60ebd23d131a6ee0608e344a38709f",
+      "bytes": 423326
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/approved-textured-three-quarter.png",
+      "sha256": "bb9a25df59eff0171238f6a83c64af7c78b42d0d16671424b51d888226edb2e4",
+      "bytes": 701508
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/approved-textured-top.png",
+      "sha256": "723351a931d9b0a62b2f343e6329d6432802fbbed23e96d4aaa13f13b7b8b9ed",
+      "bytes": 618930
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/browser-report.json",
+      "sha256": "da5a862965c6d94aa3089bab4f096312af5292dcdccaebe393505a590102ba46",
+      "bytes": 4451
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/concept-comparison.png",
+      "sha256": "2b25486f1e6a334233534c22840ce96c3f71619dca7ccb35e522afc51a6962c7",
+      "bytes": 807331
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/concept-neutral-bottom.png",
+      "sha256": "a56fd14b0d3da15861a34ac6ec54821051218e23d43f3edd03661fc88f68809c",
+      "bytes": 550891
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/concept-neutral-front.png",
+      "sha256": "f9b9e3d3ad6533c816626da630a625db8ff24c152a472249685f7d4cb5eaddeb",
+      "bytes": 552050
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/concept-neutral-rear.png",
+      "sha256": "f631a3984d8b0c3a5bf463fd11eb8262d59fcf9dc89cce50811abe8145d97e3d",
+      "bytes": 546334
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/concept-neutral-sheet.png",
+      "sha256": "41589fe955065d02151d4c9b497c357434d65fc193eef8e99af3c331981b8398",
+      "bytes": 189014
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/concept-neutral-side.png",
+      "sha256": "82bf73ddb22ef4f3d395ed9fa3d33a403ffea149a57051e3e9f9b4ee5b83f98d",
+      "bytes": 543574
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/concept-neutral-three-quarter.png",
+      "sha256": "363ca9a58d425b2f9870c757a0a35c9d6f680b2ea057b57de3579cdabcbf1e44",
+      "bytes": 572974
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/concept-neutral-top.png",
+      "sha256": "af577ecc23796570744ccbb0fc2ee54ab6ba0bf626ecdea87495c7d129d20a7d",
+      "bytes": 554249
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/concept-textured-bottom.png",
+      "sha256": "36c41c7b6087316e0a8d7a541a89a2e76fbc6896f66eb97e62f85e2cb7bbae4e",
+      "bytes": 685257
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/concept-textured-front.png",
+      "sha256": "6756e267043dcb59e5c4c85b52aab25c3d13e5af290fa9b33d3c8ae9b627ef47",
+      "bytes": 654966
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/concept-textured-rear.png",
+      "sha256": "50f3da5d2743fd9686c5b09ab4ebde2c04a172e8346bc6c7f1959b78c44592dd",
+      "bytes": 653453
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/concept-textured-sheet.png",
+      "sha256": "3c4f5f5b10e64098f6fa980d7feea7c316f54a6d3483e5357c92b1d809142f33",
+      "bytes": 410546
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/concept-textured-side.png",
+      "sha256": "fb4c5e369d8ab3d14d832df82fe2ae6e547b45c25cbf64f28403cf0a35124d01",
+      "bytes": 710851
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/concept-textured-three-quarter.png",
+      "sha256": "62eeb8c85a62f7d04c1a0e39a1d3a15b99bdfb3f7516ddb6ef02f4cf92dd593a",
+      "bytes": 861171
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/concept-textured-top.png",
+      "sha256": "286c733aba136bb3a3b12db19c19af310dc6039459a58c2656fcabcd8284283b",
+      "bytes": 810867
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/detail-engines-core.png",
+      "sha256": "31b85c5cac8d25c652d27723479325a117eab7e76422b970fc61dd579a7e36fd",
+      "bytes": 912589
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/detail-engines-glow.png",
+      "sha256": "2a79a9051f95cdd8ff6b8a7129ac86f36cb06d2a47ff148b69b933dff4b91b4c",
+      "bytes": 921431
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/detail-engines-neutral.png",
+      "sha256": "7ef59005ca25f538e96115ce4689cf7bb8c7e39859684facee1d4e49500dc753",
+      "bytes": 569618
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/detail-engines-textured.png",
+      "sha256": "2e9c49586b30eab5d7d501b1d5b0d47aa33f6aaa84922ff7553d5b740b5c3bbe",
+      "bytes": 921389
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/detail-guns-neutral.png",
+      "sha256": "59833d2533f2139223023b075998103cdf644452507c9e07875d174d3ad00c13",
+      "bytes": 550729
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/detail-guns-textured.png",
+      "sha256": "2f6ae209e8b179b273c9d11409f0f38f45fb89bd064132705de3519b872465c6",
+      "bytes": 840823
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/detail-intakes-neutral.png",
+      "sha256": "8ada08c94517b73c08c4e3d86e9a22e1ea933da60317a33e3dfc991665ec4cf7",
+      "bytes": 561957
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/detail-intakes-textured.png",
+      "sha256": "28a61d8e0384afeb17ab8aab4e2014f018c0ad74a52d6f4e370006d69d4a3d3b",
+      "bytes": 977238
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/detail-launchers-neutral.png",
+      "sha256": "c5d7c7d4380188d05847d55bf050bfdbfb5ef07e4cfd8e062614a29d9c77ec28",
+      "bytes": 565082
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/detail-launchers-textured.png",
+      "sha256": "b781d79450dfb005d1cab4a77a4aa511e52093cd63483a3ac6a9ad1381c9b616",
+      "bytes": 960576
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/mobile.png",
+      "sha256": "035180a39190fe7a3262530716a8f9449fc6ad6b2451d59786efc1f3ec0ad02b",
+      "bytes": 191232
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/orbit-zoom.png",
+      "sha256": "94f387b97adebd69d08e0ab7a929b94ccf5a9eb664269804b4a18d63adf208e5",
+      "bytes": 972601
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/runtime-turrets.png",
+      "sha256": "e0e26285b39c34b82de78a569d02788acb31c9e9caec85fe12460e6259e4793e",
+      "bytes": 863238
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/weapon-sockets.png",
+      "sha256": "dd8698a777409c76e4242872bdd1b87a3bb1c5e405140fae3ab85a9cffeac147",
+      "bytes": 864030
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/correction-final/wireframe.png",
+      "sha256": "eddab25fe9d0625612e06bc62aff45c6b22d2bcad7defdb0b85476124b4595de",
+      "bytes": 956967
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/approved-comparison.png",
+      "sha256": "b228c351125f306164d3ad4aefc5405fd4c6f4ab9507a3b4eca9e39aa971c19e",
+      "bytes": 561249
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/browser-report.json",
+      "sha256": "95b87f83fd6843a0630e6455ab140bc2671c96f1a585a06b77817d017ee29f6c",
+      "bytes": 840
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/equipped-glb-three-quarter.png",
+      "sha256": "3b6c390ecbb3272275ac9c638ca5f98c460cc95e9dfd4cd4f0a97fa202fc75e8",
+      "bytes": 867593
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/equipped-port.png",
+      "sha256": "fc651b0a66de8f9c4c66b71b1f1d2ff30944e3ded7cb9f9798404ab7630bfbeb",
+      "bytes": 996192
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/equipped-starboard.png",
+      "sha256": "8cc9789089a92b51748e0c9e5ed4e6d9476966c1f210549b1ce2b012134f843a",
+      "bytes": 1002297
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/mobile.png",
+      "sha256": "246d5b2ced5b09d836add12a14e6aaf0a4ed52fbbdfe811c151e406fdb2af8ea",
+      "bytes": 195103
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/neutral-bottom.png",
+      "sha256": "b3dbbb1637745e3fcab65f34cde984d494eaaa76609253206bae6d2547c42e43",
+      "bytes": 537298
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/neutral-front.png",
+      "sha256": "2240e6f37cd51979bdf32f08cda0f76fe6117cc32745f0747c71af1e268094f6",
+      "bytes": 552868
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/neutral-port-turret.png",
+      "sha256": "bf3954d77404de7e5d32965e203c4faa7cf4b01c29fd7964868beced88b5eab8",
+      "bytes": 562467
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/neutral-rear.png",
+      "sha256": "71799b322546fe6e18e03cf8112b3cbb11df0116ebbe6b6e9b7c517c52359c52",
+      "bytes": 550106
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/neutral-side.png",
+      "sha256": "7dfd6ad1629026fd1d03cf0b5cf696c0c62d282821ebb390542f0f8212071839",
+      "bytes": 549497
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/neutral-starboard-turret.png",
+      "sha256": "a2810885cf2cc1ef7dc14ea7b9db079de74de93126da1ec0fdd2a663df3acef6",
+      "bytes": 565203
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/neutral-three-quarter.png",
+      "sha256": "2af77eb7c1aae29bb189738c6c1f49fd8f10cdcef2ecdaf2b2f6c52dac4fa0ce",
+      "bytes": 569589
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/neutral-top.png",
+      "sha256": "1a0d014e42dd2abac199cea276b8ddec8512ef8b9efe1a0416f506caef8e2ee6",
+      "bytes": 537597
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/textured-bottom.png",
+      "sha256": "48e1af04993ccc115ba64b8aad0d0d2d19803205e1eea80a03d8caa7385c9ca4",
+      "bytes": 687535
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/textured-front.png",
+      "sha256": "86d8079eeed2b4cbfea1f799764c058bfbf734bebaebd56d56cc8b2a60b788e7",
+      "bytes": 660173
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/textured-port-turret.png",
+      "sha256": "4d60a2838c0dfa313e8df77d3646ce57065369f75a303e14fe60c13034a95f0f",
+      "bytes": 993476
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/textured-rear.png",
+      "sha256": "8cdd3b456a31468f7e57944b8973b221664d017546b9f0fb4903750f82da7755",
+      "bytes": 658308
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/textured-side.png",
+      "sha256": "23bc530547f0f2c98226f5953aee0f7df857911a333f109f6f9a5beac0d338dd",
+      "bytes": 714426
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/textured-starboard-turret.png",
+      "sha256": "474a024c7dffe5cd0f0e888883570e64cc94a27fbb310521903db04b9d48e867",
+      "bytes": 999423
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/textured-three-quarter.png",
+      "sha256": "3eab2399c4736980b34adee8962db245278fd87b367c831c978a4f8047f0e731",
+      "bytes": 864360
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/textured-top.png",
+      "sha256": "05219c726f0aa88f842b19e28d06c001dc2553bee1559b1535dd232f80d2b8a5",
+      "bytes": 813579
+    },
+    {
+      "path": "docs/ship-revisions/20261002/vanguard/evidence/side-turrets/wireframe.png",
+      "sha256": "df9ee2ed63acc94ac1f6779fb7364e3f6f93bbbd3152ec5dc0506a10b6e01664",
+      "bytes": 1132325
+    }
+  ],
+  "previousShapeAuthority": {
+    "request": "Reverse your side intake change, I meant the one in the green circle. Look at the reference image. Also rocket launchers (red circle) still clips into the hull. Look at the reference image and get that shape right.",
+    "reference": "/Users/mhoeppner/Desktop/glb_models/references/vanguard.png",
+    "approvedCandidateSHA256": "4fe7b34a72747a5f39dcbb26becc40ac320488c88a63c83441953ebc011e7944",
+    "approvedNativeSHA256": "df61af1cff587dc18d22c9c6a21bb86ce4785149d427a9c816dc69e82cb27f88",
+    "approvalRecord": "docs/ship-revisions/20261002/vanguard/approved-concept/acceptance.json",
+    "frozenInputUnchanged": true
+  },
+  "equippedModel": {
+    "name": "vanguard-equipped.glb",
+    "sha256": "89ee70970ae3c7562b1b04dbda23b1ef07d22531337b34f599ba38ab69f1db2d",
+    "bytes": 2442440,
+    "sideTurrets": 2,
+    "turretTriangles": 1016,
+    "totalTriangles": 5690,
+    "materials": 3,
+    "textures": 8,
+    "gltfErrors": 0,
+    "gltfWarnings": 0,
+    "path": "docs/ship-revisions/20261002/vanguard/vanguard-equipped.glb",
+    "native": "docs/ship-revisions/20261002/vanguard/vanguard-equipped.blend",
+    "nativeSHA256": "efd9b4594154afe90ee49c2734bff053111ca010cc31ae9e9bdc6b89a381b5d0",
+    "editableHullParts": 74,
+    "editableTurretParts": 26,
+    "packedNativeImages": 8
+  },
+  "gameIntegration": {
+    "version": "0.8.2em",
+    "cache": "voidrunner-v377-0-8-2em-vanguard-concept",
+    "shippingAsset": "assets/models/ships/vanguard.glb",
+    "shippingSHA256": "788dcb673e649fabcd52d8cc3c6fd6bd8720344c83db1a41321fa47608d99119",
+    "hullTriangles": 4674,
+    "articulatedSideTurrets": 2,
+    "engineOutlets": 4,
+    "browser": "docs/ship-revisions/20261002/vanguard/integration/browser-report.json",
+    "geometry": "docs/ship-revisions/20261002/vanguard/integration/geometry.json",
+    "verification": {
+      "focusedChecksPassed": 32,
+      "browserErrors": 0,
+      "fleetAuditExistingMismatches": [
+        "legionary native-source record",
+        "speedster native-source record",
+        "concord-battleship GLB record",
+        "andromeda native-source record",
+        "torsas native-source record",
+        "astra native-source record"
+      ]
+    },
+    "files": [
+      {
+        "path": "assets/models/ships/vanguard.glb",
+        "sha256": "788dcb673e649fabcd52d8cc3c6fd6bd8720344c83db1a41321fa47608d99119"
+      },
+      {
+        "path": "src/game/render.js",
+        "sha256": "05fe72dc3c6777e9b8295e7e1dd3c4b9348917da6631a24d8696413ecb912842"
+      },
+      {
+        "path": "src/game/shipPreview.js",
+        "sha256": "119157fb88766d2fa0f2b6b5b5194ca83f4032b9cfa6a9f7a54cc00ce2fb09ee"
+      },
+      {
+        "path": "src/game/game.js",
+        "sha256": "5bfe741784ac1d77ddfde47c1bdb4e1c22c3bdb66b6acab90fc7f70419475276"
+      },
+      {
+        "path": "src/game/turrets.js",
+        "sha256": "70fd0eb251436736e55c0925e28dc5f913db30eb6e3cda2a53d8d16cd854b759"
+      },
+      {
+        "path": "src/game/turretLayouts.js",
+        "sha256": "1307d084449c14ab559ffc3641cd81ba57d089697948c1705c859efbe8e9438c"
+      },
+      {
+        "path": "src/game/turretClearance.js",
+        "sha256": "ba87988e106f1dfad82fe08cc76d18c23dc3c0bffe20dae934f8f94173062f69"
+      },
+      {
+        "path": "src/game/shipMounts.js",
+        "sha256": "b2d910c3d721d632266cf5f7fbcae6f988f94892279c553a401ea2445c1641b8"
+      },
+      {
+        "path": "src/game/shipProfiles.js",
+        "sha256": "410150e0f67f17aeb19eeea23816ce4135fb71529ed13327c46166ed2c464aa0"
+      },
+      {
+        "path": "src/game/ui.js",
+        "sha256": "516ce5123145651f6dd7ea07c1c976a8fd05988f4e0108ba94b187beaa6ebf33"
+      },
+      {
+        "path": "sw.js",
+        "sha256": "0a0b6e60995c93e78ac377d1f1ed577aef8669cf5bd80bd4522ca2be692392d7"
+      },
+      {
+        "path": "tests/vanguard-integration.test.mjs",
+        "sha256": "dee086b1b59d6c17e233c8c394cb5a64d4463df62ae74aaa1673c36ebeab2488"
+      },
+      {
+        "path": "tests/fleet-rebuild.test.mjs",
+        "sha256": "db4cc321c89e6ffa1e9bd79bf4e34a5b55a8d98898c725beb8bacf7c4165aa24"
+      }
+    ],
+    "shipyard": "docs/ship-revisions/20261002/vanguard/integration/shipyard-report.json"
+  }
+}

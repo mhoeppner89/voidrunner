@@ -1,0 +1,1293 @@
+{
+  "id": "talon",
+  "glbPath": "assets/models/ships/talon.glb",
+  "glbSha256": "69ca47f34c934569f6f411b86a37296f16cbab5f0adb83185227840736395b41",
+  "descriptorSha256": "431ebeb9b5cf4f0faf431299446edbb7b9c3d283a112abf6b66d2b0e6e3c9422",
+  "coordinateFrame": "Unscaled GLB space",
+  "epsilon": 0.0000027382704236992253,
+  "method": "Double-sided first-hit rays at center and eight angles on 35% and 65% aperture radii. The measured aperture plane is the aft lip, not the glow socket. Whole-base fit is also visually reviewed.",
+  "mouths": [
+    {
+      "name": "Port lower engine_exhaust",
+      "center": [
+        -0.9139999747276306,
+        -0.14800000376999378,
+        0.22099999338388443
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.08233679085969925,
+      "radiusV": 0.0681408029049635,
+      "minDepth": 0.038,
+      "maxDepth": 0.4089999794960022,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.14800000376999378,
+            0.22099999338388443
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.14800000376999378,
+            0.24981787018477916
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.1311360154366353,
+            0.24137730948919559
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.12415072275325656,
+            0.22099999338388443
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.13113601543663528,
+            0.20062267727857327
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.14800000376999378,
+            0.1921821165829897
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.16486399210335226,
+            0.20062267727857327
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.171849284786731,
+            0.22099999338388443
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.16486399210335229,
+            0.24137730948919559
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.14800000376999378,
+            0.2745189074426889
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.11668116829375659,
+            0.25884358043660516
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.10370848188176751,
+            0.22099999338388443
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.11668116829375658,
+            0.1831564063311637
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.14800000376999378,
+            0.1674810793250799
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.179318839246231,
+            0.1831564063311637
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.19229152565822005,
+            0.22099999338388443
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.179318839246231,
+            0.25884358043660516
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "Port upper engine_exhaust",
+      "center": [
+        -0.9160000085830688,
+        -0.026000000536441803,
+        0.18300000578165054
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.0674309954047203,
+      "radiusV": 0.054654598236083984,
+      "minDepth": 0.038,
+      "maxDepth": 0.45100000500679016,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.026000000536441803,
+            0.18300000578165054
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.026000000536441803,
+            0.20660085417330265
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.027424180867387113,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.012473677573925349,
+            0.19968832572114337
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.006870891153812411,
+            0.18300000578165054
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.012473677573925345,
+            0.16631168584215772
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.0260000005364418,
+            0.15939915738999844
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.02742418569053144,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.03952632349895826,
+            0.16631168584215772
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 4.185952122036027e-17,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.045129109919071195,
+            0.18300000578165054
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 4.185952122036027e-17,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.039526323498958266,
+            0.19968832572114337
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 4.185952122036027e-17,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.026000000536441803,
+            0.22683015279471874
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 4.185952122036027e-17,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.0008796864631969575,
+            0.21399259995499437
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            0.00952548831701279,
+            0.18300000578165054
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.0008796864631969541,
+            0.15200741160830672
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.0260000005364418,
+            0.13916985876858234
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 4.185952122036027e-17,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.05112031460968665,
+            0.15200741160830672
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04897871745208564,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.061525489389896396,
+            0.18300000578165054
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04583820191462411,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.051120314609686655,
+            0.21399259995499437
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.048978734678932365,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": false
+    },
+    {
+      "name": "Starboard lower engine_exhaust",
+      "center": [
+        -0.9139999747276306,
+        -0.14800000376999378,
+        -0.22099999338388443
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.08233679085969925,
+      "radiusV": 0.0681408029049635,
+      "minDepth": 0.038,
+      "maxDepth": 0.4089999794960022,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.14800000376999378,
+            -0.22099999338388443
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.14800000376999378,
+            -0.1921821165829897
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.1311360154366353,
+            -0.20062267727857327
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.12415072275325656,
+            -0.22099999338388443
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.13113601543663528,
+            -0.24137730948919559
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.14800000376999378,
+            -0.24981787018477916
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.16486399210335226,
+            -0.24137730948919559
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.171849284786731,
+            -0.22099999338388443
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.16486399210335229,
+            -0.20062267727857327
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.14800000376999378,
+            -0.1674810793250799
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.11668116829375659,
+            -0.1831564063311637
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.10370848188176751,
+            -0.22099999338388443
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.11668116829375658,
+            -0.25884358043660516
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.14800000376999378,
+            -0.2745189074426889
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.179318839246231,
+            -0.25884358043660516
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.19229152565822005,
+            -0.22099999338388443
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.9139999747276306,
+            -0.179318839246231,
+            -0.1831564063311637
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.040999948978424114,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "Starboard upper engine_exhaust",
+      "center": [
+        -0.9160000085830688,
+        -0.026000000536441803,
+        -0.18300000578165054
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.0674309954047203,
+      "radiusV": 0.054654598236083984,
+      "minDepth": 0.038,
+      "maxDepth": 0.45100000500679016,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.026000000536441803,
+            -0.18300000578165054
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.026000000536441803,
+            -0.15939915738999844
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.02742418569053144,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.012473677573925349,
+            -0.16631168584215772
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.006870891153812411,
+            -0.18300000578165054
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.012473677573925345,
+            -0.19968832572114337
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.0260000005364418,
+            -0.20660085417330265
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.027424180867387113,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.03952632349895826,
+            -0.19968832572114337
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 4.185952122036027e-17,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.045129109919071195,
+            -0.18300000578165054
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 4.185952122036027e-17,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.039526323498958266,
+            -0.16631168584215772
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 4.185952122036027e-17,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.026000000536441803,
+            -0.13916985876858234
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 4.185952122036027e-17,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.0008796864631969575,
+            -0.15200741160830672
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            0.00952548831701279,
+            -0.18300000578165054
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.0008796864631969541,
+            -0.21399259995499437
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04100000858306889,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.0260000005364418,
+            -0.22683015279471874
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 4.185952122036027e-17,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.05112031460968665,
+            -0.21399259995499437
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.048978734678932365,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.061525489389896396,
+            -0.18300000578165054
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04583820191462411,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.9160000085830688,
+            -0.051120314609686655,
+            -0.15200741160830672
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04897871745208575,
+          "inwardHitMaterial": "Talon Concord authored PBR",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": false
+    }
+  ],
+  "allOutwardClear": true,
+  "allRecessesVisible": false
+}

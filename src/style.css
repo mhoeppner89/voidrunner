@@ -17604,10 +17604,15 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   #arena-panel .arena-mode-mark { width: 46px; height: 46px; }
 }
 
-/* Shared transparent symbols: shape = item kind, ticks = tier, corner = affix. */
+/* Transparent faceted glyphs: hardware shape, tier pips and modifier marks. */
 .item-icon { display:block; width:40px; height:40px; flex-shrink:0; color:var(--item-color,currentColor); }
-.item-tier-mark { stroke-width:3; }
-.item-affix-mark { stroke-width:2.5; }
+.item-icon .item-surface { fill:var(--icon-body); fill-opacity:.95; stroke:var(--icon-edge); }
+.item-icon .item-facet { fill:var(--icon-face); fill-opacity:.95; stroke:none; }
+.item-icon .item-engraving { stroke:var(--icon-line); stroke-width:1.4; }
+.item-icon .item-core { fill:var(--icon-accent); stroke:none; }
+.item-icon .item-signal { stroke:var(--icon-accent); stroke-width:2; }
+.item-icon .item-tier-mark { fill:currentColor; stroke:none; }
+.item-icon .item-affix-mark { stroke:currentColor; stroke-width:2; }
 .commodity-art > .commodity-icon { width:min(72%,110px); height:80%; color:var(--commodity-accent,var(--void-cyan)); }
 .inventory-commodity { position:relative; padding-left:52px; }
 .inventory-commodity > .commodity-icon { position:absolute; left:6px; top:50%; transform:translateY(-50%); color:var(--void-cyan); }

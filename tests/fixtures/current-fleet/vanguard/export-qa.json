@@ -1,0 +1,129 @@
+{
+  "candidateSHA256": "788dcb673e649fabcd52d8cc3c6fd6bd8720344c83db1a41321fa47608d99119",
+  "triangles": 4674,
+  "vertices": 9836,
+  "primitives": 2,
+  "materials": 2,
+  "fileBytes": 1487104,
+  "degenerateTriangles": 0,
+  "nonFiniteVertices": 0,
+  "missingUV": 0,
+  "missingTangents": 0,
+  "images": [
+    {
+      "name": "vanguard-emission-512",
+      "width": 512,
+      "height": 512,
+      "bytes": 21152,
+      "mimeType": "image/png",
+      "slots": [
+        "emissiveTexture"
+      ]
+    },
+    {
+      "name": "vanguard-normal-1024",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 224816,
+      "mimeType": "image/png",
+      "slots": [
+        "normalTexture"
+      ]
+    },
+    {
+      "name": "vanguard-albedo-1024",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 695969,
+      "mimeType": "image/jpeg",
+      "slots": [
+        "baseColorTexture"
+      ]
+    },
+    {
+      "name": "vanguard-surface-512",
+      "width": 512,
+      "height": 512,
+      "bytes": 40717,
+      "mimeType": "image/png",
+      "slots": [
+        "metallicRoughnessTexture"
+      ]
+    }
+  ],
+  "allTexturesEmbedded": true,
+  "socketNodes": [
+    {
+      "name": "Port central gun_muzzle",
+      "position": [
+        0.257999986410141,
+        0.3230000138282776,
+        0.04100000113248825
+      ]
+    },
+    {
+      "name": "Port lower drive_exhaust",
+      "position": [
+        -0.9950000047683716,
+        -0.2849999964237213,
+        0.3400000035762787
+      ]
+    },
+    {
+      "name": "Port shoulder rocket launcher_muzzle",
+      "position": [
+        0.4480000138282776,
+        0.11299999803304672,
+        0.35600000619888306
+      ]
+    },
+    {
+      "name": "Port upper drive_exhaust",
+      "position": [
+        -0.9950000047683716,
+        0.10499999672174454,
+        0.3400000035762787
+      ]
+    },
+    {
+      "name": "Rooftop reserve rocket launcher_muzzle",
+      "position": [
+        0.02199999988079071,
+        0.5019999742507935,
+        0
+      ]
+    },
+    {
+      "name": "Starboard central gun_muzzle",
+      "position": [
+        0.257999986410141,
+        0.3230000138282776,
+        -0.04100000113248825
+      ]
+    },
+    {
+      "name": "Starboard lower drive_exhaust",
+      "position": [
+        -0.9950000047683716,
+        -0.2849999964237213,
+        -0.3400000035762787
+      ]
+    },
+    {
+      "name": "Starboard shoulder rocket launcher_muzzle",
+      "position": [
+        0.4480000138282776,
+        0.11299999803304672,
+        -0.35600000619888306
+      ]
+    },
+    {
+      "name": "Starboard upper drive_exhaust",
+      "position": [
+        -0.9950000047683716,
+        0.10499999672174454,
+        -0.3400000035762787
+      ]
+    }
+  ]
+}

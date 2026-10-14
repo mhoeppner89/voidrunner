@@ -57,8 +57,8 @@ Percentages are sampled orthographic silhouette areas, not combat miss rates. �
 | concord-carrier | 0.0% | 0.0% | 6.2% |
 | concord-cruiser | 0.0% | 5.2% | 7.5% |
 
-[Collision overlay](http://127.0.0.1:4192/.freebuff/ship-collision-audit/index.html?revision=0.8.2fs) · [Game test version](http://127.0.0.1:4192/game.html?revision=0.8.2fs)
+[Collision overlay](http://127.0.0.1:4192/output/ship-collision-audit/index.html?revision=0.8.2fs) · [Game test version](http://127.0.0.1:4192/game.html?revision=0.8.2fs)
 
-Rebuild after editing a GLB: `node --import ./src/game/offlineImportHooks.mjs scripts/bake-ship-colliders.mjs`. Hash checks prevent stale shapes being accepted. Regenerate the overlay with `scripts/audit-ship-collisions.mjs`; measure queries with `scripts/benchmark-ship-collisions.mjs`, using the same offline import hook.
+Rebuild after editing a GLB: `node --import ./tests/helpers/offline-imports.mjs tools/assets/bake-ship-colliders.mjs`. Hash checks prevent stale shapes being accepted. Regenerate the overlay with `tools/assets/audit-ship-collisions.mjs`; measure queries with `tools/assets/benchmark-ship-collisions.mjs`, using the same offline import hook.
 
-Evidence: [bake metadata](bake.json), [query benchmark](performance.json), [browser checks](../../.freebuff/ship-collision-playtest/results.json), [player actions](../../.freebuff/ship-collision-playtest/player-actions.json).
+Evidence: [bake metadata](bake.json), [query benchmark](performance.json), [browser checks](../../output/playtest/results.json), [player actions](../../output/playtest/player-actions.json).

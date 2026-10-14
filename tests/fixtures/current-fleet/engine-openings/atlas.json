@@ -1,0 +1,1933 @@
+{
+  "id": "atlas",
+  "glbPath": "assets/models/ships/atlas.glb",
+  "glbSha256": "a9a294c25cef0bc1e4829e271fc6bef61430c3a3dceee386070167402440e45e",
+  "descriptorSha256": "dbeeafdb588a348b89a297157ff7bb1e85ba1879fa0203be2dc40fa1390b1110",
+  "coordinateFrame": "Unscaled GLB space",
+  "epsilon": 0.0000022292547696859393,
+  "method": "Double-sided first-hit rays at center and eight angles on 35% and 65% aperture radii. The measured aperture plane is the aft lip, not the glow socket. Whole-base fit is also visually reviewed.",
+  "mouths": [
+    {
+      "name": "Atlas source drive -1/0 rooted engine casing",
+      "center": [
+        -1.000387,
+        -0.194,
+        0.201
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.07936046588790985,
+      "radiusV": 0.07936046588790985,
+      "minDepth": 0.03198,
+      "maxDepth": 0.051000000000000004,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.194,
+            0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.194,
+            0.22877616306076845
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.17435928674438736,
+            0.22064071325561269
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.16622383693923157,
+            0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.17435928674438733,
+            0.18135928674438737
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.194,
+            0.17322383693923157
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.21364071325561265,
+            0.18135928674438734
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.22177616306076844,
+            0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.21364071325561268,
+            0.22064071325561266
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.194,
+            0.2525843028271414
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.1575243896681479,
+            0.2374756103318521
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.1424156971728586,
+            0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.1575243896681479,
+            0.16452438966814792
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.194,
+            0.1494156971728586
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.2304756103318521,
+            0.16452438966814792
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.24558430282714142,
+            0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.2304756103318521,
+            0.23747561033185208
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": false
+    },
+    {
+      "name": "Atlas source drive 1/0 rooted engine casing",
+      "center": [
+        -1.000387,
+        -0.194,
+        -0.201
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.07936046588790985,
+      "radiusV": 0.07936046588790985,
+      "minDepth": 0.03198,
+      "maxDepth": 0.051000000000000004,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.194,
+            -0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.194,
+            -0.17322383693923157
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.17435928674438736,
+            -0.18135928674438734
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.16622383693923157,
+            -0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.17435928674438733,
+            -0.22064071325561266
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.194,
+            -0.22877616306076845
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.21364071325561265,
+            -0.22064071325561269
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.22177616306076844,
+            -0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.21364071325561268,
+            -0.18135928674438737
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.194,
+            -0.1494156971728586
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.1575243896681479,
+            -0.16452438966814792
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.1424156971728586,
+            -0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.1575243896681479,
+            -0.2374756103318521
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.194,
+            -0.2525843028271414
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.2304756103318521,
+            -0.2374756103318521
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.24558430282714142,
+            -0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.2304756103318521,
+            -0.16452438966814795
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": false
+    },
+    {
+      "name": "Atlas source drive -1/1 rooted engine casing",
+      "center": [
+        -1.000387,
+        -0.014,
+        0.201
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.08851744272113023,
+      "radiusV": 0.08851744272113023,
+      "minDepth": 0.03198,
+      "maxDepth": 0.051000000000000004,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.014,
+            0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.014,
+            0.2319811049523956
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.007906949400491041,
+            0.22290694940049105
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.016981104952395576,
+            0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.007906949400491045,
+            0.17909305059950897
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.013999999999999997,
+            0.17001889504760442
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.035906949400491044,
+            0.17909305059950897
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.04498110495239558,
+            0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.03590694940049105,
+            0.22290694940049105
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.014,
+            0.25853633776873464
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.026684334600911942,
+            0.24168433460091196
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.043536337768734654,
+            0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.026684334600911942,
+            0.16031566539908806
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.013999999999999993,
+            0.14346366223126536
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.05468433460091194,
+            0.16031566539908806
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.07153633776873465,
+            0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.054684334600911946,
+            0.24168433460091193
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": false
+    },
+    {
+      "name": "Atlas source drive 1/1 rooted engine casing",
+      "center": [
+        -1.000387,
+        -0.014,
+        -0.201
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.08851744272113023,
+      "radiusV": 0.08851744272113023,
+      "minDepth": 0.03198,
+      "maxDepth": 0.051000000000000004,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.014,
+            -0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.014,
+            -0.17001889504760442
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.007906949400491041,
+            -0.17909305059950897
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.016981104952395576,
+            -0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.007906949400491045,
+            -0.22290694940049105
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.013999999999999997,
+            -0.2319811049523956
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.035906949400491044,
+            -0.22290694940049105
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.04498110495239558,
+            -0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.03590694940049105,
+            -0.17909305059950897
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.014,
+            -0.14346366223126536
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.026684334600911942,
+            -0.16031566539908806
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.043536337768734654,
+            -0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.026684334600911942,
+            -0.24168433460091196
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.013999999999999993,
+            -0.25853633776873464
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.05468433460091194,
+            -0.24168433460091196
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.07153633776873465,
+            -0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -1.000387,
+            -0.054684334600911946,
+            -0.1603156653990881
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": false
+    },
+    {
+      "name": "Atlas source drive -1/2 rooted engine casing",
+      "center": [
+        -1.000387,
+        0.166,
+        0.201
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.07630814027683641,
+      "radiusV": 0.07630814027683641,
+      "minDepth": 0.03198,
+      "maxDepth": 0.051000000000000004,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.166,
+            0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.166,
+            0.22770784909689276
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.18488530120731989,
+            0.2198853012073199
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.19270784909689276,
+            0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.18488530120731989,
+            0.18211469879268014
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.166,
+            0.17429215090310726
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.14711469879268013,
+            0.18211469879268014
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.13929215090310726,
+            0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.14711469879268013,
+            0.21988530120731986
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.166,
+            0.2506002911799437
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.20107270224216547,
+            0.23607270224216548
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.21560029117994367,
+            0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.20107270224216547,
+            0.16592729775783455
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.166,
+            0.15139970882005635
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.13092729775783454,
+            0.16592729775783455
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.11639970882005635,
+            0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.13092729775783452,
+            0.23607270224216548
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": false
+    },
+    {
+      "name": "Atlas source drive 1/2 rooted engine casing",
+      "center": [
+        -1.000387,
+        0.166,
+        -0.201
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.07630814027683641,
+      "radiusV": 0.07630814027683641,
+      "minDepth": 0.03198,
+      "maxDepth": 0.051000000000000004,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.166,
+            -0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.166,
+            -0.17429215090310726
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.18488530120731989,
+            -0.18211469879268014
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.19270784909689276,
+            -0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.18488530120731989,
+            -0.2198853012073199
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.166,
+            -0.22770784909689276
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.14711469879268013,
+            -0.2198853012073199
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.13929215090310726,
+            -0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.14711469879268013,
+            -0.18211469879268016
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.166,
+            -0.15139970882005635
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.20107270224216547,
+            -0.16592729775783455
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.21560029117994367,
+            -0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.20107270224216547,
+            -0.23607270224216548
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.166,
+            -0.2506002911799437
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.13092729775783454,
+            -0.23607270224216548
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.11639970882005635,
+            -0.201
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -1.000387,
+            0.13092729775783452,
+            -0.16592729775783455
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.012387024318694968,
+          "inwardHitMaterial": "atlas · 512 engines plating",
+          "recessed": false
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": false
+    }
+  ],
+  "allOutwardClear": true,
+  "allRecessesVisible": false
+}

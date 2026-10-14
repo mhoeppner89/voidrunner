@@ -1,0 +1,168 @@
+{
+  "date": "2026-10-14",
+  "blender": "5.2.0 LTS",
+  "sources": [
+    {
+      "path": "authoring/models/wayfarer/wayfarer.blend",
+      "editableMeshes": 119,
+      "images": 6,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/vanguard/vanguard.blend",
+      "editableMeshes": 74,
+      "images": 6,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/scrapper/scrapper.blend",
+      "editableMeshes": 150,
+      "images": 3,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/demon/demon.blend",
+      "editableMeshes": 80,
+      "images": 6,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/mule/mule.blend",
+      "editableMeshes": 209,
+      "images": 8,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/talon/talon.blend",
+      "editableMeshes": 133,
+      "images": 6,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/prospector/prospector.blend",
+      "editableMeshes": 102,
+      "images": 10,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/lancer/lancer.blend",
+      "editableMeshes": 94,
+      "images": 3,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/atlas/atlas.blend",
+      "editableMeshes": 151,
+      "images": 10,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/blade/blade.blend",
+      "editableMeshes": 190,
+      "images": 3,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/speedster/speedster.blend",
+      "editableMeshes": 115,
+      "images": 6,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/legionary/legionary.blend",
+      "editableMeshes": 173,
+      "images": 6,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/andromeda/andromeda.blend",
+      "editableMeshes": 105,
+      "images": 6,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/torsas/torsas.blend",
+      "editableMeshes": 81,
+      "images": 6,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/astra/astra.blend",
+      "editableMeshes": 83,
+      "images": 6,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/concord-frigate/concord-frigate.blend",
+      "editableMeshes": 129,
+      "images": 4,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/concord-battleship/concord-battleship.blend",
+      "editableMeshes": 1415,
+      "images": 14,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/concord-carrier/concord-carrier.blend",
+      "editableMeshes": 934,
+      "images": 24,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/concord-cruiser/concord-cruiser.blend",
+      "editableMeshes": 4871,
+      "images": 7,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/mining-drone/mining-drone.blend",
+      "editableMeshes": 66,
+      "images": 3,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/combat-drone/combat-drone.blend",
+      "editableMeshes": 66,
+      "images": 2,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/stations/original-stations-rebuilt.blend",
+      "editableMeshes": 64,
+      "images": 1,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/stations/acheron-stations.blend",
+      "editableMeshes": 20,
+      "images": 1,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/concord-frigate/frigate_with_components.blend",
+      "editableMeshes": 308,
+      "images": 4,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/concord-frigate/frigate-no-fixed-guns.blend",
+      "editableMeshes": 1,
+      "images": 1,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/ordnance/ordnance.blend",
+      "editableMeshes": 66,
+      "images": 3,
+      "missingExternalImages": []
+    },
+    {
+      "path": "authoring/models/turrets/turrets.blend",
+      "editableMeshes": 27,
+      "images": 0,
+      "missingExternalImages": []
+    }
+  ]
+}

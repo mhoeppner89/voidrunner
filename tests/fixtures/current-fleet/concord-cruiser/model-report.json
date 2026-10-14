@@ -1,0 +1,399 @@
+{
+  "hullTriangles": 6076,
+  "hullPolygons": 2438,
+  "batteryTriangles": 492,
+  "pdcTriangles": 252,
+  "objects": 131,
+  "referenceBounds": [
+    2,
+    0.682906,
+    1.102961
+  ],
+  "shapeRevision": "measured triangular bow, oval tiered bridge, tapered stern yoke, supported engine roots and aerials",
+  "batteryScaleIncrease": 1.0625,
+  "batteryScaleFromPrevious": 0.4,
+  "engineBankSections": [
+    [
+      0.5,
+      0.27,
+      -0.19,
+      0.225
+    ],
+    [
+      0.55,
+      0.332,
+      -0.322,
+      0.326
+    ],
+    [
+      0.63,
+      0.332,
+      -0.322,
+      0.326
+    ],
+    [
+      0.671,
+      0.303,
+      -0.305,
+      0.307
+    ]
+  ],
+  "engineBasesFullySupported": true,
+  "engineCenters": [
+    0.176,
+    0.173
+  ],
+  "engineRadii": [
+    0.17,
+    0.164
+  ],
+  "keelMeasuredStations": [
+    [
+      -0.145,
+      0.528,
+      0.658,
+      0.072
+    ],
+    [
+      -0.22,
+      0.551,
+      0.657,
+      0.061
+    ],
+    [
+      -0.32,
+      0.577,
+      0.659,
+      0.049
+    ],
+    [
+      -0.4,
+      0.597,
+      0.665,
+      0.04
+    ],
+    [
+      -0.48,
+      0.617,
+      0.671,
+      0.028
+    ],
+    [
+      -0.54,
+      0.637,
+      0.677,
+      0.02
+    ],
+    [
+      -0.551,
+      0.648,
+      0.67,
+      0.01
+    ]
+  ],
+  "mounts": [
+    {
+      "source": [
+        -0.61,
+        0,
+        0.157
+      ],
+      "axis": 1,
+      "side": 1,
+      "kind": "battery",
+      "label": "BATTERY 1",
+      "hull": 320,
+      "size": 34,
+      "radius": 48,
+      "explosionRadius": 94,
+      "position": [
+        0.0,
+        88.56279,
+        -344.09746
+      ],
+      "index": 0
+    },
+    {
+      "source": [
+        -0.23,
+        0,
+        0.191
+      ],
+      "axis": 1,
+      "side": 1,
+      "kind": "battery",
+      "label": "BATTERY 2",
+      "hull": 320,
+      "size": 34,
+      "radius": 48,
+      "explosionRadius": 94,
+      "position": [
+        0.0,
+        107.74199,
+        -129.74167
+      ],
+      "index": 1
+    },
+    {
+      "source": [
+        -0.17,
+        -0.284,
+        0.045
+      ],
+      "axis": 0,
+      "side": -1,
+      "kind": "battery",
+      "label": "BATTERY 3",
+      "hull": 320,
+      "size": 34,
+      "radius": 48,
+      "explosionRadius": 94,
+      "position": [
+        -160.20275,
+        25.38424,
+        -95.89601
+      ],
+      "index": 2
+    },
+    {
+      "source": [
+        -0.17,
+        0.284,
+        0.045
+      ],
+      "axis": 0,
+      "side": 1,
+      "kind": "battery",
+      "label": "BATTERY 4",
+      "hull": 320,
+      "size": 34,
+      "radius": 48,
+      "explosionRadius": 94,
+      "position": [
+        160.20275,
+        25.38424,
+        -95.89601
+      ],
+      "index": 3
+    },
+    {
+      "source": [
+        -0.56,
+        -0.184,
+        0.022
+      ],
+      "axis": 0,
+      "side": -1,
+      "kind": "pdc",
+      "label": "PDC 1",
+      "hull": 90,
+      "size": 22,
+      "radius": 36,
+      "explosionRadius": 38,
+      "position": [
+        -103.79333,
+        12.41007,
+        -315.89275
+      ],
+      "index": 4
+    },
+    {
+      "source": [
+        0.483,
+        -0.347,
+        0.151
+      ],
+      "axis": 0,
+      "side": -1,
+      "kind": "pdc",
+      "label": "PDC 2",
+      "hull": 90,
+      "size": 22,
+      "radius": 36,
+      "explosionRadius": 38,
+      "position": [
+        -195.74069,
+        85.17822,
+        272.4575
+      ],
+      "index": 5
+    },
+    {
+      "source": [
+        0.483,
+        -0.347,
+        -0.125
+      ],
+      "axis": 0,
+      "side": -1,
+      "kind": "pdc",
+      "label": "PDC 3",
+      "hull": 90,
+      "size": 22,
+      "radius": 36,
+      "explosionRadius": 38,
+      "position": [
+        -195.74069,
+        -70.51178,
+        272.4575
+      ],
+      "index": 6
+    },
+    {
+      "source": [
+        -0.56,
+        0.184,
+        0.022
+      ],
+      "axis": 0,
+      "side": 1,
+      "kind": "pdc",
+      "label": "PDC 4",
+      "hull": 90,
+      "size": 22,
+      "radius": 36,
+      "explosionRadius": 38,
+      "position": [
+        103.79333,
+        12.41007,
+        -315.89275
+      ],
+      "index": 7
+    },
+    {
+      "source": [
+        0.483,
+        0.347,
+        0.151
+      ],
+      "axis": 0,
+      "side": 1,
+      "kind": "pdc",
+      "label": "PDC 5",
+      "hull": 90,
+      "size": 22,
+      "radius": 36,
+      "explosionRadius": 38,
+      "position": [
+        195.74069,
+        85.17822,
+        272.4575
+      ],
+      "index": 8
+    },
+    {
+      "source": [
+        0.483,
+        0.347,
+        -0.125
+      ],
+      "axis": 0,
+      "side": 1,
+      "kind": "pdc",
+      "label": "PDC 6",
+      "hull": 90,
+      "size": 22,
+      "radius": 36,
+      "explosionRadius": 38,
+      "position": [
+        195.74069,
+        -70.51178,
+        272.4575
+      ],
+      "index": 9
+    },
+    {
+      "kind": "engine",
+      "label": "ENGINE 1",
+      "source": [
+        0.8,
+        -0.176,
+        -0.173
+      ],
+      "radius": 92.51144880000001,
+      "halfLength": 112.81884000000001,
+      "hull": 300,
+      "position": [
+        -99.28058,
+        -97.5883,
+        451.27536
+      ],
+      "index": 10
+    },
+    {
+      "kind": "engine",
+      "label": "ENGINE 2",
+      "source": [
+        0.8,
+        -0.176,
+        0.173
+      ],
+      "radius": 95.89601400000001,
+      "halfLength": 112.81884000000001,
+      "hull": 300,
+      "position": [
+        -99.28058,
+        97.5883,
+        451.27536
+      ],
+      "index": 11
+    },
+    {
+      "kind": "engine",
+      "label": "ENGINE 3",
+      "source": [
+        0.8,
+        0.176,
+        -0.173
+      ],
+      "radius": 92.51144880000001,
+      "halfLength": 112.81884000000001,
+      "hull": 300,
+      "position": [
+        99.28058,
+        -97.5883,
+        451.27536
+      ],
+      "index": 12
+    },
+    {
+      "kind": "engine",
+      "label": "ENGINE 4",
+      "source": [
+        0.8,
+        0.176,
+        0.173
+      ],
+      "radius": 95.89601400000001,
+      "halfLength": 112.81884000000001,
+      "hull": 300,
+      "position": [
+        99.28058,
+        97.5883,
+        451.27536
+      ],
+      "index": 13
+    }
+  ],
+  "textureSizes": {
+    "albedo": [
+      512,
+      512
+    ],
+    "normal": [
+      512,
+      512
+    ],
+    "orm": [
+      128,
+      128
+    ],
+    "emission": [
+      128,
+      128
+    ]
+  },
+  "collisionTriangles": 2584,
+  "assembledTriangles": 9556,
+  "allEnginesDestroyedTriangles": 9812
+}

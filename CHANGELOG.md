@@ -1,3 +1,24 @@
+## 0.8.2fv — Colored equipment and cargo symbols
+
+- Added metal casings, family-specific energy accents and commodity material colors to all 37 icons; rarity stays on tier and upgrade markers.
+- Refined movement/recharge arrows and separated decorative marks from the hardware with consistent stroke-safe margins.
+- Added a standalone HTML gallery with every icon, small-size samples, all seven upgrade marks, tier/rarity examples, search, size and background controls.
+- Added a reusable browser bounds check that includes curved paths, strokes and SVG transforms.
+
+## 0.8.2fu — Polished equipment and cargo icons
+
+- Redesigned all 27 equipment and 10 commodity glyphs with transparent faceted surfaces, clearer hardware silhouettes and finer details.
+- Retained white/green/blue rarity colors, tier pips and upgrade modifier marks. Icons share the same SVGs in career shops, cargo, loot and Arena Run.
+- No bitmap downloads, gradients, filters or icon animations.
+
+## Repository cleanup — 2026-10-14
+
+- Retained the current editable ship/drone/station model sources and original references under local `authoring/`, with a versioned hash manifest.
+- Removed superseded model revisions, development previews, screenshots and root experiments. Git history was preserved.
+- Grouped tests by unit, integration, performance and browser coverage. Extracted shared session helpers to avoid duplicate suite registration.
+- Consolidated asset and maintenance tools and added a pinned Playwright setup.
+- GitHub Pages now publishes an explicit game-only `dist` package. Gameplay remains unchanged. Runtime 0.8.2ft also fixes missing title-screen dependencies in the first-visit offline cache.
+
 ## 0.8.2da — Aligned wing cards, wave-clear beat, dock-prompt and frigate-hull fixes
 
 - The wing tactic cards now share the right screen edge with the flight controls: the rail uses the touch column's own safe-area offsets (8 px in the canopy, 3 px on short landscape phones), so both columns line up; the cards also hang a touch lower from the top edge so they clear the corner glass.

@@ -1,0 +1,201 @@
+{
+  "version": 1,
+  "preservedAt": "2026-10-14",
+  "models": [
+    {
+      "id": "wayfarer",
+      "runtime": "assets/models/ships/wayfarer.glb",
+      "runtimeSha256": "aa426f3507dcd274e292155b588b381dcafd4929eace886a457da85710eed6d7",
+      "source": "authoring/models/wayfarer/wayfarer.blend",
+      "sourceSha256": "bf61483c2e796970cea9daed1357a907b3228bed1c404fc1b9fa10aaa85f03b9",
+      "previousSource": "docs/ship-revisions/20261002/wayfarer/wayfarer.blend"
+    },
+    {
+      "id": "vanguard",
+      "runtime": "assets/models/ships/vanguard.glb",
+      "runtimeSha256": "788dcb673e649fabcd52d8cc3c6fd6bd8720344c83db1a41321fa47608d99119",
+      "source": "authoring/models/vanguard/vanguard.blend",
+      "sourceSha256": "8602d94fa6f431597ec266fcae76ab7eec002a7e1107f7f17a499a74a7bf29c0",
+      "previousSource": "docs/ship-revisions/20261002/vanguard/vanguard.blend"
+    },
+    {
+      "id": "scrapper",
+      "runtime": "assets/models/ships/scrapper.glb",
+      "runtimeSha256": "aadffa9a082edf820ca053c261ec2700ff6a225d49dc470fffb1e0dce277f44e",
+      "source": "authoring/models/scrapper/scrapper.blend",
+      "sourceSha256": "65575b64a5d72f49428c29f87ab05a749f2e0708c59f890f3f984b22da1653bd",
+      "previousSource": "docs/ship-revisions/20261002/scrapper/scrapper.blend"
+    },
+    {
+      "id": "demon",
+      "runtime": "assets/models/ships/demon.glb",
+      "runtimeSha256": "f933286fb0dd18ea550f10b2f53d0559996c6437187526c1eebab7874e70a1aa",
+      "source": "authoring/models/demon/demon.blend",
+      "sourceSha256": "d7e5cb3d30dc60806acc666e2d7d40fac284662aab0ba4d53de845b4710b041b",
+      "previousSource": "docs/texture-upgrade/demon.blend"
+    },
+    {
+      "id": "mule",
+      "runtime": "assets/models/ships/mule.glb",
+      "runtimeSha256": "39084a9454936c23dd056a541595233ad7363bfde398f635d96c9af75ee5733b",
+      "source": "authoring/models/mule/mule.blend",
+      "sourceSha256": "e87063bf2069eb09d4c13865d15118526d6080eb1f1a1c8874f56972437f3f12",
+      "previousSource": "docs/ship-revisions/20261002/mule/mule.blend"
+    },
+    {
+      "id": "talon",
+      "runtime": "assets/models/ships/talon.glb",
+      "runtimeSha256": "69ca47f34c934569f6f411b86a37296f16cbab5f0adb83185227840736395b41",
+      "source": "authoring/models/talon/talon.blend",
+      "sourceSha256": "87534697e8b670a5aaeb396b05f1ae213b8d653d381f1b704c84e2df984ef759",
+      "previousSource": "docs/ship-revisions/20261002/talon/talon.blend"
+    },
+    {
+      "id": "prospector",
+      "runtime": "assets/models/ships/prospector.glb",
+      "runtimeSha256": "2ecaac1b17d0019cbd36e8b426822907846804adbaea3d7c20d83077d9f623c0",
+      "source": "authoring/models/prospector/prospector.blend",
+      "sourceSha256": "06e5b168ee3583a5064dfeed7a5cb87e112dddfb1e84de6336a17453764fe564",
+      "previousSource": "docs/ship-revisions/20261002/prospector/prospector.blend"
+    },
+    {
+      "id": "lancer",
+      "runtime": "assets/models/ships/lancer.glb",
+      "runtimeSha256": "02c1f282cb1d4f9fc971643f7924dd0d02210c2d2719ff57a179a9e29670eeec",
+      "source": "authoring/models/lancer/lancer.blend",
+      "sourceSha256": "cd821ad5966dbafc9197be0b3c5742d1c4ba41d6f84d7635c3b62b2b47a64630",
+      "previousSource": "docs/ship-revisions/20261002/lancer/lancer.blend"
+    },
+    {
+      "id": "atlas",
+      "runtime": "assets/models/ships/atlas.glb",
+      "runtimeSha256": "a9a294c25cef0bc1e4829e271fc6bef61430c3a3dceee386070167402440e45e",
+      "source": "authoring/models/atlas/atlas.blend",
+      "sourceSha256": "e5a3c9a50124bf91fcc786d00026092f5e818e26d236d8e9846ce0a925c9076d",
+      "previousSource": "docs/fleet-rebuild/atlas/atlas.blend"
+    },
+    {
+      "id": "blade",
+      "runtime": "assets/models/ships/blade.glb",
+      "runtimeSha256": "4402a376db9474cb032403ae4b9391e55aa537ef325f8455d4135c1bd86badaf",
+      "source": "authoring/models/blade/blade.blend",
+      "sourceSha256": "f332ea84fbdbaa55eede7f96e4adea0f7258ade79e3425e043db385a331ed421",
+      "previousSource": "docs/ship-revisions/20261002/blade/blade.blend"
+    },
+    {
+      "id": "speedster",
+      "runtime": "assets/models/ships/speedster.glb",
+      "runtimeSha256": "368d8996cfeb3d17ae8ea513a63643b9cde65c30b424f9ec24bdf54f451dcab4",
+      "source": "authoring/models/speedster/speedster.blend",
+      "sourceSha256": "ab01e783ebcbdf4699d5745e17913657d7b190b1fa4360df1495462ef6da349c",
+      "previousSource": "docs/ship-revisions/20261002/speedster/speedster.blend"
+    },
+    {
+      "id": "legionary",
+      "runtime": "assets/models/ships/legionary.glb",
+      "runtimeSha256": "769ee8c0f07798c5e8af6ab9e89820bff7ddcbe1974eff36a82a7a2e7238ac9d",
+      "source": "authoring/models/legionary/legionary.blend",
+      "sourceSha256": "e0512eeda607f72b36d8d2dca1165e11f5eac76caa2cf3cf2c6981e60811ce60",
+      "previousSource": "docs/ship-revisions/20261002/legionary/legionary.blend"
+    },
+    {
+      "id": "andromeda",
+      "runtime": "assets/models/ships/andromeda.glb",
+      "runtimeSha256": "0ff4f965b0c06f33f80cc029d27142787944a54e96da499f2195ac4a3c2591db",
+      "source": "authoring/models/andromeda/andromeda.blend",
+      "sourceSha256": "c0984f77f1770e30d0420e86b4c11dc59214688e08f26dab1a573891c23bbd5d",
+      "previousSource": "docs/fleet-rebuild/andromeda/andromeda.blend"
+    },
+    {
+      "id": "torsas",
+      "runtime": "assets/models/ships/torsas.glb",
+      "runtimeSha256": "f79ff6399cbff4c12552c5c0e0681ae890f00858503f251b94401bf90cd60774",
+      "source": "authoring/models/torsas/torsas.blend",
+      "sourceSha256": "81c6e25369740ebba6ba3dca7fd8d538e55f03c7d4d3d21f1283f2f14906358c",
+      "previousSource": "docs/ship-revisions/20261002/torsas/torsas.blend"
+    },
+    {
+      "id": "astra",
+      "runtime": "assets/models/ships/astra.glb",
+      "runtimeSha256": "4c7ec4c5b2951eef9f5666ba63ade0dbaf1f94b21e7d741b3d8ed01989797dc2",
+      "source": "authoring/models/astra/astra.blend",
+      "sourceSha256": "28dea0ea0079bd2707c3506b84c2d154a3abee6a3b2d6e1cf5b5750d5e903e84",
+      "previousSource": "docs/fleet-rebuild/astra/astra.blend"
+    },
+    {
+      "id": "concord-frigate",
+      "runtime": "assets/models/capital/concord-frigate.glb",
+      "runtimeSha256": "6c3d0d2c2d1d96a177b5613210ee18e7dbd08bed10646e9ef4c8b11778f84be7",
+      "source": "authoring/models/concord-frigate/concord-frigate.blend",
+      "sourceSha256": "6807db06e2c288e3d8b6eb9b379a83139563f7d54ac53e6614436fa4c30f371f",
+      "previousSource": "glb_models/frigate-rebuilt/frigate.blend"
+    },
+    {
+      "id": "concord-battleship",
+      "runtime": "assets/models/capital/concord-battleship.glb",
+      "runtimeSha256": "12d7937fae9be197f8ae74b3eebc11591626d0b66cc946229c4d551a7c3eb90b",
+      "source": "authoring/models/concord-battleship/concord-battleship.blend",
+      "sourceSha256": "ad7b04217a6521b71ca63397edad8d80c8b91ce37df1642ef1de5ddb42a27435",
+      "previousSource": "docs/ship-revisions/20261002/concord-battleship/concord-battleship.blend"
+    },
+    {
+      "id": "concord-carrier",
+      "runtime": "assets/models/capital/concord-carrier.glb",
+      "runtimeSha256": "d215c83fa4cb5fac9fdcb525b0ff27e947d692a0cf1c6917751cf98e612a479f",
+      "source": "authoring/models/concord-carrier/concord-carrier.blend",
+      "sourceSha256": "6150e9e31262feed83a550abbe79f23957aa5318f02b5854b9025ef72818187b",
+      "previousSource": "docs/ship-revisions/20261002/concord-carrier/concord-carrier.blend"
+    },
+    {
+      "id": "concord-cruiser",
+      "runtime": "assets/models/capital/concord-cruiser.glb",
+      "runtimeSha256": "4dc291f6b4143db2aa645bcef42020ecde948d838ec5fd66d2dcaa8426950a15",
+      "source": "authoring/models/concord-cruiser/concord-cruiser.blend",
+      "sourceSha256": "2b0495801557f09ea6b063c3263249f080e4e2b75ec85454cc48ae696a7b2c73",
+      "previousSource": "docs/cruiser-rebuild/concord-cruiser.blend"
+    },
+    {
+      "id": "mining-drone",
+      "runtime": "assets/models/drones/mining-drone.glb",
+      "runtimeSha256": "7e46ca567c6e31c23652b00c0a3f04818bdd2012f3c47a3e24b48c47301f89a3",
+      "source": "authoring/models/mining-drone/mining-drone.blend",
+      "sourceSha256": "971bb7c5f891ca8239023dc8f639de391ecd9001576aa50ece76c64503403b25",
+      "previousSource": "docs/ship-revisions/20261002/mining-drone/mining-drone.blend"
+    },
+    {
+      "id": "combat-drone",
+      "runtime": "assets/models/drones/combat-drone.glb",
+      "runtimeSha256": "6fea66c835957d84aa5c16ec0f73f16bd4257d80b93b4b69f64940861f3548a5",
+      "source": "authoring/models/combat-drone/combat-drone.blend",
+      "sourceSha256": "6511487aa259c8e1c5b547265bbcc5fb54596db15b9b85cd2719e7aab3d5943d",
+      "previousSource": "docs/ship-revisions/20261002/combat-drone/combat-drone.blend"
+    }
+  ],
+  "extraSources": [
+    {
+      "path": "authoring/models/stations/original-stations-rebuilt.blend",
+      "sha256": "648547ddfa22cb9f5338c5fbaffa14752305179049f2cf900d80d56f43f9e1c5"
+    },
+    {
+      "path": "authoring/models/stations/acheron-stations.blend",
+      "sha256": "ec5ea1b3cf68089dd34e0ad77be2ea96d317fef7f5fa0a4691fcff787893d442"
+    },
+    {
+      "path": "authoring/models/concord-frigate/frigate_with_components.blend",
+      "sha256": "ab5e9ed8b4d558ef2aa66daef5f83b7be11d7ec9a46e1e14365aa97dfc2081b5"
+    },
+    {
+      "path": "authoring/models/concord-frigate/frigate-no-fixed-guns.blend",
+      "sha256": "b1b15abb06a8bee650a2173bd3b707d62661faa008447ee068fa73fcdc30d33c"
+    },
+    {
+      "path": "authoring/models/ordnance/ordnance.blend",
+      "sha256": "8f94f950a47638f495ea1ba393cfb85288aa1668a297685049dde146967e7dad"
+    },
+    {
+      "path": "authoring/models/turrets/turrets.blend",
+      "sha256": "7df7bec87250728ebcccab73637aec02358d4c40162f94bf2120f15013281664"
+    }
+  ],
+  "note": "Native sources are local authoring files; installed GLBs remain in assets/models. Historical revisions are in the user external safety copy."
+}

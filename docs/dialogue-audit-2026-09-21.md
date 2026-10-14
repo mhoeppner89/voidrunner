@@ -196,7 +196,7 @@ repetition problem dissolves without touching the topic contract.
 
 ### Catalog hygiene
 
-`node scripts/audit-dialogue-catalog.mjs` (added with this audit) reports the
+`node tools/assets/audit-dialogue-catalog.mjs` (added with this audit) reports the
 current state, and can list the entries underneath each number:
 
 ```

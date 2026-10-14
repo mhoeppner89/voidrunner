@@ -1,0 +1,1293 @@
+{
+  "id": "concord-battleship",
+  "glbPath": "assets/models/capital/concord-battleship.glb",
+  "glbSha256": "12d7937fae9be197f8ae74b3eebc11591626d0b66cc946229c4d551a7c3eb90b",
+  "descriptorSha256": "08d19baa7b95ece35714af9f4ef7185f2950857bce198868a36ba5024a83dc31",
+  "coordinateFrame": "Unscaled GLB space",
+  "epsilon": 0.00000239656873673766,
+  "method": "Double-sided first-hit rays at center and eight angles on 35% and 65% aperture radii. The measured aperture plane is the aft lip, not the glow socket. Whole-base fit is also visually reviewed.",
+  "mouths": [
+    {
+      "name": "Battleship rooted engine casing",
+      "center": [
+        0.9797921180725098,
+        -0.05027645425871015,
+        0.14330829229205846
+      ],
+      "outward": [
+        1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.08491404059286063,
+      "radiusV": 0.08491404059286063,
+      "minDepth": 0.050842433233261056,
+      "maxDepth": 0.07400296735763544,
+      "samplingBasis": {
+        "outward": [
+          1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.05027645425871015,
+            0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06120294332504267,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.05027645425871015,
+            0.1730282064995597
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.02926130138630362,
+            0.164323445164465
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.02055654005120893,
+            0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.029261301386303618,
+            0.12229313941965193
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.05027645425871014,
+            0.11358837808455724
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.07129160713111668,
+            0.12229313941965193
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.07999636846621136,
+            0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.07129160713111668,
+            0.16432344516446498
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.05027645425871015,
+            0.19850241867741789
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.011248313209955167,
+            0.18233643334081345
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            0.004917672126649265,
+            0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.01124831320995516,
+            0.10428015124330348
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.05027645425871014,
+            0.08811416590669904
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.08930459530746512,
+            0.10428015124330348
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.10547058064406956,
+            0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.08930459530746515,
+            0.18233643334081345
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "Battleship rooted engine casing.001",
+      "center": [
+        0.9797921180725098,
+        -0.2333288937807083,
+        0.14330829229205846
+      ],
+      "outward": [
+        1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.0849140418682774,
+      "radiusV": 0.0849140418682774,
+      "minDepth": 0.050842433233261056,
+      "maxDepth": 0.07400296735763544,
+      "samplingBasis": {
+        "outward": [
+          1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.2333288937807083,
+            0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06120294332504267,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.2333288937807083,
+            0.17302820694595555
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.21231374059265223,
+            0.16432344548011454
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.20360897912681122,
+            0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.21231374059265223,
+            0.12229313910400239
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.2333288937807083,
+            0.11358837763816138
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.2543440469687644,
+            0.12229313910400239
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.26304880843460543,
+            0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.2543440469687644,
+            0.16432344548011454
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.2333288937807083,
+            0.19850241950643877
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.19430075214574702,
+            0.18233643392701976
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.17813476656632798,
+            0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.19430075214574702,
+            0.10428015065709717
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.2333288937807083,
+            0.08811416507767815
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.2723570354156696,
+            0.10428015065709717
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.28852302099508864,
+            0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.2723570354156696,
+            0.18233643392701976
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "Battleship rooted engine casing.002",
+      "center": [
+        0.9797921180725098,
+        -0.05027645425871015,
+        -0.14330829229205846
+      ],
+      "outward": [
+        1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.08491404059286063,
+      "radiusV": 0.08491404059286063,
+      "minDepth": 0.050842433233261056,
+      "maxDepth": 0.07400296735763544,
+      "samplingBasis": {
+        "outward": [
+          1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.05027645425871015,
+            -0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06120294332504267,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.05027645425871015,
+            -0.11358837808455724
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.02926130138630362,
+            -0.12229313941965193
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.02055654005120893,
+            -0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.029261301386303618,
+            -0.16432344516446498
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.05027645425871014,
+            -0.1730282064995597
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.07129160713111668,
+            -0.164323445164465
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.07999636846621136,
+            -0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.07129160713111668,
+            -0.12229313941965195
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.05027645425871015,
+            -0.08811416590669904
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.011248313209955167,
+            -0.10428015124330348
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            0.004917672126649265,
+            -0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.01124831320995516,
+            -0.18233643334081345
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.05027645425871014,
+            -0.19850241867741789
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.08930459530746512,
+            -0.18233643334081345
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.10547058064406956,
+            -0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.08930459530746515,
+            -0.10428015124330348
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "Battleship rooted engine casing.003",
+      "center": [
+        0.9797921180725098,
+        -0.2333288937807083,
+        -0.14330829229205846
+      ],
+      "outward": [
+        1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.08491404186827742,
+      "radiusV": 0.08491404186827742,
+      "minDepth": 0.050842433233261056,
+      "maxDepth": 0.07400296735763544,
+      "samplingBasis": {
+        "outward": [
+          1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.2333288937807083,
+            -0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06120294332504267,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.2333288937807083,
+            -0.11358837763816138
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.21231374059265223,
+            -0.12229313910400239
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.20360897912681122,
+            -0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.21231374059265223,
+            -0.16432344548011454
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.2333288937807083,
+            -0.17302820694595555
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.2543440469687644,
+            -0.16432344548011454
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.26304880843460543,
+            -0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.2543440469687644,
+            -0.12229313910400239
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.2333288937807083,
+            -0.08811416507767814
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.19430075214574702,
+            -0.10428015065709717
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.17813476656632798,
+            -0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.19430075214574702,
+            -0.18233643392701976
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.2333288937807083,
+            -0.1985024195064388
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.2723570354156696,
+            -0.18233643392701976
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.28852302099508864,
+            -0.14330829229205846
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            0.9797921180725098,
+            -0.27235703541566963,
+            -0.10428015065709717
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.06200295686721796,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    }
+  ],
+  "allOutwardClear": true,
+  "allRecessesVisible": true
+}

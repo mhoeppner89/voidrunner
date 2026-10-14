@@ -33,13 +33,13 @@ Models remain below 5,000 triangles, with 512-square hull textures and reflectiv
 
 ## Verification
 
-Focused checks: `node --import ./src/game/offlineImportHooks.mjs --test tests/league.test.mjs src/game/galaxy.test.mjs src/game/droneIntegration.test.mjs src/game/shipTrade.test.mjs src/game/outfitting.test.mjs`.
+Focused checks: `node --import ./tests/helpers/offline-imports.mjs --test tests/league.test.mjs src/game/galaxy.test.mjs src/game/droneIntegration.test.mjs src/game/shipTrade.test.mjs src/game/outfitting.test.mjs`.
 
-Local disposable preview: `http://localhost:4184/.freebuff/league/play.html`. The preview supplies test credits/standing and does not save to the career. Production careers travel via Pale Ring and earn standing through local work.
+The former local preview was removed during repository cleanup. Test the League through career mode. Production careers travel via Pale Ring and earn standing through local work.
 
 ## Station artwork
 
-The Acheron exterior stations are authored in Blender and exported by `scripts/build-acheron-stations.py`, then validated/packed with `node scripts/package-acheron-stations.mjs` (uses the existing `/tmp/voidrunner-gltf-tools` build dependencies). Source scene: `glb_models/acheron-stations.blend`.
+The Acheron exterior stations are authored in Blender and exported by `tools/assets/build-acheron-stations.py`, then validated/packed with `node tools/assets/package-acheron-stations.mjs` (uses the existing `/tmp/voidrunner-gltf-tools` build dependencies). Source scene: `glb_models/acheron-stations.blend`.
 
 | Station | Design | Triangles | Texture | GLB size |
 |---|---|---:|---|---:|

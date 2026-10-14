@@ -1,0 +1,548 @@
+{
+  "ship": "lancer",
+  "candidateSHA256": "02c1f282cb1d4f9fc971643f7924dd0d02210c2d2719ff57a179a9e29670eeec",
+  "coordinateConvention": {
+    "blender": "right handed, +X nose, +Z up, +Y starboard",
+    "rawGlb": "right handed, +X nose, +Y up, -Z starboard",
+    "runtime": "right handed, -Z nose, +Y up, +X port after authored yaw",
+    "transform": "runtime = [rawZ, rawY, -rawX] × scale",
+    "yaw": 1.5707963267948966,
+    "configScale": 6.65,
+    "baseScale": 1.02,
+    "npcScale": 1.6,
+    "combinedRuntimeScale": 10.852800000000002,
+    "previewScale": 1
+  },
+  "bounds": {
+    "rawGlb": {
+      "min": [
+        -0.9639999866485596,
+        -0.30000001192092896,
+        -1.0010000467300415
+      ],
+      "max": [
+        0.9670000076293945,
+        0.3019999861717224,
+        1.0010000467300415
+      ]
+    },
+    "runtime": {
+      "min": [
+        -10.863653307151798,
+        -3.2558401293754584,
+        -10.494657682800295
+      ],
+      "max": [
+        10.863653307151797,
+        3.2775454499244696,
+        10.46209905509949
+      ],
+      "size": [
+        21.727306614303593,
+        6.533385579299928,
+        20.956756737899784
+      ]
+    },
+    "boundsChanged": true,
+    "previousRuntime": {
+      "min": [
+        -10.798536051750187,
+        -3.2302723045349127,
+        -10.407835106849674
+      ],
+      "max": [
+        10.798536051750187,
+        3.2883984336376195,
+        10.462099055099491
+      ],
+      "size": [
+        21.597072103500373,
+        6.518670738172532,
+        20.869934161949168
+      ]
+    },
+    "collisionImplications": "Authored pivot, orientation and configured scale are preserved. Candidate bounds closely follow the supplied GLB. Rebuild any detailed collision mesh from this candidate and use its measured asymmetric vertical limits; no ship-role or loadout change is proposed.",
+    "suppliedReferenceRuntime": {
+      "min": [
+        -10.870944907951356,
+        -3.287493775749207,
+        -10.529015923118592
+      ],
+      "max": [
+        10.857100440216067,
+        3.2869012361526497,
+        10.524874614715579
+      ],
+      "size": [
+        21.728045348167424,
+        6.574395011901856,
+        21.05389053783417
+      ]
+    },
+    "sizeChangeFractionFromSuppliedReference": [
+      -0.00003399909434986803,
+      -0.006237750017710764,
+      -0.004613579602299023
+    ]
+  },
+  "exhausts": [
+    {
+      "name": "Port main engine_exhaust",
+      "rawGlb": {
+        "mouthCenter": [
+          -0.964,
+          0.016,
+          0.235
+        ],
+        "existingEffectAnchor": [
+          -0.9670000076293945,
+          0.003000000026077032,
+          0.23499999940395355
+        ],
+        "proposedEffectAnchor": [
+          -0.9670000076293945,
+          0.01600000075995922,
+          0.23499999940395355
+        ],
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.042,
+        "radiusV": 0.043
+      },
+      "runtime": {
+        "mouthCenter": [
+          2.5504080000000005,
+          0.17364480000000004,
+          10.4620992
+        ],
+        "existingEffectAnchor": [
+          2.5504079935312274,
+          0.03255840028300882,
+          10.494657682800295
+        ],
+        "proposedEffectAnchor": [
+          2.5504079935312274,
+          0.17364480824768547,
+          10.494657682800295
+        ],
+        "outward": [
+          0,
+          0,
+          1
+        ],
+        "axisU": [
+          1,
+          0,
+          0
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.4558176000000001,
+        "radiusV": 0.46667040000000004
+      },
+      "preview": {
+        "fillRadiusFactor": 0.87
+      },
+      "effectAnchorUnchanged": false
+    },
+    {
+      "name": "Port auxiliary engine_exhaust",
+      "rawGlb": {
+        "mouthCenter": [
+          -0.534,
+          -0.075,
+          0.444
+        ],
+        "existingEffectAnchor": [
+          -0.5370000004768372,
+          -0.07500000298023224,
+          0.4440000057220459
+        ],
+        "proposedEffectAnchor": [
+          -0.5370000004768372,
+          -0.07500000298023224,
+          0.4440000057220459
+        ],
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.028,
+        "radiusV": 0.027
+      },
+      "runtime": {
+        "mouthCenter": [
+          4.818643200000001,
+          -0.8139600000000001,
+          5.7953952000000015
+        ],
+        "existingEffectAnchor": [
+          4.81864326210022,
+          -0.8139600323438646,
+          5.827953605175019
+        ],
+        "proposedEffectAnchor": [
+          4.81864326210022,
+          -0.8139600323438646,
+          5.827953605175019
+        ],
+        "outward": [
+          0,
+          0,
+          1
+        ],
+        "axisU": [
+          1,
+          0,
+          0
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.30387840000000005,
+        "radiusV": 0.29302560000000005
+      },
+      "preview": {
+        "fillRadiusFactor": 0.87
+      },
+      "effectAnchorUnchanged": true
+    },
+    {
+      "name": "Starboard main engine_exhaust",
+      "rawGlb": {
+        "mouthCenter": [
+          -0.964,
+          0.016,
+          -0.235
+        ],
+        "existingEffectAnchor": [
+          -0.9670000076293945,
+          0.003000000026077032,
+          -0.23499999940395355
+        ],
+        "proposedEffectAnchor": [
+          -0.9670000076293945,
+          0.01600000075995922,
+          -0.23499999940395355
+        ],
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.042,
+        "radiusV": 0.043
+      },
+      "runtime": {
+        "mouthCenter": [
+          -2.5504080000000005,
+          0.17364480000000004,
+          10.4620992
+        ],
+        "existingEffectAnchor": [
+          -2.5504079935312274,
+          0.03255840028300882,
+          10.494657682800295
+        ],
+        "proposedEffectAnchor": [
+          -2.5504079935312274,
+          0.17364480824768547,
+          10.494657682800295
+        ],
+        "outward": [
+          0,
+          0,
+          1
+        ],
+        "axisU": [
+          1,
+          0,
+          0
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.4558176000000001,
+        "radiusV": 0.46667040000000004
+      },
+      "preview": {
+        "fillRadiusFactor": 0.87
+      },
+      "effectAnchorUnchanged": false
+    },
+    {
+      "name": "Starboard auxiliary engine_exhaust",
+      "rawGlb": {
+        "mouthCenter": [
+          -0.534,
+          -0.075,
+          -0.444
+        ],
+        "existingEffectAnchor": [
+          -0.5370000004768372,
+          -0.07500000298023224,
+          -0.4440000057220459
+        ],
+        "proposedEffectAnchor": [
+          -0.5370000004768372,
+          -0.07500000298023224,
+          -0.4440000057220459
+        ],
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.028,
+        "radiusV": 0.027
+      },
+      "runtime": {
+        "mouthCenter": [
+          -4.818643200000001,
+          -0.8139600000000001,
+          5.7953952000000015
+        ],
+        "existingEffectAnchor": [
+          -4.81864326210022,
+          -0.8139600323438646,
+          5.827953605175019
+        ],
+        "proposedEffectAnchor": [
+          -4.81864326210022,
+          -0.8139600323438646,
+          5.827953605175019
+        ],
+        "outward": [
+          0,
+          0,
+          1
+        ],
+        "axisU": [
+          1,
+          0,
+          0
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.30387840000000005,
+        "radiusV": 0.29302560000000005
+      },
+      "preview": {
+        "fillRadiusFactor": 0.87
+      },
+      "effectAnchorUnchanged": true
+    }
+  ],
+  "guns": [
+    {
+      "name": "Port nose_muzzle",
+      "rawGlb": [
+        0.968999981880188,
+        -0.035999998450279236,
+        0.032999999821186066
+      ],
+      "runtime": [
+        0.3581423980593682,
+        -0.39070078318119056,
+        -10.516363003349307
+      ],
+      "outwardRaw": [
+        1,
+        0,
+        0
+      ],
+      "outwardRuntime": [
+        0,
+        0,
+        -1
+      ],
+      "outwardClear": true,
+      "backwardSupportRaw": 0.010999977588653564
+    },
+    {
+      "name": "Starboard nose_muzzle",
+      "rawGlb": [
+        0.968999981880188,
+        -0.035999998450279236,
+        -0.032999999821186066
+      ],
+      "runtime": [
+        -0.3581423980593682,
+        -0.39070078318119056,
+        -10.516363003349307
+      ],
+      "outwardRaw": [
+        1,
+        0,
+        0
+      ],
+      "outwardRuntime": [
+        0,
+        0,
+        -1
+      ],
+      "outwardClear": true,
+      "backwardSupportRaw": 0.010999977588653564
+    }
+  ],
+  "turrets": [
+    {
+      "label": "LOWER TURRET",
+      "type": "laser",
+      "size": "M",
+      "axis": 1,
+      "side": -1,
+      "pedestal": 0,
+      "hullHalfLength": 6.45,
+      "forwardCone": 10,
+      "rawGlb": {
+        "pivot": [
+          -0.40062241100049484,
+          -0.2976435126921666,
+          0
+        ],
+        "deckCenter": [
+          -0.40062241100049484,
+          -0.06801917228733081,
+          0
+        ],
+        "outward": [
+          0,
+          -1,
+          0
+        ],
+        "ringRadius": 0.1868130227022393
+      },
+      "runtime": {
+        "pivot": [
+          0,
+          -3.2302655145455463,
+          4.347874902106171
+        ],
+        "deckCenter": [
+          0,
+          -0.738198472999944,
+          4.347874902106171
+        ],
+        "outward": [
+          0,
+          -1,
+          0
+        ],
+        "scale": 4.223842443297631
+      },
+      "previewNormalized": {
+        "position": [
+          0,
+          -0.2976435126921666,
+          0.40062241100049484
+        ],
+        "scale": 0.2993798440741014
+      },
+      "existingNormalizedLayoutPosition": [
+        0,
+        -0.6896760980803002,
+        0.2074688825415025
+      ],
+      "proposedNormalizedLayoutPosition": [
+        0,
+        -0.49442444125449564,
+        0.2074688825415025
+      ],
+      "reason": "Keep the same fore/aft and lateral location; seat the complete medium ring on the new belly and continuous wing-root backing. Preserve type, size, role and slot count."
+    }
+  ],
+  "integration": {
+    "enginePortsChangeRequired": true,
+    "proposedEnginePortsRawGlb": [
+      [
+        -0.9670000076293945,
+        0.01600000075995922,
+        0.23499999940395355
+      ],
+      [
+        -0.5370000004768372,
+        -0.07500000298023224,
+        0.4440000057220459
+      ],
+      [
+        -0.9670000076293945,
+        0.01600000075995922,
+        -0.23499999940395355
+      ],
+      [
+        -0.5370000004768372,
+        -0.07500000298023224,
+        -0.4440000057220459
+      ]
+    ],
+    "turretLayoutChangeRequired": true,
+    "geometryAssetsOnly": true,
+    "proposedFixedGunMuzzlesRawGlb": [
+      [
+        0.968999981880188,
+        -0.035999998450279236,
+        0.032999999821186066
+      ],
+      [
+        0.968999981880188,
+        -0.035999998450279236,
+        -0.032999999821186066
+      ]
+    ]
+  }
+}

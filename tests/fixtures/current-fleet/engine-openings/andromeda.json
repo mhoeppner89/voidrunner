@@ -1,0 +1,1301 @@
+{
+  "id": "andromeda",
+  "glbPath": "assets/models/ships/andromeda.glb",
+  "glbSha256": "0ff4f965b0c06f33f80cc029d27142787944a54e96da499f2195ac4a3c2591db",
+  "descriptorSha256": "c147c285a529d8da9ac7ef999185b344150844795f49e1a20c5fb5ae65d03c5d",
+  "coordinateFrame": "Unscaled GLB space",
+  "epsilon": 0.000002793050774554297,
+  "method": "Double-sided first-hit rays at center and eight angles on 35% and 65% aperture radii. The measured aperture plane is the aft lip, not the glow socket. Whole-base fit is also visually reviewed.",
+  "mouths": [
+    {
+      "name": "27 aft exhaust hardware -0.75",
+      "center": [
+        -0.7377647161483765,
+        0.17231139966419765,
+        -1.000005841255188
+      ],
+      "outward": [
+        0,
+        0,
+        -1
+      ],
+      "axisU": [
+        0.9999999999999956,
+        9.400153639612817e-8,
+        0
+      ],
+      "axisV": [
+        9.400153639612817e-8,
+        -0.9999999999999956,
+        0
+      ],
+      "radiusU": 0.11322885751724293,
+      "radiusV": 0.11561359342250524,
+      "minDepth": 0.013502025604248047,
+      "maxDepth": 0.04700675201416016,
+      "blindFloorDepth": 0.045006752014160156,
+      "apertureSides": 14,
+      "samplingBasis": {
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "axisU": [
+          0.9999999999999956,
+          9.400153639612817e-8,
+          0
+        ],
+        "axisV": [
+          9.400153639612817e-8,
+          -0.9999999999999956,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.7377647161483765,
+            0.17231139966419765,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.6981346160173416,
+            0.17231140338948794,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.7097420009169629,
+            0.14369849773113658,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.737764712344627,
+            0.131846641966321,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.7657874260004761,
+            0.14369849246278046,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.7773948162794113,
+            0.17231139593890735,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.76578743137979,
+            0.20092430159725871,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.7377647199521259,
+            0.21277615736207428,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.7097420062962768,
+            0.20092430686561483,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.6641659587621689,
+            0.17231140658259392,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.6857225307186083,
+            0.11917315321708416,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.7377647090842705,
+            0.09716256393956957,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.7898068915879901,
+            0.11917314343299434,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.811363473534584,
+            0.17231139274580137,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.7898069015781446,
+            0.22544964611131113,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.7377647232124824,
+            0.24746023538882572,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.6857225407087628,
+            0.22544965589540095,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "27 aft exhaust hardware -0.4",
+      "center": [
+        -0.39315525548798697,
+        0.1924181090933936,
+        -1.000005841255188
+      ],
+      "outward": [
+        0,
+        0,
+        -1
+      ],
+      "axisU": [
+        0.9999999999999992,
+        3.7600621578458184e-8,
+        0
+      ],
+      "axisV": [
+        3.760062157845819e-8,
+        -0.9999999999999993,
+        0
+      ],
+      "radiusU": 0.11322883622986937,
+      "radiusV": 0.11561358061757535,
+      "minDepth": 0.013502025604248047,
+      "maxDepth": 0.04700675201416016,
+      "blindFloorDepth": 0.045006752014160156,
+      "apertureSides": 14,
+      "samplingBasis": {
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "axisU": [
+          0.9999999999999994,
+          3.760062157845819e-8,
+          0
+        ],
+        "axisV": [
+          3.7600621578458184e-8,
+          -0.9999999999999993,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.39315525548798697,
+            0.1924181090933936,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.3535251628075327,
+            0.19241811058350972,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.3651325471387235,
+            0.16380520874888405,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.3931552539664871,
+            0.15195335587724226,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.4211779616855246,
+            0.16380520664154163,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.4327853481684412,
+            0.1924181076032775,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.4211779638372504,
+            0.22103100943790316,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.39315525700948684,
+            0.23288286230954494,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.3651325492904493,
+            0.2210310115452456,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.31955651193857193,
+            0.1924181118607521,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.3411130828393548,
+            0.13927986559644728,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.39315525266234436,
+            0.11726928169196968,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.44519742414055696,
+            0.13927986168281134,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.466753999037402,
+            0.1924181063260351,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.4451974281366191,
+            0.24555635259033992,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.3931552583136296,
+            0.26756693649481755,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.34111308683541697,
+            0.24555635650397586,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "27 aft exhaust hardware 0.4",
+      "center": [
+        0.39452350778239115,
+        0.1924181090933936,
+        -1.000005841255188
+      ],
+      "outward": [
+        0,
+        0,
+        -1
+      ],
+      "axisU": [
+        0.9999999999999993,
+        3.7600636423434864e-8,
+        0
+      ],
+      "axisV": [
+        3.7600636423434864e-8,
+        -0.9999999999999993,
+        0
+      ],
+      "radiusU": 0.11322883410113176,
+      "radiusV": 0.11561358061757515,
+      "minDepth": 0.013502025604248047,
+      "maxDepth": 0.04700675201416016,
+      "blindFloorDepth": 0.045006752014160156,
+      "apertureSides": 14,
+      "samplingBasis": {
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "axisU": [
+          0.9999999999999993,
+          3.7600636423434864e-8,
+          0
+        ],
+        "axisV": [
+          3.7600636423434864e-8,
+          -0.9999999999999993,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            0.39452350778239115,
+            0.1924181090933936,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            0.4341535997177872,
+            0.19241811058351027,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            0.4225462156048193,
+            0.1638052087488845,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            0.39452350930389163,
+            0.15195335587724235,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            0.36650080211168956,
+            0.16380520664154127,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            0.3548934158469951,
+            0.19241810760327693,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            0.366500799959963,
+            0.22103100943790271,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            0.39452350626089067,
+            0.23288286230954486,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            0.42254621345309273,
+            0.22103101154524593,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            0.46812224994812673,
+            0.19241811186075314,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            0.44656567945261494,
+            0.13927986559644812,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            0.39452351060803487,
+            0.1172692816919698,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            0.34248134010823106,
+            0.1392798616828107,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            0.32092476561665556,
+            0.19241810632603407,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            0.34248133611216736,
+            0.2455563525903391,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            0.39452350495674743,
+            0.2675669364948174,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            0.44656567545655124,
+            0.24555635650397653,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "27 aft exhaust hardware 0.75",
+      "center": [
+        0.7391329705715179,
+        0.17231139966419765,
+        -1.000005841255188
+      ],
+      "outward": [
+        0,
+        0,
+        -1
+      ],
+      "axisU": [
+        0.9999999999999956,
+        9.400156113774344e-8,
+        0
+      ],
+      "axisV": [
+        9.400156113774344e-8,
+        -0.9999999999999956,
+        0
+      ],
+      "radiusU": 0.11322882771492054,
+      "radiusV": 0.11561359342251752,
+      "minDepth": 0.013502025604248047,
+      "maxDepth": 0.04700675201416016,
+      "blindFloorDepth": 0.045006752014160156,
+      "apertureSides": 14,
+      "samplingBasis": {
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "axisU": [
+          0.9999999999999956,
+          9.400156113774344e-8,
+          0
+        ],
+        "axisV": [
+          9.400156113774344e-8,
+          -0.9999999999999956,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            0.7391329705715179,
+            0.17231139966419765,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            0.7787630602717399,
+            0.17231140338948794,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            0.7671556784272338,
+            0.14369849773113352,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            0.7391329743752684,
+            0.13184664196631668,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            0.7111102680951176,
+            0.14369849246277744,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            0.699502880871296,
+            0.17231139593890735,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            0.7111102627158021,
+            0.20092430159726177,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            0.7391329667677675,
+            0.2127761573620786,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            0.7671556730479183,
+            0.20092430686561785,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            0.812731708586216,
+            0.17231140658259392,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            0.7911751423035617,
+            0.11917315321707853,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            0.7391329776356258,
+            0.09716256393956159,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            0.6870908088296314,
+            0.11917314343298871,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            0.6655342325568199,
+            0.17231139274580137,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            0.6870907988394742,
+            0.22544964611131676,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            0.7391329635074101,
+            0.24746023538883372,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            0.7911751323134045,
+            0.2254496558954066,
+            -1.000005841255188
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.01599997282028209,
+          "inwardHitMaterial": "andromeda · 512 engines plating",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    }
+  ],
+  "allOutwardClear": true,
+  "allRecessesVisible": true
+}

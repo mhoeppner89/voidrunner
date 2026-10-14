@@ -1,0 +1,53 @@
+{
+  "ship": "lancer",
+  "triangles": 4912,
+  "degenerateTrianglesRemoved": 0,
+  "nonFiniteVertices": false,
+  "missingUV": 0,
+  "uvBounds": [
+    0.0020751953125,
+    0.0020751953125,
+    0.9967041015625,
+    0.9456787109375
+  ],
+  "tangentSource": "Blender MikkTSpace, with collapsed-UV fallback directions made orthonormal",
+  "orthogonalizedTangents": 0,
+  "meshes": 20,
+  "primitives": 20,
+  "materials": 2,
+  "fileBytes": 10114220,
+  "sha256": "02c1f282cb1d4f9fc971643f7924dd0d02210c2d2719ff57a179a9e29670eeec",
+  "images": [
+    {
+      "name": "detailed-normal-4096",
+      "mimeType": "image/png",
+      "size": [
+        4096,
+        4096
+      ],
+      "bytes": 455387,
+      "embedded": true
+    },
+    {
+      "name": "detailed-orm-2048",
+      "mimeType": "image/png",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 1623017,
+      "embedded": true
+    },
+    {
+      "name": "detailed-albedo-4096",
+      "mimeType": "image/png",
+      "size": [
+        4096,
+        4096
+      ],
+      "bytes": 7450858,
+      "embedded": true
+    }
+  ],
+  "compression": "uncompressed static GLB; matching the game loader, deduplicated; named physical assemblies retained"
+}

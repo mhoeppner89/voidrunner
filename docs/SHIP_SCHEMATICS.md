@@ -23,8 +23,8 @@ Recognition details show existing hull structure: canopy frames, wing spars, eng
 - All 19 profiles reviewed through both the SVG gallery and the real cockpit canvas drawing method at 48px and 96px.
 - `git diff --check` passes.
 
-Local gallery: `http://127.0.0.1:4192/.freebuff/ship-outlines/index.html`.
+The former development gallery was removed during cleanup; current profiles remain visible on hull cards and cockpit monitors.
 
 ## Rebuilding after model changes
 
-Run `node --import ./src/game/offlineImportHooks.mjs scripts/bake-ship-schematics.mjs` from the project root. It updates `src/game/shipProfiles.js` and `docs/ship-schematics.json`; the latter binds each profile to the exact installed GLB. Recognition marks are maintained in `scripts/ship-schematic-details.mjs`. Review the result at small sizes before shipping.
+Run `node --import ./tests/helpers/offline-imports.mjs tools/assets/bake-ship-schematics.mjs` from the project root. It updates `src/game/shipProfiles.js` and `docs/ship-schematics.json`; the latter binds each profile to the exact installed GLB. Recognition marks are maintained in `tools/assets/ship-schematic-details.mjs`. Review the result at small sizes before shipping.

@@ -1,0 +1,414 @@
+import assert from 'node:assert/strict';
+import { cargoMass, quoteCommodityTrade } from '../../src/game/economy.js';
+import { createOutfittingState } from '../../src/game/outfitting.js';
+import { launcherMagazineEntries } from '../../src/game/weapons.js';
+import {
+    SAVE_KEY,
+    SETTINGS_KEY,
+    SAVE_VERSION,
+    createNewSave,
+    defaultSettings,
+    deleteSave,
+    hasSavedGame,
+    hydrateSave,
+    loadGame,
+    loadSettingsPreferences,
+    saveGame,
+    saveSettingsPreferences,
+} from '../../src/game/save.js';
+
+const storage = new Map();
+globalThis.window = {
+    localStorage: {
+        getItem: (key) => storage.get(key) ?? null,
+        setItem: (key, value) => storage.set(key, String(value)),
+        removeItem: (key) => storage.delete(key),
+    },
+};
+
+const canonicalPlayer = (overrides = {}) => ({
+    shipId: 'wayfarer',
+    ownedShips: ['wayfarer'],
+    systemId: 'helios-verge',
+    dockedAt: 'helix',
+    lastDockedAt: 'helix',
+    position: [18000, -8000, -176000],
+    velocity: [0, 0, 0],
+    angularVelocity: [0, 0, 0],
+    rotation: [0, 0, 0, 1],
+    ...overrides,
+});
+
+// Player preferences exist before and independently of a career autosave.
+storage.clear();
+const firstRunSettings = {
+    ...defaultSettings(),
+    music: 0,
+    effects: 0,
+    quality: 'low',
+    language: 'en',
+    tiltSensitivity: 1.6,
+};
+assert.equal(saveSettingsPreferences(firstRunSettings), true);
+assert.equal(hasSavedGame(), false);
+assert.equal(storage.has(SETTINGS_KEY), true);
+assert.deepEqual(loadSettingsPreferences(), { ...firstRunSettings, quality: 'high' });
+assert.equal(defaultSettings().easyMode, false);
+
+const easyModeSave = hydrateSave({
+    version: SAVE_VERSION,
+    player: canonicalPlayer(),
+    world: { seed: 1191 },
+    settings: { easyMode: true },
+});
+assert.equal(easyModeSave.settings.easyMode, true);
+
+// A current save preserves an intentional full mute; only legacy silent
+// defaults receive the one-time sound-on migration.
+const currentMuted = hydrateSave({
+    version: SAVE_VERSION,
+    player: canonicalPlayer(),
+    world: { seed: 119 },
+    settings: { music: 0, effects: 0 },
+});
+assert.equal(currentMuted.settings.music, 0);
+assert.equal(currentMuted.settings.effects, 0);
+const legacySilent = hydrateSave({
+    version: 8,
+    player: canonicalPlayer(),
+    world: { seed: 118 },
+    settings: { music: 0, effects: 0 },
+});
+assert.equal(legacySilent.settings.music, 0.34);
+assert.equal(legacySilent.settings.effects, 0.68);
+
+// Schema 9 stored one hull-wide missile count. Schema 10 preserves those
+// rounds by loading the fitted magazines in mount order without inventing a
+// second ordnance type.
+const legacyLauncherFit = createOutfittingState(['lancer']);
+legacyLauncherFit.loadouts.lancer.launchers = [null,null,'swarm-launcher','torpedo-launcher'];
+const legacyOrdnance = hydrateSave({
+    version: 9,
+    player: canonicalPlayer({
+        shipId: 'lancer',
+        ownedShips: ['lancer'],
+        outfitting: legacyLauncherFit,
+        missiles: 9,
+        dockedAt: undefined,
+    }),
+    world: { seed: 117 },
+});
+const migratedMagazines = launcherMagazineEntries(legacyOrdnance.player);
+assert.equal(migratedMagazines[0].launcherId, 'swarm');
+assert.equal(migratedMagazines[0].rounds, 9);
+assert.equal(migratedMagazines[1].launcherId, 'torpedo');
+assert.equal(migratedMagazines[1].rounds, 0);
+assert.equal(legacyOrdnance.player.missiles, 9);
+
+// Corrupted manifests are repaired at the save boundary and remain harmless
+// if an unsanitized runtime object reaches the economy helpers directly.
+const cargoSave = hydrateSave({
+    version: SAVE_VERSION,
+    player: canonicalPlayer({
+        cargo: { water: '2', food: -4, ore: 'broken', unknown: 999 },
+        sealedCargo: [
+            null,
+            'broken',
+            { missionId: '', label: 'orphan', units: 2, mass: 1 },
+            { missionId: 'bad-units', label: 'bad', units: -2, mass: 1 },
+            { missionId: 'valid-delivery', label: 'Medical cases', units: 3, mass: 0.5 },
+        ],
+    }),
+    world: { seed: 120 },
+});
+assert.deepEqual(cargoSave.player.cargo, { water: 2 });
+assert.deepEqual(cargoSave.player.sealedCargo, [{
+    missionId: 'valid-delivery', label: 'Medical cases', units: 3, mass: 1,
+}]);
+assert.equal(cargoMass(cargoSave.player), 5);
+assert.equal(Number.isFinite(cargoMass({ cargo: { water: 'NaN', food: -4 }, sealedCargo: [null, { mass: Infinity, units: 2 }] })), true);
+const tradeQuote = quoteCommodityTrade(cargoSave, 'helix', 'water', 'buy', 1);
+assert.equal(Number.isFinite(tradeQuote.postCargoMass ?? 0), true, 'trade quote never exposes NaN cargo mass');
+
+// Social memory and mission settlement queues are durable JSON records, but
+// malformed hand-edited values must be discarded at the save boundary.
+const malformedCollections = hydrateSave({
+    version: SAVE_VERSION,
+    player: canonicalPlayer(),
+    world: {
+        seed: 1201,
+        npcMemory: ['not-a-memory-record', null],
+        missionSettlements: { not: 'an-array' },
+        localContractProgress: ['not-a-progress-map'],
+    },
+});
+assert.deepEqual(malformedCollections.world.npcMemory, {});
+assert.deepEqual(malformedCollections.world.missionSettlements, []);
+assert.deepEqual(malformedCollections.world.localContractProgress, {});
+
+const normalizedCollections = hydrateSave({
+    version: SAVE_VERSION,
+    player: canonicalPlayer(),
+    world: {
+        seed: 1202,
+        npcMemory: {
+            'mara-vek': {
+                met: true,
+                metAt: '42',
+                lastTalkedAt: 'not-a-time',
+                talks: '3.9',
+                topics: {
+                    routes: '2.9',
+                    broken: 'NaN',
+                    zero: 0,
+                    negative: -1,
+                },
+                lastTopic: 'routes',
+            },
+            discardedNull: null,
+            discardedArray: [],
+            discardedScalar: 'not-a-record',
+        },
+        missionSettlements: [
+            null,
+            'not-a-settlement',
+            { title: 'missing id' },
+            { id: 'missing-title' },
+            {
+                id: 'normalized-settlement',
+                title: 'Normalized settlement',
+                outcome: 'unexpected-value',
+                guild: 12,
+                faction: null,
+                reward: '1200',
+                bond: '-100',
+                bonus: Infinity,
+                total: '1100',
+                repDelta: '-4',
+                factionDelta: 'bad',
+                at: '-8',
+                stageIndex: '2.9',
+                rankedUp: 'yes',
+                rankName: 12,
+                issuer: 'Settlement desk',
+            },
+        ],
+        localContractProgress: {
+            'mourning-ledger': '2.9',
+            'foundry-audit': -4,
+            'quiet-signal': 150,
+            invalid: 'not-a-number',
+            alsoInvalid: {},
+        },
+    },
+});
+assert.deepEqual(normalizedCollections.world.npcMemory, {
+    'mara-vek': {
+        met: true,
+        metAt: 42,
+        lastTalkedAt: 0,
+        talks: 3,
+        topics: { routes: 2 },
+        lastTopic: 'routes',
+    },
+});
+assert.deepEqual(normalizedCollections.world.missionSettlements, [{
+    id: 'normalized-settlement',
+    title: 'Normalized settlement',
+    outcome: 'completed',
+    guild: 'merchant',
+    faction: 'independents',
+    reward: 1200,
+    bond: -100,
+    bonus: 0,
+    total: 1100,
+    repDelta: -4,
+    factionDelta: 0,
+    at: 0,
+    stageIndex: 2,
+    issuer: 'Settlement desk',
+}]);
+assert.deepEqual(normalizedCollections.world.localContractProgress, {
+    'mourning-ledger': 2,
+    'foundry-audit': 0,
+    'quiet-signal': 99,
+});
+
+// Quest hydration keeps the existing race split array as well as tutorial
+// flags, while dropping malformed nested payloads and duplicate ids.
+const normalizedQuests = hydrateSave({
+    version: SAVE_VERSION,
+    player: canonicalPlayer(),
+    world: { seed: 12021 },
+    quests: [
+        {
+            id: 'trial-by-fire',
+            stepId: 'complete',
+            flags: { finishTime: 52.4, rank: 2, splits: [12.1, 28.6, 52.4], invalid: { nested: true } },
+            choices: {},
+            startedAt: 2,
+            completedAt: 55,
+        },
+        {
+            id: 'the-spare-key',
+            stepId: 'buy-supplies',
+            flags: { metMara: true, metRin: true, suppliesBought: 1 },
+            choices: { recorder: 'trust-rin', invalid: 4 },
+            startedAt: 0,
+        },
+        { id: 'the-spare-key', stepId: 'duplicate', flags: {}, choices: {}, startedAt: 9 },
+        { id: 'INVALID ID', stepId: 'intro', flags: {}, choices: {}, startedAt: 0 },
+    ],
+}).quests;
+assert.deepEqual(normalizedQuests[0].flags, { finishTime: 52.4, rank: 2, splits: [12.1, 28.6, 52.4] });
+assert.deepEqual(normalizedQuests[1].flags, { metMara: true, metRin: true, suppliesBought: 1 });
+assert.deepEqual(normalizedQuests[1].choices, { recorder: 'trust-rin' });
+assert.equal(normalizedQuests.length, 2);
+
+// Existing careers can already have a fresh procedural board for the current
+// cycle. Hydration still inserts the first authored local story immediately;
+// it must not make the player wait for the next timed board refresh.
+const upgradedMissionBoard = hydrateSave({
+    version: 10,
+    player: canonicalPlayer({ dockedAt: 'cairn', lastDockedAt: 'cairn' }),
+    world: {
+        seed: 1203,
+        time: 0,
+        offers: {
+            cairn: [{ id: 'cairn-0-0-existing', title: 'Existing posting', status: 'offered' }],
+        },
+    },
+});
+assert.equal(upgradedMissionBoard.world.offers.cairn[0].id, 'mourning-ledger-1');
+assert.ok(upgradedMissionBoard.world.offers.cairn.some((entry) => entry.id === 'cairn-0-0-existing'));
+
+// A valid dock is the authoritative system anchor.
+const dockMismatch = hydrateSave({
+    version: SAVE_VERSION,
+    player: canonicalPlayer({ systemId: 'redwake', dockedAt: 'helix' }),
+    world: { seed: 121 },
+});
+assert.equal(dockMismatch.player.systemId, 'helios-verge');
+assert.equal(dockMismatch.player.navTargetId, 'shardbelt');
+
+const validPendingJump = {
+    routeId: 'verge-meridian',
+    fromSystemId: 'helios-verge',
+    toSystemId: 'meridian',
+    fromLocationId: 'verge-meridian-point',
+    toLocationId: 'meridian-verge-point',
+    startedAt: 10,
+    completeAt: 10.65,
+    returnThrottle: 0.4,
+};
+const pendingForward = hydrateSave({
+    version: SAVE_VERSION,
+    player: canonicalPlayer({ dockedAt: undefined }),
+    world: { seed: 122, pendingJump: validPendingJump },
+});
+assert.deepEqual(pendingForward.world.pendingJump, validPendingJump);
+const pendingReverse = hydrateSave({
+    version: SAVE_VERSION,
+    player: canonicalPlayer({ systemId: 'meridian', dockedAt: undefined, lastDockedAt: 'meridian-prime' }),
+    world: {
+        seed: 123,
+        pendingJump: {
+            ...validPendingJump,
+            fromSystemId: 'meridian',
+            toSystemId: 'helios-verge',
+            fromLocationId: 'meridian-verge-point',
+            toLocationId: 'verge-meridian-point',
+        },
+    },
+});
+assert.equal(pendingReverse.world.pendingJump?.fromLocationId, 'meridian-verge-point');
+const mismatchedEndpoint = hydrateSave({
+    version: SAVE_VERSION,
+    player: canonicalPlayer({ dockedAt: undefined }),
+    world: {
+        seed: 124,
+        pendingJump: { ...validPendingJump, fromLocationId: 'helix' },
+    },
+});
+assert.equal(mismatchedEndpoint.world.pendingJump, null, 'route id cannot carry unrelated valid locations');
+
+// Exercise the actual localStorage APIs, including a representative undocked
+// career with settings, mission state, race records and a pending jump.
+storage.clear();
+const roundTrip = createNewSave(125);
+roundTrip.player.dockedAt = undefined;
+roundTrip.player.position = [1234, -56, 7890];
+roundTrip.player.velocity = [4, 5, 6];
+roundTrip.player.launcherMagazines['wayfarer-weapon-2'].rounds = 2;
+roundTrip.player.missiles = 2;
+roundTrip.player.prevPosition = new Float64Array([1, 2, 3]);
+roundTrip.player.prevRotation = new Float64Array([0, 0, 0, 1]);
+roundTrip.settings.quality = 'low';
+roundTrip.activeMissions = [{
+    id: 'round-trip-mission',
+    kind: 'delivery',
+    status: 'active',
+    complication: { kind: 'fragile', bonus: 210, intact: true },
+}];
+roundTrip.world.npcMemory = {
+    'mara-vek': {
+        met: true,
+        metAt: 12,
+        lastTalkedAt: 21,
+        talks: 2,
+        topics: { routes: 1 },
+        lastTopic: 'routes',
+    },
+};
+roundTrip.world.missionSettlements = [{
+    id: 'round-trip-settlement',
+    title: 'Round-trip settlement',
+    outcome: 'completed',
+    guild: 'merchant',
+    faction: 'independents',
+    reward: 100,
+    bond: 20,
+    bonus: 5,
+    total: 125,
+    repDelta: 3,
+    factionDelta: 1,
+    at: 33,
+    issuer: 'Test desk',
+}];
+roundTrip.world.localContractProgress = { 'mourning-ledger': 1 };
+roundTrip.world.raceRecords = { 'shard-gauntlet': { bestTime: 73.5, bestRank: 2, bestSplits: [10, 20] } };
+roundTrip.world.pendingJump = validPendingJump;
+assert.equal(saveGame(roundTrip), true);
+assert.equal(hasSavedGame(), true);
+const persistedRaw = JSON.parse(storage.get(SAVE_KEY));
+assert.equal('prevPosition' in persistedRaw.player, false);
+assert.equal('prevRotation' in persistedRaw.player, false);
+const loaded = loadGame();
+assert.deepEqual(loaded.player.position, [1234, -56, 7890]);
+assert.deepEqual(loaded.player.velocity, [4, 5, 6]);
+assert.equal(launcherMagazineEntries(loaded.player)[0].rounds, 2);
+assert.equal(loaded.player.activeLauncherMountId, 'wayfarer-weapon-2');
+assert.equal(loaded.player.dockedAt, undefined);
+assert.equal(loaded.settings.quality, 'high');
+assert.equal(loaded.activeMissions[0].id, 'round-trip-mission');
+assert.deepEqual(loaded.activeMissions[0].complication, roundTrip.activeMissions[0].complication);
+assert.deepEqual(loaded.world.npcMemory, roundTrip.world.npcMemory);
+assert.deepEqual(loaded.world.missionSettlements, roundTrip.world.missionSettlements);
+assert.deepEqual(loaded.world.localContractProgress, roundTrip.world.localContractProgress);
+assert.equal(loaded.world.raceRecords['shard-gauntlet'].bestTime, 73.5);
+assert.equal(loaded.world.pendingJump?.routeId, 'verge-meridian');
+
+const goodRaw = storage.get(SAVE_KEY);
+loaded.player.position = [NaN, 0, 0];
+assert.equal(saveGame(loaded), false, 'non-finite transforms do not overwrite the career');
+assert.equal(storage.get(SAVE_KEY), goodRaw);
+const arena = createNewSave(126);
+arena.arena = { environment: 'open', scenario: '1v1' };
+assert.equal(saveGame(arena), false, 'arena sessions never overwrite the career');
+assert.equal(storage.get(SAVE_KEY), goodRaw);
+
+deleteSave();
+assert.equal(hasSavedGame(), false);
+assert.equal(loadGame(), undefined);
+
+console.log('all save assertions passed');

@@ -1,0 +1,1301 @@
+{
+  "id": "torsas",
+  "glbPath": "assets/models/ships/torsas.glb",
+  "glbSha256": "f79ff6399cbff4c12552c5c0e0681ae890f00858503f251b94401bf90cd60774",
+  "descriptorSha256": "b880406d428b1764a230eb17c9468db060ee736ffc84318c6b78d46621232989",
+  "coordinateFrame": "Unscaled GLB space",
+  "epsilon": 0.0000022625652974414303,
+  "method": "Double-sided first-hit rays at center and eight angles on 35% and 65% aperture radii. The measured aperture plane is the aft lip, not the glow socket. Whole-base fit is also visually reviewed.",
+  "mouths": [
+    {
+      "name": "14 upper aft power nozzle -1",
+      "center": [
+        -0.1582153265674909,
+        0.15638848580420017,
+        -0.5098094940185547
+      ],
+      "outward": [
+        0,
+        0,
+        -1
+      ],
+      "axisU": [
+        0.999999999999994,
+        1.096460503665217e-7,
+        0
+      ],
+      "axisV": [
+        1.096460503665217e-7,
+        -0.999999999999994,
+        0
+      ],
+      "radiusU": 0.050963404277959534,
+      "radiusV": 0.05094915478704899,
+      "minDepth": 0.013498127460479736,
+      "maxDepth": 0.04699375820159912,
+      "blindFloorDepth": 0.04499375820159912,
+      "apertureSides": 12,
+      "samplingBasis": {
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "axisU": [
+          0.999999999999994,
+          1.096460503665217e-7,
+          0
+        ],
+        "axisV": [
+          1.096460503665217e-7,
+          -0.999999999999994,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.1582153265674909,
+            0.15638848580420017,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.1403781350702052,
+            0.15638848775997777,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 9.183531214131124e-18,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.1456025261198802,
+            0.14377921469116794,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 9.183531214131124e-18,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.15821532461226015,
+            0.13855628162873312,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.013065683885025279,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.17082812424998775,
+            0.14377921192528076,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.17605251806477662,
+            0.15638848384842258,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.1708281270151016,
+            0.1689977569172324,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.15821532852272166,
+            0.17422068997966722,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.013065729243985033,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.14560252888499406,
+            0.16899775968311959,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 9.183531214131124e-18,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.12508911378681742,
+            0.15638848943635858,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.07038995910636388,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.13479155430764247,
+            0.13297126802285464,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.0315387506056572,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.15821532293634807,
+            0.12327153519261852,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 9.183531214131124e-18,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.1816390936921279,
+            0.13297126288620698,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.1913415393481644,
+            0.15638848217204177,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04199418425559998,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.18163909882733933,
+            0.1798057035855457,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.15821533019863374,
+            0.18950543641578182,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 9.183531214131124e-18,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.1347915594428539,
+            0.17980570872219337,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.031538696668084516,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": false
+    },
+    {
+      "name": "18 main aft engine armored collar -1",
+      "center": [
+        -0.26014211560998646,
+        0.0025420373172632287,
+        -0.9997416734695435
+      ],
+      "outward": [
+        0,
+        0,
+        -1
+      ],
+      "axisU": [
+        0.9999999999999998,
+        9.376171362468965e-9,
+        0
+      ],
+      "axisV": [
+        9.376171362468967e-9,
+        -1,
+        0
+      ],
+      "radiusU": 0.07094904993261607,
+      "radiusV": 0.07092920807253192,
+      "minDepth": 0.013498127460479736,
+      "maxDepth": 0.04699375820159912,
+      "blindFloorDepth": 0.04499375820159912,
+      "apertureSides": 14,
+      "samplingBasis": {
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "axisU": [
+          1,
+          9.376171362468967e-9,
+          0
+        ],
+        "axisV": [
+          9.376171362468967e-9,
+          -1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.26014211560998646,
+            0.0025420373172632287,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.23530994813357084,
+            0.0025420375500938863,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.24258312143126284,
+            -0.015012045922398257,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.26014211537722093,
+            -0.02228318550812294,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.27770110945952986,
+            -0.015012046251670533,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.2849742830864021,
+            0.002542037084432568,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.2777011097887101,
+            0.020096120556924713,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.260142115842752,
+            0.0273672601426494,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.24258312176044303,
+            0.020096120886196993,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.21402523315378602,
+            0.0025420377496630214,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.22753255499235686,
+            -0.030058402984965246,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.2601421151777076,
+            -0.04356194792988252,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.2927516756162814,
+            -0.0300584035964709,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.3062589980661869,
+            0.0025420368848634305,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.29275167622761605,
+            0.0351424776194917,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.26014211604226534,
+            0.048646022564408975,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.2275325556036915,
+            0.035142478230997365,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "14 upper aft power nozzle 1",
+      "center": [
+        0.15755787926415601,
+        0.15638848580420017,
+        -0.5098094940185547
+      ],
+      "outward": [
+        0,
+        0,
+        -1
+      ],
+      "axisU": [
+        0.999999999999994,
+        1.0964605437394064e-7,
+        0
+      ],
+      "axisV": [
+        1.0964605437394064e-7,
+        -0.999999999999994,
+        0
+      ],
+      "radiusU": 0.050963398690024087,
+      "radiusV": 0.05094915478704894,
+      "minDepth": 0.013498127460479736,
+      "maxDepth": 0.04699375820159912,
+      "blindFloorDepth": 0.04499375820159912,
+      "apertureSides": 12,
+      "samplingBasis": {
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "axisU": [
+          0.999999999999994,
+          1.0964605437394064e-7,
+          0
+        ],
+        "axisV": [
+          1.0964605437394064e-7,
+          -0.999999999999994,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            0.15755787926415601,
+            0.15638848580420017,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            0.17539506880566433,
+            0.15638848775997763,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            0.1701706783288233,
+            0.1437792146911679,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            0.15755788121938685,
+            0.13855628162873315,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.013065754657867532,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            0.1449450829646027,
+            0.14377921192528087,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 9.183531214131124e-18,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            0.1397206897226477,
+            0.15638848384842272,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 9.183531214131124e-18,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            0.14494508019948874,
+            0.16899775691723246,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 9.183531214131124e-18,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            0.15755787730892518,
+            0.1742206899796672,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.013065713706607926,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            0.17017067556370932,
+            0.16899775968311948,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            0.19068408841267148,
+            0.1563884894363583,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04199418425559998,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            0.18098164895568097,
+            0.13297126802285447,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            0.15755788289529898,
+            0.12327153519261856,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 9.183531214131124e-18,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            0.1341341147078427,
+            0.1329712628862072,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.031538601412596075,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            0.12443167011564056,
+            0.15638848217204204,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.07038992144210872,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            0.13413410957263106,
+            0.17980570358554587,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.031538632716098254,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            0.15755787563301304,
+            0.18950543641578177,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 9.183531214131124e-18,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            0.18098164382046933,
+            0.17980570872219315,
+            -0.5098094940185547
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": false
+    },
+    {
+      "name": "18 main aft engine armored collar 1",
+      "center": [
+        0.25948466679879595,
+        0.0025420373172632287,
+        -0.9997416734695435
+      ],
+      "outward": [
+        0,
+        0,
+        -1
+      ],
+      "axisU": [
+        0.9999999999999998,
+        9.376173472371585e-9,
+        0
+      ],
+      "axisV": [
+        9.376173472371587e-9,
+        -1,
+        0
+      ],
+      "radiusU": 0.07094905099698472,
+      "radiusV": 0.07092920807253193,
+      "minDepth": 0.013498127460479736,
+      "maxDepth": 0.04699375820159912,
+      "blindFloorDepth": 0.04499375820159912,
+      "apertureSides": 14,
+      "samplingBasis": {
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "axisU": [
+          1,
+          9.376173472371587e-9,
+          0
+        ],
+        "axisV": [
+          9.376173472371587e-9,
+          -1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            0.25948466679879595,
+            0.0025420373172632287,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            0.2843168346477406,
+            0.002542037550093942,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            0.2770436612409374,
+            -0.01501204592239822,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            0.25948466703156153,
+            -0.022283185508122944,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            0.24192567268583476,
+            -0.015012046251670576,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            0.2346524989498513,
+            0.0025420370844325122,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            0.2419256723566545,
+            0.02009612055692468,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            0.25948466656603036,
+            0.027367260142649404,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            0.27704366091175714,
+            0.020096120886197038,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.041994154453277595,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            0.305601549946836,
+            0.002542037749663125,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            0.2920942279056301,
+            -0.030058402984965177,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            0.25948466723107494,
+            -0.04356194792988253,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            0.22687510630329658,
+            -0.03005840359647098,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            0.21336778365075587,
+            0.002542036884863327,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            0.22687510569196181,
+            0.03514247761949164,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            0.25948466636651696,
+            0.04864602256440898,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            0.2920942272942953,
+            0.03514247823099744,
+            -0.9997416734695435
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.04499375820159913,
+          "inwardHitMaterial": "Alliance · steel charcoal ochre PBR",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    }
+  ],
+  "allOutwardClear": true,
+  "allRecessesVisible": false
+}

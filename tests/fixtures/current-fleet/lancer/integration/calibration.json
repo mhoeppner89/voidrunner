@@ -1,0 +1,395 @@
+{
+  "sha256": "02c1f282cb1d4f9fc971643f7924dd0d02210c2d2719ff57a179a9e29670eeec",
+  "playerHalfExtents": [
+    6.789783316969873,
+    2.0484659062027935,
+    6.559161051750184
+  ],
+  "turret": {
+    "size": "M",
+    "pedestal": 0,
+    "hullHalfLength": 3.2300103923831496,
+    "position": [
+      0.0,
+      -0.9855745904667735,
+      0.4142941135880885
+    ],
+    "side": -1,
+    "axis": 1,
+    "forwardCone": 10,
+    "label": "LOWER TURRET"
+  },
+  "turretRuntime": {
+    "pivot": [
+      0,
+      -3.2302655145455463,
+      4.347874902106171
+    ],
+    "deckCenter": [
+      0,
+      -0.738198472999944,
+      4.347874902106171
+    ],
+    "outward": [
+      0,
+      -1,
+      0
+    ],
+    "scale": 4.223842443297631
+  },
+  "guns": [
+    {
+      "name": "Port nose_muzzle",
+      "rawGlb": [
+        0.968999981880188,
+        -0.035999998450279236,
+        0.032999999821186066
+      ],
+      "runtime": [
+        0.3581423980593682,
+        -0.39070078318119056,
+        -10.516363003349307
+      ],
+      "outwardRaw": [
+        1,
+        0,
+        0
+      ],
+      "outwardRuntime": [
+        0,
+        0,
+        -1
+      ],
+      "outwardClear": true,
+      "backwardSupportRaw": 0.010999977588653564
+    },
+    {
+      "name": "Starboard nose_muzzle",
+      "rawGlb": [
+        0.968999981880188,
+        -0.035999998450279236,
+        -0.032999999821186066
+      ],
+      "runtime": [
+        -0.3581423980593682,
+        -0.39070078318119056,
+        -10.516363003349307
+      ],
+      "outwardRaw": [
+        1,
+        0,
+        0
+      ],
+      "outwardRuntime": [
+        0,
+        0,
+        -1
+      ],
+      "outwardClear": true,
+      "backwardSupportRaw": 0.010999977588653564
+    }
+  ],
+  "exhausts": [
+    {
+      "name": "Port main engine_exhaust",
+      "rawGlb": {
+        "mouthCenter": [
+          -0.964,
+          0.016,
+          0.235
+        ],
+        "existingEffectAnchor": [
+          -0.9670000076293945,
+          0.003000000026077032,
+          0.23499999940395355
+        ],
+        "proposedEffectAnchor": [
+          -0.9670000076293945,
+          0.01600000075995922,
+          0.23499999940395355
+        ],
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.042,
+        "radiusV": 0.043
+      },
+      "runtime": {
+        "mouthCenter": [
+          2.5504080000000005,
+          0.17364480000000004,
+          10.4620992
+        ],
+        "existingEffectAnchor": [
+          2.5504079935312274,
+          0.03255840028300882,
+          10.494657682800295
+        ],
+        "proposedEffectAnchor": [
+          2.5504079935312274,
+          0.17364480824768547,
+          10.494657682800295
+        ],
+        "outward": [
+          0,
+          0,
+          1
+        ],
+        "axisU": [
+          1,
+          0,
+          0
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.4558176000000001,
+        "radiusV": 0.46667040000000004
+      },
+      "preview": {
+        "fillRadiusFactor": 0.87
+      },
+      "effectAnchorUnchanged": false
+    },
+    {
+      "name": "Port auxiliary engine_exhaust",
+      "rawGlb": {
+        "mouthCenter": [
+          -0.534,
+          -0.075,
+          0.444
+        ],
+        "existingEffectAnchor": [
+          -0.5370000004768372,
+          -0.07500000298023224,
+          0.4440000057220459
+        ],
+        "proposedEffectAnchor": [
+          -0.5370000004768372,
+          -0.07500000298023224,
+          0.4440000057220459
+        ],
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.028,
+        "radiusV": 0.027
+      },
+      "runtime": {
+        "mouthCenter": [
+          4.818643200000001,
+          -0.8139600000000001,
+          5.7953952000000015
+        ],
+        "existingEffectAnchor": [
+          4.81864326210022,
+          -0.8139600323438646,
+          5.827953605175019
+        ],
+        "proposedEffectAnchor": [
+          4.81864326210022,
+          -0.8139600323438646,
+          5.827953605175019
+        ],
+        "outward": [
+          0,
+          0,
+          1
+        ],
+        "axisU": [
+          1,
+          0,
+          0
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.30387840000000005,
+        "radiusV": 0.29302560000000005
+      },
+      "preview": {
+        "fillRadiusFactor": 0.87
+      },
+      "effectAnchorUnchanged": true
+    },
+    {
+      "name": "Starboard main engine_exhaust",
+      "rawGlb": {
+        "mouthCenter": [
+          -0.964,
+          0.016,
+          -0.235
+        ],
+        "existingEffectAnchor": [
+          -0.9670000076293945,
+          0.003000000026077032,
+          -0.23499999940395355
+        ],
+        "proposedEffectAnchor": [
+          -0.9670000076293945,
+          0.01600000075995922,
+          -0.23499999940395355
+        ],
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.042,
+        "radiusV": 0.043
+      },
+      "runtime": {
+        "mouthCenter": [
+          -2.5504080000000005,
+          0.17364480000000004,
+          10.4620992
+        ],
+        "existingEffectAnchor": [
+          -2.5504079935312274,
+          0.03255840028300882,
+          10.494657682800295
+        ],
+        "proposedEffectAnchor": [
+          -2.5504079935312274,
+          0.17364480824768547,
+          10.494657682800295
+        ],
+        "outward": [
+          0,
+          0,
+          1
+        ],
+        "axisU": [
+          1,
+          0,
+          0
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.4558176000000001,
+        "radiusV": 0.46667040000000004
+      },
+      "preview": {
+        "fillRadiusFactor": 0.87
+      },
+      "effectAnchorUnchanged": false
+    },
+    {
+      "name": "Starboard auxiliary engine_exhaust",
+      "rawGlb": {
+        "mouthCenter": [
+          -0.534,
+          -0.075,
+          -0.444
+        ],
+        "existingEffectAnchor": [
+          -0.5370000004768372,
+          -0.07500000298023224,
+          -0.4440000057220459
+        ],
+        "proposedEffectAnchor": [
+          -0.5370000004768372,
+          -0.07500000298023224,
+          -0.4440000057220459
+        ],
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.028,
+        "radiusV": 0.027
+      },
+      "runtime": {
+        "mouthCenter": [
+          -4.818643200000001,
+          -0.8139600000000001,
+          5.7953952000000015
+        ],
+        "existingEffectAnchor": [
+          -4.81864326210022,
+          -0.8139600323438646,
+          5.827953605175019
+        ],
+        "proposedEffectAnchor": [
+          -4.81864326210022,
+          -0.8139600323438646,
+          5.827953605175019
+        ],
+        "outward": [
+          0,
+          0,
+          1
+        ],
+        "axisU": [
+          1,
+          0,
+          0
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.30387840000000005,
+        "radiusV": 0.29302560000000005
+      },
+      "preview": {
+        "fillRadiusFactor": 0.87
+      },
+      "effectAnchorUnchanged": true
+    }
+  ],
+  "poseSource": "Approved preview physical pivot and scale converted to the actual factory half-extent convention."
+}

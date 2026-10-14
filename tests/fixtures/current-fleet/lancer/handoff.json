@@ -1,0 +1,1153 @@
+{
+  "ship": "lancer",
+  "status": "approved, installed in game, verified locally",
+  "request": "Clean, straight panel lines fitting the mesh; correct the circled nose markings and retain the detailed textures and approved geometry.",
+  "candidate": {
+    "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/candidate.glb",
+    "sha256": "02c1f282cb1d4f9fc971643f7924dd0d02210c2d2719ff57a179a9e29670eeec",
+    "triangles": 4912,
+    "meshes": 20,
+    "primitives": 20,
+    "materials": 2,
+    "fileBytes": 10114220
+  },
+  "native": {
+    "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/lancer.blend",
+    "sha256": "cd821ad5966dbafc9197be0b3c5742d1c4ba41d6f84d7635c3b62b2b47a64630",
+    "editableParts": 94,
+    "packedTextureSources": 3
+  },
+  "runtimeHandoff": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/runtime-handoff.json",
+  "previewURL": "http://127.0.0.1:4173/docs/ship-revisions/20261002/lancer/preview.html?v=straight-1&view=nose&display=candidate",
+  "referencePaths": [
+    {
+      "path": "/Users/mhoeppner/Desktop/glb_models/ships/lancer.glb",
+      "sha256": "ff71dbd5b003095a82260575b2003df72d58136d82e9f7b62a7d94cd32034090"
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/glb_models/references/lancer.png",
+      "sha256": "54249551fd5ba01fb362613b474b9f28ca324f7a632c70dbfd2889a55d7d828f"
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/lancer.glb",
+      "sha256": "ff71dbd5b003095a82260575b2003df72d58136d82e9f7b62a7d94cd32034090"
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/lancer.png",
+      "sha256": "54249551fd5ba01fb362613b474b9f28ca324f7a632c70dbfd2889a55d7d828f"
+    }
+  ],
+  "frozenInput": [
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/input/current.glb",
+      "sha256": "b49c6c8dc1eb7246af0e179a69967d59cf6f98285526161fbaa9f5c663983c7b",
+      "unchanged": true
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/input/current.blend",
+      "sha256": "948ff7712a9915cef9c2a7b32973b8c8ebeaf66f2b6a12e0664216ca2d7dc4d1",
+      "unchanged": true
+    }
+  ],
+  "rejectedMajorArchive": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/rejected-major",
+  "previousCanopyArchive": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/before-canopy-2",
+  "verification": {
+    "allPassed": true,
+    "canopyScope": {
+      "candidateSHA256": "02c1f282cb1d4f9fc971643f7924dd0d02210c2d2719ff57a179a9e29670eeec",
+      "nativeSHA256": "cd821ad5966dbafc9197be0b3c5742d1c4ba41d6f84d7635c3b62b2b47a64630",
+      "unrequestedParts": 64,
+      "allUnrequestedGeometryUnchanged": true,
+      "changedAssemblies": [
+        "01 Central hull",
+        "02 Cockpit and bow",
+        "03 Canopy glazing"
+      ],
+      "changedMainHullScope": "Upper center-deck edges and three fitted ivory continuation plates; existing spine parts retained.",
+      "previousAssets": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/before-canopy-2",
+      "singleFrontPane": true,
+      "totalGlazingPanes": 5,
+      "roofWidthRatioToPrevious": 0.72,
+      "hullAndCanopyEdgesShareWidthFunction": true,
+      "rearDeckHalfWidth": 0.053279999999999994,
+      "frontGlassPart": "Single uninterrupted front canopy glass",
+      "verificationReuse": {
+        "method": "Inherited numerical geometry audit; exact native vertices, polygons, normals, transforms and sockets and exact exported world triangle positions proved unchanged by texture-scope-qa.json and texture-export-qa.json. Only UVs/materials differ.",
+        "previousCandidateSHA256": "7a4ec3d30c9d4e23110687475f20f75f8a4e10c56fa698827a5f609bdd57019d",
+        "previousNativeSHA256": "b4f8964536b1e5f794ce71942934f3c332f4416cf19a2806720b3ce157eca40c",
+        "previousReport": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/before-texture/canopy-scope-qa.json",
+        "previousReportSHA256": "28d6bed3de6971d679c096edca6d5f86641a899dc9d2ef1056507a92b72cc79d"
+      }
+    },
+    "native": true,
+    "support": true,
+    "supportInterfaces": 100,
+    "supportSamples": 55952,
+    "runtime": true,
+    "tangents": true,
+    "browser": true,
+    "browserChecks": 58,
+    "browserErrors": [],
+    "conformity": {
+      "allPassed": true,
+      "minimumIoU": 0.9242477697696688,
+      "meanIoU": 0.9555541197594325,
+      "directions": 2394,
+      "resolution": 512,
+      "metric": "Orthographic silhouette intersection-over-union, same origin/scale/camera, no independent alignment",
+      "scope": "Dense sampled directions; finite sampling is not a mathematical proof over every continuous camera direction."
+    },
+    "surface": {
+      "allPassed": true,
+      "referenceAreaWithinTwoPercentSpan": 0.9984305079226543,
+      "candidateAreaWithinTwoPercentSpan": 0.9355792170770499
+    },
+    "matchedViewsInspected": [
+      "top",
+      "side",
+      "front",
+      "rear",
+      "bottom",
+      "quarter"
+    ],
+    "closeViewsInspected": [
+      "nose/canopy in native quarter, side and front views, plus the canopy-to-hull spine",
+      "concept canopy crop",
+      "engine housings/nozzles",
+      "wing armor/root",
+      "turret bottom",
+      "phone preview",
+      "part isolation/spread"
+    ],
+    "inspectionScope": "Final exact-export textured six-view and close-up images, packed native renders, geometry equality and material/UV/tangent audits.",
+    "lineFitting": {
+      "candidateSHA256": "02c1f282cb1d4f9fc971643f7924dd0d02210c2d2719ff57a179a9e29670eeec",
+      "allPassed": true,
+      "part": "Cockpit and chisel bow",
+      "face": 100,
+      "surface": "Actual central planar trapezoid, native X .71\u2013.78; all design lines stay in this facet.",
+      "maximumFacePlanarityError": 1.6989432083391875e-10,
+      "maximumEdgeParallelError": 6.2945368202042e-16,
+      "minimumContourToActualEdgeDistance": 0.0051259123761352825,
+      "bakedContourSamples": 280,
+      "visibleContourSampleFraction": 1.0,
+      "outlineVertexScale": 0.78,
+      "noseOutlineBlender": [
+        [
+          0.7176999777555466,
+          -0.021340799778699876,
+          0.06593000024557114
+        ],
+        [
+          0.7722999721765518,
+          -0.015186600498855115,
+          0.037069999873638154
+        ],
+        [
+          0.7722999721765518,
+          0.015186600498855115,
+          0.037069999873638154
+        ],
+        [
+          0.7176999777555466,
+          0.021340799778699876,
+          0.06593000024557114
+        ]
+      ],
+      "goldDatumsBlenderXY": [
+        [
+          [
+            0.729,
+            -0.008
+          ],
+          [
+            0.744,
+            -0.008
+          ],
+          [
+            0.744,
+            -0.0125
+          ],
+          [
+            0.729,
+            -0.0125
+          ]
+        ],
+        [
+          [
+            0.729,
+            0.008
+          ],
+          [
+            0.744,
+            0.008
+          ],
+          [
+            0.744,
+            0.0125
+          ],
+          [
+            0.729,
+            0.0125
+          ]
+        ]
+      ],
+      "finish": "Analytic antialiasing and shallow four-level normal relief; no random edge chips; scratches excluded around seams."
+    },
+    "textureScope": {
+      "candidateSHA256": "02c1f282cb1d4f9fc971643f7924dd0d02210c2d2719ff57a179a9e29670eeec",
+      "nativeSHA256": "cd821ad5966dbafc9197be0b3c5742d1c4ba41d6f84d7635c3b62b2b47a64630",
+      "previousNativeSHA256": "b4f8964536b1e5f794ce71942934f3c332f4416cf19a2806720b3ce157eca40c",
+      "parts": 94,
+      "sockets": 6,
+      "allGeometryAndSocketsUnchanged": true,
+      "changes": "Materials and fitted UV coordinates only; exact native vertex, polygon, normal, transform, part and socket equality."
+    },
+    "textureExport": {
+      "candidateSHA256": "02c1f282cb1d4f9fc971643f7924dd0d02210c2d2719ff57a179a9e29670eeec",
+      "previousCandidateSHA256": "7a4ec3d30c9d4e23110687475f20f75f8a4e10c56fa698827a5f609bdd57019d",
+      "previousGeometryHash": "0c4002c553754a1d531c089fc22a0bb7bd7c34488af4a9c89a019e48f9ae0502",
+      "candidateGeometryHash": "0c4002c553754a1d531c089fc22a0bb7bd7c34488af4a9c89a019e48f9ae0502",
+      "triangles": 4912,
+      "exactWorldTrianglePositionsUnchanged": true,
+      "allPaintUsesSharedPBRAtlas": true,
+      "materials": [
+        {
+          "name": "Lancer coherent Concord paint and exposed steel PBR",
+          "albedo": "detailed-albedo-4096",
+          "normal": "detailed-normal-4096",
+          "orm": "detailed-orm-2048",
+          "occlusion": "detailed-orm-2048"
+        },
+        {
+          "name": "VR_Canopy_lancer original reflective glass"
+        }
+      ],
+      "allPassed": true
+    },
+    "sharedTextureAtlas": {
+      "resolution": 4096,
+      "texelsPerAuthoredUnit": 921,
+      "faces": 2260,
+      "gutterPixels": 8,
+      "embeddedMaps": 3,
+      "textureSizes": {
+        "albedo": 4096,
+        "normal": 4096,
+        "orm": 2048
+      },
+      "densityGainOverPrevious": 4.675126903553299,
+      "detailQA": {
+        "candidateSHA256": "02c1f282cb1d4f9fc971643f7924dd0d02210c2d2719ff57a179a9e29670eeec",
+        "allPassed": true,
+        "previousTextureCandidateSHA256": "0b8a46190182a97910aac65b84a3f8056484fb861797b8a5dea634fc8053f7a7",
+        "previousTexelsPerAuthoredUnit": 197,
+        "texelsPerAuthoredUnit": 921,
+        "densityGain": 4.675126903553299,
+        "textures": [
+          {
+            "channel": "albedo",
+            "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/textures/detailed-albedo-4096.png",
+            "resolution": [
+              4096,
+              4096
+            ],
+            "sha256": "c7a43337a654520bc1e0f3a51e1440e9b68f98252ce52d5eb8d7f9ca903c7aae",
+            "bytes": 7450858,
+            "channelRange": [
+              [
+                15,
+                196
+              ],
+              [
+                22,
+                193
+              ],
+              [
+                28,
+                180
+              ]
+            ]
+          },
+          {
+            "channel": "normal",
+            "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/textures/detailed-normal-4096.png",
+            "resolution": [
+              4096,
+              4096
+            ],
+            "sha256": "432d4404dc5ab08cc927cfc7d580cd623a69bbd5f3dab3ed5f78a8ebf75dab89",
+            "bytes": 455387,
+            "channelRange": [
+              [
+                22,
+                232
+              ],
+              [
+                16,
+                238
+              ],
+              [
+                174,
+                255
+              ]
+            ]
+          },
+          {
+            "channel": "orm",
+            "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/textures/detailed-orm-2048.png",
+            "resolution": [
+              2048,
+              2048
+            ],
+            "sha256": "671a947db4e3599f5920a36f044dd52cf55296f1ccaeefe2c499eb5a2a1c86ce",
+            "bytes": 1623017,
+            "channelRange": [
+              [
+                198,
+                255
+              ],
+              [
+                98,
+                222
+              ],
+              [
+                31,
+                224
+              ]
+            ]
+          }
+        ],
+        "detailDrawingInstances": {
+          "panelOutlines": 637,
+          "fasteners": 1214,
+          "ventGrilles": 18,
+          "serviceLabels": 57,
+          "accessHatches": 34,
+          "engravedLines": 1729
+        },
+        "detailCountScope": "Visible drawing instances per face; a shared pattern can cross multiple faces. No new physical geometry.",
+        "newlyAuthoredDetail": "Native-coordinate hull/engine panels and vents, vector wing seams, inset fasteners, part-specific service stencils, clean antialiased panel lines, shallow normal relief and facet-fitted nose markings; no random edge chipping.",
+        "geometryUnchanged": true
+      }
+    },
+    "geometryAuditReuse": "Exact native shapes and exported world triangle positions unchanged; numerical geometry measurements retained with explicit provenance.",
+    "gameIntegration": {
+      "focusedTests": 28,
+      "passed": true,
+      "turretFootprintSamples": 513,
+      "clearMuzzleSamples": 44,
+      "turretClearanceSamples": 2701,
+      "gameAndShipyard": true,
+      "gallery": true,
+      "otherShipMetadataAndClearanceUnchanged": true
+    }
+  },
+  "integration": {
+    "enginePortsChangeRequired": false,
+    "proposedEnginePortsRawGlb": [
+      [
+        -0.9670000076293945,
+        0.01600000075995922,
+        0.23499999940395355
+      ],
+      [
+        -0.5370000004768372,
+        -0.07500000298023224,
+        0.4440000057220459
+      ],
+      [
+        -0.9670000076293945,
+        0.01600000075995922,
+        -0.23499999940395355
+      ],
+      [
+        -0.5370000004768372,
+        -0.07500000298023224,
+        -0.4440000057220459
+      ]
+    ],
+    "turretLayoutChangeRequired": false,
+    "geometryAssetsOnly": false,
+    "proposedFixedGunMuzzlesRawGlb": [
+      [
+        0.968999981880188,
+        -0.035999998450279236,
+        0.032999999821186066
+      ],
+      [
+        0.968999981880188,
+        -0.035999998450279236,
+        -0.032999999821186066
+      ]
+    ],
+    "installed": true,
+    "version": "0.8.2eo",
+    "cache": "voidrunner-v379-0-8-2eo-lancer",
+    "shippingAsset": "/Users/mhoeppner/Desktop/Voidrunner/assets/models/ships/lancer.glb",
+    "installedSHA256": "02c1f282cb1d4f9fc971643f7924dd0d02210c2d2719ff57a179a9e29670eeec",
+    "report": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/report.json",
+    "calibration": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/calibration.json",
+    "scopeAuthorization": "User: good, get this updated model into the game"
+  },
+  "artifacts": [
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/apply-textures.py",
+      "sha256": "3563efbd640af6d8a3cd5b1e4929beb23f1652eb67f4ced1314607c82f5c4e3a",
+      "bytes": 3995
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/audit-major.py",
+      "sha256": "394ef6ecdfa1fcb4bbd82167b8051e660671371ce42c74b3951ac9b9fbbfff35",
+      "bytes": 3919
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/audit-support.py",
+      "sha256": "21f665424a40ae756db610581b09ef2894c50a31824526fa561f4d4c93ff11eb",
+      "bytes": 176
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/audit-surface.py",
+      "sha256": "d027c7c0ccf19da416d857e1f76783568faf10517f4b66e7d78d0e9e31bf5dfe",
+      "bytes": 3889
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/before-straight-lines/user-markup.png",
+      "sha256": "a0e5fe2d5eebe740202779a458185576db386157156e65f0126a42ba97c0c548",
+      "bytes": 314311
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/build-conformant.py",
+      "sha256": "c669a822b068d6fe46202af152d76c72665cca8100c283d7a9f556e8540f1d2c",
+      "bytes": 31855
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/build-report.json",
+      "sha256": "a63a3d2f5dba8b23331d00640e9a88355986e097b28df5148bb76ec5bdde20a5",
+      "bytes": 204979
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/build.py",
+      "sha256": "db8259c29fc9b094733ca986e4771277c31b84b82f7150aafe88cb92f625661e",
+      "bytes": 173
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/candidate.glb",
+      "sha256": "02c1f282cb1d4f9fc971643f7924dd0d02210c2d2719ff57a179a9e29670eeec",
+      "bytes": 10114220
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/canopy-2-request.json",
+      "sha256": "4d88391b70a63ce6ecbee7cabbebc9f0ebc4aa6ce5b878f2fb4f1fbc47675664",
+      "bytes": 436
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/canopy-request.json",
+      "sha256": "85e70b385fe90c92c8b41b3939525d697894969276df0799ffaf00a4061757ea",
+      "bytes": 293
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/canopy-scope-qa.json",
+      "sha256": "69ec53d1a0b80febfe02374f59fa9c8011edd2e325c4f93e3b66d81cbc65e869",
+      "bytes": 1546
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/canopy-surface.py",
+      "sha256": "e2b9b5e8b472357e232cabc7ee2dcda6f27052772786797bdae83d6667f4356e",
+      "bytes": 983
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/capture-preview.mjs",
+      "sha256": "621ff4102ba1fa97078d998b3d20d852defd9206a576bb24a42002cc868178e3",
+      "bytes": 9050
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/carry-geometry-qa.py",
+      "sha256": "859dc0f2306a4dca44cdb7f304f6d476463f6d9c2844c570873bbf96201a638c",
+      "bytes": 1533
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/coherent-surface.py",
+      "sha256": "6ac21455c328f2d99f814553154ac24b44184d3613f6039a3a83c1c89734c81f",
+      "bytes": 13294
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/conformity-candidate.json",
+      "sha256": "16e5bd4898614c495076c0da989b90bbeafea378e3000bf5c9b71c48a5fe0360",
+      "bytes": 775944
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/conformity.html",
+      "sha256": "18356f174791a917104d7d9d6504be6464879337435e8ff4b677d72f016de175",
+      "bytes": 378
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/conformity.js",
+      "sha256": "5393f71d19dc71c3b6c9dcd20d0397488427cac92dae8660e36907d8e5912eae",
+      "bytes": 3940
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/detail-qa.json",
+      "sha256": "48364d7becaf2bf748feda57e40891f016409d741297fc81c1fced271f4a2a45",
+      "bytes": 2457
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/detail-qa.py",
+      "sha256": "d7bf50e442eb797100302b6d95a3520dac7508ef12aea0d9a8687b36d0a10115",
+      "bytes": 2239
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/browser-qa.json",
+      "sha256": "c3de3b1a3fa8add2473d31ed0a7b729f7c4ffa718e4f32a188e1046881dfd4b6",
+      "bytes": 5500
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/canopy-reference-comparison.png",
+      "sha256": "365eba7c898ddad90dec4faf21d8568caf2b58a1d00552a4e12eb233a8d0a42b",
+      "bytes": 877561
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/hero.png",
+      "sha256": "63e7391de365232ac54711693d3a46132c4d2d2cc9664ffb7ecd45079dc66df6",
+      "bytes": 153386
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/matched-contact-sheet.png",
+      "sha256": "f08f0e452764f22bc4c41bdaad39e0de16740a048e2914a7d7ba799ef9956066",
+      "bytes": 1037427
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/matched-neutral.png",
+      "sha256": "6d0e7a3525227f3caa5a9c6e82ccb8f3dbdc89c7eda5a76bde210ca3d6670191",
+      "bytes": 705022
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/matched-textured.png",
+      "sha256": "424f4715bc0b75f71a8bf9139c60ae0e36d9f539024f8dc5638d2bdbb8247837",
+      "bytes": 1137820
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/neutral-aft.png",
+      "sha256": "d9d4096050fbfaab45d4d1f470fc2c6aecf91573e8c28c95ca9abeb7b80a6294",
+      "bytes": 220686
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/neutral-bottom.png",
+      "sha256": "9fe0b6d2e4cc91491cb1d52e7c50f45061eb7d9d227d0ce919e9fed4d5719308",
+      "bytes": 232090
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/neutral-engines.png",
+      "sha256": "90ff1e35fb5a453ca1b8231ac7febfe0be904fd5318831c20c8bf03d4366b13b",
+      "bytes": 295457
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/neutral-front.png",
+      "sha256": "0831fb1f6f97c7c667bdf5831a021becd7257207212ddebef680a64a77d469cc",
+      "bytes": 155161
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/neutral-hull.png",
+      "sha256": "7e012818735fa5df132599213f2b516898c11ffe673a9661d195cad347543903",
+      "bytes": 397531
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/neutral-nose.png",
+      "sha256": "bb79be57105f88650f10cd3c4730b63e80b48c1047f6b2033a6175f031be5da2",
+      "bytes": 282450
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/neutral-quarter.png",
+      "sha256": "b32ca0dfd7bd92521a3977d198821eaf4a9a9088915e9ad817b13786a23fa3f8",
+      "bytes": 229378
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/neutral-rear.png",
+      "sha256": "96b9374fa15a18a086234d5c9822b46928a6941904bf72338c0a5acd1a45e749",
+      "bytes": 150788
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/neutral-side.png",
+      "sha256": "5fee99787edc8acf8682a36f550aad7a0985df3cedca18af341a23031941d455",
+      "bytes": 149089
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/neutral-top.png",
+      "sha256": "990039071e5aa2554ec3806297bf34650d3b0dfb6e1d93933a64bba4ed1c6a44",
+      "bytes": 233856
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/neutral-wing.png",
+      "sha256": "40bbd706be7fcda2bae0b5f6ce0ac1a3417a080a135b1830c42cdbba6bc15e29",
+      "bytes": 285643
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/phone-preview.png",
+      "sha256": "678755b812080f1025e6203196724f23655efedf51a113324f2501335b0fd4f9",
+      "bytes": 108948
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/runtime-bottom.png",
+      "sha256": "33a0daf6c7516460752ff378ca356396c290cfaa511804d5892a12f62925be3d",
+      "bytes": 204708
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/runtime-quarter.png",
+      "sha256": "2dc75263b0e78a5a6884983460ee8ac7cd41e2aca019caac965426b09ff34091",
+      "bytes": 231043
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/runtime-rear.png",
+      "sha256": "1a401e7d700d39585afd2d928053c77b37a79a6d84b9629bad69e89ccf86620f",
+      "bytes": 122143
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/solo-parts-exploded.png",
+      "sha256": "f38de07e96d5266ac3318dda4c3f69690323f7f4723af03bf58709a3629c68ac",
+      "bytes": 115193
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/solo-parts-quarter.png",
+      "sha256": "3f723449a9c43d5cf02aa22347aff03445c4f18bb8602d94dfd1670751314a23",
+      "bytes": 115047
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/solo-textured-bottom.png",
+      "sha256": "8a36cec0a61f4179148cded83257f25c9b6ab52938af3f81412dcfe0783fc161",
+      "bytes": 210382
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/solo-textured-engines.png",
+      "sha256": "d0588e9f2a6bb52f84f328ba83ed683a569ed8864ddb0ac45acf7ef3c6084e65",
+      "bytes": 530941
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/solo-textured-hull.png",
+      "sha256": "b8b1ac48b860fbd9aacb8c4ca1675260c66f127e23ac6fc24f501a2a5b8ebd00",
+      "bytes": 904318
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/solo-textured-nose.png",
+      "sha256": "729b489635d4b65e432ea907cca800d60e348070daf510579ce97d1098281232",
+      "bytes": 690984
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/solo-textured-quarter.png",
+      "sha256": "db522d8cae742225eed8be69690a853ad83eebf29b270c3d7f822fd46d6e05ea",
+      "bytes": 230470
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/solo-textured-rear.png",
+      "sha256": "a2c658e6768535199c040358fe96d036ec61d37199b129f86d53f1b9bc2ad6ce",
+      "bytes": 119500
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/solo-textured-wing.png",
+      "sha256": "c54c5341cda9165ae394b8dac73fdb1081bd55933b00334f7c6ce4d8867676e6",
+      "bytes": 659989
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/solo-wireframe-quarter.png",
+      "sha256": "9a6e4c8291824ffe118d7496099aafe3871780ec071afd168ec3117bba68a796",
+      "bytes": 170461
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/straight-lines-comparison.png",
+      "sha256": "21576ab2a8482b9c9a18eb05ed2de53b91a0252ad3e7b65b28d2430c85454716",
+      "bytes": 385985
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/texture-detail-comparison.png",
+      "sha256": "00f193d9f677cc7e85a17ef822eecb10003d1d9a379e7e0ed7ea1c554a030f29",
+      "bytes": 573409
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/textured-aft.png",
+      "sha256": "100309ccad9ca8368826a1dc40154df023883361ed3ae9ffa92c743f0065e974",
+      "bytes": 406228
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/textured-bottom.png",
+      "sha256": "f9bf000e0486b69faa67ef025b24c8890f0630b0994d7cdbab7f8b85e2a3baf4",
+      "bytes": 430327
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/textured-engines.png",
+      "sha256": "7f5ca502d0c8592d3d43fa36ae47fee9b7b384cc50891ae2e7c8dfd8e61b1363",
+      "bytes": 698638
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/textured-front.png",
+      "sha256": "0ce4917b6b888c9cdba322fd2b9883529c828324aa8cd522b60ccb6411dfee66",
+      "bytes": 199045
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/textured-hull.png",
+      "sha256": "32b6a9d8bddc6241caa4293d8a8ce58396a2b6fab1d0fc9474a991e87336004e",
+      "bytes": 1138700
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/textured-nose.png",
+      "sha256": "94ffc7ab42b393aa48954665decdc5bc9ddc4efffef206abd6fd65775f24334e",
+      "bytes": 758664
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/textured-quarter.png",
+      "sha256": "f8e532e6a39cc9ba336e7f81a511ccadccf87efeef6aef9d86ac1576910e0ac1",
+      "bytes": 440107
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/textured-rear.png",
+      "sha256": "39552537abdbd1ece4eb3b81041b6b656e37156d0875a8100e9b72dd424d69eb",
+      "bytes": 188899
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/textured-side.png",
+      "sha256": "54e8194766e3185898156473a2219aac96d5753ed3c0f664de48f7fe3c440741",
+      "bytes": 255565
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/textured-top.png",
+      "sha256": "8271e8370e7e9d5bc5bb41b8f262a717fa7592eae66e70c05f8df4cd0254606f",
+      "bytes": 552276
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/textured-wing.png",
+      "sha256": "8ae4c80fd8bde412888beb56b6b38a4ce4a17976584788618fb49bccabb84f18",
+      "bytes": 892949
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/candidate/worst-silhouette-overlay.png",
+      "sha256": "b5e244460272cea81cdbdf2225032c61638b2cfeb1df8d4944772e038d6f4529",
+      "bytes": 37642
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/native/candidate-textured-quarter.png",
+      "sha256": "ec11ad6379348c1b60582f6b63ddce02f1436436f96704b262b2c893f4539807",
+      "bytes": 575685
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/native/canopy-front.png",
+      "sha256": "005297b72ccc569c8a99f40b89a42fdef8ffbce417ba433df6757388ae10e7a3",
+      "bytes": 1121417
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/native/canopy-quarter.png",
+      "sha256": "22d2b4178553c73c852d98f0daca2ecdd9d20d9e0515247db478aa6ab0378b28",
+      "bytes": 1068194
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/native/canopy-side.png",
+      "sha256": "98ad2fd6b98672a420daf3166e0b42ad41e049a8e24f97c7bc248c42c429c282",
+      "bytes": 1013374
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/native/canopy-spine.png",
+      "sha256": "f2299c65f64174e13c6c7cb5f8395448f584a2fb45931a8b0461db2fa6331f30",
+      "bytes": 1141131
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/native/frozen-textured-quarter.png",
+      "sha256": "b2d4a696127d30161985acfb7e01ec2b6d65ff6a1662a11b9d8ba70436de4e46",
+      "bytes": 588484
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence/native/reference-textured-quarter.png",
+      "sha256": "dacdc7f9397eeb91f48d1e87e1439998940766da31971366d115cef29c89610a",
+      "bytes": 600999
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/evidence-sheets.py",
+      "sha256": "9b6a18f2c8162ecfd4a3555150c82bea3472d66eef9ab81efa11b3144e2af1b5",
+      "bytes": 5201
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/export-qa.json",
+      "sha256": "ef7518760880bad05abf1440ba28a9b62d57ef62188ac3a38d77320972fba108",
+      "bytes": 1195
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/finalize.py",
+      "sha256": "6eb7fb5ad820d333657c51649621d3bb4640e2c7abfdfc2ae7640632f7d318f5",
+      "bytes": 9619
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/from-scratch-request.json",
+      "sha256": "7847275992f3a29c451e465b26a31b619695e55d0cc433e3ba6bc2470dee66c9",
+      "bytes": 808
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/geometry-candidate.json",
+      "sha256": "b1590b594a8a6edb213ab61d07b752bd8ded9dabdcbe889e25985d1233ae0b59",
+      "bytes": 1189895
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/inspect-reference.py",
+      "sha256": "3f5286c2a9bd0df24a38dff44d233690656c0ded0e954355bbd186a52baf744d",
+      "bytes": 1735
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/lancer-raw.glb",
+      "sha256": "1afec54834a3e5617ac7beeb789e1c64da8df705a6c74c018afcd96ee597bf87",
+      "bytes": 10118136
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/lancer.blend",
+      "sha256": "cd821ad5966dbafc9197be0b3c5742d1c4ba41d6f84d7635c3b62b2b47a64630",
+      "bytes": 9703099
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/line-fit-qa.json",
+      "sha256": "181ca8a25847ff0b04e32bc5e2f699492fc41a7653d495144c98cf5075e5ebad",
+      "bytes": 1508
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/line-fit-qa.py",
+      "sha256": "15debe3630e8ac30814c2191a13ac08db4f4721c91bb48417bf09364705d72bd",
+      "bytes": 2422
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/measure-reference.py",
+      "sha256": "c95c863d90cbd398521c3e363a5ebe0e5105f7b0fc11b583871053022edff3df",
+      "bytes": 2165
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/native-qa.json",
+      "sha256": "bc36c786caaa1f8298b8ab5faa34da3f2b03f482892d65486222ea81597d090e",
+      "bytes": 18429
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/package.mjs",
+      "sha256": "3c2936846301c2fe510188a743ccfb4979350034a03b805ed3e7fe15232be39a",
+      "bytes": 5812
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/preview.html",
+      "sha256": "842bf5ff7c9d546dbacc5294bd75ae922627f053b8f22594c22fe170d630ea10",
+      "bytes": 3316
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/preview.js",
+      "sha256": "2f8797e5c13ba984168dd05471c904822bc3559d5407a642aad8f8b0098b14a3",
+      "bytes": 9346
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/probe-conformity.mjs",
+      "sha256": "43e39c3695a102ca77da382a4d76412092c165ae73afe02827c4d48bffc553bc",
+      "bytes": 3293
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/canopy-detail.png",
+      "sha256": "89faee8f61a63118e97970fddeac5e745f417a1df6d504c6da9cf6da112655a3",
+      "bytes": 867197
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/geometry.json",
+      "sha256": "3ab1307d633c9ef08ed69774ccff650275de7ca0ba34545abbe0cdda5d31d007",
+      "bytes": 3213324
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/inspection.blend",
+      "sha256": "a9ff0d398b1556c784be05c5cafa6b96e04e5c352ca0f175e093eefcd6d3b377",
+      "bytes": 11145303
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/lancer.glb",
+      "sha256": "ff71dbd5b003095a82260575b2003df72d58136d82e9f7b62a7d94cd32034090",
+      "bytes": 10669256
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/lancer.png",
+      "sha256": "54249551fd5ba01fb362613b474b9f28ca324f7a632c70dbfd2889a55d7d828f",
+      "bytes": 2008793
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/sections.json",
+      "sha256": "9427eafa3d4004c117f358a3d22817efdc44b1cb85908c3d4a9f4198eaea4c89",
+      "bytes": 28947
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/views/neutral-aft.png",
+      "sha256": "3b4fc7d7df11503a8c07d54146908c07a9d19060a23644bb9e70b1e3b972d5ee",
+      "bytes": 792393
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/views/neutral-bottom.png",
+      "sha256": "ff17bbecc7daa7e424f3bbe3f5cfaae09f7b98299bee1e6933182dd5ca33ad6a",
+      "bytes": 808013
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/views/neutral-front.png",
+      "sha256": "19a08b59242e3edddd5411302869a5049c98d786f31f243d975b0687e0a02da8",
+      "bytes": 773489
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/views/neutral-quarter.png",
+      "sha256": "d09404f5ed107a3b18ef969ac334dadfaba2981920ec15a0672f1dc8130c3698",
+      "bytes": 787602
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/views/neutral-rear.png",
+      "sha256": "c8339768a19cd6ccaf82ed40a7edfd0af61f23678d3e0e9294a450ee30abe136",
+      "bytes": 773156
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/views/neutral-side.png",
+      "sha256": "becee0a171e0fa74feb5aa5fbacfa7a7294eba78420f575c8733b745b8a62c36",
+      "bytes": 766637
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/views/neutral-top.png",
+      "sha256": "44e4877040a8e6dae6b5939065d03b839c804e085afdc5bd0e662c722ed19cc0",
+      "bytes": 820523
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/views/textured-aft.png",
+      "sha256": "9cd9f180be8205776eaa1310dcb240725a5923b978b0113cf17d364a0029291c",
+      "bytes": 886130
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/views/textured-bottom.png",
+      "sha256": "f1fd85224884d911df63a9b51adb8106f6322724c641d24f08fd4e767b5fefba",
+      "bytes": 887871
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/views/textured-front.png",
+      "sha256": "e60a4c15f5c7b40e1351a5523d8519fdd6b7aa60d9ed58807764230a7dc38bc5",
+      "bytes": 805760
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/views/textured-quarter.png",
+      "sha256": "72d42b29edc752f5f9469d9a078c00bd5909d0d53cda4df60c2389e8f3f6fd99",
+      "bytes": 898947
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/views/textured-rear.png",
+      "sha256": "45e4ac5ad85703605c0ea5b7ce4a8f9941e53aefa4744155ee139ce23f696ac1",
+      "bytes": 792085
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/views/textured-side.png",
+      "sha256": "5d824ea0d99fa05cff5fe0d2f4d17338c761e41a355b774efdc01f06eb3ca38e",
+      "bytes": 812775
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/reference/views/textured-top.png",
+      "sha256": "a7311a4cf220b88175efbb8ccab8221a85342d3279b8469f7693c0559c1fd9a7",
+      "bytes": 937075
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/render-canopy.py",
+      "sha256": "1add82afc1a0a8586a639ae2013bf11ea18b2e454f1f604eb66a2a816622b8bb",
+      "bytes": 1898
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/render-native.py",
+      "sha256": "067f7daf62725e098ecf62e0e88aba67b2f722e6926abb03545b4973df793d85",
+      "bytes": 2025
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/render-reference.py",
+      "sha256": "2f05bd8ef9032dd09dc474373f760513a6cf4428a68192e9eb8ae8f2996cb662",
+      "bytes": 2058
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/review.md",
+      "sha256": "02263b8018a2421edb455423256f2ad238cd009861bf2449979007945dc3d59b",
+      "bytes": 5983
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/runtime-handoff.json",
+      "sha256": "fe4a05d52cc246c18b7cef6baa3513eb0dd642f49f809c8188cfe6999f7b6667",
+      "bytes": 11764
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/runtime-qa.json",
+      "sha256": "3e9301ec6eec30c59783c5bd01388c661678e8987c3e27e79d39a9a8e5c82ba1",
+      "bytes": 85618
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/runtime-qa.mjs",
+      "sha256": "f89473a6fb854db0f01a6e3aa6cf99f96b1ea7b0da7b2d91c312d4cb6ea9b63e",
+      "bytes": 9379
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/straight-lines-request.json",
+      "sha256": "1739ff3c5cf557c99d11e597dcc837b242d2aa6202343f21e366bf169c7dd6de",
+      "bytes": 245
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/support-qa.json",
+      "sha256": "b15b7339462269d0e97d82f6fda3df52b2fc2a78491417d50aaba53dbf3954b5",
+      "bytes": 46406
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/surface-qa.json",
+      "sha256": "7b52793a30b5500d78e0ece90263281d6fbb104940a4078dc9c94ed2347de157",
+      "bytes": 2478
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/tangent-qa.json",
+      "sha256": "58158cf58515cd7e216f1b9ba937d4362b2086853a7102ea624de42a2e07ce13",
+      "bytes": 366
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/texture-detail-request.json",
+      "sha256": "bf27bb13d6878b6d677f36f68cf7fb99e9c401e1b76efb4b7079d18b79fc3796",
+      "bytes": 180
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/texture-export-qa.json",
+      "sha256": "84185e7188eb123ed51a4a716153b99595df8ef7dc3ebc96aee6e0155b8297b4",
+      "bytes": 834
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/texture-layout.json",
+      "sha256": "0a3b31a47d49d46a4d8fa99fc5c12340ec23852498355e065f7c5f3e9205d8e5",
+      "bytes": 2225058
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/texture-layout.py",
+      "sha256": "69d6334c1d922acdc23d830795ac05bcabecc20c1fe65e3018d5a064046dabca",
+      "bytes": 1379
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/texture-request.json",
+      "sha256": "9d2a45788b17e27841f0ab38450d114cbe5415c7c48a9bc6a59bfd0d2c31e801",
+      "bytes": 195
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/texture-scope-qa.json",
+      "sha256": "3bd5cdffe29d61528c7399f548ad89c816b7186d722838258d31b3ca289e3ca4",
+      "bytes": 478
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/textures/detailed-albedo-4096.png",
+      "sha256": "c7a43337a654520bc1e0f3a51e1440e9b68f98252ce52d5eb8d7f9ca903c7aae",
+      "bytes": 7450858
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/textures/detailed-normal-4096.png",
+      "sha256": "432d4404dc5ab08cc927cfc7d580cd623a69bbd5f3dab3ed5f78a8ebf75dab89",
+      "bytes": 455387
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/textures/detailed-orm-2048.png",
+      "sha256": "671a947db4e3599f5920a36f044dd52cf55296f1ccaeefe2c499eb5a2a1c86ce",
+      "bytes": 1623017
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/verify-export.mjs",
+      "sha256": "fbae707ec760fe17ede25265d2c86c0a6275be2c0ecd2788fe207f496c91d6c5",
+      "bytes": 2121
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/verify-native.py",
+      "sha256": "95b313b4362552076da4187dda62c78b4c59a007a9e2849451d8bf1260005dcb",
+      "bytes": 2138
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/verify-texture-export.mjs",
+      "sha256": "d5f869dc2a7c4eda375529b1544780182290dbe3b2a9b3ca0194a1896a8d5444",
+      "bytes": 2345
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/verify-texture-scope.py",
+      "sha256": "25cd4cfcccbeb02df35bb258d787f6957e05ca8441aa5105ebae868892bf8d7b",
+      "bytes": 1473
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/wing-surface.py",
+      "sha256": "d2a620428386608d4df3df783439f2acba0eeeb577fa0dade456125beb41b673",
+      "bytes": 2665
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/geometry.json",
+      "sha256": "941a9e7e4a7318f7f818a76d666f7047245d4910881a291622024ffe21d1fbe5",
+      "bytes": 622
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/bake.mjs",
+      "sha256": "b4ec1348311e233c21ff58d89a0f81ef833af16e2d856f05c50d7fded69b898d",
+      "bytes": 4594
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/game-quarter.png",
+      "sha256": "5a6c5e6da66113f33f9906422bb7b20f0820c5fc4ba2fb9207716607a13ce8fd",
+      "bytes": 155624
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/report.json",
+      "sha256": "169a333102a987ec0b05941df51946e9e523677cc92e3df7ff7f98fbd0550b52",
+      "bytes": 2474
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/gallery-installed.png",
+      "sha256": "40519ad31a39916ef32b9787c78b05e6064b62ea2cad0341d1577ce330a55f98",
+      "bytes": 287720
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/calibration.json",
+      "sha256": "4a4752f50e4b766f4619204174ea40e8a6228c0299fd1769c1c310e4423c2a13",
+      "bytes": 7885
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/gallery-latest.png",
+      "sha256": "3c22b8f8858661dfa134814a97fd3560f6ab16416c0f63f74381910f22b108f4",
+      "bytes": 289931
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/browser.mjs",
+      "sha256": "ab557c929f59ef96e4732df524b7c1c5a70a1ab7d9437c172e6090feaeab9f1f",
+      "bytes": 5242
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/game-port.png",
+      "sha256": "66cc17360cd62a612530910e42636f253ea6ae5e0436e378a7894bc3e30c8bb4",
+      "bytes": 360326
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/gallery-report.json",
+      "sha256": "14c47fea3348b2b2e61876d73be189d30e54dbe816e10e1f80f03c58ed6bd0fc",
+      "bytes": 2519
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/shipyard.png",
+      "sha256": "e3cc62fe3b3130398746cca9eb077c61f760281f2c91e4a7847f22049782e3c3",
+      "bytes": 151926
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/browser-report.json",
+      "sha256": "606836299ef84a961fccfc49368f78722cdfca5e14ca1c94f1f085802228d6ce",
+      "bytes": 1155
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/gallery.mjs",
+      "sha256": "a86dded3808a70c264b987196dca16dc8257df00bf53c6decbc63f4b5f77cce3",
+      "bytes": 2408
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/tests.log",
+      "sha256": "28fd9012aa4554c2c213cfcfd2187f83d47eaae2fc540541548cbe537f357da5",
+      "bytes": 2902
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/previous-shipping.glb",
+      "sha256": "3f4d792ecd4a427e0a4f84362c36d6e80f1dbfa667153fc91a4922ca9a222ad7",
+      "bytes": 986124
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/game-starboard.png",
+      "sha256": "9fd0e2fbdb44bbb4808aa6f0509034e3c41f0eeef9653823d5501b0252d01b0c",
+      "bytes": 376157
+    },
+    {
+      "path": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/integration/game-rear.png",
+      "sha256": "7e7b00c9db3c6711b9fee8263c9778c46937cba8e21a01becaf22c26568836e5",
+      "bytes": 225459
+    }
+  ],
+  "previousTextureArchive": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/before-texture",
+  "previousLowDetailArchive": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/before-detail",
+  "previousLineArchive": "/Users/mhoeppner/Desktop/Voidrunner/docs/ship-revisions/20261002/lancer/before-straight-lines"
+}

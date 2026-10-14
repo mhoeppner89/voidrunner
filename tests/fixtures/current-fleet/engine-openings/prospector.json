@@ -1,0 +1,1933 @@
+{
+  "id": "prospector",
+  "glbPath": "assets/models/ships/prospector.glb",
+  "glbSha256": "2ecaac1b17d0019cbd36e8b426822907846804adbaea3d7c20d83077d9f623c0",
+  "descriptorSha256": "47f5b4dc73e23bb7a8cd1e0b2f4ab84bdc2b49b252cf9f25c7051a162557b4b4",
+  "coordinateFrame": "Unscaled GLB space",
+  "epsilon": 0.000003253384324312497,
+  "method": "Double-sided first-hit rays at center and eight angles on 35% and 65% aperture radii. The measured aperture plane is the aft lip, not the glow socket. Whole-base fit is also visually reviewed.",
+  "mouths": [
+    {
+      "name": "Prospector source drive 0/0 rooted engine casing",
+      "center": [
+        -1.001683,
+        -0.27,
+        0.279
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.11751453602632805,
+      "radiusV": 0.11751453602632805,
+      "minDepth": 0.03772,
+      "maxDepth": 0.057999999999999996,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.27,
+            0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.27,
+            0.32013008760921485
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.24091663614072742,
+            0.3080833638592726
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.2288699123907852,
+            0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.24091663614072742,
+            0.24991663614072743
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.27,
+            0.2378699123907852
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.2990833638592726,
+            0.24991663614072743
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.31113008760921484,
+            0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.2990833638592726,
+            0.3080833638592726
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.27,
+            0.35538444841711325
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.04728640987039445,
+          "visibleRecessDepth": 0.21553876902036392,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.21598803854706522,
+            0.3330119614529348
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.1936155515828868,
+            0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.2159880385470652,
+            0.22498803854706523
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.27,
+            0.2026155515828868
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.3240119614529348,
+            0.2249880385470652
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.34638444841711324,
+            0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.04631600387514068,
+          "visibleRecessDepth": 0.5727632359985381,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.32401196145293487,
+            0.3330119614529348
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.0596928407764048,
+          "visibleRecessDepth": 0.0898894274228604,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        }
+      ],
+      "outwardClear": false,
+      "recessVisible": false
+    },
+    {
+      "name": "Prospector source drive 1/0 rooted engine casing",
+      "center": [
+        -1.001683,
+        -0.27,
+        0
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.09462209394327714,
+      "radiusV": 0.09462209394327714,
+      "minDepth": 0.03772,
+      "maxDepth": 0.057999999999999996,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.27,
+            0
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.27,
+            0.033117732880146994
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.24658222650292339,
+            0.023417773497076636
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.23688226711985302,
+            2.0278762783344538e-18
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.24658222650292339,
+            -0.02341777349707663
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.27,
+            -0.033117732880146994
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.29341777349707665,
+            -0.02341777349707664
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.303117732880147,
+            -6.083628835003361e-18
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.29341777349707665,
+            0.02341777349707663
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.27,
+            0.06150436106313015
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.22650984921971484,
+            0.04349015078028518
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.20849563893686987,
+            3.766055945478272e-18
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.22650984921971484,
+            -0.043490150780285175
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.27,
+            -0.06150436106313015
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.3134901507802852,
+            -0.04349015078028519
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.3315043610631302,
+            -1.1298167836434813e-17
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.14383837893489368,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.3134901507802852,
+            0.043490150780285175
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        }
+      ],
+      "outwardClear": false,
+      "recessVisible": false
+    },
+    {
+      "name": "Prospector source drive 2/0 rooted engine casing",
+      "center": [
+        -1.001683,
+        -0.27,
+        -0.279
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.11751453602632805,
+      "radiusV": 0.11751453602632805,
+      "minDepth": 0.03772,
+      "maxDepth": 0.057999999999999996,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.27,
+            -0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.27,
+            -0.2378699123907852
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.24091663614072742,
+            -0.24991663614072743
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.2288699123907852,
+            -0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.24091663614072742,
+            -0.3080833638592726
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.27,
+            -0.32013008760921485
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.2990833638592726,
+            -0.3080833638592726
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.31113008760921484,
+            -0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.2990833638592726,
+            -0.24991663614072746
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.27,
+            -0.2026155515828868
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.21598803854706522,
+            -0.2249880385470652
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.1936155515828868,
+            -0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.2159880385470652,
+            -0.3330119614529348
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.27,
+            -0.35538444841711325
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.04728640987039445,
+          "visibleRecessDepth": 0.21553876902036392,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.3240119614529348,
+            -0.3330119614529349
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.05969284077640502,
+          "visibleRecessDepth": 0.0898894274228605,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.34638444841711324,
+            -0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.04631600387514068,
+          "visibleRecessDepth": 0.5727632359985381,
+          "inwardHitMaterial": "Concord industrial · navy ivory brass service atlas",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -1.001683,
+            -0.32401196145293487,
+            -0.22498803854706523
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        }
+      ],
+      "outwardClear": false,
+      "recessVisible": false
+    },
+    {
+      "name": "Prospector source drive 0/1 rooted engine casing",
+      "center": [
+        -1.001683,
+        0.094,
+        0.279
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.11751453602632805,
+      "radiusV": 0.11751453602632805,
+      "minDepth": 0.03772,
+      "maxDepth": 0.057999999999999996,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.094,
+            0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.094,
+            0.32013008760921485
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.11406185604125836,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.12308336385927258,
+            0.3080833638592726
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.21184486204671135,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.1351300876092148,
+            0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.1230833638592726,
+            0.24991663614072743
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.094,
+            0.2378699123907852
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.06491663614072742,
+            0.24991663614072743
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.05286991239078519,
+            0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.0649166361407274,
+            0.3080833638592726
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.094,
+            0.35538444841711325
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.04326414942824863,
+          "visibleRecessDepth": 0.1789204050462335,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.14801196145293483,
+            0.3330119614529348
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.04362508280790389,
+          "visibleRecessDepth": 0.025022118402776756,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.17038444841711325,
+            0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 1.3809136400097017,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.14801196145293483,
+            0.22498803854706523
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.08874654465414862,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.09400000000000001,
+            0.2026155515828868
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.03998803854706519,
+            0.2249880385470652
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.01761555158288676,
+            0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.039988038547065174,
+            0.3330119614529348
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        }
+      ],
+      "outwardClear": false,
+      "recessVisible": false
+    },
+    {
+      "name": "Prospector source drive 1/1 rooted engine casing",
+      "center": [
+        -1.001683,
+        0.094,
+        0
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.09462209394327714,
+      "radiusV": 0.09462209394327714,
+      "minDepth": 0.03772,
+      "maxDepth": 0.057999999999999996,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.094,
+            0
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.094,
+            0.033117732880146994
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.11741777349707663,
+            0.023417773497076636
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.127117732880147,
+            2.0278762783344538e-18
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.11741777349707663,
+            -0.02341777349707663
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.094,
+            -0.033117732880146994
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.07058222650292337,
+            -0.02341777349707664
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.060882267119853006,
+            -6.083628835003361e-18
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.07058222650292337,
+            0.02341777349707663
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.094,
+            0.06150436106313015
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.13749015078028518,
+            0.04349015078028518
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.15550436106313015,
+            3.766055945478272e-18
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.5267183813171389,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.13749015078028518,
+            -0.043490150780285175
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.09400000000000001,
+            -0.06150436106313015
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.050509849219714825,
+            -0.04349015078028519
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.03249563893686985,
+            -1.1298167836434813e-17
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.05050984921971481,
+            0.043490150780285175
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        }
+      ],
+      "outwardClear": false,
+      "recessVisible": false
+    },
+    {
+      "name": "Prospector source drive 2/1 rooted engine casing",
+      "center": [
+        -1.001683,
+        0.094,
+        -0.279
+      ],
+      "outward": [
+        -1,
+        0,
+        0
+      ],
+      "axisU": [
+        0,
+        0,
+        1
+      ],
+      "axisV": [
+        0,
+        1,
+        0
+      ],
+      "radiusU": 0.11751453602632805,
+      "radiusV": 0.11751453602632805,
+      "minDepth": 0.03772,
+      "maxDepth": 0.057999999999999996,
+      "samplingBasis": {
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.094,
+            -0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.094,
+            -0.2378699123907852
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.12308336385927258,
+            -0.24991663614072743
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.1351300876092148,
+            -0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.1230833638592726,
+            -0.3080833638592726
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.21184486204671124,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.094,
+            -0.32013008760921485
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.11406185604125836,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.06491663614072742,
+            -0.3080833638592726
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.05286991239078519,
+            -0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.0649166361407274,
+            -0.24991663614072746
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.094,
+            -0.2026155515828868
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.14801196145293483,
+            -0.2249880385470652
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.08874654465414862,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.17038444841711325,
+            -0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 1.380913640009702,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.14801196145293483,
+            -0.3330119614529348
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.04362508280790389,
+          "visibleRecessDepth": 0.025022118402776756,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.09400000000000001,
+            -0.35538444841711325
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.04326414321855521,
+          "visibleRecessDepth": 0.17892040504623338,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.03998803854706519,
+            -0.3330119614529349
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.01761555158288676,
+            -0.279
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -1.001683,
+            0.039988038547065174,
+            -0.22498803854706523
+          ],
+          "outwardClear": false,
+          "outwardFirstHit": 0.029353819056776587,
+          "visibleRecessDepth": 0.23219925490188617,
+          "inwardHitMaterial": "prospector · detailed navy hull panels",
+          "recessed": false
+        }
+      ],
+      "outwardClear": false,
+      "recessVisible": false
+    }
+  ],
+  "allOutwardClear": false,
+  "allRecessesVisible": false
+}

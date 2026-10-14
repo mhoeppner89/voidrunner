@@ -1,60 +1,114 @@
-// Transparent, shared vector symbols. Equipment color comes from rarity;
-// the shape identifies the kind, bottom ticks its tier, corner marks its affixes.
-const shield='M32 8 49 15v13c0 10-7 16-17 21-10-5-17-11-17-21V15z';
-const rocket='M27 39V21l5-11 5 11v18zM27 30l-7 10h7m10-10 7 10h-7M29 43v5m6-5v5';
+// Shared, transparent hardware glyphs. Broad silhouettes survive small lists;
+// faceted faces carry depth without textures, gradients, filters or animation.
+const glyph=(body,facet,detail,core='')=>({body,facet,detail,core});
 const SYMBOLS={
- 'pulse-cannon':'M22 43V23h20v20zM26 23V12h4v11m4 0V12h4v11M17 16h-5m35 0h5M22 34h20',
- 'pulse-mk2':'M20 43V24h24v19zM24 24V10h5v14m6 0V10h5v14M20 34h24M13 15h-5m43 0h5M28 38h8',
- 'beam-emitter':'M22 44V30l5-6h10l5 6v14zM32 24V6M26 12l6-6 6 6M22 36h20',
- 'gauss-cannon':'M23 44V28h18v16zM26 28V8m12 20V8M26 12h12m-12 8h12M32 8V4M23 36h18',
- ripper:'M22 44V31h20v13zM26 31l-4-9h20l-4 9M32 17v-6M21 18l-4-5m26 5 4-5M13 23l-5-2m43 2 5-2',
- 'ion-blaster':'M16 42V24m32 18V24M11 24h10m22 0h10M36 8 24 27h13l-9 20M16 42h8m16 0h8',
- mortar:'M17 42V31l7-9h16l7 9v11zM26 12a6 6 0 1 0 12 0 6 6 0 1 0-12 0M32 1v3m-15 8h5m20 0h5M24 35h16',
- 'seeker-launcher':rocket,
- 'swarm-launcher':'M14 37V19l5-9 5 9v18zM28 43V25l5-9 5 9v18zM42 37V19l5-9 5 9v18zM16 41v5m16 0v4m13-9v5',
- 'shield-seeker-launcher':rocket+'M46 6 55 10v6c0 5-4 9-9 12-5-3-9-7-9-12v-6zM44 17l2-5 2 5',
- 'shield-swarm-launcher':'M12 40V23l4-8 4 8v17zM26 44V27l4-8 4 8v17zM40 40V23l4-8 4 8v17zM43 5l11 4v7c0 5-4 9-11 12-6-3-10-7-10-12V9z',
- 'torpedo-launcher':'M25 40V19c0-5 7-12 7-12s7 7 7 12v21zM25 32l-8 11h8m14-11 8 11h-8M28 19h8M29 44v5m6-5v5',
- pdc:'M16 43h32M22 38h20v5H22zM20 32h24v6H20zM25 32V18h14v14M28 18V8m8 10V8M12 16l4 4m36-4-4 4',
- 'tracking-turret':'M16 43h32M23 34h18v9H23zM22 26h20v8H22zM32 26V9M20 11a12 12 0 0 1 24 0M16 11h8m16 0h8M32 4V1',
- 'capacitor-bank':'M18 13h8v31h-8zM38 13h8v31h-8zM12 20h6m8 0h12m8 0h6M12 37h6m8 0h12m8 0h6M28 8h8m-4-4v8',
- 'sustained-reactor':'M19 15a19 19 0 1 1-6 17M11 18l8-3-1-9M36 12l-13 19h13l-8 17',
- 'shield-mk2':shield+'M32 15 42 19v9c0 6-4 10-10 14-6-4-10-8-10-14v-9z',
- 'recovery-shield':shield+'M23 26a9 9 0 1 1 2 11M21 31l2-5 5 1',
- 'capital-shield-generator':shield+'M23 27h18m-9-9v18M6 16v23m52-23v23',
- 'armor-mk2':'M12 17l13-8 13 8-13 8zM25 25v13L12 30V17M38 17v13l-13 8M38 25l13 8-13 8-13-8M38 41v7',
- 'engine-mk2':'M22 10h20v23l-5 8H27l-5-8zM22 22h20M26 41v7m6-7v11m6-11v7M15 16v13m34-13v13',
- 'thrusters-mk2':'M26 22h12v12H26zM17 28H5m0 0 5-5m-5 5 5 5M47 28h12m0 0-5-5m5 5-5 5M32 14V2m0 0-5 5m5-5 5 5M32 42v8m0 0-5-5m5 5 5-5',
- 'radar-mk2':'M13 30a19 19 0 0 1 38 0M21 30a11 11 0 0 1 22 0M32 30l12-13M32 30v13M22 43h20M28 30a4 4 0 1 0 8 0 4 4 0 1 0-8 0',
- 'cargo-pods':'M10 17l13-7 13 7-13 7zM10 17v20l13 7 13-7V17M23 24v20M40 14h12v28H40M44 22h4m-4 12h4',
- 'salvage-mk2':'M21 11 12 24l9 13M43 11l9 13-9 13M25 16l-4 8 4 8M39 16l4 8-4 8M28 20h8v8h-8zM32 36v12M26 42l6 6 6-6',
- 'frigate-battery':'M18 42V26h28v16zM23 26V9h6v17m6 0V9h6v17M18 34h28M10 42h8m28 0h8',
- 'cruiser-battery':'M20 44V28h24v16zM23 28V5h6v23m6 0V5h6v23M23 12h18m-18 9h18M12 35h8m24 0h8',
+ 'pulse-cannon':glyph('M19 26h26l3 6v13l-5 5H21l-5-5V32zM23 26V9h6v17m6 0V9h6v17','M19 26h26l-5 6H24zM41 32h7v13l-5 5h-2z','M23 14h6m6 0h6M24 36h12m-12 7h7','M26 37h5v5h-5z'),
+ 'pulse-mk2':glyph('M17 27h30l4 7v11l-7 5H20l-7-5V34zM21 27V6h8v21m6 0V6h8v21','M17 27h30l-7 7H24zM44 34h7v11l-7 5z','M21 12h8m6 0h8M21 19h8m6 0h8M24 39h16','M26 38h12v5H26z'),
+ 'beam-emitter':glyph('M21 25l11-5 11 5 5 14-7 11H23l-7-11zM25 23l-5-12 5-5 7 12 7-12 5 5-5 12','M32 20l11 5 5 14-7 11h-9V33z','M23 40h18M32 14V3m-5 6h10M24 44h6','M27 29h10v8H27z'),
+ 'gauss-cannon':glyph('M23 31h18l5 7v9l-6 3H24l-6-3v-9zM24 31V5h5v26m6 0V5h5v26','M41 31l5 7v9l-6 3h-8V38z','M24 10h16m-16 7h16m-16 7h16M24 42h10M32 5V2','M29 35h6v8h-6z'),
+ ripper:glyph('M18 30l7-7h14l7 7v14l-8 6H26l-8-6zM22 28l-4-9 5-7h18l5 7-4 9','M39 23l7 7v14l-8 6h-6V33z','M23 17h18M25 39h14M24 44h8M12 17l-5-3m45 3 5-3','M27 20h10l-5 8z'),
+ 'ion-blaster':glyph('M19 21l6-7h14l6 7v23l-8 6H27l-8-6zM13 25h6v17h-6zm32 0h6v17h-6z','M39 14l6 7v23l-8 6h-5V26z','M13 29h6m-6 8h6m26-8h6m-6 8h6M25 45h8','M35 20l-10 13h8l-4 9 11-15h-8z'),
+ mortar:glyph('M17 30l7-6h16l7 6v14l-7 6H24l-7-6zM24 24V13l8-7 8 7v11','M40 24l7 6v14l-7 6h-8V34z','M24 17h16M24 38h16M13 21l-4-4m42 4 4-4','M26 16a6 6 0 1 0 12 0 6 6 0 1 0-12 0'),
+ 'seeker-launcher':glyph('M23 36V18L32 5l9 13v18l-6 13h-6zM23 29l-9 15h9m18-15 9 15h-9','M32 5l9 13v18l-6 13h-3z','M23 20h18M27 33h10M27 46l-2 5m12-5 2 5','M29 12h6l3 6H26z'),
+ 'swarm-launcher':glyph('M10 21l6-10h32l6 10v22l-8 7H18l-8-7z','M16 11h32l6 10-10 5H20l-10-5zM44 26l10-5v22l-8 7h-2z','M17 31l3-2 3 2v5l-3 2-3-2zm13 0 3-2 3 2v5l-3 2-3-2zM17 20l3-2 3 2v5l-3 2-3-2zm13 0 3-2 3 2v5l-3 2-3-2zM45 27v10M20 45h20','M20 20l2 4h-4zm13 0 2 4h-4zM20 31l2 4h-4zm13 0 2 4h-4z'),
+ 'shield-seeker-launcher':glyph('M20 36V18L29 5l9 13v18l-6 13h-6zM20 29l-8 15h8M38 29l8 15h-8M43 7l12 5v10c0 7-6 11-12 14-6-3-11-7-11-14V12z','M29 5l9 13v18l-6 13h-3zM43 7l12 5v10l-12 9z','M20 20h17M24 34h10M39 18l4 5 7-8','M25 12h7l3 6H22z'),
+ 'shield-swarm-launcher':glyph('M9 23l7-10h27l8 10v21l-7 6H16l-7-6zM44 6l12 5v10c0 7-5 11-12 14-6-3-11-7-11-14V11z','M16 13h27l8 10-11 6H20L9 23zM40 29h11v15l-7 6h-4zM44 6l12 5v10l-12 9z','M15 33l3-2 3 2v5l-3 2-3-2zm13 0 3-2 3 2v5l-3 2-3-2zM15 22l3-2 3 2v5l-3 2-3-2zm13 0 3-2 3 2v5l-3 2-3-2zM39 17l5 5 7-8','M18 22l2 4h-4zm13 0 2 4h-4zM18 33l2 4h-4zm13 0 2 4h-4z'),
+ 'torpedo-launcher':glyph('M23 35V18c0-6 9-14 9-14s9 8 9 14v17l-5 15h-8zM23 29l-9 15h9m18-15 9 15h-9','M32 4c0 0 9 8 9 14v17l-5 15h-4z','M23 21h18M27 30h10M27 35h10M27 42h10','M27 14h10v5H27z'),
+ pdc:glyph('M15 46l7-7h20l7 7v4H15zM20 37V25l7-6h10l7 6v12l-6 5H26zM25 21V6h5v15m4 0V6h5v15','M37 19l7 6v12l-6 5h-6V27zM22 39h20l7 7H15z','M25 12h5m4 0h5M25 29h14M25 34h9','M28 29h8v6h-8z'),
+ 'tracking-turret':glyph('M14 46l8-6h20l8 6v4H14zM20 26l12-8 12 8v11l-8 6H28l-8-6zM29 22V8h6v14','M32 18l12 8v11l-8 6h-4zM22 40h20l8 6H14z','M25 31h14','M29 29h6v6h-6z'),
+ 'capacitor-bank':glyph('M12 17l6-5h28l6 5v27l-6 6H18l-6-6zM22 12V8h20v4','M18 12h28l6 5-8 5H20l-8-5zM44 22l8-5v27l-6 6h-2z','M21 27v16m11-16v16m11-16v16M19 25h6m4 0h6m5 0h6','M19 35h6v7h-6zm10 0h6v7h-6zm11 0h6v7h-6z'),
+ 'sustained-reactor':glyph('M23 9h18l12 12v17L41 50H23L11 38V21z','M41 9l12 12v17L41 50H32V39l10-10-10-11V9z','M23 16l-5 7v12l7 8h14l7-8V23l-5-7M8 25H4m4 8H4m52-8h4m-4 8h4','M32 19l8 10-8 10-8-10z'),
+ 'shield-mk2':glyph('M32 5l21 9v14c0 11-9 19-21 24C20 47 11 39 11 28V14z','M32 5l21 9v14c0 11-9 19-21 24V42l11-13V20l-11-5z','M21 20l11-5 11 5v9c-2 6-7 11-11 13-4-2-9-7-11-13z','M28 24h8v11h-8z'),
+ 'recovery-shield':glyph('M32 6l20 8v14c0 10-8 19-20 24-12-5-20-14-20-24V14z','M32 6l20 8v14c0 10-8 19-20 24V41l10-12V21l-10-5z','M22 20l10-5 10 5v10c-2 6-6 10-10 13-4-3-8-7-10-13z',''),
+ 'capital-shield-generator':glyph('M32 4l20 9v16c0 10-8 19-20 24-12-5-20-14-20-24V13zM6 16h6v25H6zm46 0h6v25h-6z','M32 4l20 9v16c0 10-8 19-20 24V41l11-13V19l-11-5z','M6 21h6m-6 14h6m40-14h6m-6 14h6','M32 20l9 5v10l-9 6-9-6V25z'),
+ 'armor-mk2':glyph('M9 22l21-12 20 11v12L30 45 9 34zM17 34v9l19 9 20-12v-9','M30 10l20 11-20 12L9 22zM30 33l20-12v12L30 45zM36 44l20-13v9L36 52z','M17 24l13 7 12-7M17 31l7 4m0 8 12 6','M20 18l10-6 11 6-11 6z'),
+ 'engine-mk2':glyph('M22 7h20l5 8v19l-7 9H24l-7-9V15z','M22 7h20l5 8-9 5H25l-8-5zM38 20l9-5v19l-7 9h-8z','M22 25h20M22 31h20','M25 34h14l-4 7h-6z'),
+ 'thrusters-mk2':glyph('M23 21l9-5 9 5v18l-9 5-9-5zM8 24h9v12H8zm39 0h9v12h-9zM26 5h12v8H26zm0 42h12v8H26z','M32 16l9 5v18l-9 5zM8 24h9v4H8zm39 0h9v4h-9z','M11 28h3m36 0h3','M28 25h8v10h-8z'),
+ 'radar-mk2':glyph('M13 14l32 25c-14 6-31-7-32-25zM29 33v12h10V38M20 46h25v4H20z','M13 14l32 25-10 1-17-15zM29 33l10 5v7H29z','M29 26l13-15M39 9l6 4M47 10l4-5m-1 12 7-1','M37 13l6-5 5 4-6 5z'),
+ 'cargo-pods':glyph('M8 20l15-8 14 8v23l-14 8-15-8zM39 19l9-5 9 5v23l-9 5-9-5z','M23 12l14 8-14 8-15-8zM23 28l14-8v23l-14 8zM48 14l9 5v23l-9 5z','M13 29v10m5-7v10m24-16 10-5M28 29v12','M12 22l5 3v8l-5-3zM42 32l4 2v7l-4-2z'),
+ 'salvage-mk2':glyph('M13 14l9-6 6 6-9 12 7 12-6 6L8 29V20zM51 14l-9-6-6 6 9 12-7 12 6 6 12-15V20z','M22 8l6 6-9 12 7 12-6 6-5-15v-9zM42 8l-6 6 9 12-7 12 6 6 5-15V20z','M24 28h16','M27 21l5-3 5 3v9l-5 3-5-3z'),
+ 'frigate-battery':glyph('M14 32l9-8h22l8 8v14l-9 5H23l-9-5zM23 24V9h8v15m6 0V9h8v15','M23 24h22l8 8-10 6H23l-9-6zM43 38l10-6v14l-9 5h-1z','M23 15h8m6 0h8M22 42h15M11 41H7m49 0h4','M27 39h9v6h-9z'),
+ 'cruiser-battery':glyph('M12 34l10-9h25l9 9v12l-11 6H23l-11-6zM22 25V5h9v20m7 0V5h9v20','M22 25h25l9 9-11 6H23l-11-6zM45 40l11-6v12l-11 6z','M22 11h9m7 0h9M22 18h9m7 0h9M21 45h19','M24 42h12v7H24z'),
 };
 const COMMODITY_SYMBOLS={
- water:'M32 7S16 25 16 35a16 16 0 0 0 32 0C48 25 32 7 32 7zM23 34c0 5 3 8 8 9',
- food:'M32 48V13M32 31c-12 0-18-9-18-16 12 0 18 9 18 16zM32 40c12 0 18-9 18-16-12 0-18 9-18 16zM27 10l5-5 5 5',
- medicine:'M23 10h18v40H23zM26 10V5h12v5M16 27h32m-16-9v18',
- electronics:'M18 14h28v30H18zM25 21h14v16H25zM24 7v7m8-7v7m8-7v7M24 44v7m8-7v7m8-7v7M11 20h7m-7 8h7m-7 8h7M46 20h7m-7 8h7m-7 8h7',
- machinery:'M25 7h14l2 9 8 2 5 12-7 6 1 9-13 6-7-6-9 2-8-11 4-8-1-9zM24 29a8 8 0 1 0 16 0 8 8 0 1 0-16 0',
- ore:'M12 35l8-18 17-7 15 18-6 19-20 4zM20 17l6 17 11-24M26 34l20 13m-20-13-14 1m14-1 26-6',
- gold:'M13 24l7-13h24l7 13-5 18H18zM13 24h38M20 11l5 13m19-13-5 13M18 42l7-18m21 18-7-18',
- scrap:'M10 22l18-13 10 14-18 13zM23 39l14-12 16 10-14 14zM10 44l7-7 5 5-7 7M40 8l8 4-3 9-8-4z',
- luxuries:'M12 17l10-8h20l10 8-20 33zM12 17h40M22 9l-2 8 12 33 12-33-2-8M20 17h24',
- arms:'M18 41V24l6-14 6 14v17zM35 41V24l6-14 6 14v17zM18 32h12m5 0h12M16 46h33',
+ water:glyph('M23 10V6h18v4l7 7v27l-7 7H23l-7-7V17z','M23 10h18l7 7-11 6H26l-10-6zM37 23l11-6v27l-7 7h-4z','M26 6v4h12V6M22 43h13','M29 25s-5 7-5 10a7 7 0 0 0 14 0c0-3-5-10-5-10z'),
+ food:glyph('M11 28l20-10 21 10v14L31 53 11 42zM31 18V6','M31 18l21 10-21 11-20-11zM31 39l21-11v14L31 53z','M17 33v6l8 4M31 12c-8 0-12-5-12-9 8 0 12 5 12 9zm0 6c8 0 12-5 12-9-8 0-12 5-12 9z','M21 25l10-5 11 5-11 6z'),
+ medicine:glyph('M13 21l10-6h19l10 6v23l-10 7H23l-10-7zM24 15V9h16v6','M23 15h19l10 6-13 7H25l-12-7zM39 28l13-7v23l-10 7h-3z','M27 9v6h10V9M19 39v5l8 4','M24 29h7v6h6v7h-6v6h-7v-6h-6v-7h6z'),
+ electronics:glyph('M19 13h26l7 7v25l-7 6H19l-7-6V20z','M19 13h26l7 7-10 6H22l-10-6zM42 26l10-6v25l-7 6h-3z','M19 7v6m10-6v6m10-6v6M5 25h7m-7 10h7m40-10h7m-7 10h7M24 51v5m10-5v5','M24 28h12v13H24z'),
+ machinery:glyph('M25 8h14l3 8 8 2 5 12-6 7v9l-13 6-7-5-9 2-8-11 4-8-2-9 9-6z','M39 8l3 8 8 2 5 12-6 7v9l-13 6-7-5 11-10V24l-9-8z','M22 28a10 10 0 1 0 20 0 10 10 0 1 0-20 0M9 25l7 4m32 8-7-3','M28 24h8v8h-8z'),
+ ore:glyph('M8 34l12-19 19-7 17 21-7 17-23 8z','M20 15l19-7-8 24-23 2zM31 32l25-3-7 17-23 8z','M20 15l11 17 18 14M26 54l5-22M39 8l4 13','M17 33l9-2-4 11-9-4z'),
+ gold:glyph('M9 36l8-13h21l7 13-5 11H15zM25 21l7-12h17l8 12-5 10h-7','M17 23h21l7 13H9zM32 9h17l8 12H25zM45 36l-5 11H30l5-11z','M17 27l-3 6m18-6 3 6M33 13l-3 5M15 41h13','M21 28h9l3 5H18zM36 14h9l3 4H33z'),
+ scrap:glyph('M9 22l18-12 11 10-4 9-14 8-11-5zM24 41l13-13 19 9-3 9-15 7zM8 43l8-6 6 6-7 8z','M27 10l11 10-18 11-11-9zM37 28l19 9-18 11-14-7z','M20 20l5 5m14 13 7 4M43 8l8 6-5 8-7-6z','M12 42l5-3 3 4-5 4z'),
+ luxuries:glyph('M10 21l13-13h20l12 13-23 33z','M23 8h20l12 13H10zM32 21h12L32 54z','M23 8l-3 13 12 33M43 8l1 13M20 21h24','M32 11l7 9H25zM7 2l2 3-2 3-2-3zm49 33 2 3-2 3-2-3z'),
+ arms:glyph('M9 25l13-8h25l9 8v20l-12 7H22l-13-7zM24 17V9h17v8','M22 17h25l9 8-14 8H22l-13-8zM42 33l14-8v20l-12 7h-2z','M27 9v8h11V9M22 33v12m9-12v12M15 37v5l5 3','M19 24l3-5 3 5v7h-6zm10 0 3-5 3 5v7h-6z'),
 };
+
+const SIGNALS={
+ 'pulse-cannon':'M24 9h4m8 0h4M26 14h1m10 0h1',
+ 'pulse-mk2':'M22 7h6m8 0h6M22 19h6m8 0h6',
+ 'beam-emitter':'M32 4v13M27 7l3 7m7-7-3 7',
+ 'gauss-cannon':'M26 7v17m12-17v17',
+ ripper:'M25 17h14M12 17l-4-3m44 3 4-3',
+ 'ion-blaster':'M14 30v6m36-6v6',
+ mortar:'M32 11v10m-5-5h10',
+ 'seeker-launcher':'M27 25h10M29 45v4m6-4v4',
+ 'swarm-launcher':'M19 44h18',
+ 'shield-seeker-launcher':'M39 18l4 5 7-8',
+ 'shield-swarm-launcher':'M39 17l5 5 7-8',
+ 'torpedo-launcher':'M27 31h10m-10 5h10M30 47v4m4-4v4',
+ pdc:'M26 7h3m6 0h3',
+ 'tracking-turret':'M16 20a19 19 0 0 1 9-10M39 10a19 19 0 0 1 9 10M16 20l-2-6m2 6 6-2M48 20l2-6m-2 6-6-2',
+ 'capacitor-bank':'M21 27v4m11-4v4m11-4v4',
+ 'sustained-reactor':'M23 16h6m6 0h6M23 42h6m6 0h6',
+ 'shield-mk2':'M27 22l5-3 5 3',
+ 'recovery-shield':'M39 24a10 10 0 1 0 2 12M39 24h-6m6 0v-6',
+ 'capital-shield-generator':'M8 23v10m48-10v10',
+ 'armor-mk2':'M18 37l11 6M39 44l9-6',
+ 'engine-mk2':'M25 45l-3 7m10-7v9m7-9 3 7',
+ 'thrusters-mk2':'M9 30H3m0 0 4-4m-4 4 4 4M55 30h6m0 0-4-4m4 4-4 4M32 8V3m0 0-4 4m4-4 4 4M32 48v6m0 0-4-4m4 4 4-4',
+ 'radar-mk2':'M48 10l4-5m-1 12 7-1',
+ 'cargo-pods':'M16 34v5m30-12v5',
+ 'salvage-mk2':'M32 36v13m0 0-5-5m5 5 5-5',
+ 'frigate-battery':'M24 10h6m8 0h6M24 16h6m8 0h6',
+ 'cruiser-battery':'M23 6h7m9 0h7M23 18h7m9 0h7',
+};
+// Body paint is independent of rarity. Rarity stays on the tier/affix markers.
+const STEEL={body:'#203b50',face:'#496b83',edge:'#a9c5d5',line:'#799aaf'};
+const ACCENTS={
+ 'pulse-cannon':'#72e7f0','pulse-mk2':'#72e7f0','beam-emitter':'#8bf3db','gauss-cannon':'#e8bd72',ripper:'#f0a176','ion-blaster':'#b8a3f5',mortar:'#ffb279',
+ 'seeker-launcher':'#edb875','swarm-launcher':'#edb875','shield-seeker-launcher':'#89c5ff','shield-swarm-launcher':'#89c5ff','torpedo-launcher':'#ea9488',
+ pdc:'#f0c781','tracking-turret':'#83e9e0','capacitor-bank':'#76ddd2','sustained-reactor':'#efc877','shield-mk2':'#79bdf4','recovery-shield':'#78e3cb','capital-shield-generator':'#8fc5f6',
+ 'armor-mk2':'#d9b37a','engine-mk2':'#f6b372','thrusters-mk2':'#7fd5ee','radar-mk2':'#83e2c9','cargo-pods':'#d3b37b','salvage-mk2':'#91dfd1','frigate-battery':'#e1ba82','cruiser-battery':'#f0b777',
+};
+const CARGO_PAINT={
+ water:{body:'#234d62',face:'#3b8198',edge:'#9ad8e8',line:'#79b7cd',accent:'#93e9fa'},
+ food:{body:'#3b4d34',face:'#7d985c',edge:'#c4d5a1',line:'#abbf88',accent:'#e5c07e'},
+ medicine:{body:'#b9cec7',face:'#628d83',edge:'#d5e6df',line:'#2d5b55',accent:'#68d7bb'},
+ electronics:{...STEEL,accent:'#7faeed'},
+ machinery:{body:'#414651',face:'#78808d',edge:'#bdc6d0',line:'#96a3b1',accent:'#e0aa6b'},
+ ore:{body:'#494655',face:'#83748c',edge:'#c2aecb',line:'#a192b1',accent:'#d4af81'},
+ gold:{body:'#76572b',face:'#c89e4d',edge:'#f2d591',line:'#f3d898',accent:'#ffe4a2'},
+ scrap:{body:'#3d4b51',face:'#73858a',edge:'#aebfc4',line:'#90a6b0',accent:'#c0936e'},
+ luxuries:{body:'#483d62',face:'#a68acb',edge:'#e0c6f6',line:'#c6ace4',accent:'#f0d5ff'},
+ arms:{body:'#51404b',face:'#88616a',edge:'#caa3a6',line:'#b48d94',accent:'#efaa84'},
+};
+const paintStyle=p=>`--icon-body:${p.body};--icon-face:${p.face};--icon-edge:${p.edge};--icon-line:${p.line};--icon-accent:${p.accent}`;
+const EQUIPMENT_PAINT=Object.fromEntries(Object.entries(ACCENTS).map(([id,accent])=>[id,paintStyle({...STEEL,accent})]));
+const COMMODITY_PAINT=Object.fromEntries(Object.entries(CARGO_PAINT).map(([id,p])=>[id,paintStyle(p)]));
+
 const AFFIX_MARKS={efficient:'M9 1 2 8h6l-4 6',precise:'M7 0v4m0 6v4M0 7h4m6 0h4M4 4h6v6H4z',rapid:'M1 2l5 5-5 5m6-10 5 5-5 5',longRange:'M1 7h12m0 0-4-4m4 4-4 4',light:'M2 12 11 2M4 9l-1-5 8-2-2 8z',tuned:'M3 12l8-8M9 1l4 4-3 3-4-4z',compact:'M1 5V1h4m4 0h4v4M1 9v4h4m4 0h4V9'};
+const fallback=glyph('M12 20l20-10 20 10v24L32 54 12 44z','M32 10l20 10-20 10-20-10zM32 30l20-10v24L32 54z','M20 24l7 4m-7 7 7 4');
 const html=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const svg=(path,attributes,extra='')=>`<svg ${attributes} viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${path}"/>${extra}</svg>`;
+const svg=(shape,attributes,paint,signal='',extra='')=>`<svg ${attributes} style="${paint}" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><g class="item-hardware" transform="translate(3 3) scale(.9)"><path d="${shape.body}" class="item-surface"/><path d="${shape.facet}" class="item-facet"/><path d="${shape.detail}" class="item-engraving"/>${shape.core?`<path d="${shape.core}" class="item-core"/>`:''}${signal?`<path d="${signal}" class="item-signal"/>`:''}</g>${extra}</svg>`;
 export function equipmentIcon(item,className=''){
  const base=item?.baseId??item?.id,key=SYMBOLS[base]?base:undefined;
  const tier=Math.max(1,Math.min(3,item?.tier??(base?.includes('mk2')?2:1)));
- const ticks=Array.from({length:tier},(_,i)=>`M${32-(tier-1)*4+i*8} 55v6`).join('');
+ const pips=Array.from({length:tier},(_,i)=>{const x=32-(tier-1)*5+i*10;return `M${x} 56l3 3-3 3-3-3z`;}).join('');
  const affixes=(item?.affixIds??[]).filter(id=>AFFIX_MARKS[id]).slice(0,2);
- const marks=affixes.map((id,i)=>`<path class="item-affix-mark" data-affix="${id}" transform="translate(${i?5:47} 2) scale(.75)" d="${AFFIX_MARKS[id]}"/>`).join('');
- return svg(SYMBOLS[key]??'M18 16h28v30H18zM24 24h16m-16 8h16',`class="item-icon ${html(className)}" data-icon="${html(key??base??'equipment')}" data-tier="${tier}"`,`<path class="item-tier-mark" d="${ticks}"/>${marks}`);
+ const marks=affixes.map((id,i)=>`<path class="item-affix-mark" data-affix="${id}" transform="translate(${i?3:51} 3) scale(.65)" d="${AFFIX_MARKS[id]}"/>`).join('');
+ return svg(SYMBOLS[key]??fallback,`class="item-icon ${html(className)}" data-icon="${html(key??base??'equipment')}" data-tier="${tier}"`,EQUIPMENT_PAINT[key]??paintStyle({...STEEL,accent:'#9ed5e8'}),SIGNALS[key],`<path class="item-tier-mark" d="${pips}"/>${marks}`);
 }
 export function commodityIcon(commodity,className=''){
  const id=typeof commodity==='string'?commodity:commodity?.id;
- return svg(COMMODITY_SYMBOLS[id]??'M14 18l18-10 18 10v26L32 54 14 44zM14 18l18 10 18-10M32 28v26',`class="item-icon commodity-icon ${html(className)}" data-commodity-icon="${html(id??'cargo')}"`);
+ return svg(COMMODITY_SYMBOLS[id]??fallback,`class="item-icon commodity-icon ${html(className)}" data-commodity-icon="${html(id??'cargo')}"`,COMMODITY_PAINT[id]??paintStyle({...STEEL,accent:'#9ed5e8'}));
 }

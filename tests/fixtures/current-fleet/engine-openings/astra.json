@@ -1,0 +1,2589 @@
+{
+  "id": "astra",
+  "glbPath": "assets/models/ships/astra.glb",
+  "glbSha256": "4c7ec4c5b2951eef9f5666ba63ade0dbaf1f94b21e7d741b3d8ed01989797dc2",
+  "descriptorSha256": "152cd6329fb9f1f9864965a01977fc60986f5db5c49dce5ffee5423c36bdcb41",
+  "coordinateFrame": "Unscaled GLB space",
+  "epsilon": 0.0000025371336489558016,
+  "method": "Double-sided first-hit rays at center and eight angles on 35% and 65% aperture radii. The measured aperture plane is the aft lip, not the glow socket. Whole-base fit is also visually reviewed.",
+  "mouths": [
+    {
+      "name": "33 aft engine machined annular nozzle (-0.2, 0.32)",
+      "center": [
+        -0.19892817735671997,
+        0.3352111627658208,
+        -0.9999958276748657
+      ],
+      "outward": [
+        0,
+        0,
+        -1
+      ],
+      "axisU": [
+        0.9999999999999968,
+        -8.066446842072413e-8,
+        0
+      ],
+      "axisV": [
+        -8.066446842072413e-8,
+        -0.9999999999999968,
+        0
+      ],
+      "radiusU": 0.0615767240524294,
+      "radiusV": 0.06286638842051398,
+      "minDepth": 0.013498181104660034,
+      "maxDepth": 0.04699393701553345,
+      "blindFloorDepth": 0.04499393701553345,
+      "apertureSides": 12,
+      "samplingBasis": {
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "axisU": [
+          0.9999999999999968,
+          -8.066446842072413e-8,
+          0
+        ],
+        "axisV": [
+          -8.066446842072413e-8,
+          -0.9999999999999968,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.19892817735671997,
+            0.3352111627658208,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.17737632393836975,
+            0.335211161027352,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.18368871691249528,
+            0.31965252419023926,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.1989281791315993,
+            0.31320792681864096,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.2141676403110031,
+            0.3196525266488054,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.2204800307750702,
+            0.3352111645042896,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.21416763780094467,
+            0.35076980134140234,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.19892817558184064,
+            0.35721439871300065,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.18368871440243684,
+            0.3507697988828362,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.158903306722641,
+            0.3352111595372359,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.17062632224601693,
+            0.3063165482683122,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.19892818065292445,
+            0.29434801029248686,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.22723003712896006,
+            0.30631655283422077,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.23895304799079894,
+            0.3352111659944057,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.22723003246742302,
+            0.3641057772633294,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.1989281740605155,
+            0.37607431523915474,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.17062631758447988,
+            0.36410577269742084,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "33 aft engine machined annular nozzle (0.2, 0.32)",
+      "center": [
+        0.20118045061826706,
+        0.3352111627658208,
+        -0.9999958276748657
+      ],
+      "outward": [
+        0,
+        0,
+        -1
+      ],
+      "axisU": [
+        0.9999999999999968,
+        -8.066449770113896e-8,
+        0
+      ],
+      "axisV": [
+        -8.066449770113896e-8,
+        -0.9999999999999968,
+        0
+      ],
+      "radiusU": 0.061576716601848,
+      "radiusV": 0.06286638842051831,
+      "minDepth": 0.013498181104660034,
+      "maxDepth": 0.04699393701553345,
+      "blindFloorDepth": 0.04499393701553345,
+      "apertureSides": 12,
+      "samplingBasis": {
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "axisU": [
+          0.9999999999999968,
+          -8.066449770113896e-8,
+          0
+        ],
+        "axisV": [
+          -8.066449770113896e-8,
+          -0.9999999999999968,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            0.20118045061826706,
+            0.3352111627658208,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            0.2227323014289138,
+            0.3352111610273516,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            0.2164199092185665,
+            0.3196525241902379,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            0.2011804488433871,
+            0.31320792681863946,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            0.1859409895079083,
+            0.31965252664880467,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            0.17962859980762033,
+            0.33521116450429,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            0.18594099201796763,
+            0.35076980134140373,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            0.20118045239314702,
+            0.35721439871300215,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            0.21641991172862582,
+            0.35076979888283694,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            0.24120531640946813,
+            0.3352111595372351,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            0.22948230230453742,
+            0.30631654826830973,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            0.2011804473220614,
+            0.29434801029248403,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            0.17287859427045793,
+            0.3063165528342194,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            0.161155584827066,
+            0.3352111659944065,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            0.1728785989319967,
+            0.3641057772633319,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            0.20118045391447273,
+            0.3760743152391576,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            0.2294823069660762,
+            0.3641057726974223,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "33 aft engine machined annular nozzle (-0.57, -0.05)",
+      "center": [
+        -0.5690286556879679,
+        -0.042640543853243194,
+        -0.9999958276748657
+      ],
+      "outward": [
+        0,
+        0,
+        -1
+      ],
+      "axisU": [
+        0.9999999999999999,
+        -1.0083061805969848e-8,
+        0
+      ],
+      "axisV": [
+        -1.008306180596985e-8,
+        -1,
+        0
+      ],
+      "radiusU": 0.06157674392064415,
+      "radiusV": 0.06286635387057819,
+      "minDepth": 0.013498181104660034,
+      "maxDepth": 0.04699393701553345,
+      "blindFloorDepth": 0.04499393701553345,
+      "apertureSides": 12,
+      "samplingBasis": {
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "axisU": [
+          1,
+          -1.008306180596985e-8,
+          0
+        ],
+        "axisV": [
+          -1.008306180596985e-8,
+          -1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.5690286556879679,
+            -0.042640543853243194,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.5474767953157424,
+            -0.042640544070551935,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.5537891892284603,
+            -0.05819917280252933,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.5690286559098278,
+            -0.06464376770794555,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.5842681224612327,
+            -0.058199172495208354,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.5905805160601934,
+            -0.042640543635934454,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.5842681221474755,
+            -0.02708191490395706,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.569028655466108,
+            -0.020637319998540828,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.5537891889147031,
+            -0.027081915211278028,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.5290037721395492,
+            -0.04264054425681657,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.5407267894060251,
+            -0.07153514047334601,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.5690286560999933,
+            -0.08350367386911903,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.5973305225526025,
+            -0.07153513990260707,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.6090535392363866,
+            -0.042640543449669825,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.5973305219699107,
+            -0.013745947233140376,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.5690286552759425,
+            -0.0017774138373673684,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.5407267888233332,
+            -0.013745947803879312,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "33 aft engine machined annular nozzle (0.57, -0.05)",
+      "center": [
+        0.5712809165318807,
+        -0.042640543853243194,
+        -0.9999958276748657
+      ],
+      "outward": [
+        0,
+        0,
+        -1
+      ],
+      "axisU": [
+        1,
+        -1.0083052045838263e-8,
+        0
+      ],
+      "axisV": [
+        -1.0083052045838263e-8,
+        -1,
+        0
+      ],
+      "radiusU": 0.06157676378885902,
+      "radiusV": 0.06286635387057785,
+      "minDepth": 0.013498181104660034,
+      "maxDepth": 0.04699393701553345,
+      "blindFloorDepth": 0.04499393701553345,
+      "apertureSides": 12,
+      "samplingBasis": {
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "axisU": [
+          1,
+          -1.0083052045838263e-8,
+          0
+        ],
+        "axisV": [
+          -1.0083052045838263e-8,
+          -1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            0.5712809165318807,
+            -0.042640543853243194,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            0.5928327838579814,
+            -0.042640544070551796,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            0.5865203879085208,
+            -0.05819917280252914,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            0.5712809163100211,
+            -0.06464376770794544,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            0.5560414448414837,
+            -0.058199172495208375,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            0.54972904920578,
+            -0.04264054363593459,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            0.5560414451552407,
+            -0.027081914903957248,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            0.5712809167537404,
+            -0.02063731999854095,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            0.5865203882222778,
+            -0.02708191521127801,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            0.6113058129946392,
+            -0.04264054425681631,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            0.5995827919456409,
+            -0.07153514047334567,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            0.5712809161198557,
+            -0.0835036738691188,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            0.5429790405354291,
+            -0.0715351399026071,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            0.5312560200691223,
+            -0.04264054344967009,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            0.5429790411181206,
+            -0.013745947233140723,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            0.5712809169439058,
+            -0.0017774138373675905,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            0.5995827925283324,
+            -0.013745947803879284,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "33 aft engine machined annular nozzle (-0.57, -0.3)",
+      "center": [
+        -0.5690286507209142,
+        -0.297945749014616,
+        -0.9999958276748657
+      ],
+      "outward": [
+        0,
+        0,
+        -1
+      ],
+      "axisU": [
+        0.9999999999999387,
+        -3.500260932784786e-7,
+        0
+      ],
+      "axisV": [
+        -3.500260932784786e-7,
+        -0.9999999999999387,
+        0
+      ],
+      "radiusU": 0.05321446557840041,
+      "radiusV": 0.0543289730706991,
+      "minDepth": 0.013498181104660034,
+      "maxDepth": 0.04699393701553345,
+      "blindFloorDepth": 0.04499393701553345,
+      "apertureSides": 12,
+      "samplingBasis": {
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "axisU": [
+          0.9999999999999387,
+          -3.500260932784786e-7,
+          0
+        ],
+        "axisV": [
+          -3.500260932784786e-7,
+          -0.9999999999999387,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.5690286507209142,
+            -0.297945749014616,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.5504035877684752,
+            -0.29794575553387403,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.5558587471135764,
+            -0.31139148847004416,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.5690286573767096,
+            -0.31696088958935953,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.5821985637409682,
+            -0.3113914792504211,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.5876537136733533,
+            -0.297945742495358,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.5821985543282521,
+            -0.28450000955918786,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.5690286440651189,
+            -0.2789306084398725,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.5558587377008603,
+            -0.2845000187788109,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.5344392480949561,
+            -0.2979457611218095,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.5445702583072867,
+            -0.3229164080032683,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.5690286630816771,
+            -0.3332595815105683,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.5934870606153002,
+            -0.32291639088111107,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.6036180533468724,
+            -0.29794573690742254,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.5934870431345418,
+            -0.2729750900259637,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.5690286383601514,
+            -0.26263191651866374,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.5445702408265283,
+            -0.27297510714812095,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "33 aft engine machined annular nozzle (0.57, -0.3)",
+      "center": [
+        0.571280911564827,
+        -0.297945749014616,
+        -0.9999958276748657
+      ],
+      "outward": [
+        0,
+        0,
+        -1
+      ],
+      "axisU": [
+        0.9999999999999387,
+        -3.500260279354158e-7,
+        0
+      ],
+      "axisV": [
+        -3.500260279354158e-7,
+        -0.9999999999999387,
+        0
+      ],
+      "radiusU": 0.05321447551250784,
+      "radiusV": 0.05432897307070003,
+      "minDepth": 0.013498181104660034,
+      "maxDepth": 0.04699393701553345,
+      "blindFloorDepth": 0.04499393701553345,
+      "apertureSides": 12,
+      "samplingBasis": {
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "axisU": [
+          0.9999999999999387,
+          -3.500260279354158e-7,
+          0
+        ],
+        "axisV": [
+          -3.500260279354158e-7,
+          -0.9999999999999387,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            0.571280911564827,
+            -0.297945749014616,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            0.5899059779942035,
+            -0.29794575553387403,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            0.5844508176307319,
+            -0.3113914884700444,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            0.5712809049090328,
+            -0.31696088958935986,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            0.5581109960862076,
+            -0.3113914792504213,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            0.5526558451354504,
+            -0.297945742495358,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            0.558111005498922,
+            -0.28450000955918764,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            0.5712809182206211,
+            -0.27893060843987216,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            0.5844508270434463,
+            -0.2845000187788107,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            0.605870320647955,
+            -0.2979457611218095,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            0.5957393085443647,
+            -0.32291640800326876,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            0.5712808992040664,
+            -0.3332595815105689,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            0.5468224971045341,
+            -0.3229163908811115,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            0.536691502481699,
+            -0.29794573690742254,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            0.5468225145852892,
+            -0.27297509002596326,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            0.5712809239255875,
+            -0.26263191651866313,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            0.5957393260251198,
+            -0.2729751071481205,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "33 aft engine machined annular nozzle (-0.19, -0.32)",
+      "center": [
+        -0.18892546370625496,
+        -0.31837016344070435,
+        -0.9999958276748657
+      ],
+      "outward": [
+        0,
+        0,
+        -1
+      ],
+      "axisU": [
+        1,
+        0,
+        0
+      ],
+      "axisV": [
+        0,
+        -1,
+        0
+      ],
+      "radiusU": 0.053214456886053085,
+      "radiusV": 0.05432897806167603,
+      "minDepth": 0.013498181104660034,
+      "maxDepth": 0.04699393701553345,
+      "blindFloorDepth": 0.04499393701553345,
+      "apertureSides": 12,
+      "samplingBasis": {
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "axisU": [
+          1,
+          0,
+          0
+        ],
+        "axisV": [
+          0,
+          -1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            -0.18892546370625496,
+            -0.31837016344070435,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            -0.17030040379613637,
+            -0.31837016344070435,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.1757555575438044,
+            -0.33181589952152557,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            -0.18892546370625496,
+            -0.337385305762291,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            -0.20209536986870552,
+            -0.33181589952152557,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            -0.20755052361637355,
+            -0.31837016344070435,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            -0.20209536986870552,
+            -0.3049244273598831,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            -0.18892546370625496,
+            -0.2993550211191177,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            -0.1757555575438044,
+            -0.3049244273598831,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            -0.15433606673032046,
+            -0.31837016344070435,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.16446706654741822,
+            -0.34334081616222945,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            -0.18892546370625496,
+            -0.35368399918079374,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            -0.2133838608650917,
+            -0.34334081616222945,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            -0.22351486068218945,
+            -0.31837016344070435,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            -0.2133838608650917,
+            -0.29339951071917925,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            -0.18892546370625496,
+            -0.28305632770061495,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            -0.16446706654741822,
+            -0.29339951071917925,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    },
+    {
+      "name": "33 aft engine machined annular nozzle (0.19, -0.32)",
+      "center": [
+        0.19117773324251175,
+        -0.31837016344070435,
+        -0.9999958276748657
+      ],
+      "outward": [
+        0,
+        0,
+        -1
+      ],
+      "axisU": [
+        1,
+        0,
+        0
+      ],
+      "axisV": [
+        0,
+        -1,
+        0
+      ],
+      "radiusU": 0.05321445316076279,
+      "radiusV": 0.05432897806167603,
+      "minDepth": 0.013498181104660034,
+      "maxDepth": 0.04699393701553345,
+      "blindFloorDepth": 0.04499393701553345,
+      "apertureSides": 12,
+      "samplingBasis": {
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "axisU": [
+          1,
+          0,
+          0
+        ],
+        "axisV": [
+          0,
+          -1,
+          0
+        ]
+      },
+      "samples": [
+        {
+          "apertureFraction": [
+            0,
+            0
+          ],
+          "pointGLB": [
+            0.19117773324251175,
+            -0.31837016344070435,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.35,
+            0
+          ],
+          "pointGLB": [
+            0.20980279184877873,
+            -0.31837016344070435,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529164,
+            0.2474873734152916
+          ],
+          "pointGLB": [
+            0.204347638483,
+            -0.33181589952152557,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            2.143131898507868e-17,
+            0.35
+          ],
+          "pointGLB": [
+            0.19117773324251175,
+            -0.337385305762291,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.2474873734152916,
+            0.24748737341529164
+          ],
+          "pointGLB": [
+            0.1780078280020235,
+            -0.33181589952152557,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.35,
+            4.286263797015736e-17
+          ],
+          "pointGLB": [
+            0.17255267463624477,
+            -0.31837016344070435,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.24748737341529167,
+            -0.2474873734152916
+          ],
+          "pointGLB": [
+            0.1780078280020235,
+            -0.3049244273598831,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -6.429395695523604e-17,
+            -0.35
+          ],
+          "pointGLB": [
+            0.19117773324251175,
+            -0.2993550211191177,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.24748737341529156,
+            -0.24748737341529167
+          ],
+          "pointGLB": [
+            0.204347638483,
+            -0.3049244273598831,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.65,
+            0
+          ],
+          "pointGLB": [
+            0.22576712779700756,
+            -0.31837016344070435,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.45961940777125593,
+            0.4596194077712559
+          ],
+          "pointGLB": [
+            0.2156361286891328,
+            -0.34334081616222945,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            3.9801020972288984e-17,
+            0.65
+          ],
+          "pointGLB": [
+            0.19117773324251175,
+            -0.35368399918079374,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.4596194077712559,
+            0.45961940777125593
+          ],
+          "pointGLB": [
+            0.1667193377958907,
+            -0.34334081616222945,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          "pointGLB": [
+            0.15658833868801594,
+            -0.31837016344070435,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -0.459619407771256,
+            -0.4596194077712559
+          ],
+          "pointGLB": [
+            0.1667193377958907,
+            -0.29339951071917925,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          "pointGLB": [
+            0.19117773324251175,
+            -0.28305632770061495,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        },
+        {
+          "apertureFraction": [
+            0.4596194077712558,
+            -0.459619407771256
+          ],
+          "pointGLB": [
+            0.2156361286891328,
+            -0.29339951071917925,
+            -0.9999958276748657
+          ],
+          "outwardClear": true,
+          "outwardFirstHit": null,
+          "visibleRecessDepth": 0.032995820045471184,
+          "inwardHitMaterial": "astra · recessed drive face",
+          "recessed": true
+        }
+      ],
+      "outwardClear": true,
+      "recessVisible": true
+    }
+  ],
+  "allOutwardClear": true,
+  "allRecessesVisible": true
+}

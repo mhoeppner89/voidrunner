@@ -1,0 +1,1268 @@
+{
+  "id": "vanguard",
+  "authority": "Latest user request: add the fitting turrets on the sides.",
+  "candidateNativeSHA256": "8602d94fa6f431597ec266fcae76ab7eec002a7e1107f7f17a499a74a7bf29c0",
+  "coordinateTransform": {
+    "BlenderToRawGLB": "[x,y,z] => [x,z,-y]",
+    "rawGLBToRuntime": "[x,y,z] => [z,y,-x] * scale",
+    "playerScale": 5.9,
+    "npcScale": 9.44,
+    "orientationUnchanged": true,
+    "sideNote": "Use runtimeSide or coordinates; canonical part labels retain the original authoring side convention."
+  },
+  "engines": [
+    {
+      "name": "Port lower drive",
+      "runtimeSide": "starboard",
+      "rawGLB": {
+        "center": [
+          -0.995,
+          -0.285,
+          0.34
+        ],
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          -1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.14874,
+        "radiusV": 0.15022000000000002,
+        "minDepth": 0.05
+      },
+      "runtimePlayer": {
+        "center": [
+          2.0060000000000002,
+          -1.6815,
+          5.870500000000001
+        ],
+        "outward": [
+          0,
+          0,
+          1
+        ],
+        "axisU": [
+          1,
+          0,
+          0
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.8775660000000001,
+        "radiusV": 0.8862980000000001
+      },
+      "runtimeNpc": {
+        "center": [
+          3.2096,
+          -2.6903999999999995,
+          9.3928
+        ],
+        "radiusU": 1.4041056,
+        "radiusV": 1.4180768000000001,
+        "outward": [
+          0,
+          0,
+          1
+        ]
+      },
+      "glow": {
+        "colour": "warm orange",
+        "exportedEmissiveCore": true,
+        "previewDefaultOn": true,
+        "emissiveStrength": 2,
+        "rawGLB": {
+          "coreCenter": [
+            -0.931,
+            -0.285,
+            0.34
+          ],
+          "coreRadiusU": 0.13869,
+          "coreRadiusV": 0.14007
+        },
+        "runtimePlayer": {
+          "coreCenter": [
+            2.0060000000000002,
+            -1.6815,
+            5.492900000000001
+          ],
+          "coreRadiusU": 0.8182710000000001,
+          "coreRadiusV": 0.8264130000000001
+        },
+        "runtimeNpc": {
+          "coreCenter": [
+            3.2096,
+            -2.6903999999999995,
+            8.78864
+          ],
+          "coreRadiusU": 1.3092336,
+          "coreRadiusV": 1.3222608
+        }
+      }
+    },
+    {
+      "name": "Port upper drive",
+      "runtimeSide": "starboard",
+      "rawGLB": {
+        "center": [
+          -0.995,
+          0.105,
+          0.34
+        ],
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          -1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.14874,
+        "radiusV": 0.13541999999999998,
+        "minDepth": 0.05
+      },
+      "runtimePlayer": {
+        "center": [
+          2.0060000000000002,
+          0.6195,
+          5.870500000000001
+        ],
+        "outward": [
+          0,
+          0,
+          1
+        ],
+        "axisU": [
+          1,
+          0,
+          0
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.8775660000000001,
+        "radiusV": 0.798978
+      },
+      "runtimeNpc": {
+        "center": [
+          3.2096,
+          0.9911999999999999,
+          9.3928
+        ],
+        "radiusU": 1.4041056,
+        "radiusV": 1.2783647999999999,
+        "outward": [
+          0,
+          0,
+          1
+        ]
+      },
+      "glow": {
+        "colour": "warm orange",
+        "exportedEmissiveCore": true,
+        "previewDefaultOn": true,
+        "emissiveStrength": 2,
+        "rawGLB": {
+          "coreCenter": [
+            -0.931,
+            0.105,
+            0.34
+          ],
+          "coreRadiusU": 0.13869,
+          "coreRadiusV": 0.12627
+        },
+        "runtimePlayer": {
+          "coreCenter": [
+            2.0060000000000002,
+            0.6195,
+            5.492900000000001
+          ],
+          "coreRadiusU": 0.8182710000000001,
+          "coreRadiusV": 0.744993
+        },
+        "runtimeNpc": {
+          "coreCenter": [
+            3.2096,
+            0.9911999999999999,
+            8.78864
+          ],
+          "coreRadiusU": 1.3092336,
+          "coreRadiusV": 1.1919887999999998
+        }
+      }
+    },
+    {
+      "name": "Starboard lower drive",
+      "runtimeSide": "port",
+      "rawGLB": {
+        "center": [
+          -0.995,
+          -0.285,
+          -0.34
+        ],
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          -1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.14874,
+        "radiusV": 0.15022000000000002,
+        "minDepth": 0.05
+      },
+      "runtimePlayer": {
+        "center": [
+          -2.0060000000000002,
+          -1.6815,
+          5.870500000000001
+        ],
+        "outward": [
+          0,
+          0,
+          1
+        ],
+        "axisU": [
+          1,
+          0,
+          0
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.8775660000000001,
+        "radiusV": 0.8862980000000001
+      },
+      "runtimeNpc": {
+        "center": [
+          -3.2096,
+          -2.6903999999999995,
+          9.3928
+        ],
+        "radiusU": 1.4041056,
+        "radiusV": 1.4180768000000001,
+        "outward": [
+          0,
+          0,
+          1
+        ]
+      },
+      "glow": {
+        "colour": "warm orange",
+        "exportedEmissiveCore": true,
+        "previewDefaultOn": true,
+        "emissiveStrength": 2,
+        "rawGLB": {
+          "coreCenter": [
+            -0.931,
+            -0.285,
+            -0.34
+          ],
+          "coreRadiusU": 0.13869,
+          "coreRadiusV": 0.14007
+        },
+        "runtimePlayer": {
+          "coreCenter": [
+            -2.0060000000000002,
+            -1.6815,
+            5.492900000000001
+          ],
+          "coreRadiusU": 0.8182710000000001,
+          "coreRadiusV": 0.8264130000000001
+        },
+        "runtimeNpc": {
+          "coreCenter": [
+            -3.2096,
+            -2.6903999999999995,
+            8.78864
+          ],
+          "coreRadiusU": 1.3092336,
+          "coreRadiusV": 1.3222608
+        }
+      }
+    },
+    {
+      "name": "Starboard upper drive",
+      "runtimeSide": "port",
+      "rawGLB": {
+        "center": [
+          -0.995,
+          0.105,
+          -0.34
+        ],
+        "outward": [
+          -1,
+          0,
+          0
+        ],
+        "axisU": [
+          0,
+          0,
+          -1
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.14874,
+        "radiusV": 0.13541999999999998,
+        "minDepth": 0.05
+      },
+      "runtimePlayer": {
+        "center": [
+          -2.0060000000000002,
+          0.6195,
+          5.870500000000001
+        ],
+        "outward": [
+          0,
+          0,
+          1
+        ],
+        "axisU": [
+          1,
+          0,
+          0
+        ],
+        "axisV": [
+          0,
+          1,
+          0
+        ],
+        "radiusU": 0.8775660000000001,
+        "radiusV": 0.798978
+      },
+      "runtimeNpc": {
+        "center": [
+          -3.2096,
+          0.9911999999999999,
+          9.3928
+        ],
+        "radiusU": 1.4041056,
+        "radiusV": 1.2783647999999999,
+        "outward": [
+          0,
+          0,
+          1
+        ]
+      },
+      "glow": {
+        "colour": "warm orange",
+        "exportedEmissiveCore": true,
+        "previewDefaultOn": true,
+        "emissiveStrength": 2,
+        "rawGLB": {
+          "coreCenter": [
+            -0.931,
+            0.105,
+            -0.34
+          ],
+          "coreRadiusU": 0.13869,
+          "coreRadiusV": 0.12627
+        },
+        "runtimePlayer": {
+          "coreCenter": [
+            -2.0060000000000002,
+            0.6195,
+            5.492900000000001
+          ],
+          "coreRadiusU": 0.8182710000000001,
+          "coreRadiusV": 0.744993
+        },
+        "runtimeNpc": {
+          "coreCenter": [
+            -3.2096,
+            0.9911999999999999,
+            8.78864
+          ],
+          "coreRadiusU": 1.3092336,
+          "coreRadiusV": 1.1919887999999998
+        }
+      }
+    }
+  ],
+  "guns": [
+    {
+      "name": "Port central gun",
+      "kind": "gun",
+      "rawGLB": {
+        "position": [
+          0.258,
+          0.323,
+          0.041
+        ],
+        "physicalMouth": [
+          0.255,
+          0.323,
+          0.041
+        ],
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "radius": 0.01
+      },
+      "runtimePlayer": {
+        "position": [
+          0.24190000000000003,
+          1.9057000000000002,
+          -1.5222000000000002
+        ],
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "radius": 0.059000000000000004
+      },
+      "runtimeNpc": {
+        "position": [
+          0.38704,
+          3.04912,
+          -2.43552
+        ],
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "radius": 0.0944
+      },
+      "runtimeSide": "starboard"
+    },
+    {
+      "name": "Starboard central gun",
+      "kind": "gun",
+      "rawGLB": {
+        "position": [
+          0.258,
+          0.323,
+          -0.041
+        ],
+        "physicalMouth": [
+          0.255,
+          0.323,
+          -0.041
+        ],
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "radius": 0.01
+      },
+      "runtimePlayer": {
+        "position": [
+          -0.24190000000000003,
+          1.9057000000000002,
+          -1.5222000000000002
+        ],
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "radius": 0.059000000000000004
+      },
+      "runtimeNpc": {
+        "position": [
+          -0.38704,
+          3.04912,
+          -2.43552
+        ],
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "radius": 0.0944
+      },
+      "runtimeSide": "port"
+    }
+  ],
+  "launchers": [
+    {
+      "name": "Port shoulder rocket launcher",
+      "kind": "launcher",
+      "rawGLB": {
+        "position": [
+          0.448,
+          0.113,
+          0.356
+        ],
+        "physicalMouth": [
+          0.446,
+          0.113,
+          0.356
+        ],
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "radius": 0.0125,
+        "cellCenters": [
+          [
+            0.448,
+            0.113,
+            0.377
+          ],
+          [
+            0.448,
+            0.113,
+            0.33499999999999996
+          ]
+        ]
+      },
+      "runtimePlayer": {
+        "position": [
+          2.1004,
+          0.6667000000000001,
+          -2.6432
+        ],
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "radius": 0.07375000000000001,
+        "cellCenters": [
+          [
+            2.2243,
+            0.6667000000000001,
+            -2.6432
+          ],
+          [
+            1.9765,
+            0.6667000000000001,
+            -2.6432
+          ]
+        ]
+      },
+      "runtimeNpc": {
+        "position": [
+          3.3606399999999996,
+          1.06672,
+          -4.22912
+        ],
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "radius": 0.118,
+        "cellCenters": [
+          [
+            3.55888,
+            1.06672,
+            -4.22912
+          ],
+          [
+            3.1623999999999994,
+            1.06672,
+            -4.22912
+          ]
+        ]
+      },
+      "runtimeSide": "starboard"
+    },
+    {
+      "name": "Starboard shoulder rocket launcher",
+      "kind": "launcher",
+      "rawGLB": {
+        "position": [
+          0.448,
+          0.113,
+          -0.356
+        ],
+        "physicalMouth": [
+          0.446,
+          0.113,
+          -0.356
+        ],
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "radius": 0.0125,
+        "cellCenters": [
+          [
+            0.448,
+            0.113,
+            -0.33499999999999996
+          ],
+          [
+            0.448,
+            0.113,
+            -0.377
+          ]
+        ]
+      },
+      "runtimePlayer": {
+        "position": [
+          -2.1004,
+          0.6667000000000001,
+          -2.6432
+        ],
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "radius": 0.07375000000000001,
+        "cellCenters": [
+          [
+            -1.9765,
+            0.6667000000000001,
+            -2.6432
+          ],
+          [
+            -2.2243,
+            0.6667000000000001,
+            -2.6432
+          ]
+        ]
+      },
+      "runtimeNpc": {
+        "position": [
+          -3.3606399999999996,
+          1.06672,
+          -4.22912
+        ],
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "radius": 0.118,
+        "cellCenters": [
+          [
+            -3.1623999999999994,
+            1.06672,
+            -4.22912
+          ],
+          [
+            -3.55888,
+            1.06672,
+            -4.22912
+          ]
+        ]
+      },
+      "runtimeSide": "port"
+    },
+    {
+      "name": "Rooftop reserve rocket launcher",
+      "kind": "launcher",
+      "rawGLB": {
+        "position": [
+          0.022,
+          0.502,
+          0
+        ],
+        "physicalMouth": [
+          0.018,
+          0.502,
+          0
+        ],
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "radius": 0.01,
+        "cellCenters": [
+          [
+            0.022,
+            0.502,
+            0.032
+          ],
+          [
+            0.022,
+            0.502,
+            -0.032
+          ]
+        ]
+      },
+      "runtimePlayer": {
+        "position": [
+          0,
+          2.9618,
+          -0.1298
+        ],
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "radius": 0.059000000000000004,
+        "cellCenters": [
+          [
+            0.18880000000000002,
+            2.9618,
+            -0.1298
+          ],
+          [
+            -0.18880000000000002,
+            2.9618,
+            -0.1298
+          ]
+        ]
+      },
+      "runtimeNpc": {
+        "position": [
+          0,
+          4.73888,
+          -0.20767999999999998
+        ],
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "radius": 0.0944,
+        "cellCenters": [
+          [
+            0.30208,
+            4.73888,
+            -0.20767999999999998
+          ],
+          [
+            -0.30208,
+            4.73888,
+            -0.20767999999999998
+          ]
+        ]
+      },
+      "runtimeSide": "center"
+    }
+  ],
+  "turrets": {
+    "action": "Fit the two S side turrets on the rear wall, behind the large intake panels and ahead of the drive housings. Preserve the equipped weapon types.",
+    "previewDefaultOn": true,
+    "previewKind": "laser",
+    "previewYaw": 0,
+    "currentNormalizedPositions": [
+      [
+        -0.7875240225953541,
+        -0.20082902499303465,
+        0.10015022639020299
+      ],
+      [
+        0.7875240225953541,
+        -0.20082902499303465,
+        0.10015022639020299
+      ]
+    ],
+    "recommendedOriginBasedHullHalfExtentsPlayer": [
+      4.779000014066696,
+      3.17419992685318,
+      5.941299819946289
+    ],
+    "mounts": [
+      {
+        "name": "PORT TURRET",
+        "type": "existing laser or PDC factory; retain equipped type",
+        "size": "S",
+        "axis": 0,
+        "side": -1,
+        "normal": [
+          -1,
+          0,
+          0
+        ],
+        "hullHalfLength": 5.9,
+        "pedestal": 0,
+        "forwardCone": 10,
+        "rawGLB": {
+          "pivot": [
+            -0.405,
+            -0.08,
+            -0.6068341398544966
+          ],
+          "deck": [
+            -0.405,
+            -0.08,
+            -0.5061341429062545
+          ],
+          "normal": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "runtimePlayer": {
+          "pivot": [
+            -3.5803214251415305,
+            -0.47200000000000003,
+            2.3895000000000004
+          ],
+          "deck": [
+            -2.9861914431469017,
+            -0.47200000000000003,
+            2.3895000000000004
+          ],
+          "turretScale": 1.0069999694824219,
+          "baseRadius": 0.4833599853515625,
+          "normal": [
+            -1,
+            0,
+            0
+          ]
+        },
+        "runtimeNpc": {
+          "pivot": [
+            -5.728514280226449,
+            -0.7552000000000001,
+            3.823200000000001
+          ],
+          "deck": [
+            -4.777906309035043,
+            -0.7552000000000001,
+            3.823200000000001
+          ],
+          "turretScale": 1.611199951171875,
+          "normal": [
+            -1,
+            0,
+            0
+          ]
+        },
+        "normalizedLayoutPosition": [
+          -0.7491779482324905,
+          -0.1486988881850075,
+          0.40218471923903043
+        ],
+        "verification": {
+          "capSamples": 385,
+          "allCapSamplesBacked": true,
+          "minimumEmbeddingPlayerUnits": 0.008055999755859375,
+          "maximumEmbeddingPlayerUnits": 0.23110878885782984,
+          "deckDepthSpanTurretUnits": 0.221502279902367,
+          "muzzleChecks": [
+            {
+              "directionRuntimePlayer": [
+                -1,
+                0,
+                0
+              ],
+              "positionRuntimePlayer": [
+                -4.4060614001171166,
+                -0.47200000000000003,
+                2.3895000000000004
+              ],
+              "hitRawGLBDistance": null,
+              "passed": true
+            },
+            {
+              "directionRuntimePlayer": [
+                -0.08715574274765817,
+                0,
+                -0.9961946980917455
+              ],
+              "positionRuntimePlayer": [
+                -3.65228940597696,
+                -0.47200000000000003,
+                1.5669022149269112
+              ],
+              "hitRawGLBDistance": null,
+              "passed": true
+            },
+            {
+              "directionRuntimePlayer": [
+                -0.17364817766693033,
+                0,
+                -0.984807753012208
+              ],
+              "positionRuntimePlayer": [
+                -3.723709667022778,
+                -0.47200000000000003,
+                1.5763048706719367
+              ],
+              "hitRawGLBDistance": null,
+              "passed": true
+            },
+            {
+              "directionRuntimePlayer": [
+                -0.3420201433256687,
+                0,
+                -0.9396926207859084
+              ],
+              "positionRuntimePlayer": [
+                -3.8627411297324143,
+                -0.47200000000000003,
+                1.6135582388275016
+              ],
+              "hitRawGLBDistance": null,
+              "passed": true
+            },
+            {
+              "directionRuntimePlayer": [
+                -0.7071067811865475,
+                0,
+                -0.7071067811865476
+              ],
+              "positionRuntimePlayer": [
+                -4.164207760943578,
+                -0.47200000000000003,
+                1.8056136641979534
+              ],
+              "hitRawGLBDistance": null,
+              "passed": true
+            }
+          ]
+        }
+      },
+      {
+        "name": "STARBOARD TURRET",
+        "type": "existing laser or PDC factory; retain equipped type",
+        "size": "S",
+        "axis": 0,
+        "side": 1,
+        "normal": [
+          1,
+          0,
+          0
+        ],
+        "hullHalfLength": 5.9,
+        "pedestal": 0,
+        "forwardCone": 10,
+        "rawGLB": {
+          "pivot": [
+            -0.405,
+            -0.08,
+            0.6068341398544966
+          ],
+          "deck": [
+            -0.405,
+            -0.08,
+            0.5061341429062545
+          ],
+          "normal": [
+            0,
+            0,
+            1
+          ]
+        },
+        "runtimePlayer": {
+          "pivot": [
+            3.5803214251415305,
+            -0.47200000000000003,
+            2.3895000000000004
+          ],
+          "deck": [
+            2.9861914431469017,
+            -0.47200000000000003,
+            2.3895000000000004
+          ],
+          "turretScale": 1.0069999694824219,
+          "baseRadius": 0.4833599853515625,
+          "normal": [
+            1,
+            0,
+            0
+          ]
+        },
+        "runtimeNpc": {
+          "pivot": [
+            5.728514280226449,
+            -0.7552000000000001,
+            3.823200000000001
+          ],
+          "deck": [
+            4.777906309035043,
+            -0.7552000000000001,
+            3.823200000000001
+          ],
+          "turretScale": 1.611199951171875,
+          "normal": [
+            1,
+            0,
+            0
+          ]
+        },
+        "normalizedLayoutPosition": [
+          0.7491779482324905,
+          -0.1486988881850075,
+          0.40218471923903043
+        ],
+        "verification": {
+          "capSamples": 385,
+          "allCapSamplesBacked": true,
+          "minimumEmbeddingPlayerUnits": 0.008055999755859375,
+          "maximumEmbeddingPlayerUnits": 0.23110878885782274,
+          "deckDepthSpanTurretUnits": 0.22150227990235996,
+          "muzzleChecks": [
+            {
+              "directionRuntimePlayer": [
+                1,
+                0,
+                0
+              ],
+              "positionRuntimePlayer": [
+                4.4060614001171166,
+                -0.47200000000000003,
+                2.3895000000000004
+              ],
+              "hitRawGLBDistance": null,
+              "passed": true
+            },
+            {
+              "directionRuntimePlayer": [
+                0.08715574274765817,
+                0,
+                -0.9961946980917455
+              ],
+              "positionRuntimePlayer": [
+                3.65228940597696,
+                -0.47200000000000003,
+                1.5669022149269112
+              ],
+              "hitRawGLBDistance": null,
+              "passed": true
+            },
+            {
+              "directionRuntimePlayer": [
+                0.17364817766693033,
+                0,
+                -0.984807753012208
+              ],
+              "positionRuntimePlayer": [
+                3.723709667022778,
+                -0.47200000000000003,
+                1.5763048706719367
+              ],
+              "hitRawGLBDistance": null,
+              "passed": true
+            },
+            {
+              "directionRuntimePlayer": [
+                0.3420201433256687,
+                0,
+                -0.9396926207859084
+              ],
+              "positionRuntimePlayer": [
+                3.8627411297324143,
+                -0.47200000000000003,
+                1.6135582388275016
+              ],
+              "hitRawGLBDistance": null,
+              "passed": true
+            },
+            {
+              "directionRuntimePlayer": [
+                0.7071067811865475,
+                0,
+                -0.7071067811865476
+              ],
+              "positionRuntimePlayer": [
+                4.164207760943578,
+                -0.47200000000000003,
+                1.8056136641979534
+              ],
+              "hitRawGLBDistance": null,
+              "passed": true
+            }
+          ]
+        }
+      }
+    ],
+    "factory": "/src/game/turretModels.js:createTurretModel",
+    "paint": "/src/game/turretModels.js:paintFrigateTurret with the actual concord-frigate.glb armor material in the local demonstration",
+    "paintNote": "Shared turret UV tiles match the frigate atlas. Do not apply the Vanguard atlas without a ship-specific UV tile mapping; the local preview reuses actual frigate paint.",
+    "calibration": "Normalize each recommended pivot by the recommended hullHalfExtents. The turret size multiplier is extentZ/hullHalfLength; NPC adds the existing 1.6 scale."
+  },
+  "boundsBlender": {
+    "min": [
+      -0.9940000176429749,
+      -0.8100000023841858,
+      -0.515999972820282
+    ],
+    "max": [
+      1.0069999694824219,
+      0.8100000023841858,
+      0.5379999876022339
+    ]
+  },
+  "boundsRawGLB": {
+    "min": [
+      -0.9940000176429749,
+      -0.515999972820282,
+      -0.8100000023841858
+    ],
+    "max": [
+      1.0069999694824219,
+      0.5379999876022339,
+      0.8100000023841858
+    ]
+  },
+  "boundsRuntimePlayer": {
+    "min": [
+      -4.779000014066696,
+      -3.044399839639664,
+      -5.941299819946289
+    ],
+    "max": [
+      4.779000014066696,
+      3.17419992685318,
+      5.864600104093552
+    ]
+  },
+  "boundsRuntimeNpc": {
+    "min": [
+      -7.646400022506714,
+      -4.871039743423462,
+      -9.506079711914062
+    ],
+    "max": [
+      7.646400022506714,
+      5.078719882965087,
+      9.383360166549682
+    ]
+  },
+  "integrationActions": [
+    "Use the two central bridge-front gun sockets and the two shoulder launcher groups plus rooftop reserve group. For physical launch-cell visuals use the per-cell centers.",
+    "Use all four measured drive mouths with their new centers, axes and elliptical radii.",
+    "Keep the two S turret slots, existing prices, roles, equipped turret types and loadout counts.",
+    "Update Vanguard HULL_FLIGHT_STATS.hullHalfExtents to the measured origin-based extents, then install the two measured normalized turret pivots. Keep both S slots and existing turret types."
+  ],
+  "conceptReconstructionLimits": "Only the visible concept view is specified. Reverse and underside geometry is inferred with manufactured symmetry. The rooftop reserve outlet preserves the existing third launcher group.",
+  "candidateSHA256": "788dcb673e649fabcd52d8cc3c6fd6bd8720344c83db1a41321fa47608d99119",
+  "recommendedCollisionHalfExtentsPlayer": [
+    4.779000014066696,
+    3.17419992685318,
+    5.941299819946289
+  ],
+  "recommendedCollisionHalfExtentsNpc": [
+    7.646400022506715,
+    5.078719882965089,
+    9.506079711914063
+  ],
+  "boundsDeltas": {
+    "from": "immutable frozen input/current.glb",
+    "runtimePlayerSize": [
+      0,
+      0.2338535487651825,
+      0.04424995779991292
+    ],
+    "runtimeNpcSize": [
+      0,
+      0.374165678024292,
+      0.07079993247986067
+    ],
+    "rawWidth": 0,
+    "rawHeight": 0.039636194705963135,
+    "rawLength": 0.007499992847442867,
+    "lengthPercent": 0.37622236613847426,
+    "startingOriginBasedHullHalfExtentsPlayer": [
+      4.779000014066696,
+      3.040646141767502,
+      5.891149938106537
+    ]
+  },
+  "collisionImplications": "The latest user request authorizes concept-based geometry. The original pivot, player/NPC scales and maximum fin span remain. The deeper nose, thinner drooped fins, raised antenna/roof head and flared shoulder ledges change the local envelope. Apply the measured origin-based half extents and updated turret pivots together; inspect any mesh-specific collision proxy during shared integration. Exact extent/size deltas from the frozen input are supplied.",
+  "refinement": {
+    "request": "Reverse your side intake change, I meant the one in the green circle. Look at the reference image. Also rocket launchers (red circle) still clips into the hull. Look at the reference image and get that shape right.",
+    "approvedCandidateSHA256": "4fe7b34a72747a5f39dcbb26becc40ac320488c88a63c83441953ebc011e7944",
+    "approvedNativeSHA256": "df61af1cff587dc18d22c9c6a21bb86ce4785149d427a9c816dc69e82cb27f88",
+    "preservedShapes": 64,
+    "changedShapes": 8,
+    "addedCradles": 2,
+    "restoredSmallVents": 14,
+    "overallBoundsUnchanged": true,
+    "glow": {
+      "exportedEmissiveCores": 4,
+      "previewDefaultOn": true
+    },
+    "rocketModules": "Grey chamfered housings on compact fitted black cradles, with stepped projecting collars; use the updated measured per-cell centers.",
+    "sideIntakes": "Two large rectangular side assemblies corresponding to the green circle, with thick walls, grey chamfered frames and recessed dark center panels.",
+    "launcherHullClearance": [
+      {
+        "part": "Port low armored two-cell shoulder rocket launcher",
+        "sampleCount": 16016,
+        "minimumVerticalHullClearance": 0.012034669518470764,
+        "passed": true
+      },
+      {
+        "part": "Port rocket cell 1 recessed machined bezel",
+        "sampleCount": 7280,
+        "minimumVerticalHullClearance": 0.05725342780351639,
+        "passed": true
+      },
+      {
+        "part": "Port rocket cell 2 recessed machined bezel",
+        "sampleCount": 7280,
+        "minimumVerticalHullClearance": 0.04416198283433914,
+        "passed": true
+      },
+      {
+        "part": "Starboard low armored two-cell shoulder rocket launcher",
+        "sampleCount": 16016,
+        "minimumVerticalHullClearance": 0.012469068169593811,
+        "passed": true
+      },
+      {
+        "part": "Starboard rocket cell 1 recessed machined bezel",
+        "sampleCount": 7280,
+        "minimumVerticalHullClearance": 0.04416198283433914,
+        "passed": true
+      },
+      {
+        "part": "Starboard rocket cell 2 recessed machined bezel",
+        "sampleCount": 7280,
+        "minimumVerticalHullClearance": 0.05725342780351639,
+        "passed": true
+      }
+    ]
+  },
+  "sideTurretAddition": {
+    "request": "add the fitting turrets on the sides",
+    "count": 2,
+    "size": "S",
+    "previewKind": "laser",
+    "defaultOn": true,
+    "placement": "Rear side wall behind each large rectangular intake and ahead of the drive housing.",
+    "restingPose": "Forward-facing; yaw zero.",
+    "hullSHA256Unchanged": "788dcb673e649fabcd52d8cc3c6fd6bd8720344c83db1a41321fa47608d99119",
+    "movingHeadAndGunSurfaceSamples": 18592,
+    "clippingSamples": 0,
+    "completeGLB": "docs/ship-revisions/20261002/vanguard/vanguard-equipped.glb",
+    "completeGLBSHA256": "89ee70970ae3c7562b1b04dbda23b1ef07d22531337b34f599ba38ab69f1db2d",
+    "completeNative": "docs/ship-revisions/20261002/vanguard/vanguard-equipped.blend",
+    "completeNativeSHA256": "efd9b4594154afe90ee49c2734bff053111ca010cc31ae9e9bdc6b89a381b5d0",
+    "separateAttachmentsGLB": "docs/ship-revisions/20261002/vanguard/side-turrets.glb",
+    "integration": "Use the gameplay hull and two existing articulated factory turrets at the measured mounts. The complete GLB is a portable assembled model; avoid adding duplicate runtime turrets to it."
+  }
+}
