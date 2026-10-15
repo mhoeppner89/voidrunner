@@ -10,7 +10,7 @@ import {getEffectiveShipStats} from './shipStats.js';
 import {cargoFree} from './economy.js';
 import {hasSystem} from './galaxy.js';
 import {COMMODITIES} from './data.js';
-import {createDroneUnit,DRONE_TYPES} from './droneData.js';
+import {createDroneUnit,DRONE_TYPES,canonicalDroneType} from './droneData.js';
 export function equipCareerItems(session,ship){
  if(session.arena||ship.capitalClass||ship.equipmentRecords)return;
  const fit=ship.combatFit;if(!fit)return;
@@ -113,9 +113,9 @@ export function normalizeCareerLoot(world, player) {
     if(!Object.hasOwn(COMMODITIES,entry.commodity)||!Number.isFinite(entry.quantity)||entry.quantity<1)continue;
     entry.quantity=Math.min(100000,Math.floor(entry.quantity));
    } else if(entry.kind==='drone') {
+    entry.type=canonicalDroneType(entry.type);
     if(!Object.hasOwn(DRONE_TYPES,entry.type))continue;
     entry.hull=Math.max(1,Math.min(DRONE_TYPES[entry.type].maxHull,Number(entry.hull)||DRONE_TYPES[entry.type].maxHull));
-    if(entry.ammo!=null)entry.ammo=Math.max(0,Math.min(DRONE_TYPES[entry.type].magazineCapacity??0,Math.floor(Number(entry.ammo)||0)));
    } else continue;
    used.add(entry.id);contents.push(entry);
   }
@@ -125,8 +125,9 @@ export function normalizeCareerLoot(world, player) {
  if(world.combatWrecks)world.combatWrecks=wrecks;
  const orphans={};
  for(const [id,raw] of Object.entries(world.orphanDrones??{})) {
+  if(raw)raw.type=canonicalDroneType(raw.type);
   if(!raw||raw.id!==id||!Object.hasOwn(DRONE_TYPES,raw.type)||!hasSystem(raw.systemId)||!tuple(raw.position,3)||!(raw.hull>0)||player.droneFleet?.unitsById?.[id])continue;
-  orphans[id]={...raw,hull:Math.min(DRONE_TYPES[raw.type].maxHull,raw.hull),velocity:tuple(raw.velocity,3)?raw.velocity:[0,0,0],rotation:tuple(raw.rotation,4)&&Math.hypot(...raw.rotation)>.001?raw.rotation:[0,0,0,1],ammo:Math.max(0,Math.min(DRONE_TYPES[raw.type].magazineCapacity??0,Number(raw.ammo)||0))};
+  orphans[id]={...raw,hull:Math.min(DRONE_TYPES[raw.type].maxHull,raw.hull),velocity:tuple(raw.velocity,3)?raw.velocity:[0,0,0],rotation:tuple(raw.rotation,4)&&Math.hypot(...raw.rotation)>.001?raw.rotation:[0,0,0,1]};
  }
  if(world.orphanDrones)world.orphanDrones=orphans;
  world.lootShipCounter=Number.isFinite(Number(world.lootShipCounter))?Math.max(0,Math.floor(Number(world.lootShipCounter))):0;

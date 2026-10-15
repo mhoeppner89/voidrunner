@@ -32,7 +32,7 @@ const OBSERVER_FITS = Object.freeze({
     beam: Object.freeze({ guns: ['beam-emitter', 'beam-emitter', 'beam-emitter'], turret: 'tracking-turret', launcher: 'seeker-launcher', power: 'sustained-reactor' }),
 });
 // Industrial combat doctrine reflects each ship's job and its crew: the
-// Wayfarer flies one attack drone, the Atlas keeps two regulation PDC escorts,
+// Wayfarer flies one PDC drone, the Atlas keeps two regulation PDC escorts,
 // and the Prospector mans one of its three bays with a PDC — like the Atlas's
 // manned turrets, a civilian crew crews what it can afford to lose. A stock NPC
 // hauler's anti-fighter power is set by this list, and it is the strongest
@@ -40,7 +40,7 @@ const OBSERVER_FITS = Object.freeze({
 // beat both tier-1 combat hulls 7/8, one drone leaves the pair roughly even
 // (measured by .freebuff/balance/main-loadouts.mjs).
 const NPC_DRONE_DEFAULTS = Object.freeze({
-    wayfarer: Object.freeze(['attack']),
+    wayfarer: Object.freeze(['pdc']),
     prospector: Object.freeze(['pdc']),
     atlas: Object.freeze(['pdc', 'pdc']),
 });

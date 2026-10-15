@@ -1,3 +1,4 @@
+import {GameUI} from '../../src/game/ui.js';
 import assert from 'node:assert/strict';
 import {registerHooks} from 'node:module';
 import {test} from 'node:test';
@@ -28,9 +29,10 @@ test('German variables, radio entries and the labels used in lessons remain cons
     assert.equal(t('Gauss Cannon').toUpperCase(),t('MAGRAIL'));
     assert.equal(t('Pulse Cannon').toUpperCase(),t('PULSE LASER'));
     assert.equal(t('DOCKYARD OUTFITTER'),t('SHIP OUTFITTING'));
-    assert.ok(ADVENTURE_DIALOGUES.outfitting.nodes.fit.text.de.includes(t('INSTALL FROM LOCKER')));
-    assert.ok(ADVENTURE_DIALOGUES.services.nodes.resources.text.de.includes(t('SERVICES')));
-    assert.ok(ADVENTURE_DIALOGUES.salvage.nodes.request.text.de.includes(t('SALVAGE')+' gedrückt'));
+    assert.equal(GameUI.prototype.missionBadge({kind:'mining'}),'ABBAU');
+    assert.ok(ADVENTURE_DIALOGUES.salvage.nodes.risk.text.de.includes('PDC'));
+    assert.ok(t('Deploy your miners: tap MINE, or press M on desktop.').includes(t('MINE')));
+    assert.ok(ADVENTURE_DIALOGUES.salvage.nodes.payment.text.de.includes(t('SALVAGE')));
     assert.doesNotMatch(JSON.stringify(ADVENTURE_DIALOGUES),/Hundekampfarena|Langbasis-Radar|BERGUNG gedrückt|Impulswaffe/);
 });
 

@@ -1,8 +1,8 @@
-// The title screen is deliberately cheap to install. Optional art, models,
+// The title and first room are deliberately small to install. Other art, models,
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v417-0-8-2fz-pulse-tiers';
+const CACHE = 'voidrunner-v433-0-8-2gp-mining-transition';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -45,6 +45,7 @@ const CORE_ASSETS = [
   './src/game/sampleSfx.js',
   './src/game/sampleSfxManifest.js',
   './src/game/repairSites.js',
+  './src/game/repairDrones.js',
   './src/game/capitalCombat.js',
   './src/game/npcDrones.js',
   './src/game/frigateMounts.js',
@@ -127,11 +128,21 @@ const CORE_ASSETS = [
   './src/game/shipStats.js',
   './src/game/shipTrade.js',
   './src/game/tutorialCampaign.js',
+  './src/game/tutorialText.js',
+  './src/game/tutorialRuntime.js',
   './src/game/ui.js',
   './src/game/canvasSizeCache.js',
   './src/game/weapons.js',
   './art/title-cockpit.webp',
   './assets/remaster/cockpit-wayfarer-sprite.png',
+  // A new career must have its actual first-room artwork when offline,
+  // rather than only a cached shell with broken image placeholders.
+  './art/locations/simplified/helix-hd-v1.webp',
+  './art/locations/simplified/bar-helix-hd-v1.webp',
+  './art/locations/simplified/market-helix-hd-v1.webp',
+  './art/portraits/simplified/mara-vek-hd-v2.webp',
+  './art/portraits/simplified/rin-vek-hd-v1.webp',
+  './assets/remaster/landed-flat/wayfarer.webp',
 ];
 
 // Cache core files independently. A transient failure for one request must
@@ -142,7 +153,7 @@ const cacheCoreAssets = async () => {
   await Promise.all(CORE_ASSETS.map(async (asset) => {
     try {
       const response = await fetch(asset, { cache: 'no-cache' });
-      if (response.ok)
+      if (response.ok && !(isArtAsset({ url: new URL(asset, self.location.href).href }) && isHtmlResponse(response)))
         await cache.put(asset, response);
     }
     catch {
@@ -173,12 +184,16 @@ self.addEventListener('activate', (event) => {
 const IMMUTABLE_ART = /\.(?:png|jpe?g|webp|gif|svg|avif|ico|woff2?|ttf|otf|glb)$/i;
 const isSameOrigin = (request) => new URL(request.url).origin === self.location.origin;
 const isArtAsset = (request) => IMMUTABLE_ART.test(new URL(request.url).pathname);
+// Some static hosts return their HTML entry page with status 200 for missing
+// assets. Such a response cannot be decoded as art and must not become an
+// authoritative cache hit for the rest of the release.
+const isHtmlResponse = (response) => /\b(?:text\/html|application\/xhtml\+xml)\b/i.test(response.headers.get('content-type') ?? '');
 
 // Return the response immediately while exposing the cache-write promise
 // separately. Fetch handlers register that promise with waitUntil(), so the
 // worker cannot be terminated between serving a response and persisting it.
 const cacheResponse = (request, response) => {
-  if (!response || !response.ok)
+  if (!response || !response.ok || (isArtAsset(request) && isHtmlResponse(response)))
     return { response, persistence: Promise.resolve() };
   try {
     const copy = response.clone();
@@ -210,12 +225,29 @@ const fetchAndCache = (request) => {
 };
 
 const offlineFallback = async (request) => {
-  const cache = await caches.open(CACHE);
-  const cached = await cache.match(request);
-  if (cached)
-    return cached;
-  if (request.mode === 'navigate')
-    return (await cache.match('./index.html')) ?? (await cache.match('./')) ?? Response.error();
+  try {
+    const cache = await caches.open(CACHE);
+    const cached = await cache.match(request);
+    if (cached)
+      return cached;
+    // The game is not an SPA with arbitrary URL routes. Serving index.html
+    // at /output/... made report links open an old game with relative asset
+    // URLs under /output/... instead of the actual report.
+    const scope = new URL('./', self.location.href);
+    const path = new URL(request.url).pathname;
+    const gameEntry = [scope.pathname, `${scope.pathname}index.html`, `${scope.pathname}game.html`].includes(path);
+    if (request.mode === 'navigate' && gameEntry) {
+      const shell = (await cache.match('./index.html')) ?? (await cache.match('./'));
+      if (shell) return shell;
+    }
+  }
+  catch { /* Storage failure must still produce an honest offline page. */ }
+  if (request.mode === 'navigate') {
+    return new Response(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Page unavailable offline</title><style>body{margin:10vh auto;padding:24px;max-width:540px;background:#081322;color:#e9f0f3;font:18px/1.5 system-ui}button{padding:12px 20px;font:inherit;cursor:pointer}</style><h1>Page unavailable offline</h1><p>This page has not been saved for offline use. Reconnect or restart the local preview server, then reload.</p><button onclick="location.reload()">Reload</button></html>`, {
+      status: 503,
+      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+    });
+  }
   return Response.error();
 };
 
@@ -225,7 +257,7 @@ const cacheFirst = (request) => {
     try {
       const cache = await caches.open(CACHE);
       const cached = await cache.match(request);
-      if (cached)
+      if (cached && cached.ok && !isHtmlResponse(cached))
         return cached;
     }
     catch {

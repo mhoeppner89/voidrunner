@@ -12,22 +12,20 @@ export const DRONE_BAY_LAYOUTS = freeze({
 });
 export const droneBayLayoutFor = (shipId) => Object.hasOwn(DRONE_BAY_LAYOUTS, shipId)
     ? DRONE_BAY_LAYOUTS[shipId] : emptyBays;
-export const DRONE_BAY_CAPACITY = freeze({ mining: 2, pdc: 1, repair: 1, attack: 1 });
-export const DRONE_FLEET_VERSION = 1;
+export const DRONE_BAY_CAPACITY = freeze({ mining: 2, pdc: 1, repair: 1 });
+export const DRONE_FLEET_VERSION = 2;
+// The retired attack role keeps owned units and bay assignments when loading saves.
+export const canonicalDroneType = type => type === 'attack' ? 'pdc' : type;
 // Provisional tuning from the approved 0.8.2 addendum, in simulation units.
 export const DRONE_TYPES = freeze({
     repair: freeze({ maxHull: 25, collisionRadius: 0.65, cruiseSpeed: 160,
         acceleration: 160, payloadUnits: 0, replacementPrice: 900, repairRate: 3, energyPerHull: 2 }),
-    attack: freeze({ maxHull: 35, collisionRadius: 0.75, cruiseSpeed: 190,
-        acceleration: 160, payloadUnits: 0, replacementPrice: 1800,
-        magazineCapacity: 180, shotInterval: 0.65, projectileSpeed: 400,
-        attackRange: 220, interceptRange: 0, roundPrice: 2, tetherRange: 450 }),
     mining: freeze({ maxHull: 20, collisionRadius: 0.5, cruiseSpeed: 120,
         acceleration: 120, payloadUnits: 1, cutSecondsPerUnit: 2.4, replacementPrice: 250 }),
     pdc: freeze({ maxHull: 40, collisionRadius: 0.75, cruiseSpeed: 160,
         acceleration: 160, payloadUnits: 0, replacementPrice: 1500,
-        escortDistance: 15, escortOrbitSeconds: 12, magazineCapacity: 120, shotInterval: 0.4,
-        projectileSpeed: 500, interceptRange: 300, attackRange: 300, roundPrice: 2 }),
+        escortDistance: 15, escortOrbitSeconds: 12, shotInterval: 0.4,
+        projectileSpeed: 500, interceptRange: 300, attackRange: 300 }),
 });
 export const DRONE_RULES = freeze({ operatingRange: 100, recallSeconds: 15,
     steeringHz: 10, repairPricePerHull: 5 });
@@ -43,14 +41,15 @@ export const normalizeDroneBays = (shipId, source) => {
     const seen = new Set();
     return droneBayLayoutFor(shipId).map(({ bayId }, index) => {
         const raw = values[index];
-        const mode = validMode(raw?.mode) && (raw.mode !== 'mining' || canMineWithHull(shipId)) ? raw.mode : canMineWithHull(shipId) ? 'mining' : 'pdc';
+        const rawMode = canonicalDroneType(raw?.mode), pending = canonicalDroneType(raw?.pendingMode);
+        const mode = validMode(rawMode) && (rawMode !== 'mining' || canMineWithHull(shipId)) ? rawMode : canMineWithHull(shipId) ? 'mining' : 'pdc';
         const unitIds = Array.from({ length: DRONE_BAY_CAPACITY[mode] }, (_, position) => {
             const id = Array.isArray(raw?.unitIds) ? unitId(raw.unitIds[position]) : null;
-            if (!id || seen.has(id) || raw?.bayId !== bayId || raw?.mode !== mode) return null;
+            if (!id || seen.has(id) || raw?.bayId !== bayId || rawMode !== mode) return null;
             seen.add(id);
             return id;
         });
-        return { bayId, mode, unitIds, ...(validMode(raw?.pendingMode) && (raw.pendingMode !== 'mining' || canMineWithHull(shipId)) ? {pendingMode: raw.pendingMode} : {}) };
+        return { bayId, mode, unitIds, ...(validMode(pending) && (pending !== 'mining' || canMineWithHull(shipId)) ? {pendingMode: pending} : {}) };
     });
 };
 export const createDefaultDroneBays = (shipId) => normalizeDroneBays(shipId);
@@ -86,7 +85,6 @@ export const createDroneUnit = (id, type = 'mining') => {
     if (!unitId(id) || !Object.hasOwn(DRONE_TYPES, type)) throw new TypeError('Invalid drone identity or type.');
     const definition = DRONE_TYPES[type];
     return { id, type, hull: definition.maxHull,
-        ...(definition.magazineCapacity ? { ammo: definition.magazineCapacity } : {}),
         state: 'stowed', position: null, velocity: null, rotation: null,
         phaseTime: 0, recallTime: 0, fireCooldown: 0, job: null, payload: null };
 };
@@ -110,11 +108,17 @@ export const normalizeDroneFleet = (candidate, loadouts = {}, { grantInitial = f
     fleet.version = DRONE_FLEET_VERSION;
     fleet.nextUnitId = counter(fleet.nextUnitId);
     fleet.nextPacketId = counter(fleet.nextPacketId);
+    for (const unit of Object.values(isRecord(fleet.unitsById) ? fleet.unitsById : {})) {
+        if (!isRecord(unit) || canonicalDroneType(unit.type) === unit.type) continue;
+        unit.type = 'pdc';
+        unit.hull = Math.min(DRONE_TYPES.pdc.maxHull, unit.hull);
+        for (const key of Object.keys(unit)) if (key.startsWith('repair')) delete unit[key];
+    }
     fleet.unitsById = Object.fromEntries(Object.entries(isRecord(fleet.unitsById) ? fleet.unitsById : {})
         .filter(([id, unit]) => unitId(id) && isRecord(unit) && unit.id === id
             && Object.hasOwn(DRONE_TYPES, unit.type) && Number.isFinite(unit.hull) && unit.hull > 0));
     fleet.controller = { ...createDroneFleet().controller, ...(isRecord(fleet.controller) ? fleet.controller : {}) };
-    fleet.pdcPolicy = fleet.pdcPolicy === 'stow' ? 'stow' : 'defend';
+    fleet.pdcPolicy = 'defend';
     fleet.migrationGrants = { ...(isRecord(fleet.migrationGrants) ? fleet.migrationGrants : {}), initialComplement: true };
     // Counters never reuse surviving identities, including payload packets.
     const advance = (id, prefix, key) => {

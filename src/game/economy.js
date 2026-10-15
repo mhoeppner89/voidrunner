@@ -1,3 +1,4 @@
+import {tutorialTradePrice} from './tutorialCampaign.js';
 import {equipmentRecord} from './equipmentCatalog.js';
 import { COMMODITIES, LOCATIONS, MARKET_LOCATION_IDS, commodityIds } from './data.js';
 import { clamp, randomBetween, seededRandom } from './random.js';
@@ -274,7 +275,7 @@ export const quoteCommodityTrade = (save, locationId, commodityId, kind, request
     const player = save?.player;
     if (!item || !commodity || !player || !finitePositive(commodity.mass))
         return emptyTradeQuote(save, locationId, commodityId, kind, requestedQuantity, 0, TRADE_FAILURE_REASONS.INVALID_MARKET);
-    const priceValue = priceOverride ?? item.lastPrice;
+    const priceValue = tutorialTradePrice(save,locationId,commodityId) ?? priceOverride ?? item.lastPrice;
     const price = finiteNumber(priceValue);
     if (!finitePositive(price))
         return emptyTradeQuote(save, locationId, commodityId, kind, requestedQuantity, price, TRADE_FAILURE_REASONS.INVALID_MARKET);

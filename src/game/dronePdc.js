@@ -5,7 +5,7 @@ import { DRONE_TYPES } from './droneData.js';
 
 export const PDC_DRONE_STEP = 1 / 60;
 export const PDC_DRONE_STATES = Object.freeze(['stowed', 'escorting', 'returning', 'destroyed']);
-const supportType = type => type === 'pdc' || type === 'attack' || type === 'repair';
+const supportType = type => type === 'pdc' || type === 'repair';
 const ZERO = Object.freeze([0, 0, 0]);
 const vector = (v) => v != null && Number.isFinite(v[0])
     && Number.isFinite(v[1]) && Number.isFinite(v[2]);
@@ -120,9 +120,9 @@ function aim(unit, threat, direction) {
  * Refresh anchors each step (near owner/miners, usually TYPE.escortDistance).
  * Point velocity defaults to shipVelocity. Missing anchors prevent deployment
  * or pause movement; they never teleport a drone to a guessed ship centre.
- * inFlight=false, policy='stow', unequipping or empty ammo requests return to
+ * inFlight=false, policy='stow' or unequipping requests return to
  * the dock anchor. Keep supplying return anchors until state becomes stowed.
- * An empty unit stays stowed until external service replenishes canonical ammo.
+ * Drones need no ammunition; only cooldown and target eligibility limit fire.
  *
  * Shared shot reservations, REQUIRED: assignments = Map<threatId,
  * {defenderId, until}>. Mounted PDCs must consult/write this SAME map, using
@@ -140,17 +140,16 @@ function aim(unit, threat, direction) {
  * may remove the unit; do not replace it or mutate threats/other fleet units.
  *
  * Events: {type, code: type, ok:true, unitId, state, threatId:null, ammoSpent:0}.
- * deploy/recall/empty/destroyed are transitions; recall has stage 'begin' or
+ * deploy/recall/destroyed are transitions; recall has stage 'begin' or
  * 'stowed' and reason. fire adds threatId, start, direction, inheritedVelocity,
- * projectileSpeed, flightTime, predictedImpact, assignedUntil and ammoSpent:1.
+ * projectileSpeed, flightTime, predictedImpact, assignedUntil and ammoSpent:0.
  * Spawn physical rounds from fire events using speed + inherited velocity;
  * only game.js resolves actual hits. A reservation/fire NEVER removes, damages
  * or reports an interception of an enemy projectile. All event vectors are
  * copies, safe to retain. No per-threat sorting/vector allocations occur.
  * Unit processing uses stable lexical IDs; target order is earliest impact,
- * then lexical projectile ID. Health/ammo/cooldown/state survive normal JSON
- * saves. pdcEmptyReported is a serializable notification latch reset by service
- * ammo on the next update. Recreate this controller after loading a fleet.
+ * then lexical projectile ID. Health/cooldown/state survive normal JSON
+ * saves. Recreate this controller after loading a fleet.
  */
 export function createPdcDroneController() {
     const orderedIds = [];
@@ -197,17 +196,11 @@ export function createPdcDroneController() {
                 continue;
             }
             const TYPE = DRONE_TYPES[unit.type];
-            const hasAmmo = unit.type === 'repair' || Number.isSafeInteger(unit.ammo) && unit.ammo > 0;
-            if (hasAmmo) unit.pdcEmptyReported = false;
-            else if (!unit.pdcEmptyReported) {
-                unit.pdcEmptyReported = true;
-                events.push(event('empty', unit));
-            }
             unit.fireCooldown = Math.max(0, (Number.isFinite(unit.fireCooldown) ? unit.fireCooldown : 0) - dt);
             const anchors = context.getBayAnchors ? context.getBayAnchors(unit, context) : context.bayAnchors?.[id];
             const escort = context.getEscortAnchor ? context.getEscortAnchor(unit, context) : context.escortAnchors?.[id];
-            const defend = (unit.type !== 'pdc' || fleet.pdcPolicy === 'defend') && !unit.recallRequested && context.inFlight && equipped.has(id) && hasAmmo;
-            if (!defend) recall(unit, events, !hasAmmo ? 'empty' : !equipped.has(id) ? 'unequipped'
+            const defend = (unit.type !== 'pdc' || fleet.pdcPolicy === 'defend') && !unit.recallRequested && context.inFlight && equipped.has(id);
+            if (!defend) recall(unit, events, !equipped.has(id) ? 'unequipped'
                 : !context.inFlight ? 'flight-ended' : 'policy');
             if (unit.state === 'stowed') {
                 if (!defend || !pointValid(anchors?.launch) || !pointValid(anchors?.dock) || !pointValid(escort)) continue;
@@ -330,7 +323,6 @@ export function createPdcDroneController() {
             if (!best) {
                 let nearest = TYPE.attackRange ** 2;
                 for (const ship of context.opponents ?? []) {
-                    if (unit.type === 'attack' && ship?.id !== context.attackTargetId) continue;
                     if (!ship || !idValid(ship.id) || ship.hostile !== true || !combatTargetEligible(ship)
                         || ship.race || !vector(ship.position) || !vector(ship.velocity)) continue;
                     const dx=ship.position[0]-unit.position[0], dy=ship.position[1]-unit.position[1], dz=ship.position[2]-unit.position[2];
@@ -352,17 +344,12 @@ export function createPdcDroneController() {
                 } else context.assignments.set(best.id, { defenderId: id, until });
             }
             if (!attackShip && context.defenseChannel) context.defenseChannel.readyAt = context.now + PDC_RECOVERY_SECONDS;
-            unit.ammo--;
             unit.fireCooldown = TYPE.shotInterval;
-            events.push(event('fire', unit, { threatId: best.id, targetKind: attackShip ? 'ship' : 'missile', ammoSpent: 1,
+            events.push(event('fire', unit, { threatId: best.id, targetKind: attackShip ? 'ship' : 'missile', ammoSpent: 0,
                 start: [...unit.position], direction: [...bestDirection], inheritedVelocity: [...unit.velocity],
                 projectileSpeed: TYPE.projectileSpeed, flightTime: bestFlight,
                 predictedImpact: bestImpact, assignedUntil: until }));
-            if (unit.ammo === 0) {
-                unit.pdcEmptyReported = true;
-                events.push(event('empty', unit));
-                recall(unit, events, 'empty');
-            }
+
         }
         return events;
     }

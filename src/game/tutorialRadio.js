@@ -3,28 +3,8 @@
 // Kept deliberately sparse: a wingman on comms drops short remarks, not
 // lectures — the objective panel carries the step-by-step instructions.
 export const TUTORIAL_RADIO = [
-    {"id":"vesper-food","step":"fly-vesper","destination":"vesper","text":"Vesper keeps growing faster than its farms can follow. That is why Mara sends protein out here."},
-    {"after":"vesper-food","destination":"vesper","id":"vesper-home","step":"fly-vesper","text":"Our mother always brought us sweets back from this run. Mara still found every one of them."},
-    {"after":"vesper-home","destination":"vesper","id":"vesper-price","step":"fly-vesper","text":"Vesper has ore to spare and food to spare for nobody. A good trade starts with listening."},
-    {"after":"vesper-price","destination":"vesper","id":"vesper-docks","step":"fly-vesper","text":"The first habitats stood right beside the landing pads. That is why the market is still at the port."},
-    {"id":"vesper-drive", step:'fly-vesper', destination:'vesper', cue:'hyperdrive',
-        text:'You are lined up with Vesper. Engage HYPERDRIVE when you are ready.'},
-    {"id":"vesper-approach", step:'fly-vesper', destination:'vesper', cue:'arrival',
-        text:'Vesper dead ahead. Keep it selected and ease in slowly – the ship handles the landing.'},
-    {"after":"belt-living","destination":"shardbelt","id":"belt-mother","step":"mine-shardbelt","text":"Our mother never threw anything away. A broken pump became a flowerpot – Mara still keeps it behind the bar."},
-    {"after":"belt-route","destination":"shardbelt","id":"belt-living","step":"mine-shardbelt","text":"Cairn buys ore from small crews like ours. It pays for fuel when a trade is not worth taking."},
-    {"id":"belt-route", step:'mine-shardbelt', destination:'shardbelt',
-        text:'Our mother taught me this belt. The gaps drift with the rocks.'},
-    {"after":"wreck-names","destination":"mourning-line","id":"wreck-radio","step":"salvage-black-box","text":"The carrier recorded the shared radio channel. If the recorder is still readable, we may hear more than the final words."},
-    {"id":"wreck-names", step:'salvage-black-box', destination:'mourning-line',
-        text:'People still come to Mourning Line looking for a name or a flight record.'},
-    {"after":"cairn-berth","destination":"cairn","id":"cairn-record","step":"dock-cairn","text":"Leave the recording as it is for now. I need to be sure of what I actually heard."},
-    {"id":"cairn-berth", step:'dock-cairn', destination:'cairn',
-        text:'Mara found me this berth at Cairn after the evacuation. I never gave her an honest word for it.'},
-    {"id":"gate-depart", step:'galaxy-map', destination:'cairn', speaker:'Rin Vek',
-        text:'The Second Light just cleared the traffic lane. Her drive signature is already fading – good travel, sister.'},
-    {"id":"helios-gate-worry", step:'cross-meridian-gate', destination:'verge-meridian-point', speaker:'Mara Vek',
-        text:'No word from Rin since the gate. Fly safe out there – and call me the moment you hear from her.'},
+    {id:'vesper-food',step:'fly-vesper',destination:'vesper',text:'Vesper needs food. Your own cargo, your own profit.'},
+    {id:'belt-route',step:'mine-shardbelt',destination:'shardbelt',text:'Select the deposit and let it scan. Your miners return automatically before hyperdrive.'},
 ];
 
 // Public regional traffic continues world-building after the prologue.

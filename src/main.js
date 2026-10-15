@@ -38,7 +38,7 @@ const syncTitleSettings = (settings = {}) => {
 const showTitleScreen = () => {
     // Notices belong to the session that emitted them. Do not carry recovery,
     // combat, or dock feedback onto the title screen or into the next sortie.
-    ui.clearToasts();
+    ui.clearStatusMessages();
     ui.showTitle(Boolean(cachedSave), titleSave());
 };
 const devPreviewParams = new URLSearchParams(location.search);
@@ -195,17 +195,17 @@ const requestTiltPermission = async () => {
         return false;
     }
 };
-const beginSession = (mode, arena) => {
+const beginSession = (mode, arena, tutorial = true) => {
     if (sessionStarting)
         return sessionStarting;
     const previousSession = session;
     session = undefined;
     previousSession?.dispose();
     if (mode !== 'observer') ui.hideObserverView();
-    ui.clearToasts();
+    ui.clearStatusMessages();
     const save = arena?.run ? (arena.resume?readArenaRun():newArenaRun(Boolean(arena.hard&&arenaRecord().unlockedHard)))
         : LANDING_PREVIEW_ID && mode !== 'arena' && mode !== 'observer' ? createNewSave(undefined, { tutorial: false })
-            : mode === 'new' || mode === 'arena' || mode === 'observer' ? createNewSave(DRONE_TEST_MODE ? 4242 : undefined, { tutorial: mode === 'new' && !DRONE_TEST_MODE })
+            : mode === 'new' || mode === 'arena' || mode === 'observer' ? createNewSave(DRONE_TEST_MODE ? 4242 : undefined, { tutorial: mode === 'new' && tutorial && !DRONE_TEST_MODE })
                 : loadGame();
     if (!save) {
         ui.showToast(t('No autosave was found.'), 'warning');
@@ -354,6 +354,7 @@ const beginSession = (mode, arena) => {
             await nextSession.prepareDockedFlightRuntime({ showLoading: false });
         else if (nextSession.renderer)
             await nextSession.prepareFlightScene();
+        if (mode === 'new' && tutorialCampaignSummary(save)?.active) ui.showStory();
         return nextSession;
     })().catch((error) => {
         console.error('Session startup failed.', error);
@@ -423,7 +424,7 @@ const assignSetting = (settings, key, value) => {
     return true;
 };
 const actions = {
-    startNew: () => beginSession('new'),
+    startNew: tutorial => beginSession('new', undefined, tutorial !== false),
     resume: () => beginSession('resume'),
     startArenaRun: (resume=false,hard=false) => beginSession('arena',{run:true,resume,hard}),
     arenaRunAction: (...args) => session?.arenaRunAction(...args),
@@ -487,7 +488,6 @@ const actions = {
     paySyndicateBerth: () => session?.paySyndicateBerth(),
     acceptMission: (missionId) => session?.acceptMission(missionId),
     discardMission: (missionId) => session?.discardMission(missionId),
-    skipTutorial: () => session?.skipTutorial(),
     chooseTutorial: (choiceId) => session?.chooseTutorial(choiceId),
     finishTutorialBriefing: (id, completed) => session?.finishTutorialBriefing(id, completed),
     talkToNpc: (personId, topicId) => session?.talkToNpc(personId, topicId),

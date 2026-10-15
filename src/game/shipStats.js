@@ -117,3 +117,13 @@ export const equipmentUnlocked = (player, equipmentId) => {
         return true;
     return Number(player.guildRank?.[equipment.requiredGuild] ?? player.guildRep?.[equipment.requiredGuild] ?? 0) >= (equipment.requiredRank ?? 0);
 };
+
+// Dock maintenance never purchases or assigns drones. Carried spares are serviced
+// too; units fitted to stored ships are not part of this visit.
+export const dockServiceQuote = (player, kind) => {
+    const drones = kind === 'repair' ? quoteDroneService(player, { fillSlots: [], includeLocker: true }) : null;
+    const shipCost = kind === 'repair' ? repairCost(player) : refillCost(player);
+    const ok = !drones || drones.ok;
+    return { ok, shipCost, drones, total: ok ? shipCost + (drones?.total ?? 0) : Infinity };
+};
+export const repaintCost = player => Math.max(250, Math.round((SHIPS[player.shipId]?.price ?? 0) * .01 / 50) * 50);

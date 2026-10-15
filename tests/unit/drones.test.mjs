@@ -234,35 +234,23 @@ assert.deepEqual(fires.map((event) => [event.unitId, event.threatId]), [
     ['pdc-a', 'a-threat'],
     ['pdc-b', 'z-threat'],
 ], 'PDCs assign earliest impacts in stable unit order through one ledger');
-assert.equal(pdcFleet.unitsById['pdc-a'].ammo, DRONE_TYPES.pdc.magazineCapacity - 1);
-assert.equal(pdcFleet.unitsById['pdc-b'].ammo, DRONE_TYPES.pdc.magazineCapacity - 1);
+assert.equal(pdcFleet.unitsById['pdc-a'].ammo, undefined);
+assert.equal(pdcFleet.unitsById['pdc-b'].ammo, undefined);
 assert.equal(assignments.get('a-threat').defenderId, 'pdc-a');
 assert.equal(assignments.get('z-threat').defenderId, 'pdc-b');
 assert.ok(fires.every((event) => Number.isFinite(event.flightTime) && Number.isFinite(event.assignedUntil)));
 
-const finiteAmmoFleet = fleetWith([['pdc-ammo', 'pdc']]);
-finiteAmmoFleet.unitsById['pdc-ammo'].ammo = 1;
-const finitePdc = createPdcDroneController();
-const finiteAssignments = new Map();
-const finiteContext = pdcContext({
-    unitIds: ['pdc-ammo'],
-    threats: [threat('finite-threat', 40)],
-    assignments: finiteAssignments,
-});
-const finiteFirst = finitePdc.update(finiteAmmoFleet, PDC_DRONE_STEP, finiteContext, []);
-assert.equal(finiteAmmoFleet.unitsById['pdc-ammo'].ammo, 0, 'PDC ammo is finite');
-assert.equal(finiteAmmoFleet.unitsById['pdc-ammo'].state, 'returning', 'empty PDC recalls');
-assert.equal(finiteFirst.filter((event) => event.type === 'fire').length, 1);
-assert.equal(finiteFirst.filter((event) => event.type === 'empty').length, 1);
-const finiteSecond = finitePdc.update(finiteAmmoFleet, PDC_DRONE_STEP, {
-    ...finiteContext,
-    now: PDC_DRONE_STEP,
-    threats: [],
-}, []);
-assert.equal(finiteAmmoFleet.unitsById['pdc-ammo'].portStage, 'enter');
-finitePdc.update(finiteAmmoFleet, PDC_DRONE_STEP, {...finiteContext, threats: []}, []);
-assert.equal(finiteAmmoFleet.unitsById['pdc-ammo'].state, 'stowed');
-assert.equal(finiteSecond.filter((event) => event.type === 'empty').length, 0, 'empty notification is latched');
+const unlimitedFleet = fleetWith([['pdc-unlimited', 'pdc']]);
+unlimitedFleet.unitsById['pdc-unlimited'].ammo = 0; // Legacy empty magazines cannot disable a drone.
+const unlimitedPdc = createPdcDroneController();
+let shots = 0;
+for (let i=0;i<600;i++) {
+ const events=unlimitedPdc.update(unlimitedFleet,PDC_DRONE_STEP,pdcContext({unitIds:['pdc-unlimited'],now:i/60,threats:[threat('unlimited-threat',40)],assignments:new Map()}),[]);
+ shots+=events.filter(e=>e.type==='fire').length;
+ assert.ok(!events.some(e=>e.type==='empty'));
+}
+assert.ok(shots>15,'PDC keeps defending with legacy zero ammo');
+assert.equal(unlimitedFleet.unitsById['pdc-unlimited'].state,'escorting');
 
 const recallPdcFleet = fleetWith([['pdc-recall', 'pdc']]);
 const recallPdc = createPdcDroneController();
@@ -310,9 +298,8 @@ assert.deepEqual(serviceQuote.lines.filter((line) => line.kind === 'repair').map
     ['pdc-service', 10, 50],
 ]);
 assert.deepEqual(serviceQuote.lines.filter((line) => line.kind === 'rounds').map((line) => [line.unitId, line.quantity, line.cost]), [
-    ['pdc-service', 20, 40],
 ]);
-assert.equal(serviceQuote.total, 105, 'quote totals repairs and rearming atomically');
+assert.equal(serviceQuote.total, 65, 'quote bills repairs without drone ammunition');
 const serviceBefore = clone(service);
 const serviceCommit = commitDroneService(service, { authorized: true, expected: serviceQuote });
 assert.equal(serviceCommit.code, 'serviced');
@@ -325,7 +312,7 @@ assert.deepEqual(service.outfitting.loadouts.prospector.droneBays, [
 ]);
 assert.equal(service.droneFleet.unitsById['miner-service'].hull, DRONE_TYPES.mining.maxHull);
 assert.equal(service.droneFleet.unitsById['pdc-service'].hull, DRONE_TYPES.pdc.maxHull);
-assert.equal(service.droneFleet.unitsById['pdc-service'].ammo, DRONE_TYPES.pdc.magazineCapacity);
+assert.equal(service.droneFleet.unitsById['pdc-service'].ammo, 100);
 
 const purchaseBays = [
     { bayId: 'drone-1', mode: 'mining', unitIds: [null, null] },

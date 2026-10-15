@@ -261,7 +261,7 @@ const normalizedQuests = hydrateSave({
     ],
 }).quests;
 assert.deepEqual(normalizedQuests[0].flags, { finishTime: 52.4, rank: 2, splits: [12.1, 28.6, 52.4] });
-assert.deepEqual(normalizedQuests[1].flags, { metMara: true, metRin: true, suppliesBought: 1 });
+assert.equal(normalizedQuests[1].flags.metMara,true);assert.equal(normalizedQuests[1].flags.suppliesBought,1);assert.equal(normalizedQuests[1].flags.campaignVersion,2);
 assert.deepEqual(normalizedQuests[1].choices, { recorder: 'trust-rin' });
 assert.equal(normalizedQuests.length, 2);
 

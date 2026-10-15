@@ -12,7 +12,7 @@ import { AMMO_CAPACITY, LEGACY_GUN_AMMO, WEAPON_ORDER, WEAPONS, normalizeLaunche
 import { HULL_HARDPOINTS, canonicalOutfitId,collapseOutfittingToSingleShip, createOutfittingState, normalizeOutfitting, projectLegacyEquipment, projectLegacyWeaponId } from './outfitting.js';
 import { combinedHullIntegrity, normalizeEnergy } from './combatResources.js';
 import { normalizeQuestStates } from './quests.js';
-import { startTutorialCampaign } from './tutorialCampaign.js';
+import { startTutorialCampaign, migrateTutorialCampaign } from './tutorialCampaign.js';
 import { normalizeDroneFleet } from './droneData.js';
 import { normalizeActiveSortie, normalizeSortieHistory } from './careerMetrics.js';
 export const DRONE_TEST_MODE = typeof location !== 'undefined' && new URLSearchParams(location.search).get('drone-test') === '1';
@@ -803,6 +803,7 @@ export const hydrateSave = (candidate) => {
     // existed in many careers. Reconcile their single story slot on every
     // load so an upgraded save sees the next stage immediately instead of
     // waiting for the board's timed refresh.
+    migrateTutorialCampaign(save);
     save.world.localContractOffersDirty = true;
     refreshMissionOffers(save);
     if ((candidate.version ?? 0) < 13) {
@@ -814,6 +815,7 @@ export const hydrateSave = (candidate) => {
         save.player.credits += refund;
     }
     save.player.ammo = {};
+    migrateTutorialCampaign(save);
     return save;
 };
 export const loadGame = () => {

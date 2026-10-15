@@ -39,29 +39,23 @@ test('every authored node has translated text and a path to completion',()=>{
     }
 });
 test('optional questions and early exit do not advance the encounter',()=>{
-    const {ui,calls}=fixture(ADVENTURE_DIALOGUES.mara);
-    ui.advanceAdventure(0);ui.advanceAdventure(0);ui.advanceAdventure(0);
-    assert.equal(ui.adventure.nodeId,'memory');
-    assert.deepEqual(ui.adventureNode().choices.map(c=>c.next),['rin','work']);assert.equal(calls.length,0);
-    ui.closeAdventure();assert.equal(calls.length,0);
+ const {ui,calls}=fixture(ADVENTURE_DIALOGUES.rin);ui.advanceAdventure(0);ui.advanceAdventure(0);assert.equal(ui.adventure.nodeId,'parents');assert.equal(calls.length,0);ui.closeAdventure();assert.equal(calls.length,0);
 });
-test('final acknowledgement records the encounter once',()=>{
-    const {ui,calls}=fixture(ADVENTURE_DIALOGUES.mara);
-    for(const index of [0,2,0,2])ui.advanceAdventure(index);
-    assert.deepEqual(calls,[['mara-vek','greeting']]);
-    ui.advanceAdventure(0);assert.equal(calls.length,1);
-});
+
+test('final acknowledgement records the encounter once',()=>{const {ui,calls}=fixture(ADVENTURE_DIALOGUES.mara);for(let i=0;i<3;i++)ui.advanceAdventure(0);assert.deepEqual(calls,[['mara-vek','greeting']]);ui.advanceAdventure(0);assert.equal(calls.length,1);});
+
 test('space dialogue holds the modal pause until the final reply',()=>{
-    const {ui,calls}=fixture(ADVENTURE_DIALOGUES.flight,true);
+    const {ui,calls}=fixture(ADVENTURE_DIALOGUES['paul-rescue'],true);
     assert.equal(ui.isModalOpen,true);
-    ui.advanceAdventure(0);ui.advanceAdventure(2);
+    for(const node of ['repairs','support','route']){ui.advanceAdventure(0);assert.equal(ui.adventure.nodeId,node);assert.equal(ui.isModalOpen,true);}
+    ui.advanceAdventure(0);
     assert.equal(ui.isModalOpen,false);assert.equal(ui.storyDismissed,true);assert.equal(calls.length,0);
 });
 test('replaying an introduction cannot advance tutorial state',()=>{
     const {ui,calls}=fixture(ADVENTURE_DIALOGUES.mara);
     ui.adventure.script=undefined;ui.adventure.node={text:'Replay',choices:[{label:'Replay',replay:'mara'}]};
     ui.advanceAdventure(0);
-    for(const index of [0,2,0,2])ui.advanceAdventure(index);
+    for(let i=0;i<3;i++)ui.advanceAdventure(0);
     assert.equal(calls.length,0);
 });
 
@@ -81,19 +75,8 @@ test('urgent radio stays compact; longer stories wait for danger to pass',async(
     assert.equal(calls.at(-1)[3],'rin-first-flight');assert.equal(session.storyLineUntil,Infinity);
 });
 
-test('remaining questions retain the latest answer and completion stays available',()=>{
-    const {ui,calls}=fixture(ADVENTURE_DIALOGUES.mara);
-    for(const index of [0,2,0])ui.advanceAdventure(index);
-    assert.equal(ui.adventure.nodeId,'food');
-    ui.advanceAdventure(0);ui.advanceAdventure(0);
-    assert.equal(ui.adventure.nodeId,'memory');
-    assert.deepEqual(ui.adventureNode().choices.map(c=>c.next??'finish'),['rin','finish']);
-    ui.advanceAdventure(0);
-    assert.equal(ui.adventure.nodeId,'rin');
-    assert.equal(ui.adventureNode().choices.length,1);
-    ui.advanceAdventure(0);
-    assert.deepEqual(calls,[['mara-vek','greeting']]);
-});
+test('remaining questions retain the latest answer and completion stays available',()=>{const {ui,calls}=fixture(ADVENTURE_DIALOGUES.rin);ui.advanceAdventure(0);ui.advanceAdventure(0);assert.equal(ui.adventure.nodeId,'parents');assert.equal(ui.adventureNode().choices.length,1);ui.advanceAdventure(0);assert.equal(ui.adventure.nodeId,'legal');ui.advanceAdventure(0);assert.deepEqual(calls,[['mara-vek','greeting']]);});
+
 test('generic answers expose remaining questions directly and acknowledge each once',()=>{
     const {ui,calls}=fixture(ADVENTURE_DIALOGUES.mara);
     ui.adventure.script=undefined;
@@ -117,14 +100,14 @@ test('rendering answers and reviewing history never replays the topic introducti
     ui.root={querySelector:()=>panel};ui.portraitImage=()=>'';
     ui.renderAdventure=GameUI.prototype.renderAdventure;
     ui.renderAdventure();
-    for(const index of [0,0,0])ui.advanceAdventure(index);
+    for(const index of [0,0])ui.advanceAdventure(index);
     const entries=ui.adventure.transcript.slice();
     ui.adventure.history=true;ui.renderAdventure();
     ui.adventure.history=false;ui.renderAdventure();
     assert.deepEqual(ui.adventure.transcript,entries);
-    assert.equal(entries.filter(e=>e.text===ADVENTURE_DIALOGUES.mara.nodes.keys.text.en || e.text===ADVENTURE_DIALOGUES.mara.nodes.keys.text.de).length,1);
+    assert.equal(entries.filter(e=>e.text===ADVENTURE_DIALOGUES.mara.nodes.welcome.text.en || e.text===ADVENTURE_DIALOGUES.mara.nodes.welcome.text.de).length,1);
     assert.ok(panel.innerHTML.includes('adventure-choices'));
-    assert.equal(ui.adventure.nodeId,'memory');
+    assert.equal(ui.adventure.nodeId,'rin');
 });
 
 // An aborted prologue leaves the pilot standing in the Helix bar without ever
@@ -134,38 +117,10 @@ test('rendering answers and reviewing history never replays the topic introducti
 // The Cairn confession explains Rin's rescue but used to stop there: the
 // player learns why the carrier was lost and never what became of the mother
 // whose loss the whole prologue mourns. "And afterwards?" must be askable.
-test('the Cairn confession accounts for the pilot’s mother, not only the carrier',()=>{
-    const cairn=ADVENTURE_DIALOGUES.cairn;
-    const loss=cairn.nodes.loss;
-    assert.ok(loss,'the confession must answer what happened after the rescue');
-    assert.match(loss.text.en,/turned around again/i);
-    assert.match(loss.text.de,/drehte wieder ab/i);
-    assert.equal(loss.returnTo,'confession');
-    assert.ok(Object.values(cairn.nodes).some(node=>(node.choices??[]).some(choice=>choice.next==='loss')),'the question must be offered');
-});
+test('the Cairn lead concerns the parents and leaves the recorder encrypted for Mara',()=>{const text=JSON.stringify(ADVENTURE_DIALOGUES.cairn);assert.match(text,/parents/);assert.match(text,/encrypted/);assert.match(text,/Mara/);assert.doesNotMatch(text,/recording is readable|mother’s voice|forged/);});
 
-// Rin leaves for Meridian alone in the departure scene, which plays after any
-// of the three recorder endings. No ending may promise that she flies with the
-// pilot instead, or the scene reads as ignoring the choice just made.
-test('no recorder ending promises Rin’s company, so the departure fits every choice',()=>{
-    const cairn=ADVENTURE_DIALOGUES.cairn;
-    const promises=/fly with you|come with me|stay with you|gemeinsam weiter|komm mit/i;
-    for(const [id,node] of Object.entries(cairn.nodes)){
-        assert.doesNotMatch(node.text.en,promises,id);
-        assert.doesNotMatch(node.text.de,promises,id);
-        for(const choice of node.choices??[]){
-            assert.doesNotMatch(choice.label.en,promises,`${id} · ${choice.label.en}`);
-            assert.doesNotMatch(choice.label.de,promises,`${id} · ${choice.label.de}`);
-        }
-    }
-    const departure=ADVENTURE_DIALOGUES.departure.nodes.leaving;
-    assert.match(departure.text.en,/jumping ahead|ahead/i);
-    assert.match(departure.text.de,/voraus/i);
-});
+test('Rin accompanies the black-box mission and Mara handles decoding before open-world exploration',()=>{assert.match(ADVENTURE_DIALOGUES.cairn.nodes.company.text.en,/coming with you/);assert.match(ADVENTURE_DIALOGUES.delivery.nodes.box.text.en,/decoding/);assert.match(ADVENTURE_DIALOGUES.delivery.nodes.rin.text.en,/gate is open/);});
 
-// Rin jumps ahead at the prologue's departure scene. She used to keep standing
-// in the Helix bar afterwards, in a campaign whose panel and whose aunt both
-// say she has gone quiet out at Meridian.
 test('Rin leaves the Helix bar once the prologue has her jump ahead',async()=>{
     globalThis.document??={activeElement:null};
     const {createNewSave}=await import('../../src/game/save.js');
@@ -259,11 +214,8 @@ test('a skipped prologue is retold without the escort or the delivery run',async
         for(const line of prologueOnly) assert.ok(!retold.includes(line),line);
         assert.match(retold,/Wayfarer/,'the retelling is still the family story');
     }
-    assert.match(collect(skipped,ADVENTURE_DIALOGUES.mara),/Shardbelt/,'and says what to do instead');
-    // The prologue's own copy is untouched for a career that flew it.
-    const lived=createNewSave(3111,{tutorial:true});
-    const heard=[collect(lived,ADVENTURE_DIALOGUES.mara),collect(lived,ADVENTURE_DIALOGUES.rin)].join('\n');
-    for(const line of prologueOnly) assert.ok(heard.includes(line),line);
+    assert.match(collect(skipped,ADVENTURE_DIALOGUES.mara),/contracts/,'and says what to do instead');
+    const lived=createNewSave(3111,{tutorial:true});assert.match(collect(lived,ADVENTURE_DIALOGUES.rin),/BUY MAX for Protein/);
 });
 
 // A contact can offer a different set of barks in a career that never played

@@ -1,4 +1,5 @@
-import {EQUIPMENT_RARITIES,equipmentName,modifiedWeapon} from './equipmentCatalog.js';
+import {EQUIPMENT_RARITIES,equipmentName,modifiedWeapon,equipmentBaseId} from './equipmentCatalog.js';
+import {normalizeEquipmentInventory} from './equipmentInventory.js';
 import {PDC_TURRET} from './turrets.js';
 import {renderEquipmentInventory,bindEquipmentInventory} from './equipmentUi.js';
 import {FLEET_PAINTS,fleetHullId} from './fleetPaintCatalog.js';
@@ -11,7 +12,7 @@ import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, 
 import { JUMP_ROUTES, SYSTEMS, planRoute } from './galaxy.js';
 import { bestKnownTradeRoute, cargoCapacity, cargoMass, currentProfitableRoutes, denPrice, knownMarketQuotes, quoteCommodityTrade, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { formatCredits, formatDuration, formatNumber } from './random.js';
-import { equipmentUnlocked, getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
+import { equipmentUnlocked, getEffectiveShipStats, dockServiceQuote, repaintCost } from './shipStats.js';
 import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, TRACKING_LASER, LAUNCHERS, weaponForOutfit, launcherForOutfit, weaponRange, weaponShotDamage, weaponIdForOutfit, launcherMagazineEntries, weaponOwned } from './weapons.js';
 import { TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 import {equipmentIcon, commodityIcon} from './itemIcons.js';
@@ -24,7 +25,7 @@ import { HULL_TRADE_IN_RATE, quoteShipTrade } from './shipTrade.js';
 import { LOADOUT_KEYS, HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RATE, itemAvailable, itemFitsMount, loadoutFor, quoteOutfitting } from './outfitting.js';
 import { playerStrengthValue } from './playerStrength.js';
 import { guildJoinCost, missionBriefing, missionTitle } from './missions.js';
-import { getTutorialQuest, tutorialCampaignSummary, tutorialDialogue } from './tutorialCampaign.js';
+import { getTutorialQuest, tutorialCampaignSummary, tutorialCardContent, tutorialDialogue, tutorialPeople, tutorialConversation, tutorialContentUnlocked, tutorialTradePrice, TUTORIAL_MINING_CONTRACT_ID } from './tutorialCampaign.js';
 import { canMineWithHull, DRONE_BAY_CAPACITY, DRONE_TYPES, droneBayLayoutFor } from './droneData.js';
 const WARM_IMAGE_TIMEOUT_MS = 5000;
 const settleWarmupPromise = (promise, fallback = false) => new Promise((resolve) => {
@@ -229,6 +230,7 @@ const ACTIVE_NPC_PORTRAIT_BY_ID = Object.freeze({
         personId,
         `./art/portraits/simplified/${path.split('/').at(-1).replace(/\.(png|webp)$/i, '.webp')}`,
     ])),
+    'paul': './art/portraits/simplified/pavel-orn-hd-v1.webp',
     'haven-factor': './art/portraits/simplified/haven-factor-portrait.webp',
     'league-yard-factor': './art/portraits/simplified/unity-yard-factor-portrait.webp',
     'cinderfall-factor': './art/portraits/simplified/cinderfall-factor-portrait.webp',
@@ -430,7 +432,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2fz';
+const GAME_VERSION = '0.8.2gp';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -942,7 +944,7 @@ export class GameUI {
     missionBoardTab = 'available';
     missionSelectedId;
     missionDiscardId;
-    tutorialSkipConfirm = false;
+    storyOpen = false;
     missionMobileDetail = false;
     // Phones show the commodity catalog or one trade ticket, never both. The
     // wide layout keeps its two columns; the flag only drives the CSS split.
@@ -966,7 +968,6 @@ export class GameUI {
     elementCache = new Map();
     shipPreviews = [];
     shipPreviewGeneration = 0;
-    toastId = 0;
     // Monitor surfaces replace the in-flight toast stack: recentEvents feeds
     // the own-ship flight-recorder ticker + the ship-menu history, sensorLog
     // feeds the radar's local-space line. Both ring-buffer so a busy fight
@@ -1331,14 +1332,16 @@ export class GameUI {
 
         <section id="new-career-panel" class="new-career-panel is-hidden" role="alertdialog" aria-modal="true" aria-labelledby="new-career-heading" aria-describedby="new-career-description">
           <div class="new-career-card">
-            <h2 id="new-career-heading">${t('Start a new career?')}</h2>
+            <h2 id="new-career-heading">${t('Play the tutorial?')}</h2>
             <p id="new-career-description">${t('Your current career autosave will be replaced. This cannot be undone.')}</p>
             <div class="new-career-actions">
-              <button type="button" data-ui-command="cancel-new-career">${t('KEEP CURRENT CAREER')}</button>
-              <button type="button" class="primary" data-ui-command="confirm-new-career">${t('START NEW CAREER')}</button>
+              <button type="button" data-ui-command="cancel-new-career">${t('Back')}</button>
+              <button type="button" class="primary" data-ui-command="confirm-new-career">${t('Play tutorial')}</button>
+              <button type="button" data-ui-command="skip-new-career">${t('Skip tutorial')}</button>
             </div>
           </div>
         </section>
+        <section id="story-panel" class="story-panel is-hidden" role="dialog" aria-modal="true" aria-labelledby="story-heading"></section>
         <section id="dock-screen" class="dock-screen is-hidden" aria-label="${t('Docked location')}"></section>
         <section id="map-panel" class="modal-panel is-hidden" aria-label="${t('Navigation map')}"></section>
         <section id="ship-panel" class="modal-panel is-hidden" aria-label="${t('Ship status')}"></section>
@@ -1347,7 +1350,6 @@ export class GameUI {
         <section id="observer-panel" class="observer-panel is-hidden" aria-label="${t('NPC combat observer')}"></section>
         <section id="adventure-panel" class="adventure-panel is-hidden" role="dialog" aria-modal="true" aria-label="Conversation"></section>
         <section id="chat-panel" class="modal-panel is-hidden" aria-label="${t('Comms log')}"></section>
-        <div id="toast-stack" class="toast-stack global-toasts" aria-live="polite"></div>
         <div id="rotate-notice" class="rotate-notice is-hidden" role="alertdialog" aria-label="${t('Rotate your screen to landscape')}">
           <div class="rotate-phone" aria-hidden="true"></div>
           <strong>${t('FLIP TO LANDSCAPE')}</strong>
@@ -1696,8 +1698,8 @@ export class GameUI {
         });
         this.root.addEventListener('change', (event) => {
             const element = event.target;
-            if(element instanceof HTMLSelectElement && element.matches('[data-ship-paint]')) {
-                this.actions?.setShipPaint?.(element.value);this.showShipMenu();return;
+            if(element instanceof HTMLSelectElement && element.matches('[data-service-paint]')) {
+                this.servicePaintId = element.value; this.renderDock(); return;
             }
             if (!(element instanceof HTMLSelectElement) || !element.matches('[data-outfit-select]'))
                 return;
@@ -1714,46 +1716,29 @@ export class GameUI {
         });
     }
     handleTutorialAction(action) {
-        if (action === 'skip') {
-            this.tutorialSkipConfirm = true;
-        }
-        else if (action === 'talk-rin') {
-            this.openTutorialDecision();
-            return;
-        }
-        else if (action === 'cancel-skip') {
-            this.tutorialSkipConfirm = false;
-        }
-        else if (action === 'confirm-skip') {
-            this.tutorialSkipConfirm = false;
-            this.actions?.skipTutorial?.();
-        }
-        if (this.dockLocation)
-            this.renderDock();
-        else if (!this.root.querySelector('#ship-panel')?.classList.contains('is-hidden'))
-            this.showShipMenu();
-        if (action === 'skip')
-            this.root.querySelector('[data-tutorial-action="cancel-skip"]')?.focus();
+        if (action === 'talk-rin') this.openTutorialDecision();
     }
     handleCommand(command, element) {
         switch (command) {
+            case 'story':
+                this.showStory(); break;
+            case 'close-story':
+                this.hideStory(); break;
             case 'resume':
                 this.actions?.resume();
                 break;
             case 'new':
-                if (this.hasCareerSave)
-                    this.showNewCareerConfirmation();
-                else
-                    this.actions?.startNew();
+                this.showNewCareerConfirmation();
                 break;
             case 'cancel-new-career':
                 this.closeNewCareerConfirmation();
                 break;
             case 'confirm-new-career':
+            case 'skip-new-career':
                 if (this.newCareerConfirm) {
                     this.closeNewCareerConfirmation(false);
-                    // Start in the same user gesture so tilt permission still works.
-                    this.actions?.startNew();
+                    // Keep start and tilt permission within this user gesture.
+                    this.actions?.startNew(command === 'confirm-new-career');
                 }
                 break;
             case 'outfit-stage':
@@ -1926,6 +1911,8 @@ export class GameUI {
                 break;
             case 'dismiss-group-help':
                 this.outfitGroupHelp=false;this.refreshOutfitting();break;
+            case 'ship-section':
+                this.inventoryView=false;this.shipMenuTab=element.dataset.shipSection;this.showShipMenu();break;
             case 'close-ship':
                 this.hideShipMenu();
                 break;
@@ -1939,6 +1926,9 @@ export class GameUI {
             case 'launcher-fire-mode':
                 this.actions?.setLauncherFireMode?.(element.dataset.launcherMode);
                 this.root.querySelector('.ship-menu-weapons details')?.setAttribute('open', '');
+                break;
+            case 'repaint':
+                this.actions?.setShipPaint?.(this.servicePaintId);
                 break;
             case 'repair':
                 this.actions?.repair();
@@ -2011,7 +2001,11 @@ export class GameUI {
         const title = this.root.querySelector('#title-screen');
         if (title) title.inert = true;
         panel.classList.remove('is-hidden');
-        panel.querySelector('[data-ui-command="cancel-new-career"]')?.focus({preventScroll:true});
+        const warning = panel.querySelector('#new-career-description');
+        if (warning) warning.hidden = !this.hasCareerSave;
+        if (this.hasCareerSave) panel.setAttribute?.('aria-describedby', 'new-career-description');
+        else panel.removeAttribute?.('aria-describedby');
+        panel.querySelector(this.hasCareerSave ? '[data-ui-command="cancel-new-career"]' : '[data-ui-command="confirm-new-career"]')?.focus({preventScroll:true});
         panel.onkeydown = event => {
             if (event.key === 'Escape') {
                 event.preventDefault();
@@ -2044,6 +2038,7 @@ export class GameUI {
             this.root.querySelector('[data-ui-command="new"]')?.focus({preventScroll:true});
     }
     showTitle(hasSave, save) {
+        this.hideStory(false);
         this.closeNewCareerConfirmation(false);
         this.closeAdventure(false);
         this.adventureQueue = [];
@@ -2102,7 +2097,7 @@ export class GameUI {
         this.missionBoardTab = 'available';
         this.missionSelectedId = undefined;
         this.missionDiscardId = undefined;
-        this.tutorialSkipConfirm = false;
+        this.hideStory(false);
         this.missionMobileDetail = false;
         this.hideTitle();
         this.hideHud();
@@ -2116,6 +2111,7 @@ export class GameUI {
             this.renderDock();
     }
     hideDock() {
+        this.hideStory(false);
         this.cancelVesperLaunchTransition();
         this.disposeShipPreviews();
         this.resetOutfittingDrafts();
@@ -2241,7 +2237,8 @@ export class GameUI {
                 ? 'market'
                 : 'concourse';
         const terminal = this.dockTerminal ? this.renderDockTab(this.dockTerminal) : '';
-        const notices = `${this.renderDockNotice()}${this.renderTutorialNotice()}`;
+        const notices = this.renderDockNotice();
+        const story = tutorialCampaignSummary(this.save);
         // One bar names the place and the screen. The old three tiers (station
         // header, terminal tab row, in-panel title) said the same thing twice
         // and spent a phone's entire first screen before any content showed.
@@ -2262,6 +2259,7 @@ export class GameUI {
         ${backCommand ? `<button type="button" class="dock-back-button dock-pointer" data-ui-command="${backCommand}" aria-label="${escapeHtml(backLabel)}">◀</button>` : ''}
         <div class="dock-heading"><span>${t(location.kind.toUpperCase())} · ${t(FACTION_NAMES[location.faction])}</span><h2>${escapeHtml(location.name)}</h2></div>
         ${this.dockScreenTabs() || `<span class="dock-screen-label">${escapeHtml(this.dockScreenLabel())}</span>`}
+        ${story && !story.skipped ? `<button type="button" class="dock-story-button" data-ui-command="story" aria-haspopup="dialog">${t('Story')}</button>` : ''}
         <div class="dock-wallet-unit"><div class="dock-wallet"><span>${t('CREDIT')}</span><strong>${formatCredits(this.save.player.credits)}</strong></div><button class="dock-options-button dock-pointer" data-ui-command="options" role="button" tabindex="0" aria-label="${t('Options')}">⚙</button></div>
       </header>
       ${notices ? `<div class="dock-notice-stack">${notices}</div>` : ''}
@@ -2269,6 +2267,8 @@ export class GameUI {
       ${this.renderSyndicateCard()}
       ${this.renderMissionSettlements()}
     `;
+        if (this.dockTerminal === 'services') this.mountShipPreviews();
+        if (this.storyOpen) this.renderStory();
         const content = dock.querySelector('.dock-content');
         const preserveScroll = prevTab === this.dockTab
             && prevTerminal === this.dockTerminal
@@ -2303,25 +2303,54 @@ export class GameUI {
         <span>${t('This dock did not report your arrival. Ledger: {credits} paid to date', { credits: formatCredits(paidHere) })}${denReady ? t(' — the smuggler\'s den is open to you.') : t(' — {credits} more buys the den.', { credits: formatCredits(SYNDICATE_DEN_FAVOR - paidHere) })}</span>
       </div>`;
     }
-    tutorialSkipControl() {
-        if (!this.tutorialSkipConfirm)
-            return `<button type="button" class="tutorial-skip" data-tutorial-action="skip">${t('SKIP TUTORIAL')}</button>`;
-        return `<div class="tutorial-skip-confirm" role="alert"><span>${t('Skip the family prologue? You can continue the career, but this story cannot be replayed in the current save.')}</span><button type="button" data-tutorial-action="cancel-skip">${t('KEEP PLAYING')}</button><button type="button" class="is-danger" data-tutorial-action="confirm-skip">${t('SKIP PROLOGUE')}</button></div>`;
-    }
     renderTutorialNotice() {
-        const campaign = tutorialCampaignSummary(this.save);
-        if (!campaign?.active)
-            return '';
-        return `
-      <aside class="tutorial-dock-notice" aria-label="${t('Family prologue objective')}">
-        ${this.portraitImage('rin-vek', 'Rin Vek')}
-        <div class="tutorial-notice-copy">
-          <span>${t(campaign.label)} · ${t('CHAPTER {chapter}/{count}', { chapter: campaign.chapter, count: campaign.chapterCount })}</span>
-          <b>${escapeHtml(t(campaign.chapterTitle))}</b>
-          <p>${escapeHtml(t(campaign.objective))}${campaign.progress ? ` <em>${escapeHtml(campaign.progress)}</em>` : ''}</p>
-        </div>
-        ${this.tutorialSkipControl()}
-      </aside>`;
+        const card = tutorialCardContent(this.save);
+        if (!card) return '';
+        const fitting = card.stepId === 'fit-upgrade';
+        const liveHint = !this.save.player.dockedAt && this.tutorialHint?.key?.startsWith(card.stepId + ':') && this.tutorialHint.text;
+        const objective = liveHint || t(card.objective);
+        const instruction = liveHint ? '' : t(card.instruction);
+        return `<aside class="tutorial-dock-notice" aria-label="${t('Family prologue objective')}">
+          ${this.portraitImage('rin-vek', 'Rin Vek')}
+          <div class="tutorial-notice-copy">
+            <p class="story-current-objective">${escapeHtml(objective)}${card.progress ? ` <em>${escapeHtml(card.progress)}</em>` : ''}</p>
+            ${instruction ? `<p class="${fitting ? 'tutorial-equipment-explainer' : 'story-objective-detail'}">${escapeHtml(instruction)}</p>` : ''}
+          </div>
+        </aside>`;
+    }
+    renderStory() {
+        const panel = this.root.querySelector('#story-panel');
+        if (!panel) return;
+        panel.innerHTML = `<div class="story-card"><header><h2 id="story-heading">${t('Story')}</h2><button type="button" data-ui-command="close-story" aria-label="${t('Close')}">×</button></header>${this.renderTutorialNotice() || `<p>${t('No active story quest.')}</p>`}</div>`;
+    }
+    showStory() {
+        if (this.save?.arena) return;
+        this.storyOpen = true;
+        this.renderStory();
+        const panel = this.root.querySelector('#story-panel');
+        if (!panel) { this.storyOpen = false; return; }
+        const dock = this.root.querySelector('#dock-screen');
+        if (dock) dock.inert = true;
+        panel.classList.remove('is-hidden');
+        panel.querySelector('[data-ui-command="close-story"]')?.focus({preventScroll:true});
+        panel.onkeydown = event => {
+            if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); this.hideStory(); }
+            else if (event.key === 'Tab') {
+                const buttons = [...panel.querySelectorAll('button:not(:disabled)')], first = buttons[0], last = buttons.at(-1);
+                if (event.shiftKey && document.activeElement === first) {event.preventDefault();last?.focus();}
+                else if (!event.shiftKey && document.activeElement === last) {event.preventDefault();first?.focus();}
+            }
+        };
+    }
+    hideStory(restoreFocus = true) {
+        const wasOpen = this.storyOpen;
+        this.storyOpen = false;
+        const panel = this.root.querySelector('#story-panel');
+        panel?.classList.add('is-hidden');
+        if (panel) panel.onkeydown = null;
+        const dock = this.root.querySelector('#dock-screen');
+        if (dock) dock.inert = false;
+        if (wasOpen && restoreFocus) dock?.querySelector('[data-ui-command="story"]')?.focus({preventScroll:true});
     }
     openTutorialDecision() {
         const campaign = tutorialCampaignSummary(this.save);
@@ -2494,7 +2523,7 @@ export class GameUI {
         const serviceDesk = hasAnyLocationService(this.dockLocation, ['repair', 'fuel']);
         const market = hasAnyLocationService(this.dockLocation, ['market', 'outfitting', 'shipyard']);
         const bar = hasAnyLocationService(this.dockLocation, ['bar', 'missions', 'race']);
-        const rinAtBerth = this.dockLocation === 'cairn' && tutorialCampaignSummary(this.save)?.stepId === 'family-choice';
+        const rinAtBerth = false;
         const raceOnly = hasLocationService(this.dockLocation, 'race') && !hasLocationService(this.dockLocation, 'missions');
         const contractsOnly = hasLocationService(this.dockLocation, 'missions') && !hasLocationService(this.dockLocation, 'bar');
         const deskLabel = raceOnly ? t('RACE DESK') : contractsOnly ? t('CONTRACTS') : t('BAR');
@@ -2564,7 +2593,8 @@ export class GameUI {
         return !['galaxy-map', 'cross-meridian-gate'].includes(quest.stepId);
     }
     barPeople(locationId = this.dockLocation) {
-        return (LOCATIONS[locationId]?.people ?? []).filter((person) => this.contactInPort(person, locationId));
+        const people=[...(LOCATIONS[locationId]?.people ?? []),...tutorialPeople(this.save,locationId)];
+        return people.filter((person,index)=>people.findIndex(p=>p.id===person.id)===index&&this.contactInPort(person,locationId));
     }
     renderBar() {
         const people = this.barPeople();
@@ -2596,8 +2626,8 @@ export class GameUI {
         this.dialogueTopic = 'greeting';
         this.renderDock();
         const firstMeeting = !(this.save.world.npcMemory?.[person.id]?.topics?.greeting > 0);
-        const authored = this.dockLocation === 'helix' && firstMeeting && tutorialDialogue(this.save,person.id)
-            ? (person.id === 'mara-vek' ? ADVENTURE_DIALOGUES.mara : person.id === 'rin-vek' ? ADVENTURE_DIALOGUES.rin : undefined) : undefined;
+        const conversation=tutorialConversation(this.save,person.id,this.dockLocation);
+        const authored=ADVENTURE_DIALOGUES[conversation];
         this.startAdventure(person, authored);
     }
     localGuildIds(locationId = this.dockLocation) {
@@ -2616,7 +2646,7 @@ export class GameUI {
     }
     dialogueTopics(person) {
         const topics = [];
-        if (!tutorialCampaignSummary(this.save)?.active && hasAnyLocationService(this.dockLocation, ['missions', 'race']))
+        if (tutorialContentUnlocked(this.save) && hasAnyLocationService(this.dockLocation, ['missions', 'race']))
             topics.push({ id: 'work', label: t('WORK') });
         if (person.marketTipster)
             topics.push({ id: 'market', label: t('TRADE TIP') });
@@ -2776,7 +2806,7 @@ export class GameUI {
             return;
         }
         const person = Object.values(LOCATIONS).flatMap(location => location.people ?? []).find(person => person.name === name)
-            ?? { id: name === 'Rin Vek' ? 'rin-vek' : '', name };
+            ?? { id: name === 'Rin Vek' ? 'rin-vek' : name==='Paul'?'paul':'', name };
         this.commsLog.push({callsign:name,line:text,relation,story:true});
         if (this.commsLog.length > 40) this.commsLog.shift();
         const script = conversationId === 'rin-first-flight' ? ADVENTURE_DIALOGUES.flight
@@ -2832,6 +2862,7 @@ export class GameUI {
             if (choice.next) state.asked.add(choice.next);
         }
         if (choice.tutorialChoice) {
+            this.recordAdventureTopic();
             if (this.actions?.chooseTutorial?.(choice.tutorialChoice)?.changed)
                 this.closeAdventure();
             return;
@@ -3012,6 +3043,10 @@ export class GameUI {
         // instead of the fitting overview. Entering always starts at the top;
         // the guns/systems choice is a preference and survives.
         if (point === 'equipment') {
+            this.inventoryItemId = undefined;
+            this.inventoryMountId = undefined;
+            this.inventoryFitExplicit = false;
+            this.inventoryNotice = undefined;
             this.outfittingItemId = undefined;
             this.outfittingMountId = undefined;
             this.outfittingStage = 'overview';
@@ -3097,7 +3132,7 @@ export class GameUI {
         const commodity = COMMODITIES[commodityId];
         const item = market[commodityId];
         const owned = this.save.player.cargo[commodityId] ?? 0;
-        const price = den ? denPrice(this.dockLocation, commodityId, item, this.save.world.seed, this.save.world.economyClock) ?? 0 : item.lastPrice;
+        const price = den ? denPrice(this.dockLocation, commodityId, item, this.save.world.seed, this.save.world.economyClock) ?? 0 : tutorialTradePrice(this.save,this.dockLocation,commodityId) ?? item.lastPrice;
         const quantity = Math.max(1, Math.min(999, Math.floor(this.marketQuantity || 1)));
         const buyQuote = quoteCommodityTrade(this.save, this.dockLocation, commodityId, 'buy', quantity, price);
         const sellQuote = quoteCommodityTrade(this.save, this.dockLocation, commodityId, 'sell', quantity, price);
@@ -3109,54 +3144,19 @@ export class GameUI {
         const trend = this.marketTrend(price, intel);
         const remoteQuotes = den ? [] : knownMarketQuotes(this.save.world, commodityId, this.dockLocation);
         const bestRoute = den ? undefined : bestKnownTradeRoute(this.save.world, this.dockLocation, commodityId);
-        const localLegal = commodityIds.filter((id) => COMMODITIES[id].legal);
-        const bestLocalBuy = [...localLegal].sort((a, b) => market[a].lastPrice / COMMODITIES[a].basePrice - market[b].lastPrice / COMMODITIES[b].basePrice)[0];
-        const strongestDemand = [...localLegal].sort((a, b) => (market[b].demand - market[b].supply) - (market[a].demand - market[a].supply))[0];
         const quoteLine = (quote) => quote.quantity > 0
             ? t('{total} · {mass} mass', { total: formatCredits(quote.total), mass: Math.abs(quote.massDelta ?? commodity.mass * quote.quantity).toFixed(1) })
             : this.tradeFailureLabel(quote.reason);
-        const marketPriceFor = (id) => den ? denPrice(this.dockLocation, id, market[id], this.save.world.seed, this.save.world.economyClock) ?? 0 : market[id].lastPrice;
-        const carried = ids.map((id) => {
-            const quantity = Math.max(0, Math.floor(this.save.player.cargo[id] ?? 0));
-            const entry = COMMODITIES[id];
-            const entryPrice = marketPriceFor(id);
-            const quote = quoteCommodityTrade(this.save, this.dockLocation, id, den ? 'den-sell' : 'sell', 999, entryPrice);
-            return { id, entry, quantity, entryPrice, quote, mass: quantity * entry.mass };
-        }).filter((entry) => entry.quantity > 0 && entry.quote.quantity > 0);
-        const carriedIds = new Set(carried.map((entry) => entry.id));
-        const carriedUnits = carried.reduce((sum, entry) => sum + entry.quantity, 0);
-        const carriedMass = carried.reduce((sum, entry) => sum + entry.mass, 0);
-        const carriedValue = carried.reduce((sum, entry) => sum + entry.quote.total, 0);
-        const carriedTypeLabel = carried.length === 1 ? t('1 TYPE') : t('{count} TYPES', { count: carried.length });
-        const carriedUnitLabel = carriedUnits === 1 ? t('1 UNIT') : t('{quantity} UNITS', { quantity: carriedUnits });
-        const otherCargoMass = Math.max(0, cargoMass(this.save.player) - carriedMass);
-        const cargoManifest = carried.length ? `
-          <div class="cargo-sale-grid">
-            ${carried.map(({ id, entry, quantity: carriedQuantity, entryPrice, quote }) => {
-                const quantityLabel = carriedQuantity === 1 ? t('1 UNIT') : t('{quantity} UNITS', { quantity: carriedQuantity });
-                const saleLabel = carriedQuantity === 1
-                    ? t('Sell {commodity} for {total}', { commodity: t(entry.name), total: formatCredits(quote.total) })
-                    : t('Sell all {quantity} {commodity} for {total}', { quantity: carriedQuantity, commodity: t(entry.name), total: formatCredits(quote.total) });
-                return `<article class="cargo-sale-item ${id === commodityId ? 'selected' : ''}" style="--commodity-accent:${entry.accent}">
-              <button type="button" class="cargo-sale-select" data-commodity-id="${id}" aria-label="${escapeHtml(t('Select {commodity} from your cargo', { commodity: t(entry.name) }))}">
-                <i aria-hidden="true"></i><span><b>${escapeHtml(t(entry.name))}</b><small>${quantityLabel} · ${(carriedQuantity * entry.mass).toFixed(1)} ${t('MASS')}</small></span><em>${formatCredits(entryPrice)} / ${t('UNIT')}</em>
-              </button>
-              <button type="button" class="cargo-sale-action" data-trade="${den ? 'den-sell' : 'sell'}:${id}:999" aria-label="${escapeHtml(saleLabel)}"><span>${t('SELL ALL')}</span><b>${formatCredits(quote.total)}</b></button>
-            </article>`;
-            }).join('')}
-          </div>` : `<p class="cargo-sale-empty"><b>${t(den ? 'NO RESTRICTED CARGO LOADED' : 'NO LOOSE CARGO LOADED')}</b><span>${t(den ? 'Restricted goods in your hold will appear here.' : 'Bought, mined, and salvaged goods will appear here.')}</span></p>`;
-        const catalogIds = [...ids].sort((a, b) => Number(carriedIds.has(b)) - Number(carriedIds.has(a)));
+        const marketPriceFor = (id) => den ? denPrice(this.dockLocation, id, market[id], this.save.world.seed, this.save.world.economyClock) ?? 0 : tutorialTradePrice(this.save,this.dockLocation,id) ?? market[id].lastPrice;
+        const catalogIds = [...ids].sort((a,b)=>Number((this.save.player.cargo[b]??0)>0)-Number((this.save.player.cargo[a]??0)>0));
         const catalog = catalogIds.map((id) => {
             const entry = COMMODITIES[id];
-            const stock = market[id];
             const entryPrice = marketPriceFor(id);
-            const entryBand = this.marketPriceBand(entryPrice, entry);
-            const entryCondition = this.marketCondition(stock);
             const entryOwned = this.save.player.cargo[id] ?? 0;
             return `<button type="button" class="commodity-card ${id === commodityId ? 'selected' : ''} ${entryOwned > 0 ? 'has-cargo' : ''} ${entry.legal ? '' : 'restricted'}" data-commodity-id="${id}" role="option" aria-selected="${id === commodityId}" style="--commodity-accent:${entry.accent}">
               ${this.commodityArt(entry)}
-              <span class="commodity-card-copy"><b>${escapeHtml(t(entry.name))}</b><small>${escapeHtml(t(entry.packaging))} · ${entry.mass} ${t('MASS')}</small><em class="market-condition ${entryCondition.className}">${entryCondition.label}</em></span>
-              <span class="commodity-card-price"><b>${formatCredits(entryPrice)}</b><small class="price-${entryBand.className}">${entryBand.label}</small>${entryOwned > 0 ? `<em class="commodity-hold-badge">${t('HOLD')} ${entryOwned}</em>` : ''}</span>
+              <span class="commodity-card-copy"><b>${escapeHtml(t(entry.name))}</b></span>
+              <span class="commodity-card-price"><b>${formatCredits(entryPrice)}</b>${entryOwned > 0 ? `<em class="commodity-hold-badge">${t('HOLD')} ${entryOwned}</em>` : ''}</span>
             </button>`;
         }).join('');
         const quoteRows = remoteQuotes.length ? remoteQuotes.slice(0, 4).map((quote) => {
@@ -3169,7 +3169,7 @@ export class GameUI {
         return `
         <div class="market-layout commodity-exchange ${den ? 'is-den' : ''} ${this.marketMobileDetail ? 'is-detail-open' : ''}">
           <div class="commodity-market-shell">
-            <div class="commodity-catalog" role="listbox" aria-label="${t('Commodities')}">${carried.length?`<details class="market-cargo"><summary>${t('CARGO')} · ${carriedUnits} · ${formatCredits(carriedValue)}</summary>${cargoManifest}${otherCargoMass>.01?`<small>${t('OTHER CARGO · {mass} MASS IS NOT TRADED HERE',{mass:otherCargoMass.toFixed(1)})}</small>`:''}</details>`:''}${catalog}</div>
+            <div class="commodity-catalog" role="listbox" aria-label="${t('Commodities')}">${catalog}</div>
             <section class="trade-ticket ${commodity.legal ? '' : 'restricted'}" style="--commodity-accent:${commodity.accent}">
               <div class="trade-ticket-hero"><button type="button" class="commodity-list-back" data-ui-command="commodity-list">${t('◀ ALL COMMODITIES')}</button>${this.commodityArt(commodity, 'hero')}<div><span class="eyebrow">${escapeHtml(t(commodity.category))} · ${escapeHtml(t(commodity.packaging))}</span><h3>${escapeHtml(t(commodity.name))}</h3><details class="ui-details"><summary>${t('Details')}</summary><p>${escapeHtml(t(commodity.description))}</p><blockquote>${escapeHtml(t(commodity.flavor))}</blockquote></details></div></div>
               <div class="trade-market-readout">
@@ -3182,8 +3182,8 @@ export class GameUI {
               <div class="trade-actions-ticket">
                 <button type="button" class="trade-buy" data-trade="${den ? 'den-buy' : 'buy'}:${commodityId}:${quantity}" ${buyQuote.quantity > 0 ? '' : 'disabled'}><span>${t('BUY')} ${buyQuote.quantity || quantity}</span><small>${escapeHtml(quoteLine(buyQuote))}</small></button>
                 <button type="button" class="trade-sell" data-trade="${den ? 'den-sell' : 'sell'}:${commodityId}:${quantity}" ${sellQuote.quantity > 0 ? '' : 'disabled'}><span>${t('SELL')} ${sellQuote.quantity || quantity}</span><small>${escapeHtml(quoteLine(sellQuote))}</small></button>
-                <button type="button" data-trade="${den ? 'den-buy' : 'buy'}:${commodityId}:999" ${maxBuy.quantity > 0 ? '' : 'disabled'}>${t('BUY MAX')} · ${maxBuy.quantity}</button>
-                <button type="button" data-trade="${den ? 'den-sell' : 'sell'}:${commodityId}:999" ${sellAll.quantity > 0 ? '' : 'disabled'}>${t('SELL ALL')} · ${sellAll.quantity}</button>
+                <button type="button" data-trade="${den ? 'den-buy' : 'buy'}:${commodityId}:999" ${maxBuy.quantity > 0 ? '' : 'disabled'}><span>${t('BUY MAX')} · ${maxBuy.quantity}</span>${maxBuy.quantity>0?`<small>${formatCredits(maxBuy.total)}</small>`:''}</button>
+                <button type="button" data-trade="${den ? 'den-sell' : 'sell'}:${commodityId}:999" ${sellAll.quantity > 0 ? '' : 'disabled'}><span>${t('SELL ALL')} · ${sellAll.quantity}</span>${sellAll.quantity>0?`<small>${formatCredits(sellAll.total)}</small>`:''}</button>
               </div>
               <details class="trade-notes"><summary>${t('Market intel')}</summary>${den ? `<p class="den-footnote">${t('Untraceable cargo. The den pays off-manifest and never writes the transaction to a licensed manifest.')}</p>` : `<div class="route-intelligence"><p>${intel?.previousPrice ? t('SINCE LAST VISIT') : t('FIRST RECORDED QUOTE')}</p>${routeCallout}<ol>${quoteRows}</ol></div>`}</details></div>
             </section>
@@ -3239,7 +3239,7 @@ export class GameUI {
         }
     }
     missionBadge(mission) {
-        return mission.authored ? t('STORY CONTRACT') : mission.kind === 'bounty' ? t('WARRANT') : mission.kind === 'transport' ? t('EXPRESS') : mission.kind === 'smuggle' ? t('DARK RUN') : t(mission.kind.toUpperCase());
+        return mission.authored ? t('STORY CONTRACT') : mission.kind === 'mining' ? t('Mining').toUpperCase() : mission.kind === 'bounty' ? t('WARRANT') : mission.kind === 'transport' ? t('EXPRESS') : mission.kind === 'smuggle' ? t('DARK RUN') : t(mission.kind.toUpperCase());
     }
     deadlineLabel(mission) {
         if (mission.authored && mission.status === 'offered' && Number.isFinite(Number(mission.deadlineSeconds)))
@@ -3370,6 +3370,7 @@ export class GameUI {
         const eligibility = this.missionEligibility(mission);
         const active = this.missionBoardTab === 'active' || mission.active;
         const discardable = active
+            && !(mission.tutorial&&!tutorialContentUnlocked(this.save))
             && !mission.authored
             && !mission.chainId
             && mission.kind !== 'race'
@@ -3397,22 +3398,17 @@ export class GameUI {
           ${active||mission.authored||!['delivery','transport','smuggle'].includes(mission.kind)?`<section class="mission-objective" aria-label="${active?t('CURRENT OBJECTIVE'):t('CONTRACT SUMMARY')}"><b>${escapeHtml(this.missionProgress(mission))}</b></section>`:''}<details class="ui-details mission-details"><summary>${t('Details')}</summary><p>${escapeHtml(t(mission.issuer))}</p>${mission.authored?'':`<p class="mission-briefing">${escapeHtml(missionBriefing(mission))}</p>`}</details>
           ${!active && eligibility.issues.length ? `<ul class="mission-blockers">${eligibility.issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join('')}</ul>` : ''}
           </div><footer class="mission-dossier-actions ${discardable ? 'has-discard' : ''}">
-            ${active ? `<button type="button" class="primary" data-mission-course="${route.targetId}" ${route.targetId ? '' : 'disabled'}>${t('SET COURSE')}</button>` : `<button type="button" class="primary" data-mission-id="${mission.id}" ${eligibility.ok && !tutorialCampaignSummary(this.save)?.active ? '' : 'disabled'}>${mission.locked ? t('COURSE LOCKED') : t('ACCEPT')}</button>`}
+            ${active ? `<button type="button" class="primary" data-mission-course="${route.targetId}" ${route.targetId ? '' : 'disabled'}>${t('SET COURSE')}</button>` : `<button type="button" class="primary" data-mission-id="${mission.id}" ${eligibility.ok && (tutorialContentUnlocked(this.save)||mission.id===TUTORIAL_MINING_CONTRACT_ID&&getTutorialQuest(this.save)?.flags.miningExplained) ? '' : 'disabled'}>${mission.locked ? t('COURSE LOCKED') : t('ACCEPT')}</button>`}
+            ${mission.id===TUTORIAL_MINING_CONTRACT_ID&&!getTutorialQuest(this.save)?.flags.miningExplained?`<small>${t('Talk to Rin first.')}</small>`:''}
             ${discardable ? `<button type="button" class="mission-discard-action" data-mission-discard="${mission.id}" aria-expanded="${confirmingDiscard}">${t('DISCARD CONTRACT')}</button>` : ''}
-            ${!active && tutorialCampaignSummary(this.save)?.active?`<small>${t('Finish the family prologue to take on contracts and races.')}</small>`:''}
+            ${!active && !tutorialContentUnlocked(this.save) && mission.id!==TUTORIAL_MINING_CONTRACT_ID?`<small>${t('Finish the family prologue to take on contracts and races.')}</small>`:''}
             ${confirmingDiscard ? `<div class="mission-discard-confirm" role="alert"><p>${t('Discard this contract? The bond stays lost, reserved mission cargo is removed, and guild and faction standing fall.')}</p><button type="button" data-ui-command="mission-discard-cancel">${t('KEEP CONTRACT')}</button><button type="button" class="mission-discard-final" data-mission-discard-confirm="${mission.id}">${t('CONFIRM DISCARD')}</button></div>` : ''}
           </footer>
         </article>`;
     }
     // The board's two lists, in the order the tabs and the list both need them.
     missionBoardCounts() {
-        const posted = this.save.world.offers[this.dockLocation] ?? [];
-        const raceActive = (mission) => mission.kind === 'race'
-            && this.save.world.raceRecords?.[mission.id.slice(5)]?.active === true;
-        return {
-            offers: posted.filter((mission) => !raceActive(mission)),
-            active: [...this.save.activeMissions, ...posted.filter(raceActive)],
-        };
+        return {offers:this.missionBoardSource('available'),active:this.missionBoardSource('active')};
     }
     renderMissions() {
         const { offers, active } = this.missionBoardCounts();
@@ -3437,7 +3433,7 @@ export class GameUI {
             && this.save.world.raceRecords?.[mission.id.slice(5)]?.active === true);
         return tab === 'active'
             ? [...this.save.activeMissions, ...activeRaces]
-            : posted.filter((mission) => !activeRaces.includes(mission));
+            : posted.filter((mission) => !activeRaces.includes(mission) && (tutorialContentUnlocked(this.save)||mission.id===TUTORIAL_MINING_CONTRACT_ID));
     }
     droneHudSnapshot(model) {
         let live = model?.miningDrones ?? model?.drones;
@@ -3525,69 +3521,68 @@ export class GameUI {
         return `<div class="drone-policy" role="group" aria-label="${t('PDC drone policy')}">${['defend', 'stow'].map(policy => `<button type="button" data-ui-command="drone-pdc-policy" data-drone-policy="${policy}" aria-pressed="${drones.pdcPolicy === policy}" ${!this.actions?.setDronePdcPolicy || this.droneCommandPending ? 'disabled' : ''}>${t(policy === 'defend' ? 'PDC DEFEND' : 'PDC STOW')}</button>`).join('')}</div>`;
     }
     renderDroneBayRows(drones, compact = false) {
-        const modes = canMineWithHull(this.save.player.shipId) ? ['mining','pdc','repair','attack'] : ['pdc','repair','attack'];
-        const modeLabel = mode => t(compact ? {mining:'Mining',pdc:'PDC',repair:'Repair',attack:'Attack'}[mode] : mode.toUpperCase());
+        const modes = canMineWithHull(this.save.player.shipId) ? ['mining','pdc','repair'] : ['pdc','repair'];
+        const modeLabel = mode => t(compact ? {mining:'Mining',pdc:'PDC',repair:'Repair'}[mode] : mode.toUpperCase());
         return drones.bays.map((bay,index) => {
             const actual = this.save.player.outfitting.loadouts[this.save.player.shipId].droneBays[index];
             const pending = actual.pendingMode;
-            return `<div class="drone-bay-row"><b>${t('BAY {number}',{number:index+1})} · ${modeLabel(bay.mode)} · ${bay.operational}/${DRONE_BAY_CAPACITY[bay.mode]}</b>
-            <p>${pending ? t('Returning, then {role}. Resume flight to complete.',{role:t(pending.toUpperCase())}) : compact ? (bay.units.length ? t('HULL')+' '+bay.units.map(u=>`${Math.ceil(u.hull)}/${DRONE_TYPES[u.type].maxHull}${DRONE_TYPES[u.type].magazineCapacity ? ` · ${t('AMMO')} ${u.ammo}`:''}`).join(' · ') : t('Empty bay')) : bay.units.map(u=>`${t(String(u.state).toUpperCase())} · ${t('HULL')} ${Math.ceil(u.hull)}/${DRONE_TYPES[u.type].maxHull}${DRONE_TYPES[u.type].magazineCapacity ? ` · ${t('AMMO')} ${u.ammo}`:''}`).join(' / ') || t('Empty bay')}</p>
-            <div class="drone-policy" role="group" aria-label="${t('BAY {number}',{number:index+1})}">${modes.map(mode=>`<button type="button" data-ui-command="drone-bay-mode" data-drone-bay="${bay.bayId}" data-drone-mode="${mode}" aria-pressed="${bay.mode===mode && !pending}" ${this.droneCommandPending ? 'disabled':''}>${DRONE_BAY_CAPACITY[mode]} ${modeLabel(mode)}</button>`).join('')}
-            <button type="button" data-ui-command="drone-bay-stow" data-drone-bay="${bay.bayId}">${t('STOW')}</button></div></div>`;
+            const hull=bay.units.reduce((sum,u)=>sum+Math.ceil(u.hull),0),maxHull=bay.units.reduce((sum,u)=>sum+DRONE_TYPES[u.type].maxHull,0);
+            const heading=compact?`<div class="drone-bay-heading"><b>${t('BAY {number}',{number:index+1})} · ${bay.operational}/${DRONE_BAY_CAPACITY[bay.mode]}</b><small>${bay.units.length?`${t('HULL')} ${hull}/${maxHull}`:t('Empty bay')}</small></div>`:`<b>${t('BAY {number}',{number:index+1})} · ${modeLabel(bay.mode)} · ${bay.operational}/${DRONE_BAY_CAPACITY[bay.mode]}</b>`;
+            return `<div class="drone-bay-row">${heading}
+            ${pending?`<p role="status">${t('Resume flight to switch to {role}. Drones return automatically.',{role:modeLabel(pending)})}</p>`:compact?'':`<p>${bay.units.map(u=>`${t(String(u.state).toUpperCase())} · ${t('HULL')} ${Math.ceil(u.hull)}/${DRONE_TYPES[u.type].maxHull}`).join(' / ')||t('Empty bay')}</p>`}
+            <div class="drone-policy" role="group" aria-label="${t('BAY {number}',{number:index+1})}">${modes.map(mode=>`<button type="button" data-ui-command="drone-bay-mode" data-drone-bay="${bay.bayId}" data-drone-mode="${mode}" aria-pressed="${(pending??bay.mode)===mode}" ${this.droneCommandPending ? 'disabled':''}>${DRONE_BAY_CAPACITY[mode]} ${modeLabel(mode)}</button>`).join('')}
+            </div></div>`;
         }).join('');
     }
     renderDroneStock(shop = false) {
         const fleet = this.save.player.droneFleet;
-        return `<details><summary>${t('DRONE CARGO')} · ${Object.keys(fleet?.unitsById ?? {}).length} ${t('mass')}</summary><p>${t('Every owned drone uses 1 cargo space, reserved while deployed. Select a bay role to load stored drones. Switching recalls that bay first.')}</p>${Object.entries(DRONE_TYPES).map(([type,definition])=>{
+        if(!shop&&!fleet?.lockerIds?.length)return '';
+        return `<details><summary>${t('DRONE CARGO')}</summary><p>${t('Each drone uses 1 cargo space. Switching roles returns deployed drones and loads the selected type from cargo automatically.')}</p>${['mining','pdc','repair'].map(type=>{const definition=DRONE_TYPES[type];
             const count = (fleet?.lockerIds ?? []).filter(id=>fleet.unitsById[id]?.type===type).length;
+            if(!shop&&!count)return '';
             return `<div class="drone-bay-row"><b>${t(type.toUpperCase())} · ${count} ${t('spare')}</b>${shop ? `<div class="drone-policy"><button data-ui-command="drone-stock-buy" data-drone-type="${type}">${t('BUY')} · ${formatCredits(definition.replacementPrice)}</button><button data-ui-command="drone-stock-sell" data-drone-type="${type}" ${count?'':'disabled'}>${t('SELL SPARE')} · ${t('up to')} ${formatCredits(Math.floor(definition.replacementPrice*.5))}</button></div>`:''}</div>`;
         }).join('')}</details>`;
     }
     renderDroneShipStatus() {
         const drones = this.droneHudSnapshot();
         if (!drones.bays?.length) return Object.keys(this.save.player.droneFleet?.unitsById ?? {}).length ? `<section class="ship-menu-drones">${this.renderDroneStock()}</section>` : '';
-        return `<section class="ship-menu-drones"><h3>${t('DRONE BAYS')}</h3>${this.renderDroneBayRows(drones,true)}${this.renderDroneStock()}
-        <button type="button" data-ui-command="drone-toggle" ${this.save.player.dockedAt || !drones.action?.ok ? 'disabled':''}>${t(drones.phase==='running'?'RECALL MINERS':'MINE')}</button>${this.renderDronePolicy(drones)}${this.droneServiceNotice ? `<p role="status">${escapeHtml(this.droneServiceNotice)}</p>`:''}</section>`;
+        return `<section class="ship-menu-drones"><p class="ship-drone-explainer">${t('Select a role for each bay. Deployed drones return automatically before switching.')}</p><div class="ship-drone-bays">${this.renderDroneBayRows(drones,true)}</div>${this.renderDroneStock()}
+        ${!this.save.player.dockedAt&&drones.phase!=='running'&&drones.action?.ok?`<button type="button" data-ui-command="drone-toggle">${t('MINE')}</button>`:''}${this.droneServiceNotice?`<p role="status">${escapeHtml(this.droneServiceNotice)}</p>`:''}</section>`;
     }
     renderDroneBayConfiguration() {
         const drones = this.droneHudSnapshot();
-        return `<section class="drone-service-card"><h3>${t('DRONE BAYS')}</h3>${this.renderDroneBayRows(drones)}${this.renderDroneStock(hasLocationService(this.dockLocation,'outfitting'))}${this.renderDroneServices(true)}</section>`;
-    }
-    renderDroneServices(compact = false) {
-        const drones = this.droneHudSnapshot();
-        if (!drones.bays?.length || !this.save?.player?.dockedAt) return '';
-        this.droneServiceQuotes = {};
-        const quotes = (compact ? ['full'] : ['full', 'maintain']).map(kind => {
-            let quote;
-            try { quote = this.actions?.droneServiceQuote?.(kind === 'maintain' ? { fillSlots: [] } : {}); } catch { /* An old callback can no longer quote this fleet. */ }
-            this.droneServiceQuotes[kind] = quote;
-            const valid = quote?.ok && Number.isFinite(quote.total);
-            const totals = { replacement: 0, repair: 0, rounds: 0 };
-            for (const line of quote?.lines ?? []) if (line.kind in totals) totals[line.kind] += line.cost;
-            const enabled = valid && quote.canCommit !== false && quote.lines?.length
-                && quote.total <= this.save.player.credits && this.actions?.serviceDrones && !this.droneCommandPending;
-            return `${kind === 'maintain' ? `<details><summary>${t('Service options')}</summary>` : ''}<div class="drone-service-quote"><b>${t(kind === 'full' ? 'Refill, repair and rearm' : 'Repair and rearm existing drones')}</b>${valid ? `<details><summary>${t('Cost breakdown')}</summary><dl><div><dt>${t('Drone replacements')}</dt><dd>${formatCredits(totals.replacement)}</dd></div><div><dt>${t('Drone repairs')}</dt><dd>${formatCredits(totals.repair)}</dd></div><div><dt>${t('Drone ammunition')}</dt><dd>${formatCredits(totals.rounds)}</dd></div></dl></details>` : `<p>${t('Drone service quote unavailable.')}</p>`}<button type="button" data-ui-command="drone-service" data-drone-service="${kind}" ${enabled ? '' : 'disabled'}>${t('SERVICE DRONES')} · ${valid ? formatCredits(quote.total) : '—'}</button></div>${kind === 'maintain' ? '</details>' : ''}`;
-        }).join('');
-        if (compact) return `<div class="drone-bay-service">${quotes}${this.droneServiceNotice ? `<p role="status">${escapeHtml(this.droneServiceNotice)}</p>` : ''}</div>`;
-        return `<article class="service-card drone-service-card"><h3>${t('Drone service')}</h3>${quotes}${this.droneServiceNotice ? `<p role="status">${escapeHtml(this.droneServiceNotice)}</p>` : ''}</article>`;
+        return `<section class="drone-service-card"><h3>${t('DRONE BAYS')}</h3>${this.renderDroneBayRows(drones)}${this.renderDroneStock(hasLocationService(this.dockLocation,'outfitting'))}</section>`;
     }
     renderServices() {
-        const stats = getEffectiveShipStats(this.save.player);
-        const repairs = repairCost(this.save.player);
-        const refill = refillCost(this.save.player);
+        const player = this.save.player, stats = getEffectiveShipStats(player);
+        const repairs = dockServiceQuote(player, 'repair'), refill = dockServiceQuote(player, 'refill');
         const repairBay = hasLocationService(this.dockLocation, 'repair');
         const fuelDepot = hasLocationService(this.dockLocation, 'fuel');
-        const ordnanceBars = launcherMagazineEntries(this.save.player).map((entry) => (
-            `<label>${escapeHtml(t(entry.launcher.ordnanceNameKey))} · ${escapeHtml(t('MOUNT {number}', { number: entry.index + 1 }))} <i><b style="width:${percent(entry.rounds, entry.capacity)}%"></b></i><em>${entry.rounds}/${entry.capacity}</em></label>`
-        )).join('') || `<label>${t('MISSILES')} <i><b style="width:0%"></b></i><em>0/0</em></label>`;
-        return `
-      <div class="service-grid">
-        ${repairBay ? `<article class="service-card compact-service"><h3>${t('Repair bay')}</h3><div class="service-bars"><label>${t('HULL INTEGRITY')} <i><b style="width:${percent(this.save.player.hull, stats.hull)}%"></b></i><em>${Math.ceil(this.save.player.hull)}/${stats.hull}</em></label></div><button class="primary" data-ui-command="repair" ${repairs <= 0 ? 'disabled' : ''}>${t('REPAIR')} · ${formatCredits(repairs)}</button></article>` : ''}
-        ${fuelDepot ? `<article class="service-card compact-service"><h3>${t('Fuel and ordnance')}</h3><div class="service-bars"><label>${t('FUEL')} <i><b style="width:${percent(this.save.player.fuel, stats.fuel)}%"></b></i><em>${Math.ceil(this.save.player.fuel)}/${stats.fuel}</em></label>${ordnanceBars}</div><details><summary>${t('Details')}</summary><p>${t('Refill afterburner propellant, mounted-rack ordnance, and installed gun magazines.')}</p></details><button class="primary" data-ui-command="refuel" ${refill <= 0 ? 'disabled' : ''}>${t('REFILL')} · ${formatCredits(refill)}</button></article>` : ''}
-        ${this.renderDroneServices()}
-        <details class="ui-details service-recovery"><summary>${t('Emergency recovery')}</summary><p>${t('A destroyed ship is towed to the last safe dock. The service retains cargo, mission bonds, and a percentage of liquid credit.')}</p></details>
-      </div>
-    `;
+        const fit = loadoutFor(player), fleet = player.droneFleet;
+        const ids = new Set([...(fit.droneBays ?? []).flatMap(b => b.unitIds).filter(Boolean), ...(fleet?.lockerIds ?? [])]);
+        const units = [...ids].map(id => fleet?.unitsById[id]).filter(Boolean);
+        const droneHull = units.reduce((n, u) => n + u.hull, 0), droneMax = units.reduce((n, u) => n + DRONE_TYPES[u.type].maxHull, 0);
+        const magazines = launcherMagazineEntries(player).map(e => [e.rounds, e.capacity]);
+        const ammoIds = new Set((fit.guns ?? []).map(weaponIdForOutfit).map(id => WEAPONS[id]?.ammoId).filter(Boolean));
+        for (const id of ammoIds) magazines.push([player.ammo?.[id] ?? 0, AMMO_CAPACITY[id] ?? 0]);
+        const ammo = magazines.reduce((n, m) => n + m[0], 0), ammoMax = magazines.reduce((n, m) => n + m[1], 0);
+        const bar = (label, value, max) => `<label><span>${t(label)}</span><em>${Math.ceil(value)}/${max}</em><i><b style="width:${percent(value,max)}%"></b></i></label>`;
+        const action = (command, label, quote) => `<button type="button" class="primary" data-ui-command="${command}" ${!quote.ok || quote.total <= 0 || quote.total > player.credits ? 'disabled' : ''}>${t(label)} · ${Number.isFinite(quote.total) ? formatCredits(quote.total) : '—'}</button>`;
+        const current = player.shipPaints?.[player.shipId] ?? 'original';
+        const paints = FLEET_PAINTS[player.shipId]?.paints ?? [];
+        if (this.servicePaintHull !== player.shipId || !paints.some(p => p.id === this.servicePaintId)) {
+            this.servicePaintHull = player.shipId; this.servicePaintId = current;
+        }
+        const paint = this.servicePaintId, cost = repaintCost(player);
+        const paintName = p => {
+            const independent = {'independent-surveyor':'Surveyor','independent-hauler':'Industrial','independent-courier':'Courier','independent-bands':'Twin bands','independent-repairs':'Repair panels','independent-split':'Split panels',neutral:'Ivory / petrol'};
+            return t(independent[p.id] ?? (p.id === 'original' ? {concord:'Concord',alliance:'Alliance',pirates:'Pirate',independents:'Silver / yellow'}[FLEET_PAINTS[player.shipId].native] : {concord:'Concord',alliance:'Alliance',pirates:'Pirate'}[p.id]) ?? p.name);
+        };
+        return `<div class="service-grid service-grid-simple">
+          ${repairBay ? `<article class="service-card"><h3>${t('Ship & drone repair')}</h3><div class="service-emblem" aria-hidden="true"><svg viewBox="0 0 100 64"><path d="M50 4 63 31 84 47 64 47 60 59 40 59 36 47 16 47 37 31Z"/><path class="service-emblem-accent" d="M76 8v20M66 18h20"/></svg></div><div class="service-bars">${bar('Hull',player.hull,stats.hull)}${droneMax ? bar('Drones',droneHull,droneMax) : ''}</div>${action('repair','REPAIR',repairs)}</article>` : ''}
+          ${fuelDepot ? `<article class="service-card"><h3>${t('Fuel and ordnance')}</h3><div class="service-emblem" aria-hidden="true"><svg viewBox="0 0 100 64"><path d="M27 13h30v46H27ZM33 5h18v8M57 21h9l9 11v17q0 8-8 8t-8-8V36M65 15l10 12"/><path class="service-emblem-accent" d="m43 24-7 13h10l-7 13"/></svg></div><div class="service-bars">${bar('FUEL',player.fuel,stats.fuel)}${ammoMax ? bar('Ammunition',ammo,ammoMax) : ''}</div>${action('refuel','REFILL',refill)}</article>` : ''}
+          ${repairBay && paints.length > 1 ? `<article class="service-card service-paint-card"><h3>${t('Hull paint')}</h3><div class="ship-silhouette service-paint-preview" data-variant="${escapeHtml(SHIPS[player.shipId].variant)}" data-paint="${escapeHtml(paint)}" role="img" aria-label="${escapeHtml(t('Hull paint'))}"></div><select data-service-paint aria-label="${t('Hull paint')}">${paints.map(p => `<option value="${p.id}" ${paint===p.id?'selected':''}>${escapeHtml(paintName(p))}</option>`).join('')}</select><button type="button" class="primary" data-ui-command="repaint" ${paint===current||player.credits<cost?'disabled':''}>${t(paint===current?'Current paint':'Apply paint')}${paint===current?'':` · ${formatCredits(cost)}`}</button></article>` : ''}
+        </div>`;
     }
     resetOutfittingDrafts() {
         this.outfittingItemId = undefined;
@@ -4042,7 +4037,7 @@ export class GameUI {
           <section class="ship-showroom-stage" aria-labelledby="ship-showroom-name">
             <div class="ship-stage-heading"><span>T${ship.tier} · ${escapeHtml(t(shipRoleLabel(ship.role)))}</span><b>${escapeHtml(t(ship.className))}</b></div>
             <div class="ship-silhouette ship-silhouette-large ${saleId}" data-variant="${ship.variant}" role="img" aria-label="${t('{name} ship preview', { name: ship.name })}"></div>
-            <div class="ship-stage-title"><div><h3 id="ship-showroom-name">${escapeHtml(ship.name)}</h3><p>${escapeHtml(t(ship.personality ?? ''))}</p></div><strong>${formatCredits(ship.price)}</strong></div>
+            <div class="ship-stage-title"><div><h3 id="ship-showroom-name">${escapeHtml(ship.name)}</h3><p>${escapeHtml(t(ship.personality ?? ''))}</p></div></div>
           </section>
           <section class="ship-showroom-sheet">
             <div class="ship-sheet-scroll"><div class="ship-spec-grid">${stats.filter(([label])=>!['AFTERBURNER','FUEL'].includes(label)).map(([label, value, delta, digits = 0]) => `<div><span title="${t(label)}">${specLabel(label)}</span><b>${value}</b>${this.statDelta(delta, digits)}</div>`).join('')}</div>
@@ -4050,8 +4045,8 @@ export class GameUI {
               ${[['Weapon','Weapon',hardpoints.weapons?.length??hardpoints.guns.length],['Utility','Utility',hardpoints.utility.length],['Drone bays','Drone bays',hardpoints.droneBays?.length??0],['Turret','Turret',hardpoints.turrets?.length??0]].map(([label,icon,n])=>`<div title="${t(label)}" aria-label="${t(label)}"><span>${t(icon)}</span><b>${n}</b></div>`).join('')}
             </div>
             <details class="ui-details ship-details"><summary>${t('Details')}</summary><div class="ship-spec-grid">${stats.filter(([label])=>['AFTERBURNER','FUEL'].includes(label)).map(([label,value,delta,digits=0])=>`<div><span>${t(label)}</span><b>${value}</b>${this.statDelta(delta,digits)}</div>`).join('')}</div><p class="ship-description">${escapeHtml(t(ship.description))}</p><p class="ship-career-note">${(ship.progressesTo ?? []).length ? `Suggested next ships: ${ship.progressesTo.map(id=>SHIPS[id].name).join(" · ")}` : "Top tier in this role"}</p>${ship.price ? `<p class="ship-career-note">Outfitting budget: ${formatCredits(Math.round(ship.price*.2))}–${formatCredits(Math.round(ship.price*.35))} extra.</p>` : ""}<p class="ship-handling-note">${t('Handling falls up to 24% as the cargo hold fills.')}</p></details></div>
-            ${active ? `<button class="ship-current-button" type="button" disabled>${t('THIS IS YOUR CURRENT SHIP')}</button>` : `<div class="ship-trade-panel">
-              ${stored ? "" : `<div class="ship-trade-numbers"><span><small>${t('LIST PRICE')}</small><b>${formatCredits(ship.price)}</b></span><span><small>${t('TRADE-IN · {name}', { name: current.name })}</small><b>${tradeIn > 0 ? '−' : ''}${formatCredits(tradeIn)}</b></span><strong><small>${amountDue >= 0 ? t('BALANCE TO PAY') : t('CREDIT TO YOU')}</small><b>${formatCredits(Math.abs(amountDue))}</b></strong></div>`}
+            ${active ? '' : `<div class="ship-trade-panel">
+              ${stored || !tradeIn ? "" : `<div class="ship-trade-numbers"><span><small>${t('TRADE-IN · {name}', { name: current.name })}</small><b>${tradeIn > 0 ? '−' : ''}${formatCredits(tradeIn)}</b></span></div>`}
               ${stored?`<small>${escapeHtml(LOCATIONS[stored.locationId]?.name ?? stored.locationId)}</small>`:''}
               <button type="button" class="primary ship-trade-button" data-ship-id="${saleId}" ${quote.ok ? '' : 'disabled'}><span>${stored?t('SWITCH'):t('Exchange')} · ${stored?escapeHtml(ship.name):formatCredits(Math.abs(amountDue))}${!stored&&amountDue<0?' +':''}</span>${blockedMessage ? `<small>${escapeHtml(blockedMessage)}</small>` : ''}</button>
               ${stored ? '' : `<button type="button" class="ship-trade-button" data-ship-id="${saleId}" data-keep-ship="true" ${keepQuote.ok ? '' : 'disabled'}>${t('Buy')} · ${formatCredits(ship.price)}<small>${t('Keep')} ${escapeHtml(current.name)}</small></button>`}
@@ -4061,6 +4056,7 @@ export class GameUI {
     }
     statDelta(delta, digits = 0) {
         const rounded = Number(delta.toFixed(digits));
+        if (!rounded) return '';
         const cls = rounded > 0 ? 'up' : rounded < 0 ? 'down' : 'even';
         const label = rounded > 0 ? `+${rounded}` : rounded < 0 ? `−${Math.abs(rounded)}` : '0';
         return `<b class="stat-delta ${cls}">${label}</b>`;
@@ -4089,7 +4085,7 @@ export class GameUI {
                 return;
             const variant = container.dataset.variant;
             const player=this.save?.player;const own=fleetHullId(variant)===player?.shipId;
-            this.shipPreviews.push(new ShipPreview(container, variant,own?{paint:player.shipPaints?.[player.shipId]??'original',fit:player.outfitting?.loadouts?.[player.shipId],fleet:player.droneFleet}:{}));
+            this.shipPreviews.push(new ShipPreview(container, variant,own?{paint:container.dataset.paint??player.shipPaints?.[player.shipId]??'original',paintPreview:container.hasAttribute('data-paint'),fit:player.outfitting?.loadouts?.[player.shipId],fleet:player.droneFleet}:{}));
         });
     }
     disposeShipPreviews() {
@@ -4475,16 +4471,12 @@ export class GameUI {
             setText('#screen-drone-losses', '');
             this.el('#screen-drone-telemetry').title = `${t('DRONE BAYS')} · M: ${t('MINING')} · P: PDC\n${drones.readout ?? ''}\n${t('Inbound cargo reserves hold space until delivery.')}`;
         }
-        let ammo = 0, capacity = 0, operational = 0, pdcBays = 0;
+        let operational = 0, pdcBays = 0;
         for (const bay of bays) {
             if (bay.mode !== 'pdc') continue;
             pdcBays++;
             operational += bay.operational ?? 0;
-            for (const unit of bay.units ?? []) {
-                if (unit.hull <= 0 || unit.state === 'destroyed') continue;
-                ammo += unit.ammo ?? 0;
-                capacity += DRONE_TYPES.pdc.magazineCapacity;
-            }
+
         }
         const pdc = this.el('#screen-own-drone-pdc');
         const minersActive = !visible && (drones.phase === 'running' || drones.phase === 'recalling');
@@ -4494,7 +4486,7 @@ export class GameUI {
             this.el('#screen-own-weapon')?.classList.add('is-visible');
         }
         if (pdcBays) {
-            setText('#screen-own-drone-pdc', `${t(drones.pdcPolicy === 'stow' ? 'PDC STOW' : 'PDC DEFEND')} ${operational}/${pdcBays} · ${ammo}/${capacity}`);
+            setText('#screen-own-drone-pdc', `${t(drones.pdcPolicy === 'stow' ? 'PDC STOW' : 'PDC DEFEND')} ${operational}/${pdcBays}`);
             this.el('#screen-own-weapon')?.classList.add('is-visible');
         }
     }
@@ -5151,24 +5143,14 @@ export class GameUI {
         }
         ctx.restore();
     }
-    clearToasts() {
-        this.root.querySelector('#toast-stack')?.replaceChildren();
+    clearStatusMessages() {
+        this.recentEvents=[];
+        this.sensorLog=[];
     }
+    // Keep notifications on the cockpit's existing ticker and in its event log.
+    // The method name remains for callers that previously requested a toast.
     showToast(message, tone = 'info', duration = 3400) {
-        const stack = this.root.querySelector('#toast-stack');
-        if (!stack)
-            return;
-        const id = ++this.toastId;
-        const toast = document.createElement('div');
-        toast.className = `toast ${tone}`;
-        toast.dataset.toastId = String(id);
-        toast.textContent = message;
-        stack.appendChild(toast);
-        requestAnimationFrame(() => toast.classList.add('visible'));
-        window.setTimeout(() => {
-            toast.classList.remove('visible');
-            window.setTimeout(() => toast.remove(), 320);
-        }, duration);
+        this.pushEvent(message,tone,duration);
     }
     // Own-ship flight recorder: combat/career events land on the own monitor's
     // ticker and persist in the ship menu's RECENT EVENTS (like the comms log).
@@ -5222,6 +5204,14 @@ export class GameUI {
     // transcript lives in the chat log, which opens when the bar is tapped.
     commsLog = [];
     commsBarTimer;
+    renderCommsMessage(bar,callsign,line,story=false) {
+        bar.textContent='';
+        const id={'Rin Vek':'rin-vek','Mara Vek':'mara-vek',Paul:'paul'}[callsign];
+        const source=story&&NPC_PORTRAIT_BY_ID[id];
+        bar.classList.toggle('has-portrait',Boolean(source));
+        if(source){const img=document.createElement('img');img.className='comms-portrait';img.src=source;img.alt=callsign;img.addEventListener('error',()=>{img.remove();bar.classList.remove('has-portrait');},{once:true});bar.append(img);}
+        const text=document.createElement('span');text.className='talker-text';text.textContent=`${callsignHandle(callsign)}: ${line}`;bar.append(text);
+    }
     storyDismissed = false;
     // story marks story-mission transmissions on the log entries; rendering
     // them distinctly (pinned bar, log tag) is later work — the flag is the
@@ -5241,24 +5231,26 @@ export class GameUI {
         if (!bar)
             return;
         const color = relationColor(relation);
-        const text = document.createElement('span');
-        text.className = 'talker-text';
-        text.textContent = `${callsignHandle(callsign)}: ${line}`;
-        bar.textContent = '';
+        this.renderCommsMessage(bar,callsign,line,story);
         bar.style.color = color;
         bar.style.borderColor = color;
         bar.classList.add('active');
         bar.classList.remove('story');
         bar.setAttribute('data-ui-command', 'open-chat');
         bar.setAttribute('aria-label', t('Open comms log'));
-        bar.append(text);
         window.clearTimeout(this.commsBarTimer);
         this.commsBarTimer = window.setTimeout(() => this.clearPilotLine(), duration);
+    }
+    setTutorialHint(speaker,text,key) {
+        if(!text){const hadHint=Boolean(this.tutorialHint);this.tutorialHint=undefined;if(hadHint)this.clearPilotLine();return;}
+        if(this.tutorialHint?.key===key)return;
+        this.tutorialHint={speaker,text,key};
+        this.showPilotLine(speaker,text,'ally',12000,true);
     }
     clearPilotLine() {
         const bar = this.el('#comms-bar');
         if (bar) {
-            bar.classList.remove('active', 'story');
+            bar.classList.remove('active', 'story','has-portrait');
             bar.setAttribute('data-ui-command', 'open-chat');
             bar.setAttribute('aria-label', t('Open comms log'));
             bar.textContent = '';
@@ -5266,6 +5258,12 @@ export class GameUI {
             bar.style.borderColor = '';
         }
         window.clearTimeout(this.commsBarTimer);
+        if(bar&&this.tutorialHint&&!this.dockLocation){
+            bar.classList.add('active');
+            this.renderCommsMessage(bar,this.tutorialHint.speaker,this.tutorialHint.text,true);
+            bar.style.color=relationColor('ally');bar.style.borderColor=relationColor('ally');
+        }
+
     }
     // A group transmission (a mugging crew that folds together): the bar shows
     // all of their callsigns, comma-joined, ahead of the line.
@@ -5292,17 +5290,14 @@ export class GameUI {
         bar.classList.add('active', 'story');
         bar.setAttribute('data-ui-command', 'dismiss-story');
         bar.setAttribute('aria-label', t('CONTINUE'));
-        const textNode = document.createElement('span');
-        textNode.className = 'talker-text';
-        textNode.textContent = `${name}: ${text}`;
-        bar.append(textNode);
+        this.renderCommsMessage(bar,name,text,true);
         window.clearTimeout(this.commsBarTimer);
         this.storyDismissed = false;
     }
     dismissStory() {
         const bar = this.el('#comms-bar');
         if (bar) {
-            bar.classList.remove('active', 'story');
+            bar.classList.remove('active', 'story','has-portrait');
             bar.setAttribute('data-ui-command', 'open-chat');
             bar.setAttribute('aria-label', t('Open comms log'));
             bar.textContent = '';
@@ -5382,6 +5377,7 @@ export class GameUI {
           </div>
         </header>
         <div id="map-sector-view" class="map-view map-view-sector" role="tabpanel" aria-labelledby="map-sector-tab" data-map-view-panel="sector">
+          ${tutorialCampaignSummary(this.save)?.stepId==='plot-vesper'?`<p class="map-tutorial-instruction">${t('Select Vesper on the navigation map.')}</p>`:''}
           <div class="navigation-map-layout sector-map-layout">
             <section class="map-section system-map-section">
               <div class="map-section-heading"><span>${t('SYSTEM POINTS')} <em class="system-star-key star-${escapeHtml(system.id)}"><i aria-hidden="true"></i>${t(SYSTEM_STAR_TYPES[system.id] ?? 'STAR')}</em></span><b>${escapeHtml(mapLocationLabel(LOCATIONS[model.navTargetId]))} · ${t('DANGER')}: ${t(LOCATIONS[model.navTargetId]?.security.label ?? system.security.label)}</b></div>
@@ -5395,7 +5391,7 @@ export class GameUI {
             const selected = model.navTargetId === id || model.currentTargetId === id;
             const objective = model.tutorial?.active && model.tutorial.destinationId === id;
             const kind = this.save.player.discovered.includes(id) ? t(location.kind) : t('UNSURVEYED');
-            return `<button class="map-node kind-${location.kind} ${selected ? 'selected' : ''} ${objective ? 'mission-objective' : ''}" style="left:${point.left.toFixed(2)}%;top:${point.top.toFixed(2)}%" data-map-layout="spatial" data-map-target-kind="location" data-map-target-id="${id}" aria-label="${escapeHtml(mapLocationLabel(location))} · ${escapeHtml(kind)} · ${t('DANGER')}: ${t(location.security.label)}${objective ? ` · ${t('MISSION OBJECTIVE')}` : ''}"><i aria-hidden="true"></i><b>${escapeHtml(mapLocationLabel(location))}</b>${objective ? `<small>${t('MISSION')}</small>` : ''}</button>`;
+            return `<button class="map-node kind-${location.kind} ${selected ? 'selected' : ''} ${objective ? 'mission-objective' : ''}" style="left:${point.left.toFixed(2)}%;top:${point.top.toFixed(2)}%" data-map-layout="spatial" data-map-target-kind="location" data-map-target-id="${id}" aria-label="${escapeHtml(mapLocationLabel(location))} · ${escapeHtml(kind)} · ${t('DANGER')}: ${t(location.security.label)}${objective ? ` · ${t('MISSION OBJECTIVE')}` : ''}"><i aria-hidden="true"></i><b>${escapeHtml(mapLocationLabel(location))}</b></button>`;
         }).join('')}
               </div>
             </section>
@@ -5449,23 +5445,8 @@ export class GameUI {
         this.updateOrientationNotice();
     }
     renderShipTutorial() {
-        const campaign = tutorialCampaignSummary(this.save);
-        if (!campaign || campaign.skipped)
-            return '';
-        if (campaign.completed)
-            return `<section class="ship-menu-tutorial"><h3>${t('The prologue is complete.')}</h3><p>${escapeHtml(t(campaign.detail))}</p>${campaign.choice ? `<p>${escapeHtml(t(campaign.choiceLabel))}</p>` : ''}</section>`;
-        const chapters = Array.from({ length: campaign.chapterCount }, (_, index) => {
-            const chapter = index + 1;
-            return `<i class="${chapter < campaign.chapter ? 'is-done' : chapter === campaign.chapter ? 'is-current' : ''}" aria-label="${t('Chapter {chapter}', { chapter })}">${String(chapter).padStart(2, '0')}</i>`;
-        }).join('');
-        return `
-          <section class="ship-menu-tutorial">
-            <header><div><span>${t(campaign.label)}</span><h3>${escapeHtml(t(campaign.chapterTitle))}</h3></div><b>${t('CHAPTER {chapter}/{count}', { chapter: campaign.chapter, count: campaign.chapterCount })}</b></header>
-            <div class="tutorial-chapter-track">${chapters}</div>
-            <strong>${escapeHtml(t(campaign.objective))}${campaign.progress ? ` · ${escapeHtml(campaign.progress)}` : ''}</strong>
-            <p>${escapeHtml(t(campaign.detail))}</p>
-            ${this.tutorialSkipControl()}
-          </section>`;
+        const content = this.renderTutorialNotice();
+        return content ? `<section class="ship-menu-tutorial">${content}</section>` : '';
     }
     // The paused ship menu repeats the wing orders: one group per wingman (the
     // crew the cockpit last published via setWingTactics), so a mixed-tactics
@@ -5487,7 +5468,7 @@ export class GameUI {
         if (!this.save)
             return;
         const panel = this.root.querySelector('#ship-panel');
-        if(this.inventoryView&&!this.save.arena){panel.innerHTML=renderEquipmentInventory(this);this.hidePause();this.hideMap();panel.classList.remove('is-hidden');return;}
+        if(this.inventoryView&&!this.save.arena){this.shipMenuTab='equipment';this.inventoryView=false;}
         const player = this.save.player;
         const ship = SHIPS[player.shipId];
         const combatValue = playerStrengthValue(player);
@@ -5495,23 +5476,6 @@ export class GameUI {
         const capacity = cargoCapacity(player);
         const loadPercent = capacity > 0 ? Math.min(100, Math.round((mass / capacity) * 100)) : 0;
         const standoff = this.mugStandoff?.();
-        const cargoEntries = Object.entries(player.cargo)
-            .filter(([, qty]) => qty > 0)
-            .map(([id, qty]) => {
-                const commodity = COMMODITIES[id];
-                return { id, name: commodity?.name ?? id, qty, mass: (commodity?.mass ?? 0) * qty };
-            });
-        const sealed = (player.sealedCargo ?? []).map((entry) => ({
-            name: entry.label,
-            qty: entry.units,
-            mass: entry.mass,
-            smuggled: entry.smuggled === true,
-        }));
-        const droneCount = Object.values(player.droneFleet?.unitsById ?? {}).filter(u=>u.hull>0).length;
-        const allCargo = [...cargoEntries, ...sealed, ...(droneCount ? [{name:'DRONE CARGO',qty:droneCount,mass:droneCount}] : [])];
-        const cargoRows = allCargo.length
-            ? allCargo.map((entry) => `<div class="cargo-row"><span><b>${escapeHtml(entry.smuggled ? t('{commodity} (syndicate)', { commodity: t(entry.name) }) : t(entry.name))}</b><small>${entry.qty} ${t('UNITS')}</small></span>${entry.id ? `<button data-jettison="${entry.id}">${t('JETTISON')}</button>` : ''}<em>${entry.mass.toFixed(1)} ${t('MASS')}</em></div>`).join('')
-            : `<p class="ship-menu-empty">${t('EMPTY')}</p>`;
         const missions = this.save.activeMissions;
         const missionRows = missions.length
             ? missions.map((mission) => {
@@ -5551,12 +5515,12 @@ export class GameUI {
             const weapon = WEAPONS[id];
             const active = player.weaponId === id;
             const ammo = `${weapon.energyCost} ⚡`;
-            const envelope = t(weapon.envelopeKey, { range: Math.round(weaponRange(weapon)) });
+            const envelope = `${Math.round(weaponRange(weapon))} km`;
             return `<div class="weapon-row${active ? ' is-active' : ''}"><span>${active ? '▸ ' : ''}${escapeHtml(t(weapon.nameKey))}</span><small>${escapeHtml(envelope)}</small><em>${ammo}</em></div>`;
         }).join('');
         const launcherRows = launcherMagazineEntries(player).map((entry) => (
             `<div class="weapon-row launcher-row${entry.selected ? ' is-active' : ''}"><span>${entry.selected ? '▸ ' : ''}${escapeHtml(t(entry.launcher.nameKey))}</span><small>${escapeHtml(t(entry.launcher.ordnanceNameKey))} · ${t('MOUNT {number}', { number: entry.index + 1 })}</small><em>${entry.rounds}/${entry.capacity}</em></div>`
-        )).join('') || `<div class="weapon-row is-locked"><span>${t('LAUNCHER')}</span><small>${t('NOT INSTALLED')}</small><em>0/0</em></div>`;
+        )).join('') || '';
         const tutorialSection = this.renderShipTutorial();
         const wingSection = this.renderShipWingOrders();
         // The four numbers a pilot checks mid-flight, at the top of the panel
@@ -5598,30 +5562,37 @@ export class GameUI {
             <div class="standoff-actions">${comply}<span>${escapeHtml(terms)}</span></div>
           </aside>`;
         })();
-        panel.innerHTML = `
-      <div class="modal-card ship-card">
-        <header><div><h2>${escapeHtml(ship?.name ?? 'VOIDRUNNER')}</h2></div>${!this.save.arena?'<button data-inventory-action="open">'+t('Equipment')+'</button>':''}<button data-ui-command="close-ship">${t('CLOSE')}</button></header>
-        ${standoffBanner}
-        <div class="ship-status-strip">${statusCells}</div>
-        <div class="pause-grid ship-menu-grid">
-          ${wingSection}
-          ${tutorialSection}
-          ${missions.length?`<section class="ship-menu-missions"><h3>${t('ACTIVE CONTRACTS · {count}/6', { count: missions.length })}</h3>${missionRows}</section>`:''}
-          <section class="ship-menu-cargo"><h3>${t('CARGO')}</h3>${cargoRows}</section>
-          <section class="ship-menu-weapons"><label>${t('Hull paint')} <select data-ship-paint>${(FLEET_PAINTS[player.shipId]?.paints??[]).map(p=>`<option value="${p.id}" ${(player.shipPaints?.[player.shipId]??'original')===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}</select></label><button data-ui-command="transponder-toggle" aria-pressed="${player.transponder !== false}">${t(player.transponder !== false ? 'TRANSPONDER ON' : 'TRANSPONDER OFF')}</button>${loadoutFor(player).turrets?.some(Boolean)?`<button data-ui-command="turret-toggle">${t(player.turretsHeld?'TURRETS HOLD FIRE':'TURRETS ACTIVE')}</button><p>${escapeHtml(t(player.turretsHeld?'TURRETS HOLD FIRE':(player.turretRuntime?.find(s=>s.status==='TURRETS WAITING FOR ENERGY')?.status??'TURRETS READY')))}</p>`:''}<details><summary>${t('WEAPON SYSTEMS')}</summary>${weaponRows}${launcherRows}<div class="drone-policy" role="group" aria-label="${t('LAUNCHER FIRING')}">${['alternating','together','single'].map(mode=>`<button data-ui-command="launcher-fire-mode" data-launcher-mode="${mode}" aria-pressed="${(player.launcherFireMode??'alternating')===mode}">${t(mode==='alternating'?'ALTERNATING':mode==='together'?'TOGETHER':'SELECTED RACK ONLY')}</button>`).join('')}</div></details><details><summary>${t('WEAPON GROUP HELP')}</summary><p>${t('Tap the weapon name to cycle populated groups and Fire all. Fire all uses every forward gun; missiles and automatic turrets stay separate. In Outfitting, open a gun’s details to assign A or B. Try beams in A and your other weapon in B to control energy use.')}</p></details></section>
-          ${this.renderDroneShipStatus()}
-          <details class="ship-menu-account"><summary>${t('ACCOUNT')} · ${formatCredits(player.credits)}</summary><div class="ship-account-row"><span>${t('COMBAT VALUE')}<small>${t('SHIP + EQUIPMENT · HALF CASH · NO CARGO')}</small></span><b>${formatCredits(combatValue)}</b></div></details>
-          ${events.length?`<details class="ship-menu-events"><summary>${t('RECENT EVENTS · {count}', { count: this.recentEvents.length })}</summary>${eventRows}</details>`:''}
-        </div>
-
-      </div>`;
+        const tabs=[['flight','Flight'],...(!this.save.arena?[['equipment','Equipment & Cargo']]:[]),
+            ...(droneBayLayoutFor(player.shipId).length||droneCount?[['drones','Drones']]:[]),...(!this.save.arena?[['journal','Journal']]:[])];
+        const tab=tabs.some(([id])=>id===this.shipMenuTab)?this.shipMenuTab:'flight';
+        this.shipMenuTab=tab;
+        const flightPanel=`<div class="ship-console-grid">
+          <section class="ship-flight-controls"><h3>${t('FLIGHT SYSTEMS')}</h3>
+            <button type="button" data-ui-command="transponder-toggle" aria-pressed="${player.transponder!==false}">${t(player.transponder!==false?'TRANSPONDER ON':'TRANSPONDER OFF')}</button>
+            ${loadoutFor(player).turrets?.some(Boolean)?`<button type="button" data-ui-command="turret-toggle" aria-pressed="${!player.turretsHeld}">${t(player.turretsHeld?'TURRETS HOLD FIRE':'TURRETS ACTIVE')}</button>`:''}
+          </section>
+          ${wingSection||`<section class="ship-flight-weapons"><h3>${t('WEAPON SYSTEMS')}</h3>${weaponRows}${launcherRows}</section>`}
+          ${wingSection?`<details><summary>${t('WEAPON SYSTEMS')}</summary>${weaponRows}${launcherRows}</details>`:''}
+          ${launcherMagazineEntries(player).length>1?`<section><h3>${t('LAUNCHER FIRING')}</h3><div class="drone-policy">${['alternating','together','single'].map(mode=>`<button type="button" data-ui-command="launcher-fire-mode" data-launcher-mode="${mode}" aria-pressed="${(player.launcherFireMode??'alternating')===mode}">${t(mode==='alternating'?'ALTERNATING':mode==='together'?'TOGETHER':'SELECTED RACK ONLY')}</button>`).join('')}</div></section>`:''}
+          <details class="ship-flight-help"><summary>${t('WEAPON GROUP HELP')}</summary><p>${t('Tap the weapon name to cycle populated groups and Fire all. Fire all uses every forward gun; missiles and automatic turrets stay separate. In Outfitting, open a gun’s details to assign A or B. Try beams in A and your other weapon in B to control energy use.')}</p></details>
+        </div>`;
+        const journalPanel=`<div class="ship-console-grid ship-journal">${tutorialSection}<section class="ship-menu-missions"><h3>${t('ACTIVE CONTRACTS · {count}/6',{count:missions.length})}</h3>${missionRows}</section>
+          <details class="ship-menu-account"><summary>${t('COMBAT VALUE')} · ${formatCredits(combatValue)}</summary><p>${t('SHIP + EQUIPMENT · HALF CASH · NO CARGO')}</p></details>
+          <details class="ship-menu-events"><summary>${t('RECENT EVENTS · {count}',{count:events.length})}</summary>${eventRows}</details></div>`;
+        panel.innerHTML=`<div class="ship-console" data-ship-pane="${tab}">
+          <header class="ship-console-header"><h2>${escapeHtml(ship?.name??'VOIDRUNNER')}</h2><b>${formatCredits(player.credits)}</b><button type="button" class="primary" data-ui-command="close-ship">${t('Resume flight')}</button></header>
+          ${standoffBanner}
+          <nav class="ship-console-tabs" aria-label="${t('Ship sections')}">${tabs.map(([id,label])=>`<button type="button" data-ui-command="ship-section" data-ship-section="${id}" aria-current="${id===tab?'page':'false'}">${t(label)}</button>`).join('')}</nav>
+          ${tab==='flight'?`<div class="ship-status-strip">${statusCells}</div>`:''}
+          <div class="ship-console-body" data-pane="${tab}">${tab==='flight'?flightPanel:tab==='equipment'?renderEquipmentInventory(this,{embedded:true}):tab==='drones'?this.renderDroneShipStatus():journalPanel}</div>
+        </div>`;
         this.hidePause();
         this.hideMap();
         panel.classList.remove('is-hidden');
         this.updateOrientationNotice();
     }
     hideShipMenu() {
-        this.inventoryView=false;
+        this.inventoryView=false;this.shipMenuTab='flight';
         this.root.querySelector('#ship-panel')?.classList.add('is-hidden');
         this.updateOrientationNotice();
     }
@@ -5875,7 +5846,7 @@ export class GameUI {
         this.observerNodes.clear();
         panel.innerHTML = `
       <div class="observer-toolbar">
-        <div class="observer-heading"><span class="eyebrow">${t('TACTICAL ANALYSIS')}</span><b id="observer-matchup"></b><small id="observer-fit"></small></div>
+        <div class="observer-heading"><b id="observer-matchup"></b><small id="observer-fit"></small></div>
         <div class="observer-clock"><small>${t('GAME TIME')}</small><strong id="observer-time">00:00.0</strong></div>
         <div id="observer-status" class="observer-status" aria-live="polite">${t('LIVE')}</div>
         <div class="observer-camera-tools" aria-label="${t('Observer camera')}"><span id="observer-camera-readout">${t('ZOOM')} 1250 · X 0 · Z 0</span><button type="button" data-ui-command="observer-zoom-out" title="${t('Zoom out')}" aria-label="${t('Zoom out')}">−</button><button type="button" data-ui-command="observer-center" title="${t('Center camera')}" aria-label="${t('Center camera')}">◎</button><button type="button" data-ui-command="observer-zoom-in" title="${t('Zoom in')}" aria-label="${t('Zoom in')}">+</button></div>
@@ -5883,14 +5854,14 @@ export class GameUI {
       </div>
       <aside id="observer-editor" class="observer-editor">
         <div class="observer-editor-card">
-          <div class="observer-editor-title"><div><span class="eyebrow">${t('STAGING EDITOR')}</span><b>${t('BUILD YOUR FIGHT')}</b></div></div>
+          <div class="observer-editor-title"><b>${t('BUILD YOUR FIGHT')}</b></div>
           <section class="observer-editor-section"><h3>${t('QUICK MATCH')}</h3><div class="observer-editor-options">${['1v1','2v1','3v3'].map(id => `<button data-ui-command="observer-preset" data-observer-preset="${id}">${id}</button>`).join('')}</div><small id="observer-preset-hull"></small></section>
           <section class="observer-editor-section"><h3>${t('MAP')}</h3><div class="observer-editor-options">${maps.map(([id, label]) => `<button data-ui-command="observer-map" data-observer-map="${id}">${t(label)}</button>`).join('')}</div></section>
           <section class="observer-editor-section"><h3>${t('SIDE')}</h3><div class="observer-editor-options observer-team-options"><button data-ui-command="observer-team" data-observer-team="blue">${t('BLUE')}</button><button data-ui-command="observer-team" data-observer-team="red">${t('RED')}</button></div></section>
           <section class="observer-editor-section"><h3>${t('PILOTS')}</h3><div class="observer-editor-options observer-difficulty-options">${difficultyOptions.map(([id, label]) => `<button data-ui-command="observer-difficulty" data-observer-difficulty="${id}">${t(label)}</button>`).join('')}</div></section>
           <section class="observer-editor-section observer-aim-section"><h3>${t('NPC AIM ERROR')}</h3><div class="observer-aim-control"><input type="range" min="1" max="2" step="0.05" value="${Number(config.aimError ?? 1.5).toFixed(2)}" data-observer-aim-error aria-label="${t('NPC AIM ERROR')}" title="${t('1.00 = PRECISE · 1.50 = DEFAULT · FRIGATES IGNORE THIS')}"><output id="observer-aim-error-value">1.50×</output></div></section>
           <section class="observer-editor-section"><h3>${t('LOADOUT FOR NEXT SHIP')}</h3><div class="observer-editor-options observer-fit-options">${fitOptions.map(([id, label]) => `<button data-ui-command="observer-fit" data-observer-fit="${id}">${t(label)}</button>`).join('')}</div></section>
-          <section class="observer-editor-section observer-ship-section"><h3>${t('ADD SHIP')}</h3><div class="observer-ship-palette">${ships.map(([id, label, fit]) => `<button data-ui-command="observer-ship" data-observer-ship="${id}"><b>${t(label)}</b><small>${t(fit)}</small></button>`).join('')}</div></section>
+          <section class="observer-editor-section observer-ship-section"><h3>${t('ADD SHIP')}</h3><div class="observer-ship-palette">${ships.map(([id, label, fit]) => `<button data-ui-command="observer-ship" data-observer-ship="${id}"><b>${t(label)}</b>${fit==='STOCK LOADOUT'?'':`<small>${t(fit)}</small>`}</button>`).join('')}</div></section>
           <p id="observer-editor-hint" class="observer-editor-hint">${t('Select a ship, then tap the map to place it.')}</p>
 
           <div class="observer-editor-footer"><span id="observer-counts"></span><div><button data-ui-command="observer-clear">${t('CLEAR FORMATION')}</button><button id="observer-start" class="primary" data-ui-command="observer-start-battle">${t('START BATTLE')}</button></div></div>
@@ -5961,11 +5932,11 @@ export class GameUI {
         }
         if (matchup)
             matchup.textContent = editor
-                ? `${t('FORMATION EDITOR')} · ${t(model.environmentLabel ?? 'OPEN SPACE')}`
+                ? t(model.environmentLabel ?? 'OPEN SPACE')
                 : `${t('BLUE')} ${blueCount} · ${t('RED')} ${redCount}`;
         if (fit)
             fit.textContent = editor
-                ? (pendingLabel ? `${t('NEXT')}: ${t(pendingLabel)} · ${t(pendingFitLabel)}` : t('SELECT A SHIP TO PLACE'))
+                ? (pendingLabel ? `${t('NEXT')}: ${t(pendingLabel)} · ${t(pendingFitLabel)}` : '')
                 : `${t('MAP')}: ${t(model.environmentLabel ?? 'OPEN SPACE')} · ${t('AIM ERROR')} ${aimErrorFactor.toFixed(2)}×`;
         if (pause) {
             pause.hidden = editor || finished;
@@ -6090,7 +6061,7 @@ export class GameUI {
         });
     };
     get isModalOpen() {
-        if (this.newCareerConfirm) return true;
+        if (this.newCareerConfirm || this.storyOpen) return true;
         // The forced-landscape overlay is a modal too: while it blocks play the
         // sim must freeze (the frame loop drops the accumulator for any open
         // modal), so a pilot can't drift into a wall or a pirate's guns while

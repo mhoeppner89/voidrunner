@@ -82,3 +82,11 @@ test('approved review names win over historical aliases in both languages',async
  }finally{setLanguage(previous);}
  const sw=await readFile('sw.js','utf8');assert.match(sw,/\.\/src\/game\/equipmentNaming\.js/);
 });
+
+test('commodity labels stay short in both languages, with legality separate from their names',async()=>{
+ const {DE_CATALOG}=await import('../../src/game/i18n-de.js');
+ const expected={food:'Protein',water:'Wasser',medicine:'Medigel',electronics:'Elektronik',machinery:'Maschinen',ore:'Erz',gold:'Gold',scrap:'Schrott',luxuries:'Luxusgüter',arms:'Waffen'};
+ for(const [id,label]of Object.entries(expected))assert.equal(DE_CATALOG[COMMODITIES[id].name],label,id);
+ assert.equal(COMMODITIES.arms.legal,false);assert.equal(COMMODITIES.arms.name,'Weapons');
+ const {ADVENTURE_DIALOGUES}=await import('../../src/game/adventureDialogues.js');assert.match(ADVENTURE_DIALOGUES.rin.nodes.trade.text.de,/Waffen sind rot markiert. Ihr Transport ist illegal/);
+});

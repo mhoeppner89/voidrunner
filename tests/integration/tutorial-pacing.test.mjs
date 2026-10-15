@@ -1,63 +1,24 @@
 import assert from 'node:assert/strict';
-import {registerHooks} from 'node:module';
 import {test} from 'node:test';
-registerHooks({resolve(specifier,context,next){return next(specifier==='three'?new URL('../../vendor/three.module.min.js',import.meta.url).href:specifier,context);}});
-const {GameSession}=await import('../../src/game/game.js');
-const {startTutorialCampaign,getTutorialQuest,tutorialLaunchBlock,advanceTutorialCampaign,skipTutorialCampaign,TUTORIAL_STEPS}=await import('../../src/game/tutorialCampaign.js');
-function fixture(step='meet-family'){
-    const save={player:{credits:3500,cargo:{},dockedAt:'helix',position:[0,0,0]},world:{time:0},quests:[]};
-    startTutorialCampaign(save);getTutorialQuest(save).stepId=step;
-    const session=Object.create(GameSession.prototype);session.save=save;
-    session.ui={showToast(){}};
-    return {save,session,quest:getTutorialQuest(save)};
-}
-test('all active prologue stages block ambient hostility entry points',()=>{
-    for(const step of Object.keys(TUTORIAL_STEPS).filter(step=>step!=='complete')){
-        const {session}=fixture(step);
-        session.hyperdriveEncounterAt=0;
-        assert.equal(session.spawnHyperdriveIntercept(),false);assert.equal(session.hyperdriveEncounterAt,null);
-        assert.equal(session.spawnJumpPointPirates({}),false);
-        assert.equal(session.beginPatrolInspection({}),false);
-        assert.equal(session.updatePatrolArrest({}),false);
-        assert.equal(session.updateBountySpawns(),undefined);
-        assert.equal(session.combatEncounterScale(),0);
-    }
+import {tutorialFixture} from '../helpers/tutorial.mjs';
+import {isTutorialGuided,tutorialContentUnlocked,tutorialGateOpen,TUTORIAL_STEPS} from '../../src/game/tutorialCampaign.js';
+import {playerStrengthValue} from '../../src/game/playerStrength.js';
+import {LOCATIONS} from '../../src/game/data.js';
+
+test('guided stages suppress ambient combat, while the earning interval restores normal career encounters',()=>{
+ for(const step of Object.keys(TUTORIAL_STEPS).filter(s=>s!=='earn-standing'&&s!=='complete')){const {save,session}=tutorialFixture(step);assert.equal(isTutorialGuided(save),true);assert.equal(session.combatEncounterScale(),0);assert.equal(session.spawnHyperdriveIntercept(),false);}
+ const {save,quest,session}=tutorialFixture('earn-standing');quest.flags.openWorld=true;session.combatCalmFactor=()=>1;assert.equal(tutorialContentUnlocked(save),true);assert.equal(session.combatEncounterScale(),1);assert.equal(tutorialGateOpen(save),false);
 });
-test('completing or skipping restores normal encounter scaling',()=>{
-    for(const skipped of [true,false]){
-        const {save,session,quest}=fixture();session.combatCalmFactor=()=>1;
-        if(skipped)skipTutorialCampaign(save);else quest.completedAt=0;
-        assert.equal(session.combatEncounterScale(),1);
-        assert.equal(tutorialLaunchBlock(save),undefined);
-    }
+test('Mara’s call uses the existing equipment/full-ship/half-cash metric and waits for quiet flight',()=>{
+ const {save,quest,session}=tutorialFixture('earn-standing');const calls=[];session.playTutorialBriefing=id=>calls.push(id);quest.flags.openWorld=true;assert.ok(playerStrengthValue(save.player)<50000);session.queueTutorialMaraCall();assert.equal(quest.stepId,'earn-standing');
+ save.player.credits=100000;assert.ok(playerStrengthValue(save.player)>=50000);session.ui.isModalOpen=true;session.queueTutorialMaraCall();assert.equal(quest.stepId,'earn-standing');session.ui.isModalOpen=false;
+ session.ships=[{hostile:true,hull:100,position:[...save.player.position]}];session.queueTutorialMaraCall();assert.equal(quest.stepId,'earn-standing');session.ships=[];session.queueTutorialMaraCall();assert.equal(quest.stepId,'meet-cairn');assert.deepEqual(calls,['mara-cairn']);session.queueTutorialMaraCall();assert.equal(calls.length,1);
 });
-test('departure checks preparation without preventing an off-route return',async()=>{
-    const {save,session,quest}=fixture();
-    assert.match(tutorialLaunchBlock(save),/Mara and Rin/);
-    assert.equal(await session.launch(),false);
-    assert.equal(session.launchPreparing,undefined);
-    quest.stepId='launch-helix';save.player.cargo.food=1;assert.match(tutorialLaunchBlock(save),/two Protein/);
-    save.player.cargo.food=2;assert.equal(tutorialLaunchBlock(save),undefined);
-    quest.stepId='sell-supplies';save.player.dockedAt='vesper';assert.match(tutorialLaunchBlock(save),/Sell/);
-    save.player.dockedAt='helix';assert.equal(tutorialLaunchBlock(save),undefined);
-    quest.stepId='family-choice';save.player.dockedAt='cairn';assert.match(tutorialLaunchBlock(save),/recorder/);
+test('both gate entry paths stay closed until Rin’s Cairn conversation',()=>{
+ const {save,quest,session}=tutorialFixture('earn-standing');session.setHyperdriveStatus=()=>{};
+ const gate=LOCATIONS['verge-meridian-point'];assert.equal(session.startGalaxyJump(gate),false);assert.equal(session.beginGalaxyGateTransition(gate),false);
+ quest.flags.gateOpen=true;session.requestDroneDeparture=()=>false;assert.equal(tutorialGateOpen(save),true);assert.equal(session.startGalaxyJump(gate),false,'the normal drone-recall gate still applies');
 });
-test('selling supplies before departure returns to the buying lesson',()=>{
-    const {save,quest}=fixture('launch-helix');
-    const result=advanceTutorialCampaign(save,{type:'traded',locationId:'helix',commodityId:'food',kind:'sell',cargoAfter:1});
-    assert.equal(result.changed,true);assert.equal(quest.stepId,'buy-supplies');
-    quest.stepId='launch-helix';assert.equal(advanceTutorialCampaign(save,{type:'launched',fromLocationId:'helix',foodCargo:0}).changed,false);
-});
-test('unrelated topics and wrong-port encounters do not finish the opening',()=>{
-    const {save,quest}=fixture();
-    for(const event of [{topicId:'work',locationId:'helix'},{topicId:'greeting',locationId:'cairn'}]){
-        assert.equal(advanceTutorialCampaign(save,{type:'talked',personId:'mara-vek',...event}).changed,false);
-    }
-    assert.notEqual(quest.flags.metMara,true);
-});
-test('tutorial combat briefing pauses even with the scripted hostile nearby',()=>{
-    const {session}=fixture('defeat-raider');session.hostilesVisibleNear=()=>true;
-    let received;session.ui.showStoryLine=(...args)=>received=args;
-    session.playStoryLine('Rin Vek','Controls','ally',15000,'tutorial-combat');
-    assert.equal(received[3],'tutorial-combat');assert.equal(session.pendingStoryConversations,undefined);
+test('docked preparation cannot be bypassed by launching',async()=>{
+ const {save,session}=tutorialFixture('mining-contract');save.player.dockedAt='vesper';assert.equal(await session.launch(),false);
 });

@@ -25,9 +25,7 @@ function inspect(player) {
             return fail('invalid-unit');
         const type = DRONE_TYPES[unit.type];
         if (!Number.isFinite(unit.hull) || unit.hull <= 0 || unit.hull > type.maxHull
-            || unit.state === 'destroyed'
-            || (type.magazineCapacity && (!Number.isSafeInteger(unit.ammo)
-                || unit.ammo < 0 || unit.ammo > type.magazineCapacity)))
+            || unit.state === 'destroyed')
             return fail('invalid-unit');
         if (/^drone-unit-\d+$/.test(id)) {
             const suffix = Number(id.slice('drone-unit-'.length));
@@ -60,10 +58,10 @@ function inspect(player) {
 }
 
 /** Read-only quote for the active ship. fillSlots defaults to all positions;
- * pass [] to repair/rearm only, or [{ bayId, position }] (zero-based) to choose.
- * Existing equipped survivors and locker units used by this quote are serviced.
+ * pass [] to repair only, or [{ bayId, position }] (zero-based) to choose.
+ * Existing equipped survivors and locker units used by this quote are repaired.
  * Other ships and unused locker stock are untouched. Replacement lines include
- * free locker assignments; purchased PDC units already include a full magazine.
+ * free locker assignments. Drones do not consume ammunition.
  * Invalid state returns { ok: false, code }, never a misleading zero price. */
 export function quoteDroneService(player, options = {}) {
     if (!record(options)) return fail('invalid-options');
@@ -116,6 +114,7 @@ export function quoteDroneService(player, options = {}) {
                 quantity: 1, unitPrice, cost: unitPrice });
         }
     }
+    if (options.includeLocker) for (const id of fleet?.lockerIds ?? []) serviceIds.add(id);
     for (const id of serviceIds) {
         const unit = fleet.unitsById[id];
         const type = DRONE_TYPES[unit.type];
@@ -123,11 +122,7 @@ export function quoteDroneService(player, options = {}) {
         if (missingHull > 0) lines.push({ kind: 'repair', unitId: id, type: unit.type,
             quantity: missingHull, unitPrice: DRONE_RULES.repairPricePerHull,
             cost: Math.ceil(missingHull * DRONE_RULES.repairPricePerHull) });
-        if (type.magazineCapacity && unit.ammo < type.magazineCapacity) {
-            const quantity = type.magazineCapacity - unit.ammo;
-            lines.push({ kind: 'rounds', unitId: id, type: unit.type,
-                quantity, unitPrice: type.roundPrice, cost: quantity * type.roundPrice });
-        }
+
     }
     const total = lines.reduce((sum, line) => sum + line.cost, 0);
     if (!Number.isSafeInteger(total)) return fail('invalid-cost');
@@ -137,11 +132,11 @@ export function quoteDroneService(player, options = {}) {
     try {
         fingerprint = JSON.stringify({ shipId: player.shipId, fleet,
             bays: Object.entries(loadouts).map(([shipId, fit]) => [shipId, fit.droneBays]),
-            fillSlots, lines, nextUnitId });
+            fillSlots, includeLocker: !!options.includeLocker, lines, nextUnitId });
     } catch {
         return fail('invalid-fleet');
     }
-    return { ok: true, shipId: player.shipId, fillSlots, lines, total, fingerprint, nextUnitId };
+    return { ok: true, shipId: player.shipId, fillSlots, includeLocker: !!options.includeLocker, lines, total, fingerprint, nextUnitId };
 }
 
 /** Commit synchronously after the caller checks docking AND service availability:
@@ -157,7 +152,7 @@ export function commitDroneService(player, options = {}) {
     const fingerprint = typeof expected === 'string' ? expected : expected?.fingerprint;
     if (typeof fingerprint !== 'string' || !fingerprint) return fail('quote-required');
     const fillSlots = options.fillSlots === undefined && record(expected) ? expected.fillSlots : options.fillSlots;
-    const quote = quoteDroneService(player, { fillSlots });
+    const quote = quoteDroneService(player, { fillSlots, includeLocker: options.includeLocker ?? expected?.includeLocker });
     if (!quote.ok) return quote;
     if (fingerprint !== quote.fingerprint) return fail('stale-quote');
     if (!Number.isFinite(player.credits) || player.credits < 0) return fail('invalid-credits');
@@ -179,8 +174,7 @@ export function commitDroneService(player, options = {}) {
             nextFit.droneBays.find((bay) => bay.bayId === line.bayId).unitIds[line.position] = line.unitId;
         } else {
             const unit = { ...nextFleet.unitsById[line.unitId] };
-            if (line.kind === 'repair') unit.hull = DRONE_TYPES[unit.type].maxHull;
-            else unit.ammo = DRONE_TYPES[unit.type].magazineCapacity;
+            unit.hull = DRONE_TYPES[unit.type].maxHull;
             nextFleet.unitsById[line.unitId] = unit;
         }
     }

@@ -101,7 +101,7 @@ function resetEncounter() {
     runtime.restartArena();
     addStressFleet();
     runtime.updateActiveInstance(true);
-    ui.clearToasts();
+    ui.clearStatusMessages();
     scenarioOrigin = runtime.save.world.time;
     nextEncounter = scenarioOrigin + 20;
     encounterResets += 1;

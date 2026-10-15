@@ -87,8 +87,8 @@ test('deployed drones remain recoverable and stored drones keep their damage and
  const {createDroneUnit,createDroneFleet}=await import('../../src/game/droneData.js');
  const s=session(),a=ship(s);a.droneFleet=createDroneFleet();const active=createDroneUnit('deployed','pdc');Object.assign(active,{state:'escort',position:[5,0,0],hull:12,ammo:7});a.droneFleet.unitsById[active.id]=active;
  makeCareerWreck(s,a);assert.equal(active.orphaned,true);assert.equal(s.save.world.orphanDrones.deployed.hull,12);
- const b=ship(s);b.droneFleet=createDroneFleet();const stored=createDroneUnit('stored','attack');Object.assign(stored,{hull:9,ammo:11});b.droneFleet.unitsById[stored.id]=stored;
- const w=makeCareerWreck(s,b,{captured:true});s.wreckNodes.push(combatWreckNode(w));const entry=w.contents.find(e=>e.kind==='drone');assert.ok(recoverWreckEntry(s,w.id,entry.id).ok);const recovered=Object.values(s.save.player.droneFleet.unitsById).find(u=>u.type==='attack');assert.equal(recovered.hull,9);assert.equal(recovered.ammo,11);
+ const b=ship(s);b.droneFleet=createDroneFleet();const stored=createDroneUnit('stored','pdc');Object.assign(stored,{hull:9,ammo:11});b.droneFleet.unitsById[stored.id]=stored;
+ const w=makeCareerWreck(s,b,{captured:true});s.wreckNodes.push(combatWreckNode(w));const entry=w.contents.find(e=>e.kind==='drone');assert.ok(recoverWreckEntry(s,w.id,entry.id).ok);const recovered=Object.values(s.save.player.droneFleet.unitsById).find(u=>u.type==='pdc');assert.equal(recovered.hull,9);assert.equal(recovered.ammo,11);
 });
 test('unknown actions and unavailable items are rejected without spending credits',()=>{
  const p=make().player,before=p.credits;assert.equal(equipmentAction(p,'invent',{id:ids(p)[0]}).ok,false);assert.equal(equipmentAction(p,'buy',{baseId:'capital-shield-generator',tier:3}).ok,false);assert.equal(p.credits,before);

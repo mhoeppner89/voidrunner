@@ -3815,8 +3815,8 @@ export class SpaceRenderer {
         }
     }
     createDroneVisual(unit) {
-        const pdc = unit.type === 'pdc' || unit.type === 'attack';
-        const color = unit.type === 'repair' ? 0x68ffb0 : unit.type === 'attack' ? 0xff7860 : pdc ? 0x69e4f2 : 0xffd05c;
+        const pdc = unit.type === 'pdc';
+        const color = unit.type === 'repair' ? 0x68ffb0 : pdc ? 0x69e4f2 : 0xffd05c;
         const root = new THREE.Group();
         root.name = `drone:${unit.id}`;
         // Distinct outlines stay legible without labels: miners have two
@@ -3870,7 +3870,7 @@ export class SpaceRenderer {
             }
             const model = template.clone(true);
             model.traverse(o => { if(o.isMesh) {o.geometry=o.geometry.clone();o.material=o.material.clone();o.raycast=()=>undefined;} });
-            if (unit.type === 'repair' || unit.type === 'attack') {
+            if (unit.type === 'repair') {
                 model.traverse(o => { if (!o.isMesh) return;
                     if (o.material.color) o.material.color.lerp(new THREE.Color(color), .25);
                 });
@@ -3890,7 +3890,7 @@ export class SpaceRenderer {
         if (units) for (const id in units) {
             const unit = units[id];
             if (!unit || !unit.position || unit.hull <= 0 || unit.state === 'stowed' || unit.state === 'destroyed'
-                || !['mining','pdc','repair','attack'].includes(unit.type)) continue;
+                || !['mining','pdc','repair'].includes(unit.type)) continue;
             let visual = this.droneVisuals[id];
             if (visual && visual.type !== unit.type) {
                 this.removeDroneVisual(id);
@@ -4586,6 +4586,18 @@ export class SpaceRenderer {
         group.userData.pulseCentered = !!centered;
         group.userData.pulseFinish = !!finish;
         return true;
+    }
+    setMissionMarker(marker) {
+        if(!this.missionMarker && marker){
+            this.missionMarker=new THREE.Group();
+            const material=new THREE.MeshBasicMaterial({color:0xffd56a,depthTest:true,transparent:true,opacity:.85});
+            const ring=new THREE.Mesh(new THREE.TorusGeometry(12,.45,4,32),material);
+            this.missionMarker.add(ring);
+            this.scene.add(this.missionMarker);
+        }
+        if(!this.missionMarker)return;
+        if(marker){this.missionMarker.position.fromArray(marker.position);this.missionMarker.quaternion.copy(this.camera.quaternion);}
+        this.missionMarker.visible=Boolean(marker)&&this.camera.position.distanceTo(this.missionMarker.position)>35;
     }
     setTarget(targetId, asteroidId, wreckId, locationId, pickupId) {
         this.targetId = targetId;

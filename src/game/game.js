@@ -1,3 +1,4 @@
+import {createRepairDroneState,prepareRepairDrone,applyDroneRepair} from './repairDrones.js';
 import {equipCareerItems,equipCapitalLoot,makeCareerWreck,combatWreckNode,recoverWreckEntry} from './careerLoot.js';
 import {equipmentAction,normalizeEquipmentInventory,refreshInventoryProjection,receiveEquipment,rollEquipmentRecord} from './equipmentInventory.js';
 import {equipmentBaseId,forgetEquipmentDefinition} from './equipmentCatalog.js';
@@ -6,7 +7,6 @@ import {FLEET_EQUIPMENT,droneDock} from './fleetEquipmentData.js';
 import {canonicalFaction,preferredNpcHull,FACTION_NAMES} from './factions.js';
 import {CRUISER_MOUNTS} from './cruiserModelData.js';
 import {CRUISER_GUN,equipCruiser,updateCruiserAttack,updateCruiserBatteries,damageCruiserMount,segmentCruiserMountHit,segmentCruiserHullHit,cruiserMountPosition,cruiserSubsystemLabel,cruiserSubsystemExplosionScale} from './cruiserCombat.js';
-import { REPAIR_SITES } from './repairSites.js';
 import { prepareLocalPursuit, updateLocalPursuit, driveRecoveryRemaining, PLAYER_RADAR_RANGE, PIRATE_ARRIVAL_MIN } from './combatTravel.js';
 import { beginPlayerDocking, landingCaptureReady, LANDING_CAPTURE_SPEED, nearestPlayerBerth, playerBerth, playerBerths, setPlayerBerthResolver, preparePlayerLaunch, stepPlayerDocking } from './playerDocking.js';
 import {fittedPlayerBerths,fitSessionPlayerBerths} from './shipLanding.js';
@@ -52,10 +52,11 @@ import { NPC_FIGHTER_SCALE, SpaceRenderer, npcShipScaleForVariant } from './rend
 import { saveGame } from './save.js';
 import { beginSortie, finishSortie, markSortieDocked, recordSortieCredit, recordSortieEncounter, recordSortieUpgrade } from './careerMetrics.js';
 import { getQuest, setFlag, setStep, startQuest } from './quests.js';
-import { advanceTutorialCampaign, getTutorialQuest, isTutorialActive, skipTutorialCampaign, tutorialCampaignSummary, tutorialLaunchBlock, TUTORIAL_MARA_CALL_MIN_COMBAT_VALUE } from './tutorialCampaign.js';
-import { TUTORIAL_RADIO, TRAVEL_RADIO } from './tutorialRadio.js';
+import { advanceTutorialCampaign, getTutorialQuest, isTutorialActive, skipTutorialCampaign, tutorialCampaignSummary, tutorialLaunchBlock, tutorialContentUnlocked, tutorialPeople, isTutorialGuided, tutorialGateOpen, TUTORIAL_FLIGHT_LESSONS, TUTORIAL_REQUIRED_SUPPLIES, TUTORIAL_MINING_CONTRACT_ID } from './tutorialCampaign.js';
+import { TutorialRuntimeMethods } from './tutorialRuntime.js';
+import { TRAVEL_RADIO } from './tutorialRadio.js';
 import { playerStrengthValue } from './playerStrength.js';
-import { getEffectiveShipStats, refillCost, repairCost } from './shipStats.js';
+import { getEffectiveShipStats, dockServiceQuote, repaintCost } from './shipStats.js';
 import { WEAPON_DAMAGE_SCALE, weaponAssistCone, weaponRange, weaponShotDamage, ammoCapacity, AMMO_CAPACITY, clearLauncherMagazines, fillLauncherMagazines, launcherMagazineEntries, normalizeLauncherMagazines, syncLauncherMissileTotal, WEAPON_ORDER, WEAPONS, LAUNCHERS, weaponForSlot, weaponForOutfit, launcherForOutfit, weaponIdForOutfit, weaponOwned } from './weapons.js';
 import { HULL_HARDPOINTS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, canonicalOutfitId, collapseOutfittingToSingleShip, commitOutfitting, itemFitsMount, loadoutFor, normalizeOutfitting, outfitItem, projectLegacyEquipment, quoteOutfitting, outfittingUsage } from './outfitting.js';
 import { combinedHullIntegrity, normalizeEnergy, passiveShieldRechargeRate, regenerateCombatResources, spendEnergy } from './combatResources.js';
@@ -198,13 +199,8 @@ const HYPERDRIVE_SPOOL_SECONDS = 2;
 const HYPERDRIVE_FX_DURATION = 0.9;
 const HYPERDRIVE_INTERRUPT_DURATION = 1.1;
 const GATE_TRANSITION_SECONDS = 0.52;
-const TUTORIAL_COMPLETION_REWARD = 2500;
 // After Rin jumps ahead, Mara's "she never called" transmission waits this
 // long so the earn-and-equip stretch is really played before the story calls.
-const TUTORIAL_MARA_CALL_DELAY = 150;
-const TUTORIAL_COMPANION_NAME = 'Rin Vek · Second Light';
-const TUTORIAL_ENEMY_NAME = 'Ash Moth';
-const TUTORIAL_RIN_HELP_DELAY = 28;
 // Give the player a short calm window after an intercept is resolved so a long
 // route cannot immediately roll into another hyperdrive ambush.
 const HYPERDRIVE_ENCOUNTER_COOLDOWN = 45;
@@ -1591,266 +1587,11 @@ export class GameSession {
             .addScaledVector(forward, -30)
             .addScaledVector(up, 8);
     }
-    ensureTutorialCompanion(forcePosition = false) {
-        if (!this.renderer || this.save.player.dockedAt || !isTutorialActive(this.save))
-            return undefined;
-        // Rin has jumped ahead through the gate: from the galaxy-map step on,
-        // the Second Light is story-absent and the Wayfarer flies solo.
-        const summary = this.tutorialSummary();
-        if (['galaxy-map','cross-meridian-gate'].includes(summary?.stepId))
-            return undefined;
-        let ship = this.ships.find((entry) => entry.tutorialCompanion && entry.hull > 0);
-        const goal = this.tutorialFormationGoal();
-        if (!ship) {
-            ship = this.spawnShip('patrol', tuple(goal), undefined, TUTORIAL_COMPANION_NAME, { tier: 'veteran', temperament: 'steady' });
-            const flight = HULL_FLIGHT_STATS.lancer;
-            ship.variant = 'lancer';
-            ship.faction = 'independents';
-            ship.tutorialCompanion = true;
-            ship.task = { kind: 'tutorial-wing' };
-            ship.destination = [...ship.position];
-            ship.hostile = false;
-            ship.authorizedTarget = false;
-            ship.dark = false;
-            ship.mugCapable = false;
-            ship.routineInspectionDue = false;
-            ship.noSurrender = true;
-            ship.speed = Math.max(96, this.playerStats().maxSpeed * 2.35);
-            ship.afterburnSpeed = 0;
-            ship.turnRate = flight.turnRate;
-            ship.maxShield = 220;
-            ship.shield = ship.maxShield;
-            ship.maxHull = 360;
-            ship.hull = ship.maxHull;
-            ship.gunDamage = 5;
-            ship.playerSensorAwareness = 1;
-            ship.identifiedByPlayer = true;
-            ship.playerAwareness = 1;
-            ship.playerIdentified = true;
-            this.renderer.ensureGlbShipModel?.('lancer');
-            forcePosition = true;
-        }
-        if (forcePosition) {
-            tupleInto(ship.position, goal);
-            tupleInto(ship.velocity, this.tmpTutorialForward.set(
-                this.save.player.velocity[0],
-                this.save.player.velocity[1],
-                this.save.player.velocity[2],
-            ));
-            quatTupleInto(ship.rotation, this.tmpQ2.set(
-                this.save.player.rotation[0],
-                this.save.player.rotation[1],
-                this.save.player.rotation[2],
-                this.save.player.rotation[3],
-            ));
-        }
-        return ship;
-    }
-    ensureTutorialEnemy() {
-        const summary = this.tutorialSummary();
-        if (!this.renderer || this.save.player.dockedAt || this.activeInstanceId !== 'shardbelt'
-            || !summary?.active || summary.stepId !== 'defeat-raider')
-            return undefined;
-        const existing = this.ships.find((entry) => entry.tutorialEnemy && entry.hull > 0);
-        this.save.player.mode = 'combat';
-        this.utilityActive = false;
-        this.renderer.setUtilityBeam(false, 'combat', this.save.player.position);
-        if (existing) {
-            if (this.save.player.currentTargetId !== existing.id)
-                this.applyTarget({ kind: 'ship', id: existing.id, position: existing.position, name: existing.name });
-            return existing;
-        }
-        const player = this.save.player;
-        const orientation = this.tmpQ2.set(player.rotation[0], player.rotation[1], player.rotation[2], player.rotation[3]);
-        const position = this.tmpTutorialGoal.set(player.position[0], player.position[1], player.position[2])
-            .addScaledVector(this.tmpTutorialForward.copy(FORWARD).applyQuaternion(orientation).normalize(), 165)
-            .addScaledVector(this.tmpTutorialRight.copy(RIGHT).applyQuaternion(orientation).normalize(), 72)
-            .addScaledVector(this.tmpTutorialUp.copy(UP).applyQuaternion(orientation).normalize(), 12);
-        const enemy = this.spawnShip('pirate', tuple(position), undefined, TUTORIAL_ENEMY_NAME, { tier: 'rookie', temperament: 'steady' });
-        enemy.tutorialEnemy = true;
-        enemy.noSurrender = true;
-        enemy.dark = false;
-        enemy.mugCapable = false;
-        enemy.holdFire = false;
-        enemy.pursuitHoldFire = false;
-        enemy.maxShield = 20;
-        enemy.shield = enemy.maxShield;
-        enemy.maxHull = 58;
-        enemy.hull = enemy.maxHull;
-        enemy.gunDamage = 3;
-        enemy.bountyValue = 0;
-        enemy.targetId = 'player';
-        enemy.playerAwareness = 1;
-        enemy.playerSensorAwareness = 1;
-        enemy.playerIdentified = true;
-        enemy.identifiedByPlayer = true;
-        // Keep the encounter in front of the canopy when that pocket is clear.
-        // findClearSpace returns a tuple, not a Vector3: tupleInto would erase
-        // its coordinates and leave an invisible, permanently selected enemy.
-        if (!this.entryPositionClear(position, this.activeFieldObstacles(), npcCollisionRadius(enemy) + 24)) {
-            const clearPosition = this.findClearSpace(enemy);
-            enemy.position.splice(0, 3, ...clearPosition);
-        }
-        enemy.task.anchor = [...enemy.position];
-        enemy.lastResolvedPlayer = [...player.position];
-        this.applyTarget({ kind: 'ship', id: enemy.id, position: enemy.position, name: enemy.name });
-        this.playTutorialBriefing('combat');
-        return enemy;
-    }
-    ensureTutorialFieldTarget() {
-        const summary = this.tutorialSummary();
-        if (!summary?.active || !this.renderer)
-            return undefined;
-        const quest = getTutorialQuest(this.save);
-        if (this.save.player.systemId !== LOCATIONS.shardbelt.systemId) return undefined;
-        if (summary.stepId === 'mine-shardbelt') {
-            let node = this.asteroids.find((entry) => entry.id === quest.flags?.oreTargetId && entry.remaining > 0);
-            if (!node) {
-                const player = this.save.player.position;
-                node = (this.asteroids.some(entry => entry.remaining > 0) ? this.asteroids.filter(entry => entry.remaining > 0) : this.asteroids).reduce((best, entry) => {
-                    if (!best)
-                        return entry;
-                    const distance = (entry.position[0] - player[0]) ** 2 + (entry.position[1] - player[1]) ** 2 + (entry.position[2] - player[2]) ** 2;
-                    const bestDistance = (best.position[0] - player[0]) ** 2 + (best.position[1] - player[1]) ** 2 + (best.position[2] - player[2]) ** 2;
-                    return distance < bestDistance ? entry : best;
-                }, undefined);
-                if (node) {
-                    if (node.remaining <= 0) {
-                        node.remaining = 1;
-                        this.save.world.depletedAsteroids[node.id] = 1;
-                    }
-                    setFlag(this.save, quest.id, 'oreTargetId', node.id);
-                }
-            }
-            if (node)
-                this.selectTarget('asteroid', node.id);
-            return node;
-        }
-        if (summary.stepId === 'salvage-black-box') {
-            let node = this.wreckNodes.find((entry) => entry.id === quest.flags?.blackBoxTargetId && entry.remaining > 0);
-            if (!node) {
-                const player = this.save.player.position;
-                const available = this.wreckNodes.filter(entry => entry.remaining > 0);
-                const candidates = available.length ? available : this.wreckNodes;
-                // Begin on loose carrier debris, not inside a capital hull.
-                // The first salvage lesson teaches the beam, not tunnel flying.
-                const carrier = candidates.filter(entry => entry.zone === 'carrier-hangar' && !entry.insideWreckId);
-                const exterior = candidates.filter(entry => !entry.insideWreckId);
-                const pool = carrier.length ? carrier : exterior.length ? exterior : candidates;
-                const preferred = pool.filter((entry) => entry.salvage === 'electronics');
-                node = (preferred.length ? preferred : pool).reduce((best, entry) => {
-                    if (!best)
-                        return entry;
-                    const distance = (entry.position[0] - player[0]) ** 2 + (entry.position[1] - player[1]) ** 2 + (entry.position[2] - player[2]) ** 2;
-                    const bestDistance = (best.position[0] - player[0]) ** 2 + (best.position[1] - player[1]) ** 2 + (best.position[2] - player[2]) ** 2;
-                    return distance < bestDistance ? entry : best;
-                }, undefined);
-                if (node) {
-                    if (node.remaining <= 0) {
-                        node.remaining = 1;
-                        this.save.world.depletedWrecks[node.id] = 1;
-                    }
-                    setFlag(this.save, quest.id, 'blackBoxTargetId', node.id);
-                }
-            }
-            if (node)
-                this.selectTarget('wreck', node.id);
-            return node;
-        }
-        return undefined;
-    }
-    tutorialFieldTarget() {
-        const quest = getTutorialQuest(this.save);
-        if (!isTutorialActive(this.save) || this.save.player.systemId !== LOCATIONS.shardbelt.systemId) return undefined;
-        if (quest.stepId === 'collect-cargo') {
-            const pickup = this.pickups?.find(entry => entry.tutorialCargo && entry.life > 0);
-            return pickup ? {kind:'pickup',id:pickup.id,position:tuple(this.pickupStore.getPos(pickup.slot,this.tmpP0)),
-                name:t('RECOVERED CARGO'),destinationId:'shardbelt'} : undefined;
-        }
-        const mining = quest.stepId === 'mine-shardbelt';
-        if (!mining && quest.stepId !== 'salvage-black-box') return undefined;
-        const id = quest.flags?.[mining ? 'oreTargetId' : 'blackBoxTargetId'];
-        const node = (mining ? this.asteroids : this.wreckNodes)?.find(entry => entry.id === id && entry.remaining > 0);
-        return node ? {kind:mining ? 'asteroid' : 'wreck',id:node.id,position:node.position,
-            name:t(mining ? 'RIN’S MINING MARKER' : 'CONVOY RECORDER SIGNAL'),destinationId:mining ? 'shardbelt' : 'mourning-line'} : undefined;
-    }
-    updateTutorialCompanion(ship, dt) {
-        if (!isTutorialActive(this.save)) {
-            ship.hull = -1;
-            return;
-        }
-        ship.hostile = false;
-        ship.playerSensorAwareness = 1;
-        ship.identifiedByPlayer = true;
-        // The wing card follows her state every frame, including the frame a
-        // disabling hit lands: it dims and drains while she is dark, and goes
-        // with her entirely when she is gone.
-        this.publishCampaignWing();
-        // Disabled (see damageShip): no orders, no guns, no station-keeping —
-        // just a dark hull bleeding off its momentum where it was hit. She comes
-        // back online as soon as the last opponent in the pilot's box is beaten,
-        // and then falls through to her ordinary wing behaviour in the same
-        // frame.
-        if (ship.poweredDown) {
-            if (!this.campaignOpponentsInFight().length)
-                this.powerUpEssentialCompanion(ship);
-            else {
-                // Drift, do not navigate. The travel AI would run her turret
-                // pass — and it fires on its own, since a powered-down hull is
-                // not in the turret hold-fire list — so a disabled companion
-                // bleeds off momentum here instead, with nothing aimed, nothing
-                // steered and nothing shot: the same drift every powered-down
-                // hull gets.
-                ship.holdFire = true;
-                ship.pursuitHoldFire = true;
-                ship.targetId = undefined;
-                const bleed = Math.max(0, 1 - dt * 0.6);
-                for (let axis = 0; axis < 3; axis++) {
-                    ship.velocity[axis] *= bleed;
-                    ship.position[axis] += ship.velocity[axis] * dt;
-                }
-                return;
-            }
-        }
-        // Wing command is taught at the combat step. From then on the player's
-        // standing order decides whether Rin engages — the same doctrine, gates
-        // and self-defence rules a hired arena veteran flies. Before that she
-        // keeps her scripted help, so the prologue's one fight cannot stall.
-        if (campaignWingUnlocked(this.save)) {
-            const { order, target } = this.applyCampaignWingOrder(ship);
-            if (target) {
-                this.updateAttackAI(
-                    ship,
-                    this.tmpTutorialGoal.set(target.position[0], target.position[1], target.position[2]),
-                    this.tmpTutorialForward.set(target.velocity[0], target.velocity[1], target.velocity[2]),
-                    dt,
-                );
-                return;
-            }
-            // Nothing legal to engage: weapons held and station kept. A wing told
-            // to break off stations on the far side of the pilot from the fight.
-            this.flyTutorialWingTo(
-                ship,
-                order === 'breakoff' ? this.campaignBreakGoal(ship, this.tmpTutorialGoal) : this.tutorialFormationGoal(),
-                dt,
-            );
-            return;
-        }
-        const enemy = this.ships.find((entry) => entry.tutorialEnemy && entry.hull > 0);
-        const playerHullRatio = this.save.player.hull / Math.max(1, this.playerStats().hull);
-        if (enemy && (this.save.world.time - enemy.spawnTime >= TUTORIAL_RIN_HELP_DELAY || playerHullRatio < 0.5)) {
-            ship.targetId = enemy.id;
-            this.updateAttackAI(
-                ship,
-                this.tmpTutorialGoal.set(enemy.position[0], enemy.position[1], enemy.position[2]),
-                this.tmpTutorialForward.set(enemy.velocity[0], enemy.velocity[1], enemy.velocity[2]),
-                dt,
-            );
-            return;
-        }
-        ship.targetId = undefined;
-        this.flyTutorialWingTo(ship, this.tutorialFormationGoal(), dt);
-    }
+
+
+
+
+
     // Formation-keeping for the companion: a teleport when she is left far
     // behind (the player crossed a gate or cut away), a velocity blend once she
     // is already on station, and the ordinary travel AI in between.
@@ -1898,93 +1639,36 @@ export class GameSession {
             this.clearTarget();
         this.renderer?.syncShips(this.ships);
     }
-    ensureTutorialDelivery() {
-        const quest = getTutorialQuest(this.save);
-        if (!isTutorialActive(this.save) || quest.stepId !== 'sell-supplies' || this.save.player.dockedAt !== 'vesper') return;
-        const sold = Number(quest.flags.suppliesSold) || 0;
-        const aboard = this.save.player.cargo.food ?? 0;
-        const missing = Math.max(0, 2 - sold - aboard);
-        const amount = Math.min(missing, Math.floor((cargoFree(this.save.player) + 1e-6) / COMMODITIES.food.mass));
-        if (amount > 0) {
-            this.save.player.cargo.food = aboard + amount;
-            this.ui.showToast(t('Rin transferred {count} replacement Protein Pack(s) for the delivery.', {count:amount}), 'info', 5200);
-        }
-        setFlag(this.save, quest.id, 'suppliesAtVesper', sold + aboard + amount);
-        if (amount < missing)
-            this.ui.showToast(t('Make room in your hold. Rin can replace the missing delivery packs at Vesper.'), 'info', 5200);
-    }
-    ensureTutorialEquipment() {
-        const quest = getTutorialQuest(this.save);
-        if (!isTutorialActive(this.save) || quest.stepId !== 'fit-upgrade') return;
-        normalizeOutfitting(this.save.player);
-        const loadout = loadoutFor(this.save.player,this.save.player.shipId);
-        if (loadout.utility.some(id => equipmentBaseId(id) === 'radar-mk2')) {
-            this.handleTutorialEvent('outfitted',{locationId:this.save.player.dockedAt,radarInstalled:true});
-            return;
-        }
-        if (!quest.flags.radarProvided) {
-            const locker = this.save.player.outfitting.locker;
-            locker['radar-mk2'] = (locker['radar-mk2'] ?? 0) + 1;
-            setFlag(this.save,quest.id,'radarProvided',true);
-            this.persistSave();
-        }
-    }
-    checkTutorialServices(reviewed = false) {
-        const quest = getTutorialQuest(this.save);
-        if (!isTutorialActive(this.save) || quest.stepId !== 'service-ship' || this.save.player.dockedAt !== 'vesper') return;
-        if (reviewed) setFlag(this.save,quest.id,'servicesReviewed',true);
-        const bill = repairCost(this.save.player) + refillCost(this.save.player);
-        if (reviewed && !quest.flags.serviceHelp && this.save.player.credits < bill) {
-            this.save.player.credits = bill;
-            setFlag(this.save,quest.id,'serviceHelp',true);
-            this.ui.showToast(t('Rin covered the shortfall for this first service visit.'),'info',5000);
-        }
-        if (reviewed) this.persistSave();
-        if (quest.flags.servicesReviewed)
-            this.handleTutorialEvent('serviced',{locationId:'vesper',ready:repairCost(this.save.player) <= 0 && refillCost(this.save.player) <= 0});
-    }
-    ensureTutorialCargo() {
-        const quest = getTutorialQuest(this.save);
-        if (!isTutorialActive(this.save) || quest.stepId !== 'collect-cargo' || this.save.player.dockedAt || !this.renderer) return;
-        if (this.save.player.systemId !== LOCATIONS.shardbelt.systemId) return;
-        let pickup = this.pickups.find(entry => entry.tutorialCargo && entry.life > 0);
-        if (!pickup) {
-            const enemy = this.ships.find(ship => ship.tutorialEnemy);
-            const savedPosition = [quest.flags.crateX,quest.flags.crateY,quest.flags.crateZ];
-            const restored = savedPosition.every(Number.isFinite);
-            const origin = restored
-                ? savedPosition
-                : enemy?.position ?? LOCATIONS.shardbelt.position;
-            pickup = this.spawnPickup('ore',origin,'combat',1);
-            pickup.tutorialCargo = true;
-            pickup.life = Infinity;
-            if (restored) this.pickupStore.setPos(pickup.slot,...savedPosition);
-            this.pickupStore.setVel(pickup.slot,0,0,0);
-            const position = this.pickupStore.getPos(pickup.slot,this.tmpP0);
-            for (const axis of ['x','y','z']) setFlag(this.save,quest.id,'crate' + axis.toUpperCase(),position[axis]);
-            this.persistSave();
-        }
-        this.selectTarget('pickup',pickup.id);
-    }
+
+
+
+
     updateTutorialFlightChecks(dt, actions) {
-        const quest = getTutorialQuest(this.save);
-        if (!isTutorialActive(this.save) || quest.stepId !== 'flight-checks' || this.save.player.dockedAt || this.autopilot) return;
-        const learned = id => quest.flags['learned-' + id];
-        if (!learned('thrust') && this.save.player.throttle >= 0.3 && Math.hypot(...this.save.player.velocity) > 8)
-            this.handleTutorialEvent('flight-lesson',{id:'thrust'});
-        if (!learned('steering') && Math.max(Math.abs(actions.pitch ?? 0),Math.abs(actions.yaw ?? 0),Math.abs(actions.roll ?? 0)) > 0.15)
-            this.handleTutorialEvent('flight-lesson',{id:'steering'});
-        if (!learned('boost') && this.afterburning && Math.hypot(...this.save.player.velocity) >= this.playerStats().maxSpeed * 0.9) {
-            this.tutorialBoostTime = (this.tutorialBoostTime ?? 0) + dt;
-            if (this.tutorialBoostTime >= 2) this.handleTutorialEvent('flight-lesson',{id:'boost'});
+        const quest = getTutorialQuest(this.save),player=this.save.player;
+        if (!isTutorialActive(this.save) || player.dockedAt || this.autopilot
+            || quest.stepId!=='flight-checks'&&quest.stepId!=='fly-vesper') return;
+        if(quest.stepId==='flight-checks'){
+            let complete=true;
+            for(const lesson of TUTORIAL_FLIGHT_LESSONS)if(!quest.flags['learned-'+lesson.id]){complete=false;break;}
+            if(complete){this.handleTutorialEvent('flight-lesson',{id:'ship-monitor'});return;}
+            if (!quest.flags['learned-thrust'] && player.throttle>=.3 && Math.hypot(...player.velocity)>8)
+                this.handleTutorialEvent('flight-lesson',{id:'thrust'});
+            if (!quest.flags['learned-steering'] && Math.max(Math.abs(actions.pitch??0),Math.abs(actions.yaw??0),Math.abs(actions.roll??0))>.15)
+                this.handleTutorialEvent('flight-lesson',{id:'steering'});
         }
+        if(quest.flags['learned-boost'])return;
+        const aboveLanding=Math.hypot(player.position[0]-LOCATIONS.vesper.position[0],player.position[1]-LOCATIONS.vesper.position[1],player.position[2]-LOCATIONS.vesper.position[2])-LOCATIONS.vesper.radius>5000;
+        const burning=this.tutorialVesperApproach()&&aboveLanding&&this.afterburning
+            &&Math.hypot(...player.velocity)>=this.playerStats().maxSpeed*.9;
+        this.tutorialBoostTime=burning?(this.tutorialBoostTime??0)+dt:0;
+        if(this.tutorialBoostTime>=2)this.handleTutorialEvent('flight-lesson',{id:'boost'});
     }
     playTutorialBriefing(id) {
         const quest = getTutorialQuest(this.save);
         if (!quest || quest.flags?.['briefingRead-' + id] || this.pendingTutorialBriefings?.has(id)) return;
         this.pendingTutorialBriefings ??= new Set();
         this.pendingTutorialBriefings.add(id);
-        this.playStoryLine('Rin Vek', t('Rin has something to discuss.'), 'ally', 15000, 'tutorial-' + id);
+        this.playStoryLine(id.startsWith('paul-')?'Paul':id.startsWith('mara-')?'Mara Vek':'Rin Vek', t(id.startsWith('paul-')?'Paul is calling.':id.startsWith('mara-')?'Mara is calling.':'Rin has something to discuss.'), 'ally', 15000, 'tutorial-' + id);
     }
     finishTutorialBriefing(conversationId, completed) {
         if (conversationId === 'tutorial-handoff') {
@@ -1996,6 +1680,7 @@ export class GameSession {
             return;
         }
         const id = conversationId?.replace(/^tutorial-/, '');
+        if(completed)this.handleTutorialEvent('conversation-completed',{id});
         if (!this.pendingTutorialBriefings?.delete(id)) return;
         const quest = getTutorialQuest(this.save);
         if (completed && quest) {
@@ -2005,125 +1690,11 @@ export class GameSession {
         this.nextChatterAt = Math.max(this.nextChatterAt ?? 0, this.save.world.time + 4);
         this.tutorialAmbientAfter = this.save.world.time + 12;
     }
-    applyTutorialTransition(result) {
-        const stepId = result?.stepId;
-        if (!stepId)
-            return;
-        if (stepId === 'buy-supplies') {
-            this.ui.showToast(t('Mara: Load two Protein Packs at the commodity market.'), 'info', 5200);
-        }
-        else if (stepId === 'fit-upgrade') {
-            this.ensureTutorialEquipment();
-            if (getTutorialQuest(this.save).stepId === 'fit-upgrade') this.playTutorialBriefing('outfitting');
-        }
-        else if (stepId === 'launch-helix') {
-            this.ui.showToast(t('Rin is waiting outside in the Second Light. Launch when ready.'), 'success', 5200);
-        }
-        else if (stepId === 'plot-vesper') {
-            this.ensureTutorialCompanion(true);
-            this.playTutorialBriefing('navigation');
-        }
-        else if (stepId === 'flight-checks') this.playTutorialBriefing('flight');
-        else if (stepId === 'fly-vesper') {
-            this.setTutorialDestination('vesper');
-            this.ensureTutorialCompanion(true);
-        }
-        else if (stepId === 'sell-supplies') {
-            this.ensureTutorialDelivery();
-        }
-        else if (stepId === 'mine-shardbelt') {
-            this.setTutorialDestination('shardbelt');
-            this.playTutorialBriefing('mining');
-        }
-        else if (stepId === 'service-ship') this.playTutorialBriefing('services');
-        else if (stepId === 'check-weapons') { this.handleTutorialEvent('resume'); }
-        else if (stepId === 'defeat-raider') {
-            const enemy = this.ensureTutorialEnemy();
-            this.utilityActive = false;
-            if (enemy)
-                this.ui.pushSensor(t('HOSTILE LOCK · ASH MOTH'), 'danger', 5200);
-            // The wing lesson lands with the fight itself: Rin takes orders from
-            // here on, and this is the fight that shows why they matter.
-            this.introduceCampaignWingOrders();
-        }
-        else if (stepId === 'salvage-black-box') {
-            this.setTutorialDestination('mourning-line');
-            this.ensureTutorialFieldTarget();
-            this.playTutorialBriefing('salvage');
-        }
-        else if (stepId === 'collect-cargo') {
-            this.ensureTutorialCargo();
-            this.playTutorialBriefing('cargo');
-        }
-        else if (stepId === 'dock-cairn') {
-            this.setTutorialDestination('cairn');
-            this.utilityActive = false;
-            this.renderer?.setUtilityBeam(false, 'salvage', this.save.player.position);
-            this.playTutorialBriefing('recorder');
-        }
-        else if (stepId === 'family-choice') {
-            this.ui.showToast(t('Rin is waiting at the Cairn berth with the recorder.'), 'warning', 6200);
-        }
-        else if (stepId === 'galaxy-map') {
-            // Rin jumps ahead alone: the Second Light leaves the formation,
-            // she says goodbye in person, and the prologue's earn-and-equip
-            // stretch begins. Mara's worried call is scheduled, not scripted
-            // to this instant.
-            this.removeTutorialActors();
-            setFlag(this.save, getTutorialQuest(this.save).id, 'rinDeparted', true);
-            this.tutorialMaraCallDue = this.save.world.time + TUTORIAL_MARA_CALL_DELAY;
-            // Persist the due time: the session field dies with the page, and a
-            // reload mid-stretch must not drop Mara's remaining wait.
-            setFlag(this.save, getTutorialQuest(this.save).id, 'maraCallDueAt', this.tutorialMaraCallDue);
-            this.playStoryLine('Rin Vek', t('Rin has something to discuss.'), 'ally', 15000, 'tutorial-departure');
-            this.playTutorialBriefing('galaxy');
-            this.ui.showToast(t('The Second Light jumps ahead. Refit the Wayfarer and earn your crossing money before you follow.'), 'info', 7000);
-        }
-        else if (stepId === 'cross-meridian-gate') {
-            // The player's own galaxy plot set the gate route; the tutorial
-            // must not stomp it (the local jump point would clear the plan).
-            // Crossing is the player's decision, on their own timetable.
-            this.ui.showToast(t('Meridian is plotted. Cross when you are ready.'), 'success', 6200);
-        }
-        else if (stepId === 'complete') {
-            const quest = getTutorialQuest(this.save);
-            if (!quest.flags?.rewardGranted) {
-                this.save.player.credits += TUTORIAL_COMPLETION_REWARD;
-                setFlag(this.save, quest.id, 'rewardGranted', true);
-            }
-            this.save.world.localContractOffersDirty = true;
-            refreshMissionOffers(this.save);
-            this.removeTutorialActors();
-            this.setTutorialDestination('meridian-prime');
-            this.queueTutorialMaraCall();
-            this.ui.pushEvent(t('FAMILY PROLOGUE COMPLETE · +{credits}', { credits: formatCredits(TUTORIAL_COMPLETION_REWARD) }), 'success', 7000);
-        }
-    }
-    restoreTutorialRuntime() {
-        let summary = this.tutorialSummary();
-        if (!summary?.active)
-            return summary;
-        this.save.world.campaignUnlocked = false;
-        this.hyperdriveEncounterAt = null;
-        this.beamAmbushNextAt = 0;
-        this.ensureTutorialEquipment();
-        if(summary.stepId==='check-weapons')this.handleTutorialEvent('resume');
-        summary = this.tutorialSummary();
-        this.ensureTutorialDelivery();
-        if (!['galaxy-map','cross-meridian-gate'].includes(summary.stepId) && summary.stepId !== 'launch-helix') this.setTutorialDestination(summary.destinationId);
-        if (!this.save.player.dockedAt && this.renderer) {
-            this.ensureTutorialCompanion();
-            if (summary.stepId === 'defeat-raider')
-                this.ensureTutorialEnemy();
-            this.ensureTutorialFieldTarget();
-            this.ensureTutorialCargo();
-            const briefing = {'plot-vesper':'navigation','flight-checks':'flight','check-weapons':'weapons','collect-cargo':'cargo','mine-shardbelt':'mining','salvage-black-box':'salvage','dock-cairn':'recorder','galaxy-map':'galaxy'}[summary.stepId];
-            if (briefing) this.playTutorialBriefing(briefing);
-        }
-        this.queueTutorialMaraCall();
-        return summary;
-    }
+
+
     handleTutorialEvent(type, payload = {}) {
+        const quest = getTutorialQuest(this.save);
+        if(type==='ship-defeated' && payload.tutorialEncounter && quest) quest.flags[`defeated-${payload.tutorialEncounter}-${payload.tutorialIndex}`]=true;
         const result = advanceTutorialCampaign(this.save, { type, ...payload });
         if (!result.changed)
             return { ...result, summary: this.tutorialSummary() };
@@ -2131,7 +1702,7 @@ export class GameSession {
         // replacement, briefings, rewards or target changes).
         if (result.fromStepId !== result.stepId)
             this.applyTutorialTransition(result);
-        else if (result.stepId === 'flight-checks' || result.stepId === 'check-weapons') {
+        else if (result.stepId === 'flight-checks') {
             this.lastTutorialHint = undefined;
             this.nextChatterAt = this.save.world.time + 0.5;
         }
@@ -2140,36 +1711,6 @@ export class GameSession {
         this.persistSave();
         return { ...result, summary: this.tutorialSummary() };
     }
-    // Mara's own comms line for the lost-Rin stretch: fire once when her call
-    // becomes due. Ticked every second from updateTutorialRadio so ordinary
-    // earning (trades, mining, docking) counts toward the wait without each
-    // event site needing to know about the call. Opening as a story bar plus
-    // conversation keeps it out of the radio noise, and the transcript shows
-    // it under Mara's own portrait (openStoryAdventure matches her by name).
-    queueTutorialMaraCall() {
-        const quest = getTutorialQuest(this.save);
-        const summary = this.tutorialSummary();
-        const stepId = quest?.stepId;
-        if (!summary || summary.skipped || this.deathTimer > 0 || this.save.player.hull <= 0
-            || this.galaxyJump || this.ui.isModalOpen || this.storyLineActive()
-            || !['galaxy-map','cross-meridian-gate','complete'].includes(stepId)
-            || quest.flags?.maraCallMade || this.tutorialMaraCallOffered
-            || this.save.world.time < (this.nextTutorialMaraCallAt ?? 0)
-            || (this.pendingStoryConversations ?? []).some(entry => entry.conversationId === 'tutorial-handoff'))
-            return;
-        // Crossing ends the prologue: Mara's call is due when the Wayfarer
-        // reaches Meridian, but the handoff waits for the player's combat
-        // value to show that the ship is ready. Session field wins while the
-        // page lives; the persisted flag covers resumes. Hand-crafted or
-        // fast-forwarded saves carry neither, so they use the current time.
-        const maraCallDue = this.tutorialMaraCallDue ?? quest.flags?.maraCallDueAt ?? 0;
-        if (stepId !== 'complete' && this.save.world.time < maraCallDue)
-            return;
-        if (playerStrengthValue(this.save.player) < TUTORIAL_MARA_CALL_MIN_COMBAT_VALUE)
-            return;
-        this.tutorialMaraCallOffered = true;
-        this.playStoryLine('Mara Vek', t('Incoming transmission · Mara Vek'), 'ally', 15000, 'tutorial-handoff');
-    }
     skipTutorial() {
         const result = skipTutorialCampaign(this.save, this.save.world.time);
         if (!result.changed)
@@ -2177,6 +1718,9 @@ export class GameSession {
         this.save.world.localContractOffersDirty = true;
         refreshMissionOffers(this.save);
         this.removeTutorialActors();
+        this.renderer?.setMissionMarker?.();
+        this.ui.setTutorialHint?.();
+        this.save.player.sealedCargo=this.save.player.sealedCargo.filter(c=>c.missionId!=='tutorial-black-box');
         this.pendingStoryConversations = [];
         this.pendingTutorialBriefings?.clear();
         for (const pickup of this.pickups ?? []) if (pickup.tutorialCargo) pickup.life = 0;
@@ -2198,6 +1742,7 @@ export class GameSession {
         // outlive the player-facing screen that opened it. Clear any stale
         // player modal before showing the observer so LIVE really means the
         // observer is running and its controls are reachable immediately.
+        this.ui.hideArena?.();
         this.ui.hidePause?.();
         this.ui.hideMap?.();
         this.ui.hideShipMenu?.();
@@ -5261,6 +4806,7 @@ export class GameSession {
     initializePdcDrones() {
         if (this.pdcDroneController || !this.save?.player?.droneFleet) return;
         this.pdcDroneController = createPdcDroneController();
+        this.repairDroneState = createRepairDroneState();
         this.pdcAssignments ??= new Map();
         this.pdcDroneShipId = this.save.player.shipId;
         this.pdcDroneEvents = [];
@@ -5276,19 +4822,11 @@ export class GameSession {
         this.pdcEnd = new THREE.Vector3();
         // Drone tuning supplies speed; collision, damage and rendering remain PDC.
         this.pdcDroneWeapon = { ...WEAPONS.pdc, damageFlat: WEAPONS.pdc.damageFlat * 2, speed: DRONE_TYPES.pdc.projectileSpeed };
-        this.attackDroneWeapon = { ...WEAPONS.pulse, damageFlat: 8, speed: DRONE_TYPES.attack.projectileSpeed, life: 1.2 };
         this.pdcDroneContext = { ownerId: 'player', unitIds: [], threats: [], opponents: [],
             bayAnchors: Object.create(null), escortAnchors: Object.create(null),
             assignments: this.pdcAssignments,
             repairHull: (unit, dt) => {
-                const player = this.save.player, stats = this.playerStats();
-                if (!unit.repairAttached) return;
-                const reserve = stats.energyCapacity * .2;
-                const repaired = Math.max(0, Math.min(stats.hull-player.hull, DRONE_TYPES.repair.repairRate*dt,
-                    (player.energy-reserve)/DRONE_TYPES.repair.energyPerHull));
-                player.hull += repaired;
-                player.energy -= repaired * DRONE_TYPES.repair.energyPerHull;
-                unit.repairing = repaired > 0;
+                applyDroneRepair(this,this.save.player,unit,dt,this.repairDroneState);
                 if (unit.repairing && this.save.world.time >= (this.repairSoundAt ?? 0)) {
                     this.repairSoundAt = this.save.world.time + .34;
                     this.audio?.play?.('repair', .5);
@@ -5419,7 +4957,7 @@ export class GameSession {
             const ship = event.targetKind === 'ship' ? this.ships.find(s => s.id === event.threatId && s.hostile && s.hull > 0 && !s.race) : null;
             let round;
             if (missile?.life > 0 || ship) {
-                round = this.spawnGunProjectile('player', fleet.unitsById[event.unitId]?.type === 'attack' ? this.attackDroneWeapon : this.pdcDroneWeapon,
+                round = this.spawnGunProjectile('player', this.pdcDroneWeapon,
                     this.pdcStart.fromArray(event.start), this.pdcDirection.fromArray(event.direction),
                     event.inheritedVelocity, ship?.id, event.unitId);
             }
@@ -5429,9 +4967,7 @@ export class GameSession {
                 if (assignment?.defenderId === event.unitId) assignment.round = round;
             }
             else {
-                // A rejected spawn must not spend ammunition or strand a reservation.
-                const unit = fleet.unitsById[event.unitId];
-                if (unit) unit.ammo += event.ammoSpent;
+                // A rejected spawn must not strand a reservation.
                 if (this.pdcAssignments.get(event.threatId)?.defenderId === event.unitId)
                     this.pdcAssignments.delete(event.threatId);
             }
@@ -5448,8 +4984,7 @@ export class GameSession {
             delete this.pdcDroneContext?.bayAnchors[event.unitId];
             delete this.pdcDroneContext?.escortAnchors[event.unitId];
             this.ui?.pushEvent?.(t('Drone lost.'), 'warning', 4000);
-        } else if (event.type === 'empty') {
-            this.ui?.pushSensor?.(t(fleet.unitsById[event.unitId]?.type === 'attack' ? 'ATTACK DRONE EMPTY · RETURNING' : 'PDC DRONE EMPTY · RETURNING'), 'warning', 3200);
+
         }
         // Durable module records, including copied fire vectors, are safe for UI/debug consumers.
         this.onPdcDroneEvent?.(event);
@@ -5482,6 +5017,7 @@ export class GameSession {
             if (bay.mode === 'mining') continue;
             anchors.dockPose=droneDock(player.shipId,bay.mode,index);
             anchors.mount=anchors.dockPose?.position??mount;
+            anchors.bayIndex=index;
             for (let slot = 0; slot < DRONE_BAY_CAPACITY[bay.mode]; slot++) {
                 const id = bay.unitIds?.[slot], unit = fleet.unitsById[id];
                 if (!unit || unit.type === 'mining' || unit.state === 'destroyed' || context.unitIds.includes(id)) continue;
@@ -5555,47 +5091,12 @@ export class GameSession {
         if (!player.turretsHeld && !player.holdFire && !player.pursuitHoldFire) {
             for (const ship of this.ships ?? []) if (ship.hostile && combatTargetEligible(ship)) context.opponents.push(ship);
         }
-        context.attackTargetId = player.currentTargetId;
-        const attackTarget = context.opponents.find(ship => ship.id === context.attackTargetId);
         for (const id of context.unitIds) {
             const unit = fleet.unitsById[id], anchor = context.escortAnchors[id];
             unit.repairing = false;
             if (unit.type === 'repair') {
-                const home = context.bayAnchors[id];
-                const sites = REPAIR_SITES[player.shipId][Math.max(0, mounts.indexOf(home.mount))];
-                const site = sites[(unit.repairSite ?? 0) % sites.length];
-                const transit = unit.repairMoveStage || unit.repairReturnStage;
-                const offset = this.pdcVector.fromArray(transit ? site.transit : site.position);
-                if (!transit) {
-                    offset.x += site.normal[0] * .65;
-                    offset.y += site.normal[1] * .65;
-                    offset.z += site.normal[2] * .65;
-                }
-                offset.applyQuaternion(q);
-                anchor.rotation ??= [0,0,0,1];
-                // Local +Y is the outward normal; the drone's belly faces the plating.
-                const [x,y,z,w] = site.rotation;
-                anchor.rotation[0]=q.w*x+q.x*w+q.y*z-q.z*y;
-                anchor.rotation[1]=q.w*y-q.x*z+q.y*w+q.z*x;
-                anchor.rotation[2]=q.w*z+q.x*y-q.y*x+q.z*w;
-                anchor.rotation[3]=q.w*w-q.x*x-q.y*y-q.z*z;
-                for (let axis=0;axis<3;axis++) {
-                    const spin = axis===0 ? omega.y*offset.z-omega.z*offset.y : axis===1 ? omega.z*offset.x-omega.x*offset.z : omega.x*offset.y-omega.y*offset.x;
-                    anchor.velocity[axis] = player.velocity[axis]+spin;
-                    anchor.position[axis] = player.position[axis] + offset.getComponent(axis)-anchor.velocity[axis]*dt;
-                }
-            }
-            if (unit.type !== 'attack' || !attackTarget) continue;
-            const delta = this.pdcVector.fromArray(attackTarget.position).sub(this.pdcEnd.fromArray(player.position));
-            const distance = delta.length();
-            if (distance > DRONE_TYPES.attack.tetherRange) { context.attackTargetId = null; continue; }
-            // Hold off the target's hull instead of ramming it or chasing forever.
-            const standOff = Math.max(80, (attackTarget.collisionRadius ?? 10) + 45);
-            if (distance <= standOff + 20) continue;
-            delta.multiplyScalar(Math.max(0, distance-standOff)/Math.max(1, distance));
-            for (let axis=0;axis<3;axis++) {
-                anchor.position[axis] = player.position[axis] + delta.getComponent(axis) + (axis === 0 ? (context.bayAnchors[id].escortIndex-(count-1)/2)*6 : 0);
-                anchor.velocity[axis] = attackTarget.velocity[axis];
+                unit.repairBayIndex=context.bayAnchors[id].bayIndex??0;
+                prepareRepairDrone(this,player,unit,anchor,dt,this.repairDroneState,context.inFlight&&!unit.recallRequested);
             }
         }
         context.threats.length = 0;
@@ -5657,10 +5158,9 @@ export class GameSession {
         const bays = fleetBays.filter(bay => bay.mode === 'pdc');
         const units = bays.flatMap(bay => bay.units);
         return { policy: this.dronePdcPolicy(), recallReason: this.pdcRecallReason ?? null, bays, units,
-            operational: units.filter(unit => unit.hull > 0 && unit.ammo > 0).length,
+            operational: units.filter(unit => unit.hull > 0).length,
             deployed: units.filter(unit => unit.state === 'escorting').length,
-            returning: units.filter(unit => unit.state === 'returning').length,
-            ammo: units.reduce((sum, unit) => sum + unit.ammo, 0) };
+            returning: units.filter(unit => unit.state === 'returning').length };
     }
     initializeMiningDrones() {
         if (this.miningDroneSystem || !this.save?.player?.droneFleet) return;
@@ -5982,7 +5482,7 @@ export class GameSession {
             const units = (bay?.bayId === bayId ? bay.unitIds ?? [] : []).slice(0, DRONE_BAY_CAPACITY[mode])
                 .map(id => fleet?.unitsById?.[id]).filter(unit => unit && unit.type === mode)
                 .map(unit => ({ id: unit.id, type: unit.type, state: unit.state, hull: unit.hull,
-                    maxHull: DRONE_TYPES[unit.type].maxHull, ammo: unit.ammo ?? null,
+                    maxHull: DRONE_TYPES[unit.type].maxHull,
                     position: unit.position?.slice() ?? null, velocity: unit.velocity?.slice() ?? null,
                     rotation: unit.rotation?.slice() ?? null,
                     cutProgress: unit.job ? unit.job.cutTime / unit.job.cutSeconds : 0,
@@ -6205,7 +5705,7 @@ export class GameSession {
     }
     triggerClaimDispute(nodeId) {
         const node = this.asteroids.find((entry) => entry.id === nodeId);
-        if (node?.combatLoot || isTutorialActive(this.save) || this.arena || this.activeRace
+        if (node?.combatLoot || isTutorialGuided(this.save) || this.arena || this.activeRace
             || this.hostilesNear(vec(this.save.player.position), ENCOUNTER_LOCK_RADIUS)) return;
         // A staked rock occasionally draws a rival prospector who contests the
         // seam mid-cut. Seeded per node and gated to fire once per claim, so the
@@ -6257,7 +5757,7 @@ export class GameSession {
         this.persistSave();
     }
     triggerSalvageAmbush(node) {
-        if (isTutorialActive(this.save) || this.arena || this.activeRace
+        if (isTutorialGuided(this.save) || this.arena || this.activeRace
             || this.hostilesNear(vec(this.save.player.position), ENCOUNTER_LOCK_RADIUS))
             return;
         if (this.salvageAmbushTriggered.has(node.id))
@@ -6767,7 +6267,7 @@ export class GameSession {
         const tutorialTarget = this.tutorialFieldTarget();
         if (tutorialTarget?.kind === kind && tutorialTarget.id === id) {
             this.changeNavTarget(tutorialTarget.destinationId);
-            if (kind !== 'pickup') this.save.player.mode = kind === 'asteroid' ? 'mining' : 'salvage';
+            if (kind === 'asteroid' || kind === 'wreck') this.save.player.mode = kind === 'asteroid' ? 'mining' : 'salvage';
             if (source === 'map') {
                 this.updateAssetWarmup(true);
             }
@@ -7022,6 +6522,7 @@ export class GameSession {
         return true;
     }
     startGalaxyJump(jumpPoint) {
+        if(!tutorialGateOpen(this.save)){this.setHyperdriveStatus(t('JUMP GATE CLOSED · REPAIRS IN PROGRESS'),5000);return false;}
         const route = getRoute(jumpPoint.routeId);
         if (!route || !jumpPoint.destinationSystemId || !LOCATIONS[jumpPoint.destinationLocationId])
             return false;
@@ -7036,6 +6537,7 @@ export class GameSession {
         return true;
     }
     beginGalaxyGateTransition(jumpPoint) {
+        if(!tutorialGateOpen(this.save)){this.setHyperdriveStatus(t('JUMP GATE CLOSED · REPAIRS IN PROGRESS'),5000);return false;}
         const route = getRoute(jumpPoint.routeId);
         if (!route || !jumpPoint.destinationSystemId || !LOCATIONS[jumpPoint.destinationLocationId])
             return false;
@@ -7161,7 +6663,7 @@ export class GameSession {
         this.renderer.setTarget();
     }
     spawnJumpPointPirates(route) {
-        if (isTutorialActive(this.save) || this.arena || this.activeRace || this.hyperdriveCooldownRemaining() > 0
+        if (isTutorialGuided(this.save) || this.arena || this.activeRace || this.hyperdriveCooldownRemaining() > 0
             || this.hostilesNear(vec(this.save.player.position), ENCOUNTER_LOCK_RADIUS)) return false;
         const region = this.careerRegionAt();
         const visibility = DARK_ENCOUNTER_MULT + (1 - DARK_ENCOUNTER_MULT) * clamp(this.playerExposureRange() / NPC_SENSOR_RANGE, 0, 1);
@@ -7212,7 +6714,7 @@ export class GameSession {
             this.galaxyJump = jump;
             return false;
         }
-        const tutorialArrival = isTutorialActive(this.save);
+        const tutorialArrival = isTutorialGuided(this.save);
         this.clearTransientSpace();
         const player = this.save.player;
         this.abandonMiningDrones('system-jump');
@@ -7333,7 +6835,7 @@ export class GameSession {
         }
         const jumpPoint = this.readyJumpPoint();
         const lesson = this.tutorialSummary();
-        if (lesson?.active && (lesson.stepId === 'plot-vesper' || lesson.stepId === 'flight-checks' || lesson.stepId === 'galaxy-map')) {
+        if (lesson?.active && (lesson.stepId === 'plot-vesper' || lesson.stepId === 'flight-checks')) {
             this.setHyperdriveStatus(t(lesson.objective),5000);
             return;
         }
@@ -7374,7 +6876,7 @@ export class GameSession {
             ? jumpPiracyRisk(nav.routeId, this.holdWorth(), { atJumpPoint: false, arrivalSystemId:this.save.player.systemId }) * broadcastMultiplier * this.combatEncounterScale()
             : 0;
         const encounterRisk = 1 - (1 - clamp(sectorRisk, 0, 1)) * (1 - clamp(cargoRisk, 0, 1));
-        if (!isTutorialActive(this.save) && !hostileInSector && this.hyperdriveCooldownRemaining() <= 0 && rng() < encounterRisk) {
+        if (!isTutorialGuided(this.save) && !hostileInSector && this.hyperdriveCooldownRemaining() <= 0 && rng() < encounterRisk) {
             const travelSeconds = HYPERDRIVE_SPOOL_SECONDS + player.distanceTo(vec(nav.position)) / HYPERDRIVE_CRUISE_SPEED;
             this.hyperdriveEncounterRegionId = nav.id;
             this.hyperdriveEncounterAt = this.save.world.time + travelSeconds * randomBetween(rng, 0.4, 0.75);
@@ -7438,7 +6940,7 @@ export class GameSession {
             ? { fx: 'active', progress: 1 } : { fx: 'none', progress: 0 };
     }
     spawnHyperdriveIntercept() {
-        if (isTutorialActive(this.save)) { this.hyperdriveEncounterAt = null; return false; }
+        if (isTutorialGuided(this.save)) { this.hyperdriveEncounterAt = null; return false; }
         const player = vec(this.save.player.position);
         if (this.arena || this.activeRace || this.hostilesNear(player, ENCOUNTER_LOCK_RADIUS) || this.hyperdriveCooldownRemaining() > 0) return false;
         const rng = seededRandom(`${this.save.world.seed}:intercept:${++this.interceptCounter}`);
@@ -7523,15 +7025,15 @@ export class GameSession {
             ship.fireCooldown = (ship.fireCooldown ?? 0) - dt;
             ship.missileCooldown = (ship.missileCooldown ?? 0) - dt;
             ship.shieldDelay = (ship.shieldDelay ?? 0) - dt;
-            if (ship.combatFit && !ship.capitalClass && !ship.tutorialCompanion && !ship.tutorialEnemy)
+            if (!ship.poweredDown && ship.combatFit && !ship.capitalClass && (ship.campaignCombat || !ship.tutorialCompanion && !ship.tutorialEnemy))
                 regenerateCombatResources(ship, ship.combatFit.resources, dt, ship.shieldDelay);
-            else if (ship.shieldDelay <= 0)
+            else if (!ship.poweredDown && ship.shieldDelay <= 0)
                 ship.shield = Math.min(ship.maxShield, ship.shield + dt * passiveShieldRechargeRate(ship.shieldRegen ?? 3.8, ship.capitalClass));
             // The standoff clock runs down: once it expires the hunters open
             // fire (or they already did if the pilot shot first). A hired
             // wingman's held weapons are a standing order rather than a stale
             // mug flag, so this housekeeping must leave them alone.
-            if (ship.holdFire && !ship.arenaRunWingman && this.save.world.time >= (ship.demandUntil ?? 0))
+            if (ship.holdFire && !ship.tutorialCompanion && !ship.tutorialPatrol && !ship.arenaRunWingman && this.save.world.time >= (ship.demandUntil ?? 0))
                 this.endMugStandoff(ship);
             // The per-ship AI hierarchy — task (what the ship wants) → interaction
             // (tasks colliding) → behavior (how it moves this frame). See shipAI.js:
@@ -7540,6 +7042,7 @@ export class GameSession {
             // travel waypoints and the interaction layer running emergent mugs.
             if (ship.tutorialCompanion)
                 this.updateTutorialCompanion(ship, dt);
+            else if(ship.tutorialPatrol) this.updateTutorialPatrol(ship,dt);
             else
                 updateShipAI(this, ship, dt);
             if(ship.capitalClass==='cruiser' && ship.cruiserBatteriesAt!==this.save.world.time)updateCruiserBatteries(this,ship,dt);
@@ -7653,7 +7156,7 @@ export class GameSession {
     playStoryLine(name, text, relation = 'neutral', duration = 12000, conversationId) {
         const urgent = conversationId === 'urgent' || duration <= 7000;
         const inSpace = !this.save.player.dockedAt;
-        if (!urgent && conversationId !== 'tutorial-combat' && inSpace
+        if (!urgent && conversationId !== 'tutorial-combat' && conversationId !== 'tutorial-paul-hide' && inSpace
             && (this.save.world.time < (this.flightDialogueAfter ?? 0)
                 || this.hostilesVisibleNear(vec(this.save.player.position), HYPERDRIVE_THREAT_RADIUS))) {
             this.pendingStoryConversations ??= [];
@@ -7663,11 +7166,16 @@ export class GameSession {
         }
         this.tutorialRadioUntil = 0;
         this.storyLineUntil = urgent ? this.save.world.time + duration / 1000 : Infinity;
+        if(!urgent&&conversationId?.startsWith('tutorial-')){
+            const quest=getTutorialQuest(this.save),key='briefingShown-'+conversationId.slice(9);
+            if(quest&&!quest.flags[key]){quest.flags[key]=true;this.persistSave();}
+        }
         this.ui.showStoryLine?.(name,text,relation,urgent ? undefined : conversationId ?? 'story');
     }
     // Called every frame: lift the story mute when the player dismissed the
     // bar or the duration elapsed, and unpin the bar.
     refreshStoryLine() {
+        this.showTutorialDockBriefing();
         if (this.ui.storyDismissed && this.tutorialMaraCallOffered && this.ui.adventure?.conversationId !== 'tutorial-handoff' && !this.pendingStoryConversations?.some(entry=>entry.conversationId==='tutorial-handoff')) {
             this.tutorialMaraCallOffered = false;
             this.nextTutorialMaraCallAt = this.save.world.time + 12;
@@ -7694,81 +7202,12 @@ export class GameSession {
             break;
         }
     }
+
     updateTutorialRadio() {
-        const now = this.save.world.time;
-        if (now < (this.nextTutorialRadioCheck ?? 0)) return;
-        this.nextTutorialRadioCheck = now + 1;
-        this.queueTutorialMaraCall();
-        // Route lore keeps playing after docking; the hyperdrive call must not
-        // fire inside the hangar where the button is out of reach.
-        const quest0 = getTutorialQuest(this.save);
-        const radioHoldDocked = this.save.player.dockedAt
-            && TUTORIAL_RADIO.some(entry => entry.cue === 'hyperdrive' && entry.step === quest0?.stepId);
-        if ((this.save.player.dockedAt && !radioHoldDocked) || this.ui.isModalOpen
-            || this.deathTimer > 0 || this.galaxyJump || now < (this.flightDialogueAfter ?? 0)
-            || this.storyLineActive() || this.pendingStoryConversations?.length) return;
-        if (!isTutorialActive(this.save)) return this.updateTravelRadio();
-        const summary = this.tutorialSummary();
-        const hintKey = summary.stepId + ':' + (summary.lessonId ?? summary.progress ?? '');
-        if (['plot-vesper','flight-checks','check-weapons','collect-cargo','galaxy-map'].includes(summary.stepId)
-            && this.lastTutorialHint !== hintKey && this.chatterOpen()) {
-            // Rin is ahead through the gate in the late prologue: the map
-            // hint still reads objective copy, but it can no longer be her
-            // voice — the player is alone with the radio silence.
-            const text = summary.stepId === 'check-weapons'
-                ? t(getTutorialQuest(this.save).flags['weapon-B'] ? 'Now tap the weapon name again to return to group A.' : 'Tap the weapon name on the left monitor to select group B.')
-                : t(summary.detail);
-            const speaker = summary.stepId === 'galaxy-map' ? 'Mara Vek' : 'Rin Vek';
-            this.ui.showPilotLine?.(speaker,text,'ally',12000,true);
-            this.lastTutorialHint = hintKey;
-            this.nextChatterAt = now + 15;
-            return;
-        }
-        const combatQuest = getTutorialQuest(this.save);
-        if (summary.stepId === 'defeat-raider' && !combatQuest.flags['energy-warning'] && this.chatterOpen()
-            && this.save.player.energy < this.playerStats().energyCapacity * 0.3) {
-            this.ui.showPilotLine?.('Rin Vek',t('Your energy is running low. Release the trigger and let the reactor recharge. Your shields need that energy too.'),'ally',10000,true);
-            setFlag(this.save,combatQuest.id,'energy-warning',true);
-            this.nextChatterAt = now + 14;
-            this.persistSave();
-            return;
-        }
-        if (this.hostilesVisibleNear(vec(this.save.player.position), HYPERDRIVE_THREAT_RADIUS)) {
-            if (now < (this.tutorialRadioUntil ?? 0)) this.ui.clearPilotLine?.();
-            this.tutorialRadioUntil = 0;
-            return;
-        }
-        const radioPlaying = now < (this.tutorialRadioUntil ?? 0);
-        if (!this.chatterOpen() && !radioPlaying) return;
-        // From Rin's departure on, the tutorial radio speaks with Mara's
-        // voice — the Second Light has gone quiet ahead of the gate.
-        const radioSpeaker = summary.stepId === 'cross-meridian-gate' ? 'Mara Vek' : 'Rin Vek';
-        const quest = getTutorialQuest(this.save), player = this.save.player;
-        const vesperDistance = Math.hypot(...player.position.map((value, i) => value - LOCATIONS.vesper.position[i]));
-        const line = TUTORIAL_RADIO.find(entry => {
-            if (entry.step !== quest.stepId || quest.flags?.['radio-' + entry.id]) return false;
-            if (entry.destination && player.navTargetId !== entry.destination) return false;
-            if (entry.cue === 'hyperdrive')
-                return !this.autopilot && this.hyperdriveBlockReason() === null;
-            if (entry.cue === 'arrival')
-                return !this.autopilot && vesperDistance < hyperdriveArrivalRadius(LOCATIONS.vesper) + 16;
-            if (!this.chatterOpen() || now < (this.tutorialAmbientAfter ?? 0) || this.utilityActive) return false;
-            if (!this.autopilot) {
-                const destination = LOCATIONS[entry.destination];
-                if (Math.hypot(...player.velocity) < 8 || !destination
-                    || Math.hypot(...player.position.map((value, i) => value - destination.position[i])) < hyperdriveArrivalRadius(destination) + 40) return false;
-            }
-            return !entry.after || quest.flags?.['radio-' + entry.after];
-        });
-        if (!line) return;
-        const text = t(line.text);
-        const duration = Math.min(14000, Math.max(8000, text.length * 55));
-        this.tutorialRadioUntil = now + duration / 1000;
-        this.nextChatterAt = this.tutorialRadioUntil + (line.cue ? 5 : 12);
-        setFlag(this.save, quest.id, 'radio-' + line.id, true);
-        this.ui.showPilotLine?.(radioSpeaker, text, 'ally', duration, true);
-        this.audio?.playComms?.('steady');
-        this.persistSave();
+        if(this.save.world.time < (this.nextTutorialRadioCheck ?? 0)) return;
+        this.nextTutorialRadioCheck=this.save.world.time+1;
+        this.updateTutorialCampaignRuntime();
+        if(tutorialContentUnlocked(this.save)&&!this.save.player.dockedAt&&!this.ui.isModalOpen&&!this.storyLineActive()&&this.save.world.time>=(this.flightDialogueAfter??0)) this.updateTravelRadio();
     }
     updateTravelRadio() {
         const now = this.save.world.time, player = this.save.player;
@@ -8357,7 +7796,7 @@ export class GameSession {
         return this.ships.find((entry) => entry.hull > 0 && entry.role === 'patrol' && entry.inspection);
     }
     beginPatrolInspection(ship) {
-        if (isTutorialActive(this.save)) return false;
+        if (isTutorialGuided(this.save)) return false;
         if (ship.inspection)
             return false;
         const active = this.playerInspectionPatrol();
@@ -8670,7 +8109,7 @@ export class GameSession {
     // player's standing is untouched. Returns true while a chase is active so
     // the dispatch sends the patrol after the smuggler instead of its lane.
     updatePatrolArrest(ship) {
-        if (isTutorialActive(this.save)) return false;
+        if (isTutorialGuided(this.save)) return false;
         if (!this.emergentMugs || this.arena || ship.role !== 'patrol' || ship.hostile || ship.targetId)
             return false;
         const time = this.save.world.time;
@@ -8956,7 +8395,7 @@ export class GameSession {
         return { position: vec(target.position), velocity: vec(target.velocity) };
     }
     npcFlightStats(ship) {
-        if (!ship.combatFit || ship.tutorialEnemy || ship.tutorialCompanion || ship.capitalClass || ship.race) return;
+        if (!ship.combatFit || (ship.tutorialEnemy || ship.tutorialCompanion) && !ship.campaignCombat || ship.capitalClass || ship.race) return;
         const stats=ship.combatFit.stats;
         ship.speed=stats.maxSpeed;ship.afterburnSpeed=stats.afterburnSpeed;
         ship.fuel ??= stats.fuel;
@@ -8981,7 +8420,7 @@ export class GameSession {
         const flightStats=this.npcFlightStats(ship);
         if(flightStats)observeIncomingFire(this,ship);
         if(flightStats)this.updateTurrets(ship,ship.id,dt);
-        if (ship.combatFit && !ship.tutorialEnemy && !ship.tutorialCompanion && !ship.capitalClass) {
+        if (ship.combatFit && (ship.campaignCombat || !ship.tutorialEnemy && !ship.tutorialCompanion) && !ship.capitalClass) {
             const distance = targetPosition.distanceTo(this.tmpA.fromArray(ship.position));
             const fit=ship.combatFit;
             // Give the defining weapon an opportunity to recharge; cheaper
@@ -9875,7 +9314,7 @@ export class GameSession {
     }
     fireNpcGun(ship, direction, opportunity) {
         const disruption=disruptionFactor(ship,this.save.world.time);
-        if (ship.combatFit && !ship.tutorialEnemy && !ship.tutorialCompanion && !ship.capitalClass) {
+        if (ship.combatFit && (ship.campaignCombat || !ship.tutorialEnemy && !ship.tutorialCompanion) && !ship.capitalClass) {
             const fit=ship.combatFit, index=opportunity?.index??ship.combatWeaponIndex;
             const weapon=weaponForOutfit(fit.guns?.[fit.gunIndices?.[index]??index]);
             if (!weapon || this.save.world.time < fit.fireAt[index] || this.save.world.time<(ship.gunBurstPauseUntil??0)) return;
@@ -10204,6 +9643,8 @@ export class GameSession {
             // shut down again.
             if (hullDamaged && ship.hull <= 1)
                 this.powerDownEssentialCompanion(ship);
+            const quest=getTutorialQuest(this.save);
+            if(quest&&ship.storyPersonId)quest.flags['actor-'+ship.storyPersonId]=[ship.hull,ship.shield,Number(Boolean(ship.poweredDown))];
             return;
         }
         if (attackerId === 'player') {
@@ -10716,8 +10157,8 @@ export class GameSession {
     // can scoop back up.
     jettisonCargo(commodityId = 'gold') {
         const tutorial = this.tutorialSummary();
-        if (commodityId === 'food' && tutorial?.active && ['meet-family','buy-supplies','fit-upgrade','launch-helix','plot-vesper','flight-checks','fly-vesper','sell-supplies'].includes(tutorial.stepId)) {
-            this.ui.showToast(t('Keep two Protein Packs aboard until you sell the delivery at Vesper.'), 'info', 4200);
+        if (commodityId === 'food' && tutorial?.active && ['meet-family','buy-supplies','launch-helix','plot-vesper','flight-checks','fly-vesper','sell-supplies'].includes(tutorial.stepId)) {
+            this.ui.showToast(t('Keep the delivery cargo aboard until you sell it at Vesper.'), 'info', 4200);
             return false;
         }
         const owned = this.save.player.cargo[commodityId] ?? 0;
@@ -10865,6 +10306,7 @@ export class GameSession {
         this.handleTutorialEvent('ship-defeated', {
             shipId: ship.id,
             tutorialEnemy: ship.tutorialEnemy === true,
+            tutorialEncounter: ship.tutorialEncounter, tutorialIndex: ship.tutorialIndex,
             attackerId,
         });
         if (this.save.player.currentTargetId === ship.id)
@@ -10938,7 +10380,7 @@ export class GameSession {
             this.restartArena();
             return;
         }
-        if (isTutorialActive(this.save)) {
+        if (isTutorialGuided(this.save)) {
             const dock = this.save.player.lastDockedAt;
             const location = LOCATIONS[dock] ?? LOCATIONS.helix;
             const stats = this.playerStats();
@@ -11007,7 +10449,7 @@ export class GameSession {
         this.persistSave();
     }
     updateBountySpawns() {
-        if (isTutorialActive(this.save)) return;
+        if (isTutorialGuided(this.save)) return;
         const player = vec(this.save.player.position);
         for (const mission of this.save.activeMissions) {
             if (mission.kind !== 'bounty' || !mission.targetZone || !mission.targetName)
@@ -11087,7 +10529,7 @@ export class GameSession {
         // The family prologue owns its one controlled hostile and its pacing.
         // Ambient pirates would stack on top of that lesson and can make the
         // deterministic early route impossible on a first attempt.
-        if (isTutorialActive(this.save))
+        if (isTutorialGuided(this.save))
             return;
         if (this.save.world.time < this.nextEncounterAt || this.ships.filter((entry) => entry.hull > 0).length > 16)
             return;
@@ -11575,7 +11017,7 @@ export class GameSession {
         const waryOfPlayer = recognizesPlayer && prior === 'fled';
         const isHostile = hostile && !(recognizesPlayer && !waryOfPlayer);
         const guild = fleetOptions.guild ?? (faction==='independents'?(role==='bounty'?'bounty':role==='miner'?'mining':role==='trader'?'merchant':undefined):undefined);
-        const hullId = fleetOptions.hullId ?? (!this.arena && !isTutorialActive(this.save) && faction==='pirates' ? careerCombatHull(faction,role,region,rng) : undefined)
+        const hullId = fleetOptions.hullId ?? (!this.arena && !isTutorialGuided(this.save) && faction==='pirates' ? careerCombatHull(faction,role,region,rng) : undefined)
             ?? preferredNpcHull(faction,role,index-1,guild);
         const hullFlight = HULL_FLIGHT_STATS[hullId ?? shipVariantForRole(role)] ?? HULL_FLIGHT_STATS.talon;
         const ship = {
@@ -12097,7 +11539,7 @@ export class GameSession {
         return clamp((this.save.world.time - this.lastCombatAt) / COMBAT_CALM_SECONDS, 0, 1);
     }
     combatEncounterScale() {
-        if (isTutorialActive(this.save)) return 0;
+        if (isTutorialGuided(this.save)) return 0;
         return 0.3 + 0.7 * this.combatCalmFactor();
     }
     autoDockCheck() {
@@ -13285,6 +12727,7 @@ export class GameSession {
         this.ui.hideHud();
         recordMarketVisit(this.save.world, locationId);
         this.ui.showDock(this.save, locationId);
+        this.showTutorialDockBriefing();
         this.persistSave();
     }
     async prepareDockedFlightRuntime({ showLoading = true } = {}) {
@@ -13441,10 +12884,10 @@ export class GameSession {
             return;
         }
         const tutorial = this.tutorialSummary();
-        if (tutorial?.active && ['meet-family','buy-supplies','fit-upgrade','launch-helix','plot-vesper','flight-checks','fly-vesper'].includes(tutorial.stepId)
+        if (tutorial?.active && ['meet-family','buy-supplies','launch-helix','plot-vesper','flight-checks','fly-vesper'].includes(tutorial.stepId)
             && (kind === 'sell' || kind === 'den-sell') && commodityId === 'food'
-            && (this.save.player.cargo.food ?? 0) - quantity < 2) {
-            const message = t('Keep two Protein Packs aboard until you sell the delivery at Vesper.');
+            && (this.save.player.cargo.food ?? 0) - quantity < (getTutorialQuest(this.save)?.flags.deliveryRequired??TUTORIAL_REQUIRED_SUPPLIES)) {
+            const message = t('Keep the delivery cargo aboard until you sell it at Vesper.');
             this.ui.showToast(message, 'warning', 4200);
             this.audio.play('warning', 0.55);
             return { ok: false, message };
@@ -13485,12 +12928,13 @@ export class GameSession {
         }else this.ui.showToast(result.message,'warning');
         this.audio.play(result.ok ? 'ui' : 'warning', 0.55);
         this.ui.refreshDock(this.save);
+        this.showTutorialDockBriefing();
         this.persistSave();
         return result;
     }
     acceptMission(missionId) {
-        if (isTutorialActive(this.save)) {
-            const message=t('Finish the family prologue before taking side contracts or races.');
+        if (!tutorialContentUnlocked(this.save) && !(missionId === TUTORIAL_MINING_CONTRACT_ID && getTutorialQuest(this.save)?.stepId === 'mining-contract' && getTutorialQuest(this.save)?.flags.miningExplained)) {
+            const message=t('Talk to Rin and accept the marked mining contract first.');
             this.ui.showToast(message,'info',4500); return {ok:false,message};
         }
         const dock = this.save.player.dockedAt;
@@ -13499,8 +12943,10 @@ export class GameSession {
         if (missionId?.startsWith?.('race-'))
             return this.acceptRace(missionId.slice(5));
         const result = acceptMission(this.save, dock, missionId);
-        if (result.ok)
+        if (result.ok) {
             this.setMissionNavigation(result.mission);
+            this.handleTutorialEvent('mission-accepted',{missionId});
+        }
         if (!result.ok) this.ui.showToast(result.message, 'warning', 3200);
         this.audio.play(result.ok ? 'success' : 'warning', 0.7);
         this.ui.refreshDock(this.save);
@@ -13508,6 +12954,7 @@ export class GameSession {
         return result;
     }
     discardMission(missionId) {
+        if(missionId===TUTORIAL_MINING_CONTRACT_ID && isTutorialGuided(this.save)){const message=t('Finish this training contract with Rin first.');this.ui.showToast(message,'info');return {ok:false,message};}
         if (!this.save.player.dockedAt) {
             const message = t('Dock before discarding a contract.');
             this.ui.showToast(message, 'warning');
@@ -13539,8 +12986,8 @@ export class GameSession {
         return this.plotSystemRoute(target.systemId, targetId);
     }
     acceptRace(courseId) {
-        if (isTutorialActive(this.save)) {
-            const message=t('Finish the family prologue before taking side contracts or races.');
+        if (!tutorialContentUnlocked(this.save)) {
+            const message=t('Finish the guided lessons before entering a race.');
             this.ui.showToast(message,'info',4500); return {ok:false,message};
         }
         if (this.activeRace && this.activeRace.state !== 'finished' && this.activeRace.state !== 'failed') {
@@ -13704,7 +13151,9 @@ export class GameSession {
             this.ui.showToast(t('Repair service is not available at this dock.'), 'warning');
             return;
         }
-        const cost = repairCost(this.save.player);
+        const quote = dockServiceQuote(this.save.player, 'repair');
+        if (!quote.ok || !this.dronesSafelyStowed()) return;
+        const cost = quote.total;
         if (cost <= 0)
             return;
         if (this.save.player.credits < cost) {
@@ -13712,21 +13161,24 @@ export class GameSession {
             return;
         }
         const stats = this.playerStats();
-        this.save.player.credits -= cost;
+        const serviced = commitDroneService(this.save.player, { authorized: true, expected: quote.drones });
+        if (!serviced.ok) return;
+        this.save.player.credits -= quote.shipCost;
         recordSortieCredit(this.save, -cost, 'repair');
         this.save.player.hull = stats.hull;
         this.ui.pushEvent(t('Repair complete. {credits} charged.', { credits: formatCredits(cost) }), 'success');
         this.audio.play('success');
         this.ui.refreshDock(this.save);
         this.persistSave();
-        this.checkTutorialServices();
     }
     refuel() {
         if (!this.dockHasService('fuel')) {
             this.ui.showToast(t('Fuel service is not available at this dock.'), 'warning');
             return;
         }
-        const cost = refillCost(this.save.player);
+        const quote = dockServiceQuote(this.save.player, 'refill');
+        if (!quote.ok) return;
+        const cost = quote.total;
         if (cost <= 0)
             return;
         if (this.save.player.credits < cost) {
@@ -13734,7 +13186,7 @@ export class GameSession {
             return;
         }
         const stats = this.playerStats();
-        this.save.player.credits -= cost;
+        this.save.player.credits -= quote.shipCost;
         recordSortieCredit(this.save, -cost, 'refill');
         this.save.player.fuel = stats.fuel;
         fillLauncherMagazines(this.save.player);
@@ -13757,7 +13209,6 @@ export class GameSession {
         this.audio.play('success');
         this.ui.refreshDock(this.save);
         this.persistSave();
-        this.checkTutorialServices();
     }
     droneServiceQuote(options = {}) {
         if (!this.save.player.dockedAt) return { ok: false, code: 'not-docked' };
@@ -13767,13 +13218,12 @@ export class GameSession {
             return { ok: false, code: 'service-unavailable' };
         const quote = quoteDroneService(this.save.player, options);
         if (!quote.ok) return quote;
-        const costs = { repair: 0, replacement: 0, ammo: 0 };
-        for (const line of quote.lines) costs[line.kind === 'rounds' ? 'ammo' : line.kind] += line.cost;
+        const costs = { repair: 0, replacement: 0 };
+        for (const line of quote.lines) costs[line.kind] += line.cost;
         const stockFits = quote.lines.filter(line => line.kind === 'replacement' && line.source === 'purchase').length <= cargoFree(this.save.player);
-        const available = stockFits && (!costs.repair && !costs.replacement || this.dockHasService('repair'))
-            && (!costs.ammo || this.dockHasService('fuel'));
+        const available = stockFits && (!costs.repair && !costs.replacement || this.dockHasService('repair'));
         return { ...quote, costs, repairCost: costs.repair, replacementCost: costs.replacement,
-            ammoCost: costs.ammo, dockId: this.save.player.dockedAt,
+            dockId: this.save.player.dockedAt,
             canCommit: available && this.dronesSafelyStowed(),
             unavailableReason: !stockFits ? 'cargo-full' : !available ? 'service-unavailable' : !this.dronesSafelyStowed() ? 'drones-deployed' : null };
     }
@@ -13793,10 +13243,6 @@ export class GameSession {
         this._statsDirty = true;
         recordSortieCredit(this.save, -Object.values(quote.costs).reduce((sum, value) => sum + value, 0), 'drones');
         this.droneServiceState = this.droneServiceQuote();
-        this.ui?.showToast?.(t('Drones serviced · repair {repair} · replacements {replacement} · ammo {ammo}', {
-            repair: formatCredits(quote.costs.repair), replacement: formatCredits(quote.costs.replacement),
-            ammo: formatCredits(quote.costs.ammo),
-        }), 'success', 5000);
         this.ui?.refreshDock?.(this.save);
         this.persistSave();
         return { ...result, costs: quote.costs };
@@ -13838,9 +13284,17 @@ export class GameSession {
         const playerNow = this.save.player;
         const bayNow = playerNow.outfitting?.loadouts?.[playerNow.shipId]?.droneBays?.find(b => b.bayId === bayId);
         if (!bayNow || !Object.hasOwn(DRONE_TYPES, mode) || mode === 'mining' && !canMineWithHull(playerNow.shipId)) return {ok:false,code:'invalid-mode'};
+        if (mode === bayNow.mode && bayNow.unitIds.some(id => playerNow.droneFleet.unitsById[id]?.state && playerNow.droneFleet.unitsById[id].state !== 'stowed')) {
+            delete bayNow.pendingMode;
+            if (mode === 'pdc') playerNow.droneFleet.pdcPolicy = 'defend';
+            for (const id of bayNow.unitIds) if (playerNow.droneFleet.unitsById[id]) playerNow.droneFleet.unitsById[id].recallRequested = false;
+            this.persistSave();
+            return {ok:true,code:'mode-unchanged',bayId,mode};
+        }
         if (bayNow.unitIds.some(id => playerNow.droneFleet.unitsById[id]?.state && playerNow.droneFleet.unitsById[id].state !== 'stowed')) {
             bayNow.pendingMode = mode;
             for (const id of bayNow.unitIds) if (playerNow.droneFleet.unitsById[id]) playerNow.droneFleet.unitsById[id].recallRequested = true;
+            if (bayNow.mode === 'mining' && !playerNow.outfitting.loadouts[playerNow.shipId].droneBays.some(b => b !== bayNow && b.mode === 'mining' && !b.pendingMode)) this.recallMiningDrones('role-change');
             this.persistSave();
             return {ok:true,code:'recalling'};
         }
@@ -13857,6 +13311,7 @@ export class GameSession {
         player.droneFleet = { ...player.droneFleet, lockerIds: quote.lockerIds };
         player.outfitting.loadouts[player.shipId] = { ...fit, droneBays: quote.bays };
         if (mode === 'pdc') player.droneFleet.pdcPolicy = 'defend';
+        this.handleTutorialEvent('drone-configured',{mode,locationId:player.dockedAt,loaded:quote.bays.some(b=>b.bayId===bayId&&b.unitIds.some(Boolean))});
         this._statsDirty = true;
         this.droneServiceState = this.droneServiceQuote();
         if (player.dockedAt) this.ui?.refreshDock?.(this.save);
@@ -13930,7 +13385,7 @@ export class GameSession {
         if(action==='group'){const fit=this.save.player.outfitting.loadouts[this.save.player.shipId];if(!fit.fireGroups.assignments[args.mountId]||!['A','B'].includes(args.group))return {ok:false,code:'Invalid fire group.'};fit.fireGroups.assignments[args.mountId]=args.group;this.persistSave();return {ok:true,code:'Fire group updated.'};}
         if(action==='select-loot'){this.selectedLootEntry=args.id;return {ok:true,code:'Salvage selection updated.'};}
         const result=action==='recover'?recoverWreckEntry(this,args.wreckId,args.id):equipmentAction(this.save.player,action,args);
-        if(result.ok){this._statsDirty=true;this.save.player.turretRuntime=[];const stats=this.playerStats();this.save.player.energy=Math.min(this.save.player.energy,stats.energyCapacity);this.save.player.shield=Math.min(this.save.player.shield,stats.shield);this.save.player.hull=Math.min(this.save.player.hull,stats.hull);this.handleTutorialEvent('outfitted',{locationId:this.save.player.dockedAt,radarInstalled:this.save.player.outfitting.loadouts[this.save.player.shipId].utility.some(id=>equipmentBaseId(id)==='radar-mk2')});if(result.credit)recordSortieCredit(this.save,result.credit,'outfitting');this.syncWeaponProjection();this.persistSave();}
+        if(result.ok){this._statsDirty=true;this.save.player.turretRuntime=[];const stats=this.playerStats();this.save.player.energy=Math.min(this.save.player.energy,stats.energyCapacity);this.save.player.shield=Math.min(this.save.player.shield,stats.shield);this.save.player.hull=Math.min(this.save.player.hull,stats.hull);this.handleTutorialEvent('outfitted',{locationId:this.save.player.dockedAt,reactorInstalled:this.save.player.outfitting.loadouts[this.save.player.shipId].utility.some(id=>equipmentBaseId(id)==='sustained-reactor')});if(result.credit)recordSortieCredit(this.save,result.credit,'outfitting');this.syncWeaponProjection();this.persistSave();}
         return result;
     }
     previewOutfitting(shipId, draft, options = {}) {
@@ -13974,9 +13429,9 @@ export class GameSession {
         }
         const tutorial = this.tutorialSummary();
         if (tutorial?.active && tutorial.stepId === 'fit-upgrade'
-            && !quote.afterLoadout.utility.includes('radar-mk2') && !(quote.lockerAfter?.['radar-mk2'] > 0)) {
-            this.ui.showToast(t('Install Rin’s radar before selling it.'),'info');
-            return {ok:false,code:'tutorial-radar-reserved'};
+            && !quote.afterLoadout.utility.some(id=>equipmentBaseId(id)==='sustained-reactor') && !Object.entries(quote.lockerAfter??{}).some(([id,n])=>n>0&&equipmentBaseId(id)==='sustained-reactor')) {
+            this.ui.showToast(t('Install the gifted reactor before selling it.'),'info');
+            return {ok:false,code:'tutorial-reactor-reserved'};
         }
         const result = commitOutfitting(this.save.player, quote, {
             locationId: this.save.player.dockedAt,
@@ -14030,7 +13485,7 @@ export class GameSession {
             this.ui.outfitGroupHelp=true;
             this.persistSave();
         }
-        this.handleTutorialEvent('outfitted',{locationId:this.save.player.dockedAt,radarInstalled:quote.afterLoadout.utility.some(id=>equipmentBaseId(id)==='radar-mk2')});
+        this.handleTutorialEvent('outfitted',{locationId:this.save.player.dockedAt,reactorInstalled:quote.afterLoadout.utility.some(id=>equipmentBaseId(id)==='sustained-reactor')});
         return { ok: true, code: 'committed', quote, result, credits: this.save.player.credits };
     }
     buyEquipment(equipmentId) {
@@ -14121,7 +13576,7 @@ export class GameSession {
     }
     talkToNpc(personId, topicId = 'greeting') {
         const dock = this.save.player.dockedAt;
-        const person = LOCATIONS[dock]?.people?.find((entry) => entry.id === personId);
+        const person = [...(LOCATIONS[dock]?.people ?? []),...tutorialPeople(this.save,dock)].find((entry) => entry.id === personId);
         if (!person)
             return { ok: false };
         const topic = typeof topicId === 'string' && /^[a-z-]{1,32}$/.test(topicId) ? topicId : 'greeting';
@@ -14196,10 +13651,19 @@ export class GameSession {
         this.onQuit();
     }
     setShipPaint(paint) {
-        const player=this.save.player;
-        if(!FLEET_PAINTS[player.shipId]?.paints.some(p=>p.id===paint))return false;
-        if(!player.shipPaints||typeof player.shipPaints!=='object'||Array.isArray(player.shipPaints))player.shipPaints={};
-        player.shipPaints[player.shipId]=paint;this.persistSave();this.ui.showToast(t('Hull paint updated.'),'success');return true;
+        const player = this.save.player;
+        if (!player.dockedAt || !this.dockHasService('repair') || this.save.arena) return false;
+        if (!FLEET_PAINTS[player.shipId]?.paints.some(p => p.id === paint)) return false;
+        if ((player.shipPaints?.[player.shipId] ?? 'original') === paint) return false;
+        const cost = repaintCost(player);
+        if (player.credits < cost) return false;
+        if (!player.shipPaints || typeof player.shipPaints !== 'object' || Array.isArray(player.shipPaints)) player.shipPaints = {};
+        player.credits -= cost;
+        player.shipPaints[player.shipId] = paint;
+        recordSortieCredit(this.save, -cost, 'paint');
+        this.persistSave();
+        this.ui.refreshDock(this.save);
+        return true;
     }
     setSetting(key, value) {
         if (key === 'music' || key === 'effects' || key === 'touchScale') {
@@ -14526,6 +13990,9 @@ export class GameSession {
                     readout: pickup?.commodity === 'credits' ? formatCredits(amount) : `${amount} ${t('UNITS')}`,
                     ...screen,
                 };
+            }
+            else if (target.kind === 'waypoint') {
+                hudTarget={kind:'gate',name:target.name,subtitle:t('SURVEY WAYPOINT'),distance,objectKind:'gate',readout:t(this.tutorialSummary()?.stepId==='hide-patrol'?'HOLD POSITION':'APPROACH SLOWLY'),...screen};
             }
             else if (target.kind === 'gate') {
                 const found = this.raceGateById(target.id);
@@ -15143,3 +14610,4 @@ const FACTION_LABEL = faction => FACTION_NAMES[faction] ?? faction;
 
 Object.assign(GameSession.prototype,ArenaRunMethods);
 Object.assign(GameSession.prototype,CampaignWingMethods);
+Object.assign(GameSession.prototype,TutorialRuntimeMethods);

@@ -1,135 +1,36 @@
 import assert from 'node:assert/strict';
-import {
-    TUTORIAL_QUEST_ID,
-    TUTORIAL_FLIGHT_LESSONS,
-    TUTORIAL_STARTING_CREDITS,
-    advanceTutorialCampaign,
-    getTutorialQuest,
-    isTutorialActive,
-    skipTutorialCampaign,
-    startTutorialCampaign,
-    tutorialCampaignSummary,
-    tutorialDialogue,
-} from '../../src/game/tutorialCampaign.js';
-
-const freshSave = () => ({
-    player: { credits: 500000, navTargetId: 'shardbelt', cargo: {} },
-    world: { time: 0 },
-    quests: [],
+import {test} from 'node:test';
+import {createNewSave,hydrateSave} from '../../src/game/save.js';
+import {advanceTutorialCampaign,getTutorialQuest,tutorialContentUnlocked,tutorialGateOpen,tutorialLaunchBlock,TUTORIAL_FLIGHT_LESSONS,TUTORIAL_STEPS,skipTutorialCampaign,migrateTutorialCampaign} from '../../src/game/tutorialCampaign.js';
+const fixture=()=>{const save=createNewSave(91,{tutorial:true});return {save,q:getTutorialQuest(save),go:event=>advanceTutorialCampaign(save,event)};};
+for(const invite of [false,true])test(`complete campaign follows the agreed sequence (Paul invited: ${invite})`,()=>{
+ const {save,q,go}=fixture();const step=expected=>assert.equal(q.stepId,expected);
+ go({type:'talked',personId:'rin-vek',locationId:'helix'});step('meet-family');go({type:'talked',personId:'mara-vek',locationId:'helix'});step('buy-supplies');
+ go({type:'traded',kind:'buy',commodityId:'food',locationId:'helix',cargoAfter:16});step('launch-helix');
+ go({type:'launched',fromLocationId:'helix',foodCargo:16});go({type:'map-selected',kind:'location',id:'vesper'});step('flight-checks');
+ for(const lesson of TUTORIAL_FLIGHT_LESSONS)go({type:'flight-lesson',id:lesson.id});step('fly-vesper');go({type:'docked',locationId:'vesper'});
+ go({type:'traded',kind:'sell',commodityId:'food',locationId:'vesper',quantity:16});step('fit-upgrade');go({type:'outfitted',locationId:'vesper',reactorInstalled:true});step('mining-contract');
+ assert.equal(go({type:'mission-accepted',missionId:'tutorial-vesper-mining'}).changed,false);go({type:'talked',personId:'rin-vek',locationId:'vesper'});go({type:'mission-accepted',missionId:'tutorial-vesper-mining'});step('mine-shardbelt');
+ q.flags.oreTargetId='training';go({type:'extracted',source:'mining',nodeId:'training',instanceId:'shardbelt',amount:6});step('return-mining');go({type:'hyperdrive-intercept'});step('raider-standoff');go({type:'standoff-ended'});step('defeat-raider');
+ go({type:'ship-defeated',tutorialEncounter:'mining'});step('land-mining');go({type:'docked',locationId:'vesper'});go({type:'talked',personId:'rin-vek',locationId:'vesper'});step('fit-pdc');
+ go({type:'drone-configured',locationId:'vesper',mode:'pdc',loaded:true});step('survey-graveyard');assert.equal(q.flags.rinDeparted,true);
+ go({type:'waypoint-reached'});go({type:'waypoint-reached'});go({type:'waypoint-reached',rescue:true});step('rescue-paul');go({type:'encounter-cleared',encounter:'rescue'});step('talk-paul');go({type:'conversation-completed',id:'paul-rescue'});
+ go({type:'waypoint-reached'});go({type:'waypoint-reached',last:true});step('carrier-wait');go({type:'patrol-arrived'});step('hide-patrol');go({type:'patrol-passed'});go({type:'docked',locationId:'helix'});step('mara-debrief');
+ go({type:'talked',personId:'mara-vek',locationId:'helix'});step('earn-standing');assert.equal(tutorialContentUnlocked(save),true);assert.equal(tutorialGateOpen(save),false);
+ go({type:'mara-call'});step('meet-cairn');go({type:'docked',locationId:'cairn'});go({type:'talked',personId:'rin-vek',locationId:'cairn'});step('launch-black-box');assert.equal(tutorialGateOpen(save),true);
+ if(invite)go({type:'choice',choiceId:'invite-paul'});assert.equal(Boolean(q.flags.paulInvited),invite);
+ go({type:'launched',fromLocationId:'cairn'});q.flags.blackBoxTargetId='recorder';go({type:'extracted',source:'salvage',instanceId:'mourning-line',nodeId:'recorder',amount:1});step('black-box-fight');
+ go({type:'encounter-cleared',encounter:'black-box'});go({type:'docked',locationId:'helix'});step('decode-black-box');go({type:'talked',personId:'mara-vek',locationId:'helix'});step('complete');assert.equal(q.flags.blackBoxDelivered,true);assert.ok(q.completedAt!==undefined);
+ assert.equal(getTutorialQuest(hydrateSave(JSON.parse(JSON.stringify(save)))).stepId,'complete');
 });
-
-const advance = (save, type, payload = {}) => advanceTutorialCampaign(save, { type, ...payload });
-
-{
-    const save = freshSave();
-    const quest = startTutorialCampaign(save);
-    assert.equal(quest.id, TUTORIAL_QUEST_ID);
-    assert.equal(quest.stepId, 'meet-family');
-    assert.equal(save.player.credits, TUTORIAL_STARTING_CREDITS);
-    assert.equal(save.player.navTargetId, 'helix');
-    assert.equal(isTutorialActive(save), true);
-    assert.equal(startTutorialCampaign(save), quest, 'starting twice must reuse the same quest');
-
-    assert.equal(advance(save, 'talked', { personId: 'mara-vek' }).changed, true);
-    save.world.npcMemory = { 'mara-vek': { topics: { greeting: 1 } } };
-    assert.match(tutorialDialogue(save, 'mara-vek'), /mother left two keys/);
-    assert.equal(advance(save, 'talked', { personId: 'mara-vek' }).changed, false, 'repeated dialogue must be idempotent');
-    advance(save, 'talked', { personId: 'rin-vek' });
-    save.world.npcMemory['rin-vek'] = { topics: { greeting: 1 } };
-    assert.match(tutorialDialogue(save, 'rin-vek'), /Second Light/);
-    save.world.npcMemory['rin-vek'].topics.greeting = 2;
-    assert.match(tutorialDialogue(save, 'rin-vek'), /commodity market/);
-    assert.equal(quest.stepId, 'buy-supplies');
-
-    assert.equal(advance(save, 'traded', { locationId: 'helix', kind: 'buy', commodityId: 'food', cargoAfter: 1 }).changed, true);
-    assert.equal(advance(save, 'traded', { locationId: 'helix', kind: 'buy', commodityId: 'food', cargoAfter: 1 }).changed, false);
-    advance(save, 'traded', { locationId: 'helix', kind: 'buy', commodityId: 'food', cargoAfter: 2 });
-    assert.equal(quest.stepId, 'fit-upgrade');
-    advance(save, 'outfitted', { locationId:'helix', radarInstalled:true });
-    assert.equal(quest.stepId, 'launch-helix');
-
-    advance(save, 'launched', { fromLocationId: 'helix' });
-    assert.equal(quest.stepId, 'plot-vesper');
-    assert.equal(advance(save, 'map-selected', {kind:'location',id:'azure'}).changed, false);
-    advance(save, 'map-selected', {kind:'location',id:'vesper'});
-    assert.equal(quest.stepId, 'flight-checks');
-    for(const lesson of TUTORIAL_FLIGHT_LESSONS) advance(save, 'flight-lesson', {id:lesson.id});
-    assert.equal(quest.stepId, 'fly-vesper');
-    advance(save, 'docked', { locationId: 'vesper', foodCargo: 2 });
-    assert.equal(quest.stepId, 'sell-supplies');
-    assert.equal(quest.flags.suppliesAtVesper, 2);
-
-    advance(save, 'traded', { locationId: 'vesper', kind: 'sell', commodityId: 'food', quantity: 1, cargoAfter: 1 });
-    assert.equal(quest.flags.suppliesSold, 1);
-    assert.equal(advance(save, 'traded', { locationId: 'vesper', kind: 'sell', commodityId: 'food', quantity: 1, cargoAfter: 1 }).changed, false);
-    advance(save, 'traded', { locationId: 'vesper', kind: 'sell', commodityId: 'food', quantity: 1, cargoAfter: 0 });
-    assert.equal(quest.stepId, 'service-ship');
-    assert.equal(advance(save,'serviced',{locationId:'vesper',ready:false}).changed,false);
-    advance(save,'serviced',{locationId:'vesper',ready:true});
-    assert.equal(quest.stepId, 'mine-shardbelt');
-
-    getTutorialQuest(save).flags.oreTargetId = 'ore-1';
-    assert.equal(advance(save, 'extracted', { source: 'mining', instanceId: 'shardbelt', nodeId: 'wrong-ore', amount: 1 }).changed, false);
-    advance(save, 'extracted', { source: 'mining', instanceId: 'shardbelt', nodeId: 'ore-1', amount: 1 });
-    assert.equal(quest.stepId, 'defeat-raider');
-    advance(save,'weapon-switched',{group:'B'});
-    assert.equal(quest.stepId,'defeat-raider');
-    advance(save,'weapon-switched',{group:'A'});
-    assert.equal(quest.stepId, 'defeat-raider');
-    advance(save, 'ship-defeated', { tutorialEnemy: true, shipId: 'ash-moth' });
-    assert.equal(quest.stepId, 'collect-cargo');
-    assert.equal(advance(save,'cargo-collected',{tutorialCargo:false}).changed,false);
-    advance(save,'cargo-collected',{tutorialCargo:true});
-    assert.equal(quest.stepId, 'salvage-black-box');
-
-    quest.flags.blackBoxTargetId = 'recorder-1';
-    assert.equal(advance(save, 'extracted', { source: 'salvage', instanceId: 'mourning-line', nodeId: 'wrong-wreck', amount: 1 }).changed, false);
-    advance(save, 'extracted', { source: 'salvage', instanceId: 'mourning-line', nodeId: 'recorder-1', amount: 1 });
-    assert.equal(quest.stepId, 'dock-cairn');
-    advance(save, 'docked', { locationId: 'cairn' });
-    assert.equal(quest.stepId, 'family-choice');
-
-    const choiceSave = structuredClone(save);
-    advance(choiceSave, 'choice', { choiceId: 'trust-rin' });
-    assert.equal(getTutorialQuest(choiceSave).choices.recorder, 'trust-rin');
-    assert.equal(getTutorialQuest(choiceSave).stepId, 'galaxy-map');
-    advance(choiceSave,'map-selected',{kind:'system',id:'meridian'});
-    assert.equal(getTutorialQuest(choiceSave).stepId, 'cross-meridian-gate');
-    advance(choiceSave, 'system-arrived', { systemId: 'meridian', at: 42 });
-    assert.equal(getTutorialQuest(choiceSave).stepId, 'complete');
-    assert.equal(getTutorialQuest(choiceSave).completedAt, 42);
-    assert.equal(choiceSave.world.campaignUnlocked, true);
-    assert.equal(isTutorialActive(choiceSave), false);
-    assert.equal(tutorialCampaignSummary(choiceSave).chapter, 4);
-
-    for (const choiceId of ['tell-mara', 'keep-recorder']) {
-        const branch = structuredClone(save);
-        advance(branch, 'choice', { choiceId });
-        assert.equal(getTutorialQuest(branch).choices.recorder, choiceId);
-        assert.equal(getTutorialQuest(branch).stepId, 'galaxy-map');
-    }
-}
-
-{
-    const save = freshSave();
-    save.player.cargo.food = 2;
-    startTutorialCampaign(save);
-    advance(save, 'talked', { personId: 'mara-vek' });
-    advance(save, 'talked', { personId: 'rin-vek' });
-    assert.equal(getTutorialQuest(save).stepId, 'fit-upgrade', 'food bought before the bar conversations still satisfies the market lesson');
-    assert.equal(getTutorialQuest(save).flags.suppliesBought, 2);
-}
-
-{
-    const save = freshSave();
-    startTutorialCampaign(save);
-    const result = skipTutorialCampaign(save, 12);
-    assert.equal(result.changed, true);
-    assert.equal(result.fromStepId, 'meet-family');
-    assert.equal(getTutorialQuest(save).flags.skipped, true);
-    assert.equal(getTutorialQuest(save).completedAt, 12);
-    assert.equal(save.world.campaignUnlocked, true);
-    assert.equal(skipTutorialCampaign(save, 13).changed, false);
-}
-
-console.log('tutorial campaign tests passed');
+test('wrong ports, unrelated topics, ordinary extraction and empty PDC bays never skip lessons',()=>{
+ const {save,q,go}=fixture();go({type:'talked',personId:'mara-vek',locationId:'cairn'});assert.ok(!q.flags.metMara);
+ q.stepId='mine-shardbelt';q.flags.oreTargetId='a';assert.equal(go({type:'extracted',nodeId:'b',source:'mining',instanceId:'shardbelt',amount:3}).changed,false);
+ q.stepId='fit-pdc';assert.equal(go({type:'drone-configured',mode:'pdc',loaded:false,locationId:'vesper'}).changed,false);assert.ok(tutorialLaunchBlock({...save,player:{...save.player,dockedAt:'vesper'}}));
+});
+test('skip opens the career and gate without paying an unearned completion reward',()=>{const {save,q}=fixture(),credits=save.player.credits;skipTutorialCampaign(save);assert.equal(save.player.credits,credits);assert.equal(tutorialContentUnlocked(save),true);assert.equal(tutorialGateOpen(save),true);assert.equal(q.flags.skipped,true);});
+test('legacy prologues migrate once without repeating trade purchases or changing finished careers',()=>{
+ const {save,q}=fixture();q.flags={suppliesBought:2};q.stepId='service-ship';migrateTutorialCampaign(save);assert.equal(q.stepId,'fit-upgrade');assert.equal(q.flags.deliveryRequired,2);migrateTutorialCampaign(save);assert.equal(q.stepId,'fit-upgrade');
+ const {save:done,q:completed}=fixture();completed.flags={};completed.completedAt=20;completed.stepId='complete';migrateTutorialCampaign(done);assert.equal(completed.completedAt,20);assert.ok(tutorialGateOpen(done));
+ for(const step of Object.values(TUTORIAL_STEPS))assert.ok(step.chapter<=6);
+});

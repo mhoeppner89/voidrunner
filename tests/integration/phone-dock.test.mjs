@@ -19,19 +19,19 @@ function confirmationFixture(hasSave = true) {
     const nodes = new Map();
     globalThis.document = {activeElement:null, fullscreenElement:{id:'fullscreen-game'}, exitFullscreen() {assert.fail('confirmation must not exit fullscreen');}};
     globalThis.window = {confirm() {assert.fail('native dialogs leave fullscreen on phones');}};
-    for (const key of ['#title-screen', '#new-career-panel', '[data-ui-command="new"]', '[data-ui-command="cancel-new-career"]', '[data-ui-command="confirm-new-career"]']) {
+    for (const key of ['#title-screen', '#new-career-panel', '[data-ui-command="new"]', '[data-ui-command="cancel-new-career"]', '[data-ui-command="confirm-new-career"]', '[data-ui-command="skip-new-career"]']) {
         const classes = new Set(['is-hidden']);
         const node = {classList:{add:c=>classes.add(c), remove:c=>classes.delete(c), contains:c=>classes.has(c)},
             focus() {document.activeElement = node;}, querySelector:selector=>nodes.get(selector),
-            querySelectorAll:()=>[nodes.get('[data-ui-command="cancel-new-career"]'), nodes.get('[data-ui-command="confirm-new-career"]')]};
+            querySelectorAll:()=>[nodes.get('[data-ui-command="cancel-new-career"]'), nodes.get('[data-ui-command="confirm-new-career"]'), nodes.get('[data-ui-command="skip-new-career"]')]};
         nodes.set(key,node);
     }
     ui.root = {querySelector:selector=>nodes.get(selector)};
     ui.hasCareerSave = hasSave;
     ui.save = createNewSave(773,{tutorial:true});
-    let starts = 0;
-    ui.actions = {startNew() {starts++;}};
-    return {ui,nodes,starts:()=>starts};
+    const choices = [];
+    ui.actions = {startNew(tutorial) {choices.push(tutorial);}};
+    return {ui,nodes,starts:()=>choices.length,choices};
 }
 
 test('new-career cancellation preserves the save and fullscreen; explicit confirmation starts once',()=>{
@@ -58,13 +58,13 @@ test('new-career cancellation preserves the save and fullscreen; explicit confir
     assert.equal(document.fullscreenElement,fullscreen);
 });
 
-test('confirmation keeps keyboard focus inside, Escape cancels, and first careers need no overwrite prompt',()=>{
+test('confirmation keeps keyboard focus inside, Escape cancels, and first careers still choose the tutorial',()=>{
     const {ui,nodes,starts} = confirmationFixture();
     ui.handleCommand('new');
     const panel = nodes.get('#new-career-panel');
     const event = {key:'Tab',shiftKey:true,preventDefault(){},stopPropagation(){}};
     panel.onkeydown(event);
-    assert.equal(document.activeElement,nodes.get('[data-ui-command="confirm-new-career"]'));
+    assert.equal(document.activeElement,nodes.get('[data-ui-command="skip-new-career"]'));
     panel.onkeydown({...event,shiftKey:false});
     assert.equal(document.activeElement,nodes.get('[data-ui-command="cancel-new-career"]'));
     panel.onkeydown({...event,key:'Escape'});
@@ -72,8 +72,15 @@ test('confirmation keeps keyboard focus inside, Escape cancels, and first career
     assert.equal(ui.newCareerConfirm,false);
     ui.hasCareerSave = false;
     ui.handleCommand('new');
+    assert.equal(starts(),0);
+    assert.equal(ui.newCareerConfirm,true);
+    ui.handleCommand('confirm-new-career');
     assert.equal(starts(),1);
     assert.equal(ui.newCareerConfirm,false);
+});
+
+test('play and skip are explicit once-only choices before a new career begins',()=>{
+ for(const [command,tutorial]of [['confirm-new-career',true],['skip-new-career',false]]){const {ui,choices}=confirmationFixture(false);ui.handleCommand('new');assert.deepEqual(choices,[]);ui.handleCommand(command);ui.handleCommand(command);assert.deepEqual(choices,[tutorial]);}
 });
 
 // Exercise the same delegated inventory clicks as the phone UI, including the
@@ -98,13 +105,13 @@ function inventorySession(save){
     return session;
 }
 
-test('phone inventory installs the gifted radar without a charge in both languages',()=>{
+test('phone inventory installs the gifted reactor without a charge in both languages',()=>{
     for(const language of ['en','de']){
         setLanguage(language);
         const save=createNewSave(842,{tutorial:true}),quest=getTutorialQuest(save);
-        quest.stepId='fit-upgrade';const session=inventorySession(save);
+        quest.stepId='fit-upgrade';save.player.dockedAt='vesper';const session=inventorySession(save);
         session.ensureTutorialEquipment();normalizeEquipmentInventory(save.player);
-        const radar=Object.values(save.player.inventory.items).find(i=>i.baseId==='radar-mk2');
+        const radar=Object.values(save.player.inventory.items).find(i=>i.baseId==='sustained-reactor');
         assert.ok(radar,'Rin provides one actual equipment item');
         const fit=loadoutFor(save.player),mount=inventoryMounts(save.player.shipId).find(s=>s.key==='utility'&&!fit.utility[s.index]);
         const {ui,click,markup}=inventoryFixture(save,session);
@@ -115,10 +122,10 @@ test('phone inventory installs the gifted radar without a charge in both languag
         assert.doesNotMatch(markup(),/data-inventory-action="buy"/);
         const credits=save.player.credits;
         click({inventoryAction:'install',itemId:radar.id,mountId:mount.mount.id});
-        assert.equal(ui.inventoryNotice,undefined);assert.equal(quest.stepId,'launch-helix');
+        assert.equal(ui.inventoryNotice,undefined);assert.equal(quest.stepId,'mining-contract');
         assert.equal(save.player.credits,credits);
         const restored=hydrateSave(JSON.parse(JSON.stringify(save)));
-        assert.ok(loadoutFor(restored.player).utility.some(id=>equipmentBaseId(id)==='radar-mk2'));
+        assert.ok(loadoutFor(restored.player).utility.some(id=>equipmentBaseId(id)==='sustained-reactor'));
     }
 });
 

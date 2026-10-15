@@ -2,7 +2,7 @@ import {PDC_TURRET} from './turrets.js';
 import {TRACKING_LASER,weaponForOutfit,launcherForOutfit} from './weapons.js';
 import {modifiedWeapon,equipmentName,EQUIPMENT_RARITIES,resolveEquipmentDefinition,registerEquipmentDefinition} from './equipmentCatalog.js';
 import {OUTFIT_ITEMS,BASE_OUTFIT_ITEMS,itemAvailable} from './outfitting.js';
-import {inventoryMounts,mountItemId,normalizeEquipmentInventory,shopEquipmentTiers} from './equipmentInventory.js';
+import {inventoryMounts,mountItemId,normalizeEquipmentInventory,shopEquipmentTiers,equipmentFitsMount,equipmentInstallMount} from './equipmentInventory.js';
 import {getEffectiveShipStats} from './shipStats.js';
 import {cargoMass} from './economy.js';
 import {COMMODITIES,LOCATIONS} from './data.js';
@@ -20,14 +20,14 @@ const itemLabel=d=>equipmentName(d,{affixes:false});
 const flight=d=>!d?undefined:d.category==='turret'?modifiedWeapon(d.turretKind==='pdc'?PDC_TURRET:TRACKING_LASER,d):weaponForOutfit(d.id)??launcherForOutfit(d.id);
 const tabLabels={cargo:'CARGO',storage:'STORAGE',shop:'SHOP',remote:'Elsewhere',loot:'Loot',drones:'Drones'};
 
-export function renderEquipmentInventory(ui){
+export function renderEquipmentInventory(ui,{embedded=false}={}){
  const player=ui.save.player;
  normalizeEquipmentInventory(player);
  const fit=player.outfitting.loadouts[player.shipId],stats=getEffectiveShipStats(player),mounts=inventoryMounts(player.shipId);
- const selectedMount=mounts.find(m=>m.mount.id===ui.inventoryMountId),docked=Boolean(player.dockedAt);
+ let selectedMount=mounts.find(m=>m.mount.id===ui.inventoryMountId);const docked=Boolean(player.dockedAt);
  const wreck=!docked?ui.save.world.combatWrecks?.[player.currentTargetId]:undefined;
  const orphans=!docked?(ui.actions?.orphanDrones?.()??[]):[];
- const tabs=['cargo',...(docked?['storage','shop','remote']:wreck||orphans.length?['loot']:[]),'drones'];
+ const tabs=['cargo',...(docked?['storage','shop','remote']:wreck||orphans.length?['loot']:[]),...(embedded?[]:['drones'])];
  const view=tabs.includes(ui.inventoryTab)?ui.inventoryTab:!docked&&wreck?'loot':'cargo';
  const selectedId=ui.inventoryItemId;
  const shop=[];
@@ -36,14 +36,19 @@ export function renderEquipmentInventory(ui){
   registerEquipmentDefinition(id,definition);shop.push({id,baseId:base.id,tier,shop:true});
  }
  const owned=Object.values(player.inventory.items);
- const compatible=item=>!selectedMount||(selectedMount.key==='weapons'?['gun','launcher'].includes(item.category):selectedMount.key==='turrets'?item.category==='turret':['power','drive','defense','utility'].includes(item.category));
+ const compatible=item=>!selectedMount||equipmentFitsMount(item,selectedMount);
  const candidates=view==='shop'?shop:owned.filter(i=>view==='cargo'?i.location.kind==='cargo':view==='storage'?i.location.kind==='station'&&i.location.stationId===player.dockedAt:view==='remote'?i.location.kind==='station'&&i.location.stationId!==player.dockedAt:false);
  const visible=candidates.filter(r=>compatible(OUTFIT_ITEMS[r.id])).sort((a,b)=>ui.inventorySort==='mass'?OUTFIT_ITEMS[a.id].mass-OUTFIT_ITEMS[b.id].mass:ui.inventorySort==='tier'?b.tier-a.tier:OUTFIT_ITEMS[a.id].name.localeCompare(OUTFIT_ITEMS[b.id].name));
  const lootEntry=view==='loot'&&wreck?.scanned?wreck.contents.find(e=>e.item?.id===selectedId):undefined;
  const record=lootEntry?{...lootEntry.item,loot:true}:owned.find(i=>i.id===selectedId)??shop.find(i=>i.id===selectedId);
- const item=record?OUTFIT_ITEMS[selectedId]:undefined,old=selectedMount?OUTFIT_ITEMS[mountItemId(fit,selectedMount)]:undefined;
+ const item=record?OUTFIT_ITEMS[selectedId]:undefined;
+ const canInstall=docked&&item&&!record.shop&&!record.loot&&(record.location.kind==='cargo'||record.location.kind==='station'&&record.location.stationId===player.dockedAt);
+ if(canInstall)selectedMount=equipmentInstallMount(player,item,ui.inventoryFitExplicit?ui.inventoryMountId:undefined);
+ else if(record?.location?.kind==='installed')selectedMount=mounts.find(s=>s.mount.id===record.location.mountId)??selectedMount;
+ const old=selectedMount?OUTFIT_ITEMS[mountItemId(fit,selectedMount)]:undefined;
+ const mountLabel=s=>t(s.key==='weapons'?'Weapon':s.key==='turrets'?'Turret':'Utility')+' '+(s.index+1);
  const card=r=>{const d=OUTFIT_ITEMS[r.id],rare=EQUIPMENT_RARITIES[quality(d)];return `<button type="button" class="inventory-item ${r.id===selectedId?'selected':''}" ${rarityStyle(d)} aria-label="${html(itemName(d)+', '+t(rare.name))}" draggable="${!r.shop}" data-inventory-id="${html(r.id)}">${equipmentIcon(d)}<span><b>${html(itemLabel(d))}</b><small>${r.shop?number(d.price)+' CR':number(d.mass)+' '+t('MASS')}</small></span><i class="rarity-mark" aria-hidden="true">◆</i></button>`;};
- const cargoSummary=view==='cargo'?Object.entries(player.cargo??{}).filter(([id,n])=>COMMODITIES[id]&&n>0).map(([id,n])=>`<div class="inventory-commodity">${commodityIcon(id)}<b>${number(n)}× ${html(t(COMMODITIES[id].name))}</b><small>${number(n*COMMODITIES[id].mass)} ${t('MASS')}</small></div>`).join('')+(player.sealedCargo??[]).map(c=>`<div class="inventory-commodity"><b>${html(c.label)} · ${number(c.units)}</b><small>${t('MISSION CARGO')}</small></div>`).join(''):'';
+ const cargoSummary=view==='cargo'?Object.entries(player.cargo??{}).filter(([id,n])=>COMMODITIES[id]&&n>0).map(([id,n])=>`<div class="inventory-commodity ${COMMODITIES[id].legal?'':'is-illegal'}">${commodityIcon(id)}<b>${number(n)}× ${html(t(COMMODITIES[id].name))}</b><small>${number(n*COMMODITIES[id].mass)} ${t('MASS')}</small>${docked?'':`<button type="button" data-jettison="${html(id)}">${t('JETTISON')}</button>`}</div>`).join('')+(player.sealedCargo??[]).map(c=>`<div class="inventory-commodity"><b>${html(c.label)} · ${number(c.units)}</b><small>${t('MISSION CARGO')}</small></div>`).join(''):'';
  let demand=0,salvo=0;
  for(const id of [...fit.guns,...fit.launchers,...fit.turrets].filter(Boolean)){const w=flight(OUTFIT_ITEMS[id]);if(w){const interval=w.burstSize?((w.shotInterval??w.cooldown)*w.burstSize+(w.burstPause??0))/w.burstSize:w.cooldown;if(interval>0)demand+=(w.energyCost??0)/interval;salvo+=w.energyCost??0;}}
  const budgetMarkup=`<dl class="inventory-readouts"><div><dt>${t('Energy capacity')}</dt><dd>${number(stats.energyCapacity)}</dd></div><div><dt>${t('Energy regeneration')}</dt><dd>${number(stats.reactorOutput)}/s</dd></div><div class="${demand>stats.reactorOutput?'power-demand-high':''}"><dt>${t('Weapon draw')}</dt><dd>${number(demand)}/s</dd></div><div><dt>${t('Cargo')}</dt><dd>${number(cargoMass(player))}/${number(stats.cargo)}</dd></div></dl>`;
@@ -66,7 +71,11 @@ export function renderEquipmentInventory(ui){
   else if(docked){
    if(record.location.kind==='installed')actions=button('remove','Remove',`data-item-id="${html(record.id)}"`);
    else if(record.location.kind==='cargo'||record.location.kind==='station'&&record.location.stationId===player.dockedAt){
-    if(selectedMount)actions+=button('install','Install',`data-item-id="${html(record.id)}" data-mount-id="${html(selectedMount.mount.id)}"`,!compatible(item));
+    if(selectedMount)actions+=button('install',`${t(old?'Replace':'Install')} · ${mountLabel(selectedMount)}`,`data-item-id="${html(record.id)}" data-mount-id="${html(selectedMount.mount.id)}"`);
+    const choices=mounts.filter(s=>equipmentFitsMount(item,s));
+    if(old)actions+=`<p class="inventory-hint">${t('Replaces {item}. The old item stays in station storage.',{item:itemLabel(old)})}</p>`;
+    if(!selectedMount)actions+=`<p class="inventory-hint">${t(choices.length?'All compatible mounts are occupied. Choose what to replace.':'This ship has no compatible mount.')}</p>`;
+    if(choices.length)actions+=`<details class="inventory-mount-picker" ${selectedMount?'':'open'}><summary>${t(selectedMount?'Choose another mount':'Choose a mount')}</summary>${choices.map(s=>{const d=OUTFIT_ITEMS[mountItemId(fit,s)];return button('fit-mount',`${mountLabel(s)} · ${d?itemLabel(d):t('EMPTY')}`,`data-mount-id="${html(s.mount.id)}" aria-pressed="${s.mount.id===selectedMount?.mount.id}"`);}).join('')}</details>`;
     actions+=button(record.location.kind==='cargo'?'store':'carry',record.location.kind==='cargo'?'Store':'CARGO',`data-item-id="${html(record.id)}"`);
     if(!record.factory)actions+=button('sell',`${t('SELL')} · ${Math.floor(item.price*.7)} CR`,`data-item-id="${html(record.id)}"`);
    }
@@ -77,11 +86,11 @@ export function renderEquipmentInventory(ui){
  const orphanRows=orphans.map(u=>{const distance=Math.hypot(...u.position.map((v,i)=>v-player.position[i]));return `<div class="inventory-loot"><span><b>${html(t(u.type+' drone'))}</b><small>${number(distance)} km</small></span>${button('recover-drone','Recover',`data-item-id="${html(u.id)}"`,distance>stats.salvageRange)}</div>`;}).join('');
  const lootRows=wreck?.scanned?wreck.contents.map(e=>{
   const d=e.item?OUTFIT_ITEMS[e.item.id]:undefined;
-  return `<div class="inventory-loot" ${rarityStyle(d)}>${d?card({...e.item,shop:false}):`<span class="inventory-loot-commodity">${e.kind==='cargo'?commodityIcon(e.commodity):''}<b>${html(e.kind==='cargo'?`${e.quantity}× ${t(COMMODITIES[e.commodity]?.name)}`:t(e.type+' drone'))}</b></span>`}<div class="inventory-loot-actions">${button('recover','Recover',`data-item-id="${html(e.id)}" data-wreck-id="${html(wreck.id)}"`)}${button('select-loot','Priority',`data-item-id="${html(e.id)}"`)}</div></div>`;
+  return `<div class="inventory-loot" ${rarityStyle(d)}>${d?card({...e.item,shop:false}):`<span class="inventory-loot-commodity ${e.kind==='cargo'&&COMMODITIES[e.commodity]?.legal===false?'is-illegal':''}">${e.kind==='cargo'?commodityIcon(e.commodity):''}<b>${html(e.kind==='cargo'?`${e.quantity}× ${t(COMMODITIES[e.commodity]?.name)}`:t(e.type+' drone'))}</b></span>`}<div class="inventory-loot-actions">${button('recover','Recover',`data-item-id="${html(e.id)}" data-wreck-id="${html(wreck.id)}"`)}${button('select-loot','Priority',`data-item-id="${html(e.id)}"`)}</div></div>`;
  }).join(''):'';
- const list=view==='loot'?`<div class="inventory-loot-list"><h3>${html(wreck?.name??t('Loot'))}</h3>${wreck&&!wreck.scanned?`<p>${t('Scan this wreck first.')}</p>`:lootRows||(!orphanRows?`<p>${t('No equipment here.')}</p>`:'')}${orphanRows}</div>`:view==='drones'?`<div class="inventory-drone-list">${ui.renderDroneBayRows?.(ui.droneHudSnapshot(),true)??''}${ui.renderDroneStock?.(docked)??''}</div>`:`<div class="inventory-items">${cargoSummary}${visible.map(card).join('')||`<p class="inventory-hint">${t('No equipment here.')}</p>`}</div>`;
+ const list=view==='loot'?`<div class="inventory-loot-list"><h3>${html(wreck?.name??t('Loot'))}</h3>${wreck&&!wreck.scanned?`<p>${t('Scan this wreck first.')}</p>`:lootRows||(!orphanRows?`<p>${t('No equipment here.')}</p>`:'')}${orphanRows}</div>`:view==='drones'?`<div class="inventory-drone-list">${ui.renderDroneBayRows?.(ui.droneHudSnapshot(),true)??''}${ui.renderDroneStock?.(docked)??''}</div>`:`<div class="inventory-items">${cargoSummary}${visible.map(card).join('')||(cargoSummary?'':`<p class="inventory-hint">${t('No equipment here.')}</p>`)}</div>`;
  const hideMounts=view==='loot'||view==='drones';
- return `<section data-inventory-view="${view}" data-inventory-context="${docked?'station':'flight'}" class="equipment-inventory ${hideMounts?'inventory-focused':''} ${item?'has-detail':''}">${docked?'':`<header><button type="button" data-ui-command="close-ship" aria-label="${t('BACK')}">◀</button><h2>${t('EQUIPMENT & CARGO')}</h2><b>${number(player.credits)} CR</b></header>`}${ui.inventoryNotice?`<p class="inventory-notice" role="status">${html(t(ui.inventoryNotice))}</p>`:''}<div class="inventory-layout"><section class="inventory-mounts" aria-label="${t('INSTALLED EQUIPMENT')}">${mounts.map(s=>{const id=mountItemId(fit,s),d=OUTFIT_ITEMS[id];return `<button type="button" class="inventory-mount ${s.mount.id===ui.inventoryMountId?'selected':''}" ${rarityStyle(d)} data-inventory-mount="${html(s.mount.id)}"><small>${t(s.key==='weapons'?'Weapon':s.key==='turrets'?'Turret':'Utility')} ${s.index+1}</small><b>${html(d?itemLabel(d):t('EMPTY'))}</b></button>`;}).join('')}${button('tab',`${t('Drones')} · ${fit.droneBays.length}`,`data-tab="drones"`)}</section><section class="inventory-stock ${item?'has-detail':''}"><nav><select class="inventory-tab-select" data-inventory-tab aria-label="${t('Inventory section')}">${tabs.map(v=>`<option value="${v}" ${view===v?'selected':''}>${t(tabLabels[v])}</option>`).join('')}</select><div class="inventory-tab-buttons">${tabs.map(v=>button('tab',tabLabels[v],`data-tab="${v}" aria-pressed="${view===v}"`)).join('')}</div>${hideMounts?'':button('clear-mount',selectedMount?t(selectedMount.key==='weapons'?'Weapon':selectedMount.key==='turrets'?'Turret':'Utility')+' '+(selectedMount.index+1)+' ×':'All items',`aria-label="${t('All items')}"`)}${hideMounts?'':`<select data-inventory-sort aria-label="${t('Sort inventory')}"><option value="name">${t('Name')}</option><option value="tier" ${ui.inventorySort==='tier'?'selected':''}>${t('Tier')}</option><option value="mass" ${ui.inventorySort==='mass'?'selected':''}>${t('Mass')}</option></select>`}</nav><div class="inventory-stock-body">${list}${panel||(!hideMounts?`<aside class="inventory-comparison inventory-empty inventory-overview">${budgetMarkup}</aside>`:'')}</div></section></div></section>`;
+ return `<section data-inventory-view="${view}" data-inventory-context="${docked?'station':'flight'}" class="equipment-inventory ${hideMounts?'inventory-focused':''} ${item?'has-detail':''}">${docked||embedded?'':`<header><button type="button" data-ui-command="close-ship" aria-label="${t('BACK')}">◀</button><h2>${t('EQUIPMENT & CARGO')}</h2><b>${number(player.credits)} CR</b></header>`}${ui.inventoryNotice?`<p class="inventory-notice" role="status">${html(t(ui.inventoryNotice))}</p>`:''}<div class="inventory-layout"><section class="inventory-mounts" aria-label="${t('INSTALLED EQUIPMENT')}">${mounts.map(s=>{const id=mountItemId(fit,s),d=OUTFIT_ITEMS[id];return `<button type="button" class="inventory-mount ${s.mount.id===ui.inventoryMountId?'selected':''}" ${rarityStyle(d)} data-inventory-mount="${html(s.mount.id)}"><small>${t(s.key==='weapons'?'Weapon':s.key==='turrets'?'Turret':'Utility')} ${s.index+1}</small><b>${html(d?itemLabel(d):t('EMPTY'))}</b></button>`;}).join('')}</section><section class="inventory-stock ${item?'has-detail':''}"><nav><select class="inventory-tab-select" data-inventory-tab aria-label="${t('Inventory section')}">${tabs.map(v=>`<option value="${v}" ${view===v?'selected':''}>${t(tabLabels[v])}</option>`).join('')}</select><div class="inventory-tab-buttons">${tabs.map(v=>button('tab',tabLabels[v],`data-tab="${v}" aria-pressed="${view===v}"`)).join('')}</div>${hideMounts||!selectedMount?'':button('clear-mount',selectedMount?t(selectedMount.key==='weapons'?'Weapon':selectedMount.key==='turrets'?'Turret':'Utility')+' '+(selectedMount.index+1)+' ×':'All items',`aria-label="${t('All items')}"`)}${hideMounts?'':`<select data-inventory-sort aria-label="${t('Sort inventory')}"><option value="name">${t('Name')}</option><option value="tier" ${ui.inventorySort==='tier'?'selected':''}>${t('Tier')}</option><option value="mass" ${ui.inventorySort==='mass'?'selected':''}>${t('Mass')}</option></select>`}</nav><div class="inventory-stock-body">${list}${panel||(!hideMounts?`<aside class="inventory-comparison inventory-empty inventory-overview">${budgetMarkup}</aside>`:'')}</div></section></div></section>`;
 }
 
 export function bindEquipmentInventory(ui){
@@ -97,9 +106,10 @@ export function bindEquipmentInventory(ui){
  };
  ui.root.addEventListener('click',event=>{
   const b=event.target.closest('[data-inventory-id],[data-inventory-mount],[data-inventory-action]');if(!b)return;
-  if(b.dataset.inventoryId){ui.inventoryItemId=b.dataset.inventoryId;redraw();return;}
+  if(b.dataset.inventoryId){ui.inventoryItemId=b.dataset.inventoryId;ui.inventoryFitExplicit=false;redraw();return;}
   if(b.dataset.inventoryMount){ui.inventoryMountId=b.dataset.inventoryMount;const slot=inventoryMounts(ui.save.player.shipId).find(s=>s.mount.id===ui.inventoryMountId);ui.inventoryItemId=mountItemId(ui.save.player.outfitting.loadouts[ui.save.player.shipId],slot);if(!ui.inventoryItemId)ui.inventoryTab=ui.save.player.dockedAt?'shop':'cargo';redraw();return;}
   const action=b.dataset.inventoryAction;
+  if(action==='fit-mount'){ui.inventoryMountId=b.dataset.mountId;ui.inventoryFitExplicit=true;redraw();return;}
   if(action==='open'){ui.inventoryView=true;ui.showShipMenu();return;}
   if(action==='tab'){ui.inventoryTab=b.dataset.tab;ui.inventoryItemId=undefined;redraw();return;}
   if(action==='close-detail'){ui.inventoryItemId=undefined;redraw();return;}
@@ -108,6 +118,7 @@ export function bindEquipmentInventory(ui){
   // Success is already visible in the updated cards. Keep only failures as text.
   ui.inventoryNotice=result?.ok?undefined:result?.code==='cargo-full'?'Cargo hold is full.':result?.code;
   if(result?.ok&&result.id)ui.inventoryItemId=result.id;
+  if(result?.ok&&['buy','install','remove'].includes(action))ui.inventoryFitExplicit=false;
   if(result?.ok&&['recover','recover-drone','sell','jettison'].includes(action))ui.inventoryItemId=undefined;
   redraw();
  });

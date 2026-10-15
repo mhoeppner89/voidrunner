@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createEnemyLoadout } from '../../src/game/enemyLoadouts.js';
 
 const wayfarer = createEnemyLoadout({ hullId: 'wayfarer', role: 'escort', pilot: { tier: 'veteran' } }, 0);
-assert.deepEqual(wayfarer.droneTypes, ['attack']);
+assert.deepEqual(wayfarer.droneTypes, ['pdc']);
 
 // A civilian hauler mans fewer mounts than its hull carries: the Prospector
 // flies one PDC drone of three bays, the Atlas two PDC drones and two of its
@@ -23,4 +23,4 @@ assert.deepEqual(mule.turrets, ['pdc', 'pdc'], 'the Mule mans both PDC sockets')
 const arenaAtlas = createEnemyLoadout({ hullId: 'atlas', role: 'trader', pilot: { tier: 'veteran' } }, 0, 'support');
 assert.equal(arenaAtlas.turrets.filter(Boolean).length, 4, 'explicit arena fits can use all four Atlas turrets');
 
-console.log('NPC role loadouts passed: Wayfarer attack drone, one defensive Prospector drone, a two-drone Atlas with two manned turrets, and all Atlas sockets retained for explicit fits.');
+console.log('NPC role loadouts passed: Wayfarer PDC drone, one defensive Prospector drone, a two-drone Atlas with two manned turrets, and all Atlas sockets retained for explicit fits.');

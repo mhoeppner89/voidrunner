@@ -16,7 +16,7 @@ import {t} from './i18n.js';
 // saves are still parked on; its only exit is that same fight, so it counts as
 // taught for unlocking while the line itself is delivered in the fight.
 export const CAMPAIGN_WING_UNLOCK_STEP='defeat-raider';
-const WING_ORDER_STEPS=new Set(['check-weapons','defeat-raider','collect-cargo','salvage-black-box','dock-cairn','family-choice','galaxy-map','cross-meridian-gate','complete']);
+const WING_ORDER_STEPS=new Set(['defeat-raider','land-mining','rescue-paul','talk-paul','survey-carrier','carrier-wait','hide-patrol','return-helix','salvage-black-box','black-box-fight','deliver-black-box']);
 // How far off the fight a breaking-off companion stations, measured from the
 // pilot along the line away from the nearest hostile.
 export const CAMPAIGN_BREAK_CLEARANCE=260;
@@ -124,13 +124,13 @@ export const CampaignWingMethods={
     },
     powerDownEssentialCompanion(ship){
         if(!ship||ship.poweredDown)return false;
-        ship.poweredDown=true;
+        ship.poweredDown=true;ship.burning=false;ship.energy=0;ship.shield=0;
         ship.holdFire=true;ship.pursuitHoldFire=true;
         ship.targetId=undefined;ship.wingTargetId=undefined;
         ship.combatThreatId=undefined;ship.combatThreatUntil=0;
         ship.destination=[...ship.position];
-        this.ui.showPilotLine?.('Rin Vek',t('Hull breach — I am dark and drifting. Finish them and I will bring the Second Light back up.'),'ally',9000);
-        this.ui.pushEvent(t('{name} is disabled. She is out of the fight until the last opponent is beaten.',{name:ship.name}),'danger',7000);
+        this.ui.showPilotLine?.(ship.storyPersonId==='paul'?'Paul':'Rin Vek',t('Hull breach. I am disabled. I will restart once the fighting is over.'),'ally',9000);
+        this.ui.pushEvent(t('{name} is disabled until the fighting ends.',{name:ship.name}),'danger',7000);
         return true;
     },
     powerUpEssentialCompanion(ship){
@@ -138,10 +138,10 @@ export const CampaignWingMethods={
         ship.poweredDown=false;
         ship.holdFire=false;ship.pursuitHoldFire=false;
         ship.hull=Math.max(1,ship.hull);
-        ship.shield=ship.maxShield;
+        ship.shield=ship.maxShield;ship.energy=ship.combatFit?.stats.energyCapacity??ship.energy;
         ship.shieldDelay=0;
         ship.destination=[...ship.position];
-        this.ui.showPilotLine?.('Rin Vek',t('Reactors are back. That one hull weld is all I have left — my shielding has to cover us both.'),'ally',8000);
+        this.ui.showPilotLine?.(ship.storyPersonId==='paul'?'Paul':'Rin Vek',t('Reactor online. I am back on your wing. The hull is still damaged.'),'ally',8000);
         return true;
     },
     // The HUD wing rail is published every frame from the companion's live
@@ -150,18 +150,8 @@ export const CampaignWingMethods={
     // drains rather than disappearing with her). No companion — before the
     // lesson or after the story — means no card at all.
     publishCampaignWing(){
-        const companion=this.campaignWingCompanion();
-        if(!companion||!campaignWingUnlocked(this.save)||this.arena?.run)return this.ui.setWingTactics?.([],0);
-        this.ui.setWingTactics?.([{
-            index:0,
-            order:normalizeWingOrder(this.save.wingOrder),
-            name:companion.name,
-            hullId:companion.hullId,
-            hull:Math.max(0,companion.hull),
-            maxHull:companion.maxHull??1,
-            shield:Math.max(0,companion.poweredDown?0:companion.shield),
-            maxShield:companion.maxShield??1,
-            poweredDown:Boolean(companion.poweredDown),
-        }],1);
+        const companions=(this.ships??[]).filter(s=>s.tutorialCompanion&&s.hull>0);
+        if(!campaignWingUnlocked(this.save)||this.arena?.run)return this.ui.setWingTactics?.([],0);
+        this.ui.setWingTactics?.(companions.map((s,index)=>({index,order:normalizeWingOrder(this.save.wingOrder),name:s.name,hullId:s.hullId,hull:Math.max(0,s.hull),maxHull:s.maxHull??1,shield:Math.max(0,s.poweredDown?0:s.shield),maxShield:s.maxShield??1,poweredDown:Boolean(s.poweredDown)})),companions.length);
     },
 };

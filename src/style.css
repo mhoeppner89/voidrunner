@@ -912,60 +912,6 @@ button.compact {
   filter: brightness(1.18);
 }
 
-/* Global status messages */
-.toast-stack {
-  position: absolute;
-  z-index: 90;
-  left: 50%;
-  /* Do not lay status toasts over the painted monitor glass. */
-  bottom: 38%;
-  display: flex;
-  width: min(520px, 74vw);
-  flex-direction: column;
-  align-items: center;
-  gap: 0.35rem;
-  transform: translateX(-50%);
-  pointer-events: none;
-}
-
-.toast {
-  max-width: 100%;
-  padding: 0.58rem 0.8rem;
-  transform: translateY(8px);
-  color: #d9dfda;
-  background: rgba(6, 10, 10, 0.94);
-  border: 1px solid rgba(118, 158, 147, 0.4);
-  border-left: 3px solid var(--teal);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: clamp(0.62rem, 1.1vw, 0.76rem);
-  line-height: 1.35;
-  letter-spacing: 0.03em;
-  text-align: center;
-  opacity: 0;
-  box-shadow: 0 7px 30px rgba(0, 0, 0, 0.42);
-  transition: opacity 180ms ease, transform 180ms ease;
-}
-
-.toast.visible {
-  transform: translateY(0);
-  opacity: 1;
-}
-
-.toast.warning {
-  border-left-color: var(--amber);
-  color: #f0d08a;
-}
-
-.toast.danger {
-  border-left-color: var(--danger);
-  color: #ff9c8b;
-}
-
-.toast.success {
-  border-left-color: var(--success);
-  color: #c6e5ba;
-}
-
 /* Title. Background is the original cockpit sprite + warm-leaning sky
    gradient that established the title-screen look before the recent
    overhauls. The .webp is in the service-worker cache list. */
@@ -2540,11 +2486,7 @@ button.compact {
     bottom: 37%;
   }
 
-  .toast-stack {
-    bottom: 37%;
-  }
-
-  .dock-header {
+.dock-header {
     min-height: 68px;
   }
 
@@ -2704,12 +2646,7 @@ button.compact {
     bottom: 37%;
   }
 
-  .toast-stack {
-    bottom: 37%;
-    width: 66vw;
-  }
-
-  .title-card {
+.title-card {
     width: 82vw;
     padding: 1.15rem 1.4rem;
   }
@@ -5564,12 +5501,7 @@ button.primary,
     width: 190px !important;
   }
 
-  .toast-stack {
-    top: 4.65rem !important;
-    width: min(42vw, 330px) !important;
-  }
-
-  .nav-compass {
+.nav-compass {
     display: none !important;
   }
 }
@@ -15110,10 +15042,6 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   border-color: #e88770;
 }
 
-#game-shell:has(.tutorial-skip-confirm) > .toast-stack {
-  display: none;
-}
-
 .ship-menu-tutorial {
   grid-column: 1 / -1;
   display: grid;
@@ -15363,7 +15291,6 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .adventure-transcript { overflow-y: auto; font-size: 16px; line-height: 1.5; }
 .adventure-transcript p { margin: 0 0 16px; }
 .adventure-transcript b { color: #f3d285; }
-.adventure-open #toast-stack { visibility: hidden; }
 @media (max-height: 500px) and (orientation: landscape) {
   .adventure-panel { gap: 6px; padding-top: max(6px, env(safe-area-inset-top)); padding-bottom: max(6px, env(safe-area-inset-bottom)); }
   .adventure-heading button { min-height: 36px; padding: 6px 12px; font-size: 13px; }
@@ -17139,7 +17066,6 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #dock-screen .ship-trade-panel { flex-shrink:0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; padding-top:8px; border-top:1px solid var(--console-edge); }
 #dock-screen .ship-trade-numbers { grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; gap:8px; }
 #dock-screen .ship-trade-numbers > span, #dock-screen .ship-trade-numbers > strong { padding:0; display:flex; gap:5px; align-items:baseline; background:none; border:0; }
-#dock-screen .ship-trade-numbers > span:first-child { display:none; }
 #dock-screen .ship-trade-numbers small { font:400 11px/1.2 var(--ui-font); letter-spacing:0; }
 #dock-screen .ship-trade-numbers b { font:500 13px/1.2 var(--ui-font); }
 #dock-screen .ship-trade-button { padding:7px; font:500 13px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; box-shadow:none; }
@@ -17324,7 +17250,14 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
    commentary are optional; the quote and transaction stay in the first view. */
 #dock-screen .commodity-exchange { display:flex; flex-direction:column; height:100%; min-height:0; padding:0; }
 #dock-screen .commodity-market-shell { height:100%; min-height:0; align-items:stretch; }
-#dock-screen .commodity-catalog { min-height:0; max-height:none; height:100%; overflow:auto; }
+#dock-screen .commodity-catalog { min-height:0; max-height:none; height:auto; overflow:visible; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:start; gap:6px; }
+#dock-screen .commodity-card { display:grid; grid-template-columns:44px minmax(0,1fr); grid-template-areas:"art price" "name name"; align-content:center; align-items:center; min-width:0; min-height:80px; padding:7px; gap:4px 8px; text-align:left; }
+#dock-screen .commodity-card .commodity-art-thumb { grid-area:art; width:44px; height:44px; min-height:0; aspect-ratio:1; }
+#dock-screen .commodity-card-copy { grid-area:name; min-width:0; }
+#dock-screen .commodity-card-copy b { margin:0; overflow-wrap:normal; hyphens:auto; }
+#dock-screen .commodity-card-price { grid-area:price; min-width:0; margin:0; text-align:left; }
+#dock-screen .commodity-card-copy :is(small,em), #dock-screen .commodity-card-price small { display:none; }
+#dock-screen .commodity-card-price .commodity-hold-badge { display:block; margin:3px 0 0; padding:0; border:0; background:none; font:400 11px/1.2 var(--ui-font); }
 #dock-screen .commodity-card-copy b { font:500 14px/1.3 var(--ui-font); letter-spacing:0; }
 #dock-screen .commodity-card-copy small, #dock-screen .commodity-card-copy em, #dock-screen .commodity-card-price small { font:400 12px/1.3 var(--ui-font); letter-spacing:0; }
 #dock-screen .commodity-card-price b { font:500 14px/1.3 var(--ui-font); letter-spacing:0; }
@@ -17351,10 +17284,16 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #dock-screen .trade-actions-ticket button { padding:6px; font:500 13px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; }
 #dock-screen .trade-actions-ticket button > span { font:500 13px/1.2 var(--ui-font); }
 #dock-screen .trade-actions-ticket button > small { font:400 11px/1.3 var(--ui-font); }
-.trade-notes, .market-cargo { min-width:0; font:400 13px/1.3 var(--ui-font); }
-.trade-notes > summary, .market-cargo > summary { min-height:44px; padding:12px 0; cursor:pointer; color:var(--void-muted); }
-#dock-screen .market-cargo .cargo-sale-grid { display:flex; flex-direction:column; gap:6px; }
-#dock-screen .market-cargo .cargo-sale-item { grid-template-columns:1fr; }
+.trade-notes { min-width:0; font:400 13px/1.3 var(--ui-font); }
+.trade-notes > summary { min-height:44px; padding:12px 0; cursor:pointer; color:var(--void-muted); }
+@media (pointer:coarse), (max-width:900px) {
+ #dock-screen .commodity-catalog { grid-template-columns:repeat(5,minmax(0,1fr)); }
+ #dock-screen .commodity-card { grid-template-columns:36px minmax(0,1fr); padding:6px; gap:4px 6px; }
+ #dock-screen .commodity-card .commodity-art-thumb { width:36px; height:36px; }
+}
+@media (max-width:550px) and (orientation:portrait) {
+ #dock-screen .commodity-catalog { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
 @media(max-height:520px) and (orientation:landscape) {
  #dock-screen .commodity-exchange { height:100%; }
  #dock-screen .trade-ticket { padding:8px; gap:14px; grid-template-columns:minmax(0,.85fr) minmax(0,1fr) minmax(0,1.2fr); }
@@ -17671,3 +17610,194 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
  .run-card[data-run-view="rewards"] .run-replacement { height:18px; }
  .run-card[data-run-view="rewards"] .run-replacement .run-item-image { width:18px; height:18px; }
 }
+
+/* Story radio stays on the existing comms strip, with one small speaker image. */
+#game-shell .comms-channel #comms-bar.has-portrait { display:flex; align-items:center; gap:8px; text-align:left; }
+.comms-portrait { width:36px; height:36px; flex:0 0 36px; object-fit:cover; border:1px solid currentColor; border-radius:3px; }
+#game-shell .comms-channel #comms-bar.has-portrait .talker-text { flex:1; }
+.tutorial-notice-copy .tutorial-equipment-explainer { max-width:780px; font:14px/1.4 var(--ui-font); white-space:normal; overflow:visible; text-overflow:clip; }
+.map-tutorial-instruction { margin:0 0 8px; color:var(--void-gold); font:14px/1.35 var(--ui-font); }
+.inventory-mount-picker { width:100%; }
+.inventory-mount-picker summary { cursor:pointer; padding:10px 0; color:var(--void-muted); }
+.inventory-mount-picker > button { display:block; width:100%; margin-bottom:6px; text-align:left; min-height:44px; }
+.inventory-actions > [data-inventory-action="install"] { border-color:var(--void-gold); color:var(--void-gold); }
+@media(max-height:520px) and (orientation:landscape) {
+ .comms-portrait { width:30px; height:30px; flex-basis:30px; }
+ .tutorial-notice-copy .tutorial-equipment-explainer { font-size:12px; line-height:1.3; }
+}
+
+/* Own-ship terminal: one fixed header and section bar, one bounded content area. */
+#ship-panel { overflow:hidden; padding:max(10px,var(--safe-top)) max(10px,var(--safe-right)) max(10px,var(--safe-bottom)) max(10px,var(--safe-left)); }
+#ship-panel .ship-console { display:flex; flex-direction:column; width:min(1120px,100%); height:min(740px,100%); min-height:0; min-width:0; overflow:hidden; border:1px solid var(--void-muted); border-top:2px solid var(--void-gold); background:var(--void-navy); box-shadow:var(--panel-shadow); color:var(--void-cream); }
+.ship-console-header { display:flex; align-items:center; gap:16px; padding:10px 14px; flex-shrink:0; border-bottom:1px solid var(--void-muted); }
+.ship-console-header h2 { margin:0 auto 0 0; font:600 20px/1.2 var(--ui-font); }
+.ship-console-header > b { font:500 14px/1.2 var(--ui-font); color:var(--void-gold); white-space:nowrap; }
+#ship-panel .ship-console button, #ship-panel .ship-console select { min-height:44px; padding:8px 12px; font:500 14px/1.25 var(--ui-font); letter-spacing:0; text-transform:none; white-space:normal; overflow-wrap:anywhere; }
+.ship-console-tabs { display:flex; flex-shrink:0; gap:0; border-bottom:1px solid var(--void-muted); }
+.ship-console-tabs > button { flex:1; border:0; border-bottom:3px solid transparent; background:transparent; color:var(--void-muted); }
+.ship-console-tabs > button[aria-current="page"] { color:var(--void-gold); border-bottom-color:var(--void-gold); background:rgba(240,204,131,.08); }
+#ship-panel .ship-console > .ship-status-strip { margin:0; padding:10px 14px 0; flex-shrink:0; }
+.ship-console-body { min-height:0; min-width:0; flex:1; overflow:auto; overscroll-behavior:contain; padding:14px; touch-action:pan-y; }
+.ship-console-body[data-pane="equipment"] { padding:0; overflow:hidden; }
+.ship-console-body > .equipment-inventory { height:100%; min-height:0; }
+.ship-console-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; align-content:start; align-items:start; }
+.ship-console-grid > section, .ship-console-grid > details { min-width:0; padding:12px; border:1px solid rgba(160,190,210,.25); background:rgba(10,30,50,.6); }
+.ship-console-grid > .ship-menu-wing { grid-column:auto; }
+.ship-console h3 { margin:0 0 10px; color:var(--void-muted); font:600 14px/1.3 var(--ui-font); letter-spacing:0; }
+.ship-console summary { cursor:pointer; padding:10px 0; color:var(--void-muted); font:500 14px/1.35 var(--ui-font); }
+.ship-console p { font:400 14px/1.5 var(--ui-font); }
+.ship-console .ship-flight-controls > button { display:block; width:100%; margin-bottom:8px; text-align:left; }
+.ship-console button[aria-pressed="true"] { border-color:var(--void-gold); color:var(--void-gold); background:rgba(240,204,131,.1); }
+.ship-console select { width:100%; max-width:100%; }
+.ship-console .weapon-row { gap:8px; min-height:38px; }
+.ship-console .weapon-row > span { min-width:0; overflow-wrap:anywhere; }
+.ship-console .weapon-row > small { text-align:right; }
+.ship-console .ship-menu-tutorial { grid-column:1/-1; }
+.ship-console .ship-drone-bays { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.ship-console .drone-bay-row { min-width:0; padding:12px; margin:0; border:1px solid rgba(160,190,210,.25); }
+.ship-console .drone-bay-row > b { font:600 14px/1.3 var(--ui-font); color:var(--void-cream); }
+.ship-console .drone-bay-row > p { margin:8px 0; color:var(--void-muted); font-size:13px; }
+.ship-console .drone-bay-row .drone-policy { display:flex; flex-wrap:nowrap; gap:6px; }
+.ship-console .drone-bay-row .drone-policy > button { flex:1; min-width:0; }
+.ship-console .ship-drone-explainer { margin:0 0 12px; color:var(--void-muted); }
+.ship-console .ship-menu-drones > details { margin-top:12px; }
+.ship-console .ship-menu-drones > details .drone-bay-row { padding:8px; margin:4px 0; }
+@media(max-height:520px) and (orientation:landscape) {
+ #ship-panel { padding:max(6px,var(--safe-top)) max(6px,var(--safe-right)) max(6px,var(--safe-bottom)) max(6px,var(--safe-left)); }
+ .ship-console-header { gap:10px; padding:3px 8px; }
+ .ship-console-header h2 { font-size:17px; }
+ #ship-panel .ship-console button, #ship-panel .ship-console select { font-size:12px; padding:6px 8px; }
+ #ship-panel .ship-console > .ship-status-strip { padding:6px 8px 0; gap:6px; }
+ #ship-panel .ship-console .ship-status-cell { padding:4px 6px; }
+ .ship-console-body { padding:8px; }
+ .ship-console-grid { gap:8px; }
+ .ship-console-grid > section, .ship-console-grid > details, .ship-console .drone-bay-row { padding:8px; }
+ .ship-console .ship-flight-controls > button { margin-bottom:6px; }
+ .ship-console h3 { font-size:12px; margin-bottom:6px; }
+ .ship-console p { font-size:13px; }
+}
+@media(max-width:600px) and (orientation:portrait) {
+ .ship-console-grid, .ship-console .ship-drone-bays { grid-template-columns:1fr; }
+ .ship-console-header > b { display:none; }
+}
+.ship-console .weapon-row :is(span,small,em) { font:400 13px/1.4 var(--ui-font); letter-spacing:0; text-transform:none; }
+#ship-panel .ship-console-grid > .ship-menu-wing { grid-column:auto; }
+#ship-panel .ship-console .drone-bay-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:4px 12px; margin:0 0 6px; }
+.ship-console .drone-bay-heading b { font:600 13px/1.3 var(--ui-font); color:var(--void-cream); }
+.ship-console .drone-bay-heading small { font:400 12px/1.3 var(--ui-font); color:var(--void-muted); }
+#ship-panel .ship-console .ship-menu-drones .drone-bay-row { padding:8px; }
+#ship-panel .ship-console .drone-bay-heading + .drone-policy { margin-top:0; }
+@media(max-height:520px) and (orientation:landscape) {
+ .ship-console .ship-drone-bays { gap:8px; }
+ .ship-console .ship-drone-explainer { margin-bottom:8px; font-size:12px; }
+ #ship-panel .ship-console .ship-menu-drones .drone-bay-row { padding:6px 8px; }
+}
+
+/* Illegal cargo uses the same red cue in trading, cargo and salvage. */
+#dock-screen .commodity-card.restricted .commodity-card-copy b,
+#dock-screen .trade-ticket.restricted .trade-ticket-hero h3,
+.inventory-commodity.is-illegal > b,
+.inventory-loot-commodity.is-illegal > b { color:var(--danger); }
+
+/* Service is three direct actions, with no nested maintenance menus. */
+#dock-screen .service-grid-simple { align-items:stretch; max-width:1200px; margin:0 auto; gap:14px; padding:16px; }
+#dock-screen .service-grid-simple .service-card { min-height:300px; padding:18px; gap:14px; background:linear-gradient(155deg,#0a2033ed,#030d1be8); border:1px solid #486477; border-top:2px solid var(--void-gold); box-shadow:0 5px 15px #02081266; }
+#dock-screen .service-grid-simple .service-card h3 { color:var(--void-cream); font-size:18px; }
+#dock-screen .service-grid-simple .service-card > button { margin-top:auto; min-height:48px; }
+#dock-screen .service-grid-simple .service-emblem { height:94px; display:grid; place-items:center; }
+.service-emblem svg { width:110px; height:76px; fill:#183951; stroke:var(--void-muted); stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }
+.service-emblem .service-emblem-accent { fill:none; stroke:var(--void-gold); stroke-width:3; }
+#dock-screen .service-grid-simple .service-bars { display:grid; gap:10px; }
+#dock-screen .service-grid-simple .service-bars label { font-size:13px; gap:5px; margin:0; }
+#dock-screen .service-grid-simple .service-bars label i { background:#02101e; border:0; height:5px; }
+#dock-screen .service-grid-simple .service-bars label i b { background:var(--void-cyan); }
+#dock-screen .service-grid-simple .service-paint-preview { flex:1; min-height:90px; height:140px; width:100%; background:none; border:0; margin:0; }
+#dock-screen .service-grid-simple select { width:100%; min-height:44px; padding:8px; color:var(--void-cream); background:#0a2033; border:1px solid #486477; font:500 14px var(--ui-font); }
+@media (max-height:520px) and (orientation:landscape) {
+ #dock-screen .service-grid-simple { padding:8px; gap:8px; }
+ #dock-screen .service-grid-simple .service-card { padding:10px; min-height:0; gap:7px; }
+ #dock-screen .service-grid-simple .service-card h3 { font-size:14px; }
+ #dock-screen .service-grid-simple .service-emblem { height:40px; }
+ #dock-screen .service-grid-simple .service-emblem svg { height:40px; width:65px; }
+ #dock-screen .service-grid-simple .service-paint-preview { height:56px; min-height:56px; flex:none; }
+ #dock-screen .service-grid-simple .service-bars { gap:6px; }
+ #dock-screen .service-grid-simple .service-bars label { font-size:12px; gap:3px; }
+ #dock-screen .service-grid-simple .service-card > button { min-height:44px; }
+ #dock-screen .service-grid-simple select { min-height:36px; padding:4px; font-size:13px; }
+}
+@media (max-width:550px) and (orientation:portrait) {
+ #dock-screen .service-grid-simple { grid-template-columns:1fr; }
+ #dock-screen .service-grid-simple .service-card { min-height:240px; }
+}
+
+#dock-screen .service-paint-preview::after { display:none; }
+
+/* The story occupies a card only when opened from the station header. */
+#dock-screen .dock-story-button { flex:0 0 auto; min-width:52px; min-height:44px; padding:6px 10px; border:1px solid var(--void-gold); color:var(--void-gold); background:#102237; font:500 14px var(--ui-font); letter-spacing:0; text-transform:none; }
+.story-panel { position:fixed; inset:0; z-index:12500; display:grid; place-items:center; padding:16px; background:#020814d9; overflow:auto; }
+.story-panel.is-hidden { display:none; }
+.story-card { width:min(620px,100%); max-height:calc(100dvh - 32px); overflow:auto; padding:18px; border:1px solid var(--void-gold); background:linear-gradient(145deg,#112b40,#040e20); color:var(--void-cream); box-shadow:0 12px 40px #0009; }
+.story-card > header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.story-card h2 { margin:0; font:600 20px var(--ui-font); }
+.story-card > header button { min-width:44px; min-height:44px; padding:0; font:24px var(--ui-font); }
+.story-card .tutorial-dock-notice { display:grid; grid-template-columns:60px minmax(0,1fr); gap:14px; padding:0; margin:0; border:0; background:none; }
+.story-card .tutorial-dock-notice > .avatar { width:60px; height:70px; }
+.story-card .tutorial-notice-copy { min-width:0; }
+.story-card .tutorial-notice-copy > span { display:block; margin-bottom:8px; font:12px/1.3 var(--ui-font); color:var(--void-muted); }
+.story-card .tutorial-notice-copy > b { display:block; margin-bottom:8px; font:600 19px/1.2 var(--ui-font); color:var(--void-gold); }
+.story-card .tutorial-notice-copy > p { margin:6px 0; max-width:none; font:15px/1.4 var(--ui-font); white-space:normal; overflow:visible; }
+.story-card .tutorial-notice-copy > p.story-objective-detail { color:var(--void-muted); font-size:14px; }
+.story-card .ship-menu-tutorial { margin:0; border:0; padding:0; }
+.new-career-actions [data-ui-command="cancel-new-career"] { flex:0 0 auto; }
+@media (max-height:520px) and (orientation:landscape) {
+ .story-panel { padding:10px; }
+ .story-card { max-height:calc(100dvh - 20px); padding:12px; }
+ .story-card > header { margin-bottom:6px; }
+ .story-card .tutorial-notice-copy > span { margin-bottom:4px; }
+ .story-card .tutorial-notice-copy > b { margin-bottom:4px; font-size:17px; }
+ .story-card .tutorial-notice-copy > p { font-size:14px; }
+ .new-career-card { padding:16px; }
+ .new-career-actions button { flex:1 1 150px; }
+}
+
+.story-card .tutorial-notice-copy > p.story-current-objective { margin-top:0; color:var(--void-cream); font:600 18px/1.35 var(--ui-font); }
+.ship-menu-tutorial .tutorial-dock-notice { display:grid; grid-template-columns:48px minmax(0,1fr); align-items:start; gap:12px; }
+.ship-menu-tutorial .tutorial-dock-notice > .avatar { width:48px; height:56px; }
+.ship-menu-tutorial .tutorial-notice-copy > p { margin:0 0 8px; white-space:normal; overflow:visible; font:14px/1.4 var(--ui-font); }
+.ship-menu-tutorial .tutorial-notice-copy > .story-current-objective { font-weight:600; color:var(--void-cream); }
+@media (max-height:520px) and (orientation:landscape) {
+ .story-card .tutorial-notice-copy > p.story-current-objective { font-size:16px; }
+}
+
+/* Compact maps hide the tactical plot: use two rows, without its old reserved
+   grid track. Let the chart and contact list share the actual available height. */
+#map-panel .sector-system-map .map-node { grid-template-columns:11px minmax(0,1fr); }
+#map-panel .sector-system-map .map-node b { white-space:normal; overflow-wrap:anywhere; }
+#map-panel .map-tutorial-instruction { padding:6px 12px; margin:0; flex:0 0 auto; }
+@media (pointer:coarse), (max-width:900px), (max-height:520px) {
+ #map-panel .map-card { display:flex; flex-direction:column; width:100%; height:min(760px,calc(100dvh - 16px)); max-height:100%; min-height:0; overflow:hidden; }
+ #map-panel .map-card > header { flex:0 0 auto; min-height:0; }
+ #map-panel .map-view:not([hidden]) { display:flex; flex:1 1 auto; flex-direction:column; min-height:0; }
+ #map-panel .map-view[hidden] { display:none; }
+ #map-panel .sector-map-layout { flex:1 1 auto; min-height:0; grid-template-columns:minmax(0,1.55fr) minmax(0,1fr); }
+ #map-panel .system-map-section { display:grid; min-height:0; grid-template-rows:auto minmax(0,1fr); }
+ #map-panel .sector-system-map { width:100%; height:100%; min-height:0; }
+ #map-panel .local-map-section { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); min-height:0; max-height:none; align-self:stretch; }
+ #map-panel .local-map-section > .map-section-heading { grid-column:auto; }
+ #map-panel .local-map-section .tactical-map { display:none; }
+ #map-panel .contact-list { height:100%; min-height:0; max-height:none; overflow-y:auto; overflow-x:hidden; }
+ #map-panel .contact-row { min-height:48px; }
+ #map-panel .contact-row > span { min-width:0; }
+ #map-panel .contact-row b { white-space:normal; overflow-wrap:anywhere; }
+ #map-panel .contact-row em { flex-shrink:0; }
+ #map-panel .local-map-section .map-section-heading { gap:6px; }
+ #map-panel .local-map-section .map-section-heading b { flex:0 0 auto; max-width:none; white-space:nowrap; }
+ #map-panel .galaxy-map-section { display:flex; flex-direction:column; min-height:0; flex:1; }
+ #map-panel .galaxy-map-stage { flex:1; height:100%; min-height:0; }
+ #map-panel .map-card > footer { flex:0 0 auto; }
+}
+
+/* One contained highlight replaces stacked mission/selection boxes. */
+#map-panel .map-node.mission-objective { outline:none; border-color:var(--void-gold); box-shadow:inset 0 0 0 1px #ffd05c66,0 0 12px #ffd05c33; }
+#map-panel .map-node.mission-objective > i { border-color:var(--void-gold); background:var(--void-gold); }
+#map-panel .map-node.selected::after { display:none; }

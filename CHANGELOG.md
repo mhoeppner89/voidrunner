@@ -1,3 +1,107 @@
+## 0.8.2gp — Keep the mining handoff under player control
+
+- Preserve the asteroid target, navigation and working miners when the mining quota is met; avoid repositioning Rin during the delivery callback.
+- Place the new tutorial deposit roughly 1,000 km from the Vesper approach exit, with extra ore for continued mining.
+- New mining contracts require six ore and pay 3,000 cr. Already accepted older contracts keep their terms and progress.
+- Keep learned travel controls quiet; nudge once after a minute without useful progress and stay silent during automatic drone work or travel.
+- Add a full animation-frame regression covering continued mining, steering, automatic drone recovery and the return intercept.
+
+## 0.8.2go — Clear story instructions through normal menus
+
+- Split the family introduction from Rin’s practical market instructions; introduce launch, mining and the return to Vesper at the relevant moment.
+- Teach normal contract acceptance and drone-role selection, automatic drone return, desktop mining/salvage/fire controls and carrier hiding.
+- Replace repeated completed lessons with concise reminders and show Mara’s Cairn call as a real conversation, including when docked.
+- Show Buy max/Sell all totals before trading; track additional opening Protein purchases in the delivery total, respect drone deployment range, and clear stale equipment details on re-entry.
+
+## 0.8.2gn — Teach normal trade and fitting at Vesper
+
+- Open Rin’s welcome dialogue after the first Vesper landing and her reactor-gift dialogue after selling the full Protein load.
+- Explain the normal commodity market, sale controls and Equipment → Storage → Install flow.
+- Remove Story’s reactor shortcut and tutorial-only trading controls; keep normal Buy max/Sell all actions.
+- Persist shown dialogues so partial sales, repeated visits and resumed saves do not repeat them.
+
+## 0.8.2gm — Fit compact navigation panels
+
+- Remove the unused tactical-radar grid row on compact maps so the contact list fills its panel.
+- Bound the compact map to the screen height, preserve contact scrolling, and wrap long destination/contact labels inside their controls.
+- Use one contained objective highlight instead of protruding mission/selection boxes.
+- Label tracked contacts correctly in German.
+
+## 0.8.2gl — Clear current tasks
+
+- Open the first Story card automatically when starting a tutorial career.
+- Rewrite every Story/journal card around the present task, with no repeated chapter/title blocks or previews of later missions.
+- Start with meeting Mara and Rin in the bar and the hint for reopening Story; keep reactor fitting and phase-specific mining/hiding instructions.
+
+## 0.8.2gk — Story on demand
+
+- Replace the dock tutorial strip with a Story button and current-objective card.
+- Ask whether to play or skip the tutorial before starting a new career, retaining the autosave replacement warning on the same card.
+- Remove tutorial-abort controls from station menus and the ship journal.
+
+## 0.8.2gj — Simple dock services
+
+- Replace the drone-service submenus with combined ship/drone repairs and ship fuel/ammunition refills; buy drones in Equipment.
+- Remove drone ammunition limits, refill costs and ammo readouts for both player and NPC drones.
+- Add a paid hull-paint preview and remove the free in-flight paint selector.
+- Keep Service to three compact cards without explanatory disclosures or recovery boilerplate.
+
+## 0.8.2gi — Clear commodity names
+
+- Shorten commodity names across trading, cargo, loot and tutorial instructions.
+- Mark weapons cargo red and have Rin explain that transporting it is illegal.
+
+## 0.8.2gh — Faster tutorial trade and approach
+
+- Offer a single Buy max action for the opening Protein Packs trade and Sell all at Vesper, tracking the actual purchased load.
+- Move the afterburner lesson out of departure checks and into the Vesper approach after hyperdrive. Coach full thrust, sustained afterburn to 5,000 km, release and braking in sequence.
+
+## 0.8.2gg — Remove repeated menu information
+
+- Remove the duplicate commodity cargo summary and manifest; owned quantities stay on commodity cards and selling stays in the trade ticket.
+- Consolidate shipyard prices around purchase/exchange actions, remove the extra current-ship placeholder and suppress zero stat differences.
+- Remove inactive inventory filters, misleading empty-item text beneath cargo, empty drone-cargo disclosures and unequipped 0/0 launcher placeholders.
+- Simplify repeated spectator-editor headings and default-loadout labels while retaining placement instructions. Clear stale Arena menus when entering spectator mode.
+
+## 0.8.2gf — Compact commodity cards
+
+- Put commodity prices beside their icons, with names below. Use compact grids so all ten commodities fit in landscape without a catalog scrollbar.
+- Keep cargo counts, commodity selection and the full trade detail available.
+
+## 0.8.2ge — Paul’s repair support
+
+- Give Paul two repair drones and introduce hull repair in his rescue dialogue, with a reminder before the black-box mission.
+- Repair drones service their owner first, then physically visit damaged friendlies within 200 km, using their owner's energy. They do not recharge shields or reactivate disabled story companions during combat.
+- Recall Paul's drones during the carrier hiding lesson and pause them while he is disabled.
+
+## 0.8.2gd — Clear ship controls and automatic drone switching
+
+- Group the own-ship terminal into Flight, Equipment & Cargo, Drones and Journal, with a fixed section bar and bounded scrolling on desktop and landscape phones.
+- Keep mining, PDC and repair drones. Remove attack drones; saved attack units and loot migrate to PDC while preserving ownership, hull and remaining ammunition.
+- Switch bay roles docked or in flight. Deployed drones return automatically, deliver their payload and load the selected type from owned cargo; remove redundant manual stow controls from the bay UI.
+- Remove floating toast notifications. Keep useful feedback on the cockpit status ticker and in the Journal; retain inline menu errors.
+
+## 0.8.2gc — One task at a time and direct fitting
+
+- Tutorial radio now follows actual travel, arrival, distance, drone and cover state. Instructions wait for the current action rather than bundling navigation, approach and landing into one transmission.
+- Explain the gifted reactor at Vesper and open it directly from the objective. Owned equipment can be installed from cargo or local storage without an intermediate carry step; free compatible mounts are selected automatically, while replacements require a visible choice.
+- Add small speaker portraits to story radio and persistent tutorial instructions. Keep the existing comms position and phone-sized strip.
+
+## 0.8.2gb — Correct offline startup and asset verification
+
+- Offline report and development URLs no longer fall back to a cached game at the wrong path. Uncached pages explain that the preview server or network must be restored.
+- Cache the opening Helix room, bar, market, Mara/Rin portraits and landed Wayfarer with the shell. Reject HTML responses masquerading as cached image/model assets.
+- Add service-worker regressions and normal cached-browser startup checks, including decoded images and offline reloads on desktop and phones.
+
+## 0.8.2ga — New tutorial campaign
+
+- Rebuilt the career prologue around trade, flight, a gifted reactor, a real mining contract, a return-drive pirate standoff, drone-bay switching and a solo graveyard survey.
+- Added Paul’s Torsas rescue, five-ship patrol and carrier-hangar stealth lesson. Fighting or escaping the patrol remains possible.
+- Unlocks normal career work in the starting system after Mara’s debrief. The unchanged 50k ship/equipment/half-cash value triggers the Cairn reunion; Rin then reopens the jump gate.
+- Added the frigate-wreck black box, optional Paul escort, four-pirate fight and delivery to Mara for decoding. Rewrote English/German dialogue and kept flight instructions on the comms display.
+- Story ships use shared NPC flight, regeneration and fitted weapons. The five-ship patrol keeps to pirate Scrapper/Demon hulls.
+- Paul and Rin disable at 1 hull and recover after combat ends. Saved casualties and companion states prevent reloads from replaying kills or restoring disabled allies.
+
 ## 0.8.2fz — One pulse-laser progression
 
 - Consolidated the reinforced pulse variant into Pulslaser I–III. Tier II matches the former reinforced base laser: 10.8 damage, 3.6 energy; tier III has 12.4 damage and costs 4 energy.

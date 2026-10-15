@@ -23,7 +23,7 @@ export const GUILD_RANK_NAMES = {
 export const COMMODITIES = {
     water: {
         id: 'water',
-        name: 'Purified Water',
+        name: 'Water',
         description: 'Shielded tanks of potable water. Cheap, bulky, always needed.',
         flavor: 'Clean water is never glamorous. It is always cargo.',
         packaging: 'Shielded tanks',
@@ -36,7 +36,7 @@ export const COMMODITIES = {
     },
     food: {
         id: 'food',
-        name: 'Protein Packs',
+        name: 'Protein',
         description: 'Long-life nutrient blocks and cultivated protein.',
         flavor: 'Crew days, counted and vacuum-sealed.',
         packaging: 'Vacuum cartons',
@@ -62,7 +62,7 @@ export const COMMODITIES = {
     },
     electronics: {
         id: 'electronics',
-        name: 'Control Electronics',
+        name: 'Electronics',
         description: 'Navigation boards, sensor cores, and industrial logic units.',
         flavor: 'Small crates that keep large machines thinking.',
         packaging: 'Anti-static crates',
@@ -75,7 +75,7 @@ export const COMMODITIES = {
     },
     machinery: {
         id: 'machinery',
-        name: 'Industrial Machinery',
+        name: 'Machinery',
         description: 'Actuators, pumps, drill heads, and pressure-rated assemblies.',
         flavor: 'Heavy replacements for the parts a frontier wears out.',
         packaging: 'Pressure-rated pallet',
@@ -88,7 +88,7 @@ export const COMMODITIES = {
     },
     ore: {
         id: 'ore',
-        name: 'Concentrated Ore',
+        name: 'Ore',
         description: 'Dense mixed-metal concentrate recovered from frontier rock.',
         flavor: 'Unrefined mass with a refinery waiting at the other end.',
         packaging: 'Lined ore hopper',
@@ -115,7 +115,7 @@ export const COMMODITIES = {
     },
     scrap: {
         id: 'scrap',
-        name: 'Reclaimed Scrap',
+        name: 'Scrap',
         description: 'Sorted hull plate, cable, and machinery fragments.',
         flavor: 'Yesterday\'s wreck, tomorrow\'s pressure door.',
         packaging: 'Banded salvage bale',
@@ -128,7 +128,7 @@ export const COMMODITIES = {
     },
     luxuries: {
         id: 'luxuries',
-        name: 'Offworld Luxuries',
+        name: 'Luxuries',
         description: 'Spices, artisan spirits, and prestige consumer goods.',
         flavor: 'What people buy when survival stops taking the whole wage.',
         packaging: 'Cushioned display case',
@@ -141,7 +141,7 @@ export const COMMODITIES = {
     },
     arms: {
         id: 'arms',
-        name: 'Restricted Armaments',
+        name: 'Weapons',
         description: 'Sealed weapon components. Legal only under licensed manifests.',
         flavor: 'Manifest-controlled hardware with a second price off the books.',
         packaging: 'Sealed weapons crate',

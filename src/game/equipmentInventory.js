@@ -69,6 +69,11 @@ export const inventoryMounts=shipId=>{
  return [...spec.weapons.map((mount,index)=>({mount,index,key:'weapons'})),...spec.turrets.map((mount,index)=>({mount,index,key:'turrets'})),...spec.utility.map((mount,index)=>({mount,index,key:'utility'}))];
 };
 export const mountItemId=(fit,mount)=>mount.key==='weapons'?fit.guns[mount.index]??fit.launchers[mount.index]:fit[mount.key]?.[mount.index];
+export const equipmentFitsMount=(item,slot)=>Boolean(item&&slot&&(slot.key==='weapons'?['gun','launcher'].includes(item.category):slot.key==='turrets'?item.category==='turret':['power','drive','defense','utility'].includes(item.category)));
+export function equipmentInstallMount(player,item,requestedId){
+ const slots=inventoryMounts(player.shipId).filter(slot=>equipmentFitsMount(item,slot)),fit=player.outfitting.loadouts[player.shipId];
+ return slots.find(slot=>slot.mount.id===requestedId)??slots.find(slot=>!mountItemId(fit,slot));
+}
 export function shopEquipmentTiers(stationId){return ['rook','argent','league-yard','haven','cinderfall'].includes(stationId)?[1,2,3]:['helix','azure','vesper','blackglass'].includes(stationId)?[1,2]:[1];}
 export function captureEquipmentAmmo(player){
  if(!player.inventory)return;
@@ -90,7 +95,7 @@ export function equipmentAction(player,action,{id,baseId,tier=1,mountId,stationI
  if(action==='install'){
   if(!accessible(item)&&!(item.location.kind==='installed'&&item.location.shipId===draft.shipId))return {ok:false,code:'Item is stored elsewhere.'};
   const slot=inventoryMounts(draft.shipId).find(s=>s.mount.id===mountId);if(!slot)return {ok:false,code:'Select a mount.'};
-  const definition=OUTFIT_ITEMS[id],valid=slot.key==='weapons'?['gun','launcher'].includes(definition.category):slot.key==='turrets'?definition.category==='turret':['power','drive','defense','utility'].includes(definition.category);
+  const definition=OUTFIT_ITEMS[id],valid=equipmentFitsMount(definition,slot);
   if(!valid)return {ok:false,code:'This equipment does not fit this mount.'};
   for(const key of LOADOUT_KEYS)for(let i=0;i<fit[key].length;i++)if(fit[key][i]===id){fit[key][i]=null;draft.outfitting.factory[draft.shipId][key][i]=false;}
   const displaced=mountItemId(fit,slot);if(displaced&&inventory.items[displaced])inventory.items[displaced].location={kind:'station',stationId};

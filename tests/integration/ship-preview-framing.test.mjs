@@ -24,3 +24,10 @@ test('resizing a showroom reframes the hull without recentering its rotated mode
  assert.equal(preview.camera.aspect,.5);
  assert.deepEqual(preview.model.position.toArray(),[3,4,5]);
 });
+
+test('fixed paint views fit long and wide hulls at short phone and desktop sizes',()=>{
+ for(const dims of [[20,2,4],[4,3,20],[9,8,10]])for(const aspect of [1,3,5]){
+  const p=Object.create(ShipPreview.prototype);p.paintPreview=true;p.camera=new THREE.PerspectiveCamera(38,aspect,.05,1000);p.container={clientWidth:300,clientHeight:300/aspect};p.pivot=new THREE.Group();p.pivot.rotation.y=.5;p.model=new THREE.Mesh(new THREE.BoxGeometry(...dims));p.pivot.add(p.model);p.modelRadius=Math.hypot(...dims)/2;p.updateCameraFraming();p.camera.updateMatrixWorld();
+  const box=new THREE.Box3().setFromObject(p.pivot),point=new THREE.Vector3();for(let c=0;c<8;c++){point.set(c&1?box.max.x:box.min.x,c&2?box.max.y:box.min.y,c&4?box.max.z:box.min.z).project(p.camera);assert.ok(Math.abs(point.x)<1&&Math.abs(point.y)<1,`${dims}/${aspect}: paint preview clips`);}
+ }
+});

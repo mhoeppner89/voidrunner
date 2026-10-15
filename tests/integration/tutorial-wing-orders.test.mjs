@@ -17,7 +17,7 @@ setLanguage('en');
 
 // The prologue's live scene: a real session, a real companion spawn, and a
 // recorder in place of the combat AI so the doctrine's decisions are readable.
-function fixture(step='check-weapons'){
+function fixture(step='defeat-raider'){
     const save=createNewSave(2468,{tutorial:true});
     const quest=getTutorialQuest(save);quest.stepId=step;
     save.player.dockedAt=undefined;save.player.position=[...LOCATIONS.shardbelt.position];
@@ -58,7 +58,7 @@ test('the prologue teaches wing orders at the fight, exactly once',()=>{
     early.session.applyTutorialTransition({stepId:'defeat-raider',fromStepId:'mine-shardbelt',changed:true});
     assert.equal(campaignWingUnlocked(early.save),true);
     assert.equal(early.quest.flags.wingOrders,true,'the lesson is remembered on the quest');
-    assert.match(early.lines.at(-1)[1],/on your wing/);
+    assert.ok(early.lines.some(line=>/on your wing/.test(line[1])));
     assert.match(early.events.at(-1)[0],/WING ORDERS/);
     assert.deepEqual(early.chip.at(-1),[['aggressive'],1],'the wing card appears with the order');
     assert.equal(early.session.campaignWingActive(),true);
@@ -70,7 +70,7 @@ test('the prologue teaches wing orders at the fight, exactly once',()=>{
     assert.equal(campaignWingUnlocked(createNewSave(8)),true,'a career with no prologue record is not locked out');
     assert.equal(campaignWingUnlocked({}),false);
     // A save parked mid-prologue from before this shipped, with no flag at all.
-    const legacy=fixture('check-weapons');
+    const legacy=fixture('defeat-raider');
     delete legacy.quest.flags.wingOrders;
     assert.equal(campaignWingUnlocked(legacy.save),true,'the legacy combat-prep step counts as taught');
     assert.equal(campaignWingUnlocked(fixture('service-ship').save),false,'the ship check does not');
@@ -138,28 +138,6 @@ test('break off stations the companion clear of the fight with weapons held',()=
     assert.ok(session.travel>0,'and follows the station leg');
 });
 
-test('before the lesson the companion keeps her scripted help, order or not',()=>{
-    const before=fixture('mine-shardbelt');
-    const enemy=before.putEnemy(300,{tutorialEnemy:true});
-    before.save.player.hull=1;before.save.wingOrder='breakoff';
-    before.session.updateTutorialCompanion(before.wing,1/60);
-    assert.equal(before.session.ai.length,1,'the scripted rescue still engages regardless of the stored order');
-    assert.deepEqual(before.session.ai[0].position,enemy.position);
-    assert.equal(before.wing.targetId,enemy.id);
-    // Once the lesson has landed the same order governs: she holds fire.
-    before.quest.stepId='defeat-raider';
-    assert.equal(campaignWingUnlocked(before.save),true,'the fight itself is the lesson');
-    before.quest.flags.wingOrders=true;
-    before.session.ai.length=0;
-    before.session.updateTutorialCompanion(before.wing,1/60);
-    assert.equal(before.session.ai.length,0,'a break-off order now holds her fire');
-    assert.equal(before.wing.holdFire,true);assert.equal(before.wing.targetId,undefined);
-    // Aggressive, the default, engages the prologue's raider as the rescue did.
-    before.save.wingOrder='aggressive';
-    before.session.updateTutorialCompanion(before.wing,1/60);
-    assert.equal(before.session.ai.length,1,'an in-gate raider is engaged under aggressive');
-    assert.deepEqual(before.session.ai[0].position,enemy.position);
-});
 
 test('the wing chip covers both scenes and never crosses their orders',()=>{
     const {save,session,wing,chip}=fixture();
@@ -272,8 +250,9 @@ test('the story companion is disabled at one hull and returns when the fight is 
     session.damageShip(wing,999,'raider',[0,0,0]);
     assert.equal(wing.hull,1,'her hull floors at one point');
     assert.equal(wing.poweredDown,true,'and she powers down instead of dying');
+    assert.equal(wing.energy,0);assert.equal(wing.shield,0);
     assert.equal(wing.holdFire,true);assert.equal(wing.targetId,undefined);assert.equal(wing.wingTargetId,undefined);
-    assert.match(lines.at(-1)[1],/drifting/);
+    assert.match(lines.at(-1)[1],/disabled/);
     assert.match(events.at(-1)[0],/disabled/);
     // A disabled companion takes no orders, so the order control goes with her.
     assert.equal(session.campaignWingActive(),false);
@@ -295,10 +274,11 @@ test('the story companion is disabled at one hull and returns when the fight is 
     // Beating the last opponent in the bubble brings her back online.
     enemy.hull=0;
     session.updateTutorialCompanion(wing,1/60);
+    assert.equal(wing.poweredDown,true,'a brief quiet moment is not enough');save.world.time+=9;session.updateTutorialCompanion(wing,1/60);
     assert.equal(wing.poweredDown,false,'the field is clear and she powers up');
     assert.equal(wing.shield,wing.maxShield,'the reactor restart refills her shield');
     assert.equal(wing.hull,1,'on that same point of hull');
-    assert.match(lines.at(-1)[1],/Reactors are back/);
+    assert.match(lines.at(-1)[1],/Reactor online/);
     assert.equal(session.campaignWingActive(),true,'and the order control comes back with her');
     // From here her shield is the only thing a fight can spend: a shield hit is
     // absorbed without shutting her down, and the first hull hit puts her out.
@@ -310,6 +290,7 @@ test('the story companion is disabled at one hull and returns when the fight is 
     // A distant opponent is not "this fight": only the bubble holds her down.
     putEnemy(CAMPAIGN_FIGHT_CLEARANCE+400);
     session.updateTutorialCompanion(wing,1/60);
+    save.world.time+=9;session.updateTutorialCompanion(wing,1/60);
     assert.equal(wing.poweredDown,false,'an opponent outside the bubble does not keep her dark');
 });
 

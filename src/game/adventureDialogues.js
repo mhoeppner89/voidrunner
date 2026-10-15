@@ -1,145 +1,77 @@
-// Responses lead directly to remaining questions; the transcript retains earlier lines.
-const pair = (de,en) => ({de,en});
-export const dialogueText = (value,language) => typeof value === 'string' ? value : value[language] ?? value.en;
-export const ADVENTURE_DIALOGUES = {
-    outfitting:{start:'spare',nodes:{
-        spare:{text:pair("Da liegt noch ein Langstreckenradar für dich. Bau es ein, bevor wir starten – das Ausrüstungslager zeigt dir wie.",'There is a spare Long-Baseline Radar for you. Fit it before we launch – the outfitting screen will show you how.'),next:'fit'},
-        fit:{text:pair("Vom Markt zur SCHIFFSAUSRÜSTUNG, dort SCHIFFSSYSTEME öffnen, freien Hilfssystemplatz antippen und das Radar mit AUS LAGER EINBAUEN setzen. Es gehört dir bereits.",'From the market, go to SHIP OUTFITTING, open SHIP SYSTEMS, tap a free utility slot and place the radar with INSTALL FROM LOCKER. You already own it.'),choices:[{label:pair("Ich sehe mir die Ausrüstung an.",'I will check the outfitting screen.'),complete:true}]},
+const pair=(de,en)=>({de,en});
+export const dialogueText=(value,language)=>typeof value==='string'?value:value?.[language]??value?.en??'';
+const end=(de='Alles klar.',en='All right.')=>({label:pair(de,en),complete:true});
+export const ADVENTURE_DIALOGUES={
+    mara:{start:'welcome',nodes:{
+        welcome:{text:pair('Da bist du. Deine Mutter hat zwei Schlüssel zur Wayfarer hinterlassen. Rin nahm einen; den anderen habe ich für dich aufgehoben.','There you are. Your mother left two keys to the Wayfarer. Rin took one; I kept the other for you.'),next:'work'},
+        work:{text:pair('Das Schiff gehört dir. Protein bringt auf Vesper mehr ein als auf Helix. Du bezahlst die Ware selbst und behältst den Gewinn. Rin zeigt dir den Einkauf.','The ship is yours. Protein sells for more on Vesper than on Helix. You pay for the cargo and keep the profit. Rin will show you how to buy it.'),noPrologue:{text:pair('Das Schiff gehört dir. An der Warenbörse kannst du günstig einkaufen und dort verkaufen, wo die Ware gebraucht wird. In der Bar findest du Aufträge.','The ship is yours. Buy goods cheaply at the market and sell them where they are needed. The bar has contracts.')},next:'rin'},
+        rin:{text:pair('Rin begleitet dich auf dem ersten Flug und zeigt dir die Steuerung. Und bringt euch beide wieder nach Hause.','Rin will accompany your first flight and teach you the controls. Bring both of you home.'),noPrologue:{text:pair('Rin fliegt ihre eigenen Routen. Frag sie, wenn du etwas über die Wayfarer wissen möchtest. Und komm gelegentlich vorbei.','Rin flies her own routes. Ask her if you want to know about the Wayfarer. And come by now and then.')},choices:[end('Wir passen aufeinander auf.','We will look after each other.')]},
     }},
-    navigation:{start:'outside',nodes:{
-        outside:{text:pair('Hier ist die Second Light. Nimm dir einen Moment zum Orientieren – diesmal setzt du den Kurs selbst.','Second Light here. Take a moment to get your bearings – this time you set the course yourself.'),next:'map'},
-        map:{text:pair('Radar antippen, in der Sektorkarte VESPER wählen. Die goldene Missionsmarkierung ist unser Ziel. Danach probieren wir die Steuerung in Ruhe.','Tap the radar and select VESPER on the sector chart. The gold mission marker is our destination. Then we can try the controls at our own pace.'),choices:[{label:pair('Ich setze den Kurs.','I will plot the course.'),complete:true}]},
-    }},
-    services:{start:'check',nodes:{
-        check:{text:pair('Lieferung ist raus. Bevor wir in den Gürtel fliegen, ein kurzer Blick unter SERVICE – das erspart uns manchmal einen langen Rückflug.','Delivery is sold. Before the belt, a quick look under SERVICES – it can save us a long flight home.'),next:'resources'},
-        resources:{text:pair('Unter SERVICE füllst du Treibstoff und Raketen nach, und Hüllenschäden werden repariert. Treibstoff braucht nur der Nachbrenner; Schilde laden im Flug selbst nach.','Under SERVICES you refill fuel and missiles, and hull damage gets repaired. Only the afterburner burns fuel; shields recharge on their own in flight.'),choices:[{label:pair('Ich prüfe die Anzeigen.','I will check the desk.'),complete:true}]},
-    }},
-    weapons:{start:'tools',nodes:{
-        tools:{text:pair('Das Erz ist an Bord. Ehe es weitergeht, siehst du dir die Waffen an – die beiden Strahllaser sind ein guter Anfang.','The ore is aboard. Before we go on, a word on your guns – the two beam lasers are a good start.'),next:'energy'},
-        energy:{text:pair('Strahllaser feuern kurze Pulse und ziehen Energie aus dem Reaktor. Nach einer Salve den Feuerknopf lösen – das war’s schon.','Your beam lasers fire short pulses and draw on reactor energy. Release the trigger after a burst – that is all there is to it.'),choices:[{label:pair('Ich achte auf den Energiespeicher.','I will watch the energy reserve.'),complete:true}]},
-    }},
-    cargo:{start:'clear',nodes:{
-        clear:{text:pair('Da treibt eine Kiste Erz aus seinem Laderaum. Ich habe sie markiert – nimm sie mit.','A crate of ore is drifting out of his hold. I have marked it – bring it in.'),next:'scoop'},
-        scoop:{text:pair('Langsam heranfliegen; kurz davor nimmt das Schiff sie automatisch auf. Dein Laderaum steckt im linken Monitor.','Come in slowly; the ship scoops it automatically at close range. Your hold is in the left monitor.'),choices:[{label:pair('Ich hole sie.','I will get it.'),complete:true}]},
-    }},
-    galaxy:{start:'route',nodes:{ // still the briefing for the galaxy-map step
-
-        route:{text:pair('Das Register liegt in einem anderen System. Karte öffnen, auf GALAXIS umschalten, MERIDIAN wählen – der Computer setzt das Sprungtor als Wegpunkt.','The ledger is in another system. Open the map, switch to GALAXY and select MERIDIAN – the computer sets the jump gate as your waypoint.'),next:'gate'},
-        gate:{text:pair('Hyperdrive bis zum Sprungpunkt, dann unter normalem Schub durch die Toröffnung. Beides kostet keinen Treibstoff.','Hyperdrive to the jump point, then fly through the gate opening under normal thrust. Neither costs fuel.'),choices:[{label:pair('Ich plane die Route.','I will plot the route.'),complete:true}]},
-    }},
-    mara: {start:'welcome',nodes:{
-        welcome:{text:pair('Da bist du ja. Deine Mutter hat zwei Schlüssel für die Wayfarer hinterlassen – Rin nahm einen, den anderen hab ich für dich.','There you are. Your mother left two keys to the Wayfarer – Rin took one, and I kept the other.'),next:'keys'},
-        keys:{text:pair('Hier. Sie hätte sich gefreut, euch beide mit dem Schiff zu sehen.','Here. She would have loved to see you both flying that ship.'),choices:[
-            {label:pair('Du hast den Schlüssel die ganze Zeit aufgehoben?','You kept the key all this time?'),next:'kept'},
-            {label:pair('Hat Rin wenigstens nach dem anderen gefragt?','Did Rin at least ask for the other one?'),next:'rin'},
-            {label:pair('Was muss ich vor dem Start erledigen?','What do I need to do before launching?'),noPrologueLabel:pair('Womit fange ich hier an?','Where do I start here?'),next:'work'},
-            {label:pair('Ich spreche mit Rin und besorge die Ware. Bis bald, Mara.','I will talk to Rin and get the cargo. See you soon, Mara.'),noPrologueLabel:pair('Ich spreche mit Rin. Bis bald, Mara.','I will talk to Rin. See you soon, Mara.'),complete:true,requires:'work'},
+    rin:{start:'ready',nodes:{
+        ready:{text:pair('Die Wayfarer ist startklar. Unsere Mutter hat gut auf sie aufgepasst. Du nimmst ihre Maschine, ich die Second Light.','The Wayfarer is ready. Our mother took good care of her. You take her ship; I will fly the Second Light.'),next:'trade'},
+        trade:{text:pair('Geh zum MARKTPLATZ und öffne die WARENBÖRSE. Wähle Protein und MAXIMAL KAUFEN. Vor dem Kauf siehst du Menge und Kosten; der Frachtraum begrenzt die Ladung. Ich bleibe auf dem Flug an deinem Flügel.','Go to the MARKET and open the COMMODITY MARKET. Use BUY MAX for Protein. The controls show quantity and cost before you buy; cargo space limits the load. I will stay on your wing for the flight.'),noPrologue:{text:pair('Du kannst handeln, Erz abbauen oder Aufträge aus der Bar übernehmen. Ich fliege meine eigenen Routen; du entscheidest, wohin es geht.','You can trade, mine ore or take contracts from the bar. I fly my own routes; you decide where to go.')},choices:[
+            {label:pair('Weißt du etwas Neues über unsere Eltern?','Any news about our parents?'),next:'parents'},{label:pair('Alles klar, ich kaufe die Ladung.','All right, I will buy the cargo.'),next:'legal',noPrologueLabel:pair('Wir sehen uns draußen.','See you outside.')}
         ]},
-        kept:{text:pair('Deine Mutter bat mich darum. Ich wollte ihn dir persönlich geben, wenn du bereit bist.','Your mother asked me to. I wanted to give it to you myself, when you were ready.'),next:'memory'},
-        memory:{text:pair('Sie wollte, dass ihr beide etwas habt, das euch gehört. Und einen Grund, wieder nach Hause zu kommen. Passt auf das Schiff auf. Und aufeinander.','She wanted you both to have something of your own. And a reason to come home. Look after the ship, and each other.'),returnTo:'keys'},
-        rin:{text:pair('Ja – als ihr klein wart, hat sie ständig danach gefragt. Jetzt hat sie einen eigenen Motor und fragt niemanden mehr.','She did – constantly, when you two were small. Now she has an engine of her own and does not ask anyone.'),returnTo:'keys'},
-        work:{text:pair("Sprich mit Rin, falls du das noch nicht getan hast, und kauf an der WARENBÖRSE zwei Proteinpakete. Auf Vesper kannst du sie verkaufen – dafür braucht ihr keinen Auftrag.",'Talk to Rin if you have not seen her yet, then buy two Protein Packs at the commodity market. You can sell them on Vesper – no contract needed for that.'),
-            // A career that never flew the prologue has no delivery waiting for
-            // it, so the answer to "what do I do first" is the sandbox itself.
-            noPrologue:{text:pair('Dann fang dort an, wo das Geld liegt: Erz aus dem Shardbelt nach Cairn, an der WARENBÖRSE billig einkaufen und dort verkaufen, wo es gebraucht wird, und am Brett in der Bar hängen Aufträge. Die Wayfarer trägt dich überall hin.','Then start where the money is: ore from the Shardbelt to Cairn, buy cheap at the commodity market and sell where it is wanted, and the board in the bar posts contracts. The Wayfarer will carry you anywhere.')},next:'food'},
-        food:{text:pair('Rin kennt die Strecke und fliegt mit. Komm danach vorbei und erzähl mir, wie es lief.','Rin knows the route and will fly with you. Come back afterwards and tell me how it went.'),
-            noPrologue:{text:pair('Rin fliegt ihre eigenen Routen; sie hängt sich nicht an deinen Flügel. Wenn du nicht weiterweißt, frag sie – sie kennt das Schiff besser als ich. Und komm vorbei, erzähl mir, wie es läuft.','Rin flies her own routes; she will not be hanging on your wing. If you get stuck, ask her – she knows that ship better than I do. And come by and tell me how it is going.')},returnTo:'keys'},
+        legal:{text:pair('Eine Sache noch: Waffen sind rot markiert. Ihr Transport ist illegal. Protein kannst du dagegen legal handeln.','One more thing: weapons are marked red. Transporting them is illegal. Protein is legal to trade.'),noPrologue:{text:pair('Waffen sind an der Börse rot markiert. Ihr Transport ist illegal.','Weapons are marked red at the market. Transporting them is illegal.')},choices:[end('Bis draußen.','See you outside.')]},
+        parents:{text:pair('Noch nichts Sicheres. Ich prüfe ein paar alte Evakuierungslisten. Erst sorgen wir dafür, dass du mit der Wayfarer Geld verdienen kannst.','Nothing certain yet. I am checking some old evacuation records. First, let us make sure you can earn a living with the Wayfarer.'),returnTo:'trade'},
     }},
-    rin:{start:'welcome',nodes:{
-        welcome:{text:pair('Die Wayfarer ist startklar. Sie hat lange gestanden, aber unsere Mutter hat gut auf sie aufgepasst.','The Wayfarer is ready. She sat idle for a while, but our mother took good care of her.'),next:'hub'},
-        hub:{text:pair('Du fliegst die Wayfarer, ich die Second Light – und bleibe an deinem Flügel. Wir gehen alles in Ruhe durch.','You fly the Wayfarer, I take the Second Light – and stay on your wing. We can take this at your pace.'),
-            // Without the prologue there is no shared flight and no cargo run: she
-            // is a contact at the bar, not a wingman, and says so.
-            noPrologue:{text:pair('Du fliegst die Wayfarer, ich die Second Light – jede mit eigener Route. Ich bleibe vorerst hier, also frag mich, was du wissen willst, solange du hier bist.','You fly the Wayfarer, I fly the Second Light – each of us on our own route. I am staying here for now, so ask me whatever you want while you are here.')},choices:[
-            {label:pair('Wie gut kennst du die Wayfarer?','How well do you know the Wayfarer?'),next:'list'},
-            {label:pair('Wie läuft die Lieferung genau?','How does this delivery work?'),noPrologueLabel:pair('Womit fange ich an?','Where do I start?'),next:'first-steps'},
-            {label:pair('Ich besorge die Ware. Wir sehen uns draußen.','I will get the cargo. See you outside.'),noPrologueLabel:pair('Gut. Ich fliege erst einmal allein.','All right. I will fly on my own for now.'),complete:true,requires:'first-steps'},
-        ]},
-        list:{text:pair('Ich bin oft mit unserer Mutter geflogen. Sie konnte am Geräusch erkennen, was dem Schiff fehlte. Meistens Treibstoff. Manchmal ihre Geduld.','I flew with our mother often. She could tell what the ship needed just by listening. Usually fuel. Sometimes her patience.'),returnTo:'hub'},
-        'first-steps':{text:pair("Zwei Proteinpakete an der WARENBÖRSE kaufen, nach Vesper fliegen und dort wieder verkaufen. So lernst du die Strecke und verdienst etwas dazu.",'Buy two Protein Packs at the commodity market, fly to Vesper and sell them there. That way you learn the route and earn something.'),
-            noPrologue:{text:pair('Cairn kauft Erz aus dem Shardbelt, das Rennbüro zahlt ohne Auftrag, und am Brett in der Bar hängen Verträge. So verdienst du dein erstes Geld; umrüsten kannst du die Wayfarer jederzeit.','Cairn buys ore from the Shardbelt, the race desk pays without a contract, and the board in the bar posts work. That is how you earn your first money; you can refit the Wayfarer any time.')},next:'ready'},
-        ready:{text:pair('Wenn die Ware an Bord ist, gehen wir kurz die Ausrüstung durch. Ich melde mich draußen per Funk.','Once the cargo is aboard, we will check your equipment. I will call you over the radio outside.'),
-            noPrologue:{text:pair('Flieg erst ein paar Runden, bevor du etwas riskierst. Fragen zur Wayfarer kannst du mir hier stellen.','Fly a few rounds before you risk anything. You can ask me your Wayfarer questions here.')},returnTo:'hub'},
+    'cargo-ready':{start:'launch',nodes:{
+        launch:{text:pair('Die Ladung ist an Bord. Geh zurück zur DOCKHALLE und wähle dort deine Wayfarer zum Start. Ich treffe dich draußen.','The cargo is aboard. Return to the DOCK HALL and select your Wayfarer to launch. I will meet you outside.'),choices:[end('Ich mache mich startklar.','I will get ready to launch.')]},
     }},
-    mining:{start:'reason',nodes:{
-        reason:{text:pair('Die Wayfarer ist bereit. Ich zeige dir, wie man Geld verdient, ohne erst Ware einzukaufen: Cairn kauft Erz aus dem Shardbelt.','The Wayfarer is ready. Let me show you how to earn without buying cargo first: Cairn buys ore from the Shardbelt.'),next:'route'},
-        route:{text:pair('Im Shardbelt üben wir den Abbau – die Bergung am Wrack nutzt dieselbe Zielsteuerung.','In the Shardbelt we practise extraction – salvage at the wreck uses the same targeting controls.'),next:'lesson'},
-        lesson:{text:pair('Ich markiere gleich eine Lagerstätte. Flieg langsam heran und warte, bis der Scan durch ist, dann tippe ABBAU an. Eine Einheit genügt. Hol die Drohnen vor dem Abflug mit RÜCKRUF zurück.',"I will mark a deposit shortly. Ease in, wait for the scan, then tap MINE. One unit is enough. Recall the drones before you leave."),choices:[
-            {label:pair('Was hat es mit dem Konvoi auf sich?','What is the convoy about?'),next:'convoy'},
-            {label:pair('Dann fliegen wir zum Shardbelt.','Then let us head for the Shardbelt.'),complete:true},
-        ]},
-        convoy:{text:pair('Unsere Mutter flog bei der Evakuierung mit. Einige Schiffe erreichten das Tor nie – in einem davon könnte noch eine Aufzeichnung stecken. Das sehen wir uns nach dem Abbau an.','Our mother flew with the evacuation. Some ships never reached the gate – one of them may still carry a recording. We will take a look at that once the ore is aboard.'),returnTo:'lesson'},
+    'reactor-ready':{start:'bar',nodes:{
+        bar:{text:pair('Der Reaktor läuft. Komm zu mir in die Bar; ich habe einen Abbauauftrag für uns.','The reactor is running. Meet me in the bar; I have a mining job for us.'),choices:[end('Bis gleich.','See you there.')]},
     }},
-    salvage:{start:'aftermath',nodes:{
-        aftermath:{text:pair('Die Kiste ist an Bord. Da wäre dann noch das Wrack, von dem ich dir erzählt habe.','The crate is aboard. Then there is that wreck I told you about.'),next:'request'},
-        request:{text:pair('Ich habe das REKORDERSIGNAL DES KONVOIS markiert – du findest es auch außerhalb der Sensorreichweite in der Kontaktliste der Karte. Hyperdrive zur Mourning Line, dann dem Marker folgen und in Reichweite BERGEN gedrückt halten.','I have marked CONVOY RECORDER SIGNAL – it stays listed in the map contacts beyond sensor range. Hyperdrive to Mourning Line, follow the marker and hold SALVAGE within range.'),choices:[
-            {label:pair('Du hoffst, dort etwas über unsere Mutter zu finden.','You are hoping to find something about our mother.'),next:'reason'},
-            {label:pair('Ich sehe nach, was noch da ist.','I will see what is still there.'),complete:true},
-        ]},
-        reason:{text:pair('Ja. Ich hätte es vor dem Start sagen sollen – ich wollte erst wissen, ob überhaupt etwas übrig ist.','Yes. I should have said so before we launched – I wanted to know if anything was left first.'),returnTo:'request'},
+    'mining-return':{start:'bar',nodes:{
+        bar:{text:pair('Gut geflogen. Der Abbauauftrag ist bezahlt. Triff mich in der Bar, bevor du wieder startest. Ich habe etwas für die Arbeit an Wracks.','Good flying. The mining contract is paid. Meet me in the bar before you launch again. I have something for working around wrecks.'),choices:[end('Ich komme.','On my way.')]},
     }},
-    recorder:{start:'found',nodes:{
-        found:{text:pair('Die Aufnahme ist lesbar. Das ist die Stimme unserer Mutter – der Rekorder hat ihren Funkverkehr mitgeschnitten.','The recording is readable. That is our mother’s voice – the recorder captured her radio traffic.'),next:'cairn'},
-        cairn:{text:pair('Ich war bei diesem Konvoi. Was ich Mara danach erzählt habe, war nicht die ganze Wahrheit. Legen wir bei Cairn an.','I was with that convoy. What I told Mara afterwards was not the whole truth. Let us dock at Cairn.'),choices:[
-            {label:pair('Gut. Diesmal erzählst du alles.','All right. This time you tell it all.'),complete:true},
+    'mara-cairn':{start:'call',nodes:{
+        call:{text:pair('Rin ist zurück und hat eine Spur zu euren Eltern. Sie wartet in der Bar auf Cairn. Flieg hin und sprich mit ihr.','Rin is back with a lead on your parents. She is waiting in the bar at Cairn. Fly there and speak with her.'),choices:[end('Ich fliege nach Cairn.','I will head to Cairn.')]},
+    }},
+    'vesper-arrival':{start:'landing',nodes:{
+        landing:{text:pair('Sehr gut. Wie war dein erster Flug? Jetzt lass uns das Protein am Markt verkaufen.','Well done. How was your first flight? Now let’s sell the Protein at the market.'),next:'market'},
+        market:{text:pair('Öffne den Marktplatz und dort die WARENBÖRSE. Wähle Protein aus deiner Fracht und tippe auf ALLES VERKAUFEN. Du siehst vorher, wie viel du dafür bekommst.','Open the marketplace and its COMMODITY MARKET. Select Protein from your cargo and choose SELL ALL. You can see what you will earn before confirming.'),choices:[end('Alles klar, zum Markt.','All right, off to the market.')]},
+    }},
+    'reactor-gift':{start:'gift',nodes:{
+        gift:{text:pair('Dein erster Gewinn! Ich schenke dir mein Ersatz-Reaktorupgrade. Es erhöht die Energieregeneration deiner Wayfarer. Das Teil liegt hier im Lager.','Your first profit! My spare Reactor Upgrade is yours. It increases your Wayfarer’s energy regeneration. The part is in storage here.'),next:'fitting'},
+        fitting:{text:pair('Öffne die SCHIFFSAUSRÜSTUNG am Marktplatz, dann LAGER. Im Handel erreichst du sie oben über AUSRÜSTUNG. Wähle das Reaktorupgrade und tippe auf EINBAUEN. Ein freier passender Platz wird vorgeschlagen. Der Einbau eines eigenen Teils kostet nichts.','Open SHIP PARTS at the market, then STORAGE. From the trade screen, use EQUIPMENT at the top. Select the Reactor Upgrade and choose INSTALL. A free compatible mount is suggested. Installing a part you own is free.'),choices:[end('Ich baue es ein.','I will install it.')]},
+    }},
+    mining:{start:'profit',nodes:{
+        profit:{text:pair('Mit dem neuen Reaktor bist du gut ausgerüstet. Hast du Lust auf einen Abbauauftrag? Dafür musst du keine Ware einkaufen.','The new reactor has you well equipped. Ready for a mining job? There is no cargo to buy first.'),next:'contract'},
+        contract:{text:pair('Öffne das AUFTRAGSBRETT hier in der Bar. Wähle den Abbauauftrag und ANNEHMEN. Er verlangt sechs Einheiten aus der markierten Lagerstätte im Shardbelt, zurück nach Vesper, und bringt 3.000 cr. Gekauftes Erz zählt nicht.','Open the MISSION BOARD here in the bar. Select the mining contract and ACCEPT. It pays 3,000 cr for six units from the marked Shardbelt deposit, returned to Vesper. Bought ore does not count.'),next:'drones'},
+        drones:{text:pair('Ich fliege mit. Die Abbaudrohnen sind schon an Bord. Am markierten Felsen startest du sie mit ABBAU, am Computer M. Sie bringen das Erz in deinen Frachtraum. Beim Start des Hyperdrives kehren sie automatisch zurück; der Antrieb wartet auf sie.','I will fly with you. Mining drones are already aboard. At the marked rock, launch them with MINE, or M on desktop. They bring ore to your hold. When you engage hyperdrive, they return automatically; the drive waits for them.'),choices:[end('Ich nehme den Vertrag an.','I will accept the contract.')]},
+    }},
+    salvage:{start:'payment',nodes:{
+        payment:{text:pair('Bergung funktioniert ähnlich wie Abbau: Ein ausgewähltes Wrack wird in Reichweite automatisch gescannt. Dann hältst du BERGEN gedrückt, am Computer M. Du bekommst verwertbare Fracht aus dem Wrack.','Salvage works much like mining: a selected wreck is scanned automatically within range. Then hold SALVAGE, or M on desktop. It recovers usable cargo from the wreck.'),next:'risk'},
+        risk:{text:pair('Wracks sind gefährlich: enge Durchgänge, lose Trümmer und Piraten. Ich gebe dir PDC-Drohnen. Sie wehren anfliegende Geschosse automatisch ab.','Wrecks are dangerous: narrow passages, loose debris and pirates. I am giving you PDC drones. They intercept incoming projectiles automatically.'),next:'fitting'},
+        fitting:{text:pair('Öffne die SCHIFFSAUSRÜSTUNG und wähle DROHNEN. Stelle Bucht 1 auf PDC. Die Abbaudrohnen bleiben in deiner Fracht; du kannst später wieder umschalten.','Open SHIP PARTS and select DRONES. Set bay 1 to PDC. Your mining drones stay in cargo; you can switch back later.'),next:'survey'},
+        survey:{text:pair('Kartiere die großen Wracks in der Mourning Line. Fliege langsam an die markierten Wegpunkte; die Aufzeichnung läuft automatisch. Diesmal fliegst du allein. Danach zu Mara auf Helix. Ich suche Informationen über unsere Eltern.','Chart the major wrecks in Mourning Line. Approach the marked waypoints slowly; the survey records automatically. This time you fly alone. Afterwards, see Mara on Helix. I will look for information about our parents.'),choices:[end('Ich stelle die Drohnen um und fliege los.','I will switch drones and head out.')]},
+    }},
+    'paul-rescue':{start:'thanks',nodes:{
+        thanks:{text:pair('Danke! Ohne dich wäre meine Torsas jetzt ein weiteres Wrack. Paul ist mein Name. Der Frachter heißt Long Memory.','Thank you! Without you, my Torsas would be another wreck. I am Paul. The freighter is Long Memory.'),next:'repairs'},
+        repairs:{text:pair('Die grünen Drohnen reparieren meine Hülle mit Energie aus meinem Schiff. Wenn meine Maschine versorgt ist, helfen sie auch dir und anderen Verbündeten in 200 km Umkreis.','The green drones repair my hull using energy from my ship. Once I am patched up, they can also repair you and other friendlies within 200 km.'),next:'support'},
+        support:{text:pair('Bleib in meiner Nähe, wenn deine Hülle beschädigt ist. Die Drohnen fliegen selbstständig hin und zurück. Schilde laden sie nicht auf.','Stay near me if your hull is damaged. The drones fly over and return automatically. They do not recharge shields.'),next:'route'},
+        route:{text:pair('Du kartierst das Feld? Dann fliegen wir die übrigen Punkte zusammen ab. Den Träger kenne ich noch aus besseren Zeiten. Ich schulde dir ohnehin einen Gefallen.','You are surveying the field? Let us visit the remaining points together. I remember that carrier from better days. I owe you a favour anyway.'),choices:[end('Gut. Bleib an meinem Flügel.','All right. Stay on my wing.')]},
+    }},
+    'paul-hide':{start:'cover',nodes:{
+        cover:{text:pair('Fünf Piraten. Wir verstecken uns im Träger. Ohne Transponder senden wir keine Kennung; die Wrackhülle blockiert ihre Sensoren. Halte das Feuer zurück, damit wir uns nicht verraten.','Five pirates. We will hide inside the carrier. With the transponder off, we broadcast no identity; the wreck’s hull blocks their sensors. Hold fire so we do not give ourselves away.'),choices:[end('Verstanden.','Understood.')]},
+    }},
+    debrief:{start:'survey',nodes:{
+        survey:{text:pair('Gute Arbeit. Die neuen Wrackpositionen helfen den Bergungsteams. Und Paul hat schon erzählt, dass du ihm geholfen hast.','Good work. The updated wreck positions will help the salvage crews. Paul has already told me you helped him.'),next:'freedom'},
+        freedom:{text:pair('Rin ist noch unterwegs. Rüste inzwischen dein Schiff auf. Handel, Abbau, Aufträge — im Startsystem entscheidest du jetzt selbst. Das Sprungtor bleibt wegen Reparaturen geschlossen.','Rin is still away. Gear up your ship meanwhile. Trade, mining, contracts — you choose your own work in the starting system now. The jump gate remains closed for repairs.'),next:'call'},
+        call:{text:pair('Ich melde mich, sobald Rin zurück ist und deine Maschine für die nächste Sache bereit ist. Pass auf dich auf.','I will call when Rin is back and your ship is ready for the next job. Look after yourself.'),choices:[end('Ich mache mich an die Arbeit.','I will get to work.')]},
+    }},
+    cairn:{start:'gate',nodes:{
+        gate:{text:pair('Da bist du. Das Sprungtor ist wieder offen. Und ich habe endlich eine brauchbare Spur zu unseren Eltern.','There you are. The jump gate is open again. And I finally have a useful lead on our parents.'),next:'box'},
+        box:{text:pair('Bei einem Fregattenwrack in der Mourning Line liegt ein Flugrekorder. Er gehörte zu ihrem Evakuierungskonvoi. Die Daten sind verschlüsselt — Mara kann sie vielleicht lesen.','There is a flight recorder beside a frigate wreck in Mourning Line. It belonged to their evacuation convoy. The data is encrypted — Mara may be able to read it.'),next:'company'},
+        company:{text:pair('Ich komme mit. Wähle beim Fregattenwrack das BLACKBOX-SIGNAL und halte in Reichweite BERGEN, am Computer M. Paul ist ebenfalls hier in der Bar; wenn du ihn fragst, begleitet er uns vielleicht.','I am coming with you. At the frigate wreck, select BLACK BOX SIGNAL and hold SALVAGE within range, or M on desktop. Paul is here in the bar too; ask him if you want his help.'),choices:[end('Ich bereite den Start vor.','I will prepare to launch.')]},
+    }},
+    'paul-offer':{start:'debt',nodes:{
+        debt:{text:pair('Gut, dich zu sehen. Meine Maschine ist wieder dicht. Du und Rin wollt zum Fregattenwrack? Wenn du Unterstützung brauchst, begleite ich euch. Meine Reparaturdrohnen helfen euch innerhalb von 200 km.','Good to see you. My ship is patched up. You and Rin are heading to the frigate wreck? If you need support, I can come along. My repair drones can help you within 200 km.'),choices:[
+            {label:pair('Ja. Komm mit uns.','Yes. Come with us.'),tutorialChoice:'invite-paul'},end('Danke, wir schaffen es zu zweit.','Thanks. We will manage together.')
         ]},
     }},
-    cairn:{start:'account',nodes:{
-        account:{text:pair('Meine Maschine fiel kurz vor dem Sprungtor aus. Unsere Mutter verließ mit der Wayfarer die Formation und holte mich an Bord. Der Träger hinter uns schaffte es nicht durch das Tor.','My ship failed just short of the jump gate. Our mother broke formation in the Wayfarer and took me aboard. The carrier behind us never made it through the gate.'),next:'record'},
-        record:{text:pair('Im offiziellen Bericht steht, sie sei ohne Freigabe abgedreht. Aber hör hier: Die Konvoileitung bestätigt ihren Rettungsanflug. Genau dieser Funkspruch fehlt im Bericht.','The official report says she turned away without clearance. But listen here: convoy control acknowledges her rescue approach. That transmission is missing from the report.'),next:'confession'},
-        confession:{text:pair('Ich habe Mara nie erzählt, dass sie wegen mir abgedreht ist. Ich hatte Angst, sie würde mir die Schuld am Verlust des Trägers geben. Das war unfair gegenüber ihr. Und gegenüber dir.','I never told Mara that she turned back for me. I was afraid she would blame me for the loss of the carrier. That was unfair to her, and to you.'),choices:[
-            {label:pair('Und danach? Sie kam nicht mit dir zurück.','And afterwards? She did not come back with you.'),next:'loss'},
-            {label:pair('Beweist die Aufnahme, wer für den Verlust verantwortlich war?','Does the recording prove who was responsible for the loss?'),next:'proof'},
-            {label:pair('Warum hast du mir nicht vorher davon erzählt?','Why did you not tell me before?'),next:'silence'},
-            {label:pair('Was können wir jetzt tun?','What can we do now?'),next:'plan'},
-            {label:pair('Mara muss das erfahren. Schick ihr eine Kopie.','Mara needs to hear this. Send her a copy.'),next:'tell',requires:'plan'},
-            {label:pair('Ich vertraue dir. Such weiter – ich komme nach.','I trust you. Keep looking – I will follow.'),next:'trust',requires:'plan'},
-            {label:pair("Ich behalte den Rekorder. Ich brauche Zeit, das einzuordnen.",'I am keeping the recorder. I need time to make sense of this.'),next:'keep',requires:'plan'},
-        ]},
-        loss:{text:pair('Sie brachte mich bis ans Tor und drehte wieder ab – zurück zu dem Träger, der noch hinter uns lag. Als ich durch war, hatte ich sie noch auf dem Funk. Danach nur die offizielle Meldung, und darin steht sie als die, die ohne Freigabe abgedreht ist.','She carried me to the gate and turned around again – back toward the carrier still behind us. I still had her voice on the radio when I went through. After that, only the official report, and in it she is the one who turned away without clearance.'),returnTo:'confession'},
-        proof:{text:pair('Nein. Sie zeigt, dass der Bericht etwas Wesentliches auslässt. Warum der Träger zurückblieb, wissen wir noch nicht. Dafür brauchen wir das vollständige Evakuierungsregister.','No. It shows that the report leaves out something important. We still do not know why the carrier was left behind. For that, we need the full evacuation ledger.'),returnTo:'confession'},
-        silence:{text:pair('Solange ich schwieg, musste ich eure Fragen nicht beantworten. Ich habe mir eingeredet, ich würde euch damit schützen. In Wahrheit habe ich mich selbst geschützt.','As long as I stayed quiet, I did not have to answer your questions. I told myself I was protecting you. Really, I was protecting myself.'),returnTo:'confession'},
-        plan:{text:pair('Die Register wurden nach Meridian Prime gebracht. Dort könnte das Original noch liegen. Wir können durch das Helios–Meridian-Tor fliegen. Was Mara von dieser Aufnahme erfährt, entscheiden wir vorher.','The ledgers were moved to Meridian Prime. The original may still be there. We can fly through the Helios–Meridian gate. Before we leave, we should decide what to tell Mara about this recording.'),returnTo:'confession'},
-        tell:{text:pair('Ich schicke ihr die Aufnahme und meine Erklärung. Sie soll es von mir erfahren. Danke, dass du mich diesmal nicht damit durchkommen lässt.','I will send her the recording and my explanation. She should hear it from me. Thank you for not letting me avoid this again.'),choices:[
-            {label:pair('Schick sie ab. Dann brechen wir auf.','Send it. Then we can leave.'),complete:true,tutorialChoice:'tell-mara'},
-        ]},
-        trust:{text:pair("Danke. Ich werde dir sagen, was ich weiß, auch wenn es unangenehm wird. Den Rekorder bewahren wir auf; wir brauchen ihn vielleicht noch.",'Thank you. I will tell you what I know, even when it is uncomfortable. We will keep the recorder safe; we may still need it.'),choices:[
-            {label:pair('Gut. Dann halte mich auf dem Laufenden.','All right. Then keep me posted.'),complete:true,tutorialChoice:'trust-rin'},
-        ]},
-        keep:{text:pair('Das verstehe ich. Du hast die Aufnahme geborgen, und du entscheidest, wem du sie zeigst. Ich fliege schon voraus und halte das Register im Blick, bis du nachkommst.','I understand. You recovered the recording, and you decide who sees it. I will fly ahead and keep an eye on the ledger until you follow.'),choices:[
-            {label:pair('Gut. Dann bis Meridian.','All right. See you on Meridian.'),complete:true,tutorialChoice:'keep-recorder'},
-        ]},
-    }},
-    departure:{start:'leaving',nodes:{
-        leaving:{text:pair('Ich springe jetzt voraus. Jemand muss am Register sein, bevor ein anderer Rekorder verschwindet – und du verdienst hier noch Geld für die Ausrüstung.','I am jumping ahead now. Someone has to be at the ledger before another recorder disappears – and you still need to earn your refit money here.'),next:'promise'},
-        promise:{text:pair('Sobald ich durch das Tor bin, melde ich mich bei Mara. Rüste die Wayfarer richtig aus – Treibstoff, Munition, was das Konto hergibt.','Once I am through the gate, I will call Mara. Fit the Wayfarer properly – fuel, ordnance, whatever the account allows.'),choices:[
-            {label:pair('Und wenn du dich nicht meldest?','And if you do not call?'),next:'worry'},
-            {label:pair('Gute Reise, Schwester. Ich folge dir.','Safe trip, sister. I will follow you.'),complete:true},
-        ]},
-        worry:{text:pair('Dann flieg mir hinterher. Aber es wird nicht nötig sein. Ich melde mich.','Then come after me. But it will not be necessary. I will call.'),returnTo:'promise'},
-    }},
-    handoff:{start:'signal',nodes:{
-        signal:{text:pair('Es ist Mara. Rin hat sich nach dem Tor nicht gemeldet. Kein Funk, keine Rückkehr, nichts – und das ist nicht ihre Art.','It is Mara. Rin never called after the gate. No radio, no return, nothing – and that is not like her.'),next:'ledger'},
-        ledger:{text:pair('Sie wollte das Register in Meridian Prime sehen. Du fliegst jetzt die einzige Wayfarer, die ihr folgen kann.','She wanted to see the ledger in Meridian Prime. You are now flying the only Wayfarer that can follow her.'),choices:[
-            {label:pair('Worum soll ich die Wayfarer noch kümmern?','What else should I do for the Wayfarer?'),next:'ship'},
-            {label:pair('Ich nehme das Tor und suche sie.','I will take the gate and look for her.'),complete:true},
-        ]},
-        ship:{text:pair('Cairn kauft Erz und das Rennbüro zahlt ohne Auftrag – so verdienst du, bevor du startest. Und wenn ein Gegner aufgibt: Feuer einstellen, dann nimmt die blaue Taste die Übergabe an.','Cairn buys ore and the race desks pay without a contract – that is how you earn before you launch. And when an opponent surrenders: hold fire, and the blue button takes the handover.'),returnTo:'ledger'},
-    }},
-    combat:{start:'contact',nodes:{
-        contact:{text:pair('Ein einzelner Plünderer: Ash Moth. Ich habe ihn markiert. Fadenkreuz drauf, roten Feuerknopf halten – zwischen Salven lösen, damit der Reaktor nachlädt.','A single raider: Ash Moth. I have marked him. Crosshair on, hold the red fire button – release between bursts so the reactor keeps up.'),next:'help'},
-        help:{text:pair('Raketen kannst du mit der blauen Taste dazugeben, wenn du freie Sicht hast. Bleib in Bewegung – wenn es eng wird, greife ich ein.','Add missiles on the blue button when you have a clear shot. Keep moving – if it gets rough, I am coming in.'),choices:[
-            {label:pair('Ich bin bereit.','I am ready.'),complete:true},
-        ]},
-    }},
-    flight:{start:'hello',nodes:{
-        hello:{text:pair('Kurs steht. Bevor der Hyperdrive anspringt, probieren wir die Steuerung hier aus.','Course is set. Before the hyperdrive, let us try the controls out here.'),next:'hub'},
-        hub:{text:pair('Schub über den Schieber links, steuern mit Joystick oder Kippen. Dann ein kurzer Nachbrennerstoß mit der goldenen Taste – die Monitore gehen wir hinterher per Funk durch.','Thrust on the left slider, steer with the stick or by tilting. Then a short afterburner burst on the gold button – we will cover the monitors over the radio.'),choices:[
-            {label:pair('Wie finde ich Vesper?','How do I find Vesper?'),next:'route'},
-            {label:pair('Ich bin noch ziemlich unsicher.','I am still rather unsure.'),next:'reassure'},
-            {label:pair('Alles klar. Bleib an meinem Flügel.','All right. Stay on my wing.'),complete:true},
-        ]},
-        route:{text:pair('Vesper ist angewählt. Hyperdrive bringt dich hin, dann langsam ran – die Landung läuft automatisch.','Vesper is selected. Hyperdrive gets you there, then ease in slowly – landing is automatic.'),returnTo:'hub'},
-        reassure:{text:pair('Das ging mir beim ersten Flug genauso. Nimm den Schub zurück, wenn du Zeit brauchst.','I felt the same on my first flight. Ease the throttle back if you need time.'),returnTo:'hub'},
+    delivery:{start:'box',nodes:{
+        box:{text:pair('Der Rekorder ist hier sicher. Ich kümmere mich um die Entschlüsselung. Das dauert; ich will keine halben Antworten über eure Eltern liefern.','The recorder is safe here. I will handle the decoding. It will take time; I will not give you half an answer about your parents.'),next:'rin'},
+        rin:{text:pair('Rin prüft schon die nächste Spur. Halte ebenfalls die Augen offen, verdiene Geld und komm heil zurück. Das Tor ist offen — wohin du fliegst, entscheidest du.','Rin is already checking the next lead. Keep your eyes open too, earn some money and come back in one piece. The gate is open — where you fly is up to you.'),choices:[end('Melde dich, sobald du etwas weißt.','Call when you know something.')]},
     }},
 };
