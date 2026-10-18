@@ -1,5 +1,11 @@
-import { LOCATIONS } from './data.js';
+import {RACE_HULLS,raceHull} from './raceHulls.js';
+import {updateRacePilot} from './racePilot.js';
+import { LOCATIONS, SHIPS } from './data.js';
 import { t } from './i18n.js';
+import { seededRandom } from './random.js';
+import {createRaceDrive,stepRaceDrive,raceDraft,raceBoostLayout,collectRaceStabilizer,sweptBoostHit} from './raceDynamics.js';
+import { MOURNING_RACE_LAYOUTS } from './graveyardRacing.js';
+import {SHARD_RACE_LAYOUTS} from './asteroidRoutes.js';
 
 export const RACE_QUEST_ID = 'bar-circuit';
 
@@ -10,6 +16,9 @@ export const RACE_QUEST_ID = 'bar-circuit';
 // world generator.
 const authoredCourse = (config) => Object.freeze({
     ...config,
+    gateRadius: config.gateRadius * 1.4,
+    finishRadius: config.finishRadius * 1.4,
+    checkpointSpacing: config.checkpointSpacing * 1.2,
     localPoints: Object.freeze(config.localPoints.map((point) => Object.freeze([...point]))),
     shortcuts: Object.freeze((config.shortcuts ?? []).map((entry) => Object.freeze({
         ...entry,
@@ -21,109 +30,9 @@ const authoredCourse = (config) => Object.freeze({
     rivalPaces: Object.freeze([...config.rivalPaces]),
 });
 
-const shardCrownPoints = [
-    [0, 0, -1080],
-    [-150, -120, -820],
-    [150, 120, -560],
-    [-150, 120, -300],
-    [160, -120, -40],
-    [-160, 120, 220],
-    [160, -120, 480],
-    [-150, 110, 740],
-    [0, 0, 980],
-    [0, 0, 1240],
-];
-const shardSwitchbackPoints = [
-    [0, 0, -1400],
-    [-220, -110, -1120],
-    [210, 120, -820],
-    [-230, 140, -520],
-    [220, -140, -220],
-    [-220, 130, 80],
-    [220, -130, 380],
-    [-220, 120, 680],
-    [210, -100, 980],
-    [-250, 140, 1260],
-    [0, -180, 1500],
-    [240, 100, 1760],
-];
-const shardKnifePoints = [
-    [0, 0, -1850],
-    [-420, -220, -1500],
-    [-500, 220, -1050],
-    [-420, 260, -500],
-    [-500, 0, 0],
-    [-420, -260, 500],
-    [-360, 220, 1000],
-    [0, 0, 1450],
-    [360, -220, 1700],
-    [500, 220, 1400],
-    [520, -160, 900],
-    [500, 200, 350],
-    [480, -220, -250],
-    [400, 180, -850],
-    [0, 0, -1850],
-];
-const mourningCarrierPoints = [
-    [0, 0, -160],
-    [0, 90, -250],
-    [0, 260, -440],
-    [0, 420, -620],
-    [0, 520, -980],
-    [160, 480, -1180],
-    [-170, 300, -1450],
-    [0, 80, -1560],
-    [260, -40, -1250],
-    [220, -80, -800],
-    [0, -20, -420],
-    [0, 0, 160],
-];
-const mourningBreachPoints = [
-    [0, 0, -180],
-    [0, -30, 50],
-    [0, -80, 220],
-    [0, -260, 520],
-    [0, -340, 780],
-    [260, -300, 900],
-    [520, -260, 1030],
-    [720, -120, 1250],
-    [420, 50, 1350],
-    [0, 120, 1250],
-    [-420, -100, 1100],
-    [-700, -250, 900],
-    [-520, -330, 650],
-    [-220, -400, 420],
-    [0, -260, 180],
-    [0, 0, 160],
-];
-const mourningRelictPoints = [
-    [0, 0, -220],
-    [0, 90, -250],
-    [0, 420, -620],
-    [0, 520, -980],
-    [-200, 360, -1250],
-    [-150, 45, -150],
-    [-500, 390, -370],
-    [-790, 520, -560],
-    [-600, 300, -100],
-    [-200, 0, 100],
-    [0, -80, 220],
-    [0, -260, 520],
-    [0, -340, 780],
-    [400, -420, 950],
-    [720, -180, 900],
-    [800, -480, 870],
-    [500, -250, 1200],
-    [0, 250, 1480],
-    [0, 390, 2020],
-];
-
-const shortcut = (id, entryIndex, exitIndex, radius, points) => ({
-    id,
-    entryIndex,
-    exitIndex,
-    gates: points.map((localPosition) => ({ localPosition, radius })),
-});
+// Shared physical racing lines, also used to reserve debris clearance and
+// draw the review. Checkpoints follow rounded bends instead of sharp corners.
+const {carrier,breach,gauntlet} = MOURNING_RACE_LAYOUTS;
 
 // The payout ladder is intentionally steep enough that a pilot can buy a
 // faster hull with race winnings. Mourning Line starts at a higher tier: its
@@ -141,22 +50,22 @@ export const RACE_COURSES = Object.freeze({
         entryFee: 500,
         payouts: Object.freeze([4200, 1600, -300, -800]),
         deadlineSeconds: 900,
-        gateRadius: 64,
-        finishRadius: 76,
-        targetTimeSeconds: 75,
-        target: '60–75 seconds',
-        targetText: 'Podium target: 60–75 seconds',
-        recommendedShip: 'Wayfarer',
-        recommendedShipText: 'Wayfarer or faster',
-        centerFuelReward: 1.25,
+        tunnelCourse: true,
+        gateRadius: 80,
+        racerLaneWidth: 6,
+        checkpointSpacing: 250,
+        finishRadius: 110,
+        targetTimeSeconds: 40,
+        target: '28–45 seconds',
+        targetText: 'Rival times: ~29 / 37 / 42 seconds',
+        recommendedShip: 'R-class loaner',
+        recommendedShipText: 'Choose a race hull',
+        centerFuelReward: .5,
         rivalPaces: [42, 44, 46],
         racerSpeed: 44,
-        localPoints: shardCrownPoints,
-        shortcuts: [shortcut('shard-gauntlet-shortcut', 3, 5, 14, [
-            [-40, 0, -180],
-            [40, 0, 80],
-        ])],
-        briefing: 'A marked rock crown with a tight zig-zag through the centre. Take the short cut only if you can thread its narrow rings without losing your line.',
+        localPoints: SHARD_RACE_LAYOUTS['shard-gauntlet'].points,
+        shortcuts: [],
+        briefing: SHARD_RACE_LAYOUTS['shard-gauntlet'].description,
     }),
     'shard-switchback': authoredCourse({
         id: 'shard-switchback',
@@ -170,22 +79,22 @@ export const RACE_COURSES = Object.freeze({
         entryFee: 900,
         payouts: Object.freeze([7800, 3200, -500, -1200]),
         deadlineSeconds: 900,
-        gateRadius: 52,
-        finishRadius: 64,
-        targetTimeSeconds: 105,
-        target: '85–105 seconds',
-        targetText: 'Podium target: 85–105 seconds',
-        recommendedShip: 'Wayfarer',
-        recommendedShipText: 'Wayfarer with afterburner bursts',
-        centerFuelReward: 1.5,
+        tunnelCourse: true,
+        gateRadius: 80,
+        racerLaneWidth: 6,
+        checkpointSpacing: 250,
+        finishRadius: 110,
+        targetTimeSeconds: 43,
+        target: '35–55 seconds',
+        targetText: 'Rival times: ~36 / 45 / 55 seconds',
+        recommendedShip: 'R-class loaner',
+        recommendedShipText: 'Choose a race hull',
+        centerFuelReward: .5,
         rivalPaces: [48, 50, 52],
         racerSpeed: 50,
-        localPoints: shardSwitchbackPoints,
-        shortcuts: [shortcut('shard-switchback-shortcut', 5, 7, 14, [
-            [0, 0, 200],
-            [0, 0, 500],
-        ])],
-        briefing: 'The Pit Boss sends the field runners deep, then doubles them back through alternating rock lanes. A very tight inner cut saves time but punishes a late turn.',
+        localPoints: SHARD_RACE_LAYOUTS['shard-switchback'].points,
+        shortcuts: [],
+        briefing: SHARD_RACE_LAYOUTS['shard-switchback'].description,
     }),
     'shard-miners-knife': authoredCourse({
         id: 'shard-miners-knife',
@@ -199,23 +108,22 @@ export const RACE_COURSES = Object.freeze({
         entryFee: 1500,
         payouts: Object.freeze([14000, 5600, -900, -2200]),
         deadlineSeconds: 900,
-        gateRadius: 40,
-        finishRadius: 56,
-        targetTimeSeconds: 145,
-        target: '120–145 seconds',
-        targetText: 'Podium target: 120–145 seconds',
-        recommendedShip: 'Wayfarer',
-        recommendedShipText: 'Wayfarer with heavy afterburner use',
-        centerFuelReward: 1.75,
+        tunnelCourse: true,
+        gateRadius: 80,
+        racerLaneWidth: 6,
+        checkpointSpacing: 250,
+        finishRadius: 110,
+        targetTimeSeconds: 70,
+        target: '56–90 seconds',
+        targetText: 'Rival times: ~58 / 74 / 90 seconds',
+        recommendedShip: 'R-class loaner',
+        recommendedShipText: 'Choose a race hull',
+        centerFuelReward: .3,
         rivalPaces: [56, 58, 60],
         racerSpeed: 58,
-        localPoints: shardKnifePoints,
-        shortcuts: [shortcut('shard-miners-knife-shortcut', 3, 6, 12, [
-            [-240, 0, -160],
-            [-220, 0, 260],
-            [-230, 0, 700],
-        ])],
-        briefing: 'The hard Shardbelt line dives around the miner monoliths and closes back on itself. It is feasible in a Wayfarer, but only with disciplined heavy-afterburner bursts and a clean exit from the knife cut.',
+        localPoints: SHARD_RACE_LAYOUTS['shard-miners-knife'].points,
+        shortcuts: [],
+        briefing: SHARD_RACE_LAYOUTS['shard-miners-knife'].description,
     }),
     'mourning-run': authoredCourse({
         id: 'mourning-run',
@@ -229,23 +137,21 @@ export const RACE_COURSES = Object.freeze({
         entryFee: 1800,
         payouts: Object.freeze([14000, 5600, -1200, -3200]),
         deadlineSeconds: 900,
-        gateRadius: 50,
-        finishRadius: 64,
+        gateRadius: 100,
+        racerLaneWidth: 12,
+        checkpointSpacing: 300,
+        finishRadius: 128,
         targetTimeSeconds: 50,
-        target: '42–50 seconds',
-        targetText: 'Podium target: 42–50 seconds',
-        recommendedShip: 'Talon or Lancer',
-        recommendedShipText: 'Talon or Lancer recommended',
-        centerFuelReward: 1.5,
+        target: '40–60 seconds',
+        targetText: 'Rival times: ~39 / 48 / 61 seconds',
+        recommendedShip: 'R-class loaner',
+        recommendedShipText: 'Choose a race hull',
+        centerFuelReward: .65,
         rivalPaces: [80, 83, 86],
         racerSpeed: 83,
-        localPoints: mourningCarrierPoints,
-        shortcuts: [shortcut('mourning-run-shortcut', 4, 6, 16, [
-            [0, 318, -902],
-            [0, 209, -1203],
-            [0, 142, -1391],
-        ])],
-        briefing: 'A Salvage Union sprint through the carrier wake and its broken hangar ribs. The short cut is barely wider than a hull and the wreck field gives slow ships no room to recover.',
+        localPoints: carrier.points,
+        shortcuts: [],
+        briefing: 'Descend into the carrier hangar, pass the torn bow and skim the nearby frigate. Follow the carrier flank and drive before turning through its break debris.',
     }),
     'mourning-breach': authoredCourse({
         id: 'mourning-breach',
@@ -259,22 +165,21 @@ export const RACE_COURSES = Object.freeze({
         entryFee: 3000,
         payouts: Object.freeze([24000, 9600, -1800, -5200]),
         deadlineSeconds: 900,
-        gateRadius: 42,
-        finishRadius: 54,
-        targetTimeSeconds: 57,
-        target: '48–57 seconds',
-        targetText: 'Podium target: 48–57 seconds',
-        recommendedShip: 'Talon or Lancer',
-        recommendedShipText: 'Talon or Lancer required to contest',
-        centerFuelReward: 1.75,
+        gateRadius: 84,
+        racerLaneWidth: 18,
+        checkpointSpacing: 300,
+        finishRadius: 108,
+        targetTimeSeconds: 60,
+        target: '50–70 seconds',
+        targetText: 'Rival times: ~47 / 55 / 68 seconds',
+        recommendedShip: 'R-class loaner',
+        recommendedShipText: 'Choose a race hull',
+        centerFuelReward: .65,
         rivalPaces: [86, 90, 94],
         racerSpeed: 90,
-        localPoints: mourningBreachPoints,
-        shortcuts: [shortcut('mourning-breach-shortcut', 3, 5, 14, [
-            [40, -290, 650],
-            [150, -300, 780],
-        ])],
-        briefing: 'Cross the battleship breach on a rising diagonal, then reverse across the open rib cage. The narrow inside line is fast only for a ship with the turn authority to hold it.',
+        localPoints: breach.points,
+        shortcuts: [],
+        briefing: 'Cross the battleship’s forward fracture, descend into its spine and leave through the aft break. Stay close around the drive and keel, then finish through the bow debris cloud.',
     }),
     'mourning-relict-gauntlet': authoredCourse({
         id: 'mourning-relict-gauntlet',
@@ -288,25 +193,21 @@ export const RACE_COURSES = Object.freeze({
         entryFee: 5000,
         payouts: Object.freeze([42000, 16800, -3000, -9000]),
         deadlineSeconds: 900,
-        gateRadius: 34,
-        finishRadius: 46,
-        targetTimeSeconds: 90,
-        target: '75–90 seconds',
-        targetText: 'Podium target: 75–90 seconds',
-        recommendedShip: 'Talon or Lancer',
-        recommendedShipText: 'Talon or Lancer strongly recommended',
-        centerFuelReward: 2,
+        gateRadius: 68,
+        racerLaneWidth: 8.5,
+        checkpointSpacing: 300,
+        finishRadius: 92,
+        targetTimeSeconds: 105,
+        target: '90–120 seconds',
+        targetText: 'Rival times: ~106 / 118 / 129 seconds',
+        recommendedShip: 'R-class loaner',
+        recommendedShipText: 'Choose a race hull',
+        centerFuelReward: .4,
         rivalPaces: [92, 97, 101],
         racerSpeed: 97,
-        localPoints: mourningRelictPoints,
-        shortcuts: [shortcut('mourning-relict-gauntlet-shortcut', 10, 13, 12, [
-            [180, -120, 460],
-            // Skim above the battleship deck, then dive back toward the bow.
-            // The former -180 line put the ring inside the visible deck plate.
-            [390, -80, 680],
-            [560, -135, 800],
-        ])],
-        briefing: 'The Union’s full relic circuit links the carrier, frigate tunnels, and battleship wake. It is a precision run for fast hulls: one missed gate costs more than the shortcut can save.',
+        localPoints: gauntlet.points,
+        shortcuts: [],
+        briefing: 'Follow the carrier fracture, escort wrecks and the broadside cruiser’s interior. Cross the port debris cloud, skim the battleship’s broken hull and weave past two more frigates before the final cruiser break.',
     }),
 });
 
@@ -546,26 +447,39 @@ export const generateRaceCourse = (courseId, _seed) => {
     const gatheringPosition = localToWorld(gatheringLocal, center);
     const gatheringDirection = [0, 0, 0];
     directionBetween(localPoints[0], localPoints[1] ?? localPoints[0], gatheringDirection);
+    const lineDistances = [0];
+    for (let i = 1; i < localPoints.length; i++) {
+        lineDistances.push(lineDistances[i - 1] + Math.hypot(...localPoints[i].map((v, j) => v - localPoints[i - 1][j])));
+    }
+    const routeLength = lineDistances.at(-1);
+    const checkpointCount = config.checkpointSpacing ? Math.max(1, Math.floor(routeLength / config.checkpointSpacing)) : localPoints.length - 1;
     const gates = [];
-    for (let pointIndex = 1; pointIndex < localPoints.length; pointIndex += 1) {
-        const previous = localPoints[pointIndex - 1];
-        const current = localPoints[pointIndex];
-        const next = localPoints[Math.min(pointIndex + 1, localPoints.length - 1)];
+    let segment = 1;
+    for (let i = 1; i <= checkpointCount; i++) {
+        const pathDistance = config.checkpointSpacing ? routeLength * i / checkpointCount : lineDistances[i];
+        while (segment < localPoints.length - 1 && lineDistances[segment] < pathDistance) segment++;
+        const previous = localPoints[segment - 1], next = localPoints[segment];
+        const t = (pathDistance - lineDistances[segment - 1]) / (lineDistances[segment] - lineDistances[segment - 1]);
+        const current = previous.map((v, j) => v + (next[j] - v) * t);
         const direction = [0, 0, 0];
-        directionBetween(previous, next === current ? current : next, direction);
+        // Sparse rings use the local flight tangent, not a chord across a bend.
+        if (config.checkpointSpacing) directionBetween(previous, next, direction);
+        else directionBetween(previous, localPoints[Math.min(segment + 1, localPoints.length - 1)], direction);
         gates.push({
             id: `${config.id}-gate-${gates.length}`,
             index: gates.length,
-            kind: pointIndex === localPoints.length - 1 ? 'finish' : 'mandatory',
-            localPosition: [...current],
+            kind: i === checkpointCount ? 'finish' : 'mandatory',
+            localPosition: current,
             position: localToWorld(current, center),
-            radius: pointIndex === localPoints.length - 1 ? config.finishRadius : config.gateRadius,
+            radius: i === checkpointCount ? config.finishRadius : config.gateRadius,
             direction,
+            pathDistance,
         });
     }
     const course = {
         ...config,
         center,
+        boostPickups: config.zone === 'mourning-line' ? raceBoostLayout(localPoints).map(p=>({...p, position:localToWorld(p.position,center), approach:localToWorld(p.approach,center), rejoin:localToWorld(p.rejoin,center)})) : [],
         localPoints,
         gathering: {
             id: `${config.id}-gathering`,
@@ -581,6 +495,10 @@ export const generateRaceCourse = (courseId, _seed) => {
         },
         gates,
         gateCount: gates.length,
+        routeLength,
+        // Keep the collision-cleared curve separate from visible checkpoints.
+        racingLine: config.checkpointSpacing ? localPoints.map(p => localToWorld(p, center)) : undefined,
+        racingLineDistances: config.checkpointSpacing ? lineDistances : undefined,
         shortcuts: config.shortcuts.map((entry) => normalizeCourseShortcut({ id: config.id, center, gatheringPosition }, entry, gates)),
         // Compatibility alias for callers that used the first checkpoint as a
         // start marker before the gathering point became explicit.
@@ -596,21 +514,21 @@ const RACER_DEFS = Object.freeze([
     Object.freeze({
         name: "Vex Marlow 'Slipstream'",
         variant: 'talon',
-        laneOffset: -1,
+        laneOffset: -0.25,
         shortcut: true,
         livery: Object.freeze({ hull: 0xa94c3d, dark: 0x321815, accent: 0xff9b55, canopy: 0x9cf5f2, engine: 0xffad62, warning: 0xffd16f, window: 0xbdfaf3 }),
     }),
     Object.freeze({
         name: "Dara Quill 'Nine Lives'",
         variant: 'lancer',
-        laneOffset: 0,
+        laneOffset: 0.25,
         shortcut: false,
         livery: Object.freeze({ hull: 0x3f7f99, dark: 0x142c3a, accent: 0x72ddff, canopy: 0xa5f3ff, engine: 0x77e5ff, warning: 0xffca69, window: 0xc4f7ff }),
     }),
     Object.freeze({
         name: "Osen Tarn 'Cold Read'",
         variant: 'kestrel',
-        laneOffset: 1,
+        laneOffset: 0.5,
         shortcut: true,
         livery: Object.freeze({ hull: 0x7163a2, dark: 0x241f3b, accent: 0xc995ff, canopy: 0xafe8ff, engine: 0xc38cff, warning: 0xffcd66, window: 0xe5ceff }),
     }),
@@ -729,23 +647,31 @@ export const stageRaceRacers = (racers, course) => {
     const gz = pointComponent(gathering.position, 2);
     racers.forEach((ship, index) => {
         ensureRacerArrays(ship);
-        const lane = Number.isFinite(ship.laneOffset) ? ship.laneOffset : index - 1;
-        // Keep all three rivals inside the player's forward cockpit view: a
-        // centre ship on the second row and two ships on the front row. The
-        // earlier wide formation put the outside ships ~69 degrees off-axis
-        // and the third behind the player, so the real meshes existed but the
-        // pilot could not actually see the waiting field. The player now owns
-        // the open rear slot and must race through the stagger.
-        const longitudinal = index === 1 ? 25 : 45;
-        const lateral = index === 1 ? 0 : lane * 14;
-        const vertical = index === 1 ? 2 : 7;
+        // Leave a clear player's slot and enough room between rival hulls to
+        // prevent the field colliding before the countdown ends. The three
+        // opponents stay in the forward view, spread across two rows.
+        const formationLane=index-1;
+        const longitudinal = index === 1 ? 55 : 90;
+        const lateral = index === 1 ? 0 : formationLane * 40;
+        const vertical = index === 1 ? 2 : 8;
         arrayWrite3(ship.position,
             gx + tmpStageForward[0] * longitudinal + tmpStageSide[0] * lateral + tmpStageUp[0] * vertical,
             gy + tmpStageForward[1] * longitudinal + tmpStageSide[1] * lateral + tmpStageUp[1] * vertical,
             gz + tmpStageForward[2] * longitudinal + tmpStageSide[2] * lateral + tmpStageUp[2] * vertical);
         arrayWrite3(ship.velocity, 0, 0, 0);
         setFacingQuaternion(ship.rotation, tmpStageForward);
+        ship.racePreviousPosition??=[0,0,0];
+        arrayRead3(ship.position,ship.racePreviousPosition);
+        ship.raceTactics=undefined;ship.raceContactUntil=0;ship.raceRecoverUntil=0;ship.raceGateRecovery=false;ship.raceGateReentry=false;
+        ship.raceFuel=100;
+        ship.raceDrive=createRaceDrive();ship.raceAngularVelocity=[0,0,0];
+        ship.raceLane=ship.laneOffset;
+        ship.raceSplits=[];
+        ship.raceBoostCollected=new Set();
+        ship.racePickupSkipped=new Set();ship.racePickupTarget=false;ship.racePickupTargetIndex=-1;ship.racePickupTargetStartedAt=undefined;ship.racePickupRejoinIndex=-1;ship.raceLaunchAt=undefined;
         ship.raceGateIndex = 0;
+        ship.raceLineDistance = 0;
+        ship.raceLineIndex = 1;
         ship.raceFinished = false;
         ship.raceFinishTime = undefined;
         ship.raceShortcutState = 'none';
@@ -756,10 +682,56 @@ export const stageRaceRacers = (racers, course) => {
     return racers;
 };
 
-export const createRaceRacers = (course, _seed, worldTime) => {
+const RACE_MISTAKE_GATES = Object.freeze({
+    // These late, relatively straight sections make an over-cautious speed
+    // check visibly cost time without affecting the route's difficult bends.
+    'mourning-run': Object.freeze([32/38,33/38,34/38,35/38]),
+    'mourning-breach': Object.freeze([23/39,31/39]),
+    'mourning-relict-gauntlet': Object.freeze([27/72,37/72,40/72,45/72]),
+});
+const RACE_PACE_PROFILES=Object.freeze({
+ 'shard-gauntlet':Object.freeze([1,.8,.7]),
+ 'shard-switchback':Object.freeze([1,.8,.7]),
+ 'shard-miners-knife':Object.freeze([1,.8,.7]),
+    'mourning-run':Object.freeze([1,.82,.7]),
+ 'mourning-breach':Object.freeze([1,.86,.7]),
+ 'mourning-relict-gauntlet':Object.freeze([1,.94,.84]),
+});
+
+const raceVariancePlan = (raceSeed, racerIndex, extraMistakeRacer, course) => {
+    const rng = seededRandom(`${raceSeed}:mistake:${racerIndex}`);
+    const skillRng=seededRandom(`${raceSeed}:corner-skill:${racerIndex}`);
+    const paceRng=seededRandom(`${raceSeed}:pace:${racerIndex}`);
+    const extraMistake=racerIndex===extraMistakeRacer;
+    const mistakeGates=RACE_MISTAKE_GATES[course?.id]??[];
+    const mistakeFraction=mistakeGates[Math.floor(rng()*mistakeGates.length)];
+    const mistakeGate=extraMistake&&Number.isFinite(mistakeFraction)?Math.min(course.gates.length-2,Math.floor(mistakeFraction*course.gates.length)):-1;
+    const baseCornerSkill=[1.18,1,.84][racerIndex]??1;
+    const basePace=RACE_PACE_PROFILES[course?.id]?.[racerIndex]??1;
+    return {
+        // Rivals have distinct driving tiers rather than identical lap pace.
+        // The best pilot carries more speed through curves; the others make
+        // progressively safer choices. Seeded variation keeps every race fresh.
+        corneringSkill:baseCornerSkill*(.97+skillRng()*.06),
+        paceMultiplier:basePace*(.96+paceRng()*.08),
+        // A fixed starting stagger and one seeded, late-course hesitation add
+        // small human-like variation without changing the speed ceiling.
+        launchDelay: .45 + racerIndex * .45,
+        mistakeGate,
+        mistakeDuration: extraMistake ? .8 + rng() * .6 : 0,
+    };
+};
+
+export const createRaceRacers = (course, _seed, worldTime, playerHullId='talon') => {
     if (!course)
         return [];
-    const racers = RACER_DEFS.map((definition, index) => {
+    const raceSeed = `${_seed ?? 0}:${course.id}:${Math.floor(worldTime ?? 0)}`;
+    const extraMistakeRacer = Math.floor(seededRandom(`${raceSeed}:extra-mistake`)() * RACER_DEFS.length);
+    const hullIds=Object.keys(RACE_HULLS).filter(id=>id!==raceHull(playerHullId).id);
+    const racers = RACER_DEFS.map((original, index) => {
+        const definition={...original,variant:hullIds[index]};
+        const raceFrame=raceHull(definition.variant);
+        const variance=raceVariancePlan(raceSeed,index,extraMistakeRacer,course);
         const pace = course.rivalPaces[index] ?? course.racerSpeed ?? 45;
         return {
             id: `race-racer-${index}`,
@@ -774,6 +746,25 @@ export const createRaceRacers = (course, _seed, worldTime) => {
             raceLivery: { ...definition.livery },
             laneOffset: definition.laneOffset,
             race: true,
+            raceCourseId:course.id,
+            raceTunnelCourse:Boolean(course.tunnelCourse),
+            raceLineCourse:Boolean(course.racingLine),
+            raceHull:raceFrame?.id,
+            raceAggression:[.95,.65,.82][index],
+            // Authored-line rivals cross the same visible aperture as players.
+            raceGateTolerance:course.racingLine?0:70,
+            // Rivals vary their launch reaction; one has a longer hesitation.
+            raceVariance:variance,
+            raceCorneringSkill:variance.corneringSkill,
+            racePaceMultiplier:variance.paceMultiplier,
+            raceLookAheadScale:course.racingLine?1.4/Math.max(.65,Math.min(1,variance.paceMultiplier)):1.6+(variance.corneringSkill-1)*.25,
+            raceDirectGateSpeedScale:2.4+(variance.corneringSkill-1)*.4,
+            raceLineDamping:course.racingLine?1.8:.4+(variance.corneringSkill-1)*.6,
+            raceLaunchDelay:0,
+            raceLaunchAt:undefined,
+            raceResources:raceFrame??SHIPS[definition.variant]??SHIPS.speedster,
+            energy:raceFrame.energyCapacity,
+            shieldDelay:0,
             raceGateIndex: 0,
             raceFinished: false,
             raceFinishTime: undefined,
@@ -786,13 +777,14 @@ export const createRaceRacers = (course, _seed, worldTime) => {
             position: [0, 0, 0],
             velocity: [0, 0, 0],
             rotation: [0, 0, 0, 1],
-            shield: 1,
-            maxShield: 1,
-            hull: 1,
-            maxHull: 1,
+            shield: raceFrame?.shield??SHIPS[definition.variant]?.shield??180,
+            maxShield: raceFrame?.shield??SHIPS[definition.variant]?.shield??180,
+            hull: raceFrame?.hull??SHIPS[definition.variant]?.hull??180,
+            maxHull: raceFrame?.hull??SHIPS[definition.variant]?.hull??180,
             pace,
             speed: pace,
-            afterburnSpeed: pace,
+            afterburnSpeed: course.racingLine ? pace*1.6 : pace,
+            acceleration: 26,
             turnRate: 2.4,
             gunDamage: 0,
             hostile: false,
@@ -803,7 +795,16 @@ export const createRaceRacers = (course, _seed, worldTime) => {
             captured: false,
         };
     });
-    return stageRaceRacers(racers, course);
+    const staged = stageRaceRacers(racers, course);
+    for (const racer of staged) {
+        racer.raceLaunchDelay = racer.raceVariance?.launchDelay ?? 0;
+        racer.raceMistakeGate = racer.raceVariance?.mistakeGate ?? -1;
+        racer.raceMistakeDuration = racer.raceVariance?.mistakeDuration ?? 0;
+        racer.raceMistakeTriggered = false;
+        racer.raceMistakeStartedAt = undefined;
+        racer.racePickupSkipped = new Set();
+    }
+    return staged;
 };
 
 const shortcutForShip = (ship, course) => {
@@ -835,6 +836,28 @@ const shortcutForShip = (ship, course) => {
     return undefined;
 };
 
+const updateRaceLineProgress = (ship,course,gate) => {
+    const line=course.racingLine,distances=course.racingLineDistances;
+    let segment=ship.raceLineIndex??1;
+    const progress=ship.raceLineDistance??0;
+    let nearest=Infinity,best=progress;
+    // Only search forward locally: crossing an earlier leg must never jump a
+    // rival to a later loop or skip a mandatory checkpoint.
+    const limit=Math.min(progress+160,gate.pathDistance+35);
+    for(let i=segment;i<line.length&&distances[i-1]<=limit;i++){
+        const a=line[i-1],b=line[i],dx=b[0]-a[0],dy=b[1]-a[1],dz=b[2]-a[2];
+        const length=distances[i]-distances[i-1];
+        const t=Math.max(0,Math.min(1,((ship.position[0]-a[0])*dx+(ship.position[1]-a[1])*dy+(ship.position[2]-a[2])*dz)/(length*length)));
+        const along=Math.min(limit,distances[i-1]+length*t);
+        if(along<progress)continue;
+        const fraction=(along-distances[i-1])/length;
+        const d=(ship.position[0]-a[0]-dx*fraction)**2+(ship.position[1]-a[1]-dy*fraction)**2+(ship.position[2]-a[2]-dz*fraction)**2;
+        if(d<nearest){nearest=d;best=along;segment=i;}
+    }
+    ship.raceLineDistance=best;
+    ship.raceLineIndex=segment;
+};
+
 export const raceRacerTarget = (ship, course, out = [0, 0, 0]) => {
     if (!ship || !course)
         return writePoint(out, 0, 0, 0);
@@ -845,6 +868,44 @@ export const raceRacerTarget = (ship, course, out = [0, 0, 0]) => {
         : course.gates?.[ship.raceGateIndex];
     if (!gate)
         return writePoint(out, pointComponent(ship.position, 0), pointComponent(ship.position, 1), pointComponent(ship.position, 2));
+    if(ship.raceHull&&!course.racingLine){
+        const plane=(ship.position[0]-gate.position[0])*gate.direction[0]+(ship.position[1]-gate.position[1])*gate.direction[1]+(ship.position[2]-gate.position[2])*gate.direction[2];
+        if(plane>10)ship.raceGateRecovery=true;
+        if(ship.raceGateRecovery){if(plane> -45)return writePoint(out,gate.position[0]-gate.direction[0]*65,gate.position[1]-gate.direction[1]*65,gate.position[2]-gate.direction[2]*65);ship.raceGateRecovery=false;}
+    }
+    if (course.racingLine) {
+        updateRaceLineProgress(ship,course,gate);
+        const plane=(ship.position[0]-gate.position[0])*gate.direction[0]+(ship.position[1]-gate.position[1])*gate.direction[1]+(ship.position[2]-gate.position[2])*gate.direction[2];
+        if(plane>15&&!ship.raceGateRecovery){ship.raceGateRecovery=true;ship.raceGateReentry=false;}
+        if(plane>30&&ship.raceGateReentry)ship.raceGateReentry=false;
+        if(ship.raceGateRecovery){
+            const approach=ship.raceHull?(ship.raceRecoveryApproach??(course.racingLine?120:80)):45,exit=course.racingLine?120:ship.raceHull?0:90;
+            if(!ship.raceGateReentry){
+                const ax=gate.position[0]-gate.direction[0]*approach,ay=gate.position[1]-gate.direction[1]*approach,az=gate.position[2]-gate.direction[2]*approach;
+                const dx=ship.position[0]-ax,dy=ship.position[1]-ay,dz=ship.position[2]-az;
+                const reentryRadius=ship.raceHull?35:55;
+                if(dx*dx+dy*dy+dz*dz>reentryRadius*reentryRadius)return writePoint(out,ax,ay,az);
+                ship.raceGateReentry=true;ship.raceLineDistance=Math.max(0,gate.pathDistance-approach);ship.raceLineIndex=1;
+                while(ship.raceLineIndex<course.racingLine.length-1&&course.racingLineDistances[ship.raceLineIndex]<ship.raceLineDistance)ship.raceLineIndex++;
+            }
+            return writePoint(out,gate.position[0]+gate.direction[0]*exit,gate.position[1]+gate.direction[1]*exit,gate.position[2]+gate.direction[2]*exit);
+        }
+        ship.racePickupTarget=false;
+        const line = course.racingLine, distances = course.racingLineDistances;
+        const segment=ship.raceLineIndex??1,best=ship.raceLineDistance??0;
+        const speed = Math.hypot(ship.velocity[0],ship.velocity[1],ship.velocity[2]);
+        const lookAhead = Math.min(best + Math.max(32, speed*(ship.raceLookAheadScale??1.6)), distances.at(-1));
+        let targetSegment = segment;
+        while (targetSegment < line.length - 1 && distances[targetSegment] < lookAhead) targetSegment++;
+        const a = line[targetSegment - 1], b = line[targetSegment];
+        const length = distances[targetSegment] - distances[targetSegment - 1];
+        const t = (lookAhead - distances[targetSegment - 1])/length;
+        normalizeVector(b[0]-a[0], b[1]-a[1], b[2]-a[2], tmpGateDirection);
+        normalizeVector(tmpGateDirection[2], 0, -tmpGateDirection[0], tmpTargetSide, 1, 0, 0);
+        const offset = (ship.raceLane ?? ship.laneOffset ?? 0) * (course.racerLaneWidth ?? 12);
+        return writePoint(out, a[0]+(b[0]-a[0])*t+tmpTargetSide[0]*offset,
+            a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t+tmpTargetSide[2]*offset);
+    }
     // Rivals do not fly a conga line through the centre. Their persistent lane
     // offset is deliberately small (at most 25% of the current aperture), so
     // the target remains a valid gate crossing while the three hulls read as
@@ -859,8 +920,8 @@ export const raceRacerTarget = (ship, course, out = [0, 0, 0]) => {
     tmpTargetSide[1] = 0;
     tmpTargetSide[2] = -tmpGateDirection[0];
     normalizeVector(tmpTargetSide[0], tmpTargetSide[1], tmpTargetSide[2], tmpTargetSide, 1, 0, 0);
-    const lateral = Math.min((Number.isFinite(gate.radius) ? gate.radius : 0) * 0.25, 12);
-    const lane = Number.isFinite(ship.laneOffset) ? ship.laneOffset : 0;
+    const lateral = Math.min((Number.isFinite(gate.radius) ? gate.radius : 0) * 0.25, course.racerLaneWidth ?? 12);
+    const lane = Number.isFinite(ship.raceLane) ? ship.raceLane : Number.isFinite(ship.laneOffset) ? ship.laneOffset : 0;
     return writePoint(out,
         pointComponent(gate.position, 0) + tmpTargetSide[0] * lane * lateral,
         pointComponent(gate.position, 1) + tmpTargetSide[1] * lane * lateral,
@@ -870,7 +931,7 @@ export const raceRacerTarget = (ship, course, out = [0, 0, 0]) => {
 // Test a complete motion segment against a gate's forward-facing plane and
 // circular aperture. A point merely passing near a ring, or crossing it from
 // the exit side, does not count.
-export const crossedRaceGate = (previous, current, gate) => {
+export const crossedRaceGate = (previous, current, gate, apertureMargin = 0) => {
     if (!previous || !current || !gate?.position)
         return false;
     const px = pointComponent(gate.position, 0);
@@ -901,8 +962,26 @@ export const crossedRaceGate = (previous, current, gate) => {
     const radialX = hitX - tmpGateDirection[0] * axial;
     const radialY = hitY - tmpGateDirection[1] * axial;
     const radialZ = hitZ - tmpGateDirection[2] * axial;
-    const radius = Number.isFinite(gate.radius) ? Math.max(0, gate.radius) : 0;
+    const radius = (Number.isFinite(gate.radius) ? Math.max(0, gate.radius) : 0) + Math.max(0, apertureMargin);
     return radialX * radialX + radialY * radialY + radialZ * radialZ <= radius * radius + 1e-7;
+};
+
+// Once an AI has missed a gate, count a close, forward-moving return through
+// the visible ring's short depth. This prevents tiny plane-crossing offsets
+// from trapping a rival in a repeated U-turn recovery loop.
+const recoveredNpcGatePass = (ship, previous, current, gate, apertureMargin = 0) => {
+    if(!ship.raceHull||!ship.raceGateRecovery||!previous||!current)return false;
+    normalizeVector(pointComponent(gate.direction,0),pointComponent(gate.direction,1),pointComponent(gate.direction,2),tmpGateDirection);
+    const gx=pointComponent(gate.position,0),gy=pointComponent(gate.position,1),gz=pointComponent(gate.position,2);
+    const px=pointComponent(previous,0)-gx,py=pointComponent(previous,1)-gy,pz=pointComponent(previous,2)-gz;
+    const cx=pointComponent(current,0)-gx,cy=pointComponent(current,1)-gy,cz=pointComponent(current,2)-gz;
+    const previousSide=px*tmpGateDirection[0]+py*tmpGateDirection[1]+pz*tmpGateDirection[2];
+    const currentSide=cx*tmpGateDirection[0]+cy*tmpGateDirection[1]+cz*tmpGateDirection[2];
+    const vx=pointComponent(ship.velocity,0),vy=pointComponent(ship.velocity,1),vz=pointComponent(ship.velocity,2);
+    if(previousSide>36||currentSide<0||currentSide-previousSide<1e-7||vx*tmpGateDirection[0]+vy*tmpGateDirection[1]+vz*tmpGateDirection[2]<=0)return false;
+    const radius=(Number.isFinite(gate.radius)?Math.max(0,gate.radius):0)+Math.max(0,apertureMargin);
+    const radialX=cx-tmpGateDirection[0]*currentSide,radialY=cy-tmpGateDirection[1]*currentSide,radialZ=cz-tmpGateDirection[2]*currentSide;
+    return radialX*radialX+radialY*radialY+radialZ*radialZ<=radius*radius;
 };
 
 const advanceRacerGate = (ship, course, worldTime) => {
@@ -925,6 +1004,7 @@ const advanceRacerGate = (ship, course, worldTime) => {
     }
     else {
         ship.raceGateIndex += 1;
+        ship.raceGateRecovery=false;ship.raceGateReentry=false;
         shortcutForShip(ship, course);
     }
     if (ship.raceGateIndex >= course.gates.length) {
@@ -935,15 +1015,16 @@ const advanceRacerGate = (ship, course, worldTime) => {
     return true;
 };
 
-// Advance one kinematic racer without allocating new transform arrays. The
-// optional steering hook is useful for tests and future rival personalities;
-// normal racers steer toward their active mandatory/shortcut gate.
+// Advance a fixed race fit without replacing transform arrays. Mourning
+// pilots share boost/recovery rules and plan speed around upcoming bends;
+// collision steering supplies the safe local direction and braking demand.
 export const updateRaceRacer = (ship, course, dt, worldTime = 0, steering) => {
     if (!ship || !course || ship.raceFinished || !(dt > 0))
         return ship;
     ensureRacerArrays(ship);
     const pace = Number.isFinite(ship.pace) ? ship.pace : Number.isFinite(ship.speed) ? ship.speed : course.racerSpeed ?? 45;
     arrayRead3(ship.position, tmpRacerPrevious);
+    arrayRead3(ship.position,ship.racePreviousPosition??=[0,0,0]);
     raceRacerTarget(ship, course, tmpRacerTarget);
     const steeringDirection = steering?.direction;
     if (steeringDirection && Math.hypot(pointComponent(steeringDirection, 0), pointComponent(steeringDirection, 1), pointComponent(steeringDirection, 2)) > 1e-7) {
@@ -957,14 +1038,45 @@ export const updateRaceRacer = (ship, course, dt, worldTime = 0, steering) => {
             tmpRacerDirection,
         );
     }
+    if(ship.raceHull&&course.racingLine){
+        updateRacePilot(ship,course,tmpRacerTarget,dt,worldTime,steering);
+        if(!steering?.deferGates)advanceRaceRacerGates(ship,course,ship.racePreviousPosition,ship.position,worldTime);
+        return ship;
+    }
     const brake = Math.max(0, Math.min(1, Number.isFinite(steering?.brake) ? steering.brake : 0));
-    const desiredSpeed = pace * (1 - brake * 0.7);
     arrayRead3(ship.velocity, tmpRacerVelocity);
-    const velocityLength = Math.hypot(tmpRacerVelocity[0], tmpRacerVelocity[1], tmpRacerVelocity[2]);
-    const blend = velocityLength < 1e-7 ? 1 : Math.max(0, Math.min(1, dt * (ship.turnRate ?? 2.4)));
-    const vx = velocityLength < 1e-7 ? tmpRacerDirection[0] * desiredSpeed : tmpRacerVelocity[0] * (1 - blend) + tmpRacerDirection[0] * desiredSpeed * blend;
-    const vy = velocityLength < 1e-7 ? tmpRacerDirection[1] * desiredSpeed : tmpRacerVelocity[1] * (1 - blend) + tmpRacerDirection[1] * desiredSpeed * blend;
-    const vz = velocityLength < 1e-7 ? tmpRacerDirection[2] * desiredSpeed : tmpRacerVelocity[2] * (1 - blend) + tmpRacerDirection[2] * desiredSpeed * blend;
+    const velocityLength = Math.hypot(...tmpRacerVelocity);
+    let desiredSpeed=pace*(1-brake*.7),acceleration=ship.acceleration??26,stabilized=false;
+    if(course.racingLine){
+        const drive=ship.raceDrive??=createRaceDrive();
+        stabilized=drive.stabilizerTime>0;
+        const draft=steering?.peers?Math.max(raceDraft(ship,steering.peers),steering.player?raceDraft(ship,steering.player):0):0;
+        const alignment=velocityLength>1?(tmpRacerDirection[0]*tmpRacerVelocity[0]+tmpRacerDirection[1]*tmpRacerVelocity[1]+tmpRacerDirection[2]*tmpRacerVelocity[2])/velocityLength:1;
+        // Look beyond the steering target: brake before the bend, spend boost
+        // on an exit/straight. No catch-up speed or player-class scaling.
+        const line=course.racingLine,distances=course.racingLineDistances;
+        let i=Math.max(1,ship.raceLineIndex??1),end=i;
+        while(end<line.length-1&&distances[end]<(ship.raceLineDistance??0)+Math.max(160,velocityLength*1.8))end++;
+        let bend=1;
+        for(let j=i+1;j<=end;j++){
+            const a=line[j-2],b=line[j-1],c=line[j];
+            const ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=c[0]-b[0],vy=c[1]-b[1],vz=c[2]-b[2];
+            bend=Math.min(bend,(ux*vx+uy*vy+uz*vz)/(Math.hypot(ux,uy,uz)*Math.hypot(vx,vy,vz)));
+        }
+        const burning=stepRaceDrive(drive,worldTime>=(ship.raceContactUntil??0)&&(ship.raceFuel??100)>.5&&brake<.08&&bend>.975&&alignment>.99,dt,draft);
+        ship.burning=burning;
+        if(burning)ship.raceFuel=Math.max(0,(ship.raceFuel??100)-dt*1.025*(1-.38*draft));
+        const ceiling=burning?ship.afterburnSpeed:pace;
+        desiredSpeed=ceiling*(1+draft*.14)*(1-brake*.7)*Math.max(.65,1-(1-bend)*6);
+        acceleration*= (burning?1.65:1)*(1+draft*.18);
+
+    }
+    const nextSpeed=course.racingLine?velocityLength+Math.max(-acceleration*1.25*dt,Math.min(acceleration*dt,desiredSpeed-velocityLength)):desiredSpeed;
+    const blend=velocityLength<1e-7?1:Math.min(1,dt*(ship.turnRate??2.4)*(stabilized?2.5:1));
+    let vx=tmpRacerVelocity[0]*(1-blend)+tmpRacerDirection[0]*Math.max(nextSpeed,1e-6)*blend;
+    let vy=tmpRacerVelocity[1]*(1-blend)+tmpRacerDirection[1]*Math.max(nextSpeed,1e-6)*blend;
+    let vz=tmpRacerVelocity[2]*(1-blend)+tmpRacerDirection[2]*Math.max(nextSpeed,1e-6)*blend;
+    const length=Math.hypot(vx,vy,vz)||1;vx*=nextSpeed/length;vy*=nextSpeed/length;vz*=nextSpeed/length;
     arrayWrite3(ship.velocity, vx, vy, vz);
     const currentX = tmpRacerPrevious[0] + vx * dt;
     const currentY = tmpRacerPrevious[1] + vy * dt;
@@ -975,6 +1087,21 @@ export const updateRaceRacer = (ship, course, dt, worldTime = 0, steering) => {
     tmpRacerCurrent[2] = currentZ;
     setFacingQuaternion(ship.rotation, velocityLength < 1e-7 ? tmpRacerDirection : normalizeVector(vx, vy, vz, tmpRacerDirection));
 
+    if(!steering?.deferGates)advanceRaceRacerGates(ship,course,ship.racePreviousPosition,ship.position,worldTime);
+    return ship;
+};
+
+export function advanceRaceRacerGates(ship,course,previous,current,worldTime){
+    if(ship.raceFinished||ship.hull<=0)return;
+    for(const pickup of course.boostPickups??[]){
+        const collected=ship.raceBoostCollected??=new Set();
+        if(!collected.has(pickup.index)&&sweptBoostHit(previous,current,pickup.position,ship.raceHull?18:12)){
+            collected.add(pickup.index);ship.racePickupRejoinIndex=pickup.index;
+            ship.racePickupTarget=false;ship.racePickupTargetIndex=-1;ship.racePickupTargetStartedAt=undefined;
+            collectRaceStabilizer(ship.raceDrive??=createRaceDrive());
+        }
+    }
+
     // A long step may cross more than one plane. Re-use the same endpoint and
     // cap the loop so malformed data cannot turn this hot path into an unbounded
     // loop.
@@ -982,8 +1109,10 @@ export const updateRaceRacer = (ship, course, dt, worldTime = 0, steering) => {
         const shortcutRoute = ship.raceShortcutState === 'active' ? course.shortcuts?.[0] : undefined;
         const shortcutGate = shortcutRoute?.gates?.[ship.raceShortcutIndex >= 0 ? ship.raceShortcutIndex : 0];
         const gate = shortcutRoute && shortcutGate ? shortcutGate : course.gates?.[ship.raceGateIndex];
-        if (!gate || !crossedRaceGate(tmpRacerPrevious, tmpRacerCurrent, gate))
+        const aiApertureMargin=ship.raceHull?Math.max(0,Math.min(70,ship.raceGateTolerance??24)):0;
+        if (!gate || (!crossedRaceGate(previous, current, gate, aiApertureMargin)&&!(!course.racingLine&&recoveredNpcGatePass(ship,previous,current,gate,aiApertureMargin))))
             break;
+        (ship.raceSplits??=[])[ship.raceGateIndex]=worldTime;
         if (!advanceRacerGate(ship, course, worldTime)) {
             arrayWrite3(ship.velocity, 0, 0, 0);
             break;

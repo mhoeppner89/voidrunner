@@ -50,10 +50,10 @@ test('tracking turret requires a selected hostile and clear sight; banking chang
  p.rotation=[0,0,1,0];tick(s);assert.equal(fired,before);
 });
 test('power, shield and engine alternatives keep their roles without crippling penalties',()=>{
- const p=createNewSave(8).player,base=getEffectiveShipStats(p),fit=p.outfitting.loadouts.wayfarer;
+ const p=createNewSave(8).player,fit=p.outfitting.loadouts.wayfarer;fit.guns.fill(null);fit.launchers.fill(null);const base=getEffectiveShipStats(p);
  fit.utility[0]='capacitor-bank';let stats=getEffectiveShipStats(p);assert.ok(stats.energyCapacity>base.energyCapacity&&stats.reactorOutput<base.reactorOutput&&stats.reactorOutput>=base.reactorOutput*.9);
  fit.utility[0]='sustained-reactor';stats=getEffectiveShipStats(p);assert.equal(stats.energyCapacity,base.energyCapacity);assert.ok(stats.reactorOutput>base.reactorOutput);
- fit.utility[1]='engine-mk2';stats=getEffectiveShipStats(p);assert.ok(stats.maxSpeed>base.maxSpeed&&stats.angularAcceleration<base.angularAcceleration&&stats.angularAcceleration>=base.angularAcceleration*.92&&stats.burnFuelMultiplier>1);
+ fit.utility[1]='engine-mk2';stats=getEffectiveShipStats(p);assert.ok(stats.maxSpeed>base.maxSpeed&&stats.angularAcceleration<base.angularAcceleration&&stats.angularAcceleration>=base.angularAcceleration*.92-1e-9&&stats.burnFuelMultiplier>1);
  fit.utility[1]='thrusters-mk2';stats=getEffectiveShipStats(p);assert.ok(stats.maxSpeed<base.maxSpeed&&stats.maxSpeed>=base.maxSpeed*.94&&stats.angularAcceleration>base.angularAcceleration&&stats.lateralMultiplier>1);
  fit.utility[2]='recovery-shield';stats=getEffectiveShipStats(p);assert.ok(stats.shield<base.shield&&stats.shield>=base.shield*.9&&stats.shieldRechargeMultiplier>1);
 });

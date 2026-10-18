@@ -52,16 +52,12 @@ export const CampaignWingMethods={
     // True when the player's orders actually steer a wing in this scene. An arena
     // run has its own wing and its own order, so it never comes up here.
     campaignWingActive(){const companion=this.campaignWingCompanion();return !this.arena?.run&&Boolean(companion)&&!companion.poweredDown&&campaignWingUnlocked(this.save);},
-    // The teaching line: once, on reaching the combat step, tell the player that
-    // the wing takes orders and which ones exist. Deliberately a comms line and
-    // an event notice rather than a modal, so it cannot collide with the step's
-    // own weapons briefing.
+    // Unlock the wing card with the first fight. Its instructions belong to
+    // Rin's paused combat dialogue, so no second comms line overwrites it.
     introduceCampaignWingOrders(){
         const quest=getTutorialQuest(this.save);
         if(!quest||quest.completedAt!==undefined||quest.flags?.wingOrders===true)return false;
         setFlag(this.save,quest.id,'wingOrders',true);
-        this.ui.showPilotLine?.('Rin Vek',t('I am on your wing now. Aggressive, defensive or break off — press Y or tap my wing card at the top right to change my orders.'),'ally',11000,true);
-        this.ui.pushEvent(t('WING ORDERS · Y or the wing cards at the top right cycle aggressive, defensive and break off'),'info',9000);
         // The wing card arrives with the lesson rather than on the next frame.
         this.publishCampaignWing();
         return true;

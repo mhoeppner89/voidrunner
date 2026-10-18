@@ -1,3 +1,6 @@
+import { createAsteroidTerrain } from './asteroidTerrain.js';
+import {createAsteroidFragmentMaterials, ASTEROID_FINISH_PALETTES,configureAsteroidShadows} from './asteroidMaterials.js';
+import {createLootVisualResources,createLootVisual,setLootVisualRarity,disposeLootVisualResources} from './lootVisuals.js';
 import {SHIELD_ACTIVATION_WINDOW} from './weaponDamage.js';
 import {FLEET_EQUIPMENT,equipmentHullId,droneDock} from './fleetEquipmentData.js';
 import {applyFleetPaint} from './fleetPaint.js';
@@ -9,11 +12,12 @@ import {bindCarrierArmament} from './carrierModels.js';
 import {CRUISER_MOUNTS,CRUISER_ARMAMENT_COUNT} from './cruiserModelData.js';
 import {createCruiserTurret,createCruiserPdc,createCruiserEngineDamage,updateCruiserEngineDamage} from './cruiserModels.js';
 import { createShipExplosion, createHullDebris } from './explosionFx.js';
+import {ShipWreckFactory} from './shipWreckFx.js';
 import { createOrdnanceModel } from './ordnanceModels.js';
 import { skipHiddenWorldMatrices, markAttributeSpan } from './renderWork.js';
 import { DRONE_PORTS } from './droneFlight.js';
 import {cockpitDamageStage} from './cockpitDamage.js';
-import { wreckSectionDelta } from './missionWorldData.js';
+import {createGraveyardPlating,prepareGraveyardModel,arrangeGraveyardModel} from './graveyardArt.js';
 import {createTurretModel,paintFrigateTurret} from './turretModels.js';
 import {createFrigateSystems,updateFrigateSystems,setFrigateComponentDamage,frigateEngineFraction} from './frigateComponents.js';
 import {FRIGATE_MOUNTS} from './frigateMounts.js';
@@ -527,6 +531,8 @@ export class SpaceRenderer {
         this.sunLight = new THREE.DirectionalLight(0xffa566, 5.0);
         this.sunLight.position.copy(sunDir).multiplyScalar(1);
         this.scene.add(this.sunLight);
+        configureAsteroidShadows(this.renderer,this.sunLight,LOCATIONS.shardbelt.position,this.touchDevice?512:1024);
+        this.renderer.shadowMap.enabled=false;this.sunLight.castShadow=false;
         this.rimLight = new THREE.DirectionalLight(0x66b9ff, 1.4);
         this.rimLight.position.set(0.58, -0.24, -0.78).normalize();
         this.scene.add(this.rimLight);
@@ -2606,63 +2612,20 @@ export class SpaceRenderer {
         });
     }
     createAsteroids() {
+        this.asteroidTerrain = createAsteroidTerrain();
+        this.instanceRoots.get('shardbelt')?.add(this.asteroidTerrain);
         // Several distinct distorted base rocks so the belt reads as varied terrain
         // rather than one rescaled boulder repeated hundreds of times.
         // The deformed-icosahedron base meshes are shared with the sim's hard
         // collision (worldData.getAsteroidBaseMeshes) so a bump lands exactly on
         // the rendered surface.
         const geometries = getAsteroidBaseMeshes().map((mesh) => mesh.geometry);
-        // Three asteroid material kinds: iron (mid-grade metallic sand),
-        // ice (pale frozen, drifts mostly), and dark (carbonaceous, monoliths/rock-crown).
-        // Each gets its own pixel texture and slightly different roughness so a
-        // belt cluster reads as varied terrain instead of one repeated rock.
-        const ironMap = this.createPixelPanelTexture('shardbelt-iron', 0x54585d, 0xb8a98a, 'rock', 128);
-        ironMap.repeat.set(3.4, 3.4);
-        const ironMaterial = new THREE.MeshStandardMaterial({
-            color: 0xb0b8c0,
-            map: ironMap,
-            // Matte: flat-shaded facets sweeping through a sharp GGX highlight
-            // read as flickering light points in the belt — rocks are diffuse.
-            roughness: 1,
-            metalness: 0.08,
-            bumpMap: ironMap,
-            bumpScale: 1.15,
-            flatShading: true,
-            vertexColors: true,
-        });
-        const iceMap = this.createPixelPanelTexture('shardbelt-ice', 0xc7d6e2, 0x8eb6cc, 'rock', 128);
-        iceMap.repeat.set(3.4, 3.4);
-        const iceMaterial = new THREE.MeshStandardMaterial({
-            color: 0xd6e6f0,
-            map: iceMap,
-            roughness: 0.85,
-            metalness: 0.02,
-            bumpMap: iceMap,
-            bumpScale: 0.72,
-            flatShading: true,
-            vertexColors: true,
-            emissive: 0x0a1822,
-            emissiveIntensity: 0.18,
-        });
-        const darkMap = this.createPixelPanelTexture('shardbelt-dark', 0x232027, 0xa4553a, 'rock', 128);
-        darkMap.repeat.set(3.4, 3.4);
-        const darkMaterial = new THREE.MeshStandardMaterial({
-            color: 0x6a5a5e,
-            map: darkMap,
-            roughness: 1,
-            metalness: 0.04,
-            bumpMap: darkMap,
-            bumpScale: 1.35,
-            flatShading: true,
-            vertexColors: true,
-        });
-        for (const material of [ironMaterial, iceMaterial, darkMaterial])
+        const materialByKind = createAsteroidFragmentMaterials();
+        for (const material of Object.values(materialByKind)) {
+            this.pixelTextures.add(material.map);
             this.simplifyAppleMaterial(material);
-        const kindPalettes = {
-            iron: { base: 0x9aa4b0, accent: 0xd0a060, scan: 0xc4ad7a },
-            ice:  { base: 0xb8cee0, accent: 0xe6f4ff, scan: 0xa8c4dc },
-            dark: { base: 0x5a4a52, accent: 0xb0483a, scan: 0x806868 },
-        };
+        }
+        const kindPalettes = ASTEROID_FINISH_PALETTES;
         const kindFor = (id) => {
             if (id.startsWith('rock-crown-')) return 'dark';
             if (id.startsWith('asteroid-monolith-')) return 'dark';
@@ -2678,13 +2641,12 @@ export class SpaceRenderer {
         const groups = new Map();
         this.asteroids.forEach((node, index) => {
             const shape = node.shape ?? 0;
-            const kind = kindFor(node.id);
+            const kind = node.finish ?? kindFor(node.id);
             const key = `${shape}:${kind}`;
             const list = groups.get(key) ?? [];
             list.push({ node, index, kind });
             groups.set(key, list);
         });
-        const materialByKind = { iron: ironMaterial, ice: iceMaterial, dark: darkMaterial };
         this.asteroidMeshes = [];
         groups.forEach((entries, key) => {
             // Keep dynamic matrix writes contiguous without adding draw calls.
@@ -2696,6 +2658,7 @@ export class SpaceRenderer {
             mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
             mesh.frustumCulled = false;
             mesh.name = `shardbelt-asteroids-${kind}`;
+            mesh.castShadow=true;mesh.receiveShadow=true;
             mesh.userData.targetKind = 'asteroid';
             mesh.userData.asteroidKind = kind;
             mesh.userData.nodeIndices = entries.map((entry) => entry.index);
@@ -2761,7 +2724,7 @@ export class SpaceRenderer {
     createGraveyard() {
         const metalMap = this.createPixelPanelTexture('graveyard-metal', 0x4a565a, 0x93b2ad, 'metal');
         metalMap.repeat.set(3.5, 2.2);
-        const rustMap = this.createPixelPanelTexture('graveyard-rust', 0x5a4436, 0xc27a48, 'rust');
+        const rustMap = this.createPixelPanelTexture('graveyard-rust', 0x414b53, 0x9caeb4, 'metal');
         rustMap.repeat.set(4.2, 2.6);
         // Route frames are painted structural salvage, not emissive markers.
         // A shared map keeps the extra visual vocabulary cheap on mobile.
@@ -2787,8 +2750,12 @@ export class SpaceRenderer {
             const kind = kindRaw;
             const finishStyle = (() => {
                 switch (finish) {
+                    case 'machinery':
+                        return {color:0x69727a,map:metalMap,roughness:.88,metalness:.38};
+                    case 'structure':
+                        return {color:0x6b8190,map:metalMap,roughness:.9,metalness:.32};
                     case 'rust':
-                        return { color: 0xbc9f88, map: rustMap, roughness: 0.92, metalness: 0.48 };
+                        return { color: 0xb7b9b4, map: rustMap, roughness: 0.92, metalness: 0.48 };
                     case 'route-gold':
                         return { color: 0xf0bd68, map: routeMap, roughness: 0.82, metalness: 0.5 };
                     case 'route-ice':
@@ -2845,72 +2812,17 @@ export class SpaceRenderer {
                 return [file, null];
             }
         })).then((loaded) => {
-            const models = new Map(loaded);
+            const plating=createGraveyardPlating();
+            this.pixelTextures.add(plating);
+            const models = new Map(loaded.map(([file,model])=>[file,model?prepareGraveyardModel(model,plating):null]));
             const root = this.instanceRoots.get('mourning-line');
             const center = LOCATIONS['mourning-line'].position;
             for (const config of GRAVEYARD_MODEL_WRECKS) {
                 const source = models.get(config.file);
                 if (!source || !root)
                     continue;
-                const wreck = source.clone(true);
-                wreck.traverse((child) => {
-                    // Earlier wreck exports carried long emissive conduit rods
-                    // that read as neon stripes floating off the dead hulls.
-                    // Remove the objects completely; their collision profiles
-                    // are filtered by the same name in the asset pipeline.
-                    if (/hot conduit/i.test(child.name) || /^COLLISION /i.test(child.name)) {
-                        child.visible = false;
-                        return;
-                    }
-                    const sourceMaterials = Array.isArray(child.material) ? child.material : [child.material];
-                    if (!sourceMaterials.some((material) => material instanceof THREE.MeshStandardMaterial))
-                        return;
-                    const prepareMaterial = (sourceMaterial) => {
-                        if (!(sourceMaterial instanceof THREE.MeshStandardMaterial))
-                            return sourceMaterial;
-                        const material = sourceMaterial.clone();
-                        // The wreck texture already carries a pale, desaturated
-                        // battlefield wash. Preserve it instead of multiplying
-                        // it by the old near-black soot tint.
-                        if (material.map)
-                            material.color.lerp(new THREE.Color(0xe7e9e5), 0.18);
-                        // A wreck is cold. This also disables emissive paint or
-                        // nav textures inherited by the fighter source hulls.
-                        material.emissive.set(0x000000);
-                        material.emissiveMap = null;
-                        material.emissiveIntensity = 0;
-                        material.roughness = Math.max(0.88, material.roughness);
-                        material.metalness = Math.min(0.48, material.metalness);
-                        // Multi-material capital sections previously skipped
-                        // this pass, so their inner faces vanished. Wreck hulls
-                        // are opaque and two-sided: closed sections look solid,
-                        // while the authored bays show their lined interior.
-                        material.transparent = false;
-                        material.opacity = 1;
-                        material.alphaTest = 0;
-                        material.depthWrite = true;
-                        material.side = THREE.DoubleSide;
-                        return material;
-                    };
-                    child.material = Array.isArray(child.material)
-                        ? child.material.map(prepareMaterial)
-                        : prepareMaterial(child.material);
-                });
-                // Wrappers leave authored transforms and shared mesh buffers intact.
-                for (const section of [...wreck.children]) {
-                    const delta = wreckSectionDelta(config, section.name);
-                    if (!delta) continue;
-                    const arrangement = new THREE.Group();
-                    arrangement.name = `${section.name} arrangement`;
-                    arrangement.position.set(...delta.position);
-                    arrangement.rotation.set(...delta.rotation);
-                    wreck.add(arrangement);
-                    arrangement.add(section);
-                }
-                wreck.name = config.id;
-                wreck.position.set(center[0] + config.local[0], center[1] + config.local[1], center[2] + config.local[2]);
-                wreck.rotation.set(...config.rotation);
-                wreck.scale.setScalar(config.scale);
+                const wreck=arrangeGraveyardModel(source,config);
+                wreck.position.set(center[0]+config.local[0],center[1]+config.local[1],center[2]+config.local[2]);
                 root.add(wreck);
                 this.graveyardModelMeshes.push(wreck);
             }
@@ -3044,10 +2956,8 @@ export class SpaceRenderer {
     }
     addCombatLootNode(node) {
         this.combatLootMeshes??=new Map();if(this.combatLootMeshes.has(node.id))return;
-        this.combatLootGeometry??=new THREE.IcosahedronGeometry(1,0);this.combatLootGeometry.userData.shared=true;
-        this.combatLootMaterial??=new THREE.MeshStandardMaterial({color:0x727b88,roughness:.85,metalness:.6});this.combatLootMaterial.userData.shared=true;
-        const mesh=new THREE.Mesh(this.combatLootGeometry,this.combatLootMaterial);
-        mesh.scale.setScalar(node.radius);mesh.position.fromArray(node.position);mesh.userData.lootNode=node;
+        this.combatLootResources??=createLootVisualResources();
+        const mesh=createLootVisual(node,this.combatLootResources);
         this.tagTargetable(mesh,'wreck',node.id);this.scene.add(mesh);this.combatLootMeshes.set(node.id,mesh);
     }
     removeCombatLootNode(id) {
@@ -3057,7 +2967,19 @@ export class SpaceRenderer {
         for(const mesh of this.combatLootMeshes?.values()??[]){const node=mesh.userData.lootNode;
             const dx=node.position[0]-this.camera.position.x,dy=node.position[1]-this.camera.position.y,dz=node.position[2]-this.camera.position.z;
             mesh.visible=node.remaining>0&&node.systemId===this.systemId&&dx*dx+dy*dy+dz*dz<WRECK_RENDER_DISTANCE_SQ;
-            if(mesh.visible)mesh.position.fromArray(node.position);
+            if(mesh.visible){
+                mesh.position.fromArray(node.position);
+                if(mesh.userData.lootRarity!==(node.lootRarity??'common'))setLootVisualRarity(mesh,this.combatLootResources,node.lootRarity);
+                const beacon=mesh.userData.lootBeacon,distance=Math.sqrt(dx*dx+dy*dy+dz*dz);
+                // World-space, depth-tested beacons: legible nearby, never an
+                // always-on-top HUD card or a marker for distant systems.
+                beacon.visible=distance<2400;
+                if(beacon.visible){
+                    const size=Math.max(3,Math.min(80,distance*2*Math.tan(this.camera.fov*Math.PI/360)*26/this.viewportHeight));
+                    beacon.scale.setScalar(size);beacon.position.y=mesh.userData.lootBodySize*.75+size*.8;
+                    beacon.quaternion.copy(this.camera.quaternion);
+                }
+            }
         }
     }
     updateWreckNodeInstances(dt = 0) {
@@ -3618,6 +3540,7 @@ export class SpaceRenderer {
         wrapper.userData.emissiveMaterials = emissiveMaterials;
         wrapper.userData.glb = true;
         if(variant==='concord-cruiser'||variant==='concord-frigate'||variant==='concord-battleship'||variant==='concord-carrier'){wrapper.userData.capitalExhaust=createCapitalEngineExhaust(variant);wrapper.add(wrapper.userData.capitalExhaust);}
+        (this.wreckFactory??=new ShipWreckFactory()).schedule(wrapper);
         return wrapper;
     }
     // Replace a voxel placeholder with the real hull once its GLB resolves.
@@ -4293,6 +4216,51 @@ export class SpaceRenderer {
         }
         return this.raceGateRoot;
     }
+    syncRaceBoosts(pickups=[],collected,gateIndex=0,course) {
+        this.raceBoostMeshes??=[];
+        while(this.raceBoostMeshes.length<pickups.length){
+            const group=new THREE.Group();group.name='optional-race-boost';
+            const material=new THREE.MeshBasicMaterial({color:0x6af3ff,toneMapped:false});
+            const core=new THREE.Mesh(new THREE.OctahedronGeometry(3),material);group.add(core);
+            // Nested gimbal rings make this pickup read as a stabilizer module,
+            // not a speed arrow or afterburner charge.
+            const ringMaterial=new THREE.MeshBasicMaterial({color:0x91d8ed,toneMapped:false});
+            const outer=new THREE.Mesh(new THREE.TorusGeometry(8,.3,4,18),ringMaterial);group.add(outer);
+            for(const axis of [0,1]){
+                const gimbal=new THREE.Mesh(new THREE.TorusGeometry(5.4,.24,4,16),material);
+                if(axis===0)gimbal.rotation.x=Math.PI/2;else gimbal.rotation.y=Math.PI/2;
+                group.add(gimbal);
+            }
+            group.raycast=()=>{};this.scene.add(group);this.raceBoostMeshes.push(group);
+        }
+        const low=gateIndex>0?(course?.gates[gateIndex-1]?.pathDistance??0)-160:0;
+        const high=course?.gates[Math.min(course.gates.length-1,gateIndex+4)]?.pathDistance??Infinity;
+        for(let i=0;i<this.raceBoostMeshes.length;i++){
+            const mesh=this.raceBoostMeshes[i],p=pickups[i];
+            mesh.visible=Boolean(p&&!collected?.has(p.index)&&p.pathDistance>=low&&p.pathDistance<=high);
+            if(mesh.visible){mesh.position.fromArray(p.position);mesh.quaternion.setFromUnitVectors(FORWARD_AXIS,(this.tmpRaceBoostDirection??=new THREE.Vector3()).fromArray(p.direction));}
+        }
+    }
+    updateRaceSpeedLines(dt) {
+        const intensity=this.reducedHyperdriveMotion?0:(this.raceSpeedIntensity??0);
+        if(intensity>0&&!this.raceSpeedLines){
+            const positions=new Float32Array(32*6),geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+            const material=new THREE.LineBasicMaterial({color:0x91d8ed,transparent:true,opacity:0,depthWrite:false,toneMapped:false});
+            const lines=new THREE.LineSegments(geometry,material);lines.frustumCulled=false;this.camera.add(lines);this.raceSpeedLines=lines;
+        }
+        const lines=this.raceSpeedLines;if(!lines)return;lines.visible=intensity>.03;if(!lines.visible)return;
+        const a=lines.geometry.attributes.position.array,aspect=this.camera.aspect,half=Math.tan(this.camera.fov*Math.PI/360);
+        for(let i=0;i<32;i++){
+            const angle=i*2.39996323,phase=(i*.618034+this.skyTime*(.3+intensity*.6))%1,z=5+phase*22;
+            // Keep every streak outside the central aiming area.
+            const x=Math.cos(angle)*.88*half*aspect,y=Math.sin(angle)*.88*half;
+            const length=.4+intensity*2;
+            a[i*6]=x*z;a[i*6+1]=y*z;a[i*6+2]=-z;
+            a[i*6+3]=x*(z+length);a[i*6+4]=y*(z+length);a[i*6+5]=-z-length;
+        }
+        lines.geometry.attributes.position.needsUpdate=true;lines.material.opacity=intensity*.16;
+        lines.material.color.setHex(0x91d8ed);
+    }
     createRaceGateMesh() {
         const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.055, 10, 40), new THREE.MeshBasicMaterial({ color: 0x53e6c8, transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false }));
         // Neutral glow texture tinted per state below (ported from the
@@ -4335,7 +4303,7 @@ export class SpaceRenderer {
         return group;
     }
     // A compact physical marker at the gathering point. It is visible during
-    // travel and the countdown but has no physics representation. The ring is
+    // travel, and has no physics representation. The ring is
     // aligned to the supplied direction; the post remains upright so the
     // marker reads clearly even when approached from above or below.
     syncRaceStart(gathering, phase = 'travel') {
@@ -4446,7 +4414,9 @@ export class SpaceRenderer {
                 group.visible = false;
                 return;
             }
-            group.visible = true;
+            // Only the next five gates belong in the flight view. Passed
+            // rings and a distant finish must not compete with the next turn.
+            group.visible = index >= currentIndex && index < currentIndex + 5;
             vectorInto(gate.position, group.position);
             // Honor an authored gate direction. Older courses did not carry
             // one, so retain the predecessor/center fallback.
@@ -4472,54 +4442,19 @@ export class SpaceRenderer {
             const isFinish = gate.kind === 'finish';
             finishRing.visible = isFinish;
             finishRing.scale.setScalar(group.userData.finishRingScale);
-            // Color language (matching the radar's gate blips): GREEN = fly
-            // through now, YELLOW = next after that, GREY = later, and dim
-            // GREY = passed. Only a gate explicitly marked `kind: 'finish'`
-            // receives the gold/white double-ring treatment.
-            if (isFinish) {
-                ring.material.color.setHex(0xffd36b);
-                ring.material.opacity = 0.96;
-                glow.material.color.setHex(0xffd36b);
-                glow.material.opacity = 0.52;
-                finishRing.material.color.setHex(0xffffed);
-                finishRing.material.opacity = 0.94;
-                group.userData.glowOpacity = 0.52;
-            }
-            else if (index === currentIndex) {
-                ring.material.color.setHex(0x3dff6e);
-                ring.material.opacity = 0.95;
-                glow.material.color.setHex(0x3dff6e);
-                glow.material.opacity = 0.5;
-                group.userData.glowOpacity = 0.5;
-            }
-            else if (index === currentIndex + 1) {
-                ring.material.color.setHex(0xffd24a);
-                ring.material.opacity = 0.8;
-                glow.material.color.setHex(0xffd24a);
-                glow.material.opacity = 0.3;
-                group.userData.glowOpacity = 0.3;
-            }
-            else if (index === currentIndex + 2) {
-                ring.material.color.setHex(0x9aa6b0);
-                ring.material.opacity = 0.5;
-                glow.material.color.setHex(0x9aa6b0);
-                glow.material.opacity = 0.1;
-                group.userData.glowOpacity = 0.1;
-            }
-            else if (index < currentIndex) {
-                ring.material.color.setHex(0x6b7680);
-                ring.material.opacity = 0.12;
-                glow.material.color.setHex(0x6b7680);
-                glow.material.opacity = 0.03;
-                group.userData.glowOpacity = 0.03;
-            }
-            else {
-                ring.material.color.setHex(0x9aa6b0);
-                ring.material.opacity = 0.14;
-                glow.material.color.setHex(0x9aa6b0);
-                glow.material.opacity = 0.04;
-                group.userData.glowOpacity = 0.04;
-            }
+            // Match the cockpit radar: next = green, following = yellow,
+            // remaining preview gates = grey. Finish keeps its double outline
+            // but follows the same next/following color priority.
+            const color = index === currentIndex ? 0x3dff6e : index === currentIndex + 1 ? 0xffd24a : 0x9aa6b0;
+            const opacity = index === currentIndex ? .95 : index === currentIndex + 1 ? .85 : .55;
+            const glowOpacity = index === currentIndex ? .5 : index === currentIndex + 1 ? .3 : .1;
+            ring.material.color.setHex(color);
+            ring.material.opacity = opacity;
+            glow.material.color.setHex(color);
+            glow.material.opacity = glowOpacity;
+            finishRing.material.color.setHex(color);
+            finishRing.material.opacity = .9;
+            group.userData.glowOpacity = glowOpacity;
             ring.scale.setScalar(group.userData.baseRingScale);
         });
         for (let index = gates.length; index < this.raceGateMeshes.length; index += 1)
@@ -5070,6 +5005,11 @@ export class SpaceRenderer {
         this.instanceRoots.forEach((root, rootId) => {
             root.visible = rootId === this.activeInstanceId && LOCATIONS[rootId]?.systemId === this.systemId;
         });
+        const shadows=this.activeInstanceId==='shardbelt';
+        if(this.renderer?.shadowMap&&this.sunLight&&this.renderer.shadowMap.enabled!==shadows){
+            this.renderer.shadowMap.enabled=shadows;this.sunLight.castShadow=shadows;
+            if(shadows){this.renderer.shadowMap.needsUpdate=true;this.sunLight.shadow.needsUpdate=true;this.asteroidShadowRefreshAt=0;}
+        }
         this.updateDistantInstanceVisibility();
         if (id === 'mourning-line') {
             void this.ensureGraveyardModels();
@@ -5231,7 +5171,8 @@ export class SpaceRenderer {
         this.updateDistantInstanceVisibility();
         this.skyRoot.position.copy(this.camera.position);
         // Tighter FOV swing so the cockpit frame doesn't punch in.
-        this.fovTarget = afterburner ? 80 : 70 + speedRatio * 2.0;
+        this.fovTarget = (afterburner ? 80 : 70 + speedRatio * 2.0) + (this.reducedHyperdriveMotion?0:(this.raceSpeedIntensity??0)*3);
+        this.updateRaceSpeedLines(dt);
         const previousFov = this.camera.fov;
         this.camera.fov += (this.fovTarget - this.camera.fov) * (1 - Math.exp(-5 * dt));
         if (Math.abs(this.camera.fov - previousFov) > 0.001)
@@ -5288,125 +5229,18 @@ export class SpaceRenderer {
     }
 
     spawnShipWreck(ship, variant, explosionScale) {
-        const fragments = createHullDebris(ship.position, Math.max(.5, explosionScale*.65), ship.velocity);
-        this.scene.add(fragments.object);
-        this.effects.push(fragments);
-        // Cosmetic wrecks keep the existing salvage/drop economy unchanged.
-        // Retain at most eight, and retire each after three minutes.
-        const wrecks = this.effects.filter(effect => effect.combatWreck && effect.life > 0);
-        if (wrecks.length >= 8) wrecks[0].life = 0;
-        // Break the rendered hull itself: graveyard assets have displaced parts,
-        // different origins, and often belong to an entirely different ship.
-        const source = this.shipMeshes?.get(ship.id);
-        if (!source) return fragments.object; // No visible hull to hand off (e.g. off-screen death).
-        source.updateWorldMatrix(true, true);
-        const root = new THREE.Group();
-        source.getWorldPosition(root.position);
-        source.getWorldQuaternion(root.quaternion);
-        source.getWorldScale(root.scale);
-        const initialScale = root.scale.clone();
-        const inverse = source.matrixWorld.clone().invert();
-        const pieces = [];
-        const bounds = new THREE.Box3();
-        const point = new THREE.Vector3();
-        source.traverseVisible(child => {
-            if (!child.isMesh || !child.geometry?.attributes.position || child.material?.isShaderMaterial) return;
-            const matrix = new THREE.Matrix4().multiplyMatrices(inverse, child.matrixWorld);
-            const positions = child.geometry.attributes.position;
-            for (let i = 0; i < positions.count; i++)
-                bounds.expandByPoint(point.fromBufferAttribute(positions, i).applyMatrix4(matrix));
-            pieces.push({ child, matrix });
-        });
-        if (!pieces.length) return fragments.object;
-        const length = Math.max(.01, bounds.max.z - bounds.min.z);
-        const sections = Array.from({ length: 3 }, (_, i) => {
-            const group = new THREE.Group();
-            group.position.z = bounds.min.z + length * (i + .5) / 3;
-            root.add(group);
-            return { group, origin: group.position.clone() };
-        });
-        const materials = new Map(), textures = new Map();
-        const damagedMaterial = original => {
-            if (materials.has(original)) return materials.get(original);
-            const material = original.clone();
-            material.userData.shared = false;
-            material.onBeforeCompile = original.onBeforeCompile;
-            material.customProgramCacheKey = original.customProgramCacheKey;
-            material.emissiveIntensity = 0;
-            material.roughness = .95;
-            material.side = THREE.DoubleSide;
-            // Own texture handles while retaining their decoded image. Wreck
-            // cleanup must never dispose a texture used by a surviving ship.
-            for (const [key, value] of Object.entries(material)) if (value?.isTexture) {
-                if (!textures.has(value)) {
-                    const texture = value.clone();
-                    texture.userData.shared = false;
-                    textures.set(value, texture);
-                }
-                material[key] = textures.get(value);
-            }
-            materials.set(original, material);
-            return material;
-        };
-        for (const { child, matrix } of pieces) {
-            const geometry = child.geometry, positions = geometry.attributes.position;
-            const index = geometry.index;
-            const buckets = [[], [], []], groups = [[], [], []];
-            const ranges = geometry.groups.length ? geometry.groups : [{ start: 0, count: index?.count ?? positions.count, materialIndex: 0 }];
-            for (const range of ranges) {
-                const starts = buckets.map(bucket => bucket.length);
-                for (let i = range.start; i < range.start + range.count; i += 3) {
-                    const ids = [0, 1, 2].map(j => index ? index.getX(i + j) : i + j);
-                    let z = 0;
-                    for (const id of ids) z += point.fromBufferAttribute(positions, id).applyMatrix4(matrix).z / 3;
-                    const section = Math.max(0, Math.min(2, Math.floor((z - bounds.min.z) / length * 3)));
-                    buckets[section].push(...ids);
-                }
-                buckets.forEach((bucket, i) => groups[i].push({ start: starts[i], count: bucket.length - starts[i], materialIndex: range.materialIndex }));
-            }
-            buckets.forEach((indices, i) => {
-                if (!indices.length) return;
-                const fragment = geometry.clone();
-                fragment.userData.shared = false;
-                fragment.setIndex(indices);
-                fragment.clearGroups();
-                for (const group of groups[i]) if (group.count) fragment.addGroup(group.start, group.count, group.materialIndex);
-                const material = Array.isArray(child.material) ? child.material.map(damagedMaterial) : damagedMaterial(child.material);
-                const mesh = new THREE.Mesh(fragment, material);
-                mesh.matrixAutoUpdate = false;
-                mesh.matrix.makeTranslation(0, 0, -sections[i].origin.z).multiply(matrix);
-                mesh.raycast = () => undefined;
-                sections[i].group.add(mesh);
-            });
-        }
-        this.scene.add(root);
-        // Preserve the ship's velocity; wreckage has no space drag.
-        const drift = new THREE.Vector3().fromArray(ship.velocity ?? [0, 0, 0]);
-        let elapsed = 0;
-        const colors = [...materials.values()].map(material => [material, material.color?.clone()]);
-        const effect = { object: root, combatWreck: true, life: 180, maxLife: 180, update(dt) {
-            const previous = elapsed;
-            elapsed += dt;
-            root.position.addScaledVector(drift, dt);
-            // Separation starts gently under the blast, then the pieces keep
-            // moving apart at a steady speed instead of easing to a stop.
-            const breakupTime = Math.max(0, elapsed - .18);
-            const breakup = 1 - Math.exp(-breakupTime * .8);
-            const turnTime = Math.max(0, elapsed - .18) - Math.max(0, previous - .18);
-            root.rotateY(turnTime * .012);
-            root.rotateZ(turnTime * .007);
-            sections.forEach(({ group, origin }, i) => {
-                const side = i - 1;
-                group.position.copy(origin);
-                group.position.x += side * length * .025 * breakupTime;
-                group.position.z += side * length * .065 * breakupTime;
-                group.rotation.set(side * .07 * breakup, side * .1 * breakup, side * .08 * breakup);
-            });
-            for (const [material, color] of colors) if (color) material.color.copy(color).multiplyScalar(1 - .48 * breakup);
-            root.scale.copy(initialScale).multiplyScalar(Math.min(1, Math.max(0, (180 - elapsed) / 8)));
-        }};
-        this.effects.push(effect);
-        return root;
+        const fragments=createHullDebris(ship.position,Math.max(.5,explosionScale*.65),ship.velocity);
+        this.scene.add(fragments.object);this.effects.push(fragments);
+        // Retire older cosmetic wrecks before debris-heavy battles accumulate
+        // draw calls. Stationary salvage nodes remain entirely separate.
+        const limit=this.qualityMode==='low'||this.touchDevice||this.isIOS||this.viewportWidth<1000?3:6;
+        const wrecks=this.effects.filter(effect=>effect.combatWreck&&effect.life>0);
+        if(wrecks.length>=limit)wrecks[0].life=0;
+        const source=this.shipMeshes?.get(ship.id);if(!source?.userData.glb)return fragments.object;
+        this.wreckFactory??=new ShipWreckFactory();
+        const hardware=[...(this.turretMeshes?.values()??[])].filter(mesh=>mesh.visible&&mesh.userData.attachment?.ownerId===ship.id);
+        const effect=this.wreckFactory.create(source,ship,hardware);if(!effect)return fragments.object;
+        this.scene.add(effect.object);this.effects.push(effect);return effect.object;
     }
 
     shieldImpactPoint(actor, extents, impact, origin, out = this.shieldImpactWorld ??= new THREE.Vector3()) {
@@ -5806,7 +5640,7 @@ export class SpaceRenderer {
             }
             if (effect.life <= 0) {
                 this.scene.remove(effect.object);
-                this.disposeObject(effect.object);
+                if(effect.dispose)effect.dispose();else this.disposeObject(effect.object);
                 this.effects.splice(index, 1);
             }
         }
@@ -5845,6 +5679,7 @@ export class SpaceRenderer {
                 if (activity) updateStationActivity(activity, this.skyTime);
             }
         }
+        for(const mesh of this.raceBoostMeshes??[])if(mesh.visible){mesh.children[0].rotation.y+=dt;mesh.children[1].rotation.z-=dt*.6;}
         const mourningVisible = Boolean(this.instanceRoots.get('mourning-line')?.visible);
         if (mourningVisible) {
             for (const piece of this.graveyard) {
@@ -6197,7 +6032,7 @@ export class SpaceRenderer {
         for (const texture of textures) this.renderer.initTexture?.(texture);
         return root;
     }
-    async prepareActiveScene() {
+    async prepareActiveScene({timeoutMs = SHADER_WARMUP_TIMEOUT_MS} = {}) {
         if (this.disposed || this.contextLost)
             return;
         let timeoutId;
@@ -6206,9 +6041,47 @@ export class SpaceRenderer {
         try {
             combatWarmup = this.prepareCombatWarmup();
             this.scene.add(combatWarmup);
-            const compile = typeof this.renderer.compileAsync === 'function'
-                ? this.renderer.compileAsync(this.scene, this.camera)
-                : Promise.resolve(this.renderer.compile(this.scene, this.camera));
+            // Three keys programs by the target's color space/tone mapping.
+            // Compiling only for the canvas left the HDR/bloom impact variant
+            // cold, so the first bump could compile it in the middle of a race.
+            const targets = [null];
+            if (!this.isIOS && (this.bloomEnabled() || this.ringVolumeEnabled)) {
+                if (!this.bloomSceneTarget) this.createBloomPipeline();
+                targets.push(this.bloomSceneTarget);
+            }
+            const previousTarget = this.renderer.getRenderTarget();
+            let compile;
+            try {
+                const prepare = (object, camera, target) => {
+                    this.renderer.setRenderTarget(target);
+                    return typeof this.renderer.compileAsync === 'function'
+                        ? this.renderer.compileAsync(object, camera)
+                        : Promise.resolve(this.renderer.compile(object, camera));
+                };
+                const stages = targets.map(target => prepare(this.scene, this.camera, target));
+                // These passes are outside the main scene. Auto quality can
+                // enable bloom later, so a scene-only warmup misses them.
+                if (this.bloomQuad) {
+                    const material = this.bloomQuad.material;
+                    try {
+                        for (const [next, target] of [
+                            [this.bloomBrightMaterial, this.bloomBlurTargets[0]],
+                            [this.bloomBlurMaterial, this.bloomBlurTargets[1]],
+                            [this.bloomCompositeMaterial, null],
+                        ]) {
+                            this.bloomQuad.material = next;
+                            stages.push(prepare(this.bloomQuad, this.bloomCamera, target));
+                        }
+                    }
+                    finally { this.bloomQuad.material = material; }
+                }
+                if (!this.isIOS && this.ringVolumeEnabled) {
+                    if (this.ringVolume?.mesh) stages.push(prepare(this.ringVolume.mesh, this.bloomCamera, this.bloomSceneTarget));
+                    if (this.ringParticles?.mesh) stages.push(prepare(this.ringParticles.mesh, this.camera, this.bloomSceneTarget));
+                }
+                compile = Promise.all(stages);
+            }
+            finally { this.renderer.setRenderTarget(previousTarget); }
             // Keep resources alive until Three finishes its readiness polling,
             // even when the loading-screen timeout wins the race.
             this.pendingShaderCompiles ??= new Set();
@@ -6219,9 +6092,16 @@ export class SpaceRenderer {
                 timeoutId = setTimeout(() => {
                     timedOut = true;
                     resolve();
-                }, SHADER_WARMUP_TIMEOUT_MS);
+                }, timeoutMs);
             });
             await Promise.race([compile, timeout]);
+            if (!timedOut) {
+                // The pinned Three build defers shader diagnostics/uniform
+                // discovery until first use, even after compileAsync resolves.
+                // Finish that work here while the loading cover is still up.
+                for (const program of this.renderer.info?.programs ?? [])
+                    program.getUniforms?.();
+            }
             if (timedOut)
                 console.warn('Flight-scene shader warm-up timed out; using first-render fallback.');
         }
@@ -6253,8 +6133,15 @@ export class SpaceRenderer {
         if (this.instanceRoots.get('mourning-line')?.visible || this.instanceRoots.get('shardbelt')?.visible) {
             if (this.instanceRoots.get('mourning-line')?.visible)
                 this.updateGraveyardInstances(this.viewFrustum);
-            if (this.instanceRoots.get('shardbelt')?.visible)
-                this.updateAsteroidInstances(this.viewFrustum);
+            if (this.instanceRoots.get('shardbelt')?.visible) {
+                // Keep off-camera fragments in the caster batches too, so
+                // turning the camera cannot remove their shadows.
+                this.updateAsteroidInstances();
+            }
+            if(this.renderer.shadowMap.enabled&&this.skyTime>=(this.asteroidShadowRefreshAt??0)){
+                this.renderer.shadowMap.needsUpdate=true;this.sunLight.shadow.needsUpdate=true;
+                this.asteroidShadowRefreshAt=this.skyTime+.25;
+            }
         }
         const volumeActive = !this.isIOS && this.ringVolumeEnabled && this.locationMeshes.get('azure')?.visible
             && this.viewFrustum.intersectsSphere(this.ringVolume.bounds);
@@ -6459,8 +6346,10 @@ export class SpaceRenderer {
         }
     }
     disposeResources() {
+        for(const effect of this.effects??[]){this.scene.remove(effect.object);if(effect.dispose)effect.dispose();else this.disposeObject(effect.object);}this.effects=[];
+        this.wreckFactory?.dispose();this.wreckFactory=undefined;
         this.clearDrones();
-        this.combatLootMeshes?.clear();this.combatLootGeometry?.dispose();this.combatLootMaterial?.dispose();
+        this.combatLootMeshes?.clear();disposeLootVisualResources(this.combatLootResources);this.combatLootResources=undefined;
         window.removeEventListener('resize', this.resize);
         this.containerResizeObserver?.disconnect();
         this.renderer.domElement.removeEventListener('webglcontextlost', this.onContextLost);
@@ -6479,6 +6368,7 @@ export class SpaceRenderer {
         this.combatWarmupRoot = null;
         this.disposeObject(this.scene);
         this.scene.environment?.dispose();
+        this.sunLight?.shadow?.dispose();
         for (const model of this.glbShipModels.values()) {
             if (model)
                 this.disposeObject(model);

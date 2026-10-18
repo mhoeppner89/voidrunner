@@ -301,7 +301,7 @@ export class AudioManager {
         this.context = undefined;
     }
 
-    update(dt, throttle, afterburner, damage = 0, nearbyEnemies = 0, musicContext) {
+    update(dt, throttle, afterburner, damage = 0, nearbyEnemies = 0, musicContext, raceIntensity = 0) {
         if (!this.context || !this.enabled)
             return;
         if (musicContext)
@@ -309,10 +309,10 @@ export class AudioManager {
         const now = this.context.currentTime;
         const thrust = this.stationMode ? 0 : throttle;
         const burn = this.stationMode ? 0 : (afterburner ? 1 : 0);
-        const sampledEngines = updateSampleEngines(this, thrust, burn);
+        const sampledEngines = updateSampleEngines(this, thrust, burn, raceIntensity);
         const engineBase = sampledEngines || this.stationMode ? 0 : 0.04 + thrust * 0.06 + burn * 0.05;
         this.setEngineTarget(this.engineGain?.gain, engineBase, now, 0.11);
-        const pitch = 41 + thrust * 30 + burn * 25 + damage * 7;
+        const pitch = 41 + thrust * 30 + burn * 25 + damage * 7 + raceIntensity * 14;
         this.setEngineTarget(this.engineOscA?.frequency, pitch, now, 0.1);
         this.setEngineTarget(this.engineOscB?.frequency, pitch * 1.047, now, 0.1);
         this.setEngineTarget(this.engineSub?.frequency, pitch * 0.49, now, 0.12);

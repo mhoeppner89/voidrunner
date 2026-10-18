@@ -98,7 +98,7 @@ export const ArenaRunMethods={
   this.preloadRunWaveModels();
   this.setupArena({run:true,environment:wave.environment,scenario:'free-flight'},false);this.updateActiveInstance(true);
   this.spawnRunWingmen();
-  this.gunCooldown=0;this.mountFireAt={};this.missileCooldown=0;this.ui.runFitNotice='';
+  this.gunCooldown=0;this.mountFireAt={};this.groupFireAt=undefined;this.groupFireHull=undefined;this.missileCooldown=0;this.ui.runFitNotice='';
   this.save.player.mode='combat';this.save.player.currentTargetId=undefined;
   r.phase='combat';r.checkpoint=clone(this.save.player);delete r.checkpoint.turretRuntime;delete r.checkpoint.prevPosition;delete r.checkpoint.prevRotation;
   r.checkpointStats={elapsed:r.elapsed,damage:r.damage,missiles:r.missiles};

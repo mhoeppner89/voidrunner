@@ -1,7 +1,7 @@
 import {SHIP_COLLISION_DATA} from './shipCollisionData.js';
 import {segmentMeshHit,prepareMeshQueryIndex} from './meshQueries.js';
 import {prepareSurfaceMeshIndex} from './surfaceMeshCandidates.js';
-import {triangleBoxContact,boxBoxContact} from './collisionSat.js';
+import {triangleBoxContact,boxBoxContact,boxBoxOverlap} from './collisionSat.js';
 import {graveyardCollisionMesh} from './worldData.js';
 // Small contact tolerance only. Weapon hulls are identical for player/NPC.
 export const PLAYER_CONTACT_SCALE=.96;
@@ -181,13 +181,20 @@ export function shipVsShip(posA,qA,variantA,scaleA,posB,qB,variantB,scaleB,out,s
         halfB[0]=(nb.maxX-nb.minX)*ratio/2;halfB[1]=(nb.maxY-nb.minY)*ratio/2;halfB[2]=(nb.maxZ-nb.minZ)*ratio/2;boxBounds();
         if(stats)stats.boundsTests=(stats.boundsTests??0)+1;
         if(na.maxX<bounds[0]||na.minX>bounds[3]||na.maxY<bounds[1]||na.minY>bounds[4]||na.maxZ<bounds[2]||na.minZ>bounds[5])continue;
+        halfA[0]=(na.maxX-na.minX)*.5;halfA[1]=(na.maxY-na.minY)*.5;halfA[2]=(na.maxZ-na.minZ)*.5;
+        if(!boxBoxOverlap(boxX-(na.minX+na.maxX)*.5,boxY-(na.minY+na.maxY)*.5,boxZ-(na.minZ+na.maxZ)*.5,halfA,halfB,matrix))continue;
+        // Keep authored traversal order: the first solid cell supplies the
+        // response normal. Prune empty regions without changing that contact.
         if(!na.leaf){pairs[pending++]=ia+1;pairs[pending++]=ib;pairs[pending++]=a.nodes[ia+1].skip;pairs[pending++]=ib;continue;}
         if(!nb.leaf){pairs[pending++]=ia;pairs[pending++]=ib+1;pairs[pending++]=ia;pairs[pending++]=b.nodes[ib+1].skip;continue;}
         for(let j=nb.first;j<nb.end;j++){const k=b.order[j],v=b.boxes,x=(v[k]+v[k+3])*ratio/2,y=(v[k+1]+v[k+4])*ratio/2,z=(v[k+2]+v[k+5])*ratio/2;
             boxX=matrix[0]*x+matrix[1]*y+matrix[2]*z+ox;boxY=matrix[3]*x+matrix[4]*y+matrix[5]*z+oy;boxZ=matrix[6]*x+matrix[7]*y+matrix[8]*z+oz;
             halfB[0]=(v[k+3]-v[k])*ratio/2;halfB[1]=(v[k+4]-v[k+1])*ratio/2;halfB[2]=(v[k+5]-v[k+2])*ratio/2;
+            boxBounds();
             for(let i=na.first;i<na.end;i++){
-                if(stats)stats.partTests=(stats.partTests??0)+1;boxContact(a.order[i]);
+                const part=a.order[i],cells=a.boxes;
+                if(cells[part+3]<bounds[0]-1e-9||cells[part]>bounds[3]+1e-9||cells[part+4]<bounds[1]-1e-9||cells[part+1]>bounds[4]+1e-9||cells[part+5]<bounds[2]-1e-9||cells[part+2]>bounds[5]+1e-9)continue;
+                if(stats)stats.partTests=(stats.partTests??0)+1;boxContact(part);
                 if(deepest>0){
                     // One real solid contact is sufficient to detect a pair.
                     // Deep spawn/ram overlaps need a whole-body exit, otherwise

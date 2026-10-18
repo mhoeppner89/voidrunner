@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v433-0-8-2gp-mining-transition';
+const CACHE = 'voidrunner-v481-0-8-2ij-asteroid-shadows';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -22,6 +22,14 @@ const CORE_ASSETS = [
   './vendor/three.module.min.js',
   './vendor/three.core.min.js',
   './src/game/adventureDialogues.js',
+  './src/game/graveyardLayout.js',
+  './src/game/graveyardRacing.js',
+  './src/game/raceDynamics.js',
+  './src/game/raceHulls.js',
+  './src/game/racePilot.js',
+  './src/game/flightDynamics.js',
+  './src/game/raceContact.js',
+  './src/game/raceTactics.js',
   './src/game/combatTactics.js',
   './src/game/enemyLoadouts.js',
   './src/game/npcGunnery.js',
@@ -37,6 +45,8 @@ const CORE_ASSETS = [
   './src/game/independentPaints.js',
   './src/game/wayfarerLiveries.js',
   './src/game/explosionFx.js',
+  './src/game/shipWreckFx.js',
+    './src/game/graveyardArt.js',
   './src/game/capitalEngineExhaust.js',
   './src/game/battleshipModels.js',
   './src/game/battleshipModelData.js',
@@ -101,6 +111,10 @@ const CORE_ASSETS = [
   './src/game/i18n.js',
   './src/game/localContracts.js',
   './src/game/missionWorldData.js',
+  './src/game/asteroidFieldLayout.js',
+  './src/game/asteroidRoutes.js',
+  './src/game/asteroidTerrain.js',
+  './src/game/asteroidMaterials.js',
   './src/game/combatTargeting.js',
   './src/game/combatPiloting.js',
   './src/game/combatPlanning.js',
@@ -115,10 +129,12 @@ const CORE_ASSETS = [
   './src/game/itemIcons.js',
   './src/game/equipmentStatPresentation.js',
   './src/game/careerLoot.js',
+  './src/game/lootVisuals.js',
   './src/game/pilots.js',
   './src/game/quests.js',
   './src/game/random.js',
   './src/game/racing.js',
+  './src/game/raceNavigation.js',
   './src/game/save.js',
   './src/game/careerMetrics.js',
   './src/game/playerStrength.js',

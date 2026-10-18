@@ -1,0 +1,651 @@
+[
+  {
+    "kind": "battleship",
+    "hullClass": "battleship",
+    "output": "concord-battleship-wreck-v4.glb",
+    "damageProfile": "battleship",
+    "cutPlanes": [
+      [
+        [
+          1,
+          0.026,
+          -0.02
+        ],
+        -0.44
+      ],
+      [
+        [
+          1,
+          0.026,
+          -0.02
+        ],
+        0.56
+      ]
+    ],
+    "source": "assets/models/capital/concord-battleship.glb",
+    "sha256": "12d7937fae9be197f8ae74b3eebc11591626d0b66cc946229c4d551a7c3eb90b",
+    "passages": [
+      {
+        "id": "bow-break",
+        "center": [
+          -0.58,
+          -0.07,
+          0
+        ],
+        "halfWidth": 0.045,
+        "halfHeight": 0.06,
+        "openingHalfWidth": 0.14,
+        "openingHalfHeight": 0.24,
+        "halfLength": 0.95
+      },
+      {
+        "id": "drive-break",
+        "center": [
+          0.72,
+          -0.07,
+          0
+        ],
+        "halfWidth": 0.045,
+        "halfHeight": 0.06,
+        "openingHalfWidth": 0.14,
+        "openingHalfHeight": 0.24,
+        "halfLength": 0.95
+      }
+    ],
+    "damage": "pressure-ruptures-and-peeled-armour",
+    "peeledMetalThickness": 0.003,
+    "shellThickness": 0.006,
+    "solidSurfaces": [
+      {
+        "part": "Battleship wreck forward section",
+        "thickness": 0.006,
+        "originalTriangles": 4644,
+        "backedTriangles": 2932,
+        "edgeTriangles": 4752
+      },
+      {
+        "part": "Battleship wreck midsection",
+        "thickness": 0.006,
+        "originalTriangles": 14715,
+        "backedTriangles": 9489,
+        "edgeTriangles": 14026
+      },
+      {
+        "part": "Battleship wreck engine section",
+        "thickness": 0.006,
+        "originalTriangles": 6624,
+        "backedTriangles": 3636,
+        "edgeTriangles": 6676
+      },
+      {
+        "part": "Battleship wreck detached engine pod",
+        "thickness": 0.006,
+        "originalTriangles": 2140,
+        "backedTriangles": 1348,
+        "edgeTriangles": 2856
+      },
+      {
+        "part": "Battleship wreck bridge",
+        "thickness": 0.006,
+        "originalTriangles": 659,
+        "backedTriangles": 433,
+        "edgeTriangles": 514
+      },
+      {
+        "part": "Battleship wreck bridge support 1",
+        "thickness": 0.006,
+        "originalTriangles": 487,
+        "backedTriangles": 247,
+        "edgeTriangles": 666
+      },
+      {
+        "part": "Battleship wreck bridge support 2",
+        "thickness": 0.006,
+        "originalTriangles": 576,
+        "backedTriangles": 204,
+        "edgeTriangles": 512
+      },
+      {
+        "part": "Battleship wreck bridge support 3",
+        "thickness": 0.006,
+        "originalTriangles": 768,
+        "backedTriangles": 320,
+        "edgeTriangles": 552
+      }
+    ],
+    "bytes": 6551188,
+    "triangles": 79776
+  },
+  {
+    "kind": "carrier",
+    "hullClass": "carrier",
+    "output": "concord-carrier-wreck-v4.glb",
+    "damageProfile": "carrier",
+    "cutPlanes": [
+      [
+        [
+          1,
+          -0.2,
+          0.24
+        ],
+        -0.61
+      ]
+    ],
+    "source": "assets/models/capital/concord-carrier.glb",
+    "sha256": "d215c83fa4cb5fac9fdcb525b0ff27e947d692a0cf1c6917751cf98e612a479f",
+    "passages": [
+      {
+        "id": "bow-break",
+        "center": [
+          -0.84,
+          -0.04,
+          0
+        ],
+        "halfWidth": 0.045,
+        "halfHeight": 0.06,
+        "openingHalfWidth": 0.14,
+        "openingHalfHeight": 0.24,
+        "halfLength": 0.95
+      }
+    ],
+    "damage": "pressure-ruptures-and-peeled-armour",
+    "peeledMetalThickness": 0.003,
+    "shellThickness": 0.006,
+    "solidSurfaces": [
+      {
+        "part": "Carrier wreck bow",
+        "thickness": 0.006,
+        "originalTriangles": 6428,
+        "backedTriangles": 3696,
+        "edgeTriangles": 7004
+      },
+      {
+        "part": "Carrier wreck command island",
+        "thickness": 0.006,
+        "originalTriangles": 1173,
+        "backedTriangles": 73,
+        "edgeTriangles": 106
+      },
+      {
+        "part": "Carrier wreck detached engine pod",
+        "thickness": 0.006,
+        "originalTriangles": 1430,
+        "backedTriangles": 1006,
+        "edgeTriangles": 1868
+      },
+      {
+        "part": "Carrier wreck flight deck",
+        "thickness": 0.006,
+        "originalTriangles": 26680,
+        "backedTriangles": 14778,
+        "edgeTriangles": 28092
+      },
+      {
+        "part": "Carrier wreck ejected structure 1",
+        "thickness": 0.006,
+        "originalTriangles": 2492,
+        "backedTriangles": 1768,
+        "edgeTriangles": 3368
+      },
+      {
+        "part": "Carrier wreck ejected structure 2",
+        "thickness": 0.006,
+        "originalTriangles": 2725,
+        "backedTriangles": 1429,
+        "edgeTriangles": 3086
+      },
+      {
+        "part": "Carrier wreck ejected structure 3",
+        "thickness": 0.006,
+        "originalTriangles": 1123,
+        "backedTriangles": 991,
+        "edgeTriangles": 2330
+      },
+      {
+        "part": "Carrier wreck ejected structure 4",
+        "thickness": 0.006,
+        "originalTriangles": 1578,
+        "backedTriangles": 994,
+        "edgeTriangles": 2152
+      }
+    ],
+    "bytes": 9866028,
+    "triangles": 116370
+  },
+  {
+    "kind": "cruiser",
+    "hullClass": "cruiser",
+    "output": "concord-cruiser-wreck-v4.glb",
+    "damageProfile": "cruiser",
+    "cutPlanes": [
+      [
+        [
+          1,
+          0.08,
+          -0.24
+        ],
+        0.56
+      ]
+    ],
+    "source": "assets/models/capital/concord-cruiser.glb",
+    "sha256": "4dc291f6b4143db2aa645bcef42020ecde948d838ec5fd66d2dcaa8426950a15",
+    "passages": [
+      {
+        "id": "drive-break",
+        "center": [
+          0.9,
+          -0.04,
+          0
+        ],
+        "halfWidth": 0.045,
+        "halfHeight": 0.06,
+        "openingHalfWidth": 0.14,
+        "openingHalfHeight": 0.24,
+        "halfLength": 0.8
+      }
+    ],
+    "damage": "pressure-ruptures-and-peeled-armour",
+    "peeledMetalThickness": 0.003,
+    "shellThickness": 0.006,
+    "solidSurfaces": [
+      {
+        "part": "Cruiser wreck command tower",
+        "thickness": 0.006,
+        "originalTriangles": 699,
+        "backedTriangles": 143,
+        "edgeTriangles": 210
+      },
+      {
+        "part": "Cruiser wreck command hull",
+        "thickness": 0.006,
+        "originalTriangles": 15085,
+        "backedTriangles": 11691,
+        "edgeTriangles": 18378
+      },
+      {
+        "part": "Cruiser wreck engine cluster",
+        "thickness": 0.006,
+        "originalTriangles": 7144,
+        "backedTriangles": 5704,
+        "edgeTriangles": 10080
+      },
+      {
+        "part": "Cruiser wreck detached engine pod",
+        "thickness": 0.006,
+        "originalTriangles": 2759,
+        "backedTriangles": 2719,
+        "edgeTriangles": 5618
+      },
+      {
+        "part": "Cruiser wreck ejected structure 1",
+        "thickness": 0.006,
+        "originalTriangles": 420,
+        "backedTriangles": 376,
+        "edgeTriangles": 728
+      },
+      {
+        "part": "Cruiser wreck ejected structure 2",
+        "thickness": 0.006,
+        "originalTriangles": 1036,
+        "backedTriangles": 976,
+        "edgeTriangles": 1708
+      }
+    ],
+    "bytes": 5635856,
+    "triangles": 85474
+  },
+  {
+    "kind": "cruiser-broadside",
+    "hullClass": "cruiser",
+    "output": "concord-cruiser-broadside.glb",
+    "damageProfile": "cruiser-broadside",
+    "cutPlanes": [
+      [
+        [
+          0.1,
+          0.12,
+          1
+        ],
+        0.22
+      ]
+    ],
+    "source": "assets/models/capital/concord-cruiser.glb",
+    "sha256": "4dc291f6b4143db2aa645bcef42020ecde948d838ec5fd66d2dcaa8426950a15",
+    "passages": [],
+    "damage": "pressure-ruptures-and-peeled-armour",
+    "peeledMetalThickness": 0.003,
+    "shellThickness": 0.006,
+    "solidSurfaces": [
+      {
+        "part": "Cruiser wreck command tower",
+        "thickness": 0.006,
+        "originalTriangles": 697,
+        "backedTriangles": 141,
+        "edgeTriangles": 202
+      },
+      {
+        "part": "Cruiser wreck command hull",
+        "thickness": 0.006,
+        "originalTriangles": 7961,
+        "backedTriangles": 4997,
+        "edgeTriangles": 8950
+      },
+      {
+        "part": "Cruiser wreck broadside shell",
+        "thickness": 0.006,
+        "originalTriangles": 2093,
+        "backedTriangles": 1893,
+        "edgeTriangles": 4138
+      },
+      {
+        "part": "Cruiser wreck ejected structure 1",
+        "thickness": 0.006,
+        "originalTriangles": 449,
+        "backedTriangles": 405,
+        "edgeTriangles": 754
+      },
+      {
+        "part": "Cruiser wreck ejected structure 2",
+        "thickness": 0.006,
+        "originalTriangles": 846,
+        "backedTriangles": 846,
+        "edgeTriangles": 1952
+      }
+    ],
+    "bytes": 3164964,
+    "triangles": 36324
+  },
+  {
+    "kind": "frigate",
+    "hullClass": "frigate",
+    "output": "concord-frigate-wreck-v3.glb",
+    "damageProfile": "frigate",
+    "cutPlanes": [
+      [
+        [
+          1,
+          0.38,
+          0.16
+        ],
+        -0.06
+      ]
+    ],
+    "source": "assets/models/capital/concord-frigate.glb",
+    "sha256": "6c3d0d2c2d1d96a177b5613210ee18e7dbd08bed10646e9ef4c8b11778f84be7",
+    "passages": [],
+    "damage": "pressure-ruptures-and-peeled-armour",
+    "peeledMetalThickness": 0.003,
+    "shellThickness": 0.006,
+    "solidSurfaces": [
+      {
+        "part": "Frigate wreck forward section",
+        "thickness": 0.006,
+        "originalTriangles": 3757,
+        "backedTriangles": 2509,
+        "edgeTriangles": 3918
+      },
+      {
+        "part": "Frigate wreck command tower",
+        "thickness": 0.006,
+        "originalTriangles": 242,
+        "backedTriangles": 38,
+        "edgeTriangles": 48
+      },
+      {
+        "part": "Frigate wreck engine section",
+        "thickness": 0.006,
+        "originalTriangles": 6570,
+        "backedTriangles": 5098,
+        "edgeTriangles": 7528
+      },
+      {
+        "part": "Frigate wreck ejected structure 1",
+        "thickness": 0.006,
+        "originalTriangles": 100,
+        "backedTriangles": 100,
+        "edgeTriangles": 164
+      },
+      {
+        "part": "Frigate wreck ejected structure 2",
+        "thickness": 0.006,
+        "originalTriangles": 76,
+        "backedTriangles": 76,
+        "edgeTriangles": 132
+      }
+    ],
+    "bytes": 2654816,
+    "triangles": 30356
+  },
+  {
+    "kind": "frigate-drive-loss",
+    "hullClass": "frigate",
+    "output": "concord-frigate-drive-loss.glb",
+    "damageProfile": "frigate-drive-loss",
+    "cutPlanes": [
+      [
+        [
+          1,
+          -0.18,
+          0.1
+        ],
+        0.62
+      ]
+    ],
+    "source": "assets/models/capital/concord-frigate.glb",
+    "sha256": "6c3d0d2c2d1d96a177b5613210ee18e7dbd08bed10646e9ef4c8b11778f84be7",
+    "passages": [],
+    "damage": "pressure-ruptures-and-peeled-armour",
+    "peeledMetalThickness": 0.003,
+    "shellThickness": 0.006,
+    "solidSurfaces": [
+      {
+        "part": "Frigate wreck command tower",
+        "thickness": 0.006,
+        "originalTriangles": 242,
+        "backedTriangles": 38,
+        "edgeTriangles": 48
+      },
+      {
+        "part": "Frigate wreck forward section",
+        "thickness": 0.006,
+        "originalTriangles": 8235,
+        "backedTriangles": 5659,
+        "edgeTriangles": 9526
+      },
+      {
+        "part": "Frigate wreck engine section",
+        "thickness": 0.006,
+        "originalTriangles": 4744,
+        "backedTriangles": 4104,
+        "edgeTriangles": 6452
+      },
+      {
+        "part": "Frigate wreck ejected structure 1",
+        "thickness": 0.006,
+        "originalTriangles": 100,
+        "backedTriangles": 100,
+        "edgeTriangles": 164
+      },
+      {
+        "part": "Frigate wreck ejected structure 2",
+        "thickness": 0.006,
+        "originalTriangles": 76,
+        "backedTriangles": 76,
+        "edgeTriangles": 132
+      }
+    ],
+    "bytes": 3170432,
+    "triangles": 39696
+  },
+  {
+    "kind": "frigate-broadside",
+    "hullClass": "frigate",
+    "output": "concord-frigate-broadside.glb",
+    "damageProfile": "frigate-broadside",
+    "cutPlanes": [
+      [
+        [
+          0.1,
+          0.12,
+          1
+        ],
+        -0.13
+      ]
+    ],
+    "source": "assets/models/capital/concord-frigate.glb",
+    "sha256": "6c3d0d2c2d1d96a177b5613210ee18e7dbd08bed10646e9ef4c8b11778f84be7",
+    "passages": [],
+    "damage": "pressure-ruptures-and-peeled-armour",
+    "peeledMetalThickness": 0.003,
+    "shellThickness": 0.006,
+    "solidSurfaces": [
+      {
+        "part": "Frigate wreck command tower",
+        "thickness": 0.006,
+        "originalTriangles": 242,
+        "backedTriangles": 38,
+        "edgeTriangles": 48
+      },
+      {
+        "part": "Frigate wreck forward section",
+        "thickness": 0.006,
+        "originalTriangles": 3960,
+        "backedTriangles": 2688,
+        "edgeTriangles": 4244
+      },
+      {
+        "part": "Frigate wreck port armour",
+        "thickness": 0.006,
+        "originalTriangles": 2123,
+        "backedTriangles": 1547,
+        "edgeTriangles": 2670
+      },
+      {
+        "part": "Frigate wreck ejected structure 1",
+        "thickness": 0.006,
+        "originalTriangles": 100,
+        "backedTriangles": 100,
+        "edgeTriangles": 164
+      },
+      {
+        "part": "Frigate wreck ejected structure 2",
+        "thickness": 0.006,
+        "originalTriangles": 76,
+        "backedTriangles": 76,
+        "edgeTriangles": 132
+      }
+    ],
+    "bytes": 2060104,
+    "triangles": 18208
+  },
+  {
+    "kind": "wayfarer",
+    "hullClass": "wayfarer",
+    "output": "wayfarer-wreck.glb",
+    "damageProfile": "wayfarer",
+    "cutPlanes": [
+      [
+        [
+          1,
+          0.026,
+          -0.02
+        ],
+        -0.44
+      ],
+      [
+        [
+          1,
+          0.026,
+          -0.02
+        ],
+        0.56
+      ]
+    ],
+    "source": "assets/models/ships/wayfarer.glb",
+    "sha256": "aa426f3507dcd274e292155b588b381dcafd4929eace886a457da85710eed6d7",
+    "passages": [],
+    "damage": "pressure-ruptures-and-peeled-armour",
+    "peeledMetalThickness": 0.003,
+    "shellThickness": 0.006,
+    "solidSurfaces": [
+      {
+        "part": "Wayfarer wreck prow",
+        "thickness": 0.006,
+        "originalTriangles": 3135,
+        "backedTriangles": 1929,
+        "edgeTriangles": 3686
+      },
+      {
+        "part": "Wayfarer wreck cabin",
+        "thickness": 0.006,
+        "originalTriangles": 6244,
+        "backedTriangles": 3148,
+        "edgeTriangles": 5900
+      },
+      {
+        "part": "Wayfarer wreck drive",
+        "thickness": 0.006,
+        "originalTriangles": 3130,
+        "backedTriangles": 2446,
+        "edgeTriangles": 3896
+      }
+    ],
+    "bytes": 2474248,
+    "triangles": 33514
+  },
+  {
+    "kind": "talon",
+    "hullClass": "talon",
+    "output": "talon-wreck.glb",
+    "damageProfile": "talon",
+    "cutPlanes": [
+      [
+        [
+          1,
+          0.026,
+          -0.02
+        ],
+        -0.44
+      ],
+      [
+        [
+          1,
+          0.026,
+          -0.02
+        ],
+        0.56
+      ]
+    ],
+    "source": "assets/models/ships/talon.glb",
+    "sha256": "69ca47f34c934569f6f411b86a37296f16cbab5f0adb83185227840736395b41",
+    "passages": [],
+    "damage": "pressure-ruptures-and-peeled-armour",
+    "peeledMetalThickness": 0.003,
+    "shellThickness": 0.006,
+    "solidSurfaces": [
+      {
+        "part": "Talon wreck nose",
+        "thickness": 0.006,
+        "originalTriangles": 2470,
+        "backedTriangles": 1550,
+        "edgeTriangles": 2572
+      },
+      {
+        "part": "Talon wreck wing core",
+        "thickness": 0.006,
+        "originalTriangles": 5979,
+        "backedTriangles": 4479,
+        "edgeTriangles": 6834
+      },
+      {
+        "part": "Talon wreck engine",
+        "thickness": 0.006,
+        "originalTriangles": 6001,
+        "backedTriangles": 3757,
+        "edgeTriangles": 5870
+      }
+    ],
+    "bytes": 2691012,
+    "triangles": 39512
+  }
+]

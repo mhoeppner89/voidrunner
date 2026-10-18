@@ -6,16 +6,16 @@ import {GRAVEYARD_MODEL_COLLIDERS} from '../../src/game/worldData.js';
 import {GRAVEYARD_COLLISION_PROFILES} from '../../src/game/graveyardCollisionProfiles.js';
 import {LOCATIONS} from '../../src/game/data.js';
 
-test('repeated wrecks use four frigate arrangements and two cruiser arrangements without extra assets',()=>{
+test('repeated wrecks share three frigate damage models and two distinct cruiser damage models',()=>{
  for(const [kind,count] of [['frigate',4],['cruiser',2]]){
   const wrecks=GRAVEYARD_MODEL_WRECKS.filter(w=>w.class===kind);
   assert.equal(new Set(wrecks.map(w=>w.variant??0)).size,count);
-  assert.equal(new Set(wrecks.map(w=>w.file)).size,1);
+  assert.equal(new Set(wrecks.map(w=>w.file)).size,kind==='frigate'?3:2);
  }
  for(const w of GRAVEYARD_MODEL_WRECKS){
   if(w.interior)assert.equal(wreckSectionDelta(w,w.interior.sectionName),undefined);
   for(const key of Object.keys(WRECK_SECTION_VARIANTS[w.class]?.[w.variant??0]??{}))
-   assert.ok(GRAVEYARD_COLLISION_PROFILES[w.class].some(p=>p.name===key));
+   assert.ok(GRAVEYARD_COLLISION_PROFILES[w.modelKey??w.class].some(p=>p.name===key));
  }
 });
 
@@ -23,7 +23,7 @@ test('each collider follows the same section delta as the rendered mesh and stay
  const origin=new THREE.Vector3(...LOCATIONS['mourning-line'].position);
  for(const w of GRAVEYARD_MODEL_WRECKS){
   const whole=new THREE.Matrix4().compose(origin.clone().add(new THREE.Vector3(...w.local)),new THREE.Quaternion().setFromEuler(new THREE.Euler(...w.rotation)),new THREE.Vector3().setScalar(w.scale));
-  for(const p of GRAVEYARD_COLLISION_PROFILES[w.class]){
+  for(const p of GRAVEYARD_COLLISION_PROFILES[w.modelKey??w.class]){
    const delta=wreckSectionDelta(w,p.name);
    const part=new THREE.Matrix4().compose(new THREE.Vector3(...(delta?.position??[0,0,0])),new THREE.Quaternion().setFromEuler(new THREE.Euler(...(delta?.rotation??[0,0,0]))),new THREE.Vector3(1,1,1));
    const collider=GRAVEYARD_MODEL_COLLIDERS.find(c=>c.modelWreckId===w.id&&c.sectionName===p.name);
@@ -45,7 +45,29 @@ test('arrangements and salvage remain fixed across reloads and depletion',()=>{
  const a=generateWreckNodes('variant-check',{}),b=generateWreckNodes('variant-check',{[a[0]?.id]:0});
  assert.deepEqual(a.map(n=>[n.id,n.position,n.insideWreckId]),b.map(n=>[n.id,n.position,n.insideWreckId]));
  const frigates=GRAVEYARD_MODEL_COLLIDERS.filter(c=>c.modelClass==='frigate');
- for(const a of frigates)for(const b of frigates)if(a.sectionName===b.sectionName){assert.equal(a.meshVerts,b.meshVerts);assert.equal(a.meshIndices,b.meshIndices);}
+ for(const a of frigates)for(const b of frigates)if(a.modelAssetKey===b.modelAssetKey&&a.sectionName===b.sectionName){assert.equal(a.meshVerts,b.meshVerts);assert.equal(a.meshIndices,b.meshIndices);}
+});
+
+test('capital wrecks have different fracture topology and retain complete command structures',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const patterns=new Map();
+ for(const w of GRAVEYARD_MODEL_WRECKS.filter((w,i,a)=>!['wayfarer','talon'].includes(w.class)&&a.findIndex(x=>x.file===w.file)===i)){
+  const b=await readFile(w.file),json=JSON.parse(b.subarray(20,20+b.readUInt32LE(12))),key=w.modelKey??w.class;
+  assert.equal(json.asset.extras.damageProfile,key);
+  patterns.set(key,JSON.stringify(json.asset.extras.cutPlanes));
+  const command=json.meshes.find(m=>/command tower|command island|wreck bridge$/.test(m.name));
+  assert.ok(command,w.id+' has no retained command structure');
+  const pose=wreckSectionDelta(w,command.name);
+  assert.ok(Math.hypot(...pose.rotation)>.2,w.id+' command structure has no tilt');
+  if(w.class!=='battleship'){
+   const minimum=Math.min(...command.primitives.map(p=>json.accessors[p.attributes.POSITION].min[1]));
+   assert.ok(minimum<(w.class==='frigate'?.13:w.class==='carrier'?.18:.31),w.id+' only detached the antenna platform');
+   assert.equal(json.meshes.filter(m=>m.name.includes('ejected structure')).length,w.class==='carrier'?4:2,w.id+' removed material vanished');
+  }
+ }
+ assert.equal(new Set(patterns.values()).size,patterns.size,'fracture planes were copied across hull types');
+ const frigates=GRAVEYARD_MODEL_COLLIDERS.filter(c=>c.modelClass==='frigate'&&c.sectionName==='Frigate wreck forward section');
+ for(const a of frigates)for(const b of frigates)if(a.modelAssetKey!==b.modelAssetKey)assert.notEqual(a.meshVerts,b.meshVerts,'different damage models share a collider');
 });
 
 test('section arrangements introduce no new intersections on authored race centerlines',async()=>{
@@ -54,7 +76,7 @@ test('section arrangements introduce no new intersections on authored race cente
  const ray=new THREE.Ray(),a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3(),hit=new THREE.Vector3();
  const routes=Object.values(RACE_COURSES).filter(course=>course.zone==='mourning-line');
  let checked=0;
- for(const w of GRAVEYARD_MODEL_WRECKS.filter(w=>w.variant))for(const p of GRAVEYARD_COLLISION_PROFILES[w.class]){
+ for(const w of GRAVEYARD_MODEL_WRECKS.filter(w=>w.variant))for(const p of GRAVEYARD_COLLISION_PROFILES[w.modelKey??w.class]){
   const delta=wreckSectionDelta(w,p.name);if(!delta)continue;
   const world=new THREE.Matrix4().compose(origin.clone().add(new THREE.Vector3(...w.local)),new THREE.Quaternion().setFromEuler(new THREE.Euler(...w.rotation)),new THREE.Vector3().setScalar(w.scale));
   const part=new THREE.Matrix4().compose(new THREE.Vector3(...delta.position),new THREE.Quaternion().setFromEuler(new THREE.Euler(...delta.rotation)),new THREE.Vector3(1,1,1));

@@ -1,7 +1,9 @@
 import * as THREE from 'three';
+import { generateShardbeltDeposits } from './asteroidFieldLayout.js';
 import { LOCATIONS } from './data.js';
 import { pick, randomBetween, randomInt, seededRandom } from './random.js';
 import { t } from './i18n.js';
+import {raceBoostLayout} from './raceDynamics.js';
 import { RACE_COURSES } from './racing.js';
 import { GRAVEYARD_COLLISION_PROFILES } from './graveyardCollisionProfiles.js';
 import { wreckSectionDelta, GRAVEYARD_MODEL_WRECKS, generateWreckNodes, miningClaimCandidates, miningClaimName } from './missionWorldData.js';
@@ -39,6 +41,7 @@ const buildRaceCorridors = (zone) => {
         if (course.zone !== zone)
             continue;
         segments.push(...courseCorridorSegments(course));
+        if(zone==='mourning-line')for(const p of raceBoostLayout(course.localPoints))segments.push([p.approach,p.position],[p.position,p.rejoin]);
     }
     return segments;
 };
@@ -60,39 +63,13 @@ const pointSegmentDistanceSq = (point, start, end) => {
     return ox * ox + oy * oy + oz * oz;
 };
 const intersectsRaceCorridor = (zone, local, reach) => {
-    const limitSq = (Math.max(0, reach) + RACE_CORRIDOR_MARGIN) ** 2;
+    const limitSq = (Math.max(0, reach) + (zone === 'mourning-line' ? 30 : RACE_CORRIDOR_MARGIN)) ** 2;
     for (const [start, end] of RACE_CORRIDORS[zone] ?? [])
         if (pointSegmentDistanceSq(local, start, end) <= limitSq)
             return true;
     return false;
 };
-const closestRaceFrame = (zone, local, courseId) => {
-    let bestDistanceSq = Infinity;
-    let bestDirection = [0, 0, 1];
-    let bestCenter = [...local];
-    const segments = courseId ? courseCorridorSegments(RACE_COURSES[courseId]) : (RACE_CORRIDORS[zone] ?? []);
-    for (const [start, end] of segments) {
-        const dx = end[0] - start[0];
-        const dy = end[1] - start[1];
-        const dz = end[2] - start[2];
-        const lengthSq = dx * dx + dy * dy + dz * dz;
-        const along = lengthSq > 1e-8
-            ? Math.max(0, Math.min(1, ((local[0] - start[0]) * dx + (local[1] - start[1]) * dy + (local[2] - start[2]) * dz) / lengthSq))
-            : 0;
-        const center = [start[0] + dx * along, start[1] + dy * along, start[2] + dz * along];
-        const ox = local[0] - center[0];
-        const oy = local[1] - center[1];
-        const oz = local[2] - center[2];
-        const distanceSq = ox * ox + oy * oy + oz * oz;
-        if (distanceSq >= bestDistanceSq)
-            continue;
-        bestDistanceSq = distanceSq;
-        bestDirection = [dx, dy, dz];
-        bestCenter = center;
-    }
-    return { center: bestCenter, direction: bestDirection };
-};
-// The asteroid surface is a detail-2 icosahedron whose vertices are pushed
+// Asteroid surfaces use detail-1/2 icosahedra whose vertices are pushed
 // radially by a per-variant distortion function, then scaled per axis by the
 // rock's radius × node.scale. That deformed mesh is the ONLY source of truth
 // for both the rendered rock (render.js builds its instanced geometry from it)
@@ -101,14 +78,17 @@ const closestRaceFrame = (zone, local, courseId) => {
 let asteroidBaseMeshes = null;
 const buildAsteroidBaseMeshes = () => {
     const meshes = [];
-    for (let variant = 0; variant < 4; variant += 1) {
-        const geometry = new THREE.IcosahedronGeometry(1, 2);
+    for (let variant = 0; variant < 8; variant += 1) {
+        const geometry = new THREE.IcosahedronGeometry(1, variant < 4 ? 2 : 1);
         const positions = geometry.getAttribute('position');
         const vertex = new THREE.Vector3();
         for (let index = 0; index < positions.count; index += 1) {
             vertex.fromBufferAttribute(positions, index);
             const seedPhase = variant * 7.31;
-            const distortion = 0.72 + 0.32 * Math.sin(vertex.x * (6.3 + variant * 1.9) + vertex.y * (9.7 + variant * 2.3) + vertex.z * (13.1 + variant * 1.5) + seedPhase);
+            const distortion = variant < 4
+                ? 0.72 + 0.32 * Math.sin(vertex.x * (6.3 + variant * 1.9) + vertex.y * (9.7 + variant * 2.3) + vertex.z * (13.1 + variant * 1.5) + seedPhase)
+                : .84 + .11 * Math.sin(vertex.x * 3.3 + vertex.y * 4.1 + vertex.z * 3.7 + seedPhase)
+                    + .035 * Math.sin(vertex.x * 9.1 - vertex.z * 7.3 + seedPhase);
             vertex.multiplyScalar(distortion);
             positions.setXYZ(index, vertex.x, vertex.y, vertex.z);
         }
@@ -197,6 +177,9 @@ const depletedOrRoll = (rng, depleted, id, low, high) => {
 // sphere can never approximate a flat slab).
 export const GRAVEYARD_GEOMETRY_HALF_EXTENTS = {
     engine: [1, 0.5, 1],
+    girder: [0.5, 0.5, 0.5],
+    machinery: [0.5, 0.5, 0.5],
+    vessel: [0.5, 0.5, 0.5],
     carrierHull: [0.58, 0.44, 0.62],
     battleshipHull: [0.6, 0.5, 0.68],
     frigateHull: [0.42, 0.38, 0.66],
@@ -204,6 +187,7 @@ export const GRAVEYARD_GEOMETRY_HALF_EXTENTS = {
     // The panel is now a beveled, irregular extrusion rather than a paper-thin
     // box. Keep the collision envelope aligned with the generated geometry.
     panel: [0.56, 0.135, 0.56],
+    shard: [0.54, 0.2, 0.54],
     disc: [1, 0.08, 1],
     turret: [1, 0.2, 1],
     // THREE.TorusGeometry lies in the local XY plane; its hole runs along Z.
@@ -304,10 +288,10 @@ const buildGraveyardModelColliders = () => {
     const worldCenter = new THREE.Vector3();
     const colliders = [];
     for (const wreck of GRAVEYARD_MODEL_WRECKS) {
-        const profiles = GRAVEYARD_COLLISION_PROFILES[wreck.class] ?? [];
+        const profiles = GRAVEYARD_COLLISION_PROFILES[wreck.modelKey??wreck.class] ?? [];
         configQuaternion.setFromEuler(new THREE.Euler(...wreck.rotation, 'XYZ'));
         profiles.forEach((profile, sectionIndex) => {
-            const mesh = scaledColliderMesh(wreck.class, sectionIndex, profile, wreck.scale);
+            const mesh = scaledColliderMesh(wreck.modelKey??wreck.class, sectionIndex, profile, wreck.scale);
             const delta = wreckSectionDelta(wreck, profile.name);
             sectionQuaternion.setFromEuler(new THREE.Euler(...(delta?.rotation ?? [0, 0, 0]), 'XYZ'));
             colliderQuaternion.copy(configQuaternion).multiply(sectionQuaternion);
@@ -320,6 +304,7 @@ const buildGraveyardModelColliders = () => {
                 id: `${wreck.id}:section:${sectionIndex}`,
                 modelWreckId: wreck.id,
                 modelClass: wreck.class,
+                modelAssetKey: wreck.modelKey??wreck.class,
                 sectionName: profile.name,
                 position: Object.freeze(worldCenter.toArray()),
                 halfExtents: Object.freeze(halfExtents),
@@ -470,11 +455,37 @@ export const getGraveyardGeometry = (kind) => {
         case 'panel':
             geometry = extrudedGraveyardGeometry(GRAVEYARD_GEOMETRY_PROFILES[kind]);
             break;
+        case 'shard': {
+            geometry=extrudedGraveyardGeometry({outline:[[-.49,-.42],[-.2,-.5],[.16,-.37],[.47,-.44],[.32,-.12],[.5,.12],[.11,.5],[-.04,.25],[-.4,.4]],depth:.055,bevelThickness:.012,bevelSize:.014});
+            const a=geometry.attributes.position;
+            for(let i=0;i<a.count;i++){const x=a.getX(i),z=a.getZ(i);a.setY(i,a.getY(i)+Math.max(0,z+.05)*.38+Math.max(0,-x-.2)*.22);}
+            geometry.center();geometry.computeVertexNormals();break;
+        }
         case 'disc': geometry = new THREE.CylinderGeometry(1, 1, 0.16, 14); break;
         case 'turret': geometry = new THREE.CylinderGeometry(0.72, 1, 0.34, 8); break;
         case 'ring': {
             const profile = GRAVEYARD_GEOMETRY_PROFILES.ring;
             geometry = new THREE.TorusGeometry(profile.majorRadius, profile.tubeRadius, 6, 18);
+            break;
+        }
+        case 'machinery': {
+            geometry=extrudedGraveyardGeometry({outline:[[-.44,-.5],[.44,-.5],[.5,-.44],[.5,.44],[.44,.5],[-.44,.5],[-.5,.44],[-.5,-.44]],depth:.9,bevelThickness:.025,bevelSize:.025});
+            geometry.computeBoundingBox();
+            const size=geometry.boundingBox.getSize(new THREE.Vector3());geometry.scale(1/size.x,1/size.y,1/size.z);
+            break;
+        }
+        case 'vessel':
+            geometry=new THREE.LatheGeometry([[0,-.5],[.38,-.5],[.5,-.38],[.5,.38],[.38,.5],[0,.5]].map(p=>new THREE.Vector2(...p)),12);
+            break;
+        case 'girder': {
+            // Closed I-section. The flange/web triangles are used by both
+            // instanced rendering and the exact surface collider.
+            const positions=[], normals=[], uvs=[];
+            for(const [w,h,y] of [[1,.14,-.43],[.18,.72,0],[1,.14,.43]]) {
+                const box=new THREE.BoxGeometry(w,h,1).toNonIndexed();box.translate(0,y,0);
+                positions.push(...box.attributes.position.array);normals.push(...box.attributes.normal.array);uvs.push(...box.attributes.uv.array);box.dispose();
+            }
+            geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('normal',new THREE.Float32BufferAttribute(normals,3));geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
             break;
         }
         case 'spine': geometry = new THREE.BoxGeometry(0.34, 0.34, 1); break;
@@ -618,117 +629,8 @@ export const graveyardZoneAt = (position) => {
     return nearest?.id ?? 'field-lanes';
 };
 export const graveyardZoneLabel = (zoneId) => t(GRAVEYARD_ZONE_DEFINITIONS.find((zone) => zone.id === zoneId)?.label ?? 'FIELD LANES / OPEN DEBRIS');
-export const generateAsteroidField = (seed, depleted, scanned = []) => {
-    const rng = seededRandom(`${seed}:asteroid-field`);
-    const center = LOCATIONS.shardbelt.position;
-    const nodes = [];
-    const shape = () => randomInt(rng, 0, 3);
-    const pushIfRaceClear = (node, local, movingMargin = 0) => {
-        // Clear the rock's full envelope (sphere ∪ box corner reach), not just
-        // its bounding sphere: a rock that misses the corridor by its sphere
-        // can still have a spawn-clearance box corner intruding on a gate.
-        const reach = asteroidEnvelopeReach(node) + movingMargin;
-        if (!intersectsRaceCorridor('shardbelt', local, reach))
-            nodes.push(node);
-    };
-    // Rock crown: a broad, flyable tunnel through a ring of massive static bodies.
-    const ringRadius = 372;
-    for (let index = 0; index < 36; index += 1) {
-        const angle = (index / 36) * Math.PI * 2;
-        const radial = ringRadius + randomBetween(rng, -30, 36);
-        const local = [Math.cos(angle) * radial, Math.sin(angle) * radial * 0.78, randomBetween(rng, -78, 78)];
-        const id = `rock-crown-${index}`;
-        const remaining = depletedOrRoll(rng, depleted, id, 3.4, 7.8);
-        const node = {
-            id,
-            position: add(center, local),
-            velocity: [0, 0, 0],
-            radius: randomBetween(rng, 40, 80),
-            scale: [randomBetween(rng, 0.8, 1.4), randomBetween(rng, 0.7, 1.3), randomBetween(rng, 0.8, 1.5)],
-            rotation: [rng() * Math.PI, rng() * Math.PI, rng() * Math.PI],
-            rotationSpeed: [0, 0, 0],
-            moving: false,
-            resource: 'ore',
-            remaining,
-            scanned: scanned.includes(id),
-            tunnelPart: true,
-            shape: shape(),
-        };
-        pushIfRaceClear(node, local);
-    }
-    // Monoliths: huge, jagged slabs you can tuck behind for cover or mine dry.
-    for (let index = 0; index < 18; index += 1) {
-        const offset = sphericalOffset(rng, 1860, 900);
-        const id = `asteroid-monolith-${index}`;
-        const remaining = depletedOrRoll(rng, depleted, id, 4, 8);
-        const node = {
-            id,
-            position: add(center, offset),
-            velocity: [0, 0, 0],
-            radius: randomBetween(rng, 70, 130),
-            scale: [randomBetween(rng, 0.9, 1.6), randomBetween(rng, 0.7, 1.2), randomBetween(rng, 0.85, 1.5)],
-            rotation: [rng() * Math.PI, rng() * Math.PI, rng() * Math.PI],
-            rotationSpeed: [0, 0, 0],
-            moving: false,
-            resource: 'ore',
-            remaining,
-            scanned: scanned.includes(id),
-            tunnelPart: false,
-            shape: shape(),
-        };
-        pushIfRaceClear(node, offset);
-    }
-    for (let index = 0; index < 330; index += 1) {
-        let offset = sphericalOffset(rng, 2200, 210);
-        // Keep the central tunnel approach readable.
-        if (Math.hypot(offset[0], offset[1]) < 246 && Math.abs(offset[2]) < 990)
-            offset = [offset[0] + 405, offset[1], offset[2]];
-        const id = `asteroid-static-${index}`;
-        const remaining = depletedOrRoll(rng, depleted, id, 1.2, 5.4);
-        const node = {
-            id,
-            position: add(center, offset),
-            velocity: [0, 0, 0],
-            radius: randomBetween(rng, 8, index < 110 ? 64 : 40),
-            scale: [randomBetween(rng, 0.65, 1.5), randomBetween(rng, 0.6, 1.4), randomBetween(rng, 0.7, 1.55)],
-            rotation: [rng() * Math.PI, rng() * Math.PI, rng() * Math.PI],
-            rotationSpeed: [0, 0, 0],
-            moving: false,
-            resource: 'ore',
-            remaining,
-            scanned: scanned.includes(id),
-            tunnelPart: false,
-            shape: shape(),
-        };
-        pushIfRaceClear(node, offset);
-    }
-    for (let index = 0; index < 150; index += 1) {
-        const offset = sphericalOffset(rng, 2160, 114);
-        const speed = randomBetween(rng, 0.25, 1.75);
-        const theta = rng() * Math.PI * 2;
-        const id = `asteroid-drift-${index}`;
-        const remaining = depletedOrRoll(rng, depleted, id, 0.4, 1.8);
-        const node = {
-            id,
-            position: add(center, offset),
-            velocity: [Math.cos(theta) * speed, randomBetween(rng, -0.25, 0.25), Math.sin(theta) * speed],
-            radius: randomBetween(rng, 2, 11),
-            scale: [randomBetween(rng, 0.7, 1.35), randomBetween(rng, 0.7, 1.35), randomBetween(rng, 0.7, 1.35)],
-            rotation: [rng() * Math.PI, rng() * Math.PI, rng() * Math.PI],
-            rotationSpeed: [randomBetween(rng, -0.25, 0.25), randomBetween(rng, -0.25, 0.25), randomBetween(rng, -0.25, 0.25)],
-            moving: true,
-            resource: 'ore',
-            remaining,
-            scanned: scanned.includes(id),
-            tunnelPart: false,
-            shape: shape(),
-        };
-        // Drifters remain genuine live hazards, but do not begin directly in
-        // a race line. The extra band gives a pilot time to read their motion.
-        pushIfRaceClear(node, offset, 34);
-    }
-    return nodes;
-};
+// Mining boards and the live field use one lightweight, deterministic layout.
+export const generateAsteroidField = generateShardbeltDeposits;
 
 // These secondary fields are environmental terrain rather than mining nodes.
 // They still use the exact same deformed base meshes as Shardbelt so their
@@ -828,12 +730,19 @@ export const generateGraveyardPieces = (seed) => {
     // starboard, and +Y is up. The fixed formations tell the battle story;
     // seeded fragment streams add variation without dissolving the landmarks.
     const worldPosition = (local) => add(center, local);
-    const pushPiece = ({ id, kind, local, rotation = [0, 0, 0], scale, collisionRadius, halfExtents, moving = false, drift = [0, 0, 0], spin = [0, 0, 0], finish, collidable = true, render = true, zone, route, reserveRaceCorridor = false }) => {
+    const pushPiece = ({ id, kind, local, rotation = [0, 0, 0], scale, collisionRadius, halfExtents, moving = false, drift = [0, 0, 0], spin = [0, 0, 0], finish, collidable = true, render = true, zone, route, attachedWreckId, interiorPart, debrisCloud, reserveRaceCorridor = false }) => {
         // Fixed wreck structures are authored around the courses and remain
         // meaningful obstacles. Seeded loose debris is different: reject it
         // before insertion when its full visual reach would intrude into a
         // fixed main or shortcut line.
         const geometryHalfExtents = GRAVEYARD_GEOMETRY_HALF_EXTENTS[kind] ?? [0.5, 0.5, 0.5];
+        if(kind === 'panel') {
+            // A real extrusion can still read as a vanishing plane when its
+            // Y scale is tiny. Keep a readable edge on every loose plate,
+            // including the dense small-debris clouds, before clearance checks.
+            const depth = Math.max(.2,Math.min(scale[0],scale[2])*.045);
+            scale = [scale[0],Math.max(scale[1],depth/(2*geometryHalfExtents[1])),scale[2]];
+        }
         const visualReach = Math.max(1, Math.hypot(
             geometryHalfExtents[0] * scale[0],
             geometryHalfExtents[1] * scale[1],
@@ -871,6 +780,9 @@ export const generateGraveyardPieces = (seed) => {
             piece.render = false;
         if (halfExtents)
             piece.halfExtents = [...halfExtents];
+        if (attachedWreckId) piece.attachedWreckId=attachedWreckId;
+        if (interiorPart) piece.interiorPart=interiorPart;
+        if (debrisCloud) piece.debrisCloud=debrisCloud;
         if (zone)
             piece.zone = zone;
         if (route)
@@ -880,229 +792,49 @@ export const generateGraveyardPieces = (seed) => {
             looseDebrisClearances.push({ local: [...local], reach: raceReach });
         return true;
     };
-    const rotateLocalOffset = ([x, y, z], yaw) => {
-        const cosine = Math.cos(yaw);
-        const sine = Math.sin(yaw);
-        return [x * cosine + z * sine, y, -x * sine + z * cosine];
-    };
-    const offsetFrom = (anchor, offset, yaw = 0) => {
-        const rotated = rotateLocalOffset(offset, yaw);
-        return [anchor[0] + rotated[0], anchor[1] + rotated[1], anchor[2] + rotated[2]];
-    };
-    // Keep the carrier from presenting a perfectly head-on silhouette at the
-    // clean entry point. Its broken length should be visible as the player
-    // approaches, while the other wrecks retain their separate headings.
-    const carrierYaw = 0.36;
-    const carrierOffset = [0, 560, -420];
-    const pushCarrierPiece = ({ local, rotation = [0, 0, 0], ...piece }) => pushPiece({
-        ...piece,
-        // The enlarged authored Concord wrecks now carry the field's scale.
-        // Retain the carrier silhouette and hangar route, but trim its old
-        // oversized proxy chunks so they read as secondary debris.
-        scale: piece.scale.map((value) => value * 0.72),
-        local: add(rotateLocalOffset(local, carrierYaw), carrierOffset),
-        rotation: [rotation[0], rotation[1] + carrierYaw, rotation[2]],
-        zone: piece.zone ?? 'carrier-hangar',
-    });
-    const addCarrierFrame = (index, z) => {
-        // The carrier's hangar ribs are deliberately staggered and canted. A
-        // perfectly repeated rectangle reads as scaffolding; changing the
-        // shoulder, deck height, and missing keel makes this a broken ship
-        // section instead of four aligned boxes.
-        const section = [
-            { shoulder: 322, top: 238, bottom: -210, cant: -0.18 },
-            { shoulder: 286, top: 272, bottom: -232, cant: 0.12 },
-            { shoulder: 350, top: 214, bottom: -176, cant: -0.24 },
-            { shoulder: 252, top: 248, bottom: -220, cant: 0.2 },
-        ][index];
-        const span = section.shoulder * 2;
-        const height = section.top - section.bottom;
-        const centerY = (section.top + section.bottom) * 0.5;
-        if (index !== 3)
-            pushCarrierPiece({ id: `carrier-rib-${index}-port`, kind: 'beam', local: [-section.shoulder, centerY, z], rotation: [0, 0, section.cant], scale: [24, height, 18], finish: 'rust' });
-        if (index !== 1)
-            pushCarrierPiece({ id: `carrier-rib-${index}-starboard`, kind: 'beam', local: [section.shoulder, centerY, z], rotation: [0, 0, -section.cant], scale: [24, height, 18], finish: 'rust' });
-        if (index === 0 || index === 2)
-            pushCarrierPiece({ id: `carrier-rib-${index}-top`, kind: 'beam', local: [index % 2 ? -24 : 18, section.top, z], rotation: [0, 0, section.cant * 0.45], scale: [span, 24, 18], finish: 'rust' });
-        if (index === 0)
-            pushCarrierPiece({ id: `carrier-rib-${index}-keel`, kind: 'beam', local: [-18, section.bottom, z], rotation: [0, 0, -section.cant * 0.7], scale: [span * 0.9, 20, 18], finish: 'rust' });
-        if (index === 3)
-            pushCarrierPiece({ id: `carrier-rib-${index}-keel-fragment`, kind: 'beam', local: [section.shoulder * 0.42, section.bottom, z], rotation: [0, 0, -section.cant * 0.7], scale: [span * 0.42, 20, 18], finish: 'rust' });
-    };
-    // One carrier: a long, broken hangar spine with a readable central run.
-    pushCarrierPiece({ id: 'carrier-keel-left', kind: 'carrierHull', local: [-260, -80, -610], rotation: [0.04, -0.08, -0.03], scale: [150, 74, 700], finish: 'rust', moving: true, spin: [0.0007, -0.0011, 0.0003] });
-    pushCarrierPiece({ id: 'carrier-keel-right', kind: 'carrierHull', local: [250, 40, -500], rotation: [-0.03, 0.1, 0.04], scale: [135, 70, 640], finish: 'rust', moving: true, spin: [-0.0005, 0.0009, -0.0004] });
-    pushCarrierPiece({ id: 'carrier-flight-deck', kind: 'carrierHull', local: [0, 170, -680], rotation: [0.04, 0, 0], scale: [380, 22, 620], finish: 'rust', moving: true, spin: [0.0003, 0.0006, -0.0002] });
-    pushCarrierPiece({ id: 'carrier-bow', kind: 'carrierHull', local: [0, 45, -1390], rotation: [0, 0.08, 0], scale: [300, 110, 180], finish: 'rust', moving: true, spin: [-0.0004, 0.0003, 0.0002] });
-    // Wide deck shoulders and a broken elevator plate make the flight deck
-    // read as a carrier at a distance instead of a long rectangular wreck.
-    pushCarrierPiece({ id: 'carrier-deck-edge-port', kind: 'carrierHull', local: [-382, 148, -760], rotation: [0.04, -0.02, -0.04], scale: [72, 18, 420], finish: 'rust' });
-    pushCarrierPiece({ id: 'carrier-deck-edge-starboard', kind: 'carrierHull', local: [382, 155, -650], rotation: [0.03, 0.03, 0.05], scale: [70, 18, 360], finish: 'rust' });
-    pushCarrierPiece({ id: 'carrier-elevator-plate', kind: 'disc', local: [-116, 202, -960], rotation: [0.02, 0.08, 0.02], scale: [92, 8, 148], finish: 'route-gold' });
-    // Off-centre island: the asymmetry is the fastest long-range cue that this
-    // is a carrier, not a generic beam cage.
-    pushCarrierPiece({ id: 'carrier-island', kind: 'bridge', local: [215, 315, -760], rotation: [0.04, -0.12, 0.08], scale: [128, 112, 168], finish: 'rust' });
-    pushCarrierPiece({ id: 'carrier-island-turret', kind: 'turret', local: [230, 425, -760], rotation: [0, -0.12, 0], scale: [34, 12, 34], finish: 'rust' });
-    pushCarrierPiece({ id: 'carrier-island-mast', kind: 'spine', local: [245, 486, -760], rotation: [0, 0, 0], scale: [12, 12, 92], finish: 'rust' });
-    [-1060, -820, -580, -340].forEach((z, index) => addCarrierFrame(index, z));
-    pushCarrierPiece({ id: 'carrier-hangar-ring', kind: 'ring', local: [0, 0, -820], scale: [220, 220, 30], finish: 'rust' });
-    // The engine bank is behind the hangar. Its central bore is an intentional
-    // expert route rather than an accidental gap in the random field.
-    const engineRotation = [Math.PI / 2, 0, 0];
-    pushCarrierPiece({ id: 'carrier-engine-port', kind: 'engine', local: [-190, -35, 600], rotation: engineRotation, scale: [105, 105, 115], finish: 'rust', zone: 'outer-wake' });
-    pushCarrierPiece({ id: 'carrier-engine-starboard', kind: 'engine', local: [190, 35, 630], rotation: [Math.PI / 2, 0.04, 0], scale: [105, 105, 115], finish: 'rust', zone: 'outer-wake' });
-    pushCarrierPiece({ id: 'carrier-engine', kind: 'engine', local: [0, -30, 720], rotation: engineRotation, scale: [125, 125, 130], finish: 'rust', zone: 'outer-wake', moving: true, spin: [0.0002, -0.0004, 0.0003] });
-    // One battleship crosses below the carrier at the impact point. Split
-    // sections leave a narrow, visible gate through the centre instead of a
-    // solid wall; the vertical offset makes it a separate layer of the scene.
-    const battleshipOffset = [0, -380, 500];
-    const pushBattleshipPiece = ({ local, rotation = [0, 0, 0], ...piece }) => pushPiece({
-        ...piece,
-        local: add(local, battleshipOffset),
-        rotation: [rotation[0] + 0.05, rotation[1], rotation[2]],
-        zone: piece.zone ?? 'battleship-breach',
-    });
-    pushBattleshipPiece({ id: 'battleship-bow', kind: 'battleshipHull', local: [520, 85, 120], rotation: [0, -0.12, 0.08], scale: [520, 120, 170], finish: 'metal', moving: true, spin: [0.0002, 0.0005, -0.0003] });
-    pushBattleshipPiece({ id: 'battleship-stern', kind: 'battleshipHull', local: [-500, -55, 310], rotation: [0, 0.14, -0.05], scale: [430, 100, 150], finish: 'metal', moving: true, spin: [-0.0003, -0.0004, 0.0002] });
-    // The raised prow and long dorsal keel are deliberately asymmetrical: the
-    // battleship should read as a warship even when the bow is half lost in
-    // the impact fan.
-    pushBattleshipPiece({ id: 'battleship-prow', kind: 'battleshipHull', local: [852, 92, 108], rotation: [0.02, -0.2, 0.08], scale: [238, 78, 104], finish: 'metal' });
-    pushBattleshipPiece({ id: 'battleship-dorsal-keel', kind: 'spine', local: [248, 116, 268], rotation: [0.02, Math.PI / 2, 0.02], scale: [18, 18, 350], finish: 'metal' });
-    pushBattleshipPiece({ id: 'battleship-bow-array', kind: 'beam', local: [680, 258, 118], rotation: [0.06, -0.12, 0.22], scale: [18, 18, 150], finish: 'metal' });
-    pushBattleshipPiece({ id: 'battleship-bridge', kind: 'bridge', local: [70, 205, 230], rotation: [0.04, -0.08, 0], scale: [150, 92, 160], finish: 'metal' });
-    pushBattleshipPiece({ id: 'battleship-bridge-top', kind: 'bridge', local: [54, 292, 220], rotation: [0.08, -0.12, 0.04], scale: [92, 54, 98], finish: 'metal' });
-    pushBattleshipPiece({ id: 'battleship-deck', kind: 'battleshipHull', local: [260, 210, 190], rotation: [0.06, -0.16, 0.03], scale: [260, 16, 145], finish: 'metal' });
-    [[330, 235, 80], [650, 220, 165], [-300, 185, 345], [-620, 155, 390]].forEach(([x, y, z], index) => {
-        pushBattleshipPiece({ id: `battleship-turret-${index}`, kind: 'turret', local: [x, y, z], rotation: [0, index % 2 ? 0.14 : -0.1, 0], scale: [62, 18, 62], finish: 'metal' });
-        pushBattleshipPiece({ id: `battleship-gun-${index}`, kind: 'spine', local: [x + (index % 2 ? 42 : -42), y + 22, z + (index % 2 ? 70 : -70)], rotation: [0, Math.PI / 2, 0], scale: [14, 14, 130], finish: 'metal' });
-    });
-    pushBattleshipPiece({ id: 'battleship-gate-ring', kind: 'ring', local: [0, -10, 470], scale: [200, 200, 28], finish: 'metal' });
-    const addFrigate = (name, anchor, yaw, roll, pitch) => {
-        const place = (offset) => offsetFrom(anchor, offset, yaw);
-        const rotation = [pitch, yaw, roll];
-        pushPiece({ id: `${name}-mid`, kind: 'frigateHull', local: place([0, 0, 0]), rotation, scale: [72, 62, 245], finish: 'metal', zone: name });
-        pushPiece({ id: `${name}-bow`, kind: 'frigateHull', local: place([0, 18, 185]), rotation: [pitch + 0.05, yaw, roll], scale: [78, 66, 135], finish: 'metal', zone: name, moving: true, spin: [0.0004, -0.0005, 0.0003] });
-        pushPiece({ id: `${name}-deck`, kind: 'frigateHull', local: place([0, 72, 30]), rotation: [pitch + 0.08, yaw, roll], scale: [118, 10, 180], finish: 'metal', zone: name });
-        pushPiece({ id: `${name}-prow`, kind: 'frigateHull', local: place([0, 12, 286]), rotation: [pitch + 0.08, yaw, roll], scale: [46, 42, 74], finish: 'metal', zone: name });
-        pushPiece({ id: `${name}-keel`, kind: 'spine', local: place([0, -66, 18]), rotation, scale: [10, 10, 182], finish: 'metal', zone: name });
-        // A small offset bridge and forward gun give each escort a readable
-        // command end when viewed from the side of the field.
-        pushPiece({ id: `${name}-bridge`, kind: 'bridge', local: place([32, 112, 18]), rotation: [pitch + 0.1, yaw, roll + 0.04], scale: [58, 48, 78], finish: 'metal', zone: name });
-        pushPiece({ id: `${name}-turret`, kind: 'turret', local: place([-18, 150, 108]), rotation: [pitch + 0.04, yaw, roll], scale: [28, 9, 28], finish: 'metal', zone: name });
-        pushPiece({ id: `${name}-mast`, kind: 'spine', local: place([35, 158, 8]), rotation: [pitch, yaw, roll], scale: [8, 8, 58], finish: 'metal', zone: name });
-        pushPiece({ id: `${name}-engine`, kind: 'engine', local: place([0, -12, -205]), rotation: [Math.PI / 2 + pitch, yaw, roll], scale: [54, 54, 70], finish: 'metal', zone: name });
-        pushPiece({ id: `${name}-gate`, kind: 'ring', local: place([0, 0, 120]), rotation: [pitch, yaw, 0], scale: [112, 112, 18], finish: 'metal', zone: name });
-    };
-    // Two frigates were thrown into distinct upper and lower routes, rather
-    // than sharing the carrier/battleship plane.
-    addFrigate('frigate-alpha', [-1220, 760, -1050], -0.34, 0.12, 0.16);
-    addFrigate('frigate-beta', [1500, -780, 100], 0.46, -0.14, -0.2);
-    // Painted structural hoops make the routes legible without beacon lights.
-    // Their torus walls and broken fins are physical; the openings remain true
-    // holes, so a precise pilot can thread them while a clipped edge collides.
-    const addRouteFrames = ({ route, course, zone, finish, points, widths, heights }) => {
-        points.forEach((point, index) => {
-            // Face each physical hoop down the nearest authored race segment.
-            // A hoop at a bend aligned to the next decorative hoop instead of
-            // the incoming flight line forced racers through its visible wall.
-            const frame = closestRaceFrame('mourning-line', point, course);
-            const [dx, dy, dz] = frame.direction;
-            const frameCenter = frame.center;
-            const hoopQuaternion = new THREE.Quaternion().setFromUnitVectors(
-                new THREE.Vector3(0, 0, 1),
-                new THREE.Vector3(dx, dy, dz).normalize(),
-            );
-            const hoopEuler = new THREE.Euler().setFromQuaternion(hoopQuaternion, 'XYZ');
-            const pitch = hoopEuler.x;
-            const yaw = hoopEuler.y;
-            const width = widths[index] ?? widths[widths.length - 1];
-            const height = heights[index] ?? heights[heights.length - 1];
-            pushPiece({
-                id: `route-${route}-${index}-hoop`,
-                kind: 'ring',
-                local: frameCenter,
-                rotation: [pitch, yaw, 0],
-                scale: [width / 2.36, height / 2.36, 16],
-                finish,
-                zone,
-                route,
-            });
-            // Broken chevrons on the hoop sides indicate the route direction
-            // even when the player approaches from an oblique roll angle.
-            const sideVector = new THREE.Vector3(1, 0, 0).applyQuaternion(hoopQuaternion);
-            [-1, 1].forEach((side) => {
-                pushPiece({
-                    id: `route-${route}-${index}-fin-${side < 0 ? 'port' : 'starboard'}`,
-                    kind: 'panel',
-                    local: [frameCenter[0] + sideVector.x * side * width * 0.34, frameCenter[1] + sideVector.y * side * width * 0.34 + height * 0.08, frameCenter[2] + sideVector.z * side * width * 0.34],
-                    rotation: [pitch, yaw + side * 0.34, side * 0.16],
-                    scale: [width * 0.13, 5, 18],
-                    finish,
-                    zone,
-                    route,
-                });
-            });
-        });
-    };
-    addRouteFrames({
-        route: 'upper-hangar-run',
-        course: 'mourning-run',
-        zone: 'carrier-hangar',
-        finish: 'route-gold',
-        points: [[0, 90, -250], [0, 420, -620], [0, 520, -980]],
-        widths: [260, 340, 300],
-        heights: [160, 220, 195],
-    });
-    addRouteFrames({
-        route: 'lower-breach-crossing',
-        course: 'mourning-breach',
-        zone: 'battleship-breach',
-        finish: 'route-ice',
-        points: [[0, -90, 420], [60, -260, 900], [110, -400, 1480]],
-        widths: [330, 430, 390],
-        heights: [185, 230, 205],
-    });
-    addRouteFrames({
-        route: 'port-frigate-tunnel',
-        course: 'mourning-relict-gauntlet',
-        zone: 'frigate-alpha',
-        finish: 'route-copper',
-        points: [[-260, 100, -240], [-760, 480, -650], [-1130, 710, -980]],
-        widths: [180, 220, 195],
-        heights: [150, 180, 165],
-    });
-    addRouteFrames({
-        route: 'starboard-frigate-tunnel',
-        course: 'mourning-relict-gauntlet',
-        zone: 'frigate-beta',
-        finish: 'route-teal',
-        points: [[400, -420, 950], [720, -180, 900], [800, -480, 870]],
-        widths: [240, 260, 240],
-        heights: [200, 220, 200],
-    });
-    addRouteFrames({
-        route: 'outer-wake-run',
-        course: 'mourning-relict-gauntlet',
-        zone: 'outer-wake',
-        finish: 'route-ash',
-        points: [[180, -180, 2700], [0, 420, 3500]],
-        widths: [480, 560],
-        heights: [285, 320],
-    });
+    // Optional racing stabilizers lie alongside physical wreck fragments. The
+    // ship-width approach and return are reserved too, across every seed.
+    for(const course of Object.values(RACE_COURSES))if(course.zone==='mourning-line')for(const p of raceBoostLayout(course.localPoints)){
+        const parent=GRAVEYARD_MODEL_WRECKS.find(w=>Math.hypot(...p.hazard.map((v,j)=>v-w.local[j]))<w.clearanceRadius+26);
+        pushPiece({id:`boost-debris-${course.id}-${p.index}`,kind:'machinery',local:p.hazard,scale:[12,18,38],rotation:[.2,.4,-.3],finish:'structure',attachedWreckId:parent?.id});
+    }
+    // Substantial wreckage inside otherwise empty bends. These are torn
+    // assemblies, not race furniture: thick folded skins, broken spars and
+    // exposed machinery. Existing geometry/material batches are reused.
+    const turnDebris = [
+        {id:'carrier-torn-drive', center:[-180,1440,-180], size:100, rotation:[.25,.6,-.35]},
+        {id:'battleship-keel-section', center:[-1400,-200,2720], size:170, rotation:[-.2,-.3,.4]},
+        {id:'cruiser-reactor-spar', center:[-2100,40,850], size:240, rotation:[.35,.45,-.25]},
+    ];
+    for (const assembly of turnDebris) {
+        const {id,center:anchor,size,rotation}=assembly;
+        const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(...rotation));
+        const part=(name,kind,offset,dimensions,turn=[0,0,0])=>{
+            const local=new THREE.Vector3(...offset).multiplyScalar(size).applyQuaternion(q).add(new THREE.Vector3(...anchor));
+            const orientation=q.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...turn)));
+            const e=new THREE.Euler().setFromQuaternion(orientation);
+            pushPiece({id:`turn-debris-${id}-${name}`,kind,local:local.toArray(),scale:dimensions.map(v=>v*size),rotation:[e.x,e.y,e.z],finish:kind==='shard'?'metal':'structure'});
+        };
+        part('port-spar','girder',[-.22,0,0],[.055,.075,1.05]);
+        part('starboard-spar','girder',[.22,0,.08],[.055,.075,.88],[.08,0,.12]);
+        part('cross-member','girder',[0,0,-.2],[.05,.06,.57],[0,Math.PI/2,0]);
+        part('torn-skin','shard',[-.1,.08,-.05],[.56,.28,.74],[.12,.15,.35]);
+        part('folded-skin','shard',[.2,-.06,.2],[.35,.25,.46],[-.2,.2,-.7]);
+        part('power-unit','machinery',[0,-.05,-.1],[.26,.21,.32],[.1,0,.1]);
+        part('severed-tank','vessel',[.15,-.08,.23],[.17,.3,.17],[.25,0,.4]);
+        // Keep subsequent seeded debris from interpenetrating this assembly.
+        looseDebrisClearances.push({local:anchor,reach:size*.7});
+    }
+    // The GLB casualties are the only large hulls. Old proxy ships and
+    // freestanding race hoops made the battlefield read as a training course.
+    // Racing keeps its existing gates; ordinary exploration sees real debris.
     const fragmentScale = (kind, large) => {
-        switch (kind) {
-            case 'panel': return [randomBetween(rng, 14, large ? 34 : 22), randomBetween(rng, 3, large ? 9 : 6), randomBetween(rng, 20, large ? 56 : 36)];
-            case 'beam': return [randomBetween(rng, 8, large ? 20 : 14), randomBetween(rng, 8, large ? 20 : 14), randomBetween(rng, 30, large ? 92 : 58)];
-            case 'hull': return [randomBetween(rng, 22, large ? 52 : 34), randomBetween(rng, 10, large ? 25 : 17), randomBetween(rng, 38, large ? 105 : 68)];
-            case 'engine': return [randomBetween(rng, 16, large ? 32 : 23), randomBetween(rng, 16, large ? 30 : 22), randomBetween(rng, 22, large ? 58 : 38)];
-            case 'spine': return [randomBetween(rng, 5, large ? 12 : 8), randomBetween(rng, 5, large ? 12 : 8), randomBetween(rng, 24, large ? 70 : 46)];
-            case 'disc': return [randomBetween(rng, 16, large ? 34 : 23), randomBetween(rng, 4, large ? 11 : 7), randomBetween(rng, 16, large ? 34 : 23)];
-            case 'ring': {
-                const radius = randomBetween(rng, 16, large ? 46 : 30);
-                return [radius, radius * randomBetween(rng, 0.72, 1.12), randomBetween(rng, 4, large ? 10 : 7)];
-            }
-            default: return [20, 10, 40];
+        switch(kind) {
+            case 'shard': {const length=randomBetween(rng,large?55:24,large?140:70);return [length*randomBetween(rng,.35,.8),length*.7,length];}
+            case 'girder': return [randomBetween(rng,5,large?12:8),randomBetween(rng,6,large?16:10),randomBetween(rng,35,large?170:78)];
+            case 'engine': return [randomBetween(rng,16,large?44:24),randomBetween(rng,20,large?70:40),randomBetween(rng,16,large?44:24)];
+            case 'spine': return [randomBetween(rng,8,large?18:12),randomBetween(rng,8,large?18:12),randomBetween(rng,30,large?100:60)];
+            default: return [randomBetween(rng,22,large?100:44),randomBetween(rng,4,large?15:8),randomBetween(rng,30,large?150:70)];
         }
     };
     const addFragmentStream = ({ prefix, origin, direction, length, spread, count, kinds, zone, route, finish }) => {
@@ -1132,7 +864,7 @@ export const generateGraveyardPieces = (seed) => {
                 local[0] = (rng() < 0.5 ? -1 : 1) * randomBetween(rng, 360, 520);
                 local[1] += (rng() < 0.5 ? -1 : 1) * randomBetween(rng, 180, 320);
             }
-            const kind = pick(rng, kinds);
+            const selectedKind=pick(rng,kinds),kind=selectedKind==='panel'&&rng()<.45?'shard':selectedKind;
             // Only a few loose pieces get the upper size range now that the
             // landmark wrecks themselves supply the field's large silhouettes.
             const large = fraction < 0.2 && rng() < 0.38;
@@ -1145,14 +877,14 @@ export const generateGraveyardPieces = (seed) => {
                 id: `${prefix}-${accepted}`,
                 kind,
                 local,
-                rotation: [randomBetween(rng, -0.18, 0.18), yaw + randomBetween(rng, -0.24, 0.24), randomBetween(rng, -0.38, 0.38)],
+                rotation: [randomBetween(rng,-Math.PI,Math.PI),yaw+randomBetween(rng,-Math.PI,Math.PI),randomBetween(rng,-Math.PI,Math.PI)],
                 scale: fragmentScale(kind, large),
                 moving,
                 drift,
                 spin: moving ? [randomBetween(rng, -0.08, 0.08), randomBetween(rng, -0.08, 0.08), randomBetween(rng, -0.08, 0.08)] : [0, 0, 0],
                 zone,
                 route,
-                finish,
+                finish:kind==='shard'?'metal':finish,
                 reserveRaceCorridor: true,
             });
             if (inserted)
@@ -1160,35 +892,194 @@ export const generateGraveyardPieces = (seed) => {
         }
     };
     // Coherent wakes and impact fans replace a uniform spherical scatter. The
-    // mix deliberately contains many plates, bars, rings, and faceted chunks;
+    // mix contains torn plates, I-beams, severed spars and engine shrouds;
     // retrying rejected candidates keeps the density stable after the race
-    // corridors and all twelve authored wrecks have been reserved.
-    addFragmentStream({ prefix: 'carrier-wake', origin: [-650, 850, -1850], direction: [0.16, -0.04, 1], length: 2650, spread: [500, 330, 280], count: 38, kinds: ['panel', 'panel', 'beam', 'hull', 'spine', 'disc', 'ring'], zone: 'carrier-hangar', route: 'upper-hangar-run' });
-    addFragmentStream({ prefix: 'impact-port', origin: [350, -700, 1900], direction: [-0.86, 0.26, -0.3], length: 2700, spread: [400, 340, 330], count: 28, kinds: ['panel', 'panel', 'beam', 'hull', 'hull', 'engine', 'spine', 'ring'], zone: 'battleship-breach', route: 'lower-breach-crossing' });
-    addFragmentStream({ prefix: 'impact-starboard', origin: [350, -700, 1900], direction: [0.84, -0.28, 0.34], length: 2700, spread: [400, 330, 330], count: 28, kinds: ['panel', 'beam', 'beam', 'hull', 'hull', 'engine', 'spine', 'ring'], zone: 'battleship-breach', route: 'lower-breach-crossing' });
-    addFragmentStream({ prefix: 'cruiser-alpha-shatter', origin: [2850, 850, -1500], direction: [0.55, 0.18, -0.82], length: 1550, spread: [240, 200, 220], count: 20, kinds: ['panel', 'beam', 'hull', 'hull', 'spine', 'disc', 'ring'], zone: 'cruiser-alpha' });
-    addFragmentStream({ prefix: 'cruiser-beta-shatter', origin: [-3000, -650, 1200], direction: [-0.62, -0.1, 0.78], length: 1550, spread: [240, 200, 220], count: 20, kinds: ['panel', 'beam', 'hull', 'hull', 'spine', 'disc', 'ring'], zone: 'cruiser-beta' });
-    addFragmentStream({ prefix: 'frigate-alpha-wake', origin: [-2200, 1300, -850], direction: [-0.68, 0.18, -0.65], length: 1450, spread: [210, 190, 190], count: 16, kinds: ['panel', 'beam', 'hull', 'spine', 'ring'], zone: 'frigate-alpha', route: 'port-frigate-tunnel' });
-    addFragmentStream({ prefix: 'frigate-beta-wake', origin: [1900, -1400, 100], direction: [0.62, -0.18, 0.78], length: 1450, spread: [210, 190, 190], count: 16, kinds: ['panel', 'beam', 'hull', 'engine', 'spine', 'ring'], zone: 'frigate-beta', route: 'starboard-frigate-tunnel' });
-    addFragmentStream({ prefix: 'escort-crossfire', origin: [-2700, 300, 3300], direction: [1, -0.1, 0.06], length: 5300, spread: [190, 170, 160], count: 22, kinds: ['panel', 'panel', 'beam', 'beam', 'hull', 'spine', 'disc', 'ring'], zone: 'outer-wake' });
-    addFragmentStream({ prefix: 'outer-wake', origin: [0, 250, 3000], direction: [0.04, 0.08, 1], length: 2200, spread: [620, 420, 380], count: 24, kinds: ['panel', 'beam', 'hull', 'hull', 'spine', 'disc', 'ring'], zone: 'outer-wake', route: 'outer-wake-run', finish: 'distant' });
+    // corridors and all fourteen authored wrecks have been reserved.
+    addFragmentStream({ prefix: 'carrier-wake', origin: [-650, 850, -1850], direction: [0.16, -0.04, 1], length: 2650, spread: [500, 330, 280], count: 38, kinds: ['panel', 'panel', 'girder', 'panel', 'spine', 'spine', 'panel'], zone: 'carrier-hangar', route: 'upper-hangar-run' });
+    addFragmentStream({ prefix: 'impact-port', origin: [350, -700, 1900], direction: [-0.86, 0.26, -0.3], length: 2700, spread: [400, 340, 330], count: 28, kinds: ['panel', 'panel', 'girder', 'panel', 'panel', 'engine', 'spine', 'panel'], zone: 'battleship-breach', route: 'lower-breach-crossing' });
+    addFragmentStream({ prefix: 'impact-starboard', origin: [350, -700, 1900], direction: [0.84, -0.28, 0.34], length: 2700, spread: [400, 330, 330], count: 28, kinds: ['panel', 'girder', 'girder', 'panel', 'panel', 'engine', 'spine', 'panel'], zone: 'battleship-breach', route: 'lower-breach-crossing' });
+    addFragmentStream({ prefix: 'cruiser-alpha-shatter', origin: [2850, 850, -1500], direction: [0.55, 0.18, -0.82], length: 1550, spread: [240, 200, 220], count: 20, kinds: ['panel', 'girder', 'panel', 'panel', 'spine', 'spine', 'panel'], zone: 'cruiser-alpha' });
+    addFragmentStream({ prefix: 'cruiser-beta-shatter', origin: [-3000, -650, 1200], direction: [-0.62, -0.1, 0.78], length: 1550, spread: [240, 200, 220], count: 20, kinds: ['panel', 'girder', 'panel', 'panel', 'spine', 'spine', 'panel'], zone: 'cruiser-beta' });
+    addFragmentStream({ prefix: 'frigate-alpha-wake', origin: [-2200, 1300, -850], direction: [-0.68, 0.18, -0.65], length: 1450, spread: [210, 190, 190], count: 16, kinds: ['panel', 'girder', 'panel', 'spine', 'panel'], zone: 'frigate-alpha', route: 'port-frigate-tunnel' });
+    addFragmentStream({ prefix: 'frigate-beta-wake', origin: [1900, -1400, 100], direction: [0.62, -0.18, 0.78], length: 1450, spread: [210, 190, 190], count: 16, kinds: ['panel', 'girder', 'panel', 'engine', 'spine', 'panel'], zone: 'frigate-beta', route: 'starboard-frigate-tunnel' });
+    addFragmentStream({ prefix: 'escort-crossfire', origin: [-2000, -1250, 2800], direction: [1, -0.1, 0.06], length: 5300, spread: [190, 170, 160], count: 22, kinds: ['panel', 'panel', 'girder', 'girder', 'panel', 'spine', 'spine', 'panel'], zone: 'outer-wake' });
+    addFragmentStream({ prefix: 'outer-wake', origin: [0, 250, 3000], direction: [0.04, 0.08, 1], length: 2200, spread: [620, 420, 380], count: 24, kinds: ['panel', 'girder', 'panel', 'panel', 'spine', 'spine', 'panel'], zone: 'outer-wake', route: 'outer-wake-run', finish: 'distant' });
+    // Dense local pockets, rather than another uniform layer across the
+    // field. Independent RNG leaves existing debris and salvage identities alone.
+    const cloudRandom=seededRandom(`${seed}:graveyard-small-clouds`);
+    const clouds=[
+        ['carrier-break',[-150,1450,-200],[155,85,120]],
+        ['battleship-break',[-1320,-400,2750],[170,100,125]],
+        ['cruiser-alpha-break',[3900,1050,-2500],[110,70,100]],
+        ['cruiser-beta-break',[-3700,-450,1850],[115,75,100]],
+    ];
+    for(const [id,anchor,spread]of clouds) {
+        let accepted=0;
+        for(let attempt=0;accepted<96&&attempt<6000;attempt++) {
+            const local=anchor.map((v,i)=>v+randomBetween(cloudRandom,-spread[i],spread[i]));
+            if(Math.hypot(...local.map((v,i)=>(v-anchor[i])/spread[i]))>1)continue;
+            const kind=pick(cloudRandom,['panel','panel','panel','girder','spine']);
+            const length=randomBetween(cloudRandom,2,11),scale=kind==='panel'?[length*.7,randomBetween(cloudRandom,.25,1),length]:[randomBetween(cloudRandom,.5,1.4),randomBetween(cloudRandom,.5,1.4),length];
+            if(pushPiece({id:`cloud-${id}-${accepted}`,kind,local,scale,rotation:[cloudRandom()*Math.PI,cloudRandom()*Math.PI,cloudRandom()*Math.PI],finish:'structure',debrisCloud:id,collidable:length>=7,reserveRaceCorridor:true}))accepted++;
+        }
+    }
+    const passageBoxes=wreck=>(wreck.passages??[]).map(route=>{
+        const margin=16/wreck.scale;
+        return new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(...route.center),new THREE.Vector3(2*(route.halfWidth+margin),2*(route.halfHeight+margin),2*route.halfLength));
+    });
+    // All attached equipment shares the hull/section transform and collision.
+    // Keep the whole authored interior volume free, including salvage pockets.
+    const component=(wreck,id,kind,point,dimensions,localRotation=[0,0,0],section)=>{
+        const sectionPose=section?wreckSectionDelta(wreck,section):undefined;
+        const partRotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(...localRotation));
+        const sectionRotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(...(sectionPose?.rotation??[0,0,0])));
+        const local=new THREE.Vector3(...point).applyQuaternion(sectionRotation);
+        if(sectionPose)local.add(new THREE.Vector3(...sectionPose.position));
+        const modelBounds=new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(),new THREE.Vector3(...dimensions)).applyMatrix4(new THREE.Matrix4().compose(local,sectionRotation.clone().multiply(partRotation),new THREE.Vector3(1,1,1)));
+        if(passageBoxes(wreck).some(box=>modelBounds.intersectsBox(box)))return;
+        const rotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(...wreck.rotation));
+        const world=local.clone().multiplyScalar(wreck.scale).applyQuaternion(rotation).add(new THREE.Vector3(...wreck.local));
+        const orientation=rotation.clone().multiply(sectionRotation).multiply(partRotation),euler=new THREE.Euler().setFromQuaternion(orientation);
+        const scale=dimensions.map(v=>v*wreck.scale),reach=Math.hypot(...scale)*.5;
+        if(intersectsRaceCorridor('mourning-line',world.toArray(),reach))return;
+        if(wreck.interior) {
+            const box=new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(...point),new THREE.Vector3(...dimensions));
+            const bay=wreck.interior,pad=14/wreck.scale;
+            const free=new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(...bay.center),new THREE.Vector3(2*(bay.halfLength+pad),2*(bay.halfHeight*.9+pad),2*(bay.halfWidth*.9+pad)));
+            if(box.intersectsBox(free))return;
+        }
+        pushPiece({id:`interior-${wreck.id}-${id}`,kind,local:world.toArray(),scale,rotation:[euler.x,euler.y,euler.z],finish:kind==='vessel'?'structure':'machinery',attachedWreckId:wreck.id,interiorPart:id});
+    };
+    // Exposed load-bearing frames sit at the walls and below the flight
+    // lane. They belong to each hull, unlike the old freestanding torus hoops.
+    // They use the same transformed triangle geometry for collision.
+    for(const wreck of GRAVEYARD_MODEL_WRECKS.filter(w=>w.interior)) {
+        const bay=wreck.interior, rotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(...wreck.rotation));
+        const transform=p=>new THREE.Vector3(...p).multiplyScalar(wreck.scale).applyQuaternion(rotation).add(new THREE.Vector3(...wreck.local));
+        const strut=(id,a,b,width)=>{
+            const bounds=new THREE.Box3().setFromPoints([new THREE.Vector3(...a),new THREE.Vector3(...b)]).expandByScalar(width/wreck.scale);
+            if(passageBoxes(wreck).some(box=>bounds.intersectsBox(box)))return;
+            const from=transform(a),to=transform(b),delta=to.clone().sub(from),mid=from.clone().add(to).multiplyScalar(.5);
+            const reach=delta.length()*.5+width;
+            if(intersectsRaceCorridor('mourning-line',mid.toArray(),reach))return;
+            const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),delta.normalize());
+            const e=new THREE.Euler().setFromQuaternion(q);
+            pushPiece({id:`structure-${wreck.id}-${id}`,kind:'girder',local:mid.toArray(),rotation:[e.x,e.y,e.z],scale:[width,width,from.distanceTo(to)],finish:'structure',attachedWreckId:wreck.id});
+        };
+        // Find the real inner wall instead of building a rectangular cage
+        // from a clearance box. A missing wall means a torn opening: no post
+        // is allowed to hang in open space just to complete the frame.
+        const profile=GRAVEYARD_COLLISION_PROFILES[wreck.modelKey??wreck.class].find(p=>p.name===bay.sectionName);
+        const ray=new THREE.Ray(),v0=new THREE.Vector3(),v1=new THREE.Vector3(),v2=new THREE.Vector3(),hit=new THREE.Vector3();
+        const surface=(start,direction,max)=>{
+            ray.set(new THREE.Vector3(...start).sub(new THREE.Vector3(...profile.center)),new THREE.Vector3(...direction));
+            let nearest=max,result;
+            for(let i=0;i<profile.indices.length;i+=3) {
+                v0.fromArray(profile.vertices,profile.indices[i]*3);v1.fromArray(profile.vertices,profile.indices[i+1]*3);v2.fromArray(profile.vertices,profile.indices[i+2]*3);
+                if(ray.intersectTriangle(v0,v1,v2,false,hit)) {
+                    const distance=hit.distanceTo(ray.origin);
+                    if(distance<nearest&&distance>.008){nearest=distance;result=hit.clone().add(new THREE.Vector3(...profile.center));}
+                }
+            }
+            return result?.toArray();
+        };
+        let priorFloor=[];
+        for(const [i,fraction]of [-.78,-.26,.26,.78].entries()) {
+            const x=bay.center[0]+bay.halfLength*fraction,y=bay.center[1],z=bay.center[2],w=Math.max(3,wreck.scale*.004),floor=[];
+            for(const [j,side]of [-1,1].entries()) {
+                const low=surface([x,y-bay.halfHeight*.5,z],[0,0,side],bay.halfWidth*3.2);
+                const high=surface([x,y+bay.halfHeight*.5,z],[0,0,side],bay.halfWidth*3.2);
+                if(low&&high)strut(`rib-${i}-${side}`,low,high,w);
+                floor[j]=surface([x,y,z+side*bay.halfWidth*.6],[0,-1,0],bay.halfHeight*3.2);
+                if(floor[j]&&priorFloor[j])strut(`sill-${i}-${side}`,priorFloor[j],floor[j],w);
+            }
+            if(floor[0]&&floor[1])strut(`deck-${i}`,floor[0],floor[1],w);
+            // Machinery occupies surviving space outside the navigable bay,
+            // with different equipment in hangars, weapons decks and cruisers.
+            const cellLength=bay.halfLength*.38;
+            for(const side of [-1,1]) {
+                const inner=bay.center[2]+side*(bay.halfWidth+.002);
+                const samples=[-.15,0,.15].map(f=>surface([x+cellLength*f,y,z],[0,0,side],bay.halfWidth*3.2));
+                if(samples.every(Boolean)) {
+                    const outer=side<0?Math.max(...samples.map(p=>p[2]))+.012:Math.min(...samples.map(p=>p[2]))-.012;
+                    const depth=(outer-inner)*side;
+                    if(depth>.02) {
+                        const midZ=(inner+outer)*.5,roof=surface([x,y,midZ],[0,1,0],bay.halfHeight*4),bottom=surface([x,y,midZ],[0,-1,0],bay.halfHeight*4);
+                        if(roof&&bottom){
+                            const height=Math.min(bay.halfHeight*.9,(roof[1]-y)*1.65,(y-bottom[1])*1.65);
+                            if(height>.015)component(wreck,`systems-${i}-${side}`,'machinery',[x,y,midZ],[cellLength,height,depth*.88]);
+                            const tankHeight=Math.min(bay.halfHeight*.55,(roof[1]-y-height*.5)*.7);
+                            if(i%2===0&&tankHeight>.018)component(wreck,`tank-${i}-${side}`,'vessel',[x,y+height*.5+tankHeight*.55,midZ],[cellLength*.65,tankHeight,depth*.65]);
+                        }
+                    }
+                }
+            }
+            for(const [j,side]of [-1,1].entries())if(floor[j]) {
+                const floorY=floor[j][1]+.004,top=bay.center[1]-bay.halfHeight-.015,height=top-floorY;
+                if(height>.015) {
+                    const point=[x,floorY+height*.5,z+side*bay.halfWidth*.58];
+                    component(wreck,`lower-bay-${i}-${side}`,wreck.class==='carrier'?'machinery':'vessel',point,[cellLength,height*.85,bay.halfWidth*.62]);
+                    component(wreck,`deck-${i}-${side}`,'machinery',[x,top+.009,point[2]],[cellLength*1.04,.012,bay.halfWidth*.68]);
+                }
+            }
+            priorFloor=floor;
+        }
+    }
+    // Smaller hulls retain compact systems instead of becoming empty tubes.
+    // Cores stay inside the central portion of each torn section, with conduits
+    // and transverse ribs visible at the break. No new fly-through route here.
+    for(const wreck of GRAVEYARD_MODEL_WRECKS)for(const [i,profile]of GRAVEYARD_COLLISION_PROFILES[wreck.modelKey??wreck.class].entries()) {
+        if(profile.name===wreck.interior?.sectionName)continue;
+        const [hx,hy,hz]=profile.halfExtents,centre=profile.center;
+        const ray=new THREE.Ray(),v0=new THREE.Vector3(),v1=new THREE.Vector3(),v2=new THREE.Vector3(),hit=new THREE.Vector3();
+        const wall=(point,direction)=>{
+            ray.set(new THREE.Vector3(...point).sub(new THREE.Vector3(...centre)),new THREE.Vector3(...direction));let nearest=Infinity;
+            for(let j=0;j<profile.indices.length;j+=3) {
+                v0.fromArray(profile.vertices,profile.indices[j]*3);v1.fromArray(profile.vertices,profile.indices[j+1]*3);v2.fromArray(profile.vertices,profile.indices[j+2]*3);
+                if(ray.intersectTriangle(v0,v1,v2,false,hit)){const d=hit.distanceTo(ray.origin);if(d>.002)nearest=Math.min(nearest,d);}
+            }
+            return nearest;
+        };
+        let fit;
+        for(const y of [0,-.25,-.5]) {
+            const point=[centre[0],centre[1]+hy*y,centre[2]],h=Math.min(wall(point,[0,1,0]),wall(point,[0,-1,0])),w=Math.min(wall(point,[0,0,1]),wall(point,[0,0,-1]));
+            if(!Number.isFinite(h*w)||h<.008||w<.008)continue;
+            if(!fit||h*w>fit.h*fit.w)fit={point,h,w};
+        }
+        if(!fit)continue;
+        const height=fit.h*.85,width=fit.w*.85,length=hx*.75;
+        component(wreck,`equipment-core-${i}`,'machinery',fit.point,[length,height,width],[0,0,0],profile.name);
+        for(const side of [-1,1]) {
+            component(wreck,`conduit-${i}-${side}`,'vessel',[fit.point[0],fit.point[1]+height*.48,fit.point[2]+side*width*.36],[Math.min(height,width)*.16,length*.92,Math.min(height,width)*.16],[0,0,Math.PI/2],profile.name);
+            component(wreck,`bulkhead-${i}-${side}`,'machinery',[fit.point[0]+side*length*.36,fit.point[1],fit.point[2]],[length*.045,height*1.2,width*1.2],[0,0,0],profile.name);
+        }
+    }
+    // Fine fragments around the torn bridge support accompany the retained
+    // source-model chunks. Their spread stays above the exploration lanes.
+    for(const wreck of GRAVEYARD_MODEL_WRECKS.filter(w=>!['wayfarer','talon'].includes(w.class))){
+        const small=wreck.class==='frigate',count=wreck.class==='battleship'?28:small?8:24;
+        const random=seededRandom(`${seed}:${wreck.id}:command-breakup`),rotation=new THREE.Euler(...wreck.rotation);
+        const base=wreck.class==='battleship'?[.43,.32,0]:wreck.class==='carrier'?[.31,.25,0]:wreck.class==='cruiser'?[.16,.39,0]:[.31,.18,0];
+        for(let i=0;i<count;i++){
+            const local=new THREE.Vector3(base[0]+randomBetween(random,-.22,.22),base[1]+randomBetween(random,0,.18),base[2]+randomBetween(random,-.25,.25));
+            const kind=pick(random,['shard','shard','girder','spine']),length=randomBetween(random,small?.7:4,small?2.2:15);
+            const scale=kind==='shard'?[length*.65,length*.45,length]:[length*.12,length*.12,length];
+            const bounds=new THREE.Box3().setFromCenterAndSize(local,new THREE.Vector3().setScalar(length/wreck.scale));
+            if(passageBoxes(wreck).some(box=>bounds.intersectsBox(box)))continue;
+            const point=local.multiplyScalar(wreck.scale).applyEuler(rotation).add(new THREE.Vector3(...wreck.local));
+            if(intersectsRaceCorridor('mourning-line',point.toArray(),length))continue;
+            pushPiece({id:`command-break-scatter-${wreck.id}-${i}`,kind,local:point.toArray(),scale,rotation:[random()*Math.PI,random()*Math.PI,random()*Math.PI],finish:kind==='shard'?'metal':'structure',attachedWreckId:wreck.id});
+        }
+    }
     // Finish every physical piece from the same geometry the renderer uses.
     // Rings and engine shells retain their analytical hollow collision; plates,
     // bars, discs, and chunks use their exact triangles.
     for (const piece of pieces) {
-        // Procedural stand-ins for the landmark hulls are replaced by adapted
-        // GLBs. Route hoops and the carrier impact wake remain, but duplicate
-        // hull art and its old oversized collision are suppressed.
-        const replacedBattleship = piece.id.startsWith('battleship-');
-        const replacedCarrier = piece.id.startsWith('carrier-') && !piece.id.startsWith('carrier-wake-');
-        const replacedFrigate = /^frigate-(?:alpha|beta)-(?:mid|bow|deck|prow|keel|bridge|turret|mast|engine|gate)$/.test(piece.id);
         const base = GRAVEYARD_GEOMETRY_HALF_EXTENTS[piece.kind] ?? [0.5, 0.5, 0.5];
-        const visualReach = Math.hypot(base[0] * piece.scale[0], base[1] * piece.scale[1], base[2] * piece.scale[2]);
-        const local = [piece.position[0] - center[0], piece.position[1] - center[1], piece.position[2] - center[2]];
-        const overlapsModel = !piece.id.startsWith('route-') && overlapsGraveyardModelWreck(local, visualReach);
-        if (replacedBattleship || replacedCarrier || replacedFrigate || overlapsModel) {
-            piece.render = false;
-            piece.collidable = false;
+        const visualReach = Math.hypot(base[0]*piece.scale[0],base[1]*piece.scale[1],base[2]*piece.scale[2]);
+        const local=piece.position.map((value,index)=>value-center[index]);
+        if(!piece.attachedWreckId&&overlapsGraveyardModelWreck(local,visualReach)) {
+            piece.render=false;piece.collidable=false;
         }
         if (piece.collidable !== false && piece.kind !== 'ring' && piece.kind !== 'engine') {
             const collisionMesh = graveyardCollisionMesh(piece);

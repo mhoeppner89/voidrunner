@@ -17,7 +17,7 @@ test('capacitor comparisons name actual stored energy and output and retain repl
 });
 test('shield recharge is a real per-second rate; sensor and cargo upgrades expose their own stats',()=>{
  const s=createNewSave(83,{tutorial:false}),p=s.player,fit=p.outfitting.loadouts[p.shipId];fit.utility.fill(null);const before=getEffectiveShipStats(p);
- for(const[id,keys]of [['recovery-shield',['shield','shieldRechargeMultiplier']],['radar-mk2',['radarRange','scanRange']],['cargo-pods',['cargo']]]){fit.utility.fill(null);fit.utility[0]=id;const after=getEffectiveShipStats(p),rows=equipmentStatChanges(before,after,BASE_OUTFIT_ITEMS[id]);for(const key of keys)assert(rows.some(r=>r.key===key));if(id==='recovery-shield'){const r=rows.find(r=>r.key==='shieldRechargeMultiplier');assert.equal(r.after,after.shieldRechargeMultiplier*SHIELD_RECHARGE_RATE);assert.equal(r.unit,'/s');}}
+ for(const[id,keys]of [['recovery-shield',['shield','shieldRegeneration']],['radar-mk2',['radarRange','scanRange']],['cargo-pods',['cargo']]]){fit.utility.fill(null);fit.utility[0]=id;const after=getEffectiveShipStats(p),rows=equipmentStatChanges(before,after,BASE_OUTFIT_ITEMS[id]);for(const key of keys)assert(rows.some(r=>r.key===key));if(id==='recovery-shield'){const r=rows.find(r=>r.key==='shieldRegeneration');assert.equal(r.after,after.shieldRegeneration);assert.equal(r.unit,'/s');}}
 });
 test('new shell modules are included in the offline cache',async()=>{const sw=await readFile('sw.js','utf8');assert.match(sw,/\.\/src\/game\/itemIcons\.js/);assert.match(sw,/\.\/src\/game\/equipmentStatPresentation\.js/);});
 
@@ -68,7 +68,7 @@ test('German Arena reward names use complete weapon types and tiers',async()=>{
 
 test('unmounted utility bonuses use concrete stat labels and actual rolled effects',()=>{
  const base=BASE_OUTFIT_ITEMS['capacitor-bank'];const item=resolveEquipmentDefinition(base,{id:'tier2',baseId:base.id,tier:2,rarity:'common',affixes:[]});
- const rows=equipmentEffectStats(item);assert.deepEqual(rows.map(r=>r.label),['Energy capacity','Energy regeneration']);assert.equal(rows[0].unit,'%');assert(Math.abs(rows[0].value-55)<.001);assert(Math.abs(rows[1].value+11)<.001);
+ const rows=equipmentEffectStats(item);assert.deepEqual(rows.map(r=>r.label),['Energy capacity','Energy regeneration']);assert.equal(rows[0].unit,'%');assert(Math.abs(rows[0].value-44)<.001);assert(Math.abs(rows[1].value+11)<.001);
  for(const base of Object.values(BASE_OUTFIT_ITEMS).filter(d=>!['gun','launcher','turret'].includes(d.category)))assert(equipmentEffectStats(base).length,base.id);
 });
 
@@ -88,5 +88,5 @@ test('commodity labels stay short in both languages, with legality separate from
  const expected={food:'Protein',water:'Wasser',medicine:'Medigel',electronics:'Elektronik',machinery:'Maschinen',ore:'Erz',gold:'Gold',scrap:'Schrott',luxuries:'Luxusgüter',arms:'Waffen'};
  for(const [id,label]of Object.entries(expected))assert.equal(DE_CATALOG[COMMODITIES[id].name],label,id);
  assert.equal(COMMODITIES.arms.legal,false);assert.equal(COMMODITIES.arms.name,'Weapons');
- const {ADVENTURE_DIALOGUES}=await import('../../src/game/adventureDialogues.js');assert.match(ADVENTURE_DIALOGUES.rin.nodes.trade.text.de,/Waffen sind rot markiert. Ihr Transport ist illegal/);
+ const {ADVENTURE_DIALOGUES}=await import('../../src/game/adventureDialogues.js');assert.match(ADVENTURE_DIALOGUES.rin.nodes.legal.text.de,/Waffen sind rot markiert. Ihr Transport ist illegal/);
 });

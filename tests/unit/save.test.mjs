@@ -412,3 +412,21 @@ assert.equal(hasSavedGame(), false);
 assert.equal(loadGame(), undefined);
 
 console.log('all save assertions passed');
+
+// A redesigned circuit preserves earned ranks but starts comparable times
+// afresh. New records and unrelated graveyard times survive normal reloads.
+const oldRaceSave=createNewSave(718,{tutorial:false});
+delete oldRaceSave.world.shardRaceLayoutVersion;
+oldRaceSave.world.raceRecords={
+    'shard-gauntlet':{bestRank:1,bestTime:12,time:12,bestSplits:[4,8,12],active:true,attempts:3},
+    'mourning-run':{bestRank:2,bestTime:48,bestSplits:[12,24,48]},
+};
+const migratedRaces=hydrateSave(oldRaceSave);
+assert.equal(migratedRaces.world.raceRecords['shard-gauntlet'].bestRank,1);
+assert.equal(migratedRaces.world.raceRecords['shard-gauntlet'].attempts,3);
+assert.equal(migratedRaces.world.raceRecords['shard-gauntlet'].bestTime,undefined);
+assert.equal(migratedRaces.world.raceRecords['shard-gauntlet'].bestSplits,undefined);
+assert.equal(migratedRaces.world.raceRecords['shard-gauntlet'].active,false);
+assert.equal(migratedRaces.world.raceRecords['mourning-run'].bestTime,48);
+migratedRaces.world.raceRecords['shard-gauntlet'].bestTime=42;
+assert.equal(hydrateSave(migratedRaces).world.raceRecords['shard-gauntlet'].bestTime,42);

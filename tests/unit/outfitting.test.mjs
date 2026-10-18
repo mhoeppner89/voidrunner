@@ -60,7 +60,7 @@ all(OUTFIT_ITEM_IDS, (id) => {
         return item.tier >= 3 && Number.isFinite(item.mass) && item.mass > 0;
     return ['S', 'M'].includes(item.size)
         && item.sizes.length > 0
-        && item.mass === undefined
+        && Number.isFinite(item.mass) && item.mass > 0
         && (item.category !== 'gun' || (Number.isFinite(item.energyCost) && item.energyCost > 0))
         && item.power === undefined
         && item.availability.length > 0
@@ -78,7 +78,7 @@ const expectedCounts = {
 };
 for (const [shipId, counts] of Object.entries(expectedCounts)) {
     const spec = HULL_HARDPOINTS[shipId];
-    const expected = { weapon: counts.gun + counts.launcher, turret: counts.turret, utility: counts.power + counts.drive + counts.defense + counts.utility };
+    const expected = { weapon: counts.gun + counts.launcher, turret: counts.turret, utility: {wayfarer:3,talon:2,vanguard:4,prospector:5,lancer:3,atlas:6}[shipId] };
     assert.deepEqual(spec.slotCounts, expected, `${shipId} hardpoint matrix`);
     assert.equal(spec.guns, spec.launchers, `${shipId} exposes one shared weapon-bay list`);
     assert.equal(spec.weapons.length, expected.weapon);
@@ -144,20 +144,20 @@ assert.equal(quoteOutfitting(player, 'wayfarer', player.outfitting.loadouts.wayf
 
 const empty = {
     guns: [null, null, null], launchers: [null, null, null], turrets: [null],
-    power: [], drive: [], defense: [], utility: [null, null, null, null, null], mountSchema: 4,
+    power: [], drive: [], defense: [], utility: [null, null, null], mountSchema: 4,
 };
 const duplicateDraft = {
     guns: [null, null], launchers: [null, null],
     turrets: ['pdc', 'pdc', null, null],
     power: [], drive: [], defense: [],
-    utility: ['cargo-pods', 'cargo-pods', null, null, null, null, null],
+    utility: ['cargo-pods', 'cargo-pods', null, null, null, null],
     mountSchema: 4,
 };
 const atlasPlayer = capablePlayer({ shipId: 'atlas', ownedShips: ['atlas'], outfitting: createOutfittingState(['atlas']) });
 assert.equal(validateLoadout(atlasPlayer, 'atlas', duplicateDraft).ok, true, 'duplicate guns and cargo pods are legal');
 const uniqueDraft = {
     guns: [null, null], launchers: [null, null], turrets: [null, null, null, null],
-    power: [], drive: [], defense: [], utility: ['radar-mk2', 'radar-mk2', null, null, null, null, null], mountSchema: 4,
+    power: [], drive: [], defense: [], utility: ['radar-mk2', 'radar-mk2', null, null, null, null], mountSchema: 4,
 };
 assert.equal(validateLoadout(atlasPlayer, 'atlas', uniqueDraft).code, 'duplicate-unique-module');
 
@@ -165,7 +165,7 @@ const energyHungry = {
     ...empty,
     guns: ['ripper', 'ripper', null],
     launchers: [null, null, 'seeker-launcher'],
-    utility: ['engine-mk2', 'shield-mk2', 'salvage-mk2', 'radar-mk2', null],
+    utility: ['engine-mk2', 'shield-mk2', 'salvage-mk2'],
 };
 assert.equal(validateLoadout(player, 'wayfarer', energyHungry).ok, true, 'high-drain weapons are legal fits and constrained by the flight capacitor');
 // The mounts are the fitting limit. This fit fills every bay a Wayfarer has,
@@ -175,7 +175,7 @@ const fullBays = {
     ...empty,
     guns: ['ripper', 'ripper', null],
     launchers: [null, null, 'seeker-launcher'],
-    utility: ['engine-mk2', 'armor-mk2', 'cargo-pods', 'radar-mk2', 'capacitor-bank'],
+    utility: ['engine-mk2', 'armor-mk2', 'capacitor-bank'],
     turrets: ['tracking-turret'],
 };
 const fullBayCheck = validateLoadout(player, 'wayfarer', fullBays);

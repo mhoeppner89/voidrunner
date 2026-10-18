@@ -1,12 +1,11 @@
 import {displaySpeed} from './data.js';
-import {SHIELD_RECHARGE_RATE} from './combatResources.js';
 // Shared concrete labels/conversions for comparisons. Values come from the
 // actual staged ship stats, including losses caused by replaced equipment.
 export const EQUIPMENT_STAT_FIELDS=[
  {key:'energyCapacity',label:'Energy capacity',effects:['capacityMultiplier']},
  {key:'reactorOutput',label:'Energy regeneration',unit:'/s',effects:['outputMultiplier']},
  {key:'shield',label:'Shield capacity',effects:['shieldCapacity','shieldMultiplier']},
- {key:'shieldRechargeMultiplier',label:'Shield regeneration',unit:'/s',scale:SHIELD_RECHARGE_RATE,effects:['rechargeMultiplier']},
+ {key:'shieldRegeneration',label:'Shield regeneration',unit:'/s',effects:['rechargeMultiplier']},
  {key:'hull',label:'Hull integrity',effects:['hullCapacity']},
  {key:'maxSpeed',label:'Max speed',unit:'km/s',convert:displaySpeed,effects:['speedMultiplier']},
  {key:'acceleration',label:'Acceleration',unit:'km/s²',convert:displaySpeed,effects:['accelerationMultiplier']},

@@ -1,3 +1,4 @@
+import {highestLootRarity} from './lootVisuals.js';
 import {FRIGATE_MOUNTS} from './frigateMounts.js';
 import {CRUISER_MOUNTS} from './cruiserModelData.js';
 import {registerInventoryDefinitions} from './equipmentInventory.js';
@@ -11,7 +12,7 @@ import {cargoFree} from './economy.js';
 import {hasSystem} from './galaxy.js';
 import {COMMODITIES} from './data.js';
 import {createDroneUnit,DRONE_TYPES,canonicalDroneType} from './droneData.js';
-export function equipCareerItems(session,ship){
+export function equipCareerItems(session,ship,{tutorialMiningPirate=false}={}){
  if(session.arena||ship.capitalClass||ship.equipmentRecords)return;
  const fit=ship.combatFit;if(!fit)return;
  const serial=++session.save.world.lootShipCounter|| (session.save.world.lootShipCounter=1);
@@ -19,7 +20,11 @@ export function equipCareerItems(session,ship){
  const rng=seededRandom(ship.lootKey),region=session.careerRegionAt(ship.position),tier=region.danger>=2.1?3:region.danger>=1.15?2:1;
  ship.equipmentRecords=[];
  for(const key of LOADOUT_KEYS)for(let i=0;i<(fit[key]?.length??0);i++)if(fit[key][i]){
-  const baseId=equipmentBaseId(fit[key][i]),item=rollEquipmentRecord(baseId,rng,Math.max(tier,OUTFIT_ITEMS[fit[key][i]]?.tier??1),`${ship.lootKey}-${key}-${i}`);if(!item)continue;
+  const baseId=equipmentBaseId(fit[key][i]),id=`${ship.lootKey}-${key}-${i}`;
+  // The first pirate carries the exact green tier I weapon that introduces loot.
+  const guaranteed=tutorialMiningPirate&&key==='guns'&&!ship.guaranteedLootId;
+  const item=guaranteed?createEquipmentRecord(baseId,{id,tier:1,rarity:'uncommon',affixes:['efficient']}):rollEquipmentRecord(baseId,rng,Math.max(tier,OUTFIT_ITEMS[fit[key][i]]?.tier??1),id);if(!item)continue;
+  if(guaranteed)ship.guaranteedLootId=item.id;
   fit[key][i]=item.id;ship.equipmentRecords.push({item,key,index:i});
  }
  fit.weaponDefinitions=fit.gunIndices.map(i=>weaponForOutfit(fit.guns[i]));
@@ -42,7 +47,7 @@ export function equipCapitalLoot(session,ship){
 export function combatWreckNode(wreck){
  for(const entry of wreck.contents)if(entry.item)registerInventoryDefinitions({items:{[entry.item.id]:entry.item}});
  const count=wreck.contents.reduce((n,e)=>n+(e.quantity??1),0);
- return {id:wreck.id,name:wreck.name,position:[...wreck.position],rotation:[0,0,0],radius:wreck.radius,shape:0,salvage:'scrap',remaining:count,scanned:wreck.scanned??false,combatLoot:true,systemId:wreck.systemId,instanceId:wreck.instanceId,velocity:wreck.velocity??[0,0,0]};
+ return {id:wreck.id,name:wreck.name,position:[...wreck.position],rotation:[0,0,0],radius:wreck.radius,shape:0,salvage:'scrap',remaining:count,scanned:wreck.scanned??false,combatLoot:true,lootRarity:highestLootRarity(wreck.contents),systemId:wreck.systemId,instanceId:wreck.instanceId,velocity:[0,0,0]};
 }
 export function makeCareerWreck(session,ship,{captured=false}={}){
  if(session.arena||ship.lootResolved)return null;
@@ -54,7 +59,7 @@ export function makeCareerWreck(session,ship,{captured=false}={}){
  for(const {item,key,index} of equipment){
   if(['turrets','capital'].includes(key)&&ship.capitalMountHull?.[index]<=0){forgetEquipmentDefinition(item.id);continue;}
   const rack=ship.combatFit?.racks?.find(r=>r.itemId===item.id);if(rack)item.rounds=rack.missiles;
-  if(captured||rng()<ITEM_SURVIVAL_CHANCE)contents.push({id:item.id,kind:'equipment',item:{...item,factory:false,location:{kind:'wreck'}}});
+  if(captured||rng()<ITEM_SURVIVAL_CHANCE||item.id===ship.guaranteedLootId)contents.push({id:item.id,kind:'equipment',item:{...item,factory:false,location:{kind:'wreck'}}});
   else forgetEquipmentDefinition(item.id);
  }
  for(const [commodity,raw] of Object.entries(ship.cargo??{})){
@@ -68,7 +73,7 @@ export function makeCareerWreck(session,ship,{captured=false}={}){
  }
  // Cosmetic debris always appears; an empty hull does not advertise loot.
  if(!contents.length)return null;
- const ext=session.npcHullExtents(ship),wreck={id:`wreck-${ship.lootKey}`,name:`${ship.name} — salvage`,position:[...ship.position],velocity:[...ship.velocity],radius:Math.max(3,Math.min(35,Math.max(...ext)*.5)),systemId:session.save.player.systemId,instanceId:session.activeInstanceId,contents,scanned:captured};
+ const ext=session.npcHullExtents(ship),wreck={id:`wreck-${ship.lootKey}`,name:`${ship.name} — salvage`,position:[...ship.position],velocity:[0,0,0],radius:Math.max(3,Math.min(35,Math.max(...ext)*.5)),systemId:session.save.player.systemId,instanceId:session.activeInstanceId,contents,scanned:captured};
  session.save.world.combatWrecks[wreck.id]=wreck;return wreck;
 }
 export function recoverWreckEntry(session,wreckId,entryId){
@@ -91,6 +96,7 @@ export function recoverWreckEntry(session,wreckId,entryId){
  if(!result.ok)return result;
  session.recordExtractionProgress?.('salvage',1);
  if(entry.kind!=='cargo'||entry.quantity<=0)wreck.contents.splice(index,1);
+ node.lootRarity=highestLootRarity(wreck.contents);
  node.remaining=wreck.contents.reduce((n,e)=>n+(e.quantity??1),0);session._statsDirty=true;
  if(!node.remaining){delete session.save.world.combatWrecks[wreck.id];session.wreckNodes.splice(session.wreckNodes.indexOf(node),1);session.renderer?.removeCombatLootNode?.(node.id);if(session.save.player.currentTargetId===node.id)session.save.player.currentTargetId=undefined;}
  return {ok:true,code:'Recovered into cargo.'};
@@ -120,7 +126,7 @@ export function normalizeCareerLoot(world, player) {
    used.add(entry.id);contents.push(entry);
   }
   if(!contents.length)continue;
-  wrecks[id]={...raw,name:String(raw.name??'Ship wreck').slice(0,150),contents,radius:Math.max(1,Math.min(35,Number(raw.radius)||3)),velocity:tuple(raw.velocity,3)?raw.velocity:[0,0,0],scanned:Boolean(raw.scanned)};
+  wrecks[id]={...raw,name:String(raw.name??'Ship wreck').slice(0,150),contents,radius:Math.max(1,Math.min(35,Number(raw.radius)||3)),velocity:[0,0,0],scanned:Boolean(raw.scanned)};
  }
  if(world.combatWrecks)world.combatWrecks=wrecks;
  const orphans={};

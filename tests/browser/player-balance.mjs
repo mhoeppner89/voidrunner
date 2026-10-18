@@ -1,0 +1,27 @@
+import {chromium,webkit,devices} from 'playwright';
+import assert from 'node:assert/strict';
+import {mkdir,writeFile} from 'node:fs/promises';
+const out='output/player-balance/browser';await mkdir(out,{recursive:true});const report=[];
+for(const [name,type,device] of [['desktop',chromium,{viewport:{width:1440,height:900}}],['android',chromium,devices['Pixel 7 landscape']],['iphone',webkit,devices['iPhone 13 landscape']]]){
+ const browser=await type.launch({headless:true,...(type===chromium?{executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--no-sandbox','--disable-gpu-sandbox','--mute-audio','--use-gl=angle','--use-angle=swiftshader']}:{})});
+ try{
+  const page=await browser.newPage({...device,serviceWorkers:'block'}),errors=[];page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.stack));page.on('console',m=>{if(m.type()==='error'&&m.text().includes('Frame error'))errors.push(m.text());});
+  await page.addInitScript(()=>{localStorage.setItem('void-privateer-settings-v1',JSON.stringify({music:0,effects:0}));const A=window.AudioContext??window.webkitAudioContext;if(A)A.prototype.resume=async function(){await this.suspend();};});
+  await page.goto(`${process.env.VR_BASE_URL??'http://127.0.0.1:4192'}/game.html?revision=0.8.2gq`);await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.newGame);await page.evaluate(()=>__VOID_PRIVATEER__.newGame());
+  const career=await page.evaluate(async()=>{
+   const r=__VOID_PRIVATEER__.getRuntime();cancelAnimationFrame(r.frameId);r.audio.setVolumes(0,0);r.ui.hideStory();r.save.quests=[];
+   const {HULL_HARDPOINTS}=await import('/src/game/outfitting.js'),{getEffectiveShipStats}=await import('/src/game/shipStats.js'),{createEnemyLoadout}=await import('/src/game/enemyLoadouts.js');
+   const p=r.save.player;p.credits=100000;p.dockedAt='rook';r.ui.showDock(r.save,'rook');for(const [baseId,prefix]of [['mortar','weapon'],['sustained-reactor','utility']])for(let i=0;i<3;i++){const bought=r.inventoryCommand('buy',{baseId});if(!bought.ok)throw Error('Purchase failed '+bought.code);const fitted=r.inventoryCommand('install',{id:bought.id,mountId:`wayfarer-${prefix}-${i}`});if(!fitted.ok)throw Error('Fitting failed '+fitted.code);}if(Math.abs(r.playerStats().reactorOutput-15.25)>.001)throw Error('Fitting did not update live reactor output');await r.launch();cancelAnimationFrame(r.frameId);p.throttle=0;p.velocity.fill(0);p.energy=r.playerStats().energyCapacity;
+   let shots=0;const fire=r.spawnPlayerGunProjectile;r.spawnPlayerGunProjectile=function(...a){shots++;return fire.apply(this,a);};
+   for(let i=0;i<720;i++)r.updateSimulation(1/60,{fire:true});r.spawnPlayerGunProjectile=fire;
+   const stats=r.playerStats();if(shots<1||shots>Math.floor((stats.energyCapacity+stats.reactorOutput*12)/18)+1)throw Error('Mounted heavy guns ignored the shared capacitor: '+shots);
+   const roster=Object.keys(HULL_HARDPOINTS).map(hull=>{const player=getEffectiveShipStats({shipId:hull,equipment:[]}),npc=createEnemyLoadout({hullId:hull},0,{guns:[],turrets:[]});if(player.shield!==npc.stats.shield||player.reactorOutput!==npc.stats.reactorOutput||player.shieldRegeneration!==npc.stats.shieldRegeneration)throw Error('Player/NPC mismatch '+hull);return hull;});
+   r.syncRender(0,performance.now());r.ui.shipMenuTab='equipment';r.ui.showShipMenu();return {shots,energy:p.energy,reactorOutput:stats.reactorOutput,utility:p.outfitting.loadouts.wayfarer.utility.length,roster};
+  });assert.equal(career.utility,3);assert.ok(Math.abs(career.reactorOutput-15.25)<.001);assert.equal(career.roster.length,15);await page.screenshot({path:`${out}/${name}-career-fit.png`});
+  await page.evaluate(()=>__VOID_PRIVATEER__.startArenaRun(false));
+  const run=await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();cancelAnimationFrame(r.frameId);r.audio.setVolumes(0,0);r.arenaRunAction('hull','wayfarer');for(let i=0;i<2;i++){const offers=r.save.arenaRun.offers;r.arenaRunAction('reward',offers.find(x=>x!=='repair')??offers[0]);r.arenaRunAction('accept');}r.startRunWave();for(let i=0;i<300;i++)r.updateSimulation(1/60,{fire:true});const s=r.playerStats();if(!Number.isFinite(r.save.player.energy)||r.save.player.energy>s.energyCapacity+.001)throw Error('Arena capacitor exceeded capacity');r.syncRender(0,performance.now());return {capacity:s.energyCapacity,shield:s.shield,energy:r.save.player.energy,ships:r.ships.length};});await page.screenshot({path:`${out}/${name}-arena-run.png`});
+  await page.evaluate(()=>__VOID_PRIVATEER__.startObserver('open'));
+  const observer=await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();cancelAnimationFrame(r.frameId);r.audio.setVolumes(0,0);r.observerSelectShip('blade');r.observerPreset('3v3');r.observerStartBattle();for(let i=0;i<600;i++)r.updateSimulation(1/60,{});if(!r.ships.length||r.ships.some(s=>!Number.isFinite(s.energy)||s.energy>s.combatFit.stats.energyCapacity+.001))throw Error('Spectator resource failure');r.syncRender(0,performance.now());return r.ships.map(s=>({hull:s.combatFit.hullId,shield:s.maxShield,energy:s.energy,capacity:s.combatFit.stats.energyCapacity}));});await page.screenshot({path:`${out}/${name}-spectator.png`});
+  assert.deepEqual(errors,[]);report.push({name,career,run,observer,errors});await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));console.log(name,'career mounted weapons, 15 hulls, Arena Run and spectator passed');
+ }finally{await browser.close();}
+}

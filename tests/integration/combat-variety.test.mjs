@@ -27,7 +27,7 @@ test('shared flight preserves coasting, bounds thrust, and gives NPCs hull speed
     integrateFlightVelocity(v,forward,50,50,21,true,false,1,1/60);
     assert.ok(v.x>29 && v.x<30);assert.ok(Math.abs(v.z+20.35)<1e-9);
     const s=fixture(),ship=spawn(s),stats=s.npcFlightStats(ship);
-    assert.equal(ship.speed,SHIPS.talon.maxSpeed);assert.equal(ship.afterburnSpeed,SHIPS.talon.afterburnSpeed);
+    assert.equal(ship.speed,stats.maxSpeed);assert.equal(ship.afterburnSpeed,stats.afterburnSpeed);assert.ok(stats.maxSpeed<=SHIPS.talon.maxSpeed);
     const p=new THREE.Vector3(),velocity=new THREE.Vector3(0,0,-stats.maxSpeed),q=new THREE.Quaternion(),goal=new THREE.Quaternion();
     const fuel=ship.fuel;
     for(let i=0;i<120;i++)s.integrateNpcFlight(ship,p,velocity,q,goal,stats.afterburnSpeed,true,true,1/60);
@@ -178,7 +178,17 @@ test('observer loadout presets fit real hull mounts and alter only equipment sta
         assert.ok(turretFit.turrets.includes(choice.turret),`${id} should mount its selected turret on a hull with turrets`);
         assert.ok(fit.stats.maxSpeed>0&&fit.stats.shield>0&&fit.stats.hull>0);
         if(id==='assault')assert.ok(fit.stats.maxSpeed>baseline.stats.maxSpeed,'the assault engine should affect NPC flight speed');
-        else assert.equal(fit.stats.maxSpeed,baseline.stats.maxSpeed,'the preset must use the real hull stat path');
+        else assert.ok(fit.stats.maxSpeed<=SHIPS.talon.maxSpeed&&fit.stats.maxSpeed>=SHIPS.talon.maxSpeed*.65,'equipment mass uses the real hull handling path');
     }
     assert.notEqual(createEnemyLoadout({role:'pirate',hullId:'talon',pilot:{tier:'veteran'},maxShield:58},0,'support').stats.energyCapacity,baseline.stats.energyCapacity);
+});
+
+test('veteran and ace story actors attack without a legacy combat profile',()=>{
+ for(const [flag,hull] of [['tutorialCompanion','lancer'],['tutorialCompanion','torsas'],['tutorialEnemy','scrapper']])for(const tier of ['veteran','ace']){
+  const s=fixture(),ship=spawn(s,'patrol',tier,[0,0,200],hull);ship[flag]=true;ship.campaignCombat=true;
+  assert.equal(combatProfile(ship),undefined);assert.ok(s.npcFlightStats(ship));
+  for(let i=0;i<120;i++)step(s,ship);
+  assert.ok([...ship.position,...ship.velocity,...ship.rotation,ship.energy,ship.shield].every(Number.isFinite),`${tier} ${hull} combat stays finite`);
+  assert.ok(ship.energy>=0);
+ }
 });

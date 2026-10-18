@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {equipmentBaseId} from '../../src/game/equipmentCatalog.js';
 import {tutorialFixture} from '../helpers/tutorial.mjs';
 import {updateNpcDrones} from '../../src/game/npcDrones.js';
 import {selectRepairTarget,repairTargetEligible,applyDroneRepair,createRepairDroneState} from '../../src/game/repairDrones.js';
@@ -50,4 +51,28 @@ test('player repair drones physically service a friendly fighter and stop when i
  for(let i=0;i<14400&&paul.hull===hull;i++){r.save.world.time+=1/60;p.energy=r.playerStats().energyCapacity;r.updatePdcDrones(1/60);}
  assert.ok(paul.hull>hull);const u=f.unitsById[id];assert.equal(u.repairTargetId,paul.id);
  paul.position[0]=201;const before=paul.hull;r.updatePdcDrones(1/60);assert.equal(paul.hull,before);assert.equal(u.repairing,false);assert.equal(u.repairAttached,false);
+});
+
+test('stock NPC Wayfarer deploys one repair drone, repairs itself and then its nearby ally',()=>{
+ const {session:r,save}=tutorialFixture('earn-standing'),p=save.player;
+ p.dockedAt=undefined;p.position=[10000,90000,0];p.velocity.fill(0);
+ const owner=r.spawnShip('escort',[0,90000,0],undefined,'Support Wayfarer',{tier:'veteran',temperament:'steady'},{hullId:'wayfarer',faction:'independents'});
+ const friend=r.spawnShip('escort',[100,90000,0],undefined,'Nearby ally',{tier:'veteran',temperament:'steady'},{hullId:'talon',faction:'independents'});
+ for(const s of [owner,friend]){s.position[1]=90000;s.velocity.fill(0);s.rotation=[0,0,0,1];s.hostile=false;s.hull=s.maxHull;}
+ owner.hull-=6;friend.hull-=12;const before=friend.hull;
+ updateNpcDrones(r,1/60);const units=Object.values(owner.droneFleet.unitsById);
+ assert.equal(units.length,1);assert.equal(units[0].type,'repair');assert.deepEqual(owner.combatFit.turrets.map(equipmentBaseId),['pdc']);
+ advance(r,()=>owner.hull===owner.maxHull);assert.equal(friend.hull,before);
+ advance(r,()=>friend.hull>before);assert.equal(units[0].repairTargetId,friend.id);assert.equal(units[0].repairing,true);
+ assert.equal(p.outfitting.loadouts.wayfarer.droneBays[0].mode,'mining','player starting drone role stays independent of NPC fits');
+});
+
+test('spectator simulation advances stock NPC repair drones and sends them to the renderer',()=>{
+ const {session:r}=tutorialFixture('earn-standing');r.arena={observer:true};r.observerStarted=true;
+ const ship=r.spawnShip('escort',[0,90000,0],undefined,'Observer Wayfarer',{tier:'veteran'},{hullId:'wayfarer',faction:'concord'});ship.hull=ship.maxHull-8;ship.velocity.fill(0);ship.rotation=[0,0,0,1];ship.observerTeam='blue';const initial=ship.hull;
+ r.snapshotInterpolationState=()=>{};r.renderer.updateWorld=()=>{};for(const key of ['updateShips','resolveShipContacts','updateProjectiles','updatePickups','cleanupEntities','updateObserverBattleState'])r[key]=()=>{};
+ for(let i=0;i<720&&ship.hull===initial;i++)r.updateSimulation(1/60,{});
+ assert.ok(ship.hull>initial,'observer branch must actually run repairs');const units=Object.values(ship.droneFleet.unitsById);assert.equal(units.length,1);assert.equal(units[0].type,'repair');
+ let rendered;r.updateObserverFocus=()=>null;r.observerViewModel=()=>({});r.ui.updateObserverView=()=>{};for(const key of ['setCockpitVisible','updateObserverCamera','syncProjectiles','syncPickups','render'])r.renderer[key]=()=>{};
+ r.renderer.syncDrones=fleet=>{rendered=fleet.unitsById;};r.syncRender(0,0);assert.equal(rendered[units[0].id],units[0],'NPC drone must also be visible in observer mode');
 });

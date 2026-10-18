@@ -452,7 +452,7 @@ const actions = {
     requestFullscreen: () => void enterFullscreen(),
     toggleFullscreen: () => void toggleFullscreen(),
     launch: () => {
-        void withSession((ready) => {
+        return withSession((ready) => {
             // Audio resume is best-effort and can remain pending in browsers
             // that decline or defer the gesture. It must never hold up the
             // staged WebGL preparation or keep the player trapped at the dock.
@@ -477,6 +477,9 @@ const actions = {
     serviceDrones: (options) => session?.serviceDrones(options),
     miningDrones: () => session?.miningDroneHud(),
     cycleCapitalSubtarget: () => session?.cycleCapitalSubtarget(),
+    setWeaponGroup: (mountId,group) => session?.setWeaponGroup(mountId,group),
+    setGroupFireMode: (group,mode) => session?.setGroupFireMode(group,mode),
+    selectFireGroup: group => session?.selectFireGroup(group),
     setLauncherFireMode: mode => session?.setLauncherFireMode(mode),
     launcherCycle: () => session?.cycleLauncher(),
     selectTarget: (kind, id) => session?.selectTarget(kind, id, 'map'),
@@ -486,6 +489,7 @@ const actions = {
     payOffMug: () => session?.payOffMug(),
     patrolReply: () => session?.patrolReply(),
     paySyndicateBerth: () => session?.paySyndicateBerth(),
+    chooseRaceHull:id=>session?.chooseRaceHull(id),
     acceptMission: (missionId) => session?.acceptMission(missionId),
     discardMission: (missionId) => session?.discardMission(missionId),
     chooseTutorial: (choiceId) => session?.chooseTutorial(choiceId),

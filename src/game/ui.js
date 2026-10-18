@@ -1,3 +1,4 @@
+import {RACE_HULLS} from './raceHulls.js';
 import {EQUIPMENT_RARITIES,equipmentName,modifiedWeapon,equipmentBaseId} from './equipmentCatalog.js';
 import {normalizeEquipmentInventory} from './equipmentInventory.js';
 import {PDC_TURRET} from './turrets.js';
@@ -25,7 +26,7 @@ import { HULL_TRADE_IN_RATE, quoteShipTrade } from './shipTrade.js';
 import { LOADOUT_KEYS, HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RATE, itemAvailable, itemFitsMount, loadoutFor, quoteOutfitting } from './outfitting.js';
 import { playerStrengthValue } from './playerStrength.js';
 import { guildJoinCost, missionBriefing, missionTitle } from './missions.js';
-import { getTutorialQuest, tutorialCampaignSummary, tutorialCardContent, tutorialDialogue, tutorialPeople, tutorialConversation, tutorialContentUnlocked, tutorialTradePrice, TUTORIAL_MINING_CONTRACT_ID } from './tutorialCampaign.js';
+import { getTutorialQuest, tutorialCampaignSummary, tutorialCardContent, tutorialDialogue, tutorialPeople, tutorialConversation, tutorialContentUnlocked, tutorialTradePrice, tutorialLaunchBlock, TUTORIAL_MINING_CONTRACT_ID } from './tutorialCampaign.js';
 import { canMineWithHull, DRONE_BAY_CAPACITY, DRONE_TYPES, droneBayLayoutFor } from './droneData.js';
 const WARM_IMAGE_TIMEOUT_MS = 5000;
 const settleWarmupPromise = (promise, fallback = false) => new Promise((resolve) => {
@@ -432,7 +433,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2gp';
+const GAME_VERSION = '0.8.2ij';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -1266,7 +1267,7 @@ export class GameUI {
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="${t('Own ship status display; tap to open ship menu')}">
             <div class="monitor-damage" aria-hidden="true"></div><div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
             <div class="screen-race-strip" id="screen-race-strip"><span id="screen-race-label"></span><b id="screen-race-value"></b></div>
-            <div class="screen-ship-layout"><div class="screen-flight"><div><span data-short="SPD">${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span data-short="FUEL">${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em><small id="screen-own-launcher"></small><small id="screen-own-drone-pdc" class="is-hidden"></small></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span data-short="S">${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i></div><div><span data-short="E">${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i></div><div><span data-short="H">${t('HULL')}</span><i><b id="screen-own-hull"></b></i></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
+            <div class="screen-ship-layout"><div class="screen-flight"><div><span data-short="SPD">${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span id="screen-own-fuel-label" data-short="FUEL">${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em><small id="screen-own-launcher"></small><small id="screen-own-drone-pdc" class="is-hidden"></small></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span data-short="S">${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i></div><div><span data-short="E">${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i></div><div><span data-short="H">${t('HULL')}</span><i><b id="screen-own-hull"></b></i></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="${t('Radar display; tap to open navigation map')}">
             <div class="monitor-damage" aria-hidden="true"></div><div class="radar-screen-wrap"><canvas id="radar" width="220" height="220" role="button" tabindex="0" aria-label="${t('Open navigation map')}"></canvas></div>
@@ -1281,6 +1282,7 @@ export class GameUI {
           <button type="button" id="hyperdrive-card" class="cockpit-identity" data-touch-action="autopilot" aria-label="${t('Hyperdrive: engage jump to nav point')}"><b>HYPERDRIVE</b></button>
           </div>
           <div class="hud-wing-tactics" id="hud-wing-tactics"></div>
+          <div id="race-flight-vector" class="race-flight-vector is-hidden" aria-hidden="true"><svg viewBox="0 0 32 32"><g class="flight-vector-ring"><circle cx="16" cy="16" r="6"/><path d="M2 16h8M22 16h8M16 2v8"/></g><path class="flight-vector-arrow" d="M8 20l8-10 8 10"/></svg></div>
           <div id="target-bracket" class="target-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
           <div id="target-edge-pointer" class="target-edge-pointer is-hidden" aria-hidden="true"><i></i><span></span></div>
           <div class="reticle" aria-hidden="true"><span></span><span></span><span></span><span></span><b></b></div>
@@ -1298,7 +1300,7 @@ export class GameUI {
             </div>
             <div class="touch-right">
               <button class="touch-boost touch-boost-right" data-touch-action="afterburner" aria-label="${t('Afterburner — hold')}"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" fill-rule="evenodd"><path d="M12 2.2C7.9 7.5 5.4 10.3 5.4 14a6.6 6.6 0 0 0 13.2 0c0-3.7-2.5-6.5-6.6-11.8Zm0 7c-2 2.6-2.8 3.8-2.8 5.3a2.8 2.8 0 0 0 5.6 0c0-1.5-.8-2.7-2.8-5.3Z"/></svg></button>
-              <button id="touch-fire" class="touch-fire" data-touch-action="fire" aria-label="${t('Fire — hold')}"><svg data-icon="fire" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.6"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg><svg data-icon="scan" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="is-hidden"><circle cx="12" cy="12" r="6.2"/><path d="M12 5.8V12l4.2 2.4M4.8 4.8 3.4 3.4M19.2 4.8l1.4-1.4M4.8 19.2l-1.4 1.4M19.2 19.2l1.4 1.4"/></svg><span id="touch-drone-label" class="is-hidden"></span></button>
+              <button id="touch-fire" class="touch-fire" data-touch-action="fire" aria-label="${t('Fire — hold')}"><svg data-icon="fire" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.6"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21"/></svg><svg data-icon="brake" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="is-hidden" aria-hidden="true"><path d="M3 6l5 6-5 6M21 6l-5 6 5 6M10 5v14M14 5v14"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg><svg data-icon="scan" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="is-hidden"><circle cx="12" cy="12" r="6.2"/><path d="M12 5.8V12l4.2 2.4M4.8 4.8 3.4 3.4M19.2 4.8l1.4-1.4M4.8 19.2l-1.4 1.4M19.2 19.2l1.4 1.4"/></svg><span id="touch-drone-label" class="is-hidden"></span></button>
               <div class="touch-secondary-row"><button type="button" id="touch-launcher-cycle" class="touch-launcher-cycle" data-touch-action="launcherCycle" aria-label="${t('Cycle launcher — press L or tap')}"><span id="touch-launcher-code">SKR</span><b id="touch-missile-count">0</b></button><button id="touch-missile" class="touch-missile" data-touch-action="missile" aria-label="${t('Missile')}"><svg data-icon="missile" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.4 9.3 8.8h5.4Z"/><path d="M9.3 8.8h5.4v6.4H9.3Z"/><path d="M9.3 15.2 6.8 21M14.7 15.2l2.5 5.8"/></svg><svg data-icon="scan" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="is-hidden"><circle cx="12" cy="12" r="6.2"/><path d="M12 5.8V12l4.2 2.4"/><path d="M4.8 4.8 3.4 3.4M19.2 4.8l1.4-1.4M4.8 19.2l-1.4 1.4M19.2 19.2l1.4 1.4"/></svg><svg data-icon="mine" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M20.9 3.4 17.3 7.4 13.8 11.9"/><path d="M13.8 11.9 5.6 20.4"/></svg><svg data-icon="salvage" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M17.4 3.2a5 5 0 0 1 0 10"/><path d="M17.4 3.2l-2.7 2.7"/><path d="M17.4 13.2l-2.7-2.7"/><path d="M14.7 10.5 6.2 19"/></svg><svg data-icon="capture" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="is-hidden"><path d="M8 3.6h8l1.8 3H6.2Z"/><path d="M9.2 6.6v2.1M14.8 6.6v2.1"/><path d="M7 11.5h10M8.1 14.5h7.8M9.3 17.5h5.4M10.6 20.5h2.8"/></svg></button></div>
             </div>
           </div>
@@ -1586,6 +1588,7 @@ export class GameUI {
                 this.actions?.payOffMug();
                 this.showShipMenu();
             }
+            else if(target.dataset.raceHull){this.actions?.chooseRaceHull(target.dataset.raceHull);this.renderDock();}
             else if (target.dataset.missionId) {
                 const missionId = target.dataset.missionId;
                 const result = this.actions?.acceptMission(missionId);
@@ -1835,8 +1838,8 @@ export class GameUI {
             case 'launch':
                 if (DOCK_LOCATION_IDS.includes(this.dockLocation) && this.dockTerminal === 'concourse' && element?.classList.contains('concourse-hover-ship'))
                     this.startVesperLaunchTransition();
-                else
-                    this.actions?.launch();
+                else if (this.canLaunchFromDock())
+                    void this.launchFromDock();
                 break;
             case 'pause':
                 this.showPause();
@@ -1923,9 +1926,14 @@ export class GameUI {
                 this.hidePause();
                 this.actions?.quitToTitle();
                 break;
+            case 'weapon-group':
+                this.actions?.setWeaponGroup?.(element.dataset.mountId,element.dataset.group);this.showShipMenu();break;
+            case 'group-fire-mode':
+                this.actions?.setGroupFireMode?.(element.dataset.group,element.dataset.fireMode);this.showShipMenu();break;
+            case 'fire-group-select':
+                this.actions?.selectFireGroup?.(element.dataset.group);this.showShipMenu();break;
             case 'launcher-fire-mode':
                 this.actions?.setLauncherFireMode?.(element.dataset.launcherMode);
-                this.root.querySelector('.ship-menu-weapons details')?.setAttribute('open', '');
                 break;
             case 'repaint':
                 this.actions?.setShipPaint?.(this.servicePaintId);
@@ -2118,7 +2126,30 @@ export class GameUI {
         this.root.querySelector('#dock-screen')?.classList.add('is-hidden');
         this.dockLocation = undefined;
     }
+    showLaunchBlocked(message) {
+        this.showStory(message);
+    }
+    canLaunchFromDock() {
+        const message = tutorialLaunchBlock(this.save);
+        if (!message) return true;
+        this.showLaunchBlocked(t(message));
+        return false;
+    }
+    async launchFromDock() {
+        try {
+            return await this.actions?.launch();
+        } catch (error) {
+            console.warn('Departure failed', error);
+            this.showLaunchBlocked(t('Unable to launch. Please try again.'));
+            return false;
+        } finally {
+            // A refused or failed departure must leave the dock usable.
+            this.cancelVesperLaunchTransition();
+        }
+    }
     cancelVesperLaunchTransition() {
+        this.vesperLaunchCleanup?.();
+        this.vesperLaunchCleanup = undefined;
         this.vesperLaunchTransition = false;
         if (this.vesperLaunchTimer !== undefined) {
             window.clearTimeout(this.vesperLaunchTimer);
@@ -2126,18 +2157,18 @@ export class GameUI {
         }
     }
     startVesperLaunchTransition() {
-        if (this.vesperLaunchTransition)
+        if (this.vesperLaunchTransition || !this.canLaunchFromDock())
             return;
         const dock = this.root.querySelector('#dock-screen');
         const scene = dock?.querySelector('.station-scene');
         const ship = dock?.querySelector('.concourse-hover-ship');
         const flight = dock?.querySelector('.concourse-hover-ship-flight');
         if (!scene || !ship || !flight) {
-            this.actions?.launch();
+            void this.launchFromDock();
             return;
         }
         if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-            this.actions?.launch();
+            void this.launchFromDock();
             return;
         }
         this.vesperLaunchTransition = true;
@@ -2152,16 +2183,24 @@ export class GameUI {
                 return;
             finished = true;
             flight.removeEventListener('animationend', onAnimationEnd);
-            this.vesperLaunchTransition = false;
             if (this.vesperLaunchTimer !== undefined) {
                 window.clearTimeout(this.vesperLaunchTimer);
                 this.vesperLaunchTimer = undefined;
             }
-            this.actions?.launch();
+            void this.launchFromDock();
         };
         const onAnimationEnd = (event) => {
             if (event.animationName === 'vesper-launch-ship' || event.animationName === 'rook-launch-ship')
                 finish();
+        };
+        this.vesperLaunchCleanup = () => {
+            finished = true;
+            flight.removeEventListener('animationend', onAnimationEnd);
+            scene.classList.remove('is-launching');
+            ship.closest('.concourse-hover-preview')?.classList.remove('is-departing');
+            scene.querySelector('.scene-pointers')?.removeAttribute('aria-hidden');
+            ship.removeAttribute('aria-disabled');
+            ship.setAttribute('tabindex', '0');
         };
         flight.addEventListener('animationend', onAnimationEnd);
         this.vesperLaunchTimer = window.setTimeout(finish, VESPER_LAUNCH_DURATION + 120);
@@ -2318,15 +2357,16 @@ export class GameUI {
           </div>
         </aside>`;
     }
-    renderStory() {
+    renderStory(message = this.storyMessage) {
         const panel = this.root.querySelector('#story-panel');
         if (!panel) return;
-        panel.innerHTML = `<div class="story-card"><header><h2 id="story-heading">${t('Story')}</h2><button type="button" data-ui-command="close-story" aria-label="${t('Close')}">×</button></header>${this.renderTutorialNotice() || `<p>${t('No active story quest.')}</p>`}</div>`;
+        panel.innerHTML = `<div class="story-card"><header><h2 id="story-heading">${message ? escapeHtml(SHIPS[this.save?.player?.shipId]?.name ?? '') : t('Story')}</h2><button type="button" data-ui-command="close-story" aria-label="${t('Close')}">×</button></header>${message ? `<p role="status">${escapeHtml(message)}</p>` : this.renderTutorialNotice() || `<p>${t('No active story quest.')}</p>`}</div>`;
     }
-    showStory() {
+    showStory(message) {
         if (this.save?.arena) return;
+        this.storyMessage = message;
         this.storyOpen = true;
-        this.renderStory();
+        this.renderStory(message);
         const panel = this.root.querySelector('#story-panel');
         if (!panel) { this.storyOpen = false; return; }
         const dock = this.root.querySelector('#dock-screen');
@@ -2345,6 +2385,7 @@ export class GameUI {
     hideStory(restoreFocus = true) {
         const wasOpen = this.storyOpen;
         this.storyOpen = false;
+        this.storyMessage = undefined;
         const panel = this.root.querySelector('#story-panel');
         panel?.classList.add('is-hidden');
         if (panel) panel.onkeydown = null;
@@ -3396,7 +3437,7 @@ export class GameUI {
           </dl>
           ${complication ? `<section class="mission-complication ${complicationLost ? 'is-lost' : ''}"><span>${complication.kind === 'fragile' ? t('FRAGILE LOAD') : t('EARLY DELIVERY BONUS')}</span><b>${complicationLost ? t('BONUS LOST') : `+${formatCredits(complication.bonus)}`}</b><p>${complication.kind === 'fragile' ? t('Keep structural damage at zero after acceptance.') : t('Deliver within {time} to earn the bonus.', { time: complicationTime })}</p></section>` : ''}
           ${active||mission.authored||!['delivery','transport','smuggle'].includes(mission.kind)?`<section class="mission-objective" aria-label="${active?t('CURRENT OBJECTIVE'):t('CONTRACT SUMMARY')}"><b>${escapeHtml(this.missionProgress(mission))}</b></section>`:''}<details class="ui-details mission-details"><summary>${t('Details')}</summary><p>${escapeHtml(t(mission.issuer))}</p>${mission.authored?'':`<p class="mission-briefing">${escapeHtml(missionBriefing(mission))}</p>`}</details>
-          ${!active && eligibility.issues.length ? `<ul class="mission-blockers">${eligibility.issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join('')}</ul>` : ''}
+          ${!active&&mission.kind==='race'?`<div class="race-hull-options">${Object.values(RACE_HULLS).map(h=>`<button data-race-hull="${h.id}" aria-pressed="${(this.save.player.raceHullChoice??'talon')===h.id}">${h.name}<small>${h.style}</small></button>`).join('')}</div>`:''}${!active && eligibility.issues.length ? `<ul class="mission-blockers">${eligibility.issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join('')}</ul>` : ''}
           </div><footer class="mission-dossier-actions ${discardable ? 'has-discard' : ''}">
             ${active ? `<button type="button" class="primary" data-mission-course="${route.targetId}" ${route.targetId ? '' : 'disabled'}>${t('SET COURSE')}</button>` : `<button type="button" class="primary" data-mission-id="${mission.id}" ${eligibility.ok && (tutorialContentUnlocked(this.save)||mission.id===TUTORIAL_MINING_CONTRACT_ID&&getTutorialQuest(this.save)?.flags.miningExplained) ? '' : 'disabled'}>${mission.locked ? t('COURSE LOCKED') : t('ACCEPT')}</button>`}
             ${mission.id===TUTORIAL_MINING_CONTRACT_ID&&!getTutorialQuest(this.save)?.flags.miningExplained?`<small>${t('Talk to Rin first.')}</small>`:''}
@@ -4187,7 +4228,9 @@ export class GameUI {
         // A fixed label and footprint keep drive activity out of the canopy.
         const card = this.el('#hyperdrive-card');
         if (card) {
-            card.dataset.hyperdriveReady = model.hyperdriveReady ? 'true' : 'false';
+            card.dataset.hyperdriveReady = !model.raceControl&&model.hyperdriveReady ? 'true' : 'false';
+            card.disabled=Boolean(model.raceControl);setText('#hyperdrive-card b',model.raceControl?t(model.raceControl):'HYPERDRIVE');
+            card.setAttribute('aria-label',model.raceControl?t(model.raceControl):t('Hyperdrive: engage jump to nav point'));
         }
         // Monitor tickers: the own-ship flight recorder and the radar sensor
         // log replace the in-flight toast stack. Each shows the newest entry
@@ -4278,6 +4321,7 @@ export class GameUI {
         // monitor reserves permanently at its foot, so it can never print
         // over the hull outline or the bars — and its appearance never
         // shifts the layout (stable positions).
+        this.root?.classList.toggle('is-racing',['countdown','running'].includes(model.race?.phase)||Boolean(this.save?.player.raceReturn));
         const raceStrip = this.el('#screen-race-strip');
         if (raceStrip) {
             const race = model.race;
@@ -4311,7 +4355,7 @@ export class GameUI {
                         label.textContent = race.draft > 0.15 ? `${shortcut} · ${t('DRAFT')}` : shortcut;
                         value.textContent = Number.isFinite(race.splitDelta) && (race.splitAge ?? 99) < 2.2
                             ? `${race.rankLabel} · ${t('PB {delta}', { delta: `${race.splitDelta <= 0 ? '−' : '+'}${Math.abs(race.splitDelta).toFixed(1)}` })}`
-                            : `${race.rankLabel} · ${clock(race.time)}`;
+                            : `${race.rankLabel} · ~${race.gap>=0?'+':'−'}${Math.abs(race.gap??0).toFixed(1)}s`;
                     }
                     raceStrip.title = `${label.textContent} · ${value.textContent}`;
                 }
@@ -4336,7 +4380,14 @@ export class GameUI {
             speedCell?.setAttribute('aria-label', `${t('SPEED')} ${speed} / ${maxSpeed}`);
             speedCell?.setAttribute('title', `${t('SPEED')} ${speed} / ${maxSpeed}`);
         }
-        setText('#screen-own-fuel', Math.round((model.fuel / model.maxFuel) * 100).toString());
+        const raceDriveLive=model.race?.phase==='running'&&Number.isFinite(model.race.boost);
+        const stabilizer=raceDriveLive&&model.race.stabilizerTime>0;
+        const driveLabel=stabilizer?t('STABILIZER'):t(model.race?.racingHull?'THRUST':'BOOST');
+        setText('#screen-own-fuel-label',raceDriveLive?driveLabel:t('FUEL'));
+        this.el('#screen-own-fuel-label')?.setAttribute('data-short',raceDriveLive?(stabilizer?'STAB':t(model.race?.racingHull?'THRUST':'BOOST')):t('FUEL'));
+        setText('#screen-own-fuel',stabilizer?`${Math.ceil(model.race.stabilizerTime)}s`:Math.round(raceDriveLive?model.race.boost*100:(model.fuel/model.maxFuel)*100).toString());
+        const boostValue=this.el('#screen-own-fuel');
+        if(boostValue){boostValue.dataset.boost=stabilizer?'stabilizer':raceDriveLive&&model.race.boostLocked?'recovering':'';boostValue.nextElementSibling.textContent=stabilizer?'':'%';}
         const standoff = this.el('#screen-standoff');
         if (standoff) {
             standoff.classList.toggle('is-visible', Boolean(model.standoff));
@@ -4369,9 +4420,17 @@ export class GameUI {
                 targetReadout.textContent = model.monitorStatus;
             else if (model.dockPrompt)
                 targetReadout.textContent = model.dockPrompt;
+            if(model.race?.phase==='running'&&!model.monitorStatus){
+                const seconds=Math.floor(model.race.time),delta=model.race.sectorDelta;
+                targetReadout.textContent=`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}${Number.isFinite(delta)?` · Δ ${delta<=0?'−':'+'}${Math.abs(delta).toFixed(1)}s`:''}`;
+                targetReadout.title=t('Race time · Sector gain / loss');
+            }else
             targetReadout.title = targetReadout.textContent === '—' ? '' : targetReadout.textContent;
         }
         this.drawHullOutline(this.ownHullCanvas, model.playerVariant ?? 'kestrel', 0, 'rgba(111, 216, 236, 0.9)', false, model.missiles, model.maxMissiles);
+        const marker=this.el('#race-flight-vector');
+        if(marker){marker.classList.toggle('is-hidden',!model.raceVector);if(model.raceVector){marker.style.left=`${model.raceVector.x}px`;marker.style.top=`${model.raceVector.y}px`;marker.style.transform=`translate(-50%,-50%) rotate(${model.raceVector.angle}deg)`;marker.classList.toggle('is-edge',model.raceVector.edge);}}
+        for(const button of this.root.querySelectorAll('.touch-boost'))button.setAttribute('aria-label',model.raceControl?t('Thrust — hold'):t('Afterburner — hold'));
         const throttleThumb = this.el('[data-touch-throttle-thumb]');
         const throttleFill = this.el('.touch-throttle-fill');
         if (throttleThumb)
@@ -4564,6 +4623,9 @@ export class GameUI {
         }
         if (launcherCode)
             launcherCode.textContent = launcher?.displayCode ?? launcher?.shortCode ?? '—';
+        if(this.save?.player.raceReturn){
+            showIcon(fire,'brake');if(fireText)fireText.textContent=t('BRAKE');fire.setAttribute('aria-label',t('Brake — hold'));return;
+        }
         fire.setAttribute('aria-label', t('Fire — hold'));
         missile.setAttribute('aria-label', droneMining ? droneAction?.label ?? droneLabel : salvage
             ? t('Salvage — hold')
@@ -5055,7 +5117,7 @@ export class GameUI {
             const x = wx * radius;
             const y = wy * radius;
             const size = (contact.selected ? 5.5 : 3.2) * ratio;
-            const color = contact.type === 'hostile' ? '#ff5a43' : contact.type === 'friendly' ? '#6cc8e4' : contact.type === 'location' ? '#e6b95f' : contact.type === 'resource' ? '#b8c97b' : contact.type === 'wreck' ? '#87b5aa' : contact.type === 'pickup' ? '#f2df91' : contact.type === 'distress' ? '#ff9442' : '#c9cbc6';
+            const color = contact.lootRarity ? (EQUIPMENT_RARITIES[contact.lootRarity]?.color ?? EQUIPMENT_RARITIES.common.color) : contact.type === 'hostile' ? '#ff5a43' : contact.type === 'friendly' ? '#6cc8e4' : contact.type === 'location' ? '#e6b95f' : contact.type === 'resource' ? '#b8c97b' : contact.type === 'wreck' ? '#87b5aa' : contact.type === 'pickup' ? '#f2df91' : contact.type === 'distress' ? '#ff9442' : '#c9cbc6';
             // A distress beacon from beyond the horizon (see radarContacts): a
             // pulsing diamond at the disc rim aimed at the source, with a
             // distance readout tucked just inside it.
@@ -5197,7 +5259,7 @@ export class GameUI {
         }
         return undefined;
     }
-    // Pilot chatter: a top-center comms bar showing the latest transmission
+    // Pilot chatter: an edge-anchored comms bar showing the latest transmission
     // as just "callsign: message", colored by the speaker's relation (hostiles
     // red, allies blue, neutral white). No badges, no timestamps, no log tag —
     // the transmission is the whole bar. Last speaker wins; the full
@@ -5464,6 +5526,21 @@ export class GameUI {
         }).join('');
         return `<section class="ship-menu-wing"><h3>${t('WING ORDERS')}</h3>${groups}</section>`;
     }
+    renderShipWeaponControls() {
+        const player=this.save.player,fit=loadoutFor(player),spec=HARDPOINT_SPECS[player.shipId];
+        const guns=spec.guns.map((mount,index)=>({mount,index,item:OUTFIT_ITEMS[fit.guns[index]]})).filter(g=>g.item?.category==='gun');
+        const command=(name,attrs,label,pressed,disabled=false)=>`<button type="button" data-ui-command="${name}" ${attrs} aria-pressed="${pressed}" ${disabled?'disabled':''}>${label}</button>`;
+        const active=fit.fireGroups.activeGroup;
+        const activeButtons=['A','B','ALL'].map(group=>command('fire-group-select',`data-group="${group}"`,group==='ALL'?t('FIRE ALL'):group,active===group,!guns.some(g=>group==='ALL'||fit.fireGroups.assignments[g.mount.id]===group))).join('');
+        const groups=['A','B'].map(group=>{
+            const fitted=guns.filter(g=>fit.fireGroups.assignments[g.mount.id]===group),mode=fit.fireGroups.firingModes?.[group]??'together';
+            return `<section class="ship-gun-group" data-weapon-group="${group}"><header><h3>${t('FIRE GROUP')} ${group}<small>${fitted.length}</small></h3><div class="ship-fire-modes" role="group" aria-label="${t('FIRING MODE')} ${group}">${['alternating','together'].map(value=>command('group-fire-mode',`data-group="${group}" data-fire-mode="${value}"`,t(value==='alternating'?'ALTERNATING':'TOGETHER'),mode===value)).join('')}</div></header>
+            ${fitted.map(({mount,index,item})=>`<div class="ship-gun-row" data-gun-mount="${mount.id}"><span class="ship-gun-number">${index+1}</span>${equipmentIcon(item,'ship-gun-icon')}<b>${escapeHtml(equipmentName(item,{affixes:false}))}</b><div class="ship-group-assignment" role="group" aria-label="${t('FIRE GROUP')} ${index+1}">${['A','B'].map(g=>command('weapon-group',`data-mount-id="${mount.id}" data-group="${g}"`,g,g===group)).join('')}</div></div>`).join('')}</section>`;
+        }).join('');
+        const racks=launcherMagazineEntries(player);
+        const launchers=racks.length?`<section class="ship-launcher-controls"><header><h3>${t('LAUNCHER FIRING')}</h3>${racks.length>1?`<div class="ship-fire-modes">${['alternating','together','single'].map(mode=>command('launcher-fire-mode',`data-launcher-mode="${mode}"`,t(mode==='alternating'?'ALTERNATING':mode==='together'?'TOGETHER':'SELECTED RACK ONLY'),(player.launcherFireMode??'alternating')===mode)).join('')}</div>`:''}</header>${racks.map(entry=>`<div class="weapon-row"><span>${escapeHtml(equipmentName(OUTFIT_ITEMS[entry.itemId],{affixes:false}))}</span><em>${entry.rounds}/${entry.capacity}</em></div>`).join('')}</section>`:'';
+        return `<div class="ship-weapons"><nav class="ship-active-group" aria-label="${t('FIRE GROUP')}">${activeButtons}</nav><div class="ship-weapon-columns">${groups}</div>${launchers}</div>`;
+    }
     showShipMenu() {
         if (!this.save)
             return;
@@ -5510,17 +5587,6 @@ export class GameUI {
             ? events.slice(0, 5).map(eventRow).join('') + (events.length > 5
                 ? `<details><summary>${t('Earlier events')}</summary>${events.slice(5).map(eventRow).join('')}</details>` : '')
             : `<p class="ship-menu-empty">${t('NONE')}</p>`;
-        // Owned weapon details are optional; the shop catalogue stays at dock.
-        const weaponRows = WEAPON_ORDER.filter((id) => weaponOwned(player, id)).map((id) => {
-            const weapon = WEAPONS[id];
-            const active = player.weaponId === id;
-            const ammo = `${weapon.energyCost} ⚡`;
-            const envelope = `${Math.round(weaponRange(weapon))} km`;
-            return `<div class="weapon-row${active ? ' is-active' : ''}"><span>${active ? '▸ ' : ''}${escapeHtml(t(weapon.nameKey))}</span><small>${escapeHtml(envelope)}</small><em>${ammo}</em></div>`;
-        }).join('');
-        const launcherRows = launcherMagazineEntries(player).map((entry) => (
-            `<div class="weapon-row launcher-row${entry.selected ? ' is-active' : ''}"><span>${entry.selected ? '▸ ' : ''}${escapeHtml(t(entry.launcher.nameKey))}</span><small>${escapeHtml(t(entry.launcher.ordnanceNameKey))} · ${t('MOUNT {number}', { number: entry.index + 1 })}</small><em>${entry.rounds}/${entry.capacity}</em></div>`
-        )).join('') || '';
         const tutorialSection = this.renderShipTutorial();
         const wingSection = this.renderShipWingOrders();
         // The four numbers a pilot checks mid-flight, at the top of the panel
@@ -5562,7 +5628,7 @@ export class GameUI {
             <div class="standoff-actions">${comply}<span>${escapeHtml(terms)}</span></div>
           </aside>`;
         })();
-        const tabs=[['flight','Flight'],...(!this.save.arena?[['equipment','Equipment & Cargo']]:[]),
+        const tabs=[['flight','Flight'],['weapons','Weapons'],...(!this.save.arena?[['equipment','Equipment & Cargo']]:[]),
             ...(droneBayLayoutFor(player.shipId).length||droneCount?[['drones','Drones']]:[]),...(!this.save.arena?[['journal','Journal']]:[])];
         const tab=tabs.some(([id])=>id===this.shipMenuTab)?this.shipMenuTab:'flight';
         this.shipMenuTab=tab;
@@ -5571,10 +5637,7 @@ export class GameUI {
             <button type="button" data-ui-command="transponder-toggle" aria-pressed="${player.transponder!==false}">${t(player.transponder!==false?'TRANSPONDER ON':'TRANSPONDER OFF')}</button>
             ${loadoutFor(player).turrets?.some(Boolean)?`<button type="button" data-ui-command="turret-toggle" aria-pressed="${!player.turretsHeld}">${t(player.turretsHeld?'TURRETS HOLD FIRE':'TURRETS ACTIVE')}</button>`:''}
           </section>
-          ${wingSection||`<section class="ship-flight-weapons"><h3>${t('WEAPON SYSTEMS')}</h3>${weaponRows}${launcherRows}</section>`}
-          ${wingSection?`<details><summary>${t('WEAPON SYSTEMS')}</summary>${weaponRows}${launcherRows}</details>`:''}
-          ${launcherMagazineEntries(player).length>1?`<section><h3>${t('LAUNCHER FIRING')}</h3><div class="drone-policy">${['alternating','together','single'].map(mode=>`<button type="button" data-ui-command="launcher-fire-mode" data-launcher-mode="${mode}" aria-pressed="${(player.launcherFireMode??'alternating')===mode}">${t(mode==='alternating'?'ALTERNATING':mode==='together'?'TOGETHER':'SELECTED RACK ONLY')}</button>`).join('')}</div></section>`:''}
-          <details class="ship-flight-help"><summary>${t('WEAPON GROUP HELP')}</summary><p>${t('Tap the weapon name to cycle populated groups and Fire all. Fire all uses every forward gun; missiles and automatic turrets stay separate. In Outfitting, open a gun’s details to assign A or B. Try beams in A and your other weapon in B to control energy use.')}</p></details>
+          ${wingSection}
         </div>`;
         const journalPanel=`<div class="ship-console-grid ship-journal">${tutorialSection}<section class="ship-menu-missions"><h3>${t('ACTIVE CONTRACTS · {count}/6',{count:missions.length})}</h3>${missionRows}</section>
           <details class="ship-menu-account"><summary>${t('COMBAT VALUE')} · ${formatCredits(combatValue)}</summary><p>${t('SHIP + EQUIPMENT · HALF CASH · NO CARGO')}</p></details>
@@ -5584,7 +5647,7 @@ export class GameUI {
           ${standoffBanner}
           <nav class="ship-console-tabs" aria-label="${t('Ship sections')}">${tabs.map(([id,label])=>`<button type="button" data-ui-command="ship-section" data-ship-section="${id}" aria-current="${id===tab?'page':'false'}">${t(label)}</button>`).join('')}</nav>
           ${tab==='flight'?`<div class="ship-status-strip">${statusCells}</div>`:''}
-          <div class="ship-console-body" data-pane="${tab}">${tab==='flight'?flightPanel:tab==='equipment'?renderEquipmentInventory(this,{embedded:true}):tab==='drones'?this.renderDroneShipStatus():journalPanel}</div>
+          <div class="ship-console-body" data-pane="${tab}">${tab==='flight'?flightPanel:tab==='weapons'?this.renderShipWeaponControls():tab==='equipment'?renderEquipmentInventory(this,{embedded:true}):tab==='drones'?this.renderDroneShipStatus():journalPanel}</div>
         </div>`;
         this.hidePause();
         this.hideMap();

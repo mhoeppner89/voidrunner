@@ -86,7 +86,7 @@ export const TutorialRuntimeMethods={
                 const patrol=encounter==='patrol',range=patrol?this.playerStats().radarRange*.92:240+index*95;
                 const offset=(patrol?new THREE.Vector3(range+index*55,range*.45,index*70):new THREE.Vector3(Math.cos(index*1.4)*range,60+index*12,Math.sin(index*1.4)*range)).add(point(origin));
                 let position=offset.toArray();
-                ship=this.spawnShip('pirate',position,undefined,encounter==='mining'?'Ash Moth':`${patrol?'Redwake patrol':'Graveyard raider'} ${index+1}`,{tier:patrol?'veteran':'novice',temperament:'steady'},{hullId:hulls[index],faction:'pirates'});
+                ship=this.spawnShip('pirate',position,undefined,encounter==='mining'?'Ash Moth':`${patrol?'Redwake patrol':'Graveyard raider'} ${index+1}`,{tier:patrol?'veteran':'novice',temperament:'steady'},{hullId:hulls[index],faction:'pirates',tutorialEncounter:encounter});
                 Object.assign(ship,{tutorialEnemy:true,campaignCombat:true,tutorialEncounter:encounter,tutorialIndex:index,noSurrender:true,dark:false,mugCapable:false,targetId:patrol?undefined:encounter==='rescue'?this.ships.find(s=>s.storyPersonId==='paul')?.id:'player',playerAwareness:1,playerSensorAwareness:1,playerIdentified:true,identifiedByPlayer:true});
                 if(!this.entryPositionClear(point(ship.position),this.activeFieldObstacles(),30))ship.position.splice(0,3,...this.findClearSpace(ship));
                 if(encounter==='mining'&&q.stepId==='raider-standoff'){ship.holdFire=true;ship.pursuitHoldFire=true;ship.demandUntil=Number.MAX_SAFE_INTEGER;ship.destination=[...ship.position];}
@@ -252,11 +252,12 @@ export const TutorialRuntimeMethods={
         if(s==='defeat-raider'){
             const enemy=this.ensureTutorialEnemy();if(enemy){enemy.holdFire=false;enemy.pursuitHoldFire=false;enemy.demandUntil=0;enemy.targetId='player';}
             this.save.player.mode='combat';this.utilityActive=false;this.introduceCampaignWingOrders();
-            this.ui.showPilotLine?.('Rin Vek',t('Just one Scrapper. We can take him. Fire when he crosses your sights.'),'ally',12000,true);
+            this.playTutorialBriefing('combat');
         }
         if(['rescue-paul','black-box-fight','hide-patrol'].includes(s)){q.flags.encounterStartedAt=this.save.world.time;this.ensureTutorialCompanion();this.ensureTutorialEnemy();}
         if(s==='rescue-paul')this.ui.showPilotLine?.('Paul',t('Mayday! Two Scrappers on my tail by the cruiser. I could use a hand!'),'ally',12000,true);
         if(s==='talk-paul')this.playTutorialBriefing('paul-rescue');
+        if(s==='land-mining'&&q.flags.tutorialLootWreckId)this.playTutorialBriefing('loot');
         if(s==='carrier-wait')q.flags.carrierWaitStartedAt=this.save.world.time;
         if(s==='hide-patrol')this.ensureTutorialHidePosition();
         if(s==='meet-cairn'){delete q.flags['actor-rin'];delete q.flags['actor-paul'];}
@@ -273,10 +274,12 @@ export const TutorialRuntimeMethods={
         this.save.world.campaignUnlocked=tutorialContentUnlocked(this.save);
         if(isTutorialGuided(this.save)){this.hyperdriveEncounterAt=null;this.beamAmbushNextAt=0;}
         this.ensureTutorialEquipment();this.ensureTutorialDelivery();this.ensureTutorialMiningContract();
-        if(!this.save.player.dockedAt){if(!['earn-standing','raider-standoff','defeat-raider','hide-patrol','talk-paul','return-mining'].includes(q.stepId))this.setTutorialDestination(this.tutorialSummary().destinationId);this.ensureTutorialCompanion();this.ensureTutorialEnemy();if(q.stepId==='hide-patrol')this.ensureTutorialHidePosition();this.ensureTutorialFieldTarget();if(q.stepId==='talk-paul')this.playTutorialBriefing('paul-rescue');}
+        if(!this.save.player.dockedAt){if(!['earn-standing','raider-standoff','defeat-raider','hide-patrol','talk-paul','return-mining'].includes(q.stepId))this.setTutorialDestination(this.tutorialSummary().destinationId);this.ensureTutorialCompanion();this.ensureTutorialEnemy();if(q.stepId==='hide-patrol')this.ensureTutorialHidePosition();this.ensureTutorialFieldTarget();if(q.stepId==='talk-paul')this.playTutorialBriefing('paul-rescue');if(q.stepId==='defeat-raider')this.playTutorialBriefing('combat');if(q.stepId==='land-mining'&&this.save.world.combatWrecks?.[q.flags.tutorialLootWreckId])this.playTutorialBriefing('loot');}
         this.queueTutorialMaraCall();return this.tutorialSummary();
     },
     queueTutorialMaraCall(){
+        // Do not value a borrowed racing hull or interrupt a live race briefing.
+        if(this.activeRace)return;
         const q=getTutorialQuest(this.save);if(!q||q.stepId!=='earn-standing'||!isTutorialActive(this.save)||this.deathTimer>0||this.save.player.hull<=0||this.galaxyJump||this.ui.isModalOpen||this.save.world.missionSettlements?.length||this.storyLineActive()||this.campaignOpponentsInFight().length)return;
         if(playerStrengthValue(this.save.player)>=TUTORIAL_MARA_CALL_MIN_COMBAT_VALUE)this.handleTutorialEvent('mara-call');
     },
@@ -382,6 +385,7 @@ export const TutorialRuntimeMethods={
             this.disengageHyperdrive();this.handleTutorialEvent('hyperdrive-intercept');return;
         }
         if(s==='raider-standoff'&&now-(q.flags.standoffStartedAt??now)>=8)this.handleTutorialEvent('standoff-ended');
+        if(s==='defeat-raider'&&!q.flags['briefingShown-combat'])this.playTutorialBriefing('combat');
         if(['rescue-paul','black-box-fight'].includes(s)){
             const encounter=s==='rescue-paul'?'rescue':'black-box',count=encounter==='rescue'?2:4;
             this.ensureTutorialEnemy();if(Array.from({length:count},(_,i)=>q.flags[`defeated-${encounter}-${i}`]).every(Boolean))this.handleTutorialEvent('encounter-cleared',{encounter});

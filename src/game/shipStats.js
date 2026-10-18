@@ -4,6 +4,11 @@ import { EQUIPMENT, SHIPS } from './data.js';
 import { quoteDroneService } from './droneService.js';
 import { HULL_HARDPOINTS, OUTFIT_ITEMS, installedItemIds, loadoutFor } from './outfitting.js';
 import { AMMO_CAPACITY, AMMO_UNIT_COST, WEAPON_ORDER, WEAPONS, launcherMagazineEntries, missileCapacityForPlayer, weaponIdForOutfit } from './weapons.js';
+// Strongest bonus first, then half effectiveness for each additional module.
+// Benefits and drawbacks stack separately, so slot order cannot change a fit.
+// The total contribution stays below twice the strongest individual effect.
+export const stackedBonus = values => values.filter(v=>v>0).sort((a,b)=>b-a).reduce((sum,v,i)=>sum+v*2**-i,0);
+export const stackedMultiplier = values => Math.max(.2,1+stackedBonus(values.map(v=>v-1))-stackedBonus(values.map(v=>1-v)));
 export const getEffectiveShipStats = (player) => {
     const base = SHIPS[player.shipId];
     if (!base)
@@ -31,7 +36,8 @@ export const getEffectiveShipStats = (player) => {
     const salvageRate = has('salvage-mk2') ? effect('salvage-mk2', 'salvageRate', 1.7) : 1;
     const salvageRange = has('salvage-mk2') ? effect('salvage-mk2', 'salvageRange', 170) : 100;
     const selectedEffects=installed.map(id=>OUTFIT_ITEMS[id]?.effects??{});
-    const product=(key)=>{let n=0;return selectedEffects.reduce((value,e)=>e[key]==null?value:value*(1+(e[key]-1)/Math.sqrt(++n)),1);};
+    const product=key=>stackedMultiplier(selectedEffects.flatMap(e=>e[key]==null?[]:[e[key]]));
+    const capacity=key=>stackedBonus(selectedEffects.map(e=>e[key]??0));
     const equipmentMass=installed.reduce((n,id)=>n+(OUTFIT_ITEMS[id]?.mass??0),0);
     const spec=HULL_HARDPOINTS[player.shipId],allowance=spec?spec.stockGunCount*2+spec.stockLauncherCount*3+spec.turrets.length+spec.utility.length:8;
     const handling=Math.max(.65,1/(1+Math.max(0,equipmentMass-allowance)*.012));
@@ -41,11 +47,12 @@ export const getEffectiveShipStats = (player) => {
         afterburnSpeed: base.afterburnSpeed * product('speedMultiplier') * handling,
         acceleration: base.acceleration * product('accelerationMultiplier') * handling,
         angularAcceleration: base.angularAcceleration * product('turnMultiplier') * handling,
-        shield: (base.shield + selectedEffects.reduce((n,e)=>n+(e.shieldCapacity??0),0))*product('shieldMultiplier'),
-        hull: base.hull + selectedEffects.reduce((n,e)=>n+(e.hullCapacity??0),0),
+        shield: (base.shield + capacity('shieldCapacity'))*product('shieldMultiplier'),
+        hull: base.hull + capacity('hullCapacity'),
         reactorOutput: base.reactorOutput * product('outputMultiplier'),
         energyCapacity: base.energyCapacity * product('capacityMultiplier'),
         burnFuelMultiplier:product('burnFuelMultiplier'),lateralMultiplier:(base.lateralMultiplier??1)*product('lateralMultiplier'),shieldRechargeMultiplier:product('rechargeMultiplier'),
+        shieldRegeneration:(base.shieldRegen??5)*product('rechargeMultiplier'),
         cargo: base.cargo + cargoBonus,
         // Pulse Mk II's multiplier lives on its projectile definition. Keeping
         // the hull's base gunDamage untouched prevents an installed gun from

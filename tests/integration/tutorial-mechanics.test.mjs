@@ -39,9 +39,9 @@ test('PDC switching moves the real mining drones to cargo without deleting them 
  assert.equal(loadoutFor(save.player).droneBays.length,1);assert.ok(miners.filter(Boolean).every(id=>save.player.droneFleet.lockerIds.includes(id)));assert.equal(Object.values(save.player.droneFleet.unitsById).filter(u=>u.type==='pdc').length,gift);
 });
 test('one coordinated mining intercept happens during the return drive, followed by a real standoff',()=>{
- const {save,quest,session,lines}=tutorialFixture('return-mining');save.player.dockedAt=undefined;save.player.navTargetId='vesper';session.autopilot=true;session.hyperdriveFx='active';session.disengageHyperdrive=()=>{session.autopilot=false;};
+ const {save,quest,session}=tutorialFixture('return-mining');const briefings=[];session.playTutorialBriefing=id=>briefings.push(id);save.player.dockedAt=undefined;save.player.navTargetId='vesper';session.autopilot=true;session.hyperdriveFx='active';session.disengageHyperdrive=()=>{session.autopilot=false;};
  session.updateTutorialCampaignRuntime();assert.equal(quest.stepId,'raider-standoff');assert.equal(session.autopilot,false);const enemy=session.ships.find(s=>s.tutorialEnemy);assert.ok(enemy.holdFire);assert.equal(enemy.hullId,'scrapper');
- save.world.time=7;session.updateTutorialCampaignRuntime();assert.equal(quest.stepId,'raider-standoff');save.world.time=9;session.updateTutorialCampaignRuntime();assert.equal(quest.stepId,'defeat-raider');assert.equal(enemy.holdFire,false);assert.equal(enemy.pursuitHoldFire,false);assert.ok(lines.some(l=>/We can take him/.test(l[1])));
+ save.world.time=7;session.updateTutorialCampaignRuntime();assert.equal(quest.stepId,'raider-standoff');save.world.time=9;session.updateTutorialCampaignRuntime();assert.equal(quest.stepId,'defeat-raider');assert.equal(enemy.holdFire,false);assert.equal(enemy.pursuitHoldFire,false);assert.deepEqual(briefings,['combat']);
 });
 test('shooting the standoff pirate early does not strand the story',()=>{const {session,quest}=tutorialFixture('raider-standoff');session.handleTutorialEvent('ship-defeated',{tutorialEncounter:'mining',tutorialIndex:0});assert.equal(quest.stepId,'land-mining');});
 test('encounter casualties persist and only surviving enemies return after reload',()=>{

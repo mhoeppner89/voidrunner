@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { SHIPS } from '../../src/game/data.js';
+import { RACE_HULLS } from '../../src/game/raceHulls.js';
 import {
     RACE_COURSES,
     crossedRaceGate,
@@ -33,7 +34,7 @@ for (const id of ids) {
     assert.deepEqual(first, second, `${id} ignores seed variation`);
     assert.notEqual(first, second, `${id} returns an independent course object`);
     assert.deepEqual(first.center.map((value, index) => value + config.localPoints[0][index]), first.gathering.position, `${id} translates its gathering point from local coordinates`);
-    assert.equal(first.gates.length, config.localPoints.length - 1, `${id} has every authored point after gathering as a gate`);
+    assert.equal(first.gates.length, config.checkpointSpacing ? Math.floor(first.routeLength/config.checkpointSpacing) : config.localPoints.length - 1, `${id} has the authored checkpoint spacing`);
     assert.equal(first.gates.at(-1).kind, 'finish', `${id} has a distinct finish gate`);
     assert.equal(first.gates.filter((gate) => gate.kind === 'finish').length, 1, `${id} has one finish`);
     assert.equal(new Set(first.gates.map((gate) => gate.id)).size, first.gates.length, `${id} mandatory gate IDs are unique`);
@@ -61,10 +62,10 @@ for (const id of ids) {
     }
     const mutated = generateRaceCourse(id, 0);
     mutated.gates[0].position[0] += 999;
-    mutated.shortcuts[0].gates[0].position[0] += 999;
+    if(mutated.shortcuts.length) mutated.shortcuts[0].gates[0].position[0] += 999;
     const clean = generateRaceCourse(id, 0);
     assert.notEqual(mutated.gates[0].position[0], clean.gates[0].position[0], `${id} generated gates are mutable per run`);
-    assert.notEqual(mutated.shortcuts[0].gates[0].position[0], clean.shortcuts[0].gates[0].position[0], `${id} generated shortcut gates are mutable per run`);
+    if(mutated.shortcuts.length) assert.notEqual(mutated.shortcuts[0].gates[0].position[0], clean.shortcuts[0].gates[0].position[0], `${id} generated shortcut gates are mutable per run`);
 }
 
 assert.deepEqual(raceOffersForLocation('shardbelt'), raceOffersForLocation('helix'), 'field alias resolves Shardbelt board');
@@ -74,8 +75,9 @@ assert.equal(raceCourseUnlocked('shard-switchback', {}), false);
 assert.equal(raceCourseUnlocked('shard-switchback', { 'shard-gauntlet': { rank: 2 } }), true, 'legacy rank unlocks the next tier');
 assert.equal(raceCourseUnlocked('shard-switchback', { 'shard-gauntlet': { rank: 3 } }), false);
 assert.equal(raceCourseUnlocked('mourning-relict-gauntlet', { 'mourning-breach': { bestRank: 2 } }), true);
-assert.ok(RACE_COURSES['shard-miners-knife'].rivalPaces[0] < SHIPS.wayfarer.afterburnSpeed, 'the hardest Shardbelt rival remains reachable by a Wayfarer afterburner');
+assert.ok(Object.values(RACE_COURSES).every(c=>c.recommendedShip==='R-class loaner'), 'all six courses use dedicated race hulls');
 assert.ok(RACE_COURSES['mourning-run'].rivalPaces[0] > SHIPS.wayfarer.afterburnSpeed, 'Mourning rivals require a faster hull than the Wayfarer ceiling');
+assert.ok(Object.values(RACE_HULLS).every(hull => hull.afterburnSpeed === 500), 'race hulls retain the shared 1,000 km/s displayed race-speed ceiling');
 
 const normalized = normalizeRaceRecord({ rank: 2, time: 42, at: 100, active: true, ghost: {}, champion: {}, replay: {} });
 assert.equal(normalized.rank, 2);
@@ -108,12 +110,20 @@ const course = generateRaceCourse('shard-gauntlet', 1);
 const racersA = createRaceRacers(course, 'stable-seed', 10);
 const racersB = createRaceRacers(course, 'stable-seed', 9999);
 assert.deepEqual(racersA.map(({ name, variant, laneOffset, pace, raceShortcutChoice }) => ({ name, variant, laneOffset, pace, raceShortcutChoice })), racersB.map(({ name, variant, laneOffset, pace, raceShortcutChoice }) => ({ name, variant, laneOffset, pace, raceShortcutChoice })), 'racer roster is not world-time seeded');
+const reactionCourse = generateRaceCourse('mourning-run');
+const reactionRacers = createRaceRacers(reactionCourse, 'reaction-seed', 10);
+const reactionsA = reactionRacers.map(racer => racer.raceLaunchDelay);
+const reactionsB = createRaceRacers(reactionCourse, 'reaction-seed', 10).map(racer => racer.raceLaunchDelay);
+assert.deepEqual(reactionRacers.map(racer => racer.raceVariance), createRaceRacers(reactionCourse, 'reaction-seed', 10).map(racer => racer.raceVariance), 'race variance is stable for the same seed');
+assert.ok(reactionsA.every(delay => delay >= .45 && delay <= 1.35), 'the field keeps a small, ordered start stagger');
+assert.equal(reactionRacers.filter(racer => racer.raceMistakeGate >= 0).length, 1, 'one rival gets a late-course speed-check mistake');
+assert.ok(reactionRacers.filter(racer => racer.raceMistakeGate >= 0).every(racer => racer.raceMistakeGate >= reactionCourse.gates.length - 6 && racer.raceMistakeGate < reactionCourse.gates.length - 2), 'the seeded mistake occurs on a late, open section');
 assert.equal(racersA.length, 3);
 assert.equal(new Set(racersA.map((racer) => racer.laneOffset)).size, 3);
 assert.equal(new Set(racersA.map((racer) => racer.raceLivery?.accent)).size, 3, 'named rivals have three distinct race liveries');
 assert.ok(racersA.every((racer) => Number.isFinite(racer.spawnTime)), 'race meshes always receive a finite render phase');
 assert.equal(new Set(racersA.map((racer) => racersA[racersA.indexOf(racer)].variant)).size, 3);
-assert.notEqual(racersA[0].raceShortcutChoice, racersA[1].raceShortcutChoice, 'rivals make distinct shortcut choices');
+assert.ok(racersA.every(r=>!r.raceShortcutChoice), 'the new courses keep all rivals on the full route');
 for (const [index, racer] of racersA.entries()) {
     const positionReference = racer.position;
     const velocityReference = racer.velocity;
@@ -123,8 +133,16 @@ for (const [index, racer] of racersA.entries()) {
     const dx = target[0] - gate.position[0];
     const dy = target[1] - gate.position[1];
     const dz = target[2] - gate.position[2];
-    assert.ok(Math.hypot(dx, dy, dz) <= gate.radius * 0.3 + 1e-8, 'racer lane target remains inside gate centre aperture');
-    assert.equal(target[0] === gate.position[0] && target[1] === gate.position[1] && target[2] === gate.position[2], index === 1, 'racer targets use persistent lateral lanes');
+    // Sparse gates retain a detailed racing line. Initial steering aims at
+    // that line's lookahead, rather than at the more distant next ring.
+    assert.ok(target.every(Number.isFinite));
+    let nearest=Infinity;
+    for(let j=1;j<course.racingLine.length;j++){
+        const a=course.racingLine[j-1],b=course.racingLine[j],d=b.map((v,k)=>v-a[k]);
+        const t=Math.max(0,Math.min(1,d.reduce((sum,v,k)=>sum+(target[k]-a[k])*v,0)/d.reduce((sum,v)=>sum+v*v,0)));
+        nearest=Math.min(nearest,Math.hypot(...target.map((v,k)=>v-a[k]-d[k]*t)));
+    }
+    assert.ok(nearest<=course.racerLaneWidth*.6,'racer aims within its narrow reserved line');
     updateRaceRacer(racer, course, 1 / 60, 1);
     assert.equal(racer.position, positionReference, 'racer position array is updated in place');
     assert.equal(racer.velocity, velocityReference, 'racer velocity array is updated in place');
@@ -132,6 +150,7 @@ for (const [index, racer] of racersA.entries()) {
     assert.ok(Math.abs(Math.hypot(...racer.rotation) - 1) < 1e-9, 'racer orientation remains a unit quaternion');
 }
 const stagedReferences = racersA.map((racer) => racer.position);
+for(const racer of racersA)racer.position[0]+=10;
 const beforeRestagePositions = racersA.map((racer) => [...racer.position]);
 assert.equal(stageRaceRacers(racersA, course), racersA);
 for (const [index, racer] of racersA.entries()) {
@@ -139,10 +158,10 @@ for (const [index, racer] of racersA.entries()) {
     assert.notDeepEqual(racer.position, beforeRestagePositions[index], 'restaging returns the racer to the gathering grid');
 }
 for (const racer of racersA)
-    assert.ok(Math.hypot(racer.position[0] - course.gathering.position[0], racer.position[1] - course.gathering.position[1], racer.position[2] - course.gathering.position[2]) < 80, 'racer is staged at the gathering point');
+    assert.ok(Math.hypot(racer.position[0] - course.gathering.position[0], racer.position[1] - course.gathering.position[1], racer.position[2] - course.gathering.position[2]) < 110, 'racer is staged at the gathering point');
 const gridLongitudinal = racersA.map((racer) => racer.position.reduce((sum, value, index) => sum + (value - course.gathering.position[index]) * course.gathering.direction[index], 0));
 assert.equal(gridLongitudinal.filter((value) => value > 0).length, 3, 'all three rivals wait ahead of the player');
-assert.ok(Math.min(...gridLongitudinal) >= 20 && Math.max(...gridLongitudinal) <= 46, 'rivals form a compact, cockpit-visible stagger');
+assert.ok(Math.min(...gridLongitudinal) >= 54.9 && Math.max(...gridLongitudinal) <= 90.1, 'rivals form a safe, cockpit-visible stagger');
 
 const gate = { position: [0, 0, 0], direction: [0, 0, 1], radius: 2 };
 assert.equal(crossedRaceGate([0, 0, -10], [0, 0, 10], gate), true);

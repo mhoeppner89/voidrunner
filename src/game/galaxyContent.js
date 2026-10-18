@@ -244,7 +244,7 @@ export const GALAXY_LOCATIONS = {
                 lines: [
                     'You made it to Cairn. Are you here to race, or are you here to watch someone else hit a wreck?',
                     'The next gate is not the finish; hold your line and save afterburner for the exit.',
-                    'The Mourning Run is drawing faster hulls this cycle, and the inner shortcut is still open.',
+                    'The Mourning Run is drawing faster hulls this cycle. Every checkpoint counts.',
                 ],
             },
             {

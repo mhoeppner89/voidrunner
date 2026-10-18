@@ -97,13 +97,19 @@ export function createHullDebris(position, scale = 1, velocity = [0,0,0]) {
     const random=seededRandom(position.join(':')+':hull-shards');
     const root=new THREE.Group();root.position.fromArray(position);
     const inheritedVelocity=new THREE.Vector3().fromArray(velocity);
-    const geometry=new THREE.BoxGeometry(1,1,1);
-    const material=new THREE.MeshStandardMaterial({color:0xb1a89c,roughness:.87,metalness:.35});
-    const chunks=new THREE.InstancedMesh(geometry,material,12);
+    // Torn, bent armour rather than identical rectangular bricks. Two skins
+    // and a ragged perimeter give the plates thickness from every direction.
+    const rim=[[-.5,-.3],[-.24,-.52],[.38,-.4],[.5,.08],[.18,.5],[-.4,.34]],vertices=[],indices=[];
+    for(const side of [-1,1])for(const [x,z]of rim)vertices.push(x,side*.18+(x>0?.5:-.15)*z,z);
+    for(let i=1;i<rim.length-1;i++){indices.push(0,i,i+1,6,6+i+1,6+i);}
+    for(let i=0;i<rim.length;i++){const j=(i+1)%rim.length;indices.push(i,6+j,j,i,6+i,6+j);}
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.setIndex(indices);geometry.computeVertexNormals();
+    const material=new THREE.MeshStandardMaterial({color:0xb1a89c,roughness:.87,metalness:.5,flatShading:true});
+    const chunks=new THREE.InstancedMesh(geometry,material,20);
     chunks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);chunks.frustumCulled=false;
     chunks.raycast=()=>undefined;root.add(chunks);
     const parts=[],matrix=new THREE.Object3D(),color=new THREE.Color();
-    for(let i=0;i<12;i++) {
+    for(let i=0;i<20;i++) {
         const z=random()*2-1,a=random()*Math.PI*2,r=Math.sqrt(1-z*z),speed=(3+random()*8)*scale;
         parts.push({velocity:[Math.cos(a)*r*speed,Math.sin(a)*r*speed,z*speed],
             size:[(.3+random()*.65)*scale,(.07+random()*.16)*scale,(.25+random()*.6)*scale],

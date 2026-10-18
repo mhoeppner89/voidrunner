@@ -1,17 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {activationWeaponDamage,weaponDamage} from '../../src/game/weaponDamage.js';
-import {SHIPS,SHIP_SHIELD_CAPACITY_MULTIPLIER} from '../../src/game/data.js';
+import {SHIPS} from '../../src/game/data.js';
 import {getEffectiveShipStats} from '../../src/game/shipStats.js';
 import {createEnemyLoadout} from '../../src/game/enemyLoadouts.js';
 import {SHIELD_RECHARGE_RATE,regenerateCombatResources} from '../../src/game/combatResources.js';
-test('player and NPC use the same enlarged capacities and reduced regeneration',()=>{
- assert.equal(SHIP_SHIELD_CAPACITY_MULTIPLIER,1.75);assert.equal(SHIELD_RECHARGE_RATE,5.3);
+test('player and NPC use the same explicit capacities and hull regeneration',()=>{
+ assert.equal(SHIELD_RECHARGE_RATE,5);
  for(const hull of Object.keys(SHIPS)){
   const p=getEffectiveShipStats({shipId:hull,equipment:[]}),npc=createEnemyLoadout({hullId:hull},0,{guns:[],turrets:[]});
   assert.equal(npc.stats.shield,p.shield,hull);
  }
- const p={shield:0,energy:100};regenerateCombatResources(p,{shield:100,energyCapacity:100,reactorOutput:0},1);assert.equal(p.shield,5.3);
+ const p={shield:0,energy:100};regenerateCombatResources(p,{shield:100,energyCapacity:100,reactorOutput:0},1);assert.equal(p.shield,5);
 });
 test('first hit costs full energy; equal follow-ups cost a quarter within a fixed window',()=>{
  const actor={shield:100};

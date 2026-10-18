@@ -4,9 +4,9 @@
 // Apply a broad recharge lift to every flyable hull and non-frigate NPC ship.
 // Capital frigates use their separate, subsystem-controlled recharge rate.
 export const NON_FRIGATE_SHIELD_RECHARGE_MULTIPLIER = 2;
-// Flyable hulls share this rate in player and NPC combat; capitals retain
-// their separate passive/subsystem rates. Damage should persist between passes.
-export const SHIELD_RECHARGE_RATE = 5.3;
+// Fallback for legacy/minimal stat records. Flyable hulls provide their own
+// whole-number regeneration; capitals keep separate passive/subsystem rates.
+export const SHIELD_RECHARGE_RATE = 5;
 export const SHIELD_ENERGY_PER_POINT = 1.25;
 
 const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
@@ -44,7 +44,7 @@ export const regenerateCombatResources = (player, stats, dt, shieldDelay = 0) =>
     let shieldRestored = 0;
     let shieldEnergySpent = 0;
     if (finite(shieldDelay) <= 0 && shield < shieldMax && energy > 0) {
-        const desired = Math.min(shieldMax - shield, SHIELD_RECHARGE_RATE * (stats.shieldRechargeMultiplier??1) * seconds);
+        const desired = Math.min(shieldMax - shield, (stats.shieldRegeneration??(stats.shieldRegen??SHIELD_RECHARGE_RATE)*(stats.shieldRechargeMultiplier??1)) * seconds);
         shieldRestored = Math.min(desired, energy / SHIELD_ENERGY_PER_POINT);
         shieldEnergySpent = shieldRestored * SHIELD_ENERGY_PER_POINT;
         shield += shieldRestored;

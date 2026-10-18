@@ -33,10 +33,10 @@ export const WEAPONS = {
     ion:{id:'ion',nameKey:'ION PROJECTOR',hudNameKey:'ION',kind:'ion',slot:5,equipmentId:'ion-lance',
         speed:PROJECTILE_SPEEDS.normal,range:400,cooldown:.62,damageFlat:5,energyCost:9,shieldMul:12,jamSeconds:1.0,assist:1,audioKey:'ion',mountSize:'M'},
     mortar:{id:'mortar',nameKey:'SUNLANCE PLASMA MORTAR',hudNameKey:'PLASMA MORTAR',kind:'mortar',slot:6,equipmentId:'sunlance-mortar',
-        speed:PROJECTILE_SPEEDS.plasma,range:500,cooldown:1.5,damageFlat:70,energyCost:16,splashRadius:18,splashMin:4,splashDamage:21,assist:.35,audioKey:'mortar',mountSize:'M'},
+        speed:PROJECTILE_SPEEDS.plasma,range:500,cooldown:1.5,damageFlat:70,energyCost:18,splashRadius:18,splashMin:4,splashDamage:21,assist:.35,audioKey:'mortar',mountSize:'M'},
 };
-WEAPONS['frigate-battery']={id:'frigate-battery',nameKey:'CAPITAL ANTI-FIGHTER CANNON',hudNameKey:'CAP CANNON',kind:'laser',speed:520,range:600,cooldown:1.4,damageFlat:72,energyCost:12,assist:.7,audioKey:'laser'};
-WEAPONS['cruiser-battery']={id:'cruiser-battery',nameKey:'CAPITAL RAIL BATTERY',hudNameKey:'CAP RAIL',kind:'gauss',speed:900,range:1900,cooldown:7,damageFlat:200,energyCost:45,shieldMul:.8,hullMul:1.3,assist:.3,audioKey:'gauss'};
+WEAPONS['frigate-battery']={id:'frigate-battery',nameKey:'CAPITAL ANTI-FIGHTER CANNON',hudNameKey:'CAP CANNON',kind:'laser',speed:520,range:600,cooldown:1.4,damageFlat:72,energyCost:40,assist:.7,audioKey:'laser'};
+WEAPONS['cruiser-battery']={id:'cruiser-battery',nameKey:'CAPITAL RAIL BATTERY',hudNameKey:'CAP RAIL',kind:'gauss',speed:900,range:1900,cooldown:7,damageFlat:200,energyCost:80,shieldMul:.8,hullMul:1.3,assist:.3,audioKey:'gauss'};
 const descriptions={
     pulse:'Normal-speed fire. Shares its lead with pulse, ion and scatterguns. 450 km range.',
     gauss:'Very fast precision shots bypass 15% of shields. Slow firing; 600 km range.',

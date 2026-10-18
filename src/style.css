@@ -3061,7 +3061,7 @@ button.compact {
 .screen-ship-layout > .screen-bars { grid-area: bars; }
 .screen-ship-layout > .screen-ticker { grid-area: ticker; }
 
-/* Pilot chatter: a top-center comms bar that shows the latest transmission
+/* Pilot chatter: an edge-anchored comms bar that shows the latest transmission
    as just "callsign: message", colored by the speaker's relation (hostiles
    red, allies blue, neutral white), and opens the full chat log when tapped
    — so several hostiles talking never buries the toast stack (which stays
@@ -16331,32 +16331,25 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
    context; otherwise the painted frame hides targets near the screen edge. */
 #target-edge-pointer { z-index:6; }
 
-/* Comms occupy clear space between the hull's instruments. The idle log
-   control is compact; an incoming transmission expands within that lane. */
-#game-shell { --comms-top:12%; --comms-left:50%; --comms-width:60vw; }
-#game-shell[data-cockpit-ship="vanguard"] { --comms-top:73%; --comms-width:50vw; }
-#game-shell[data-cockpit-ship="talon"] { --comms-top:40%; --comms-width:46vw; }
-#game-shell[data-cockpit-ship="prospector"] { --comms-top:17%; --comms-left:59%; --comms-width:44vw; }
-#game-shell[data-cockpit-ship="lancer"] { --comms-top:15%; --comms-width:40vw; }
-#game-shell[data-cockpit-ship="atlas"] { --comms-top:57%; --comms-width:52vw; }
-#game-shell[data-cockpit-ship="speedster"] { --comms-top:5%; --comms-width:28vw; }
-#game-shell[data-cockpit-ship="legionary"] { --comms-top:16%; }
-#game-shell[data-cockpit-ship="andromeda"] { --comms-top:13%; --comms-left:44%; --comms-width:38vw; }
-#game-shell[data-cockpit-ship="torsas"] { --comms-top:18%; --comms-left:56%; --comms-width:40vw; }
-#game-shell[data-cockpit-ship="astra"] { --comms-top:37%; }
+/* The comms log stays at the upper edge on every cockpit. Incoming
+   messages expand inward from that corner, leaving the aiming lane clear. */
+#game-shell { --comms-width:36vw; }
 .comms-channel {
-  position:absolute; z-index:6; top:var(--comms-top); left:var(--comms-left);
-  transform:translateX(-50%); width:128px; max-width:80vw;
+  position:absolute; z-index:6; top:var(--safe-top); right:var(--safe-right);
+  width:128px; max-width:80vw;
   display:flex; flex-direction:column; align-items:center; gap:4px; pointer-events:none;
 }
-.comms-channel:has(.comms-bar.active) { width:min(700px,var(--comms-width)); }
+.comms-channel:has(.comms-bar.active) { width:min(440px,var(--comms-width)); }
+/* Vanguard has instruments along its upper edge; transmissions sit in the
+   clear right-hand gap beneath them. The idle log keeps the same corner. */
+#game-shell[data-cockpit-ship="vanguard"] .comms-channel:has(.comms-bar.active) { top:34%; }
 #game-shell .comms-channel #comms-bar {
   position:relative; inset:auto; width:100%; margin:0; min-height:32px;
   font:13px/1.3 "Courier New",monospace; letter-spacing:0; padding:6px 8px;
 }
 #game-shell .comms-channel #comms-bar.active { min-height:44px; }
 #game-shell .comms-channel #comms-bar .talker-text {
-  min-width:0; max-height:min(90px,18vh); overflow-y:auto; overscroll-behavior:contain; touch-action:pan-y;
+  min-width:0; max-height:min(64px,14vh); overflow-y:auto; overscroll-behavior:contain; touch-action:pan-y;
 }
 #game-shell .comms-channel #patrol-reply-chip { position:relative; inset:auto; margin:0; flex:none; }
 #chat-panel .comms-card { max-height:calc(100dvh - 24px); }
@@ -16369,10 +16362,8 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath fill='white' fill-rule='evenodd' d='M0 0H100V100H0Z M10 49L15 27L43 7L47 6L50 12L53 6L57 7L85 27L90 49L82 63L66 68L50 64L34 68L18 63Z'/%3E%3C/svg%3E");
   mask-size:100% 100%; mask-repeat:no-repeat;
 }
-#game-shell[data-cockpit-ship="lancer"] { --comms-width:36vw; }
 #game-shell .comms-channel #comms-bar { min-height:44px; }
-#game-shell[data-cockpit-ship="speedster"] .comms-channel #comms-bar .talker-text { max-height:min(110px,27vh); }
-.comms-channel:has(#patrol-reply-chip:not(.is-hidden)) { width:min(700px,var(--comms-width)); flex-direction:row; align-items:flex-start; }
+.comms-channel:has(#patrol-reply-chip:not(.is-hidden)) { width:min(440px,var(--comms-width)); flex-direction:row; align-items:flex-start; }
 .comms-channel:has(#patrol-reply-chip:not(.is-hidden)) #comms-bar { flex:1; min-width:0; }
 #game-shell .comms-channel #patrol-reply-chip { width:90px; max-width:30%; border-radius:4px; font-size:12px; letter-spacing:0; }
 
@@ -16630,8 +16621,12 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
     width:calc(var(--cockpit-target-width) - 2.5vw);
   }
 }
-#game-shell[data-cockpit-ship="vanguard"] .comms-channel #comms-bar .talker-text {
-  max-height:min(90px,calc(16vh - 20px));
+@media (max-height:520px) and (orientation:landscape) {
+  .comms-channel { width:96px; }
+  #game-shell:is([data-cockpit-ship="lancer"],[data-cockpit-ship="torsas"]) .comms-channel { top:env(safe-area-inset-top,0px); }
+  #game-shell[data-cockpit-ship="speedster"] .comms-channel { right:30vw; }
+  #game-shell .comms-channel #comms-bar.active { height:44px; padding:4px 6px; }
+  #game-shell .comms-channel #comms-bar .talker-text { max-height:34px; }
 }
 
 /* Arena Run preparation: clear stage progress without covering flight. */
@@ -17801,3 +17796,64 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #map-panel .map-node.mission-objective { outline:none; border-color:var(--void-gold); box-shadow:inset 0 0 0 1px #ffd05c66,0 0 12px #ffd05c33; }
 #map-panel .map-node.mission-objective > i { border-color:var(--void-gold); background:var(--void-gold); }
 #map-panel .map-node.selected::after { display:none; }
+
+/* Cockpit weapon configuration uses real mounted parts and direct controls. */
+.ship-weapons { display:grid; gap:12px; }
+.ship-active-group { display:flex; gap:6px; }
+.ship-active-group > button { min-width:64px; }
+.ship-weapon-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.ship-gun-group, .ship-launcher-controls { min-width:0; border:1px solid var(--void-muted); background:rgba(10,30,50,.6); padding:12px; }
+.ship-gun-group header { display:grid; gap:8px; margin-bottom:8px; }
+.ship-gun-group h3 { display:flex; gap:8px; align-items:center; margin:0; }
+.ship-gun-group h3 small { margin-left:auto; color:var(--void-cream); }
+.ship-fire-modes, .ship-group-assignment { display:flex; gap:4px; }
+.ship-fire-modes > button { flex:1; }
+.ship-gun-row { display:flex; align-items:center; gap:8px; padding:8px 0; border-top:1px solid rgba(160,190,210,.2); }
+.ship-gun-row > b { flex:1; min-width:0; font:500 14px/1.3 var(--ui-font); overflow-wrap:anywhere; }
+.ship-gun-number { font:13px var(--ui-font); color:var(--void-muted); }
+.ship-gun-icon { width:32px; height:32px; flex:0 0 32px; }
+.ship-group-assignment > button { min-width:40px; }
+.ship-launcher-controls > header { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.ship-launcher-controls h3 { margin:0; }
+@media (max-height:520px) {
+ .ship-weapons, .ship-weapon-columns { gap:8px; }
+ .ship-gun-group, .ship-launcher-controls { padding:8px; }
+ #ship-panel .ship-gun-row { gap:6px; padding:4px 0; }
+ #ship-panel .ship-fire-modes > button { padding:6px 8px; font-size:12px; }
+ .ship-gun-row > b { font-size:12px; }
+ .ship-gun-icon { width:24px; height:24px; flex-basis:24px; }
+}
+@media (max-height:520px) and (min-width:700px) {
+ .ship-gun-group header { display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:4px; }
+ .ship-gun-group h3 { gap:6px; white-space:nowrap; }
+ #ship-panel .ship-gun-group h3 { margin:0; }
+ .ship-gun-group .ship-fire-modes { flex:1; max-width:240px; }
+ #ship-panel .ship-gun-group .ship-fire-modes > button { padding:6px 4px; white-space:nowrap; overflow-wrap:normal; }
+ #ship-panel .ship-gun-row { padding:0; min-height:44px; }
+ .ship-launcher-controls:has(.weapon-row:only-of-type) { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+ .ship-launcher-controls:has(.weapon-row:only-of-type) .weapon-row { flex:1; margin:0; border:0; }
+}
+@media (max-width:600px) { .ship-weapon-columns { grid-template-columns:1fr; } }
+
+/* Racing reuses the fuel cell: charge, recovery, or pickup seconds. */
+#screen-own-fuel[data-boost="stabilizer"] { color:var(--void-cyan); }
+#screen-own-fuel[data-boost="recovering"] { color:var(--retro-amber); }
+
+/* A race has no combat: leave the right thumb area for the boost control. */
+#game-shell.is-racing .touch-secondary-row { display:none; }
+
+#game-shell.is-racing .touch-fire { display:flex; color:var(--void-gold); }
+.race-hull-options { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px; }
+.race-hull-options button { min-width:0;padding:8px;font-size:14px; }
+.race-hull-options small { display:block;color:var(--void-cyan);font-size:11px; }
+.race-hull-options [aria-pressed="true"] { border-color:var(--void-gold); }
+@media(max-width:600px){.race-hull-options{grid-template-columns:repeat(2,minmax(0,1fr));}}
+
+#game-shell.is-racing .touch-throttle { display:none; }
+
+#game-shell.is-racing #screen-own-weapon { display:none; }
+#game-shell.is-racing #hyperdrive-card:disabled { opacity:1;cursor:default; }
+.race-flight-vector { position:absolute;width:28px;height:28px;pointer-events:none;color:var(--void-cyan);z-index:11;filter:drop-shadow(0 1px 2px #000); }
+.race-flight-vector svg { width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.6; }
+.race-flight-vector .flight-vector-arrow,.race-flight-vector.is-edge .flight-vector-ring { display:none; }
+.race-flight-vector.is-edge .flight-vector-arrow { display:block; }

@@ -77,6 +77,7 @@ export const tutorialConversation = (save,personId,locationId) => {
 export const tutorialLaunchBlock = save => {
     if(!isTutorialActive(save))return;
     const q=getTutorialQuest(save),dock=save.player.dockedAt;
+    if(dock==='helix'&&q.stepId==='meet-family')return 'You do not have the keys to this ship yet.';
     const prep={helix:['meet-family','buy-supplies','mara-debrief','decode-black-box'],vesper:['sell-supplies','fit-upgrade','mining-contract','salvage-briefing','fit-pdc'],cairn:['rin-cairn']};
     if(prep[dock]?.includes(q.stepId))return TUTORIAL_STEPS[q.stepId].objective;
     if(dock==='helix'&&q.stepId==='launch-helix'&&integer(save.player.cargo?.food)<(q.flags.deliveryRequired??TUTORIAL_REQUIRED_SUPPLIES))return TUTORIAL_STEPS['buy-supplies'].objective;
@@ -129,7 +130,7 @@ export const advanceTutorialCampaign=(save,event={})=>{
     if(s==='mine-shardbelt'&&type==='extracted'&&event.source==='mining'&&event.instanceId==='shardbelt'&&event.nodeId===f.oreTargetId){f.oreRecovered=integer(f.oreRecovered)+integer(event.amount);if(f.oreRecovered>=tutorialMiningQuantity(save))return next('return-mining');return {changed:true,quest:q,fromStepId:s,stepId:s};}
     if(s==='return-mining'&&type==='hyperdrive-intercept')return next('raider-standoff');
     if(s==='raider-standoff'&&type==='standoff-ended')return next('defeat-raider');
-    if(['raider-standoff','defeat-raider'].includes(s)&&type==='ship-defeated'&&event.tutorialEncounter==='mining'){f.tutorialEnemyDefeated=true;return next('land-mining');}
+    if(['raider-standoff','defeat-raider'].includes(s)&&type==='ship-defeated'&&event.tutorialEncounter==='mining'){f.tutorialEnemyDefeated=true;if(event.wreckId)f.tutorialLootWreckId=event.wreckId;return next('land-mining');}
     if(s==='land-mining'&&dock('vesper'))return next('salvage-briefing');
     if(s==='salvage-briefing'&&talked('rin-vek','vesper'))return next('fit-pdc');
     if(s==='fit-pdc'&&type==='drone-configured'&&event.mode==='pdc'&&event.loaded&&event.locationId==='vesper'){f.rinDeparted=true;return next('survey-graveyard');}

@@ -1,7 +1,10 @@
+import { generateShardbeltDeposits } from './asteroidFieldLayout.js';
 import { LOCATIONS } from './data.js';
 import { pick, randomBetween, randomInt, seededRandom } from './random.js';
 import { t } from './i18n.js';
 import { RACE_COURSES } from './racing.js';
+import {GRAVEYARD_MODEL_WRECKS,WRECK_SECTION_VARIANTS,WRECK_BREAK_ROUTES,wreckSectionDelta} from './graveyardLayout.js';
+export {GRAVEYARD_MODEL_WRECKS,WRECK_SECTION_VARIANTS,WRECK_BREAK_ROUTES,wreckSectionDelta};
 
 // This module contains only the deterministic world data needed to build
 // mission boards. Keep it free of render/collision-profile imports: save.js
@@ -55,7 +58,7 @@ const pointSegmentDistanceSq = (point, start, end) => {
     return ox * ox + oy * oy + oz * oz;
 };
 const intersectsRaceCorridor = (zone, local, reach) => {
-    const limitSq = (Math.max(0, reach) + RACE_CORRIDOR_MARGIN) ** 2;
+    const limitSq = (Math.max(0, reach) + (zone === 'mourning-line' ? 30 : RACE_CORRIDOR_MARGIN)) ** 2;
     for (const [start, end] of RACE_CORRIDORS[zone] ?? [])
         if (pointSegmentDistanceSq(local, start, end) <= limitSq)
             return true;
@@ -81,64 +84,6 @@ const depletedOrRoll = (rng, depleted, id, low, high) => {
     const roll = randomBetween(rng, low, high);
     return Math.max(0, depleted[id] ?? roll);
 };
-
-const WRECK_INTERIORS = Object.freeze({
-    // Runtime/glTF axes are X=length, Y=height, Z=-Blender-side. These values
-    // deliberately match the shipped GLB frame.
-    battleship: Object.freeze({ sectionName: 'Battleship wreck midsection', center: Object.freeze([0.072063, 0.065, 0.05]), halfLength: 0.356085, halfWidth: 0.19, halfHeight: 0.14, hotspotCount: 10 }),
-    carrier: Object.freeze({ sectionName: 'Carrier wreck flight deck', center: Object.freeze([0.087386, 0.015, -0.07]), halfLength: 0.382288, halfWidth: 0.205, halfHeight: 0.145, hotspotCount: 10 }),
-    cruiser: Object.freeze({ sectionName: 'Cruiser wreck command hull', center: Object.freeze([0.033398, 0.19, 0.04]), halfLength: 0.421548, halfWidth: 0.13, halfHeight: 0.12, hotspotCount: 6 }),
-});
-
-// Fixed section arrangements share each hull's geometry and textures. Deltas
-// act in the model frame (before the whole wreck rotation/scale). Keep the
-// cruiser command hull unchanged: its interior contains authored race/salvage routes.
-const sectionDelta = (position, rotation) => Object.freeze({ position: Object.freeze(position), rotation: Object.freeze(rotation) });
-export const WRECK_SECTION_VARIANTS = Object.freeze({
-    cruiser: Object.freeze([
-        Object.freeze({}),
-        Object.freeze({
-            'Cruiser wreck engine cluster': sectionDelta([0.08, -0.06, 0.08], [0.18, 0.12, -0.08]),
-            'Cruiser wreck prow': sectionDelta([-0.08, 0.04, -0.08], [-0.14, -0.12, 0.06]),
-        }),
-    ]),
-    frigate: Object.freeze([
-        Object.freeze({}),
-        Object.freeze({
-            'Frigate wreck engine section': sectionDelta([-0.08, 0.10, -0.08], [0.42, -0.16, 0.14]),
-            'Frigate wreck forward section': sectionDelta([0.06, -0.08, 0.06], [-0.18, 0.12, -0.12]),
-        }),
-        Object.freeze({
-            'Frigate wreck engine section': sectionDelta([-0.10, -0.12, 0.08], [-0.38, 0.18, -0.16]),
-            'Frigate wreck forward section': sectionDelta([0.08, 0.12, -0.06], [0.26, -0.14, 0.12]),
-        }),
-        Object.freeze({
-            'Frigate wreck engine section': sectionDelta([-0.12, 0.04, 0.12], [0.64, 0.08, -0.10]),
-            'Frigate wreck forward section': sectionDelta([0.10, -0.04, -0.10], [-0.36, -0.08, 0.10]),
-        }),
-    ]),
-});
-export const wreckSectionDelta = (wreck, name) => WRECK_SECTION_VARIANTS[wreck.class]?.[wreck.variant ?? 0]?.[name];
-
-// High-detail wreck landmarks rendered from the same hulls that fly in live
-// space. worldData.js re-exports this object for render/game callers so there
-// remains one shared identity and one source of truth.
-export const GRAVEYARD_MODEL_WRECKS = Object.freeze([
-    Object.freeze({ id: 'concord-battleship-wreck', class: 'battleship', file: 'assets/models/wrecks/concord-battleship-wreck-v4.glb', local: [350, -700, 1900], rotation: [0.04, -0.12, 0.05], scale: 1130, clearanceRadius: 1460, interior: WRECK_INTERIORS.battleship }),
-    Object.freeze({ id: 'concord-carrier-wreck', class: 'carrier', file: 'assets/models/wrecks/concord-carrier-wreck-v4.glb', local: [-650, 850, -1850], rotation: [0.04, -1.21, 0.05], scale: 902.5508, clearanceRadius: 1250, interior: WRECK_INTERIORS.carrier }),
-    Object.freeze({ id: 'concord-cruiser-alpha-wreck', class: 'cruiser', file: 'assets/models/wrecks/concord-cruiser-wreck-v4.glb', local: [2850, 850, -1500], rotation: [-0.08, -0.42, 0.16], scale: 564.0943, clearanceRadius: 900, interior: WRECK_INTERIORS.cruiser }),
-    Object.freeze({ id: 'concord-cruiser-beta-wreck', variant: 1, class: 'cruiser', file: 'assets/models/wrecks/concord-cruiser-wreck-v4.glb', local: [-3000, -650, 1200], rotation: [0.12, 0.82, -0.18], scale: 564.0943, clearanceRadius: 900, interior: WRECK_INTERIORS.cruiser }),
-    Object.freeze({ id: 'concord-frigate-alpha-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-2200, 1300, -850], rotation: [0.16, -1.91, 0.12], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-beta-wreck', variant: 1, class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [1900, -1400, 100], rotation: [-0.2, -1.11, -0.14], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-gamma-wreck', variant: 2, class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-3600, 1100, -2600], rotation: [0.12, -0.45, 0.21], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-delta-wreck', variant: 3, class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [3500, -1200, -2500], rotation: [-0.16, 0.52, -0.1], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-epsilon-wreck', variant: 1, class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-4300, -300, -100], rotation: [0.25, -2.35, 0.08], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-zeta-wreck', variant: 2, class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [4200, 500, 600], rotation: [-0.1, 1.22, -0.2], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-eta-wreck', variant: 3, class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [-2700, 300, 3300], rotation: [0.18, -0.78, 0.14], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'concord-frigate-theta-wreck', class: 'frigate', file: 'assets/models/wrecks/concord-frigate-wreck-v3.glb', local: [2600, -200, 3600], rotation: [-0.22, 0.34, -0.12], scale: 113, clearanceRadius: 230 }),
-    Object.freeze({ id: 'wayfarer-fighter-wreck', class: 'wayfarer', file: 'assets/models/wrecks/wayfarer-wreck.glb', local: [1100, 900, 3200], rotation: [0.34, -0.88, 0.28], scale: 18, clearanceRadius: 62 }),
-    Object.freeze({ id: 'talon-fighter-wreck', class: 'talon', file: 'assets/models/wrecks/talon-wreck.glb', local: [-1650, -1050, -3250], rotation: [-0.26, 0.64, -0.31], scale: 18, clearanceRadius: 62 }),
-]);
 
 const overlapsGraveyardModelWreck = (local, reach = 0) => GRAVEYARD_MODEL_WRECKS.some((wreck) => {
     const dx = local[0] - wreck.local[0];
@@ -366,99 +311,10 @@ export const generateWreckNodes = (seed, depleted, scanned = []) => {
     return nodes;
 };
 
-// The rendered field's claimable monolith/static geometry has no collision
-// profile dependency. Replaying these same loops through the static stream
-// preserves the exact candidates and rng order without constructing drifters.
-const ASTEROID_COLLISION_FACTOR = 0.9;
-const asteroidEnvelopeReach = (node) => {
-    const sx = node.scale[0];
-    const sy = node.scale[1];
-    const sz = node.scale[2];
-    return node.radius * Math.max(Math.max(sx, sy, sz), ASTEROID_COLLISION_FACTOR * Math.hypot(sx, sy, sz));
-};
-const generateMiningClaimField = (seed, depleted, scanned = []) => {
-    const rng = seededRandom(`${seed}:asteroid-field`);
-    const center = LOCATIONS.shardbelt.position;
-    const nodes = [];
-    const shape = () => randomInt(rng, 0, 3);
-    const pushIfRaceClear = (node, local) => {
-        if (!intersectsRaceCorridor('shardbelt', local, asteroidEnvelopeReach(node)))
-            nodes.push(node);
-    };
-    for (let index = 0; index < 36; index += 1) {
-        const angle = (index / 36) * Math.PI * 2;
-        const radial = 372 + randomBetween(rng, -30, 36);
-        const local = [Math.cos(angle) * radial, Math.sin(angle) * radial * 0.78, randomBetween(rng, -78, 78)];
-        const id = `rock-crown-${index}`;
-        const remaining = depletedOrRoll(rng, depleted, id, 3.4, 7.8);
-        const node = {
-            id,
-            position: add(center, local),
-            velocity: [0, 0, 0],
-            radius: randomBetween(rng, 40, 80),
-            scale: [randomBetween(rng, 0.8, 1.4), randomBetween(rng, 0.7, 1.3), randomBetween(rng, 0.8, 1.5)],
-            rotation: [rng() * Math.PI, rng() * Math.PI, rng() * Math.PI],
-            rotationSpeed: [0, 0, 0],
-            moving: false,
-            resource: 'ore',
-            remaining,
-            scanned: scanned.includes(id),
-            tunnelPart: true,
-            shape: shape(),
-        };
-        pushIfRaceClear(node, local);
-    }
-    for (let index = 0; index < 18; index += 1) {
-        const offset = sphericalOffset(rng, 1860, 900);
-        const id = `asteroid-monolith-${index}`;
-        const remaining = depletedOrRoll(rng, depleted, id, 4, 8);
-        const node = {
-            id,
-            position: add(center, offset),
-            velocity: [0, 0, 0],
-            radius: randomBetween(rng, 70, 130),
-            scale: [randomBetween(rng, 0.9, 1.6), randomBetween(rng, 0.7, 1.2), randomBetween(rng, 0.85, 1.5)],
-            rotation: [rng() * Math.PI, rng() * Math.PI, rng() * Math.PI],
-            rotationSpeed: [0, 0, 0],
-            moving: false,
-            resource: 'ore',
-            remaining,
-            scanned: scanned.includes(id),
-            tunnelPart: false,
-            shape: shape(),
-        };
-        pushIfRaceClear(node, offset);
-    }
-    for (let index = 0; index < 330; index += 1) {
-        let offset = sphericalOffset(rng, 2200, 210);
-        if (Math.hypot(offset[0], offset[1]) < 246 && Math.abs(offset[2]) < 990)
-            offset = [offset[0] + 405, offset[1], offset[2]];
-        const id = `asteroid-static-${index}`;
-        const remaining = depletedOrRoll(rng, depleted, id, 1.2, 5.4);
-        const node = {
-            id,
-            position: add(center, offset),
-            velocity: [0, 0, 0],
-            radius: randomBetween(rng, 8, index < 110 ? 64 : 40),
-            scale: [randomBetween(rng, 0.65, 1.5), randomBetween(rng, 0.6, 1.4), randomBetween(rng, 0.7, 1.55)],
-            rotation: [rng() * Math.PI, rng() * Math.PI, rng() * Math.PI],
-            rotationSpeed: [0, 0, 0],
-            moving: false,
-            resource: 'ore',
-            remaining,
-            scanned: scanned.includes(id),
-            tunnelPart: false,
-            shape: shape(),
-        };
-        pushIfRaceClear(node, offset);
-    }
-    return nodes;
-};
-
 // A mining claim needs a specific, still-rich rock: contracts stake one of
 // the monoliths, with static bodies as a deterministic fallback.
 export const miningClaimCandidates = (seed, depleted, scanned = []) => {
-    const field = generateMiningClaimField(seed, depleted, scanned);
+    const field = generateShardbeltDeposits(seed, depleted, scanned);
     const monoliths = field.filter((node) => node.id.startsWith('asteroid-monolith-') && node.remaining >= 4);
     if (monoliths.length)
         return monoliths;

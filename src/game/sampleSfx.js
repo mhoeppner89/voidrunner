@@ -59,7 +59,7 @@ export function playWorkSample(manager,id,intensity,pan,distance) {
     voice.gain.gain.setTargetAtTime(0,now+.4,.035);
     clearTimeout(voice.timer);voice.timer=setTimeout(()=>{voice.source.stop();manager.sampleWork.delete(id);},650);
 }
-export function updateSampleEngines(manager,throttle,burn) {
+export function updateSampleEngines(manager,throttle,burn,raceIntensity=0) {
     if(!manager.sampleEngines){
         const buffers=['idle','thrust','afterburner'].map(id=>bufferFor(manager,'engine-'+id));
         if(buffers.some(b=>!b))return false;
@@ -71,6 +71,9 @@ export function updateSampleEngines(manager,throttle,burn) {
     }
     const thrust=Math.max(0,Math.min(1,throttle));
     const levels=manager.stationMode?[0,0,0]:[(1-thrust)*.8,thrust*(burn?.25:.8),burn?.8:0];
-    manager.sampleEngines.forEach((voice,i)=>manager.setEngineTarget(voice.gain.gain,levels[i],manager.context.currentTime,.15));
+    manager.sampleEngines.forEach((voice,i)=>{
+        manager.setEngineTarget(voice.gain.gain,levels[i],manager.context.currentTime,.15);
+        manager.setEngineTarget(voice.source.playbackRate,1+raceIntensity*(i===2?.16:.08),manager.context.currentTime,.18);
+    });
     return true;
 }

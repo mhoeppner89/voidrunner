@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
 import { LOCATIONS, SHIPS } from '../../src/game/data.js';
 import {
@@ -16,6 +17,7 @@ import {
     wreckNodeCollisionRadius,
 } from '../../src/game/worldData.js';
 import { hullVsAsteroid, hullVsEngine, hullVsRing } from '../../src/game/hullCollision.js';
+import {RACE_HULLS} from '../../src/game/raceHulls.js';
 import {
     RACE_COURSES,
     createRaceRacers,
@@ -79,7 +81,7 @@ for (let seed = 0; seed < 30; seed += 1) {
         const local = piece.position.map((value, index) => value - mourningCenter[index]);
         const profile = GRAVEYARD_GEOMETRY_HALF_EXTENTS[piece.kind] ?? [0.5, 0.5, 0.5];
         const visualReach = Math.hypot(profile[0] * piece.scale[0], profile[1] * piece.scale[1], profile[2] * piece.scale[2]);
-        if (!piece.id.startsWith('route-') && overlapsGraveyardModelWreck(local, visualReach)) {
+        if (!piece.attachedWreckId && !piece.id.startsWith('route-') && overlapsGraveyardModelWreck(local, visualReach)) {
             assert.equal(piece.render, false, `seed ${seed}: ${piece.id} visibly overlaps an adapted wreck`);
             assert.equal(piece.collidable, false, `seed ${seed}: ${piece.id} blocks an adapted wreck fly-through`);
             checkedWreckClearances += 1;
@@ -107,14 +109,17 @@ for (let seed = 0; seed < 30; seed += 1) {
 }
 assert.ok(checkedRocks > 14000 && checkedFragments >= 6300 && checkedSalvage === 3000, 'the seed sweep exercised the full structured fields');
 assert.equal(checkedHotspotSalvage, 960, '32 capital-belly salvage hotspots remain stable across every seed');
-assert.ok(checkedWreckClearances > 500, 'the seed sweep exercised the adapted wreck clearance volumes');
+assert.equal(checkedWreckClearances,0,'loose debris is rejected before insertion, not kept as hidden proxies');
 
 const classCounts = Object.fromEntries(['battleship', 'carrier', 'cruiser', 'frigate'].map((className) => [className, GRAVEYARD_MODEL_WRECKS.filter((wreck) => wreck.class === className).length]));
 assert.deepEqual(classCounts, { battleship: 1, carrier: 1, cruiser: 2, frigate: 8 }, 'Mourning Line has the requested exact wreck roster');
 assert.deepEqual(GRAVEYARD_MODEL_WRECKS.filter((wreck) => wreck.class === 'wayfarer' || wreck.class === 'talon').map((wreck) => wreck.class).sort(), ['talon', 'wayfarer'], 'two textured fighter wrecks replace generic filler');
 assert.equal(GRAVEYARD_MODEL_WRECKS.filter((wreck) => wreck.interior).length, 4, 'the battleship, carrier and two cruisers have flyable torn bellies');
 assert.equal(GRAVEYARD_MODEL_WRECKS.filter((wreck) => !wreck.interior).length, 10, 'frigates and fighters use their visible torn surfaces');
-assert.equal(GRAVEYARD_MODEL_COLLIDERS.length, 34, 'every rendered wreck section has one shared surface collider');
+for(const wreck of GRAVEYARD_MODEL_WRECKS){
+    const bytes=readFileSync(wreck.file),asset=JSON.parse(bytes.subarray(20,20+bytes.readUInt32LE(12)));
+    assert.equal(GRAVEYARD_MODEL_COLLIDERS.filter(c=>c.modelWreckId===wreck.id).length,asset.nodes.filter(n=>n.mesh!==undefined).length,`${wreck.id}: every rendered section, including torn propulsion pods, has a surface collider`);
+}
 assert.ok(GRAVEYARD_MODEL_COLLIDERS.every((collider) => collider.surfaceOnly), 'wreck collision never fills an opening by inferring a solid convex interior');
 for (const wreck of GRAVEYARD_MODEL_WRECKS.filter((entry) => entry.interior)) {
     const colliders = GRAVEYARD_MODEL_COLLIDERS.filter((entry) => entry.modelWreckId === wreck.id);
@@ -258,6 +263,7 @@ for (let seed = 0; seed < 30; seed += 1) {
 assert.equal(intrudingGates, 0, `a rock envelope intrudes on an authored gate (${intrudingGates} intrusions across 30 seeds)`);
 
 const fullRouteDistance = (course) => {
+    if(course.racingLine) return course.routeLength;
     let total = 0;
     let previous = course.gathering.position;
     for (const gate of course.gates) {
@@ -268,6 +274,7 @@ const fullRouteDistance = (course) => {
 };
 const shortcutRouteDistance = (course) => {
     const route = course.shortcuts[0];
+    if(!route) return fullRouteDistance(course);
     let total = 0;
     let previous = course.gathering.position;
     for (let index = 0; index < route.entryIndex; index += 1) {
@@ -301,12 +308,12 @@ const hardestShard = generateRaceCourse('shard-miners-knife');
 const hardestShardDistance = Math.min(fullRouteDistance(hardestShard), shortcutRouteDistance(hardestShard));
 const hardestShardRival = fastestRivalTime(hardestShard);
 assert.ok(hardestShardDistance / SHIPS.wayfarer.maxSpeed > hardestShardRival, 'a cruise-only Wayfarer should lose the hardest Shardbelt course');
-assert.ok(hardestShardDistance / SHIPS.wayfarer.afterburnSpeed < hardestShardRival, 'heavy Wayfarer afterburner use should make the hardest Shardbelt course winnable');
+assert.ok(hardestShardDistance / RACE_HULLS.talon.afterburnSpeed < hardestShardRival, 'the dedicated race hull can contest the full Shardbelt course');
 
 const mourningRun = generateRaceCourse('mourning-run');
 const mourningDistance = Math.min(fullRouteDistance(mourningRun), shortcutRouteDistance(mourningRun));
 const mourningRival = fastestRivalTime(mourningRun);
 assert.ok(mourningDistance / SHIPS.wayfarer.afterburnSpeed > mourningRival, 'even an ideal full-burn Wayfarer should not contest the Mourning Run');
-assert.ok(mourningDistance / SHIPS.talon.afterburnSpeed < mourningRival, 'a faster Talon with afterburner should be able to contest the Mourning Run');
+assert.ok(mourningDistance / RACE_HULLS.talon.afterburnSpeed < mourningRival, 'a dedicated Talon R with afterburner should be able to contest the Mourning Run');
 
 console.log(`racing world checks passed: ${checkedRocks} rocks, ${checkedFragments} fragments, ${checkedSalvage} salvage nodes across 30 seeds`);

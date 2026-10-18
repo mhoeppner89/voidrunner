@@ -1,10 +1,12 @@
 import {steerToward} from './npcNav.js';
 import * as THREE from 'three';
+import {terrainFlightDistance} from './asteroidTerrain.js';
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const forward=new THREE.Vector3(0,0,-1),worldUp=new THREE.Vector3(0,1,0);
 // Cheap swept-hull queries against world-sized obstacle bounds. Debris box
 // extents already include model scale; applying scale again closes real gaps.
 function rayDistance(o,p,d,reach,limit,s){
+ if(o.terrain)return terrainFlightDistance(o,p,d,reach,limit,s);
  s.local.set(p.x-o.x,p.y-o.y,p.z-o.z);s.ray.copy(d);
  if(o.box&&(o.shape!=='asteroid'||Math.max(o.box.hx,o.box.hy,o.box.hz)>Math.min(o.box.hx,o.box.hy,o.box.hz)*1.5)){
   const b=o.box;s.q.set(b.qx,b.qy,b.qz,b.qw).invert();s.local.applyQuaternion(s.q);s.ray.applyQuaternion(s.q);
@@ -47,7 +49,7 @@ export function fieldCombatSteering(session,ship,goal,desired,dt,out){
   s.nextPlan=now+.20+(Number(ship.id?.replace(/\D/g,''))%5||0)*.007;s.plans++;
   s.obstacles.length=0;
   const dock=session.activeDockObstacle();if(dock)s.obstacles.push(dock);
-  const radius=look+180;
+  const radius=look+(session.activeInstanceId==='shardbelt'?240:180);
   session.forEachObstacleInBox(p.x-radius,p.y-radius,p.z-radius,p.x+radius,p.y+radius,p.z+radius,o=>s.obstacles.push(o));
   // Keep all broadphase candidates for immediate danger; route alternatives
   // use five waypoints around the closest blocker in debris. Round asteroid
@@ -55,7 +57,7 @@ export function fieldCombatSteering(session,ship,goal,desired,dt,out){
   s.goal.copy(desired).normalize();
   // Commit around isolated cover while hunting. Dense fields keep sampled
   // escape headings, which handle overlapping clearance bounds better.
-  s.roundField=(ship.combatIntent!=='hunt'||s.obstacles.length>3)&&s.obstacles.length>0&&s.obstacles.every(o=>o.shape==='asteroid');
+  s.roundField=(ship.combatIntent!=='hunt'||s.obstacles.length>3)&&s.obstacles.length>0&&s.obstacles.every(o=>o.shape==='asteroid'&&!o.terrain);
   if(s.roundField)steerToward(session,ship,goal,{goalDir:s.goal,speed,horizon:1.8,brakeScale:0,synthesize:true},s.goal);
   const goalClear=clearDistance(s,p,s.goal,reach,look);
   const stuck=(s.obstacles.length>0 && (s.lowTime>.75||s.blockedTime>.6))||(Boolean(ship.search)&&s.blockedTime>.4);

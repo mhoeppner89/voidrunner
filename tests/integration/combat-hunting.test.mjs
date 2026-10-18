@@ -49,10 +49,10 @@ test('tracking anticipates moving firing solutions without exceeding normal turn
  }
  assert.ok(newError<oldError*.5,{oldError,newError});
 });
-test('Sunlance costs half the energy and a paired salvo cannot erase a fresh Talon',()=>{
+test('Sunlance pays its energy cost and a paired salvo cannot erase a fresh Talon',()=>{
  const s=session(),p=s.save.player;p.shipId='vanguard';p.ownedShips=['vanguard'];const fit=loadoutFor(p);fit.guns=['mortar','mortar'];fit.fireGroups.activeGroup='ALL';p.outfitting.loadouts.vanguard=fit;p.energy=100;
  const victim={tutorialCompanion:true,position:[0,0,-100],hull:137,shield:58};let impacts=0;
  s.spawnPlayerGunProjectile=w=>{impacts++;s.damageShip(victim,w.damageFlat,'enemy',undefined,w);};
- s.fireMountedPlayerGuns();assert.equal(impacts,2);assert.equal(p.energy,68);assert.equal(victim.hull,137+58-2*WEAPONS.mortar.damageFlat);assert.equal(victim.shield,0);
- assert.equal(WEAPONS.mortar.cooldown,1.5);assert.equal(WEAPONS.mortar.energyCost,16);
+ s.fireMountedPlayerGuns();assert.equal(impacts,2);assert.equal(p.energy,64);assert.equal(victim.hull,137+58-2*WEAPONS.mortar.damageFlat);assert.equal(victim.shield,0);
+ assert.equal(WEAPONS.mortar.cooldown,1.5);assert.equal(WEAPONS.mortar.energyCost,18);
 });

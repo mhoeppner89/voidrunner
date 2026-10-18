@@ -22,25 +22,20 @@ export const HULL_NPC_FITS = Object.freeze({
  blade:{guns:['pulse-cannon-t2','gauss-cannon'],launchers:['seeker-launcher','shield-seeker-launcher'],turret:'pdc',power:'sustained-reactor'},
 });
 // Observer presets are deliberately expressed as real outfitting item ids.
-// createEnemyLoadout still checks every choice against the active hull's
-// mounts, so a medium-only weapon simply falls back to the universal pulse
-// cannon on a small bay instead of creating an impossible ship.
+// createEnemyLoadout checks each choice against the hull's current physical
+// mounts. Weapon size is unrestricted; demanding fits share the same energy
+// and handling rules as the player.
 const OBSERVER_FITS = Object.freeze({
     balanced: Object.freeze({ guns: ['pulse-cannon', 'pulse-cannon', 'gauss-cannon'], turret: 'pdc', launcher: 'seeker-launcher' }),
     assault: Object.freeze({ guns: ['ripper', 'ripper', 'ion-blaster'], turret: 'tracking-turret', launcher: 'swarm-launcher', drive: 'engine-mk2', defense: 'recovery-shield' }),
     support: Object.freeze({ guns: ['pulse-cannon', 'pulse-cannon', 'mortar'], turret: 'pdc', launcher: 'seeker-launcher', power: 'capacitor-bank', defense: 'shield-mk2' }),
     beam: Object.freeze({ guns: ['beam-emitter', 'beam-emitter', 'beam-emitter'], turret: 'tracking-turret', launcher: 'seeker-launcher', power: 'sustained-reactor' }),
 });
-// Industrial combat doctrine reflects each ship's job and its crew: the
-// Wayfarer flies one PDC drone, the Atlas keeps two regulation PDC escorts,
-// and the Prospector mans one of its three bays with a PDC — like the Atlas's
-// manned turrets, a civilian crew crews what it can afford to lose. A stock NPC
-// hauler's anti-fighter power is set by this list, and it is the strongest
-// balance lever in the hauler-versus-fighter band: three Prospector PDC drones
-// beat both tier-1 combat hulls 7/8, one drone leaves the pair roughly even
-// (measured by .freebuff/balance/main-loadouts.mjs).
+// The Wayfarer supports its crew and nearby allies with repairs. Its PDC
+// turret remains its automatic weapon; the drone competes for reactor energy.
+// Civilian industrial crews man only part of their available PDC drone bays.
 const NPC_DRONE_DEFAULTS = Object.freeze({
-    wayfarer: Object.freeze(['pdc']),
+    wayfarer: Object.freeze(['repair']),
     prospector: Object.freeze(['pdc']),
     atlas: Object.freeze(['pdc', 'pdc']),
 });
@@ -73,7 +68,8 @@ export function createEnemyLoadout(ship, index, arenaFit) {
         defense:spec.defense.map((mount)=>observerFit?.defense && itemFitsMount(OUTFIT_ITEMS[observerFit.defense],mount)?observerFit.defense:null),
         utility:spec.utility.map((mount)=>observerFit?.utility && itemFitsMount(OUTFIT_ITEMS[observerFit.utility],mount)?observerFit.utility:null),
         fireGroups:{activeGroup:'ALL',assignments:Object.fromEntries(spec.guns.map((mount)=>[mount.id,'A']))}};
-    equipmentLoadout.utility=[observerFit?.utility,observerFit?.power,observerFit?.drive,observerFit?.defense].filter(Boolean);while(equipmentLoadout.utility.length<spec.utility.length)equipmentLoadout.utility.push(null);
+    const utilities=observerFit?.utilities??(Array.isArray(observerFit?.utility)?observerFit.utility:[observerFit?.utility,observerFit?.power,observerFit?.drive,observerFit?.defense].filter(Boolean));
+    equipmentLoadout.utility=spec.utility.map((mount,i)=>utilities?.[i]&&itemFitsMount(utilities[i],mount)?utilities[i]:null);
     const stats=observerFit
         ? getEffectiveShipStats({shipId:hullId,outfitting:{schema:4,locker:{},loadouts:{[hullId]:equipmentLoadout}}})
         : getEffectiveShipStats({shipId:hullId,equipment:[]});

@@ -1,3 +1,280 @@
+## 0.8.2ij — Asteroid sunlight occlusion
+
+- Let large and small asteroid fragments cast and receive sunlight shadows, including across tunnel walls and neighboring chunks. Keep soft ambient fill for navigation.
+- Use one cached, field-sized shadow map, refresh drifting casters at most four times per second, and use a smaller map on phones. Disable shadow rendering outside Shardbelt and dispose its GPU target with the renderer.
+
+## 0.8.2ii — Softer asteroid shadow fill
+
+- Reduce ambient reflection on large and small rocks while retaining tunnel visibility and direct sunlight.
+- Reduce the review scene’s ambient and opposing rim lights so shadowed faces read as rock rather than glowing surfaces. No shadow-map passes, geometry changes or per-frame work added.
+
+## 0.8.2ih — Larger race rings
+
+- Increase checkpoint, finish and starting-ring diameter by 40% on all six courses. Space checkpoints about 20% farther apart along the same routes. Keep course shapes, lengths and flight physics unchanged.
+
+## 0.8.2ig — Shared racing AI for the graveyard
+
+- Apply continuous line anticipation, corner-skill braking, corner-exit control, predictive gate correction and missed-gate recovery to all three graveyard courses.
+- Tune narrow-ring corner budgets and rival pace variation against real wreck collisions. Remove enlarged NPC apertures on authored tracks.
+- Keep course geometry, checkpoints, player flight physics and race-hull capabilities unchanged.
+
+## 0.8.2if — Faster, cleaner asteroid racing opponents
+
+- Keep the three tracks, player flight physics and ship speed ceilings unchanged. Replace checkpoint-relative steering jumps with continuous anticipation of the physical racing line.
+- Apply driver corner skill to braking plans, settle tight corners before accelerating, predict aperture misses and retain lateral correction while tracking the line.
+- Remove the doubled pace penalty on slower rivals and improve missed-gate recovery. Shardbelt rivals now pass through the same visible aperture as the player, without an enlarged AI ring or recovery-plane allowance.
+- Retain distinct rival skill tiers and seeded variation. Add player-time benchmarks, strict gate checks, recovery-time limits and tests across both field seeds and all four race models.
+
+## 0.8.2ie — Racing through Shardbelt
+
+- Rebuild all three Shardbelt races around the new asteroid: central-bore sprint and eastern rim, mineral-gallery climb and chimney descent, and a longer circuit linking all three tunnels.
+- Space mandatory gates about 250 km apart, with 160 km clear apertures and no shortcuts. Reserve loose-rock clearance around the racing lines; extend rough tunnel mouths and remove the obsolete zigzag racing bores.
+- Give tunnel racers a planned-path obstacle probe and line-following gate approach, retaining their normal thrust, drift, collisions and speed ceiling. Rivals keep different pace and seeded variation.
+- Preserve earned race ranks/unlocks while clearing obsolete Shardbelt times and splits on older saves.
+- Add an interactive route survey with X-ray, orbit, flythrough, scrubbing and a link to the isolated playable race with all four loaners.
+
+## 0.8.2id — Clearer large asteroid surfaces
+
+- Replace soft continuous surface grain on large fragments with position-based stone pixels, distinct mineral seams and restrained chips.
+- Remove the soft shader relief; preserve smooth broad normals and sharp fracture edges. No geometry, collision or draw-count changes.
+
+## 0.8.2ic — Small asteroid textures
+
+- Give small asteroid fragments shared 64×64 rock textures in the game and field review, with iron, dark stone and ice finishes.
+- Wrap each texture once, without tiled bump patterns; retain crisp nearby pixels and mipmaps for stable distant rocks. Preserve existing geometry, collisions and instanced draws.
+
+## 0.8.2ib — Smooth rock surfaces, crisp fractures
+
+- Smooth broad crust, crater and tunnel shading using normals from the continuous rock surface, avoiding the bias of long meshing triangles.
+- Preserve hard normal splits at actual fracture corners. Retain the same positions, collision triangles, tunnel clearances and rendering draw count.
+
+## 0.8.2ia — Natural asteroid surfaces
+
+- Replace periodic sine-based rock deformation, crater-floor ripples and repeated mineral stripes with non-periodic spatial noise.
+- Reduce fine bump strength and remove the stamped micro-pattern; keep broad rock variation, mineral patches and crater detail.
+- Soften narrow fracture/crust junctions to avoid regular mesh sawteeth. Keep the visible terrain and collision geometry shared.
+
+## 0.8.2hz — Asteroid surface variety
+
+- Increase the parent asteroid from three impact bowls to 18 varied craters, with shallow broken rims, irregular floors and oblique shapes.
+- Give the rock broad dark patches, dusty deposits, exposed pale crater interiors, stronger mineral seams and grain at several scales.
+- Preserve the existing field boundary and clear tunnel cores; collision surfaces follow the revised crater geometry.
+
+## 0.8.2hy — Shattered Shardbelt
+
+- Rebuild Shardbelt as ten separated sections of one giant asteroid, with matching strata, exposed fracture faces, old impact bowls and 560 smaller fragments. Preserve the 2340 km field radius.
+- Add three connected, uneven tunnel systems with roughly race-gate-sized openings. Carve the existing Shardbelt race routes through the same solid rock.
+- Use the rendered triangles for tunnel, hull and projectile collisions. Cache terrain generation, warm collision indexes, and split collisions into local surface tiles while rendering the parent in ten draws.
+- Share deposit generation with mining contracts, retain depletion/scans, and move embedded older saves to a safe nearby position.
+- Add an interactive field review and muted desktop/phone checks.
+
+## 0.8.2hx — Stabilizer racing pickups
+
+- Replace the temporary speed surge from graveyard-race pickups with five seconds of stronger lateral-drift damping. The effect helps velocity follow the ship's nose without raising the speed ceiling or refilling thrust.
+- Show a stabilizer timer in the cockpit monitor, tint it cyan, and give the pickup a gimbal-ring silhouette.
+- Add regression checks for unchanged speed and thrust resources, improved heading alignment, pickup collection and the desktop/iPhone HUD.
+
+## 0.8.2hw — Balanced rival pace and safer Gauntlet approaches
+
+- Reduce race-hull turning response by about 27% across the field. A tested 50% cut made rivals miss too many gates and run far over target, so keep the smaller, stable reduction.
+- On Relict Gauntlet, keep the final approach on the collision-checked racing line instead of aiming through gate normals that point into neighboring wreck sections.
+- Set the posted rival targets to 40 / 50 / 60 seconds for Mourning Run, 50 / 60 / 70 for Breach Crossing, and 90 / 105 / 120 for Relict Gauntlet.
+- Verified 24 full debris-field races across both world seeds and all four loaner choices with no wreck clipping. Finish times by place were 42–43 / 46–48 / 61–64s, 55 / 59–62 / 65–72s, and 99–112 / 112–122 / 121–126s respectively.
+
+## 0.8.2hv — Faster, steadier race pilots
+
+- Set dedicated race hulls to a shared 500 km/s afterburner ceiling for players and rivals.
+- Tune the AI's corner-speed target by course: faster through the open Mourning Run, conservative around the tighter debris routes. Missed-gate recovery now uses the same small aperture margin as a normal NPC pass.
+- Add deterministic launch-reaction variation; one rival hesitates longer each race so a small player mistake does not always put them last.
+- Verified 18 full debris-field rival runs across both world seeds: Mourning Run 48.2–50.0s, Breach 57.3–59.0s and Gauntlet 107.2–118.9s, with no wreck clipping. Open-track Mourning Run benchmark: 44.5s.
+
+## 0.8.2hu — More deliberate race handling
+
+- Slightly reduce turn acceleration across all four dedicated race hulls.
+- Give rivals more line lookahead, earlier corner braking and a longer obstacle-avoidance reaction window to keep their racing smooth and clear of wrecks.
+- Preserve the race speed ceilings, hull identities, normal afterburner flight model and player controls.
+
+## 0.8.2ht — Race flight-assist parity
+
+- Race hulls now honor the player's normal Flight Assist setting instead of forcing course correction on. With assist enabled, they use the same afterburner turn and drift integrators; with it disabled, drift damping is off while the dedicated counterthrust brake still works.
+- Race speed and the thrust/brake controls remain race-specific.
+- Rivals now keep their obstacle-avoidance heading when checkpoint alignment would otherwise steer them back into wreck plating. Longer prediction gives them room to react at race speed.
+- Verified all 18 rival runs across the three Mourning routes and two debris seeds; all complete without wreck clipping.
+
+## 0.8.2hs — Afterburner drift assistance for racing
+
+- Keep the normal afterburner's gentle lateral drift correction active on all four race hulls. It trims sideways momentum without damping forward coasting or snapping the nose to the velocity.
+- Retuned the four hulls with the corrected flight model. All finish each of the three Mourning courses with under 7% clean-time spread; thrust, counterthrust braking and pickup boost still behave as intended.
+- Verified rival steering, wreck clearance and ship contacts across all three routes and two debris seeds. Releasing throttle coasts while the shared afterburner drift assist gradually reduces sideslip.
+
+## 0.8.2hr — Newtonian race hulls
+
+- Choose Speedster R, Demon R, Talon R or Lancer R for every race. Fixed race frames share powered speed limits and differ in acceleration, braking, rotation and contact mass. Your own hull, equipment, cargo and resources are parked and restored safely.
+- Hold the former afterburner button (Shift) for thrust, hold the fire button (Space) for counterthrust, release both to coast. Removed the race thrust slider and rechargeable boost reserve. Track pickups provide five seconds of extra engine power; expiry preserves existing momentum.
+- Racers use bounded Newtonian torque and thrust. NPCs anticipate braking distance, steer against drift and use the same physical collision hulls and engine limits. Racing world impacts retain tangential momentum and use matching player/NPC damage caps.
+- A cyan flight-path symbol shows actual velocity. Cockpit status shows thrust/brake/coast, and race-only weapons/hyperdrive controls are disabled. Added four-hull selection to the isolated race session and career entries.
+
+## 0.8.2hq — Smoother close racing
+
+- Prune separated hull regions and individual cells before detailed ship-contact tests. The current collision shapes, swept impacts and aggressive racing remain in use.
+- Warm flight shaders for both canvas and bloom targets, including deferred shader validation. The isolated Talon race loads the actual rival models and prepares its graveyard scene, contact effects and speed streaks before enabling Start.
+- Added collision-work regression coverage and flat-cell contact comparisons for rotated fighters of different sizes.
+
+## 0.8.2hp — Contact racing
+
+- Racers now collide using the current hull geometry, including swept high-speed contact, momentum transfer, shield/hull damage, impact sparks and a brief boost interruption. Gentle parallel rubbing does not deal damage based on absolute speed.
+- Rivals draft, defend lanes and contest shoulders against other rivals and the player. A short recovery move after contact prevents continuous rubbing; environment steering still protects wreck clearances.
+- Gate and pickup crossings resolve after ship contact, so a ram that stops a ship before a checkpoint cannot award it. Rivals recover missed checkpoint approaches, and the grid/restart clears contact state.
+- Rival hulls now have real health and reactor-limited shield recovery. Racing impacts no longer force the player's speed down to the unrelated combat-speed cap. Non-racing collision behavior remains unchanged.
+
+## 0.8.2ho — Boost and racing lines
+
+- Graveyard rivals accelerate and brake, plan boost around bends, draft other pilots and move out to pass. Player and rivals share finite boost charge and recovery; no catch-up speed changes.
+- Three optional boost pickups per graveyard course sit on precise detours beside physical machinery fragments. Collecting one replenishes boost and grants five seconds of enhanced afterburn. Each pilot can collect each pickup once.
+- Cockpit monitors show boost charge/recovery, pickup seconds, estimated gap to the leading rival, race time and sector gains/losses. Peripheral speed streaks, engine pitch and a small extra FOV increase emphasize speed; reduced-motion mode suppresses the added motion.
+
+## 0.8.2hn — Quiet checkpoints and clear cockpit comms
+
+- Removed checkpoint/shortcut success sounds; start and final race-result feedback remain.
+- Anchored the idle comms log to the upper-right corner across all cockpits. Live messages expand from that edge, with a separate clear gap below the Vanguard’s upper instruments and compact scrolling messages on phones.
+- Moved the isolated race restart control beside the pause/fullscreen controls so it does not overlap comms.
+
+## 0.8.2hm — Clear engine approach and five-gate race view
+
+- Routed Breach Crossing gate 19 around the actual battleship engine geometry. Added rendered-triangle clearance checks for every graveyard racing line and direct checkpoint approach, including hull-width offsets; raised the carrier hangar exit clear of another tight deck edge.
+- All race courses show only the next five rings: green for next, yellow for following and grey for the remaining three. Distant finish and passed rings stay hidden; the finish follows the same color priority.
+- Approaching a race shows only its gathering marker. Phase transitions clear stale course rings, and the navigation chart lists only the next five main checkpoints.
+
+## 0.8.2hl — Broader graveyard turns and spaced checkpoints
+
+- Extended the Gauntlet’s cramped frigate-beta turn and rebuilt the smaller courses’ tight return bends around wrecks and substantial debris.
+- Checkpoints are spaced about 300 m along the racing line; curve samples no longer each produce a ring. Rivals follow the cleared curve between rings.
+- Added three physical wreckage assemblies with thick torn skins, exposed spars and machinery at otherwise empty bends. Existing instanced geometry batches are reused.
+- Preserved enlarged rings, no Mourning shortcuts and approximately half-length shorter courses; adjusted checkpoint fuel rewards to match the reduced ring counts.
+
+## 0.8.2hk — Race closer to the wreckage
+
+- Pull carrier and battleship racing lines toward their hull flanks and existing break debris. Bring the longer course past two more frigate wrecks and the port debris cloud.
+- Keep rounded bends, double-sized rings and no shortcuts. Lengths remain 11.1 km, 10.9 km and 21.5 km.
+- Revise course briefings and target times, and preserve the fuel allowance with the additional turns.
+
+## 0.8.2hj — Wider graveyard race rings
+
+- Remove shortcuts from all three graveyard courses and their review controls/briefings.
+- Double checkpoint and finish ring diameters and their crossing apertures. Preserve the routes and rival lane spacing.
+
+## 0.8.2hi — Flowing graveyard race lines
+
+- Replace abrupt checkpoint turns with tangent circular bends and longer approaches through the wrecks. Keep the Gauntlet at 20.8 km; reshape Mourning Run to 10.9 km and Breach Crossing to 10.6 km.
+- Refit the shortcuts and race briefings, retune target times and keep fuel rewards proportional despite the additional curve checkpoints.
+- Limit dense-course rendering to the nearby checkpoint sequence and finish; keep the full course in the review viewer.
+
+## 0.8.2hh — Graveyard racing routes
+
+- Build three courses around the current wrecks: a carrier hangar dive, a battleship fracture circuit and a longer multi-wreck gauntlet. Update shortcuts, target times and German briefings.
+- Reserve room for racing lanes and turns around debris. Race pilots check actual hull surfaces so open hangars remain flyable instead of being blocked by enclosing navigation boxes.
+- Add a reproducible 3D review with all three routes, checkpoint numbers, shortcuts, camera scrubbing and fly-throughs.
+
+## 0.8.2hg — Distinct capital wrecks
+
+- Replace repeated bow/middle/stern destruction with a collapsed carrier hangar and connected drive, an aft-sheared cruiser, a broadside-torn cruiser, and three frigate break patterns.
+- Tilt complete command structures and retain displaced source hull surfaces as large fragments, with smaller debris around every capital command break.
+- Match collision to each damage model; retain solid metal, shared instancing, mission bays and verified flight routes.
+
+## 0.8.2hf — Solid wreck decks and debris
+
+- Give open hull skins, exposed decks and detached support fragments real backings and metal edge faces across all six wreck sources. Preserve existing solid parts, paint and jagged passages.
+- Keep small debris plates thick enough to remain readable from the side; rebuild matching collision without increasing its triangle budget.
+
+## 0.8.2he — Solid torn armour
+
+- Give peeled metal strips closed front/back skins and perimeter faces, including continuous thickness through their folds. Loose panels and folded debris retain their existing solid extrusions.
+- Rebuild matching collision and verify fracture-route clearance after the thicker edges.
+
+## 0.8.2hd — Routes between broken hull sections
+
+- Remove the added rectangular tunnel cuts. Fly through the jagged bow and stern gaps instead, with wider section separation where NPC steering needs room.
+- Tilt the battleship's broken bridge independently and retain its removed support geometry as displaced fragments, with small debris scattered nearby.
+- Exercise normal NPC flight and full hull collision through both fracture gaps in both directions; preserve salvage, race paths and carrier hiding.
+
+## 0.8.2hc — Torn wreck structure
+
+- Replace flat section cuts with matching jagged fracture contours, pressure ruptures and peeled metal edges, using the current ship hulls.
+- Separate damaged capital propulsion pods and add folded shards with varied debris orientations. Keep the existing travel, salvage and hiding routes.
+- Concentrate soot and heat staining at breaks and impact areas using the shared plating texture. Rebuild simplified collision surfaces for the damaged hulls.
+
+## 0.8.2hb — Fly-through wreck passages
+
+- Cut horizontal passages through both side walls of the battleship, carrier and both cruisers. Reserve clear entrances and exits through the hull, fittings and collision surfaces.
+- Tilt and separate detached bow and engine sections around their own centres, with different breakup poses for escorts and cruiser variants.
+- Verify complete routes with rendered-surface rays and full-size player collision checks; preserve carrier hiding cover, salvage and race routes.
+
+## 0.8.2ha — Surviving wreck interiors
+
+- Rebuilt all six graveyard wreck assets from the currently shipped ship GLBs, with preserved hull details and new lined passages/breaches. Regenerated matching simplified surface collision.
+- Added surviving machinery, pressure vessels, conduits, partial decks and bulkheads, fitted to the shell around the flyable corridors and salvage pockets. Carrier hiding cover remains usable.
+- Added four dense pockets of 96 small fragments. Larger shards collide; tiny splinters are cosmetic. All use shared instanced batches, with clear race and arrival routes.
+
+## 0.8.2gz — Mourning Line graveyard
+
+- Rebuilt the battlefield around the capital wrecks and their escort screens, with directional armour and machinery trails, a clear arrival area, and separated exploration sites.
+- Refinished the wrecks with shared 512² naval plating, exposed dark interiors, scorched breaks, and physical I-section frames lining the four flyable bays.
+- Removed duplicate placeholder hulls and freestanding decorative hoops. Preserved salvage identities, tutorial landmarks, hiding cover and race routes; all new structure uses matching surface collision.
+
+## 0.8.2gy — Model-based ship breakup
+
+- Fracture current hulls into independently drifting and tumbling sections, retaining their paint and mounted hardware.
+- Add scorched torn edges, recessed bulkheads, internal frames and bent armour debris; larger ships tumble more slowly.
+- Cache fracture geometry through short idle jobs, share hull textures, and bound cosmetic wreck retention. Loot containers remain stationary and use a compact crate size.
+
+## 0.8.2gx — Stationary loot
+
+- Keep equipment wrecks and loose cargo stationary instead of inheriting ship velocity or drifting.
+- Stop saved wrecks at their current position on reload. Cargo still moves toward the ship during collection.
+
+## 0.8.2gw — Configure weapons from the cockpit
+
+- Replace the static weapons list and placeholder help with a functional Weapons section in career and Arena Run.
+- Reassign fitted guns to A/B, select the active group, and choose alternating or together firing for each group. Fire All respects both groups’ modes.
+- Preserve independent mount cooldowns, shared energy costs and per-hull settings through saves. Launcher firing modes remain available separately.
+
+## 0.8.2gv — Show loot rarity in space
+
+- Replace plain grey loot rocks with salvage containers and white/green/blue/gold diamond beacons, with one to four rarity pips.
+- Show the highest remaining equipment rarity and update it after collection; cargo-only wrecks use white.
+- Share visual resources across drops and keep beacons depth-tested and limited to nearby loot.
+
+## 0.8.2gu — Teach loot with the first pirate
+
+- Guarantee one fitted uncommon tier I weapon survives the tutorial mining pirate’s destruction, including kills by Rin.
+- Add Rin’s paused explanation of technology tiers, rarity colours and ordinary wreck recovery after the fight.
+- Keep the item in the persistent wreck until collected through normal salvage.
+
+## 0.8.2gt — Unfreeze the first tutorial fight
+
+- Fix veteran story companions reading a missing combat profile when starting an attack, which repeatedly interrupted the flight frame.
+- Present Rin’s first-combat and wing-order explanation in one normal paused dialogue instead of overlapping comms messages.
+- Restore unfinished combat briefings when resuming a saved tutorial encounter.
+
+## 0.8.2gs — Keep blocked tutorial departures usable
+
+- Show a short keys message when clicking the Wayfarer before the opening conversations.
+- Check tutorial departure requirements before animating, and restore ship and station controls after refused or failed launches.
+
+## 0.8.2gr — Give NPC Wayfarers repair support
+
+- Replace the stock NPC Wayfarer’s PDC drone with one repair drone, keeping its defensive turret.
+- Reuse normal owner-first and nearby-friendly repairs with shared reactor energy; player drone choices remain unchanged.
+- Fix spectator mode skipping NPC drone simulation and rendering, so repair and PDC support actually participate in spectator battles.
+
+## 0.8.2gq — Balance player hulls and unrestricted fittings
+
+- Give all flyable hulls rounded, explicit capacities and whole-number base energy/shield regeneration; strengthen expensive combat hulls and distinguish industrial endurance.
+- Replace inherited utility counts with hull-specific counts. Repeated stat bonuses now diminish by half without multiplying previous upgrades or depending on slot order.
+- Increase power-system and heavy-weapon costs; recovered capital guns demand substantial energy and mass. Use identical mass rules for ordinary and loot equipment.
+- Preserve displaced modules and loot IDs on old-save loads; start new careers at their actual capacitor limit.
+- Add equal-total-budget fitting searches, tier III stress checks, moving 1v1/2v1/group comparisons and save/resource regressions.
+
 ## 0.8.2gp — Keep the mining handoff under player control
 
 - Preserve the asteroid target, navigation and working miners when the mining quota is met; avoid repositioning Rin during the delivery callback.

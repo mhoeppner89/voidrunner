@@ -87,7 +87,7 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             transponder: true,
             shield: SHIPS.wayfarer.shield,
             hull: SHIPS.wayfarer.hull,
-            energy: 72,
+            energy: SHIPS.wayfarer.energyCapacity,
             missiles: 4,
             launcherMagazines: {},
             activeLauncherMountId: null,
@@ -155,6 +155,7 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             failedMissionIds: [],
             bountyKills: [],
             raceRecords: {},
+            shardRaceLayoutVersion: 1,
             // Cleared-warrant registry: callsign → { tier, temperament, danger,
             // count, clearedAt }. The bounty board reads this to remember which
             // named pilots the player has taken down (ace kills pay bonus rep).
@@ -328,7 +329,7 @@ export const saveGame = (save) => {
     if (!storageAvailable())
         return false;
     try {
-        captureEquipmentAmmo(save.player);
+        if(!save.player.raceReturn)captureEquipmentAmmo(save.player);
         save.updatedAt = Date.now();
         // Never persist a corrupted state: if the player's position or velocity
         // has gone non-finite (a crash glitch), keep the last good autosave
@@ -344,6 +345,7 @@ export const saveGame = (save) => {
         // Interpolation scratch slots (prevPosition/prevRotation) are transient
         // sim state, not career data — keep them out of the persisted save.
         const persist = { ...save, player: { ...save.player } };
+        if(save.player.raceReturn){Object.assign(persist.player,save.player.raceReturn);delete persist.player.raceReturn;}
         delete persist.player.prevPosition;
         delete persist.player.prevRotation;
         delete persist.player.shipStates;
@@ -371,9 +373,18 @@ const mergeMarket = (candidateMarket, fallbackMarket) => {
     }
     return merged;
 };
-const normalizeRaceRecords = (records) => Object.fromEntries(
+const normalizeRaceRecords = (records,shardVersion) => Object.fromEntries(
     Object.entries(records && typeof records === 'object' ? records : {})
-        .map(([courseId, record]) => [courseId, normalizeRaceRecord(record)]),
+        .map(([courseId,record])=>{
+            const normalized=normalizeRaceRecord(record);
+            // Keep earned ranks/unlocks, but old zigzag-course times cannot
+            // be compared against the rebuilt natural-tunnel circuits.
+            if((shardVersion??0)<1&&courseId.startsWith('shard-')){
+                for(const key of ['time','bestTime','lastTime','bestSplits','lastSplits'])delete normalized[key];
+                normalized.active=false;
+            }
+            return [courseId,normalized];
+        }),
 );
 // Version 8 stored armor and hull separately. These maxima let a damaged save
 // with one missing legacy field migrate conservatively instead of receiving a
@@ -614,7 +625,8 @@ export const hydrateSave = (candidate) => {
             localContractProgress: normalizeLocalContractProgress(candidate.world?.localContractProgress),
             // Upgrade legacy rank/time entries into the persistent PB/split
             // shape and deliberately discard any old replay/ghost payloads.
-            raceRecords: normalizeRaceRecords(candidate.world?.raceRecords),
+            raceRecords: normalizeRaceRecords(candidate.world?.raceRecords,candidate.world?.shardRaceLayoutVersion),
+            shardRaceLayoutVersion: 1,
             // Legacy saves stored surrendered callsigns as a plain array (no
             // capture/fled distinction); default those to 'captured' so existing
             // recognition behavior is preserved.

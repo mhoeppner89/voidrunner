@@ -58,8 +58,8 @@ test('the prologue teaches wing orders at the fight, exactly once',()=>{
     early.session.applyTutorialTransition({stepId:'defeat-raider',fromStepId:'mine-shardbelt',changed:true});
     assert.equal(campaignWingUnlocked(early.save),true);
     assert.equal(early.quest.flags.wingOrders,true,'the lesson is remembered on the quest');
-    assert.ok(early.lines.some(line=>/on your wing/.test(line[1])));
-    assert.match(early.events.at(-1)[0],/WING ORDERS/);
+    assert.equal(early.lines.length,0,'wing instructions stay in the paused combat dialogue');
+    assert.equal(early.events.length,0,'no duplicate wing-order notice');
     assert.deepEqual(early.chip.at(-1),[['aggressive'],1],'the wing card appears with the order');
     assert.equal(early.session.campaignWingActive(),true);
     assert.equal(early.session.introduceCampaignWingOrders(),false,'and the lesson never repeats');

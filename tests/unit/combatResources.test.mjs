@@ -12,7 +12,7 @@ import {
 assert.equal(combinedHullIntegrity(100, 85), 185, 'legacy hull and armor combine without loss');
 assert.equal(normalizeEnergy(undefined, 72), 72, 'missing legacy energy starts full');
 assert.equal(normalizeEnergy(90, 72), 72, 'energy clamps to capacitor');
-assert.equal(SHIELD_RECHARGE_RATE, 5.3, 'flyable shield recharge is halved to retain damage between passes');
+assert.equal(SHIELD_RECHARGE_RATE, 5, 'fallback shield regeneration is a whole number');
 assert.equal(passiveShieldRechargeRate(8, 'cruiser'), 16, 'non-frigate capital recharge doubles');
 assert.equal(passiveShieldRechargeRate(8, 'carrier'), 16, 'carrier recharge doubles');
 assert.equal(passiveShieldRechargeRate(32, 'frigate'), 32, 'frigate recharge stays on its own rate');

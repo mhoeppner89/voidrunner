@@ -31,7 +31,7 @@ export function planShieldRecovery(session,ship,plan,target,now,distance){
    r.mode=cover?'cover':'range';if(cover)r.cover.set(cover.x,cover.y,cover.z);
    r.active=true;r.attempts++;r.started=now;r.startRange=distance;r.holdingRange=false;r.shieldGoal=ship.maxShield*(novice?.3:ace?.4:.35);
    r.safeRange=clamp((ship.observedWeaponRange??400)+80,380,750);
-   r.until=now+clamp(Math.max(0,ship.shieldDelay??4.5)+(r.shieldGoal-ship.shield)/SHIELD_RECHARGE_RATE+6,10,14);
+   r.until=now+clamp(Math.max(0,ship.shieldDelay??4.5)+(r.shieldGoal-ship.shield)/(ship.combatFit?.stats?.shieldRegeneration??SHIELD_RECHARGE_RATE)+6,10,14);
    r.side.copy(plan.right);r.up.copy(plan.up);ship.fireCommitUntil=0;plan.reapproachUntil=0;
    // Choose a clear oblique exit once, allowing the turn to finish before
    // changing course. The main nav controller still enforces hull clearance.

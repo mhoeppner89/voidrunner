@@ -65,3 +65,28 @@ test('Paul introduces sensor cover at the carrier without waiting for the approa
 test('investing while docked can trigger Mara’s call, but it waits for a settlement receipt to close',()=>{
  const {session,save,quest}=tutorialFixture('earn-standing'),calls=[];save.player.credits=100000;session.ui.dockLocation=save.player.dockedAt='helix';session.playTutorialBriefing=id=>calls.push(id);save.world.missionSettlements=[{id:'receipt'}];session.refreshStoryLine();assert.equal(quest.stepId,'earn-standing');save.world.missionSettlements=[];session.refreshStoryLine();assert.equal(quest.stepId,'meet-cairn');assert.deepEqual(calls,['mara-cairn']);
 });
+
+test('Rin’s combat lesson opens immediately beside the pirate and is remembered after completion',()=>{
+ const {session,save,quest}=tutorialFixture('defeat-raider'),calls=[];save.player.dockedAt=undefined;
+ session.hostilesVisibleNear=()=>true;session.flightDialogueAfter=1000;
+ session.playTutorialBriefing=GameSession.prototype.playTutorialBriefing;session.ui.showStoryLine=(...args)=>calls.push(args);
+ session.playTutorialBriefing('combat');session.playTutorialBriefing('combat');
+ assert.equal(calls.length,1);assert.equal(calls[0][3],'tutorial-combat');assert.equal(session.storyLineUntil,Infinity);
+ assert.equal(session.pendingStoryConversations,undefined,'the nearby pirate cannot delay his own combat lesson');
+ assert.match(ADVENTURE_DIALOGUES.combat.nodes.weapons.text.en,/Space.*fire pad.*energy/);
+ assert.match(ADVENTURE_DIALOGUES.combat.nodes.wing.text.en,/Y.*wing card.*aggressive.*defensive.*break off/);
+ session.finishTutorialBriefing('tutorial-combat',true);assert.equal(quest.flags['briefingRead-combat'],true);
+ session.playTutorialBriefing('combat');assert.equal(calls.length,1);assert.equal(quest.stepId,'defeat-raider');
+ const resumed=tutorialFixture('defeat-raider',hydrateSave(JSON.parse(JSON.stringify(save))));resumed.session.playTutorialBriefing=GameSession.prototype.playTutorialBriefing;resumed.session.ui.showStoryLine=()=>assert.fail('completed combat lesson repeated');resumed.session.playTutorialBriefing('combat');
+});
+
+test('resuming an unfinished first-combat briefing restores it once, including older stuck saves',()=>{
+ for(const alreadyShown of [false,true]){
+  const {save,quest}=tutorialFixture('defeat-raider');save.player.dockedAt=undefined;quest.flags['briefingShown-combat']=alreadyShown;
+  const resumed=tutorialFixture('defeat-raider',hydrateSave(JSON.parse(JSON.stringify(save)))),calls=[];
+  resumed.session.playTutorialBriefing=GameSession.prototype.playTutorialBriefing;resumed.session.ui.showStoryLine=(...a)=>calls.push(a);
+  resumed.session.hostilesVisibleNear=()=>true;resumed.session.restoreTutorialRuntime();resumed.session.restoreTutorialRuntime();
+  assert.equal(calls.length,1);assert.equal(calls[0][3],'tutorial-combat');assert.equal(resumed.session.ships.filter(s=>s.tutorialEncounter==='mining').length,1);
+  resumed.session.finishTutorialBriefing('tutorial-combat',true);resumed.session.restoreTutorialRuntime();assert.equal(calls.length,1);
+ }
+});

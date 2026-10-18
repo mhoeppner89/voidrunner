@@ -47,3 +47,14 @@ export function boxBoxContact(x,y,z,a,b,m,out) {
     if(out){out.x=nx;out.y=ny;out.z=nz;out.push=Math.max(0,best);}
     return true;
 }
+
+// Conservative node test used after the A-frame AABB rejection. Check B's
+// three face axes as well. Skipping cross axes may retain an empty node pair,
+// but can never discard a real contact; exact leaf SAT still checks all 15.
+export function boxBoxOverlap(x,y,z,a,b,m){
+    for(let j=0;j<3;j++){
+        const u=m[j],v=m[j+3],w=m[j+6];
+        if(Math.abs(x*u+y*v+z*w)>a[0]*Math.abs(u)+a[1]*Math.abs(v)+a[2]*Math.abs(w)+b[j]+1e-8)return false;
+    }
+    return true;
+}

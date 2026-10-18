@@ -21,6 +21,7 @@ import * as THREE from 'three';
 import { clamp } from './random.js';
 import { GRAVEYARD_GEOMETRY_PROFILES } from './worldData.js';
 import { pilotMod } from './pilots.js';
+import { terrainFlightDistance } from './asteroidTerrain.js';
 
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const UP = new THREE.Vector3(0, 1, 0);
@@ -306,6 +307,13 @@ const rayRingHit = (px, py, pz, cx, cy, cz, obstacle, scratch) => {
 // Clearance of a ray (P, c) to a single obstacle's avoidance surface over the
 // lookahead horizon. Negative = the path would collide.
 const rayObstacleClearance = (px, py, pz, cx, cy, cz, obstacle, lookahead, shipClearance, scratch) => {
+    if (obstacle.terrain) {
+        scratch.terrainOrigin ??= new THREE.Vector3();
+        scratch.terrainDirection ??= new THREE.Vector3();
+        const distance = terrainFlightDistance(obstacle, scratch.terrainOrigin.set(px,py,pz),
+            scratch.terrainDirection.set(cx,cy,cz), shipClearance, lookahead, scratch);
+        return distance < lookahead ? -10 : Infinity;
+    }
     if (obstacle.shape === 'ring') {
         let best = Infinity;
         for (const f of PATH_SAMPLES) {

@@ -9,6 +9,10 @@ function fieldEncounter(seed,field,role,tier){
  const s=session();s.tmpCollide=new THREE.Vector3();s.tmpEuler=new THREE.Euler();s.damageShip=()=>{};s.fireNpcGun=()=>{};
   s.activeInstanceId=field==='debris'?'mourning-line':'shardbelt';s.asteroids=generateAsteroidField(seed,[]);s.graveyard=generateGraveyardPieces(seed);s.wreckNodes=[];
   s.activeFieldObstacles=GameSession.prototype.activeFieldObstacles;s.obstacles=s.activeFieldObstacles();
+  // Exercise the live broadphase. Walking every triangle tile in this fixture
+  // both hid grid regressions and made large environments prohibitively slow.
+  s.forEachObstacleInBox=GameSession.prototype.forEachObstacleInBox;
+  s.obstacleCellSize=180;s.obstacleQueryStamp=0;
   const center=new THREE.Vector3(...LOCATIONS[s.activeInstanceId].position);
   for(const k of ['tmpEntryAnchor','tmpEntryCandidate','tmpEntryPreferredDirection'])s[k]=new THREE.Vector3();
   s.setFieldArenaPosition(center,s.activeInstanceId);const origin=center.toArray();

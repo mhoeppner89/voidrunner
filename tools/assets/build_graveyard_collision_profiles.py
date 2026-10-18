@@ -16,13 +16,10 @@ from mathutils import Vector
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = PROJECT_ROOT / "src/game/graveyardCollisionProfiles.js"
 SOURCES = {
-    "battleship": PROJECT_ROOT / "assets/models/wrecks/concord-battleship-wreck-v4.glb",
-    "carrier": PROJECT_ROOT / "assets/models/wrecks/concord-carrier-wreck-v4.glb",
-    "cruiser": PROJECT_ROOT / "assets/models/wrecks/concord-cruiser-wreck-v4.glb",
-    "frigate": PROJECT_ROOT / "assets/models/wrecks/concord-frigate-wreck-v3.glb",
-    "wayfarer": PROJECT_ROOT / "assets/models/wrecks/wayfarer-wreck.glb",
-    "talon": PROJECT_ROOT / "assets/models/wrecks/talon-wreck.glb",
+    entry["kind"]: PROJECT_ROOT / "assets/models/wrecks" / entry["output"]
+    for entry in json.loads((PROJECT_ROOT / "assets/models/wrecks/sources.json").read_text())
 }
+
 
 
 def is_removed_visual(obj):
@@ -50,8 +47,21 @@ def triangle_count(obj):
 
 
 def collision_budget(kind, obj):
+    kind = kind.split("-")[0]
     lowered = obj.name.lower()
+    if "ejected structure" in lowered:
+        return 300
+    if "command tower" in lowered or "command island" in lowered:
+        return 650
+    if "port armour" in lowered or "broadside shell" in lowered:
+        return 1000 if kind == "cruiser" else 650
+    if "bridge support" in lowered:
+        return 360
+    if "wreck bridge" in lowered:
+        return 780
     if kind in {"carrier", "battleship", "cruiser"}:
+        if "engine" in lowered:
+            return 1100 if kind != "cruiser" else 900
         if "wreck" in lowered:
             return 2200 if kind != "cruiser" else 1800
         return 360
@@ -91,7 +101,8 @@ def surface_profile(kind, obj):
     mesh = copy.data
     mesh.calc_loop_triangles()
     coordinates = [three_coordinate(copy.matrix_world @ vertex.co) for vertex in mesh.vertices]
-    if len(coordinates) < 3 or not mesh.loop_triangles:
+    triangles = [tuple(triangle.vertices) for triangle in mesh.loop_triangles]
+    if len(coordinates) < 3 or not triangles:
         bpy.data.objects.remove(copy, do_unlink=True)
         return None
 
@@ -104,7 +115,7 @@ def surface_profile(kind, obj):
         relative = point - center
         vertices.extend(rounded(component) for component in relative)
         radius = max(radius, relative.length)
-    indices = [index for triangle in mesh.loop_triangles for index in triangle.vertices]
+    indices = [index for triangle in triangles for index in triangle]
     if len(coordinates) > 65535:
         bpy.data.objects.remove(copy, do_unlink=True)
         raise RuntimeError(f"{obj.name} exceeds Uint16 collision indices after reduction")

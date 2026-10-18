@@ -6,7 +6,7 @@ import { HULL_TRADE_IN_RATE, commitShipTrade, quoteShipTrade } from '../../src/g
 const makePlayer = (shipId = 'wayfarer') => ({
     shipId,
     ownedShips: [shipId],
-    credits: 100000,
+    credits: 200000,
     dockedAt: 'helix',
     cargo: {},
     sealedCargo: [],

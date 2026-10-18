@@ -15,7 +15,7 @@ export function tutorialFixture(step='meet-family',existing){
     session.asteroids=generateAsteroidField(save.world.seed,save.world.depletedAsteroids,save.world.scannedNodes);session.wreckNodes=generateWreckNodes(save.world.seed,save.world.depletedWrecks,save.world.scannedNodes);
     const lines=[],events=[];
     session.renderer={setTarget(){},setUtilityBeam(){},syncShips(){},setMissionMarker(){},spawnImpact(){},spawnMuzzleFlash(){},spawnExplosion(){},flashShield(){},ensureGlbShipModel(){}};
-    session.ui={isModalOpen:false,showToast(){},pushEvent(...a){events.push(a);},pushSensor(){},refreshDock(){},setWingTactics(){},setTutorialHint(...a){lines.push(a);},showPilotLine(...a){lines.push(a);},showStoryLine(){},clearPilotLine(){}};
+    session.ui={isModalOpen:false,showLaunchBlocked(){},showToast(){},pushEvent(...a){events.push(a);},pushSensor(){},refreshDock(){},setWingTactics(){},setTutorialHint(...a){lines.push(a);},showPilotLine(...a){lines.push(a);},showStoryLine(){},clearPilotLine(){}};
     session.audio={play(){},playAtDirection(){}};session.persistSave=()=>{};session.updateAssetWarmup=()=>{};session.activeFieldObstacles=()=>[];session.activeDockObstacle=()=>undefined;session.lineBlocked=()=>false;session.forEachObstacleAlongSegment=()=>{};session.forEachObstacleInBox=()=>{};session.storyLineActive=()=>false;session.deathTimer=0;session.activeInstanceId=['rescue-paul','talk-paul','survey-carrier','carrier-wait','hide-patrol','black-box-fight'].includes(step)?'mourning-line':undefined;
     session.playTutorialBriefing=()=>{};session.updateTravelAI=()=>{};session.updateAttackAI=()=>{};
     return {save,quest,session,lines,events};

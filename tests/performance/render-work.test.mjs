@@ -118,3 +118,74 @@ test('HUD sizing keeps the live-layout fallback on browsers without ResizeObserv
     assert.equal(cache.get(canvas).width, 100);
     canvas.clientWidth = 200; assert.equal(cache.get(canvas).width, 200);
 });
+
+
+test('all races show only the next five rings, with distinct next/following colors, and reuse their pool',()=>{
+    const r=Object.create(SpaceRenderer.prototype);
+    r.scene=new THREE.Scene();r.raceGateMeshes=[];r.raceShortcutMeshes=[];
+    r.radialTexture=()=>null;
+    const gates=Array.from({length:80},(_,i)=>({position:[i*100,0,0],direction:[1,0,0],radius:40,kind:i===79?'finish':'mandatory'}));
+    r.syncRaceGates(gates,10);
+    assert.deepEqual(r.raceGateMeshes.flatMap((g,i)=>g.visible?[i]:[]),[10,11,12,13,14]);
+    assert.equal(r.raceGateMeshes[10].children[0].material.color.getHex(),0x3dff6e);
+    assert.equal(r.raceGateMeshes[11].children[0].material.color.getHex(),0xffd24a);
+    assert.ok([12,13,14].every(i=>r.raceGateMeshes[i].children[0].material.color.getHex()===0x9aa6b0));
+    const pool=[...r.raceGateMeshes];r.syncRaceGates(gates,40);
+    assert.equal(r.raceGateMeshes.length,80);
+    assert.ok(r.raceGateMeshes.every((g,i)=>g===pool[i]),'gate changes reuse existing meshes');
+    assert.equal(r.raceGateMeshes.filter(g=>g.visible).length,5);
+    r.syncRaceGates(gates,78);
+    assert.deepEqual(r.raceGateMeshes.flatMap((g,i)=>g.visible?[i]:[]),[78,79]);
+    assert.equal(r.raceGateMeshes[79].children[0].material.color.getHex(),0xffd24a,'finish still follows the upcoming color');
+    r.syncRaceGates(gates,79);
+    assert.equal(r.raceGateMeshes[79].children[0].material.color.getHex(),0x3dff6e,'finish becomes green when next');
+    r.syncRaceGates(gates,80);
+    assert.equal(r.raceGateMeshes.filter(g=>g.visible).length,0);
+    r.syncRaceGates(gates.slice(0,16),0);
+    assert.equal(r.raceGateMeshes.filter(g=>g.visible).length,5,'small legacy courses follow the same five-ring rule');
+});
+
+test('race boost markers and peripheral streaks reuse bounded pools and clear after racing',()=>{
+ const r=Object.create(SpaceRenderer.prototype);r.scene=new THREE.Scene();r.camera=new THREE.PerspectiveCamera(80,1.6);r.scene.add(r.camera);r.skyTime=10;
+ const pickups=Array.from({length:3},(_,i)=>({index:i,position:[i*300,0,0],pathDistance:i*300+100,direction:[0,0,1]}));
+ r.syncRaceBoosts(pickups,new Set());assert.equal(r.raceBoostMeshes.filter(m=>m.visible).length,3);const refs=[...r.raceBoostMeshes];
+ r.syncRaceBoosts(pickups,new Set([1]));assert.equal(r.raceBoostMeshes[1].visible,false);
+ r.syncRaceBoosts([]);assert.ok(r.raceBoostMeshes.every(m=>!m.visible));r.syncRaceBoosts(pickups);assert.ok(r.raceBoostMeshes.every((m,i)=>m===refs[i]));
+ r.raceSpeedIntensity=1;r.updateRaceSpeedLines(1/60);const geometry=r.raceSpeedLines.geometry,buffer=geometry.attributes.position.array;
+ for(let i=0;i<60;i++){r.skyTime+=1/60;r.updateRaceSpeedLines(1/60);}
+ assert.equal(r.raceSpeedLines.geometry,geometry);assert.equal(geometry.attributes.position.array,buffer);assert.equal(buffer.length,32*6);
+ r.raceSpeedIntensity=0;r.updateRaceSpeedLines(1/60);assert.equal(r.raceSpeedLines.visible,false);
+ r.raceSpeedIntensity=1;r.reducedHyperdriveMotion=true;r.updateRaceSpeedLines(1/60);assert.equal(r.raceSpeedLines.visible,false);
+});
+
+test('flight warmup retains canvas and HDR effect programs and restores the current target',async()=>{
+    const hdr={},previous={},compiled=[],warmup=new THREE.Group();let target=previous,initialized=0;
+    const s=Object.create(SpaceRenderer.prototype);
+    Object.assign(s,{scene:new THREE.Scene(),camera:new THREE.PerspectiveCamera(),isIOS:false,
+        bloomSceneTarget:hdr,bloomEnabled:()=>true,prepareCombatWarmup:()=>warmup,
+        renderer:{info:{programs:[{getUniforms:()=>initialized++}]},getRenderTarget:()=>target,setRenderTarget:value=>target=value,
+            compileAsync:async()=>{compiled.push(target);}}});
+    await s.prepareActiveScene();
+    assert.deepEqual(compiled,[null,hdr]);assert.equal(target,previous);assert.equal(initialized,1);
+    assert.equal(warmup.parent,null);assert.equal(s.pendingShaderCompiles.size,0);
+    compiled.length=0;s.isIOS=true;await s.prepareActiveScene();
+    assert.deepEqual(compiled,[null],'iOS uses the direct canvas path');
+});
+
+
+test('off-scene postprocess and planetary ring passes are prepared before flight',async()=>{
+    const s=Object.create(SpaceRenderer.prototype),hdr={},blurA={},blurB={},calls=[];
+    const material={},quad={material},bright={},blur={},composite={},volume={},particles={};let target=null;
+    Object.assign(s,{scene:new THREE.Scene(),camera:{},bloomCamera:{},isIOS:false,
+        bloomSceneTarget:hdr,bloomBlurTargets:[blurA,blurB],bloomQuad:quad,
+        bloomBrightMaterial:bright,bloomBlurMaterial:blur,bloomCompositeMaterial:composite,
+        ringVolumeEnabled:true,ringVolume:{mesh:volume},ringParticles:{mesh:particles},
+        bloomEnabled:()=>true,prepareCombatWarmup:()=>new THREE.Group(),
+        renderer:{getRenderTarget:()=>target,setRenderTarget:value=>target=value,
+            compileAsync:async object=>{calls.push({object,material:object.material,target});}}});
+    await s.prepareActiveScene();
+    assert.deepEqual(calls.map(call=>call.target),[null,hdr,blurA,blurB,null,hdr,hdr]);
+    assert.deepEqual(calls.slice(2,5).map(call=>call.material),[bright,blur,composite]);
+    assert.equal(calls[5].object,volume);assert.equal(calls[6].object,particles);
+    assert.equal(quad.material,material);assert.equal(target,null);
+});
