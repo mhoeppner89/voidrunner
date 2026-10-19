@@ -16,17 +16,22 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1280,heig
    return{node:node.id,quantity:offer.quantity,reward:offer.reward,range:Math.hypot(...node.position.map((v,i)=>v-q.flags.miningEntryPosition[i]))};
   });assert.equal(setup.quantity,6);assert.equal(setup.reward,3000);assert.ok(setup.range>=750&&setup.range<=1250);
   const mined=await page.evaluate(()=>{
-   const r=__VOID_PRIVATEER__.getRuntime(),p=r.save.player,q=r.save.quests.find(q=>q.id==='the-spare-key'),rock=q.flags.oreTargetId;let handoff;
+   const r=__VOID_PRIVATEER__.getRuntime(),p=r.save.player,q=r.save.quests.find(q=>q.id==='the-spare-key'),rock=q.flags.oreTargetId,minerVisuals=new Map();let handoff;
    // Drive the complete frame loop, including HUD, interpolation, rendering and
    // event processing. A drone-only loop missed this player-facing transition.
    for(let i=0;i<600;i++){
     r.lastFrame=performance.now()-100;r.frame(performance.now());cancelAnimationFrame(r.frameId);
+    for(const[id,visual]of Object.entries(r.renderer.droneVisuals)){
+     if(minerVisuals.has(id)&&minerVisuals.get(id)!==visual.root)throw Error('Mining delivery rebuilt a drone render graph');
+     minerVisuals.set(id,visual.root);
+    }
     if(q.stepId==='return-mining'&&!handoff){handoff={cargo:p.cargo.ore,target:p.currentTargetId,phase:p.droneFleet.controller.phase,nav:p.navTargetId};if(p.currentTargetId!==rock)throw Error('Contract completion hijacked target');}
     if(handoff&&(p.cargo.ore??0)>=8)break;
    }
    if(!handoff)throw Error('Contract never completed');if((p.cargo.ore??0)<8)throw Error('Miners stopped at the contract threshold');
    if(r.ui.isModalOpen)throw Error('Unexpected modal blocked flight');if(r.ui.tutorialHint)throw Error('Repeated travel instructions immediately after mining');
-   return{handoff,cargo:p.cargo.ore,time:r.save.world.time,position:[...p.position],rotation:[...p.rotation]};
+   if(minerVisuals.size<2)throw Error('Both miners must participate in the retention check');
+   return{handoff,cargo:p.cargo.ore,time:r.save.world.time,position:[...p.position],rotation:[...p.rotation],retainedMiners:minerVisuals.size};
   });assert.equal(mined.handoff.target,setup.node);assert.equal(mined.handoff.phase,'running');assert.equal(mined.handoff.nav,'shardbelt');await page.screenshot({path:`${out}/${name}-continue-mining.png`});
   if(name==='desktop')await page.keyboard.down('w');
   await page.evaluate(async mobile=>{

@@ -354,6 +354,7 @@ const beginSession = (mode, arena, tutorial = true) => {
             await nextSession.prepareDockedFlightRuntime({ showLoading: false });
         else if (nextSession.renderer)
             await nextSession.prepareFlightScene();
+        if (!arena && save.player.dockedAt) await ui.prepareDockView();
         if (mode === 'new' && tutorialCampaignSummary(save)?.active) ui.showStory();
         return nextSession;
     })().catch((error) => {
@@ -424,6 +425,9 @@ const assignSetting = (settings, key, value) => {
     return true;
 };
 const actions = {
+    cinematicSound: (...args) => session?.audio?.cinematicSound(...args),
+    stationTransitData: id => session?.stationTransitData(id),
+    planetSurface: id => session?.renderer?.worldSurfaceMaterials?.get(id)?.map,
     startNew: tutorial => beginSession('new', undefined, tutorial !== false),
     resume: () => beginSession('resume'),
     startArenaRun: (resume=false,hard=false) => beginSession('arena',{run:true,resume,hard}),
@@ -483,7 +487,6 @@ const actions = {
     setLauncherFireMode: mode => session?.setLauncherFireMode(mode),
     launcherCycle: () => session?.cycleLauncher(),
     selectTarget: (kind, id) => session?.selectTarget(kind, id, 'map'),
-    reviewServices: () => session?.checkTutorialServices(true),
     trade: (kind, commodityId, quantity) => session?.trade(kind, commodityId, quantity),
     jettison: (commodityId) => session?.jettisonCargo(commodityId),
     payOffMug: () => session?.payOffMug(),

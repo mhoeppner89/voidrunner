@@ -166,10 +166,14 @@ test('flight warmup retains canvas and HDR effect programs and restores the curr
         renderer:{info:{programs:[{getUniforms:()=>initialized++}]},getRenderTarget:()=>target,setRenderTarget:value=>target=value,
             compileAsync:async()=>{compiled.push(target);}}});
     await s.prepareActiveScene();
-    assert.deepEqual(compiled,[null,hdr]);assert.equal(target,previous);assert.equal(initialized,1);
+    assert.deepEqual(compiled,[null,hdr,null,hdr]);assert.equal(target,previous);assert.equal(initialized,1);
     assert.equal(warmup.parent,null);assert.equal(s.pendingShaderCompiles.size,0);
-    compiled.length=0;s.isIOS=true;await s.prepareActiveScene();
-    assert.deepEqual(compiled,[null],'iOS uses the direct canvas path');
+    compiled.length=0;s.isIOS=true;
+    s.renderer.domElement={width:640,height:360};
+    await s.prepareActiveScene();
+    assert.deepEqual(compiled,[null,s.pixelSceneTarget,null,s.pixelSceneTarget,null],'iOS prepares shadow/no-shadow HDR scenes and its bounded resolve');
+    assert.equal(s.pixelQuad.material,s.pixelResolveMaterial);
+    s.pixelSceneTarget.dispose();s.pixelResolveMaterial.dispose();s.pixelQuad.geometry.dispose();
 });
 
 
@@ -184,8 +188,8 @@ test('off-scene postprocess and planetary ring passes are prepared before flight
         renderer:{getRenderTarget:()=>target,setRenderTarget:value=>target=value,
             compileAsync:async object=>{calls.push({object,material:object.material,target});}}});
     await s.prepareActiveScene();
-    assert.deepEqual(calls.map(call=>call.target),[null,hdr,blurA,blurB,null,hdr,hdr]);
-    assert.deepEqual(calls.slice(2,5).map(call=>call.material),[bright,blur,composite]);
-    assert.equal(calls[5].object,volume);assert.equal(calls[6].object,particles);
+    assert.deepEqual(calls.map(call=>call.target),[null,hdr,null,hdr,blurA,blurB,null,hdr,hdr]);
+    assert.deepEqual(calls.slice(4,7).map(call=>call.material),[bright,blur,composite]);
+    assert.equal(calls[7].object,volume);assert.equal(calls[8].object,particles);
     assert.equal(quad.material,material);assert.equal(target,null);
 });

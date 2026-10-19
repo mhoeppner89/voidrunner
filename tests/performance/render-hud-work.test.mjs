@@ -41,6 +41,23 @@ function createCockpitElement(tagName) {
     };
 }
 
+function mockCockpitBrowser(t) {
+    const names = ['document', 'requestAnimationFrame', 'cancelAnimationFrame'];
+    const previous = names.map(name => Object.getOwnPropertyDescriptor(globalThis, name));
+    const frames = new Map();
+    let nextFrame = 0;
+    globalThis.document = { baseURI: 'https://voidrunner.test/', createElement: createCockpitElement };
+    globalThis.requestAnimationFrame = callback => { frames.set(++nextFrame, callback); return nextFrame; };
+    globalThis.cancelAnimationFrame = id => frames.delete(id);
+    t.after(() => names.forEach((name, i) => {
+        if (previous[i]) Object.defineProperty(globalThis, name, previous[i]);
+        else delete globalThis[name];
+    }));
+    return () => {
+        for (const [id, callback] of frames) { frames.delete(id); callback(); }
+    };
+}
+
 test('static GLB parts preserve world transforms while the model root moves', async () => {
     // Include an authored shear matrix: recomposing it from TRS would lose it.
     const matrix = [1, 0, 0, 0, .3, 1, 0, 0, 0, 0, 1, 0, 4, 5, 6, 1];
@@ -133,35 +150,30 @@ test('own hull redraws for content, size and canvas changes; targets remain live
     assert.equal(clears, first);
     draw(1); assert.equal(clears, first + 1);
     canvas.clientWidth = 200; draw(1); assert.equal(clears, first + 2);
-    window.devicePixelRatio = 2; draw(1); assert.equal(clears, first + 3);
-    ui.ownHullCanvas = { ...canvas }; draw(1); assert.equal(clears, first + 4);
+    window.devicePixelRatio = 2; draw(1); assert.equal(clears, first + 2, 'monitor pixels stay on the CSS grid across DPR changes');
+    ui.ownHullCanvas = { ...canvas }; draw(1); assert.equal(clears, first + 3);
     ui.drawHullOutline(canvas, 'kestrel'); ui.drawHullOutline(canvas, 'kestrel');
-    assert.equal(clears, first + 6, 'target redraws must not be skipped');
+    assert.equal(clears, first + 5, 'target redraws must not be skipped');
 });
 
-test('cockpit images are preloaded on ship changes, not every HUD update', () => {
+test('cockpit images are preloaded on ship changes, not every HUD update', t => {
     const ui = Object.create(GameUI.prototype);
     const { nodes, instruments } = cockpitNodeMocks();
-    const previousDocument = globalThis.document;
-    globalThis.document = { baseURI: 'https://voidrunner.test/', createElement: createCockpitElement };
+    const flushFrames = mockCockpitBrowser(t);
     ui.root = { dataset: {} }; ui.el = (selector) => nodes[selector];
     let preloads = 0; ui.preloadImageSet = () => { preloads++; };
-    try {
-        ui.setCockpitShip('wayfarer');
-        assert.ok(instruments.querySelector('.cockpit-bezel-own'));
-        assert.ok(instruments.querySelector('.cockpit-bezel-radar'));
-        assert.ok(instruments.querySelector('.cockpit-bezel-target'));
-        for (let i = 0; i < 60; i++) ui.setCockpitShip('wayfarer');
-        assert.equal(preloads, 1);
-        delete ui.root.dataset.cockpitShip;
-        ui.setCockpitShip('wayfarer'); assert.equal(preloads, 2);
-    } finally {
-        if (previousDocument === undefined) delete globalThis.document;
-        else globalThis.document = previousDocument;
-    }
+    ui.setCockpitShip('wayfarer');
+    assert.ok(instruments.querySelector('.cockpit-bezel-own'));
+    assert.ok(instruments.querySelector('.cockpit-bezel-radar'));
+    assert.ok(instruments.querySelector('.cockpit-bezel-target'));
+    for (let i = 0; i < 60; i++) ui.setCockpitShip('wayfarer');
+    assert.equal(preloads, 1);
+    delete ui.root.dataset.cockpitShip;
+    ui.setCockpitShip('wayfarer'); assert.equal(preloads, 2);
+    flushFrames();
 });
 
-test('all eleven ships use hull-matched transparent cockpit sprites and distinct monitor layouts', async () => {
+test('all eleven ships use hull-matched transparent cockpit sprites and distinct monitor layouts', async t => {
     const { readFile } = await import('node:fs/promises');
     const shipIds = ['wayfarer', 'vanguard', 'talon', 'prospector', 'lancer', 'atlas',
         'speedster', 'legionary', 'andromeda', 'torsas', 'astra'];
@@ -176,51 +188,46 @@ test('all eleven ships use hull-matched transparent cockpit sprites and distinct
     const ui = Object.create(GameUI.prototype);
     ui.root = { dataset: {} }; ui.el = (selector) => nodes[selector]; ui.preloadImageSet = () => {};
     const layouts = new Set(), artUrls = new Set();
-    const previousDocument = globalThis.document;
-    globalThis.document = { baseURI: 'https://voidrunner.test/', createElement: createCockpitElement };
-    try {
-        for (const shipId of shipIds) {
-            const artPath = artByShip[shipId] ?? 'cockpit-' + shipId + '-sprite.png';
-            ui.setCockpitShip(shipId);
-            assert.equal(ui.root.dataset.cockpitShip, shipId);
-            assert.equal(nodes['.canopy-aperture'].points, CANOPY_APERTURES[shipId]);
-            assert.equal(nodes['.canopy-art-mask'].href, './assets/remaster/' + artPath);
-            assert.ok(nodes['.cockpit-art'].style.backgroundImage.includes(artPath));
-            assert.ok(instruments.style.values['--cockpit-own-left']);
-            assert.ok(instruments.style.values['--cockpit-radar-left']);
-            assert.ok(instruments.style.values['--cockpit-target-left']);
-            assert.equal(['own', 'radar', 'target'].filter(panel => instruments.querySelector('.cockpit-bezel-' + panel)).length, 3);
-            for (const panel of ['own', 'radar', 'target']) {
-                const rect = ['left', 'top', 'width', 'height'].map(property =>
-                    Number.parseFloat(instruments.style.values[`--cockpit-${panel}-${property}`]));
-                assert.ok(rect.every(Number.isFinite), `${shipId}: ${panel} has a complete aperture`);
-                const [left, top, width, height] = rect;
-                assert.ok(left >= 0 && top >= 0 && width >= 8 && height >= 15
-                    && left + width <= 100 && top + height <= 100, `${shipId}: ${panel} aperture stays readable and inside the canopy`);
-            }
-            layouts.add(Object.values(instruments.style.values).join('|'));
-            artUrls.add(nodes['.canopy-art-mask'].href);
-            const png = await readFile(new URL('../../assets/remaster/' + artPath, import.meta.url));
-            assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], shipId + ': valid PNG');
-            assert.equal(png.readUInt32BE(16), 1672, shipId + ': authoring width');
-            assert.equal(png.readUInt32BE(20), 941, shipId + ': authoring height');
-            assert.equal(png[25], 6, shipId + ': RGBA alpha preserves the transparent canopy');
-        }
-        ui.setCockpitShip('vanguard');
-        assert.ok(instruments.style.values['--cockpit-radar-width'], 'Vanguard radar has a fitted monitor aperture');
-        ui.setCockpitShip('wayfarer');
-        assert.equal(nodes['.canopy-art-mask'].href, './assets/remaster/cockpit-wayfarer-sprite.png', 'approved Wayfarer sprite stays unchanged');
+    const flushFrames = mockCockpitBrowser(t);
+    for (const shipId of shipIds) {
+        const artPath = artByShip[shipId] ?? 'cockpit-' + shipId + '-sprite.png';
+        ui.setCockpitShip(shipId);
+        assert.equal(ui.root.dataset.cockpitShip, shipId);
+        assert.equal(nodes['.canopy-aperture'].points, CANOPY_APERTURES[shipId]);
+        assert.equal(nodes['.canopy-art-mask'].href, './assets/remaster/' + artPath);
+        assert.ok(nodes['.cockpit-art'].style.backgroundImage.includes(artPath));
+        assert.ok(instruments.style.values['--cockpit-own-left']);
+        assert.ok(instruments.style.values['--cockpit-radar-left']);
+        assert.ok(instruments.style.values['--cockpit-target-left']);
+        assert.equal(['own', 'radar', 'target'].filter(panel => instruments.querySelector('.cockpit-bezel-' + panel)).length, 3);
         for (const panel of ['own', 'radar', 'target']) {
-            const left = Number.parseFloat(instruments.style.values[`--cockpit-${panel}-left`]);
-            assert.ok(Number.isFinite(left) && left >= 0 && left <= 100,
-                `Wayfarer ${panel} monitor remains inside the cockpit layout`);
+            const rect = ['left', 'top', 'width', 'height'].map(property =>
+                Number.parseFloat(instruments.style.values[`--cockpit-${panel}-${property}`]));
+            assert.ok(rect.every(Number.isFinite), `${shipId}: ${panel} has a complete aperture`);
+            const [left, top, width, height] = rect;
+            assert.ok(left >= 0 && top >= 0 && width >= 8 && height >= 15
+                && left + width <= 100 && top + height <= 100, `${shipId}: ${panel} aperture stays readable and inside the canopy`);
         }
-        assert.equal(layouts.size, shipIds.length, 'every hull has its own monitor layout');
-        assert.equal(artUrls.size, shipIds.length, 'every hull has its own cockpit sprite');
-    } finally {
-        if (previousDocument === undefined) delete globalThis.document;
-        else globalThis.document = previousDocument;
+        layouts.add(Object.values(instruments.style.values).join('|'));
+        artUrls.add(nodes['.canopy-art-mask'].href);
+        const png = await readFile(new URL('../../assets/remaster/' + artPath, import.meta.url));
+        assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], shipId + ': valid PNG');
+        assert.equal(png.readUInt32BE(16), 1672, shipId + ': authoring width');
+        assert.equal(png.readUInt32BE(20), 941, shipId + ': authoring height');
+        assert.equal(png[25], 6, shipId + ': RGBA alpha preserves the transparent canopy');
     }
+    ui.setCockpitShip('vanguard');
+    assert.ok(instruments.style.values['--cockpit-radar-width'], 'Vanguard radar has a fitted monitor aperture');
+    ui.setCockpitShip('wayfarer');
+    assert.equal(nodes['.canopy-art-mask'].href, './assets/remaster/cockpit-wayfarer-sprite.png', 'approved Wayfarer sprite stays unchanged');
+    for (const panel of ['own', 'radar', 'target']) {
+        const left = Number.parseFloat(instruments.style.values[`--cockpit-${panel}-left`]);
+        assert.ok(Number.isFinite(left) && left >= 0 && left <= 100,
+            `Wayfarer ${panel} monitor remains inside the cockpit layout`);
+    }
+    assert.equal(layouts.size, shipIds.length, 'every hull has its own monitor layout');
+    assert.equal(artUrls.size, shipIds.length, 'every hull has its own cockpit sprite');
+    flushFrames();
 });
 
 test('flight log groups identical consecutive notices without merging different rewards', () => {
@@ -265,4 +272,15 @@ test('packed ship preserves authored glass PBR values and geometry', async () =>
         if (previous) globalThis.createImageBitmap = previous;
         else delete globalThis.createImageBitmap;
     }
+});
+
+
+test('static target schematics avoid repeated canvas uploads and invalidate on content/size changes',()=>{
+ let clears=0;const ctx=new Proxy({},{get:(_,key)=>key==='clearRect'?()=>clears++:()=>{},set:()=>true});
+ const canvas={width:150,height:110,clientWidth:150,clientHeight:110,getContext:()=>ctx};
+ const ui=Object.create(GameUI.prototype);
+ ui.drawObjectOutline(canvas,'station');for(let i=0;i<120;i++)ui.drawObjectOutline(canvas,'station');assert.equal(clears,1);
+ ui.drawObjectOutline(canvas,'planet');assert.equal(clears,2);
+ canvas.clientWidth=200;ui.drawObjectOutline(canvas,'planet');assert.equal(clears,3);
+ ui.drawHullOutline(canvas,'kestrel');ui.drawObjectOutline(canvas,'planet');assert.equal(clears,5,'returning from a ship restores the static schematic');
 });

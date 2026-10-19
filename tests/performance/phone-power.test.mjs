@@ -73,7 +73,7 @@ test('iPhone and desktop-mode iPad use the bounded render profile without changi
     android.lastQualityScale = 1;
     assert.equal(android.bloomEnabled(), true, 'Android keeps the high-fidelity bloom path');
 });
-test('iOS renders directly when the Azure ring volume is not active',()=>{
+test('iOS uses the bounded pixel resolve without bloom when the ring volume is inactive',()=>{
     const r=Object.create(SpaceRenderer.prototype);
     r.contextLost=false;r.isIOS=true;r.qualityMode='high';r.scene=new THREE.Scene();
     r.camera=new THREE.PerspectiveCamera(60,2,0.1,1000);r.viewProjection=new THREE.Matrix4();r.viewFrustum=new THREE.Frustum();
@@ -81,9 +81,10 @@ test('iOS renders directly when the Azure ring volume is not active',()=>{
     r.updateWorldVisuals=()=>{};
     let calls=0;let targetChanges=0;
     r.renderer={setRenderTarget(){targetChanges++;},render(){calls++;}};
+    r.renderPixelScene=()=>{r.renderer.setRenderTarget({});r.renderer.render(r.scene,r.camera);r.renderer.setRenderTarget(null);r.renderer.render({},{});};
     r.render();
-    assert.equal(calls,1,'iOS submits one scene pass without bloom or a copy quad');
-    assert.equal(targetChanges,1,'iOS selects the default framebuffer directly');
+    assert.equal(calls,2,'iOS submits one scene and one bounded pixel resolve');
+    assert.equal(targetChanges,2,'iOS resolves its logical scene target to the framebuffer');
     assert.equal(r.bloomSceneTarget,undefined,'iOS does not allocate an HDR target for ordinary flight');
 });
 test('paused and hidden flight does no continuous rendering, redraws once on resize, and resumes without catch-up',()=>{
@@ -132,7 +133,7 @@ test('ring bounds reject offscreen ray marching and keep overhead and inside-rin
     r.instanceRoots=new Map();r.locationMeshes=new Map([['azure',{visible:true}]]);r.atmosphereShells=[];
     r.ringVolume=volume;r.ringVolumeEnabled=true;r.hyperdriveFxRoot={visible:false};r.bloomCamera=new THREE.Camera();
     r.bloomSceneTarget={width:100,height:50,texture:{},depthTexture:{}};r.bloomBlurTargets=[{texture:{}},{texture:{}}];
-    const material=()=>({uniforms:{uResolution:{value:new THREE.Vector2()},uDirection:{value:new THREE.Vector2()},tDiffuse:{},uExposure:{},tScene:{},tBloom:{},uStrength:{}}});
+    const material=()=>({uniforms:{uResolution:{value:new THREE.Vector2()},uDirection:{value:new THREE.Vector2()},tDiffuse:{},uExposure:{},tScene:{},tDepth:{},uNearFar:{value:new THREE.Vector2()},tBloom:{},uStrength:{}}});
     r.bloomCompositeMaterial=material();r.bloomBrightMaterial=material();r.bloomBlurMaterial=material();r.bloomQuad={};
     r.qualityMode='high';let calls=0;r.renderer={toneMappingExposure:1,setRenderTarget(){},render(){calls++;}};
     r.ringParticles={update(){return false;}};

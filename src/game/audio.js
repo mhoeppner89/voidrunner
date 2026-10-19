@@ -1,5 +1,6 @@
 import { playIndustrial, warmIndustrial, INDUSTRIAL_DURATIONS, playWorkSample, updateSampleEngines, stopSampleLoops } from './sampleSfx.js';
 import { clamp } from './random.js';
+import {createTransitVoice} from './transitAudio.js';
 
 const midiToFrequency = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
 
@@ -258,8 +259,9 @@ export class AudioManager {
         this.effectsVolume = clamp(effects, 0, 1);
         if (!this.context) return;
         const now = this.context.currentTime;
-        this.musicGain?.gain.setTargetAtTime(this.musicVolume, now, 0.04);
-        this.musicReverbGain?.gain.setTargetAtTime(this.musicVolume, now, 0.04);
+        const musicLevel=this.musicVolume*(this.cinematicVoice&&!this.cinematicVoice.stopped ? .65 : 1);
+        this.musicGain?.gain.setTargetAtTime(musicLevel, now, 0.04);
+        this.musicReverbGain?.gain.setTargetAtTime(musicLevel, now, 0.04);
         this.effectsGain?.gain.setTargetAtTime(this.effectsVolume, now, 0.04);
         this.effectsReverbGain?.gain.setTargetAtTime(this.effectsVolume, now, 0.04);
     }
@@ -282,11 +284,27 @@ export class AudioManager {
         }
     }
 
+    cinematicSound(event,phase,kind,progress=0,pan=0){
+        if(event==='stop'){
+            this.cinematicVoice?.stop();this.cinematicVoice=undefined;
+            if(this.context)this.setVolumes(this.musicVolume,this.effectsVolume);
+            return;
+        }
+        if(!this.context||!this.enabled||this.effectsVolume<=.001||progress>=1)return;
+        if(event==='start'||!this.cinematicVoice){
+            this.cinematicVoice?.stop();
+            this.cinematicVoice=createTransitVoice(this,phase,kind,progress);
+            this.setVolumes(this.musicVolume,this.effectsVolume);
+        }
+        this.cinematicVoice?.update(progress,pan);
+    }
+
     dispose() {
         if (!this.context)
             return;
         const context = this.context;
         const now = context.currentTime;
+        this.cinematicVoice?.stop();this.cinematicVoice=undefined;
         this.stopDrones();
         stopSampleLoops(this);
         this.sampleEngines = undefined;

@@ -1,3 +1,169 @@
+## 0.8.2ji — Station films in the game
+
+- Use all updated station models in flight and arrival/departure films. Include their berthed ships and service cradles in the films, using the same hull scale as flight and the workshop.
+- Reach the close arrival shot before the fade; use a three-quarter view for clearer small-ship silhouettes. Frame Blackglass’s elevated cave galleries in its wide arrival shot. Tighten departure framing and limit engine glow to the nearby deck.
+- Check both film directions and real game transitions at every station on desktop and iPhone. Preserve approved concourse artwork, ship placements, berths, flight physics and career saves.
+
+## 0.8.2jh — Station scale and inhabited facades
+
+- Resize crew airlocks, elevator doors, frames and controls against the ships and existing glazing. Keep industrial freight shutters separate from personnel doors.
+- Add side and rear windows to occupied modules, window banks in landing halls and courtyards, and glazing around the fortress and construction torus. Preserve unglazed processing vessels and tanks.
+- Batch flush windows by material and discard panes without a supporting wall, including excavated hangar entrances. Retain mip filtering, surface depth bias, clear flight paths and existing export budgets.
+
+## 0.8.2jg — Station detail and stable surfaces
+
+- Add role-specific machinery, airlocks, gallery framing, service equipment, shopfronts, hoppers and reservoir fittings across all thirteen stations.
+- Bake subtle contact shading into vertex colours. Retain at most ten material batches and one shared atlas per station.
+- Quiet the repeated panel texture, remove overlapping coplanar export faces, and weld identical vertices while retaining UV and normal seams.
+- Clear excavated station bodies below the finished landing floor, avoiding competing floor caps. Keep deck markings low enough for all fitted hulls; use depth bias for surface accents.
+- Add motion-based surface stability checks at flight-camera depth precision, alongside existing docking, collision, camera and desktop/phone checks.
+
+## 0.8.2jf — Station concourse architecture
+
+- Match all thirteen station landing spaces to their existing concourse paintings. Connect broad portals to shared inhabited halls; use sheltered decks, exposed pads or open courtyards where shown.
+- Rebuild Blackglass as an open cliff terrace with excavated tavern galleries, Torchwell as a broad fuel apron, Haven as a trading court and Cinderfall as an industrial courtyard.
+- Align the actual landing floors, private berth, NPC routes, parked ships and tracking cameras. Preserve station locations, world radii, approved 2D art and docked ship placements.
+- Add a concourse camera and artwork comparison to the station workshop. Verify real floors, roof/open-sky clearance, shared-floor access, source mesh contacts and resource budgets.
+
+## 0.8.2je — Detailed stations and connected structures
+
+- Complete the remaining twelve station models, each with architecture suited to its role. Keep existing locations and world radii.
+- Fix Helix's detached roof shields, signage, vents, wall conduits, status lamps, freight connections and structural roots. Connect pipes to their equipment instead of leaving loose ends.
+- Size small-ship doors in world units across every station. Preserve one private player berth, two NPC lanes, parked hull clearance and clear cinematic approaches.
+- Seat capital-yard maintenance lifts on the drydock floor. Join Nacre's transfer corridor and Argent's terminal to the actual hull surfaces.
+- Retain editable Blender sources, static exports, one panel atlas and at most ten station material batches. Add a mesh-contact audit so broad bounds cannot hide unsupported parts.
+- Expand the responsive station workshop to all thirteen ports, with detail views and optional previous-model comparisons.
+
+## 0.8.2jd — Helix station model
+
+- Rebuild Helix with smaller individual berths, inhabited decks, cargo handling, refinery plumbing, thick radiator panels and a detailed command crown.
+- Keep a private player berth and two NPC lanes; align parked ships, floor coordinates, collision surfaces and the cinematic camera with the new model.
+- Preserve the station's world radius. Batch the shell into 10 materials with one shared panel atlas, and retain an editable Blender source and orbit review.
+- Keep location buttons clear of the projected ship launch area, including large hulls on phones.
+
+## 0.8.2jc — Cockpit comms
+
+- Fit comms to each cockpit's free area, including separate phone positions and sizes.
+- Shorten sender labels and let normal transmissions grow to their full height. Preserve portraits and full sender names in the log.
+- Use automatic pages when longer transmissions exceed the available space, without scrolling. Clear wing-order buttons and refit on hull, viewport, wing or patrol-reply changes.
+
+## 0.8.2jb — Story cast at the bar
+
+- Remove filler bar contacts from all ports. Keep Mara, Rin and Paul's story appearances and existing quest progression.
+- Remove generic news/advice topics and empty question menus. Keep family backstory and concrete contract/trading information.
+- Preserve direct access to contract, race and guild boards.
+
+## 0.8.2ja — Docked starts and location buttons
+
+- Start new and resumed docked careers with the ship parked; play arrival animations only after an actual landing.
+- Centre compact phone labels, remove unused icon/description space, and give desktop labels room beside their icons.
+- Keep concourse, market and bar buttons inside their scenes and separate overlapping targets. Position additional bar contacts instead of leaving them in the top-left corner.
+- Wrap long contact descriptions, shorten market labels and remove an obsolete tutorial callback that threw an error when opening Services.
+
+## 0.8.2iz — Natural target colours
+
+- Remove selection and scan tints from asteroids and the extra glow on selected pickups. Targeting keeps original surface colours, ship paint and loot rarity colours; brackets and cockpit instruments still identify the target.
+
+## 0.8.2iy — Mining performance and cinematic sound
+
+- Keep drone meshes, buffers and shader references across stow/deploy cycles, including NPC docking visuals. Remove the repeated shader stalls on each mining delivery; prepare drone/effect and environment shader variants before flight.
+- Synchronize landing/departure engine passes, atmosphere, hangar reverb, gear and touchdown cues to animation progress. Replace the premature generic docking cue.
+- Fade and stop film audio on completion, skip, cancellation, hidden views or context loss. Briefly duck music and reuse existing decoded engine sounds.
+- Add an opt-in Sound control to the isolated landing review. Automated browser checks stay muted; audio waveforms are checked offline.
+
+## 0.8.2ix — Clean pixels and original colours
+
+- Remove ordered dithering, sprite recolouring and monitor palette filters. Keep the artwork's original colours without smoothing or palette reduction.
+- Remove stacked location-art colour adjustments, screen blending and scanlines. Concourse backgrounds and ships share crisp, whole-number pixel scaling.
+- Decode original sprites directly and remove the conversion worker/cache, avoiding duplicate images and conversion work.
+
+## 0.8.2iw — Station approach and departure films
+
+- Use each of the 13 authored station models for exterior docking and departure shots, joined to the existing concourse animations.
+- Lock a station, approach within 200 km of its visible hull and slow below landing speed; docking control handles the final route. Launch returns control beyond the station, facing outward.
+- Preserve transponder restrictions, drone recall, tutorial progression, skipping, reduced motion and cancellation recovery. Remove manual landing-guide prompts.
+
+## 0.8.2iv — Outbound planetary departure
+
+- Give departure its own front-quarter tracking camera and outward climb instead of reversing the arrival composition.
+- Project the departing planet from a fixed point behind the flight path, so it recedes behind the engines while the nose points into open space.
+- Match hull pitch to the climb and stream clouds past the tail. Preserve arrival, landing-pad poses and cockpit launch direction.
+
+## 0.8.2iu — Smooth landing-pad shadows
+
+- Pad shadows follow every rendered motion frame, soften and fade as the hull rises, and disappear before open flight.
+- Shadows and floor reflections are clipped to each painted landing platform, including cropped phone views.
+- Removed black floor blotches from collapsed normal-map UVs and invalid HDR reflection samples.
+- Moving reflections follow landing/takeoff continuously; distant ships skip floor captures. Approved hull placements remain unchanged.
+
+## 0.8.2it — Approved placements and full-screen dock flight
+
+- Apply the approved desktop and smartphone ship/button placements at all 17 ports, preserving exact angles, scales and zoom values.
+- Expand the 3D camera to the full painted backdrop while retaining the authored resting pose. Arrivals and departures now cross the actual screen edge instead of an internal preview boundary.
+- Calculate off-screen entry/exit paths from each hull's bounds, heading and viewport. Remove departure shrinking and prevent a settled-hull flash before arrival.
+- Keep atmosphere handoffs, cached reflections, reduced motion and cancelled-launch recovery. Seed and reset the placement editor from the approved layouts.
+
+## 0.8.2is — Shared landing finish and placement editor
+
+- Combine the painted concourse background, ship, shadow and reflection before a single pixel and colour shader, using the existing bounded renderer. Remove separate background filtering and palette conversion for these plates.
+- Extend the landing editor with draggable ships and menu buttons, precise X/Y controls and separate desktop/smartphone placements. Keep approved hull angles fixed and allow per-view display size adjustment.
+- Export both layouts in version 2 JSON; autosave drafts separately from careers and retain reset/undo and validated import.
+- Preserve landing, atmosphere and departure poses, cached reflections and paused rendering outside the concourse.
+
+## 0.8.2ir — Approved landing layouts
+
+- Apply the final exported ship angles and scales to all 17 ports.
+- Fit rotated hulls to the viewport and keep tilted hulls above the platform. Landings settle into the approved pose; departures follow the hull heading.
+- Restore the same pose after atmosphere shots or cancelled departures. Keep dock rotation out of the atmosphere camera shots.
+- Share pose and bounds handling with the editor; its defaults now match the approved layouts.
+
+## 0.8.2iq — Ships matched to landing platforms
+
+- Calibrate key light, sky/deck fill, exposure, shadow and ship scale for all 17 landing scenes.
+- Reflect the painted room's actual colours on the hull and retain authored paint/metal roughness differences.
+- Add subtle, softly filtered ship reflections on suitable floors, using a small cached target that pauses with the dock view.
+- Lower the hover and fit larger hulls inside the available screen area, including landscape phones.
+- Keep cropped landing pads visible on phones and place concourse actions clear of the settled hull.
+
+## 0.8.2ip — Planet approach and ascent
+
+- Add short, smoothly banked exterior atmosphere-entry and ascent shots around planetary platform landing/takeoff.
+- Use the current hull, paint and equipment, the existing planet surface textures, curved horizons, atmospheric scattering, passing clouds and the shared pixel palette.
+- Give all four planets distinct atmospheric colours. Keep station hangar sequences and already-docked resume behavior unchanged.
+- Reuse the dock renderer, hull and cinematic scenery at bounded resolution/cadence; stop rendering when hidden and preserve progress across visibility/phone-orientation changes. Support skipping, reduced motion, cancellation and failed-launch recovery.
+
+## 0.8.2io — Live concourse ships
+
+- Replace limited landed-ship sprites with current 3D hulls, owned paints and fitted equipment at every port.
+- Match the painted landing platforms with local lighting, pixel palette shading and a real cast shadow on a transparent ground receiver.
+- Add a banked landing approach, gentle idle hover and turning, climbing departure. Reveal concourse actions after landing; respect reduced motion.
+- Reuse one bounded dock renderer, pause it in other menus and flight, and retain the current hull between visits.
+
+## 0.8.2in — Lighter flight display and fitted comms
+
+- Remove the redundant full-screen compositor filter; retain the GPU world palette, cached sprite palette and bounded monitor finish.
+- Prepare and decode converted cockpit/destination images with existing active/predicted asset bundles; release their cache leases when those bundles change.
+- Restore compact Courier instrument and radar typography in flight. Keep menu typography.
+- Replace scrolling flight transmissions with automatically advancing, fitted pages; retain complete messages in the paused log.
+- Skip destruction-geometry preparation for indestructible racing hulls.
+
+## 0.8.2im — Faster pixel rendering
+
+- Replaced the changing full-page SVG finish with GPU world grading, worker-cached sprite conversion and small monitor filters, retaining a shared final colour grade.
+- Preserved cockpit transparency and crisp bitmap instruments; original sprite sources remain untouched and converted images use a bounded cache.
+- Removed the expensive 4x HDR multisampling fallback; supported 2x smoothing remains available.
+
+## 0.8.2il — Unified cockpit and world finish
+
+- Applied the final pixel grid and palette to cockpit sprites, monitors, menus and the world in every quality mode. Low/Auto now simplify dithering instead of bypassing the cockpit finish.
+- Moved distance blur and procedural rock-detail softening out to 20,000–80,000 km, keeping normal flight, combat and field exploration crisp.
+
+## 0.8.2ik — Unified pixel display
+
+- Added a static pixel and colour finish across flight, cockpit art, monitors, menus and touch controls, with locally bundled bitmap typography.
+- Reduced distant shimmer with mip blending, filtered procedural detail, multisampled scene edges and a depth-aware distance resolve; nearby geometry remains sharp.
+- Reused bounded render targets, retained adaptive quality, added a lighter Low/Auto display path and removed animated CRT noise. iOS uses the resolve without bloom blur passes.
+
 ## 0.8.2ij — Asteroid sunlight occlusion
 
 - Let large and small asteroid fragments cast and receive sunlight shadows, including across tunnel walls and neighboring chunks. Keep soft ambient fill for navigation.

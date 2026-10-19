@@ -5,541 +5,438 @@ import {applyShipLivery,stationShipFaction} from './shipLivery.js';
 // Coordinates use the Blender station author's frame (Z up, front -Y).
 // Ships remain separate reusable assets, rather than duplicated into station GLBs.
 export const STATION_OCCUPANTS = {
-  "league-yard": {
-    "radius": 90.29042090621726,
+  "helix": {
+    "radius": 84.42890708589043,
     "ships": [
       {
-        "hull": "concord-cruiser",
-        "capital": true,
-        "deck": -3.32,
-        "keel": 14,
+        "hull": "atlas",
         "at": [
-          0,
-          4,
-          0
+          -5,
+          -28.2,
+          -13.5
         ],
         "size": [
-          24,
-          34,
-          82
+          2,
+          1.5,
+          3
         ]
       },
       {
-        "hull": "speedster",
+        "hull": "wayfarer",
         "at": [
-          -34,
-          -72,
-          -7.14
+          5,
+          -28.2,
+          -13.5
         ],
         "size": [
-          5,
-          3,
-          10
+          2,
+          1.5,
+          3
+        ]
+      }
+    ]
+  },
+  "rook": {
+    "radius": 66.17620712925944,
+    "ships": [
+      {
+        "hull": "vanguard",
+        "at": [
+          -4.3,
+          -30.2,
+          -11
+        ],
+        "size": [
+          2,
+          1.5,
+          3
         ]
       },
       {
-        "hull": "astra",
+        "hull": "lancer",
         "at": [
-          34,
-          -72,
-          -7.14
+          4.3,
+          -30.2,
+          -11
         ],
         "size": [
-          5,
-          3,
-          10
+          2,
+          1.5,
+          3
+        ]
+      }
+    ]
+  },
+  "cairn": {
+    "radius": 43.812098785609436,
+    "ships": [
+      {
+        "hull": "prospector",
+        "at": [
+          -9,
+          -23.2,
+          -11
+        ],
+        "size": [
+          2,
+          1.5,
+          3
         ]
       },
       {
-        "hull": "legionary",
+        "hull": "talon",
         "at": [
-          -7,
-          -46,
-          -3.32
+          9,
+          -23.2,
+          -11
         ],
         "size": [
-          10,
-          5,
-          14
-        ],
-        "heading": 0,
-        "berth": true
-      },
-      {
-        "hull": "torsas",
-        "at": [
-          7,
-          -46,
-          -3.32
-        ],
-        "size": [
-          10,
-          5,
-          14
-        ],
-        "heading": 0,
-        "berth": true
+          2,
+          1.5,
+          3
+        ]
       }
     ]
   },
   "argent": {
-    "radius": 94.69084023605122,
+    "radius": 76.72142364228878,
     "ships": [
+      {
+        "hull": "lancer",
+        "at": [
+          -5,
+          -60.2,
+          0
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "atlas",
+        "at": [
+          5,
+          -60.2,
+          0
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      },
       {
         "hull": "concord-frigate",
         "capital": true,
-        "deck": -13,
+        "deck": -19.5,
         "keel": 18,
         "at": [
           0,
           0,
-          -9
+          -15
         ],
         "size": [
           23,
           21,
           76
         ]
-      },
-      {
-        "hull": "lancer",
-        "at": [
-          0,
-          -84,
-          -3.64
-        ],
-        "size": [
-          11,
-          5,
-          13
-        ]
-      }
-    ]
-  },
-  "helix": {
-    "radius": 86.00093022759303,
-    "ships": [
-      {
-        "hull": "atlas",
-        "at": [
-          -5,
-          -63,
-          -15.64
-        ],
-        "size": [
-          8,
-          5,
-          12
-        ]
-      },
-      {
-        "hull": "wayfarer",
-        "at": [
-          6,
-          -61,
-          -15.64
-        ],
-        "size": [
-          8,
-          5,
-          11
-        ]
-      }
-    ]
-  },
-  "rook": {
-    "radius": 76.42587219279665,
-    "ships": [
-      {
-        "hull": "vanguard",
-        "at": [
-          -17,
-          -40,
-          -9.64
-        ],
-        "size": [
-          12,
-          5,
-          12
-        ]
-      },
-      {
-        "hull": "lancer",
-        "at": [
-          17,
-          -40,
-          -9.64
-        ],
-        "size": [
-          11,
-          5,
-          12
-        ]
-      }
-    ]
-  },
-  "cairn": {
-    "radius": 54.88516384531569,
-    "ships": [
-      {
-        "hull": "wayfarer",
-        "at": [
-          -11,
-          -26,
-          -8.49
-        ],
-        "size": [
-          12,
-          6,
-          18
-        ]
-      },
-      {
-        "hull": "prospector",
-        "at": [
-          12,
-          18,
-          -7.14
-        ],
-        "size": [
-          10,
-          5,
-          12
-        ]
-      },
-      {
-        "hull": "talon",
-        "at": [
-          12,
-          -23,
-          -8.49
-        ],
-        "size": [
-          11,
-          5,
-          13
-        ]
-      }
-    ]
-  },
-  "gatehouse-twelve": {
-    "radius": 63.853764118794686,
-    "ships": [
-      {
-        "hull": "atlas",
-        "at": [
-          -19,
-          5,
-          -9.14
-        ],
-        "size": [
-          12,
-          6,
-          15
-        ]
-      },
-      {
-        "hull": "vanguard",
-        "at": [
-          17,
-          14,
-          -9.14
-        ],
-        "size": [
-          10,
-          5,
-          12
-        ]
-      },
-      {
-        "hull": "wayfarer",
-        "at": [
-          0,
-          -26,
-          -9.18
-        ],
-        "size": [
-          10,
-          5,
-          14
-        ]
       }
     ]
   },
   "blackglass": {
-    "radius": 71.43039350964938,
+    "radius": 62.13694553162394,
     "ships": [
       {
-        "hull": "talon",
+        "hull": "demon",
         "at": [
-          -6,
-          -40,
-          -13.49
+          -7,
+          -19.2,
+          -12
         ],
         "size": [
-          12,
-          5,
-          14
+          2,
+          1.5,
+          3
         ]
       },
       {
-        "hull": "wayfarer",
+        "hull": "scrapper",
         "at": [
-          -24,
-          -17,
-          -11.94
+          7,
+          -19.2,
+          -12
         ],
         "size": [
-          8,
-          4,
-          11
-        ]
-      },
-      {
-        "hull": "lancer",
-        "at": [
-          24,
-          -17,
-          -11.94
-        ],
-        "size": [
-          8,
-          4,
-          11
+          2,
+          1.5,
+          3
         ]
       }
     ]
   },
   "cinder": {
-    "radius": 87.15067406643723,
+    "radius": 67.62396025078685,
     "ships": [
       {
         "hull": "atlas",
         "at": [
           -10,
-          -36,
-          -18.49
+          -24.2,
+          -21
         ],
         "size": [
-          14,
-          7,
-          20
+          2,
+          1.5,
+          3
         ]
       },
       {
         "hull": "prospector",
         "at": [
-          23,
-          0,
-          -16.14
+          11,
+          -24.2,
+          -21
         ],
         "size": [
-          9,
-          5,
-          12
+          2,
+          1.5,
+          3
         ]
       }
     ]
   },
   "torchwell": {
-    "radius": 63.324560795950255,
+    "radius": 56.588608523483096,
     "ships": [
       {
         "hull": "prospector",
         "at": [
           -10,
-          -29,
-          -13.49
+          -16.2,
+          -10
         ],
         "size": [
-          12,
-          6,
-          17
+          2,
+          1.5,
+          3
         ]
       },
       {
         "hull": "wayfarer",
         "at": [
-          12,
-          0,
-          -10.64
+          18,
+          -16.2,
+          -10
         ],
         "size": [
-          10,
-          5,
-          10
+          2,
+          1.5,
+          3
         ]
       }
     ]
   },
   "nacre": {
-    "radius": 61.055361155712546,
+    "radius": 69.19421949553792,
     "ships": [
-      {
-        "hull": "lancer",
-        "at": [
-          -7,
-          -43,
-          -5.96
-        ],
-        "size": [
-          11,
-          5,
-          14
-        ]
-      },
       {
         "hull": "talon",
         "at": [
-          12,
-          -43,
-          -5.96
+          -6,
+          -53.2,
+          -12
         ],
         "size": [
-          10,
-          5,
-          12
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "lancer",
+        "at": [
+          6,
+          -53.2,
+          -12
+        ],
+        "size": [
+          2,
+          1.5,
+          3
         ]
       }
     ]
   },
   "shepherd": {
-    "radius": 73.57554812808827,
+    "radius": 73.45663382096357,
     "ships": [
       {
         "hull": "wayfarer",
         "at": [
           -9,
-          -30,
-          -13.49
+          -14.2,
+          -14
         ],
         "size": [
-          12,
-          6,
-          16
+          2,
+          1.5,
+          3
         ]
       },
       {
         "hull": "talon",
         "at": [
-          10,
-          -25,
-          -13.49
+          9,
+          -14.2,
+          -14
         ],
         "size": [
-          10,
-          5,
-          12
+          2,
+          1.5,
+          3
         ]
       }
     ]
   },
   "haven": {
-    "radius": 81.0009876483696,
+    "radius": 53.369191767187296,
     "ships": [
       {
         "hull": "andromeda",
         "at": [
-          -5,
-          -46,
-          -8.14
+          -6,
+          -17.2,
+          -11
         ],
         "size": [
-          8,
-          4,
-          12
+          2,
+          1.5,
+          3
         ]
       },
       {
         "hull": "speedster",
         "at": [
           6,
-          -45,
-          -8.14
+          -17.2,
+          -11
         ],
         "size": [
-          7,
-          4,
-          11
+          2,
+          1.5,
+          3
         ]
-      },
+      }
+    ]
+  },
+  "league-yard": {
+    "radius": 87.61906180075616,
+    "ships": [
       {
-        "hull": "legionary",
+        "hull": "speedster",
         "at": [
-          43,
-          0,
-          7.5
+          -8,
+          -71.2,
+          -14
         ],
         "size": [
-          10,
-          4.5,
-          8
-        ],
-        "heading": 1.5707963267948966,
-        "berth": true
+          2,
+          1.5,
+          3
+        ]
       },
       {
         "hull": "astra",
         "at": [
-          -43,
-          0,
-          7.5
+          8,
+          -71.2,
+          -14
         ],
         "size": [
-          10,
-          4.5,
-          8
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "concord-cruiser",
+        "capital": true,
+        "deck": -14.5,
+        "keel": 14,
+        "at": [
+          0,
+          -2,
+          -11
         ],
-        "heading": -1.5707963267948966,
-        "berth": true
+        "size": [
+          24,
+          34,
+          82
+        ]
       }
     ]
   },
   "cinderfall": {
-    "radius": 75.00106665915709,
+    "radius": 56.65351361979899,
     "ships": [
       {
-        "hull": "torsas",
+        "hull": "prospector",
         "at": [
-          0,
-          -37,
-          -8.14
+          -6,
+          -17.2,
+          -19
         ],
         "size": [
-          9,
-          4,
-          12
+          2,
+          1.5,
+          3
         ]
       },
       {
-        "hull": "astra",
+        "hull": "atlas",
         "at": [
-          -31,
-          -18,
-          -13.5
+          6,
+          -17.2,
+          -19
         ],
         "size": [
-          7,
-          4,
-          9
+          2,
+          1.5,
+          3
+        ]
+      }
+    ]
+  },
+  "gatehouse-twelve": {
+    "radius": 49.874241873349874,
+    "ships": [
+      {
+        "hull": "atlas",
+        "at": [
+          -7,
+          -27.2,
+          -12.5
         ],
-        "heading": 0,
-        "berth": true
+        "size": [
+          2,
+          1.5,
+          3
+        ]
       },
       {
-        "hull": "speedster",
+        "hull": "vanguard",
         "at": [
-          31,
-          -18,
-          -13.5
+          7,
+          -27.2,
+          -12.5
         ],
         "size": [
-          7,
-          4,
-          9
-        ],
-        "heading": 0,
-        "berth": true
+          2,
+          1.5,
+          3
+        ]
       }
     ]
   }

@@ -18,8 +18,8 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1440,hei
   // The docked ship bobs continuously; use a real pointer at its current position.
   const clickShip=async()=>{await ship.waitFor({state:'visible'});const box=await ship.boundingBox();assert.ok(box);const x=box.x+box.width/2,y=box.y+box.height/2;if(device.isMobile)await page.touchscreen.tap(x,y);else await page.mouse.click(x,y);};
   const healthy=async()=>{
-   const state=await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime(),s=document.querySelector('.concourse-hover-ship');return{dock:r.save.player.dockedAt,transition:r.ui.vesperLaunchTransition,launching:!!document.querySelector('.is-launching,.is-departing'),disabled:s.getAttribute('aria-disabled'),tab:s.getAttribute('tabindex'),hidden:document.querySelector('.scene-pointers')?.getAttribute('aria-hidden'),inert:document.querySelector('#dock-screen').inert};});
-   assert.equal(state.dock,'helix');assert.ok(!state.transition&&!state.launching&&!state.disabled&&!state.hidden&&!state.inert);assert.equal(state.tab,'0');
+   const state=await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime(),s=document.querySelector('.concourse-hover-ship');return{dock:r.save.player.dockedAt,transition:r.ui.vesperLaunchTransition,launching:!!document.querySelector('.is-launching,.is-departing'),disabled:s.disabled,tab:s.tabIndex,hidden:document.querySelector('.scene-pointers')?.inert,inert:document.querySelector('#dock-screen').inert};});
+   assert.equal(state.dock,'helix');assert.ok(!state.transition&&!state.launching&&!state.disabled&&!state.hidden&&!state.inert);assert.equal(state.tab,0);
    assert.ok(await page.locator('[data-dock-hotspot="bar"]').isVisible());
   };
   for(let i=0;i<2;i++){
@@ -42,7 +42,7 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1440,hei
   await page.evaluate(()=>{__VOID_PRIVATEER__.getRuntime().ui.actions.launch=async()=>{throw Error('Expected departure failure');};});await clickShip();
   await page.locator('#story-panel').waitFor({state:'visible'});assert.match(await page.locator('#story-panel p').innerText(),/Start nicht möglich/);await close.click();await healthy();
   // Cancelling must detach animation callbacks, so a stale animation cannot launch later.
-  await page.evaluate(()=>{const u=__VOID_PRIVATEER__.getRuntime().ui;window.departureCalls=0;u.actions.launch=()=>{window.departureCalls++;return false;};u.startVesperLaunchTransition();u.cancelVesperLaunchTransition();document.querySelector('.concourse-hover-ship-flight').dispatchEvent(new AnimationEvent('animationend',{animationName:'vesper-launch-ship'}));});
+  await page.evaluate(()=>{const u=__VOID_PRIVATEER__.getRuntime().ui;window.departureCalls=0;u.actions.launch=()=>{window.departureCalls++;return false;};u.startVesperLaunchTransition();u.cancelVesperLaunchTransition();u.concourseShip.finishAnimation(true);});
   assert.equal(await page.evaluate(()=>window.departureCalls),0);await healthy();
   await page.evaluate(()=>{__VOID_PRIVATEER__.getRuntime().ui.actions.launch=window.realDeparture;});await clickShip();
   await page.waitForFunction(()=>!__VOID_PRIVATEER__.getRuntime().save.player.dockedAt&&!__VOID_PRIVATEER__.getRuntime().launchPreparing);

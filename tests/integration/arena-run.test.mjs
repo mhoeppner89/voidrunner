@@ -371,7 +371,7 @@ test('preparation screens render in both languages and every wave briefing is tr
  // The own-ship plaque names the crew and the order, and hides with no wing
  // left. It lives in the monitor markup, so the stand-in root resolves it by
  // selector rather than receiving a freshly created node.
- const railRoot=uiRoot(),railUi=Object.create(GameUI.prototype);railUi.root=railRoot;railUi.actions={};
+ const railRoot=uiRoot(),railUi=Object.create(GameUI.prototype);railUi.root=railRoot;railUi.actions={};railUi.scheduleCommsFit=()=>{};
  const previousDocument=globalThis.document;globalThis.document=railRoot;
  try{
   railUi.setWingTactics([{index:0,order:'formation',name:'Vetra Skeld',hull:120,maxHull:120,shield:40,maxShield:80}],1);

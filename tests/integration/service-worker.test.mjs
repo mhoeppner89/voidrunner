@@ -44,9 +44,9 @@ test('a cached HTML error under an art URL is bypassed and repaired online',asyn
  assert.equal(await(await w.fetch(url,'no-cors')).text(),'network asset');assert.equal(w.requests.length,1,'valid artwork remains cached');
 });
 
-test('install saves the opening room, portraits and landed hull rather than only JavaScript',async()=>{
+test('install saves the opening room, portraits and the opening 3D hull rather than only JavaScript',async()=>{
  const w=workerFixture();w.online(true);await w.event('install');w.online(false);
- for(const path of ['./art/locations/simplified/helix-hd-v1.webp','./art/locations/simplified/bar-helix-hd-v1.webp','./art/locations/simplified/market-helix-hd-v1.webp','./art/portraits/simplified/mara-vek-hd-v2.webp','./art/portraits/simplified/rin-vek-hd-v1.webp','./assets/remaster/landed-flat/wayfarer.webp']){
+ for(const path of ['./art/locations/simplified/helix-hd-v1.webp','./art/locations/simplified/bar-helix-hd-v1.webp','./art/locations/simplified/market-helix-hd-v1.webp','./art/portraits/simplified/mara-vek-hd-v2.webp','./art/portraits/simplified/rin-vek-hd-v1.webp','./assets/models/ships/wayfarer.glb']){
   await access(new URL('../../'+path.slice(2),import.meta.url));assert.equal(await(await w.fetch(path,'no-cors')).text(),'network asset',path);
  }
 });

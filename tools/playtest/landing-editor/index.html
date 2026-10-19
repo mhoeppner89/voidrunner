@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Voidrunner · Landeplatz-Editor</title>
+  <link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="./editor.css">
+</head>
+<body>
+  <header class="toolbar">
+    <div class="brand"><span>VOIDRUNNER</span><strong>Landeplätze</strong></div>
+    <div class="toolbar-actions"><button id="import" disabled>Import</button><button id="export" class="primary" disabled>JSON exportieren ↓</button><button id="toggle" aria-expanded="true" aria-label="Einstellungen ein-/ausblenden">⚙</button></div>
+  </header>
+  <main>
+    <section class="workspace" aria-label="Vorschau">
+      <div class="view-tools"><div class="segmented" role="group" aria-label="Bildschirmformat"><button data-device="desktop" class="active">Desktop</button><button data-device="phone">Smartphone</button></div><button id="menus" aria-pressed="true">Menüs</button><span id="frame-size">1440 × 900</span></div>
+      <div class="viewport"><div class="frame"><iframe src="./preview.html" title="Aktueller Landeplatz" tabindex="-1"></iframe><div class="drag-surface" aria-label="Schiff und Schaltflächen verschieben"></div></div><div id="loading" role="status">Landeplätze werden geladen …</div></div>
+      <footer><span>Ziehen: verschieben · Pfeiltasten: fein justieren</span><span id="status" role="status"></span></footer>
+    </section>
+    <aside aria-label="Einstellungen">
+      <div class="port-heading"><span id="port-count">ORT — / 17</span><div><button id="previous" aria-label="Vorheriger Ort" disabled>←</button><button id="next" aria-label="Nächster Ort" disabled>→</button></div></div>
+      <label>Ort<select id="port" disabled></select></label>
+      <div class="preview-pickers"><label>Schiff<select id="hull" disabled></select></label><label>Lackierung<select id="paint" disabled></select></label></div>
+      <div class="divider"></div>
+      <fieldset disabled id="controls"><legend>Position · <span id="view-name">Desktop</span></legend>
+        <label class="element-picker">Element<select id="element"><option value="ship">Schiff</option></select></label>
+        <div class="position-inputs">
+          <label>X <div class="value"><input id="position-x" type="number" min="0" max="100" step="0.1" aria-label="Position X"><span>%</span></div></label>
+          <label>Y <div class="value"><input id="position-y" type="number" min="0" max="100" step="0.1" aria-label="Position Y"><span>%</span></div></label>
+        </div>
+        <label class="control scale" id="size-control"><span>Größe</span><div class="value"><input id="size-number" type="number" min="20" max="150" step="1" value="100" aria-label="Anzeigegröße in Prozent"><span>%</span></div><input id="size-range" type="range" min="20" max="150" step="1" value="100" aria-label="Anzeigegröße"></label>
+        <div class="control-actions"><button id="undo" disabled>Rückgängig</button><button id="reset">Ansicht zurücksetzen</button></div>
+      </fieldset>
+      <p class="scope">🔒 Winkel fixiert · Desktop und Smartphone separat</p><p class="saved" id="saved">Automatisch lokal gespeichert</p>
+    </aside>
+  </main>
+  <input type="file" id="file" accept="application/json,.json" hidden>
+  <script type="module" src="./editor.js"></script>
+</body>
+</html>

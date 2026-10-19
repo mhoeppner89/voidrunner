@@ -14,7 +14,7 @@ import {canonicalFaction,preferredNpcHull,FACTION_NAMES} from './factions.js';
 import {CRUISER_MOUNTS} from './cruiserModelData.js';
 import {CRUISER_GUN,equipCruiser,updateCruiserAttack,updateCruiserBatteries,damageCruiserMount,segmentCruiserMountHit,segmentCruiserHullHit,cruiserMountPosition,cruiserSubsystemLabel,cruiserSubsystemExplosionScale} from './cruiserCombat.js';
 import { prepareLocalPursuit, updateLocalPursuit, driveRecoveryRemaining, PLAYER_RADAR_RANGE, PIRATE_ARRIVAL_MIN } from './combatTravel.js';
-import { beginPlayerDocking, landingCaptureReady, LANDING_CAPTURE_SPEED, nearestPlayerBerth, playerBerth, playerBerths, setPlayerBerthResolver, preparePlayerLaunch, stepPlayerDocking } from './playerDocking.js';
+import { nearestPlayerBerth, playerBerth, playerBerths, setPlayerBerthResolver, preparePlayerLaunch, stepPlayerDocking } from './playerDocking.js';
 import {fittedPlayerBerths,fitSessionPlayerBerths} from './shipLanding.js';
 setPlayerBerthResolver(fitSessionPlayerBerths);
 import { stationApproach, reserveStationDock, stationVisualSurfaceRadius, stationSurfaceDistance } from './stationTraffic.js';
@@ -11577,69 +11577,23 @@ export class GameSession {
         this.stationLandingNoticeId = undefined;
         this.stationLandingNoticeGranted = undefined;
     }
+    stationTransitData(id) {
+        const extents=this.playerHullExtents(),height=extents[1];
+        const berths=fittedPlayerBerths(id,playerShipVariant(this.save.player.shipId),this.renderer?.stationColliders?.get(id));
+        const berth=berths.find(b=>b.padIndex===(this.save.player.stationPadIndex??0))??berths[0]??playerBerth(id,height);
+        return {berth,height,extents};
+    }
     updateStationLandingGuidance() {
-        const player = this.save.player;
-        if (this.arena || player.dockedAt || this.deathTimer > 0 || this.playerDocking) {
-            this.clearStationLandingGuidance();
-            return;
-        }
-        const id = player.currentTargetId;
-        const location = LOCATIONS[id];
-        if (!location || location.kind !== 'station' || location.systemId !== player.systemId) {
-            this.clearStationLandingGuidance();
-            return;
-        }
-        const p = player.position;
-        const surfaceDistance = stationSurfaceDistance(id,p);
-        // Reveal every authored pad at 400 km. Grant clearance automatically
-        // in the final 200 km; the pilot may still approach a different pad.
-        if (surfaceDistance > STATION_LANDING_BEACON_RANGE) {
-            this.clearStationLandingGuidance();
-            return;
-        }
-        const height = this.playerHullExtents()[1];
-        const landingCollider=this.renderer?.stationColliders?.get(id);
-        if (this.stationLandingBeaconId !== id || !this.stationLandingBerths?.length
-            ||this.stationLandingCollider!==landingCollider||this.stationLandingHull!==player.shipId) {
-            this.stationLandingBerths = fittedPlayerBerths(id,playerShipVariant(player.shipId),landingCollider);
-            this.stationLandingCollider=landingCollider;this.stationLandingHull=player.shipId;
-            this.stationLandingBerth = nearestPlayerBerth(id, p, height, this.stationLandingBerths);
-            if (!this.stationLandingBerth) {
-                this.clearStationLandingGuidance();
-                return;
-            }
-            this.stationLandingBeaconId = id;
-        }
-        else {
-            const nearest = nearestPlayerBerth(id,p,height,this.stationLandingBerths);
-            const pad = this.stationLandingBerth.pad;
-            const currentDistance = Math.hypot(p[0]-pad[0],p[1]-pad[1],p[2]-pad[2]);
-            const nearestDistance = Math.hypot(p[0]-nearest.pad[0],p[1]-nearest.pad[1],p[2]-nearest.pad[2]);
-            // Small hysteresis keeps adjacent beacons from flickering while
-            // allowing the marked berth to follow a deliberate pad change.
-            if (currentDistance > nearestDistance + 10) this.stationLandingBerth = nearest;
-        }
-        const permitted = !(player.transponder === false && this.darkDockPolicy(id) === 'deny');
-        if (surfaceDistance <= STATION_LANDING_CLEARANCE_RANGE) {
-            const noticeChanged = this.stationLandingNoticeId !== id
-                || this.stationLandingNoticeGranted !== permitted;
-            if (noticeChanged) {
-                const message = permitted
-                    ? t('LANDING PERMITTED · {location} · FOLLOW LIGHTS', { location: location.shortName })
-                    : t('DOCKING DENIED · TRANSPONDER REQUIRED');
-                this.ui.showToast(message, permitted ? 'success' : 'warning', 3600);
-                this.stationLandingNoticeId = id;
-                this.stationLandingNoticeGranted = permitted;
-            }
-            this.stationLandingClearanceId = id;
-            this.stationLandingClearanceGranted = permitted;
-            this.stationLandingGuideId = permitted ? id : undefined;
-        }
-        else {
-            this.stationLandingClearanceId = undefined;
-            this.stationLandingClearanceGranted = undefined;
-            this.stationLandingGuideId = undefined;
-        }
+        const player=this.save.player,id=player.currentTargetId,location=LOCATIONS[id];
+        if(this.arena||player.dockedAt||this.deathTimer>0||this.playerDocking||!location||location.kind!=='station'||location.systemId!==player.systemId||stationSurfaceDistance(id,player.position)>STATION_LANDING_BEACON_RANGE){this.clearStationLandingGuidance();return;}
+        this.stationLandingBeaconId=id;
+        const close=stationSurfaceDistance(id,player.position)<=STATION_LANDING_CLEARANCE_RANGE;
+        this.stationLandingClearanceId=close?id:undefined;
+        this.stationLandingClearanceGranted=close&&!(player.transponder===false&&this.darkDockPolicy(id)==='deny');
+        // The film handles the final route. Do not display manual pad/runway
+        // guidance over the cockpit or require a particular berth approach.
+        this.stationLandingGuideId=undefined;
+        this.renderer.setLandingGuide?.(null);
     }
     // Returns cached effective ship stats. Equipment and shipId only change
     // at dock, so the cache is valid for the entire flight. Replaces ~10
@@ -11684,18 +11638,14 @@ export class GameSession {
             return;
         const station = LOCATIONS[candidate]?.kind === 'station';
         if (station && (this.stationLandingClearanceId !== candidate
-            || !this.stationLandingClearanceGranted
-            || this.stationLandingGuideId !== candidate
-            || !this.stationLandingBerth))
+            || !this.stationLandingClearanceGranted))
             return;
         // A dark ship lands like anyone else — the syndicate collects its fee
         // as a starting card on the concourse (pay or launch back out), so the
         // approach itself is never blocked.
         const velocity = this.save.player.velocity;
         const speed = Math.hypot(velocity[0], velocity[1], velocity[2]);
-        if (speed > (station ? LANDING_CAPTURE_SPEED : AUTO_DOCK_SPEED))
-            return;
-        if (station && !landingCaptureReady(this.save.player.position, velocity, this.stationLandingBerth))
+        if (speed > AUTO_DOCK_SPEED)
             return;
 
         if (this.save.player.transponder === false && this.darkDockPolicy(candidate) === 'deny') {
@@ -12832,7 +12782,7 @@ export class GameSession {
         // Auto-docking retries on later live steps while the fleet flies home.
         // Its bounded recall clock handles drones that cannot reach the bay.
         if (this.save.player.droneFleet?.controller?.phase === 'recalling' || this.hasDeployedPdcDrones()) return;
-        if (!landed && !this.save.player.dockedAt && beginPlayerDocking(this,locationId)) return;
+        if(LOCATIONS[locationId].kind==='station'){const berth=this.stationTransitData(locationId).berth;if(berth)this.save.player.stationPadIndex=berth.padIndex??0;}
         this.renderer?.clearDrones?.();
         this.autopilot = false;
         this.afterburning = false;
@@ -12862,11 +12812,11 @@ export class GameSession {
         this.renderer.setCockpitVisible(false);
         this.renderer.setUtilityBeam(false, this.save.player.mode, this.save.player.position);
         this.audio.setStationMode(true);
-        this.audio.play('dock');
         this.ui.hideHud();
         recordMarketVisit(this.save.world, locationId);
-        this.ui.showDock(this.save, locationId);
-        this.showTutorialDockBriefing();
+        this.ui.showDock(this.save, locationId, {arrival:true});
+        if(this.ui.afterDockArrival)this.ui.afterDockArrival(()=>{if(this.save.player.dockedAt===locationId)this.showTutorialDockBriefing();});
+        else this.showTutorialDockBriefing();
         this.persistSave();
     }
     async prepareDockedFlightRuntime({ showLoading = true } = {}) {
@@ -12935,14 +12885,14 @@ export class GameSession {
             const launchBerth = preparePlayerLaunch(this, locationId);
             if (launchBerth) {
                 launchBerth.id = locationId;
-                this.departureClearance = launchBerth;
+                this.departureClearance = undefined;
             }
             else {
                 this.departureClearance = undefined;
                 const center = vec(location.position);
                 const launchDistance = (location.dockRadius ?? location.radius * 1.7) + 8;
-                // Planet launches retain their existing clear radial start; station
-                // launches begin at the authored player pad with engines at idle.
+                // Planet launches retain their existing clear radial start;
+                // station launches have already cleared the exterior gate.
                 const obstacleRadius = location.kind === 'planet' ? location.radius + 60 : location.radius * 0.73;
                 const others = this.currentNavLocationIds().filter((id) => id !== locationId);
                 let direction = center.clone().normalize();
@@ -13943,21 +13893,7 @@ export class GameSession {
         this.renderer.setHyperdriveFx(fxState.fx, fxState.progress);
         this.renderer.raceSpeedIntensity=this.activeRace?.state==='running'?clamp((speed/Math.max(1,stats.maxSpeed)-.8)/.9,0,1):0;
         this.renderer.updateCamera(this.save.player.position, this.save.player.prevPosition, this.save.player.rotation, this.save.player.prevRotation, this.save.player.angularVelocity, clamp(speed / Math.max(1, stats.afterburnSpeed), 0, 2), this.afterburning || (this.autopilot && speed > stats.afterburnSpeed), dt, alpha);
-        const departureGuide = this.departureClearance;
-        const landingGuideId = departureGuide?.id ?? this.stationLandingBeaconId;
-        const landingGuideMode = departureGuide ? 'departure'
-            : this.stationLandingGuideId === this.stationLandingBeaconId && this.stationLandingGuideId
-                ? 'landing'
-                : 'beacon';
-        this.renderer.setLandingGuide?.(
-            landingGuideId,
-            this.save.player.position,
-            departureGuide?.height ?? this.stationLandingBerth?.height ?? 2,
-            speed <= LANDING_CAPTURE_SPEED,
-            landingGuideMode,
-            departureGuide ?? this.stationLandingBerth,
-            departureGuide ? undefined : this.stationLandingBerths,
-        );
+        this.renderer.setLandingGuide?.(null);
         this.renderer.setDamageWarning(1 - this.save.player.hull / stats.hull, this.save.settings.reducedDamageEffects);
         this.renderer.syncShips(this.ships, alpha);
         this.renderer.syncProjectiles(this.projectiles, this.projStore, alpha);
@@ -14218,7 +14154,7 @@ export class GameSession {
         else if (dockTargeted && LOCATIONS[dock].kind === 'station'
             && this.stationLandingClearanceId === dock
             && this.stationLandingClearanceGranted
-            && speed > LANDING_CAPTURE_SPEED) {
+            && speed > AUTO_DOCK_SPEED) {
             dockPrompt = t('SLOW TO LAND');
         }
         let raceVector;

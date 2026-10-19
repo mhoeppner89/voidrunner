@@ -7,7 +7,7 @@ registerHooks({ resolve(specifier, context, next) {
 const { buildGlbScene } = await import('../../src/game/glbLoader.js');
 const THREE = await import('../../vendor/three.module.min.js');
 
-function fixture({ stride = 12, offset = 4, indexType = 5123, texture, clearcoat, occlusion } = {}) {
+function fixture({ stride = 12, offset = 4, indexType = 5123, texture, clearcoat, occlusion, colors, overlay } = {}) {
     const bin = new Uint8Array(128), view = new DataView(bin.buffer);
     const positions = [1.5, -2, 3, 4, 5.25, -6, 7, 8, 9];
     for (let i = 0; i < 3; i++) for (let k = 0; k < 3; k++)
@@ -25,6 +25,13 @@ function fixture({ stride = 12, offset = 4, indexType = 5123, texture, clearcoat
         meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1, material: 0 }] }],
         nodes: [{ mesh: 0, translation: [10, 20, 30] }], scenes: [{ nodes: [0] }], scene: 0,
     };
+    if (overlay) json.materials[0].extras = {voidSurfaceOverlay:true};
+    if (colors) {
+        bin.set([255,128,0,64,192,255,255,255,255],112);
+        json.bufferViews.push({buffer:0,byteOffset:112,byteLength:9});
+        json.accessors.push({bufferView:2,componentType:5121,normalized:true,count:3,type:'VEC3'});
+        json.meshes[0].primitives[0].attributes.COLOR_0=2;
+    }
     if (clearcoat !== undefined) {
         json.extensionsUsed = ['KHR_materials_clearcoat'];
         json.materials[0].extensions = { KHR_materials_clearcoat: clearcoat };
@@ -109,4 +116,11 @@ for (const [name, occlusion, strength] of [['default', {}, 1], ['authored streng
  assert.ok(material.aoMap);assert.equal(material.aoMapIntensity,strength);assert.equal(material.aoMap.colorSpace,THREE.NoColorSpace);assert.equal(material.aoMap.channel,0);assert.equal(material.map.colorSpace,THREE.SRGBColorSpace);assert.equal(material.aoMap.image,material.map.image);assert.notEqual(material.aoMap,material.map);
  material.aoMap.dispose();material.map.dispose();material.dispose();root.children[0].children[0].geometry.dispose();
  }finally{globalThis.createImageBitmap=previous;}
+});
+
+test('GLB contact shading decodes normalized byte colours without changing hull paint',async()=>{
+ const root=await buildGlbScene(fixture({colors:true,overlay:true}).buffer),mesh=root.children[0].children[0],color=mesh.geometry.attributes.color;
+ assert.equal(mesh.material.vertexColors,true);assert.equal(color.array.constructor,Uint8Array);assert.equal(color.normalized,true);assert.ok(Math.abs(color.getY(0)-128/255)<1e-8);assert.equal(color.getZ(0),0);assert.equal(color.getX(2),1);
+ assert.ok(mesh.material.polygonOffset);assert.equal(mesh.material.polygonOffsetUnits,-2);assert.equal(mesh.material.depthWrite,true);
+ mesh.geometry.dispose();mesh.material.dispose();
 });

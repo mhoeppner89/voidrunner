@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v481-0-8-2ij-asteroid-shadows';
+const CACHE = 'voidrunner-v508-0-8-2ji-station-films';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -19,6 +19,17 @@ const CORE_ASSETS = [
   './manifest.webmanifest',
   './src/style.css',
   './src/main.js',
+  './src/game/retroDisplay.js',
+  './src/game/pixelResolve.js',
+  './src/game/concourseShip.js',
+  './src/game/concourseReflection.js',
+  './src/game/concourseDeck.js',
+  './src/game/concourseLayouts.js',
+  './src/game/concourseFinish.js',
+  './src/game/planetTransit.js',
+  './src/game/stationTransit.js',
+  './src/game/transitAudio.js',
+  './assets/fonts/void-vga.ttf',
   './vendor/three.module.min.js',
   './vendor/three.core.min.js',
   './src/game/adventureDialogues.js',
@@ -158,7 +169,7 @@ const CORE_ASSETS = [
   './art/locations/simplified/market-helix-hd-v1.webp',
   './art/portraits/simplified/mara-vek-hd-v2.webp',
   './art/portraits/simplified/rin-vek-hd-v1.webp',
-  './assets/remaster/landed-flat/wayfarer.webp',
+  './assets/models/ships/wayfarer.glb',
 ];
 
 // Cache core files independently. A transient failure for one request must

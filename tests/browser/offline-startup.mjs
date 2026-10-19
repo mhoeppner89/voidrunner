@@ -35,7 +35,10 @@ for(const [name,engine,device] of profiles){
   await page.goto(`${origin.url}/game.html`);await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.newGame);
   await page.waitForFunction(()=>navigator.serviceWorker.controller);
   await page.reload();await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.newGame);
-  await page.locator('[data-ui-command="new"]').click();await page.locator('[data-ui-command="confirm-new-career"]').click();await page.locator('[data-ui-command="close-story"]').click();
+  await page.locator('[data-ui-command="new"]').click();await page.locator('[data-ui-command="confirm-new-career"]').click();
+  // The opening card is shown only after the flight scene is prepared. A cold
+  // proxied/software-rendered startup can exceed the normal click timeout.
+  await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime()?.flightPrepared&&document.querySelector('#loading-screen')?.classList.contains('is-hidden'),null,{timeout:120000});
   await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.getRuntime()?.save.player.dockedAt==='helix');
   const imagesReady=async()=>{
    await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime()?.flightPrepared&&document.querySelector('#loading-screen')?.classList.contains('is-hidden'));
@@ -43,12 +46,22 @@ for(const [name,engine,device] of profiles){
    // decoders settle before deliberately unloading the document: otherwise
    // WebKit reports aborted blob images as access-control page errors.
    await page.evaluate(async()=>{const renderer=__VOID_PRIVATEER__.getRuntime().renderer;await Promise.allSettled([...renderer.glbShipLoading.values(),...(renderer.stationModelLoads?.values()??[])]);});
-   await page.waitForFunction(()=>{const imgs=[...document.querySelectorAll('#dock-screen img')].filter(i=>i.getClientRects().length);return imgs.length>=3&&imgs.every(i=>i.complete&&i.naturalWidth>0);});
-   return page.evaluate(()=>[...document.querySelectorAll('#dock-screen img')].filter(i=>i.getClientRects().length).map(i=>({src:i.getAttribute('src'),width:i.naturalWidth,height:i.naturalHeight})));
+   // The old tutorial banner's portrait now lives in the Story card. Check
+   // the real card, decoded background and live 3D hull.
+   if(!await page.locator('#story-panel').isVisible())await page.locator('[data-ui-command="story"]').click();
+   const portrait=page.locator('#story-panel img');await portrait.evaluate(async image=>{await image.decode();if(!image.naturalWidth)throw Error('Story portrait did not decode');});
+   await page.locator('[data-ui-command="close-story"]').click();
+   await page.waitForFunction(()=>{const i=document.querySelector('#dock-screen .dock-backdrop img'),ship=__VOID_PRIVATEER__.getRuntime()?.ui.concourseShip;return i?.complete&&i.naturalWidth>0&&document.querySelector('.concourse-model-stage.has-model')&&ship?.model&&!__VOID_PRIVATEER__.getRuntime().ui.concourseArrivalPending;});
+   assert.ok(await page.evaluate(()=>{const ship=__VOID_PRIVATEER__.getRuntime().ui.concourseShip;let textures=0;ship.model.traverse(o=>{if(o.material?.map?.image?.width>0)textures++;});return textures>0&&ship.renderCount>0;}),'Docked GLB and embedded textures render online and offline');
+   await page.evaluate(()=>document.fonts.ready);
+   const warmed=await page.evaluate(async()=>{const ui=__VOID_PRIVATEER__.getRuntime().ui,urls=[...ui.warmImageSlots.get('flight-core')];await Promise.all(urls.map(url=>ui.warmImageRecords.get(url).promise));return urls.map(url=>{const r=ui.warmImageRecords.get(url);return{ready:r.ready,original:r.image.src===new URL(url,document.baseURI).href,src:r.image.src};});});
+   assert.ok(warmed.every(image=>image.ready&&image.original),'Original flight sprites must decode before launch: '+JSON.stringify(warmed));
+   assert.ok(await page.evaluate(()=>[...document.fonts].some(f=>f.family==='Void VGA'&&f.status==='loaded')),'Bundled bitmap font must load online and offline');
+   return page.evaluate(()=>[...document.querySelectorAll('#dock-screen img')].filter(i=>i.getClientRects().length).map(i=>({src:i.dataset.retroSource??i.getAttribute('src'),width:i.naturalWidth,height:i.naturalHeight})));
   };
   const online=await imagesReady();await page.screenshot({path:`${out}/${name}-online-helix.png`});
   const chapterCount=await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().tutorialSummary().chapterCount);assert.equal(chapterCount,6);
-  await page.waitForFunction(async name=>{if(!(await caches.keys()).includes(name))return false;const c=await caches.open(name);return(await Promise.all(['art/locations/simplified/helix-hd-v1.webp','art/portraits/simplified/rin-vek-hd-v1.webp','assets/remaster/landed-flat/wayfarer.webp'].map(p=>c.match(new URL(p,document.baseURI))))).every(Boolean);},currentCache);
+  await page.waitForFunction(async name=>{if(!(await caches.keys()).includes(name))return false;const c=await caches.open(name);return(await Promise.all(['art/locations/simplified/helix-hd-v1.webp','art/portraits/simplified/rin-vek-hd-v1.webp','assets/models/ships/wayfarer.glb','assets/fonts/void-vga.ttf','src/game/retroDisplay.js','src/game/pixelResolve.js'].map(p=>c.match(new URL(p,document.baseURI))))).every(Boolean);},currentCache);
   // Cache a real report, then prove an unvisited report is not the game.
   phase='report navigation';await page.goto(`${origin.url}/${out}/report-fixture.html`);await page.locator('h1').filter({hasText:'Cached QA report'}).waitFor();
   await page.waitForFunction(async name=>Boolean(await(await caches.open(name)).match(location.href)),currentCache);

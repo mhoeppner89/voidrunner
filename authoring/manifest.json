@@ -169,6 +169,110 @@
       "source": "authoring/models/combat-drone/combat-drone.blend",
       "sourceSha256": "6511487aa259c8e1c5b547265bbcc5fb54596db15b9b85cd2719e7aab3d5943d",
       "previousSource": "docs/ship-revisions/20261002/combat-drone/combat-drone.blend"
+    },
+    {
+      "id": "station-helix",
+      "kind": "station",
+      "runtime": "assets/models/stations/helix.glb",
+      "runtimeSha256": "4d3eb162e041429aaa2512ba9814ca0a9fac2c03b290741733f896f0a58c5c38",
+      "source": "authoring/models/stations/helix/helix.blend",
+      "sourceSha256": "ac94eba1628d4a428f4fcc2e303c7412efe6ec2693c8c325479a03fb61a77b75"
+    },
+    {
+      "id": "station-rook",
+      "kind": "station",
+      "runtime": "assets/models/stations/rook.glb",
+      "runtimeSha256": "3c0efe999d23483a34518352aa405b17637d7d3a4b2497faa30770b8d3649bfc",
+      "source": "authoring/models/stations/rook/rook.blend",
+      "sourceSha256": "7cfd9d8dc2962397a6c64923ec1ce1d78f4a3510eef4cb9cd945a38e814a656f"
+    },
+    {
+      "id": "station-cairn",
+      "kind": "station",
+      "runtime": "assets/models/stations/cairn.glb",
+      "runtimeSha256": "d8c481b0a3c4c43de2a03ceede338af26bca3a54994c40a93c382ca157893434",
+      "source": "authoring/models/stations/cairn/cairn.blend",
+      "sourceSha256": "4bc7127b1ce59006ec9ea2b5f8bf1e88b66a6916e6f613fb1847625a281422cd"
+    },
+    {
+      "id": "station-argent",
+      "kind": "station",
+      "runtime": "assets/models/stations/argent.glb",
+      "runtimeSha256": "c1b961fdbbe2025fef5a85a5183348f4c1559e91b1a345ae68bd6688c9d92da5",
+      "source": "authoring/models/stations/argent/argent.blend",
+      "sourceSha256": "a2c3ee4b7b95c55f7cc6093c432754bcc53e540087f3661f83033e33d949717e"
+    },
+    {
+      "id": "station-blackglass",
+      "kind": "station",
+      "runtime": "assets/models/stations/blackglass.glb",
+      "runtimeSha256": "05b1460d739a7c63d1583be1c72cf79b70f82760ac65adc0c2c7934276372ca9",
+      "source": "authoring/models/stations/blackglass/blackglass.blend",
+      "sourceSha256": "9af90b9228196e11ef014b7cd9b67ec0fb17e0839b4d20f0c482d18bcd2c7ff1"
+    },
+    {
+      "id": "station-cinder",
+      "kind": "station",
+      "runtime": "assets/models/stations/cinder.glb",
+      "runtimeSha256": "f9a55dcdd2dc381e4ad89798c472ec8b8ead4add2465eb06ed233d34e1f84a82",
+      "source": "authoring/models/stations/cinder/cinder.blend",
+      "sourceSha256": "f89f53fc1441643e0f5043781173b42e76cdb045f015ae665c674bf57f2b6d54"
+    },
+    {
+      "id": "station-torchwell",
+      "kind": "station",
+      "runtime": "assets/models/stations/torchwell.glb",
+      "runtimeSha256": "92d3b1b045c0e478f6dba2de54cdc28f6fa69969553692797ab02d91050f98a6",
+      "source": "authoring/models/stations/torchwell/torchwell.blend",
+      "sourceSha256": "af81d3a19941be6e5a5c1973b2fb9bbcfd118c305cee4bc4d8bfa6cecf4358ef"
+    },
+    {
+      "id": "station-nacre",
+      "kind": "station",
+      "runtime": "assets/models/stations/nacre.glb",
+      "runtimeSha256": "3a902d56d8d7877133f8804bdfb1c3bde7c5f064fa575da88ffe32c9b8726eb7",
+      "source": "authoring/models/stations/nacre/nacre.blend",
+      "sourceSha256": "6a3702e128e15d40d86366422a75606bbe771745cb680940f3bca82c196596a8"
+    },
+    {
+      "id": "station-shepherd",
+      "kind": "station",
+      "runtime": "assets/models/stations/shepherd.glb",
+      "runtimeSha256": "aa041a81398d55d7369b85ef895d5ba96b87f5ac08636e3086bc4950384d193e",
+      "source": "authoring/models/stations/shepherd/shepherd.blend",
+      "sourceSha256": "4982d2c4749d85c6e1f6e89eb6e07f2581fa91050508c56c45a4a370f002e84e"
+    },
+    {
+      "id": "station-haven",
+      "kind": "station",
+      "runtime": "assets/models/stations/haven.glb",
+      "runtimeSha256": "6015c2fed8a90ac0a2b3d7d729b1b3e18ee9e2d58131ad08dba92c1540098742",
+      "source": "authoring/models/stations/haven/haven.blend",
+      "sourceSha256": "a90dd77a3b104ba64176b7f83454c70d5e26facce9dfdc8eb73dfad3aae83695"
+    },
+    {
+      "id": "station-league-yard",
+      "kind": "station",
+      "runtime": "assets/models/stations/league-yard.glb",
+      "runtimeSha256": "808bdb4773b4aa5676d7cd50500743cc9aaf6a30c89de5ced1de738e62f40851",
+      "source": "authoring/models/stations/league-yard/league-yard.blend",
+      "sourceSha256": "7df1ee0f1ce4699f6ad5779ad6ebf16daf2d1f57a996b5b19077f068a8a24bf4"
+    },
+    {
+      "id": "station-cinderfall",
+      "kind": "station",
+      "runtime": "assets/models/stations/cinderfall.glb",
+      "runtimeSha256": "eaaa747f2d0fa4fba2edc7c53903993d880583f2d6b9de8a13052a7e03716c9b",
+      "source": "authoring/models/stations/cinderfall/cinderfall.blend",
+      "sourceSha256": "af66aaa3909c7e30fcebcc5bc31beaa5e9f094f5c2d605d549a5282a22d8404b"
+    },
+    {
+      "id": "station-gatehouse-twelve",
+      "kind": "station",
+      "runtime": "assets/models/stations/gatehouse-twelve.glb",
+      "runtimeSha256": "aeeaf715f03c5a895ad043dc7e68a620f8a5add767570f129982731f0d4ee04b",
+      "source": "authoring/models/stations/gatehouse-twelve/gatehouse-twelve.blend",
+      "sourceSha256": "b86c0379c578b5308150bf379961dcce670248655166357ba514cbcfea2d6698"
     }
   ],
   "extraSources": [

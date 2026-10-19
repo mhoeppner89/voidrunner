@@ -12,3 +12,7 @@ Three.js is copyright its contributors and licensed under the MIT License. The v
 Project source: https://github.com/mrdoob/three.js
 
 All game-specific code, procedural geometry, interface art, names, dialogue, and synthesized audio in this artifact were created for this vertical slice. No proprietary Wing Commander: Privateer assets are included.
+
+## Void VGA bitmap font
+
+Derived from Daniel Hepper’s public-domain font8x8 collection (Marcel Sondaar / IBM VGA sources): https://github.com/dhepper/font8x8. Original bitmap headers, font generator and license are included under tools/assets/font8x8 and assets/fonts/LICENSE-font8x8.txt.

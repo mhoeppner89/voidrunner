@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import {
     LANDING_CAPTURE_SPEED,
@@ -15,6 +16,8 @@ import { LOCATIONS, hyperdriveArrivalRadius } from '../../src/game/data.js';
 import { STATION_DOCKS } from '../../src/game/stationDocks.js';
 import { stationVisualSurfaceRadius } from '../../src/game/stationTraffic.js';
 import { GameSession } from '../../src/game/game.js';
+
+const stationReports = JSON.parse(readFileSync(new URL('../fixtures/station-models.json', import.meta.url)));
 
 function fixture(id) {
     const location = LOCATIONS[id];
@@ -34,10 +37,11 @@ function fixture(id) {
 }
 
 for (const id of Object.keys(STATION_DOCKS)) {
-    test(`${id}: landing capture requires the marked berth and launch starts idle at the pad`, () => {
+    test(`${id}: legacy capture respects the berth and cinematic launch returns control outside the station`, () => {
         const session = fixture(id);
         const berths = playerBerths(id, 6);
-        assert.ok(berths.length >= 2, 'station has several player landing spots');
+        assert.equal(berths.length, 1, 'station has one private player berth');
+        assert.equal(STATION_DOCKS[id].lanes.length, 2, 'NPCs retain separate traffic lanes');
         for (const candidate of berths)
             assert.equal(nearestPlayerBerth(id, candidate.pad, 6).padIndex, candidate.padIndex);
         const berth = berths.at(-1);
@@ -61,13 +65,14 @@ for (const id of Object.keys(STATION_DOCKS)) {
 
         const launchBerth = preparePlayerLaunch(session, id);
         assert.ok(launchBerth);
-        assert.deepEqual(session.save.player.position, launchBerth.pad);
-        assert.deepEqual(session.save.player.velocity, [0, 0, 0]);
+        const beyond=new THREE.Vector3(...session.save.player.position).sub(new THREE.Vector3(...launchBerth.gate));
+        assert.ok(beyond.length()>=59.999,'control resumes beyond the outer gate');
+        assert.ok(Math.abs(Math.hypot(...session.save.player.velocity)-6)<1e-9);
         assert.deepEqual(session.save.player.angularVelocity, [0, 0, 0]);
-        assert.equal(session.save.player.throttle, 0);
+        assert.equal(session.save.player.throttle, .18);
         const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion().fromArray(session.save.player.rotation));
         const gateDirection = new THREE.Vector3(...launchBerth.gate).sub(new THREE.Vector3(...launchBerth.pad)).normalize();
-        assert.ok(forward.distanceTo(gateDirection) < 1e-5, 'launch faces the approach gate');
+        assert.ok(forward.distanceTo(gateDirection) < 1e-5, 'launch faces away from the station');assert.ok(beyond.dot(forward)>59.99);
         assert.equal(session.autopilot, false);
         assert.equal(session.afterburning, false);
     });
@@ -128,32 +133,40 @@ test('Helix landing gates enter through the authored hangar mouth', () => {
     const location = LOCATIONS.helix;
     const spec = STATION_DOCKS.helix;
     const scale = stationVisualSurfaceRadius('helix') / spec.radius;
-    const hangar = { width: 27, depth: 25, centerY: -59, centerZ: -10, height: 13 };
-    const floorTop = hangar.centerZ - hangar.height / 2 + 0.85;
-    const roofBottom = hangar.centerZ + hangar.height / 2 - 1;
+    const report = stationReports.helix;
+    const hangar = report.concourse.hall;
+    const floorTop = report.concourse.touchdowns[0][2];
+    const roofBottom = floorTop + report.portalHeight;
     const halfShipHeight = 6 / scale;
 
     assert.equal(stationVisualSurfaceRadius('helix'), location.radius * 0.95);
     for (const berth of playerBerths('helix', 6)) {
-        const padSpec = spec.playerPads[berth.padIndex];
-        const [, , , , length] = padSpec;
         const toModel = (point) => [
             (point[0] - location.position[0]) / scale,
-            -(point[2] - location.position[2]) / scale + length * 0.28,
+            -(point[2] - location.position[2]) / scale,
             (point[1] - location.position[1]) / scale,
         ];
         const pad = toModel(berth.pad);
         const gate = toModel(berth.gate);
-        const mouthY = hangar.centerY - hangar.depth / 2;
-        const physicalPadY = -(berth.pad[2] - location.position[2]) / scale;
-        assert.ok(physicalPadY > mouthY && physicalPadY < hangar.centerY + hangar.depth / 2,
+        const mouthY = hangar.front;
+        assert.ok(pad[1] > mouthY && pad[1] < hangar.back && Math.abs(pad[0]) < hangar.width / 2,
             `${berth.label} touchdown is inside the actual hangar floor bounds`);
         const t = (mouthY - gate[1]) / (pad[1] - gate[1]);
         const crossing = gate.map((value, axis) => value + (pad[axis] - value) * t);
 
         assert.ok(t > 0 && t < 1, `${berth.label} route crosses the hangar entrance`);
-        assert.ok(Math.abs(crossing[0]) < hangar.width / 2 - 1, `${berth.label} fits between the hangar jambs`);
+        assert.ok(Math.abs(crossing[0]) < report.portalWidth / 2 - 1, `${berth.label} fits between the hangar jambs`);
         assert.ok(crossing[2] - halfShipHeight >= floorTop - 1e-6, `${berth.label} clears the hangar floor`);
         assert.ok(crossing[2] + halfShipHeight <= roofBottom + 1e-6, `${berth.label} clears the hangar roof`);
     }
+});
+
+test('station approach starts the film near the outer hull, without requiring a manual pad landing',()=>{
+ const s=Object.create(GameSession.prototype),id='helix',l=LOCATIONS[id];let docked=0;
+ Object.assign(s,{save:{player:{position:[l.position[0],l.position[1],l.position[2]+stationVisualSurfaceRadius(id)+150],velocity:[0,0,7],currentTargetId:id,systemId:l.systemId,transponder:true}},renderer:{setLandingGuide(){}},currentDockLocationIds:()=>[id],activeInstanceId:id,dockAt:()=>docked++});
+ s.updateStationLandingGuidance();assert.equal(s.stationLandingClearanceGranted,true);s.autoDockCheck();assert.equal(docked,1);
+ s.save.player.velocity[2]=9;s.autoDockCheck();assert.equal(docked,1,'fast flybys do not dock');s.save.player.velocity[2]=0;s.save.player.currentTargetId=undefined;s.autoDockCheck();assert.equal(docked,1,'requires a deliberate station lock');
+ s.save.player.currentTargetId=id;s.save.player.transponder=false;s.darkDockPolicy=()=> 'deny';s.updateStationLandingGuidance();assert.equal(s.stationLandingClearanceGranted,false);s.autoDockCheck();assert.equal(docked,1,'restricted stations still require a transponder');
+ s.darkDockPolicy=()=> 'syndicate';s.updateStationLandingGuidance();s.autoDockCheck();assert.equal(docked,2,'syndicate payment is handled after docking');
+ s.save.player.raceReturn={};s.autoDockCheck();assert.equal(docked,2,'a race never initiates station docking');
 });

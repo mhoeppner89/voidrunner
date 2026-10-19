@@ -14,6 +14,7 @@ import {EQUIPMENT_NAMING} from './equipmentNaming.js';
 // Player address is informal "du" throughout, matching the frontier voice of
 // the English lines. Values are plain text — never HTML.
 export const DE_CATALOG = {
+    'Skip cinematic':'Zwischensequenz überspringen',
     'R-class loaner': 'Rennklasse R',
     'Choose a race hull': 'Rennschiff wählen',
     'COAST': 'GLEITEN',
@@ -1418,6 +1419,11 @@ export const DE_CATALOG = {
     'Unidentified vessel escaped inspection. Local patrols are alert.': 'Schiff ohne Kennung entkam der Kontrolle. Örtliche Patrouillen sind alarmiert.',
     'PATROL HAIL · TRANSMIT ID · SLOW BELOW {speed}': 'PATROUILLENRUF · ID SENDEN · UNTER {speed} ABBREMSEN',
     'INSPECTION COMPLETE · MANIFEST CLEAR': "KONTROLLE ABGESCHLOSSEN · FRACHT UNBEDENKLICH",
+    'Approach to 200 km from the station.': 'Nähere dich der Station auf 200 km.',
+    'Set thrust to zero. Docking control will take you in.': 'Setze den Schub auf null. Die Dockkontrolle übernimmt den Anflug.',
+    'Return to Helix and dock.': 'Kehre nach Helix zurück und docke an.',
+    'Switch your transponder ON, select Helix and slow down near the station.': 'Schalte den Transponder EIN, wähle Helix und bremse nahe der Station ab.',
+    'Fly to Helix, dock and take the black box to the bar.': 'Flieg nach Helix, docke an und bring die Blackbox in die Bar.',
     'LANDING PERMITTED · {location} · FOLLOW LIGHTS': 'LANDUNG FREI · {location} · DEN LICHTERN FOLGEN',
     'DOCKING DENIED · TRANSPONDER REQUIRED': 'ANDOCKEN VERWEIGERT · TRANSPONDER NÖTIG',
     'TRANSMIT ID TO DOCK': "ZUM ANDOCKEN KENNUNG SENDEN",

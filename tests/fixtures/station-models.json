@@ -1,0 +1,2037 @@
+{
+  "helix": {
+    "id": "helix",
+    "sourceRadius": 84.42890708589043,
+    "triangles": 34618,
+    "materials": 10,
+    "bytes": 2449724,
+    "sourceParts": 1515,
+    "detachedGroups": [],
+    "description": "Commercial refinery freeport with deep multilevel arrival atrium, central lift, inhabited galleries and connected freight pier.",
+    "windowSupport": {
+      "supportedFaces": 3644,
+      "discardedFaces": 4,
+      "facadeFaces": [
+        1078,
+        1078,
+        792,
+        696
+      ],
+      "maxStandOff": 0.075
+    },
+    "surfaceCleanup": {
+      "coplanarSubtractions": 515,
+      "overlapAreaRemoved": 365.6738,
+      "tolerance": 0.0001
+    },
+    "contactOcclusion": {
+      "samples": 6,
+      "radius": 2.4,
+      "minimum": 0.58,
+      "vertices": 103854
+    },
+    "packing": {
+      "verticesBefore": 103854,
+      "verticesAfter": 63138,
+      "positionPrecision": 0.00001
+    },
+    "portalWidth": 14,
+    "portalHeight": 9,
+    "playerPads": [
+      [
+        0,
+        -24.04,
+        -13.5,
+        4,
+        7
+      ]
+    ],
+    "lanes": [
+      [
+        -5,
+        -30.04,
+        -13.5,
+        4,
+        7
+      ],
+      [
+        5,
+        -30.04,
+        -13.5,
+        4,
+        7
+      ]
+    ],
+    "occupants": [
+      {
+        "hull": "atlas",
+        "at": [
+          -5,
+          -28.2,
+          -13.5
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "wayfarer",
+        "at": [
+          5,
+          -28.2,
+          -13.5
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      }
+    ],
+    "cinematic": {
+      "entrySide": 0.1,
+      "exitSide": 0.08,
+      "elevation": 0.1,
+      "lift": 0.06
+    },
+    "views": {
+      "terminal": {
+        "point": [
+          0,
+          -11.5,
+          26
+        ],
+        "distance": 37,
+        "yaw": 0.35,
+        "pitch": 0.22
+      },
+      "concourse": {
+        "position": [
+          -8,
+          -35,
+          -9
+        ],
+        "target": [
+          2,
+          -20,
+          -11
+        ]
+      }
+    },
+    "concourse": {
+      "kind": "interior",
+      "reference": "art/locations/simplified/helix-hd-v1.webp",
+      "description": "Cylindrical multilevel atrium, central lift tower and broad side portal.",
+      "touchdowns": [
+        [
+          0,
+          -26,
+          -13.5
+        ],
+        [
+          -5,
+          -32,
+          -13.5
+        ],
+        [
+          5,
+          -32,
+          -13.5
+        ]
+      ],
+      "roofOverPlayer": true,
+      "hall": {
+        "width": 24,
+        "front": -43,
+        "back": -7,
+        "height": 15
+      }
+    },
+    "crewDoorHeight": 0.56,
+    "crewDoorWidth": 0.3,
+    "detailParts": 711,
+    "physicalDetachedGroups": [],
+    "physicalContactTolerance": 0.05
+  },
+  "rook": {
+    "id": "rook",
+    "sourceRadius": 66.17620712925944,
+    "triangles": 22814,
+    "materials": 10,
+    "bytes": 1700956,
+    "sourceParts": 1229,
+    "detachedGroups": [],
+    "description": "Octagonal fortress, four connected cannon bastions, armored barracks and deep shared military landing hall.",
+    "windowSupport": {
+      "supportedFaces": 5166,
+      "discardedFaces": 4,
+      "facadeFaces": [
+        1458,
+        1458,
+        1224,
+        1026
+      ],
+      "maxStandOff": 0.075
+    },
+    "surfaceCleanup": {
+      "coplanarSubtractions": 582,
+      "overlapAreaRemoved": 81.0088,
+      "tolerance": 0.0001
+    },
+    "contactOcclusion": {
+      "samples": 6,
+      "radius": 2.4,
+      "minimum": 0.58,
+      "vertices": 68442
+    },
+    "packing": {
+      "verticesBefore": 68442,
+      "verticesAfter": 43772,
+      "positionPrecision": 0.00001
+    },
+    "portalWidth": 13,
+    "portalHeight": 19,
+    "playerPads": [
+      [
+        0,
+        -25.04,
+        -11,
+        4,
+        7
+      ]
+    ],
+    "lanes": [
+      [
+        -4.3,
+        -32.04,
+        -11,
+        4,
+        7
+      ],
+      [
+        4.3,
+        -32.04,
+        -11,
+        4,
+        7
+      ]
+    ],
+    "occupants": [
+      {
+        "hull": "vanguard",
+        "at": [
+          -4.3,
+          -30.2,
+          -11
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "lancer",
+        "at": [
+          4.3,
+          -30.2,
+          -11
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      }
+    ],
+    "cinematic": {
+      "entrySide": 0.1,
+      "exitSide": 0.08,
+      "elevation": 0.1,
+      "lift": 0.06
+    },
+    "views": {
+      "terminal": {
+        "point": [
+          0,
+          -9,
+          27
+        ],
+        "distance": 37,
+        "yaw": 0.35,
+        "pitch": 0.22
+      },
+      "concourse": {
+        "position": [
+          -6,
+          -39,
+          -6
+        ],
+        "target": [
+          3,
+          -27,
+          -8
+        ]
+      }
+    },
+    "concourse": {
+      "kind": "interior",
+      "reference": "art/locations/simplified/rook-hd-v1.webp",
+      "description": "Tall military landing hall with a vertical entrance and flanking galleries.",
+      "touchdowns": [
+        [
+          0,
+          -27,
+          -11
+        ],
+        [
+          -4.3,
+          -34,
+          -11
+        ],
+        [
+          4.3,
+          -34,
+          -11
+        ]
+      ],
+      "roofOverPlayer": true,
+      "hall": {
+        "width": 19,
+        "front": -43,
+        "back": -16,
+        "height": 19
+      }
+    },
+    "crewDoorHeight": 0.56,
+    "crewDoorWidth": 0.3,
+    "detailParts": 577,
+    "physicalDetachedGroups": [],
+    "physicalContactTolerance": 0.05
+  },
+  "cairn": {
+    "id": "cairn",
+    "sourceRadius": 43.812098785609436,
+    "triangles": 17779,
+    "materials": 9,
+    "bytes": 1277876,
+    "sourceParts": 414,
+    "detachedGroups": [],
+    "description": "Open salvage yard with a tensioned gantry hoist, machine shops, reclaimed engines and a sheltered working landing apron.",
+    "windowSupport": {
+      "supportedFaces": 3589,
+      "discardedFaces": 31,
+      "facadeFaces": [
+        1043,
+        1034,
+        756,
+        756
+      ],
+      "maxStandOff": 0.075
+    },
+    "surfaceCleanup": {
+      "coplanarSubtractions": 469,
+      "overlapAreaRemoved": 79.6457,
+      "tolerance": 0.0001
+    },
+    "contactOcclusion": {
+      "samples": 6,
+      "radius": 2.4,
+      "minimum": 0.581,
+      "vertices": 53337
+    },
+    "packing": {
+      "verticesBefore": 53337,
+      "verticesAfter": 32583,
+      "positionPrecision": 0.00001
+    },
+    "portalWidth": 24,
+    "portalHeight": 16,
+    "playerPads": [
+      [
+        0,
+        -15.04,
+        -11,
+        4,
+        7
+      ]
+    ],
+    "lanes": [
+      [
+        -9,
+        -25.04,
+        -11,
+        4,
+        7
+      ],
+      [
+        9,
+        -25.04,
+        -11,
+        4,
+        7
+      ]
+    ],
+    "occupants": [
+      {
+        "hull": "prospector",
+        "at": [
+          -9,
+          -23.2,
+          -11
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "talon",
+        "at": [
+          9,
+          -23.2,
+          -11
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      }
+    ],
+    "cinematic": {
+      "entrySide": 0.1,
+      "exitSide": 0.08,
+      "elevation": 0.1,
+      "lift": 0.06
+    },
+    "views": {
+      "terminal": {
+        "point": [
+          0,
+          -9,
+          17
+        ],
+        "distance": 37,
+        "yaw": 0.35,
+        "pitch": 0.22
+      },
+      "concourse": {
+        "position": [
+          -9,
+          -29,
+          -4
+        ],
+        "target": [
+          2,
+          -9,
+          -10
+        ]
+      }
+    },
+    "concourse": {
+      "kind": "sheltered",
+      "reference": "art/locations/simplified/concourse-cairn-hd-v2.webp",
+      "description": "Working salvage apron beneath a cantilevered workshop roof.",
+      "touchdowns": [
+        [
+          0,
+          -17,
+          -11
+        ],
+        [
+          -9,
+          -27,
+          -11
+        ],
+        [
+          9,
+          -27,
+          -11
+        ]
+      ],
+      "roofOverPlayer": true,
+      "hall": {
+        "width": 30,
+        "front": -28,
+        "back": -4,
+        "height": 16
+      }
+    },
+    "crewDoorHeight": 0.56,
+    "crewDoorWidth": 0.3,
+    "detailParts": 49,
+    "physicalDetachedGroups": [],
+    "physicalContactTolerance": 0.05
+  },
+  "argent": {
+    "id": "argent",
+    "sourceRadius": 76.72142364228878,
+    "triangles": 21110,
+    "materials": 9,
+    "bytes": 1584084,
+    "sourceParts": 727,
+    "detachedGroups": [],
+    "description": "Orbital assembly torus around a working frigate drydock; ring workstations and supported assembly arms.",
+    "windowSupport": {
+      "supportedFaces": 5284,
+      "discardedFaces": 0,
+      "facadeFaces": [
+        1298,
+        1298,
+        1340,
+        1348
+      ],
+      "maxStandOff": 0.075
+    },
+    "surfaceCleanup": {
+      "coplanarSubtractions": 251,
+      "overlapAreaRemoved": 239.068,
+      "tolerance": 0.0001
+    },
+    "contactOcclusion": {
+      "samples": 6,
+      "radius": 2.4,
+      "minimum": 0.58,
+      "vertices": 63330
+    },
+    "packing": {
+      "verticesBefore": 63330,
+      "verticesAfter": 40760,
+      "positionPrecision": 0.00001
+    },
+    "portalWidth": 17,
+    "portalHeight": 8,
+    "playerPads": [
+      [
+        0,
+        -55.04,
+        0,
+        4,
+        7
+      ]
+    ],
+    "lanes": [
+      [
+        -5,
+        -62.04,
+        0,
+        4,
+        7
+      ],
+      [
+        5,
+        -62.04,
+        0,
+        4,
+        7
+      ]
+    ],
+    "occupants": [
+      {
+        "hull": "lancer",
+        "at": [
+          -5,
+          -60.2,
+          0
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "atlas",
+        "at": [
+          5,
+          -60.2,
+          0
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "concord-frigate",
+        "capital": true,
+        "deck": -19.5,
+        "keel": 18,
+        "at": [
+          0,
+          0,
+          -15
+        ],
+        "size": [
+          23,
+          21,
+          76
+        ]
+      }
+    ],
+    "cinematic": {
+      "entrySide": 0.1,
+      "exitSide": 0.08,
+      "elevation": 0.1,
+      "lift": 0.06
+    },
+    "views": {
+      "terminal": {
+        "point": [
+          0,
+          2,
+          57
+        ],
+        "distance": 37,
+        "yaw": 0.35,
+        "pitch": 0.22
+      },
+      "concourse": {
+        "position": [
+          -6,
+          -68,
+          3
+        ],
+        "target": [
+          3,
+          -50,
+          3
+        ]
+      }
+    },
+    "concourse": {
+      "kind": "sheltered",
+      "reference": "art/locations/simplified/concourse-argent-hd-v2.webp",
+      "description": "Open-sided landing terrace integrated into the construction torus.",
+      "touchdowns": [
+        [
+          0,
+          -57,
+          0
+        ],
+        [
+          -5,
+          -64,
+          0
+        ],
+        [
+          5,
+          -64,
+          0
+        ]
+      ],
+      "roofOverPlayer": true,
+      "hall": {
+        "width": 18,
+        "front": -70,
+        "back": -48,
+        "height": 8.5
+      }
+    },
+    "crewDoorHeight": 0.56,
+    "crewDoorWidth": 0.3,
+    "detailParts": 86,
+    "physicalDetachedGroups": [],
+    "physicalContactTolerance": 0.05
+  },
+  "blackglass": {
+    "id": "blackglass",
+    "sourceRadius": 62.13694553162394,
+    "triangles": 8341,
+    "materials": 10,
+    "bytes": 633748,
+    "sourceParts": 577,
+    "detachedGroups": [],
+    "description": "Open moon-cliff terrace below two deeply excavated warm tavern galleries, with rock anchors and cantilevered foundations.",
+    "windowSupport": {
+      "supportedFaces": 640,
+      "discardedFaces": 0,
+      "facadeFaces": [
+        48,
+        48,
+        352,
+        192
+      ],
+      "maxStandOff": 0.075
+    },
+    "surfaceCleanup": {
+      "coplanarSubtractions": 201,
+      "overlapAreaRemoved": 35.0393,
+      "tolerance": 0.0001
+    },
+    "contactOcclusion": {
+      "samples": 6,
+      "radius": 2.4,
+      "minimum": 0.58,
+      "vertices": 25023
+    },
+    "packing": {
+      "verticesBefore": 25023,
+      "verticesAfter": 15766,
+      "positionPrecision": 0.00001
+    },
+    "portalWidth": 30,
+    "portalHeight": 0,
+    "playerPads": [
+      [
+        0,
+        -13.04,
+        -12,
+        4,
+        7
+      ]
+    ],
+    "lanes": [
+      [
+        -7,
+        -21.04,
+        -12,
+        4,
+        7
+      ],
+      [
+        7,
+        -21.04,
+        -12,
+        4,
+        7
+      ]
+    ],
+    "occupants": [
+      {
+        "hull": "demon",
+        "at": [
+          -7,
+          -19.2,
+          -12
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "scrapper",
+        "at": [
+          7,
+          -19.2,
+          -12
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      }
+    ],
+    "cinematic": {
+      "entrySide": 0.1,
+      "exitSide": 0.08,
+      "elevation": 0.1,
+      "lift": 0.06
+    },
+    "views": {
+      "terminal": {
+        "point": [
+          0,
+          -10,
+          15
+        ],
+        "distance": 37,
+        "yaw": 0.35,
+        "pitch": 0.22
+      },
+      "concourse": {
+        "position": [
+          -29,
+          -60,
+          10
+        ],
+        "target": [
+          1,
+          -2,
+          8
+        ]
+      }
+    },
+    "concourse": {
+      "kind": "exterior",
+      "reference": "art/locations/simplified/concourse-blackglass-hd-v2.webp",
+      "description": "Open cliff platform beneath two warm cave galleries.",
+      "touchdowns": [
+        [
+          0,
+          -15,
+          -12
+        ],
+        [
+          -7,
+          -23,
+          -12
+        ],
+        [
+          7,
+          -23,
+          -12
+        ]
+      ],
+      "roofOverPlayer": false,
+      "hall": null
+    },
+    "crewDoorHeight": 0.56,
+    "crewDoorWidth": 0.3,
+    "detailParts": 132,
+    "physicalDetachedGroups": [],
+    "physicalContactTolerance": 0.05
+  },
+  "cinder": {
+    "id": "cinder",
+    "sourceRadius": 67.62396025078685,
+    "triangles": 16134,
+    "materials": 10,
+    "bytes": 1146420,
+    "sourceParts": 309,
+    "detachedGroups": [],
+    "description": "Tall connected ore-fractionation towers with pipe bridges, sorting house, cooling wings and freight berths.",
+    "windowSupport": {
+      "supportedFaces": 3146,
+      "discardedFaces": 14,
+      "facadeFaces": [
+        848,
+        848,
+        718,
+        732
+      ],
+      "maxStandOff": 0.075
+    },
+    "surfaceCleanup": {
+      "coplanarSubtractions": 644,
+      "overlapAreaRemoved": 62.6567,
+      "tolerance": 0.0001
+    },
+    "contactOcclusion": {
+      "samples": 6,
+      "radius": 2.4,
+      "minimum": 0.581,
+      "vertices": 48402
+    },
+    "packing": {
+      "verticesBefore": 48402,
+      "verticesAfter": 29076,
+      "positionPrecision": 0.00001
+    },
+    "portalWidth": 19,
+    "portalHeight": 10,
+    "playerPads": [
+      [
+        0,
+        -21.04,
+        -21,
+        4,
+        7
+      ]
+    ],
+    "lanes": [
+      [
+        -10,
+        -26.04,
+        -21,
+        4,
+        7
+      ],
+      [
+        11,
+        -26.04,
+        -21,
+        4,
+        7
+      ]
+    ],
+    "occupants": [
+      {
+        "hull": "atlas",
+        "at": [
+          -10,
+          -24.2,
+          -21
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "prospector",
+        "at": [
+          11,
+          -24.2,
+          -21
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      }
+    ],
+    "cinematic": {
+      "entrySide": 0.1,
+      "exitSide": 0.08,
+      "elevation": 0.1,
+      "lift": 0.06
+    },
+    "views": {
+      "terminal": {
+        "point": [
+          0,
+          -19,
+          23
+        ],
+        "distance": 37,
+        "yaw": 0.35,
+        "pitch": 0.22
+      },
+      "concourse": {
+        "position": [
+          -18,
+          -38,
+          -8
+        ],
+        "target": [
+          5,
+          -12,
+          -15
+        ]
+      }
+    },
+    "concourse": {
+      "kind": "exterior",
+      "reference": "art/locations/simplified/concourse-cinder-hd-v2.webp",
+      "description": "Refinery forecourt, processing plant behind it and a framed side opening.",
+      "touchdowns": [
+        [
+          0,
+          -23,
+          -21
+        ],
+        [
+          -10,
+          -28,
+          -21
+        ],
+        [
+          11,
+          -28,
+          -21
+        ]
+      ],
+      "roofOverPlayer": false,
+      "hall": null
+    },
+    "crewDoorHeight": 0.56,
+    "crewDoorWidth": 0.3,
+    "detailParts": 44,
+    "physicalDetachedGroups": [],
+    "physicalContactTolerance": 0.05
+  },
+  "torchwell": {
+    "id": "torchwell",
+    "sourceRadius": 56.588608523483096,
+    "triangles": 10129,
+    "materials": 10,
+    "bytes": 722204,
+    "sourceParts": 248,
+    "detachedGroups": [],
+    "description": "Exposed refueling apron, a rear triad of reservoirs and low service house, matching the open frontier concourse.",
+    "windowSupport": {
+      "supportedFaces": 864,
+      "discardedFaces": 0,
+      "facadeFaces": [
+        192,
+        192,
+        240,
+        240
+      ],
+      "maxStandOff": 0.075
+    },
+    "surfaceCleanup": {
+      "coplanarSubtractions": 315,
+      "overlapAreaRemoved": 1365.1865,
+      "tolerance": 0.0001
+    },
+    "contactOcclusion": {
+      "samples": 6,
+      "radius": 2.4,
+      "minimum": 0.58,
+      "vertices": 30387
+    },
+    "packing": {
+      "verticesBefore": 30387,
+      "verticesAfter": 17982,
+      "positionPrecision": 0.00001
+    },
+    "portalWidth": 38,
+    "portalHeight": 0,
+    "playerPads": [
+      [
+        3,
+        -10.04,
+        -10,
+        4,
+        7
+      ]
+    ],
+    "lanes": [
+      [
+        -10,
+        -18.04,
+        -10,
+        4,
+        7
+      ],
+      [
+        18,
+        -18.04,
+        -10,
+        4,
+        7
+      ]
+    ],
+    "occupants": [
+      {
+        "hull": "prospector",
+        "at": [
+          -10,
+          -16.2,
+          -10
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "wayfarer",
+        "at": [
+          18,
+          -16.2,
+          -10
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      }
+    ],
+    "cinematic": {
+      "entrySide": 0.1,
+      "exitSide": 0.08,
+      "elevation": 0.1,
+      "lift": 0.06
+    },
+    "views": {
+      "terminal": {
+        "point": [
+          3,
+          -8,
+          12
+        ],
+        "distance": 37,
+        "yaw": 0.35,
+        "pitch": 0.22
+      },
+      "concourse": {
+        "position": [
+          -33,
+          -47,
+          13
+        ],
+        "target": [
+          1,
+          8,
+          -1
+        ]
+      }
+    },
+    "concourse": {
+      "kind": "exterior",
+      "reference": "art/locations/simplified/concourse-torchwell-hd-v2.webp",
+      "description": "Broad exposed fuel apron with reservoirs and service house at the rear.",
+      "touchdowns": [
+        [
+          3,
+          -12,
+          -10
+        ],
+        [
+          -10,
+          -20,
+          -10
+        ],
+        [
+          18,
+          -20,
+          -10
+        ]
+      ],
+      "roofOverPlayer": false,
+      "hall": null
+    },
+    "crewDoorHeight": 0.56,
+    "crewDoorWidth": 0.3,
+    "detailParts": 39,
+    "physicalDetachedGroups": [],
+    "physicalContactTolerance": 0.05
+  },
+  "nacre": {
+    "id": "nacre",
+    "sourceRadius": 69.19421949553792,
+    "triangles": 17390,
+    "materials": 9,
+    "bytes": 1227648,
+    "sourceParts": 240,
+    "detachedGroups": [],
+    "description": "Pearlescent laboratory cluster with pressure vessels, enclosed transfer tunnels, life support and an exposed circular science terrace.",
+    "windowSupport": {
+      "supportedFaces": 2208,
+      "discardedFaces": 0,
+      "facadeFaces": [
+        552,
+        552,
+        552,
+        552
+      ],
+      "maxStandOff": 0.075
+    },
+    "surfaceCleanup": {
+      "coplanarSubtractions": 557,
+      "overlapAreaRemoved": 59.6566,
+      "tolerance": 0.0001
+    },
+    "contactOcclusion": {
+      "samples": 6,
+      "radius": 2.4,
+      "minimum": 0.581,
+      "vertices": 52170
+    },
+    "packing": {
+      "verticesBefore": 52170,
+      "verticesAfter": 31217,
+      "positionPrecision": 0.00001
+    },
+    "portalWidth": 26,
+    "portalHeight": 0,
+    "playerPads": [
+      [
+        0,
+        -55.04,
+        -12,
+        4,
+        7
+      ]
+    ],
+    "lanes": [
+      [
+        -6,
+        -55.04,
+        -12,
+        4,
+        7
+      ],
+      [
+        6,
+        -55.04,
+        -12,
+        4,
+        7
+      ]
+    ],
+    "occupants": [
+      {
+        "hull": "talon",
+        "at": [
+          -6,
+          -53.2,
+          -12
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "lancer",
+        "at": [
+          6,
+          -53.2,
+          -12
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      }
+    ],
+    "cinematic": {
+      "entrySide": 0.1,
+      "exitSide": 0.08,
+      "elevation": 0.1,
+      "lift": 0.06
+    },
+    "views": {
+      "terminal": {
+        "point": [
+          0,
+          -10,
+          57
+        ],
+        "distance": 37,
+        "yaw": 0.35,
+        "pitch": 0.22
+      },
+      "concourse": {
+        "position": [
+          -26,
+          -81,
+          7
+        ],
+        "target": [
+          0,
+          -50,
+          -10
+        ]
+      }
+    },
+    "concourse": {
+      "kind": "exterior",
+      "reference": "art/locations/simplified/concourse-nacre-hd-v2.webp",
+      "description": "Circular exposed terrace directly joined to the white pressure laboratories.",
+      "touchdowns": [
+        [
+          0,
+          -57,
+          -12
+        ],
+        [
+          -6,
+          -57,
+          -12
+        ],
+        [
+          6,
+          -57,
+          -12
+        ]
+      ],
+      "roofOverPlayer": false,
+      "hall": null
+    },
+    "crewDoorHeight": 0.56,
+    "crewDoorWidth": 0.3,
+    "detailParts": 56,
+    "physicalDetachedGroups": [],
+    "physicalContactTolerance": 0.05
+  },
+  "shepherd": {
+    "id": "shepherd",
+    "sourceRadius": 73.45663382096357,
+    "triangles": 12049,
+    "materials": 10,
+    "bytes": 871916,
+    "sourceParts": 224,
+    "detachedGroups": [],
+    "description": "A tall inhabited navigation lighthouse, braced deep-space dish, remote service workshop and open landing aprons.",
+    "windowSupport": {
+      "supportedFaces": 1915,
+      "discardedFaces": 5,
+      "facadeFaces": [
+        590,
+        590,
+        365,
+        370
+      ],
+      "maxStandOff": 0.075
+    },
+    "surfaceCleanup": {
+      "coplanarSubtractions": 222,
+      "overlapAreaRemoved": 16.7333,
+      "tolerance": 0.0001
+    },
+    "contactOcclusion": {
+      "samples": 6,
+      "radius": 2.4,
+      "minimum": 0.581,
+      "vertices": 36147
+    },
+    "packing": {
+      "verticesBefore": 36147,
+      "verticesAfter": 21931,
+      "positionPrecision": 0.00001
+    },
+    "portalWidth": 30,
+    "portalHeight": 0,
+    "playerPads": [
+      [
+        0,
+        -11.04,
+        -14,
+        4,
+        7
+      ]
+    ],
+    "lanes": [
+      [
+        -9,
+        -16.04,
+        -14,
+        4,
+        7
+      ],
+      [
+        9,
+        -16.04,
+        -14,
+        4,
+        7
+      ]
+    ],
+    "occupants": [
+      {
+        "hull": "wayfarer",
+        "at": [
+          -9,
+          -14.2,
+          -14
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "talon",
+        "at": [
+          9,
+          -14.2,
+          -14
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      }
+    ],
+    "cinematic": {
+      "entrySide": 0.1,
+      "exitSide": 0.08,
+      "elevation": 0.1,
+      "lift": 0.06
+    },
+    "views": {
+      "terminal": {
+        "point": [
+          0,
+          -12,
+          13
+        ],
+        "distance": 37,
+        "yaw": 0.35,
+        "pitch": 0.22
+      },
+      "concourse": {
+        "position": [
+          -32,
+          -47,
+          7
+        ],
+        "target": [
+          0,
+          -7,
+          -11
+        ]
+      }
+    },
+    "concourse": {
+      "kind": "exterior",
+      "reference": "art/locations/simplified/concourse-shepherd-hd-v2.webp",
+      "description": "Flat open landing deck beside the relay tower.",
+      "touchdowns": [
+        [
+          0,
+          -13,
+          -14
+        ],
+        [
+          -9,
+          -18,
+          -14
+        ],
+        [
+          9,
+          -18,
+          -14
+        ]
+      ],
+      "roofOverPlayer": false,
+      "hall": null
+    },
+    "crewDoorHeight": 0.56,
+    "crewDoorWidth": 0.3,
+    "detailParts": 33,
+    "physicalDetachedGroups": [],
+    "physicalContactTolerance": 0.05
+  },
+  "haven": {
+    "id": "haven",
+    "sourceRadius": 53.369191767187296,
+    "triangles": 20165,
+    "materials": 10,
+    "bytes": 1424024,
+    "sourceParts": 573,
+    "detachedGroups": [],
+    "description": "Open circular trading courtyard within an inhabited blue-and-gold habitat ring, linked galleries, market awnings and high skybridge.",
+    "windowSupport": {
+      "supportedFaces": 3452,
+      "discardedFaces": 36,
+      "facadeFaces": [
+        850,
+        850,
+        880,
+        872
+      ],
+      "maxStandOff": 0.075
+    },
+    "surfaceCleanup": {
+      "coplanarSubtractions": 321,
+      "overlapAreaRemoved": 54.1243,
+      "tolerance": 0.0001
+    },
+    "contactOcclusion": {
+      "samples": 6,
+      "radius": 2.4,
+      "minimum": 0.58,
+      "vertices": 60495
+    },
+    "packing": {
+      "verticesBefore": 60495,
+      "verticesAfter": 36311,
+      "positionPrecision": 0.00001
+    },
+    "portalWidth": 21.599999999999998,
+    "portalHeight": 25,
+    "playerPads": [
+      [
+        0,
+        -13.04,
+        -11,
+        4,
+        7
+      ]
+    ],
+    "lanes": [
+      [
+        -6,
+        -19.04,
+        -11,
+        4,
+        7
+      ],
+      [
+        6,
+        -19.04,
+        -11,
+        4,
+        7
+      ]
+    ],
+    "occupants": [
+      {
+        "hull": "andromeda",
+        "at": [
+          -6,
+          -17.2,
+          -11
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "speedster",
+        "at": [
+          6,
+          -17.2,
+          -11
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      }
+    ],
+    "cinematic": {
+      "entrySide": 0.1,
+      "exitSide": 0.08,
+      "elevation": 0.1,
+      "lift": 0.06
+    },
+    "views": {
+      "terminal": {
+        "point": [
+          0,
+          -9,
+          15
+        ],
+        "distance": 37,
+        "yaw": 0.35,
+        "pitch": 0.22
+      },
+      "concourse": {
+        "position": [
+          -11,
+          -26,
+          -5
+        ],
+        "target": [
+          4,
+          0,
+          -7
+        ]
+      }
+    },
+    "concourse": {
+      "kind": "courtyard",
+      "reference": "art/locations/simplified/acheron-haven-concourse.webp",
+      "description": "Open circular trading court, blue/gold galleries, awnings and skybridges.",
+      "touchdowns": [
+        [
+          0,
+          -15,
+          -11
+        ],
+        [
+          -6,
+          -21,
+          -11
+        ],
+        [
+          6,
+          -21,
+          -11
+        ]
+      ],
+      "roofOverPlayer": false,
+      "hall": {
+        "width": 58,
+        "front": -36,
+        "back": 29,
+        "height": 25
+      }
+    },
+    "crewDoorHeight": 0.56,
+    "crewDoorWidth": 0.3,
+    "detailParts": 176,
+    "physicalDetachedGroups": [],
+    "physicalContactTolerance": 0.05
+  },
+  "league-yard": {
+    "id": "league-yard",
+    "sourceRadius": 87.61906180075616,
+    "triangles": 26242,
+    "materials": 9,
+    "bytes": 1936156,
+    "sourceParts": 1329,
+    "detachedGroups": [],
+    "description": "Long cruiser drydock with connected crane ribs, service spines, propellant saddles and a directly connected factory landing hall.",
+    "windowSupport": {
+      "supportedFaces": 5920,
+      "discardedFaces": 0,
+      "facadeFaces": [
+        1584,
+        1584,
+        1520,
+        1232
+      ],
+      "maxStandOff": 0.075
+    },
+    "surfaceCleanup": {
+      "coplanarSubtractions": 304,
+      "overlapAreaRemoved": 77.6615,
+      "tolerance": 0.0001
+    },
+    "contactOcclusion": {
+      "samples": 6,
+      "radius": 2.4,
+      "minimum": 0.58,
+      "vertices": 78726
+    },
+    "packing": {
+      "verticesBefore": 78726,
+      "verticesAfter": 49934,
+      "positionPrecision": 0.00001
+    },
+    "portalWidth": 23,
+    "portalHeight": 15,
+    "playerPads": [
+      [
+        0,
+        -65.04,
+        -14,
+        4,
+        7
+      ]
+    ],
+    "lanes": [
+      [
+        -8,
+        -73.04,
+        -14,
+        4,
+        7
+      ],
+      [
+        8,
+        -73.04,
+        -14,
+        4,
+        7
+      ]
+    ],
+    "occupants": [
+      {
+        "hull": "speedster",
+        "at": [
+          -8,
+          -71.2,
+          -14
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "astra",
+        "at": [
+          8,
+          -71.2,
+          -14
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "concord-cruiser",
+        "capital": true,
+        "deck": -14.5,
+        "keel": 14,
+        "at": [
+          0,
+          -2,
+          -11
+        ],
+        "size": [
+          24,
+          34,
+          82
+        ]
+      }
+    ],
+    "cinematic": {
+      "entrySide": 0.1,
+      "exitSide": 0.08,
+      "elevation": 0.1,
+      "lift": 0.06
+    },
+    "views": {
+      "terminal": {
+        "point": [
+          0,
+          -12,
+          67
+        ],
+        "distance": 37,
+        "yaw": 0.35,
+        "pitch": 0.22
+      },
+      "concourse": {
+        "position": [
+          -13,
+          -79,
+          -8
+        ],
+        "target": [
+          3,
+          -67,
+          -12
+        ]
+      }
+    },
+    "concourse": {
+      "kind": "interior",
+      "reference": "art/locations/simplified/acheron-unity-concourse.webp",
+      "description": "Large covered factory hall connected directly to the capital construction yard.",
+      "touchdowns": [
+        [
+          0,
+          -67,
+          -14
+        ],
+        [
+          -8,
+          -75,
+          -14
+        ],
+        [
+          8,
+          -75,
+          -14
+        ]
+      ],
+      "roofOverPlayer": true,
+      "hall": {
+        "width": 34,
+        "front": -84,
+        "back": -54,
+        "height": 22
+      }
+    },
+    "crewDoorHeight": 0.56,
+    "crewDoorWidth": 0.3,
+    "detailParts": 876,
+    "physicalDetachedGroups": [],
+    "physicalContactTolerance": 0.05
+  },
+  "cinderfall": {
+    "id": "cinderfall",
+    "sourceRadius": 56.65351361979899,
+    "triangles": 19586,
+    "materials": 10,
+    "bytes": 1353980,
+    "sourceParts": 381,
+    "detachedGroups": [],
+    "description": "Open industrial court within inhabited pressure galleries, warm process towers, conveyor and exposed ventral heat plant.",
+    "windowSupport": {
+      "supportedFaces": 2666,
+      "discardedFaces": 10,
+      "facadeFaces": [
+        673,
+        673,
+        660,
+        660
+      ],
+      "maxStandOff": 0.075
+    },
+    "surfaceCleanup": {
+      "coplanarSubtractions": 819,
+      "overlapAreaRemoved": 107.3222,
+      "tolerance": 0.0001
+    },
+    "contactOcclusion": {
+      "samples": 6,
+      "radius": 2.4,
+      "minimum": 0.58,
+      "vertices": 58758
+    },
+    "packing": {
+      "verticesBefore": 58758,
+      "verticesAfter": 34405,
+      "positionPrecision": 0.00001
+    },
+    "portalWidth": 18,
+    "portalHeight": 22,
+    "playerPads": [
+      [
+        0,
+        -13.04,
+        -19,
+        4,
+        7
+      ]
+    ],
+    "lanes": [
+      [
+        -6,
+        -19.04,
+        -19,
+        4,
+        7
+      ],
+      [
+        6,
+        -19.04,
+        -19,
+        4,
+        7
+      ]
+    ],
+    "occupants": [
+      {
+        "hull": "prospector",
+        "at": [
+          -6,
+          -17.2,
+          -19
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "atlas",
+        "at": [
+          6,
+          -17.2,
+          -19
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      }
+    ],
+    "cinematic": {
+      "entrySide": 0.1,
+      "exitSide": 0.08,
+      "elevation": 0.1,
+      "lift": 0.06
+    },
+    "views": {
+      "terminal": {
+        "point": [
+          0,
+          -17,
+          15
+        ],
+        "distance": 37,
+        "yaw": 0.35,
+        "pitch": 0.22
+      },
+      "concourse": {
+        "position": [
+          -10,
+          -19,
+          -13
+        ],
+        "target": [
+          4,
+          10,
+          -9
+        ]
+      }
+    },
+    "concourse": {
+      "kind": "courtyard",
+      "reference": "art/locations/simplified/acheron-cinderfall-concourse.webp",
+      "description": "Open industrial court enclosed by habitat walls, conveyors and warm refinery equipment.",
+      "touchdowns": [
+        [
+          0,
+          -15,
+          -19
+        ],
+        [
+          -6,
+          -21,
+          -19
+        ],
+        [
+          6,
+          -21,
+          -19
+        ]
+      ],
+      "roofOverPlayer": false,
+      "hall": {
+        "width": 46,
+        "front": -30,
+        "back": 23,
+        "height": 22
+      }
+    },
+    "crewDoorHeight": 0.56,
+    "crewDoorWidth": 0.3,
+    "detailParts": 175,
+    "physicalDetachedGroups": [],
+    "physicalContactTolerance": 0.05
+  },
+  "gatehouse-twelve": {
+    "id": "gatehouse-twelve",
+    "sourceRadius": 49.874241873349874,
+    "triangles": 14690,
+    "materials": 9,
+    "bytes": 1085044,
+    "sourceParts": 330,
+    "detachedGroups": [],
+    "description": "Customs checkpoint with a full inspection gantry, bonded warehouses, administration and a covered shared inspection deck.",
+    "windowSupport": {
+      "supportedFaces": 3612,
+      "discardedFaces": 24,
+      "facadeFaces": [
+        894,
+        1074,
+        726,
+        918
+      ],
+      "maxStandOff": 0.075
+    },
+    "surfaceCleanup": {
+      "coplanarSubtractions": 438,
+      "overlapAreaRemoved": 465.563,
+      "tolerance": 0.0001
+    },
+    "contactOcclusion": {
+      "samples": 6,
+      "radius": 2.4,
+      "minimum": 0.58,
+      "vertices": 44070
+    },
+    "packing": {
+      "verticesBefore": 44070,
+      "verticesAfter": 27595,
+      "positionPrecision": 0.00001
+    },
+    "portalWidth": 30,
+    "portalHeight": 11,
+    "playerPads": [
+      [
+        0,
+        -21.04,
+        -12.5,
+        4,
+        7
+      ]
+    ],
+    "lanes": [
+      [
+        -7,
+        -29.04,
+        -12.5,
+        4,
+        7
+      ],
+      [
+        7,
+        -29.04,
+        -12.5,
+        4,
+        7
+      ]
+    ],
+    "occupants": [
+      {
+        "hull": "atlas",
+        "at": [
+          -7,
+          -27.2,
+          -12.5
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      },
+      {
+        "hull": "vanguard",
+        "at": [
+          7,
+          -27.2,
+          -12.5
+        ],
+        "size": [
+          2,
+          1.5,
+          3
+        ]
+      }
+    ],
+    "cinematic": {
+      "entrySide": 0.1,
+      "exitSide": 0.08,
+      "elevation": 0.1,
+      "lift": 0.06
+    },
+    "views": {
+      "terminal": {
+        "point": [
+          0,
+          -10.5,
+          23
+        ],
+        "distance": 37,
+        "yaw": 0.35,
+        "pitch": 0.22
+      },
+      "concourse": {
+        "position": [
+          -12,
+          -35,
+          -8
+        ],
+        "target": [
+          6,
+          -14,
+          -6
+        ]
+      }
+    },
+    "concourse": {
+      "kind": "sheltered",
+      "reference": "art/locations/simplified/concourse-gatehouse-twelve-hd-v2.webp",
+      "description": "Covered inspection hall, an open space-facing side and a service tunnel.",
+      "touchdowns": [
+        [
+          0,
+          -23,
+          -12.5
+        ],
+        [
+          -7,
+          -31,
+          -12.5
+        ],
+        [
+          7,
+          -31,
+          -12.5
+        ]
+      ],
+      "roofOverPlayer": true,
+      "hall": {
+        "width": 32,
+        "front": -38,
+        "back": -10,
+        "height": 12
+      }
+    },
+    "crewDoorHeight": 0.56,
+    "crewDoorWidth": 0.3,
+    "detailParts": 31,
+    "physicalDetachedGroups": [],
+    "physicalContactTolerance": 0.05
+  }
+}

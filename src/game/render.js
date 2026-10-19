@@ -1,3 +1,5 @@
+import {createPixelResolveMaterial,createPixelSceneTarget,pixelTargetSamples,bindPixelResolve} from './pixelResolve.js';
+import {pixelRenderSize} from './retroDisplay.js';
 import { createAsteroidTerrain } from './asteroidTerrain.js';
 import {createAsteroidFragmentMaterials, ASTEROID_FINISH_PALETTES,configureAsteroidShadows} from './asteroidMaterials.js';
 import {createLootVisualResources,createLootVisual,setLootVisualRarity,disposeLootVisualResources} from './lootVisuals.js';
@@ -234,6 +236,16 @@ const NPC_FIGHTER_VARIANTS = new Set(['speedster','legionary','andromeda','astra
     'warden',
 ]);
 export const npcShipScaleForVariant = (variant) => NPC_FIGHTER_VARIANTS.has(variant) ? NPC_FIGHTER_SCALE : NPC_CAPITAL_SCALE;
+// One scale contract for parked hulls in flight, the station workshop and films.
+export function stationOccupantScale(id,hull) {
+    if(hull.startsWith('concord-'))return undefined;
+    const variant=({wayfarer:'kestrel',vanguard:'warden',atlas:'atlas-freighter'})[hull]??hull;
+    const config=GLB_SHIP_CONFIG[variant],spec=STATION_OCCUPANTS[id];
+    if(!config||!spec)return undefined;
+    const world=LOCATIONS[id].radius*(id==='blackglass'?.2:.95)/spec.radius;
+    return config.scale*npcShipScaleForVariant(variant)*(config.baseScale??1)/world;
+}
+
 // Race entities carry their own hull variant so the starting grid can show
 // the actual ships that are about to race. Ordinary traffic still only has a
 // role, so retain the role mapping as the fallback for every other ship.
@@ -500,8 +512,8 @@ export class SpaceRenderer {
         this.renderer.domElement.addEventListener('webglcontextlost', this.onContextLost);
         this.renderer.domElement.addEventListener('webglcontextrestored', this.onContextRestored);
         this.resize();
-        // iOS renders the scene directly by default. The bloom targets are
-        // created lazily only if the Azure ring-volume pass needs them.
+        // iOS uses the bounded scene resolve. Desktop retains bloom; phones
+        // do not allocate its blur targets or run those extra passes.
         if (!this.isIOS)
             this.createBloomPipeline();
         // Warm only the player's current hull. Traffic variants load when an
@@ -1010,11 +1022,12 @@ export class SpaceRenderer {
     configurePixelTexture(texture, repeatX = 1, repeatY = 1) {
         texture.colorSpace = THREE.SRGBColorSpace;
         texture.magFilter = THREE.NearestFilter;
-        texture.minFilter = THREE.NearestMipmapNearestFilter;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
         texture.wrapS = THREE.RepeatWrapping;
         texture.wrapT = THREE.RepeatWrapping;
         texture.repeat.set(repeatX, repeatY);
         texture.generateMipmaps = true;
+        texture.anisotropy=Math.min(4,this.renderer?.capabilities?.getMaxAnisotropy?.()??1);
         texture.needsUpdate = true;
         this.pixelTextures.add(texture);
         return texture;
@@ -1553,15 +1566,7 @@ export class SpaceRenderer {
                 model.scale.setScalar(LOCATIONS[id].radius * (id === 'blackglass' ? .2 : .95) / 100);
                 model.position.z = stationModelOffsetZ(id);
                 const collider = buildStationCollider(model, LOCATIONS[id].position);
-                try { await addStationOccupants(model, id, undefined, hull => {
-                    // Parked civilian hulls must match the flying entity beside them.
-                    if (hull.startsWith('concord-')) return undefined;
-                    const variant = ({wayfarer:'kestrel',vanguard:'warden',atlas:'atlas-freighter'})[hull] ?? hull;
-                    const spec = GLB_SHIP_CONFIG[variant];
-                    const radius = STATION_OCCUPANTS[id].radius;
-                    const worldScale = LOCATIONS[id].radius * (id === 'blackglass' ? .2 : .95) / radius;
-                    return spec.scale * npcShipScaleForVariant(variant) * (spec.baseScale ?? (variant === 'atlas-freighter' ? .92 : 1)) / worldScale;
-                }); }
+                try { await addStationOccupants(model, id, undefined, hull => stationOccupantScale(id,hull)); }
                 catch (error) { console.warn(`Station ${id} dock occupants unavailable.`, error); }
                 if (this.disposed) { this.disposeObject(model); return; }
                 // Traffic shares bays with authored parked ships. Save their
@@ -2701,7 +2706,8 @@ export class SpaceRenderer {
                     matrixStart = Math.min(matrixStart, count * 16);
                     matrixEnd = (count + 1) * 16;
                 }
-                const tint = node.id === this.selectedAsteroidId ? 0xcfe884 : node.scanned ? palette.scan : palette.base;
+                // Targeting and scanning belong on the instruments, not the rock's surface.
+                const tint = palette.base;
                 if (reassigned || entry.renderTint !== tint) {
                     color.setHex(tint);
                     mesh.setColorAt(count, color);
@@ -3540,7 +3546,9 @@ export class SpaceRenderer {
         wrapper.userData.emissiveMaterials = emissiveMaterials;
         wrapper.userData.glb = true;
         if(variant==='concord-cruiser'||variant==='concord-frigate'||variant==='concord-battleship'||variant==='concord-carrier'){wrapper.userData.capitalExhaust=createCapitalEngineExhaust(variant);wrapper.add(wrapper.userData.capitalExhaust);}
-        (this.wreckFactory??=new ShipWreckFactory()).schedule(wrapper);
+        // Racing hulls cannot be destroyed: clipping their detailed hull into
+        // explosion sections is wasted background work during a timed race.
+        if (!entity.race) (this.wreckFactory??=new ShipWreckFactory()).schedule(wrapper);
         return wrapper;
     }
     // Replace a voxel placeholder with the real hull once its GLB resolves.
@@ -3719,9 +3727,13 @@ export class SpaceRenderer {
         const bays=ids?ports.userData.npcBays:actor?.outfitting?.loadouts?.[actor.shipId]?.droneBays;
         const revision=ports.userData.revision=(ports.userData.revision??0)+1;
         for(let bay=0;bay<(bays?.length??0);bay++)for(let slot=0;slot<(bays[bay].unitIds?.length??0);slot++) {
-            const id=bays[bay].unitIds[slot],unit=fleet?.unitsById?.[id];if(!unit||unit.hull<=0||unit.state!=='stowed')continue;
-            const dock=droneDock(ports.userData.hullId,unit.type,bay,slot);if(!dock)continue;
+            const id=bays[bay].unitIds[slot],unit=fleet?.unitsById?.[id];if(!unit||unit.hull<=0)continue;
             let visual=ports.userData.dockVisuals.get(id);
+            if(unit.state!=='stowed'){
+                if(visual){visual.revision=revision;visual.root.visible=false;visual.pad.visible=false;}
+                continue;
+            }
+            const dock=droneDock(ports.userData.hullId,unit.type,bay,slot);if(!dock)continue;
             if(!visual){
                 visual=this.createDroneVisual(unit);ports.add(visual.root);ports.userData.dockVisuals.set(id,visual);
                 visual.root.position.fromArray(dock.position);
@@ -3731,7 +3743,7 @@ export class SpaceRenderer {
                 pad.position.fromArray(dock.point);pad.quaternion.copy(visual.root.quaternion);pad.raycast=()=>{};
                 ports.add(pad);visual.pad=pad;
             }
-            visual.revision=revision;
+            visual.revision=revision;visual.root.visible=true;visual.pad.visible=true;
         }
         for(const[id,v]of ports.userData.dockVisuals)if(v.revision!==revision) {
             ports.remove(v.root,v.pad);this.disposeObject(v.root);this.disposeObject(v.pad);ports.userData.dockVisuals.delete(id);
@@ -3786,7 +3798,7 @@ export class SpaceRenderer {
                 if (this.disposed) { this.disposeObject(model); return null; }
                 return model;
             }).catch(error => { console.warn('Drone model unavailable', error); return null; }));
-        this.droneModels.get(kind).then(template => {
+        const ready=this.droneModels.get(kind).then(template => {
             if (!template || this.disposed || !root.parent) return;
             for (const child of [...root.children]) if (child !== engine && child !== lamp && child !== root.userData.miningDebris && child !== root.userData.repairSparks) {
                 root.remove(child); this.disposeObject(child);
@@ -3801,7 +3813,7 @@ export class SpaceRenderer {
             model.scale.setScalar(1.15); root.add(model); lamp.visible=false;
             root.userData.newDroneModel=true;
         });
-        return { root, beam, engine, lamp, type: unit.type, revision: 0, glow: .2 };
+        return { root, beam, engine, lamp, type: unit.type, revision: 0, glow: .2, ready };
     }
     // Call with save.player.droneFleet and the live miningDroneContext (not
     // miningDroneHud(), which copies arrays). workPoint is a Point or tuple.
@@ -3812,12 +3824,21 @@ export class SpaceRenderer {
         const now = performance.now() * 0.009;
         if (units) for (const id in units) {
             const unit = units[id];
-            if (!unit || !unit.position || unit.hull <= 0 || unit.state === 'stowed' || unit.state === 'destroyed'
+            if (!unit || !unit.position || unit.hull <= 0 || unit.state === 'destroyed'
                 || !['mining','pdc','repair'].includes(unit.type)) continue;
             let visual = this.droneVisuals[id];
             if (visual && visual.type !== unit.type) {
                 this.removeDroneVisual(id);
                 visual = undefined;
+            }
+            // A delivery briefly stows both miners. Disposing their materials
+            // here released the last shader references, forcing a driver link
+            // on every next trip. Keep one hidden visual per installed unit.
+            if(unit.state==='stowed'){
+                const own=!unit.ownerId||unit.ownerId==='player',bays=player?.outfitting?.loadouts?.[player.shipId]?.droneBays;
+                if(own&&bays&&!bays.some(bay=>bay.unitIds.includes(id)))continue;
+                if(visual){visual.revision=revision;visual.root.visible=false;visual.beam.visible=false;}
+                continue;
             }
             if (!visual) visual = this.droneVisuals[id] = this.createDroneVisual(unit);
             visual.revision = revision;
@@ -4172,17 +4193,7 @@ export class SpaceRenderer {
                 this.dynamicRoot.add(mesh);
                 this.pickupMeshes.set(pickup.slot, mesh);
             }
-            // A locked crate is a findable marker: the glow swells and
-            // brightens while it's the current target, so the loot doesn't get
-            // lost in the field.
             mesh.userData.targetId = pickup.id;
-            const selected = pickup.id === this.selectedPickupId;
-            const glow = mesh.children[1];
-            if (glow) {
-                glow.scale.setScalar(selected ? 5 : 3.2);
-                if (glow.material)
-                    glow.material.opacity = selected ? 0.6 : 0.3;
-            }
             const i = pickup.slot * 3;
             mesh.userData.syncRevision = revision;
             mesh.position.set(pos[i], pos[i + 1], pos[i + 2]);
@@ -5891,53 +5902,7 @@ export class SpaceRenderer {
             depthWrite: false,
             toneMapped: false,
         });
-        this.bloomCompositeMaterial = new THREE.ShaderMaterial({
-            uniforms: {
-                tScene: { value: null },
-                tBloom: { value: null },
-                uStrength: { value: 0.6 },
-                uExposure: { value: 1.2 },
-            },
-            vertexShader,
-            fragmentShader: `
-                uniform sampler2D tScene;
-                uniform sampler2D tBloom;
-                uniform float uStrength;
-                uniform float uExposure;
-                varying vec2 vUv;
-
-                // three.js NeutralToneMapping, applied here in the final composite
-                // because the intermediate float buffers hold linear HDR values.
-                vec3 neutralToneMapping(vec3 color) {
-                    float startCompression = 0.8 - 0.04;
-                    float desaturation = 0.15;
-                    color *= uExposure;
-                    float x = min(color.r, min(color.g, color.b));
-                    float offset = x < 0.08 ? x - 6.25 * x * x : 0.01125;
-                    color.rgb += offset;
-                    float peak = max(color.r, max(color.g, color.b));
-                    if (peak < startCompression)
-                        return color;
-                    float d = 1.0 - startCompression;
-                    float newPeak = 1.0 - d * d / (peak + d - startCompression);
-                    color.rgb *= newPeak / peak;
-                    float g = 1.0 - 1.0 / (desaturation * (peak - newPeak) + 1.0);
-                    return mix(color.rgb, vec3(newPeak), g);
-                }
-                vec3 sRGBTransferOETF(vec3 color) {
-                    return mix(color * 12.92, 1.055 * pow(color, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), color));
-                }
-
-                void main() {
-                    vec3 scene = texture2D(tScene, vUv).rgb;
-                    vec3 bloom = texture2D(tBloom, vUv).rgb;
-                    vec3 color = neutralToneMapping(scene + bloom * uStrength);
-                    gl_FragColor = vec4(sRGBTransferOETF(color), 1.0);
-                }`,
-            depthTest: false,
-            depthWrite: false,
-            toneMapped: false,
-        });
+        this.bloomCompositeMaterial = createPixelResolveMaterial();
         this.bloomCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
         this.bloomQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.bloomCompositeMaterial);
         this.bloomQuad.frustumCulled = false;
@@ -5958,15 +5923,7 @@ export class SpaceRenderer {
         });
         if (this.bloomSceneTarget)
             this.bloomSceneTarget.dispose();
-        this.bloomSceneTarget = new THREE.WebGLRenderTarget(sceneWidth, sceneHeight, {
-            type: THREE.HalfFloatType,
-            minFilter: THREE.LinearFilter,
-            magFilter: THREE.LinearFilter,
-            depthBuffer: true,
-            stencilBuffer: false,
-            colorSpace: THREE.LinearSRGBColorSpace,
-        });
-        this.bloomSceneTarget.depthTexture = new THREE.DepthTexture(sceneWidth, sceneHeight, THREE.UnsignedIntType);
+        this.bloomSceneTarget = createPixelSceneTarget(sceneWidth,sceneHeight,pixelTargetSamples(this.renderer));
         this.ringVolumeTarget?.dispose();
         this.ringVolumeTarget = null;
         for (const target of this.bloomBlurTargets)
@@ -5975,6 +5932,26 @@ export class SpaceRenderer {
         // The shader sees the old half-resolution texel spacing, retaining the
         // established glow radius even though the storage target is smaller.
         this.bloomBlurMaterial.uniforms.uResolution.value.set(width * 2, height * 2);
+    }
+    ensurePixelPipeline(){
+        const width=this.renderer.domElement.width,height=this.renderer.domElement.height;
+        if(!this.pixelResolveMaterial){
+            this.pixelResolveMaterial=createPixelResolveMaterial();
+            this.pixelCamera=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+            this.pixelQuad=new THREE.Mesh(new THREE.PlaneGeometry(2,2),this.pixelResolveMaterial);
+            this.pixelQuad.frustumCulled=false;
+        }
+        if(!this.pixelSceneTarget||this.pixelSceneTarget.width!==width||this.pixelSceneTarget.height!==height){
+            this.pixelSceneTarget?.dispose();
+            this.pixelSceneTarget=createPixelSceneTarget(width,height,pixelTargetSamples(this.renderer));
+        }
+    }
+    renderPixelScene(){
+        this.ensurePixelPipeline();
+        this.renderer.setRenderTarget(this.pixelSceneTarget);
+        this.renderer.render(this.scene,this.camera);
+        bindPixelResolve(this.pixelResolveMaterial,this.pixelSceneTarget.texture,this.pixelSceneTarget,this.camera,this.renderer.toneMappingExposure);
+        this.renderer.setRenderTarget(null);this.renderer.render(this.pixelQuad,this.pixelCamera);
     }
     // Bloom costs three extra full-screen passes every frame, which is most of
     // the GPU bill on a weak chip. iOS skips it as part of its fixed phone
@@ -6021,6 +5998,21 @@ export class SpaceRenderer {
         this.flashShield(actor,[1,1,1],.25,false,[0,0,1],[0,0,10]);
         root.add(this.shieldFields.get(actor.id));
         this.shieldFields.delete(actor.id);
+        const droneReady=[];
+        for(const type of ['mining','pdc','repair']){
+            const visual=this.createDroneVisual({id:`warm-${type}`,type});
+            root.add(visual.root,visual.beam);droneReady.push(visual.ready);
+            this.updateMiningDebris(visual.root,true,0);this.updateMiningDebris(visual.root,true,1);
+            this.updateRepairSparks(visual.root,true,1);
+        }
+        this.droneWarmupReady=Promise.all(droneReady);
+        // Shadow depth programs are separate from colour programs. Keep the
+        // ordinary and instanced variants resident before entering Shardbelt.
+        const depth=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking,side:THREE.BackSide});
+        const depthGeometry=new THREE.BoxGeometry(1,1,1);
+        root.add(new THREE.Mesh(depthGeometry,depth));
+        const depthInstances=new THREE.InstancedMesh(depthGeometry,depth,1);
+        depthInstances.setColorAt(0,new THREE.Color(0xffffff));root.add(depthInstances);
         const textures = new Set();
         root.traverse(object => {
             for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
@@ -6040,6 +6032,10 @@ export class SpaceRenderer {
         let combatWarmup;
         try {
             combatWarmup = this.prepareCombatWarmup();
+            // Tiny drone models must join the material warmup, rather than
+            // replacing their placeholder for the first time during mining.
+            await Promise.race([this.droneWarmupReady,new Promise(resolve=>{timeoutId=setTimeout(resolve,timeoutMs);})]);
+            clearTimeout(timeoutId);timeoutId=undefined;
             this.scene.add(combatWarmup);
             // Three keys programs by the target's color space/tone mapping.
             // Compiling only for the canvas left the HDR/bloom impact variant
@@ -6048,8 +6044,12 @@ export class SpaceRenderer {
             if (!this.isIOS && (this.bloomEnabled() || this.ringVolumeEnabled)) {
                 if (!this.bloomSceneTarget) this.createBloomPipeline();
                 targets.push(this.bloomSceneTarget);
+            }else{
+                this.ensurePixelPipeline();targets.push(this.pixelSceneTarget);
             }
             const previousTarget = this.renderer.getRenderTarget();
+            const environmentVisibility=[...(this.instanceRoots?.values()??[])].map(root=>[root,root.visible]);
+            const shadows=this.renderer.shadowMap?.enabled,shadowType=this.renderer.shadowMap?.type,castShadow=this.sunLight?.castShadow;
             let compile;
             try {
                 const prepare = (object, camera, target) => {
@@ -6058,7 +6058,17 @@ export class SpaceRenderer {
                         ? this.renderer.compileAsync(object, camera)
                         : Promise.resolve(this.renderer.compile(object, camera));
                 };
-                const stages = targets.map(target => prepare(this.scene, this.camera, target));
+                // Environment visibility and directional shadows alter every
+                // lit material's program key. Prepare both combinations while
+                // loading, without rendering hidden locations during flight.
+                for(const[root]of environmentVisibility)root.visible=true;
+                const stages=[];
+                for(const shadowed of [false,true]){
+                    if(this.renderer.shadowMap)this.renderer.shadowMap.enabled=shadowed;
+                    if(shadowed&&this.renderer.shadowMap)this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+                    if(this.sunLight)this.sunLight.castShadow=shadowed;
+                    for(const target of targets)stages.push(prepare(this.scene,this.camera,target));
+                }
                 // These passes are outside the main scene. Auto quality can
                 // enable bloom later, so a scene-only warmup misses them.
                 if (this.bloomQuad) {
@@ -6075,13 +6085,20 @@ export class SpaceRenderer {
                     }
                     finally { this.bloomQuad.material = material; }
                 }
+                if(this.pixelQuad)stages.push(prepare(this.pixelQuad,this.pixelCamera,null));
                 if (!this.isIOS && this.ringVolumeEnabled) {
                     if (this.ringVolume?.mesh) stages.push(prepare(this.ringVolume.mesh, this.bloomCamera, this.bloomSceneTarget));
                     if (this.ringParticles?.mesh) stages.push(prepare(this.ringParticles.mesh, this.camera, this.bloomSceneTarget));
                 }
                 compile = Promise.all(stages);
             }
-            finally { this.renderer.setRenderTarget(previousTarget); }
+            finally {
+                this.renderer.setRenderTarget(previousTarget);
+                for(const[root,visible]of environmentVisibility)root.visible=visible;
+                if(this.renderer.shadowMap)this.renderer.shadowMap.enabled=shadows;
+                if(this.renderer.shadowMap)this.renderer.shadowMap.type=shadowType;
+                if(this.sunLight)this.sunLight.castShadow=castShadow;
+            }
             // Keep resources alive until Three finishes its readiness polling,
             // even when the loading-screen timeout wins the race.
             this.pendingShaderCompiles ??= new Set();
@@ -6148,13 +6165,11 @@ export class SpaceRenderer {
         if (this.ringVolumeEnabled && this.azureRingSurface)
             this.azureRingSurface.visible = this.isIOS ? Boolean(this.locationMeshes.get('azure')?.visible) : false;
         const bloomOn = this.bloomEnabled();
-        // A phone without bloom does not need an HDR scene target or a
-        // tone-mapping copy pass. Render straight to the screen; this removes
-        // the full-resolution half-float buffer as well as the extra quad.
-        // Azure's ring volume still uses the post-process path when visible.
+        // Phones and low quality share the depth-aware pixel resolve, without
+        // allocating bloom blur buffers or running glow passes. Both paths
+        // render the world once at the bounded logical pixel resolution.
         if (!bloomOn && !volumeActive) {
-            this.renderer.setRenderTarget(null);
-            this.renderer.render(this.scene, this.camera);
+            this.renderPixelScene();
             this.ringParticleDt = 0;
             return;
         }
@@ -6207,8 +6222,7 @@ export class SpaceRenderer {
         }
         // Pass 4: composite scene + bloom to the screen. With bloom off the
         // strength is zeroed, so the pass is a plain tone-mapped copy.
-        this.bloomCompositeMaterial.uniforms.uExposure.value = this.renderer.toneMappingExposure;
-        this.bloomCompositeMaterial.uniforms.tScene.value = sceneTexture;
+        bindPixelResolve(this.bloomCompositeMaterial,sceneTexture,this.bloomSceneTarget,this.camera,this.renderer.toneMappingExposure);
         this.bloomCompositeMaterial.uniforms.tBloom.value = this.bloomBlurTargets[0].texture;
         this.bloomCompositeMaterial.uniforms.uStrength.value = bloomOn ? 0.6 : 0;
         this.bloomQuad.material = this.bloomCompositeMaterial;
@@ -6279,17 +6293,20 @@ export class SpaceRenderer {
             touchDevice: this.touchDevice,
             viewportWidth: this.viewportWidth,
         });
-        const renderWidth = Math.max(288, Math.round(Math.min(this.viewportWidth, baseWidth) * this.lastQualityScale));
-        const renderHeight = Math.max(180, Math.round(renderWidth / aspect));
-        this.renderer.setPixelRatio(1);
-        this.renderer.setSize(renderWidth, renderHeight, false);
-        this.renderer.domElement.style.width = '100%';
-        this.renderer.domElement.style.height = '100%';
+        const desiredWidth=Math.max(288,Math.min(this.viewportWidth,baseWidth)*this.lastQualityScale);
+        const {width:renderWidth,height:renderHeight,scale:pixelScale}=pixelRenderSize(this.viewportWidth,this.viewportHeight,desiredWidth);
+        const outputChanged=this.renderer.domElement.width!==renderWidth||this.renderer.domElement.height!==renderHeight;
+        if(outputChanged)this.renderer.setSize(renderWidth,renderHeight,false);
+        this.renderer.domElement.style.width = `${renderWidth*pixelScale}px`;
+        this.renderer.domElement.style.height = `${renderHeight*pixelScale}px`;
+        this.renderer.domElement.style.maxWidth='none';
+        this.renderer.domElement.dataset.pixelScale=String(pixelScale);
         this.renderer.domElement.dataset.renderResolution = `${renderWidth}x${renderHeight}`;
         this.camera.aspect = aspect;
         this.camera.updateProjectionMatrix();
-        if (this.bloomSceneTarget)
+        if (outputChanged&&this.bloomSceneTarget)
             this.resizeBloomTargets();
+        if(outputChanged&&this.pixelSceneTarget)this.ensurePixelPipeline();
     };
     onContextLost = (event) => {
         event.preventDefault();
@@ -6377,6 +6394,7 @@ export class SpaceRenderer {
         this.glbShipLoading.clear();
         this.stationColliders?.clear();
         this.stationDockObstacles?.clear();
+        this.pixelSceneTarget?.dispose();this.pixelResolveMaterial?.dispose();this.pixelQuad?.geometry.dispose();
         this.bloomSceneTarget?.dispose();
         this.ringVolumeTarget?.dispose();
         this.ringParticles?.dispose();

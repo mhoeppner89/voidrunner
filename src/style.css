@@ -1,3 +1,4 @@
+@font-face { font-family:"Void VGA"; src:url("../assets/fonts/void-vga.ttf") format("truetype"); font-display:swap; font-style:normal; font-weight:400 900; }
 :root {
   --console-brass: #a58b58;
   --console-brass-light: #cfb67a;
@@ -6,8 +7,9 @@
   --console-edge: #516374;
   --console-screw: #201b13;
 
+  --flight-font: "Courier New", monospace;
   color-scheme: dark;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--pixel-font);
   /* Base palette (touch UI + generic UI). */
   --ink: #e6e0d0;
   --line: rgba(139, 160, 151, 0.32);
@@ -32,22 +34,17 @@
   --drone-pdc: var(--void-cyan);
   --void-cream: #fff3cf;
   --void-muted: #a8c7dc;
-  --helix-shadow-core: rgba(4, 16, 43, 0.94);
-  --helix-shadow-mid: rgba(17, 52, 97, 0.68);
-  --helix-shadow-edge: rgba(43, 88, 139, 0.34);
-  --helix-shadow-glow: rgba(76, 174, 231, 0.18);
-  --helix-ship-glow: rgba(75, 171, 231, 0.16);
   --void-shadow: 0 8px 0 rgba(1, 7, 24, 0.68), 0 0 0 1px rgba(2, 12, 39, 0.96), 0 16px 34px rgba(1, 7, 25, 0.42);
   --retro-black: #06102d;
   --retro-amber: #ffb83d;
   --retro-amber-hi: #ffe89a;
   --retro-green: #75e7c8;
   --retro-red: #ff5e57;
-  --pixel-font: "Lucida Console", "Courier New", ui-monospace, monospace;
+  --pixel-font: "Void VGA", "Lucida Console", "Courier New", ui-monospace, monospace;
   --display-font: Impact, "Arial Narrow", Haettenschweiler, sans-serif;
   /* Docked UI type floors. Station interfaces scroll or reflow before these
      values are reduced; dense pixel text below this scale is not readable. */
-  --ui-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ui-font: var(--pixel-font);
   --station-label: 13px;
   --station-control: 14px;
   --station-body: 15px;
@@ -145,7 +142,7 @@ button.compact {
 .eyebrow {
   display: block;
   color: var(--teal);
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.61rem;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -178,7 +175,7 @@ button.compact {
   z-index: 20;
   color: #d8e1d9;
   pointer-events: none;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   text-shadow: 0 1px 3px #000, 0 0 6px rgba(103, 205, 184, 0.14);
 }
 
@@ -219,7 +216,7 @@ button.compact {
 .objective-chip strong {
   display: block;
   color: #f1c978;
-  font-family: Arial Narrow, Impact, sans-serif;
+  font-family:var(--pixel-font);
   font-size: clamp(0.88rem, 1.65vw, 1.3rem);
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -965,7 +962,7 @@ button.compact {
 
 .title-kicker {
   color: #7db7ab;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: clamp(0.58rem, 1.1vw, 0.75rem);
   letter-spacing: 0.18em;
 }
@@ -973,7 +970,7 @@ button.compact {
 .title-card h1 {
   margin: 0.55rem 0 0.9rem;
   color: #d2d0c4;
-  font-family: Arial Narrow, Impact, sans-serif;
+  font-family:var(--pixel-font);
   font-size: clamp(3rem, 9vw, 7.6rem);
   font-weight: 900;
   letter-spacing: -0.035em;
@@ -1104,7 +1101,7 @@ button.compact {
   gap: 0.3rem 1rem;
   margin-top: 1.2rem;
   color: #69736f;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: clamp(0.53rem, 0.85vw, 0.66rem);
 }
 
@@ -1137,7 +1134,7 @@ button.compact {
   right: var(--safe-right);
   bottom: var(--safe-bottom);
   color: #5d6662;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.56rem;
   letter-spacing: 0.06em;
 }
@@ -1159,15 +1156,8 @@ button.compact {
 .dock-backdrop {
   position: absolute;
   inset: 0;
-  opacity: 0.64;
-  filter: saturate(0.75) contrast(1.06);
-}
-
-.dock-backdrop::after {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, rgba(5, 8, 8, 0.96) 0 35%, rgba(5, 8, 8, 0.58) 65%, rgba(5, 8, 8, 0.86)), linear-gradient(0deg, rgba(5, 7, 7, 0.9), transparent 55%);
-  content: "";
+  opacity: 1;
+  filter: none;
 }
 
 .dock-backdrop svg {
@@ -1205,7 +1195,7 @@ button.compact {
 .dock-wallet small {
   display: block;
   color: #77827e;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.58rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1214,7 +1204,7 @@ button.compact {
 .dock-header h2 {
   margin: 0.12rem 0 0;
   color: color-mix(in srgb, var(--dock-accent), #fff 22%);
-  font-family: Arial Narrow, Impact, sans-serif;
+  font-family:var(--pixel-font);
   font-size: clamp(1.55rem, 4vw, 3.2rem);
   letter-spacing: 0.04em;
   line-height: 1;
@@ -1231,7 +1221,7 @@ button.compact {
 .dock-wallet strong {
   display: block;
   color: #f1ce82;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: clamp(0.9rem, 2vw, 1.3rem);
 }
 
@@ -1296,7 +1286,7 @@ button.compact {
 
 .dock-footer span {
   color: #6e7975;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.55rem;
   letter-spacing: 0.1em;
 }
@@ -1344,7 +1334,7 @@ button.compact {
 .table-title h3 {
   margin: 0.28rem 0 0.65rem;
   color: #e5dcc7;
-  font-family: Arial Narrow, Impact, sans-serif;
+  font-family:var(--pixel-font);
   font-size: clamp(1.05rem, 2.4vw, 1.65rem);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1370,7 +1360,7 @@ button.compact {
   color: #bbb7a9;
   background: rgba(4, 8, 8, 0.7);
   border: 1px solid rgba(122, 153, 142, 0.25);
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.66rem;
 }
 
@@ -1383,7 +1373,7 @@ button.compact {
   display: block;
   margin-top: 0.2rem;
   color: #6f7975;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.55rem;
 }
 
@@ -1413,7 +1403,7 @@ button.compact {
 .snapshot-stats b {
   margin-top: 0.13rem;
   color: #d7c798;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.78rem;
 }
 
@@ -1535,7 +1525,7 @@ button.compact {
 .table-title > div:last-child,
 .table-title > small {
   color: #87918d;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.62rem;
   text-align: right;
 }
@@ -1658,7 +1648,7 @@ button.compact {
   justify-content: space-between;
   gap: 0.7rem;
   color: #77837d;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.56rem;
 }
 
@@ -1705,7 +1695,7 @@ button.compact {
 .ship-card dd {
   margin: 0.12rem 0 0;
   color: #c5c5b9;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.58rem;
 }
 
@@ -1714,7 +1704,7 @@ button.compact {
   gap: 0.2rem;
   margin: -0.18rem 0 0.72rem;
   color: var(--teal);
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.56rem;
   letter-spacing: 0.045em;
 }
@@ -1749,7 +1739,7 @@ button.compact {
   gap: 0.4rem;
   margin: 0.55rem 0;
   color: #7f8c87;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.58rem;
 }
 
@@ -1851,7 +1841,7 @@ button.compact {
 
 .ship-card dd .stat-delta {
   margin-left: 0.3rem;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.52rem;
   font-weight: 700;
 }
@@ -1931,7 +1921,7 @@ button.compact {
 
 .guild-meter em {
   color: #b5aa8e;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.58rem;
   font-style: normal;
 }
@@ -1949,7 +1939,7 @@ button.compact {
   gap: 0.5rem;
   padding: 0.22rem 0;
   color: #e5dcc7;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.66rem;
 }
 
@@ -2006,7 +1996,7 @@ button.compact {
 .modal-card h2 {
   margin: 0.15rem 0 0;
   color: #e0d7c1;
-  font-family: Arial Narrow, Impact, sans-serif;
+  font-family:var(--pixel-font);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -2225,7 +2215,7 @@ button.compact {
   padding: 0.36rem 0;
   border-bottom: 1px solid rgba(119, 139, 130, 0.14);
   color: #9fd8cf;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.66rem;
   line-height: 1.4;
 }
@@ -2353,7 +2343,7 @@ button.compact {
   border-radius: 3px;
   background: rgba(177, 79, 62, 0.16);
   color: #e0a06a;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.54rem;
   letter-spacing: 0.08em;
   cursor: pointer;
@@ -2373,7 +2363,7 @@ button.compact {
 
 .controls-reference p {
   color: #89938e;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.64rem;
   line-height: 1.5;
 }
@@ -2396,7 +2386,7 @@ button.compact {
   background:
     radial-gradient(ellipse at 50% 36%, rgba(40, 78, 100, 0.6), rgba(3, 6, 6, 0.98) 70%),
     #030606;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   text-align: center;
 }
 
@@ -2707,12 +2697,7 @@ button.compact {
   z-index: 3;
   overflow: hidden;
   color: var(--void-cyan);
-  /* Scanlines softened (0.055 → 0.03, 5px → 6px): at the monitor's small
-     type the old stripes crossed every glyph and read as distortion
-     (user report). The CRT texture stays, the text survives it. */
-  background:
-    repeating-linear-gradient(0deg, rgba(74, 214, 240, 0.03) 0 1px, transparent 1px 6px),
-    linear-gradient(180deg, rgba(2, 22, 58, 0.96), rgba(1, 11, 34, 0.98));
+  background: linear-gradient(180deg, rgba(2, 22, 58, 0.96), rgba(1, 11, 34, 0.98));
   border: 2px solid rgba(20, 108, 160, 0.86);
   box-shadow: inset 0 0 0 2px rgba(1, 8, 27, 0.96), inset 0 0 18px rgba(26, 139, 209, 0.2), 0 0 0 2px rgba(0, 5, 18, 0.9);
   font-family: var(--pixel-font);
@@ -2849,7 +2834,7 @@ button.compact {
   gap: 0.4rem;
   padding: 0.1rem 0.48rem;
   color: #e0a06a;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: clamp(10px, 0.86vw, 12px);
   letter-spacing: 0.06em;
   white-space: nowrap;
@@ -2904,7 +2889,7 @@ button.compact {
   justify-content: space-between;
   gap: 0.4rem;
   padding: 0.1rem 0.48rem;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: clamp(10px, 0.86vw, 12px);
   letter-spacing: 0.06em;
   white-space: nowrap;
@@ -2973,7 +2958,7 @@ button.compact {
   margin: 0.14rem 0.48rem 0;
   padding-top: 0.12rem;
   border-top: 1px solid rgba(115, 198, 180, 0.28);
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: clamp(10px, 0.86vw, 12px);
   letter-spacing: 0.06em;
   white-space: nowrap;
@@ -3084,7 +3069,7 @@ button.compact {
   border: 1px solid transparent;
   border-bottom-width: 2px;
   box-shadow: none;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: clamp(0.72rem, 1.15vw, 0.98rem);
   letter-spacing: 0.03em;
   text-align: center;
@@ -3180,7 +3165,7 @@ html[lang="de"] .comms-bar.story::after {
   background: rgba(2, 8, 10, 0.88);
   border: 1px solid rgba(111, 181, 255, 0.55);
   border-radius: 999px;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.72rem;
   letter-spacing: 0.12em;
   text-align: center;
@@ -3227,7 +3212,7 @@ html[lang="de"] .comms-bar.story::after {
   background: linear-gradient(180deg, rgba(24, 13, 3, 0.97), rgba(10, 6, 2, 0.98));
   border: 1px solid rgba(255, 183, 84, 0.55);
   box-shadow: 0 0 0 6px rgba(0, 0, 0, 0.35), 0 10px 40px rgba(0, 0, 0, 0.6);
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
 }
 
 .syndicate-card-eyebrow {
@@ -3292,7 +3277,7 @@ html[lang="de"] .comms-bar.story::after {
   color: #0b0601;
   background: #ffb754;
   border: 1px solid #ffcf7d;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -3361,7 +3346,7 @@ html[lang="de"] .comms-bar.story::after {
   background: rgba(6, 12, 12, 0.72);
   border: 1px solid rgba(118, 158, 147, 0.28);
   border-left: 3px solid var(--teal);
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.88rem;
 }
 
@@ -3729,7 +3714,7 @@ html[lang="de"] .comms-bar.story::after {
 }
 
 .cockpit-screen {
-  animation: cockpit-flicker 5s steps(1) infinite;
+  animation: none;
 }
 
 .cockpit-screen::before {
@@ -3802,7 +3787,7 @@ html[lang="de"] .comms-bar.story::after {
   padding: 0.08rem 0.4rem 0.1rem;
   color: #8fd1c1;
   border-top: 1px solid rgba(48, 161, 195, 0.3);
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: clamp(10px, 0.95vw, 13px);
   letter-spacing: 0.04em;
   line-height: 1.1;
@@ -4389,28 +4374,12 @@ button.primary,
   background: #020504;
 }
 
-.dock-backdrop {
-  opacity: 0.84;
-  filter: saturate(0.82) contrast(1.16) brightness(0.72);
-}
-
 .dock-backdrop img {
   width: 100%;
   height: 100%;
   display: block;
   object-fit: cover;
   image-rendering: pixelated;
-}
-
-.dock-backdrop::after {
-  background:
-    linear-gradient(90deg, rgba(2, 6, 5, 0.92) 0 23%, rgba(2, 6, 5, 0.53) 57%, rgba(2, 6, 5, 0.84)),
-    linear-gradient(0deg, rgba(2, 5, 4, 0.94) 0 11%, transparent 46%, rgba(2, 5, 4, 0.55) 100%);
-}
-
-.dock-screen[data-tab="bar"] .dock-backdrop {
-  opacity: 0.94;
-  filter: saturate(0.92) contrast(1.13) brightness(0.64);
 }
 
 .dock-screen[data-location="rook"] { --retro-edge-hi: #6faec0; }
@@ -4533,7 +4502,7 @@ button.primary,
 .ship-card p.ship-personality {
   margin: -0.45rem 0 0.55rem;
   color: var(--dock-accent);
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.6rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -4694,7 +4663,7 @@ button.primary,
   gap: 0.5rem;
   margin-top: 0.4rem;
   color: #77827e;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 0.56rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -4954,7 +4923,7 @@ button.primary,
 .hyperdrive-chip strong {
   display: block;
   color: #8fe0ff;
-  font-family: Arial Narrow, Impact, sans-serif;
+  font-family:var(--pixel-font);
   font-size: clamp(0.8rem, 1.4vw, 1.12rem);
   font-weight: 800;
   letter-spacing: 0.1em;
@@ -5114,7 +5083,6 @@ button.primary,
 }
 
 
-
 .hud-top-left,
 .hud-bottom-center,
 .reticle,
@@ -5144,43 +5112,12 @@ button.primary,
   z-index: 1;
 }
 
-.dock-scanlines {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  opacity: 0.24;
-  background:
-    repeating-linear-gradient(0deg, transparent 0 2px, rgba(0, 0, 0, 0.16) 2px 3px),
-    radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.35) 100%);
-}
 
 .dock-header,
 .dock-nav,
 .dock-content,
 .dock-footer {
   z-index: 3;
-}
-
-.dock-backdrop {
-  background: linear-gradient(90deg, rgba(5, 9, 8, 0.28), rgba(0, 0, 0, 0.08));
-}
-
-.dock-backdrop img {
-  mix-blend-mode: screen;
-  opacity: 0.78;
-}
-
-.dock-screen[data-location="rook"] .dock-backdrop img {
-  filter: hue-rotate(14deg) saturate(0.82) contrast(1.14) brightness(0.78);
-}
-
-.dock-screen[data-location="vesper"] .dock-backdrop img {
-  filter: sepia(0.16) saturate(1.04) contrast(1.14) brightness(0.77);
-}
-
-.dock-screen[data-location="azure"] .dock-backdrop img {
-  filter: hue-rotate(-9deg) saturate(0.9) contrast(1.14) brightness(0.78);
 }
 
 @media (max-width: 900px), (pointer: coarse) {
@@ -5237,29 +5174,13 @@ button.primary,
   font-size: 0.92em;
 }
 
-.dock-screen::after {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 56px;
-  z-index: 1;
-  height: min(17vh, 150px);
-  content: "";
-  pointer-events: none;
-  opacity: 0.38;
-  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.66));
-  image-rendering: pixelated;
-  filter: saturate(0.66) contrast(1.18) brightness(0.54);
-}
 
 @media (max-width: 900px), (pointer: coarse) {
   .title-card h1 {
     font-size: clamp(2.35rem, 9vw, 4.3rem);
   }
 
-  .dock-screen::after {
-    display: none;
-  }
+
 }
 
 /* Legacy cockpit instrument styles retained for older markup variants. */
@@ -5430,29 +5351,6 @@ button.primary,
   content: none !important;
 }
 
-.dock-backdrop {
-  opacity: 0.82;
-  filter: saturate(0.82) contrast(1.08) brightness(0.72);
-}
-
-.dock-backdrop::after {
-  background:
-    linear-gradient(90deg, rgba(3, 7, 7, 0.91) 0%, rgba(3, 7, 7, 0.68) 48%, rgba(3, 7, 7, 0.82) 100%),
-    linear-gradient(0deg, rgba(3, 7, 7, 0.64) 0%, rgba(3, 7, 7, 0.22) 36%, rgba(3, 7, 7, 0.58) 100%);
-}
-
-/* Remove the concept-board texture from live dock screens; it contained baked UI. */
-.dock-backdrop {
-  background:
-    linear-gradient(90deg, rgba(5, 9, 8, 0.18), rgba(0, 0, 0, 0.04)),
-    #050808 !important;
-}
-
-.dock-backdrop img {
-  mix-blend-mode: normal !important;
-  opacity: 0.9 !important;
-}
-
 @media (min-width: 1000px) and (min-height: 720px) {
   .bar-layout {
     width: 100%;
@@ -5616,17 +5514,6 @@ button.primary,
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
-.dock-backdrop {
-  opacity: 1;
-  filter: saturate(1.24) contrast(1.05) brightness(1.2);
-}
-
-.dock-backdrop::after {
-  background:
-    linear-gradient(90deg, rgba(4, 18, 55, 0.52) 0%, rgba(4, 18, 55, 0.16) 49%, rgba(4, 18, 55, 0.48) 100%),
-    linear-gradient(0deg, rgba(4, 17, 50, 0.62) 0%, rgba(4, 17, 50, 0.04) 38%, rgba(4, 17, 50, 0.28) 100%);
-}
-
 .dock-header {
   min-height: 82px;
   background: linear-gradient(180deg, rgba(5, 25, 68, 0.92), rgba(3, 15, 44, 0.82));
@@ -5700,18 +5587,6 @@ button.primary,
   border: 1px solid rgba(101, 214, 247, 0.64);
   background: linear-gradient(90deg, rgba(3, 19, 54, 0.18), rgba(3, 19, 54, 0.04));
   box-shadow: var(--void-shadow);
-}
-
-/* Approved Voidrunner landing plates: bright environment art stays visible under the adventure UI. */
-.dock-backdrop img {
-  opacity: 0.98 !important;
-  filter: saturate(1.08) contrast(1.02) brightness(1.08) !important;
-}
-
-.dock-screen[data-location="rook"] .dock-backdrop img,
-.dock-screen[data-location="vesper"] .dock-backdrop img,
-.dock-screen[data-location="azure"] .dock-backdrop img {
-  filter: saturate(1.08) contrast(1.02) brightness(1.08) !important;
 }
 
 .landing-copy,
@@ -5906,9 +5781,6 @@ button.primary,
 }
 
 @media (max-width: 900px), (pointer: coarse) {
-  .dock-backdrop {
-    filter: saturate(1.18) contrast(1.03) brightness(1.16);
-  }
 
   .landing-scene {
     min-height: 0;
@@ -6016,46 +5888,6 @@ button.primary,
   .dock-screen:has(.terminal-nav) .terminal-nav {
     margin-bottom: 0.45rem;
   }
-}
-
-/* Three-screen station flow: Concourse, Bar, Market. */
-.dock-screen[data-tab="concourse"] .dock-backdrop {
-  opacity: 0.94;
-  filter: saturate(1.12) contrast(1.04) brightness(1.02);
-}
-
-.dock-screen[data-tab="concourse"] .dock-backdrop::after {
-  background:
-    linear-gradient(90deg, rgba(4, 18, 55, 0.18), rgba(4, 18, 55, 0.02) 52%, rgba(4, 18, 55, 0.22)),
-    linear-gradient(0deg, rgba(3, 14, 43, 0.48), transparent 45%, rgba(3, 14, 43, 0.12));
-}
-
-.dock-screen[data-tab="bar"] .dock-backdrop {
-  opacity: 0.96;
-  filter: saturate(1.1) contrast(1.04) brightness(0.98);
-}
-
-.dock-screen[data-tab="bar"] .dock-backdrop::after {
-  background:
-    linear-gradient(90deg, rgba(4, 18, 55, 0.16), rgba(4, 18, 55, 0.02) 56%, rgba(4, 18, 55, 0.2)),
-    linear-gradient(0deg, rgba(3, 14, 43, 0.44), transparent 52%, rgba(3, 14, 43, 0.1));
-}
-
-.dock-screen[data-tab="market"] .dock-backdrop {
-  opacity: 0.95;
-  filter: saturate(1.1) contrast(1.04) brightness(1.04);
-}
-
-.dock-screen[data-tab="market"] .dock-backdrop::after {
-  background:
-    linear-gradient(90deg, rgba(3, 13, 42, 0.34), rgba(3, 13, 42, 0.1) 56%, rgba(3, 13, 42, 0.32)),
-    linear-gradient(0deg, rgba(3, 12, 38, 0.54), rgba(3, 12, 38, 0.08) 58%, rgba(3, 12, 38, 0.26));
-}
-
-.dock-screen[data-tab="services"] .dock-backdrop::after {
-  background:
-    linear-gradient(90deg, rgba(3, 13, 42, 0.76), rgba(3, 13, 42, 0.5) 56%, rgba(3, 13, 42, 0.72)),
-    linear-gradient(0deg, rgba(3, 12, 38, 0.72), rgba(3, 12, 38, 0.18) 58%, rgba(3, 12, 38, 0.58));
 }
 
 .concourse-screen {
@@ -7419,24 +7251,6 @@ button.primary,
   overflow: hidden;
 }
 
-.dock-backdrop {
-  opacity: 1 !important;
-  filter: saturate(1.08) contrast(1.04) brightness(1.08) !important;
-}
-
-.dock-backdrop::after {
-  background:
-    linear-gradient(90deg, rgba(4, 18, 55, 0.12), rgba(4, 18, 55, 0.02) 52%, rgba(4, 18, 55, 0.14)),
-    linear-gradient(0deg, rgba(3, 14, 43, 0.22), transparent 48%, rgba(3, 14, 43, 0.12));
-}
-
-.dock-screen[data-tab="bar"] .dock-backdrop::after,
-.dock-screen[data-tab="market"] .dock-backdrop::after {
-  background:
-    linear-gradient(90deg, rgba(4, 18, 55, 0.08), rgba(4, 18, 55, 0.01) 52%, rgba(4, 18, 55, 0.12)),
-    linear-gradient(0deg, rgba(3, 14, 43, 0.2), transparent 52%, rgba(3, 14, 43, 0.1));
-}
-
 .dock-pointer,
 .scene-pointer {
   cursor: pointer;
@@ -7664,45 +7478,6 @@ button.primary,
   --concourse-bar-left: 20%; --concourse-bar-top: 32%;
 }
 
-/* The live hull inherits the practical light of each v6 landing plate. Warm
-   industrial docks share amber deck bounce; exposed and civic pads use cool
-   star or station light. The filter follows the sprite alpha, so no coloured
-   rectangle can wash over the painted background. */
-.dock-screen[data-location="cairn"],
-.dock-screen[data-location="blackglass"],
-.dock-screen[data-location="cinder"],
-.dock-screen[data-location="torchwell"] {
-  --concourse-shadow-core: rgba(13, 8, 4, 0.9);
-  --concourse-shadow-mid: rgba(42, 24, 9, 0.62);
-  --concourse-shadow-edge: rgba(73, 43, 18, 0.28);
-  --concourse-shadow-glow: rgba(255, 156, 62, 0.16);
-  --concourse-shadow-after: rgba(227, 112, 40, 0.13);
-}
-
-.dock-screen[data-location="meridian-prime"],
-.dock-screen[data-location="argent"],
-.dock-screen[data-location="gatehouse-twelve"],
-.dock-screen[data-location="nacre"],
-.dock-screen[data-location="boreal"],
-.dock-screen[data-location="shepherd"] {
-  --concourse-shadow-core: rgba(3, 10, 20, 0.88);
-  --concourse-shadow-mid: rgba(9, 28, 48, 0.58);
-  --concourse-shadow-edge: rgba(31, 72, 98, 0.24);
-  --concourse-shadow-glow: rgba(83, 181, 239, 0.15);
-  --concourse-shadow-after: rgba(65, 151, 210, 0.12);
-}
-
-.dock-screen[data-location="cairn"] { --concourse-ship-filter: brightness(0.82) saturate(0.82) contrast(1.08) sepia(0.1) drop-shadow(0 12px 7px rgba(22, 12, 5, 0.46)) drop-shadow(0 0 11px rgba(255, 172, 79, 0.14)); }
-.dock-screen[data-location="meridian-prime"] { --concourse-ship-filter: brightness(0.94) saturate(0.76) contrast(1.04) drop-shadow(0 12px 7px rgba(8, 23, 38, 0.4)) drop-shadow(0 0 11px rgba(99, 205, 255, 0.13)); }
-.dock-screen[data-location="argent"] { --concourse-ship-filter: brightness(0.84) saturate(0.74) contrast(1.09) drop-shadow(0 12px 7px rgba(5, 16, 27, 0.48)) drop-shadow(0 0 10px rgba(89, 183, 226, 0.11)); }
-.dock-screen[data-location="gatehouse-twelve"] { --concourse-ship-filter: brightness(0.74) saturate(0.7) contrast(1.12) drop-shadow(0 12px 7px rgba(1, 8, 18, 0.55)) drop-shadow(0 0 12px rgba(55, 143, 221, 0.14)); }
-.dock-screen[data-location="blackglass"] { --concourse-ship-filter: brightness(0.7) saturate(0.76) contrast(1.1) sepia(0.08) drop-shadow(0 12px 8px rgba(8, 5, 3, 0.6)) drop-shadow(0 0 10px rgba(224, 126, 55, 0.11)); }
-.dock-screen[data-location="cinder"] { --concourse-ship-filter: brightness(0.75) saturate(0.78) contrast(1.1) sepia(0.08) drop-shadow(0 12px 8px rgba(12, 7, 3, 0.55)) drop-shadow(0 0 12px rgba(255, 133, 49, 0.14)); }
-.dock-screen[data-location="torchwell"] { --concourse-ship-filter: brightness(0.7) saturate(0.76) contrast(1.11) sepia(0.1) drop-shadow(0 12px 8px rgba(10, 5, 3, 0.58)) drop-shadow(0 0 10px rgba(213, 82, 47, 0.13)); }
-.dock-screen[data-location="nacre"] { --concourse-ship-filter: brightness(0.88) saturate(0.67) contrast(1.06) drop-shadow(0 12px 7px rgba(5, 15, 27, 0.45)) drop-shadow(0 0 12px rgba(116, 206, 255, 0.15)); }
-.dock-screen[data-location="boreal"] { --concourse-ship-filter: brightness(0.82) saturate(0.72) contrast(1.08) drop-shadow(0 12px 7px rgba(2, 13, 28, 0.5)) drop-shadow(0 0 12px rgba(92, 181, 236, 0.15)); }
-.dock-screen[data-location="shepherd"] { --concourse-ship-filter: brightness(0.73) saturate(0.7) contrast(1.1) drop-shadow(0 12px 7px rgba(2, 9, 20, 0.55)) drop-shadow(0 0 12px rgba(62, 151, 222, 0.13)); }
-
 /* The smuggler's den has no storefront: the pointer sits low under the pad,
    the way a back door should read. */
 .concourse-pointer-den { left: 55%; top: 72%; }
@@ -7719,9 +7494,10 @@ button.primary,
 /* Bar: people and the two deeper menus are pointers over the approved plate. */
 .bar-pointer-missions { left: 13%; top: 23%; }
 .bar-pointer-guilds { left: 76%; top: 24%; }
-.bar-person-0 { left: 18%; top: 59%; }
-.bar-person-1 { left: 47%; top: 49%; }
-.bar-person-2 { left: 75%; top: 59%; }
+.bar-person-pointer {
+  left: calc(12% + var(--person-column, 0) * 29%);
+  top: calc(48% + var(--person-row, 0) * 24%);
+}
 
 .bar-dialogue-card {
   position: absolute;
@@ -7865,9 +7641,6 @@ button.primary,
   .dock-screen[data-location="azure"][data-tab="concourse"] .concourse-pointer-bar { left: var(--concourse-bar-left, 10%); top: var(--concourse-bar-top, 31%); }
   .bar-pointer-missions { left: 10%; top: 24%; }
   .bar-pointer-guilds { left: 64%; top: 24%; }
-  .bar-person-0 { left: 8%; top: 58%; }
-  .bar-person-1 { left: 39%; top: 49%; }
-  .bar-person-2 { left: 69%; top: 59%; }
   .market-pointer-commodities { left: 8%; top: 58%; }
   .market-pointer-equipment { left: 39%; top: 38%; }
   .market-pointer-shipyard { left: 68%; top: 60%; }
@@ -7887,10 +7660,6 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   grid-template-columns: minmax(0, 1fr);
 }
 
-.dock-screen::after {
-  display: none !important;
-  content: none !important;
-}
 
 .dock-screen[data-tab="concourse"] .concourse-screen.station-scene {
   height: 100%;
@@ -8004,7 +7773,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   width: min(1180px, 96vw);
   max-width: 96vw;
   overflow-x: hidden;
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:var(--pixel-font);
   image-rendering: auto;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -8070,7 +7839,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   padding: 0.3rem 0.58rem;
   transform: translate(-50%, -50%);
   color: #8fafbd;
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:var(--pixel-font);
   text-align: left;
   background: linear-gradient(180deg, rgba(5, 30, 66, 0.98), rgba(3, 14, 37, 0.98));
   border: 1px solid rgba(79, 145, 170, 0.34);
@@ -8124,7 +7893,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .regional-system b {
   grid-column: 2;
   color: currentColor;
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:var(--pixel-font);
   font-size: 13px;
   line-height: 1.15;
 }
@@ -8151,7 +7920,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   color: var(--void-cyan);
   background: rgba(4, 27, 68, 0.9);
   border-bottom: 1px solid rgba(91, 195, 224, 0.36);
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:var(--pixel-font);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -8270,7 +8039,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   padding: 0.34rem 0.55rem;
   place-items: center start;
   color: var(--void-cream);
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:var(--pixel-font);
   background: linear-gradient(180deg, rgba(5, 32, 74, 0.94), rgba(3, 15, 41, 0.95));
   border: 1px solid rgba(85, 183, 218, 0.48);
   box-shadow: 0 4px 0 rgba(0, 4, 18, 0.55);
@@ -8305,7 +8074,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .system-map .map-node b {
   min-width: 0;
   color: var(--void-cream);
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:var(--pixel-font);
   font-size: 12px;
   font-weight: 650;
   letter-spacing: 0.01em;
@@ -9049,7 +8818,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   min-height: 40px;
   padding: 0.48rem 0.78rem;
   color: #88aab7;
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:var(--pixel-font);
   font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.11em;
@@ -10255,119 +10024,31 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   }
 }
 
-/* Concourse ship overlay. GameUI calculates these anchors from the rendered
-   background image, keeping the sprite over the same pad location as the
-   viewport changes at every dock. */
-.dock-screen[data-tab="concourse"] .concourse-hover-preview {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.dock-screen[data-tab="concourse"] .concourse-hover-shadow {
-  position: absolute;
-  left: var(--vesper-shadow-left, 51%);
-  top: var(--vesper-shadow-top, 62%);
-  width: var(--vesper-shadow-width, 430px);
-  height: var(--vesper-shadow-height, 58px);
-  border-radius: 50%;
-  transform: translate(-50%, -50%) rotate(var(--vesper-shadow-angle, 3deg)) scale(1);
-  transform-origin: center;
-  animation: vesper-hover-shadow 5.8s ease-in-out infinite;
-  background:
-    radial-gradient(ellipse at center, var(--concourse-shadow-core, rgba(13, 9, 6, 0.92)) 0 22%, var(--concourse-shadow-mid, rgba(24, 15, 8, 0.68)) 43%, var(--concourse-shadow-edge, rgba(31, 22, 12, 0.34)) 61%, transparent 79%),
-    radial-gradient(ellipse at center, var(--concourse-shadow-glow, rgba(255, 165, 74, 0.2)), transparent 70%);
-  filter: blur(3px);
-  opacity: 1;
-  will-change: transform, opacity;
-}
-
-.dock-screen[data-tab="concourse"] .concourse-hover-shadow::after {
-  position: absolute;
-  inset: 24% 12%;
-  border-radius: 50%;
-  background: var(--concourse-shadow-after, rgba(232, 129, 47, 0.16));
-  box-shadow: 0 0 20px var(--concourse-shadow-glow, rgba(255, 177, 83, 0.2));
-  content: "";
-  filter: blur(5px);
-}
-
-/* Helix's open hangar throws cool station light across the pad. The tint is
-   alpha-matched to the active ship art, so it grades the silhouette only and
-   never paints a rectangle over the background. */
-.dock-screen[data-location="helix"][data-tab="concourse"] .concourse-hover-shadow,
-.dock-screen[data-location="rook"][data-tab="concourse"] .concourse-hover-shadow {
-  background:
-    radial-gradient(ellipse at center, var(--helix-shadow-core) 0 22%, var(--helix-shadow-mid) 43%, var(--helix-shadow-edge) 61%, transparent 79%),
-    radial-gradient(ellipse at center, var(--helix-shadow-glow), transparent 70%);
-}
-
-.dock-screen[data-location="helix"][data-tab="concourse"] .concourse-hover-shadow::after,
-.dock-screen[data-location="rook"][data-tab="concourse"] .concourse-hover-shadow::after {
-  background: rgba(48, 127, 201, 0.16);
-  box-shadow: 0 0 20px var(--helix-shadow-glow);
-}
-
-/* Helix/Rook cool hangar light comes from the blue drop-shadows now — the
-   masked ::after wash is gone (it loaded the same PNG twice). A full
-   hue-rotate read too blue, so the grade stays in the shadows. */
-.dock-screen[data-location="helix"][data-tab="concourse"] .concourse-hover-ship,
-.dock-screen[data-location="rook"][data-tab="concourse"] .concourse-hover-ship {
-  filter: brightness(0.8) saturate(0.82) contrast(1.12)
-    drop-shadow(0 12px 7px rgba(3, 14, 38, 0.5))
-    drop-shadow(0 0 10px var(--helix-ship-glow));
-}
-
-/* Rook's pad is brighter than the Helix deck. Keep its blue shadow edge
-   darker than the surrounding metal instead of letting the tint glow. */
-.dock-screen[data-location="rook"][data-tab="concourse"] .concourse-hover-shadow {
-  border-radius: 50%;
-  background:
-    radial-gradient(ellipse at center, var(--helix-shadow-core) 0 22%, var(--helix-shadow-mid) 43%, rgba(24, 53, 89, 0.22) 59%, rgba(8, 22, 44, 0.08) 70%, transparent 80%),
-    none;
-  box-shadow: none;
-}
-
-.dock-screen[data-location="rook"][data-tab="concourse"] .concourse-hover-shadow::after {
-  background: rgba(28, 76, 125, 0.08);
-  box-shadow: none;
-}
-
-.dock-screen[data-tab="concourse"] .concourse-hover-ship-flight {
-  position: absolute;
-  left: var(--vesper-ship-left, 51%);
-  top: var(--vesper-ship-top, 48%);
-  width: var(--vesper-ship-width, 350px);
-  max-width: none;
-  transform: translate3d(-50%, -50%, 0) rotate(var(--vesper-ship-angle, -1deg));
-  transform-origin: center;
-  animation: vesper-hover-bob 5.8s ease-in-out infinite;
-  pointer-events: none;
-  opacity: 0.9;
-  backface-visibility: hidden;
-  will-change: transform, opacity;
-}
-
-.dock-screen[data-tab="concourse"] .concourse-hover-ship {
-  display: block;
-  width: 100%;
-  max-width: none;
-  height: auto;
-  pointer-events: auto;
-  cursor: pointer;
-  object-fit: contain;
-  filter: var(--concourse-ship-filter,
-    brightness(0.78) saturate(0.78) contrast(1.12) sepia(0.08)
-    drop-shadow(0 12px 7px rgba(27, 15, 7, 0.42))
-    drop-shadow(0 0 10px rgba(255, 177, 83, 0.1)));
-}
-
-.dock-screen[data-tab="concourse"] .concourse-hover-ship:focus-visible {
-  outline: 2px dashed var(--void-gold);
-  outline-offset: 6px;
-}
+/* The background remains painted; the transparent model and shadow receiver
+   share a pad-anchored 3D camera. One reusable canvas serves every hull. */
+.dock-screen[data-tab="concourse"] .concourse-hover-preview { position:absolute;inset:0;z-index:2;overflow:hidden;pointer-events:none; }
+#dock-screen .concourse-model-stage { position:absolute;left:var(--concourse-ground-x,50%);top:var(--concourse-ground-y,70%);width:var(--concourse-stage-width,600px);height:var(--concourse-stage-height,450px);transform:translate(-50%,-50%);pointer-events:none; }
+#dock-screen .concourse-model-stage:not(.has-model) .concourse-ship-canvas { visibility:hidden; }
+#dock-screen .concourse-ship-canvas { display:block;width:100%;height:100%;image-rendering:pixelated; }
+#dock-screen .dock-backdrop .concourse-ship-canvas { position:absolute;inset:0;z-index:1;pointer-events:none; }
+#dock-screen .dock-backdrop .is-concourse-composite { visibility:hidden; }
+#dock-screen .dock-backdrop.has-concourse-composite .is-concourse-composite { visibility:visible; }
+#dock-screen .dock-backdrop.has-concourse-composite > img { opacity:0; }
+.planet-transit { position:fixed;inset:0;z-index:11900;background:#02050b;overflow:hidden;touch-action:none; }
+#game-shell:has(.planet-transit) #rotate-notice { position:fixed;z-index:14000; }
+.planet-transit-stage { position:absolute;inset:5% 0;overflow:hidden; }
+.planet-transit .concourse-ship-canvas { display:block;width:100%;height:100%;image-rendering:pixelated; }
+.planet-transit-skip { position:absolute;right:max(12px,env(safe-area-inset-right));bottom:max(6px,env(safe-area-inset-bottom));min-width:44px;min-height:44px;padding:0 10px;border:0;background:#05111c99;color:var(--void-cream);font:28px/1 var(--pixel-font);opacity:.65; }
+.planet-transit-skip:hover,.planet-transit-skip:focus-visible { opacity:1;outline:1px solid var(--void-gold); }
+#dock-screen .concourse-hover-ship { position:absolute;left:calc(var(--concourse-ground-x,50%) - 80px);top:calc(var(--concourse-ground-y,70%) - 80px);width:160px;height:80px;min-height:44px;padding:0;background:transparent;border:0;box-shadow:none;filter:none;pointer-events:auto;cursor:pointer; }
+#dock-screen .concourse-hover-ship:hover { background:transparent;box-shadow:none;filter:none; }
+#dock-screen .concourse-hover-ship:focus-visible { outline:2px dashed var(--void-gold);outline-offset:5px; }
+#dock-screen .concourse-hover-ship:disabled { cursor:default; }
+#dock-screen .concourse-model-stage.has-model + .concourse-hover-ship .concourse-model-fallback { display:none; }
+#dock-screen .concourse-model-fallback { color:var(--void-gold);background:var(--void-navy);padding:8px; }
+#dock-screen .scene-pointers { transition:opacity .3s ease,transform .3s ease; }
+#dock-screen .station-scene:is(.is-arriving,.is-launching) .scene-pointers { opacity:0;pointer-events:none;transform:translateY(6px); }
+#dock-screen .station-scene:is(.is-arriving,.is-launching) .concourse-hover-ship { pointer-events:none; }
 
 /* The live fleet switcher is intentionally preview-only. It sits above the
    scene in the local Vesper art review, without changing the normal dock UI. */
@@ -10467,109 +10148,6 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   letter-spacing: 0.04em;
 }
 
-.dock-screen[data-tab="concourse"] .station-scene.is-launching .scene-pointers {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(6px);
-  transition: opacity 180ms ease, transform 180ms ease;
-}
-
-.dock-screen[data-tab="concourse"] .station-scene.is-launching .vesper-preview-toolbar {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-6px);
-}
-
-.dock-screen[data-tab="concourse"] .concourse-hover-preview.is-departing .concourse-hover-ship-flight {
-  animation: vesper-launch-ship 960ms ease-in-out forwards;
-  pointer-events: none;
-}
-
-.dock-screen[data-tab="concourse"] .concourse-hover-preview.is-departing .concourse-hover-ship {
-  filter: brightness(0.78) saturate(0.78) contrast(1.12) sepia(0.08);
-}
-
-.dock-screen[data-tab="concourse"] .concourse-hover-preview.is-departing .concourse-hover-shadow {
-  animation: vesper-launch-shadow 960ms ease-out forwards;
-  pointer-events: none;
-}
-
-.dock-screen[data-location="rook"][data-tab="concourse"] .concourse-hover-preview.is-departing .concourse-hover-ship-flight {
-  animation: rook-launch-ship 960ms ease-in-out forwards;
-}
-
-.dock-screen[data-location="rook"][data-tab="concourse"] .concourse-hover-preview.is-departing .concourse-hover-ship {
-  filter: brightness(0.8) saturate(0.82) contrast(1.12)
-    drop-shadow(0 12px 7px rgba(3, 14, 38, 0.5))
-    drop-shadow(0 0 10px var(--helix-ship-glow));
-}
-
-@keyframes vesper-hover-bob {
-  0%,
-  100% {
-    transform: translate3d(-50%, -50%, 0) rotate(var(--vesper-ship-angle, -1deg));
-  }
-
-  50% {
-    transform: translate3d(-50%, calc(-50% - var(--vesper-ship-bob, 8px)), 0) rotate(var(--vesper-ship-angle, -1deg));
-  }
-}
-
-@keyframes vesper-hover-shadow {
-  0%,
-  100% {
-    opacity: 1;
-    transform: translate(-50%, -50%) rotate(3deg) scale(1);
-  }
-
-  50% {
-    opacity: 0.78;
-    transform: translate(-50%, -50%) rotate(3deg) scale(1.08, 1.12);
-  }
-}
-
-@keyframes vesper-launch-ship {
-  0% {
-    opacity: 0.9;
-    transform: translate3d(-50%, -50%, 0) rotate(var(--vesper-ship-angle, -1deg)) scale(1);
-  }
-
-  100% {
-    opacity: 0.9;
-    transform: translate3d(calc(-50% + 78vw), calc(-50% - 42px), 0) rotate(var(--vesper-ship-angle, -1deg)) scale(1.65);
-  }
-}
-
-@keyframes rook-launch-ship {
-  0% {
-    opacity: 0.9;
-    transform: translate3d(-50%, -50%, 0) rotate(var(--vesper-ship-angle, -1deg)) scale(1);
-  }
-
-  100% {
-    opacity: 0.9;
-    transform: translate3d(-50%, calc(-50% - 84vh), 0) rotate(var(--vesper-ship-angle, -1deg)) scale(0.78);
-  }
-}
-
-@keyframes vesper-launch-shadow {
-  0% {
-    opacity: 1;
-    transform: translate(-50%, -50%) rotate(3deg) scale(1);
-  }
-
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -50%) rotate(3deg) scale(0.7, 0.62);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dock-screen[data-tab="concourse"] .concourse-hover-ship-flight,
-  .dock-screen[data-tab="concourse"] .concourse-hover-shadow {
-    animation: none;
-  }
-}
 
 @media (max-width: 720px) {
   .dock-screen[data-tab="concourse"] .vesper-preview-toolbar {
@@ -12291,7 +11869,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   overflow: hidden;
   margin: 0.24rem 0 0.18rem;
   color: #bec7bd;
-  font-family: Inter, ui-sans-serif, sans-serif;
+  font-family:var(--pixel-font);
   font-size: 0.54rem;
   line-height: 1.35;
   -webkit-box-orient: vertical;
@@ -12964,7 +12542,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 }
 
 #dock-screen :is(p, blockquote, li, .market-intel-empty) {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:var(--pixel-font);
   font-size: var(--station-body);
   line-height: var(--station-leading);
 }
@@ -13043,29 +12621,48 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 }
 
 #dock-screen .scene-pointer {
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: 3px;
   width: max-content;
-  min-width: 154px;
-  max-width: min(230px, 30vw);
-  min-height: 54px;
-  padding: 9px 12px 9px 31px;
+  min-width: 144px;
+  max-width: min(240px, calc(100% - 16px));
+  min-height: 56px;
+  padding: 10px 14px 10px 46px;
   background: rgba(3, 14, 38, 0.94);
 }
 
 #dock-screen .scene-pointer i {
+  left: 10px;
   width: 25px;
   height: 25px;
   font-size: 15px;
 }
 
 #dock-screen .scene-pointer b {
+  min-width: 0;
   font-size: var(--station-control);
-  line-height: 1.2;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 #dock-screen .scene-pointer small {
-  margin-top: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  margin: 0;
   font-size: var(--station-label);
   line-height: 1.25;
+}
+
+#dock-screen .scene-pointer em {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  margin: 0;
+  color: #65efcf;
+  font-family: var(--pixel-font);
+  font-size: 12px;
+  font-style: normal;
+  letter-spacing: 0.04em;
 }
 
 #dock-screen .market-menu-screen {
@@ -13242,7 +12839,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   height: 100%;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-family:var(--pixel-font);
 }
 
 #dock-screen .dealer-header {
@@ -13591,9 +13188,18 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   }
 
   #dock-screen .scene-pointer {
-    min-width: 136px;
-    max-width: 34vw;
+    min-width: 96px;
+    max-width: clamp(112px, 28vw, 180px);
+    min-height: 44px;
+    padding: 9px 12px;
+    gap: 0;
+    place-items: center;
+    text-align: center;
   }
+
+  #dock-screen .scene-pointer > :is(i, small, em) { display: none; }
+
+  #dock-screen .scene-pointer b { letter-spacing: 0.02em; }
 
   #dock-screen .mission-layout {
     grid-template-columns: 1fr;
@@ -14739,16 +14345,6 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #dock-screen .mission-list-empty p { color: #81939c; font-size: 11px; }
 #dock-screen .mission-list-empty { padding: 24px 16px; color: var(--void-cream); text-align: center; border: 1px dashed rgba(91, 160, 181, 0.4); }
 
-#dock-screen .bar-person-pointer.is-new em {
-  display: block;
-  margin-top: 3px;
-  color: #65efcf;
-  font-family: var(--pixel-font);
-  font-size: 8px;
-  font-style: normal;
-  letter-spacing: 0.08em;
-}
-
 #dock-screen .bar-dialogue-card {
   width: min(760px, 67vw);
   grid-template-columns: 132px minmax(0, 1fr);
@@ -14980,7 +14576,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   margin: 3px 0 0;
   overflow: hidden;
   color: #d8e7e8;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 11px;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -15031,7 +14627,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 
 .tutorial-skip-confirm span {
   color: #e4b8ad;
-  font-family: "Courier New", ui-monospace, monospace;
+  font-family:var(--pixel-font);
   font-size: 10px;
   line-height: 1.3;
 }
@@ -15260,7 +14856,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
   display: flex; flex-direction: column; gap: 12px;
   background: rgba(3, 11, 22, .96); background-size: cover; background-position: center;
-  color: #f1ece0; font-family: system-ui, sans-serif; text-shadow: none;
+  color: #f1ece0; font-family:var(--pixel-font); text-shadow: none;
 }
 .adventure-panel.is-hidden { display: none; }
 .adventure-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: 0 0 auto; }
@@ -15277,11 +14873,11 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .adventure-portrait .avatar { display: block; width: 100%; height: 100%; max-width: none; max-height: none; object-fit: cover; object-position: center 22%; border: 0; border-radius: 0; image-rendering: auto; }
 .adventure-portrait .generated-avatar { display: grid; place-items: center; font-size: 56px; }
 .adventure-portrait figcaption { position: absolute; bottom: 0; left: 0; right: 0; padding: 26px 12px 12px; background: linear-gradient(transparent, #03101ef0); color: #f5d586; font-size: 18px; }
-.adventure-portrait figcaption small { display: block; margin-top: 5px; font: 13px/1.4 system-ui, sans-serif; color: #c3d8de; }
+.adventure-portrait figcaption small { display: block; margin-top: 5px; font: 13px/1.4 var(--pixel-font); color: #c3d8de; }
 .map-node.mission-objective, .regional-system.mission-objective { outline: 2px solid #ffd24a; outline-offset: 3px; }
-.map-node.mission-objective > small { position: absolute; bottom: calc(100% + 5px); left: 0; padding: 1px 5px; color: #081222; background: #ffd24a; font: bold 12px/1.2 system-ui, sans-serif; }
+.map-node.mission-objective > small { position: absolute; bottom: calc(100% + 5px); left: 0; padding: 1px 5px; color: #081222; background: #ffd24a; font: bold 12px/1.2 var(--pixel-font); }
 .adventure-dialogue { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; padding: 6px 6px 4px; }
-.adventure-dialogue h2 { flex-shrink: 0; margin: 0 0 12px; font: 600 clamp(20px, 2.5vw, 30px)/1.15 system-ui, sans-serif; color: #f3d285; letter-spacing: .02em; }
+.adventure-dialogue h2 { flex-shrink: 0; margin: 0 0 12px; font: 600 clamp(20px, 2.5vw, 30px)/1.15 var(--pixel-font); color: #f3d285; letter-spacing: .02em; }
 .adventure-speech { margin: 0 0 18px; font-size: clamp(16px, 1.7vw, 22px); line-height: 1.5; max-width: 64ch; }
 .adventure-choices { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
 .adventure-choices button { text-align: left; font-size: 16px; line-height: 1.35; background: #071725db; }
@@ -15328,10 +14924,10 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   border: 1px solid var(--void-gold);
   box-shadow: var(--panel-shadow);
 }
-.new-career-card h2 { margin: 0 0 12px; font: 600 24px/1.2 system-ui, sans-serif; }
-.new-career-card p { margin: 0 0 20px; font: 16px/1.5 system-ui, sans-serif; }
+.new-career-card h2 { margin: 0 0 12px; font: 600 24px/1.2 var(--pixel-font); }
+.new-career-card p { margin: 0 0 20px; font: 16px/1.5 var(--pixel-font); }
 .new-career-actions { display: flex; flex-wrap: wrap; gap: 10px; }
-.new-career-actions button { flex: 1 1 200px; min-height: 48px; padding: 10px; font: 600 14px/1.3 system-ui, sans-serif; }
+.new-career-actions button { flex: 1 1 200px; min-height: 48px; padding: 10px; font: 600 14px/1.3 var(--pixel-font); }
 .new-career-actions button:focus-visible { outline: 3px solid var(--void-cyan); outline-offset: 3px; }
 
 /* Desktop keeps the existing two-column workbench. Short screens show one
@@ -15383,7 +14979,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   }
   #dock-screen .dealer-stages button { min-height: 44px; padding: 6px; font-size: 14px; }
   #dock-screen .dealer-stages button[aria-pressed="true"] { color: #09121d; background: var(--void-gold); border-color: var(--void-gold); }
-  #dock-screen .dealer-mobile-wallet { max-width: 110px; overflow-wrap: anywhere; color: var(--void-gold); font: 14px/1.3 system-ui, sans-serif; }
+  #dock-screen .dealer-mobile-wallet { max-width: 110px; overflow-wrap: anywhere; color: var(--void-gold); font: 14px/1.3 var(--pixel-font); }
   #dock-screen .dealer-notice {
     grid-row: 2;
     position: static;
@@ -15875,7 +15471,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
                  .fit-slot, .dealer-item-tile, .dealer-mount, .drone-bay-row,
                  .trade-ticket, .mission-dossier, .service-card, .ship-card,
                  .guild-card, .bar-dialogue-card, .ship-showroom-sheet) {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:var(--pixel-font);
   text-transform: none;
   letter-spacing: 0;
   font-weight: 500;
@@ -15989,14 +15585,12 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #dock-screen .commodity-hold-strip span { font-size: 12px; }
 #dock-screen .ship-spec-grid .stat-delta { font-size: 12px; }
 #dock-screen .ship-trade-numbers small { font-size: 12px; }
-#dock-screen .bar-person-pointer > em { font-size: 12px; }
 #dock-screen .guild-card-head small { font-size: 12px; }
 #dock-screen .guild-meter em { font-size: 12px; }
 #dock-screen .guild-benefits span { font-size: 12px; }
 #dock-screen .guild-next span { font-size: 12px; }
 #dock-screen .guild-next p { font-size: 13px; line-height: 1.4; }
 
-#dock-screen .bar-person-pointer.is-new em { font-size: 12px; }
 #dock-screen .mission-list-empty p,
 #dock-screen .mission-dossier-empty p { font-size: 13px; }
 
@@ -16263,7 +15857,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 }
 /* The artwork can vary, but critical readings must not scale with its tiny
    decorative lettering. Use a clear instrument face with restrained bloom. */
-#game-shell:not([data-cockpit-ship="wayfarer"]) .cockpit-screen { font-family:"Courier New",monospace; text-shadow:none; }
+#game-shell:not([data-cockpit-ship="wayfarer"]) .cockpit-screen { font-family:var(--pixel-font); text-shadow:none; }
 #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-bars > div,
 #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-flight,
 #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-own-weapon { font-size:clamp(11px,.9vw,14px); }
@@ -16331,25 +15925,34 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
    context; otherwise the painted frame hides targets near the screen edge. */
 #target-edge-pointer { z-index:6; }
 
-/* The comms log stays at the upper edge on every cockpit. Incoming
-   messages expand inward from that corner, leaving the aiming lane clear. */
-#game-shell { --comms-width:36vw; }
+/* Incoming comms grow inside each cockpit's free area, clear of monitors,
+   touch controls and the aiming lane. Idle uses a compact hull-specific anchor. */
+#game-shell { --comms-width:min(480px,39vw); --comms-left-limit:60vw; --comms-height:28dvh; --comms-top:var(--safe-top); --comms-right:var(--safe-right); --comms-text-inset:15px; --comms-line-height:17px; }
+#game-shell[data-cockpit-ship="vanguard"] { --comms-top:34dvh; --comms-width:min(480px,32vw); --comms-height:30dvh; }
+#game-shell[data-cockpit-ship="talon"] { --comms-width:min(480px,36vw); --comms-left-limit:62vw; --comms-height:24dvh; }
+#game-shell[data-cockpit-ship="prospector"] { --comms-width:min(480px,38vw); --comms-left-limit:62vw; }
+#game-shell[data-cockpit-ship="lancer"] { --comms-right:28vw; --comms-idle-right:28vw; --comms-width:44vw; --comms-left-limit:26vw; --comms-height:30dvh; }
+#game-shell[data-cockpit-ship="atlas"] { --comms-width:min(480px,36vw); --comms-left-limit:63vw; --comms-height:18dvh; }
+#game-shell[data-cockpit-ship="speedster"] { --comms-right:28vw; --comms-idle-right:28vw; --comms-width:44vw; --comms-left-limit:26vw; }
+#game-shell[data-cockpit-ship="legionary"] { --comms-width:min(480px,37vw); --comms-left-limit:62vw; }
+#game-shell[data-cockpit-ship="andromeda"] { --comms-width:min(480px,36vw); --comms-height:24dvh; }
+#game-shell[data-cockpit-ship="torsas"] { --comms-top:12dvh; --comms-right:21vw; --comms-width:44vw; --comms-left-limit:32vw; --comms-height:18dvh; }
+#game-shell[data-cockpit-ship="astra"] { --comms-width:min(480px,38vw); }
 .comms-channel {
-  position:absolute; z-index:6; top:var(--safe-top); right:var(--safe-right);
+  --comms-wing-gap:0px;
+  position:absolute; z-index:6; top:var(--comms-idle-top,var(--safe-top)); right:calc(var(--comms-idle-right,var(--safe-right)) + var(--comms-wing-gap));
   width:128px; max-width:80vw;
   display:flex; flex-direction:column; align-items:center; gap:4px; pointer-events:none;
 }
-.comms-channel:has(.comms-bar.active) { width:min(440px,var(--comms-width)); }
-/* Vanguard has instruments along its upper edge; transmissions sit in the
-   clear right-hand gap beneath them. The idle log keeps the same corner. */
-#game-shell[data-cockpit-ship="vanguard"] .comms-channel:has(.comms-bar.active) { top:34%; }
+.comms-channel:has(.comms-bar.active) { top:var(--comms-top); right:calc(var(--comms-right) + var(--comms-wing-gap)); width:min(var(--comms-width),calc(100vw - var(--comms-right) - var(--comms-wing-gap) - var(--comms-left-limit))); }
 #game-shell .comms-channel #comms-bar {
   position:relative; inset:auto; width:100%; margin:0; min-height:32px;
-  font:13px/1.3 "Courier New",monospace; letter-spacing:0; padding:6px 8px;
+  font:13px/1.3 var(--pixel-font); letter-spacing:0; padding:6px 8px;
 }
-#game-shell .comms-channel #comms-bar.active { min-height:44px; }
+#game-shell .comms-channel #comms-bar.active { min-height:44px; max-height:var(--comms-height); }
 #game-shell .comms-channel #comms-bar .talker-text {
-  min-width:0; max-height:min(64px,14vh); overflow-y:auto; overscroll-behavior:contain; touch-action:pan-y;
+  min-width:0; height:auto; max-height:calc(var(--comms-height) - var(--comms-text-inset)); flex:1;
+  overflow:hidden; touch-action:manipulation; text-align:left; overflow-wrap:anywhere;
 }
 #game-shell .comms-channel #patrol-reply-chip { position:relative; inset:auto; margin:0; flex:none; }
 #chat-panel .comms-card { max-height:calc(100dvh - 24px); }
@@ -16363,13 +15966,10 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   mask-size:100% 100%; mask-repeat:no-repeat;
 }
 #game-shell .comms-channel #comms-bar { min-height:44px; }
-.comms-channel:has(#patrol-reply-chip:not(.is-hidden)) { width:min(440px,var(--comms-width)); flex-direction:row; align-items:flex-start; }
+.comms-channel:has(#patrol-reply-chip:not(.is-hidden)) { top:var(--comms-top); right:calc(var(--comms-right) + var(--comms-wing-gap)); width:min(var(--comms-width),calc(100vw - var(--comms-right) - var(--comms-wing-gap) - var(--comms-left-limit))); flex-direction:row; align-items:flex-start; }
 .comms-channel:has(#patrol-reply-chip:not(.is-hidden)) #comms-bar { flex:1; min-width:0; }
-#game-shell .comms-channel #patrol-reply-chip { width:90px; max-width:30%; border-radius:4px; font-size:12px; letter-spacing:0; }
+#game-shell .comms-channel #patrol-reply-chip { width:90px; min-width:76px; max-width:36%; border-radius:4px; font-size:12px; letter-spacing:0; }
 
-.comms-channel .talker-text { scrollbar-width:thin; scrollbar-color:var(--void-gold) transparent; }
-.comms-channel .talker-text::-webkit-scrollbar { width:4px; }
-.comms-channel .talker-text::-webkit-scrollbar-thumb { background:var(--void-gold); }
 
 /* Compact flight instruments: numbers and short gauges with the hull
    schematic beside the bars. Full ship/loadout details remain in the
@@ -16622,11 +16222,16 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   }
 }
 @media (max-height:520px) and (orientation:landscape) {
+  #game-shell { --comms-line-height:14px; --comms-text-inset:11px; }
   .comms-channel { width:96px; }
-  #game-shell:is([data-cockpit-ship="lancer"],[data-cockpit-ship="torsas"]) .comms-channel { top:env(safe-area-inset-top,0px); }
-  #game-shell[data-cockpit-ship="speedster"] .comms-channel { right:30vw; }
-  #game-shell .comms-channel #comms-bar.active { height:44px; padding:4px 6px; }
-  #game-shell .comms-channel #comms-bar .talker-text { max-height:34px; }
+  #game-shell[data-cockpit-ship="vanguard"] { --comms-top:34dvh; --comms-right:58vw; --comms-idle-top:34dvh; --comms-idle-right:58vw; --comms-width:33vw; --comms-left-limit:9vw; --comms-height:32dvh; }
+  #game-shell[data-cockpit-ship="talon"] { --comms-top:env(safe-area-inset-top,0px); --comms-width:calc(38vw - var(--safe-right)); --comms-height:23dvh; }
+  #game-shell[data-cockpit-ship="lancer"] { --comms-right:31vw; --comms-idle-right:31vw; --comms-width:40vw; }
+  #game-shell[data-cockpit-ship="atlas"] { --comms-top:env(safe-area-inset-top,0px); --comms-width:38vw; --comms-left-limit:62vw; --comms-height:20.8dvh; }
+  #game-shell[data-cockpit-ship="andromeda"] { --comms-height:calc(24dvh - var(--safe-top)); }
+  #game-shell[data-cockpit-ship="torsas"] { --comms-top:12.8dvh; --comms-right:20vw; --comms-idle-right:20vw; --comms-width:48vw; --comms-height:17.2dvh; }
+  #game-shell .comms-channel #comms-bar { font-size:12px; }
+  #game-shell .comms-channel #comms-bar.active { height:auto; padding:4px 6px; }
 }
 
 /* Arena Run preparation: clear stage progress without covering flight. */
@@ -16645,15 +16250,15 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   #game-shell .cockpit-screen-own,
   #game-shell .cockpit-screen-target {
     container-type:size;
-    font-family:"Courier New",monospace;
+    font-family:var(--pixel-font);
     text-shadow:none;
     animation:none;
-    background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(80,187,219,.025) 3px 4px),linear-gradient(145deg,#071c2e,#03101e);
+    background:linear-gradient(145deg,#071c2e,#03101e);
     box-shadow:inset 0 0 0 1px rgba(78,184,215,.25),inset 0 0 18px rgba(0,0,0,.5);
   }
   #game-shell .cockpit-screen-own :is(.screen-flight,.screen-own-weapon,.screen-bars,.screen-event-ticker),
   #game-shell .cockpit-screen-target :is(.screen-heading,.screen-target-distance,.screen-target-readout,.screen-bars) {
-    font-family:"Courier New",monospace;
+    font-family:var(--pixel-font);
   }
   #game-shell .cockpit-screen-own .screen-flight small { display:none; }
   #game-shell .cockpit-screen-own::before,
@@ -16677,7 +16282,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
     letter-spacing:0; border:0; border-bottom:1px solid rgba(48,161,195,.25);
     font-family:inherit; text-shadow:none;
   }
-  #game-shell .cockpit-screen-own .screen-event-ticker { font:11px/16px "Courier New",monospace; padding:0; opacity:.8; }
+  #game-shell .cockpit-screen-own .screen-event-ticker { font:11px/16px var(--pixel-font); padding:0; opacity:.8; }
   #game-shell .cockpit-screen-own .hull-outline,
   #game-shell .cockpit-screen-target .hull-outline {
     max-height:100%; align-self:center; filter:none;
@@ -16704,11 +16309,11 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   }
   #game-shell .cockpit-screen-target:not(.has-capital-target) .screen-target-distance {
     height:18%; padding:0 8px; justify-content:flex-start;
-    font:700 clamp(16px,11cqh,24px)/1 "Courier New",monospace; letter-spacing:0; text-shadow:none;
+    font:700 clamp(16px,11cqh,24px)/1 var(--pixel-font); letter-spacing:0; text-shadow:none;
   }
   #game-shell .cockpit-screen-target:not(.has-capital-target) .screen-target-readout {
     height:15%; padding:0 8px; justify-content:flex-start;
-    font:clamp(12px,7cqh,14px)/1.2 "Courier New",monospace; text-shadow:none;
+    font:clamp(12px,7cqh,14px)/1.2 var(--pixel-font); text-shadow:none;
   }
   #game-shell .cockpit-screen-target:not(.has-capital-target) .screen-target-layout {
     flex:1; height:auto; min-height:0; padding:3px 8px 8px;
@@ -16840,7 +16445,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   .inventory-items { grid-template-columns:1fr; }
 }
 .equipment-inventory select { height:44px; min-height:44px; appearance:none; padding-right:28px; background-image:linear-gradient(45deg,transparent 50%,var(--void-muted) 50%),linear-gradient(135deg,var(--void-muted) 50%,transparent 50%); background-position:calc(100% - 15px) 19px,calc(100% - 10px) 19px; background-size:5px 5px; background-repeat:no-repeat; }
-.inventory-item b, .inventory-mount b { text-transform:none; font-family:Inter,ui-sans-serif,system-ui,sans-serif; }
+.inventory-item b, .inventory-mount b { text-transform:none; font-family:var(--pixel-font); }
 .inventory-loot .inventory-item .item-icon { width:32px; height:32px; }
 .equipment-inventory .inventory-loot > .inventory-item { min-height:44px; }
 @media(max-height:500px),(max-width:800px) {
@@ -17607,7 +17212,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 }
 
 /* Story radio stays on the existing comms strip, with one small speaker image. */
-#game-shell .comms-channel #comms-bar.has-portrait { display:flex; align-items:center; gap:8px; text-align:left; }
+#game-shell .comms-channel #comms-bar.has-portrait { display:flex; align-items:flex-start; gap:6px; text-align:left; }
 .comms-portrait { width:36px; height:36px; flex:0 0 36px; object-fit:cover; border:1px solid currentColor; border-radius:3px; }
 #game-shell .comms-channel #comms-bar.has-portrait .talker-text { flex:1; }
 .tutorial-notice-copy .tutorial-equipment-explainer { max-width:780px; font:14px/1.4 var(--ui-font); white-space:normal; overflow:visible; text-overflow:clip; }
@@ -17617,7 +17222,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .inventory-mount-picker > button { display:block; width:100%; margin-bottom:6px; text-align:left; min-height:44px; }
 .inventory-actions > [data-inventory-action="install"] { border-color:var(--void-gold); color:var(--void-gold); }
 @media(max-height:520px) and (orientation:landscape) {
- .comms-portrait { width:30px; height:30px; flex-basis:30px; }
+ .comms-portrait { width:28px; height:28px; flex-basis:28px; }
  .tutorial-notice-copy .tutorial-equipment-explainer { font-size:12px; line-height:1.3; }
 }
 
@@ -17857,3 +17462,34 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .race-flight-vector svg { width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.6; }
 .race-flight-vector .flight-vector-arrow,.race-flight-vector.is-edge .flight-vector-ring { display:none; }
 .race-flight-vector.is-edge .flight-vector-arrow { display:block; }
+
+/* Crisp output preserves the painted colours; no dither, grain or palette filter. */
+#game-shell { filter:none; }
+#game-shell .global-crt-overlay { display:none; }
+#game-shell .cockpit-screen { text-shadow:none; }
+#game-shell .cockpit-screen::before { display:none; }
+#game-shell .hull-outline, #game-shell #radar { image-rendering:pixelated; }
+#space-canvas { filter:none; image-rendering:pixelated; }
+
+#game-shell button, #game-shell input, #game-shell select, #game-shell textarea,
+#game-shell .cockpit-screen * { font-family:var(--pixel-font); }
+/* Tiny vector-font sizes lose whole rows in bitmap type. Keep spectator
+   labels readable without changing their ship-locked placement. */
+#game-shell .observer-unit-label b { font-size:12px; letter-spacing:0; }
+#game-shell .observer-unit small { font-size:10px; letter-spacing:0; }
+@media(min-width:901px) and (min-height:501px) {
+ #game-shell .observer-heading b { font-size:14px; }
+ #game-shell :is(.observer-heading small,.observer-clock small,.observer-status,.observer-legend) { font-size:12px; letter-spacing:0; }
+ #game-shell .observer-camera-tools span { font-size:11px; letter-spacing:0; }
+}
+/* Preserve the original painted cockpit, without converting or recolouring it. */
+#game-shell .cockpit-art,
+#game-shell .cockpit-bezel { image-rendering:pixelated; }
+
+#game-shell .cockpit-screen { filter:none; }
+
+/* Flight keeps the compact instrument typeface its monitor apertures were
+   designed for. Menus retain their VGA lettering. */
+#hud { --pixel-font:var(--flight-font); font-family:var(--flight-font); }
+#game-shell .comms-channel #comms-bar { line-height:var(--comms-line-height); }
+#game-shell .comms-channel #comms-bar.story::after { content:"›"; margin-left:2px; padding-left:4px; letter-spacing:0; }

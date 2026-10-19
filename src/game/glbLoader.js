@@ -162,6 +162,14 @@ export async function buildGlbScene(arrayBuffer) {
             const scale = definition.normalTexture.scale ?? 1;
             material.normalScale.set(scale, scale);
         }
+        // Authored inset windows and lamps need a small depth bias when seen
+        // through the flight camera's wide depth range. Opaque hull geometry
+        // stays unbiased; coplanar structural overlaps are removed offline.
+        if (definition.extras?.voidSurfaceOverlay) {
+            material.polygonOffset = true;
+            material.polygonOffsetFactor = -1;
+            material.polygonOffsetUnits = -2;
+        }
         material.name = definition.name ?? '';
         return material;
     });
@@ -175,21 +183,19 @@ export async function buildGlbScene(arrayBuffer) {
             const componentSize = COMPONENT_SIZE[accessor.componentType] ?? 4;
             const itemSize = TYPE_COUNT[accessor.type] ?? 1;
             const stride = bufferView.byteStride ?? componentSize * itemSize;
-            const out = new (accessor.componentType === 5126 ? Float32Array : accessor.componentType === 5123 ? Uint16Array : Uint32Array)(accessor.count * itemSize);
+            const ArrayType = ({5120:Int8Array,5121:Uint8Array,5122:Int16Array,5123:Uint16Array,5125:Uint32Array,5126:Float32Array})[accessor.componentType];
+            const out = new ArrayType(accessor.count * itemSize);
             const absoluteOffset = bin.byteOffset + byteOffset;
             if (LITTLE_ENDIAN && stride === componentSize * itemSize
                 && absoluteOffset % componentSize === 0
-                && (accessor.componentType === 5126 || accessor.componentType === 5123 || accessor.componentType === 5125)) {
+                && COMPONENT_SIZE[accessor.componentType]) {
                 // Copy, rather than retain a view into the multi-megabyte GLB:
                 // this preserves independent geometry buffers and frees BIN.
                 out.set(new out.constructor(bin.buffer, absoluteOffset, out.length));
                 return out;
             }
-            const reader = accessor.componentType === 5126
-                ? (o) => dataView.getFloat32(o, true)
-                : accessor.componentType === 5123
-                    ? (o) => dataView.getUint16(o, true)
-                    : (o) => dataView.getUint32(o, true);
+            const readers = {5120:o=>dataView.getInt8(o),5121:o=>dataView.getUint8(o),5122:o=>dataView.getInt16(o,true),5123:o=>dataView.getUint16(o,true),5125:o=>dataView.getUint32(o,true),5126:o=>dataView.getFloat32(o,true)};
+            const reader = readers[accessor.componentType];
             for (let i = 0; i < accessor.count; i += 1) {
                 const base = byteOffset + i * stride;
                 for (let k = 0; k < itemSize; k += 1)
@@ -205,6 +211,10 @@ export async function buildGlbScene(arrayBuffer) {
             geometry.setAttribute('tangent', new THREE.BufferAttribute(readAccessor(primitive.attributes.TANGENT), 4));
         if (primitive.attributes.TEXCOORD_0 !== undefined)
             geometry.setAttribute('uv', new THREE.BufferAttribute(readAccessor(primitive.attributes.TEXCOORD_0), 2));
+        if (primitive.attributes.COLOR_0 !== undefined) {
+            const index = primitive.attributes.COLOR_0, accessor = json.accessors[index];
+            geometry.setAttribute('color', new THREE.BufferAttribute(readAccessor(index), TYPE_COUNT[accessor.type], accessor.normalized ?? false));
+        }
         if (primitive.indices !== undefined)
             geometry.setIndex(new THREE.BufferAttribute(readAccessor(primitive.indices), 1));
         geometry.computeBoundingSphere();
@@ -231,7 +241,9 @@ export async function buildGlbScene(arrayBuffer) {
         }
         if (node.mesh !== undefined) {
             for (const primitive of json.meshes[node.mesh].primitives) {
-                const mesh = new THREE.Mesh(buildGeometry(primitive), materials[primitive.material ?? 0]);
+                const material = materials[primitive.material ?? 0];
+                if (primitive.attributes.COLOR_0 !== undefined) material.vertexColors = true;
+                const mesh = new THREE.Mesh(buildGeometry(primitive), material);
                 mesh.name = json.meshes[node.mesh].name ?? object.name;
                 mesh.castShadow = true;
                 object.add(mesh);

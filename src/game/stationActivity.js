@@ -69,7 +69,8 @@ export function addStationActivity(station, id) {
                 if (!capital) continue;
                 const x = center.x + side*(size.x/2+2.3);
                 const berth = STATION_OCCUPANTS[id]?.ships.find(item => ship.name === `berthed-${item.hull}`);
-                const bottom = (berth ? berth.at[2] + 1.8 : bounds.min.y-1) + .3;
+                // A lift starts on the dock floor, not beside the elevated keel.
+                const bottom = (berth?.deck ?? bounds.min.y-1) + .3;
                 const railZ = center.z + side * size.z * .27;
                 const top = center.y+size.y*.2;
                 fixture(dock,'Service lift guide',[x,(bottom+top)/2,railZ],[.28,top-bottom+2,.28],steel);

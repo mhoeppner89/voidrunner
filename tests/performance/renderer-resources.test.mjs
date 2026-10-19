@@ -74,7 +74,7 @@ test('debris compaction preserves edge objects, restores visibility and refreshe
     b.mesh.getMatrixAt(0, m); assert.equal(m.elements[14], -10);
 });
 
-test('compacted asteroids retain raycast identity and selection colors after turning', () => {
+test('compacted asteroids retain raycast identity and natural colors when selected or scanned', () => {
     const r = fieldRenderer();
     const nodes = [piece([0, 0, -10]), piece([100, 0, 0])];
     nodes.forEach((node, index) => Object.assign(node, { id: String(index), radius: 1 }));
@@ -94,7 +94,14 @@ test('compacted asteroids retain raycast identity and selection colors after tur
         assert.ok(hit, 'tap ray still hits the visible asteroid');
         assert.equal(b.mesh.userData.nodeIndices[hit.instanceId], index);
         const color = new THREE.Color(); b.mesh.getColorAt(0, color);
-        assert.equal(color.getHex(), 0xcfe884);
+        assert.equal(color.getHex(), 0x123456);
+        const version = b.mesh.instanceColor.version;
+        nodes[index].scanned = true;
+        r.selectedAsteroidId = undefined;
+        r.updateAsteroidInstances(frustum(r.camera));
+        b.mesh.getColorAt(0, color);
+        assert.equal(color.getHex(), 0x123456);
+        assert.equal(b.mesh.instanceColor.version, version, 'selection and scanning need no color upload');
     }
 });
 function model() {
@@ -139,6 +146,9 @@ test('renderer shutdown releases postprocessing and cached resources', () => {
     r.dynamicRoot = new THREE.Group();
     r.screenTextures = [];
     r.bloomSceneTarget = new THREE.WebGLRenderTarget(2, 2);
+    r.pixelSceneTarget = new THREE.WebGLRenderTarget(2,2);
+    r.pixelResolveMaterial = new THREE.ShaderMaterial();
+    r.pixelQuad = new THREE.Mesh(new THREE.PlaneGeometry(),r.pixelResolveMaterial);
     r.sunLight=new THREE.DirectionalLight();r.sunLight.shadow.map=new THREE.WebGLRenderTarget(2,2);
     r.bloomBlurTargets = [new THREE.WebGLRenderTarget(2, 2), new THREE.WebGLRenderTarget(2, 2)];
     r.bloomBrightMaterial = new THREE.ShaderMaterial();
@@ -149,6 +159,7 @@ test('renderer shutdown releases postprocessing and cached resources', () => {
     const glow = r.radialTexture('#ffffff', '#123456');
     const resources = [sprite.geometry, sprite.material, glow, r.scene.environment, r.sunLight.shadow.map, r.bloomSceneTarget, ...r.bloomBlurTargets,
         r.bloomBrightMaterial, r.bloomBlurMaterial, r.bloomCompositeMaterial, r.bloomQuad.geometry,
+        r.pixelSceneTarget,r.pixelResolveMaterial,r.pixelQuad.geometry,
         r.glbShipModels.get('talon').children[0].geometry];
     const counts = resources.map(watch);
     r.dispose();
@@ -183,4 +194,33 @@ test('glow cache has bounded retention; overflow textures remain individually ow
         }
     }
     assert.equal(r.radialTextureCache.size, 64);
+});
+
+test('racing hulls skip unused fracture preparation while combat ships retain it',()=>{
+ const r=renderer(),source=model(),scheduled=[];r.wreckFactory={schedule:ship=>scheduled.push(ship)};
+ const racer=r.createGlbShipMesh({id:'race',role:'racer',race:{},faction:'independents'},source,config,'talon');
+ assert.equal(scheduled.length,0);assert.ok(racer.userData.glb);
+ const combat=r.createGlbShipMesh({id:'combat',role:'pirate',hostile:true},source,config,'talon');
+ assert.deepEqual(scheduled,[combat]);r.disposeGlbShip(racer);r.disposeGlbShip(combat);
+});
+
+test('mining delivery cycles retain hidden drone buffers and shader references until the unit is removed',()=>{
+ const r=renderer();r.droneVisuals={};r.droneSyncRevision=0;r.dynamicRoot=new THREE.Group();r.camera=new THREE.PerspectiveCamera();r.dronePrevPosition=new THREE.Vector3();r.dronePrevRotation=new THREE.Quaternion();
+ let created=0,disposed=0;r.createDroneVisual=unit=>{created++;const root=new THREE.Group(),body=new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshStandardMaterial());body.geometry.addEventListener('dispose',()=>disposed++);root.add(body);r.dynamicRoot.add(root);return{root,beam:new THREE.Group(),engine:new THREE.Group(),lamp:new THREE.Mesh(),type:unit.type,glow:.2};};
+ r.updateMiningDebris=r.updateRepairSparks=()=>{};
+ const unit={id:'miner',type:'mining',hull:10,state:'mining',position:[0,0,-50],rotation:[0,0,0,1]},fleet={unitsById:{miner:unit}},player={shipId:'wayfarer',outfitting:{loadouts:{wayfarer:{droneBays:[{unitIds:['miner']}]}}}};
+ r.syncDrones(fleet,undefined,1,player);const visual=r.droneVisuals.miner;
+ for(let i=0;i<30;i++){
+  unit.state='stowed';r.syncDrones(fleet,undefined,1,player);assert.equal(r.droneVisuals.miner,visual);assert.equal(visual.root.visible,false);
+  unit.state='mining';r.syncDrones(fleet,undefined,1,player);assert.equal(r.droneVisuals.miner,visual);assert.equal(visual.root.visible,true);
+ }
+ assert.equal(created,1);assert.equal(disposed,0);
+ unit.state='stowed';player.outfitting.loadouts.wayfarer.droneBays[0].unitIds=[];r.syncDrones(fleet,undefined,1,player);assert.equal(disposed,1);assert.equal(r.droneVisuals.miner,undefined,'uninstalled stock must not retain GPU resources');
+});
+
+test('environment shader preparation restores hidden regions and shadow settings',async()=>{
+ const r=renderer(),region=new THREE.Group(),scene=new THREE.Scene(),originalTarget={};region.visible=false;scene.add(region);const calls=[];let target=originalTarget;
+ Object.assign(r,{scene,camera:new THREE.PerspectiveCamera(),instanceRoots:new Map([['shardbelt',region]]),sunLight:{castShadow:false},isIOS:false,bloomSceneTarget:{},bloomEnabled:()=>true,prepareCombatWarmup:()=>new THREE.Group(),renderer:{shadowMap:{enabled:false,type:THREE.PCFShadowMap},getRenderTarget:()=>target,setRenderTarget:t=>{target=t;},compileAsync:async()=>{calls.push({region:region.visible,shadow:r.renderer.shadowMap.enabled,type:r.renderer.shadowMap.type});}}});
+ await r.prepareActiveScene();assert.equal(calls.length,4);assert.ok(calls.every(c=>c.region));assert.ok(calls.some(c=>c.shadow&&c.type===THREE.PCFSoftShadowMap));
+ assert.equal(region.visible,false);assert.equal(r.renderer.shadowMap.enabled,false);assert.equal(r.renderer.shadowMap.type,THREE.PCFShadowMap);assert.equal(r.sunLight.castShadow,false);assert.equal(target,originalTarget);
 });

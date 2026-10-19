@@ -46,20 +46,7 @@ export const GALAXY_LOCATIONS = {
             "electronics": 0.88,
             "machinery": 0.9
         },
-        "people": [
-            {
-                "id": "haven-factor",
-                "name": "Iona Rell",
-                "role": "Freeport liaison",
-                "affiliation": "Alliance",
-                "portraitSeed": 311,
-                "lines": [
-                    "Haven stays open because everybody here has repaired something for somebody else.",
-                    "We trade water, food and machine parts under Acheron’s shadow. No parade, no gatekeeping—just fair weights and a berth if you need one.",
-                    "Unity builds the Alliance’s hard ships. Haven keeps the crews fed and the civilian hulls moving. If you want their trust, start with work that helps people."
-                ]
-            }
-        ]
+        "people": []
     },
     "league-yard": {
         "id": "league-yard",
@@ -106,20 +93,7 @@ export const GALAXY_LOCATIONS = {
             "electronics": 0.88,
             "machinery": 0.9
         },
-        "people": [
-            {
-                "id": "league-yard-factor",
-                "name": "Commander Soren Vale",
-                "role": "Shipworks commander",
-                "affiliation": "Alliance",
-                "portraitSeed": 312,
-                "lines": [
-                    "A hull tells you what its builders believe. Ours are compact, repairable and built to come home.",
-                    "Unity does not sell military hulls on a handshake. Earn Alliance standing, then choose the ship that matches the work you are willing to do.",
-                    "The Alliance’s ships are in these bays, not in some admiral’s story. Look closely at the Speedster, Legionary, Andromeda, Torsas and Astra before you decide."
-                ]
-            }
-        ]
+        "people": []
     },
     "cinderfall": {
         "id": "cinderfall",
@@ -164,20 +138,7 @@ export const GALAXY_LOCATIONS = {
             "electronics": 0.88,
             "machinery": 0.9
         },
-        "people": [
-            {
-                "id": "cinderfall-factor",
-                "name": "Mika Dorn",
-                "role": "Foundry liaison",
-                "affiliation": "Alliance",
-                "portraitSeed": 313,
-                "lines": [
-                    "If the floor is warm, the habitat is earning its keep.",
-                    "Cinderfall turns Shattered Crown ore into the parts Haven trades and Unity bolts onto hulls. We are not pretty, but we are why the frontier keeps moving.",
-                    "Bring ore, food or a willingness to work. Leave the speeches to the officers at Unity."
-                ]
-            }
-        ]
+        "people": []
     },
     "acheron-belt": {
         "id": "acheron-belt",
@@ -234,32 +195,7 @@ export const GALAXY_LOCATIONS = {
             race: true,
         },
         encounterRate: 0.48,
-        people: [
-            {
-                id: 'juno-rell',
-                name: 'Juno Rell',
-                role: 'Race coordinator',
-                affiliation: 'Cairn Yard Racing League',
-                portraitSeed: 214,
-                lines: [
-                    'You made it to Cairn. Are you here to race, or are you here to watch someone else hit a wreck?',
-                    'The next gate is not the finish; hold your line and save afterburner for the exit.',
-                    'The Mourning Run is drawing faster hulls this cycle. Every checkpoint counts.',
-                ],
-            },
-            {
-                id: 'merrit-voss',
-                name: 'Merrit Voss',
-                role: 'Depot mechanic',
-                affiliation: 'Salvage Union',
-                portraitSeed: 227,
-                lines: [
-                    'Merrit Voss. Park the ship where I can reach it, then tell me what the wrecks did to you.',
-                    'Keep your approach slow near the hull plates; a salvage beam cannot repair a collision.',
-                    'A new claim beacon lit inside the Mourning Line, but two crews are already disputing it.',
-                ],
-            },
-        ],
+        people: [],
     },
 
     'meridian-prime': {
@@ -312,45 +248,7 @@ export const GALAXY_LOCATIONS = {
         },
         shipsForSale: ['talon', 'atlas', 'lancer'],
         encounterRate: 0.22,
-        people: [
-            {
-                id: 'leon-vale',
-                name: 'Leon Vale',
-                role: 'Orbital market factor',
-                marketTipster: true,
-                affiliation: 'Merchant Guild',
-                portraitSeed: 241,
-                lines: [
-                    'Welcome to Meridian Prime. Give me your origin and destination, and I’ll show you the useful prices.',
-                    'Do not fill the hold before checking the return leg; Meridian’s cheap electronics leave little room for a second cargo.',
-                    'Customs tightened inspections on cargo from Redwake after another unregistered shipment came through.',
-                ],
-            },
-            {
-                id: 'sela-orrin',
-                name: 'Sela Orrin',
-                role: 'Concord customs liaison',
-                affiliation: 'Concord Patrol',
-                portraitSeed: 253,
-                lines: [
-                    'Sela Orrin, Concord customs. If your manifest is ready, we can keep this conversation short.',
-                    'Keep your transponder live in the approach lane and make sure the cargo count matches the sealed hold.',
-                    'The gate records show more dark arrivals from Redwake this week, so patrols are checking closer to Meridian Prime.',
-                ],
-            },
-            {
-                id: 'tomas-quin',
-                name: 'Tomas Quin',
-                role: 'Dockside courier',
-                affiliation: 'Free Merchants Compact',
-                portraitSeed: 266,
-                lines: [
-                    'Tomas Quin, courier desk. I can find a fast contract, but I cannot make a late pilot look punctual.',
-                    'Set your course before you launch and leave enough fuel for the final approach.',
-                    'Argent is clearing a backlog of hulls, and its outbound cargo queues are stretching into the Foundry Lanes.',
-                ],
-            },
-        ],
+        people: [],
     },
 
     argent: {
@@ -403,45 +301,7 @@ export const GALAXY_LOCATIONS = {
         },
         shipsForSale: ['vanguard', 'lancer', 'blade', 'atlas'],
         encounterRate: 0.26,
-        people: [
-            {
-                id: 'arden-kai',
-                name: 'Arden Kai',
-                role: 'Shipwright foreman',
-                affiliation: 'Argent Shipworks',
-                portraitSeed: 279,
-                lines: [
-                    'Arden Kai, Argent foreman. Tell me what the ship must do, and I’ll tell you which hull can do it.',
-                    'Compare the launcher and magazine space before you buy; a bigger hull does not automatically carry more ordnance.',
-                    'The Foundry Lanes are busy with new frigates, and test flights are getting priority over civilian traffic.',
-                ],
-            },
-            {
-                id: 'mira-kest',
-                name: 'Mira Kest',
-                role: 'Outfitting broker',
-                marketTipster: true,
-                affiliation: 'Merchant Guild',
-                portraitSeed: 291,
-                lines: [
-                    'Mira Kest. Bring your current fitting and your budget; we can work from there.',
-                    'Fit the launcher for the ammunition you can actually replace, then leave room for the mission cargo.',
-                    'Meridian Prime is buying finished machinery again, while frontier yards are taking Argent’s scrap.',
-                ],
-            },
-            {
-                id: 'bram-tel',
-                name: 'Bram Tel',
-                role: 'Test-flight pilot',
-                affiliation: 'Concord Patrol',
-                portraitSeed: 304,
-                lines: [
-                    'Bram Tel, test flight. If the warning lights change when you turn, I want to hear about it.',
-                    'Test a new loadout with a full hold; mass changes the turn and the braking distance.',
-                    'Concord is reserving a clear lane through the Foundry Lanes for the next round of trials.',
-                ],
-            },
-        ],
+        people: [],
     },
 
     'gatehouse-twelve': {
@@ -536,46 +396,7 @@ export const GALAXY_LOCATIONS = {
         },
         shipsForSale: ['scrapper', 'demon', 'talon', 'vanguard', 'prospector'],
         encounterRate: 0.62,
-        people: [
-            {
-                id: 'vesh-orr',
-                name: 'Vesh Orr',
-                role: 'Freeport fixer',
-                marketTipster: true,
-                affiliation: 'Red Talon Syndicate',
-                portraitSeed: 318,
-                lines: [
-                    'Vesh Orr. You found Blackglass, so you probably already know that discretion costs extra.',
-                    'If you run dark, cut your emissions before the patrol gets close; a silent transponder is not a silent ship.',
-                    'The Talons are paying well for electronics, and that has made the route from Cinder much less quiet.',
-                ],
-            },
-            {
-                id: 'nara-quill',
-                name: 'Nara Quill',
-                role: 'Independent broker',
-                marketTipster: true,
-                affiliation: 'Free Merchants Compact',
-                portraitSeed: 331,
-                lines: [
-                    'Nara Quill, independent broker. Tell me whether you want a clean price or a quiet delivery.',
-                    'Count the escort and the den fee before you call a Redwake quote profitable.',
-                    'Cinder’s refinery is running again, and Blackglass is short on the machinery it needs to keep up.',
-                ],
-            },
-            {
-                id: 'kellan-rusk',
-                name: 'Kellan Rusk',
-                role: 'Mercenary captain',
-                affiliation: 'Independent',
-                portraitSeed: 344,
-                lines: [
-                    'Kellan Rusk. If you’re taking a belt contract, I’ll tell you where the rocks stop protecting you.',
-                    'Use the debris for cover, but keep an escape vector; pirates wait for pilots who fly into dead ends.',
-                    'Ash Crown has been hitting refinery haulers in the Redwake Belt and selling their transponder keys.',
-                ],
-            },
-        ],
+        people: [],
     },
 
     cinder: {
@@ -628,45 +449,7 @@ export const GALAXY_LOCATIONS = {
         },
         shipsForSale: ['prospector', 'atlas'],
         encounterRate: 0.5,
-        people: [
-            {
-                id: 'mara-jen',
-                name: 'Mara Jen',
-                role: 'Station quartermaster',
-                marketTipster: true,
-                affiliation: 'Free Merchants Compact',
-                portraitSeed: 357,
-                lines: [
-                    'Mara Jen, Cinder quartermaster. Tell me what the station needs and how much room you have left.',
-                    'Keep a reserve of water and machinery mass; a refinery run is no use if you cannot make the return.',
-                    'Blackglass is asking for medigel again, while Torchwell has fuel but almost no spare parts.',
-                ],
-            },
-            {
-                id: 'dax-hollis',
-                name: 'Dax Hollis',
-                role: 'Refinery engineer',
-                affiliation: 'Cinder Independent Assembly',
-                portraitSeed: 369,
-                lines: [
-                    'Dax Hollis. The refinery is loud because it is working; if it goes quiet, call me immediately.',
-                    'Do not run the drive hot all the way to Torchwell; short afterburner bursts leave more margin for docking.',
-                    'One of Cinder’s pumps failed yesterday, and the replacement shipment from Argent is late.',
-                ],
-            },
-            {
-                id: 'rhea-sol',
-                name: 'Rhea Sol',
-                role: 'Freight dispatcher',
-                affiliation: 'Merchant Guild',
-                portraitSeed: 382,
-                lines: [
-                    'Rhea Sol, freight dispatch. I can put a real deadline on a job, so give me a route you can actually fly.',
-                    'Leave time to slow down at the destination; a late approach still misses the contract.',
-                    'More pilots are taking Cinder runs to Blackglass, and pirates are waiting closer to the approach.',
-                ],
-            },
-        ],
+        people: [],
     },
 
     torchwell: {
@@ -761,45 +544,7 @@ export const GALAXY_LOCATIONS = {
         },
         shipsForSale: ['talon', 'prospector'],
         encounterRate: 0.34,
-        people: [
-            {
-                id: 'dr-elin-saye',
-                name: 'Dr. Elin Saye',
-                role: 'Research director',
-                marketTipster: true,
-                affiliation: 'Pale Ring Survey Authority',
-                portraitSeed: 395,
-                lines: [
-                    'I’m Dr. Elin Saye. If your sensor logs are intact, the Pale Ring Survey Authority can use them.',
-                    'Record the full scan before you leave a ring corridor; a single contact is not enough to map it.',
-                    'A probe went silent near the Pale Rings, and Pavel is sending a search crew through Shepherd Relay.',
-                ],
-            },
-            {
-                id: 'pavel-orn',
-                name: 'Pavel Orn',
-                role: 'Survey dispatcher',
-                affiliation: 'Pale Ring Survey Authority',
-                portraitSeed: 408,
-                lines: [
-                    'Pavel Orn, survey dispatch. Give me your last known position and I’ll check the ring traffic.',
-                    'Use Shepherd Relay as a checkpoint, then approach the dense bands with a clear return vector.',
-                    'The safe corridor through the Pale Rings shifted again, and the old beacon is now off the chart.',
-                ],
-            },
-            {
-                id: 'tessa-rye',
-                name: 'Tessa Rye',
-                role: 'Clinic quartermaster',
-                affiliation: 'Civilian Medical Service',
-                portraitSeed: 421,
-                lines: [
-                    'Tessa Rye, clinic stores. If you have room for medicine, I can give you a delivery that matters.',
-                    'Medicine travels at temperature or not at all. Take the long lane rather than risk a warm case.',
-                    'Boreal’s eastern settlement is short on medigel after a fracture opened beneath the pressure domes.',
-                ],
-            },
-        ],
+        people: [],
     },
 
     boreal: {
@@ -852,45 +597,7 @@ export const GALAXY_LOCATIONS = {
         },
         shipsForSale: ['prospector', 'atlas'],
         encounterRate: 0.4,
-        people: [
-            {
-                id: 'soren-vek',
-                name: 'Soren Vek',
-                role: 'Extraction supervisor',
-                marketTipster: true,
-                affiliation: 'Frontier Miners Cooperative',
-                portraitSeed: 434,
-                lines: [
-                    'Soren Vek, extraction supervisor. If you’re here for a claim, show me the scan and your cargo limit.',
-                    'Do not promise more ore than your hold can take; a claim only counts what you cut and bring back.',
-                    'Water output is up on Boreal, but machinery deliveries from Nacre are still behind schedule.',
-                ],
-            },
-            {
-                id: 'aya-north',
-                name: 'Aya North',
-                role: 'Colony medic',
-                affiliation: 'Civilian Medical Service',
-                portraitSeed: 447,
-                lines: [
-                    'Aya North, colony medic. Are you here with supplies, or are you another pilot asking for directions out?',
-                    'Take the medicine first and keep the ship intact; damaged medical cargo helps nobody.',
-                    'The clinic is treating more radiation injuries from the eastern fracture, and the next medigel shipment is overdue.',
-                ],
-            },
-            {
-                id: 'halden-ree',
-                name: 'Halden Ree',
-                role: 'Ice-hauler captain',
-                affiliation: 'Free Merchants Compact',
-                portraitSeed: 460,
-                lines: [
-                    'Halden Ree, ice-hauler. I can give you the route, but you still have to fly around the ring traffic.',
-                    'Watch the distance to drifting ice and leave room to turn when the scanner fills with returns.',
-                    'Nacre is asking for fresh samples, while Boreal’s water tanks are finally running full.',
-                ],
-            },
-        ],
+        people: [],
     },
 
     shepherd: {

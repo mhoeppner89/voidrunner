@@ -129,11 +129,10 @@ export function stepPlayerDocking(session, dt) {
     return true;
 }
 
-// A station launch now releases the pilot at the marked pad. The Launch button
-// starts the flight with engines at idle and the ship facing the clearance gate.
+// The exterior departure shot clears the station before returning control.
+// Spawn beyond its approach gate, facing outward, with gentle forward thrust.
 export function preparePlayerLaunch(session, id) {
     const p = session.save.player;
-    const height = session.playerHullExtents()[1];
     const candidates=sessionBerths(session,id);
     const berth = candidates.find(b=>b.padIndex===(p.stationPadIndex??0))??candidates[0];
     if (!berth) return null;
@@ -144,10 +143,11 @@ export function preparePlayerLaunch(session, id) {
         berth.gate[2] - berth.pad[2],
     ).normalize();
     q.setFromUnitVectors(forward, direction).toArray(p.rotation);
-    p.position.splice(0, 3, ...berth.pad);
-    p.velocity.fill(0);
+    const clearance=Math.max(60,Math.max(...session.playerHullExtents())*3);
+    p.position.splice(0,3,...berth.gate.map((n,i)=>n+direction.getComponent(i)*clearance));
+    direction.clone().multiplyScalar(6).toArray(p.velocity);
     p.angularVelocity.fill(0);
-    p.throttle = 0;
+    p.throttle = .18;
     session.autopilot = false;
     session.afterburning = false;
     session.stationLandingGuideId = undefined;

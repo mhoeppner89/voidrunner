@@ -178,6 +178,7 @@ test('the campaign order saves with the career and reads in German',()=>{
         remove(){const parent=this.parentNode;if(parent){const at=parent.children.indexOf(this);if(at>=0)parent.children.splice(at,1);}}});
     const rail=makeNode();
     const ui=Object.create(GameUI.prototype);
+    let commsFits=0;ui.scheduleCommsFit=()=>{commsFits++;};
     ui.root={querySelector:selector=>selector==='#hud-wing-tactics'?rail:undefined,createElement:()=>makeNode()};
     ui.setWingTactics([{index:0,order:'breakoff',name:'Rin Vek',hull:36,maxHull:36,shield:110,maxShield:220}],1);
     assert.equal(rail.children.length,1,'one card for the one companion');
@@ -189,11 +190,13 @@ test('the campaign order saves with the career and reads in German',()=>{
     assert.match(card.innerHTML,/width:100%/,'the hull fill reads full');
     assert.match(card.innerHTML,/width:50%/,'the shield fill reads half');
     assert.equal(ui.wingOrderCount,1,'the ship menu reads the live wing count');
+    assert.equal(commsFits,1,'a new wing reserves room beside comms');
     // Repaints are keyed: same state, same card object, no innerHTML churn.
     const before=card.innerHTML;
     ui.setWingTactics([{index:0,order:'breakoff',name:'Rin Vek',hull:36,maxHull:36,shield:110,maxShield:220}],1);
     assert.equal(rail.children[0],card,'the card is reused, not rebuilt');
     assert.equal(card.innerHTML,before);
+    assert.equal(commsFits,1,'unchanged wing telemetry does not remeasure comms');
     ui.setWingTactics([{index:0,order:'defensive',name:'Rin Vek',hull:36,maxHull:36,shield:220,maxShield:220}],1);
     assert.equal(card.dataset.wingOrder,'defensive');
     assert.match(card.innerHTML,/width:100%/,'a full shield refills the fill');
@@ -201,6 +204,7 @@ test('the campaign order saves with the career and reads in German',()=>{
     ui.setWingTactics([],0);
     assert.equal(rail.children.length,0,'no wing, no cards');
     assert.equal(ui.wingOrderCount,0);
+    assert.equal(commsFits,2,'removing the wing returns its comms space');
     setLanguage('de');
     // The emptied rail grows a fresh card; the state key still repaints it in
     // the language of the moment.

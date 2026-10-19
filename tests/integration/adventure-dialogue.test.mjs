@@ -15,6 +15,25 @@ function fixture(script,space=false) {
     ui.startAdventure({id:'mara-vek',name:'Mara Vek'},script,space);
     return {ui,calls};
 }
+test('bars retain only the story cast and quest-driven visits',async()=>{
+    const {LOCATIONS}=await import('../../src/game/data.js');
+    const {createNewSave}=await import('../../src/game/save.js');
+    const {getTutorialQuest}=await import('../../src/game/tutorialCampaign.js');
+    for(const [id,location] of Object.entries(LOCATIONS))
+        assert.deepEqual((location.people??[]).map(p=>p.id),id==='helix'?['mara-vek','rin-vek']:[],id);
+    const ui=Object.create(GameUI.prototype);ui.save=createNewSave(5821,{tutorial:true});ui.dockLocation='helix';
+    const q=getTutorialQuest(ui.save);
+    q.stepId='mining-contract';assert.deepEqual(ui.barPeople('vesper').map(p=>p.id),['rin-vek']);
+    q.stepId='rin-cairn';assert.deepEqual(ui.barPeople('cairn').map(p=>p.id),['rin-vek','paul']);
+    q.stepId='complete';q.completedAt=10;assert.deepEqual(ui.barPeople('vesper'),[]);assert.deepEqual(ui.barPeople('cairn'),[]);
+    assert.deepEqual(ui.barPeople('helix').map(p=>p.id),['mara-vek']);
+});
+test('remaining contacts do not offer arbitrary news or advice topics',async()=>{
+    const {LOCATIONS}=await import('../../src/game/data.js');
+    const {createNewSave}=await import('../../src/game/save.js');
+    const ui=Object.create(GameUI.prototype);ui.save=createNewSave(5822,{tutorial:false});ui.dockLocation='helix';
+    for(const person of LOCATIONS.helix.people){const ids=ui.dialogueTopics(person).map(t=>t.id);assert.ok(!ids.includes('local')&&!ids.includes('advice'));assert.ok(ids.includes('work'));}
+});
 test('every authored node has translated text and a path to completion',()=>{
     for(const script of Object.values(ADVENTURE_DIALOGUES)){
         assert.ok(script.nodes[script.start]);

@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import {stoneNoise} from './asteroidFieldLayout.js';
 
 export const ASTEROID_FINISH_PALETTES = Object.freeze({
-    iron: {base:0xe4d6c3,accent:0xd0a060,scan:0xe6cc97},
-    ice: {base:0xb8cee0,accent:0xe6f4ff,scan:0xa8c4dc},
-    dark: {base:0xc1b3a5,accent:0xb0483a,scan:0xd5b18a},
+    iron: {base:0xe4d6c3,accent:0xd0a060},
+    ice: {base:0xb8cee0,accent:0xe6f4ff},
+    dark: {base:0xc1b3a5,accent:0xb0483a},
 });
 
 // One field-sized sunlight map. Cache it between updates: the major chunks
@@ -62,7 +62,7 @@ export function createAsteroidFragmentMaterials(){
         }
         const map=new THREE.DataTexture(data,size,size,THREE.RGBAFormat);
         map.name=`asteroid-${kind}-64px`;map.colorSpace=THREE.SRGBColorSpace;
-        map.magFilter=THREE.NearestFilter;map.minFilter=THREE.NearestMipmapNearestFilter;
+        map.magFilter=THREE.NearestFilter;map.minFilter=THREE.LinearMipmapLinearFilter;
         map.wrapS=THREE.RepeatWrapping;map.wrapT=THREE.ClampToEdgeWrapping;
         map.generateMipmaps=true;map.needsUpdate=true;
         const material=new THREE.MeshStandardMaterial({map,color:0xffffff,roughness:1,metalness:kind==='iron'?.035:.01,flatShading:true});

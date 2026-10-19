@@ -33,7 +33,7 @@ const definitions = [
     ['survey-carrier',4,'The Wrecks Remember','Chart the remaining wrecks with Paul.','Follow the survey markers to the carrier. Paul is on your wing.','mourning-line'],
     ['carrier-wait',4,'The Wrecks Remember','Stay near the carrier with Paul.','Keep close to the carrier while Paul checks the old flight deck.','mourning-line'],
     ['hide-patrol',4,'The Wrecks Remember','Switch off your transponder and hide inside the carrier.','Open the left ship monitor to switch the transponder OFF. Enter the marked carrier hangar, lower thrust and hold fire. Five pirates are passing through.','mourning-line'],
-    ['return-helix',4,'The Wrecks Remember','Return to Helix and land at the hangar.','Switch your transponder ON, fly to Helix and approach the marked hangar slowly.','helix'],
+    ['return-helix',4,'The Wrecks Remember','Return to Helix and dock.','Switch your transponder ON, select Helix and slow down near the station.','helix'],
     ['mara-debrief',4,'The Wrecks Remember','Talk to Mara at Helix.','Mara is waiting in the bar.','helix'],
     ['earn-standing',5,'Your Own Course','Earn and equip your ship.','Trade, mine and take contracts in the starting system. Mara will call when your ship and equipment are ready. The jump gate is closed for repairs.','helix'],
     ['meet-cairn',5,'Your Own Course','Meet Rin at Cairn Yard.','Mara has news from Rin. Fly to Cairn and land.','cairn'],
@@ -41,7 +41,7 @@ const definitions = [
     ['launch-black-box',6,'The Black Box','Launch from Cairn.','Rin will join you. Talk to Paul before launching if you want his help.','mourning-line'],
     ['salvage-black-box',6,'The Black Box','Salvage the black box beside the frigate wreck.','Fly to Mourning Line and follow BLACK BOX SIGNAL. Within range, hold SALVAGE.','mourning-line'],
     ['black-box-fight',6,'The Black Box','Defeat the four pirate ships.','Three Scrappers and a Demon are closing in. Protect the black box. Rin will help; Paul joins if you asked him.','mourning-line'],
-    ['deliver-black-box',6,'The Black Box','Bring the black box to Mara at Helix.','Fly to Helix, land at the hangar and take the black box to the bar.','helix'],
+    ['deliver-black-box',6,'The Black Box','Bring the black box to Mara at Helix.','Fly to Helix, dock and take the black box to the bar.','helix'],
     ['decode-black-box',6,'The Black Box','Give Mara the black box.','Talk to Mara in the Helix bar. She will decode the recorder.','helix'],
     ['complete',6,'The Black Box','Explore on your own terms.','Mara is decoding the black box. Rin is following the next lead. Trade, explore and take contracts across the open jump gate.','helix'],
 ];

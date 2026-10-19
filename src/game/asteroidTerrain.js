@@ -172,16 +172,19 @@ float rockHash(vec3 p){return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.545
 float rockGrain(vec3 p){p=mat3(.8,-.48,.36,.36,.8,-.48,-.48,.36,.8)*p;vec3 i=floor(p),f=fract(p);f=f*f*f*(f*(f*6.0-15.0)+10.0);
 return mix(mix(mix(rockHash(i),rockHash(i+vec3(1,0,0)),f.x),mix(rockHash(i+vec3(0,1,0)),rockHash(i+vec3(1,1,0)),f.x),f.y),mix(mix(rockHash(i+vec3(0,0,1)),rockHash(i+vec3(1,0,1)),f.x),mix(rockHash(i+vec3(0,1,1)),rockHash(i+vec3(1,1,1)),f.x),f.y),f.z);}`)
             .replace('#include <color_fragment>',`#include <color_fragment>
-vec3 rockPixel=floor(vRockPosition/4.0)*4.0;
+float rockFootprint=max(length(dFdx(vRockPosition)),length(dFdy(vRockPosition)));
+float rockDistant=smoothstep(20000.0,80000.0,length(vViewPosition));
+float rockFine=1.0-smoothstep(3.0,14.0,rockFootprint)*rockDistant;
+vec3 rockPixel=mix(floor(vRockPosition/4.0)*4.0,vRockPosition,smoothstep(2.0,8.0,rockFootprint)*rockDistant);
 float deposit=rockGrain(rockPixel*.006+vec3(31.0,17.0,53.0));
 float grain=rockGrain(rockPixel*.045+deposit*2.7);
-float stoneTone=floor(grain*7.0)/6.0;
-float mineral=1.0-smoothstep(.012,.028,abs(deposit-.52));
-float fleck=step(.90,rockHash(floor(vRockPosition/4.0)));
+float stoneTone=mix(.5,floor(grain*7.0)/6.0,rockFine);
+float mineral=(1.0-smoothstep(.012,.028,abs(deposit-.52)))*rockFine;
+float fleck=step(.90,rockHash(floor(vRockPosition/4.0)))*(1.0-smoothstep(1.0,4.0,rockFootprint));
 diffuseColor.rgb*=.68+stoneTone*.62+fleck*.055;
 diffuseColor.rgb+=mineral*vec3(.026,.019,.009);`);
     };
-    material.customProgramCacheKey=()=> 'shardbelt-rock-v6-shadow-fill';
+    material.customProgramCacheKey=()=> 'shardbelt-rock-v8-distant-detail';
     for(const f of getAsteroidTerrain().fragments){const mesh=new THREE.Mesh(f.geometry,material);mesh.name=f.id;mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);}
     return group;
 }

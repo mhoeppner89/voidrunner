@@ -1,3 +1,4 @@
+import {installRetroDisplay,monitorRasterRatio} from './retroDisplay.js';
 import {RACE_HULLS} from './raceHulls.js';
 import {EQUIPMENT_RARITIES,equipmentName,modifiedWeapon,equipmentBaseId} from './equipmentCatalog.js';
 import {normalizeEquipmentInventory} from './equipmentInventory.js';
@@ -29,14 +30,14 @@ import { guildJoinCost, missionBriefing, missionTitle } from './missions.js';
 import { getTutorialQuest, tutorialCampaignSummary, tutorialCardContent, tutorialDialogue, tutorialPeople, tutorialConversation, tutorialContentUnlocked, tutorialTradePrice, tutorialLaunchBlock, TUTORIAL_MINING_CONTRACT_ID } from './tutorialCampaign.js';
 import { canMineWithHull, DRONE_BAY_CAPACITY, DRONE_TYPES, droneBayLayoutFor } from './droneData.js';
 const WARM_IMAGE_TIMEOUT_MS = 5000;
-const settleWarmupPromise = (promise, fallback = false) => new Promise((resolve) => {
+const settleWarmupPromise = (promise, fallback = false, timeoutMs = WARM_IMAGE_TIMEOUT_MS) => new Promise((resolve) => {
     let settled = false;
     const timer = setTimeout(() => {
         if (settled)
             return;
         settled = true;
         resolve(fallback);
-    }, WARM_IMAGE_TIMEOUT_MS);
+    }, timeoutMs);
     Promise.resolve(promise).then((value) => {
         if (settled)
             return;
@@ -374,14 +375,19 @@ const mapLocationLabel = (location) => location?.kind === 'jump-point' && locati
     : location?.shortName ?? '';
 // Talker identity for the comms surfaces: the color follows the speaker's
 // relation to the player — hostiles red, allies blue, neutral white — so the
-// strip reads at a glance without a per-ship legend. The text shows the
-// callsign itself: the quoted combat handle when there is one, the plain name
-// otherwise.
+// strip reads at a glance. Flight uses a short label; the transcript keeps
+// the complete identity, including quoted combat handles.
 const RELATION_COLORS = { hostile: '#ff6b5e', ally: '#6fb5ff', neutral: '#e9e6dc' };
 export const relationColor = (relation) => RELATION_COLORS[relation] ?? RELATION_COLORS.neutral;
 export const callsignHandle = (callsign) => {
     const quoted = callsign.match(/“[^”]+”/);
     return quoted ? quoted[0].slice(1, -1) : callsign;
+};
+export const commsSenderLabel = (callsign) => {
+    const handles=String(callsign??'').split(/,\s*/).map(callsignHandle);
+    const name=({'Rin Vek':'Rin','Mara Vek':'Mara'})[handles[0]]??handles[0];
+    const chars=Array.from(name),short=chars.length>12?chars.slice(0,11).join('')+'…':name;
+    return handles.length>1?`${short} +${handles.length-1}`:short;
 };
 // Radar altitude tick geometry. The caller picks the direction sign (-1 = up
 // the screen, +1 = down); magnitude is the contact's elevation ratio (sin of
@@ -433,7 +439,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2ij';
+const GAME_VERSION = '0.8.2ji';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -448,91 +454,11 @@ const PREVIEW_LOCATION = DEV_PREVIEW_LOCATION ?? (VESPER_HOVER_PREVIEW ? 'vesper
 const PREVIEW_MODE = Boolean(PREVIEW_LOCATION);
 const VESPER_ART_WIDTH = 1672;
 const VESPER_ART_HEIGHT = 941;
-// These are background-space anchors, not viewport percentages. Each profile
-// compensates for the sprite's actual visible silhouette and visual angle so
-// transparent canvas padding does not decide how high the ship appears to
-// hover above a concourse pad.
-const VESPER_SHIP_PROFILES = Object.freeze({
-    speedster: Object.freeze({name:'Speedster',art:'./assets/remaster/landed-league/speedster.png',anchorX:848,anchorY:498,width:950,angle:0,bob:6,shadowX:790,shadowY:625,shadowWidth:280}),
-    legionary: Object.freeze({name:'Legionary',art:'./assets/remaster/landed-league/legionary.png',anchorX:848,anchorY:498,width:1050,angle:0,bob:6,shadowX:790,shadowY:625,shadowWidth:280}),
-    andromeda: Object.freeze({name:'Andromeda',art:'./assets/remaster/landed-league/andromeda.png',anchorX:848,anchorY:498,width:1050,angle:0,bob:6,shadowX:790,shadowY:625,shadowWidth:280}),
-    torsas: Object.freeze({name:'Torsas',art:'./assets/remaster/landed-league/torsas.png',anchorX:848,anchorY:498,width:1300,angle:0,bob:6,shadowX:790,shadowY:625,shadowWidth:280}),
-    astra: Object.freeze({name:'Astra',art:'./assets/remaster/landed-league/astra.png',anchorX:848,anchorY:498,width:1100,angle:0,bob:6,shadowX:790,shadowY:625,shadowWidth:280}),
-    wayfarer: Object.freeze({
-        name: 'Wayfarer',
-        art: './assets/remaster/landed-flat/wayfarer.webp',
-        anchorX: 848,
-        anchorY: 498,
-        width: 245,
-        angle: -1,
-        bob: 8,
-        shadowX: 790,
-        shadowY: 625,
-        shadowWidth: 301,
-    }),
-    talon: Object.freeze({
-        name: 'Talon',
-        art: './assets/remaster/landed-flat/talon.webp',
-        anchorX: 848,
-        anchorY: 492,
-        width: 228.2,
-        angle: 4,
-        bob: 8,
-        shadowX: 790,
-        shadowY: 625,
-        shadowWidth: 287,
-    }),
-    vanguard: Object.freeze({
-        name: 'Vanguard',
-        art: './assets/remaster/landed-flat/vanguard.webp',
-        anchorX: 848,
-        anchorY: 497,
-        width: 225.4,
-        angle: 7,
-        bob: 7,
-        shadowX: 790,
-        shadowY: 625,
-        shadowWidth: 294,
-    }),
-    prospector: Object.freeze({
-        name: 'Prospector',
-        art: './assets/remaster/landed-flat/prospector.webp',
-        anchorX: 848,
-        anchorY: 512,
-        width: 222.6,
-        angle: -3,
-        bob: 5,
-        shadowX: 790,
-        shadowY: 633,
-        shadowWidth: 301,
-    }),
-    lancer: Object.freeze({
-        name: 'Lancer',
-        art: './assets/remaster/landed-flat/lancer.webp',
-        anchorX: 848,
-        anchorY: 497,
-        width: 228.2,
-        angle: 13,
-        bob: 8,
-        shadowX: 790,
-        shadowY: 625,
-        shadowWidth: 297.5,
-    }),
-    atlas: Object.freeze({
-        name: 'Atlas Hauler',
-        art: './assets/remaster/landed-flat/atlas.webp',
-        anchorX: 848,
-        anchorY: 505,
-        width: 420,
-        angle: -1,
-        bob: 4,
-        shadowX: 790,
-        shadowY: 640,
-        shadowWidth: 520,
-    }),
-});
+// Every playable hull has a live concourse model, including former sprite gaps.
+const VESPER_SHIP_PROFILES = Object.freeze(Object.fromEntries(
+    Object.entries(SHIPS).map(([id,ship])=>[id,Object.freeze({name:ship.name})]),
+));
 const DEFAULT_VESPER_SHIP_PROFILE = VESPER_SHIP_PROFILES.wayfarer;
-const VESPER_LAUNCH_DURATION = 960;
 const VESPER_POINTER_ANCHORS = Object.freeze({
     services: Object.freeze({ x: 496, y: 617 }),
     market: Object.freeze({ x: 450, y: 405 }),
@@ -1000,6 +926,7 @@ export class GameUI {
     constructor(host) {
         host.innerHTML = this.shellMarkup();
         this.root = host.querySelector('#game-shell');
+        installRetroDisplay(this.root);
         this.viewport = host.querySelector('#viewport');
         const radar = host.querySelector('#radar');
         this.radarContext = radar.getContext('2d');
@@ -1023,6 +950,7 @@ export class GameUI {
             this.radarLayoutDirty = true;
             this.updateOrientationNotice();
             this.syncConcourseOverlay();
+            this.scheduleCommsFit();
         });
     }
     setActions(actions) {
@@ -1072,8 +1000,10 @@ export class GameUI {
             bezel.style.setProperty('--bezel-position', `${(x-w*.08)/(100-cw)*100}% ${(y-h*.12)/(100-ch)*100}%`);
         }
         const art = this.el('.cockpit-art');
-        if (art)
+        if (art) {
             art.style.backgroundImage = `url("${COCKPIT_ART_BY_SHIP[nextId]}")`;
+        }
+        this.scheduleCommsFit();
     }
     warmImage(url, priority = 'low') {
         let record = this.warmImageRecords.get(url);
@@ -1089,13 +1019,13 @@ export class GameUI {
             image.addEventListener('load', () => resolve(true), { once: true });
             image.addEventListener('error', () => resolve(false), { once: true });
         });
-        image.src = url;
         record = { image, refs: 0, ready: false, failed: false, promise: undefined };
         record.promise = (async () => {
-            // Wait for the network event first, then treat decode as a
-            // best-effort improvement. WebKit has shipped cases where
-            // HTMLImageElement.decode() never settles for background images;
-            // neither phase is allowed to retain the warm-up forever.
+            // Decode the original artwork once. No palette conversion,
+            // resampling or duplicate converted bitmap is needed.
+            image.src = url;
+            // Both network and decode have timeouts: WebKit has shipped cases
+            // where decode() never settles for background images.
             let ok = await settleWarmupPromise(loaded);
             if (ok && typeof image.decode === 'function')
                 await settleWarmupPromise(Promise.resolve().then(() => image.decode()), false);
@@ -1153,18 +1083,8 @@ export class GameUI {
         if (!location || !art)
             return [];
         const urls = [...Object.values(art)];
-        const shipArt = VESPER_SHIP_PROFILES[shipId]?.art;
-        if (shipArt)
-            urls.push(shipArt);
-        // A shipyard can replace the active hull while the player remains on
-        // this screen. Warm the hulls sold here as part of the dock bundle so
-        // the newly commissioned ship portrait does not introduce a fresh
-        // image request after the purchase. setCockpitShip warms its cockpit.
-        for (const candidateId of location.shipsForSale ?? []) {
-            const candidateArt = VESPER_SHIP_PROFILES[candidateId]?.art;
-            if (candidateArt)
-                urls.push(candidateArt);
-        }
+        // The owned hull is a live model. Ship portraits no longer belong to
+        // the concourse image/decode bundle.
         for (const person of location.people ?? []) {
             const portrait = NPC_PORTRAIT_BY_ID[person.id];
             if (portrait)
@@ -1232,14 +1152,7 @@ export class GameUI {
             return;
         this.vesperPreviewShipId = shipId;
         const profile = this.getVesperShipProfile();
-        const layer = this.root.querySelector('.concourse-hover-preview');
-        const image = layer?.querySelector('.concourse-hover-ship');
-        if (!layer || !image)
-            return;
-        const launchLabel = t('Launch the docked {name}', { name: profile.name });
-        image.src = profile.art;
-        image.alt = launchLabel;
-        image.setAttribute('aria-label', launchLabel);
+        void this.mountConcourseShip(false);
         this.syncConcourseOverlay();
         const toolbar = this.root.querySelector('.vesper-preview-toolbar');
         const heading = toolbar?.querySelector('.vesper-preview-heading b');
@@ -1545,7 +1458,6 @@ export class GameUI {
                     this.dockTab = 'concourse';
                     this.dockTerminal = 'services';
                     this.renderDock();
-                    this.actions?.reviewServices?.();
                 }
             }
             else if (target.dataset.marketPoint) {
@@ -2046,12 +1958,17 @@ export class GameUI {
             this.root.querySelector('[data-ui-command="new"]')?.focus({preventScroll:true});
     }
     showTitle(hasSave, save) {
+        this.cancelVesperLaunchTransition();
+        this.cancelPlanetTransit();
         this.hideStory(false);
         this.closeNewCareerConfirmation(false);
         this.closeAdventure(false);
         this.adventureQueue = [];
         this.save = save;
         this.hasCareerSave = Boolean(hasSave);
+        this.concourseGeneration=(this.concourseGeneration??0)+1;
+        this.concourseShip?.dispose();this.concourseShip=undefined;
+        this.concourseArrivalPending=false;
         this.titleVisible = true;
         this.root.querySelector('#title-screen')?.classList.remove('is-hidden');
         this.root.querySelector('#hud')?.classList.add('is-hidden');
@@ -2087,8 +2004,14 @@ export class GameUI {
         screen?.classList.toggle('is-hidden', !active);
         this.root.querySelector('#game-shell')?.setAttribute('aria-busy', String(Boolean(active)));
     }
-    showDock(save, locationId) {
+    showDock(save, locationId, {arrival=false}={}) {
         this.cancelVesperLaunchTransition();
+        this.cancelPlanetTransit();
+        this.concourseAtmosphereArrival=arrival&&['planet','station'].includes(LOCATIONS[locationId]?.kind);
+        // A new or resumed docked career starts with the ship already parked.
+        this.concourseArrivalPending=Boolean(arrival);
+        this.concourseModelResolved?.(false);
+        this.concourseModelReady=new Promise(resolve=>{this.concourseModelResolved=resolve;});
         this.save = save;
         this.dockLocation = locationId;
         // Promote a decoded approach bundle before inserting the first dock
@@ -2120,7 +2043,13 @@ export class GameUI {
     }
     hideDock() {
         this.hideStory(false);
+        this.concourseGeneration=(this.concourseGeneration??0)+1;
+        this.concourseArrivalPending=false;
+        this.pendingDockStory=undefined;
+        this.pendingDockBriefing=undefined;
         this.cancelVesperLaunchTransition();
+        this.cancelPlanetTransit();
+        this.concourseShip?.pause();
         this.disposeShipPreviews();
         this.resetOutfittingDrafts();
         this.root.querySelector('#dock-screen')?.classList.add('is-hidden');
@@ -2156,54 +2085,85 @@ export class GameUI {
             this.vesperLaunchTimer = undefined;
         }
     }
+    cancelPlanetTransit() {
+        if(!this.planetTransitOverlay)return;
+        this.concourseShip?.pause();
+        this.planetTransitOverlay.remove();this.planetTransitOverlay=undefined;
+    }
+    async playPlanetTransit(direction,locationId,canStart) {
+        if(!['planet','station'].includes(LOCATIONS[locationId]?.kind)||!this.concourseShip?.model||this.concourseShip.contextLost||this.concourseShip.reducedMotion)return true;
+        this.cancelPlanetTransit();
+        const overlay=document.createElement('div');overlay.className='planet-transit';overlay.dataset.direction=direction;overlay.dataset.location=locationId;overlay.dataset.kind=LOCATIONS[locationId].kind;
+        overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label',LOCATIONS[locationId].name);
+        const stage=document.createElement('div');stage.className='planet-transit-stage';overlay.append(stage);
+        const skip=document.createElement('button');skip.className='planet-transit-skip';skip.textContent='»';skip.setAttribute('aria-label',t('Skip cinematic'));overlay.append(skip);
+        const skipShot=()=>this.concourseShip?.skipAtmosphere();
+        skip.addEventListener('click',skipShot);
+        const key=e=>{if(!['Escape','Enter',' ','Tab'].includes(e.key))return;e.preventDefault();e.stopImmediatePropagation();if(e.key==='Tab')skip.focus({preventScroll:true});else skipShot();};
+        document.addEventListener('keydown',key,true);
+        this.planetTransitOverlay=overlay;(this.el('#game-shell')??this.root).append(overlay);
+        skip.focus({preventScroll:true});
+        try{return LOCATIONS[locationId].kind==='station'
+            ? await this.concourseShip.playStation(stage,direction,locationId,canStart,this.actions?.stationTransitData?.(locationId))
+            : await this.concourseShip.playAtmosphere(stage,direction,locationId,canStart,this.actions?.planetSurface?.(locationId));}
+        catch(error){console.warn('Exterior transition unavailable.',error);return true;}
+        finally{document.removeEventListener('keydown',key,true);overlay.remove();if(this.planetTransitOverlay===overlay)this.planetTransitOverlay=undefined;}
+    }
     startVesperLaunchTransition() {
-        if (this.vesperLaunchTransition || !this.canLaunchFromDock())
-            return;
-        const dock = this.root.querySelector('#dock-screen');
-        const scene = dock?.querySelector('.station-scene');
-        const ship = dock?.querySelector('.concourse-hover-ship');
-        const flight = dock?.querySelector('.concourse-hover-ship-flight');
-        if (!scene || !ship || !flight) {
-            void this.launchFromDock();
-            return;
-        }
-        if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-            void this.launchFromDock();
-            return;
-        }
-        this.vesperLaunchTransition = true;
-        scene.classList.add('is-launching');
-        ship.closest('.concourse-hover-preview')?.classList.add('is-departing');
-        scene.querySelector('.scene-pointers')?.setAttribute('aria-hidden', 'true');
-        ship.setAttribute('aria-disabled', 'true');
-        ship.removeAttribute('tabindex');
-        let finished = false;
-        const finish = () => {
-            if (finished)
-                return;
-            finished = true;
-            flight.removeEventListener('animationend', onAnimationEnd);
-            if (this.vesperLaunchTimer !== undefined) {
-                window.clearTimeout(this.vesperLaunchTimer);
-                this.vesperLaunchTimer = undefined;
-            }
-            void this.launchFromDock();
-        };
-        const onAnimationEnd = (event) => {
-            if (event.animationName === 'vesper-launch-ship' || event.animationName === 'rook-launch-ship')
-                finish();
-        };
-        this.vesperLaunchCleanup = () => {
-            finished = true;
-            flight.removeEventListener('animationend', onAnimationEnd);
-            scene.classList.remove('is-launching');
-            ship.closest('.concourse-hover-preview')?.classList.remove('is-departing');
-            scene.querySelector('.scene-pointers')?.removeAttribute('aria-hidden');
-            ship.removeAttribute('aria-disabled');
-            ship.setAttribute('tabindex', '0');
-        };
-        flight.addEventListener('animationend', onAnimationEnd);
-        this.vesperLaunchTimer = window.setTimeout(finish, VESPER_LAUNCH_DURATION + 120);
+        if (this.vesperLaunchTransition || this.concourseArrivalPending || !this.canLaunchFromDock()) return;
+        const scene=this.root.querySelector('#dock-screen .station-scene');
+        if(!scene || (!this.concourseShip?.model||this.concourseShip.contextLost||!this.concourseShip.host?.classList.contains('has-model')) || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches){void this.launchFromDock();return;}
+        this.vesperLaunchTransition=true;
+        scene.classList.add('is-launching');scene.querySelector('.scene-pointers')?.setAttribute('inert','');
+        const ship=scene.querySelector('.concourse-hover-ship');ship?.setAttribute('disabled','');
+        let cancelled=false;
+        this.vesperLaunchCleanup=()=>{cancelled=true;this.cancelPlanetTransit();this.concourseShip?.pause();if(this.concourseShip?.model){this.concourseShip.resetPose();if(scene.isConnected&&!this.el('#dock-screen').classList.contains('is-hidden'))this.concourseShip.resume();}scene.classList.remove('is-launching');scene.querySelector('.scene-pointers')?.removeAttribute('inert');ship?.removeAttribute('disabled');};
+        const locationId=this.dockLocation;
+        void (async()=>{try{
+            if(!await this.concourseShip.animate('takeoff')||cancelled)return;
+            if(!await this.playPlanetTransit('exit',locationId)||cancelled)return;
+            await this.launchFromDock();
+        }finally{if(!cancelled)this.cancelVesperLaunchTransition();}})();
+    }
+    async mountConcourseShip(arrival=this.concourseArrivalPending) {
+        const generation=this.concourseGeneration=(this.concourseGeneration??0)+1,resolveModel=this.concourseModelResolved;
+        const scene=this.root.querySelector('#dock-screen .station-scene'),host=scene?.querySelector('.concourse-model-stage'),button=scene?.querySelector('.concourse-hover-ship');
+        if(!host)return;
+        const pointers=scene.querySelector('.scene-pointers');
+        if(arrival){scene.classList.add('is-arriving');pointers?.setAttribute('inert','');button.disabled=true;}
+        try {
+            const {ConcourseShip}=await (this.concourseModulePromise??=import('./concourseShip.js'));
+            if(generation!==this.concourseGeneration||!host.isConnected)return;
+            this.concourseShip??=new ConcourseShip();this.concourseShip.onAnimationSound=this.actions?.cinematicSound;this.concourseShip.soundEnvironment=LOCATIONS[this.dockLocation].kind;this.concourseShip.waitingArrival=Boolean(arrival);this.concourseShip.attach(host,button);
+            const player=this.save.player,id=this.getVesperShipId();
+            const options={paint:player.shipPaints?.[id]??'original',fit:player.outfitting?.loadouts?.[id],fleet:player.droneFleet};
+            const ready=await settleWarmupPromise(this.concourseShip.configure(id,SHIPS[id].variant,options,this.dockLocation),false,15000);
+            resolveModel?.(ready);
+            if(generation!==this.concourseGeneration||!host.isConnected)return;
+            this.syncConcourseOverlay();
+            if(arrival&&ready&&!this.concourseShip.contextLost&&!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches){
+                const loading=this.el('#loading-screen');
+                const canStart=()=>!loading||loading.classList.contains('is-hidden');
+                if(this.concourseAtmosphereArrival){
+                    this.concourseAtmosphereArrival=false;
+                    await this.playPlanetTransit('entry',this.dockLocation,canStart);
+                    if(generation!==this.concourseGeneration||!host.isConnected)return;
+                }
+                if(!this.concourseShip.contextLost)await this.concourseShip.animate('landing',canStart);
+            }else this.concourseShip.resume();
+        }catch(error){resolveModel?.(false);console.warn('Docked ship view could not be prepared.',error);}
+        if(generation!==this.concourseGeneration||!host.isConnected)return;
+        if(this.concourseShip?.waitingArrival){this.concourseShip.waitingArrival=false;this.concourseShip.resetPose();}
+        this.syncConcourseOverlay();
+        scene.classList.remove('is-arriving');pointers?.removeAttribute('inert');button.disabled=false;
+        this.concourseArrivalPending=false;
+        const pending=this.pendingDockStory;this.pendingDockStory=undefined;
+        if(pending)this.showStory(pending.message);
+        const briefing=this.pendingDockBriefing;this.pendingDockBriefing=undefined;briefing?.();
+    }
+    prepareDockView(){return settleWarmupPromise(this.concourseModelReady,false,8000);}
+    afterDockArrival(callback) {
+        if(this.concourseArrivalPending)this.pendingDockBriefing=callback;else callback();
     }
     // Screens that switch within themselves put their tabs in the header bar,
     // exactly where the static screen name would sit: one band names the screen
@@ -2251,6 +2211,7 @@ export class GameUI {
     renderDock() {
         if (!this.save || !this.dockLocation)
             return;
+        this.concourseShip?.pause();
         this.disposeShipPreviews();
         const dock = this.root.querySelector('#dock-screen');
         const location = LOCATIONS[this.dockLocation];
@@ -2293,7 +2254,6 @@ export class GameUI {
                 : t('Return to the concourse');
         dock.innerHTML = `
       <div class="dock-backdrop">${this.locationIllustration(this.dockLocation, illustrationScreen)}</div>
-      <div class="dock-scanlines" aria-hidden="true"></div>
       <header class="dock-header">
         ${backCommand ? `<button type="button" class="dock-back-button dock-pointer" data-ui-command="${backCommand}" aria-label="${escapeHtml(backLabel)}">◀</button>` : ''}
         <div class="dock-heading"><span>${t(location.kind.toUpperCase())} · ${t(FACTION_NAMES[location.faction])}</span><h2>${escapeHtml(location.name)}</h2></div>
@@ -2307,6 +2267,7 @@ export class GameUI {
       ${this.renderMissionSettlements()}
     `;
         if (this.dockTerminal === 'services') this.mountShipPreviews();
+        if (this.dockTerminal === 'concourse') void this.mountConcourseShip();
         if (this.storyOpen) this.renderStory();
         const content = dock.querySelector('.dock-content');
         const preserveScroll = prevTab === this.dockTab
@@ -2320,6 +2281,9 @@ export class GameUI {
         illustration?.addEventListener('load', () => this.syncConcourseOverlay(), { once: true });
         this.syncConcourseOverlay();
         requestAnimationFrame(() => this.syncConcourseOverlay());
+        void document.fonts?.ready.then(() => {
+            if(dock.isConnected&&!dock.classList.contains('is-hidden'))this.syncConcourseOverlay();
+        });
         if (this.dockTerminal === 'market' && this.marketPoint) {
             this.renderMarketPoint(this.marketPoint);
             if (content && preserveScroll)
@@ -2364,6 +2328,7 @@ export class GameUI {
     }
     showStory(message) {
         if (this.save?.arena) return;
+        if(this.concourseArrivalPending){this.pendingDockStory={message};return;}
         this.storyMessage = message;
         this.storyOpen = true;
         this.renderStory(message);
@@ -2470,8 +2435,10 @@ export class GameUI {
         const layer = dock?.querySelector('.concourse-hover-preview');
         const scene = dock?.querySelector('.station-scene');
         const illustration = dock?.querySelector('.dock-backdrop img');
-        if (!layer || !scene || !illustration)
+        if (!layer || !scene || !illustration) {
+            this.fitScenePointers(scene);
             return;
+        }
         const imageRect = illustration.getBoundingClientRect();
         const sceneRect = scene.getBoundingClientRect();
         const naturalWidth = illustration.naturalWidth || VESPER_ART_WIDTH;
@@ -2479,8 +2446,16 @@ export class GameUI {
         const scale = Math.max(imageRect.width / naturalWidth, imageRect.height / naturalHeight);
         const renderedWidth = naturalWidth * scale;
         const renderedHeight = naturalHeight * scale;
+        const anchors = CONCOURSE_PREVIEW_ANCHORS[this.dockLocation] ?? CONCOURSE_PREVIEW_ANCHORS.vesper;
         const contentLeft = imageRect.left + (imageRect.width - renderedWidth) / 2;
-        const contentTop = imageRect.top + (imageRect.height - renderedHeight) / 2;
+        // A wide phone crops the bottom of tall painted rooms. Move that crop
+        // toward the floor before fitting the hull, keeping ship and pad together.
+        const overflowY=Math.max(0,renderedHeight-imageRect.height);
+        const padY=anchors.shadowY*renderedHeight/VESPER_ART_HEIGHT;
+        const desiredPadY=sceneRect.top-imageRect.top+sceneRect.height*.79;
+        const offsetY=Math.max(-overflowY,Math.min(-overflowY/2,desiredPadY-padY));
+        illustration.style.objectPosition=`50% ${overflowY?(-offsetY/overflowY*100).toFixed(2):50}%`;
+        const contentTop = imageRect.top + offsetY;
         // The location anchors and ship profiles are authored in the original
         // 1672×941 plate space. Simplified art is served at 1280×720, so
         // convert from that stable design space before applying object-cover.
@@ -2490,39 +2465,69 @@ export class GameUI {
         const plateScaleY = renderedHeight / VESPER_ART_HEIGHT;
         const anchorX = (sourceX) => `${(contentLeft + sourceX * plateScaleX - sceneRect.left).toFixed(2)}px`;
         const anchorY = (sourceY) => `${(contentTop + sourceY * plateScaleY - sceneRect.top).toFixed(2)}px`;
-        const profile = this.getVesperShipProfile();
-        const anchors = CONCOURSE_PREVIEW_ANCHORS[this.dockLocation] ?? CONCOURSE_PREVIEW_ANCHORS.vesper;
-        const isAtlas = profile === VESPER_SHIP_PROFILES.atlas;
-        const shipBaseX = isAtlas ? (anchors.atlasShipX ?? anchors.shipX) : (anchors.smallShipX ?? anchors.shipX);
-        const shipBaseY = isAtlas ? (anchors.atlasShipY ?? anchors.shipY) : (anchors.smallShipY ?? anchors.shipY);
-        const shadowBaseX = isAtlas ? (anchors.atlasShadowX ?? anchors.shadowX) : (anchors.smallShadowX ?? anchors.shadowX);
-        const shadowBaseY = isAtlas ? (anchors.atlasShadowY ?? anchors.shadowY) : (anchors.smallShadowY ?? anchors.shadowY);
-        const shipAnchorX = shipBaseX + (profile.anchorX - DEFAULT_VESPER_SHIP_PROFILE.anchorX);
-        const shipAnchorY = shipBaseY + (profile.anchorY - DEFAULT_VESPER_SHIP_PROFILE.anchorY);
-        const shadowAnchorX = shadowBaseX + (profile.shadowX - DEFAULT_VESPER_SHIP_PROFILE.shadowX);
-        const shadowAnchorY = shadowBaseY + (profile.shadowY - DEFAULT_VESPER_SHIP_PROFILE.shadowY);
-        const concourseShipScale = anchors.shipScale ?? (this.dockLocation === 'rook' ? 0.86 : 1);
-        const concourseShadowScale = anchors.shadowScale ?? (this.dockLocation === 'rook' ? 0.9 : 1);
-        layer.style.setProperty('--vesper-ship-left', anchorX(shipAnchorX));
-        layer.style.setProperty('--vesper-ship-top', anchorY(shipAnchorY));
-        layer.style.setProperty('--vesper-ship-width', `${(profile.width * plateScaleX * concourseShipScale).toFixed(2)}px`);
-        layer.style.setProperty('--vesper-ship-angle', `${profile.angle + (anchors.angleOffset ?? 0)}deg`);
-        layer.style.setProperty('--vesper-ship-bob', `${(profile.bob * plateScaleY * concourseShipScale).toFixed(2)}px`);
-        layer.style.setProperty('--vesper-shadow-left', anchorX(shadowAnchorX));
-        layer.style.setProperty('--vesper-shadow-top', anchorY(shadowAnchorY));
-        layer.style.setProperty('--vesper-shadow-width', `${(profile.shadowWidth * plateScaleX * concourseShadowScale).toFixed(2)}px`);
-        layer.style.setProperty('--vesper-shadow-height', `${(58 * plateScaleY * concourseShadowScale).toFixed(2)}px`);
-        layer.style.setProperty('--vesper-shadow-angle', `${anchors.shadowAngle ?? 3}deg`);
+        // The transparent shadow receiver's origin is the painted landing pad.
+        // One orthographic camera keeps hulls and shadows in the plate's perspective.
+        const placement=this.concoursePlacement??this.concourseShip?.profile?.placements?.[window.innerWidth<=900?'phone':'desktop'];
+        layer.style.setProperty('--concourse-ground-x',placement?.ship?`${placement.ship.x*sceneRect.width}px`:anchorX(anchors.shadowX));
+        layer.style.setProperty('--concourse-ground-y',placement?.ship?`${placement.ship.y*sceneRect.height}px`:anchorY(anchors.shadowY));
+        if(this.concourseShip){this.concourseShip.placementZoom=placement?.ship?.zoom;this.concourseShip.setBackdropFraming((imageRect.left-contentLeft)/renderedWidth,1-(imageRect.bottom-contentTop)/renderedHeight,imageRect.width/renderedWidth,imageRect.height/renderedHeight);}
+
+        const shipScale=this.concourseShip?.location===this.dockLocation?this.concourseShip.profile.scale:(anchors.shipScale??1);
+        layer.style.setProperty('--concourse-stage-width',`${(800*plateScaleX*shipScale).toFixed(2)}px`);
+        layer.style.setProperty('--concourse-stage-height',`${(600*plateScaleY*shipScale).toFixed(2)}px`);
+        if(this.concourseShip?.location===this.dockLocation)this.concourseShip.setBackdrop(illustration);
+        this.concourseShip?.resize();
         // Object-cover can crop an artwork anchor above the usable scene,
         // especially when the tutorial notice takes a row on landscape phones.
         // Keep the whole touch target inside the scene, not just its origin.
-        for (const key of ['services', 'market', 'bar']) {
+        const ship=scene.querySelector('.concourse-hover-ship')?.getBoundingClientRect();
+        const occupied=ship&&this.concourseShip?.location===this.dockLocation
+            ? [{x:ship.left-sceneRect.left-8,y:ship.top-sceneRect.top-8,w:ship.width+16,h:ship.height+16}] : [];
+        for (const key of ['services', 'market', 'bar', 'den']) {
             const pointer = scene.querySelector(`.concourse-pointer-${key}`);
+            if(!pointer)continue;
+            const manual=placement?.buttons?.[key];
+            if(manual){Object.assign(pointer.style,{left:`${manual.x*sceneRect.width}px`,top:`${manual.y*sceneRect.height}px`});continue;}
             const inset = 6;
-            const x = Math.max(inset, Math.min(parseFloat(anchorX(anchors[key].x)), sceneRect.width - (pointer?.offsetWidth ?? 0) - inset));
-            const y = Math.max(inset, Math.min(parseFloat(anchorY(anchors[key].y)), sceneRect.height - (pointer?.offsetHeight ?? 0) - inset));
-            scene.style.setProperty(`--concourse-${key}-left`, `${x}px`);
-            scene.style.setProperty(`--concourse-${key}-top`, `${y}px`);
+            const w=pointer.offsetWidth,h=pointer.offsetHeight,existing=pointer.getBoundingClientRect();
+            const right=Math.max(inset,sceneRect.width-w-inset),bottom=Math.max(inset,sceneRect.height-h-inset);
+            const preferred={x:Math.max(inset,Math.min(anchors[key]?parseFloat(anchorX(anchors[key].x)):existing.left-sceneRect.left,right)),y:Math.max(inset,Math.min(anchors[key]?parseFloat(anchorY(anchors[key].y)):existing.top-sceneRect.top,bottom))};
+            const candidates=[preferred];
+            for(const x of [inset,right*.5,right])for(const y of [inset,bottom*.5,bottom])candidates.push({x,y});
+            const score=p=>occupied.reduce((sum,b)=>sum+Math.max(0,Math.min(p.x+w,b.x+b.w)-Math.max(p.x,b.x))*Math.max(0,Math.min(p.y+h,b.y+b.h)-Math.max(p.y,b.y))*1e6,0)+Math.hypot(p.x-preferred.x,p.y-preferred.y);
+            let best=preferred,bestScore=score(best);for(const p of candidates){const s=score(p);if(s<bestScore){best=p;bestScore=s;}}
+            const {x,y}=best;occupied.push({x:x-6,y:y-6,w:w+12,h:h+12});
+            Object.assign(pointer.style,{left:`${x}px`,top:`${y}px`});
+        }
+        this.fitScenePointers(scene);
+    }
+    fitScenePointers(scene=this.root.querySelector('#dock-screen .station-scene')) {
+        if(!scene)return;
+        const width=scene.clientWidth,height=scene.clientHeight,inset=8,gap=8,occupied=[];
+        if(!width||!height)return;
+        // A wide hull's projected launch hit area can reach an authored menu
+        // anchor, especially on phones. Reserve that area before fitting the
+        // room buttons so tapping the ship cannot open a different terminal.
+        const ship=scene.querySelector('.concourse-model-stage.has-model + .concourse-hover-ship');
+        if(ship){const a=ship.getBoundingClientRect(),b=scene.getBoundingClientRect();occupied.push({x:a.left-b.left,y:a.top-b.top,w:a.width,h:a.height});}
+        const pointers=scene.querySelectorAll('.scene-pointers > .scene-pointer');
+        // Restore CSS anchors before measuring: fitting must not accumulate a
+        // new offset on each resize, font load or return to the room.
+        if(!scene.classList.contains('concourse-screen'))for(const pointer of pointers){pointer.style.left='';pointer.style.top='';}
+        for(const pointer of pointers){
+            const w=pointer.offsetWidth,h=pointer.offsetHeight;
+            const right=Math.max(inset,width-w-inset),bottom=Math.max(inset,height-h-inset);
+            const clampX=x=>Math.max(inset,Math.min(right,x)),clampY=y=>Math.max(inset,Math.min(bottom,y));
+            const preferred={x:clampX(pointer.offsetLeft),y:clampY(pointer.offsetTop)};
+            const overlap=(x,y)=>occupied.reduce((sum,b)=>sum+Math.max(0,Math.min(x+w+gap,b.x+b.w)-Math.max(x-gap,b.x))*Math.max(0,Math.min(y+h+gap,b.y+b.h)-Math.max(y-gap,b.y)),0);
+            let best=preferred,bestScore=overlap(best.x,best.y)*1e6;
+            if(bestScore){
+                const xs=[preferred.x,inset,right],ys=[preferred.y,inset,bottom];
+                for(const b of occupied){xs.push(clampX(b.x-w-gap),clampX(b.x+b.w+gap));ys.push(clampY(b.y-h-gap),clampY(b.y+b.h+gap));}
+                for(const x of xs)for(const y of ys){const score=overlap(x,y)*1e6+Math.hypot(x-preferred.x,y-preferred.y);if(score<bestScore){best={x,y};bestScore=score;}}
+            }
+            Object.assign(pointer.style,{left:`${best.x}px`,top:`${best.y}px`});
+            occupied.push({...best,w,h});
         }
     }
     renderLandingScene() {
@@ -2581,10 +2586,8 @@ export class GameUI {
       <div class="concourse-screen station-scene" aria-label="${t('Concourse points of interest')}">
         ${previewToolbar}
         ${showShipPreview ? `<div class="concourse-hover-preview" aria-label="${t('Your docked ship')}">
-          <div class="concourse-hover-shadow" aria-hidden="true"></div>
-          <div class="concourse-hover-ship-flight">
-            <img class="concourse-hover-ship" src="${profile.art}" alt="${escapeHtml(launchLabel)}" data-ui-command="launch" role="button" tabindex="0" aria-label="${escapeHtml(launchLabel)}" draggable="false">
-          </div>
+          <div class="concourse-model-stage" aria-hidden="true"></div>
+          <button type="button" class="concourse-hover-ship" data-ui-command="launch" aria-label="${escapeHtml(launchLabel)}"><span class="concourse-model-fallback">${escapeHtml(profile.name)} ↗</span></button>
         </div>` : ''}
         <div class="scene-pointers" aria-label="${t('Concourse actions')}">
           ${showShipPreview ? '' : `<div class="scene-pointer concourse-pointer-ship" data-ui-command="launch" role="button" tabindex="0" aria-label="${t('Launch the docked ship')}"><i>↗</i><b>${t('YOUR SHIP')}</b><small>${t('Launch')}</small></div>`}
@@ -2653,7 +2656,7 @@ export class GameUI {
           ${missionDesk ? `<div class="scene-pointer bar-pointer-missions" data-bar-panel="missions" role="button" tabindex="0" aria-label="${t('Open the mission board')}"><i>✦</i><b>${hasLocationService(this.dockLocation, 'race') && !hasLocationService(this.dockLocation, 'missions') ? t('RACE BOARD') : t('MISSION BOARD')}</b><small>${hasLocationService(this.dockLocation, 'race') ? t('Enter a course') : t('Find work')}</small></div>` : ''}
           ${guildDesk ? `<div class="scene-pointer bar-pointer-guilds" data-bar-panel="guilds" role="button" tabindex="0" aria-label="${t('Open guilds')}"><i>◇</i><b>${t('LOCAL GUILDS')}</b><small>${t('{count} represented here', { count: this.localGuildIds().length })}</small></div>` : ''}
           ${people.map((person, index) => `
-            <div class="scene-pointer bar-person-pointer bar-person-${index} ${(this.save.world.npcMemory?.[person.id]?.met) ? 'is-known' : 'is-new'}" data-person-id="${person.id}" role="button" tabindex="0" aria-label="${t('Talk to {name}', { name: person.name })}"><i>●</i><b>${escapeHtml(person.name)}</b><small>${escapeHtml(t(person.role))}</small>${this.save.world.npcMemory?.[person.id]?.met ? '' : `<em>${t('NEW CONTACT')}</em>`}</div>
+            <div class="scene-pointer bar-person-pointer ${(this.save.world.npcMemory?.[person.id]?.met) ? 'is-known' : 'is-new'}" style="--person-column:${index%3};--person-row:${Math.floor(index/3)}" data-person-id="${person.id}" role="button" tabindex="0" aria-label="${t('Talk to {name}', { name: person.name })}"><i>●</i><b>${escapeHtml(person.name)}</b><small>${escapeHtml(t(person.role))}</small>${this.save.world.npcMemory?.[person.id]?.met ? '' : `<em>${t('NEW CONTACT')}</em>`}</div>
           `).join('')}
         </div>
       </div>
@@ -2693,9 +2696,6 @@ export class GameUI {
             topics.push({ id: 'market', label: t('TRADE TIP') });
         if (this.personGuildId(person.id))
             topics.push({ id: 'guild', label: t('GUILD') });
-        topics.push({ id: 'local', label: t('LOCAL NEWS') });
-        if (topics.length < 4)
-            topics.push({ id: 'advice', label: t('ADVICE') });
         return topics.slice(0, 4);
     }
     dialogueMission(person) {
@@ -2821,7 +2821,7 @@ export class GameUI {
             this.dialogueTopic = 'greeting';
             const text = space || message ? message : this.dialogueResponse(person,'greeting').text;
             this.adventure.nodeId = '@greeting';
-            this.adventure.node = { text, next: space || message ? '@end' : '@topics' };
+            this.adventure.node = { text, next: space || message || !this.dialogueTopics(person).length ? '@end' : '@topics' };
             const replay = !space && !message && this.dockLocation === 'helix' && (person.id === 'mara-vek' ? 'mara' : person.id === 'rin-vek' ? 'rin' : undefined);
             if (replay) {
                 // "Tell me again" only when the pilot actually heard it. An
@@ -2830,7 +2830,7 @@ export class GameUI {
                 // the same choice becomes how a skipped career hears it at all.
                 const heard = Boolean(getTutorialQuest(this.save)?.flags?.[person.id === 'mara-vek' ? 'metMara' : 'metRin']);
                 this.adventure.node.choices = [
-                    {label:this.adventureLabel('Ich habe ein paar Fragen.','I have a few questions.'),next:'@topics'},
+                    ...(this.dialogueTopics(person).length ? [{label:this.adventureLabel('Ich habe ein paar Fragen.','I have a few questions.'),next:'@topics'}] : []),
                     heard
                         ? {label:this.adventureLabel('Noch einmal: Wie fing das mit der Wayfarer an?','Tell me again: how did this start with the Wayfarer?'),replay}
                         : {label:this.adventureLabel('Wie fing das mit der Wayfarer an?','How did this start with the Wayfarer?'),replay},
@@ -3040,8 +3040,8 @@ export class GameUI {
             return `
         <div class="market-scene station-scene" aria-label="${t('Market points of interest')}">
           <div class="scene-pointers" aria-label="${t('Market actions')}">
-            ${commodityMarket ? `<div class="scene-pointer market-pointer-commodities" data-market-point="commodities" role="button" tabindex="0" aria-label="${t('Open commodity market')}"><i>▦</i><b>${t('COMMODITY MARKET')}</b><small>${t('Buy and sell cargo')}</small></div>` : ''}
-            ${outfitting ? `<div class="scene-pointer market-pointer-equipment" data-market-point="equipment" role="button" tabindex="0" aria-label="${t('Open ship parts')}"><i>⚙</i><b>${t('SHIP PARTS')}</b><small>${t('Fit out your ship')}</small></div>` : ''}
+            ${commodityMarket ? `<div class="scene-pointer market-pointer-commodities" data-market-point="commodities" role="button" tabindex="0" aria-label="${t('Open commodity market')}"><i>▦</i><b>${t('Trade')}</b><small>${t('Buy and sell cargo')}</small></div>` : ''}
+            ${outfitting ? `<div class="scene-pointer market-pointer-equipment" data-market-point="equipment" role="button" tabindex="0" aria-label="${t('Open ship parts')}"><i>⚙</i><b>${t('Equipment')}</b><small>${t('Fit out your ship')}</small></div>` : ''}
             ${shipyard ? `<div class="scene-pointer market-pointer-shipyard" data-market-point="shipyard" role="button" tabindex="0" aria-label="${t('Open the ship dealer')}"><i>↗</i><b>${t('NEW SHIP')}</b><small>${t('Hulls for sale')}</small></div>` : ''}
             ${this.denUnlockedAt(this.dockLocation) ? `<div class="scene-pointer market-pointer-den" data-market-point="den" role="button" tabindex="0" aria-label="${t('Enter the smuggler\'s den')}"><i>☣</i><b>${t('SMUGGLER\'S DEN')}</b><small>${t('Black-market prices')}</small></div>` : ''}
           </div>
@@ -4108,9 +4108,8 @@ export class GameUI {
             .filter((container) => !container.querySelector('.ship-preview-canvas'));
         if (!containers.length)
             return;
-        // Keep Three.js, the GLB loader, and the flight renderer out of the
-        // title/dock startup path. The showroom renderer is only needed after
-        // the player deliberately opens a shipyard.
+        // The broker/service turntable is independent of the concourse view and
+        // exists only while its own screen is open.
         let ShipPreview;
         try {
             ({ ShipPreview } = await import('./shipPreview.js'));
@@ -4206,7 +4205,7 @@ export class GameUI {
             const source = VESPER_HOVER_PREVIEW && locationId === 'vesper' && screen === 'concourse'
                 ? './art/locations/simplified/vesper-preview.webp'
                 : art[screen] ?? art.concourse;
-            return `<img src="${source}" alt="${t('HD view')} of ${escapeHtml(label)}" draggable="false">`;
+            return `<img ${screen==='concourse'?'data-concourse-plate':''} src="${source}" alt="${t('HD view')} of ${escapeHtml(label)}" draggable="false">`;
         }
         const screenLabel = screen === 'bar' ? t('BAR') : screen === 'market' ? t('MARKET') : t('CONCOURSE');
         return `<div class="procedural-location-plate system-${escapeHtml(location.systemId ?? 'helios-verge')}" style="--plate-accent:${escapeHtml(location.accent ?? '#80b7c8')};--plate-secondary:${escapeHtml(location.secondary ?? '#182b36')}" role="img" aria-label="${escapeHtml(location.name)} · ${escapeHtml(screenLabel)}"><span>${escapeHtml(location.shortName)}</span><b>${escapeHtml(screenLabel)}</b><i aria-hidden="true"></i></div>`;
@@ -4280,7 +4279,9 @@ export class GameUI {
         // for the courtesy, with the window ticking down.
         const patrolReply = this.el('#patrol-reply-chip');
         if (patrolReply) {
+            const wasHidden=patrolReply.classList.contains('is-hidden');
             patrolReply.classList.toggle('is-hidden', !model.patrolReply);
+            if(wasHidden!==!model.patrolReply)this.scheduleCommsFit();
             if (model.patrolReply) {
                 const timer = this.el('#patrol-reply-timer');
                 if (timer)
@@ -4384,7 +4385,7 @@ export class GameUI {
         const stabilizer=raceDriveLive&&model.race.stabilizerTime>0;
         const driveLabel=stabilizer?t('STABILIZER'):t(model.race?.racingHull?'THRUST':'BOOST');
         setText('#screen-own-fuel-label',raceDriveLive?driveLabel:t('FUEL'));
-        this.el('#screen-own-fuel-label')?.setAttribute('data-short',raceDriveLive?(stabilizer?'STAB':t(model.race?.racingHull?'THRUST':'BOOST')):t('FUEL'));
+        this.el('#screen-own-fuel-label')?.setAttribute('data-short',raceDriveLive?(stabilizer?'STAB':t(model.race?.racingHull?'THRUST':'BOOST')):'FUEL');
         setText('#screen-own-fuel',stabilizer?`${Math.ceil(model.race.stabilizerTime)}s`:Math.round(raceDriveLive?model.race.boost*100:(model.fuel/model.maxFuel)*100).toString());
         const boostValue=this.el('#screen-own-fuel');
         if(boostValue){boostValue.dataset.boost=stabilizer?'stabilizer':raceDriveLive&&model.race.boostLocked?'recovering':'';boostValue.nextElementSibling.textContent=stabilizer?'':'%';}
@@ -4650,8 +4651,11 @@ export class GameUI {
         };
         const clearHull = () => {
             const canvas = this.targetHullCanvas;
-            if (canvas)
+            if (canvas && !this.targetOutlineBlank) {
                 canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+                this.targetOutlineBlank=true;
+                this.objectOutlineCanvas=undefined;
+            }
         };
         const isShip = Boolean(target && target.kind === 'ship');
         // Ships show shield/hull bars; stations, planets, asteroids and wrecks
@@ -4669,6 +4673,7 @@ export class GameUI {
         this.el('#screen-target-name').title = target.name;
         setBar('#screen-target-shield', percent(target.shield ?? 0, target.maxShield ?? 0));
         setBar('#screen-target-hull', percent(target.hull ?? 0, target.maxHull ?? 0));
+        this.targetOutlineBlank=false;
         if (isShip) {
             this.drawHullOutline(this.targetHullCanvas, target.variant ?? 'kestrel', target.heading ?? 0, 'rgba(255, 192, 70, 0.92)', Boolean(target.hostile));
         }
@@ -4680,12 +4685,17 @@ export class GameUI {
         if (!canvas)
             return;
         const ctx = canvas.getContext('2d');
-        const ratio = Math.min(2, window.devicePixelRatio || 1);
+        const ratio = monitorRasterRatio();
         const size = (this.hullCanvasSizes ??= new CanvasSizeCache()).get(canvas);
         const cssW = size.width || 150;
         const cssH = size.height || 110;
         const width = Math.max(60, Math.floor(cssW * ratio));
         const height = Math.max(60, Math.floor(cssH * ratio));
+        // Stations/rocks/planets have fixed schematics. Redrawing and uploading
+        // their identical canvas at HUD frequency cannot add information.
+        if (this.objectOutlineCanvas===canvas && this.objectOutlineKind===kind
+            && this.objectOutlineAccent===accent && canvas.width===width && canvas.height===height)return;
+        this.objectOutlineCanvas=canvas;this.objectOutlineKind=kind;this.objectOutlineAccent=accent;
         if (canvas.width !== width || canvas.height !== height) {
             canvas.width = width;
             canvas.height = height;
@@ -4804,8 +4814,9 @@ export class GameUI {
     drawHullOutline(canvas, variant, heading = 0, accent = 'rgba(111, 216, 236, 0.9)', hostile = false, missiles = 0, missileCapacity = 0) {
         if (!canvas)
             return;
+        if (this.objectOutlineCanvas===canvas)this.objectOutlineCanvas=undefined;
         const ctx = canvas.getContext('2d');
-        const ratio = Math.min(2, window.devicePixelRatio || 1);
+        const ratio = monitorRasterRatio();
         const size = (this.hullCanvasSizes ??= new CanvasSizeCache()).get(canvas);
         const cssW = size.width || 150;
         const cssH = size.height || 110;
@@ -4941,7 +4952,7 @@ export class GameUI {
     }
     drawRadar(contacts, rings, searchRings = [], warpCombat = 0.2) {
         const canvas = this.radarContext.canvas;
-        const ratio = Math.min(2, window.devicePixelRatio || 1);
+        const ratio = monitorRasterRatio();
         if (ratio !== this.radarPixelRatio)
             this.radarLayoutDirty = true;
         if (this.radarLayoutDirty || this.radarCssWidth <= 0 || this.radarCssHeight <= 0) {
@@ -4953,8 +4964,8 @@ export class GameUI {
                 this.radarLayoutDirty = false;
             }
         }
-        const width = Math.max(150, Math.floor((this.radarCssWidth || 150) * ratio));
-        const height = Math.max(150, Math.floor((this.radarCssHeight || 150) * ratio));
+        const width = Math.max(72, Math.floor((this.radarCssWidth || 150) * ratio));
+        const height = Math.max(72, Math.floor((this.radarCssHeight || 150) * ratio));
         if (canvas.width !== width || canvas.height !== height) {
             canvas.width = width;
             canvas.height = height;
@@ -4965,8 +4976,8 @@ export class GameUI {
         const radius = Math.min(width, height) * 0.44;
         // Distance labels are sparse but important. Keep them at a true 10px
         // CSS floor rather than the old 8px bitmap text, including on 1x
-        // landscape-phone captures; DPR still scales the backing-store glyphs.
-        const radarTextFont = `${Math.max(10, Math.floor(10.5 * ratio))}px ui-monospace, monospace`;
+        // landscape-phone captures; the bitmap backing store follows CSS pixels.
+        const radarTextFont = `${Math.max(10, Math.floor(10.5 * ratio))}px "Courier New", monospace`;
         ctx.clearRect(0, 0, width, height);
         ctx.save();
         ctx.translate(cx, cy);
@@ -5267,12 +5278,64 @@ export class GameUI {
     commsLog = [];
     commsBarTimer;
     renderCommsMessage(bar,callsign,line,story=false) {
+        this.commsMessage={callsign,line,pinned:false};
+        delete bar.dataset.page;
+        window.clearTimeout(this.commsPageTimer);
         bar.textContent='';
         const id={'Rin Vek':'rin-vek','Mara Vek':'mara-vek',Paul:'paul'}[callsign];
         const source=story&&NPC_PORTRAIT_BY_ID[id];
         bar.classList.toggle('has-portrait',Boolean(source));
-        if(source){const img=document.createElement('img');img.className='comms-portrait';img.src=source;img.alt=callsign;img.addEventListener('error',()=>{img.remove();bar.classList.remove('has-portrait');},{once:true});bar.append(img);}
-        const text=document.createElement('span');text.className='talker-text';text.textContent=`${callsignHandle(callsign)}: ${line}`;bar.append(text);
+        if(source){const img=document.createElement('img');img.className='comms-portrait';img.src=source;img.alt=callsign;img.addEventListener('error',()=>{img.remove();bar.classList.remove('has-portrait');this.scheduleCommsFit();},{once:true});bar.append(img);}
+        const text=document.createElement('span');text.className='talker-text';text.textContent=`${commsSenderLabel(callsign)}: ${line}`;bar.append(text);
+        this.scheduleCommsFit();
+    }
+    scheduleCommsFit() {
+        if (this.commsFitFrame) cancelAnimationFrame(this.commsFitFrame);
+        this.commsFitFrame=requestAnimationFrame(()=>{this.commsFitFrame=0;this.fitCommsMessage();});
+    }
+    fitCommsMessage() {
+        const message=this.commsMessage,bar=this.el('#comms-bar'),text=bar?.querySelector('.talker-text');
+        if(message&&text)text.textContent=`${commsSenderLabel(message.callsign)}: ${message.line}`;
+        // Reserve the wing-order buttons only when they share this hull's
+        // comms area. This runs on message/layout changes, never per frame.
+        const channel=bar?.parentElement,wing=this.el('#hud-wing-tactics');
+        if(channel?.style){
+            channel.style.removeProperty('--comms-wing-gap');
+            if(wing?.children.length){
+                const a=bar.getBoundingClientRect(),b=wing.getBoundingClientRect();
+                if(a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top)
+                    channel.style.setProperty('--comms-wing-gap',`${a.right-b.left+8}px`);
+            }
+        }
+        if(!message||!text||!bar.classList.contains('active')||!text.clientWidth)return;
+        window.clearTimeout(this.commsPageTimer);
+        // Let ordinary transmissions grow to their full height inside the
+        // hull's clear area. Exceptionally long text still uses bounded pages.
+        const prefix=`${commsSenderLabel(message.callsign)}: `,pages=[];
+        const fits=()=>text.scrollHeight<=text.clientHeight+1&&text.scrollWidth<=text.clientWidth+1;
+        text.textContent=prefix+message.line;
+        if(fits())pages.push(text.textContent);
+        const words=message.line.split(/\s+/);
+        let start=0;
+        if(!pages.length)while(start<words.length){
+            let lo=start+1,hi=words.length,best=start;
+            while(lo<=hi){const end=(lo+hi)>>1;text.textContent=prefix+words.slice(start,end).join(' ');
+                if(fits()){best=end;lo=end+1;}else hi=end-1;}
+            if(best===start){
+                const chars=Array.from(words[start]);let length=1;lo=1;hi=chars.length;
+                while(lo<=hi){const end=(lo+hi)>>1;text.textContent=prefix+chars.slice(0,end).join('');if(fits()){length=end;lo=end+1;}else hi=end-1;}
+                pages.push(prefix+chars.slice(0,length).join(''));words[start]=chars.slice(length).join('');if(!words[start])start++;
+            }else{pages.push(prefix+words.slice(start,best).join(' '));start=best;}
+        }
+        if(!pages.length)pages.push(prefix);
+        let index=0;
+        const show=()=>{if(this.commsMessage!==message||!bar.classList.contains('active'))return;
+            text.textContent=pages[index];bar.dataset.page=`${index+1}/${pages.length}`;
+            if(++index<pages.length)this.commsPageTimer=window.setTimeout(show,Math.max(4000,text.textContent.length*65));};
+        show();
+        if(!message.pinned){window.clearTimeout(this.commsBarTimer);
+            const duration=pages.reduce((ms,page)=>ms+Math.max(4000,page.length*65),0);
+            this.commsBarTimer=window.setTimeout(()=>this.clearPilotLine(),Math.max(message.duration??6000,duration));}
     }
     storyDismissed = false;
     // story marks story-mission transmissions on the log entries; rendering
@@ -5294,6 +5357,7 @@ export class GameUI {
             return;
         const color = relationColor(relation);
         this.renderCommsMessage(bar,callsign,line,story);
+        this.commsMessage.duration=duration;
         bar.style.color = color;
         bar.style.borderColor = color;
         bar.classList.add('active');
@@ -5310,6 +5374,7 @@ export class GameUI {
         this.showPilotLine(speaker,text,'ally',12000,true);
     }
     clearPilotLine() {
+        this.commsMessage=undefined; window.clearTimeout(this.commsPageTimer);
         const bar = this.el('#comms-bar');
         if (bar) {
             bar.classList.remove('active', 'story','has-portrait');
@@ -5323,12 +5388,13 @@ export class GameUI {
         if(bar&&this.tutorialHint&&!this.dockLocation){
             bar.classList.add('active');
             this.renderCommsMessage(bar,this.tutorialHint.speaker,this.tutorialHint.text,true);
+            this.commsMessage.pinned=true;
             bar.style.color=relationColor('ally');bar.style.borderColor=relationColor('ally');
         }
-
+        this.scheduleCommsFit();
     }
-    // A group transmission (a mugging crew that folds together): the bar shows
-    // all of their callsigns, comma-joined, ahead of the line.
+    // A group transmission keeps all callsigns in the log; the flight label
+    // shows the first handle and a count of the other senders.
     showGroupLine(callsigns, line, relation = 'neutral', duration = 6000) {
         const names = callsigns.map((callsign) => callsignHandle(callsign)).join(', ');
         this.showPilotLine(names, line, relation, duration);
@@ -5353,10 +5419,12 @@ export class GameUI {
         bar.setAttribute('data-ui-command', 'dismiss-story');
         bar.setAttribute('aria-label', t('CONTINUE'));
         this.renderCommsMessage(bar,name,text,true);
+        this.commsMessage.pinned=true;
         window.clearTimeout(this.commsBarTimer);
         this.storyDismissed = false;
     }
     dismissStory() {
+        this.commsMessage=undefined; window.clearTimeout(this.commsPageTimer);
         const bar = this.el('#comms-bar');
         if (bar) {
             bar.classList.remove('active', 'story','has-portrait');
@@ -5366,6 +5434,7 @@ export class GameUI {
             bar.style.color = '';
             bar.style.borderColor = '';
         }
+        this.scheduleCommsFit();
         window.clearTimeout(this.commsBarTimer);
         this.storyDismissed = true;
     }
@@ -5753,6 +5822,7 @@ export class GameUI {
         this.wingTacticsCrew=Array.isArray(crew)?crew:[];this.wingOrderCount=count;
         const rail=this.root.querySelector('#hud-wing-tactics');
         if(!rail)return;
+        const previousCount=rail.children.length;
         const list=this.wingTacticsCrew.slice(0,2);
         // Retire cards for wingmen that are gone (dead, or no wing at all).
         for(const card of [...rail.children])
@@ -5784,6 +5854,7 @@ export class GameUI {
             }
             card.classList.toggle('is-powered-down',Boolean(entry.poweredDown));
         }
+        if(previousCount!==rail.children.length)this.scheduleCommsFit();
     }
     showArenaRun(save) {
         const r=save.arenaRun,p=save.player,stats=getEffectiveShipStats(p),wave=RUN_WAVES[r.wave],fit=loadoutFor(p),spec=HARDPOINT_SPECS[p.shipId];

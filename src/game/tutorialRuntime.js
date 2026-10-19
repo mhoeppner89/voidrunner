@@ -121,6 +121,7 @@ export const TutorialRuntimeMethods={
         if(amount>0){this.save.player.cargo.food=(this.save.player.cargo.food??0)+amount;this.ui.showToast(t('Rin replaced the lost delivery cargo.'),'info',5000);}
     },
     showTutorialDockBriefing(){
+        if(this.ui.concourseArrivalPending)return;
         const q=getTutorialQuest(this.save),port=this.save.player.dockedAt;
         if(!isTutorialActive(this.save)||!port)return;
         if(q.stepId==='earn-standing'&&this.ui.dockLocation===port&&!this.ui.isTitleVisible
@@ -323,8 +324,8 @@ export const TutorialRuntimeMethods={
                 if(p.throttle>.01||Math.hypot(...p.velocity)>8)return say('brake','Set thrust to zero to slow down for landing.');
                 return say('land','Hold position. Landing starts automatically below 5,000 km.');
             }
-            if(!this.stationLandingClearanceGranted)return say('beacon','Approach the highlighted landing beacon.');
-            return say('hangar','Fly slowly along the landing guide into the marked hangar.');
+            if(!this.stationLandingClearanceGranted)return say('station-approach','Approach to 200 km from the station.');
+            return say('station-dock','Set thrust to zero. Docking control will take you in.');
         }
         if(['mine-shardbelt','survey-graveyard','survey-carrier','salvage-black-box'].includes(s)){
             const travel=transit(summary.destinationId);if(travel)return travel;

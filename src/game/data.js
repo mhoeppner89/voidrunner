@@ -192,147 +192,7 @@ const helixPeople = [
             'Mara kept that key for years and handed it over the day you walked in. Ask her why now – I would.',
         ],
     },
-    {
-        id: 'oskar-brill',
-        name: 'Oskar Brill',
-        role: 'Cargo factor',
-        affiliation: 'Merchant Guild',
-        portraitSeed: 31,
-        lines: [
-            'Welcome to Helix; if your hold is empty, I can show you what the next ports are paying for.',
-            'Check the buy and sell quotes before you load; cargo mass turns a cheap run into a slow one.',
-            'Azure Reach has surplus food again, while Vesper is paying more for every crate that arrives.',
-        ],
-    },
-    {
-        id: 'sana-kell',
-        name: 'Sana Kell',
-        role: 'Dock mechanic',
-        affiliation: 'Helix Freeport',
-        portraitSeed: 53,
-        lines: [
-            'Bring me the damage report and I’ll tell you what Helix can fix before launch.',
-            'Use afterburner in short bursts; it burns fuel quickly and heats the drive during a long crossing.',
-            'If you run the Mourning Line dark, cool the drive before anyone gets close; a hot ship still shows up.',
-        ],
-    },
-];
-const rookPeople = [
-    {
-        id: 'captain-dorne',
-        name: 'Captain Elian Dorne',
-        role: 'Warrant marshal',
-        affiliation: 'Concord Patrol',
-        portraitSeed: 72,
-        lines: [
-            'Captain Dorne, Concord Patrol. Tell me what you need before you leave my dock.',
-            'On a warrant, confirm the target and keep civilian traffic out of your firing line.',
-            'Red Talon traffic has moved toward Mourning Line, where the wrecks make identification difficult.',
-        ],
-    },
-    {
-        id: 'yara-tan',
-        name: 'Yara Tan',
-        role: 'Ship broker',
-        marketTipster: true,
-        affiliation: 'Free Merchants Compact',
-        portraitSeed: 87,
-        lines: [
-            'If you’re shopping for a hull, tell me the job first; the cheapest ship is rarely the cheapest run.',
-            'Compare cargo capacity with the modules you want to fit before you sign the trade.',
-            'Vanguard demand is up because more pilots are taking contracts through the Shardbelt.',
-        ],
-    },
-    {
-        id: 'tovik',
-        name: 'Tovik Raal',
-        role: 'Bounty pilot',
-        affiliation: 'Bounty Hunters Registry',
-        portraitSeed: 103,
-        lines: [
-            'Tovik Raal, Registry pilot. I can help you read a warrant before you chase it.',
-            'In debris, make the target turn around the rocks; a straight chase gives pirates the easy line.',
-            'The Registry has posted more named targets near Mourning Line, and several have escorts.',
-        ],
-    },
-];
-const vesperPeople = [
-    {
-        id: 'devi-castor',
-        name: 'Devi Castor',
-        role: 'Mining foreman',
-        marketTipster: true,
-        affiliation: 'Frontier Miners Cooperative',
-        portraitSeed: 121,
-        lines: [
-            'You’re at Vesper; show me your scanner before you point a mining laser at anything.',
-            'Scan the asteroid first, then cut only when the deposit marker is clear.',
-            'Ore prices are soft here, but machinery shipments from Meridian are late again.',
-        ],
-    },
-    {
-        id: 'ren-iverson',
-        name: 'Ren Iverson',
-        role: 'Surveyor',
-        affiliation: 'Prospectors Guild',
-        portraitSeed: 138,
-        lines: [
-            'Ren Iverson, Prospector survey. I can mark a claim if your scan has enough detail.',
-            'Run a full scan over the rock; a partial pass will not reveal deep signatures.',
-            'A harmonic marker from the old Shardbelt tunnel is active again, near the rock crown.',
-        ],
-    },
-    {
-        id: 'kes-ali',
-        name: 'Kes Ali',
-        role: 'Union organizer',
-        affiliation: 'Frontier Miners Cooperative',
-        portraitSeed: 147,
-        lines: [
-            'Sit down. I’m Kes Ali, and I keep the Cooperative’s people from being treated as easy salvage.',
-            'If pirates are near a claim, call for help before you start cutting; an escort is cheaper than a lost hold.',
-            'The Cooperative has logged more gold in the Shardbelt, which is why the pirate patrols are thicker.',
-        ],
-    },
-];
-const azurePeople = [
-    {
-        id: 'linh-sorel',
-        name: 'Linh Sorel',
-        role: 'Agronomy delegate',
-        marketTipster: true,
-        affiliation: 'Azure Reach Cooperative',
-        portraitSeed: 166,
-        lines: [
-            'Welcome to Azure Reach. We have food to move and too few pilots willing to take the long route.',
-            'Leave room for the return cargo; food is light, but a full hold still limits your options.',
-            'The latest harvest came in early, and Vesper’s clinics are already asking for more medicine.',
-        ],
-    },
-    {
-        id: 'ivo-senn',
-        name: 'Ivo Senn',
-        role: 'Courier',
-        affiliation: 'Merchant Guild',
-        portraitSeed: 179,
-        lines: [
-            'Ivo Senn, courier desk. If the deadline matters, I’ll show you the route before you accept.',
-            'Express contracts pay more, but check the clock against your jump plan before you take one.',
-            'Helix is buying protein packs by the pallet, while Vesper is paying emergency prices.',
-        ],
-    },
-    {
-        id: 'doctor-ames',
-        name: 'Dr. Soraya Ames',
-        role: 'Clinic director',
-        affiliation: 'Civilian Medical Service',
-        portraitSeed: 191,
-        lines: [
-            'I’m Dr. Soraya Ames. If you’re carrying medicine, tell me how long it has been out of the cold.',
-            'Keep medical cargo sealed and avoid unnecessary fights; a hull hit can cost the fragile-load bonus.',
-            'The clinics around Mourning Line are short on intact medical cores after the last salvage run.',
-        ],
-    },
+
 ];
 const HELIOS_LOCATIONS = {
     helix: {
@@ -371,7 +231,7 @@ const HELIOS_LOCATIONS = {
         shipsForSale: ['lancer', 'vanguard', 'blade'],
         economy: { food: 1.14, water: 1.08, medicine: 1.18, electronics: 1.06, machinery: 1.04, ore: 1.1, scrap: 0.88, luxuries: 1.22, arms: 0.96 },
         marketBias: { medicine: -14, arms: 18, scrap: 22, luxuries: -12 },
-        people: rookPeople,
+        people: [],
     },
     vesper: {
         id: 'vesper',
@@ -391,7 +251,7 @@ const HELIOS_LOCATIONS = {
         shipsForSale: ['prospector', 'atlas'],
         economy: { food: 1.36, water: 1.28, medicine: 1.25, electronics: 1.12, machinery: 1.2, ore: 0.58, scrap: 0.78, luxuries: 1.45, arms: 1.1 },
         marketBias: { ore: 45, scrap: 25, food: -24, water: -22, machinery: -18 },
-        people: vesperPeople,
+        people: [],
     },
     azure: {
         id: 'azure',
@@ -411,7 +271,7 @@ const HELIOS_LOCATIONS = {
         shipsForSale: ['talon'],
         economy: { food: 0.55, water: 0.62, medicine: 0.82, electronics: 1.28, machinery: 1.34, ore: 1.22, scrap: 1.12, luxuries: 0.72, arms: 1.35 },
         marketBias: { food: 48, water: 38, medicine: 20, machinery: -25, electronics: -18 },
-        people: azurePeople,
+        people: [],
     },
     shardbelt: {
         id: 'shardbelt',

@@ -27,7 +27,7 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heig
   const concourse=async()=>{for(let i=0;i<3&&await page.locator('.dock-header .dock-back-button').count();i++)await page.locator('.dock-header .dock-back-button').click();};
   const bar=async()=>{await concourse();await page.locator('[data-dock-hotspot="bar"]').click();};
   const stock=async(tab)=>{const select=page.locator('[data-inventory-tab]');if(await select.isVisible())await select.selectOption(tab);else await page.locator(`[data-inventory-action="tab"][data-tab="${tab}"]`).click();};
-  await bar();await page.locator('[data-person-id="mara-vek"]').click();await finish('mara',/Protein.*Vesper/s);await page.locator('[data-person-id="rin-vek"]').click();await finish('rin-buying',/MARKTPLATZ.*WARENBÖRSE.*MAXIMAL KAUFEN/s);
+  await bar();assert.deepEqual(await page.locator('[data-person-id]').evaluateAll(es=>es.map(e=>e.dataset.personId)),['mara-vek','rin-vek']);await page.locator('[data-person-id="mara-vek"]').click();await finish('mara',/Protein.*Vesper/s);await page.locator('[data-person-id="rin-vek"]').click();await finish('rin-buying',/MARKTPLATZ.*WARENBÖRSE.*MAXIMAL KAUFEN/s);
   await concourse();await page.locator('[data-dock-hotspot="market"]').click();await page.locator('[data-market-point="commodities"]').click();await page.locator('[data-commodity-id="food"]').click();
   assert.ok(await page.locator('[data-trade="buy:food:999"] small').isVisible());await page.screenshot({path:`${out}/${name}-normal-buy.png`});
   await page.locator('[data-trade="buy:food:1"]').click();assert.ok(await page.locator('#adventure-panel').isHidden());await page.locator('[data-trade="buy:food:999"]').click();await finish('cargo-ready',/DOCKHALLE.*Wayfarer/s);
@@ -48,6 +48,20 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heig
   await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();r.dockAt('cairn',true);});await bar();await page.locator('[data-person-id="rin-vek"]').click();await finish('rin-black-box',/BLACKBOX-SIGNAL.*BERGEN.*Computer M.*Paul/s);
   await page.locator('[data-person-id="paul"]').click();await page.locator('#adventure-panel [data-ui-command="adventure-choice"]').first().click();assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().save.quests.find(q=>q.id==='the-spare-key').flags.paulInvited),true);
   await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();r.save.quests.find(q=>q.id==='the-spare-key').stepId='decode-black-box';r.save.player.dockedAt='helix';r.ui.showDock(r.save,'helix');});await bar();await page.locator('[data-person-id="mara-vek"]').click();await finish('mara-decoding',/Entschlüsselung.*Tor ist offen/s);assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().tutorialSummary().stepId),'complete');
-  assert.deepEqual(errors,[]);report.push({name,purchased,normalContract:true,normalDroneSwitch:true,paulInvited:true,dialogues,errors});await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));console.log(name,'normal opening trade, contract, drone switching and every authored story lesson passed');
+  const desks=[];
+  for(const id of ['rook','vesper','cairn']){
+   await page.evaluate(id=>{const r=__VOID_PRIVATEER__.getRuntime();r.save.player.dockedAt=id;r.ui.showDock(r.save,id);r.ui.switchToTerminal('bar');},id);
+   assert.equal(await page.locator('[data-person-id]').count(),0,`${id}: filler contact remains`);
+   await page.waitForFunction(()=>{const i=document.querySelector('#dock-screen .dock-backdrop img');return i?.complete&&i.naturalWidth>0;});await page.screenshot({path:`${out}/${name}-${id}-story-only-bar.png`});
+   await page.locator('[data-bar-panel="missions"]').click();assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.barPanel),'missions');assert.ok(await page.locator('.mission-terminal').isVisible());
+   if(id==='cairn')assert.ok(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().save.world.offers.cairn.some(m=>m.kind==='race')),'race entries remain available');
+   await page.locator('[data-ui-command="bar-scene"]').click();
+   if(id==='rook'){
+    await page.locator('[data-bar-panel="guilds"]').click();assert.equal(await page.locator('.guild-card-head img').count(),0,'Removed representatives must not reappear on guild cards');
+    const join=page.locator('[data-guild-id]:not(:disabled)').first(),guild=await join.getAttribute('data-guild-id');await join.click();assert.ok(await page.evaluate(guild=>__VOID_PRIVATEER__.getRuntime().save.player.guildRep[guild]>0,guild),'guild registration still works');await page.screenshot({path:`${out}/${name}-rook-guild-desk.png`});
+   }
+   desks.push(id);
+  }
+  assert.deepEqual(errors,[]);report.push({name,purchased,normalContract:true,normalDroneSwitch:true,paulInvited:true,storyOnlyBars:true,desks,dialogues,errors});await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));console.log(name,'authored story conversations, story-only bars, contract/race boards and guild registration passed');
  }finally{await browser.close();}
 }

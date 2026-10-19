@@ -25,11 +25,10 @@ for(const [name,type,device] of [['desktop',chromium,{viewport:{width:1440,heigh
   await page.evaluate(()=>__VOID_PRIVATEER__.newGame());
   const landing=await page.evaluate(async()=>{
    const r=__VOID_PRIVATEER__.getRuntime();r.audio.setVolumes(0,0);cancelAnimationFrame(r.frameId);r.skipTutorial();r.save.player.dockedAt='helix';await r.launch();cancelAnimationFrame(r.frameId);
-   const T=await import('/vendor/three.module.min.js'),b=r.departureClearance;if(!b)throw Error('Station launch has no berth');r.ships=[];
-   r.save.player.position.splice(0,3,...b.pad);r.save.player.velocity.fill(0);r.save.player.currentTargetId='helix';r.save.player.navTargetId='helix';r.activeInstanceId='helix';
+   const T=await import('/vendor/three.module.min.js'),{LOCATIONS}=await import('/src/game/data.js'),{stationVisualSurfaceRadius,stationSurfaceDistance}=await import('/src/game/stationTraffic.js'),b=r.stationTransitData('helix').berth;r.ships=[];if(stationSurfaceDistance('helix',r.save.player.position)<50)throw Error('Station departure did not clear the hull');
+   const l=LOCATIONS.helix;r.save.player.position.splice(0,3,l.position[0],l.position[1],l.position[2]+stationVisualSurfaceRadius('helix')+150);r.save.player.velocity.fill(0);r.save.player.currentTargetId='helix';r.save.player.navTargetId='helix';r.activeInstanceId='helix';
    new T.Quaternion().setFromUnitVectors(new T.Vector3(0,0,-1),new T.Vector3(...b.pad).sub(new T.Vector3(...b.gate)).normalize()).toArray(r.save.player.rotation);
-   r.updateStationLandingGuidance();r.autoDockCheck();if(!r.playerDocking)throw Error('Automatic station landing did not capture the pad');
-   for(let i=0;i<90;i++)r.updateSimulation(1/60,{});if(r.save.player.dockedAt!=='helix')throw Error('Station landing did not complete');
+   r.updateStationLandingGuidance();r.autoDockCheck();if(r.save.player.dockedAt!=='helix'||r.playerDocking)throw Error('Station outer approach did not hand over to the arrival film');
    return{dockedAt:r.save.player.dockedAt,padId:b.padId,position:[...r.save.player.position]};
   });await page.screenshot({path:`${out}/${name}-landed.png`});
   assert.deepEqual(errors,[]);results.push({name,combat,landing,errors});await writeFile(`${out}/player-actions.json`,JSON.stringify(results,null,2));console.log(name,JSON.stringify(results.at(-1)));

@@ -1,0 +1,148 @@
+{
+  "format": "voidrunner-landing-layout",
+  "version": 1,
+  "referenceRuntime": "0.8.2iq",
+  "exportedAt": "2026-10-19T07:40:36.525Z",
+  "preview": {
+    "hull": "wayfarer",
+    "paint": "original"
+  },
+  "locations": {
+    "helix": {
+      "scale": 1.5444,
+      "rotationDeg": {
+        "yaw": 30,
+        "pitch": 3,
+        "roll": 6
+      }
+    },
+    "rook": {
+      "scale": 1.3696,
+      "rotationDeg": {
+        "yaw": -104,
+        "pitch": 0,
+        "roll": -4
+      }
+    },
+    "vesper": {
+      "scale": 1.254,
+      "rotationDeg": {
+        "yaw": 34,
+        "pitch": 0,
+        "roll": 8
+      }
+    },
+    "azure": {
+      "scale": 1.104,
+      "rotationDeg": {
+        "yaw": 42,
+        "pitch": 0,
+        "roll": 6
+      }
+    },
+    "haven": {
+      "scale": 1.7152,
+      "rotationDeg": {
+        "yaw": -108,
+        "pitch": 0,
+        "roll": -6
+      }
+    },
+    "league-yard": {
+      "scale": 1.7484,
+      "rotationDeg": {
+        "yaw": -8,
+        "pitch": 4,
+        "roll": 0
+      }
+    },
+    "cinderfall": {
+      "scale": 1.7952,
+      "rotationDeg": {
+        "yaw": -111,
+        "pitch": 0,
+        "roll": -4
+      }
+    },
+    "cairn": {
+      "scale": 2.5456,
+      "rotationDeg": {
+        "yaw": -93,
+        "pitch": 0,
+        "roll": 0
+      }
+    },
+    "meridian-prime": {
+      "scale": 2.324,
+      "rotationDeg": {
+        "yaw": 75,
+        "pitch": 0,
+        "roll": 5
+      }
+    },
+    "argent": {
+      "scale": 1.9458,
+      "rotationDeg": {
+        "yaw": 18,
+        "pitch": 0,
+        "roll": 3
+      }
+    },
+    "gatehouse-twelve": {
+      "scale": 2.288,
+      "rotationDeg": {
+        "yaw": 89,
+        "pitch": 0,
+        "roll": 3
+      }
+    },
+    "blackglass": {
+      "scale": 1.8875,
+      "rotationDeg": {
+        "yaw": 71,
+        "pitch": 0,
+        "roll": 1
+      }
+    },
+    "cinder": {
+      "scale": 1.54,
+      "rotationDeg": {
+        "yaw": 85,
+        "pitch": 0,
+        "roll": 3
+      }
+    },
+    "torchwell": {
+      "scale": 1.32,
+      "rotationDeg": {
+        "yaw": -98,
+        "pitch": 0,
+        "roll": 0
+      }
+    },
+    "nacre": {
+      "scale": 1.6632,
+      "rotationDeg": {
+        "yaw": 81,
+        "pitch": 0,
+        "roll": 3
+      }
+    },
+    "boreal": {
+      "scale": 1.242,
+      "rotationDeg": {
+        "yaw": -149,
+        "pitch": 3,
+        "roll": -2
+      }
+    },
+    "shepherd": {
+      "scale": 1.1016,
+      "rotationDeg": {
+        "yaw": 88,
+        "pitch": 0,
+        "roll": 0
+      }
+    }
+  }
+}

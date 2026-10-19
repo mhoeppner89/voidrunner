@@ -26,6 +26,8 @@ function bufferFor(manager, id) {
     bank.next.set(id, (next+1)%buffers.length);
     return buffers[next];
 }
+// Reuse the already decoded engine recording in exterior animation voices.
+export function sampleBufferFor(manager,id){return bufferFor(manager,id);}
 export function playIndustrial(manager,id,at,intensity,out) {
     const buffer = bufferFor(manager,id);
     if (!buffer) return;
