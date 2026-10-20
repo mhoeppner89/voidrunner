@@ -65,6 +65,15 @@ test('source geometry/order are immutable and the index is cached', () => {
     invalidateSurfaceMeshIndex(mesh.meshVerts);
     assert.notEqual(first, prepareSurfaceMeshIndex(mesh.meshVerts, mesh.meshIndices));
 });
+test('the coarse sphere encloses every indexed point, including off-centre meshes',()=>{
+    const mesh=field();
+    for(let i=0;i<mesh.meshVerts.length;i+=3){mesh.meshVerts[i]-=1000;mesh.meshVerts[i+1]+=700;mesh.meshVerts[i+2]-=40;}
+    const tree=prepareSurfaceMeshIndex(mesh.meshVerts,mesh.meshIndices);
+    for(const index of mesh.meshIndices){const i=index*3;assert.ok(Math.hypot(mesh.meshVerts[i],mesh.meshVerts[i+1],mesh.meshVerts[i+2])<=tree.radius);}
+    mesh.meshVerts[0]-=2000;invalidateSurfaceMeshIndex(mesh.meshVerts);
+    assert.ok(prepareSurfaceMeshIndex(mesh.meshVerts,mesh.meshIndices).radius>tree.radius);
+    assert.equal(prepareSurfaceMeshIndex(new Float32Array(),new Uint16Array()).radius,0);
+});
 test('scratch buffers are reused but independent between callers', () => {
     const mesh = field(), a = new Float32Array(mesh.meshVerts.length), b = new Float32Array(mesh.meshVerts.length);
     const one = surfaceMeshCandidates({ x: 0, y: 0, z: 0 }, [2, 2, 2], mesh, a);

@@ -86,11 +86,11 @@ const safeCargoNumber = (value) => {
         : 0;
 };
 export const cargoMass = (player) => {
-    // All owned drones reserve one cargo unit, including deployed ones. Launching
-    // cannot create free cargo space and returning never strands a drone.
-    let mass = Number(player?._inventoryCargoMass) || Object.values(player?.inventory?.items??{}).reduce((n,item)=>n+(item.location?.kind==='cargo'?(equipmentRecord(item.id)?.mass??1):0),0);
+    // Installed drones occupy their bay. Spare drones count once as cargo;
+    // station storage and their equipment presentation records add no mass.
+    let mass = Number(player?._inventoryCargoMass) || Object.values(player?.inventory?.items??{}).reduce((n,item)=>n+(!item.droneUnitId&&item.location?.kind==='cargo'?(equipmentRecord(item.id)?.mass??1):0),0);
     const drones = player?.droneFleet?.unitsById;
-    for (const id in drones) if (drones[id]?.hull > 0 && drones[id].state !== 'destroyed') mass++;
+    for (const id of player?.droneFleet?.lockerIds??[]) if (drones[id]?.hull > 0 && drones[id].state !== 'destroyed'&&(!player.inventory?.items?.[`eq-${id}`]||player.inventory.items[`eq-${id}`].location?.kind==='cargo')) mass++;
     for (const item of Array.isArray(player?.sealedCargo) ? player.sealedCargo : []) {
         if (!item || typeof item !== 'object')
             continue;

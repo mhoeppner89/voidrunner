@@ -267,7 +267,7 @@ export function createMiningDroneSystem({ launchSeconds = 0.25, dockSeconds = 0.
                 if (unit.payload) {
                     const event = deliverMiningPayload(fleet, id, miningContext);
                     if (!event.ok) continue; // Keep the packet and retry on a later step.
-                    miningContext.cargoMass += event.unitMass;
+                    miningContext.cargoMass += event.units * event.unitMass;
                     events.push(event);
                 }
                 const event = transitionMinerUnit(fleet, id, 'stowed');

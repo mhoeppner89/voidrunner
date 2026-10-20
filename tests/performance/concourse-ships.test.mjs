@@ -125,3 +125,22 @@ test('normal-mapped dock materials keep authored detail and use geometric normal
  const shader={fragmentShader:'#include <normal_fragment_maps>'};hook(shader,{});assert.equal(called,1);assert.ok(shader.fragmentShader.includes('texture2D( normalMap'));assert.ok(shader.fragmentShader.includes('mappedLength>1e-8'));assert.ok(!shader.fragmentShader.includes('normal = normalize( tbn * mapN );'));
  material.normalMap.dispose();material.dispose();
 });
+
+test('dock and film outputs reuse one bounded drawing buffer with the same pixel coordinates',()=>{
+ for(const touchDevice of [false,true]){
+  const v=Object.create(ConcourseShip.prototype),canvas={width:1,height:1,style:{},dataset:{}};let allocations=0;
+  Object.assign(v,{touchDevice,canvas,renderer:{setSize(w,h){allocations++;canvas.width=w;canvas.height=h;}},target:new THREE.WebGLRenderTarget(1,1)});
+  for(const [width,height,scale]of [[458,238,2],[420,270,2],[640,360,1],[458,238,2],[320,480,2],[458,238,2]]){
+   v.resizeOutput(width,height,scale);assert.equal(allocations,1,'view switches and rotation retain the default framebuffer');
+   assert.equal(v.target.width,width);assert.equal(v.target.height,height);
+   assert.equal(canvas.width,touchDevice?768:960);assert.equal(canvas.height,touchDevice?480:600);
+   const offset=Number(canvas.style.transform.match(/-?[\d.]+/)[0]);
+   for(const [x,y]of [[0,0],[width*.5,height*.5],[width,height]]){
+    // WebGL's origin is bottom-left; DOM coordinates start at the top-left.
+    const cssX=x*scale,cssY=(canvas.height-y)*scale+offset;
+    assert.equal(cssX,x*scale);assert.equal(cssY,(height-y)*scale,'no scene shift or change of pixel size');
+   }
+  }
+  v.target.dispose();
+ }
+});

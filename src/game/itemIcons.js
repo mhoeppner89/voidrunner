@@ -2,6 +2,9 @@
 // faceted faces carry depth without textures, gradients, filters or animation.
 const glyph=(body,facet,detail,core='')=>({body,facet,detail,core});
 const SYMBOLS={
+ 'mining-drone':glyph('M24 16l8-8 8 8v27l-8 8-8-8zM24 22H8v18h16m16-18h16v18H40','M32 8l8 8v27l-8 8V35l5-7-5-8zM8 22h16v5H8m32-5h16v5H40','M12 31h8m24 0h8M27 42h10','M27 26l10-10m-10 1 10 10M28 33l4-4 4 4-4 6z'),
+ 'pdc-drone':glyph('M24 16l8-8 8 8v27l-8 8-8-8zM24 22H8v18h16m16-18h16v18H40','M32 8l8 8v27l-8 8V35l5-7-5-8zM8 22h16v5H8m32-5h16v5H40','M12 31h8m24 0h8M27 42h10','M28 16v17m8-17v17M27 24h10'),
+ 'repair-drone':glyph('M24 16l8-8 8 8v27l-8 8-8-8zM24 22H8v18h16m16-18h16v18H40','M32 8l8 8v27l-8 8V35l5-7-5-8zM8 22h16v5H8m32-5h16v5H40','M12 31h8m24 0h8M27 42h10','M29 20h6v6h6v6h-6v6h-6v-6h-6v-6h6z'),
  'pulse-cannon':glyph('M19 26h26l3 6v13l-5 5H21l-5-5V32zM23 26V9h6v17m6 0V9h6v17','M19 26h26l-5 6H24zM41 32h7v13l-5 5h-2z','M23 14h6m6 0h6M24 36h12m-12 7h7','M26 37h5v5h-5z'),
  'beam-emitter':glyph('M21 25l11-5 11 5 5 14-7 11H23l-7-11zM25 23l-5-12 5-5 7 12 7-12 5 5-5 12','M32 20l11 5 5 14-7 11h-9V33z','M23 40h18M32 14V3m-5 6h10M24 44h6','M27 29h10v8H27z'),
  'gauss-cannon':glyph('M23 31h18l5 7v9l-6 3H24l-6-3v-9zM24 31V5h5v26m6 0V5h5v26','M41 31l5 7v9l-6 3h-8V38z','M24 10h16m-16 7h16m-16 7h16M24 42h10M32 5V2','M29 35h6v8h-6z'),
@@ -25,6 +28,7 @@ const SYMBOLS={
  'thrusters-mk2':glyph('M23 21l9-5 9 5v18l-9 5-9-5zM8 24h9v12H8zm39 0h9v12h-9zM26 5h12v8H26zm0 42h12v8H26z','M32 16l9 5v18l-9 5zM8 24h9v4H8zm39 0h9v4h-9z','M11 28h3m36 0h3','M28 25h8v10h-8z'),
  'radar-mk2':glyph('M13 14l32 25c-14 6-31-7-32-25zM29 33v12h10V38M20 46h25v4H20z','M13 14l32 25-10 1-17-15zM29 33l10 5v7H29z','M29 26l13-15M39 9l6 4M47 10l4-5m-1 12 7-1','M37 13l6-5 5 4-6 5z'),
  'cargo-pods':glyph('M8 20l15-8 14 8v23l-14 8-15-8zM39 19l9-5 9 5v23l-9 5-9-5z','M23 12l14 8-14 8-15-8zM23 28l14-8v23l-14 8zM48 14l9 5v23l-9 5z','M13 29v10m5-7v10m24-16 10-5M28 29v12','M12 22l5 3v8l-5-3zM42 32l4 2v7l-4-2z'),
+ 'loot-collector':glyph('M20 8h24l8 8v9H12v-9zM22 37l10-6 10 6v11l-10 5-10-5z','M44 8l8 8v9H39V16zM32 31l10 6v11l-10 5z','M15 31l7 6m27-6-7 6M24 17h16M27 38l5 3 5-3M32 41v8','M26 15h12v6H26z'),
  'salvage-mk2':glyph('M13 14l9-6 6 6-9 12 7 12-6 6L8 29V20zM51 14l-9-6-6 6 9 12-7 12 6 6 12-15V20z','M22 8l6 6-9 12 7 12-6 6-5-15v-9zM42 8l-6 6 9 12-7 12 6 6 5-15V20z','M24 28h16','M27 21l5-3 5 3v9l-5 3-5-3z'),
  'frigate-battery':glyph('M14 32l9-8h22l8 8v14l-9 5H23l-9-5zM23 24V9h8v15m6 0V9h8v15','M23 24h22l8 8-10 6H23l-9-6zM43 38l10-6v14l-9 5h-1z','M23 15h8m6 0h8M22 42h15M11 41H7m49 0h4','M27 39h9v6h-9z'),
  'cruiser-battery':glyph('M12 34l10-9h25l9 9v12l-11 6H23l-11-6zM22 25V5h9v20m7 0V5h9v20','M22 25h25l9 9-11 6H23l-11-6zM45 40l11-6v12l-11 6z','M22 11h9m7 0h9M22 18h9m7 0h9M21 45h19','M24 42h12v7H24z'),
@@ -66,6 +70,7 @@ const SIGNALS={
  'thrusters-mk2':'M9 30H3m0 0 4-4m-4 4 4 4M55 30h6m0 0-4-4m4 4-4 4M32 8V3m0 0-4 4m4-4 4 4M32 48v6m0 0-4-4m4 4 4-4',
  'radar-mk2':'M48 10l4-5m-1 12 7-1',
  'cargo-pods':'M16 34v5m30-12v5',
+ 'loot-collector':'M17 27l5 5m25-5-5 5',
  'salvage-mk2':'M32 36v13m0 0-5-5m5 5 5-5',
  'frigate-battery':'M24 10h6m8 0h6M24 16h6m8 0h6',
  'cruiser-battery':'M23 6h7m9 0h7M23 18h7m9 0h7',
@@ -73,10 +78,11 @@ const SIGNALS={
 // Body paint is independent of rarity. Rarity stays on the tier/affix markers.
 const STEEL={body:'#203b50',face:'#496b83',edge:'#a9c5d5',line:'#799aaf'};
 const ACCENTS={
+ 'mining-drone':'#ecc46f','pdc-drone':'#8bc8ed','repair-drone':'#83dbad',
  'pulse-cannon':'#72e7f0','beam-emitter':'#8bf3db','gauss-cannon':'#e8bd72',ripper:'#f0a176','ion-blaster':'#b8a3f5',mortar:'#ffb279',
  'seeker-launcher':'#edb875','swarm-launcher':'#edb875','shield-seeker-launcher':'#89c5ff','shield-swarm-launcher':'#89c5ff','torpedo-launcher':'#ea9488',
  pdc:'#f0c781','tracking-turret':'#83e9e0','capacitor-bank':'#76ddd2','sustained-reactor':'#efc877','shield-mk2':'#79bdf4','recovery-shield':'#78e3cb','capital-shield-generator':'#8fc5f6',
- 'armor-mk2':'#d9b37a','engine-mk2':'#f6b372','thrusters-mk2':'#7fd5ee','radar-mk2':'#83e2c9','cargo-pods':'#d3b37b','salvage-mk2':'#91dfd1','frigate-battery':'#e1ba82','cruiser-battery':'#f0b777',
+ 'armor-mk2':'#d9b37a','engine-mk2':'#f6b372','thrusters-mk2':'#7fd5ee','radar-mk2':'#83e2c9','cargo-pods':'#d3b37b','salvage-mk2':'#91dfd1','loot-collector':'#8de2db','frigate-battery':'#e1ba82','cruiser-battery':'#f0b777',
 };
 const CARGO_PAINT={
  water:{body:'#234d62',face:'#3b8198',edge:'#9ad8e8',line:'#79b7cd',accent:'#93e9fa'},

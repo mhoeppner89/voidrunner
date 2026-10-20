@@ -1,3 +1,4 @@
+import {stabilizeMaterialNormals} from './materialNormals.js';
 import * as THREE from 'three';
 import {TURRET_MODEL_DATA} from './turretModelData.js';
 // Blender-authored meshes shared across instances; each instance owns only pivots.
@@ -27,7 +28,7 @@ function armorUV(part,kind,index,geometry){
 export function paintFrigateTurret(root,hullMaterial){
     if(!hullMaterial?.map||root.userData.armorAtlas===hullMaterial.map)return;
     let material=frigateMaterials.get(hullMaterial.map);
-    if(!material){material=hullMaterial.clone();material.name='Concord turret armor · shared hull atlas';material.userData.shared=true;frigateMaterials.set(hullMaterial.map,material);}
+    if(!material){material=hullMaterial.clone();material.name='Concord turret armor · shared hull atlas';material.userData.shared=true;material.userData.borrowedTextures=true;stabilizeMaterialNormals(material);frigateMaterials.set(hullMaterial.map,material);}
     root.traverse(o=>{if(!o.isMesh)return;if(o.userData.damageMaterial){o.userData.damageMaterial.dispose();delete o.userData.damageMaterial;}o.material=material;o.userData.healthyMaterial=material;});
     root.userData.armorAtlas=hullMaterial.map;delete root.userData.healthFraction;
 }

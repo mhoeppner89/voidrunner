@@ -1,4 +1,5 @@
-import {createPixelResolveMaterial,createPixelSceneTarget,pixelTargetSamples,bindPixelResolve} from './pixelResolve.js';
+import {stabilizeMaterialNormals} from './materialNormals.js';
+import {createPixelResolveMaterial,createPixelSceneTarget,pixelTargetSamples,bindPixelResolve,FINITE_COLOUR_GLSL} from './pixelResolve.js';
 import {pixelRenderSize} from './retroDisplay.js';
 import { createAsteroidTerrain } from './asteroidTerrain.js';
 import {createAsteroidFragmentMaterials, ASTEROID_FINISH_PALETTES,configureAsteroidShadows} from './asteroidMaterials.js';
@@ -6,6 +7,8 @@ import {createLootVisualResources,createLootVisual,setLootVisualRarity,disposeLo
 import {SHIELD_ACTIVATION_WINDOW} from './weaponDamage.js';
 import {FLEET_EQUIPMENT,equipmentHullId,droneDock} from './fleetEquipmentData.js';
 import {applyFleetPaint} from './fleetPaint.js';
+import {applyIndependentPaint} from './independentPaints.js';
+import {applyWayfarerLivery,WAYFARER_INDEPENDENT_LIVERIES} from './wayfarerLiveries.js';
 import {resolveFleetPaint,fleetPaintPath} from './fleetPaintCatalog.js';
 import {TURRET_LAYOUTS} from './turretLayouts.js';
 import {createCapitalEngineExhaust,updateCapitalEngineExhaust} from './capitalEngineExhaust.js';
@@ -16,10 +19,10 @@ import {createCruiserTurret,createCruiserPdc,createCruiserEngineDamage,updateCru
 import { createShipExplosion, createHullDebris } from './explosionFx.js';
 import {ShipWreckFactory} from './shipWreckFx.js';
 import { createOrdnanceModel } from './ordnanceModels.js';
-import { skipHiddenWorldMatrices, markAttributeSpan } from './renderWork.js';
+import { skipHiddenWorldMatrices, markAttributeSpan, configureShaderDiagnostics, prepareRenderScene, freezeStaticTransforms, waitForRenderWork } from './renderWork.js';
 import { DRONE_PORTS } from './droneFlight.js';
 import {cockpitDamageStage} from './cockpitDamage.js';
-import {createGraveyardPlating,prepareGraveyardModel,arrangeGraveyardModel} from './graveyardArt.js';
+import {createGraveyardPlating,prepareGraveyardModel,arrangeGraveyardModel,batchGraveyardModelAsync} from './graveyardArt.js';
 import {createTurretModel,paintFrigateTurret} from './turretModels.js';
 import {createFrigateSystems,updateFrigateSystems,setFrigateComponentDamage,frigateEngineFraction} from './frigateComponents.js';
 import {FRIGATE_MOUNTS} from './frigateMounts.js';
@@ -36,7 +39,7 @@ import { paintShipMaterial, shipPaintFrames } from './shipLivery.js';
 import { addStationOccupants, STATION_OCCUPANTS } from './stationOccupants.js';
 import { addStationActivity, updateStationActivity } from './stationActivity.js';
 import { playerBerth } from './playerDocking.js';
-import { buildStationCollider } from './stationCollision.js';
+import { buildStationColliderAsync } from './stationCollision.js';
 import { stationModelOffsetZ, stationVisualSurfaceRadius } from './stationTraffic.js';
 import { LaserFx } from './laserFx.js';
 const tupleToVector = (tuple, out = new THREE.Vector3()) => out.set(tuple[0], tuple[1], tuple[2]);
@@ -65,7 +68,7 @@ const WRECK_RENDER_DISTANCE_SQ = WRECK_RENDER_DISTANCE * WRECK_RENDER_DISTANCE;
 const MOURNING_ROOT_VISIBILITY_RANGE = WRECK_RENDER_DISTANCE + 6000;
 const MOURNING_ROOT_VISIBILITY_RANGE_SQ = MOURNING_ROOT_VISIBILITY_RANGE * MOURNING_ROOT_VISIBILITY_RANGE;
 const HIDDEN_SCALE = [0.0001, 0.0001, 0.0001];
-const SHADER_WARMUP_TIMEOUT_MS = 2500;
+const SHADER_WARMUP_TIMEOUT_MS = 8000;
 const IOS_RENDER_WIDTH = 640;
 export const IOS_INITIAL_SCALE = 0.82;
 
@@ -443,6 +446,7 @@ export class SpaceRenderer {
             depth: true,
             stencil: false,
         });
+        configureShaderDiagnostics(this.renderer);
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderer.toneMapping = THREE.NeutralToneMapping;
         this.renderer.toneMappingExposure = 1.18;
@@ -460,11 +464,16 @@ export class SpaceRenderer {
         this.scene.add(this.skyRoot);
         this.scene.add(this.dynamicRoot);
         this.scene.add(this.locationRoot);
+        // Identity scene/container transforms otherwise force every static
+        // station and wreck descendant to multiply matrices on every pass.
+        this.scene.matrixAutoUpdate = false;
+        this.locationRoot.matrixAutoUpdate = false;
         this.locationRoot.name = 'persistent-locations';
         Object.keys(LOCATIONS).forEach((id) => {
             const root = new THREE.Group();
             root.name = `poi-instance-${id}`;
             root.visible = false;
+            root.matrixAutoUpdate = false;
             skipHiddenWorldMatrices(root);
             this.instanceRoots.set(id, root);
             this.scene.add(root);
@@ -479,7 +488,7 @@ export class SpaceRenderer {
         this.createLocations();
         this.createLandingGuide();
         // Other systems stay resident for fast jumps, but contribute no pixels.
-        for (const root of this.locationMeshes.values()) skipHiddenWorldMatrices(root);
+        for (const root of this.locationMeshes.values()) { root.updateMatrix(); root.matrixAutoUpdate=false; skipHiddenWorldMatrices(root); }
         this.createAsteroids();
         this.createGraveyard();
         this.createWreckNodes();
@@ -1565,7 +1574,8 @@ export class SpaceRenderer {
                 // Build before adding parked ships and decorative activity.
                 model.scale.setScalar(LOCATIONS[id].radius * (id === 'blackglass' ? .2 : .95) / 100);
                 model.position.z = stationModelOffsetZ(id);
-                const collider = buildStationCollider(model, LOCATIONS[id].position);
+                const collider = await buildStationColliderAsync(model, LOCATIONS[id].position, {shouldCancel: () => this.disposed});
+                if (!collider) { this.disposeObject(model); return; }
                 try { await addStationOccupants(model, id, undefined, hull => stationOccupantScale(id,hull)); }
                 catch (error) { console.warn(`Station ${id} dock occupants unavailable.`, error); }
                 if (this.disposed) { this.disposeObject(model); return; }
@@ -1580,7 +1590,8 @@ export class SpaceRenderer {
                     dockObstacles.push({min:box.min.toArray().map((v,i)=>v+origin[i]),max:box.max.toArray().map((v,i)=>v+origin[i])});
                 });
                 this.stationDockObstacles.set(id,dockObstacles);
-                addStationActivity(model, id);
+                const activity=addStationActivity(model, id);
+                freezeStaticTransforms(model,new Set(activity.lifts.map(entry=>entry.lift)));
                 model.name = `station-${id}`;
                 model.userData.stationAsset = id;
                 model.traverse(node => {
@@ -1596,6 +1607,14 @@ export class SpaceRenderer {
                         }
                     }
                 });
+                // Stream decoded textures/programs before replacing the
+                // fallback. The pilot never pays their first-use cost in the
+                // frame that reveals the new station.
+                this.stationWarmupTarget ??= new THREE.WebGLRenderTarget(1, 1, {type: THREE.HalfFloatType});
+                await prepareRenderScene(this.renderer, model, this.camera, this.stationWarmupTarget, {
+                    lightingScene: this.scene, shouldCancel: () => this.disposed || this.contextLost,
+                });
+                if (this.disposed) { this.disposeObject(model); return; }
                 for (const old of [...root.children]) {
                     if (old.name === 'blackglass-moon') continue;
                     root.remove(old); this.disposeObject(old);
@@ -1605,6 +1624,7 @@ export class SpaceRenderer {
                 // share their own unrotated local frame.
                 root.scale.setScalar(1);
                 root.rotation.set(0, 0, 0);
+                root.updateMatrix();
                 if (id === 'helix') this.helixRotor = null;
                 root.add(model);
                 this.stationColliders.set(id, collider);
@@ -2801,10 +2821,9 @@ export class SpaceRenderer {
         });
         this.updateGraveyardInstances();
     }
-    // The six adapted wreck files are deliberately absent from the install
-    // cache and boot preload. They begin loading when the surrounding field
-    // first becomes visible, then supply twelve fleet casualties and two
-    // smaller textured fighter breakups.
+    // Adapted wreck files stay outside the install cache. Starting-system
+    // careers prepare this nearby field behind their loading cover; other
+    // contexts load it when visible. The same assets supply all casualties.
     ensureGraveyardModels() {
         if (this.graveyardModelLoading || this.graveyardModelMeshes.length)
             return this.graveyardModelLoading;
@@ -2817,21 +2836,43 @@ export class SpaceRenderer {
                 console.warn(`Graveyard wreck ${file} failed to load.`, error);
                 return [file, null];
             }
-        })).then((loaded) => {
+        })).then(async (loaded) => {
+            if (this.disposed) { for (const [, model] of loaded) if (model) this.disposeObject(model); return []; }
+            const stage = new THREE.Group();
             const plating=createGraveyardPlating();
             this.pixelTextures.add(plating);
             const models = new Map(loaded.map(([file,model])=>[file,model?prepareGraveyardModel(model,plating):null]));
+            const batches = new Map();
             const root = this.instanceRoots.get('mourning-line');
             const center = LOCATIONS['mourning-line'].position;
             for (const config of GRAVEYARD_MODEL_WRECKS) {
                 const source = models.get(config.file);
                 if (!source || !root)
                     continue;
-                const wreck=arrangeGraveyardModel(source,config);
+                const key=config.file+'|'+(config.variant??0);
+                let wreck=batches.get(key);
+                if(wreck){wreck=wreck.clone(true);wreck.name=config.id;wreck.rotation.set(...config.rotation);wreck.scale.setScalar(config.scale);}
+                else{
+                    wreck=await batchGraveyardModelAsync(arrangeGraveyardModel(source,config),{shouldCancel:()=>this.disposed});
+                    if(!wreck){this.disposeObject(stage);return [];}
+                    batches.set(key,wreck);
+                }
                 wreck.position.set(center[0]+config.local[0],center[1]+config.local[1],center[2]+config.local[2]);
-                root.add(wreck);
-                this.graveyardModelMeshes.push(wreck);
+                wreck.updateMatrix();
+                freezeStaticTransforms(wreck);
+                stage.add(wreck);
+                await (globalThis.scheduler?.yield?.() ?? new Promise(resolve => setTimeout(resolve, 0)));
+                if (this.disposed) { this.disposeObject(stage); return []; }
             }
+            this.stationWarmupTarget ??= new THREE.WebGLRenderTarget(1, 1, {type: THREE.HalfFloatType});
+            try {
+                await prepareRenderScene(this.renderer, stage, this.camera, this.stationWarmupTarget, {
+                    lightingScene: this.scene, timeoutMs: SHADER_WARMUP_TIMEOUT_MS,
+                    shouldCancel: () => this.disposed || this.contextLost,
+                });
+            } catch (error) { console.warn('Wreck material preparation interrupted.', error); }
+            if (this.disposed) { this.disposeObject(stage); return []; }
+            for (const wreck of [...stage.children]) { root.add(wreck); this.graveyardModelMeshes.push(wreck); }
             this.updateGraveyardModelVisibility();
             return this.graveyardModelMeshes;
         });
@@ -3426,6 +3467,11 @@ export class SpaceRenderer {
                     }
                 }
                 const ready = this.prepareGlbShip(model, config, variant);
+                // Keep the cheap, already prepared placeholder until the new
+                // hull's material variants are ready for its first visible draw.
+                try { await this.prepareNewTrafficModel(variant, ready); }
+                catch (error) { console.warn(`Traffic material preparation interrupted for ${variant}.`, error); }
+                if (this.disposed) { this.disposeObject(model); return null; }
                 this.glbShipModels.set(variant, ready);
                 this.glbRetryCount?.delete(variant);
                 return ready;
@@ -3511,7 +3557,7 @@ export class SpaceRenderer {
         });
         if(!entity.race)applyFleetPaint(group,variant,entity);
         wrapper.userData.livery=group.userData.livery;
-        emissiveMaterials.length=0;group.traverse(o=>{if(o.isMesh)for(const m of Array.isArray(o.material)?o.material:[o.material])if(m&&!emissiveMaterials.includes(m))emissiveMaterials.push(m);});
+        emissiveMaterials.length=0;group.traverse(o=>{if(o.isMesh)for(const m of Array.isArray(o.material)?o.material:[o.material])if(m&&!emissiveMaterials.includes(m)){stabilizeMaterialNormals(m);emissiveMaterials.push(m);}});
         const baseScale = config.baseScale ?? (variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1);
         const engineColor = config.engineColor ?? palette.engine;
         const engineFlareTexture = this.radialTexture(cssHex(engineColor), cssHex(engineColor));
@@ -4536,14 +4582,27 @@ export class SpaceRenderer {
     setMissionMarker(marker) {
         if(!this.missionMarker && marker){
             this.missionMarker=new THREE.Group();
-            const material=new THREE.MeshBasicMaterial({color:0xffd56a,depthTest:true,transparent:true,opacity:.85});
-            const ring=new THREE.Mesh(new THREE.TorusGeometry(12,.45,4,32),material);
-            this.missionMarker.add(ring);
+            const material=new THREE.MeshBasicMaterial({color:0xffd56a,depthTest:false,depthWrite:false,transparent:true,opacity:.85,toneMapped:false,fog:false});
+            const shape=new THREE.Shape();
+            [[0,1],[.16,.22],[.75,0],[.16,-.22],[0,-1],[-.16,-.22],[-.75,0],[-.16,.22]].forEach(([x,y],i)=>i?shape.lineTo(x,y):shape.moveTo(x,y));shape.closePath();
+            const star=new THREE.Mesh(new THREE.ShapeGeometry(shape),material);star.renderOrder=50;
+            this.missionMarker.add(star);
             this.scene.add(this.missionMarker);
         }
         if(!this.missionMarker)return;
-        if(marker){this.missionMarker.position.fromArray(marker.position);this.missionMarker.quaternion.copy(this.camera.quaternion);}
-        this.missionMarker.visible=Boolean(marker)&&this.camera.position.distanceTo(this.missionMarker.position)>35;
+        this.missionMarker.userData.active=Boolean(marker);
+        if(marker)this.missionMarker.position.fromArray(marker.position);
+        this.updateMissionMarker();
+    }
+    updateMissionMarker(){
+        const marker=this.missionMarker;if(!marker)return;
+        const distance=this.camera.position.distanceTo(marker.position);
+        marker.visible=marker.userData.active&&distance>2;
+        if(!marker.visible)return;
+        const pulse=this.reducedHyperdriveMotion?0:Math.sin((this.skyTime??0)*3.4);
+        marker.quaternion.copy(this.camera.quaternion);
+        marker.scale.setScalar(distance*Math.tan(this.camera.fov*Math.PI/360)*28/Math.max(1,this.viewportHeight??800)*(1+pulse*.12));
+        marker.children[0].material.opacity=.8+pulse*.18;
     }
     setTarget(targetId, asteroidId, wreckId, locationId, pickupId) {
         this.targetId = targetId;
@@ -5314,7 +5373,8 @@ export class SpaceRenderer {
                         float life=max(0.,1.-age/.25);
                         float angle=acos(clamp(dot(direction,hits[i]),-1.,1.));
                         float radius=.10+age*3.5;
-                        float ring=exp(-pow((angle-radius)/(.035+age*.12),2.));
+                        float band=(angle-radius)/(.035+age*.12);
+                        float ring=exp(-band*band);
                         float spot=exp(-angle*angle/(.018+age*.28));
                         glow+=(spot*.40+ring*.60)*life;core+=exp(-angle*angle/.009)*life;}
                         float a=min(.8,glow)*fade; a*=mix(1.,.16,interior);
@@ -5456,7 +5516,7 @@ export class SpaceRenderer {
         const local=mesh.userData.local.copy(direction).applyQuaternion(mesh.userData.inverse.copy(mesh.quaternion).invert());
         mesh.userData.yaw.rotation.y=Math.atan2(-local.x,-local.z);
         mesh.userData.pitch.rotation.x=Math.atan2(local.y,Math.hypot(local.x,local.z));
-        mesh.userData.life=.25;mesh.visible=true;
+        mesh.userData.expiresAt=(this.skyTime??0)+.25;mesh.visible=true;
     }
     showCombatBeam(id,start,end,color,player) {
         this.combatBeams ??= new Map();
@@ -5683,13 +5743,6 @@ export class SpaceRenderer {
                 }
             }
         }
-        for (const [id, root] of this.locationMeshes) {
-            if (!root.visible || this.camera.position.distanceToSquared(root.position) > (LOCATIONS[id].radius * 8) ** 2) continue;
-            for (const model of root.children) {
-                const activity = model.userData.stationActivity;
-                if (activity) updateStationActivity(activity, this.skyTime);
-            }
-        }
         for(const mesh of this.raceBoostMeshes??[])if(mesh.visible){mesh.children[0].rotation.y+=dt;mesh.children[1].rotation.z-=dt*.6;}
         const mourningVisible = Boolean(this.instanceRoots.get('mourning-line')?.visible);
         if (mourningVisible) {
@@ -5723,8 +5776,10 @@ export class SpaceRenderer {
         }
         for(const glow of this.capitalCharges?.values()??[]){glow.userData.life-=dt;glow.visible=glow.userData.life>0;}
         for(const [id,mesh] of this.turretMeshes??[]) {
-            mesh.userData.life-=dt;
-            if(mesh.userData.life<=0){this.scene.remove(mesh);this.disposeObject(mesh);this.turretMeshes.delete(id);}
+            // Simulation can refresh this mount on the last catch-up step.
+            // Time accumulated before that refresh must not immediately retire
+            // it at the next draw and rebuild it again on every slow frame.
+            if(this.skyTime>=mesh.userData.expiresAt){this.scene.remove(mesh);this.disposeObject(mesh);this.turretMeshes.delete(id);}
         }
         this.updateHyperdriveFx(dt);
         if (this.starShimmer) {
@@ -5864,8 +5919,9 @@ export class SpaceRenderer {
                 uniform float uThreshold;
                 uniform float uKnee;
                 varying vec2 vUv;
+                ${FINITE_COLOUR_GLSL}
                 void main() {
-                    vec3 color = texture2D(tDiffuse, vUv).rgb;
+                    vec3 color = finiteColour(texture2D(tDiffuse, vUv).rgb);
                     float brightness = max(max(color.r, color.g), color.b);
                     float soft = brightness - uThreshold + uKnee;
                     soft = clamp(soft, 0.0, 2.0 * uKnee);
@@ -5975,11 +6031,12 @@ export class SpaceRenderer {
         return true;
     }
     prepareCombatWarmup() {
-        if (this.combatWarmupRoot) return this.combatWarmupRoot;
+        if (this.combatWarmupRoot) { this.prepareTrafficWarmup(this.combatWarmupRoot); return this.combatWarmupRoot; }
         const root = this.combatWarmupRoot = new THREE.Group();
         // Visible to compileAsync, outside every gameplay camera's frustum.
         // Retain the small representatives so their programs stay resident.
         root.position.set(1e9, 1e9, 1e9);
+        this.prepareTrafficWarmup(root);
         for (const kind of ['laser', 'gauss', 'pdc', 'ripper', 'ion', 'mortar', 'missile']) {
             const launchers = kind === 'missile' ? ['seeker', 'swarm', 'torpedo'] : [undefined];
             for (const launcherId of launchers) {
@@ -6024,13 +6081,139 @@ export class SpaceRenderer {
         for (const texture of textures) this.renderer.initTexture?.(texture);
         return root;
     }
-    async prepareActiveScene({timeoutMs = SHADER_WARMUP_TIMEOUT_MS} = {}) {
+    prepareTrafficWarmup(root, models = this.glbShipModels ?? []) {
+        // NPC arrivals still use these shaders while a new hull loads.
+        if (!root.userData.voxelWarmup) {
+            root.add(createVoxelShipModel('kestrel', paletteForFaction('independents')).group);
+            root.userData.voxelWarmup = true;
+        }
+        const signatures = root.userData.paintWarmupSignatures ??= new Set();
+        const geometries = root.userData.trafficWarmupGeometries ??= new Set();
+        for (const [variant, model] of models) model?.traverse(object => {
+            if (!object.isMesh) return;
+            for (const source of Array.isArray(object.material) ? object.material : [object.material]) {
+                if (!source?.isMeshStandardMaterial) continue;
+                // Shader representatives alone do not upload the real hull.
+                // These borrow the cache's geometry, so initial and later NPCs
+                // cannot introduce its first bufferData call in a visible draw.
+                if (!geometries.has(object.geometry)) {
+                    const mesh = new THREE.Mesh(object.geometry, source.clone());
+                    mesh.name = 'traffic-geometry-warmup';
+                    mesh.userData.borrowedWarmupTextures = true;
+                    mesh.userData.borrowedWarmupGeometry = true;
+                    root.add(mesh); geometries.add(object.geometry);
+                }
+                // Detailed hulls carry authored tangents; procedural turrets
+                // sample the same maps using derivatives. Prepare both forms.
+                const modes = source.normalMap && object.geometry.attributes.tangent ? [true, false] : [Boolean(object.geometry.attributes.tangent)];
+                for (const tangents of modes) {
+                    const signature = [source.type, source.side, source.flatShading, source.transparent, source.vertexColors,
+                        object.geometry.attributes.color?.itemSize, tangents, Boolean(source.clearcoat), Boolean(source.alphaTest),
+                        ...Object.keys(source).filter(key => source[key]?.isTexture).sort()].join('|');
+                    const makeMesh = material => {
+                        const geometry = new THREE.BoxGeometry();
+                        if (tangents) geometry.computeTangents();
+                        if (source.vertexColors) {
+                            const size = object.geometry.attributes.color?.itemSize ?? 3;
+                            geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(geometry.attributes.position.count * size).fill(1), size));
+                        }
+                        const mesh = new THREE.Mesh(geometry, material);
+                        mesh.userData.borrowedWarmupTextures = true;
+                        return mesh;
+                    };
+                    if (!signatures.has('base|' + signature)) {
+                        const mesh = makeMesh(source.clone());mesh.name = 'traffic-material-warmup';
+                        root.add(mesh);signatures.add('base|' + signature);
+                    }
+                    if (!source.map) continue;
+                    if (variant === 'kestrel' || variant === 'wayfarer') for (const paint of WAYFARER_INDEPENDENT_LIVERIES) {
+                        const key = 'wayfarer|' + paint + '|' + signature;
+                        if (signatures.has(key)) continue;
+                        const group = new THREE.Group(), mesh = makeMesh(source); group.add(mesh);
+                        applyWayfarerLivery(group, paint);
+                        if (mesh.material === source) { mesh.geometry.dispose(); continue; }
+                        mesh.name = 'traffic-wayfarer-warmup'; root.add(group); signatures.add(key);
+                    }
+                    if (!signatures.has('paint|' + signature)) {
+                        let painted = false;
+                        for (const paint of ['independent-surveyor', 'independent-hauler', 'independent-courier']) {
+                            const group = new THREE.Group(), mesh = makeMesh(source);group.add(mesh);
+                            applyIndependentPaint(group, paint, variant);
+                            if (mesh.material === source) { mesh.geometry.dispose();continue; }
+                            mesh.name = 'traffic-paint-warmup';root.add(group);painted = true;
+                        }
+                        if (painted) signatures.add('paint|' + signature);
+                    }
+                    for (const faction of ['concord', 'alliance', 'pirates', 'neutral']) {
+                        const material = source.clone();
+                        if (!paintShipMaterial(material, faction, undefined, variant)) { material.dispose();continue; }
+                        const key = material.customProgramCacheKey() + '|' + signature;
+                        if (signatures.has(key)) { material.dispose();continue; }
+                        const mesh = makeMesh(material);mesh.name = 'traffic-faction-warmup';root.add(mesh);signatures.add(key);
+                    }
+                }
+            }
+        });
+    }
+    async prepareNewTrafficModel(variant, model) {
+        const root = this.combatWarmupRoot;
+        if (!root || this.disposed || this.contextLost) return;
+        const first = root.children.length, stage = new THREE.Group();
+        this.prepareTrafficWarmup(root, [[variant, model]]);
+        for (const child of root.children.slice(first)) stage.add(child);
+        if (!stage.children.length) return;
+        root.add(stage); // retain program references, including after NPCs leave
+        this.stationWarmupTarget ??= new THREE.WebGLRenderTarget(1, 1, {type: THREE.HalfFloatType});
+        await prepareRenderScene(this.renderer, stage, this.camera, this.stationWarmupTarget, {
+            lightingScene: this.scene, timeoutMs: SHADER_WARMUP_TIMEOUT_MS,
+            shouldCancel: () => this.disposed || this.contextLost,
+        });
+        this.prepareTrafficBuffers(stage);
+        await waitForRenderWork(this.renderer,{shouldCancel:()=>this.disposed||this.contextLost});
+    }
+    disposeCombatWarmup() {
+        if (!this.combatWarmupRoot) return;
+        // Layout representatives own tiny geometry; actual hull buffers and
+        // every texture remain owned by the GLB cache.
+        const borrowed=[];
+        this.combatWarmupRoot.traverse(object=>{if(object.userData.borrowedWarmupTextures)borrowed.push(object);});
+        for(const mesh of borrowed){mesh.removeFromParent();if(!mesh.userData.borrowedWarmupGeometry)mesh.geometry.dispose();mesh.material.dispose();}
+        this.disposeObject(this.combatWarmupRoot);this.combatWarmupRoot=null;
+    }
+    prepareTrafficBuffers(stage) {
+        if (!this.renderer.render || this.disposed || this.contextLost) return;
+        const previous=this.renderer.getRenderTarget(),shadows=this.renderer.shadowMap.enabled,culled=[];
+        try {
+            // Keep normal world culling. Only the newly loaded, off-camera
+            // hull buffers need a hidden draw; do not wake the whole field.
+            stage.traverse(mesh=>{if(mesh.userData.borrowedWarmupGeometry){culled.push([mesh,mesh.frustumCulled]);mesh.frustumCulled=false;}});
+            this.renderer.shadowMap.enabled=false;
+            this.renderer.setRenderTarget(this.stationWarmupTarget);
+            this.renderer.render(this.scene,this.camera);
+        } finally {
+            this.renderer.setRenderTarget(previous);this.renderer.shadowMap.enabled=shadows;
+            for(const [mesh,value]of culled)mesh.frustumCulled=value;
+        }
+    }
+    async prepareActiveScene({timeoutMs = SHADER_WARMUP_TIMEOUT_MS, assetTimeoutMs = 8000, prepareNearbyWrecks = false} = {}) {
         if (this.disposed || this.contextLost)
             return;
         let timeoutId;
         let timedOut = false;
         let combatWarmup;
         try {
+            // Cairn can reveal the capital wrecks in the distance. In a career
+            // starting here, upload their real geometry while the loading cover
+            // is up; shader compilation alone cannot warm a driver's first draw.
+            const nearby = prepareNearbyWrecks ? this.ensureGraveyardModels() : undefined;
+            // Stations and parked hulls can finish loading after the primitive
+            // scene. Include them before compiling, not on the first flyby.
+            await Promise.race([
+                Promise.all([nearby, ...(this.stationModelLoads?.values() ?? []), ...(this.glbShipLoading?.values() ?? [])]),
+                new Promise(resolve => { timeoutId = setTimeout(resolve, assetTimeoutMs); }),
+            ]);
+            clearTimeout(timeoutId); timeoutId = undefined;
+            if (this.disposed || this.contextLost) return;
             combatWarmup = this.prepareCombatWarmup();
             // Tiny drone models must join the material warmup, rather than
             // replacing their placeholder for the first time during mining.
@@ -6118,6 +6301,11 @@ export class SpaceRenderer {
                 // Finish that work here while the loading cover is still up.
                 for (const program of this.renderer.info?.programs ?? [])
                     program.getUniforms?.();
+                // Compilation does not upload geometry or off-camera maps.
+                // One tiny hidden draw uploads those buffers during loading,
+                // without rasterizing a full-resolution view of every field.
+                this.prepareSceneBuffers();
+                await waitForRenderWork(this.renderer,{timeoutMs,shouldCancel:()=>this.disposed||this.contextLost});
             }
             if (timedOut)
                 console.warn('Flight-scene shader warm-up timed out; using first-render fallback.');
@@ -6133,11 +6321,41 @@ export class SpaceRenderer {
                 clearTimeout(timeoutId);
         }
     }
+    prepareSceneBuffers() {
+        if (!this.renderer.render || this.disposed || this.contextLost) return;
+        const renderer = this.renderer, previous = renderer.getRenderTarget();
+        const regions = [...(this.instanceRoots?.values() ?? [])].map(root => [root, root.visible]);
+        const wrecks = (this.graveyardModelMeshes ?? []).map(root => [root, root.visible]);
+        const culled = [];
+        const shadows = renderer.shadowMap.enabled, castShadow = this.sunLight?.castShadow;
+        this.stationWarmupTarget ??= new THREE.WebGLRenderTarget(1, 1, {type: THREE.HalfFloatType});
+        try {
+            for (const [root] of regions) root.visible = true;
+            for (const [root] of wrecks) root.visible = true;
+            this.scene.traverse(object => {
+                if (object.isMesh || object.isPoints || object.isSprite || object.isLine) {
+                    culled.push([object, object.frustumCulled]); object.frustumCulled = false;
+                }
+            });
+            renderer.shadowMap.enabled = false;
+            if (this.sunLight) this.sunLight.castShadow = false;
+            renderer.setRenderTarget(this.stationWarmupTarget);
+            renderer.render(this.scene, this.camera);
+        } finally {
+            renderer.setRenderTarget(previous);
+            renderer.shadowMap.enabled = shadows;
+            if (this.sunLight) this.sunLight.castShadow = castShadow;
+            for (const [object, value] of culled) object.frustumCulled = value;
+            for (const [root, value] of regions) root.visible = value;
+            for (const [root, value] of wrecks) root.visible = value;
+        }
+    }
     render() {
         this.updateCombatLootNodes();
         if (this.contextLost)
             return;
         this.updateWorldVisuals();
+        this.updateMissionMarker();
         // Keep the atmosphere shells' camera-distance uniform fresh so the
         // near-field dome fade tracks the pilot's altitude.
         const cam = this.camera.position;
@@ -6339,14 +6557,18 @@ export class SpaceRenderer {
                 mesh.geometry.dispose();
             const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
             materials.forEach((material) => {
-                if (!material)
+                if (!material || material.userData?.shared)
                     return;
-                for (const value of Object.values(material)) {
-                    if (value instanceof THREE.Texture && !value.userData?.shared)
-                        value.dispose();
+                // A private damage material can still borrow the hull atlas.
+                // Its owner releases those maps; retiring this attachment must
+                // not evict textures still used by the visible hull/neighbours.
+                if (!material.userData?.borrowedTextures) {
+                    for (const value of Object.values(material)) {
+                        if (value instanceof THREE.Texture && !value.userData?.shared)
+                            value.dispose();
+                    }
                 }
-                if (!material.userData?.shared)
-                    material.dispose();
+                material.dispose();
             });
         });
     }
@@ -6381,8 +6603,7 @@ export class SpaceRenderer {
         }
         this.shipMeshes.clear();
         this.clearProjectilePools();
-        if (this.combatWarmupRoot) this.disposeObject(this.combatWarmupRoot);
-        this.combatWarmupRoot = null;
+        this.disposeCombatWarmup();
         this.disposeObject(this.scene);
         this.scene.environment?.dispose();
         this.sunLight?.shadow?.dispose();
@@ -6394,6 +6615,7 @@ export class SpaceRenderer {
         this.glbShipLoading.clear();
         this.stationColliders?.clear();
         this.stationDockObstacles?.clear();
+        this.stationWarmupTarget?.dispose();
         this.pixelSceneTarget?.dispose();this.pixelResolveMaterial?.dispose();this.pixelQuad?.geometry.dispose();
         this.bloomSceneTarget?.dispose();
         this.ringVolumeTarget?.dispose();

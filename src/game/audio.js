@@ -13,6 +13,7 @@ const MUSIC_INTERVALS = {
     planet: 2.5,
     field: 1.5,
     graveyard: 3.4,
+    stealth: 1.8,
     open: 3.0,
     combat: 0.8,
 };
@@ -20,11 +21,13 @@ const DRONE_ROOTS = {
     planet: [38, 45],
     field: [40],
     graveyard: [38],
+    stealth: [33],
 };
 const DRONE_LEVEL = {
     planet: 0.018,
     field: 0.014,
     graveyard: 0.014,
+    stealth: 0.009,
 };
 
 // Filtered pink noise is the shared material for engine wash, impacts and
@@ -346,7 +349,7 @@ export class AudioManager {
             this.dangerLevel = Math.max(0, this.dangerLevel - dt * 0.18);
         // Combat overrides the location ambience while hostiles are close;
         // station mode wins over both (you are safe on the pad).
-        const context = this.stationMode ? 'station' : (this.dangerLevel > 0.2 ? 'combat' : this.musicContext);
+        const context = this.stationMode ? 'station' : (this.musicContext==='stealth'&&nearbyEnemies===0?'stealth':this.dangerLevel > 0.2 ? 'combat' : this.musicContext);
         if (context !== this.currentContext) {
             this.currentContext = context;
             this.swapMusicBus();
@@ -692,6 +695,14 @@ export class AudioManager {
         }
     }
 
+    playStealthBar(now, step) {
+        // Muted heartbeat and sparse minor seconds leave room for Paul's voice.
+        const root=[33,33,31,32][Math.floor(step/2)%4];
+        for(const offset of [0,.24])this.musicNote({at:now+offset,midi:root,type:'sine',level:offset?.025:.037,attack:.025,decay:.26,filterFreq:180,pan:0});
+        if(step%2===0)this.musicNote({at:now+.65,midi:root+24,type:'triangle',level:.013,attack:.5,decay:2.1,filterFreq:550,pan:step%4===0?-.3:.3});
+        if(step%4===3)this.musicNote({at:now+.85,midi:root+25,type:'sine',level:.009,attack:.6,decay:1.7,filterFreq:600,pan:-.2});
+    }
+
     // Combat: a driving 8-chord progression over a relentless percussion kit
     // — kick on the downbeat, snare on the backbeat, 8th-note hats, with
     // stabbing square chords and a sawtooth bass pulse. BSG-style: the drums
@@ -780,6 +791,7 @@ export class AudioManager {
             case 'planet': this.playPlanetBar(now, step); break;
             case 'field': this.playFieldBar(now, step); break;
             case 'graveyard': this.playGraveyardBar(now, step); break;
+            case 'stealth': this.playStealthBar(now, step); break;
             default: this.playOpenBar(now, step);
         }
     }

@@ -66,12 +66,11 @@ test('loot from a moving ship stays at the destruction position, including old s
  const before=[...node.position];for(let i=0;i<600;i++)session.updatePickups(1/60);
  assert.deepEqual(node.position,before);assert.deepEqual(wreck.position,before);assert.deepEqual(node.velocity,[0,0,0]);
 });
-test('loose cargo remains still at rest and after its collection beam stops',()=>{
- const {session,save}=tutorialFixture('land-mining');session.pickupStore=new EntityStore(8);session.pickups=[];session.pickupCounter=0;save.player.position.splice(0,3,0,0,0);
+test('loose cargo stays stationary even with the old salvage controls held',()=>{
+ const {session,save}=tutorialFixture('land-mining');session.pickupStore=new EntityStore(8);session.pickups=[];session.pickupCounter=0;save.player.dockedAt=undefined;save.player.position.splice(0,3,0,0,0);save.player.prevPosition=new Float64Array(save.player.position);
  const pickup=session.spawnPickup('ore',[100,0,0],'combat'),read=()=>Array.from(session.pickupStore.pos.subarray(pickup.slot*3,pickup.slot*3+3));
- const before=read();assert.deepEqual(Array.from(session.pickupStore.vel.subarray(pickup.slot*3,pickup.slot*3+3)),[0,0,0]);
- for(let i=0;i<120;i++)session.updatePickups(1/60);assert.deepEqual(read(),before);
- save.player.mode='salvage';session.utilityActive=true;session.pickupStore.setPos(pickup.slot,10,0,0);
- for(let i=0;i<60;i++)session.updatePickups(1/60);assert.ok(read()[0]<10,'collection must still pull cargo in');
- session.utilityActive=false;const stopped=read();for(let i=0;i<120;i++)session.updatePickups(1/60);assert.deepEqual(read(),stopped);
+ const before=read();save.player.mode='salvage';session.utilityActive=true;
+ for(let i=0;i<120;i++)session.updatePickups(1/60);
+ assert.deepEqual(read(),before);assert.ok(pickup.life>0);
+ assert.deepEqual(Array.from(session.pickupStore.vel.subarray(pickup.slot*3,pickup.slot*3+3)),[0,0,0]);
 });

@@ -58,6 +58,9 @@ export const CampaignWingMethods={
         const quest=getTutorialQuest(this.save);
         if(!quest||quest.completedAt!==undefined||quest.flags?.wingOrders===true)return false;
         setFlag(this.save,quest.id,'wingOrders',true);
+        // Introduce covering fire first; the player can explicitly ask for a
+        // more committed attack after learning the wing control.
+        this.save.wingOrder='defensive';
         // The wing card arrives with the lesson rather than on the next frame.
         this.publishCampaignWing();
         return true;

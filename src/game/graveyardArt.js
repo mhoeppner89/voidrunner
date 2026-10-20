@@ -1,3 +1,4 @@
+import {stabilizeMaterialNormals} from './materialNormals.js';
 import * as THREE from 'three';
 import {seededRandom} from './random.js';
 import {wreckSectionDelta} from './missionWorldData.js';
@@ -58,6 +59,7 @@ export function prepareGraveyardModel(root,plating) {
         const prepare=original=>{
             if(!original?.isMeshStandardMaterial)return original;
             const material=original.clone();
+            material.userData.graveyardSource=original.uuid;
             material.emissive.set(0);material.emissiveMap=null;material.emissiveIntensity=0;
             material.transparent=false;material.opacity=1;material.alphaTest=0;material.depthWrite=true;
             material.side=THREE.DoubleSide;material.roughness=.88;material.metalness=.25;
@@ -66,6 +68,7 @@ export function prepareGraveyardModel(root,plating) {
             const interior=/charred|torn hull/i.test(material.name);
             if(interior)material.map=null;
             material.color.set(0xffffff);
+            material.userData.graveyardBatch={source:original.uuid,frame,cutX};
             material.onBeforeCompile=shader=>{
                 shader.uniforms.gyFractureX={value:fractureX};shader.uniforms.gyInterior={value:interior?1:0};shader.uniforms.gyPlating={value:plating};shader.uniforms.gyFrame={value:frame};shader.uniforms.gyCutX={value:cutX};
                 shader.vertexShader='uniform mat4 gyFrame; varying vec3 gyPosition; varying vec3 gyNormal;\n'+shader.vertexShader;
@@ -107,6 +110,7 @@ export function prepareGraveyardModel(root,plating) {
             return material;
         };
         mesh.material=Array.isArray(mesh.material)?mesh.material.map(prepare):prepare(mesh.material);
+        for(const material of Array.isArray(mesh.material)?mesh.material:[mesh.material])stabilizeMaterialNormals(material);
     });
     return root;
 }
@@ -122,4 +126,92 @@ export function arrangeGraveyardModel(source,config) {
     }
     wreck.name=config.id;wreck.rotation.set(...config.rotation);wreck.scale.setScalar(config.scale);
     return wreck;
+}
+
+// Keep every triangle, UV and authored damage sample, but submit nearby static
+// sections with the same finish together. Damage coordinates are baked before
+// applying the broken section's transform, so paint and torn edges do not move.
+// Four longitudinal clusters retain useful close-up frustum culling.
+function* graveyardBatchBuild(wreck) {
+    if(wreck.userData.graveyardBatched)return wreck;
+    wreck.updateMatrixWorld(true);
+    const inverse=wreck.matrixWorld.clone().invert(),bounds=new THREE.Box3();
+    const meshes=[],matrix=new THREE.Matrix4(),point=new THREE.Vector3();
+    wreck.traverse(mesh=>{
+        if(!mesh.isMesh||!mesh.visible||Array.isArray(mesh.material)||mesh.geometry.morphAttributes.position)return;
+        let visible=true;for(let p=mesh.parent;p&&p!==wreck;p=p.parent)visible&&=p.visible;
+        if(!visible)return;
+        mesh.geometry.computeBoundingBox();
+        matrix.multiplyMatrices(inverse,mesh.matrixWorld);
+        bounds.union(mesh.geometry.boundingBox.clone().applyMatrix4(matrix));meshes.push(mesh);
+    });
+    const size=bounds.getSize(new THREE.Vector3()),axis=size.x>=size.y&&size.x>=size.z?'x':size.y>=size.z?'y':'z';
+    const groups=new Map();
+    for(const mesh of meshes){
+        const material=mesh.material,data=material.userData.graveyardBatch;
+        matrix.multiplyMatrices(inverse,mesh.matrixWorld);
+        const centre=mesh.geometry.boundingBox.getCenter(point).applyMatrix4(matrix);
+        const cluster=Math.min(3,Math.max(0,Math.floor((centre[axis]-bounds.min[axis])/Math.max(.001,size[axis])*4)));
+        // Unmodified dark glazing and structural alloy can share only their
+        // original material object; the painted variants retain source IDs.
+        const key=(data?.source??material.userData.graveyardSource??material.uuid)+'|'+cluster;
+        const group=groups.get(key)??{material,parts:[],meshes:[]};groups.set(key,group);
+        const geometry=mesh.geometry.clone();
+        if(data){
+            const positions=geometry.attributes.position,normals=geometry.attributes.normal;
+            const local=new Float32Array(positions.count*3),normal=new Float32Array(positions.count*3),cuts=new Float32Array(positions.count*2);
+            const direction=new THREE.Vector3(),linear=new THREE.Matrix3().setFromMatrix4(data.frame);
+            for(let i=0;i<positions.count;i++){
+                point.fromBufferAttribute(positions,i).applyMatrix4(data.frame).toArray(local,i*3);
+                direction.fromBufferAttribute(normals,i).applyMatrix3(linear).normalize().toArray(normal,i*3);
+                cuts[i*2]=data.cutX.x;cuts[i*2+1]=data.cutX.y;
+                if(i%1024===1023)yield;
+            }
+            geometry.setAttribute('gyLocalPosition',new THREE.BufferAttribute(local,3));
+            geometry.setAttribute('gyLocalNormal',new THREE.BufferAttribute(normal,3));
+            geometry.setAttribute('gyCutBounds',new THREE.BufferAttribute(cuts,2));
+        }
+        geometry.applyMatrix4(matrix);group.parts.push(geometry);group.meshes.push(mesh);yield;
+    }
+    for(const {material,parts,meshes:originals}of groups.values()){
+        if(parts.length<2){parts[0]?.dispose();continue;}
+        // Loader attributes are packed arrays. Preserve index winding, normal
+        // and tangent data rather than rebuilding or simplifying the surface.
+        const names=Object.keys(parts[0].attributes);
+        if(parts.some(p=>Object.keys(p.attributes).length!==names.length||names.some(n=>p.attributes[n]?.itemSize!==parts[0].attributes[n].itemSize))){for(const p of parts)p.dispose();continue;}
+        const geometry=new THREE.BufferGeometry(),count=parts.reduce((n,p)=>n+p.attributes.position.count,0);
+        for(const name of names){
+            const first=parts[0].attributes[name],array=new first.array.constructor(count*first.itemSize);let offset=0;
+            for(const part of parts){array.set(part.attributes[name].array,offset);offset+=part.attributes[name].array.length;}
+            geometry.setAttribute(name,new THREE.BufferAttribute(array,first.itemSize,first.normalized));
+        }
+        const indices=[],sections=[];let offset=0;
+        for(let n=0;n<parts.length;n++){const part=parts[n];sections.push({name:originals[n].name,source:originals[n].uuid,start:offset,count:part.attributes.position.count});if(part.index)for(const index of part.index.array)indices.push(index+offset);else for(let i=0;i<part.attributes.position.count;i++)indices.push(i+offset);offset+=part.attributes.position.count;part.dispose();yield;}
+        geometry.setIndex(indices);geometry.computeBoundingBox();geometry.computeBoundingSphere();
+        let finish=material;
+        if(material.userData.graveyardBatch){
+            finish=material.clone();const compile=material.onBeforeCompile;
+            finish.onBeforeCompile=(shader,renderer)=>{
+                compile.call(material,shader,renderer);
+                shader.vertexShader=shader.vertexShader.replace('uniform mat4 gyFrame;','attribute vec3 gyLocalPosition;attribute vec3 gyLocalNormal;attribute vec2 gyCutBounds;varying vec2 gyCutX;')
+                    .replace('gyPosition=(gyFrame*vec4(position,1.)).xyz;','gyPosition=gyLocalPosition;')
+                    .replace('gyNormal=normalize(mat3(gyFrame)*normal);','gyNormal=gyLocalNormal;gyCutX=gyCutBounds;');
+                shader.fragmentShader=shader.fragmentShader.replace('uniform vec2 gyCutX;','varying vec2 gyCutX;');
+            };
+            finish.customProgramCacheKey=()=> 'graveyard-plating-batched-v1';
+        }
+        const mesh=new THREE.Mesh(geometry,finish);mesh.name='Batched wreck sections';mesh.userData.graveyardSections=sections;
+        mesh.castShadow=originals[0].castShadow;mesh.receiveShadow=originals[0].receiveShadow;
+        wreck.add(mesh);for(const original of originals)original.removeFromParent();
+    }
+    wreck.userData.graveyardBatched=true;return wreck;
+}
+export function batchGraveyardModel(wreck){const build=graveyardBatchBuild(wreck);let next;do{next=build.next();}while(!next.done);return next.value;}
+export async function batchGraveyardModelAsync(wreck,{shouldCancel=()=>false,budgetMs=3}={}){
+    const build=graveyardBatchBuild(wreck);let deadline=performance.now()+budgetMs;
+    while(!shouldCancel()){
+        const next=build.next();if(next.done)return next.value;
+        if(performance.now()>=deadline){await(globalThis.scheduler?.yield?.()??new Promise(resolve=>setTimeout(resolve,0)));deadline=performance.now()+budgetMs;}
+    }
+    build.return();return null;
 }

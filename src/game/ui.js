@@ -30,6 +30,16 @@ import { guildJoinCost, missionBriefing, missionTitle } from './missions.js';
 import { getTutorialQuest, tutorialCampaignSummary, tutorialCardContent, tutorialDialogue, tutorialPeople, tutorialConversation, tutorialContentUnlocked, tutorialTradePrice, tutorialLaunchBlock, TUTORIAL_MINING_CONTRACT_ID } from './tutorialCampaign.js';
 import { canMineWithHull, DRONE_BAY_CAPACITY, DRONE_TYPES, droneBayLayoutFor } from './droneData.js';
 const WARM_IMAGE_TIMEOUT_MS = 5000;
+const cockpitPolygonContains=(points,x,y)=>{
+    let inside=false;
+    for(let i=0,j=points.length-1;i<points.length;j=i++){
+        const a=points[i],b=points[j];
+        if((a[1]>y)!==(b[1]>y)&&x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0])inside=!inside;
+    }
+    return inside;
+};
+// Match the existing CSS cutout that removes Lancer's inner painted struts.
+const LANCER_CANOPY_OPENING=[[10,49],[15,27],[43,7],[47,6],[50,12],[53,6],[57,7],[85,27],[90,49],[82,63],[66,68],[50,64],[34,68],[18,63]];
 const settleWarmupPromise = (promise, fallback = false, timeoutMs = WARM_IMAGE_TIMEOUT_MS) => new Promise((resolve) => {
     let settled = false;
     const timer = setTimeout(() => {
@@ -439,7 +449,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2ji';
+const GAME_VERSION = '0.8.2jv';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -948,6 +958,7 @@ export class GameUI {
         this.updateOrientationNotice();
         window.addEventListener('resize', () => {
             this.radarLayoutDirty = true;
+            this.cockpitVisibilityDirty = true;
             this.updateOrientationNotice();
             this.syncConcourseOverlay();
             this.scheduleCommsFit();
@@ -975,6 +986,7 @@ export class GameUI {
         void this.preloadImageSet('flight-core', [COCKPIT_ART_BY_SHIP[nextId], ...FLIGHT_SCREEN_ART], { priority: 'high' });
         this.cockpitShipId = nextId;
         this.radarLayoutDirty = true;
+        this.cockpitVisibilityDirty = true;
         this.root.dataset.cockpitShip = nextId;
         this.el('.canopy-aperture')?.setAttribute('points',CANOPY_APERTURES[nextId]);
         this.el('.canopy-art-mask')?.setAttribute('href',COCKPIT_ART_BY_SHIP[nextId]);
@@ -1004,6 +1016,34 @@ export class GameUI {
             art.style.backgroundImage = `url("${COCKPIT_ART_BY_SHIP[nextId]}")`;
         }
         this.scheduleCommsFit();
+    }
+    cockpitPointVisible(x,y,shipId=this.save?.player?.shipId) {
+        this.setCockpitShip(shipId);
+        const art=this.el('.cockpit-art');
+        if(!art)return true;
+        // Layout reads happen only after a hull/viewport change. The HUD's
+        // steady-state visibility check samples a cached byte, not the DOM.
+        if(this.cockpitVisibilityDirty||!this.cockpitVisibility?.rect.width){
+            this.cockpitVisibility={rect:art.getBoundingClientRect(),blockers:[...this.root.querySelectorAll('.cockpit-screen,.cockpit-bezel,#hyperdrive-card')].filter(e=>e.getClientRects().length).map(e=>e.getBoundingClientRect()),
+                fallback:CANOPY_APERTURES[this.cockpitShipId].split(' ').map(p=>p.split(',').map(Number))};
+            this.cockpitVisibilityDirty=false;
+        }
+        const {rect,blockers,fallback}=this.cockpitVisibility;
+        if(blockers.some(r=>x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom))return false;
+        const u=(x-rect.left)/rect.width,v=(y-rect.top)/rect.height;
+        if(u<0||u>=1||v<0||v>=1)return true;
+        if(this.cockpitShipId==='lancer'&&cockpitPolygonContains(LANCER_CANOPY_OPENING,u*100,v*100))return true;
+        this.cockpitAlphaMasks??=new Map();
+        let mask=this.cockpitAlphaMasks.get(this.cockpitShipId);
+        const image=this.warmImageRecords.get(COCKPIT_ART_BY_SHIP[this.cockpitShipId]);
+        if(!mask&&image?.ready){
+            const canvas=document.createElement('canvas');canvas.width=canvas.height=256;
+            const ctx=canvas.getContext('2d',{willReadFrequently:true});
+            ctx.drawImage(image.image,0,0,256,256);const rgba=ctx.getImageData(0,0,256,256).data;
+            mask=new Uint8Array(256*256);for(let i=0;i<mask.length;i++)mask[i]=rgba[i*4+3];
+            this.cockpitAlphaMasks.set(this.cockpitShipId,mask);
+        }
+        return mask?mask[Math.floor(v*256)*256+Math.floor(u*256)]<128:cockpitPolygonContains(fallback,u*1000,v*1000);
     }
     warmImage(url, priority = 'low') {
         let record = this.warmImageRecords.get(url);
@@ -1112,6 +1152,11 @@ export class GameUI {
         return ready;
     }
     predictLocationAssets(locationId, shipId = this.save?.player?.shipId) {
+        // Reuse the dormant dock renderer's single station assembly during
+        // approach/hyperdrive. Do not create another WebGL context or render
+        // a hidden film while the pilot is flying.
+        if (LOCATIONS[locationId]?.kind === 'station' && this.concourseShip?.paused && !this.concourseShip.transit)
+            void this.concourseShip.prepareStation(locationId).catch(() => {});
         return this.preloadLocationAssets(locationId, { slot: 'location-next', priority: 'low', shipId });
     }
     preloadSessionAssets(save, { priority = 'high', includeLocation = true } = {}) {
@@ -2032,6 +2077,7 @@ export class GameUI {
         this.missionMobileDetail = false;
         this.hideTitle();
         this.hideHud();
+        this.root.querySelector('#dock-screen')?.classList.toggle('is-arrival-covered',this.concourseAtmosphereArrival&&!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
         this.root.querySelector('#dock-screen')?.classList.remove('is-hidden');
         this.renderDock();
         this.updateOrientationNotice();
@@ -2041,18 +2087,22 @@ export class GameUI {
         if (this.dockLocation)
             this.renderDock();
     }
-    hideDock() {
+    hideDock({awaitFlight=false}={}) {
         this.hideStory(false);
         this.concourseGeneration=(this.concourseGeneration??0)+1;
         this.concourseArrivalPending=false;
         this.pendingDockStory=undefined;
         this.pendingDockBriefing=undefined;
-        this.cancelVesperLaunchTransition();
-        this.cancelPlanetTransit();
+        // Departure cleanup may resume a refused launch's dock. Hide first
+        // when actually leaving, so it cannot redraw that view on the way out.
+        this.root.querySelector('#dock-screen')?.classList.add('is-hidden');
+        this.root.querySelector('#dock-screen')?.classList.remove('is-arrival-covered');
+        const keepTransit=awaitFlight&&this.planetTransitOverlay?.dataset.awaitingFlight==='true';
+        this.cancelVesperLaunchTransition({keepTransit});
+        if(!keepTransit)this.cancelPlanetTransit();
         this.concourseShip?.pause();
         this.disposeShipPreviews();
         this.resetOutfittingDrafts();
-        this.root.querySelector('#dock-screen')?.classList.add('is-hidden');
         this.dockLocation = undefined;
     }
     showLaunchBlocked(message) {
@@ -2076,8 +2126,8 @@ export class GameUI {
             this.cancelVesperLaunchTransition();
         }
     }
-    cancelVesperLaunchTransition() {
-        this.vesperLaunchCleanup?.();
+    cancelVesperLaunchTransition({keepTransit=false}={}) {
+        this.vesperLaunchCleanup?.({keepTransit});
         this.vesperLaunchCleanup = undefined;
         this.vesperLaunchTransition = false;
         if (this.vesperLaunchTimer !== undefined) {
@@ -2088,7 +2138,11 @@ export class GameUI {
     cancelPlanetTransit() {
         if(!this.planetTransitOverlay)return;
         this.concourseShip?.pause();
+        this.planetTransitOverlay.removeKeyHandler?.();
         this.planetTransitOverlay.remove();this.planetTransitOverlay=undefined;
+    }
+    completeDepartureTransit() {
+        if(this.planetTransitOverlay?.dataset.awaitingFlight==='true')this.cancelPlanetTransit();
     }
     async playPlanetTransit(direction,locationId,canStart) {
         if(!['planet','station'].includes(LOCATIONS[locationId]?.kind)||!this.concourseShip?.model||this.concourseShip.contextLost||this.concourseShip.reducedMotion)return true;
@@ -2101,13 +2155,21 @@ export class GameUI {
         skip.addEventListener('click',skipShot);
         const key=e=>{if(!['Escape','Enter',' ','Tab'].includes(e.key))return;e.preventDefault();e.stopImmediatePropagation();if(e.key==='Tab')skip.focus({preventScroll:true});else skipShot();};
         document.addEventListener('keydown',key,true);
+        overlay.removeKeyHandler=()=>document.removeEventListener('keydown',key,true);
         this.planetTransitOverlay=overlay;(this.el('#game-shell')??this.root).append(overlay);
         skip.focus({preventScroll:true});
-        try{return LOCATIONS[locationId].kind==='station'
+        let completed=false;
+        try{completed=LOCATIONS[locationId].kind==='station'
             ? await this.concourseShip.playStation(stage,direction,locationId,canStart,this.actions?.stationTransitData?.(locationId))
-            : await this.concourseShip.playAtmosphere(stage,direction,locationId,canStart,this.actions?.planetSurface?.(locationId));}
-        catch(error){console.warn('Exterior transition unavailable.',error);return true;}
-        finally{document.removeEventListener('keydown',key,true);overlay.remove();if(this.planetTransitOverlay===overlay)this.planetTransitOverlay=undefined;}
+            : await this.concourseShip.playAtmosphere(stage,direction,locationId,canStart,this.actions?.planetSurface?.(locationId));return completed;}
+        catch(error){console.warn('Exterior transition unavailable.',error);completed=true;return true;}
+        finally{
+            if(direction==='exit'&&completed&&this.planetTransitOverlay===overlay){
+                // Keep the opaque final shot through asynchronous launch work.
+                // The first freshly rendered cockpit frame releases it.
+                overlay.dataset.awaitingFlight='true';skip.hidden=true;
+            }else{overlay.removeKeyHandler();overlay.remove();if(this.planetTransitOverlay===overlay)this.planetTransitOverlay=undefined;}
+        }
     }
     startVesperLaunchTransition() {
         if (this.vesperLaunchTransition || this.concourseArrivalPending || !this.canLaunchFromDock()) return;
@@ -2117,7 +2179,7 @@ export class GameUI {
         scene.classList.add('is-launching');scene.querySelector('.scene-pointers')?.setAttribute('inert','');
         const ship=scene.querySelector('.concourse-hover-ship');ship?.setAttribute('disabled','');
         let cancelled=false;
-        this.vesperLaunchCleanup=()=>{cancelled=true;this.cancelPlanetTransit();this.concourseShip?.pause();if(this.concourseShip?.model){this.concourseShip.resetPose();if(scene.isConnected&&!this.el('#dock-screen').classList.contains('is-hidden'))this.concourseShip.resume();}scene.classList.remove('is-launching');scene.querySelector('.scene-pointers')?.removeAttribute('inert');ship?.removeAttribute('disabled');};
+        this.vesperLaunchCleanup=({keepTransit=false}={})=>{cancelled=true;if(!keepTransit)this.cancelPlanetTransit();this.concourseShip?.pause();if(this.concourseShip?.model){this.concourseShip.resetPose();if(scene.isConnected&&!this.el('#dock-screen').classList.contains('is-hidden'))this.concourseShip.resume();}scene.classList.remove('is-launching');scene.querySelector('.scene-pointers')?.removeAttribute('inert');ship?.removeAttribute('disabled');};
         const locationId=this.dockLocation;
         void (async()=>{try{
             if(!await this.concourseShip.animate('takeoff')||cancelled)return;
@@ -2149,12 +2211,17 @@ export class GameUI {
                     await this.playPlanetTransit('entry',this.dockLocation,canStart);
                     if(generation!==this.concourseGeneration||!host.isConnected)return;
                 }
-                if(!this.concourseShip.contextLost)await this.concourseShip.animate('landing',canStart);
+                if(!this.concourseShip.contextLost){
+                    const landing=this.concourseShip.animate('landing',canStart);
+                    this.el('#dock-screen').classList.remove('is-arrival-covered');
+                    await landing;
+                }
             }else this.concourseShip.resume();
         }catch(error){resolveModel?.(false);console.warn('Docked ship view could not be prepared.',error);}
         if(generation!==this.concourseGeneration||!host.isConnected)return;
         if(this.concourseShip?.waitingArrival){this.concourseShip.waitingArrival=false;this.concourseShip.resetPose();}
         this.syncConcourseOverlay();
+        this.el('#dock-screen').classList.remove('is-arrival-covered');
         scene.classList.remove('is-arriving');pointers?.removeAttribute('inert');button.disabled=false;
         this.concourseArrivalPending=false;
         const pending=this.pendingDockStory;this.pendingDockStory=undefined;
@@ -4408,7 +4475,7 @@ export class GameUI {
         setBar('#screen-own-shield', percent(model.shield, model.maxShield));
         setBar('#screen-own-energy', percent(model.energy, model.maxEnergy));
         setBar('#screen-own-hull', percent(model.hull, model.maxHull));
-        this.updateTarget(model.target, model.mode);
+        this.updateTarget(model.target, model.mode, this.droneHud);
         this.updateDroneTelemetry(model);
         const targetReadout = this.el('#screen-target-readout');
         if (targetReadout) {
@@ -4439,7 +4506,7 @@ export class GameUI {
         if (throttleFill)
             throttleFill.style.height = `${model.throttle * 100}%`;
     }
-    updateTarget(target, mode = this.lastHud?.mode ?? 'combat') {
+    updateTarget(target, mode = this.lastHud?.mode ?? 'combat', drones) {
         const capital=Boolean(target?.capitalClass||target?.capitalSubtarget);
         this.el('#screen-target-readout').classList.toggle('is-capital-warning',capital&&(target.capitalTorpedoWarning||!target.capitalDisarmed&&['CHARGING','SALVO'].includes(target.capitalAttack)));
         const subtarget=this.el('#capital-subtarget');
@@ -4469,7 +4536,7 @@ export class GameUI {
             this.el('#screen-target-distance').textContent = '—';
             this.el('#screen-target-readout').textContent = '—';
             this.setTargetScreenValue(undefined);
-            this.updateWeaponButtons(undefined, mode);
+            this.updateWeaponButtons(undefined, mode, drones);
             this.targetLayout?.classList.remove('is-clip-flash');
             bracket?.classList.add('is-hidden');
             bracket?.classList.remove('is-hostile', 'is-surrendered');
@@ -4487,7 +4554,7 @@ export class GameUI {
         this.el('#screen-target-readout').textContent = capital ? (target.capitalTorpedoWarning?t('TORPEDO'):target.capitalDisarmed?t('DISARMED'):target.capitalAttack==='CHARGING'?t('CHARGING'):target.capitalAttack==='SALVO'?t('SALVO'):'') : target.kind === 'ship' ? (target.readout ?? '—').replace(/\s*·\s*[\d.,]+\s*\/\s*[\d.,]+\s*km\s*$/i, '') : target.readout ?? '—';
         this.el('#screen-target-readout').title = target.readout ?? '';
         this.setTargetScreenValue(target);
-        this.updateWeaponButtons(target, mode);
+        this.updateWeaponButtons(target, mode, drones);
         // A clipped NPC flashes its outline on the target monitor for a beat.
         this.targetLayout?.classList.toggle('is-clip-flash', Boolean(target.clipFlash));
         if (bracket && target.onScreen && target.screenX !== undefined && target.screenY !== undefined) {
@@ -4550,7 +4617,7 @@ export class GameUI {
             this.el('#screen-own-weapon')?.classList.add('is-visible');
         }
     }
-    updateWeaponButtons(target, mode = this.lastHud?.mode ?? 'combat') {
+    updateWeaponButtons(target, mode = this.lastHud?.mode ?? 'combat', hudDrones) {
         const fire = this.el('#touch-fire');
         const missile = this.el('#touch-missile');
         if (!fire || !missile)
@@ -4562,12 +4629,14 @@ export class GameUI {
         const mining = kind === 'asteroid';
         // Target selection can change drone availability before the next full HUD refresh.
         let liveDrones;
-        try { liveDrones = this.actions?.miningDrones?.(); } catch { /* Keep the fallback for stale session callbacks. */ }
-        const drones = liveDrones ?? this.droneHud ?? this.droneHudSnapshot(this.lastHud) ?? {};
+        if (!hudDrones) {
+            try { liveDrones = this.actions?.miningDrones?.(); } catch { /* Keep the fallback for stale session callbacks. */ }
+        }
+        const drones = hudDrones ?? liveDrones ?? this.droneHud ?? this.droneHudSnapshot(this.lastHud) ?? {};
         const droneMining = mining;
         const droneAction = drones.action;
         const droneLabel = t(drones.phase === 'running' ? 'RECALL' : drones.phase === 'recalling' ? 'RETURNING' : 'MINE');
-        const salvage = kind === 'wreck';
+        const salvage = kind === 'wreck' && !target?.combatLoot;
         const utility = mining || salvage;
         const surrendered = kind === 'ship' && Boolean(target.surrendered) && !target.captured;
         const capture = surrendered && Boolean(target.captureAvailable);
@@ -4575,6 +4644,15 @@ export class GameUI {
         const missileCurrent = Math.max(0, Math.floor(Number(launcher?.current) || 0));
         const missileCapacity = Math.max(0, Math.floor(Number(launcher?.capacity) || 0));
         const missileAction = !utility && !surrendered;
+        // Target motion and radar sweeps need fresh HUD frames; these controls
+        // change only with their action, magazine, drone state or language.
+        // Compare values rather than snapshot identity (each HUD model is new).
+        const state = [fire, missile, kind, salvage, drones.phase, droneAction?.ok, droneAction?.label,
+            surrendered, capture, target?.captureClaimable, missileCurrent, missileCapacity,
+            launcher?.name, launcher?.displayCode, launcher?.shortCode, launcher?.index, launcher?.count,
+            Boolean(this.save?.player.raceReturn), getLanguage()];
+        if (this.weaponButtonState?.length === state.length && state.every((value, index) => value === this.weaponButtonState[index])) return;
+        this.weaponButtonState = state;
         fire.classList.remove('is-mining', 'is-salvage', 'is-surrendered', 'is-recalling');
         missile.classList.remove('is-hidden', 'is-scan');
         missile.classList.toggle('is-mining', mining);
@@ -4777,6 +4855,11 @@ export class GameUI {
                 ctx.arc(cx + r * dx, cy + r * dy, r * cr, 0, Math.PI * 2);
                 ctx.stroke();
             }
+        }
+        else if (kind === 'waypoint') {
+            ctx.beginPath();
+            [[0,-1],[.16,-.22],[.75,0],[.16,.22],[0,1],[-.16,.22],[-.75,0],[-.16,-.22]].forEach(([x,y],i)=>i?ctx.lineTo(cx+x*r,cy+y*r):ctx.moveTo(cx+x*r,cy+y*r));
+            ctx.closePath();ctx.fill();
         }
         else if (kind === 'gate') {
             // Race checkpoint: a ring with course tick marks, so the target
@@ -5698,7 +5781,7 @@ export class GameUI {
           </aside>`;
         })();
         const tabs=[['flight','Flight'],['weapons','Weapons'],...(!this.save.arena?[['equipment','Equipment & Cargo']]:[]),
-            ...(droneBayLayoutFor(player.shipId).length||droneCount?[['drones','Drones']]:[]),...(!this.save.arena?[['journal','Journal']]:[])];
+            ...(this.save.arena&&(droneBayLayoutFor(player.shipId).length||droneCount)?[['drones','Drones']]:[]),...(!this.save.arena?[['journal','Journal']]:[])];
         const tab=tabs.some(([id])=>id===this.shipMenuTab)?this.shipMenuTab:'flight';
         this.shipMenuTab=tab;
         const flightPanel=`<div class="ship-console-grid">

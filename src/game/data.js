@@ -754,6 +754,7 @@ const FIELD_ARRIVAL_MARGIN = -60;
 // jump will not arm until the ship is within one kilometre of the centre.
 export const JUMP_POINT_ACTIVATION_RADIUS = 1000;
 export const hyperdriveArrivalRadius = (location) => {
+    if(location.kind==='waypoint')return 500;
     if (location.kind === 'field' || location.kind === 'graveyard' || location.kind === 'rings')
         return location.radius + FIELD_ARRIVAL_MARGIN;
     if (location.kind === 'jump-point')

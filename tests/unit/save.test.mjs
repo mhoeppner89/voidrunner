@@ -336,6 +336,9 @@ assert.equal(mismatchedEndpoint.world.pendingJump, null, 'route id cannot carry 
 // career with settings, mission state, race records and a pending jump.
 storage.clear();
 const roundTrip = createNewSave(125);
+const {equipmentAction}=await import('../../src/game/equipmentInventory.js');
+const launcher=equipmentAction(roundTrip.player,'buy',{baseId:'seeker-launcher'});
+assert.ok(equipmentAction(roundTrip.player,'install',{id:launcher.id,mountId:'wayfarer-weapon-2'}).ok);
 roundTrip.player.dockedAt = undefined;
 roundTrip.player.position = [1234, -56, 7890];
 roundTrip.player.velocity = [4, 5, 6];

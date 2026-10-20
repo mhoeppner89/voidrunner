@@ -30,7 +30,7 @@ export const TUTORIAL_TRANSLATIONS = {
     "Talk to Rin in Vesper’s bar.": "Sprich mit Rin in Vespers Bar.",
     "Rin has a survey job for you before she leaves to gather information.": "Rin hat einen Erkundungsauftrag für dich, bevor sie Informationen sammeln geht.",
     "Switch your drone bay to PDC drones.": "Stelle deine Drohnenbucht auf PDC um.",
-    "Open EQUIPMENT → DRONES and choose PDC for the bay. Your mining drones stay in cargo.": "Öffne AUSRÜSTUNG → DROHNEN und wähle PDC für die Bucht. Die Abbaudrohnen bleiben in deiner Fracht.",
+    "Open EQUIPMENT, select the PDC drone in cargo and install it in Drone bay 1.": "Öffne AUSRÜSTUNG, wähle die PDC-Drohne in der Fracht und baue sie in Drohnenbucht 1 ein.",
     "Chart the major wrecks in Mourning Line.": "Kartiere die großen Wracks in der Mourning Line.",
     "Fly alone to Mourning Line. Approach each marked wreck slowly to chart it.": "Fliege allein zur Mourning Line. Nähere dich jedem markierten Wrack langsam, um es zu kartieren.",
     "Help Paul defeat the two Scrappers.": "Hilf Paul gegen die beiden Scrapper.",
@@ -208,7 +208,7 @@ Object.assign(TUTORIAL_TRANSLATIONS, {
     "Land at Vesper.": "Lande auf Vesper.",
     "Approach slowly; landing is automatic.": "Nähere dich langsam. Die Landung erfolgt automatisch.",
     "Switch your drone bay to PDC.": "Stelle deine Drohnenbucht auf PDC um.",
-    "EQUIPMENT → DRONES.": "AUSRÜSTUNG → DROHNEN.",
+    "EQUIPMENT → CARGO → PDC Drone.": "AUSRÜSTUNG → FRACHT → PDC-Drohne.",
     "Chart the marked wrecks in Mourning Line.": "Kartiere die markierten Wracks in der Mourning Line.",
     "Approach each waypoint slowly.": "Nähere dich jedem Wegpunkt langsam.",
     "Help Paul defeat the two Scrappers.": "Hilf Paul gegen die beiden Scrapper.",
@@ -257,4 +257,24 @@ Object.assign(TUTORIAL_TRANSLATIONS, {
 Object.assign(TUTORIAL_TRANSLATIONS, {
     'Mine 3 units of ore from the marked deposit.':'Baue 3 Einheiten Erz aus der markierten Lagerstätte ab.',
     'Mine 3 units of ore at the marked deposit.':'Baue 3 Einheiten Erz an der markierten Lagerstätte ab.',
+});
+
+Object.assign(TUTORIAL_TRANSLATIONS, {
+ 'Fly within 100 km of each survey star.':'Nähere dich jedem Kartierungsstern auf unter 100 km.',
+ 'Fly alone to Mourning Line. Fly within 100 km of each survey star to chart it.':'Fliege allein zur Mourning Line. Nähere dich jedem Kartierungsstern auf unter 100 km.',
+ 'Aim at the survey star and engage HYPERDRIVE.':'Richte dein Schiff auf den Kartierungsstern und aktiviere HYPERDRIVE.',
+ 'Fly within 100 km of the survey star.':'Nähere dich dem Kartierungsstern auf unter 100 km.',
+ 'Fly within 100 km of the star. Local jumps need over 2,000 km.':'Nähere dich dem Stern auf unter 100 km. Kurze Sprünge sind bei über 2000 km möglich.',
+ 'WITHIN 100 KM':'AUF UNTER 100 KM NÄHERN',
+ 'Open the left ship monitor, choose Flight and switch the transponder OFF. Enter the marked carrier hangar, lower thrust and hold fire. Five pirates are passing through.':'Öffne den Schiffsmonitor links, wähle Flug und schalte den Transponder AUS. Fliege in den markierten Trägerhangar, nimm den Schub zurück und halte das Feuer.',
+ 'I used to bring supplies here. The flight deck was so busy you could barely find a berth.':'Früher habe ich Vorräte hergebracht. Auf dem Flugdeck war so viel los, dass du kaum einen Liegeplatz gefunden hast.',
+ 'Good. Their sensors cannot see us through this hull.':'Gut. Durch diese Hülle können ihre Sensoren uns nicht sehen.',
+ 'The last time I came through this hangar, every berth was full. Hard to believe it is the same place.':'Als ich zuletzt durch diesen Hangar flog, war jeder Platz belegt. Schwer zu glauben, dass es derselbe Ort ist.',
+ 'Thanks for coming back for me. Most pilots would have kept flying.':'Danke, dass du für mich umgedreht bist. Die meisten wären einfach weitergeflogen.',
+});
+Object.assign(TUTORIAL_TRANSLATIONS,{
+ 'HOLD POSITION':'POSITION HALTEN',
+ 'ENTER HANGAR':'HANGAR ANFLIEGEN',
+ 'ACTIVATE HYPERDRIVE':'HYPERDRIVE AKTIVIEREN',
+ 'SURVEY WAYPOINT':'KARTIERUNGSPUNKT',
 });

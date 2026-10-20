@@ -23,7 +23,7 @@ const migrated = hydrateSave(old);
 assert.equal(JSON.stringify(old), before, 'migration does not mutate the input');
 assert.equal(migrated.player.credits, old.player.credits + 3 * 7600);
 assert.equal(migrated.player.cargo.medicine, 50);
-assert.equal(cargoMass(migrated.player), 52, 'owned drones reserve cargo space too');
+assert.equal(cargoMass(migrated.player), 50, 'installed drones occupy their bays');
 assert.equal(cargoFree(migrated.player), 0);
 assert.equal(hydrateSave(migrated).player.credits, migrated.player.credits, 'refund exactly once');
 const keyed = structuredClone(old);
@@ -47,14 +47,14 @@ for (const hull of Object.keys(SHIPS)) {
  }
 }
 // Both authored drone hulls receive a complete fresh complement: Wayfarer has
-// one two-slot bay, while Prospector has three. This guards the full player
+// one single-drone bay, while Prospector has three. This guards the full player
 // setup rather than only the isolated controller fixtures below.
 for (const hull of ['wayfarer', 'prospector']) {
  const loadouts = createOutfittingState([hull]).loadouts;
  const fleet = normalizeDroneFleet(null, loadouts, { grantInitial: true });
  const fit = loadouts[hull];
  const assigned = fit.droneBays.flatMap(bay => bay.unitIds).filter(Boolean);
- assert.equal(assigned.length, hull === 'wayfarer' ? 2 : 6, `${hull} receives every bay slot`);
+ assert.equal(assigned.length, hull === 'wayfarer' ? 1 : 3, `${hull} receives every bay slot`);
  assert.equal(new Set(assigned).size, assigned.length, `${hull} drone identities are unique`);
  assert.ok(assigned.every(id => fleet.unitsById[id]?.type === 'mining'), `${hull} complement is operational mining stock`);
 }
@@ -104,14 +104,14 @@ function measureMiners(hull, limit) {
   velocity: [0, 0, 0], rotation: [0, 0, 0, 1], angularVelocity: [0, 0, 0] });
  save.player.outfitting.loadouts = loadouts;
  save.player.droneFleet = normalizeDroneFleet(null, loadouts, { grantInitial: true });
- if (limit === 1) loadouts[hull].droneBays[0].unitIds[1] = null;
+
  const node = generateAsteroidField(4242, {})[0];
  Object.assign(node, { position: [0, 0, 0], moving: false, scanned: true, remaining: 1000 });
  save.player.currentTargetId = node.id;
  const rt = Object.create(GameSession.prototype);
  Object.assign(rt, { save, asteroids: [node], deathTimer: 0, playerStats: () => ({ cargo: 1000 }) });
  let ctx = rt.prepareMiningDroneContext();
- assert.equal(ctx.unitIds.length, limit ?? droneBayLayoutFor(hull).length * 2);
+ assert.equal(ctx.unitIds.length, limit ?? droneBayLayoutFor(hull).length);
  assert.equal(new Set(ctx.unitIds.map(id => ctx.bayAnchors[id].launch.position.join(','))).size, ctx.unitIds.length);
  assert.equal(new Set(ctx.unitIds.map(id => ctx.getWorkPoint(save.player.droneFleet.unitsById[id], ctx).position.join(','))).size, ctx.unitIds.length);
  assert.equal(startMining(save.player.droneFleet, ctx).ok, true);
@@ -122,11 +122,11 @@ function measureMiners(hull, limit) {
  return save.player.cargo.ore ?? 0;
 }
 const soloYield = measureMiners('wayfarer', 1);
-const pairYield = measureMiners('wayfarer');
-const sixYield = measureMiners('prospector');
+
+const threeYield = measureMiners('prospector');
 assert.ok(soloYield > 0);
-assert.ok(pairYield / soloYield >= 1.8 && pairYield / soloYield <= 2.2);
-assert.ok(sixYield / pairYield >= 2.7 && sixYield / pairYield <= 3.3);
-console.log(`120s mining deliveries: one ${soloYield}, pair ${pairYield}, three pairs ${sixYield}`);
+
+assert.ok(threeYield / soloYield >= 2.6 && threeYield / soloYield <= 3.4);
+console.log(`120s mining deliveries: one ${soloYield}, three ${threeYield}`);
 
 for (const hull of ['torsas','astra','atlas']) { const yieldCount=measureMiners(hull); assert.ok(yieldCount>0, hull+' must return ore'); console.log(hull+' 120s mining: '+yieldCount); }

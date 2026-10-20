@@ -1,3 +1,92 @@
+## 0.8.2jv — Fly-over loot and automatic collectors
+
+- Collect dropped cargo and equipment by flying over them, including fast passes between simulation steps. Selection, scanning and salvage controls are unnecessary.
+- Add the Loot Collector / Beutesammler as normal purchasable utility equipment. Tiers I / II / III collect automatically at exactly 150 / 200 / 250 km; only the strongest fitted unit applies.
+- Preserve stationary drops, item identity, partial cargo stacks, reserved drone capacity and obstacle checks. Ejected equipment has the same eight-second collection delay as ejected cargo.
+- Update Rin’s loot explanation, target hints and equipment stats. Keep large-wreck salvage separate.
+
+## 0.8.2ju — Carrier hiding simulation recovery
+
+- Restore a companion’s formation destination when collision or search cleanup clears its travel leg. This fixes repeated flight-update exceptions while hiding with Paul in the carrier and also protects Rin’s formation flight.
+- Reuse the restored destination buffer across repeated contacts.
+- Add route-reset and real-contact regressions, including an extended muted carrier wait with desktop Chrome and iPhone WebKit.
+
+## 0.8.2jt — Wreck survey travel and stealth guidance
+
+- Replace survey rings with pulsing stars. Visits trigger within 100 km at any speed, including fast flybys between simulation steps.
+- Use the normal hyperdrive controls for selected survey stars over 2,000 km away. Keep obstruction checks and drop around 500 km from the marker.
+- Explain desktop and phone transponder controls before hiding. Add spaced, one-time Paul chatter and a sparse stealth music cue.
+- After the patrol passes, explain switching the transponder back on, patrol scans and station access. Allow dark arrivals at Concord stations while retaining existing berth fees and patrol behavior.
+- Add focused integration coverage and muted desktop, Android and iPhone browser checks of the survey, rescue, hiding and return sequence.
+
+## 0.8.2js — First-fight coaching and stable lighting
+
+- Preserve geometric lighting when ship, turret or wreck normal mapping becomes undefined. Keep invalid HDR values out of the glow filter and final colour conversion.
+- Add native Chrome/Metal and WebKit GPU regressions for invalid normals, non-finite HDR inputs and retained healthy colour channels.
+- Open Rin’s paused combat briefing four seconds after the first pirate arrives, down from eight.
+- Begin with defensive covering fire. Rin uses occasional forward-gun shots in the first duel, with turrets and missiles held; an aggressive order increases support. Later battles retain normal weapons.
+- Rename “Auswärts” to “Andere Stationen,” hide the empty section and show where each item is stored. Clear mount filters with “Alle Teile.”
+
+## 0.8.2jr — Mining turn rendering stall
+
+- Preserve borrowed hull textures when temporary turrets retire, including private damaged materials. Turning toward nearby ships no longer repeatedly uploads their unchanged hull maps.
+- Expire turret meshes from their last simulation refresh. Catch-up time before a refresh cannot immediately remove the new mount at the next draw.
+- Extend the mining navigation regression with actual desktop steering after selecting Vesper, checking continued mining, live hull texture ownership and repeat uploads.
+
+## 0.8.2jq — Cockpit navigation guidance
+
+- Retain the target arrow when opaque cockpit artwork or instruments cover the target. Keep the normal bracket through transparent cockpit windows, including each hull's phone layout.
+- Keep a selected same-system destination at the radar rim beyond sensor range, following the ship's heading. Unselected distant contacts retain their normal range limit.
+- Add desktop, Android and iPhone regressions for mining during radar selection, automatic recall before hyperdrive, distant bearings and all 11 cockpit plates.
+
+## 0.8.2jp — Seamless cinematic handoffs
+
+- Hide the reused cutscene canvas until its first new frame has been drawn, preventing stale location artwork from flashing during preparation.
+- Keep the final departure shot over asynchronous launch work and release it only after the first cockpit frame. Refused or cancelled departures restore the dock normally.
+- Cover arriving location screens until the exterior shot finishes and the pad landing starts. New careers, docked resumes and reduced-motion views still start parked.
+
+## 0.8.2jo — Starter equipment and unified drone bays
+
+- Start new careers without a launcher; retain launchers in existing saves. The first tutorial pirate drops exactly one green tier I missile launcher.
+- Make beam lasers ordinary sellable equipment, including existing bundled copies. Require another installed ammo-free weapon before selling a beam laser.
+- Show drone bays below utility mounts in the shared equipment inventory. Buy, install, store, carry and sell drones using ordinary item cards; retain health and station storage. In-flight swaps recall deployed drones and deliver carried ore automatically.
+- Use one drone per bay and the same physical docking mouth for mining, PDC and repair. Miners carry up to two units per trip, with safe single-unit loads when ore or cargo space is limited. Retain surplus miners from older saves.
+- Update the tutorial's loot and drone-fitting instructions and add distinct drone equipment icons.
+
+## 0.8.2jn — Less repeated field collision work
+
+- Reject distant ship/mesh pairs using conservative bounds from the actual geometry before building relative transforms.
+- Use each fitted hull’s rotated bounds to narrow nearby surface queries, then reject unrelated triangles within the remaining leaves. Keep exact contacts and their original order.
+- Preserve solid-core spawn recovery and open wreck/asteroid passages. Cache only one additional radius per existing surface index; add no query allocations or duplicate geometry.
+- Add exhaustive contact comparisons across all 19 hulls and checks for sparse leaves, off-centre surfaces, cache invalidation and embedded recovery.
+
+## 0.8.2jm — Less repeated cockpit work
+
+- Update contextual touch controls only when their displayed state changes. Reuse the HUD drone snapshot; direct target-selection updates still query live drone state.
+- Keep mining, recall, salvage, capture, magazine changes and racing brake/fire controls immediate. Preserve language and replaced-element invalidation.
+- Reuse one bounded canvas drawing buffer through dock/cinematic switches. Retain each view’s scene resolution, integer pixel scale and crop; omit the unused depth buffer on the final colour-only canvas. Scene and reflection depth buffers remain.
+- Wait asynchronously for the preceding GPU frame before resizing the canvas at either end of arrival, retaining skip/cancellation and the existing detail, lighting, camera paths and animation timing.
+- Add muted cockpit work comparisons and control regressions for desktop, Android and iPhone browser profiles.
+
+## 0.8.2jl — Less scenery rendering work
+
+- Batch static wreck sections by finish and nearby region, preserving all geometry, UVs, normals, paint coordinates and jagged fracture surfaces. Share the resulting buffers between repeated arrangements and divide construction into short tasks.
+- Render station cradles, gantries and work lights in two or three instanced batches instead of up to 42 individual draws. Preserve the original dimensions, materials and moving service lifts.
+- Cache static local transforms and stop identity scene/container transforms from forcing world-matrix updates on every frame. Moving hulls, effects and station activity still update normally.
+- Avoid drawing the previous dock while mounting and preparing the next one. Add geometry-equivalence checks, fixed-view pixel comparisons and more detailed station profiling.
+- Upload the actual cached NPC hull geometry during preparation, retaining its existing buffers without duplication. Prepare newly loaded hull buffers before publishing their detailed models.
+- Wait asynchronously for queued GPU preparation to finish before revealing flight or starting a cinematic clock. Keep skipping, cancellation, timeout recovery and loading-screen input responsive.
+
+## 0.8.2jk — Smoother station approaches and films
+
+- Prepare station textures, shader variants and off-camera geometry buffers before revealing them. Reuse the dormant concourse renderer to preload the selected station on approach.
+- Prepare later NPC hulls, authored traffic paints and distant graveyard models before their first visible draw.
+- Divide collision setup, texture uploads and shader-uniform setup into short tasks. Keep the exact station collision surfaces, models, artwork, lighting and camera paths.
+- Prepare concourse and exterior material variants before playback, with cancellation, skip and timeout recovery. Retain one station assembly and one reusable tiny buffer-warmup target.
+- Return completed departures directly to the cockpit; restore the dock only for cancelled or refused launches.
+- Update station activity once per rendered frame and upload docking light colours only when their sequence changes. Share independent paint shaders across hulls while retaining their exact colours and pattern placement.
+- Add muted station performance diagnostics for desktop, Android with CPU throttling and iPhone/WebKit. Shader-driver diagnostics are opt-in through `?debug-shaders`.
+
 ## 0.8.2ji — Station films in the game
 
 - Use all updated station models in flight and arrival/departure films. Include their berthed ships and service cradles in the films, using the same hull scale as flight and the workshop.

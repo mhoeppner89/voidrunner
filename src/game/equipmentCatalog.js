@@ -55,6 +55,8 @@ export function resolveEquipmentDefinition(base, record) {
  const named=record.rarity==='named'?NAMED_EQUIPMENT[record.baseId]:undefined;
  if(named)for(const key of Object.keys(modifiers))modifiers[key]*=named[key]??1;
  const effects={...base.effects};
+ // Collection distance is a fixed technology specification, never an affix roll.
+ if(base.id==='loot-collector')effects.lootRange=[150,200,250][tier-1];
  for(const [key,value] of Object.entries(effects))if(typeof value==='number'){
   if(key.endsWith('Multiplier'))effects[key]=1+(value-1)*modifiers.effect;
   else if(['cargoCapacity','shieldCapacity','hullCapacity','salvageRange','salvageRate','radarMultiplier','scanMultiplier'].includes(key))effects[key]=value*modifiers.effect;

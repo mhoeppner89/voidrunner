@@ -20,7 +20,9 @@ function boxTree(boxes){
 export const SHIP_COLLIDERS=Object.fromEntries(Object.entries(SHIP_COLLISION_DATA).map(([variant,data])=>{
     const meshVerts=decode(data.vertices,Float32Array),meshIndices=decode(data.indices,data.indexBytes===2?Uint16Array:Uint32Array),boxes=decode(data.boxes,Float32Array);
     prepareMeshQueryIndex(meshVerts,meshIndices);
-    return [variant,{extent:data.extent,min:data.min,max:data.max,sha256:data.sha256,meshVerts,meshIndices,boxes,...boxTree(boxes),radius:Math.hypot(...data.extent)}];
+    const tree=boxTree(boxes),root=tree.nodes[0];
+    const contactRadius=Math.hypot(Math.max(Math.abs(root.minX),Math.abs(root.maxX)),Math.max(Math.abs(root.minY),Math.abs(root.maxY)),Math.max(Math.abs(root.minZ),Math.abs(root.maxZ)));
+    return [variant,{extent:data.extent,min:data.min,max:data.max,sha256:data.sha256,meshVerts,meshIndices,boxes,...tree,radius:Math.hypot(...data.extent),contactRadius}];
 }));
 // Warm data is numeric and shared. No renderer traversal, arrays, clones or
 // vectors are allocated by the queries below; scratches never alias live state.
@@ -141,23 +143,60 @@ export function shipVsBox(position,q,variant,scale,obstacle,out,stats){
     halfB[0]=b.hx/scale;halfB[1]=b.hy/scale;halfB[2]=b.hz/scale;boxBounds();visits(boxContact);return deepest>0;
 }
 export function shipVsMesh(position,q,variant,scale,obstacle,out,stats){
-    begin(position,q,variant,scale,out,stats);const v=obstacle.meshVerts,indices=obstacle.meshIndices;if(!v||!indices)return false;
-    const b=obstacle.box;obstacleQuaternion.x=b.qx;obstacleQuaternion.y=b.qy;obstacleQuaternion.z=b.qz;obstacleQuaternion.w=b.qw;relativeMatrix(obstacleQuaternion);
-    const tree=prepareSurfaceMeshIndex(v,indices),reach=currentProfile.radius*scale;
+    const v=obstacle.meshVerts,indices=obstacle.meshIndices;if(!v||!indices)return false;
+    const profile=SHIP_COLLIDERS[variant]??SHIP_COLLIDERS.kestrel,tree=prepareSurfaceMeshIndex(v,indices),b=obstacle.box;
+    const dx=position.x-obstacle.x,dy=position.y-obstacle.y,dz=position.z-obstacle.z;
+    const radius=tree.radius+profile.contactRadius*scale+1e-5;
+    if(dx*dx+dy*dy+dz*dz>radius*radius){
+        if(stats)stats.meshRejects=(stats.meshRejects??0)+1;
+        return embeddedMeshContact(position,q,variant,scale,obstacle,out,stats);
+    }
     rotate(position.x-obstacle.x,position.y-obstacle.y,position.z-obstacle.z,-b.qx,-b.qy,-b.qz,b.qw,rotated);
     const lx=rotated.x,ly=rotated.y,lz=rotated.z;
+    // Most grid neighbours are far outside the hull. Reject them before building
+    // relative transforms; use the mesh's actual bounds, not its visual radius.
+    const root=tree.nodes[0],reach=profile.radius*scale;
+    if(!root||root.maxX<lx-reach||root.minX>lx+reach||root.maxY<ly-reach||root.minY>ly+reach||root.maxZ<lz-reach||root.minZ>lz+reach){
+        if(stats)stats.meshRejects=(stats.meshRejects??0)+1;
+        return embeddedMeshContact(position,q,variant,scale,obstacle,out,stats);
+    }
+    begin(position,q,variant,scale,out,stats);
+    obstacleQuaternion.x=b.qx;obstacleQuaternion.y=b.qy;obstacleQuaternion.z=b.qz;obstacleQuaternion.w=b.qw;relativeMatrix(obstacleQuaternion);
+    // Bound the fitted solid cells in obstacle space. The old sphere cube was
+    // particularly loose for thin fighters beside a large rock surface. Keep
+    // the original traversal/contact order and pad only for floating arithmetic.
+    const hull=profile.nodes[0],hx=(hull.maxX-hull.minX)*scale/2,hy=(hull.maxY-hull.minY)*scale/2,hz=(hull.maxZ-hull.minZ)*scale/2;
+    const sx=(hull.minX+hull.maxX)*scale/2,sy=(hull.minY+hull.maxY)*scale/2,sz=(hull.minZ+hull.maxZ)*scale/2;
+    const cx=lx+matrix[0]*sx+matrix[3]*sy+matrix[6]*sz,cy=ly+matrix[1]*sx+matrix[4]*sy+matrix[7]*sz,cz=lz+matrix[2]*sx+matrix[5]*sy+matrix[8]*sz;
+    const pad=1e-7*Math.max(1,reach,Math.abs(lx),Math.abs(ly),Math.abs(lz));
+    const ex=Math.abs(matrix[0])*hx+Math.abs(matrix[3])*hy+Math.abs(matrix[6])*hz+pad,ey=Math.abs(matrix[1])*hx+Math.abs(matrix[4])*hy+Math.abs(matrix[7])*hz+pad,ez=Math.abs(matrix[2])*hx+Math.abs(matrix[5])*hy+Math.abs(matrix[8])*hz+pad;
+    const minX=cx-ex,minY=cy-ey,minZ=cz-ez,maxX=cx+ex,maxY=cy+ey,maxZ=cz+ez;
+    const nodeMinX=Math.max(lx-reach,minX),nodeMinY=Math.max(ly-reach,minY),nodeMinZ=Math.max(lz-reach,minZ),nodeMaxX=Math.min(lx+reach,maxX),nodeMaxY=Math.min(ly+reach,maxY),nodeMaxZ=Math.min(lz+reach,maxZ);
     rotate(obstacle.x-position.x,obstacle.y-position.y,obstacle.z-position.z,-qx,-qy,-qz,qw,rotated);
     const ox=rotated.x,oy=rotated.y,oz=rotated.z;
-    for(let at=0;at<tree.nodes.length;){const n=tree.nodes[at];if(n.maxX<lx-reach||n.minX>lx+reach||n.maxY<ly-reach||n.minY>ly+reach||n.maxZ<lz-reach||n.minZ>lz+reach){at=n.skip;continue;}at++;if(!n.leaf)continue;
-        for(let i=n.first;i<n.end;i++){const t=tree.order[i];for(let k=0;k<3;k++){const j=indices[t+k]*3,x=v[j],y=v[j+1],z=v[j+2];triangle[k*3]=(matrix[0]*x+matrix[1]*y+matrix[2]*z+ox)/scale;triangle[k*3+1]=(matrix[3]*x+matrix[4]*y+matrix[5]*z+oy)/scale;triangle[k*3+2]=(matrix[6]*x+matrix[7]*y+matrix[8]*z+oz)/scale;}queryTriangle();}
+    for(let at=0;at<tree.nodes.length;){const n=tree.nodes[at];if(stats)stats.meshBoundsTests=(stats.meshBoundsTests??0)+1;
+        if(n.maxX<nodeMinX||n.minX>nodeMaxX||n.maxY<nodeMinY||n.minY>nodeMaxY||n.maxZ<nodeMinZ||n.minZ>nodeMaxZ){at=n.skip;continue;}at++;if(!n.leaf)continue;
+        for(let i=n.first;i<n.end;i++){
+            const t=tree.order[i],a=indices[t]*3,c=indices[t+1]*3,d=indices[t+2]*3;
+            // A leaf contains up to twelve triangles. Its neighbours need not
+            // touch this hull even when the leaf's combined bounds do.
+            if(Math.max(v[a],v[c],v[d])<minX||Math.min(v[a],v[c],v[d])>maxX
+                ||Math.max(v[a+1],v[c+1],v[d+1])<minY||Math.min(v[a+1],v[c+1],v[d+1])>maxY
+                ||Math.max(v[a+2],v[c+2],v[d+2])<minZ||Math.min(v[a+2],v[c+2],v[d+2])>maxZ)continue;
+            if(stats)stats.meshTriangles=(stats.meshTriangles??0)+1;
+            for(let k=0;k<3;k++){const j=indices[t+k]*3,x=v[j],y=v[j+1],z=v[j+2];triangle[k*3]=(matrix[0]*x+matrix[1]*y+matrix[2]*z+ox)/scale;triangle[k*3+1]=(matrix[3]*x+matrix[4]*y+matrix[5]*z+oy)/scale;triangle[k*3+2]=(matrix[6]*x+matrix[7]*y+matrix[8]*z+oz)/scale;}queryTriangle();
+        }
     }
-    if(!deepest&&!obstacle.surfaceOnly&&obstacle.minReach>0){
+    return deepest>0||embeddedMeshContact(position,q,variant,scale,obstacle,out,stats);
+}
+function embeddedMeshContact(position,q,variant,scale,obstacle,out,stats){
+    if(!obstacle.surfaceOnly&&obstacle.minReach>0){
         const dx=position.x-obstacle.x,dy=position.y-obstacle.y,dz=position.z-obstacle.z;
         // Only an actual inscribed solid core permits embedded-spawn recovery.
         // Never infer a filled interior for wreck shells, rings or engine bores.
         if(dx*dx+dy*dy+dz*dz<obstacle.minReach*obstacle.minReach)
             return shipVsSphere(position,q,variant,scale,obstacle.x,obstacle.y,obstacle.z,obstacle.minReach,out,stats);
-    }return deepest>0;
+    }return false;
 }
 const hollowMeshes=new WeakMap();
 export function shipVsObstacle(position,q,variant,scale,obstacle,out,stats){

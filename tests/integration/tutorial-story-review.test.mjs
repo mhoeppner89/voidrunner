@@ -27,7 +27,7 @@ test('launch, fitted-reactor and mining-return introductions wait for their real
 });
 test('a heard mining/salvage lesson and an accepted escort offer become short reminders',()=>{
  const {save,quest}=tutorialFixture('mining-contract');assert.equal(tutorialConversation(save,'rin-vek','vesper'),'mining');quest.flags.miningExplained=true;assert.equal(tutorialConversation(save,'rin-vek','vesper'),undefined);assert.match(tutorialDialogue(save,'rin-vek'),/mission board.*accept/);
- quest.stepId='fit-pdc';assert.equal(tutorialConversation(save,'rin-vek','vesper'),undefined);assert.match(tutorialDialogue(save,'rin-vek'),/EQUIPMENT → DRONES/);
+ quest.stepId='fit-pdc';assert.equal(tutorialConversation(save,'rin-vek','vesper'),undefined);assert.match(tutorialDialogue(save,'rin-vek'),/EQUIPMENT.*PDC drone.*Drone bay 1/);
  quest.stepId='launch-black-box';quest.flags.paulInvited=true;assert.equal(tutorialConversation(save,'paul','cairn'),undefined);assert.match(tutorialDialogue(save,'paul'),/repair drones are ready/);
 });
 test('story dialogue teaches normal interfaces and automatic recall without trading/fitting/contract shortcuts',()=>{
@@ -35,7 +35,7 @@ test('story dialogue teaches normal interfaces and automatic recall without trad
  assert.doesNotMatch(JSON.stringify(ADVENTURE_DIALOGUES),/Recall every drone|Drohnen zurückrufen/);
  assert.match(ADVENTURE_DIALOGUES.rin.nodes.trade.text.en,/MARKET.*COMMODITY MARKET.*BUY MAX/);
  assert.match(ADVENTURE_DIALOGUES.mining.nodes.contract.text.en,/MISSION BOARD.*ACCEPT/);
- assert.match(ADVENTURE_DIALOGUES.salvage.nodes.fitting.text.en,/SHIP PARTS.*DRONES.*PDC/);
+ assert.match(ADVENTURE_DIALOGUES.salvage.nodes.fitting.text.en,/EQUIPMENT.*PDC drone.*Drone bay 1/);
  assert.doesNotMatch(ADVENTURE_DIALOGUES.mara.nodes.work.text.en,/BUY MAX/);
 });
 test('Mara’s milestone dialogue is visible docked and is queued until danger passes in flight',()=>{
@@ -74,7 +74,7 @@ test('Rin’s combat lesson opens immediately beside the pirate and is remembere
  assert.equal(calls.length,1);assert.equal(calls[0][3],'tutorial-combat');assert.equal(session.storyLineUntil,Infinity);
  assert.equal(session.pendingStoryConversations,undefined,'the nearby pirate cannot delay his own combat lesson');
  assert.match(ADVENTURE_DIALOGUES.combat.nodes.weapons.text.en,/Space.*fire pad.*energy/);
- assert.match(ADVENTURE_DIALOGUES.combat.nodes.wing.text.en,/Y.*wing card.*aggressive.*defensive.*break off/);
+ for(const phrase of [/Y.*wing card/,/defensive.*covering fire/i,/aggressive.*more help/i,/break off/])assert.match(ADVENTURE_DIALOGUES.combat.nodes.wing.text.en,phrase);
  session.finishTutorialBriefing('tutorial-combat',true);assert.equal(quest.flags['briefingRead-combat'],true);
  session.playTutorialBriefing('combat');assert.equal(calls.length,1);assert.equal(quest.stepId,'defeat-raider');
  const resumed=tutorialFixture('defeat-raider',hydrateSave(JSON.parse(JSON.stringify(save))));resumed.session.playTutorialBriefing=GameSession.prototype.playTutorialBriefing;resumed.session.ui.showStoryLine=()=>assert.fail('completed combat lesson repeated');resumed.session.playTutorialBriefing('combat');

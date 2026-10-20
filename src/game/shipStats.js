@@ -68,6 +68,7 @@ export const getEffectiveShipStats = (player) => {
         miningRange: 100,
         salvageRate,
         salvageRange,
+        lootRange: selectedEffects.reduce((range,e)=>Math.max(range,e.lootRange??0),0),
     };
 };
 export const repairCost = (player) => {

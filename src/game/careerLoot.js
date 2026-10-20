@@ -1,7 +1,8 @@
+import {t} from './i18n.js';
 import {highestLootRarity} from './lootVisuals.js';
 import {FRIGATE_MOUNTS} from './frigateMounts.js';
 import {CRUISER_MOUNTS} from './cruiserModelData.js';
-import {registerInventoryDefinitions} from './equipmentInventory.js';
+import {registerInventoryDefinitions,refreshInventoryProjection} from './equipmentInventory.js';
 import {weaponForOutfit} from './weapons.js';
 import {OUTFIT_ITEMS,BASE_OUTFIT_ITEMS,LOADOUT_KEYS} from './outfitting.js';
 import {createEquipmentRecord,rollEquipmentRecord,receiveEquipment,ITEM_SURVIVAL_CHANCE,CARGO_SURVIVAL_CHANCE} from './equipmentInventory.js';
@@ -22,7 +23,7 @@ export function equipCareerItems(session,ship,{tutorialMiningPirate=false}={}){
  for(const key of LOADOUT_KEYS)for(let i=0;i<(fit[key]?.length??0);i++)if(fit[key][i]){
   const baseId=equipmentBaseId(fit[key][i]),id=`${ship.lootKey}-${key}-${i}`;
   // The first pirate carries the exact green tier I weapon that introduces loot.
-  const guaranteed=tutorialMiningPirate&&key==='guns'&&!ship.guaranteedLootId;
+  const guaranteed=tutorialMiningPirate&&key==='launchers'&&!ship.guaranteedLootId;
   const item=guaranteed?createEquipmentRecord(baseId,{id,tier:1,rarity:'uncommon',affixes:['efficient']}):rollEquipmentRecord(baseId,rng,Math.max(tier,OUTFIT_ITEMS[fit[key][i]]?.tier??1),id);if(!item)continue;
   if(guaranteed)ship.guaranteedLootId=item.id;
   fit[key][i]=item.id;ship.equipmentRecords.push({item,key,index:i});
@@ -55,46 +56,106 @@ export function makeCareerWreck(session,ship,{captured=false}={}){
  session.save.world.combatWrecks??={};
  if(!ship.lootKey){const serial=(session.save.world.lootShipCounter??0)+1;session.save.world.lootShipCounter=serial;ship.lootKey=`loot-${session.save.world.seed}-${serial}`;}
  const rng=seededRandom(`${ship.lootKey}:survival`),contents=[];
+ const tutorialOnly=Boolean(ship.guaranteedLootId);
  const equipment=ship.equipmentRecords??[];
  for(const {item,key,index} of equipment){
+  if(tutorialOnly&&item.id!==ship.guaranteedLootId){forgetEquipmentDefinition(item.id);continue;}
   if(['turrets','capital'].includes(key)&&ship.capitalMountHull?.[index]<=0){forgetEquipmentDefinition(item.id);continue;}
   const rack=ship.combatFit?.racks?.find(r=>r.itemId===item.id);if(rack)item.rounds=rack.missiles;
   if(captured||rng()<ITEM_SURVIVAL_CHANCE||item.id===ship.guaranteedLootId)contents.push({id:item.id,kind:'equipment',item:{...item,factory:false,location:{kind:'wreck'}}});
   else forgetEquipmentDefinition(item.id);
  }
- for(const [commodity,raw] of Object.entries(ship.cargo??{})){
+ for(const [commodity,raw] of Object.entries(tutorialOnly?{}:ship.cargo??{})){
   if(!COMMODITIES[commodity])continue;let quantity=0;
   for(let i=0;i<Math.min(100000,Math.max(0,Math.floor(raw)));i++)if(captured||rng()<CARGO_SURVIVAL_CHANCE)quantity++;
   if(quantity)contents.push({id:`${ship.lootKey}-cargo-${commodity}`,kind:'cargo',commodity,quantity});
  }
- for(const unit of Object.values(ship.droneFleet?.unitsById??{}))if(unit.hull>0){
+ for(const unit of Object.values(tutorialOnly?{}:ship.droneFleet?.unitsById??{}))if(unit.hull>0){
   if(!captured&&unit.state!=='stowed'&&unit.position){unit.orphaned=true;unit.state='orphaned';unit.targetId=undefined;session.save.world.orphanDrones??={};session.save.world.orphanDrones[unit.id]={id:unit.id,type:unit.type,hull:unit.hull,ammo:unit.ammo,position:[...unit.position],velocity:[...(unit.velocity??[0,0,0])],rotation:[...(unit.rotation??[0,0,0,1])],systemId:session.save.player.systemId};continue;}
   if(captured||rng()<ITEM_SURVIVAL_CHANCE)contents.push({id:`${ship.lootKey}-${unit.id}`,kind:'drone',type:unit.type,hull:unit.hull,ammo:unit.ammo});
  }
  // Cosmetic debris always appears; an empty hull does not advertise loot.
  if(!contents.length)return null;
- const ext=session.npcHullExtents(ship),wreck={id:`wreck-${ship.lootKey}`,name:`${ship.name} — salvage`,position:[...ship.position],velocity:[0,0,0],radius:Math.max(3,Math.min(35,Math.max(...ext)*.5)),systemId:session.save.player.systemId,instanceId:session.activeInstanceId,contents,scanned:captured};
+ const ext=session.npcHullExtents(ship),wreck={id:`wreck-${ship.lootKey}`,name:`${ship.name} — ${t('Loot')}`,position:[...ship.position],velocity:[0,0,0],radius:Math.max(3,Math.min(35,Math.max(...ext)*.5)),systemId:session.save.player.systemId,instanceId:session.activeInstanceId,contents,scanned:captured};
  session.save.world.combatWrecks[wreck.id]=wreck;return wreck;
+}
+// Drops stay stationary. Test the swept hull envelope so a fast fly-over cannot
+// jump past a small crate between fixed steps. Long teleports are never swept.
+export function lootCollectionEnabled(session){
+ const p=session.save.player;
+ return !p.dockedAt && p.hull>0 && !session.autopilot && !session.galaxyJump && !session.playerDocking && !(session.deathTimer>0) && session.hyperdriveFx!=='spool';
+}
+export function lootInReach(session,position,range=0,swept=false,ignoreId,checkSight=true){
+ if(!lootCollectionEnabled(session))return false;
+ const p=session.save.player,now=p.position,prev=swept?p.prevPosition:undefined;
+ let x=now[0],y=now[1],z=now[2];
+ const dx=position[0]-x,dy=position[1]-y,dz=position[2]-z;
+ const beam=range>0 && dx*dx+dy*dy+dz*dz<=range*range;
+ if(!beam){
+  if(prev){
+   const vx=x-prev[0],vy=y-prev[1],vz=z-prev[2],length2=vx*vx+vy*vy+vz*vz;
+   if(length2>0&&length2<=10000){
+    const along=Math.max(0,Math.min(1,((position[0]-prev[0])*vx+(position[1]-prev[1])*vy+(position[2]-prev[2])*vz)/length2));
+    x=prev[0]+vx*along;y=prev[1]+vy*along;z=prev[2]+vz*along;
+   }
+  }
+  const ext=session.playerHullExtents?.(),contact=3.2+(ext?Math.max(ext[0],ext[1],ext[2]):0);
+  if((position[0]-x)**2+(position[1]-y)**2+(position[2]-z)**2>contact*contact)return false;
+ }
+ return !checkSight || !session.lineBlocked?.(session.tmpP3.set(x,y,z),session.tmpP4.fromArray(position),ignoreId);
+}
+export function updateCombatLoot(session){
+ if(session.arena||!lootCollectionEnabled(session))return;
+ const range=session.playerStats().lootRange??0;
+ const retry=session.lootRetryAt??=new WeakMap();
+ let changed=false,beams=0;
+ for(const id in session.save.world.combatWrecks){
+  const wreck=session.save.world.combatWrecks[id];
+  if(wreck.systemId!==session.save.player.systemId || session.save.world.time<(wreck.collectAfter??0) || session.save.world.time<(retry.get(wreck)??0))continue;
+  if(!lootInReach(session,wreck.position,range,true,wreck.id))continue;
+  // Bounded work even for imported wrecks with a very large manifest. Cargo
+  // stacks transfer in bulk, retaining any remainder when the hold fills.
+  let recovered=false;
+  for(const entry of wreck.contents.slice(0,64)){
+   const result=transferWreckEntry(session,wreck,entry.id,true);
+   if(result.ok){changed=true;recovered=true;}
+  }
+  if(recovered){
+   if(range>0&&beams<4){session.renderer?.showCombatBeam?.('loot-collector-'+beams++,session.tmpP3.fromArray(session.save.player.position),session.tmpP4.fromArray(wreck.position),0x74d5c4,session.save.player);}
+   session.setOwnMonitorStatus?.('+'+t('Loot'));
+  }
+  if(wreck.contents.length)retry.set(wreck,session.save.world.time+.5);
+ }
+ if(changed){session.audio?.play('pickup',.7);session.persistSave?.();}
 }
 export function recoverWreckEntry(session,wreckId,entryId){
  if(session.arena)return {ok:false,code:'Career salvage only.'};
- const wreck=session.save.world.combatWrecks?.[wreckId],node=session.wreckNodes.find(n=>n.id===wreckId);
- if(!wreck||!node||wreck.systemId!==session.save.player.systemId||!node.scanned)return {ok:false,code:'Scan this wreck first.'};
- const distance=Math.hypot(...wreck.position.map((v,i)=>v-session.save.player.position[i]));
- if(distance>session.playerStats().salvageRange+node.radius)return {ok:false,code:'Wreck is outside salvage range.'};
- if(session.lineBlocked&&session.tmpP3&&session.tmpP4&&session.lineBlocked(session.tmpP3.fromArray(session.save.player.position),session.tmpP4.fromArray(wreck.position),wreck.id))return {ok:false,code:'BEAM OBSTRUCTED'};
+ const wreck=session.save.world.combatWrecks?.[wreckId];
+ if(!wreck||wreck.systemId!==session.save.player.systemId)return {ok:false,code:'Loot is unavailable.'};
+ if(session.save.world.time<(wreck.collectAfter??0))return {ok:false,code:'Loot is not ready for collection.'};
+ if(!lootInReach(session,wreck.position,session.playerStats().lootRange??0,false,wreck.id,false))return {ok:false,code:'Loot is outside collection range.'};
+ if(session.lineBlocked?.(session.tmpP3.fromArray(session.save.player.position),session.tmpP4.fromArray(wreck.position),wreck.id))return {ok:false,code:'BEAM OBSTRUCTED'};
+ return transferWreckEntry(session,wreck,entryId,false);
+}
+function transferWreckEntry(session,wreck,entryId,bulk){
+ const node=session.wreckNodes.find(n=>n.id===wreck.id);
+ if(!node)return {ok:false,code:'Loot is unavailable.'};
  const index=wreck.contents.findIndex(e=>e.id===entryId),entry=wreck.contents[index];if(!entry)return {ok:false,code:'Already recovered.'};
  let result;
- if(entry.kind==='equipment')result=receiveEquipment(session.save.player,entry.item);
+ if(entry.kind==='equipment'){
+  if(cargoFree(session.save.player)+.0001<(OUTFIT_ITEMS[entry.item.id]?.mass??Infinity))return {ok:false,code:'Cargo hold is full.'};
+  result=receiveEquipment(session.save.player,entry.item);
+ }
  else if(entry.kind==='cargo'){
   if(cargoFree(session.save.player)<COMMODITIES[entry.commodity].mass)return {ok:false,code:'Cargo hold is full.'};
-  session.save.player.cargo[entry.commodity]=(session.save.player.cargo[entry.commodity]??0)+1;entry.quantity--;result={ok:true};
+  const amount=bulk?Math.min(entry.quantity,Math.floor((cargoFree(session.save.player)+.0001)/COMMODITIES[entry.commodity].mass)):1;
+  session.save.player.cargo[entry.commodity]=(session.save.player.cargo[entry.commodity]??0)+amount;entry.quantity-=amount;result={ok:true,amount};
  }else{
   if(cargoFree(session.save.player)<1)return {ok:false,code:'Cargo hold is full.'};
-  const fleet=session.save.player.droneFleet,id=`drone-unit-${fleet.nextUnitId++}`;fleet.unitsById[id]=createDroneUnit(id,entry.type);if(entry.hull!=null)fleet.unitsById[id].hull=entry.hull;if(entry.ammo!=null)fleet.unitsById[id].ammo=entry.ammo;fleet.lockerIds.push(id);result={ok:true};
+  const fleet=session.save.player.droneFleet,id=`drone-unit-${fleet.nextUnitId++}`;fleet.unitsById[id]=createDroneUnit(id,entry.type);if(entry.hull!=null)fleet.unitsById[id].hull=entry.hull;if(entry.ammo!=null)fleet.unitsById[id].ammo=entry.ammo;fleet.lockerIds.push(id);refreshInventoryProjection(session.save.player);result={ok:true};
  }
  if(!result.ok)return result;
- session.recordExtractionProgress?.('salvage',1);
+ session.recordExtractionProgress?.('salvage',result.amount??1);
  if(entry.kind!=='cargo'||entry.quantity<=0)wreck.contents.splice(index,1);
  node.lootRarity=highestLootRarity(wreck.contents);
  node.remaining=wreck.contents.reduce((n,e)=>n+(e.quantity??1),0);session._statsDirty=true;

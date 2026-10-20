@@ -1,6 +1,8 @@
 import {chromium,webkit,devices} from 'playwright';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
+import {isolateBrowserProfiles} from '../helpers/browser-profiles.mjs';
+await isolateBrowserProfiles(import.meta.url,['desktop','android','iphone']);
 const out='output/tutorial-mining',base=process.env.VR_BASE_URL??'http://127.0.0.1:4192';await mkdir(out,{recursive:true});const report=[];
 for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1280,height:800}}],['android',chromium,devices['Pixel 7 landscape']],['iphone',webkit,devices['iPhone 13 landscape']]]){
  if(process.env.VR_PROFILES&&!process.env.VR_PROFILES.split(',').includes(name))continue;
@@ -8,7 +10,7 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1280,heig
  try{
   const page=await browser.newPage({...device,serviceWorkers:'block'});page.setDefaultTimeout(60000);const errors=[];page.on('pageerror',e=>errors.push(e.stack));page.on('console',m=>{if(m.type()==='error'&&m.text().includes('Frame error'))errors.push(m.text());});
   await page.addInitScript(()=>{localStorage.setItem('void-privateer-settings-v1',JSON.stringify({music:0,effects:0}));const A=window.AudioContext??window.webkitAudioContext;if(A)A.prototype.resume=async function(){await this.suspend();};});
-  await page.goto(`${base}/game.html?revision=0.8.2gu`);await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.newGame);await page.evaluate(()=>__VOID_PRIVATEER__.newGame());
+  await page.goto(`${base}/game.html?revision=0.8.2js`);await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.newGame);await page.evaluate(()=>__VOID_PRIVATEER__.newGame());
   const setup=await page.evaluate(async()=>{
    const r=__VOID_PRIVATEER__.getRuntime(),p=r.save.player,q=r.save.quests.find(q=>q.id==='the-spare-key');r.audio.setVolumes(0,0);cancelAnimationFrame(r.frameId);r.ui.hideStory();q.stepId='mining-contract';q.flags.miningExplained=true;p.dockedAt='vesper';r.ui.showDock(r.save,'vesper');r.ensureTutorialMiningContract();const offer=r.save.world.offers.vesper.find(m=>m.id==='tutorial-vesper-mining');r.acceptMission(offer.id);await r.launch();cancelAnimationFrame(r.frameId);
    const {asteroidCollisionRadius}=await import('/src/game/worldData.js'),{LOCATIONS}=await import('/src/game/data.js'),T=await import('/vendor/three.module.min.js');const node=r.asteroids.find(n=>n.id===q.flags.oreTargetId);node.remaining=Math.max(node.remaining,20);
@@ -30,7 +32,7 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1280,heig
    }
    if(!handoff)throw Error('Contract never completed');if((p.cargo.ore??0)<8)throw Error('Miners stopped at the contract threshold');
    if(r.ui.isModalOpen)throw Error('Unexpected modal blocked flight');if(r.ui.tutorialHint)throw Error('Repeated travel instructions immediately after mining');
-   if(minerVisuals.size<2)throw Error('Both miners must participate in the retention check');
+   if(minerVisuals.size<1)throw Error('The single miner must participate in the retention check');
    return{handoff,cargo:p.cargo.ore,time:r.save.world.time,position:[...p.position],rotation:[...p.rotation],retainedMiners:minerVisuals.size};
   });assert.equal(mined.handoff.target,setup.node);assert.equal(mined.handoff.phase,'running');assert.equal(mined.handoff.nav,'shardbelt');await page.screenshot({path:`${out}/${name}-continue-mining.png`});
   if(name==='desktop')await page.keyboard.down('w');
@@ -59,7 +61,7 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1280,heig
    for(let i=0;i<10;i++){r.lastFrame=performance.now()-100;r.frame(performance.now());cancelAnimationFrame(r.frameId);}
    if(r.save.world.time!==before.time||r.save.player.position.some((v,i)=>v!==before.position[i])||r.save.player.hull!==before.hull)throw Error('Player/simulation advanced during combat dialogue');
    if(r.ships.some(s=>{const prev=before.ships.find(p=>p.id===s.id);return !prev||s.hull!==prev.hull||s.position.some((v,i)=>v!==prev.position[i]);}))throw Error('Combat continued behind dialogue');
-   return{time:before.time,conversation:r.ui.adventure.conversationId};
+   const q=r.save.quests.find(q=>q.id==='the-spare-key'),delay=before.time-q.flags.standoffStartedAt;if(delay<4||delay>5.1)throw Error('Unexpected standoff duration '+delay);return{time:before.time,delay,conversation:r.ui.adventure.conversationId};
   });
   let nodes=0;while(await page.locator('#adventure-panel').isVisible()){
    const speech=page.locator('.adventure-speech');assert.ok(await speech.isVisible());
@@ -71,21 +73,21 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1280,heig
   const combat=await page.evaluate(()=>{
    const r=__VOID_PRIVATEER__.getRuntime(),q=r.save.quests.find(q=>q.id==='the-spare-key');r.refreshStoryLine();
    if(!q.flags['briefingRead-combat']||r.ui.isModalOpen)throw Error('Combat lesson did not release flight');
-   const rin=r.ships.find(s=>s.storyPersonId==='rin'),before={time:r.save.world.time,position:[...rin.position]};
+   const rin=r.ships.find(s=>s.storyPersonId==='rin'),before={time:r.save.world.time,position:[...rin.position]},shots=[],launches=rin.combatFit.missiles,fire=r.fireNpcGun; if(r.save.wingOrder!=='defensive')throw Error('First lesson should begin with covering fire');r.fireNpcGun=function(ship,...args){const prior=ship.lastCombatShotAt,result=fire.call(this,ship,...args);if(ship===rin&&ship.lastCombatShotAt!==prior)shots.push(this.save.world.time-before.time);return result;};
    // The old test stopped at the standoff. Drive actual combat frames to catch
    // companion AI exceptions, which the RAF guard otherwise logs repeatedly.
    for(let i=0;i<60;i++){r.lastFrame=performance.now()-100;r.frame(performance.now());cancelAnimationFrame(r.frameId);}
    if(r.frameErrorAt)throw Error('A flight frame failed during the first fight');
    if(r.save.world.time-before.time<4||rin.position.every((v,i)=>v===before.position[i]))throw Error('Combat did not resume');
    const enemy=r.ships.find(s=>s.tutorialEncounter==='mining'&&s.hull>0);if(!enemy)throw Error('Pirate disappeared during lesson');
-   const elapsed=r.save.world.time-before.time;r.damageShip(enemy,100000,window.innerWidth<1000?rin.id:'player',enemy.position);
+   const elapsed=r.save.world.time-before.time;r.fireNpcGun=fire;if(shots.length>1||shots.some((time,i)=>i===0?time<2.99:time-shots[i-1]<4.99))throw Error('Rin fired too often '+JSON.stringify(shots));if(rin.combatFit.missiles!==launches)throw Error('Rin launched training missiles');r.damageShip(enemy,100000,window.innerWidth<1000?rin.id:'player',enemy.position);
    if(q.stepId!=='land-mining')throw Error('First combat did not complete');
-   return{elapsed,rinMoved:true,read:q.flags['briefingRead-combat'],step:q.stepId};
+   return{elapsed,coveringShots:shots,rinMoved:true,read:q.flags['briefingRead-combat'],step:q.stepId};
   });await page.screenshot({path:`${out}/${name}-combat-resumed.png`});assert.deepEqual(errors,[]);
   const loot=await page.evaluate(()=>{
    const r=__VOID_PRIVATEER__.getRuntime(),q=r.save.quests.find(q=>q.id==='the-spare-key'),w=r.save.world.combatWrecks[q.flags.tutorialLootWreckId];
    if(r.ui.adventure?.conversationId!=='tutorial-loot')throw Error('Rin loot explanation did not open');
-   const item=w?.contents.find(e=>e.item?.rarity==='uncommon'&&e.item?.tier===1)?.item;if(!item)throw Error('No guaranteed green tier I loot');
+   const item=w?.contents.find(e=>e.item?.rarity==='uncommon'&&e.item?.tier===1)?.item;if(!item||item.baseId!=='seeker-launcher'||w.contents.length!==1)throw Error('Expected only the guaranteed green tier I missile launcher');
    const before=r.save.world.time;for(let i=0;i<5;i++){r.lastFrame=performance.now()-100;r.frame(performance.now());cancelAnimationFrame(r.frameId);}
    if(before!==r.save.world.time)throw Error('Loot explanation did not pause flight');
    return{wreck:w.id,item:item.id};

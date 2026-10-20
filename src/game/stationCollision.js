@@ -2,14 +2,15 @@ import * as THREE from 'three';
 
 // Static station surfaces, before docked ships, lights and traffic are added.
 // Keep concave hangar mouths and gaps; a station-wide box/sphere fills them in.
-export function buildStationCollider(model, origin) {
+function* stationColliderBuild(model, origin) {
     model.updateMatrixWorld(true);
     const triangles = [];
     const point = new THREE.Vector3();
-    model.traverse(mesh => {
-        if (!mesh.isMesh || !mesh.visible) return;
+    const meshes = [];
+    model.traverse(mesh => { if (mesh.isMesh && mesh.visible) meshes.push(mesh); });
+    for (const mesh of meshes) {
         const positions = mesh.geometry?.attributes.position;
-        if (!positions) return;
+        if (!positions) continue;
         const indices = mesh.geometry.index;
         const count = indices?.count ?? positions.count;
         for (let i = 0; i + 2 < count; i += 3) {
@@ -17,16 +18,20 @@ export function buildStationCollider(model, origin) {
                 point.fromBufferAttribute(positions, indices ? indices.getX(i + j) : i + j).applyMatrix4(mesh.matrixWorld);
                 triangles.push(point.x, point.y, point.z);
             }
+            if (i % 3072 === 3069) yield;
         }
-    });
+    }
     const vertices = new Float64Array(triangles);
     const order = Array.from({length:vertices.length / 9}, (_,i) => i);
     const nodes = [];
-    function branch(first, last) {
+    function* branch(first, last) {
         const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
-        for (let i = first; i < last; i++) for (let j = 0; j < 9; j++) {
-            const axis = j % 3, value = vertices[order[i] * 9 + j];
-            min[axis] = Math.min(min[axis], value); max[axis] = Math.max(max[axis], value);
+        for (let i = first; i < last; i++) {
+            for (let j = 0; j < 9; j++) {
+                const axis = j % 3, value = vertices[order[i] * 9 + j];
+                min[axis] = Math.min(min[axis], value); max[axis] = Math.max(max[axis], value);
+            }
+            if ((i - first) % 1024 === 1023) yield;
         }
         const index = nodes.length, node = {min, max, first, last, left:-1, right:-1};
         nodes.push(node);
@@ -35,14 +40,38 @@ export function buildStationCollider(model, origin) {
             const axis = span.indexOf(Math.max(...span));
             const centroid = i => vertices[i*9+axis] + vertices[i*9+3+axis] + vertices[i*9+6+axis];
             const sorted = order.slice(first,last).sort((a,b) => centroid(a)-centroid(b));
+            yield;
             for (let i=0;i<sorted.length;i++) order[first+i]=sorted[i];
             const middle = (first + last) >> 1;
-            node.left = branch(first,middle); node.right = branch(middle,last);
+            node.left = yield* branch(first,middle); node.right = yield* branch(middle,last);
         }
         return index;
     }
-    if (order.length) branch(0,order.length);
+    if (order.length) yield* branch(0,order.length);
     return {origin:[...origin],vertices,order:new Uint32Array(order),nodes,stack:new Uint32Array(nodes.length)};
+}
+
+// Tests/tools can build immediately. Flight streaming uses the identical
+// triangles and BVH, divided into short tasks instead of blocking input.
+export function buildStationCollider(model, origin) {
+    const build = stationColliderBuild(model, origin);
+    let next; do { next = build.next(); } while (!next.done);
+    return next.value;
+}
+const yieldMainThread = () => globalThis.scheduler?.yield?.() ?? new Promise(resolve => setTimeout(resolve, 0));
+export async function buildStationColliderAsync(model, origin, {budgetMs = 3, yieldTask = yieldMainThread, shouldCancel = () => false} = {}) {
+    const build = stationColliderBuild(model, origin);
+    let deadline = performance.now() + budgetMs;
+    while (!shouldCancel()) {
+        const next = build.next();
+        if (next.done) return next.value;
+        if (performance.now() >= deadline) {
+            await yieldTask();
+            deadline = performance.now() + budgetMs;
+        }
+    }
+    build.return();
+    return null;
 }
 
 const triangle = new THREE.Triangle();

@@ -36,3 +36,12 @@ test('learned travel instructions remain silent for a minute, nudge once and res
 test('automatic cruising, scanning and drone work do not produce instructional nudges',()=>{
  const {session,save,lines}=tutorialFixture('mine-shardbelt');save.player.dockedAt=undefined;for(const stage of ['cruise','recover-drones','mining','scan']){session.updateTutorialGuidance({key:`mine-shardbelt:${stage}`,speaker:'Rin',text:'No action needed'});save.world.time+=120;session.updateTutorialGuidance({key:`mine-shardbelt:${stage}`,speaker:'Rin',text:'No action needed'});}assert.ok(!lines.some(a=>a[1]==='No action needed'));
 });
+test('Rin opens the paused combat lesson four seconds after the pirate arrives',()=>{
+ const {session,save,quest}=tutorialFixture('raider-standoff');save.player.dockedAt=undefined;
+ quest.flags.standoffStartedAt=save.world.time;
+ session.ensureTutorialCompanion=()=>{};session.ensureTutorialEnemy=()=>{};
+ let briefings=0;session.playTutorialBriefing=id=>{assert.equal(id,'combat');briefings++;session.ui.isModalOpen=true;quest.flags['briefingShown-combat']=true;};
+ save.world.time+=3.99;session.updateTutorialCampaignRuntime();assert.equal(quest.stepId,'raider-standoff');assert.equal(briefings,0);
+ save.world.time+=.01;session.updateTutorialCampaignRuntime();assert.equal(quest.stepId,'defeat-raider');assert.equal(briefings,1);assert.equal(session.ui.isModalOpen,true);assert.equal(save.wingOrder,'defensive');
+ session.updateTutorialCampaignRuntime();assert.equal(briefings,1,'the lesson does not reopen');
+});

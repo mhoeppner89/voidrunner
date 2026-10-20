@@ -13,6 +13,7 @@ export const EQUIPMENT_STAT_FIELDS=[
  {key:'cargo',label:'Cargo capacity',effects:['cargoCapacity']},
  {key:'radarRange',label:'Radar range',unit:'km',effects:['radarMultiplier']},
  {key:'scanRange',label:'Scan range',unit:'km',effects:['scanMultiplier']},
+ {key:'lootRange',label:'Loot collection range',unit:'km',effects:['lootRange']},
  {key:'salvageRange',label:'Salvage range',unit:'km',effects:['salvageRange']},
  {key:'salvageRate',label:'Salvage rate',unit:'×',effects:['salvageRate']},
  {key:'burnFuelMultiplier',label:'Boost fuel use',unit:'%',scale:100,lowerBetter:true,effects:['burnFuelMultiplier']},
@@ -33,6 +34,6 @@ export function equipmentEffectStats(item){
   if(!effect)return [];
   const ratio=effect.endsWith('Multiplier')||effect==='salvageRate';
   const value=ratio?(item.effects[effect]-1)*100:item.effects[effect];
-  return [{key:field.key,label:field.label,value,unit:ratio?'%':['salvageRange'].includes(effect)?' km':''}];
+  return [{key:field.key,label:field.label,value,unit:ratio?'%':['salvageRange','lootRange'].includes(effect)?' km':''}];
  });
 }

@@ -19,11 +19,11 @@ test('combat-strength proxy uses full hull and equipment value, half cash, and n
     const breakdown = playerStrengthBreakdown(player);
     assert.equal(breakdown.shipValue, 105000);
     assert.equal(breakdown.installedEquipmentValue, 1620 + 6500 + 1800 + 4800 + 5400);
-    assert.equal(breakdown.storedEquipmentValue, 16400);
+    assert.equal(breakdown.storedEquipmentValue, 14850);
     assert.equal(breakdown.cashValue, 500);
     assert.equal(breakdown.cargoValue, 0);
-    assert.equal(breakdown.total, 142020);
-    assert.equal(playerStrengthValue(player), 142020);
+    assert.equal(breakdown.total, 140470);
+    assert.equal(playerStrengthValue(player), 140470);
     assert.equal(player.cargo.gold, 999, 'cargo remains outside the proxy and unchanged');
 });
 
@@ -39,7 +39,7 @@ test('legacy equipment is still valued without mutating the player save', () => 
     const before = JSON.stringify(player);
     const breakdown = playerStrengthBreakdown(player);
     assert.equal(breakdown.shipValue, 0);
-    assert.equal(breakdown.equipmentValue, 15920);
-    assert.equal(breakdown.total, 16020);
+    assert.equal(breakdown.equipmentValue, 16170);
+    assert.equal(breakdown.total, 16270);
     assert.equal(JSON.stringify(player), before);
 });

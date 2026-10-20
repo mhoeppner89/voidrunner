@@ -1,6 +1,6 @@
 import {equipmentRecord, equipmentBaseId,registerEquipmentDefinition,resolveEquipmentDefinition} from './equipmentCatalog.js';
 import { TURRET_LAYOUTS } from './turretLayouts.js';
-import { createDefaultDroneBays, droneBayLayoutFor, normalizeDroneBays, validateDroneBays } from './droneData.js';
+import { createDefaultDroneBays, droneBayLayoutFor, normalizeDroneBays, validateDroneBays, DRONE_TYPES } from './droneData.js';
 /*
  * Ship outfitting is deliberately kept independent from the dock UI and the
  * flight simulator.  A loadout is just a set of item ids in named hardpoint
@@ -13,9 +13,9 @@ import { createDefaultDroneBays, droneBayLayoutFor, normalizeDroneBays, validate
  */
 import { LOCATIONS, SHIPS } from './data.js';
 
-export const OUTFIT_CATEGORIES = Object.freeze(['gun', 'launcher', 'turret', 'power', 'drive', 'defense', 'utility']);
-// Generic item-id arrays only. droneBays contains physical-unit records and
-// must never enter item pricing, legacy equipment, or factory-item ledgers.
+export const OUTFIT_CATEGORIES = Object.freeze(['gun', 'launcher', 'turret', 'power', 'drive', 'defense', 'utility', 'drone']);
+// Generic item-id arrays only. The inventory adapter presents physical drone
+// units as equipment; keep their canonical fleet records out of these ledgers.
 export const LOADOUT_KEYS = Object.freeze(['guns', 'launchers', 'turrets', 'power', 'drive', 'defense', 'utility']);
 export const RESALE_RATE = 0.7;
 export const OUTFITTING_SCHEMA = 5;
@@ -51,6 +51,11 @@ const freezeItem = (item) => {
 // that replaced a historical id lets save migration and old UI callers keep
 // working without adding aliases to the 18-item shop roster.
 const itemRecords = [
+    ...Object.entries({mining:'Mining Drone',pdc:'PDC Drone',repair:'Repair Drone'}).map(([type,name])=>({
+        id:`${type}-drone`,name,category:'drone',droneType:type,price:DRONE_TYPES[type].replacementPrice,mass:1,
+        description:type==='mining'?'Extracts up to two units per trip.':type==='repair'?'Repairs your ship or friendlies within 200 km.':'Intercepts incoming missiles and defends your ship.',
+        effects:{},availability:[],
+    })),
     { id:'tracking-turret', name:"Laser Turret", category:'turret', size:'S', sizes:['S','M'], price:4200,
       description:'Instant supporting fire at your selected hostile within 300 km. Reserves energy for forward guns; the hull limits its firing arc.', stat:'300 km · 4.8 damage · 4 energy · 0.7 s interval',
       turretKind:'laser',effects:{turretKind:'laser'},availability:['helix','rook','vesper'],art:'./art/outfitting/pulse-cannon.webp' },
@@ -65,7 +70,7 @@ const itemRecords = [
       effects:{shieldMultiplier:0.9,rechargeMultiplier:1.4},availability:['helix','rook','vesper'],art:'./art/outfitting/shield-mk2.webp' },
     {
         id: 'beam-emitter', name: "Beam Laser Cannon", category: 'gun', size: 'S', sizes: ['S', 'M'],
-        price: 2400, energyCost: 3.5, weaponId: 'beam', factoryFit: true,
+        price: 2400, energyCost: 3.5, weaponId: 'beam',
         description: "Instant beam pulses make aiming easy. Moderate damage and efficient sustained fire; 350 km range.", stat: '350 km · 10.4 damage · 3.5 energy · 0.4 s interval',
         effects: {weaponId: 'beam'}, availability: ['helix', 'rook', 'vesper'],
         art: './art/outfitting/ion-blaster.webp',
@@ -192,6 +197,13 @@ const itemRecords = [
         requiredGuild: 'merchant', requiredRank: 1, art: './art/outfitting/cargo-pods.webp',
     },
     {
+        id: 'loot-collector', name: 'Loot Collector', category: 'utility', size: 'S', sizes: ['S', 'M'],
+        price: 4000, mass: 2,
+        description: 'Automatically beams loose cargo and dropped equipment into the hold. Clear line of sight and cargo space required. The strongest fitted collector determines range.',
+        stat: '150 / 200 / 250 km collection range', effects: { lootRange: 150 }, availability: ['helix', 'vesper', 'rook'],
+        art: './art/outfitting/salvage-mk2.webp',
+    },
+    {
         id: 'salvage-mk2', name: "Salvage Tractor", category: 'utility', size: 'M', sizes: ['M'],
         price: 8100,
         description: 'A phase-locked tractor that holds unstable wreckage together while it is pulled aboard.', stat: '+70% salvage rate · 170u range',
@@ -263,7 +275,7 @@ export const HULL_HARDPOINTS = freeze({
 });
 export const HARDPOINT_SPECS = HULL_HARDPOINTS;
 export const UNIQUE_OUTFIT_IDS = freeze(['radar-mk2', 'salvage-mk2']);
-const FACTORY_BASELINE_IDS = freeze(['pulse-cannon', 'gauss-cannon', 'seeker-launcher', 'beam-emitter']);
+const FACTORY_BASELINE_IDS = freeze(['pulse-cannon', 'gauss-cannon', 'seeker-launcher']);
 
 const categoryKey = (category) => category === 'gun' ? 'guns' : category === 'launcher' ? 'launchers' : category === 'turret' ? 'turrets' : ['power','drive','defense'].includes(category)?'utility':category;
 const canonicalId = (id) => LEGACY_OUTFIT_ID_MAP[id] ?? id;
@@ -1124,6 +1136,7 @@ export const quoteOutfitting = (player = {}, shipId = player.shipId, draft, opti
     const requested = normalizeLoadout(shipId, supplied);
     const explicitPurchases = normalizeCountMap(safeOptions.purchases ?? safeOptions.buy);
     const explicitSales = normalizeCountMap(safeOptions.sales ?? safeOptions.sell);
+    if(Object.entries(explicitSales).some(([id,n])=>n>0&&equipmentBaseId(id)==='beam-emitter')&&!requested.guns.some(id=>itemFor(id)?.category==='gun'&&!itemFor(id)?.effects?.ammoId))return {ok:false,code:'last-ammo-free-weapon',errors:[{code:'last-ammo-free-weapon'}],shipId};
     // Price the staged fit before anything can refuse it. Every refusal below
     // reports this number, because the dock labels its install control from it:
     // while it was missing, a 5.400 cr purchase behind a quote that failed for

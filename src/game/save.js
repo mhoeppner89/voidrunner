@@ -88,7 +88,7 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             shield: SHIPS.wayfarer.shield,
             hull: SHIPS.wayfarer.hull,
             energy: SHIPS.wayfarer.energyCapacity,
-            missiles: 4,
+            missiles: 0,
             launcherMagazines: {},
             activeLauncherMountId: null,
             // Active primary weapon + per-weapon ammo pools. hydrateSave
@@ -196,6 +196,9 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
         quests: [],
         settings: defaultSettings(),
     };
+    // The first career launcher comes from the tutorial pirate's salvage.
+    save.player.outfitting.loadouts.wayfarer.launchers.fill(null);
+    save.player.outfitting.factory.wayfarer.launchers.fill(false);
     save.player.droneFleet = normalizeDroneFleet(undefined, save.player.outfitting.loadouts, { grantInitial: true, activeShipId: save.player.shipId });
     normalizeEquipmentInventory(save.player);
     normalizeLauncherMagazines(save.player, { fill: true });

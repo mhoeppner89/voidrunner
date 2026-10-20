@@ -91,6 +91,7 @@ export const EQUIPMENT_NAMING = {
       "en": "Cargo Expansion",
       "de": "Frachterweiterung"
     },
+    "loot-collector": {"en": "Loot Collector", "de": "Beutesammler"},
     "salvage-mk2": {
       "en": "Salvage Tractor",
       "de": "Bergungstraktor"

@@ -1,3 +1,4 @@
+import {stabilizeMaterialNormals as stabilizeConcourseNormals} from './materialNormals.js';
 import * as THREE from 'three';
 import {loadPreviewGlb,disposeObject} from './shipPreview.js';
 import {GLB_SHIP_CONFIG,stationOccupantScale} from './render.js';
@@ -9,6 +10,7 @@ import {ConcourseReflection} from './concourseReflection.js';
 import {ConcourseDeck,concourseGroundFade} from './concourseDeck.js';
 import {CONCOURSE_LAYOUTS} from './concourseLayouts.js';
 import {pixelRenderSize} from './retroDisplay.js';
+import {configureShaderDiagnostics,prepareRenderScene,warmRenderBuffers,waitForRenderWork} from './renderWork.js';
 
 // One bounded renderer, reused between dock screens. Composite the painted
 // plate with the owned hull, exhaust, shadow and floor reflection on one grid.
@@ -58,29 +60,21 @@ export function frameConcourseCamera(camera,width,height,x,y,fullWidth,fullHeigh
  out.top=(camera.top+camera.bottom+sy)/2+y/height*sy;out.bottom=out.top-fullHeight/height*sy;
  out.zoom=1;out.updateProjectionMatrix();out.updateMatrixWorld();return out;
 }
-// Collapsed UVs can produce a zero/undefined tangent-space normal at a few
-// pixels. Keep the geometric normal there instead of contaminating HDR and
-// magnifying those pixels through the floor reflection filter.
-const SAFE_NORMAL_MAPS=THREE.ShaderChunk.normal_fragment_maps.replace('normal = normalize( tbn * mapN );',`vec3 mappedNormal=tbn*mapN;
- float mappedLength=dot(mappedNormal,mappedNormal);
- normal=mappedLength>1e-8&&mappedLength<1e8?mappedNormal*inversesqrt(mappedLength):normal;`);
-export function stabilizeConcourseNormals(material){
- if(!material.normalMap||material.userData.concourseNormals)return;
- material.userData.concourseNormals=true;
- const compile=material.onBeforeCompile,key=material.customProgramCacheKey();
- material.onBeforeCompile=(shader,renderer)=>{compile.call(material,shader,renderer);shader.fragmentShader=shader.fragmentShader.replace('#include <normal_fragment_maps>',SAFE_NORMAL_MAPS);};
- material.customProgramCacheKey=()=>key+'-concourse-normal-v1';
-}
+export {stabilizeMaterialNormals as stabilizeConcourseNormals} from './materialNormals.js';
 export class ConcourseShip {
  constructor(){
   this.touchDevice=matchMedia('(pointer:coarse)').matches;
   this.motionQuery=matchMedia('(prefers-reduced-motion: reduce)');this.reducedMotion=this.motionQuery.matches;
   this.onMotion=()=>{this.reducedMotion=this.motionQuery.matches;if(!this.paused)this.resume();};this.motionQuery.addEventListener('change',this.onMotion);
-  this.renderer=new THREE.WebGLRenderer({alpha:true,antialias:false,stencil:false,powerPreference:'low-power'});
+  // The canvas receives only the final full-screen quad. The HDR scene and
+  // reflection targets own their depth buffers; the canvas needs colour only.
+  this.renderer=new THREE.WebGLRenderer({alpha:true,antialias:false,depth:false,stencil:false,powerPreference:'low-power'});
+  configureShaderDiagnostics(this.renderer);
   this.renderer.setPixelRatio(1);this.renderer.setClearColor(0,0);this.renderer.outputColorSpace=THREE.SRGBColorSpace;
   this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFShadowMap;this.renderer.shadowMap.autoUpdate=false;
   this.canvas=this.renderer.domElement;this.canvas.className='concourse-ship-canvas';this.canvas.setAttribute('aria-hidden','true');
   this.scene=new THREE.Scene();this.pivot=new THREE.Group();this.scene.add(this.pivot);
+  this.scene.matrixAutoUpdate=false;
   this.camera=new THREE.OrthographicCamera(-6,6,4.5,-4.5,.1,80);this.camera.position.set(7,5,-9);this.camera.lookAt(0,0,0);this.renderCamera=new THREE.OrthographicCamera();
   this.hemi=new THREE.HemisphereLight(0xb6ceef,0x263443,2);this.scene.add(this.hemi);
   this.sun=new THREE.DirectionalLight(0xe6efff,3.1);this.sun.position.set(-3.5,7,-4.5);this.sun.castShadow=true;
@@ -105,14 +99,19 @@ export class ConcourseShip {
   this.canvas.addEventListener('webglcontextlost',this.onLost);this.canvas.addEventListener('webglcontextrestored',this.onRestored);
  }
  attach(host,button){
+  this.pendingDockAttach=undefined;
+  // Moving the reused canvas also moves its last pixels. Keep those hidden
+  // until a complete frame for the new host has actually been drawn.
+  this.canvas.style.visibility='hidden';
   if(this.host!==host){if(this.host)this.resizeObserver.unobserve(this.host);this.host=host;this.resizeObserver.observe(host);}
   this.outputHost=this.transit?host:host.closest('#dock-screen')?.querySelector('.dock-backdrop')??host;
   this.outputHost.append(this.canvas);this.canvas.classList.toggle('is-concourse-composite',this.outputHost!==host);
   this.button=button;host.classList.toggle('has-model',!!this.model);this.resize();
  }
  async configure(shipId,variant,options,location){
+  const locationChanged=this.location!==location;
   this.setLocation(location);if(this.profile&&location&& !['vesper','azure','meridian-prime','boreal'].includes(location))void this.prepareStation(location).catch(()=>{});const key=JSON.stringify([shipId,options.paint,options.fit,options.fleet]);
-  if(this.key===key)return this.ready;
+  if(this.key===key){const ready=await this.ready;if(ready&&locationChanged&&!this.transit)return this.prepareDockScene();return ready;}
   this.key=key;const generation=++this.generation;this.host?.classList.remove('has-model');
   this.ready=(async()=>{
    const model=await loadPreviewGlb(variant,options);
@@ -136,8 +135,24 @@ export class ConcourseShip {
    // Include socket glows in screen fitting, but use the solid hull alone
    // for deck clearance so the approved resting height stays unchanged.
    this.framingBounds=new THREE.Box3().setFromObject(assembly);this.setLayout(this.profile);this.pivot.add(assembly);
-   this.loadedShipId=shipId;this.loadedVariant=variant;this.host?.classList.add('has-model');this.renderer.shadowMap.needsUpdate=true;this.reflection.dirty=true;this.resetPose();this.resize();if(!this.paused)this.resume();return true;
+   this.loadedShipId=shipId;this.loadedVariant=variant;this.host?.classList.add('has-model');this.renderer.shadowMap.needsUpdate=true;this.reflection.dirty=true;this.resetPose();
+   await this.prepareDockScene();if(!this.paused)this.resume();
+   // A cancelled warmup does not discard the loaded model or poison the
+   // reusable model promise for a later dock visit.
+   return !this.disposed&&generation===this.generation&&!!this.model;
   })();return this.ready;
+ }
+ async prepareDockScene(){
+  const token=this.dockPreparing={},generation=this.transitGeneration;
+  try{
+   // Use the final painted plate's reflected light before compiling the hull,
+   // floor and mirror programs. Resize must not draw a partially prepared view.
+   const image=this.host?.closest('#dock-screen')?.querySelector('.dock-backdrop img');
+   this.setBackdrop(image);this.resize();
+   await prepareRenderScene(this.renderer,this.scene,this.renderCamera,this.target,{shouldCancel:()=>this.disposed||this.contextLost||this.dockPreparing!==token||this.transitGeneration!==generation});
+   if(this.disposed||this.contextLost||this.dockPreparing!==token||this.transitGeneration!==generation)return false;
+  }finally{if(this.dockPreparing===token)this.dockPreparing=undefined;}
+  this.render();return true;
  }
  makeGlow(){const c=document.createElement('canvas');c.width=c.height=32;const ctx=c.getContext('2d'),g=ctx.createRadialGradient(16,16,0,16,16,16);g.addColorStop(0,'white');g.addColorStop(.15,'#c0f6ff');g.addColorStop(.4,'#408bdc');g.addColorStop(1,'transparent');ctx.fillStyle=g;ctx.fillRect(0,0,32,32);const t=new THREE.CanvasTexture(c);t.userData.shared=true;return t;}
  setLocation(id){
@@ -165,7 +180,18 @@ export class ConcourseShip {
   ctx.save();ctx.translate(128,0);ctx.scale(-1,1);ctx.drawImage(image,0,0,image.naturalWidth,image.naturalHeight,0,0,64,64);ctx.restore();
   this.backdropKey=key;this.replaceEnvironment(c);this.backdropTexture?.dispose();
   this.backdropTexture=new THREE.Texture(image);this.backdropTexture.magFilter=THREE.NearestFilter;this.backdropTexture.minFilter=THREE.NearestFilter;this.backdropTexture.generateMipmaps=false;this.backdropTexture.needsUpdate=true;
-  this.finish.uniforms.tBackdrop.value=this.backdropTexture;this.finish.uniforms.uHasBackdrop.value=1;if(!this.transit)this.render();
+  this.finish.uniforms.tBackdrop.value=this.backdropTexture;this.finish.uniforms.uHasBackdrop.value=1;if(!this.transit&&!this.paused)this.render();
+ }
+ resizeOutput(width,height,scale){
+  // Keep the default drawing buffer through dock/film switches. Changing its
+  // dimensions can block the driver even when queued work has already ended.
+  // Only the active viewport is drawn; CSS places its top edge at the host's
+  // top edge, retaining the exact old integer pixel scale and crop.
+  const capacityWidth=Math.max(width,this.touchDevice?768:960),capacityHeight=Math.max(height,this.touchDevice?480:600);
+  if(this.canvas.width!==capacityWidth||this.canvas.height!==capacityHeight)this.renderer.setSize(capacityWidth,capacityHeight,false);
+  this.target.setSize(width,height);
+  this.canvas.style.width=`${capacityWidth*scale}px`;this.canvas.style.height=`${capacityHeight*scale}px`;
+  this.canvas.style.transform=`translateY(${(height-capacityHeight)*scale}px)`;this.canvas.dataset.pixelScale=String(scale);
  }
  resize(){
   if(!this.host?.isConnected||this.disposed||!this.host.clientWidth||!this.host.clientHeight||(this.transit&&window.innerHeight>window.innerWidth))return;
@@ -174,8 +200,7 @@ export class ConcourseShip {
   const maxWidth=this.transit?(this.touchDevice?640:768):(this.touchDevice?768:960),maxHeight=this.transit?480:(this.touchDevice?432:600);
   const desiredWidth=Math.min(maxWidth,output.width*maxHeight/output.height);
   const {width:w,height:h,scale}=pixelRenderSize(output.width,output.height,desiredWidth);
-  this.canvas.style.width=`${w*scale}px`;this.canvas.style.height=`${h*scale}px`;this.canvas.dataset.pixelScale=String(scale);
-  if(this.canvas.width!==w||this.canvas.height!==h){this.renderer.setSize(w,h,false);this.target.setSize(w,h);}
+  this.resizeOutput(w,h,scale);
   this.sceneViewport.set(0,0,w,h);this.deck.uniforms.uDeckResolution.value.set(w,h);
   const aspect=width/height;if(this.transit)this.transit.resize(aspect);else{this.camera.left=-4.5*aspect;this.camera.right=4.5*aspect;this.camera.zoom=this.placementZoom??1;this.camera.updateProjectionMatrix();}
   this.originX=r.left-parent.left;this.originY=r.top-parent.top;this.cssWidth=width;this.cssHeight=height;this.clipWidth=parent.width;this.clipHeight=parent.height;
@@ -192,7 +217,9 @@ export class ConcourseShip {
    this.camera.zoom=THREE.MathUtils.clamp(fit,.2,1);this.camera.updateProjectionMatrix();this.reflection.dirty=true;
   }
   if(!this.transit){frameConcourseCamera(this.camera,width,height,r.left-output.left,r.top-output.top,output.width,output.height,this.renderCamera);this.reflection.dirty=true;this.refreshFlightPath();}
-  if(this.model)this.render();
+  // Mounting the next dock starts paused: its old hull, lighting and backdrop
+  // need not be redrawn before configure/prepareDockScene replaces them.
+  if(this.model&&!this.paused)this.render();
  }
  refreshFlightPath(){
   if(!this.framingBounds||!this.renderCamera)return;
@@ -239,7 +266,7 @@ export class ConcourseShip {
   this.pivot.scale.setScalar(p.scale);this.deckClearance=p.y;
   for(const glow of this.glows){glow.material.opacity=p.thrust*.75;glow.scale.setScalar(.1+p.thrust*.18);}}
  render(){
-  if(this.disposed||this.contextLost||!this.model)return;
+  if(this.disposed||this.contextLost||!this.model||this.dockPreparing||this.transitPreparing)return;
   const view=this.transit??this;
   const waiting=!this.transit&&this.waitingArrival;
   if(!this.transit&&!waiting){
@@ -263,7 +290,8 @@ export class ConcourseShip {
   this.target.viewport.copy(this.sceneViewport);this.renderer.setRenderTarget(this.target);
   try{this.renderer.render(view.scene,this.transit?view.camera:this.renderCamera);}
   finally{this.pivot.visible=pivotVisible;this.ground.visible=groundVisible;this.reflection.plane.visible=reflectionVisible;}
-  this.renderer.setRenderTarget(null);this.renderer.setViewport(0,0,this.canvas.width,this.canvas.height);this.renderer.render(this.quad,this.quadCamera);
+  this.renderer.setRenderTarget(null);this.renderer.setViewport(0,0,this.sceneViewport.z,this.sceneViewport.w);this.renderer.render(this.quad,this.quadCamera);
+  this.canvas.style.visibility='';
   if(!this.transit&&this.outputHost!==this.host)this.outputHost.classList.toggle('has-concourse-composite',this.finish.uniforms.uHasBackdrop.value>0);this.renderCount=(this.renderCount??0)+1;
   if(!this.transit&&this.button&&this.phase!=='takeoff'){
    this.bounds.setFromObject(this.pivot);this.camera.updateMatrixWorld();let x0=1,y0=1,x1=-1,y1=-1;
@@ -295,22 +323,57 @@ export class ConcourseShip {
    shot.configure(this.pivot,this.scene.environment,location,direction,data);
   }
   shot.origin=origin;this.transit=shot;
-  this.renderer.shadowMap.enabled=false;this.finish.uniforms.uExposure.value=1.1;this.attach(host,null);
-  try{return await this.animate(direction,canStart);}
-  finally{if(this.transit===shot&&this.transitGeneration===generation){this.stop();this.endAtmosphere();}}
+  const preparing=this.transitPreparing={skipped:false};
+  let completed=false;
+  try{
+   // Resizing the drawing buffer can otherwise wait synchronously for the
+   // previous dock frame. Drain that queue without blocking input first.
+   await waitForRenderWork(this.renderer,{shouldCancel:()=>this.disposed||this.contextLost||this.transitGeneration!==generation||preparing.skipped});
+   if(this.disposed||this.contextLost||this.transitGeneration!==generation)return false;
+   if(preparing.skipped){completed=true;return true;}
+   this.renderer.shadowMap.enabled=false;this.finish.uniforms.uExposure.value=1.1;this.attach(host,null);
+   await prepareRenderScene(this.renderer,shot.scene,shot.camera,this.target,{shouldCancel:()=>this.disposed||this.contextLost||this.transitGeneration!==generation||preparing.skipped});
+   if(this.disposed||this.contextLost||this.transitGeneration!==generation)return false;
+   if(preparing.skipped){completed=true;return true;}
+   this.transitWarmupTarget??=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType});
+   warmRenderBuffers(this.renderer,shot.scene,shot.camera,this.transitWarmupTarget);
+   await waitForRenderWork(this.renderer,{shouldCancel:()=>this.disposed||this.contextLost||this.transitGeneration!==generation||preparing.skipped});
+   if(this.disposed||this.contextLost||this.transitGeneration!==generation)return false;
+   if(preparing.skipped){completed=true;return true;}
+   this.transitPreparing=undefined;
+   completed=await this.animate(direction,canStart);
+   if(completed&&direction==='entry'){
+    // Returning to the dock changes the buffer size too. The final film draw
+    // must finish before that resize, just like the dock draw on the way in.
+    this.transitPreparing=preparing;
+    await waitForRenderWork(this.renderer,{shouldCancel:()=>this.disposed||this.contextLost||this.transitGeneration!==generation||preparing.skipped});
+    if(this.disposed||this.contextLost||this.transitGeneration!==generation)return false;
+   }
+   return completed;
+  }
+  finally{if(this.transitPreparing===preparing)this.transitPreparing=undefined;if(this.transit===shot&&this.transitGeneration===generation){this.stop();this.endAtmosphere({deferDock:direction==='exit'&&completed});}}
  }
- endAtmosphere(){
+ endAtmosphere({deferDock=false}={}){
   const shot=this.transit;if(!shot)return;this.transit=undefined;this.transitGeneration++;
   this.scene.add(this.pivot);shot.release();this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.needsUpdate=true;
   this.finish.uniforms.uExposure.value=concourseLighting(this.location).exposure;this.finish.uniforms.uFade.value=1;
   this.resetPose();
-  if(!this.disposed&&shot.origin.host?.isConnected)this.attach(shot.origin.host,shot.origin.button);
-  const pending=this.pendingBackdrop;this.pendingBackdrop=undefined;if(pending?.isConnected&&!this.disposed)this.setBackdrop(pending);
+  const pending=this.pendingBackdrop;this.pendingBackdrop=undefined;
+  if(deferDock&&!this.disposed)this.pendingDockAttach={...shot.origin,backdrop:pending};
+  else{
+   if(!this.disposed&&shot.origin.host?.isConnected)this.attach(shot.origin.host,shot.origin.button);
+   if(pending?.isConnected&&!this.disposed)this.setBackdrop(pending);
+  }
  }
- skipAtmosphere(){if(this.transit){this.stop();this.finishAnimation(true);}}
+ skipAtmosphere(){if(this.transit){if(this.transitPreparing)this.transitPreparing.skipped=true;this.stop();this.finishAnimation(true);}}
  animate(phase,canStart){this.finishAnimation(false);this.phase=phase;this.phaseStart=undefined;this.elapsed=0;this.canStart=canStart;if(!this.transit){this.waitingArrival=false;this.reflection.dirty=true;this.renderer.shadowMap.needsUpdate=true;}const pose=this.transit?this.transit.update(0):concoursePose(phase,0,0,this.flightPath);this.applyPose(pose);this.finish.uniforms.uFade.value=pose.fade??1;this.render();this.resume();return new Promise(resolve=>{this.animationResolve=resolve;});}
  finishAnimation(result){this.stopAnimationSound();const resolve=this.animationResolve;this.animationResolve=undefined;if(resolve)resolve(result);this.phase='idle';this.phaseStart=undefined;}
- resume(){this.paused=false;if(this.disposed||this.contextLost||document.hidden||this.raf)return;this.budget.reset();this.raf=requestAnimationFrame(this.tick);}
+ resume(){this.paused=false;if(this.disposed||this.contextLost||document.hidden||this.raf)return;
+  // A completed exit goes straight to the cockpit. Restore the dock only if
+  // a refused launch or another explicit resume actually needs that view.
+  const pending=this.pendingDockAttach;
+  if(pending){this.pendingDockAttach=undefined;if(pending.host?.isConnected){this.attach(pending.host,pending.button);if(pending.backdrop?.isConnected)this.setBackdrop(pending.backdrop);}}
+  this.budget.reset();this.raf=requestAnimationFrame(this.tick);}
  stopAnimationSound(){if(this.soundActive){this.onAnimationSound?.('stop');this.soundActive=false;}}
  stop(){if(this.raf)cancelAnimationFrame(this.raf);this.raf=0;this.stopAnimationSound();}
  pause(){this.paused=true;this.transitGeneration=(this.transitGeneration??0)+1;this.stop();this.finishAnimation(false);this.endAtmosphere();}
@@ -333,6 +396,6 @@ export class ConcourseShip {
   }this.raf=requestAnimationFrame(this.tick);
  };
  dispose(){if(this.disposed)return;this.disposed=true;this.pause();this.outputHost?.classList.remove('has-concourse-composite');this.generation++;this.resizeObserver.disconnect();if(this.resizeFrame)cancelAnimationFrame(this.resizeFrame);window.removeEventListener('resize',this.onViewportResize);window.visualViewport?.removeEventListener('resize',this.onViewportResize);document.removeEventListener('visibilitychange',this.onVisibility);this.motionQuery.removeEventListener('change',this.onMotion);this.canvas.removeEventListener('webglcontextlost',this.onLost);this.canvas.removeEventListener('webglcontextrestored',this.onRestored);
-  this.atmosphereView?.dispose();this.stationView?.dispose();this.reflection.dispose();for(const glow of this.glows)glow.material.dispose();if(this.model)disposeObject(this.model);this.ground.geometry.dispose();this.ground.material.dispose();this.sun.shadow.map?.dispose();this.scene.environment?.dispose();this.exhaustTexture?.dispose();this.backdropTexture?.dispose();this.target.dispose();this.finish.dispose();this.quad.geometry.dispose();this.renderer.dispose();this.canvas.remove();
+  this.atmosphereView?.dispose();this.stationView?.dispose();this.transitWarmupTarget?.dispose();this.reflection.dispose();for(const glow of this.glows)glow.material.dispose();if(this.model)disposeObject(this.model);this.ground.geometry.dispose();this.ground.material.dispose();this.sun.shadow.map?.dispose();this.scene.environment?.dispose();this.exhaustTexture?.dispose();this.backdropTexture?.dispose();this.target.dispose();this.finish.dispose();this.quad.geometry.dispose();this.renderer.dispose();this.canvas.remove();
  }
 }

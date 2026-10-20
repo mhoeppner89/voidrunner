@@ -33,7 +33,7 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heig
   });assert.deepEqual(stationary.after,stationary.before);assert.deepEqual(stationary.rendered,stationary.before);assert.deepEqual(stationary.cargoAfter,stationary.cargoBefore);
   await page.screenshot({path:`${out}/${name}-all-rarities.png`});
   const downgraded=await page.evaluate(()=>{
-   const r=__VOID_PRIVATEER__.getRuntime(),p=r.save.player,c=lootCases[2],w=r.save.world.combatWrecks[c.id],node=r.wreckNodes.find(n=>n.id===c.id);p.position.splice(0,3,w.position[0],w.position[1],w.position[2]+45);r.resetPlayerInterpolation(true);r.selectTarget('wreck',c.id);r.autoScanTarget();
+   const r=__VOID_PRIVATEER__.getRuntime(),p=r.save.player,c=lootCases[2],w=r.save.world.combatWrecks[c.id],node=r.wreckNodes.find(n=>n.id===c.id);p.position.splice(0,3,w.position[0],w.position[1],w.position[2]+2);r.resetPlayerInterpolation(true);r.selectTarget('wreck',c.id);r.autoScanTarget();
    const results=[];for(const rarity of ['rare','uncommon']){const item=w.contents.find(e=>e.item?.rarity===rarity);const result=r.inventoryCommand('recover',{wreckId:w.id,id:item.id});if(!result.ok)throw Error(result.code);r.syncRender(0,performance.now());const root=r.renderer.combatLootMeshes.get(c.id);results.push({rarity:node.lootRarity,rendered:root.userData.lootRarity,colour:root.userData.lootFace.material.color.getHexString()});}
    r.ui.updateHud(r.buildHudModel());return results;
   });assert.deepEqual(downgraded.map(x=>x.rarity),['uncommon','common']);assert.deepEqual(downgraded.map(x=>x.colour),['72df95','f1f4f7']);await page.screenshot({path:`${out}/${name}-remaining-common.png`});

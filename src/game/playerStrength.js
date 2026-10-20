@@ -1,5 +1,6 @@
 import { SHIPS } from './data.js';
 import { LOADOUT_KEYS, OUTFIT_ITEMS, normalizeOutfitting } from './outfitting.js';
+import {DRONE_TYPES,droneInventoryId} from './droneData.js';
 
 // This is deliberately a readable proxy, not a second combat formula. Hulls
 // and modules keep their shop prices; cash contributes only half because it
@@ -46,8 +47,14 @@ export const playerStrengthBreakdown = (player = {}) => {
         for (let index = 0; index < Math.max(0, Math.floor(positiveNumber(count))); index += 1)
             stored.push(id);
     }
-    const installedEquipmentValue = equipmentValue(installed);
-    const storedEquipmentValue = equipmentValue(stored);
+    const installedDrones=new Set(Object.values(state.loadouts??{}).flatMap(fit=>(fit.droneBays??[]).flatMap(bay=>bay.unitIds).filter(Boolean)));
+    let droneInstalled=0,droneStored=0;
+    for(const unit of Object.values(player.droneFleet?.unitsById??{}))if(unit.hull>0&&unit.state!=='destroyed'){
+        const value=positiveNumber(OUTFIT_ITEMS[droneInventoryId(unit.id)]?.price??DRONE_TYPES[unit.type]?.replacementPrice);
+        if(installedDrones.has(unit.id))droneInstalled+=value;else droneStored+=value;
+    }
+    const installedEquipmentValue = equipmentValue(installed)+droneInstalled;
+    const storedEquipmentValue = equipmentValue(stored)+droneStored;
     const equipmentValueTotal = installedEquipmentValue + storedEquipmentValue;
     const cash = positiveNumber(player?.credits);
     const cashValue = cash * PLAYER_STRENGTH_WEIGHTS.cash;

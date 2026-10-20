@@ -1,3 +1,4 @@
+import {stabilizeMaterialNormals} from './materialNormals.js';
 import * as THREE from 'three';
 import {FRIGATE_MOUNTS,FRIGATE_ENGINE_MOUNTS,FRIGATE_TORPEDO_LAYOUT} from './frigateMounts.js';
 // Equipment is built in world-sized ship coordinates, shared by game and review.
@@ -79,7 +80,7 @@ export function setFrigateComponentDamage(root,health,maxHealth){
  for(const o of root.userData.visualParts){
   o.userData.healthyMaterial??=o.material;
   if(!destroyed){if(o.userData.damageMaterial){o.userData.damageMaterial.dispose();delete o.userData.damageMaterial;}o.material=o.userData.healthyMaterial;continue;}
-  const m=o.userData.damageMaterial??=o.userData.healthyMaterial.clone();m.userData.shared=false;o.material=m;
+  const m=o.userData.damageMaterial??=o.userData.healthyMaterial.clone();m.userData.shared=false;stabilizeMaterialNormals(m);o.material=m;
   m.color.copy(o.userData.healthyMaterial.color).multiplyScalar(.3);m.roughness=.92;m.emissive.copy(o.userData.healthyMaterial.emissive);m.emissiveIntensity=0;
  }
  if(root.userData.scars)root.userData.scars.visible=destroyed;

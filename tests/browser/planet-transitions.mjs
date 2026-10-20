@@ -59,7 +59,7 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
    await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.startVesperLaunchTransition());await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime().ui.concourseShip.phase==='exit');
    await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.cancelVesperLaunchTransition());await page.waitForTimeout(100);assert.equal(await page.locator('.planet-transit').count(),0);assert.ok(await page.locator('.concourse-hover-ship').isEnabled());
    // Reusing the same shot never accumulates geometry or textures.
-   const memory=await page.evaluate(async()=>{const v=__VOID_PRIVATEER__.getRuntime().ui.concourseShip,host=v.host,memories=[];for(let i=0;i<3;i++){const done=v.playAtmosphere(host,'entry','vesper',undefined);v.stop();v.applyPose(v.transit.update(.5));v.render();memories.push({...v.renderer.info.memory});v.skipAtmosphere();await done;}v.resume();return memories;});
+   const memory=await page.evaluate(async()=>{const v=__VOID_PRIVATEER__.getRuntime().ui.concourseShip,host=v.host,memories=[];for(let i=0;i<3;i++){const done=v.playAtmosphere(host,'entry','vesper',undefined);while(v.transitPreparing)await new Promise(resolve=>setTimeout(resolve,10));v.stop();v.applyPose(v.transit.update(.5));v.render();memories.push({...v.renderer.info.memory});v.skipAtmosphere();await done;}v.resume();return memories;});
    assert.deepEqual(memory[1],memory[2],'repeat shots reuse GPU resources');
    if(name==='desktop'){
     await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.startVesperLaunchTransition());await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime().ui.concourseShip.phase==='exit');

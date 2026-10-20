@@ -449,8 +449,9 @@ export async function addStationOccupants(station, id, load = loadGlb, shipScale
     const steel=new THREE.MeshStandardMaterial({color:0x34434b,roughness:.7,metalness:.5});
     const gold=new THREE.MeshStandardMaterial({color:0xa98030,roughness:.65,metalness:.3});
     const light=new THREE.MeshStandardMaterial({color:0xbce8ec,emissive:0x83c8d5,emissiveIntensity:.8});
+    const fixtures=new Map();
     const box=(name,position,size,material)=>{
-        const m=new THREE.Mesh(new THREE.BoxGeometry(...size),material);m.name=name;m.position.set(...position);group.add(m);return m;
+        const parts=fixtures.get(material)??[];fixtures.set(material,parts);parts.push({name,position,size});
     };
     const templates = new Map();
     for(const item of spec.ships){
@@ -496,6 +497,16 @@ export async function addStationOccupants(station, id, load = loadGlb, shipScale
                 box('Active repair light',[xx-side*.35,z+lift+size.y*.35+1.8,zz],[.18,.18,.5],light);
             }
         }
+    }
+    // Cradles and gantries are static, untextured boxes with three finishes.
+    // One unit box per finish keeps their exact dimensions and shading while
+    // replacing up to 42 separate geometry buffers and draw calls.
+    const matrix=new THREE.Matrix4(),position=new THREE.Vector3(),scale=new THREE.Vector3(),rotation=new THREE.Quaternion();
+    for(const [material,parts]of fixtures){
+        const mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(),material,parts.length);
+        mesh.name='Dock service fixtures';mesh.userData.fixtures=parts;
+        for(let i=0;i<parts.length;i++)mesh.setMatrixAt(i,matrix.compose(position.fromArray(parts[i].position),rotation,scale.fromArray(parts[i].size)));
+        mesh.computeBoundingBox();mesh.computeBoundingSphere();group.add(mesh);
     }
     group.updateMatrixWorld(true);station.add(group);
     return group;

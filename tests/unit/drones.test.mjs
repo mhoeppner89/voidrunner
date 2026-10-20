@@ -95,7 +95,7 @@ for (const shipId of ['talon', 'vanguard', 'lancer', 'blade'])
     assert.equal(droneBayLayoutFor(shipId).length, 0, `${shipId} has no drone bays`);
 assert.deepEqual(droneBayLayoutFor('wayfarer').map((bay) => bay.bayId), ['drone-1']);
 assert.deepEqual(droneBayLayoutFor('prospector').map((bay) => bay.bayId), ['drone-1', 'drone-2', 'drone-3']);
-assert.equal(DRONE_BAY_CAPACITY.mining, 2, 'a mining bay has two slots');
+assert.equal(DRONE_BAY_CAPACITY.mining, 1, 'every bay has one physical drone slot');
 assert.equal(DRONE_BAY_CAPACITY.pdc, 1, 'a PDC bay has one slot');
 
 const normalizedMixed = normalizeDroneBays('prospector', [
@@ -104,9 +104,9 @@ const normalizedMixed = normalizeDroneBays('prospector', [
     { bayId: 'wrong-bay', mode: 'invalid', unitIds: ['wrong-mode'] },
 ]);
 assert.deepEqual(normalizedMixed, [
-    { bayId: 'drone-1', mode: 'mining', unitIds: ['miner-a', null] },
+    { bayId: 'drone-1', mode: 'mining', unitIds: ['miner-a'] },
     { bayId: 'drone-2', mode: 'pdc', unitIds: ['pdc-a'] },
-    { bayId: 'drone-3', mode: 'mining', unitIds: [null, null] },
+    { bayId: 'drone-3', mode: 'mining', unitIds: [null] },
 ], 'normalization enforces mode capacities, bay identity and duplicate filtering');
 
 const miningFleet = fleetWith([
@@ -169,8 +169,8 @@ assert.equal(completeMiningCut(lossFleet, 'miner-loss', lossContext).code, 'cut-
 assert.equal(recallMining(lossFleet, 'miner-destroyed').code, 'recalling');
 const minerLoss = destroyMiningUnit(lossFleet, 'miner-loss', 'collision');
 assert.equal(minerLoss.code, 'miner-destroyed');
-assert.equal(minerLoss.lostUnits, 1, 'destroying a loaded miner loses its carried unit');
-assert.equal(minerLoss.releasedMass, COMMODITIES.ore.mass);
+assert.equal(minerLoss.lostUnits, 2, 'destroying a loaded miner loses both carried units');
+assert.equal(minerLoss.releasedMass, 2 * COMMODITIES.ore.mass);
 assert.equal(lossFleet.unitsById['miner-loss'].payload, null);
 assert.equal(lossFleet.unitsById['miner-loss'].state, 'destroyed');
 assert.equal(finishMiningRecall(lossFleet).code, 'recall-completed');
@@ -271,7 +271,7 @@ assert.equal(recallPdcFleet.unitsById['pdc-recall'].hull, 0);
 assert.equal(destroyPdcDrone(recallPdcFleet, 'pdc-recall'), null, 'PDC destruction is emitted only once');
 
 const serviceBays = [
-    { bayId: 'drone-1', mode: 'mining', unitIds: ['miner-service', null] },
+    { bayId: 'drone-1', mode: 'mining', unitIds: ['miner-service'] },
     { bayId: 'drone-2', mode: 'pdc', unitIds: ['pdc-service'] },
     { bayId: 'drone-3', mode: 'pdc', unitIds: [null] },
 ];
@@ -290,7 +290,6 @@ assert.equal(serviceQuote.ok, true);
 assert.deepEqual(serviceQuote.lines.filter((line) => line.kind === 'replacement').map((line) => [
     line.bayId, line.position, line.type, line.source, line.unitId, line.cost,
 ]), [
-    ['drone-1', 1, 'mining', 'locker', 'miner-locker', 0],
     ['drone-3', 0, 'pdc', 'locker', 'pdc-locker', 0],
 ], 'service uses compatible locker stock before purchasing replacements');
 assert.deepEqual(serviceQuote.lines.filter((line) => line.kind === 'repair').map((line) => [line.unitId, line.quantity, line.cost]), [
@@ -304,9 +303,9 @@ const serviceBefore = clone(service);
 const serviceCommit = commitDroneService(service, { authorized: true, expected: serviceQuote });
 assert.equal(serviceCommit.code, 'serviced');
 assert.equal(service.credits, serviceBefore.credits - serviceQuote.total);
-assert.deepEqual(service.droneFleet.lockerIds, []);
+assert.deepEqual(service.droneFleet.lockerIds, ['miner-locker']);
 assert.deepEqual(service.outfitting.loadouts.prospector.droneBays, [
-    { bayId: 'drone-1', mode: 'mining', unitIds: ['miner-service', 'miner-locker'] },
+    { bayId: 'drone-1', mode: 'mining', unitIds: ['miner-service'] },
     { bayId: 'drone-2', mode: 'pdc', unitIds: ['pdc-service'] },
     { bayId: 'drone-3', mode: 'pdc', unitIds: ['pdc-locker'] },
 ]);
@@ -315,14 +314,14 @@ assert.equal(service.droneFleet.unitsById['pdc-service'].hull, DRONE_TYPES.pdc.m
 assert.equal(service.droneFleet.unitsById['pdc-service'].ammo, 100);
 
 const purchaseBays = [
-    { bayId: 'drone-1', mode: 'mining', unitIds: [null, null] },
-    { bayId: 'drone-2', mode: 'mining', unitIds: [null, null] },
-    { bayId: 'drone-3', mode: 'mining', unitIds: [null, null] },
+    { bayId: 'drone-1', mode: 'mining', unitIds: [null] },
+    { bayId: 'drone-2', mode: 'mining', unitIds: [null] },
+    { bayId: 'drone-3', mode: 'mining', unitIds: [null] },
 ];
-const poorService = servicePlayer({ credits: 1499, bays: purchaseBays });
+const poorService = servicePlayer({ credits: 749, bays: purchaseBays });
 const purchaseQuote = quoteDroneService(poorService);
-assert.equal(purchaseQuote.lines.filter((line) => line.kind === 'replacement').length, 6);
-assert.equal(purchaseQuote.total, 6 * DRONE_TYPES.mining.replacementPrice);
+assert.equal(purchaseQuote.lines.filter((line) => line.kind === 'replacement').length, 3);
+assert.equal(purchaseQuote.total, 3 * DRONE_TYPES.mining.replacementPrice);
 const poorBefore = clone(poorService);
 assert.equal(commitDroneService(poorService, { authorized: true, expected: purchaseQuote }).code, 'insufficient-credits');
 assert.deepEqual(poorService, poorBefore, 'insufficient credits do not partially create units or charge the player');

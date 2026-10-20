@@ -96,11 +96,14 @@ export function updateStationActivity(activity, time) {
     const lights = root.userData.laneLights;
     if (lights) {
         const current = Math.floor(time*2+phase)%6;
-        for(const lane of lanes){
-            const bright = lane.step===current;
-            lights.setColorAt(lane.index,color.setRGB(bright?.3:.025,bright?.9:.12,bright?1:.15));
+        if (activity.laneStep !== current) {
+            for(const lane of lanes){
+                const bright = lane.step===current;
+                lights.setColorAt(lane.index,color.setRGB(bright?.3:.025,bright?.9:.12,bright?1:.15));
+            }
+            lights.instanceColor.needsUpdate=true;
+            activity.laneStep=current;
         }
-        lights.instanceColor.needsUpdate=true;
     }
     for(const entry of lifts){
         // Slow smooth trips with a short dwell at each end.

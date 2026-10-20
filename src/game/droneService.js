@@ -1,4 +1,4 @@
-import { createDroneUnit, DRONE_FLEET_VERSION, DRONE_RULES, DRONE_TYPES, validateDroneBays } from './droneData.js';
+import { createDroneUnit, DRONE_FLEET_VERSION, DRONE_RULES, DRONE_TYPES, validateDroneBays,droneUnitAccessible } from './droneData.js';
 
 const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const fail = (code) => ({ ok: false, code });
@@ -98,7 +98,7 @@ export function quoteDroneService(player, options = {}) {
             }
             if (selected && !selected.has(slotKey(bay.bayId, position))) continue;
             const lockerId = fleet.lockerIds.find((candidate) => !usedLocker.has(candidate)
-                && fleet.unitsById[candidate].type === bay.mode);
+                && droneUnitAccessible(player,candidate)&&fleet.unitsById[candidate].type === bay.mode);
             let unitId = lockerId;
             if (lockerId) {
                 usedLocker.add(lockerId);
@@ -114,7 +114,7 @@ export function quoteDroneService(player, options = {}) {
                 quantity: 1, unitPrice, cost: unitPrice });
         }
     }
-    if (options.includeLocker) for (const id of fleet?.lockerIds ?? []) serviceIds.add(id);
+    if (options.includeLocker) for (const id of fleet?.lockerIds ?? []) if(droneUnitAccessible(player,id))serviceIds.add(id);
     for (const id of serviceIds) {
         const unit = fleet.unitsById[id];
         const type = DRONE_TYPES[unit.type];

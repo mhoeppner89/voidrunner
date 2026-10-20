@@ -1,0 +1,41 @@
+// Muted GPU checks: malformed lighting must not spread black rectangles via HDR.
+import {chromium,webkit} from 'playwright';
+import assert from 'node:assert/strict';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {isolateBrowserProfiles} from '../helpers/browser-profiles.mjs';
+await isolateBrowserProfiles(import.meta.url,['desktop','iphone']);
+const out='output/render-finite';await mkdir(out,{recursive:true});
+await writeFile(`${out}/fixture.html`,String.raw`<link rel="icon" href="data:,"><script type="importmap">{"imports":{"three":"/vendor/three.module.min.js"}}</script><script type="module">
+import * as T from 'three';
+import {createPixelResolveMaterial} from '/src/game/pixelResolve.js';
+import {SpaceRenderer} from '/src/game/render.js';
+import {stabilizeMaterialNormals} from '/src/game/materialNormals.js';
+const renderer=new T.WebGLRenderer({preserveDrawingBuffer:true});renderer.setSize(128,128);document.body.append(renderer.domElement);
+const camera=new T.Camera(),geometry=new T.PlaneGeometry(2,2),resolve=createPixelResolveMaterial(),quad=new T.Mesh(geometry,resolve),gl=renderer.getContext();
+const texture=values=>{const t=new T.DataTexture(new Float32Array(values),1,1,T.RGBAFormat,T.FloatType);t.needsUpdate=true;return t;};
+resolve.uniforms.tDepth.value=texture([1,0,0,1]);
+const pass=(material,target=null)=>{quad.material=material;renderer.setRenderTarget(target);renderer.render(quad,camera);};
+const sample=()=>{const bytes=new Uint8Array(4);gl.readPixels(64,64,1,1,gl.RGBA,gl.UNSIGNED_BYTE,bytes);return [...bytes];};
+const resolveColour=(scene,bloom=[0,0,0,1])=>{resolve.uniforms.tScene.value=texture(scene);resolve.uniforms.tBloom.value=texture(bloom);resolve.uniforms.uStrength.value=.6;pass(resolve);return sample();};
+const pairs=[[[NaN,.18,.26,1],[0,.18,.26,1]],[[Infinity,.18,.26,1],[65504,.18,.26,1]],[[-.01,.18,.26,1],[0,.18,.26,1]]];
+const colours=pairs.map(([invalid,clean])=>({actual:resolveColour(invalid),expected:resolveColour(clean)}));
+colours.push({actual:resolveColour([.18,.26,.4,1],[NaN,.1,.2,1]),expected:resolveColour([.18,.26,.4,1],[0,.1,.2,1])});
+const space=Object.create(SpaceRenderer.prototype);space.renderer=renderer;space.bloomBlurTargets=[];space.createBloomPipeline();
+const bright=space.bloomBrightMaterial,blur=space.bloomBlurMaterial,rt=new T.WebGLRenderTarget(128,128,{type:T.FloatType});
+bright.uniforms.tDiffuse.value=texture([NaN,2.,.4,1]);pass(bright,rt);
+const bytes=new Float32Array(128*128*4);renderer.readRenderTargetPixels(rt,0,0,128,128,bytes);
+const brightFinite=[...bytes].every(Number.isFinite);
+blur.uniforms.tDiffuse.value=rt.texture;blur.uniforms.uDirection.value.set(1,0);pass(blur,space.bloomBlurTargets[0]);
+resolve.uniforms.tScene.value=texture([.18,.26,.4,1]);resolve.uniforms.tBloom.value=space.bloomBlurTargets[0].texture;pass(resolve);const glow=sample();
+// Force an unusable tangent frame without removing the authored normal map.
+const normalMap=new T.DataTexture(new Uint8Array([128,128,255,255]),1,1);normalMap.needsUpdate=true;
+const material=new T.MeshStandardMaterial({color:0x8b9ba9,roughness:.8,normalMap});
+material.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <normal_fragment_maps>','tbn=mat3(0.);\n#include <normal_fragment_maps>');};
+const scene=new T.Scene(),mesh=new T.Mesh(geometry,material),light=new T.DirectionalLight(0xffffff,2);light.position.set(0,0,2);scene.add(mesh,light);
+const normalCamera=new T.OrthographicCamera(-1,1,1,-1,.1,10);normalCamera.position.z=2;normalCamera.lookAt(0,0,0);const draw=()=>{renderer.setRenderTarget(null);renderer.render(scene,normalCamera);return sample();};
+const unstable=draw();stabilizeMaterialNormals(material);material.needsUpdate=true;const fallback=draw();mesh.material=new T.MeshStandardMaterial({color:0x8b9ba9,roughness:.8});const reference=draw();
+window.result={colours,brightFinite,glow,normals:{unstable,fallback,reference},renderer:gl.getExtension('WEBGL_debug_renderer_info')?gl.getParameter(0x9246):'unavailable'};window.ready=true;
+</script>`);
+const profile=process.env.VR_PROFILES??'desktop',engine=profile==='iphone'?webkit:chromium;
+const browser=await engine.launch({headless:true,...(engine===chromium?{executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--no-sandbox','--disable-gpu-sandbox','--mute-audio','--use-gl=angle','--use-angle=metal']}:{})});
+try{const page=await browser.newPage({serviceWorkers:'block'}),errors=[];page.on('pageerror',e=>errors.push(e.stack));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await page.goto(`${process.env.VR_BASE_URL??'http://127.0.0.1:4192'}/${out}/fixture.html`);await page.waitForFunction(()=>window.ready);const result=await page.evaluate(()=>window.result);for(const pair of result.colours)assert.deepEqual(pair.actual,pair.expected,'invalid channel cannot blacken other channels');assert.ok(result.brightFinite);assert.ok(result.glow.slice(0,3).every(c=>c>0));assert.notDeepEqual(result.normals.unstable,result.normals.reference,'the deliberately broken tangent frame must reproduce a lighting error');assert.deepEqual(result.normals.fallback,result.normals.reference,'collapsed frame retains real geometric lighting');assert.deepEqual(errors,[]);await page.screenshot({path:`${out}/${profile}.png`});await writeFile(`${out}/${profile}.json`,JSON.stringify(result,null,2));console.log(profile,JSON.stringify(result));}finally{await Promise.race([browser.close(),new Promise(resolve=>setTimeout(resolve,5000))]);}process.exit(0);

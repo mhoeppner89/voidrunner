@@ -7,13 +7,13 @@ import {hydrateSave} from '../../src/game/save.js';
 import {GameSession} from '../../src/game/game.js';
 
 const pirate=seed=>{const f=tutorialFixture('defeat-raider');f.save.world.seed=seed;f.save.player.dockedAt=undefined;f.enemy=f.session.ensureTutorialEnemy();return f;};
-test('the first pirate carries a real green tier I gun that always survives, independent of kill credit',()=>{
+test('the first pirate carries a real green tier I missile launcher that always survives, independent of kill credit',()=>{
  for(let seed=1;seed<=12;seed++){
   const {session,enemy,save,quest}=pirate(seed),record=enemy.equipmentRecords.find(e=>e.item.id===enemy.guaranteedLootId);
-  assert.ok(record);assert.equal(record.key,'guns');assert.equal(enemy.combatFit.guns[record.index],record.item.id);
+  assert.ok(record);assert.equal(record.key,'launchers');assert.equal(record.item.baseId,'seeker-launcher');assert.equal(enemy.combatFit.launchers[record.index],record.item.id);
   assert.equal(record.item.tier,1);assert.equal(record.item.rarity,'uncommon');assert.equal(record.item.affixes.length,1);
   assert.equal(OUTFIT_ITEMS[record.item.id].rarity,'uncommon');
-  const wreck=makeCareerWreck(session,enemy),entry=wreck.contents.find(e=>e.id===record.item.id);assert.ok(entry);assert.equal(entry.item.factory,false);
+  const wreck=makeCareerWreck(session,enemy),entry=wreck.contents.find(e=>e.id===record.item.id);assert.ok(entry);assert.equal(entry.item.factory,false);assert.equal(wreck.contents.length,1,'only the launcher survives this tutorial encounter');
   assert.equal(makeCareerWreck(session,enemy),null,'destruction resolves only once');enemy.hull=0;
   const briefings=[];session.playTutorialBriefing=id=>briefings.push(id);
   session.handleTutorialEvent('ship-defeated',{tutorialEncounter:'mining',tutorialIndex:0,attackerId:seed%2?'player':'rin',wreckId:wreck.id});
@@ -22,10 +22,10 @@ test('the first pirate carries a real green tier I gun that always survives, ind
   assert.deepEqual(saved.item,entry.item);assert.equal(restored.quests.find(q=>q.id===quest.id).flags['defeated-mining-0'],true);
  }
 });
-test('guaranteed loot uses normal scanned, capacity-limited, one-time wreck recovery',()=>{
+test('guaranteed loot uses unscanned, capacity-limited, one-time wreck recovery',()=>{
  const {session,enemy,save}=pirate(91),wreck=makeCareerWreck(session,enemy),entry=wreck.contents.find(e=>e.id===enemy.guaranteedLootId),node=combatWreckNode(wreck);
  session.wreckNodes.push(node);save.player.position.splice(0,3,...wreck.position);
- assert.equal(recoverWreckEntry(session,wreck.id,entry.id).code,'Scan this wreck first.');node.scanned=true;
+ assert.equal(node.scanned,false,'fly-over recovery does not require selection or scanning');
  save.player.cargo.ore=1000;assert.equal(recoverWreckEntry(session,wreck.id,entry.id).ok,false);assert.ok(wreck.contents.includes(entry));
  save.player.cargo.ore=0;assert.equal(recoverWreckEntry(session,wreck.id,entry.id).ok,true);
  assert.equal(save.player.inventory.items[entry.id].location.kind,'cargo');assert.equal(save.player.inventory.items[entry.id].tier,1);assert.equal(save.player.inventory.items[entry.id].rarity,'uncommon');

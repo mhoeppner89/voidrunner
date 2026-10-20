@@ -73,7 +73,8 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
  const hulls=(await page.evaluate(async()=>Object.keys((await import('/src/game/data.js')).SHIPS))).filter(id=>!process.env.VR_HULLS||process.env.VR_HULLS.split(',').includes(id)),hullReport=[];let alignment;
  for(const id of hulls){
   await page.evaluate(async id=>{const r=__VOID_PRIVATEER__.getRuntime(),{createOutfittingState}=await import('/src/game/outfitting.js');r.save.player.shipId=id;r.save.player.outfitting=createOutfittingState([id]);r.ui.refreshDock(r.save);},id);
-  await page.waitForFunction(id=>{const v=__VOID_PRIVATEER__.getRuntime().ui.concourseShip;return v?.loadedShipId===id&&v.host?.classList.contains('has-model');},id);
+  await page.waitForFunction(id=>{const v=__VOID_PRIVATEER__.getRuntime().ui.concourseShip;return v?.loadedShipId===id&&v.host?.classList.contains('has-model')&&!v.dockPreparing&&!v.transitPreparing;},id);
+  await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.prepareDockView());
   const info=await page.evaluate(()=>{const v=__VOID_PRIVATEER__.getRuntime().ui.concourseShip,b=document.querySelector('.concourse-hover-ship').getBoundingClientRect();return{id:v.loadedShipId,variant:v.loadedVariant,paint:v.model.userData.livery,width:b.width,height:b.height,x:b.x,y:b.y,right:b.right,bottom:b.bottom,w:innerWidth,h:innerHeight,shadow:!!v.sun.shadow.map};});
   assert.ok(info.width>30&&info.height>15&&info.x>=-1&&info.right<=info.w+1&&info.y>=50&&info.bottom<=info.h+1&&info.shadow,JSON.stringify(info));
   if(id==='atlas'){

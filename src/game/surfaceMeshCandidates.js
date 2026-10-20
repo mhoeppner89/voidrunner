@@ -57,7 +57,11 @@ export function prepareSurfaceMeshIndex(vertices, indices) {
         node.skip = nodes.length;
     }
     if (count) build(0, count);
-    tree = { nodes, order: Uint32Array.from(order) };
+    const root=nodes[0];
+    // An origin-centred sphere permits a cheap world-space miss before any
+    // inverse rotation. Include off-centre geometry as well as ordinary rocks.
+    const radius=root?Math.hypot(Math.max(Math.abs(root.minX),Math.abs(root.maxX)),Math.max(Math.abs(root.minY),Math.abs(root.maxY)),Math.max(Math.abs(root.minZ),Math.abs(root.maxZ))):0;
+    tree = { nodes, order: Uint32Array.from(order), radius };
     byIndices.set(indices, tree);
     return tree;
 }

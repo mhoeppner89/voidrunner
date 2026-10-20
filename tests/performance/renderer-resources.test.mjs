@@ -131,6 +131,64 @@ test('trail-free ships reuse glow textures and preserve cached hulls', () => {
     assert.equal(r.pixelTextures.size, 0, 'no exhaust texture is allocated');
 });
 
+test('retiring healthy or damaged turrets preserves the hull textures they borrow', async () => {
+    const {createTurretModel, paintFrigateTurret} = await import('../../src/game/turretModels.js');
+    const {setFrigateComponentDamage} = await import('../../src/game/frigateComponents.js');
+    const r = renderer();
+    const hull = new THREE.MeshStandardMaterial({
+        map: new THREE.Texture(), normalMap: new THREE.Texture(),
+        roughnessMap: new THREE.Texture(), metalnessMap: new THREE.Texture(),
+    });
+    const maps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap'];
+    const disposed = maps.map(slot => watch(hull[slot]));
+    const neighbor = createTurretModel('laser', 'M');
+    paintFrigateTurret(neighbor, hull);
+    for (const health of [100, 0]) {
+        const turret = createTurretModel('laser', 'M');
+        paintFrigateTurret(turret, hull);
+        setFrigateComponentDamage(turret, health, 100);
+        const privateMaterials = new Set();
+        turret.traverse(o => {
+            if (o.isMesh && !o.material.userData.shared) privateMaterials.add(o.material);
+        });
+        const privateDisposals = [...privateMaterials].map(watch);
+        r.disposeObject(turret);
+        assert.ok(disposed.every(read => read() === 0), 'live hull maps must stay resident');
+        assert.ok(privateDisposals.every(read => read() === 1), 'private damage materials are released');
+        neighbor.traverse(o => {
+            if (o.isMesh) for (const slot of maps) assert.equal(o.material[slot], hull[slot]);
+        });
+    }
+    r.disposeObject(neighbor);
+    assert.ok(disposed.every(read => read() === 0));
+    // The cached hull remains the owner and releases its maps at shutdown.
+    r.disposeObject(new THREE.Mesh(new THREE.BoxGeometry(), hull));
+    assert.ok(disposed.every(read => read() === 1));
+});
+
+test('a freshly refreshed turret survives accumulated simulation time before rendering', () => {
+    const r = renderer();
+    Object.assign(r, {
+        scene: new THREE.Scene(), skyTime: 10, instanceRoots: new Map(),
+        locationMeshes: new Map(), jumpPointVisuals: [], effects: [],
+        updatePdcTracers() {}, updateRailPlumes() {}, updateHyperdriveFx() {},
+    });
+    const show = () => r.showTurret('npc-0', new THREE.Vector3(), new THREE.Vector3(0,0,-1), 'S');
+    show();
+    const turret = r.turretMeshes.get('npc-0');
+    // Three catch-up steps have run since the previous draw. The mount was
+    // refreshed on the last step, so none of that earlier time should age it.
+    r.pendingWorldVisualDt = .3;
+    r.updateWorldVisuals();
+    assert.equal(r.turretMeshes.get('npc-0'), turret);
+    r.skyTime = 10.2; show();
+    r.pendingWorldVisualDt = .2; r.updateWorldVisuals();
+    assert.equal(r.turretMeshes.get('npc-0'), turret);
+    r.skyTime = 10.46;
+    r.pendingWorldVisualDt = .26; r.updateWorldVisuals();
+    assert.equal(r.turretMeshes.has('npc-0'), false, 'unrefreshed mounts still retire');
+});
+
 test('renderer shutdown releases postprocessing and cached resources', () => {
     const r = renderer();
     globalThis.window = { removeEventListener() {} };

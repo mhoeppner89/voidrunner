@@ -16,16 +16,16 @@ export function applyIndependentPaint(root,id,hull){
  root.traverse(o=>{if(!o.isMesh)return;const paint=source=>{
   if(!source.isMeshStandardMaterial||!source.map||/glass|canopy|window|emissive|exhaust/i.test(source.name)||(/engine/i.test(source.name)&&!/plating/i.test(source.name)))return source;
   const m=source.clone();m.userData.livery=id;m.onBeforeCompile=shader=>{
-   Object.assign(shader.uniforms,{ipFrame:{value:frames.get(o)},ipBase:{value:new THREE.Color(scheme.base)},ipMain:{value:new THREE.Color(scheme.main)},ipAccent:{value:new THREE.Color(scheme.accent)}});
+   Object.assign(shader.uniforms,{ipFrame:{value:frames.get(o)},ipOffset:{value:Number(offset.toFixed(4))},ipBase:{value:new THREE.Color(scheme.base)},ipMain:{value:new THREE.Color(scheme.main)},ipAccent:{value:new THREE.Color(scheme.accent)}});
    shader.vertexShader='uniform mat4 ipFrame;varying vec3 ipPosition;varying vec3 ipNormal;\n'+shader.vertexShader;
    shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nipPosition=(ipFrame*vec4(position,1.)).xyz;ipNormal=normalize(mat3(ipFrame)*normal);');
-   shader.fragmentShader='uniform vec3 ipBase,ipMain,ipAccent;varying vec3 ipPosition,ipNormal;float band(float v,float c,float w){float aa=max(fwidth(v),.001);return 1.-smoothstep(w-aa,w+aa,abs(v-c));}\n'+shader.fragmentShader;
+   shader.fragmentShader='uniform vec3 ipBase,ipMain,ipAccent;uniform float ipOffset;varying vec3 ipPosition,ipNormal;float band(float v,float c,float w){float aa=max(fwidth(v),.001);return 1.-smoothstep(w-aa,w+aa,abs(v-c));}\n'+shader.fragmentShader;
    shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
-    vec3 source=diffuseColor.rgb;float lum=dot(source,vec3(.2126,.7152,.0722));float x=ipPosition.x,y=ipPosition.y,z=ipPosition.z,offset=${offset.toFixed(4)};
+    vec3 source=diffuseColor.rgb;float lum=dot(source,vec3(.2126,.7152,.0722));float x=ipPosition.x,y=ipPosition.y,z=ipPosition.z,offset=ipOffset;
     ${patterns[id]}
     vec3 finish=mix(ipBase,ipMain,mainZone);finish=mix(finish,ipAccent,accentZone);float coat=smoothstep(.005,.065,lum);float detail=.42+.58*pow(clamp(lum*1.8,0.,1.),.4);
     float exhaust=(1.-smoothstep(-.8,-.57,z))*smoothstep(.5,.85,-normalize(ipNormal).z);diffuseColor.rgb=mix(source,finish*detail,coat*(1.-exhaust));`);
-  };m.customProgramCacheKey=()=>`independent-${id}-${hull}`;m.needsUpdate=true;return m;
+  };m.customProgramCacheKey=()=>`independent-${id}-uniform-offset-v2`;m.needsUpdate=true;return m;
  };o.material=Array.isArray(o.material)?o.material.map(paint):paint(o.material);});
  root.userData.livery=id;
 }

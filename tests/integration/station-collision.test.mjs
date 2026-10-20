@@ -87,3 +87,15 @@ test('Blackglass clearance comes from its attached model; its moon stays solid',
     const p=new THREE.Vector3(...location.position).add(new THREE.Vector3(0,0,location.radius*.82-1)),before=p.clone();
     s.resolvePlayerCollisions(p,new THREE.Vector3());assert.ok(p.distanceTo(before)>1,'host moon still blocks ships');
 });
+
+test('streamed collision setup yields without changing any triangles, BVH nodes or contact results',async()=>{
+    const {buildStationColliderAsync}=await import('../../src/game/stationCollision.js');
+    const model=stationModel('helix'),origin=LOCATIONS.helix.position,expected=buildStationCollider(model,origin);
+    let yields=0;
+    const streamed=await buildStationColliderAsync(model,origin,{budgetMs:0,yieldTask:async()=>{yields++;}});
+    assert.ok(yields>100,'large station setup is split into many bounded chunks');
+    assert.deepEqual(streamed,expected);
+    for(const p of [[0,0,0],[0,-20,100],[150,20,200]])assert.equal(hits(streamed,p.map((n,i)=>n+origin[i])),hits(expected,p.map((n,i)=>n+origin[i])));
+    let cancelled=false;
+    assert.equal(await buildStationColliderAsync(model,origin,{budgetMs:0,shouldCancel:()=>cancelled,yieldTask:async()=>{cancelled=true;}}),null,'superseded sessions abandon partial colliders');
+});

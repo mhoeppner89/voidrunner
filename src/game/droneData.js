@@ -12,7 +12,14 @@ export const DRONE_BAY_LAYOUTS = freeze({
 });
 export const droneBayLayoutFor = (shipId) => Object.hasOwn(DRONE_BAY_LAYOUTS, shipId)
     ? DRONE_BAY_LAYOUTS[shipId] : emptyBays;
-export const DRONE_BAY_CAPACITY = freeze({ mining: 2, pdc: 1, repair: 1 });
+export const DRONE_BAY_CAPACITY = freeze({ mining: 1, pdc: 1, repair: 1 });
+export const DRONE_ITEM_IDS=freeze({mining:'mining-drone',pdc:'pdc-drone',repair:'repair-drone'});
+export const droneInventoryId=id=>`eq-${id}`;
+export const droneUnitAccessible=(player,id)=>{
+    const location=player.inventory?.items?.[droneInventoryId(id)]?.location;
+    return !location||location.kind==='cargo'||location.kind==='station'&&location.stationId===player.dockedAt
+        ||location.kind==='installed'&&location.shipId===player.shipId&&player.droneFleet?.lockerIds?.includes(id);
+};
 export const DRONE_FLEET_VERSION = 2;
 // The retired attack role keeps owned units and bay assignments when loading saves.
 export const canonicalDroneType = type => type === 'attack' ? 'pdc' : type;
@@ -21,7 +28,7 @@ export const DRONE_TYPES = freeze({
     repair: freeze({ maxHull: 25, collisionRadius: 0.65, cruiseSpeed: 160,
         acceleration: 160, payloadUnits: 0, replacementPrice: 900, repairRate: 3, energyPerHull: 2 }),
     mining: freeze({ maxHull: 20, collisionRadius: 0.5, cruiseSpeed: 120,
-        acceleration: 120, payloadUnits: 1, cutSecondsPerUnit: 2.4, replacementPrice: 250 }),
+        acceleration: 120, payloadUnits: 2, cutSecondsPerUnit: 2.4, replacementPrice: 250 }),
     pdc: freeze({ maxHull: 40, collisionRadius: 0.75, cruiseSpeed: 160,
         acceleration: 160, payloadUnits: 0, replacementPrice: 1500,
         escortDistance: 15, escortOrbitSeconds: 12, shotInterval: 0.4,
@@ -49,7 +56,10 @@ export const normalizeDroneBays = (shipId, source) => {
             seen.add(id);
             return id;
         });
-        return { bayId, mode, unitIds, ...(validMode(pending) && (pending !== 'mining' || canMineWithHull(shipId)) ? {pendingMode: pending} : {}) };
+        const change=raw?.pendingInventoryDrone;
+        const pendingInventoryDrone=change&&['install','remove'].includes(change.action)&&unitId(change.id)&&change.mountId===`${shipId}-${bayId}`
+            ?{action:change.action,id:change.id,mountId:change.mountId}:undefined;
+        return { bayId, mode, unitIds, ...(validMode(pending) && (pending !== 'mining' || canMineWithHull(shipId)) ? {pendingMode: pending} : {}),...(pendingInventoryDrone?{pendingInventoryDrone}:{}) };
     });
 };
 export const createDefaultDroneBays = (shipId) => normalizeDroneBays(shipId);

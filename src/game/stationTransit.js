@@ -6,6 +6,7 @@ import {playerBerth} from './playerDocking.js';
 import {stationModelOffsetZ,stationVisualSurfaceRadius} from './stationTraffic.js';
 import {STATION_DOCKS} from './stationDocks.js';
 import {addStationOccupants} from './stationOccupants.js';
+import {freezeStaticTransforms} from './renderWork.js';
 
 export const STATION_TRANSIT_DURATION={entry:4200,exit:3600};
 const ease=t=>t*t*(3-2*t),forward=new THREE.Vector3(0,0,-1);
@@ -14,6 +15,7 @@ const ease=t=>t*t*(3-2*t),forward=new THREE.Vector3(0,0,-1);
 export class StationTransit {
  constructor(patchMaterial,occupantScale){
   this.patchMaterial=patchMaterial;this.occupantScale=occupantScale;this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(38,1,.04,350);
+  this.scene.matrixAutoUpdate=false;
   this.point=new THREE.Vector3();this.look=new THREE.Vector3();this.out=new THREE.Vector3();this.right=new THREE.Vector3();this.pad=new THREE.Vector3();this.gate=new THREE.Vector3();this.rotation=new THREE.Quaternion();this.euler=new THREE.Euler();
   this.hemi=new THREE.HemisphereLight(0x809cbd,0x182636,1.5);this.key=new THREE.DirectionalLight(0xffebcf,2.6);this.key.position.set(-18,30,24);this.rim=new THREE.DirectionalLight(0x79baf5,1.8);this.rim.position.set(20,6,-20);this.scene.add(this.hemi,this.key,this.rim);
   this.engineLight=new THREE.PointLight(0x70ceff,.32,2,2);this.scene.add(this.engineLight);
@@ -32,6 +34,7 @@ export class StationTransit {
    if(this.disposed||generation!==this.generation){disposeObject(model);return false;}
    if(this.model){this.scene.remove(this.model);disposeObject(this.model);}
    this.model=model;model.scale.setScalar(.18);model.name=`cinematic-station-${id}`;
+   freezeStaticTransforms(model);
    model.traverse(o=>{if(!o.isMesh)return;for(const m of Array.isArray(o.material)?o.material:[o.material]){m.fog=false;if(m.roughness!==undefined)m.roughness=Math.max(.55,m.roughness);this.patchMaterial?.(m);for(const t of Object.values(m))if(t?.isTexture){t.anisotropy=2;t.minFilter=THREE.LinearMipmapLinearFilter;t.magFilter=THREE.NearestFilter;}}});
    this.scene.add(model);return true;
   }).catch(error=>{if(generation===this.generation){this.id=undefined;this.ready=undefined;}throw error;});return this.ready;

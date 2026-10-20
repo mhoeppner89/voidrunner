@@ -60,7 +60,7 @@ test('the prologue teaches wing orders at the fight, exactly once',()=>{
     assert.equal(early.quest.flags.wingOrders,true,'the lesson is remembered on the quest');
     assert.equal(early.lines.length,0,'wing instructions stay in the paused combat dialogue');
     assert.equal(early.events.length,0,'no duplicate wing-order notice');
-    assert.deepEqual(early.chip.at(-1),[['aggressive'],1],'the wing card appears with the order');
+    assert.deepEqual(early.chip.at(-1),[['defensive'],1],'the wing card starts with covering fire');
     assert.equal(early.session.campaignWingActive(),true);
     assert.equal(early.session.introduceCampaignWingOrders(),false,'and the lesson never repeats');
     // Skipped and finished prologues keep the mechanic for the rest of the career.
@@ -333,4 +333,52 @@ test('the target readout names the locked ship\'s manoeuvre in one word',()=>{
     setLanguage('de');
     for(const word of words)assert.ok(DE_CATALOG[word],`${word} has a German catalog entry`);
     setLanguage('en');
+});
+
+
+test('Rin gives occasional covering shots in the first duel and restores normal weapons afterward',()=>{
+    for(const [order,interval] of [['defensive',5],['aggressive',3]]){
+        const {save,quest,session,wing,putEnemy}=fixture();
+        const enemy=putEnemy(300);save.player.currentTargetId=enemy.id;session.setCampaignWingOrder(order);
+        const shots=[],fit=wing.combatFit,originalLaunchAt=fit.launchAt,originalTurrets=wing.turretsHeld;
+        session.updateAttackAI=ship=>{
+            assert.equal(ship.turretsHeld,true,'the Lancer turrets do not overwhelm the training target');
+            assert.ok(fit.launchAt>save.world.time,'missiles are held');
+            if(save.world.time>=(ship.gunBurstPauseUntil??0)){
+                ship.lastCombatShotAt=save.world.time;shots.push(save.world.time);
+            }
+        };
+        const start=save.world.time;
+        for(let step=0;step<=1200;step++){
+            save.world.time=start+step/60;session.updateTutorialCompanion(wing,1/60);
+            assert.equal(wing.turretsHeld,originalTurrets,'temporary turret hold is restored');
+            assert.equal(fit.launchAt,originalLaunchAt,'normal launcher timing is preserved');
+        }
+        assert.ok(shots.length>=3&&shots.length<=7,'Rin still helps');
+        assert.ok(shots[0]-start>=3,'the player has time to take the opening shot');
+        for(let i=1;i<shots.length;i++)assert.ok(shots[i]-shots[i-1]>=interval-1e-6,'one covering shot per interval');
+        quest.stepId='black-box-fight';
+        session.updateAttackAI=ship=>{
+            assert.equal(ship.tutorialCoverShotAt,undefined);
+            assert.equal(ship.gunBurstPauseUntil,0,'tutorial cadence does not leak into later battles');
+            assert.equal(ship.turretsHeld,originalTurrets);assert.equal(fit.launchAt,originalLaunchAt);
+        };
+        session.updateTutorialCompanion(wing,1/60);
+    }
+});
+
+test('Rin and Paul recover their formation destination after another AI path clears it',()=>{
+ for(const step of ['fly-vesper','hide-patrol']){
+  const {session,wing,save}=fixture(step),goal=session.tutorialFormationGoal().clone();
+  if(wing.storyPersonId==='paul')goal.addScaledVector(session.tmpTutorialRight,-96);
+  wing.position.splice(0,3,goal.x+80,goal.y,goal.z);wing.velocity.fill(0);
+  session.clearSearch(wing);assert.equal(wing.destination,undefined);
+  session.updateTutorialCompanion(wing,1/60);assert.deepEqual(wing.destination,goal.toArray());assert.equal(session.travel,1);
+  const destination=wing.destination;
+  for(let i=0;i<600;i++){
+   session.clearSearch(wing);save.world.time+=1/60;session.updateTutorialCompanion(wing,1/60);
+   assert.equal(wing.destination,destination,'repeated route resets reuse the companion buffer');
+  }
+  assert.equal(session.travel,601);
+ }
 });

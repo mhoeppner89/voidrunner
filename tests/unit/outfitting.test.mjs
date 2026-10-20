@@ -37,18 +37,20 @@ const capablePlayer = (overrides = {}) => ({
     ...overrides,
 });
 
-assert.equal(OUTFIT_ITEM_IDS.length, 26, 'registry includes the shop roster and three capital salvage modules');
-assert.equal(new Set(OUTFIT_ITEM_IDS).size, 26, 'registry ids are unique');
+assert.equal(OUTFIT_ITEM_IDS.length, 30, 'registry includes the shop roster and three capital salvage modules');
+assert.equal(new Set(OUTFIT_ITEM_IDS).size, 30, 'registry ids are unique');
 assert.deepEqual(OUTFIT_ITEM_IDS, [
+    'mining-drone','pdc-drone','repair-drone',
     'tracking-turret','capacitor-bank','sustained-reactor','recovery-shield','beam-emitter',
     'pulse-cannon', 'gauss-cannon', 'pdc', 'ripper', 'ion-blaster', 'mortar',
     'seeker-launcher', 'swarm-launcher', 'shield-seeker-launcher', 'shield-swarm-launcher', 'torpedo-launcher',
     'engine-mk2', 'thrusters-mk2', 'shield-mk2', 'armor-mk2',
-    'radar-mk2', 'cargo-pods', 'salvage-mk2',
+    'radar-mk2', 'cargo-pods', 'loot-collector', 'salvage-mk2',
     'frigate-battery', 'cruiser-battery', 'capital-shield-generator',
 ]);
 all(OUTFIT_ITEM_IDS, (id) => {
     const item = OUTFIT_ITEMS[id];
+    if(item.category==='drone')return item.mass===1&&item.price>0&&['mining','pdc','repair'].includes(item.droneType)&&item.description.length>0;
     if (!['gun', 'launcher', 'turret', 'power', 'drive', 'defense', 'utility'].includes(item.category)
         || !Number.isFinite(item.price) || item.price < 0
         || !item.effects
@@ -219,7 +221,7 @@ const removeAndSell = quoteOutfitting(player, 'wayfarer', createOutfittingState(
 assert.equal(removeAndSell.ok, true, 'remove + sell is one valid staged transaction');
 assert.equal(removeAndSell.sellable.ripper, 2);
 assert.equal(removeAndSell.resale, Math.round(OUTFIT_ITEMS.ripper.price * 2 * RESALE_RATE));
-assert.equal(quoteOutfitting(player, 'wayfarer', fit, { sales: { 'beam-emitter': 1 } }).code, 'not-enough-stock-to-sell', 'factory pulse cannot be sold after removal');
+assert.equal(quoteOutfitting(player, 'wayfarer', fit, { sales: { 'beam-emitter': 1 } }).ok, true, 'ordinary starting beams can be sold while a sustained weapon stays fitted');
 
 // Removing an installed module returns it to the locker; selling that locker
 // copy yields exactly 70% of its price and remains atomic.

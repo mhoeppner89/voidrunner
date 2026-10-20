@@ -7,7 +7,7 @@ import { DRONE_RULES, DRONE_TYPES } from './droneData.js';
 //   cargoMass: actual total mass (including sealed cargo), cargoCapacity,
 //   cargo: the live ship commodity-count object (delivery only) }.
 // The caller resolves the key to the live deposit and supplies trusted mass data.
-// Jobs reserve one deposit unit AND cargo mass; payloads reserve only cargo mass.
+// Jobs reserve up to two deposit units AND their cargo mass; payloads reserve only cargo mass.
 // No separate reservation ledger can drift from the serializable fleet records.
 // Outcomes are synchronous: apply stats/claims only for a returned cut/delivery,
 // using packetId as the identity. Retrying a committed operation cannot repeat it.
@@ -24,6 +24,7 @@ const transitions = Object.freeze({
 const positive = (n) => Number.isFinite(n) && n > 0;
 const nonnegative = (n) => Number.isFinite(n) && n >= 0;
 const key = (value) => typeof value === 'string' && value.length > 0;
+const validUnits=n=>Number.isSafeInteger(n)&&n>=1&&n<=DRONE_TYPES.mining.payloadUnits;
 const fail = (code) => ({ ok: false, code });
 const miner = (fleet, id) => key(id) && Object.hasOwn(fleet.unitsById, id)
     && fleet.unitsById[id].type === 'mining' ? fleet.unitsById[id] : null;
@@ -41,8 +42,8 @@ export function miningReservedMass(fleet) {
         for (let i = 0; i < 2; i++) {
             const reservation = i === 0 ? unit.job : unit.payload;
             if (!reservation) continue;
-            if (reservation.units !== 1 || !positive(reservation.unitMass)) return Infinity;
-            mass += reservation.unitMass;
+            if (!validUnits(reservation.units) || !positive(reservation.unitMass)) return Infinity;
+            mass += reservation.units * reservation.unitMass;
         }
     }
     return mass;
@@ -53,7 +54,7 @@ export function miningReservedUnits(fleet, targetNodeKey) {
     for (const id in fleet.unitsById) {
         if (!Object.hasOwn(fleet.unitsById, id)) continue;
         const unit = fleet.unitsById[id];
-        if (unit.type === 'mining' && unit.job?.targetNodeKey === targetNodeKey) units++;
+        if (unit.type === 'mining' && unit.job?.targetNodeKey === targetNodeKey) units += unit.job.units;
     }
     return units;
 }
@@ -134,13 +135,13 @@ export function reserveMiningJob(fleet, unitId, context) {
     const reason = reservationFailure(fleet, context);
     if (reason) return fail(reason);
     unit.job = { targetNodeKey: context.targetNodeKey, cycleId: fleet.controller.cycleId,
-        commodityId: context.commodityId, units: 1, unitMass: context.unitMass,
+        commodityId: context.commodityId, units: Math.min(DRONE_TYPES.mining.payloadUnits, context.deposit.remaining - miningReservedUnits(fleet, context.targetNodeKey), Math.floor(miningCargoAvailable(fleet, context) / context.unitMass)), unitMass: context.unitMass,
         cutTime: 0, cutSeconds: DRONE_TYPES.mining.cutSecondsPerUnit };
     unit.state = 'launching';
     unit.phaseTime = 0;
     unit.recallTime = 0;
     return { ok: true, code: 'job-reserved', unitId, targetNodeKey: context.targetNodeKey,
-        cycleId: unit.job.cycleId, units: 1, unitMass: unit.job.unitMass };
+        cycleId: unit.job.cycleId, units: unit.job.units, unitMass: unit.job.unitMass };
 }
 
 /** Cancel uncut work only. Carried ore keeps its reservation until delivery/loss. */
@@ -154,7 +155,7 @@ export function cancelMiningJob(fleet, unitId, reason = 'cancelled') {
         unit.phaseTime = 0;
     }
     return { ok: true, code: 'job-cancelled', reason, unitId,
-        targetNodeKey: job.targetNodeKey, cycleId: job.cycleId, releasedMass: job.unitMass };
+        targetNodeKey: job.targetNodeKey, cycleId: job.cycleId, releasedMass: job.units * job.unitMass };
 }
 
 /** Arrival transitions only; geometry/movement remain in game.js. */
@@ -193,14 +194,15 @@ function cutFailure(fleet, job, context) {
     else if (job.cycleId !== fleet.controller.cycleId || job.targetNodeKey !== fleet.controller.targetNodeKey
         || job.targetNodeKey !== context.targetNodeKey) reason = 'target-changed';
     else reason = targetFailure(context);
-    if (!reason && (job.units !== 1 || job.commodityId !== context.commodityId || job.unitMass !== context.unitMass)) reason = 'invalid-job';
+    if (!reason && context.deposit.remaining < job.units) reason = 'exhausted';
+    if (!reason && (!validUnits(job.units) || job.commodityId !== context.commodityId || job.unitMass !== context.unitMass)) reason = 'invalid-job';
     if (!reason && (!nonnegative(context.cargoMass) || !nonnegative(context.cargoCapacity)
         || context.cargoMass + miningReservedMass(fleet) > context.cargoCapacity)) reason = 'cargo-full';
     if (!reason && (!positive(job.cutSeconds) || !nonnegative(job.cutTime))) reason = 'invalid-job';
     return reason;
 }
 
-/** Atomic cut: rock -1, job -> one packet, reserved cargo mass unchanged.
+/** Atomic cut: rock -job.units, job -> one packet, reserved cargo mass unchanged.
  * Invalid/stale context cancels uncut work. Incomplete cuts are harmless no-ops. */
 export function completeMiningCut(fleet, unitId, context) {
     const unit = miner(fleet, unitId);
@@ -213,8 +215,8 @@ export function completeMiningCut(fleet, unitId, context) {
     if (number === null) return cancelMiningJob(fleet, unitId, 'identity-exhausted');
     const payload = { packetId: `drone-packet-${number}`, unitId,
         targetNodeKey: job.targetNodeKey, cycleId: job.cycleId,
-        commodityId: job.commodityId, units: 1, unitMass: job.unitMass };
-    context.deposit.remaining--;
+        commodityId: job.commodityId, units: job.units, unitMass: job.unitMass };
+    context.deposit.remaining -= job.units;
     fleet.nextPacketId = number + 1;
     unit.job = null;
     unit.payload = payload;
@@ -256,18 +258,18 @@ export function deliverMiningPayload(fleet, unitId, context) {
     if (!alive(unit) || !unit.payload) return fail('no-payload');
     if (unit.state !== 'docking' || unit.job) return fail('not-docking');
     const payload = unit.payload;
-    if (!key(payload.packetId) || payload.unitId !== unitId || payload.units !== 1
+    if (!key(payload.packetId) || payload.unitId !== unitId || !validUnits(payload.units)
         || !key(payload.commodityId) || !positive(payload.unitMass)) return fail('invalid-payload');
     if (!nonnegative(context.cargoMass) || !nonnegative(context.cargoCapacity)
         || context.cargoMass + miningReservedMass(fleet) > context.cargoCapacity) return fail('cargo-full');
     const cargo = context.cargo;
     if (!cargo || typeof cargo !== 'object' || Array.isArray(cargo)) return fail('invalid-cargo');
     const count = Object.hasOwn(cargo, payload.commodityId) ? cargo[payload.commodityId] : 0;
-    if (!Number.isSafeInteger(count) || count < 0 || count >= Number.MAX_SAFE_INTEGER) return fail('invalid-cargo');
+    if (!Number.isSafeInteger(count) || count < 0 || count > Number.MAX_SAFE_INTEGER - payload.units) return fail('invalid-cargo');
     // defineProperty also treats an imported '__proto__' commodity as data.
-    Object.defineProperty(cargo, payload.commodityId, { value: count + 1, writable: true, enumerable: true, configurable: true });
+    Object.defineProperty(cargo, payload.commodityId, { value: count + payload.units, writable: true, enumerable: true, configurable: true });
     unit.payload = null;
-    return { ok: true, code: 'payload-delivered', ...payload, releasedMass: payload.unitMass };
+    return { ok: true, code: 'payload-delivered', ...payload, releasedMass: payload.units * payload.unitMass };
 }
 
 /** Loss consumes carried ore permanently. Ownership/bay cleanup is the caller's
@@ -285,8 +287,8 @@ export function destroyMiningUnit(fleet, unitId, reason = 'destroyed') {
     unit.recallTime = 0;
     return { ok: true, code: 'miner-destroyed', reason, unitId,
         packetId: payload?.packetId ?? null, targetNodeKey: payload?.targetNodeKey ?? job?.targetNodeKey ?? null,
-        commodityId: payload?.commodityId ?? null, lostUnits: payload ? 1 : 0,
-        releasedMass: (job?.unitMass ?? 0) + (payload?.unitMass ?? 0) };
+        commodityId: payload?.commodityId ?? null, lostUnits: payload?.units ?? 0,
+        releasedMass: (job?.units ?? 0) * (job?.unitMass ?? 0) + (payload?.units ?? 0) * (payload?.unitMass ?? 0) };
 }
 
 export function miningRecallEligibility(fleet) {
@@ -314,7 +316,7 @@ export function recallMining(fleet, reason = 'recalled') {
         if (!Object.hasOwn(fleet.unitsById, id)) continue;
         const unit = fleet.unitsById[id];
         if (unit.type !== 'mining') continue;
-        if (unit.job) { cancelledJobs++; releasedMass += unit.job.unitMass; unit.job = null; }
+        if (unit.job) { cancelledJobs++; releasedMass += unit.job.units * unit.job.unitMass; unit.job = null; }
         unit.recallTime = 0;
         if (airborne(unit) && unit.state !== 'returning' && unit.state !== 'docking') {
             unit.state = 'returning';

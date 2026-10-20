@@ -10,7 +10,7 @@ const {createNewSave, hydrateSave} = await import('../../src/game/save.js');
 const {getTutorialQuest} = await import('../../src/game/tutorialCampaign.js');
 const {HARDPOINT_SPECS, OUTFIT_ITEMS, loadoutFor} = await import('../../src/game/outfitting.js');
 const {renderEquipmentInventory,bindEquipmentInventory} = await import('../../src/game/equipmentUi.js');
-const {normalizeEquipmentInventory,inventoryMounts} = await import('../../src/game/equipmentInventory.js');
+const {normalizeEquipmentInventory,inventoryMounts,createEquipmentRecord} = await import('../../src/game/equipmentInventory.js');
 const {equipmentBaseId} = await import('../../src/game/equipmentCatalog.js');
 const {setLanguage} = await import('../../src/game/i18n.js');
 
@@ -144,4 +144,28 @@ test('phone shop disables an unaffordable radar purchase and never treats it as 
         assert.equal(save.player.credits,credits);assert.deepEqual(Object.keys(save.player.inventory.items),items);
         assert.equal(ui.inventoryNotice,'Not enough credits.');
     }
+});
+
+
+test('equipment navigation names remote storage, hides empty sections and clears mount filters',()=>{
+ for(const language of ['en','de']){
+  setLanguage(language);const save=createNewSave(844),p=save.player,session=inventorySession(save);
+  const {ui,click,markup}=inventoryFixture(save,session);
+  assert.doesNotMatch(markup(),/value="remote"|data-tab="remote"/,'no empty remote section');
+  const remote=createEquipmentRecord('pulse-cannon',{id:'eq-remote-gun',location:{kind:'station',stationId:'vesper'}});p.inventory.items[remote.id]=remote;
+  ui.refreshDock();assert.match(markup(),new RegExp(language==='de'?'Andere Stationen':'Other stations'));
+  click({inventoryMount:'wayfarer-drone-1'});click({inventoryAction:'close-detail'});
+  assert.match(markup(),new RegExp('data-inventory-action="clear-mount"[^>]*>'+ (language==='de'?'Alle Teile':'All items')));
+  click({inventoryAction:'tab',tab:'remote'});
+  assert.match(markup(),/data-inventory-id="eq-remote-gun"/,'drone mount filter cannot hide a remotely stored gun');
+  assert.match(markup(),/<small>Vesper<\/small>/i,'each remote card names its station');
+  assert.doesNotMatch(markup(),/data-inventory-action="clear-mount"/);
+  click({inventoryId:remote.id});
+  for(const action of ['install','sell','carry'])assert.doesNotMatch(markup(),new RegExp('data-inventory-action="'+action+'"'),'remote stock is read only');
+  click({inventoryAction:'tab',tab:'shop'});click({inventoryAction:'clear-mount'});
+  assert.equal(ui.inventoryMountId,undefined);assert.match(markup(),/data-inventory-id="shop-pulse-cannon-1"/);
+  p.dockedAt='vesper';ui.inventoryItemId=undefined;ui.inventoryTab='remote';ui.refreshDock();
+  assert.doesNotMatch(markup(),/value="remote"|data-tab="remote"/);assert.match(markup(),/data-inventory-view="cargo"/);
+ }
+ setLanguage('en');
 });
