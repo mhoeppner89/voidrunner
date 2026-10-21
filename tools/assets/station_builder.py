@@ -1,12 +1,23 @@
 """Shared offline station authoring tools. No runtime procedural geometry."""
 from pathlib import Path
-import bpy, math, json, random, struct
+import bpy, math, json, random, struct, subprocess
 from mathutils import Vector
 import numpy as np
 ROOT = Path(__file__).resolve().parents[2]
+_LOCATION_RADII=None
+
+def detail_units(world_size):
+    # Same world frame as the fitted ships and the capital-ship model sources.
+    return world_size / SOURCE_TO_WORLD
+
 
 def init(station_id, label, palette=None):
-    global scene, rng, image, COLORS, M, parts
+    global scene, rng, image, COLORS, M, parts, SOURCE_TO_WORLD, _LOCATION_RADII
+    from station_volumes import ENVELOPES
+    if _LOCATION_RADII is None:
+        code=f"import {{LOCATIONS}} from '{(ROOT/'src/game/data.js').as_uri()}'; console.log(JSON.stringify(Object.fromEntries(Object.entries(LOCATIONS).map(([id,l])=>[id,l.radius]))));"
+        _LOCATION_RADII=json.loads(subprocess.check_output(['node','--input-type=module','-e',code],text=True,cwd=ROOT))
+    SOURCE_TO_WORLD=_LOCATION_RADII[station_id]*(.2 if station_id=='blackglass' else .95)/ENVELOPES[station_id]
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.context.preferences.filepaths.save_version = 0
     scene = bpy.context.scene
@@ -99,6 +110,20 @@ def beam(name, a, b, width, material='metal'):
     vs = [tuple(p+v*dv*width/2+w*dw*width/2) for p in [a,b] for dv,dw in [(-1,-1),(1,-1),(1,1),(-1,1)]]
     return mesh(name, vs, [(3,2,1,0),(4,5,6,7),(0,1,5,4),(1,2,6,5),(2,3,7,6),(3,0,4,7)], material)
 
+def pressure_building(name,levels,material='hull',chamfer=2):
+    """Closed stepped pressure hull, levels (z,x,y,width,depth)."""
+    vs=[]
+    for z,x,y,w,d in levels:
+        c=min(chamfer,w*.18,d*.18)
+        cross=[(-w/2+c,-d/2),(w/2-c,-d/2),(w/2,-d/2+c),(w/2,d/2-c),
+               (w/2-c,d/2),(-w/2+c,d/2),(-w/2,d/2-c),(-w/2,-d/2+c)]
+        vs.extend((x+dx,y+dy,z)for dx,dy in cross)
+    fs=[tuple(reversed(range(8))),tuple(range((len(levels)-1)*8,len(levels)*8))]
+    for j in range(len(levels)-1):
+        for i in range(8):k=(i+1)%8;fs.append((j*8+i,j*8+k,(j+1)*8+k,(j+1)*8+i))
+    return mesh(name,vs,fs,material)
+
+
 def lathe(name, profile, material='hull', n=48, center=(0,0)):
     vs = [(center[0]+r*math.cos(i*math.tau/n), center[1]+r*math.sin(i*math.tau/n), z) for z,r in profile for i in range(n)]
     fs = [tuple(reversed(range(n))),tuple(range((len(profile)-1)*n,len(profile)*n))]
@@ -128,24 +153,30 @@ def tube(name, points, radius=.2, material='metal', n=8):
         fs=[tuple(reversed(range(n))),tuple(range(n,2*n))]+[(i,(i+1)%n,(i+1)%n+n,i+n)for i in range(n)]
         mesh(name,vs,fs,material)
 
-def text(name, words, at, size, material='armor'):
-    curve=bpy.data.curves.new(name,'FONT');curve.body=words;curve.size=size;curve.align_x='CENTER';curve.extrude=.025;curve.resolution_u=2
+def text(name, words, at, size, material='armor',extrude=.025):
+    curve=bpy.data.curves.new(name,'FONT');curve.body=words;curve.size=size;curve.align_x='CENTER';curve.extrude=extrude;curve.resolution_u=2
     o=bpy.data.objects.new(name,curve);scene.collection.objects.link(o);o.location=at;o.rotation_euler.x=math.pi/2;curve.materials.append(M[material])
     bpy.context.view_layer.objects.active=o;o.select_set(True);bpy.ops.object.convert(target='MESH');o.select_set(False);parts.append(o)
 
 def window_panes(name, panes, framed=True):
-    """Flush framed glazing, batched by material; no boxes per window.
+    """Small flush glazing, batched by material; no boxes per window.
 
     A pane is (centre, horizontal tangent, outward normal, width, height).
     Vertical faces use Z up. Tangent cross Z must equal the outward normal.
     """
     batches={key:[] for key in ['dark','warm','glass','cool']}
-    for i,(center,tangent,normal,w,h) in enumerate(panes):
+    serial=0
+    for center,tangent,normal,w,h in panes:
         center,tangent,normal=Vector(center),Vector(tangent),Vector(normal)
-        layers=([('dark',w+.055,h+.045,.022)] if framed else [])+[(
-            'glass' if i%7 in [0,3] else 'cool' if i%13==5 else 'warm',w,h,.03)]
-        for material,width,height,offset in layers:
-            c=center+normal*offset
+        # Keep the architectural bay, but replace oversized glass with small
+        # groups of room windows. No ship-sized frames around each tiny pane.
+        width,height=min(w,detail_units(3)),min(h,detail_units(1.4))
+        count=3 if w>=detail_units(10) else 1
+        pitch=min(w*.32,detail_units(4.5))
+        for j in range(count):
+            c=center+tangent*((j-(count-1)/2)*pitch)+normal*.025
+            material='warm' if serial%9==0 else 'cool' if serial%31==5 else 'glass'
+            serial+=1
             batches[material].extend(tuple(c+tangent*dx+Vector((0,0,dz)))
                 for dx,dz in [(-width/2,-height/2),(width/2,-height/2),(width/2,height/2),(-width/2,height/2)])
     for material,vertices in batches.items():
@@ -163,41 +194,42 @@ def window_arc(name,radius,z,rows,n=48,center=(0,0),start=0,end=math.tau,inward=
     for face in range(n):
         a=start+face*step;b=a+step;mid=(a+b)/2
         face_width=2*radius*math.sin(step/2)
-        count=max(1,int((face_width-.12)/pitch))
+        count=max(1,int((face_width-.12)/max(pitch,2.4)))
         tangent=Vector((-math.sin(mid),math.cos(mid),0))*(-1 if inward else 1)
         normal=Vector((math.cos(mid),math.sin(mid),0))*(-1 if inward else 1)
         c=Vector((center[0]+radius*math.cos(step/2)*math.cos(mid),center[1]+radius*math.cos(step/2)*math.sin(mid),z))
         for row in range(rows):
-            for i in range(count):panes.append((c+tangent*((i-(count-1)/2)*pitch)+Vector((0,0,row*row_pitch)),tangent,normal,.38,.18))
+            for i in range(count):panes.append((c+tangent*((i-(count-1)/2)*max(pitch,2.4))+Vector((0,0,row*row_pitch)),tangent,normal,min(1.6,face_width*.65),.38))
     window_panes(name,panes,framed=False)
 
 def windows(radius,z,rows,name,n=48):
     window_arc(name,radius,z+.09,rows,n)
 
-def tank(name, x,y,z,r,height):
+def tank(name, x,y,z,r,height,collar_segments=16):
     lathe(name,[(z-height/2,r*.68),(z-height/2+.5,r),(z+height/2-.5,r),(z+height/2,r*.68)],'copper',16,(x,y))
     for zz in [z-height*.32,z+height*.32]:
-        o=ring(name+' collar',r+.07,.18,zz,.23,'metal',16);o.location.x=x;o.location.y=y
+        o=ring(name+' collar',r+.07,.18,zz,.23,'metal',collar_segments);o.location.x=x;o.location.y=y
     tube(name+' bypass return',[(x+r,y,z),(x+r+.6,y,z),(x+r+.6,y,z-height/2-.8),(x,y,z-height/2-.8),(x,y,z-height/2+.1)],.13)
 
 def container(name,x,y,z,w=1.05,d=2.5,h=1):
     box(name,(x,y,z+h/2),(w,d,h),'copper',chamfer=.09)
     for yy in [-d*.35,d*.35]:box(name+' bands',(x,y+yy,z+h/2),(w+.025,.07,h+.025),'metal')
 
-# A crew door is about three window heights, not a ship-sized hangar portal.
+# Base door proportions; crew_door converts the whole fixture to world scale.
 CREW_DOOR_HEIGHT=.56
 CREW_DOOR_WIDTH=.30
 
 def crew_door(name,at,tangent,normal):
     """Small personnel airlock with proportional frame, leaves and controls."""
     at,t,n=Vector(at),Vector(tangent),Vector(normal)
+    scale=detail_units(3)/CREW_DOOR_HEIGHT
     def piece(label,u,v,z,w,d,h,material):
-        c=at+t*u+n*v+Vector((0,0,z))
+        c=at+(t*u+n*v+Vector((0,0,z)))*scale
         # Local X follows tangent and local -Y faces the normal.
-        return box(name+' '+label,c,(w,d,h),material,yaw=math.atan2(t.y,t.x))
+        return box(name+' '+label,c,(w*scale,d*scale,h*scale),material,yaw=math.atan2(t.y,t.x))
     def plate(label,u,v,z,w,h,material):
-        c=at+t*u+n*v+Vector((0,0,z))
-        return mesh(name+' '+label,[tuple(c+t*dx+Vector((0,0,dz))) for dx,dz in [(-w/2,-h/2),(w/2,-h/2),(w/2,h/2),(-w/2,h/2)]],[(0,1,2,3)],material)
+        c=at+(t*u+n*v+Vector((0,0,z)))*scale
+        return mesh(name+' '+label,[tuple(c+(t*dx+Vector((0,0,dz)))*scale) for dx,dz in [(-w/2,-h/2),(w/2,-h/2),(w/2,h/2),(-w/2,h/2)]],[(0,1,2,3)],material)
     w,h=CREW_DOOR_WIDTH,CREW_DOOR_HEIGHT
     plate('recess',0,.018,h/2,w+.09,h+.04,'dark')
     for u in [-w/2-.022,w/2+.022]:piece('jamb',u,.015,h/2,.045,.09,h+.065,'metal')
@@ -210,17 +242,21 @@ def crew_door(name,at,tangent,normal):
 def block(name, at, size, material='hull', rows=3):
     """Occupied module with glazing on all four faces, seated roof and crew door."""
     x,y,z=at;w,d,h=size
-    box(name,at,size,material,chamfer=min(.6,w*.07))
+    body=box(name,at,size,material,chamfer=min(.6,w*.07))
+    bevel=body.modifiers.new('Pressure module edge protection','BEVEL');bevel.width=min(.25,detail_units(.8),h*.06);bevel.segments=1
+    bpy.context.view_layer.objects.active=body;bpy.ops.object.modifier_apply(modifier=bevel.name)
     box(name+' roof',(x,y,z+h/2+.18),(w+.5,d+.5,.4),'armor',chamfer=.25)
     for side in [-1,1]:
-        box(name+' reinforced corner',(x+side*(w/2-.45),y-d/2-.06,z),(.3,.3,h-.5),'metal')
+        box(name+' reinforced corner',(x+side*(w/2-min(.95,w*.25)),y-d/2-.06,z),(.3,.3,h-.5),'metal')
     crew_door(name+' crew airlock',(x,y-d/2,z-h/2),(1,0,0),(0,-1,0))
-    # Keep the original storey pitch and window size. Add side/rear glazing
-    # without quadrupling the old individual twelve-triangle window boxes.
+    # Group glazing into readable bays across the actual occupied height.
     for dx,dy,t,n,span in [(0,-d/2,(1,0,0),(0,-1,0),w),(0,d/2,(-1,0,0),(0,1,0),w),
             (w/2,0,(0,1,0),(1,0,0),d),(-w/2,0,(0,-1,0),(-1,0,0),d)]:
-        count=max(1,int((span-1.6)/.9))
-        window_wall(name,(x+dx,y+dy,z-h/2+.92),t,n,count,min(rows,max(1,int((h-1.25)/.65))),pitch=.9)
+        count=max(1,int((span-1.6)/3.6));floors=max(1,min(rows,int(max(1,h-1)/1.3)))
+        pitch=(span-1.6)/(count+1);row_pitch=max(.7,(h-2.2)/max(1,floors-1))
+        window_wall(name+' recessed occupied bays',(x+dx,y+dy,z-h/2+1.1),t,n,count,floors,pitch=pitch,row_pitch=row_pitch,width=min(1.8,pitch*.68),height=min(.65,row_pitch*.4))
+    for zz in [z-h/2+.7,z+h/2-.7]:
+        for side in [-1,1]:box(name+' facade floor datum',(x,y+side*(d/2+.025),zz),(w-.9,.16,.22),'metal')
 
 def truss(name,a,b,width=2):
     a,b=Vector(a),Vector(b);u=(b-a).normalized();v=u.cross(Vector((0,0,1)))
@@ -336,16 +372,53 @@ def seat_windows():
 
 def export_model(station_id, metadata, description):
     source=ROOT/'authoring/models/stations'/station_id;source.mkdir(parents=True,exist_ok=True)
+    metadata['detailScale']={'ordinaryWindowWorldSize':[3,1.4],'crewDoorWorldHeight':3,
+        'capitalWindowReferenceHeight':2.486,'sourceToWorld':SOURCE_TO_WORLD,'panelWorldSize':[6,3]}
     window_support=seat_windows()
     bpy.context.view_layer.update()
     for o in parts:
+        # Converted lettering may carry a generated UVMap. Keep only the
+        # authored atlas coordinates so the exporter cannot select that map.
+        for layer in list(o.data.uv_layers):o.data.uv_layers.remove(layer)
         uv=o.data.uv_layers.new(name='Physical structural panels')
+        atlas_cells=json.loads(o['station_atlas_cells'])if o.get('station_atlas_cells')else None
+        city=json.loads(o['station_city_facade'])if o.get('station_city_facade')else None
         for p in o.data.polygons:
+            if city and abs(p.normal.z)<.01 and max(abs(p.normal.x),abs(p.normal.y))>.99:
+                x0,y0,x1,y1,w,d,base,h=city
+                axis=0 if abs(p.normal.y)>.99 else 1;span=w if axis==0 else d
+                for li in p.loop_indices:
+                    v=o.data.vertices[o.data.loops[li].vertex_index].co
+                    u=v[axis]/span+.5;t=(v.z-base)/h
+                    uv.data[li].uv=(x0+u*(x1-x0),y0+t*(y1-y0))
+                continue
+            if atlas_cells:
+                x0,y0,x1,y1=atlas_cells[p.index%len(atlas_cells)]
+                if len(p.loop_indices)==4:
+                    coords=[(0,0),(1,0),(1,1),(0,1)]
+                else:
+                    axis=max(range(3),key=lambda k:abs(p.normal[k]));axes=[k for k in range(3)if k!=axis]
+                    points=[o.data.vertices[o.data.loops[li].vertex_index].co for li in p.loop_indices]
+                    low=[min(v[a]for v in points)for a in axes];high=[max(v[a]for v in points)for a in axes]
+                    coords=[tuple((v[a]-low[j])/max(1e-6,high[j]-low[j])for j,a in enumerate(axes))for v in points]
+                for li,(u,v)in zip(p.loop_indices,coords):uv.data[li].uv=(x0+u*(x1-x0),y0+v*(y1-y0))
+                continue
+            if o.get('station_panel_layout')=='faceted'and len(p.loop_indices)==4:
+                # Author-selected hero panels occupy one quiet atlas cell per
+                # hull facet. This avoids dense projected repeats on shoulders.
+                col=p.index%4
+                for li,(u,v)in zip(p.loop_indices,[(0,0),(1,0),(1,1),(0,1)]):
+                    uv.data[li].uv=((col+.012+u*.976)/4,(7+.012+v*.976)/8)
+                continue
             axis=max(range(3),key=lambda k:abs(p.normal[k]));axes=[k for k in range(3)if k!=axis]
             for li in p.loop_indices:
                 v=o.matrix_world@o.data.vertices[o.data.loops[li].vertex_index].co
-                uv.data[li].uv=(v[axes[0]]/14,v[axes[1]]/14)
+                size=detail_units(24)*o.get('station_panel_scale',1)
+                uv.data[li].uv=(v[axes[0]]/size,v[axes[1]]/size)
     radius=max((o.matrix_world@v.co).length for o in parts for v in o.data.vertices)
+    # A new hull may replace a square corner with a curved surface. Keep the
+    # authored envelope so existing berths and film cameras retain their scale.
+    radius=max(radius,metadata.get('architecture',{}).get('originalRadius',0))
     detached=structural_audit()
     assert not detached,[(g['parts'][0],len(g['parts']))for g in detached]
     scene['source_radius']=radius;scene['description']=description;scene['shipping_triangle_budget']=40000
@@ -371,7 +444,10 @@ def export_model(station_id, metadata, description):
     raw=path.read_bytes();jl=struct.unpack_from('<I',raw,12)[0];doc=json.loads(raw[20:20+jl]);binary=raw[20+jl+8:]
     for material in doc['materials']:
         key=material['name'].split(' · ')[-1]
-        if key in COLORS:material.setdefault('pbrMetallicRoughness',{})['baseColorFactor']=[*COLORS[key],1]
+        if key in COLORS:material.setdefault('pbrMetallicRoughness',{})['baseColorFactor']=[*COLORS[key],M[key].diffuse_color[3]]
+        if key=='canopy':
+            material['alphaMode']='BLEND';material['doubleSided']=False
+            material['extras']={'voidGlassCanopy':True}
         if key in ['warm','cool','glass','ochre']:material['extras']={'voidSurfaceOverlay':True}
     from station_occlusion import bake
     binary,occlusion=bake(doc,binary)

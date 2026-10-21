@@ -42,6 +42,9 @@ export function addStationActivity(station, id) {
         };
         dock.updateMatrixWorld(true);
         for (const ship of [...dock.children].filter(n => n.userData.stationOccupant)) {
+            // Moored visiting capitals have pressure connections rather than
+            // drydock floors, repair lifts or welding activity.
+            if(ship.userData.stationBerth?.moored)continue;
             // Bounds and ray tests stay in the dock's local coordinate system.
             ship.updateMatrix();
             const bounds = new THREE.Box3();

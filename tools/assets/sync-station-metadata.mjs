@@ -3,11 +3,13 @@ import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {STATION_DOCKS} from '../../src/game/stationDocks.js';
 const docks={},occupants={},reports={};
+const clearanceStations=new Set(Object.keys(STATION_DOCKS));
 for(const id of Object.keys(STATION_DOCKS)){
  const r=JSON.parse(fs.readFileSync(`authoring/models/stations/${id}/model-report.json`));
  reports[id]=r;
  if(r.physicalDetachedGroups?.length!==0)throw Error(`${id}: run the physical source audit before syncing`);
- docks[id]={radius:r.sourceRadius,approachVector:[0,-1,0],cinematic:r.cinematic??STATION_DOCKS[id].cinematic??{entrySide:.12,exitSide:.10,elevation:.10,lift:.06},playerPads:r.playerPads,lanes:r.lanes};
+ if(clearanceStations.has(id)&&!r.practicalClearance?.checks?.length)throw Error(`${id}: run the source clearance audit before syncing`);
+ docks[id]={...(r.sharedEntry?{sharedEntry:r.sharedEntry}:{}),radius:r.sourceRadius,approachVector:[0,-1,0],cinematic:r.cinematic??STATION_DOCKS[id].cinematic??{entrySide:.12,exitSide:.10,elevation:.10,lift:.06},playerPads:r.playerPads,lanes:r.lanes};
  occupants[id]={radius:r.sourceRadius,ships:r.occupants};
 }
 fs.writeFileSync('src/game/stationDocks.js',`// Authored floors, aprons and shared approach lanes. Blender Z-up, front -Y.\n// Generated from current model reports by tools/assets/sync-station-metadata.mjs.\nexport const STATION_DOCKS = ${JSON.stringify(docks,null,2)};\n`);

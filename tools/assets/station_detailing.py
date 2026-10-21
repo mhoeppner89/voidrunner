@@ -2,6 +2,7 @@
 import math
 import station_builder as B
 from station_builder import box,beam,ring,tube,lathe,truss,mesh
+from mathutils import Matrix,Vector
 
 # Personnel doors use the same dimensions on the concourse and occupied modules.
 # Freight shutters are separate, deliberately ship-sized industrial entrances.
@@ -20,18 +21,29 @@ def front_door(x,y,z,w=3,h=3.8):
         box('Roller door reinforced slat',(x,y-.26,z+zz*.5),(w-.25,.16,.22),'metal')
     box('Service door illuminated panel',(x,y-.75,z+h+.2),(w*.55,.12,.13),'warm')
 
+def scale_fixture(first,anchor,world_height,source_height):
+    scale=min(1,B.detail_units(world_height)/source_height)
+    a=Vector(anchor);transform=Matrix.Translation(a)@Matrix.Scale(scale,4)@Matrix.Translation(-a)
+    for o in B.parts[first:]:o.matrix_world=transform@o.matrix_world
+
 def wall_equipment(x,y,z,side=1):
+    first=len(B.parts)
     box('Recessed wall plant backplate',(x,y,z+1.8),(.4,2.8,3.6),'metal')
     for yy in [y-.7,y+.7]:
         box('Wall plant enclosure',(x-side*.4,yy,z+1.8),(.7,.9,2.9),'armor',chamfer=.12)
         for zz in [z+1,z+1.6,z+2.2]:box('Plant cooling slot',(x-side*.8,yy,zz),(.12,.6,.19),'dark')
     tube('Wall plant common conduit',[(x,y-1.2,z+.2),(x-side*.45,y-1.2,z+.2),(x-side*.45,y+1.2,z+.2),(x,y+1.2,z+.2)],.15,'copper')
 
+    scale_fixture(first,(x,y,z),6,3.6)
+
 def roof_machine(x,y,z,w=3):
+    first=len(B.parts)
     box('Plant seated plinth',(x,y,z+.15),(w+1,3.8,.3),'metal')
     box('Plant angular enclosure',(x,y,z+1.1),(w,3,1.9),'armor',chamfer=.35)
     for dy in [-.8,0,.8]:box('Plant grille duct',(x,y+dy,z+2.1),(w*.7,.35,.25),'dark')
     tube('Plant insulated feed',[(x+w/2,y,z+.7),(x+w/2+.7,y,z+.7),(x+w/2+.7,y,z+.05)],.22,'copper')
+
+    scale_fixture(first,(x,y,z),5,2.225)
 
 def hall(r):
     h=r['concourse']['hall'];w=h['width'];front=h['front'];back=h['back'];floor=r['concourse']['touchdowns'][0][2]
@@ -59,10 +71,17 @@ def hall(r):
             B.window_wall('Rear concourse inhabited rooms',
                 (side*(w+transfer)/4,back-.5,floor+level+1.05),
                 (1,0,0),(0,-1,0),min(6,int(span/1.1)),2,pitch=1.0,row_pitch=.48,width=.32)
+    for side in [-1,1]:
+        x=side*(w/2-.04)
+        for y in [front+9,back-6]:
+            B.window_wall('Staffed concourse service frontage',(x,y,floor+1.7),(0,-side,0),(-side,0,0),3,1,pitch=1.25,width=1.05,height=.7)
+            box('Occupied-edge service counter',(x-side*.20,y,floor+.65),(.4,4,1.3),'metal',chamfer=.12)
+        for y in [front+4,back-3]:side_door(x,y,floor,side)
+        beam('Concourse protected walkway datum',(x,front+.7,floor+.25),(x,back-.7,floor+.25),.18,'ochre')
     if r['id']=='helix':
         cy=back-2.8
         for z in [floor+4,floor+8,floor+12]:
-            o=ring('Atrium lift illuminated collar',2.09,.16,z+.75,.22,'cool',32);o.location.y=cy
+            o=ring('Atrium lift illuminated collar',2.09,.16,z+.75,.22,'cool',16);o.location.y=cy
             for side in [-1,1]:
                 box('Elevator articulated guide',(side*1.3,cy-1.42,z-1.1),(.22,.6,2.4),'metal')
         front_airlock(0,cy-2,floor)
@@ -158,14 +177,14 @@ def apply(station_id,r):
         for x,y,h in [(-24,12,20),(-16,22,35),(-7,28,25)]:
             o=ring('Fuel reservoir valve platform',4.6,.7,-10+h*.73,.45,'metal',24);o.location.x=x;o.location.y=y
             tube('Fuel reservoir external riser',[(x-4,y,-10),(x-4,y,-10+h*.7),(x,y,-10+h*.7)],.28,'ochre')
-        roof_machine(12,19,.4,4)
+        roof_machine(12,17,6.33,4)
     elif station_id=='nacre':
         # Clean glazed observation pods remain behind the open landing circle.
         for x in [-9,9]:
             box('Science apron instrument pedestal',(x,-50,-11.5),(2,2,1),'metal')
             lathe('Sample transfer capsule',[(-11, .6),(-10.6,.9),(-8.3,.9),(-8,.6)],'armor',16,(x,-50))
-            box('Capsule sample window',(x,-50.8,-9.6),(1,.3,.9),'glass')
-        for x in [-40,40]:roof_machine(x,0,13.23,3)
+            box('Capsule sample window',(x,-50.8,-9.6),(B.detail_units(3),.3,B.detail_units(1.4)),'glass')
+        for x in [-40,40]:roof_machine(x,0,10.25,3)
         for i in range(4):
             a=i*math.tau/4+math.pi/48;cx,cy=40*math.cos(i*math.tau/4),40*math.sin(i*math.tau/4)
             rr=13*math.cos(math.pi/48)
@@ -176,7 +195,7 @@ def apply(station_id,r):
         front_airlock(9.8,-2.5,-14)
         for z in [15,20,25]:
             o=ring('Relay tower guide collar',11-(z+18)/11+.15,.65,z,.5,'metal',32);o.location.x=-10;o.location.y=8
-        roof_machine(13,14,4.4,3)
+        roof_machine(13,14,-1.6,3)
     elif station_id=='haven':
         for x in [-24,24]:roof_machine(x,12,21.4,3)
     elif station_id=='league-yard':
@@ -186,16 +205,7 @@ def apply(station_id,r):
             tube('Courtyard tower feed',[(x,y,-17),(x+3,y,-17),(x+3,y,0),(x,y,0)],.3,'metal')
         roof_machine(0,23,13.4,4)
     if station_id=='rook':
-        # The fortress tapers above and below its widest belt. Each row follows
-        # its actual octagonal plane, rather than floating at a constant radius.
-        before=len(B.parts)
-        for z in [-14,-10,1,5,10]:
-            radius=30+(z+21)*3/17 if z<-4 else 33-(z+4)*5/21
-            B.window_arc('Citadel occupied decks',radius,z,1,8,pitch=1.4)
-        # Remove glazing where the front citadel shell was excavated for the hall.
-        for o in B.parts[before:]:
-            faces=[tuple(p.vertices) for p in o.data.polygons if not(abs(p.center.x)<9.6 and p.center.y<-13 and -11.3<p.center.z<8)]
-            data=B.bpy.data.meshes.new(o.name+' clear hall');data.from_pydata([v.co for v in o.data.vertices],[],faces);data.materials.append(o.data.materials[0]);o.data=data
+        pass
     elif station_id=='argent':
         before=len(B.parts)
         for inward in [False,True]:B.window_arc('Assembly torus occupied rooms',56 if inward else 64,2.2,4,64,inward=inward,pitch=1.35)
@@ -211,6 +221,6 @@ def apply(station_id,r):
         for side in [-1,1]:
             for y in [-52,-30,-8,14,36,57]:
                 B.window_wall('Drydock pier workroom',(side*27+side*3.5,y,0),(0,side,0),(side,0,0),6,2)
-    r['crewDoorHeight']=B.CREW_DOOR_HEIGHT
-    r['crewDoorWidth']=B.CREW_DOOR_WIDTH
+    r['crewDoorHeight']=B.detail_units(3)
+    r['crewDoorWidth']=B.detail_units(3)*B.CREW_DOOR_WIDTH/B.CREW_DOOR_HEIGHT
     r['detailParts']=len(B.parts)-detail_start

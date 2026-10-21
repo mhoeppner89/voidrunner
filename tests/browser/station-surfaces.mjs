@@ -22,7 +22,7 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1280,heig
     const projection={near:r.camera.near,far:r.camera.far,aspect:r.camera.aspect};
     const scale=LOCATIONS[id].radius*(id==='blackglass'?.2:.95)/100;let maps=0,colors=0;
     root.traverse(o=>{if(!o.isMesh)return;if(o.geometry.attributes.color&&o.material.vertexColors)colors++;if(o.material.map){maps++;if(o.material.map.minFilter!==T.LinearMipmapLinearFilter||!o.material.map.generateMipmaps)throw Error('Missing mip filtering');}});
-    for(const view of ['concourse','terminal','overview']){
+    for(const view of ['concourse','terminal','overview','habitat','engineering','underside','rear']){
      r.setView(view);r.camera.near=.08/scale;r.camera.far=2000000/scale;r.camera.aspect=640/360;r.camera.updateProjectionMatrix();const start=r.camera.position.clone(),focus=start.clone().add(r.camera.getWorldDirection(new T.Vector3()).multiplyScalar(40));
      for(const [build,model]of [...(old?[['previous',old]]:[]),['current',root]]){
       r.scene.remove(root,old);r.scene.add(model);let worst=0;

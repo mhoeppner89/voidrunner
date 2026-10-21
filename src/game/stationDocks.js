@@ -41,6 +41,12 @@ export const STATION_DOCKS = {
     ]
   },
   "rook": {
+    "sharedEntry": {
+      "x": 0,
+      "innerY": -38,
+      "frontY": -43,
+      "width": 5.25
+    },
     "radius": 66.17620712925944,
     "approachVector": [
       0,
@@ -64,14 +70,14 @@ export const STATION_DOCKS = {
     ],
     "lanes": [
       [
-        -4.3,
+        -2.8,
         -32.04,
         -11,
         4,
         7
       ],
       [
-        4.3,
+        2.8,
         -32.04,
         -11,
         4,

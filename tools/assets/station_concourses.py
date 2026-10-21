@@ -91,8 +91,8 @@ def railing(a,b,z,colour='metal'):
         p=a.lerp(b,i/n);beam('Concourse guard post',p,p+Vector((0,0,.7)),.085,colour)
     for h in [.34,.7]:beam('Concourse guard rail',a+Vector((0,0,h)),b+Vector((0,0,h)),.075,colour)
 
-def circle(name,x,y,z,r,material='ochre'):
-    o=ring(name,r,.055,z+.015,.05,material,64);o.location.x=x;o.location.y=y
+def circle(name,x,y,z,r,material='ochre',segments=64):
+    o=ring(name,r,.055,z+.015,.05,material,segments);o.location.x=x;o.location.y=y
     for dx in [-r*.4,r*.4]:box(name+' centre mark',(x+dx,y,z+.015),(.08,r*.6,.05),material)
 
 def floor_lights(x,y,z,width):
@@ -103,7 +103,8 @@ def metadata(station_id,positions,floor,npcs,door_width,door_height,hall=None,ro
     """Positions are actual touchdown centres; compensate the legacy pad offset."""
     specs=[[x,y+7*.28,floor,4,7]for x,y in positions]
     for i,(x,y)in enumerate(positions):
-        circle('Shared concourse landing circle'if i==0 else 'Traffic landing circle',x,y,floor,3 if i==0 else 2.5,'armor'if station_id=='nacre'else'ochre')
+        circle('Shared concourse landing circle'if i==0 else 'Traffic landing circle',x,y,floor,3 if i==0 else 2.5,'armor'if station_id=='nacre'else'ochre',
+            (32 if i==0 else 24)if station_id=='helix'else 64)
         floor_lights(x,y,floor,2.7 if i==0 else 2.2)
     occupants=[{'hull':h,'at':[x,y+3.8,floor],'size':[2,1.5,3]}for(x,y),h in zip(positions[1:],npcs)]
     ref,kind,description=REFERENCES[station_id]
@@ -212,14 +213,19 @@ def courtyard(station_id,floor,radius,industrial=False):
 
 def build(station_id,npcs=('atlas','wayfarer')):
     if station_id=='helix':return hall('helix',-43,-7,-13.5,24,15,14,[(0,-26),(-5,-32),(5,-32)],npcs,True,True)
-    if station_id=='rook':return hall('rook',-43,-16,-11,19,19,13,[(0,-27),(-4.3,-34),(4.3,-34)],npcs,True)
+    if station_id=='rook':
+        m=hall('rook',-43,-16,-11,19,30,5.25,[(0,-27),(-2.8,-34),(2.8,-34)],npcs,True)
+        # One small door, then a real manoeuvring area before the two berths.
+        m['sharedEntry']={'x':0,'innerY':-38,'frontY':-43,'width':5.25}
+        for occupant in m['occupants']:occupant['at'][1]+=6
+        return m
     if station_id=='league-yard':return hall('league-yard',-84,-54,-14,34,22,23,[(0,-67),(-8,-75),(8,-75)],npcs,True,factory=True)
     if station_id=='cairn':
         # The actual yard floor is the landing space; its workshop roof shelters the centre.
-        box('Workshop landing canopy',(-3,-16,5.4),(32,24,.8),'armor',chamfer=.5)
-        for x in [-18,12]:
-            for y in [-26,-5]:beam('Workshop canopy support',(x,y,-11),(x,y,5.4),.8)
-        for y in [-25,-17,-9]:beam('Canopy roof girder',(-18,y,4.8),(12,y,4.8),.55)
+        box('Workshop landing canopy',(-3,-12,5.4),(36,16,1.6),'armor',chamfer=1)
+        for x in [-19,14]:
+            for y in [-5]:beam('Workshop canopy support',(x,y,-11),(x,y,5.4),1.8)
+        for y in [-18,-10]:beam('Canopy roof girder',(-18,y,4.8),(12,y,4.8),.55)
         return metadata('cairn',[(0,-17),(-9,-27),(9,-27)],-11,npcs,24,16,{'width':30,'front':-28,'back':-4,'height':16},True)
     if station_id=='argent':
         carve('Torus open landing terrace',(-9,-69,-.2),(9,-48,8.5))
@@ -229,7 +235,7 @@ def build(station_id,npcs=('atlas','wayfarer')):
             box('Torus terrace flank',(x,-59,4.2),(.8,23,8.4),'hull')
             for y in [-68,-60,-50]:beam('Torus terrace pier',(x,y,0),(x,y,8.9),.7)
         portal('Torus open terrace frame',0,-70,0,17,8,.6)
-        for y in [-67,-60,-52]:box('Torus ceiling light',(0,y,8.4),(6,.2,.15),'warm')
+        for y in [-67,-60,-52]:box('Torus ceiling light',(0,y,8.49),(6,.2,.15),'warm')
         return metadata('argent',[(0,-57),(-5,-64),(5,-64)],0,npcs,17,8,{'width':18,'front':-70,'back':-48,'height':8.5},True)
     if station_id=='gatehouse-twelve':
         # An open side preserves the space view; the left tunnel joins the warehouse.
@@ -251,9 +257,6 @@ def build(station_id,npcs=('atlas','wayfarer')):
         for x in [-13.8,-4.2]:box('Inspection tunnel pressure wall',(x,-2,-8.25),(.6,16,8.5),'hull')
         return metadata('gatehouse-twelve',[(0,-23),(-7,-31),(7,-31)],-12.5,npcs,30,11,{'width':32,'front':-38,'back':-10,'height':12},True)
     if station_id=='cinder':
-        for x in [8,29]:beam('Refinery side portal pier',(x,-30,-21),(x,-30,-10),1.2,'armor')
-        box('Refinery side port roof',(18.5,-25,-9.9),(22,11,1),'armor')
-        portal('Refinery side opening',18.5,-30,-21,19,10,.65)
         return metadata('cinder',[(0,-23),(-10,-28),(11,-28)],-21,npcs,19,10,None,False)
     if station_id=='nacre':
         lathe('Laboratory circular landing terrace',[(-14,13),(-12.8,15),(-12,15)],'armor',64,(0,-53))

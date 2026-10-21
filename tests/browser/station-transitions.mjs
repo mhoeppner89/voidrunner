@@ -25,7 +25,7 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
     const r=__VOID_PRIVATEER__.getRuntime(),shot=r.ui.concourseShip.transit,{STATION_OCCUPANTS}=await import('/src/game/stationOccupants.js');
     const cinematic=shot.model.getObjectByName('station-docked-ships'),live=r.renderer.locationMeshes.get(id).getObjectByName('station-docked-ships');
     const ships=STATION_OCCUPANTS[id].ships.map(item=>{
-     const a=cinematic?.getObjectByName(`berthed-${item.hull}`),b=live?.getObjectByName(`berthed-${item.hull}`);
+     const a=cinematic?.getObjectByName(`berthed-${item.id??item.hull}`),b=live?.getObjectByName(`berthed-${item.id??item.hull}`);
      return {hull:item.hull,present:!!a&&!!b,sameScale:!!a&&!!b&&Math.abs(a.scale.x-b.scale.x)<1e-10};
     });
     return{ships};

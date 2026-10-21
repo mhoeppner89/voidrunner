@@ -2,38 +2,39 @@
   "helix": {
     "id": "helix",
     "sourceRadius": 84.42890708589043,
-    "triangles": 34618,
+    "triangles": 38759,
     "materials": 10,
-    "bytes": 2449724,
-    "sourceParts": 1515,
+    "bytes": 2487948,
+    "sourceParts": 2079,
     "detachedGroups": [],
-    "description": "Commercial refinery freeport with deep multilevel arrival atrium, central lift, inhabited galleries and connected freight pier.",
+    "description": "Three circular refinery decks with dense enclosed urban districts, paired sealed freight holds and a clear shared arrival atrium.",
     "windowSupport": {
-      "supportedFaces": 3644,
-      "discardedFaces": 4,
+      "supportedFaces": 2230,
+      "discardedFaces": 36,
       "facadeFaces": [
-        1078,
-        1078,
-        792,
-        696
+        617,
+        617,
+        519,
+        477
       ],
       "maxStandOff": 0.075
     },
     "surfaceCleanup": {
-      "coplanarSubtractions": 515,
-      "overlapAreaRemoved": 365.6738,
+      "coplanarSubtractions": 743,
+      "overlapAreaRemoved": 511.9181,
       "tolerance": 0.0001
     },
     "contactOcclusion": {
       "samples": 6,
       "radius": 2.4,
       "minimum": 0.58,
-      "vertices": 103854
+      "vertices": 116277
     },
     "packing": {
-      "verticesBefore": 103854,
-      "verticesAfter": 63138,
-      "positionPrecision": 0.00001
+      "verticesBefore": 116277,
+      "verticesAfter": 73637,
+      "positionPrecision": 0.00001,
+      "unusedUvBytesRemoved": 576528
     },
     "portalWidth": 14,
     "portalHeight": 9,
@@ -149,50 +150,1412 @@
         "height": 15
       }
     },
-    "crewDoorHeight": 0.56,
-    "crewDoorWidth": 0.3,
-    "detailParts": 711,
+    "crewDoorHeight": 0.30297454695893694,
+    "crewDoorWidth": 0.1623077930137162,
+    "detailParts": 693,
+    "architecture": {
+      "revision": "inhabited-refinery-city-v3",
+      "originalRadius": 84.42890708589043,
+      "partsAdded": 803,
+      "strategy": "tiered refinery spindle with inhabited roof districts",
+      "silhouettePartsAdded": 803,
+      "silhouette": "tiered refinery city, dense inhabited roof districts and paired sealed freight holds",
+      "restoredFrom": "febb5f8",
+      "cityBlocks": [
+        {
+          "name": "Helix city middle district 30 block 00",
+          "roof": "middle",
+          "center": [
+            32.023605030858405,
+            3.3658165172184416,
+            0.4
+          ],
+          "yaw": -1.4660765716752369,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 7.500000000000001,
+          "roomWindows": 480,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 03",
+          "roof": "middle",
+          "center": [
+            23.929263380372095,
+            21.546005524755238,
+            0.4
+          ],
+          "yaw": -0.8377580409572781,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 6.2250000000000005,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 04",
+          "roof": "middle",
+          "center": [
+            18.926685123817638,
+            26.05034721887331,
+            0.4
+          ],
+          "yaw": -0.6283185307179586,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 7.925000000000001,
+          "roomWindows": 480,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 05",
+          "roof": "middle",
+          "center": [
+            13.096919907040773,
+            29.416163736091747,
+            0.4
+          ],
+          "yaw": -0.41887902047863923,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 5.8,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 06",
+          "roof": "middle",
+          "center": [
+            6.694756444331848,
+            31.496352743628545,
+            0.4
+          ],
+          "yaw": -0.2094395102393194,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 8.35,
+          "roomWindows": 480,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 07",
+          "roof": "middle",
+          "center": [
+            9.121517625213248e-15,
+            32.2,
+            0.4
+          ],
+          "yaw": -2.220446049250313e-16,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 6.2250000000000005,
+          "roomWindows": 360,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 08",
+          "roof": "middle",
+          "center": [
+            -6.694756444331851,
+            31.496352743628545,
+            0.4
+          ],
+          "yaw": 0.20943951023931962,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 8.35,
+          "roomWindows": 480,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 09",
+          "roof": "middle",
+          "center": [
+            -13.096919907040762,
+            29.416163736091754,
+            0.4
+          ],
+          "yaw": 0.418879020478639,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 5.8,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 10",
+          "roof": "middle",
+          "center": [
+            -18.926685123817634,
+            26.05034721887331,
+            0.4
+          ],
+          "yaw": 0.6283185307179586,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 7.925000000000001,
+          "roomWindows": 480,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 11",
+          "roof": "middle",
+          "center": [
+            -23.929263380372088,
+            21.546005524755245,
+            0.4
+          ],
+          "yaw": 0.837758040957278,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 6.2250000000000005,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 14",
+          "roof": "middle",
+          "center": [
+            -32.023605030858405,
+            3.365816517218436,
+            0.4
+          ],
+          "yaw": 1.466076571675237,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 7.500000000000001,
+          "roomWindows": 480,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 15",
+          "roof": "middle",
+          "center": [
+            -32.023605030858405,
+            -3.3658165172184287,
+            0.4
+          ],
+          "yaw": 1.675516081914556,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 7.500000000000001,
+          "roomWindows": 480,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 16",
+          "roof": "middle",
+          "center": [
+            -30.62401982470395,
+            -9.950347218873304,
+            0.4
+          ],
+          "yaw": 1.8849555921538759,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 8.35,
+          "roomWindows": 480,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 17",
+          "roof": "middle",
+          "center": [
+            -27.886018001858933,
+            -16.099999999999994,
+            0.4
+          ],
+          "yaw": 2.0943951023931953,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 5.375,
+          "roomWindows": 360,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 18",
+          "roof": "middle",
+          "center": [
+            -23.929263380372095,
+            -21.546005524755238,
+            0.4
+          ],
+          "yaw": 2.303834612632515,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 6.2250000000000005,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 19",
+          "roof": "middle",
+          "center": [
+            -18.92668512381764,
+            -26.050347218873306,
+            0.4
+          ],
+          "yaw": 2.5132741228718345,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 7.925000000000001,
+          "roomWindows": 480,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 25",
+          "roof": "middle",
+          "center": [
+            18.92668512381763,
+            -26.050347218873313,
+            0.4
+          ],
+          "yaw": 3.7699111843077517,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 7.925000000000001,
+          "roomWindows": 480,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 26",
+          "roof": "middle",
+          "center": [
+            23.9292633803721,
+            -21.546005524755234,
+            0.4
+          ],
+          "yaw": 3.9793506945470716,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 6.2250000000000005,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 27",
+          "roof": "middle",
+          "center": [
+            27.886018001858933,
+            -16.09999999999999,
+            0.4
+          ],
+          "yaw": 4.188790204786391,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 5.375,
+          "roomWindows": 360,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 28",
+          "roof": "middle",
+          "center": [
+            30.624019824703947,
+            -9.950347218873317,
+            0.4
+          ],
+          "yaw": 4.39822971502571,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 8.35,
+          "roomWindows": 480,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 30 block 29",
+          "roof": "middle",
+          "center": [
+            32.023605030858405,
+            -3.36581651721844,
+            0.4
+          ],
+          "yaw": 4.60766922526503,
+          "width": 5.8,
+          "depth": 4.5,
+          "height": 7.500000000000001,
+          "roomWindows": 480,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 24 block 00",
+          "roof": "middle",
+          "center": [
+            25.281843965032166,
+            3.3284179016113153,
+            0.4
+          ],
+          "yaw": -1.4398966328953218,
+          "width": 5.2,
+          "depth": 4.1,
+          "height": 4.25,
+          "roomWindows": 216,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 24 block 03",
+          "roof": "middle",
+          "center": [
+            15.523416439722377,
+            20.230510177426495,
+            0.4
+          ],
+          "yaw": -0.6544984694978736,
+          "width": 5.2,
+          "depth": 4.1,
+          "height": 4.5125,
+          "roomWindows": 360,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 24 block 04",
+          "roof": "middle",
+          "center": [
+            9.758427525309791,
+            23.558928079037813,
+            0.4
+          ],
+          "yaw": -0.39269908169872414,
+          "width": 5.2,
+          "depth": 4.1,
+          "height": 5.562500000000001,
+          "roomWindows": 360,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 24 block 05",
+          "roof": "middle",
+          "center": [
+            3.3284179016113185,
+            25.281843965032166,
+            0.4
+          ],
+          "yaw": -0.1308996938995748,
+          "width": 5.2,
+          "depth": 4.1,
+          "height": 4.775,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 24 block 06",
+          "roof": "middle",
+          "center": [
+            -3.328417901611316,
+            25.281843965032166,
+            0.4
+          ],
+          "yaw": 0.1308996938995748,
+          "width": 5.2,
+          "depth": 4.1,
+          "height": 4.775,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 24 block 07",
+          "roof": "middle",
+          "center": [
+            -9.758427525309783,
+            23.558928079037816,
+            0.4
+          ],
+          "yaw": 0.3926990816987239,
+          "width": 5.2,
+          "depth": 4.1,
+          "height": 5.562500000000001,
+          "roomWindows": 360,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 24 block 08",
+          "roof": "middle",
+          "center": [
+            -15.523416439722377,
+            20.230510177426495,
+            0.4
+          ],
+          "yaw": 0.6544984694978737,
+          "width": 5.2,
+          "depth": 4.1,
+          "height": 4.5125,
+          "roomWindows": 360,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 24 block 11",
+          "roof": "middle",
+          "center": [
+            -25.281843965032166,
+            3.3284179016113256,
+            0.4
+          ],
+          "yaw": 1.4398966328953215,
+          "width": 5.2,
+          "depth": 4.1,
+          "height": 4.25,
+          "roomWindows": 216,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 24 block 12",
+          "roof": "middle",
+          "center": [
+            -25.281843965032166,
+            -3.3284179016113202,
+            0.4
+          ],
+          "yaw": 1.7016960206944716,
+          "width": 5.2,
+          "depth": 4.1,
+          "height": 4.25,
+          "roomWindows": 216,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 24 block 13",
+          "roof": "middle",
+          "center": [
+            -23.558928079037816,
+            -9.758427525309786,
+            0.4
+          ],
+          "yaw": 1.9634954084936207,
+          "width": 5.2,
+          "depth": 4.1,
+          "height": 4.775,
+          "roomWindows": 360,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 24 block 14",
+          "roof": "middle",
+          "center": [
+            -20.230510177426495,
+            -15.523416439722377,
+            0.4
+          ],
+          "yaw": 2.2252947962927703,
+          "width": 5.2,
+          "depth": 4.1,
+          "height": 5.3,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 24 block 21",
+          "roof": "middle",
+          "center": [
+            20.230510177426492,
+            -15.523416439722382,
+            0.4
+          ],
+          "yaw": 4.057890510886816,
+          "width": 5.2,
+          "depth": 4.1,
+          "height": 5.3,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 24 block 22",
+          "roof": "middle",
+          "center": [
+            23.558928079037816,
+            -9.758427525309784,
+            0.4
+          ],
+          "yaw": 4.319689898685966,
+          "width": 5.2,
+          "depth": 4.1,
+          "height": 4.775,
+          "roomWindows": 360,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city middle district 24 block 23",
+          "roof": "middle",
+          "center": [
+            25.281843965032166,
+            -3.328417901611318,
+            0.4
+          ],
+          "yaw": 4.581489286485115,
+          "width": 5.2,
+          "depth": 4.1,
+          "height": 4.25,
+          "roomWindows": 216,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 00",
+          "roof": "upper",
+          "center": [
+            25.24029013128836,
+            2.843897693024019,
+            21.9
+          ],
+          "yaw": -1.4585965891666897,
+          "width": 5,
+          "depth": 4.1,
+          "height": 11,
+          "roomWindows": 768,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 02",
+          "roof": "upper",
+          "center": [
+            21.50679466039842,
+            13.513614743489548,
+            21.9
+          ],
+          "yaw": -1.009797638653862,
+          "width": 5,
+          "depth": 4.1,
+          "height": 14.75,
+          "roomWindows": 768,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 03",
+          "roof": "upper",
+          "center": [
+            17.960512242138307,
+            17.960512242138304,
+            21.9
+          ],
+          "yaw": -0.7853981633974483,
+          "width": 5,
+          "depth": 4.1,
+          "height": 10.0625,
+          "roomWindows": 896,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 04",
+          "roof": "upper",
+          "center": [
+            13.513614743489548,
+            21.506794660398416,
+            21.9
+          ],
+          "yaw": -0.5609986881410345,
+          "width": 5,
+          "depth": 4.1,
+          "height": 13.8125,
+          "roomWindows": 768,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 06",
+          "roof": "upper",
+          "center": [
+            2.843897693024015,
+            25.24029013128836,
+            21.9
+          ],
+          "yaw": -0.11219973762820667,
+          "width": 5,
+          "depth": 4.1,
+          "height": 14.75,
+          "roomWindows": 896,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 07",
+          "roof": "upper",
+          "center": [
+            -2.8438976930240125,
+            25.24029013128836,
+            21.9
+          ],
+          "yaw": 0.11219973762820667,
+          "width": 5,
+          "depth": 4.1,
+          "height": 14.75,
+          "roomWindows": 896,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 09",
+          "roof": "upper",
+          "center": [
+            -13.513614743489546,
+            21.50679466039842,
+            21.9
+          ],
+          "yaw": 0.5609986881410345,
+          "width": 5,
+          "depth": 4.1,
+          "height": 13.8125,
+          "roomWindows": 768,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 10",
+          "roof": "upper",
+          "center": [
+            -17.960512242138304,
+            17.960512242138307,
+            21.9
+          ],
+          "yaw": 0.7853981633974483,
+          "width": 5,
+          "depth": 4.1,
+          "height": 10.0625,
+          "roomWindows": 896,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 11",
+          "roof": "upper",
+          "center": [
+            -21.506794660398416,
+            13.513614743489551,
+            21.9
+          ],
+          "yaw": 1.009797638653862,
+          "width": 5,
+          "depth": 4.1,
+          "height": 14.75,
+          "roomWindows": 768,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 13",
+          "roof": "upper",
+          "center": [
+            -25.24029013128836,
+            2.8438976930240227,
+            21.9
+          ],
+          "yaw": 1.4585965891666897,
+          "width": 5,
+          "depth": 4.1,
+          "height": 11,
+          "roomWindows": 768,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 14",
+          "roof": "upper",
+          "center": [
+            -25.24029013128836,
+            -2.843897693024016,
+            21.9
+          ],
+          "yaw": 1.6829960644231035,
+          "width": 5,
+          "depth": 4.1,
+          "height": 11,
+          "roomWindows": 768,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 15",
+          "roof": "upper",
+          "center": [
+            -23.974636589832535,
+            -8.38908817366124,
+            21.9
+          ],
+          "yaw": 1.9073955396795172,
+          "width": 5,
+          "depth": 4.1,
+          "height": 12.875,
+          "roomWindows": 768,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 17",
+          "roof": "upper",
+          "center": [
+            -17.96051224213831,
+            -17.960512242138304,
+            21.9
+          ],
+          "yaw": 2.356194490192345,
+          "width": 5,
+          "depth": 4.1,
+          "height": 10.0625,
+          "roomWindows": 896,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 18",
+          "roof": "upper",
+          "center": [
+            -13.513614743489551,
+            -21.506794660398416,
+            21.9
+          ],
+          "yaw": 2.5805939654487586,
+          "width": 5,
+          "depth": 4.1,
+          "height": 13.8125,
+          "roomWindows": 768,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 19",
+          "roof": "upper",
+          "center": [
+            -8.389088173661248,
+            -23.97463658983253,
+            21.9
+          ],
+          "yaw": 2.8049934407051724,
+          "width": 5,
+          "depth": 4.1,
+          "height": 9.125,
+          "roomWindows": 480,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 20",
+          "roof": "upper",
+          "center": [
+            -2.843897693024024,
+            -25.24029013128836,
+            21.9
+          ],
+          "yaw": 3.029392915961586,
+          "width": 5,
+          "depth": 4.1,
+          "height": 14.75,
+          "roomWindows": 896,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 21",
+          "roof": "upper",
+          "center": [
+            2.8438976930240147,
+            -25.24029013128836,
+            21.9
+          ],
+          "yaw": 3.253792391218,
+          "width": 5,
+          "depth": 4.1,
+          "height": 14.75,
+          "roomWindows": 896,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 22",
+          "roof": "upper",
+          "center": [
+            8.389088173661237,
+            -23.97463658983254,
+            21.9
+          ],
+          "yaw": 3.478191866474414,
+          "width": 5,
+          "depth": 4.1,
+          "height": 9.125,
+          "roomWindows": 480,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 23",
+          "roof": "upper",
+          "center": [
+            13.513614743489542,
+            -21.50679466039842,
+            21.9
+          ],
+          "yaw": 3.7025913417308276,
+          "width": 5,
+          "depth": 4.1,
+          "height": 13.8125,
+          "roomWindows": 768,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 24",
+          "roof": "upper",
+          "center": [
+            17.9605122421383,
+            -17.96051224213831,
+            21.9
+          ],
+          "yaw": 3.9269908169872414,
+          "width": 5,
+          "depth": 4.1,
+          "height": 10.0625,
+          "roomWindows": 896,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 26",
+          "roof": "upper",
+          "center": [
+            23.97463658983253,
+            -8.38908817366125,
+            21.9
+          ],
+          "yaw": 4.375789767500069,
+          "width": 5,
+          "depth": 4.1,
+          "height": 12.875,
+          "roomWindows": 768,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 28 block 27",
+          "roof": "upper",
+          "center": [
+            25.24029013128836,
+            -2.8438976930240254,
+            21.9
+          ],
+          "yaw": 4.600189242756483,
+          "width": 5,
+          "depth": 4.1,
+          "height": 11,
+          "roomWindows": 768,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 00",
+          "roof": "upper",
+          "center": [
+            16.395626453879288,
+            2.5968121196678324,
+            21.9
+          ],
+          "yaw": -1.413716694115407,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 5,
+          "roomWindows": 360,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 01",
+          "roof": "upper",
+          "center": [
+            14.790708301526909,
+            7.536242295676478,
+            21.9
+          ],
+          "yaw": -1.0995574287564276,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 5.5,
+          "roomWindows": 360,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 02",
+          "roof": "upper",
+          "center": [
+            11.73797256769669,
+            11.737972567696689,
+            21.9
+          ],
+          "yaw": -0.7853981633974483,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 4.75,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 03",
+          "roof": "upper",
+          "center": [
+            7.5362422956764785,
+            14.790708301526909,
+            21.9
+          ],
+          "yaw": -0.47123889803846897,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 4,
+          "roomWindows": 252,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 04",
+          "roof": "upper",
+          "center": [
+            2.5968121196678338,
+            16.395626453879288,
+            21.9
+          ],
+          "yaw": -0.15707963267948966,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 5.5,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 05",
+          "roof": "upper",
+          "center": [
+            -2.596812119667828,
+            16.395626453879288,
+            21.9
+          ],
+          "yaw": 0.15707963267948943,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 5.5,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 06",
+          "roof": "upper",
+          "center": [
+            -7.536242295676477,
+            14.790708301526909,
+            21.9
+          ],
+          "yaw": 0.47123889803846897,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 4,
+          "roomWindows": 252,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 07",
+          "roof": "upper",
+          "center": [
+            -11.737972567696689,
+            11.73797256769669,
+            21.9
+          ],
+          "yaw": 0.7853981633974483,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 4.75,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 08",
+          "roof": "upper",
+          "center": [
+            -14.790708301526907,
+            7.5362422956764785,
+            21.9
+          ],
+          "yaw": 1.0995574287564276,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 5.5,
+          "roomWindows": 360,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 09",
+          "roof": "upper",
+          "center": [
+            -16.395626453879288,
+            2.5968121196678347,
+            21.9
+          ],
+          "yaw": 1.413716694115407,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 5,
+          "roomWindows": 360,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 10",
+          "roof": "upper",
+          "center": [
+            -16.395626453879288,
+            -2.59681211966783,
+            21.9
+          ],
+          "yaw": 1.7278759594743862,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 5,
+          "roomWindows": 360,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 11",
+          "roof": "upper",
+          "center": [
+            -14.790708301526909,
+            -7.536242295676476,
+            21.9
+          ],
+          "yaw": 2.0420352248333655,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 5.5,
+          "roomWindows": 360,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 12",
+          "roof": "upper",
+          "center": [
+            -11.737972567696692,
+            -11.737972567696689,
+            21.9
+          ],
+          "yaw": 2.356194490192345,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 4.75,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 13",
+          "roof": "upper",
+          "center": [
+            -7.53624229567648,
+            -14.790708301526907,
+            21.9
+          ],
+          "yaw": 2.670353755551324,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 4,
+          "roomWindows": 252,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 14",
+          "roof": "upper",
+          "center": [
+            -2.5968121196678355,
+            -16.395626453879288,
+            21.9
+          ],
+          "yaw": 2.9845130209103035,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 5.5,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 15",
+          "roof": "upper",
+          "center": [
+            2.5968121196678293,
+            -16.395626453879288,
+            21.9
+          ],
+          "yaw": 3.2986722862692828,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 5.5,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 16",
+          "roof": "upper",
+          "center": [
+            7.536242295676475,
+            -14.790708301526909,
+            21.9
+          ],
+          "yaw": 3.612831551628262,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 4,
+          "roomWindows": 252,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 17",
+          "roof": "upper",
+          "center": [
+            11.737972567696687,
+            -11.737972567696692,
+            21.9
+          ],
+          "yaw": 3.9269908169872414,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 4.75,
+          "roomWindows": 420,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 18",
+          "roof": "upper",
+          "center": [
+            14.790708301526907,
+            -7.53624229567648,
+            21.9
+          ],
+          "yaw": 4.241150082346221,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 5.5,
+          "roomWindows": 360,
+          "litWindows": 4
+        },
+        {
+          "name": "Helix city upper district 20 block 19",
+          "roof": "upper",
+          "center": [
+            16.395626453879288,
+            -2.596812119667837,
+            21.9
+          ],
+          "yaw": 4.5553093477052,
+          "width": 4.6,
+          "depth": 2.6,
+          "height": 5,
+          "roomWindows": 360,
+          "litWindows": 4
+        }
+      ],
+      "cityConnections": [
+        {
+          "name": "Helix connected middle housing wing 25",
+          "buildings": [
+            "Helix city middle district 30 block 25",
+            "Helix city middle district 30 block 26"
+          ],
+          "roof": "middle"
+        },
+        {
+          "name": "Helix connected middle housing wing 18",
+          "buildings": [
+            "Helix city middle district 30 block 18",
+            "Helix city middle district 30 block 19"
+          ],
+          "roof": "middle"
+        },
+        {
+          "name": "Helix connected middle housing wing 03",
+          "buildings": [
+            "Helix city middle district 30 block 03",
+            "Helix city middle district 30 block 04"
+          ],
+          "roof": "middle"
+        },
+        {
+          "name": "Helix connected middle housing wing 10",
+          "buildings": [
+            "Helix city middle district 30 block 10",
+            "Helix city middle district 30 block 11"
+          ],
+          "roof": "middle"
+        },
+        {
+          "name": "Helix connected upper housing wing 23",
+          "buildings": [
+            "Helix city upper district 28 block 23",
+            "Helix city upper district 28 block 24"
+          ],
+          "roof": "upper"
+        },
+        {
+          "name": "Helix connected upper housing wing 17",
+          "buildings": [
+            "Helix city upper district 28 block 17",
+            "Helix city upper district 28 block 18"
+          ],
+          "roof": "upper"
+        },
+        {
+          "name": "Helix connected upper housing wing 03",
+          "buildings": [
+            "Helix city upper district 28 block 03",
+            "Helix city upper district 28 block 04"
+          ],
+          "roof": "upper"
+        },
+        {
+          "name": "Helix connected upper housing wing 09",
+          "buildings": [
+            "Helix city upper district 28 block 09",
+            "Helix city upper district 28 block 10"
+          ],
+          "roof": "upper"
+        }
+      ],
+      "parks": [
+        {
+          "center": [
+            23.974636589832535,
+            8.389088173661243,
+            23.2
+          ],
+          "yaw": -1.2341971139102759,
+          "width": 5.1,
+          "depth": 4.1,
+          "height": 3.7,
+          "variant": 0,
+          "replacedBuildings": 1
+        },
+        {
+          "center": [
+            8.38908817366125,
+            23.97463658983253,
+            23.2
+          ],
+          "yaw": -0.3365992128846209,
+          "width": 5.1,
+          "depth": 4.1,
+          "height": 3.3,
+          "variant": 1,
+          "replacedBuildings": 1
+        },
+        {
+          "center": [
+            -8.389088173661246,
+            23.97463658983253,
+            23.2
+          ],
+          "yaw": 0.3365992128846209,
+          "width": 5.1,
+          "depth": 4.1,
+          "height": 3.3,
+          "variant": 1,
+          "replacedBuildings": 1
+        },
+        {
+          "center": [
+            -23.974636589832535,
+            8.389088173661246,
+            23.2
+          ],
+          "yaw": 1.2341971139102759,
+          "width": 5.1,
+          "depth": 4.1,
+          "height": 3.7,
+          "variant": 0,
+          "replacedBuildings": 1
+        },
+        {
+          "center": [
+            -21.50679466039842,
+            -13.513614743489546,
+            23.2
+          ],
+          "yaw": 2.131795014935931,
+          "width": 5.1,
+          "depth": 4.1,
+          "height": 4,
+          "variant": 2,
+          "replacedBuildings": 1
+        },
+        {
+          "center": [
+            21.506794660398413,
+            -13.513614743489553,
+            23.2
+          ],
+          "yaw": 4.151390292243655,
+          "width": 5.1,
+          "depth": 4.1,
+          "height": 4,
+          "variant": 2,
+          "replacedBuildings": 1
+        }
+      ],
+      "exteriorStreetDoors": false,
+      "cityWindowCount": 38656,
+      "cityLitWindowCount": 308,
+      "enclosedFreightHolds": 2
+    },
+    "detailScale": {
+      "ordinaryWindowWorldSize": [
+        3,
+        1.4
+      ],
+      "crewDoorWorldHeight": 3,
+      "capitalWindowReferenceHeight": 2.486,
+      "sourceToWorld": 9.901821886069522,
+      "panelWorldSize": [
+        6,
+        3
+      ]
+    },
     "physicalDetachedGroups": [],
-    "physicalContactTolerance": 0.05
+    "physicalContactTolerance": 0.05,
+    "windowSizeAudit": {
+      "panes": 2230,
+      "maximumShortEdgeWorld": 1.4000029219856491,
+      "capitalReferenceHeight": 2.486
+    },
+    "practicalClearance": {
+      "checks": [
+        "Circular pressure decks meet the original spindle",
+        "Interdeck elevators join occupied decks",
+        "Port freight hold joins the pressure decks",
+        "Starboard freight hold joins the pressure decks",
+        "Command cylinder seats in the service cone",
+        "Radiator manifolds meet thick plates",
+        "Every original reflector feed seats in the dish skin",
+        "Reflector bowls clear Upper services cone",
+        "Reflector bowls clear Command pressure cylinder",
+        "Reflector bowls clear Command deck band",
+        "Reflector bowls clear Command crown",
+        "Reflector bowls clear Tower seated service spine",
+        "Reflector outriggers seat in the service cone",
+        "Both dish pedestals seat on structural outriggers",
+        "City pressure buildings clear elevator and engineering structures",
+        "City pressure buildings have separated occupied footprints",
+        "Every housing foundation corner embeds in a real pressure deck",
+        "All six glazed conservatories seal against their deck foundations",
+        "City window atlas stays isolated from structural and roof panels",
+        "Enclosed housing wings join two blocks and clear engineering corridors",
+        "Both original radiator braces seat in occupied decks"
+      ],
+      "intersectionTolerance": 0.005,
+      "frame": "source Z-up"
+    }
   },
   "rook": {
     "id": "rook",
     "sourceRadius": 66.17620712925944,
-    "triangles": 22814,
-    "materials": 10,
-    "bytes": 1700956,
-    "sourceParts": 1229,
+    "triangles": 31189,
+    "materials": 9,
+    "bytes": 1984592,
+    "sourceParts": 1554,
     "detachedGroups": [],
-    "description": "Octagonal fortress, four connected cannon bastions, armored barracks and deep shared military landing hall.",
+    "description": "Paired deep armored arrival wings joined by a closed pitched armored roof above the vertical landing hall, with an inhabited command bridge, continuous lower keel and stern engineering body.",
     "windowSupport": {
-      "supportedFaces": 5166,
-      "discardedFaces": 4,
+      "supportedFaces": 2388,
+      "discardedFaces": 64,
       "facadeFaces": [
-        1458,
-        1458,
-        1224,
-        1026
+        593,
+        594,
+        757,
+        444
       ],
       "maxStandOff": 0.075
     },
     "surfaceCleanup": {
-      "coplanarSubtractions": 582,
-      "overlapAreaRemoved": 81.0088,
+      "coplanarSubtractions": 340,
+      "overlapAreaRemoved": 66.3638,
       "tolerance": 0.0001
     },
     "contactOcclusion": {
       "samples": 6,
       "radius": 2.4,
       "minimum": 0.58,
-      "vertices": 68442
+      "vertices": 93567
     },
     "packing": {
-      "verticesBefore": 68442,
-      "verticesAfter": 43772,
-      "positionPrecision": 0.00001
+      "verticesBefore": 93567,
+      "verticesAfter": 59837,
+      "positionPrecision": 0.00001,
+      "unusedUvBytesRemoved": 499584
     },
-    "portalWidth": 13,
-    "portalHeight": 19,
+    "portalWidth": 5.25,
+    "portalHeight": 30,
     "playerPads": [
       [
         0,
@@ -204,14 +1567,14 @@
     ],
     "lanes": [
       [
-        -4.3,
+        -2.8,
         -32.04,
         -11,
         4,
         7
       ],
       [
-        4.3,
+        2.8,
         -32.04,
         -11,
         4,
@@ -222,8 +1585,8 @@
       {
         "hull": "vanguard",
         "at": [
-          -4.3,
-          -30.2,
+          -2.8,
+          -24.2,
           -11
         ],
         "size": [
@@ -235,14 +1598,68 @@
       {
         "hull": "lancer",
         "at": [
-          4.3,
-          -30.2,
+          2.8,
+          -24.2,
           -11
         ],
         "size": [
           2,
           1.5,
           3
+        ]
+      },
+      {
+        "id": "rook-port-frigate",
+        "hull": "concord-frigate",
+        "capital": true,
+        "moored": true,
+        "at": [
+          -30,
+          13,
+          -37.5
+        ],
+        "size": [
+          23,
+          21,
+          76
+        ],
+        "roll": 3.141592653589793,
+        "dockPort": [
+          -30,
+          13,
+          -26.7
+        ],
+        "outward": [
+          0,
+          0,
+          -1
+        ]
+      },
+      {
+        "id": "rook-starboard-frigate",
+        "hull": "concord-frigate",
+        "capital": true,
+        "moored": true,
+        "at": [
+          30,
+          13,
+          -37.5
+        ],
+        "size": [
+          23,
+          21,
+          76
+        ],
+        "roll": 3.141592653589793,
+        "dockPort": [
+          30,
+          13,
+          -26.7
+        ],
+        "outward": [
+          0,
+          0,
+          -1
         ]
       }
     ],
@@ -287,12 +1704,12 @@
           -11
         ],
         [
-          -4.3,
+          -2.8,
           -34,
           -11
         ],
         [
-          4.3,
+          2.8,
           -34,
           -11
         ]
@@ -302,50 +1719,987 @@
         "width": 19,
         "front": -43,
         "back": -16,
-        "height": 19
+        "height": 30
       }
     },
-    "crewDoorHeight": 0.56,
-    "crewDoorWidth": 0.3,
-    "detailParts": 577,
+    "sharedEntry": {
+      "x": 0,
+      "innerY": -38,
+      "frontY": -43,
+      "width": 5.25
+    },
+    "centralRoof": {
+      "front": -33.8,
+      "back": 18.2,
+      "ridgeHeight": 36.2,
+      "thickness": 1.4,
+      "gableFront": -34,
+      "gableBack": 18
+    },
+    "capitalPorts": [
+      {
+        "id": "port",
+        "position": [
+          -30,
+          13,
+          -26.7
+        ],
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "occupied": true,
+        "collarLength": 1.5
+      },
+      {
+        "id": "starboard",
+        "position": [
+          30,
+          13,
+          -26.7
+        ],
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "occupied": true,
+        "collarLength": 1.5
+      },
+      {
+        "id": "ventral-heavy",
+        "position": [
+          0,
+          0,
+          -49.1
+        ],
+        "outward": [
+          0,
+          0,
+          -1
+        ],
+        "occupied": false,
+        "collarLength": 1.8
+      }
+    ],
+    "architecture": {
+      "revision": "inhabited-districts-v1",
+      "originalRadius": 66.17620712925944,
+      "partsAdded": 20,
+      "strategy": "paired armored arrival wings and deep service hull",
+      "silhouettePartsAdded": 9,
+      "silhouette": "armored military bastions joined by a reinforced roof, narrow arrival hall and a continuous reactor keel"
+    },
+    "crewDoorHeight": 0.21768489187256393,
+    "crewDoorWidth": 0.1166169063603021,
+    "detailParts": 844,
+    "armament": {
+      "source": "src/game/cruiserModelData.js",
+      "sourceSha256": "59831b66b10fe63dd1aca069d8c156fcd519e2a80b35352ba296eedf056698a6",
+      "frame": "source Z-up",
+      "batteries": 8,
+      "pdcs": 16,
+      "mounts": [
+        {
+          "name": "Rook port upper cruiser battery",
+          "kind": "battery",
+          "modelFactory": "createCruiserTurret",
+          "position": [
+            -20,
+            -12,
+            37.52000045776367
+          ],
+          "normal": [
+            0,
+            0,
+            1
+          ],
+          "size": 3.9,
+          "elevationDegrees": 8,
+          "direction": [
+            -0.1942075490951538,
+            -0.971037745475769,
+            0.13917303085327148
+          ],
+          "muzzles": [
+            [
+              -20.706884384155273,
+              -22.295726776123047,
+              41.766353607177734
+            ],
+            [
+              -23.307384490966797,
+              -21.775625228881836,
+              41.766353607177734
+            ]
+          ]
+        },
+        {
+          "name": "Rook port flank cruiser battery",
+          "kind": "battery",
+          "modelFactory": "createCruiserTurret",
+          "position": [
+            -38,
+            -3,
+            1.5199999809265137
+          ],
+          "normal": [
+            0,
+            0,
+            1
+          ],
+          "size": 3.6,
+          "elevationDegrees": 10,
+          "direction": [
+            -0.21159757673740387,
+            -0.961807131767273,
+            0.1736481636762619
+          ],
+          "muzzles": [
+            [
+              -38.82322692871094,
+              -12.438630104064941,
+              5.768603324890137
+            ],
+            [
+              -41.214054107666016,
+              -11.912647247314453,
+              5.768603324890137
+            ]
+          ]
+        },
+        {
+          "name": "Rook port hangar guard PDC",
+          "kind": "pdc",
+          "modelFactory": "createCruiserPdc",
+          "position": [
+            -7,
+            -39.5,
+            19.920000076293945
+          ],
+          "normal": [
+            0,
+            0,
+            1
+          ],
+          "size": 1.8,
+          "elevationDegrees": 35,
+          "direction": [
+            0,
+            -0.8191519975662231,
+            0.5735765099525452
+          ],
+          "muzzles": [
+            [
+              -6.676000118255615,
+              -41.328346252441406,
+              22.100223541259766
+            ],
+            [
+              -7.323999881744385,
+              -41.328346252441406,
+              22.100223541259766
+            ]
+          ]
+        },
+        {
+          "name": "Rook port aft upper cruiser battery",
+          "kind": "battery",
+          "modelFactory": "createCruiserTurret",
+          "position": [
+            -20,
+            6,
+            37.52000045776367
+          ],
+          "normal": [
+            0,
+            0,
+            1
+          ],
+          "size": 3.5,
+          "elevationDegrees": 12,
+          "direction": [
+            -0.11654160916805267,
+            0.9711801409721375,
+            0.20791170001029968
+          ],
+          "muzzles": [
+            [
+              -22.262447357177734,
+              14.865913391113281,
+              41.9683837890625
+            ],
+            [
+              -19.89940071105957,
+              15.149478912353516,
+              41.9683837890625
+            ]
+          ]
+        },
+        {
+          "name": "Rook port aft flank cruiser battery",
+          "kind": "battery",
+          "modelFactory": "createCruiserTurret",
+          "position": [
+            -38,
+            12,
+            2.325000047683716
+          ],
+          "normal": [
+            0,
+            0,
+            1
+          ],
+          "size": 3.2,
+          "elevationDegrees": 15,
+          "direction": [
+            -0.925189197063446,
+            0.27755677700042725,
+            0.25881901383399963
+          ],
+          "muzzles": [
+            [
+              -46.15823745727539,
+              13.311566352844238,
+              6.823785781860352
+            ],
+            [
+              -45.5329704284668,
+              15.395795822143555,
+              6.823785781860352
+            ]
+          ]
+        },
+        {
+          "name": "Rook port fore roof PDC",
+          "kind": "pdc",
+          "modelFactory": "createCruiserPdc",
+          "position": [
+            -24,
+            -20,
+            37.52000045776367
+          ],
+          "normal": [
+            0,
+            0,
+            1
+          ],
+          "size": 1.6,
+          "elevationDegrees": 35,
+          "direction": [
+            -0.12151338905096054,
+            -0.8100891709327698,
+            0.5735765099525452
+          ],
+          "muzzles": [
+            [
+              -23.956268310546875,
+              -21.649938583374023,
+              39.457977294921875
+            ],
+            [
+              -24.525896072387695,
+              -21.564495086669922,
+              39.457977294921875
+            ]
+          ]
+        },
+        {
+          "name": "Rook port outer flank PDC",
+          "kind": "pdc",
+          "modelFactory": "createCruiserPdc",
+          "position": [
+            -48.36000061035156,
+            5,
+            -8
+          ],
+          "normal": [
+            -1,
+            0,
+            0
+          ],
+          "size": 1.8,
+          "elevationDegrees": 40,
+          "direction": [
+            -0.6427876949310303,
+            -0.7660443782806396,
+            0
+          ],
+          "muzzles": [
+            [
+              -50.6947021484375,
+              3.290189027786255,
+              -7.676000118255615
+            ],
+            [
+              -50.6947021484375,
+              3.290189027786255,
+              -8.324000358581543
+            ]
+          ]
+        },
+        {
+          "name": "Rook port ventral guard PDC",
+          "kind": "pdc",
+          "modelFactory": "createCruiserPdc",
+          "position": [
+            -20,
+            -8,
+            -22.020000457763672
+          ],
+          "normal": [
+            0,
+            0,
+            -1
+          ],
+          "size": 1.8,
+          "elevationDegrees": 35,
+          "direction": [
+            0,
+            -0.8191519975662231,
+            -0.5735765099525452
+          ],
+          "muzzles": [
+            [
+              -20.323999404907227,
+              -9.828347206115723,
+              -24.20022201538086
+            ],
+            [
+              -19.676000595092773,
+              -9.828347206115723,
+              -24.20022201538086
+            ]
+          ]
+        },
+        {
+          "name": "Rook port stern engineering PDC",
+          "kind": "pdc",
+          "modelFactory": "createCruiserPdc",
+          "position": [
+            -17,
+            39.040000915527344,
+            -8
+          ],
+          "normal": [
+            0,
+            1,
+            0
+          ],
+          "size": 1.7,
+          "elevationDegrees": 40,
+          "direction": [
+            0,
+            0.6427876949310303,
+            0.7660443782806396
+          ],
+          "muzzles": [
+            [
+              -16.694000244140625,
+              41.244998931884766,
+              -6.385178565979004
+            ],
+            [
+              -17.305999755859375,
+              41.244998931884766,
+              -6.385178565979004
+            ]
+          ]
+        },
+        {
+          "name": "Rook port aft ventral guard PDC",
+          "kind": "pdc",
+          "modelFactory": "createCruiserPdc",
+          "position": [
+            -20,
+            10,
+            -22.020000457763672
+          ],
+          "normal": [
+            0,
+            0,
+            -1
+          ],
+          "size": 1.7,
+          "elevationDegrees": 35,
+          "direction": [
+            0,
+            0.8191519975662231,
+            -0.5735765099525452
+          ],
+          "muzzles": [
+            [
+              -19.694000244140625,
+              11.72677230834961,
+              -24.079099655151367
+            ],
+            [
+              -20.305999755859375,
+              11.72677230834961,
+              -24.079099655151367
+            ]
+          ]
+        },
+        {
+          "name": "Rook port forward bastion PDC",
+          "kind": "pdc",
+          "modelFactory": "createCruiserPdc",
+          "position": [
+            -20,
+            -39.040000915527344,
+            -4
+          ],
+          "normal": [
+            0,
+            -1,
+            0
+          ],
+          "size": 1.7,
+          "elevationDegrees": 35,
+          "direction": [
+            -0.8191519975662231,
+            -0.5735765099525452,
+            0
+          ],
+          "muzzles": [
+            [
+              -21.72677230834961,
+              -41.099098205566406,
+              -4.306000232696533
+            ],
+            [
+              -21.72677230834961,
+              -41.099098205566406,
+              -3.694000005722046
+            ]
+          ]
+        },
+        {
+          "name": "Rook port rear command roof PDC",
+          "kind": "pdc",
+          "modelFactory": "createCruiserPdc",
+          "position": [
+            -13,
+            25,
+            23.020000457763672
+          ],
+          "normal": [
+            0,
+            0,
+            1
+          ],
+          "size": 1.7,
+          "elevationDegrees": 35,
+          "direction": [
+            -0.16064892709255219,
+            0.8032446503639221,
+            0.5735765099525452
+          ],
+          "muzzles": [
+            [
+              -13.638705253601074,
+              26.633228302001953,
+              25.079099655151367
+            ],
+            [
+              -13.038590431213379,
+              26.753252029418945,
+              25.079099655151367
+            ]
+          ]
+        },
+        {
+          "name": "Rook starboard upper cruiser battery",
+          "kind": "battery",
+          "modelFactory": "createCruiserTurret",
+          "position": [
+            20,
+            -12,
+            37.52000045776367
+          ],
+          "normal": [
+            0,
+            0,
+            1
+          ],
+          "size": 3.9,
+          "elevationDegrees": 8,
+          "direction": [
+            0.1942075490951538,
+            -0.971037745475769,
+            0.13917303085327148
+          ],
+          "muzzles": [
+            [
+              23.307384490966797,
+              -21.775625228881836,
+              41.766353607177734
+            ],
+            [
+              20.706884384155273,
+              -22.295726776123047,
+              41.766353607177734
+            ]
+          ]
+        },
+        {
+          "name": "Rook starboard flank cruiser battery",
+          "kind": "battery",
+          "modelFactory": "createCruiserTurret",
+          "position": [
+            38,
+            -3,
+            1.5199999809265137
+          ],
+          "normal": [
+            0,
+            0,
+            1
+          ],
+          "size": 3.6,
+          "elevationDegrees": 10,
+          "direction": [
+            0.21159757673740387,
+            -0.961807131767273,
+            0.1736481636762619
+          ],
+          "muzzles": [
+            [
+              41.214054107666016,
+              -11.912647247314453,
+              5.768603324890137
+            ],
+            [
+              38.82322692871094,
+              -12.438630104064941,
+              5.768603324890137
+            ]
+          ]
+        },
+        {
+          "name": "Rook starboard hangar guard PDC",
+          "kind": "pdc",
+          "modelFactory": "createCruiserPdc",
+          "position": [
+            7,
+            -39.5,
+            19.920000076293945
+          ],
+          "normal": [
+            0,
+            0,
+            1
+          ],
+          "size": 1.8,
+          "elevationDegrees": 35,
+          "direction": [
+            0,
+            -0.8191519975662231,
+            0.5735765099525452
+          ],
+          "muzzles": [
+            [
+              7.323999881744385,
+              -41.328346252441406,
+              22.100223541259766
+            ],
+            [
+              6.676000118255615,
+              -41.328346252441406,
+              22.100223541259766
+            ]
+          ]
+        },
+        {
+          "name": "Rook starboard aft upper cruiser battery",
+          "kind": "battery",
+          "modelFactory": "createCruiserTurret",
+          "position": [
+            20,
+            6,
+            37.52000045776367
+          ],
+          "normal": [
+            0,
+            0,
+            1
+          ],
+          "size": 3.5,
+          "elevationDegrees": 12,
+          "direction": [
+            0.11654160916805267,
+            0.9711801409721375,
+            0.20791170001029968
+          ],
+          "muzzles": [
+            [
+              19.89940071105957,
+              15.149478912353516,
+              41.9683837890625
+            ],
+            [
+              22.262447357177734,
+              14.865913391113281,
+              41.9683837890625
+            ]
+          ]
+        },
+        {
+          "name": "Rook starboard aft flank cruiser battery",
+          "kind": "battery",
+          "modelFactory": "createCruiserTurret",
+          "position": [
+            38,
+            12,
+            2.325000047683716
+          ],
+          "normal": [
+            0,
+            0,
+            1
+          ],
+          "size": 3.2,
+          "elevationDegrees": 15,
+          "direction": [
+            0.925189197063446,
+            0.27755677700042725,
+            0.25881901383399963
+          ],
+          "muzzles": [
+            [
+              45.5329704284668,
+              15.395795822143555,
+              6.823785781860352
+            ],
+            [
+              46.15823745727539,
+              13.311566352844238,
+              6.823785781860352
+            ]
+          ]
+        },
+        {
+          "name": "Rook starboard fore roof PDC",
+          "kind": "pdc",
+          "modelFactory": "createCruiserPdc",
+          "position": [
+            24,
+            -20,
+            37.52000045776367
+          ],
+          "normal": [
+            0,
+            0,
+            1
+          ],
+          "size": 1.6,
+          "elevationDegrees": 35,
+          "direction": [
+            0.12151338905096054,
+            -0.8100891709327698,
+            0.5735765099525452
+          ],
+          "muzzles": [
+            [
+              24.525896072387695,
+              -21.564495086669922,
+              39.457977294921875
+            ],
+            [
+              23.956268310546875,
+              -21.649938583374023,
+              39.457977294921875
+            ]
+          ]
+        },
+        {
+          "name": "Rook starboard outer flank PDC",
+          "kind": "pdc",
+          "modelFactory": "createCruiserPdc",
+          "position": [
+            48.36000061035156,
+            5,
+            -8
+          ],
+          "normal": [
+            1,
+            0,
+            0
+          ],
+          "size": 1.8,
+          "elevationDegrees": 40,
+          "direction": [
+            0.6427876949310303,
+            -0.7660443782806396,
+            0
+          ],
+          "muzzles": [
+            [
+              50.6947021484375,
+              3.290189027786255,
+              -8.324000358581543
+            ],
+            [
+              50.6947021484375,
+              3.290189027786255,
+              -7.676000118255615
+            ]
+          ]
+        },
+        {
+          "name": "Rook starboard ventral guard PDC",
+          "kind": "pdc",
+          "modelFactory": "createCruiserPdc",
+          "position": [
+            20,
+            -8,
+            -22.020000457763672
+          ],
+          "normal": [
+            0,
+            0,
+            -1
+          ],
+          "size": 1.8,
+          "elevationDegrees": 35,
+          "direction": [
+            0,
+            -0.8191519975662231,
+            -0.5735765099525452
+          ],
+          "muzzles": [
+            [
+              19.676000595092773,
+              -9.828347206115723,
+              -24.20022201538086
+            ],
+            [
+              20.323999404907227,
+              -9.828347206115723,
+              -24.20022201538086
+            ]
+          ]
+        },
+        {
+          "name": "Rook starboard stern engineering PDC",
+          "kind": "pdc",
+          "modelFactory": "createCruiserPdc",
+          "position": [
+            17,
+            39.040000915527344,
+            -8
+          ],
+          "normal": [
+            0,
+            1,
+            0
+          ],
+          "size": 1.7,
+          "elevationDegrees": 40,
+          "direction": [
+            0,
+            0.6427876949310303,
+            0.7660443782806396
+          ],
+          "muzzles": [
+            [
+              17.305999755859375,
+              41.244998931884766,
+              -6.385178565979004
+            ],
+            [
+              16.694000244140625,
+              41.244998931884766,
+              -6.385178565979004
+            ]
+          ]
+        },
+        {
+          "name": "Rook starboard aft ventral guard PDC",
+          "kind": "pdc",
+          "modelFactory": "createCruiserPdc",
+          "position": [
+            20,
+            10,
+            -22.020000457763672
+          ],
+          "normal": [
+            0,
+            0,
+            -1
+          ],
+          "size": 1.7,
+          "elevationDegrees": 35,
+          "direction": [
+            0,
+            0.8191519975662231,
+            -0.5735765099525452
+          ],
+          "muzzles": [
+            [
+              20.305999755859375,
+              11.72677230834961,
+              -24.079099655151367
+            ],
+            [
+              19.694000244140625,
+              11.72677230834961,
+              -24.079099655151367
+            ]
+          ]
+        },
+        {
+          "name": "Rook starboard forward bastion PDC",
+          "kind": "pdc",
+          "modelFactory": "createCruiserPdc",
+          "position": [
+            20,
+            -39.040000915527344,
+            -4
+          ],
+          "normal": [
+            0,
+            -1,
+            0
+          ],
+          "size": 1.7,
+          "elevationDegrees": 35,
+          "direction": [
+            0.8191519975662231,
+            -0.5735765099525452,
+            0
+          ],
+          "muzzles": [
+            [
+              21.72677230834961,
+              -41.099098205566406,
+              -3.694000005722046
+            ],
+            [
+              21.72677230834961,
+              -41.099098205566406,
+              -4.306000232696533
+            ]
+          ]
+        },
+        {
+          "name": "Rook starboard rear command roof PDC",
+          "kind": "pdc",
+          "modelFactory": "createCruiserPdc",
+          "position": [
+            13,
+            25,
+            23.020000457763672
+          ],
+          "normal": [
+            0,
+            0,
+            1
+          ],
+          "size": 1.7,
+          "elevationDegrees": 35,
+          "direction": [
+            0.16064892709255219,
+            0.8032446503639221,
+            0.5735765099525452
+          ],
+          "muzzles": [
+            [
+              13.038590431213379,
+              26.753252029418945,
+              25.079099655151367
+            ],
+            [
+              13.638705253601074,
+              26.633228302001953,
+              25.079099655151367
+            ]
+          ]
+        }
+      ]
+    },
+    "detailScale": {
+      "ordinaryWindowWorldSize": [
+        3,
+        1.4
+      ],
+      "crewDoorWorldHeight": 3,
+      "capitalWindowReferenceHeight": 2.486,
+      "sourceToWorld": 13.781388199215248,
+      "panelWorldSize": [
+        6,
+        3
+      ]
+    },
     "physicalDetachedGroups": [],
-    "physicalContactTolerance": 0.05
+    "physicalContactTolerance": 0.05,
+    "windowSizeAudit": {
+      "panes": 2388,
+      "maximumShortEdgeWorld": 1.4000008374970987,
+      "capitalReferenceHeight": 2.486
+    },
+    "practicalClearance": {
+      "checks": [
+        "Command bridge meets armored wings",
+        "Central roof joins the forward pressure gable",
+        "Central roof joins the aft pressure gable",
+        "Forward roof gable seats in the command bridge",
+        "Aft roof gable seats in the stern command hull",
+        "Closed lower keel meets the arrival floor",
+        "Closed lower keel meets the reactor casemate",
+        "Closed lower keel joins both armored wings",
+        "Casemate transfer seats in defense hull",
+        "Command service trunk meets stern body",
+        "Central armored roof seats in both bastions",
+        "Marked central underside gap is filled by a closed pressure hull",
+        "port capital berth joins its lower pressure pod",
+        "starboard capital berth joins its lower pressure pod",
+        "Heavy ventral port joins the reactor keel",
+        "All capital collars are short and seated directly in their pressure hulls",
+        "All capital weapon bearings sit on real hull surfaces",
+        "Every barrel has an unobstructed outward firing line"
+      ],
+      "intersectionTolerance": 0.005,
+      "frame": "source Z-up"
+    }
   },
   "cairn": {
     "id": "cairn",
     "sourceRadius": 43.812098785609436,
-    "triangles": 17779,
+    "triangles": 20755,
     "materials": 9,
-    "bytes": 1277876,
-    "sourceParts": 414,
+    "bytes": 1262924,
+    "sourceParts": 557,
     "detachedGroups": [],
     "description": "Open salvage yard with a tensioned gantry hoist, machine shops, reclaimed engines and a sheltered working landing apron.",
     "windowSupport": {
-      "supportedFaces": 3589,
-      "discardedFaces": 31,
+      "supportedFaces": 2445,
+      "discardedFaces": 19,
       "facadeFaces": [
-        1043,
-        1034,
-        756,
-        756
+        636,
+        630,
+        588,
+        591
       ],
       "maxStandOff": 0.075
     },
     "surfaceCleanup": {
-      "coplanarSubtractions": 469,
-      "overlapAreaRemoved": 79.6457,
+      "coplanarSubtractions": 486,
+      "overlapAreaRemoved": 125.0067,
       "tolerance": 0.0001
     },
     "contactOcclusion": {
       "samples": 6,
       "radius": 2.4,
       "minimum": 0.581,
-      "vertices": 53337
+      "vertices": 62265
     },
     "packing": {
-      "verticesBefore": 53337,
-      "verticesAfter": 32583,
-      "positionPrecision": 0.00001
+      "verticesBefore": 62265,
+      "verticesAfter": 37382,
+      "positionPrecision": 0.00001,
+      "unusedUvBytesRemoved": 330936
     },
     "portalWidth": 24,
     "portalHeight": 16,
@@ -461,47 +2815,83 @@
         "height": 16
       }
     },
-    "crewDoorHeight": 0.56,
-    "crewDoorWidth": 0.3,
+    "architecture": {
+      "revision": "inhabited-districts-v1",
+      "originalRadius": 43.812098785609436,
+      "partsAdded": 51,
+      "strategy": "reclaimed freighter keel",
+      "silhouettePartsAdded": 95,
+      "silhouette": "inhabited workshop bay, traveling salvage crane and stern repair stores"
+    },
+    "crewDoorHeight": 0.26606537724054313,
+    "crewDoorWidth": 0.1425350235217195,
     "detailParts": 49,
+    "detailScale": {
+      "ordinaryWindowWorldSize": [
+        3,
+        1.4
+      ],
+      "crewDoorWorldHeight": 3,
+      "capitalWindowReferenceHeight": 2.486,
+      "sourceToWorld": 11.27542422510605,
+      "panelWorldSize": [
+        6,
+        3
+      ]
+    },
     "physicalDetachedGroups": [],
-    "physicalContactTolerance": 0.05
+    "physicalContactTolerance": 0.05,
+    "windowSizeAudit": {
+      "panes": 2445,
+      "maximumShortEdgeWorld": 1.4000083113586568,
+      "capitalReferenceHeight": 2.486
+    },
+    "practicalClearance": {
+      "checks": [
+        "Upper gallery sits on workshop",
+        "Rear roof gallery seats on canopy",
+        "Crane rails meet gantry uprights"
+      ],
+      "intersectionTolerance": 0.005,
+      "frame": "source Z-up"
+    }
   },
   "argent": {
     "id": "argent",
     "sourceRadius": 76.72142364228878,
-    "triangles": 21110,
+    "triangles": 21630,
     "materials": 9,
-    "bytes": 1584084,
-    "sourceParts": 727,
+    "bytes": 1368556,
+    "sourceParts": 502,
     "detachedGroups": [],
     "description": "Orbital assembly torus around a working frigate drydock; ring workstations and supported assembly arms.",
     "windowSupport": {
-      "supportedFaces": 5284,
-      "discardedFaces": 0,
+      "supportedFaces": 5008,
+      "discardedFaces": 8,
       "facadeFaces": [
-        1298,
-        1298,
-        1340,
-        1348
+        1293,
+        1293,
+        1215,
+        1207
       ],
       "maxStandOff": 0.075
     },
     "surfaceCleanup": {
-      "coplanarSubtractions": 251,
-      "overlapAreaRemoved": 239.068,
+      "coplanarSubtractions": 603,
+      "overlapAreaRemoved": 238.9877,
       "tolerance": 0.0001
     },
     "contactOcclusion": {
       "samples": 6,
       "radius": 2.4,
       "minimum": 0.58,
-      "vertices": 63330
+      "vertices": 64890
     },
     "packing": {
-      "verticesBefore": 63330,
-      "verticesAfter": 40760,
-      "positionPrecision": 0.00001
+      "verticesBefore": 64890,
+      "verticesAfter": 41317,
+      "positionPrecision": 0.00001,
+      "unusedUvBytesRemoved": 352464
     },
     "portalWidth": 17,
     "portalHeight": 8,
@@ -633,47 +3023,84 @@
         "height": 8.5
       }
     },
-    "crewDoorHeight": 0.56,
-    "crewDoorWidth": 0.3,
-    "detailParts": 86,
+    "architecture": {
+      "revision": "inhabited-districts-v1",
+      "originalRadius": 76.72142364228878,
+      "partsAdded": 99,
+      "strategy": "open assembly torus and suspended service frame",
+      "silhouettePartsAdded": 134,
+      "silhouette": "inhabited assembly torus, observation lounge and one working gantry"
+    },
+    "crewDoorHeight": 0.17061843656550507,
+    "crewDoorWidth": 0.09140273387437771,
+    "detailParts": 80,
+    "detailScale": {
+      "ordinaryWindowWorldSize": [
+        3,
+        1.4
+      ],
+      "crewDoorWorldHeight": 3,
+      "capitalWindowReferenceHeight": 2.486,
+      "sourceToWorld": 17.583093951562603,
+      "panelWorldSize": [
+        6,
+        3
+      ]
+    },
     "physicalDetachedGroups": [],
-    "physicalContactTolerance": 0.05
+    "physicalContactTolerance": 0.05,
+    "windowSizeAudit": {
+      "panes": 5008,
+      "maximumShortEdgeWorld": 1.4000058175242258,
+      "capitalReferenceHeight": 2.486
+    },
+    "practicalClearance": {
+      "checks": [
+        "Assembly control meets supporting leg",
+        "Gantry leg seats in inhabited torus",
+        "Arrival lounge seats on terrace roof",
+        "All terrace lamps seat in ceiling"
+      ],
+      "intersectionTolerance": 0.005,
+      "frame": "source Z-up"
+    }
   },
   "blackglass": {
     "id": "blackglass",
     "sourceRadius": 62.13694553162394,
-    "triangles": 8341,
+    "triangles": 9771,
     "materials": 10,
-    "bytes": 633748,
-    "sourceParts": 577,
+    "bytes": 662400,
+    "sourceParts": 621,
     "detachedGroups": [],
     "description": "Open moon-cliff terrace below two deeply excavated warm tavern galleries, with rock anchors and cantilevered foundations.",
     "windowSupport": {
-      "supportedFaces": 640,
+      "supportedFaces": 280,
       "discardedFaces": 0,
       "facadeFaces": [
-        48,
-        48,
-        352,
-        192
+        40,
+        40,
+        140,
+        60
       ],
       "maxStandOff": 0.075
     },
     "surfaceCleanup": {
       "coplanarSubtractions": 201,
-      "overlapAreaRemoved": 35.0393,
+      "overlapAreaRemoved": 32.7052,
       "tolerance": 0.0001
     },
     "contactOcclusion": {
       "samples": 6,
       "radius": 2.4,
       "minimum": 0.58,
-      "vertices": 25023
+      "vertices": 29313
     },
     "packing": {
-      "verticesBefore": 25023,
-      "verticesAfter": 15766,
-      "positionPrecision": 0.00001
+      "verticesBefore": 29313,
+      "verticesAfter": 18938,
+      "positionPrecision": 0.00001,
+      "unusedUvBytesRemoved": 132552
     },
     "portalWidth": 30,
     "portalHeight": 0,
@@ -784,47 +3211,82 @@
       "roofOverPlayer": false,
       "hall": null
     },
-    "crewDoorHeight": 0.56,
-    "crewDoorWidth": 0.3,
-    "detailParts": 132,
+    "architecture": {
+      "revision": "inhabited-districts-v1",
+      "originalRadius": 62.13694553162394,
+      "partsAdded": 11,
+      "strategy": "rock-anchored cliff terrace",
+      "silhouettePartsAdded": 41,
+      "silhouette": "rock-seated freeport, recessed warm cave markets and anchored freight apron"
+    },
+    "crewDoorHeight": 0.17008288010481007,
+    "crewDoorWidth": 0.0911158286275768,
+    "detailParts": 124,
+    "detailScale": {
+      "ordinaryWindowWorldSize": [
+        3,
+        1.4
+      ],
+      "crewDoorWorldHeight": 3,
+      "capitalWindowReferenceHeight": 2.486,
+      "sourceToWorld": 17.63845954484844,
+      "panelWorldSize": [
+        6,
+        3
+      ]
+    },
     "physicalDetachedGroups": [],
-    "physicalContactTolerance": 0.05
+    "physicalContactTolerance": 0.05,
+    "windowSizeAudit": {
+      "panes": 280,
+      "maximumShortEdgeWorld": 1.4000069965650301,
+      "capitalReferenceHeight": 2.486
+    },
+    "practicalClearance": {
+      "checks": [
+        "Service lock embedded in real rock",
+        "Platform braces meet rock"
+      ],
+      "intersectionTolerance": 0.005,
+      "frame": "source Z-up"
+    }
   },
   "cinder": {
     "id": "cinder",
     "sourceRadius": 67.62396025078685,
-    "triangles": 16134,
+    "triangles": 17308,
     "materials": 10,
-    "bytes": 1146420,
-    "sourceParts": 309,
+    "bytes": 1033832,
+    "sourceParts": 421,
     "detachedGroups": [],
     "description": "Tall connected ore-fractionation towers with pipe bridges, sorting house, cooling wings and freight berths.",
     "windowSupport": {
-      "supportedFaces": 3146,
-      "discardedFaces": 14,
+      "supportedFaces": 1542,
+      "discardedFaces": 0,
       "facadeFaces": [
-        848,
-        848,
-        718,
-        732
+        375,
+        375,
+        396,
+        396
       ],
       "maxStandOff": 0.075
     },
     "surfaceCleanup": {
-      "coplanarSubtractions": 644,
-      "overlapAreaRemoved": 62.6567,
+      "coplanarSubtractions": 638,
+      "overlapAreaRemoved": 52.5952,
       "tolerance": 0.0001
     },
     "contactOcclusion": {
       "samples": 6,
       "radius": 2.4,
       "minimum": 0.581,
-      "vertices": 48402
+      "vertices": 51924
     },
     "packing": {
-      "verticesBefore": 48402,
-      "verticesAfter": 29076,
-      "positionPrecision": 0.00001
+      "verticesBefore": 51924,
+      "verticesAfter": 30645,
+      "positionPrecision": 0.00001,
+      "unusedUvBytesRemoved": 299496
     },
     "portalWidth": 19,
     "portalHeight": 10,
@@ -935,47 +3397,82 @@
       "roofOverPlayer": false,
       "hall": null
     },
-    "crewDoorHeight": 0.56,
-    "crewDoorWidth": 0.3,
+    "architecture": {
+      "revision": "inhabited-districts-v1",
+      "originalRadius": 67.62396025078685,
+      "partsAdded": 37,
+      "strategy": "deep fractionation and smelter hull",
+      "silhouettePartsAdded": 81,
+      "silhouette": "fractionation towers, horizontal heat-recovery plant and operations street"
+    },
+    "crewDoorHeight": 0.16948360965109488,
+    "crewDoorWidth": 0.0907947908845151,
     "detailParts": 44,
+    "detailScale": {
+      "ordinaryWindowWorldSize": [
+        3,
+        1.4
+      ],
+      "crewDoorWorldHeight": 3,
+      "capitalWindowReferenceHeight": 2.486,
+      "sourceToWorld": 17.700826682744776,
+      "panelWorldSize": [
+        6,
+        3
+      ]
+    },
     "physicalDetachedGroups": [],
-    "physicalContactTolerance": 0.05
+    "physicalContactTolerance": 0.05,
+    "windowSizeAudit": {
+      "panes": 1542,
+      "maximumShortEdgeWorld": 1.40002799504322,
+      "capitalReferenceHeight": 2.486
+    },
+    "practicalClearance": {
+      "checks": [
+        "Operations street meets refinery rooms",
+        "Recovery drum rests on foundation"
+      ],
+      "intersectionTolerance": 0.005,
+      "frame": "source Z-up"
+    }
   },
   "torchwell": {
     "id": "torchwell",
     "sourceRadius": 56.588608523483096,
-    "triangles": 10129,
+    "triangles": 16130,
     "materials": 10,
-    "bytes": 722204,
-    "sourceParts": 248,
+    "bytes": 992680,
+    "sourceParts": 369,
     "detachedGroups": [],
     "description": "Exposed refueling apron, a rear triad of reservoirs and low service house, matching the open frontier concourse.",
     "windowSupport": {
-      "supportedFaces": 864,
-      "discardedFaces": 0,
+      "supportedFaces": 703,
+      "discardedFaces": 5,
       "facadeFaces": [
-        192,
-        192,
-        240,
-        240
+        167,
+        166,
+        184,
+        186
       ],
       "maxStandOff": 0.075
     },
     "surfaceCleanup": {
-      "coplanarSubtractions": 315,
-      "overlapAreaRemoved": 1365.1865,
+      "coplanarSubtractions": 383,
+      "overlapAreaRemoved": 816.2952,
       "tolerance": 0.0001
     },
     "contactOcclusion": {
       "samples": 6,
       "radius": 2.4,
       "minimum": 0.58,
-      "vertices": 30387
+      "vertices": 48390
     },
     "packing": {
-      "verticesBefore": 30387,
-      "verticesAfter": 17982,
-      "positionPrecision": 0.00001
+      "verticesBefore": 48390,
+      "verticesAfter": 28484,
+      "positionPrecision": 0.00001,
+      "unusedUvBytesRemoved": 230640
     },
     "portalWidth": 38,
     "portalHeight": 0,
@@ -1086,47 +3583,83 @@
       "roofOverPlayer": false,
       "hall": null
     },
-    "crewDoorHeight": 0.56,
-    "crewDoorWidth": 0.3,
+    "architecture": {
+      "revision": "inhabited-districts-v1",
+      "originalRadius": 56.588608523483096,
+      "partsAdded": 50,
+      "strategy": "bulk propellant spheres under an open service apron",
+      "silhouettePartsAdded": 71,
+      "silhouette": "compact frontier fuel depot with tank racks and connected service rooms"
+    },
+    "crewDoorHeight": 0.21792788905064095,
+    "crewDoorWidth": 0.11674708341998621,
     "detailParts": 39,
+    "detailScale": {
+      "ordinaryWindowWorldSize": [
+        3,
+        1.4
+      ],
+      "crewDoorWorldHeight": 3,
+      "capitalWindowReferenceHeight": 2.486,
+      "sourceToWorld": 13.76602147191393,
+      "panelWorldSize": [
+        6,
+        3
+      ]
+    },
     "physicalDetachedGroups": [],
-    "physicalContactTolerance": 0.05
+    "physicalContactTolerance": 0.05,
+    "windowSizeAudit": {
+      "panes": 703,
+      "maximumShortEdgeWorld": 1.4000020153441857,
+      "capitalReferenceHeight": 2.486
+    },
+    "practicalClearance": {
+      "checks": [
+        "Access module connects through vestibule",
+        "Vestibule seats in service house",
+        "Roof control cabin seats on service house"
+      ],
+      "intersectionTolerance": 0.005,
+      "frame": "source Z-up"
+    }
   },
   "nacre": {
     "id": "nacre",
     "sourceRadius": 69.19421949553792,
-    "triangles": 17390,
+    "triangles": 30018,
     "materials": 9,
-    "bytes": 1227648,
-    "sourceParts": 240,
+    "bytes": 1847012,
+    "sourceParts": 349,
     "detachedGroups": [],
     "description": "Pearlescent laboratory cluster with pressure vessels, enclosed transfer tunnels, life support and an exposed circular science terrace.",
     "windowSupport": {
-      "supportedFaces": 2208,
-      "discardedFaces": 0,
+      "supportedFaces": 4808,
+      "discardedFaces": 64,
       "facadeFaces": [
-        552,
-        552,
-        552,
-        552
+        1202,
+        1202,
+        1202,
+        1202
       ],
       "maxStandOff": 0.075
     },
     "surfaceCleanup": {
-      "coplanarSubtractions": 557,
-      "overlapAreaRemoved": 59.6566,
+      "coplanarSubtractions": 865,
+      "overlapAreaRemoved": 101.0071,
       "tolerance": 0.0001
     },
     "contactOcclusion": {
       "samples": 6,
       "radius": 2.4,
-      "minimum": 0.581,
-      "vertices": 52170
+      "minimum": 0.58,
+      "vertices": 90054
     },
     "packing": {
-      "verticesBefore": 52170,
-      "verticesAfter": 31217,
-      "positionPrecision": 0.00001
+      "verticesBefore": 90054,
+      "verticesAfter": 55455,
+      "positionPrecision": 0.00001,
+      "unusedUvBytesRemoved": 488784
     },
     "portalWidth": 26,
     "portalHeight": 0,
@@ -1237,47 +3770,83 @@
       "roofOverPlayer": false,
       "hall": null
     },
-    "crewDoorHeight": 0.56,
-    "crewDoorWidth": 0.3,
+    "architecture": {
+      "revision": "inhabited-districts-v1",
+      "originalRadius": 69.19421949553792,
+      "partsAdded": 28,
+      "strategy": "laboratory pressure cluster",
+      "silhouettePartsAdded": 86,
+      "silhouette": "rounded research habitat, panoramic observation dome and laboratory pressure necks"
+    },
+    "crewDoorHeight": 0.1655364102764065,
+    "crewDoorWidth": 0.08868021979093205,
     "detailParts": 56,
+    "detailScale": {
+      "ordinaryWindowWorldSize": [
+        3,
+        1.4
+      ],
+      "crewDoorWorldHeight": 3,
+      "capitalWindowReferenceHeight": 2.486,
+      "sourceToWorld": 18.122901149002278,
+      "panelWorldSize": [
+        6,
+        3
+      ]
+    },
     "physicalDetachedGroups": [],
-    "physicalContactTolerance": 0.05
+    "physicalContactTolerance": 0.05,
+    "windowSizeAudit": {
+      "panes": 4808,
+      "maximumShortEdgeWorld": 1.4000201198602436,
+      "capitalReferenceHeight": 2.486
+    },
+    "practicalClearance": {
+      "checks": [
+        "Observation dome joins central habitat",
+        "Panoramic laboratory rooms seat in pressure hulls",
+        "Terrace vestibule joins pressure laboratory"
+      ],
+      "intersectionTolerance": 0.005,
+      "frame": "source Z-up"
+    }
   },
   "shepherd": {
     "id": "shepherd",
     "sourceRadius": 73.45663382096357,
-    "triangles": 12049,
+    "triangles": 11459,
     "materials": 10,
-    "bytes": 871916,
-    "sourceParts": 224,
+    "bytes": 726136,
+    "sourceParts": 277,
     "detachedGroups": [],
     "description": "A tall inhabited navigation lighthouse, braced deep-space dish, remote service workshop and open landing aprons.",
     "windowSupport": {
-      "supportedFaces": 1915,
-      "discardedFaces": 5,
+      "supportedFaces": 590,
+      "discardedFaces": 64,
       "facadeFaces": [
-        590,
-        590,
-        365,
-        370
+        148,
+        162,
+        140,
+        140
       ],
       "maxStandOff": 0.075
     },
     "surfaceCleanup": {
-      "coplanarSubtractions": 222,
-      "overlapAreaRemoved": 16.7333,
+      "coplanarSubtractions": 257,
+      "overlapAreaRemoved": 277.4617,
       "tolerance": 0.0001
     },
     "contactOcclusion": {
       "samples": 6,
       "radius": 2.4,
       "minimum": 0.581,
-      "vertices": 36147
+      "vertices": 34377
     },
     "packing": {
-      "verticesBefore": 36147,
-      "verticesAfter": 21931,
-      "positionPrecision": 0.00001
+      "verticesBefore": 34377,
+      "verticesAfter": 20310,
+      "positionPrecision": 0.00001,
+      "unusedUvBytesRemoved": 139920
     },
     "portalWidth": 30,
     "portalHeight": 0,
@@ -1388,47 +3957,83 @@
       "roofOverPlayer": false,
       "hall": null
     },
-    "crewDoorHeight": 0.56,
-    "crewDoorWidth": 0.3,
+    "architecture": {
+      "revision": "inhabited-districts-v1",
+      "originalRadius": 73.45663382096357,
+      "partsAdded": 16,
+      "strategy": "inhabited lighthouse and reactor keel",
+      "silhouettePartsAdded": 36,
+      "silhouette": "navigation lighthouse with mounted antenna equipment and connected service gallery"
+    },
+    "crewDoorHeight": 0.34112987842552744,
+    "crewDoorWidth": 0.18274814915653254,
     "detailParts": 33,
+    "detailScale": {
+      "ordinaryWindowWorldSize": [
+        3,
+        1.4
+      ],
+      "crewDoorWorldHeight": 3,
+      "capitalWindowReferenceHeight": 2.486,
+      "sourceToWorld": 8.79430442694258,
+      "panelWorldSize": [
+        6,
+        3
+      ]
+    },
     "physicalDetachedGroups": [],
-    "physicalContactTolerance": 0.05
+    "physicalContactTolerance": 0.05,
+    "windowSizeAudit": {
+      "panes": 590,
+      "maximumShortEdgeWorld": 1.4000088144657314,
+      "capitalReferenceHeight": 2.486
+    },
+    "practicalClearance": {
+      "checks": [
+        "Service gallery meets pressure neck",
+        "Gallery neck seats in tower",
+        "Antenna mount seats in panel"
+      ],
+      "intersectionTolerance": 0.005,
+      "frame": "source Z-up"
+    }
   },
   "haven": {
     "id": "haven",
     "sourceRadius": 53.369191767187296,
-    "triangles": 20165,
+    "triangles": 34299,
     "materials": 10,
-    "bytes": 1424024,
-    "sourceParts": 573,
+    "bytes": 2095524,
+    "sourceParts": 677,
     "detachedGroups": [],
     "description": "Open circular trading courtyard within an inhabited blue-and-gold habitat ring, linked galleries, market awnings and high skybridge.",
     "windowSupport": {
-      "supportedFaces": 3452,
-      "discardedFaces": 36,
+      "supportedFaces": 7481,
+      "discardedFaces": 21,
       "facadeFaces": [
-        850,
-        850,
-        880,
-        872
+        2074,
+        2071,
+        1668,
+        1668
       ],
       "maxStandOff": 0.075
     },
     "surfaceCleanup": {
-      "coplanarSubtractions": 321,
-      "overlapAreaRemoved": 54.1243,
+      "coplanarSubtractions": 358,
+      "overlapAreaRemoved": 637.3004,
       "tolerance": 0.0001
     },
     "contactOcclusion": {
       "samples": 6,
       "radius": 2.4,
       "minimum": 0.58,
-      "vertices": 60495
+      "vertices": 102897
     },
     "packing": {
-      "verticesBefore": 60495,
-      "verticesAfter": 36311,
-      "positionPrecision": 0.00001
+      "verticesBefore": 102897,
+      "verticesAfter": 64197,
+      "positionPrecision": 0.00001,
+      "unusedUvBytesRemoved": 608544
     },
     "portalWidth": 21.599999999999998,
     "portalHeight": 25,
@@ -1544,47 +4149,82 @@
         "height": 25
       }
     },
-    "crewDoorHeight": 0.56,
-    "crewDoorWidth": 0.3,
+    "architecture": {
+      "revision": "inhabited-districts-v1",
+      "originalRadius": 53.369191767187296,
+      "partsAdded": 30,
+      "strategy": "inhabited torus and pressure bowl",
+      "silhouettePartsAdded": 100,
+      "silhouette": "curved trading habitat, stepped civic districts and enclosed pedestrian galleries"
+    },
+    "crewDoorHeight": 0.24076327113016824,
+    "crewDoorWidth": 0.12898032381973296,
     "detailParts": 176,
+    "detailScale": {
+      "ordinaryWindowWorldSize": [
+        3,
+        1.4
+      ],
+      "crewDoorWorldHeight": 3,
+      "capitalWindowReferenceHeight": 2.486,
+      "sourceToWorld": 12.460372323061083,
+      "panelWorldSize": [
+        6,
+        3
+      ]
+    },
     "physicalDetachedGroups": [],
-    "physicalContactTolerance": 0.05
+    "physicalContactTolerance": 0.05,
+    "windowSizeAudit": {
+      "panes": 7481,
+      "maximumShortEdgeWorld": 1.4000236723226578,
+      "capitalReferenceHeight": 2.486
+    },
+    "practicalClearance": {
+      "checks": [
+        "Port civic district seats on conservatory",
+        "Rear district joins inhabited ring"
+      ],
+      "intersectionTolerance": 0.005,
+      "frame": "source Z-up"
+    }
   },
   "league-yard": {
     "id": "league-yard",
     "sourceRadius": 87.61906180075616,
-    "triangles": 26242,
+    "triangles": 27228,
     "materials": 9,
-    "bytes": 1936156,
-    "sourceParts": 1329,
+    "bytes": 1667252,
+    "sourceParts": 1575,
     "detachedGroups": [],
     "description": "Long cruiser drydock with connected crane ribs, service spines, propellant saddles and a directly connected factory landing hall.",
     "windowSupport": {
-      "supportedFaces": 5920,
-      "discardedFaces": 0,
+      "supportedFaces": 3170,
+      "discardedFaces": 22,
       "facadeFaces": [
-        1584,
-        1584,
-        1520,
-        1232
+        877,
+        877,
+        773,
+        643
       ],
       "maxStandOff": 0.075
     },
     "surfaceCleanup": {
-      "coplanarSubtractions": 304,
-      "overlapAreaRemoved": 77.6615,
+      "coplanarSubtractions": 590,
+      "overlapAreaRemoved": 99.6469,
       "tolerance": 0.0001
     },
     "contactOcclusion": {
       "samples": 6,
       "radius": 2.4,
       "minimum": 0.58,
-      "vertices": 78726
+      "vertices": 81684
     },
     "packing": {
-      "verticesBefore": 78726,
-      "verticesAfter": 49934,
-      "positionPrecision": 0.00001
+      "verticesBefore": 81684,
+      "verticesAfter": 50530,
+      "positionPrecision": 0.00001,
+      "unusedUvBytesRemoved": 471384
     },
     "portalWidth": 23,
     "portalHeight": 15,
@@ -1716,47 +4356,83 @@
         "height": 22
       }
     },
-    "crewDoorHeight": 0.56,
-    "crewDoorWidth": 0.3,
-    "detailParts": 876,
+    "architecture": {
+      "revision": "inhabited-districts-v1",
+      "originalRadius": 87.61906180075616,
+      "partsAdded": 145,
+      "strategy": "longitudinal drydock frame and work modules",
+      "silhouettePartsAdded": 143,
+      "silhouette": "long fabrication districts, factory arrival hall and working bridge cranes"
+    },
+    "crewDoorHeight": 0.30743530456405666,
+    "crewDoorWidth": 0.16469748458788747,
+    "detailParts": 834,
+    "detailScale": {
+      "ordinaryWindowWorldSize": [
+        3,
+        1.4
+      ],
+      "crewDoorWorldHeight": 3,
+      "capitalWindowReferenceHeight": 2.486,
+      "sourceToWorld": 9.75815059449337,
+      "panelWorldSize": [
+        6,
+        3
+      ]
+    },
     "physicalDetachedGroups": [],
-    "physicalContactTolerance": 0.05
+    "physicalContactTolerance": 0.05,
+    "windowSizeAudit": {
+      "panes": 3170,
+      "maximumShortEdgeWorld": 1.400009336438307,
+      "capitalReferenceHeight": 2.486
+    },
+    "practicalClearance": {
+      "checks": [
+        "Factory arrival gallery seats on hall",
+        "Bridge crane seats in original upright",
+        "Fabrication district joins service spine"
+      ],
+      "intersectionTolerance": 0.005,
+      "frame": "source Z-up"
+    }
   },
   "cinderfall": {
     "id": "cinderfall",
     "sourceRadius": 56.65351361979899,
-    "triangles": 19586,
+    "triangles": 31955,
     "materials": 10,
-    "bytes": 1353980,
-    "sourceParts": 381,
+    "bytes": 1923556,
+    "sourceParts": 490,
     "detachedGroups": [],
     "description": "Open industrial court within inhabited pressure galleries, warm process towers, conveyor and exposed ventral heat plant.",
     "windowSupport": {
-      "supportedFaces": 2666,
-      "discardedFaces": 10,
+      "supportedFaces": 6165,
+      "discardedFaces": 291,
       "facadeFaces": [
-        673,
-        673,
-        660,
-        660
+        1733,
+        1732,
+        1344,
+        1356
       ],
       "maxStandOff": 0.075
     },
     "surfaceCleanup": {
-      "coplanarSubtractions": 819,
-      "overlapAreaRemoved": 107.3222,
+      "coplanarSubtractions": 1021,
+      "overlapAreaRemoved": 207.8205,
       "tolerance": 0.0001
     },
     "contactOcclusion": {
       "samples": 6,
       "radius": 2.4,
       "minimum": 0.58,
-      "vertices": 58758
+      "vertices": 95865
     },
     "packing": {
-      "verticesBefore": 58758,
-      "verticesAfter": 34405,
-      "positionPrecision": 0.00001
+      "verticesBefore": 95865,
+      "verticesAfter": 58381,
+      "positionPrecision": 0.00001,
+      "unusedUvBytesRemoved": 543744
     },
     "portalWidth": 18,
     "portalHeight": 22,
@@ -1872,47 +4548,82 @@
         "height": 22
       }
     },
-    "crewDoorHeight": 0.56,
-    "crewDoorWidth": 0.3,
+    "architecture": {
+      "revision": "inhabited-districts-v1",
+      "originalRadius": 56.65351361979899,
+      "partsAdded": 24,
+      "strategy": "industrial pressure bowl and reduction vessels",
+      "silhouettePartsAdded": 85,
+      "silhouette": "inhabited industrial court with grounded furnaces, flues and process bridges"
+    },
+    "crewDoorHeight": 0.29817638747262626,
+    "crewDoorWidth": 0.15973735043176404,
     "detailParts": 175,
+    "detailScale": {
+      "ordinaryWindowWorldSize": [
+        3,
+        1.4
+      ],
+      "crewDoorWorldHeight": 3,
+      "capitalWindowReferenceHeight": 2.486,
+      "sourceToWorld": 10.061158851069022,
+      "panelWorldSize": [
+        6,
+        3
+      ]
+    },
     "physicalDetachedGroups": [],
-    "physicalContactTolerance": 0.05
+    "physicalContactTolerance": 0.05,
+    "windowSizeAudit": {
+      "panes": 6165,
+      "maximumShortEdgeWorld": 1.400002073296538,
+      "capitalReferenceHeight": 2.486
+    },
+    "practicalClearance": {
+      "checks": [
+        "Furnaces grounded in court",
+        "Process bridge meets grounded furnace"
+      ],
+      "intersectionTolerance": 0.005,
+      "frame": "source Z-up"
+    }
   },
   "gatehouse-twelve": {
     "id": "gatehouse-twelve",
     "sourceRadius": 49.874241873349874,
-    "triangles": 14690,
+    "triangles": 16270,
     "materials": 9,
-    "bytes": 1085044,
-    "sourceParts": 330,
+    "bytes": 1017668,
+    "sourceParts": 450,
     "detachedGroups": [],
     "description": "Customs checkpoint with a full inspection gantry, bonded warehouses, administration and a covered shared inspection deck.",
     "windowSupport": {
-      "supportedFaces": 3612,
-      "discardedFaces": 24,
+      "supportedFaces": 2580,
+      "discardedFaces": 0,
       "facadeFaces": [
-        894,
-        1074,
-        726,
-        918
+        693,
+        747,
+        564,
+        576
       ],
       "maxStandOff": 0.075
     },
     "surfaceCleanup": {
-      "coplanarSubtractions": 438,
-      "overlapAreaRemoved": 465.563,
+      "coplanarSubtractions": 478,
+      "overlapAreaRemoved": 1074.6858,
       "tolerance": 0.0001
     },
     "contactOcclusion": {
       "samples": 6,
       "radius": 2.4,
       "minimum": 0.58,
-      "vertices": 44070
+      "vertices": 48810
     },
     "packing": {
-      "verticesBefore": 44070,
-      "verticesAfter": 27595,
-      "positionPrecision": 0.00001
+      "verticesBefore": 48810,
+      "verticesAfter": 30018,
+      "positionPrecision": 0.00001,
+      "unusedUvBytesRemoved": 257016
     },
     "portalWidth": 30,
     "portalHeight": 11,
@@ -2028,10 +4739,49 @@
         "height": 12
       }
     },
-    "crewDoorHeight": 0.56,
-    "crewDoorWidth": 0.3,
-    "detailParts": 31,
+    "architecture": {
+      "revision": "inhabited-districts-v1",
+      "originalRadius": 49.874241873349874,
+      "partsAdded": 32,
+      "strategy": "bonded vault and vertical customs core",
+      "silhouettePartsAdded": 117,
+      "silhouette": "deep inspection terminal with occupied control floor and bonded warehouses"
+    },
+    "crewDoorHeight": 0.20723369199452857,
+    "crewDoorWidth": 0.11101804928278314,
+    "detailParts": 28,
+    "detailScale": {
+      "ordinaryWindowWorldSize": [
+        3,
+        1.4
+      ],
+      "crewDoorWorldHeight": 3,
+      "capitalWindowReferenceHeight": 2.486,
+      "sourceToWorld": 14.476410525365763,
+      "panelWorldSize": [
+        6,
+        3
+      ]
+    },
     "physicalDetachedGroups": [],
-    "physicalContactTolerance": 0.05
+    "physicalContactTolerance": 0.05,
+    "windowSizeAudit": {
+      "panes": 2580,
+      "maximumShortEdgeWorld": 1.4000166307032502,
+      "capitalReferenceHeight": 2.486
+    },
+    "practicalClearance": {
+      "checks": [
+        "Inspection control seats on hall",
+        "Administration passage meets control floor",
+        "Staffed rear checkpoint joins occupied upper floor",
+        "Rear checkpoint picture window seats in wall",
+        "Interior scanner heads meet structural beam",
+        "Dish column reaches reflector",
+        "Scanner operates beneath the occupied hall roof"
+      ],
+      "intersectionTolerance": 0.005,
+      "frame": "source Z-up"
+    }
   }
 }

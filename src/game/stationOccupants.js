@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {loadGlb} from './glbLoader.js';
-import {applyShipLivery,stationShipFaction} from './shipLivery.js';
+import {applyShipLivery,stationShipFaction,SHIP_LIVERIES} from './shipLivery.js';
 
 // Coordinates use the Blender station author's frame (Z up, front -Y).
 // Ships remain separate reusable assets, rather than duplicated into station GLBs.
@@ -42,8 +42,8 @@ export const STATION_OCCUPANTS = {
       {
         "hull": "vanguard",
         "at": [
-          -4.3,
-          -30.2,
+          -2.8,
+          -24.2,
           -11
         ],
         "size": [
@@ -55,14 +55,68 @@ export const STATION_OCCUPANTS = {
       {
         "hull": "lancer",
         "at": [
-          4.3,
-          -30.2,
+          2.8,
+          -24.2,
           -11
         ],
         "size": [
           2,
           1.5,
           3
+        ]
+      },
+      {
+        "id": "rook-port-frigate",
+        "hull": "concord-frigate",
+        "capital": true,
+        "moored": true,
+        "at": [
+          -30,
+          13,
+          -37.5
+        ],
+        "size": [
+          23,
+          21,
+          76
+        ],
+        "roll": 3.141592653589793,
+        "dockPort": [
+          -30,
+          13,
+          -26.7
+        ],
+        "outward": [
+          0,
+          0,
+          -1
+        ]
+      },
+      {
+        "id": "rook-starboard-frigate",
+        "hull": "concord-frigate",
+        "capital": true,
+        "moored": true,
+        "at": [
+          30,
+          13,
+          -37.5
+        ],
+        "size": [
+          23,
+          21,
+          76
+        ],
+        "roll": 3.141592653589793,
+        "dockPort": [
+          30,
+          13,
+          -26.7
+        ],
+        "outward": [
+          0,
+          0,
+          -1
         ]
       }
     ]
@@ -446,8 +500,8 @@ export async function addStationOccupants(station, id, load = loadGlb, shipScale
     if(!spec)return;
     const group=new THREE.Group();group.name='station-docked-ships';
     group.scale.setScalar(100/spec.radius);
-    const steel=new THREE.MeshStandardMaterial({color:0x34434b,roughness:.7,metalness:.5});
-    const gold=new THREE.MeshStandardMaterial({color:0xa98030,roughness:.65,metalness:.3});
+    const steel=new THREE.MeshStandardMaterial({color:id==='rook'?SHIP_LIVERIES.concord.main:0x34434b,roughness:.7,metalness:.5});
+    const gold=new THREE.MeshStandardMaterial({color:id==='rook'?SHIP_LIVERIES.concord.accent:0xa98030,roughness:.65,metalness:.3});
     const light=new THREE.MeshStandardMaterial({color:0xbce8ec,emissive:0x83c8d5,emissiveIntensity:.8});
     const fixtures=new Map();
     const box=(name,position,size,material)=>{
@@ -464,12 +518,36 @@ export async function addStationOccupants(station, id, load = loadGlb, shipScale
         model.updateMatrixWorld(true);
         let bounds=new THREE.Box3().setFromObject(model),size=bounds.getSize(new THREE.Vector3());
         const scale=shipScale?.(item.hull) ?? Math.min(item.size[0]/size.x,item.size[1]/size.y,item.size[2]/size.z);
-        model.scale.setScalar(scale);model.updateMatrixWorld(true);
+        model.scale.setScalar(scale);
+        // Roll after sizing: the same real hull keeps its scale at an inverted berth.
+        if(item.roll)model.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),item.roll));
+        model.updateMatrixWorld(true);
         bounds=new THREE.Box3().setFromObject(model);size=bounds.getSize(new THREE.Vector3());
         const center=bounds.getCenter(new THREE.Vector3()),[x,y,z]=item.at;
         const lift=item.capital?2:shipScale?Math.min(.45,scale*.05):.45;
-        model.position.set(x-center.x,z+lift-bounds.min.y,-y-center.z);
-        model.name=`berthed-${item.hull}`;model.userData.stationOccupant=true;group.add(model);
+        model.position.set(x-center.x,z-(item.moored?center.y:bounds.min.y-lift),-y-center.z);
+        model.name=`berthed-${item.id??item.hull}`;model.userData.stationOccupant=true;model.userData.stationBerth=item;group.add(model);
+        if(item.moored){
+            // Outside berths use sealed telescopic gangways, not a shipyard
+            // floor or free-floating maintenance cradles. Fit their end to an
+            // actual hull intersection so model silhouettes remain untouched.
+            const [px,py,pz]=item.dockPort,port=new THREE.Vector3(px,pz,-py),out=new THREE.Vector3(item.outward[0],item.outward[2],-item.outward[1]);
+            group.updateMatrixWorld(true);
+            const hit=new THREE.Raycaster(port.clone().applyMatrix4(group.matrixWorld),out.clone().transformDirection(group.matrixWorld),0,30*group.scale.x).intersectObject(model,true)[0];
+            if(!hit)throw Error(`Capital berth ${item.id} does not meet its ship`);
+            const end=group.worldToLocal(hit.point.clone()),length=end.distanceTo(port),mid=port.clone().lerp(end,.5);
+            const axis=Math.abs(out.x)>.5?0:Math.abs(out.y)>.5?1:2;
+            const section=(along,across)=>{const size=[across,across,across];size[axis]=along;return size;};
+            box('Sealed capital docking gangway',mid.toArray(),section(length+.24,2.3),steel);
+            const ribs=length<3?1:4;
+            for(let step=0;step<=ribs;step++){
+                const point=port.clone().lerp(end,step/ribs);
+                box('Capital gangway pressure rib',point.toArray(),section(.18,2.65),gold);
+            }
+            box('Capital hull docking seal',end.toArray(),section(.32,3.1),steel);
+            model.userData.dockingContact={port:port.toArray(),end:end.toArray(),length};
+            continue;
+        }
         if(item.berth){
             for(const side of [-1,1]){
                 box('Occupied berth side stripe',[x+side*(size.x/2+.4),z+.03,-y],[.09,.06,size.z+.8],gold);

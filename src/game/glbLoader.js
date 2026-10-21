@@ -156,6 +156,9 @@ export async function buildGlbScene(arrayBuffer) {
             material.alphaTest = definition.alphaCutoff ?? 0.5;
         else if (definition.alphaMode === 'BLEND' || material.opacity < 1)
             material.transparent = true;
+        // Conservatory glazing is one outward shell. Keep its depth test, but
+        // let the opaque trees and paths behind it supply the depth buffer.
+        if (definition.extras?.voidGlassCanopy) material.depthWrite = false;
         if (definition.normalTexture) {
             material.normalMap = textures[definition.normalTexture.index];
             material.normalMap.colorSpace = THREE.NoColorSpace;

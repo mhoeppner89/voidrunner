@@ -71,6 +71,12 @@ function berthFromSpec(id, laneSpec, height = 2, radialGate = false) {
         gate[1] += Math.max(12,height*3);
         gate[2] = Math.max(pad[2]+100,location.position[2]+location.radius*1.15+100);
     }
+    if(spec.sharedEntry){
+        const throat=[location.position[0]+spec.sharedEntry.x*scale,pad[1],
+            location.position[2]-spec.sharedEntry.innerY*scale+stationModelOffsetZ(id)];
+        gate[0]=throat[0];
+        return {pad,gate,throat};
+    }
     return {pad,gate};
 }
 export function stationBerth(id, lane = 0, height = 2) {
@@ -93,11 +99,21 @@ export function stationApproach(id) {
     return approaches.get(id);
 }
 
+// Cold-path route data shared by clearance checks and docking guidance.
+export function stationDockRoute(berth){return berth.throat?[berth.gate,berth.throat,berth.pad]:[berth.gate,berth.pad];}
+
+function sharedEntryBusy(session,id,ship){
+    if(!STATION_DOCKS[id]?.sharedEntry)return false;
+    if(session.stationLandingBerth?.id===id||session.departureClearance?.id===id)return true;
+    for(const other of session.ships)if(other!==ship&&other.hull>0&&other.stationDock?.id===id&&other.stationDock.phase!=='docked')return true;
+    return false;
+}
 export function reserveStationDock(session,ship,id,departing=false) {
     const spec=STATION_DOCKS[id];
     if(!spec || ship.capitalClass || ship.hostile || ship.captured || ship.poweredDown)return false;
     // Wait for the actual model/parked bounds before assigning a live route.
     if(session.renderer?.stationModelLoads && !session.renderer.stationColliders?.has(id)){ship.stationQueue=id;return false;}
+    if(!departing&&sharedEntryBusy(session,id,ship)){ship.stationQueue=id;return false;}
     const hull=session.npcHullExtents(ship);
     let lane=-1,berth;
     for(let i=0;i<spec.lanes.length;i++) {
@@ -128,19 +144,30 @@ export function clearParkedBerth(berth,hull,obstacles=[]) {
             || min[2]>berth.gate[2]+hull[2])continue;
         berth.pad[2]=Math.max(berth.pad[2],max[2]+hull[2]+2);
     }
-    return berth.pad[2]+hull[2]+4<berth.gate[2];
+    return berth.pad[2]+hull[2]+4<(berth.throat??berth.gate)[2];
 }
 const rotation=new THREE.Quaternion(),goal=new THREE.Quaternion(),direction=new THREE.Vector3();
 const forward=new THREE.Vector3(0,0,-1);
-function segment(ship,phase,to,duration) {
+function segment(ship,phase,to,duration,via) {
     const dock=ship.stationDock;
     dock.phase=phase;dock.from=[...ship.position];dock.to=to;dock.elapsed=0;dock.duration=duration;
+    dock.via=via;
+    if(via){
+        dock.firstLength=Math.hypot(...via.map((v,i)=>v-dock.from[i]));
+        dock.routeLength=dock.firstLength+Math.hypot(...to.map((v,i)=>v-via[i]));
+    }
 }
 function move(ship,dt) {
     const d=ship.stationDock;
     d.elapsed=Math.min(d.duration,d.elapsed+dt);
     const t=d.elapsed/d.duration,blend=t*t*t*(10+t*(-15+6*t));
-    for(let i=0;i<3;i++) {const next=d.from[i]+(d.to[i]-d.from[i])*blend;ship.velocity[i]=(next-ship.position[i])/dt;ship.position[i]=next;}
+    let from=d.from,to=d.to,along=blend;
+    if(d.via){
+        const distance=blend*d.routeLength;
+        if(distance<=d.firstLength){to=d.via;along=distance/Math.max(1e-9,d.firstLength);}
+        else{from=d.via;along=(distance-d.firstLength)/Math.max(1e-9,d.routeLength-d.firstLength);}
+    }
+    for(let i=0;i<3;i++) {const next=from[i]+(to[i]-from[i])*along;ship.velocity[i]=(next-ship.position[i])/dt;ship.position[i]=next;}
     return t>=1;
 }
 // Docking guidance owns actual entity transforms; there is no second decorative ship.
@@ -149,6 +176,7 @@ export function updateStationDock(session,ship,dt) {
     if(!d)return false;
     if(ship.captured||ship.poweredDown){delete ship.stationDock;return false;}
     ship.burning=false;
+    const heading=d.throat??d.pad;
     // Emergency departure stays in the clear lane before combat takes over.
     if(ship.hostile && d.phase==='docked')d.until=0;
     if(d.phase==='align') {
@@ -158,38 +186,39 @@ export function updateStationDock(session,ship,dt) {
         // Finish heading alignment outside the hull before entering the door.
         d.phase='orient';ship.velocity.fill(0);
     } else if(d.phase==='orient') {
-        direction.set(d.pad[0]-d.gate[0],d.pad[1]-d.gate[1],d.pad[2]-d.gate[2]).normalize();
+        direction.set(heading[0]-d.gate[0],heading[1]-d.gate[1],heading[2]-d.gate[2]).normalize();
         goal.setFromUnitVectors(forward,direction);
         rotation.fromArray(ship.rotation).rotateTowards(goal,dt*.8).toArray(ship.rotation);
-        if(rotation.angleTo(goal)<1e-5)segment(ship,'landing',d.pad,Math.max(8,Math.hypot(...d.pad.map((x,i)=>x-ship.position[i]))/18));
+        if(rotation.angleTo(goal)<1e-5)segment(ship,'landing',d.pad,Math.max(8,Math.hypot(...d.pad.map((x,i)=>x-ship.position[i]))/18),d.throat);
         return true;
     } else if(d.phase==='landing' && move(ship,dt)) {
         d.phase='docked';d.until=session.save.world.time+8;
         ship.velocity.fill(0);
     } else if(d.phase==='docked') {
         ship.velocity.fill(0);
-        if(session.save.world.time>=d.until) {
+        if(session.save.world.time>=d.until&&!sharedEntryBusy(session,d.id,ship)) {
             // Back out through the entrance on manoeuvring thrusters. Turning
             // around inside a narrow hangar sweeps wings through its walls.
-            direction.set(d.gate[0]-d.pad[0],d.gate[1]-d.pad[1],d.gate[2]-d.pad[2]).normalize();
+            const toward=d.throat??d.gate;
+            direction.set(toward[0]-d.pad[0],toward[1]-d.pad[1],toward[2]-d.pad[2]).normalize();
             const release=d.pad.map((value,i)=>value+direction.getComponent(i)*8);
             segment(ship,'launch',release,4);
         }
     } else if(d.phase==='launch' && move(ship,dt)) {
-        segment(ship,'outbound',d.gate,Math.max(8,Math.hypot(...d.gate.map((value,i)=>value-ship.position[i]))/22));
+        segment(ship,'outbound',d.gate,Math.max(8,Math.hypot(...d.gate.map((value,i)=>value-ship.position[i]))/22),d.throat);
     } else if(d.phase==='outbound' && move(ship,dt)) {
         d.phase='turnout';ship.velocity.fill(0);
     } else if(d.phase==='turnout') {
         // Turn only at the exterior gate. Hand normal flight an outward
         // heading so its first acceleration cannot send it back into the bay.
-        direction.set(d.gate[0]-d.pad[0],d.gate[1]-d.pad[1],d.gate[2]-d.pad[2]).normalize();
+        direction.set(d.gate[0]-heading[0],d.gate[1]-heading[1],d.gate[2]-heading[2]).normalize();
         goal.setFromUnitVectors(forward,direction);
         rotation.fromArray(ship.rotation).rotateTowards(goal,dt*.8).toArray(ship.rotation);
         if(rotation.angleTo(goal)<1e-5){delete ship.stationDock;ship.stationDockCompleted=d.id;}
         return true;
     }
     if(d.phase==='turnout')return true;
-    direction.set(d.pad[0]-d.gate[0],d.pad[1]-d.gate[1],d.pad[2]-d.gate[2]).normalize();
+    direction.set(heading[0]-d.gate[0],heading[1]-d.gate[1],heading[2]-d.gate[2]).normalize();
     goal.setFromUnitVectors(forward,direction);
     rotation.fromArray(ship.rotation).rotateTowards(goal,dt*.8).toArray(ship.rotation);
     return true;

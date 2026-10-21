@@ -5,7 +5,7 @@ No geometry decoder or compressed-texture extension is needed at runtime.
 import numpy as np
 
 def pack(doc,binary):
-    out=bytearray();views=[];accessors=[];before=after=0
+    out=bytearray();views=[];accessors=[];before=after=unused_uv_bytes=0
     types={5121:np.uint8,5123:np.uint16,5125:np.uint32,5126:np.float32};sizes={'SCALAR':1,'VEC2':2,'VEC3':3,'VEC4':4}
     def read(index):
         a=doc['accessors'][index];v=doc['bufferViews'][a['bufferView']];dtype=types[a['componentType']];size=sizes[a['type']];step=np.dtype(dtype).itemsize
@@ -21,6 +21,18 @@ def pack(doc,binary):
         accessors.append(a);return len(accessors)-1
     for mesh in doc['meshes']:
         for p in mesh['primitives']:
+            # Blender emits UVs for every material batch, even solid metal,
+            # windows and radiators. Those channels are never sampled. Removing
+            # them also permits identical untextured vertices to weld properly.
+            material=doc['materials'][p['material']]
+            def uses_texture(node):
+                return isinstance(node,dict)and any(
+                    (key.endswith('Texture')and isinstance(value,dict)and 'index'in value)or uses_texture(value)
+                    for key,value in node.items())
+            if not uses_texture(material):
+                for name in list(p['attributes']):
+                    if name.startswith('TEXCOORD_'):
+                        unused_uv_bytes+=read(p['attributes'].pop(name)).nbytes
             names=list(p['attributes']);arrays=[];templates=[]
             for name in names:
                 i=p['attributes'][name];a=read(i)
@@ -35,4 +47,4 @@ def pack(doc,binary):
         v=doc['bufferViews'][image['bufferView']];start=v.get('byteOffset',0);image['bufferView']=blob(binary[start:start+v['byteLength']])
     while len(out)%4:out.append(0)
     doc['bufferViews']=views;doc['accessors']=accessors;doc['buffers'][0]['byteLength']=len(out)
-    return bytes(out),{'verticesBefore':before,'verticesAfter':after,'positionPrecision':.00001}
+    return bytes(out),{'verticesBefore':before,'verticesAfter':after,'positionPrecision':.00001,'unusedUvBytesRemoved':unused_uv_bytes}

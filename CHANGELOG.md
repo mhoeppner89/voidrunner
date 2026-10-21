@@ -1,3 +1,116 @@
+## 0.8.2kn — Compact Rook docks and Concord paint
+
+- Replace Rook's long docking funnels and hanging gangways with short, pod-mounted pressure collars. Bring both frigates close and dock them belly-up against their ventral hulls. Shorten the available central heavy port too.
+- Match the station and docking seals to Concord's navy hull, pale armor and brass trim. Keep the authored lighting, panel detail and material batches.
+- Preserve station dimensions, landing lanes and flight physics. Check hull separation, weapon arcs and actual hull-fitted seal lengths.
+
+## 0.8.2km — Helix conservatories and underside capital docking
+
+- Move Helix's radar dishes onto supported outriggers clear of the command tower. Tilt the bowls slightly outward and check their actual clearance from the tower, deck bands, crown and service spines.
+- Increase park conservatories from two to six, retaining 83 housing/courtyard sites. Add continuous glazing frames, bronze latitude bands and crown caps, varied broadleaf trees, rounded planting beds, benches, water basins and interior path lights. Make the glass more legible.
+- Move all Rook capital ports underneath: two below the lower pressure pods and a heavy central port below the reactor keel. Move both frigates below their ports and fit vertical pressure gangways to their real hulls. Aim aft ventral PDCs outward to keep the moorings clear.
+- Preserve station envelopes, landing lanes, one atlas, material limits and shipping model budgets. Use actual station triangles to check ship clearance beneath the concave lower hull.
+
+## 0.8.2kl — Sealed Helix parks and Rook capital berths
+
+- Extend every Helix housing foundation into its actual deck. Remove exposed house doors and exterior personnel entrances; keep access within pressure galleries and replace external plant doors with sealed inspection covers.
+- Add two transparent park domes with planted terraces, trees, paths and sealed vestibules in upper-deck courtyards. Keep 81 housing blocks, one atlas and ten materials.
+- Give Rook eight Cruiser batteries and sixteen capital PDCs. Add connected side docking ports, two real Concord frigates with hull-fitted pressure gangways, and an available heavy stern port. Visiting ships do not receive floating drydock lifts or repair cradles.
+- Raise near-flush weapon flanges, portal lips, side armor and roof grille surfaces to address depth flicker. Check seven camera angles with the flight depth range, all gun lines against station and berthed ships, and actual desktop/phone landing routes.
+
+## 0.8.2ki — Rook central armored roof
+
+- Close the upper slot between Rook's bastions with a thick pitched armored roof and pressure gables seated in the command hulls.
+- Add transverse armor ribs, longitudinal sills, fitted service panels, cooling grilles and small command-gallery windows. Seat the roof machinery and communications mast on the new ridge.
+- Preserve the tall hangar doorway, shared flight route, weapon mounts and station envelope. Check both roof-to-bastion connections, gable supports and outward barrel clearance.
+
+## 0.8.2kh — Dense Helix housing districts
+
+- Increase Helix's city buildings from 52 to 83. Close the gaps in both outer housing rows and fill the inner upper deck while preserving elevator, radiator and landing clearances.
+- Replace sparse room strips with full residential window patterns, selected lit rooms, facade floor divisions, doors and service risers. Retain roof equipment, structural piers and enclosed housing connections.
+- Pack housing facades, quiet structural panels and tower plating into separate regions of the existing atlas. Most room windows are painted detail; selected lights retain emissive geometry. Keep one texture, ten material batches and the existing model budgets.
+- Verify actual atlas isolation and dense-row spacing. Remove generated text UVs before authoring atlas coordinates so registry lettering samples the correct region.
+
+## 0.8.2kg — Helix architectural detail
+
+- Refine Helix's city buildings with recessed room bays, structural piers, roof cornices and seated rooftop service houses. Keep small individual windows and the connected housing layout.
+- Give the station a cooler blue-gray industrial palette with restrained copper and ochre accents, following its concourse artwork.
+- Add armored freight-lock actuators, transfer lintels, integrated HELIX registry panels and service spines following the tower's shoulders.
+- Map larger quiet industrial panels and sparse service markings onto the main tower and crown, using the existing atlas. Broaden the deck-wall panel spacing.
+- Lower tessellation on small landing circles and plant collars, and simplify repetitive window rows to keep the new detail inside the existing model budget. Preserve the main silhouette, landing space, material batches and atlas count.
+
+## 0.8.2kf — Helix roof districts and Rook underside
+
+- Replace Helix's exposed cargo slab, crane and outdoor containers with two mirrored enclosed freight holds and sealed transfer shutters embedded in the pressure decks.
+- Populate the two marked roof levels with 52 closed urban buildings, varied roofs, small room windows and integrated street foundations. Eight enclosed housing wings join buildings into larger complexes. Reserve the main arrival route, elevator footprints and radiator engineering corridors.
+- Close Rook's actual central underside gap with a continuous armored keel between the hangar floor, side hulls and reactor housing. Remove the former exposed support bars. Undo the preceding upper command-section change and restore its approach PDC positions.
+- Check physical mounts, city clearances, bilateral district placement, filled underside geometry and all-hull docking. Keep the original station envelopes, one atlas, existing material batches and shipping budgets.
+
+## 0.8.2ke — Restore Helix and complete Rook's center
+
+- Restore Helix's original refinery spindle, three circular pressure decks, service crown, radiator wings and freight pier from the pre-expansion design. Remove the spiral galleries and later trading districts. Retain the smaller window/door scale and fix a small original reflector-support gap.
+- Bring Rook's command section forward between the armored wings to close the recessed space above its hangar. Keep the narrow entrance and shared traffic route; relocate its two approach PDCs onto the command roof.
+- Check source connections, weapon clearances, all playable hull approaches, landing/departure framing and surface stability. Refresh the station gallery and keep the rejected models available as Previous comparisons.
+
+## 0.8.2kd — Station proportions and detail scale
+
+- Widen Helix's twin spiral galleries and extend its central hull, roof control rooms and engineering keel. Keep the galleries separate from large buildings, linked through enclosed radial passages.
+- Halve Rook's entrance width again, from 10.5 to 5.25 authoring units. Route traffic through one central opening before splitting into its internal berths; serialize arrivals and departures through the door. Keep the capital gun mounts.
+- Calibrate ordinary windows, personnel doors, smaller utility equipment and panel spacing against fitted ships and capital-ship windows. Retain a few restrained panorama rooms instead of broad oversized glazing.
+- Keep static material batching, one atlas and the existing shipping budgets. Audit native mesh contacts, large-structure clearances, window sizes and all-hull docking routes.
+
+## 0.8.2kc — Rook capital armament
+
+- Replace Rook's simple decorative cannon shapes with four heavy Cruiser batteries and eight capital-ship PDC mounts, using the same approved weapon mesh data as the ships.
+- Place heavy batteries on the upper bastions and flank casemates. Position PDCs above the hangar, on the aft roofs, outer flanks and underside. Keep the arrival lane clear.
+- Bake the visible hardware into Rook's existing material batches and station atlas. Check every bearing against the actual hull skin and every barrel's outward line against station geometry.
+
+## 0.8.2kb — Helix spiral galleries and Rook entrance
+
+- Give Helix a distinct double-helix silhouette with two enclosed trading galleries, room windows, armored sills and copper roof edges. Connect the galleries through occupied radial passages and terminal rooms; move the thermal bank clear of the lower gallery.
+- Narrow Rook's vertical hangar entrance from 13 to 10.5 authoring units. Recenter its NPC lanes and parked ships so wide wings still clear the portal; keep the player pad and tall interior hall.
+- Retain original station envelopes, one atlas and existing material counts. Refresh the station gallery and preserve the preceding Helix/Rook models for comparison.
+
+## 0.8.2ka — Inhabited station architecture
+
+- Rebuild Helix as a coherent trading drum with an integrated berth, merchant districts and freight handling. Give Rook tall armored arrival wings, recessed galleries and grounded defense casemates.
+- Remove the repeated ornamental arches, fins, crowns and oversized utility pods. Organize each station around its artwork: workshop galleries, shipyard fabrication halls, customs inspection rooms, research laboratories, rock-cut market terraces or refinery equipment.
+- Replace dense window speckle with larger architectural bays, floor divisions and quieter glazing. Add Nacre's curved picture windows and a staffed rear checkpoint at Gatehouse, with its scanner operating inside the hall.
+- Preserve original station envelopes, landing floors, berths and traffic lanes. Raise Rook's hall to match the artwork. Retain baked contact shading, cleaned surfaces and the existing material/texture budgets; total station download size decreases.
+- Strengthen source contact and mounting checks, and refresh the front, rear and underside review gallery. Keep the immediately preceding models available for comparison.
+
+## 0.8.2jz — Stronger station landmarks
+
+- Give all thirteen stations larger silhouettes with closed architectural volumes: Helix's fluted command crown and asymmetric freight keel, raised armored citadel wings at Rook, Cairn's cantilever engine hoist, deep fabrication keels at Argent, and Gatehouse's swept control tower.
+- Build up Blackglass's broken rock shoulders and upper terraces. Add Cinder's deep smelting bowl, Torchwell's elevated depot bridge, Nacre's oblique observatory spire, Shepherd's phased-array sail, Haven's civic tower, League Yard's raised fabrication gatehouse, and Cinderfall's large induction furnace heart.
+- Add seated structural roots, control-room glazing, personnel locks, lifting cables, heat-recovery vents and visible process connections. Preserve original station envelopes, landing floors, berths, traffic lanes and cinematic coordinates.
+- Reroute Helix's gallery support below its radiator, separate Shepherd's array and Haven's tower from occupied decks, move Torchwell's fuel globe clear of its service building, and seat the hoist pivot and antenna assemblies. Check actual mesh separation and mount contact in the editable sources.
+- Retain existing material counts and the 40,000-triangle / 2.5 MB limits. New detail remains in offline material-batched assets with baked contact shading and cleaned surfaces.
+
+## 0.8.2jy — Larger station structures and inhabited machinery
+
+- Add long merchant galleries to Helix, deeper bastion armor and a stern power casemate to Rook, a reclaimed freighter workshop at Cairn, and outboard fabrication halls at Argent and League Yard.
+- Expand Gatehouse with occupied customs wings, Blackglass with a cantilever tavern and excavated lift tower, Cinder with a cross-station reaction kiln and reactor crown, and Torchwell with long side service hulls.
+- Give Nacre optical sunshades and external instrument chambers, Shepherd an annular watch deck and counterweight hull, Haven a stepped upper residential crescent, and Cinderfall folded ceramic furnace mantles.
+- Keep each original station envelope, berth, material count and rendering budget. Author closed pressure vessels, thick fairings, attached process mains and structural roots offline.
+- Add a rear gallery view and tighter thumbnail framing. Show the model revision and version image requests so an older review tab cannot reuse the preceding thumbnails after refresh.
+
+## 0.8.2jx — Distinct station silhouettes
+
+- Give every port larger, connected superstructures: Helix's inhabited trading crescent, Rook's armored command halo, vaulted assembly structures at Argent and League Yard, and Cairn's reclaimed drive tower and crane crown.
+- Add refinery reaction chambers, large Torchwell reservoirs, Nacre's instrument halo and observatory, Shepherd's asymmetric receiver and solar sails, Haven's split residential towers and promenades, and Cinderfall's forked furnace crown. Break Blackglass's straight rock skyline with crags and an embedded watchtower; give Gatehouse a stepped customs keep and armored shoulders.
+- Keep original station envelopes, landing spaces, traffic routes and movie coordinates. All new structure is authored and batched offline, with existing contact shading and surface cleanup.
+- Remove unused UV channels from untextured station material batches. Larger models remain within the existing triangle, material and file-size limits, without extra runtime update work.
+- Update the multi-angle station gallery and retain the preceding station models for direct comparison.
+
+## 0.8.2jw — Complete station hulls and orbital architecture
+
+- Give all thirteen stations distinct complete structures: tapered hulls, inhabited pressure modules, reactor keels, reservoir globes and three-dimensional shipyard underframes. Keep Helix's established spindle; give Blackglass a natural rock foundation rather than an orbital hull.
+- Add visible bow and side compartments to Cairn and Torchwell. Carry pipes, girders, heat sinks and vessels into the station structure instead of leaving a thin underside.
+- Preserve existing landing floors, concourse spaces, traffic lanes, cinematic coordinates and outer envelopes. Retain baked contact shading, supported windows, cleaned surfaces, one atlas and at most ten material batches per station.
+- Keep each model below the existing 40,000-triangle and 2.5 MB limits. Add geometry checks for substantial lower hulls and retain actual mesh-contact, berth and route audits.
+- Add rear and underside views to the station workshop and an overview gallery.
+
 ## 0.8.2jv — Fly-over loot and automatic collectors
 
 - Collect dropped cargo and equipment by flying over them, including fast passes between simulation steps. Selection, scanning and salvage controls are unnecessary.

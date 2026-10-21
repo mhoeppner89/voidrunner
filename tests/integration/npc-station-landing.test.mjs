@@ -16,7 +16,7 @@ for(const id of Object.keys(STATION_DOCKS))test(`${id}: every traffic lane clear
   const variant=def.variant??hullId,hull=GameSession.prototype.npcHullExtents.call({}, {variant}),berth=stationBerth(id,lane,hull[1]);
   const ship={hull:100,maxHull:100,variant,position:berth.gate.map((v,i)=>v+(i===2?40:0)),velocity:[0,0,0],rotation:[0,Math.sin(.7),0,Math.cos(.7)]};
   // Occupy the preceding lanes so reservation chooses the tested one.
-  const occupied=Array.from({length:lane},(_,i)=>({hull:100,stationDock:{id,lane:i}}));
+  const occupied=Array.from({length:lane},(_,i)=>({hull:100,stationDock:{id,lane:i,phase:'docked',until:Infinity}}));
   const session={ships:[...occupied,ship],save:{player:{systemId:LOCATIONS[id].systemId},world:{time:0}},npcHullExtents:()=>hull};
   assert.ok(reserveStationDock(session,ship,id));assert.equal(ship.stationDock.lane,lane);
   const phases=new Set();let docked=false;

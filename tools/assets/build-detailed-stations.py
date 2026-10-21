@@ -10,6 +10,9 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 import station_builder as B
 import station_concourses as C
 import station_detailing as D
+import station_volumes as V
+import station_silhouettes as S
+import station_armament as W
 from mathutils import Vector
 from station_builder import box,beam,lathe,ring,tube,windows,tank,container,block,truss,radiator,dish,export_model
 
@@ -39,12 +42,9 @@ def service_skid(x,y,z):
 
 def finish_details(station_id):
     if station_id=='rook':
-        for i in range(8):
-            a=(i+.5)*math.tau/8;r=32*math.cos(math.pi/8)
-            for z in [-1,7]:
-                r=(33-(z+4)*5/21)*math.cos(math.pi/8)+.2
-                box('Citadel inset armor course',(r*math.cos(a),r*math.sin(a),z),(.9,12,2.6),'metal',yaw=a,chamfer=.2)
-        for side in [-1,1]:tube('Bastion power umbilical',[(side*22,20,-10),(side*39,23,-10),(side*39,23,4)],.45,'copper')
+        for side in [-1,1]:
+            box('Casemate inset service armor',(side*47.95,5,-9),(.8,18,8),'dark')
+            tube('Casemate protected power main',[(side*25,12,-14),(side*38,12,-14),(side*38,12,-5)],.55,'copper')
     elif station_id=='cairn':
         railing((28,-27),(28,28),-11);railing((-28,-27),(-28,-18),-11)
         for x in [13,21]:
@@ -58,7 +58,6 @@ def finish_details(station_id):
         for x in [-13,13]:
             for y in [-4,7,18]:box('Inspection floor lane',(x,y,-12.47),(.14,8,.06),'ochre')
             service_skid(x,31,-12.5)
-        for side in [-1,1]:railing((side*25.8,-23),(side*25.8,-13),-11.5)
     elif station_id=='blackglass':
         railing((-24,-29),(-24,-4),-12);railing((24,-29),(24,-4),-12)
         for x in [-20,20]:
@@ -66,43 +65,96 @@ def finish_details(station_id):
     elif station_id=='torchwell':
         railing((-31,-28),(-31,10),-10);railing((31,-28),(31,10),-10)
     elif station_id=='nacre':
-        beam('Telescope foundation',(0,40,12.8),(0,40,17),1.1)
-        dish('Astronomy reflector',(0,40,17),6)
+        beam('Telescope foundation',(0,40,10),(0,40,14),1.1)
+        dish('Astronomy reflector',(0,40,14),6)
         for x in [-40,40]:
-            beam('Sample mast foot',(x,0,12.8),(x,0,16),.7)
-            box('Sample analyser',(x,0,16),(2,3,2),'copper',chamfer=.3)
-            box('Analyser glazed face',(x,-1.52,16),(1.4,.08,1),'glass')
+            beam('Sample mast foot',(x,0,10),(x,0,13),.7)
+            box('Sample analyser',(x,0,13),(2,3,2),'copper',chamfer=.3)
+            box('Analyser glazed face',(x,-1.52,13),(1.4,.08,1),'glass')
     elif station_id=='shepherd':
         service_skid(14,-9,-14)
         for y in [-5,-10,-15]:container('Emergency supply container',-19,y,-14,1.5,3,1.2)
         railing((-21,-21),(-21,-8),-14);railing((21,-21),(21,-8),-14)
 
 def rook():
-    B.init('rook','Rook Bastion · fortified patrol base',{'hull':(.22,.28,.28),'armor':(.47,.51,.43),'ochre':(.65,.48,.17)})
-    lathe('Octagonal armored citadel',[(-26,18),(-21,30),(-4,33),(17,28),(23,20)],'hull',8)
-    for z,r in [(-20,29),(-5,33),(16,28)]:
-        ring('Armored belt',r,3,z,2,'armor',8)
+    # glTF material factors are linear; use the fleet's sRGB paint colors.
+    def paint(rgb):
+        channels=[((rgb>>shift)&255)/255 for shift in [16,8,0]]
+        return tuple(v/12.92 if v<=.04045 else ((v+.055)/1.055)**2.4 for v in channels)
+    B.init('rook','Rook Bastion · fortified vertical hangar',{
+        'hull':paint(0x182d4d),'armor':paint(0xe3e5df),'ochre':paint(0xd8ad56),
+        'metal':paint(0x65788c),'copper':paint(0x96723b)})
+    # Thick armored wings flank the landing hall; a common stern body joins them.
     for side in [-1,1]:
-        for y in [-17,22]:
-            x=side*42
-            truss('Bastion armored attachment',(side*22,y,-8),(x,y,-8),5)
-            lathe('Defense bastion',[(-17,9),(-13,11),(3,11),(7,8)],'armor',8,(x,y))
-            block('Bastion barracks',(x,y,0),(11,11,6),rows=4)
-            lathe('Turret armored pedestal',[(7,5),(9,4),(12,4)],'hull',12,(x,y))
-            box('Twin cannon mantlet',(x,y,13),(7,6,3),'armor',chamfer=.6)
-            for dx in [-1.5,1.5]:
-                tube('Defense cannon barrel',[(x+dx,y,13),(x+dx,y-10,13)],.5,'metal')
-                box('Cannon muzzle',(x+dx,y-10,13),(1.2,1.1,1.2),'dark',chamfer=.15)
-            for k in range(5):box('Bastion heat exchanger',(x+side*(10.9-.41421356*abs(-3+k*1.5)),y-3+k*1.5,-4),(.5,.5,5),'dark')
-    block('Command bunker',(0,3,25),(23,22,9),rows=7)
-    roof_vents(0,6,29.7,4);mast(-7,6,29.7,49)
-    dish('Tactical communications',(8,6,33),4.5);beam('Reflector support',(8,6,29.7),(8,6,33),1)
-    for x in [-17,17]:
-        block('Rear engineering block',(x,29,-9),(13,20,12),rows=4)
-        radiator('Bastion heat wing',(x,31,-4),(x*2.8,38,-5),13)
-    m=C.build('rook',('vanguard', 'lancer'))
-    for x in [-22,22]:block('Ammunition magazine',(x,-20,-15),(8,13,9),rows=1)
-    return m,'Octagonal fortress, four connected cannon bastions, armored barracks and deep shared military landing hall.'
+        x=side*20
+        B.pressure_building('Rook tall armored arrival wing',[(-22,x,-10,19,50),(-17,x,-10,23,58),(26,x,-10,23,58),(33,x,-8,18,50),(37,x,-6,12,36)],'hull',3)
+        for y in [-29,-10,9]:box('Arrival wing armored buttress',(side*31.7,y,5),(2,3,39),'armor',chamfer=.6)
+        box('Arrival wing crown shoulder',(x,-6,37),(12,35,1),'armor',chamfer=1)
+        box('Arrival wing inset armor field',(side*31.70,-10,6),(.5,39,25),'dark')
+        for z in [-12,-2,9,20]:B.window_wall('Protected arrival wing slit bank',(x,-39.02,z),(1,0,0),(0,-1,0),4,1,pitch=2.2,width=1.5,height=.4)
+        B.text('Military station identification','ROOK',(x,-39.02,15),1.4,'armor')
+        block('Rear engineering block',(side*17,29,-9),(13,20,12),rows=4)
+        # Two integrated low casemates, rather than four giant detached barrels.
+        box('Rook integrated defense casemate',(side*38,5,-9),(20,29,21),'hull',chamfer=3)
+        beam('Casemate occupied transfer',(side*25,5,-8),(side*38,5,-8),8,'armor')
+    block('Rook inhabited stern command body',(0,18,2),(40,26,42),'hull',rows=7)
+    block('Rook overhead command bridge',(0,-24,24.5),(37,14,10),'armor',rows=4)
+    for x in [-7,7]:B.window_wall('Command bridge observation rooms',(x,-31,24.5),(1,0,0),(0,-1,0),4,2,pitch=1.5,row_pitch=.5,width=.8,height=.3)
+    m=C.build('rook',('vanguard','lancer'))
+    # Give the portal frame a visible raised lip. Its old front was only .05
+    # ahead of the shoulder wall, below the flight depth buffer's precision.
+    for o in B.parts:
+        if o.name.startswith('Main concourse portal'):o.location.y-=.20
+    # A closed armored vault covers the upper central slot. Its eaves embed
+    # in both stepped bastions; front/rear pressure gables seat in the command
+    # hulls. The genuine flight doorway and its existing ceiling stay below.
+    top=[(-14.5,32.2),(-12,34.2),(-4,36.2),(4,36.2),(12,34.2),(14.5,32.2)]
+    cross=top+[(x,z-1.4)for x,z in reversed(top)];n=len(cross)
+    vs=[(x,y,z)for y in [-33.8,18.2]for x,z in cross]
+    fs=[tuple(reversed(range(n))),tuple(range(n,2*n))]
+    fs.extend((i,(i+1)%n,(i+1)%n+n,i+n)for i in range(n))
+    roof=B.mesh('Rook central armored roof',vs,fs,'armor');roof['station_panel_scale']=5
+    for label,y,depth,base in [('forward',-30,8,28.7),('aft',15,6,22.9)]:
+        B.pressure_building('Rook '+label+' roof pressure gable',[
+            (base,0,y,28,depth),(31,0,y,28,depth),(33,0,y,23.6,depth),(35,0,y,8,depth)],'hull',.45)
+    # Load ribs wrap the roof profile rather than floating above the plating.
+    for y in [-31.5,-12,13.8]:
+        for (x0,z0),(x1,z1)in zip(top,top[1:]):
+            beam('Rook roof transverse armor rib',(x0,y,z0+.025),(x1,y,z1+.025),.28,'metal')
+    for side in [-1,1]:
+        beam('Rook roof longitudinal armored sill',(side*14.35,-33.7,32.13),(side*14.35,16.8,32.13),.4,'metal')
+        for y in [-21,1]:
+            x=side*8;z=35.2;angle=side*math.atan(.25)
+            panel=box('Rook roof seated service panel',(x,y,z+.08),(3.2,7,.4),'metal',chamfer=.18);panel.rotation_euler.y=angle
+            for dy in [-2,-.8,.4,1.6]:
+                grille=box('Rook roof seated cooling grille',(x,y+dy,z+.30),(2.3,.28,.16),'dark');grille.rotation_euler.y=angle
+    for z in [30.3,31.4]:
+        B.window_wall('Roof command gallery small rooms',(0,-34.01,z),(1,0,0),(0,-1,0),8,1,pitch=1.6,width=B.detail_units(3),height=B.detail_units(1.4))
+    box('Rook roof gallery armored brow',(0,-34.10,32.3),(18,.45,.35),'metal',chamfer=.1)
+    roof_vents(0,3,36.13,3);mast(0,11,36.16,46)
+    m['centralRoof']={'front':-33.8,'back':18.2,'ridgeHeight':36.2,'thickness':1.4,'gableFront':-34,'gableBack':18}
+    # Compact pod-mounted pressure collars. Frigates dock belly-up so their
+    # broad ventral hull meets the seal, without a long stalk or mast collisions.
+    ports=[]
+    for side in [-1,1]:
+        label='port'if side<0 else'starboard'
+        lathe('Rook '+label+' capital pressure gangway',[(-26.7,1.65),(-26.25,1.65),(-25.8,2.0),(-25.2,2.65)],'hull',16,(side*30,13))
+        for z,r in [(-25.65,2.2),(-26.65,1.95)]:
+            collar=ring('Rook '+label+' capital docking collar',r,.7,z,.3,'armor',16)
+            collar.location.x=side*30;collar.location.y=13
+        for xoff in [-1,1]:
+            box('Rook '+label+' docking alignment lamp',(side*30+xoff*1.9,13,-26.7),(.28,.7,.18),'cool')
+        ports.append({'id':label,'position':[side*30,13,-26.7],'outward':[0,0,-1],'occupied':True,'collarLength':1.5})
+        m['occupants'].append({'id':'rook-'+label+'-frigate','hull':'concord-frigate','capital':True,'moored':True,
+            'at':[side*30,13,-37.5],'size':[23,21,76],'roll':math.pi,'dockPort':[side*30,13,-26.7],'outward':[0,0,-1]})
+    tube('Rook ventral heavy docking pressure trunk',[(0,0,-47.3),(0,0,-49.1)],3.0,'hull',16)
+    for z in [-47.7,-49]:ring('Rook ventral heavy capital collar',3.5,1.2,z,.35,'armor',20)
+    for side in [-1,1]:
+        box('Rook ventral heavy docking guidance',(side*3.3,0,-49.1),(.5,.8,.18),'cool')
+    ports.append({'id':'ventral-heavy','position':[0,0,-49.1],'outward':[0,0,-1],'occupied':False,'collarLength':1.8})
+    m['capitalPorts']=ports
+    return m,'Paired deep armored arrival wings joined by a closed pitched armored roof above the vertical landing hall, with an inhabited command bridge, continuous lower keel and stern engineering body.'
+
 
 def cairn():
     B.init('cairn','Cairn Anchorage · salvage and repair yard',{'armor':(.60,.55,.40),'hull':(.26,.32,.33),'copper':(.44,.20,.10)})
@@ -112,7 +164,7 @@ def cairn():
     block('Rear reclaimed parts store',(5,22,-5),(37,16,12),rows=6)
     block('Crane control cabin',(-19,-8,9.7),(9,8,5),rows=3)
     for x in [-22,22]:
-        beam('Overhead salvage crane upright',(x,2,-11),(x,2,24),1.7,'ochre')
+        beam('Overhead salvage crane upright',(x,2,-11),(x,2,25.5),1.7,'ochre')
         beam('Crane foot brace',(x,-6,-11),(x,2,7),.9)
         box('Crane foundation shoe',(x,2,-10.4),(4,5,1.2),'metal')
     beam('Salvage crane crossbeam',(-22,2,24),(22,2,24),2,'ochre')
@@ -140,10 +192,7 @@ def argent():
     for i in range(16):
         a=i*math.tau/16;x,y=60*math.cos(a),60*math.sin(a)
         box('Torus segment service module',(x,y,6),(5,9,6),'armor',yaw=a,chamfer=.5)
-        truss('Assembly ring keel support',(x,y,-1),(x*.35,y*.77,-20),2)
-        if i%2==0:
-            block('Ring occupied workstation',(x,y,15),(6,7,7),rows=5)
-            roof_vents(x,y,18.7,1)
+        if i%4==0:truss('Assembly ring keel support',(x,y,-1),(x*.35,y*.77,-20),3)
     box('Frigate drydock keel',(0,0,-21),(44,108,3),'hull',chamfer=1)
     for x in [-18,18]:
         beam('Continuous capital cradle rail',(x,-51,-18.8),(x,51,-18.8),1.5,'ochre')
@@ -168,13 +217,12 @@ def gatehouse():
         for y in [6,17,28]:
             box('Warehouse wall brace',(x+side*7.4,y,-4),(1,1.8,12),'armor')
             container('Sealed inspected freight',x,-4+y*.1,-11.5,2.2,4,1.8)
-        box('Scanner leg load-bearing deck',(x,-15,-13),(6,20,3),'metal')
-        beam('Scanning gantry leg',(x,-20,-12.5),(x,-20,13),1.4,'ochre')
-        beam('Scanner stabilizing knee',(x,-14,-12.5),(x,-20,4),1)
-    beam('Inspection scanner overhead',(-23,-20,13),(23,-20,13),2,'ochre')
-    for x in range(-20,21,4):
-        box('Supported scanner head',(x,-20,11),(2.4,2,3),'metal',chamfer=.3)
-        box('Scanner emitter',(x,-21.04,11),(.9,.1,1),'cool')
+        box('Scanner seated floor shoe',(side*14.8,-20,-12.3),(2.5,3,.4),'metal')
+        beam('Scanning gantry leg',(side*14.8,-20,-12.5),(side*14.8,-20,-2.2),1,'metal')
+    beam('Inspection scanner overhead',(-14.8,-20,-2.2),(14.8,-20,-2.2),.8,'metal')
+    for x in range(-12,13,6):
+        box('Supported scanner head',(x,-20,-2.9),(1.8,1.5,1.2),'ochre',chamfer=.2)
+        box('Scanner emitter',(x,-20,-3.52),(.9,1,.06),'cool')
     block('Customs administration',(0,15,2.5),(25,19,30),rows=15)
     roof_vents(0,18,17.7,4);mast(-8,15,17.7,41)
     dish('Traffic control antenna',(8,16,22),5);beam('Antenna mounting column',(8,16,17.7),(8,16,22),1)
@@ -270,20 +318,20 @@ def torchwell():
 
 def nacre():
     B.init('nacre','Nacre Research · pressure-laboratory cluster',{'hull':(.41,.47,.50),'armor':(.75,.76,.69),'copper':(.27,.43,.48),'ochre':(.34,.62,.63)})
-    lathe('Central science pressure hull',[(-19,10),(-15,18),(12,18),(19,12),(23,5)],'armor',48)
+    lathe('Central science pressure hull',[(-19,10),(-15,18),(8,18),(13,13),(17,10)],'armor',48)
     for z in [-11,-3,5]:windows(18,z,5,'Science occupied windows')
     for i in range(4):
         a=i*math.tau/4;x,y=40*math.cos(a),40*math.sin(a)
         beam('Enclosed laboratory transfer tunnel',(x*.35,y*.35,0),(x,y,0),5,'hull')
-        lathe('Round pressure laboratory',[(-12,5),(-10,10),(-5,13),(6,13),(11,8),(13,4)],'armor',48,(x,y))
+        lathe('Round pressure laboratory',[(-12,5),(-10,10),(-5,13),(2,13),(6,11),(9,7),(10,1)],'armor',48,(x,y))
         # Window bands follow their local cylindrical module, including its offset.
         before=len(B.parts);windows(13,-3,4,'Laboratory occupied windows')
         for o in B.parts[before:]:o.location.x=x;o.location.y=y
-        for z in [-5,6]:
+        for z in [-5,1]:
             o=ring('Laboratory equator band',13.1,1,z,.5,'metal',48);o.location.x=x;o.location.y=y
         tank('Laboratory life support',x,y,-21,2.5,15)
         beam('Lab utility neck',(x,y,-11),(x,y,-15),2)
-        box('Laboratory roof hatch',(x,y,13),(3,3,.5),'metal',chamfer=.3)
+        box('Laboratory roof hatch',(x,y,10),(3,3,.5),'metal',chamfer=.3)
     # Offset terminal preserves an unobstructed central approach in front of the south lab.
     m=C.build('nacre',('talon', 'lancer'))
     mast(0,0,23,43)
@@ -296,13 +344,14 @@ def shepherd():
     lathe('Relay tower base',[(-25,8),(-18,11),(26,7),(30,9),(37,9),(40,5),(54,4)],'hull',48,(-10,8))
     for z,r in [(-12,10),(22,8),(29,9.1),(37,9.1)]:
         o=ring('Relay tower structural band',r,1.3,z,.8,'armor',48);o.location.x=-10;o.location.y=8
-    before=len(B.parts);windows(9,30,7,'Watch room windows')
+    before=len(B.parts);windows(9,31,3,'Watch room windows')
     for o in B.parts[before:]:o.location.x=-10;o.location.y=8
+    panoramic=ring('Watch level panoramic glazing',9.03,.12,32.1,B.detail_units(5),'glass',48);panoramic.location.x=-10;panoramic.location.y=8
     mast(-10,8,54,72)
     truss('Reflector supported outrigger',(-10,8,22),(12,8,31),3)
     dish('Primary deep-space reflector',(12,8,31),13)
-    block('Remote maintenance house',(13,9,-5),(14,23,18),rows=11)
-    roof_vents(13,14,4.2,2)
+    block('Remote maintenance house',(13,9,-8),(14,23,12),rows=5)
+    roof_vents(13,14,-1.8,2)
     lathe('Ventral power plant',[(-33,5),(-28,9),(-17,9)],'metal',24)
     for x in [-16,16]:truss('Deck to generator knee',(x,-14,-17),(0,0,-31),2)
     radiator('Remote power cooling',(0,8,-25),(29,16,-23),12)
@@ -364,6 +413,9 @@ BUILDERS={'rook':rook,'cairn':cairn,'argent':argent,'gatehouse-twelve':gatehouse
 requested=sys.argv[sys.argv.index('--')+1:]if '--'in sys.argv else list(BUILDERS)
 for station_id in requested:
     metadata,description=BUILDERS[station_id]()
+    V.apply(station_id,metadata)
+    S.apply(station_id,metadata)
     finish_details(station_id)
     D.apply(station_id,metadata)
+    if station_id=='rook':W.rook(metadata)
     export_model(station_id,metadata,description)
