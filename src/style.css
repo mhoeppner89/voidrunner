@@ -17516,7 +17516,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #dock-screen .paint-control-heading h3 { margin:0; font:600 20px/1.2 var(--ui-font); }
 #dock-screen .paint-workshop button { min-width:0; min-height:44px; padding:9px 12px; font:500 14px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; }
 #dock-screen .paint-workshop button[aria-pressed=true] { border-color:var(--void-gold); box-shadow:inset 0 0 0 1px var(--void-gold); }
-#dock-screen .paint-patterns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+#dock-screen .paint-patterns { display:grid; grid-template-columns:1fr; gap:8px; }
 #dock-screen .paint-patterns button { display:flex; align-items:center; gap:10px; text-align:left; background:var(--paint-pattern-background); }
 #dock-screen .paint-patterns svg { width:44px; height:44px; flex:none; }
 #dock-screen .paint-current-pattern { display:none; }
@@ -17540,7 +17540,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
  #dock-screen .paint-stage h3 { margin:10px 12px 0; font-size:15px; }
  #dock-screen .paint-control-heading h3 { font-size:16px; }
  #dock-screen .paint-workshop button { padding:7px; font-size:14px; }
- #dock-screen .paint-patterns { grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; }
+ #dock-screen .paint-patterns { grid-template-columns:repeat(var(--paint-pattern-count),minmax(0,1fr)); gap:5px; }
  #dock-screen .paint-patterns button { justify-content:center; }
  #dock-screen .paint-patterns span { display:none; }
  #dock-screen .paint-heading-title { display:none; }

@@ -5,14 +5,17 @@ import * as THREE from 'three';
 import {customPaintFrames} from '../../src/game/customShipPaint.js';
 import {applyFleetPaint} from '../../src/game/fleetPaint.js';
 import {SHIPS} from '../../src/game/data.js';
-import {PAINT_LAYOUTS,PAINT_PATTERNS,normalizePaintDesign,samePaint} from '../../src/game/paintDesign.js';
+import {PAINT_LAYOUTS,PAINT_PATTERNS,paintPatternsForHull,normalizePaintDesign,samePaint} from '../../src/game/paintDesign.js';
 import {SHIP_PAINT_MASKS} from '../../src/game/shipPaintMaskCatalog.js';
 import {resolveFleetPaint,fleetPaintPath} from '../../src/game/fleetPaintCatalog.js';
 const design={pattern:'stripes',colors:['#FF2211','#121aBC','#abcdef']};
-test('every playable hull has four authored patterns and shipping UV masks',()=>{
+test('every playable hull has four distinct authored plans and side profiles',()=>{
  assert.equal(PAINT_PATTERNS.length,4);
  for(const id of Object.keys(SHIPS)){
-  assert.ok(PAINT_LAYOUTS[id]);const masks=SHIP_PAINT_MASKS[id];assert.ok(masks&&Object.keys(masks.surfaces).length);
+  const styles=paintPatternsForHull(id);assert.equal(styles.length,4);assert.equal(new Set(styles.map(p=>JSON.stringify(p.top))).size,4);
+  assert.equal(new Set(styles.map(p=>p.id)).size,styles.length);
+  for(const p of styles){assert.ok(p.name&&p.top.length&&(p.port.length||p.starboard.length));for(const view of [p.top,p.port,p.starboard])for(const shape of view){assert.ok([1,2].includes(shape.color));assert.ok(shape.points.every(v=>v.length===2&&v.every(Number.isFinite)));}}
+  const masks=SHIP_PAINT_MASKS[id];assert.ok(masks&&Object.keys(masks.surfaces).length);assert.equal(masks.tileSize,192);
   for(const file of [masks.patterns,...Object.values(masks.surfaces)])assert.ok(fs.existsSync(`assets/paint/${file}`));
  }
 });
@@ -41,4 +44,18 @@ test('custom paint preserves source geometry, glass and PBR maps and restores th
  applyFleetPaint(root,'wayfarer',{id:'player',livery:{pattern:'blocks',colors:['#222222','#bbbbbb','#ff8800']}});assert.equal(body.material,painted);
  applyFleetPaint(root,'wayfarer',{id:'player',livery:'original'});assert.equal(body.material,source);assert.equal(glass.material,originalGlass);assert.equal(root.userData.livery,'original');
  geometry.dispose();source.dispose();originalGlass.dispose();map.dispose();normalMap.dispose();
+});
+
+test('all four original pattern IDs remain valid on every hull with colors intact',()=>{
+ for(const hull of Object.keys(PAINT_LAYOUTS))for(const choice of PAINT_PATTERNS){
+  const result=normalizePaintDesign({pattern:choice.id,colors:design.colors},hull);assert.equal(result.pattern,choice.id);assert.deepEqual(result.colors,['#ff2211','#121abc','#abcdef']);
+ }
+});
+test('Scrapper paint runs along the actual +Z nose without changing faction frames',()=>{
+ const root=new THREE.Group();root.userData.paintHullRoot=true;const body=new THREE.Mesh(new THREE.BoxGeometry(2,1,4));root.add(body);
+ const frame=customPaintFrames(root,'scrapper').get(body);assert.ok(new THREE.Vector3(0,0,2).applyMatrix4(frame).distanceTo(new THREE.Vector3(0,0,1))<1e-6);body.geometry.dispose();body.material.dispose();
+});
+test('projection normals preserve shallow camber on a physically thin wing',()=>{
+ const root=new THREE.Group(),body=new THREE.Mesh(new THREE.BoxGeometry(2,.1,10));root.userData.paintHullRoot=true;root.add(body);
+ const frames=customPaintFrames(root,'demon'),shallow=new THREE.Vector3(.1,.99,0).normalize(),facing=shallow.clone().applyMatrix3(frames.normals.get(body)).normalize();assert.ok(facing.distanceTo(shallow)<1e-6);body.geometry.dispose();body.material.dispose();
 });

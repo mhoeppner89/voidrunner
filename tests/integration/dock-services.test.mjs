@@ -20,7 +20,7 @@ test('paint requires a serviced dock and credits, bills once and survives save h
  p.dockedAt=undefined;assert.equal(r.setShipPaint('original'),false);p.dockedAt='helix';p.credits=cost-1;assert.equal(r.setShipPaint('original'),false);assert.equal(p.shipPaints[p.shipId],'independent-bands');
 });
 test('custom paint costs once, survives saving per hull and cannot be mutated by the editor',()=>{
- const {session:r,save}=setup(),p=save.player,before=p.credits,cost=repaintCost(p),draft={pattern:'blocks',colors:['#f02020','#121212','#ffcc66']};
+ const {session:r,save}=setup(),p=save.player,before=p.credits,cost=repaintCost(p),draft={pattern:'panels',colors:['#f02020','#121212','#ffcc66']};
  assert.equal(r.setShipPaint({...draft,pattern:'invalid'}),false);assert.equal(p.credits,before);
  assert.equal(r.setShipPaint(draft),true);assert.equal(p.credits,before-cost);assert.deepEqual(p.shipPaints.wayfarer,draft);
  draft.colors[0]='#ffffff';assert.equal(p.shipPaints.wayfarer.colors[0],'#f02020');
@@ -29,4 +29,10 @@ test('custom paint costs once, survives saving per hull and cannot be mutated by
  const restored=hydrateSave(save);assert.deepEqual(restored.player.shipPaints,p.shipPaints);
  p.shipPaints.mule={pattern:'bad',colors:['bad']};assert.equal(hydrateSave(save).player.shipPaints.mule,undefined);
  p.dockedAt=undefined;assert.equal(r.setShipPaint('original'),false);assert.deepEqual(p.shipPaints.wayfarer,restored.player.shipPaints.wayfarer);
+});
+test('saved choices keep their pattern IDs and colors without charging',()=>{
+ const {save}=setup(),colors=['#182d4d','#e3e5df','#d8ad56'],credits=save.player.credits;
+ save.player.shipPaints??={};save.player.shipPaints.demon={pattern:'asymmetric',colors:[...colors]};save.player.shipPaints.lancer={pattern:'stripes',colors:[...colors]};
+ const restored=hydrateSave(save);assert.equal(restored.player.credits,credits);
+ assert.deepEqual(restored.player.shipPaints.demon,{pattern:'asymmetric',colors});assert.deepEqual(restored.player.shipPaints.lancer,{pattern:'stripes',colors});
 });

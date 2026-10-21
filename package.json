@@ -45,6 +45,7 @@
     "test:browser:station-surfaces": "node tools/playtest/station-review.mjs && node tests/browser/station-surfaces.mjs",
     "test:browser:survey": "node tests/browser/tutorial-survey.mjs",
     "test:browser:carrier-hiding": "node tests/browser/carrier-hiding.mjs",
+    "review:paint-quality": "node tools/playtest/repaint-review.mjs && node tools/playtest/paint-quality.mjs",
     "review:paint": "node tools/playtest/repaint-review.mjs",
     "test:browser:paint": "node tests/browser/custom-paint.mjs"
   },

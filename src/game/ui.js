@@ -5,7 +5,8 @@ import {normalizeEquipmentInventory} from './equipmentInventory.js';
 import {PDC_TURRET} from './turrets.js';
 import {renderEquipmentInventory,bindEquipmentInventory} from './equipmentUi.js';
 import {FLEET_PAINTS,fleetHullId} from './fleetPaintCatalog.js';
-import {PAINT_PATTERNS,PAINT_PALETTES,editablePaint,normalizePaintDesign,samePaint} from './paintDesign.js';
+import {PAINT_LAYOUTS,paintPatternsForHull,PAINT_PALETTES,editablePaint,normalizePaintDesign,samePaint} from './paintDesign.js';
+import {SHIP_PAINT_MASKS} from './shipPaintMaskCatalog.js';
 import {GUILD_SHIP_PREFERENCES} from './factions.js';
 import { CanvasSizeCache } from './canvasSizeCache.js';
 import {cockpitDamageMarkup,CANOPY_APERTURES} from './cockpitDamage.js';
@@ -450,7 +451,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2ko';
+const GAME_VERSION = '0.8.2kq';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -3703,12 +3704,15 @@ export class GameUI {
     }
     renderPaintWorkshop(){
         const player=this.save.player,design=editablePaint(this.paintDraft,player.shipId);
-        const colorStyle=design.colors.map((c,i)=>`--paint-${i}:${c}`).join(';');
-        const shape={panels:'M4 10h18v24H4Zm23 6h10v22H27Z',stripes:'M10 3h6v34h-6Zm15 0h3v34h-3Z',blocks:'m2 30 18-22 18 22-18-12Z',asymmetric:'M20 3h18v35H20ZM9 3h4v35H9Z'};
+        const patterns=paintPatternsForHull(player.shipId),layout=PAINT_LAYOUTS[player.shipId];
+        const colorStyle=design.colors.map((c,i)=>`--paint-${i}:${c}`).join(';')+`;--paint-pattern-count:${patterns.length}`;
+        const path=points=>points.map(([x,z],i)=>`${i?'L':'M'}${x},${z}`).join(' ');
+        const aspect=SHIP_PAINT_MASKS[player.shipId].aspect;
+        const icon=p=>{const clip=`paint-${player.shipId}-${p.id}`;return `<svg viewBox="0 0 40 40" aria-hidden="true"><defs><clipPath id="${clip}"><path d="${path(layout.outline)}Z"/></clipPath></defs><g transform="translate(20 20) scale(${17*Math.min(1,aspect)} ${-17/Math.max(1,aspect)})"><g clip-path="url(#${clip})"><path class="paint-main" d="M-1 -1H1V1H-1Z"/>${p.top.map(s=>`<path class="paint-${s.color===1?'second':'accent'}" d="${path(s.points)}${s.width?'':'Z'}" ${s.width?`style="fill:none;stroke:var(--paint-${s.color});stroke-width:${s.width};stroke-linejoin:round"`:''}/>`).join('')}</g></g></svg>`;};
         return `<section class="paint-workshop" style="${colorStyle}">
           <div class="paint-stage"><h3>${escapeHtml(SHIPS[player.shipId].name)}</h3><div class="ship-silhouette paint-editor-preview" data-variant="${escapeHtml(SHIPS[player.shipId].variant)}" data-repaint-preview role="img" aria-label="${escapeHtml(t('Paint preview'))}"></div><span class="paint-orbit-hint">${t('Drag to rotate')}</span></div>
           <div class="paint-controls"><div class="paint-control-heading"><h3><span class="paint-heading-title">${t('Hull paint')}</span><span class="paint-current-pattern"></span></h3><button data-ui-command="paint-factory" aria-pressed="${this.paintDraft==='original'}">${t('Factory finish')}</button></div>
-          <div class="paint-patterns" aria-label="${t('Pattern')}">${PAINT_PATTERNS.map(p=>`<button data-ui-command="paint-pattern" data-pattern="${p.id}" aria-label="${t(p.name)}" aria-pressed="${typeof this.paintDraft==='object'&&this.paintDraft.pattern===p.id}"><svg viewBox="0 0 40 40" aria-hidden="true"><path class="paint-main" d="M3 3h34v34H3Z"/><path class="paint-second" d="${shape[p.id]}"/><path class="paint-accent" d="M3 32h34v3H3Z"/></svg><span>${t(p.name)}</span></button>`).join('')}</div>
+          <div class="paint-patterns" aria-label="${t('Pattern')}">${patterns.map(p=>`<button data-ui-command="paint-pattern" data-pattern="${p.id}" aria-label="${t(p.name)}" aria-pressed="${typeof this.paintDraft==='object'&&this.paintDraft.pattern===p.id}">${icon(p)}<span>${t(p.name)}</span></button>`).join('')}</div>
           <div class="paint-colors">${['Main color','Secondary color','Accent color'].map((name,i)=>`<label><span>${t(name)}</span><input type="color" data-paint-color="${i}" value="${design.colors[i]}" aria-label="${t(name)}"></label>`).join('')}</div>
           <div class="paint-palettes" aria-label="${t('Suggested colors')}">${PAINT_PALETTES.map((p,i)=>`<button data-ui-command="paint-palette" data-palette="${i}" aria-label="${t(p.name)}" title="${t(p.name)}">${p.colors.map(c=>`<i style="background:${c}"></i>`).join('')}</button>`).join('')}</div>
           <div class="paint-commit"><button data-ui-command="paint-reset">${t('Reset')}</button><button class="primary" data-ui-command="repaint">${t('Apply paint')}</button></div></div></section>`;
@@ -3718,7 +3722,7 @@ export class GameUI {
         const player=this.save.player,design=editablePaint(this.paintDraft,player.shipId),same=samePaint(this.paintDraft,player.shipPaints?.[player.shipId]);
         design.colors.forEach((c,i)=>{workshop.style.setProperty(`--paint-${i}`,c);workshop.querySelector(`[data-paint-color="${i}"]`).value=c;});
         for(const b of workshop.querySelectorAll('[data-pattern]'))b.setAttribute('aria-pressed',typeof this.paintDraft==='object'&&this.paintDraft.pattern===b.dataset.pattern);
-        workshop.querySelector('.paint-current-pattern').textContent=t(PAINT_PATTERNS.find(p=>p.id===this.paintDraft?.pattern)?.name??(this.paintDraft==='original'?'Factory finish':'Current paint'));
+        workshop.querySelector('.paint-current-pattern').textContent=t(paintPatternsForHull(player.shipId).find(p=>p.id===this.paintDraft?.pattern)?.name??(this.paintDraft==='original'?'Factory finish':'Current paint'));
         workshop.querySelector('[data-ui-command="paint-factory"]').setAttribute('aria-pressed',this.paintDraft==='original');
         const apply=workshop.querySelector('[data-ui-command="repaint"]');
         apply.disabled=same||player.credits<repaintCost(player)||this.paintPreviewPending;

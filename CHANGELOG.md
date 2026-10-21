@@ -1,3 +1,16 @@
+## 0.8.2kq — Four fitted patterns plus the original finish
+
+- Give every playable hull four distinctive paint designs plus its exact original finish. Add eighteen new hull-specific designs, including split wings, crossbands, center spears, staggered cargo bays and offset nacelles.
+- Keep all four saved pattern IDs valid on every hull and preserve chosen colors. Retain protected glass, machinery, PBR detail and the existing repaint fee.
+- Show each original finish alongside all four custom patterns in the five-angle comparison gallery. Use new atlas URLs so returning previews load the expanded designs.
+
+## 0.8.2kp — Hull-specific paint designs
+
+- Replace the shared paint templates with individually authored panel shapes, wing strakes, nacelle finishes and matching side profiles on all fifteen player hulls. Offer two or three suitable designs per hull; remove weak or redundant choices.
+- Generate the editor thumbnails from the same fitted artwork. Keep the three color controls, pricing, factory finish and scene continuity.
+- Correct the Scrapper's paint axis and coating coverage. Preserve glazing, machinery, vents, texture wear and existing PBR maps. Retired pattern IDs migrate to suitable designs with their colors intact and no fee.
+- Keep one shader program through pattern/color edits, the same two mask samples and no extra draw calls. Use physical surface normals for projection and new atlas URLs for cache updates.
+
 ## 0.8.2ko — Custom ship paint workshop
 
 - Give all fifteen player hulls four fitted patterns and independent main, secondary and accent colors. Retain the exact factory finish and existing preset saves.

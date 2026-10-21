@@ -38,7 +38,24 @@ export function restorePaintSources(root){
 export function customPaintFrames(root,hull){
  let hullRoot=root;
  if(!root.userData.paintHullRoot)root.traverse(n=>{if(n.userData.paintHullRoot)hullRoot=n;});
- return shipPaintFrames(hullRoot,hull);
+ const frames=shipPaintFrames(hullRoot,hull);
+ // Scrapper's native model already has +Z along its nose. Keep this custom
+ // correction local so existing NPC faction finishes remain unchanged.
+ if(paintHullId(hull)==='scrapper'){
+  const axes=new THREE.Matrix4().set(0,0,1,0,0,1,0,0,1,0,0,0,0,0,0,1);
+  for(const frame of frames.values())frame.premultiply(axes);
+ }
+ // Choose the projection using physical surface normals. Using the normalized
+ // position frame here would turn a thin wing's shallow camber into a side.
+ const axes=new THREE.Matrix4(),id=paintHullId(hull);
+ if(!['astra','torsas','andromeda','legionary','blade','demon','mule','scrapper'].includes(id))axes.set(0,0,1,0,0,1,0,0,id==='speedster'?-1:1,0,0,0,0,0,0,1);
+ const inverse=new THREE.Matrix4().copy(hullRoot.matrixWorld).invert();
+ frames.normals=new Map();
+ for(const node of frames.keys()){
+  const physical=new THREE.Matrix4().multiplyMatrices(axes,inverse).multiply(node.matrixWorld);
+  frames.normals.set(node,new THREE.Matrix3().getNormalMatrix(physical));
+ }
+ return frames;
 }
 export function applyCustomShipPaint(root,hull,value){
  hull=paintHullId(hull);const design=normalizePaintDesign(value,hull),masks=SHIP_PAINT_MASKS[hull];
@@ -61,19 +78,24 @@ export function applyCustomShipPaint(root,hull,value){
    material.userData.customPaint=true;
    material.onBeforeCompile=shader=>{
     const uniforms={cpMain:{value:new THREE.Color()},cpSecond:{value:new THREE.Color()},cpAccent:{value:new THREE.Color()},
-     cpPattern:{value:0},cpFrame:{value:frames.get(node)},cpSurface:{value:textures.get(file)??protectedSurface},cpAtlas:{value:textures.get(masks.patterns)??mainPattern}};
+     cpPattern:{value:0},cpFrame:{value:frames.get(node)},cpNormalFrame:{value:frames.normals.get(node)},cpSurface:{value:textures.get(file)??protectedSurface},cpAtlas:{value:textures.get(masks.patterns)??mainPattern}};
     updateUniforms(uniforms,state.design);Object.assign(shader.uniforms,uniforms);state.uniforms.push(uniforms);
     if(!textures.has(file)||!textures.has(masks.patterns))void warmCustomPaint(hull).then(()=>{
      if(root.customPaintState!==state)return;
      uniforms.cpSurface.value=textures.get(file);uniforms.cpAtlas.value=textures.get(masks.patterns);
     }).catch(error=>console.warn('Hull paint masks failed to load',error));
-    shader.vertexShader='uniform mat4 cpFrame;varying vec3 cpPosition;\n'+shader.vertexShader;
-    shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ncpPosition=(cpFrame*vec4(position,1.)).xyz;');
-    shader.fragmentShader='uniform vec3 cpMain,cpSecond,cpAccent;uniform float cpPattern;uniform sampler2D cpSurface,cpAtlas;varying vec3 cpPosition;\n'+shader.fragmentShader;
+    shader.vertexShader='uniform mat4 cpFrame;uniform mat3 cpNormalFrame;varying vec3 cpPosition,cpNormal;\n'+shader.vertexShader;
+    shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ncpPosition=(cpFrame*vec4(position,1.)).xyz;cpNormal=normalize(cpNormalFrame*normal);');
+    shader.fragmentShader='uniform vec3 cpMain,cpSecond,cpAccent;uniform float cpPattern;uniform sampler2D cpSurface,cpAtlas;varying vec3 cpPosition,cpNormal;\n'+shader.fragmentShader;
     shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
      vec4 coat=texture2D(cpSurface,vMapUv);
-     vec2 top=clamp(vec2(cpPosition.x*.5+.5,.5-cpPosition.z*.5),0.,1.);
-     vec2 patternUv=vec2((top.x*(127./128.)+.5/128.+cpPattern)/4.,top.y*(127./128.)+.5/128.);
+     vec3 facing=abs(cpNormal);
+     float profile=step(max(facing.y,facing.z),facing.x);
+     float pane=profile*(cpNormal.x<0.?1.:2.);
+     vec2 plan=vec2(cpPosition.x*.5+.5,.5-cpPosition.z*.5);
+     vec2 side=vec2(cpPosition.z*.5+.5,.5-cpPosition.y*.5);
+     vec2 local=(clamp(mix(plan,side,profile),0.,1.)*191.+.5)/192.;
+     vec2 patternUv=(local+vec2(cpPattern,pane))/vec2(4.,3.);
      vec3 weights=texture2D(cpAtlas,patternUv).rgb;
      weights/=max(dot(weights,vec3(1.)),.001);
      vec3 pigment=weights.r*cpMain+weights.g*cpSecond+weights.b*cpAccent;
@@ -82,7 +104,7 @@ export function applyCustomShipPaint(root,hull,value){
      diffuseColor.rgb=mix(diffuseColor.rgb,pigment*detail,coat.g);
     `);
    };
-   material.customProgramCacheKey=()=> 'voidrunner-custom-hull-paint-v1';material.needsUpdate=true;return material;
+   material.customProgramCacheKey=()=> 'voidrunner-custom-hull-paint-v2';material.needsUpdate=true;return material;
   };
   node.material=Array.isArray(node.material)?node.material.map(coat):coat(node.material);
  });

@@ -11,7 +11,7 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
   const page=await browser.newPage({...device,serviceWorkers:'allow'}),errors=[],requests=[];page.setDefaultTimeout(60000);
   page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.on('request',r=>{if(r.url().includes('.glb'))requests.push(r.url());});
   await page.addInitScript(()=>{localStorage.setItem('void-privateer-settings-v1',JSON.stringify({music:0,effects:0}));const C=window.AudioContext??window.webkitAudioContext;if(C)C.prototype.resume=async function(){await this.suspend();};});
-  await page.goto(`${base}/game.html?revision=0.8.2ko&debug-shaders`);await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.newGame);await page.waitForFunction(()=>navigator.serviceWorker.controller);await page.reload();
+  await page.goto(`${base}/game.html?revision=0.8.2kq&debug-shaders`);await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.newGame);await page.waitForFunction(()=>navigator.serviceWorker.controller);await page.reload();
   await page.locator('[data-ui-command="new"]').click();await page.locator('[data-ui-command="skip-new-career"]').click();
   await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime()?.flightPrepared&&document.querySelector('#loading-screen').classList.contains('is-hidden'));
   const hulls=process.env.VR_HULLS?.split(',')??(name==='desktop'?await page.evaluate(async()=>Object.keys((await import('/src/game/data.js')).SHIPS)):['wayfarer','talon','demon','lancer','atlas']);
@@ -29,10 +29,11 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
     for(const b of layout.controls)assert.ok(b.width>=44&&b.height>=44&&b.x>=0&&b.right<=layout.width,'phone controls retain 44px hit targets');
    }
    const initial=await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime(),p=r.ui.shipPreviews[0];window.paintProbe={model:p.model,canvas:p.renderer.domElement,calls:p.renderer.info.render.calls};return r.save.player.credits;});
-   assert.equal(await page.locator('[data-pattern]').count(),4);assert.equal(await page.locator('[data-paint-color]').count(),3);
+   const patterns=await page.evaluate(async h=>(await import('/src/game/paintDesign.js')).paintPatternsForHull(h).map(p=>p.id),hull);
+   assert.equal(patterns.length,4);assert.equal(await page.locator('[data-pattern]').count(),4);assert.equal(await page.locator('[data-ui-command="paint-factory"]').count(),1);assert.equal(await page.locator('[data-paint-color]').count(),3);
    await page.locator('[data-ui-command="paint-palette"][data-palette="2"]').click();await paintReady();
    const baseline=await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0].renderer.info.programs.length),beforeRequests=requests.length;
-   for(const pattern of ['panels','stripes','blocks','asymmetric']){
+   for(const pattern of patterns){
     await page.locator(`[data-pattern="${pattern}"]`).click();await paintReady();
     assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().save.player.credits),initial);
     const state=await page.evaluate(()=>{const p=__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0],root=p.model;let painted=0,glass=0,paintedGlass=0;root.traverse(n=>{if(!n.isMesh)return;for(const m of Array.isArray(n.material)?n.material:[n.material]){if(m.userData.customPaint)painted++;if(/canopy|glass|glazing/i.test(m.name)){glass++;paintedGlass+=!!m.userData.customPaint;}}});return{sameModel:root===paintProbe.model,sameCanvas:p.renderer.domElement===paintProbe.canvas,sameCalls:p.renderer.info.render.calls===paintProbe.calls,painted,glass,paintedGlass,programs:p.renderer.info.programs.length,design:root.userData.paintDesign};});
@@ -50,7 +51,7 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
    assert.notEqual(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0].pivot.rotation.y),rotation);
    await page.locator('[data-ui-command="paint-factory"]').click();await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0].model.userData.livery==='original');
    assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().save.player.credits),initial);
-   await page.locator('[data-pattern="stripes"]').click();await paintReady();
+   await page.locator(`[data-pattern="${patterns[1]}"]`).click();await paintReady();
    for(const[i,c]of ['#267e91','#e0c487','#a7335c'].entries()){await page.locator(`[data-paint-color="${i}"]`).fill(c);await paintReady();}
    const design=await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.paintDraft);
    assert.deepEqual(design.colors,['#267e91','#e0c487','#a7335c']);
@@ -58,7 +59,7 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
    const saved=await page.evaluate(async()=>{const r=__VOID_PRIVATEER__.getRuntime(),{repaintCost}=await import('/src/game/shipStats.js'),{hydrateSave}=await import('/src/game/save.js');return{credits:r.save.player.credits,cost:repaintCost(r.save.player),paint:r.save.player.shipPaints[r.save.player.shipId],restored:hydrateSave(JSON.parse(JSON.stringify(r.save))).player.shipPaints[r.save.player.shipId]};});
    assert.equal(saved.credits,initial-saved.cost);assert.deepEqual(saved.paint,design);assert.deepEqual(saved.restored,design);assert.ok(await page.locator('[data-ui-command="repaint"]').isDisabled());
    assert.ok(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0].renderer.domElement===paintProbe.canvas),'applying paint retains the service renderer');
-   if(hull==='wayfarer'||hull==='lancer'){
+   if(hull==='wayfarer'||hull==='lancer'||hull==='scrapper'){
     const flight=await page.evaluate(async()=>{
      const r=__VOID_PRIVATEER__.getRuntime(),T=await import('three'),{GLB_SHIP_CONFIG}=await import('/src/game/render.js'),{SHIPS}=await import('/src/game/data.js'),h=r.save.player.shipId,variant=SHIPS[h].variant;
      r.renderer.ensureGlbShipModel(variant);await r.renderer.glbShipLoading.get(variant);
@@ -68,8 +69,8 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
      const materials=new Set();mesh.traverse(n=>{for(const m of [n.material].flat())if(m)materials.add(m);if(n.paintSources)for(const source of n.paintSources.values())for(const m of [source].flat())materials.add(m);});for(const m of materials)m.dispose();scene.clear();return result;
     });assert.equal(flight.livery,'custom');assert.deepEqual(flight.design,design);assert.deepEqual(flight.colors,design.colors.map(c=>c.slice(1)));
    }
-   await page.locator('[data-pattern="blocks"]').click();await paintReady();await page.locator('[data-ui-command="paint-reset"]').click();await paintReady();assert.deepEqual(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.paintDraft),design);
-   await page.locator('[data-pattern="blocks"]').click();await paintReady();
+   await page.locator('[data-pattern="panels"]').click();await paintReady();await page.locator('[data-ui-command="paint-reset"]').click();await paintReady();assert.deepEqual(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.paintDraft),design);
+   await page.locator('[data-pattern="panels"]').click();await paintReady();
    await page.locator('[data-ui-command="paint-back"]').click();await ready();assert.deepEqual(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().save.player.shipPaints[__VOID_PRIVATEER__.getRuntime().save.player.shipId]),design);
    assert.deepEqual(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0].model.userData.paintDesign),design);
    cases.push({hull,...saved});console.log(name,hull,'patterns, colors, fixed glass, rotation, uniform reuse, billing and save passed');
@@ -92,7 +93,7 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
    // landscape context can retain its old CSS layout viewport and only shrink
    // the visual viewport, which is not a device rotation.
    const portrait=await browser.newPage({...devices['iPhone 13'],serviceWorkers:'block'});
-   portrait.on('pageerror',e=>errors.push(e.message));await portrait.goto(`${base}/output/repaint/index.html?revision=0.8.2ko`);
+   portrait.on('pageerror',e=>errors.push(e.message));await portrait.goto(`${base}/output/repaint/index.html?revision=0.8.2kq`);
    await portrait.waitForFunction(()=>window.paintReview?.shipPreviews[0]?.model?.paintSources);
    const layout=await portrait.evaluate(()=>({width:innerWidth,doc:document.documentElement.scrollWidth,client:document.documentElement.clientWidth}));
    assert.equal(layout.doc>layout.width,false);assert.equal(await portrait.locator('#review-hull option').count(),15);
