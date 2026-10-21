@@ -19,3 +19,14 @@ test('paint requires a serviced dock and credits, bills once and survives save h
  const {session:r,save}=setup(),p=save.player,cost=repaintCost(p),before=p.credits;assert.equal(r.setShipPaint('bogus'),false);assert.equal(r.setShipPaint('original'),false);assert.equal(p.credits,before);assert.equal(r.setShipPaint('independent-bands'),true);assert.equal(p.credits,before-cost);assert.equal(r.setShipPaint('independent-bands'),false);assert.equal(hydrateSave(save).player.shipPaints[p.shipId],'independent-bands');
  p.dockedAt=undefined;assert.equal(r.setShipPaint('original'),false);p.dockedAt='helix';p.credits=cost-1;assert.equal(r.setShipPaint('original'),false);assert.equal(p.shipPaints[p.shipId],'independent-bands');
 });
+test('custom paint costs once, survives saving per hull and cannot be mutated by the editor',()=>{
+ const {session:r,save}=setup(),p=save.player,before=p.credits,cost=repaintCost(p),draft={pattern:'blocks',colors:['#f02020','#121212','#ffcc66']};
+ assert.equal(r.setShipPaint({...draft,pattern:'invalid'}),false);assert.equal(p.credits,before);
+ assert.equal(r.setShipPaint(draft),true);assert.equal(p.credits,before-cost);assert.deepEqual(p.shipPaints.wayfarer,draft);
+ draft.colors[0]='#ffffff';assert.equal(p.shipPaints.wayfarer.colors[0],'#f02020');
+ assert.equal(r.setShipPaint({...p.shipPaints.wayfarer,colors:[...p.shipPaints.wayfarer.colors]}),false);assert.equal(p.credits,before-cost);
+ p.shipPaints.talon={pattern:'stripes',colors:['#224488','#dddddd','#dd6633']};
+ const restored=hydrateSave(save);assert.deepEqual(restored.player.shipPaints,p.shipPaints);
+ p.shipPaints.mule={pattern:'bad',colors:['bad']};assert.equal(hydrateSave(save).player.shipPaints.mule,undefined);
+ p.dockedAt=undefined;assert.equal(r.setShipPaint('original'),false);assert.deepEqual(p.shipPaints.wayfarer,restored.player.shipPaints.wayfarer);
+});

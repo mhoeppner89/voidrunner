@@ -3494,6 +3494,7 @@ export class SpaceRenderer {
     // Bake the per-variant yaw + scale into the shared model so every clone
     // inherits the same flight orientation and world size.
     prepareGlbShip(model, config, variant) {
+        model.userData.paintHullRoot=true;
         model.rotation.y = config.yaw;
         model.scale.setScalar(config.scale * npcShipScaleForVariant(variant));
         return model;

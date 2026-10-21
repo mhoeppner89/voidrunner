@@ -5,6 +5,7 @@ import {normalizeEquipmentInventory} from './equipmentInventory.js';
 import {PDC_TURRET} from './turrets.js';
 import {renderEquipmentInventory,bindEquipmentInventory} from './equipmentUi.js';
 import {FLEET_PAINTS,fleetHullId} from './fleetPaintCatalog.js';
+import {PAINT_PATTERNS,PAINT_PALETTES,editablePaint,normalizePaintDesign,samePaint} from './paintDesign.js';
 import {GUILD_SHIP_PREFERENCES} from './factions.js';
 import { CanvasSizeCache } from './canvasSizeCache.js';
 import {cockpitDamageMarkup,CANOPY_APERTURES} from './cockpitDamage.js';
@@ -449,7 +450,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2kn';
+const GAME_VERSION = '0.8.2ko';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -1646,6 +1647,10 @@ export class GameUI {
         });
         this.root.addEventListener('input', (event) => {
             const element = event.target;
+            if(element.matches?.('[data-paint-color]')){
+                const draft=editablePaint(this.paintDraft,this.save.player.shipId);draft.colors[Number(element.dataset.paintColor)]=element.value;
+                this.updatePaintDraft(draft);return;
+            }
             if (element.matches?.('[data-observer-aim-error]')) {
                 this.actions?.observerSetAimError(Number(element.value));
                 return;
@@ -1658,9 +1663,6 @@ export class GameUI {
         });
         this.root.addEventListener('change', (event) => {
             const element = event.target;
-            if(element instanceof HTMLSelectElement && element.matches('[data-service-paint]')) {
-                this.servicePaintId = element.value; this.renderDock(); return;
-            }
             if (!(element instanceof HTMLSelectElement) || !element.matches('[data-outfit-select]'))
                 return;
             this.installOutfittingItem(element.value);
@@ -1893,8 +1895,22 @@ export class GameUI {
                 this.actions?.setLauncherFireMode?.(element.dataset.launcherMode);
                 break;
             case 'repaint':
-                this.actions?.setShipPaint?.(this.servicePaintId);
+                this.actions?.setShipPaint?.(this.paintDraft);
                 break;
+            case 'paint-open':
+                this.paintEditorOpen=true;this.paintDraftHull=this.save.player.shipId;
+                this.paintDraft=JSON.parse(JSON.stringify(this.save.player.shipPaints?.[this.paintDraftHull]??'original'));
+                this.paintPreviewPending=false;this.renderDock();break;
+            case 'paint-back':
+                this.paintEditorOpen=false;this.paintDraft=undefined;this.renderDock();break;
+            case 'paint-pattern':{
+                const draft=editablePaint(this.paintDraft,this.save.player.shipId);draft.pattern=element.dataset.pattern;this.updatePaintDraft(draft);break;
+            }
+            case 'paint-palette':{
+                const palette=PAINT_PALETTES[Number(element.dataset.palette)];if(palette){const draft=editablePaint(this.paintDraft,this.save.player.shipId);draft.colors=[...palette.colors];this.updatePaintDraft(draft);}break;
+            }
+            case 'paint-factory':this.updatePaintDraft('original');break;
+            case 'paint-reset':this.updatePaintDraft(JSON.parse(JSON.stringify(this.save.player.shipPaints?.[this.save.player.shipId]??'original')));break;
             case 'repair':
                 this.actions?.repair();
                 break;
@@ -2279,7 +2295,7 @@ export class GameUI {
         if (!this.save || !this.dockLocation)
             return;
         this.concourseShip?.pause();
-        this.disposeShipPreviews();
+        this.disposeShipPreviews(this.dockTerminal==='services');
         const dock = this.root.querySelector('#dock-screen');
         const location = LOCATIONS[this.dockLocation];
         // Refreshes of the same dock screen (e.g. a market trade) must keep the
@@ -2313,7 +2329,7 @@ export class GameUI {
         // The bar's boards are a level deeper than the bar floor, so the single
         // back control steps up one level at a time.
         const barPanelOpen = this.dockTerminal === 'bar' && this.barPanel !== 'people';
-        const backCommand = marketPointOpen ? 'market-overview'
+        const backCommand = this.dockTerminal==='services'&&this.paintEditorOpen ? 'paint-back' : marketPointOpen ? 'market-overview'
             : barPanelOpen ? 'bar-scene'
                 : this.dockTerminal !== 'concourse' ? 'dock-concourse' : '';
         const backLabel = marketPointOpen ? t('Return to the market floor')
@@ -2333,6 +2349,7 @@ export class GameUI {
       ${this.renderSyndicateCard()}
       ${this.renderMissionSettlements()}
     `;
+        this.syncPaintControls();
         if (this.dockTerminal === 'services') this.mountShipPreviews();
         if (this.dockTerminal === 'concourse') void this.mountConcourseShip();
         if (this.storyOpen) this.renderStory();
@@ -2667,6 +2684,7 @@ export class GameUI {
     `;
     }
     switchToTerminal(tab, panel = 'people') {
+        this.paintEditorOpen=false;this.paintDraft=undefined;
         this.dockTab = tab;
         this.dockTerminal = tab;
         this.missionDiscardId = undefined;
@@ -3662,6 +3680,7 @@ export class GameUI {
         return `<section class="drone-service-card"><h3>${t('DRONE BAYS')}</h3>${this.renderDroneBayRows(drones)}${this.renderDroneStock(hasLocationService(this.dockLocation,'outfitting'))}</section>`;
     }
     renderServices() {
+        if(this.paintEditorOpen&&this.paintDraftHull===this.save.player.shipId)return this.renderPaintWorkshop();
         const player = this.save.player, stats = getEffectiveShipStats(player);
         const repairs = dockServiceQuote(player, 'repair'), refill = dockServiceQuote(player, 'refill');
         const repairBay = hasLocationService(this.dockLocation, 'repair');
@@ -3676,21 +3695,42 @@ export class GameUI {
         const ammo = magazines.reduce((n, m) => n + m[0], 0), ammoMax = magazines.reduce((n, m) => n + m[1], 0);
         const bar = (label, value, max) => `<label><span>${t(label)}</span><em>${Math.ceil(value)}/${max}</em><i><b style="width:${percent(value,max)}%"></b></i></label>`;
         const action = (command, label, quote) => `<button type="button" class="primary" data-ui-command="${command}" ${!quote.ok || quote.total <= 0 || quote.total > player.credits ? 'disabled' : ''}>${t(label)} · ${Number.isFinite(quote.total) ? formatCredits(quote.total) : '—'}</button>`;
-        const current = player.shipPaints?.[player.shipId] ?? 'original';
-        const paints = FLEET_PAINTS[player.shipId]?.paints ?? [];
-        if (this.servicePaintHull !== player.shipId || !paints.some(p => p.id === this.servicePaintId)) {
-            this.servicePaintHull = player.shipId; this.servicePaintId = current;
-        }
-        const paint = this.servicePaintId, cost = repaintCost(player);
-        const paintName = p => {
-            const independent = {'independent-surveyor':'Surveyor','independent-hauler':'Industrial','independent-courier':'Courier','independent-bands':'Twin bands','independent-repairs':'Repair panels','independent-split':'Split panels',neutral:'Ivory / petrol'};
-            return t(independent[p.id] ?? (p.id === 'original' ? {concord:'Concord',alliance:'Alliance',pirates:'Pirate',independents:'Silver / yellow'}[FLEET_PAINTS[player.shipId].native] : {concord:'Concord',alliance:'Alliance',pirates:'Pirate'}[p.id]) ?? p.name);
-        };
         return `<div class="service-grid service-grid-simple">
           ${repairBay ? `<article class="service-card"><h3>${t('Ship & drone repair')}</h3><div class="service-emblem" aria-hidden="true"><svg viewBox="0 0 100 64"><path d="M50 4 63 31 84 47 64 47 60 59 40 59 36 47 16 47 37 31Z"/><path class="service-emblem-accent" d="M76 8v20M66 18h20"/></svg></div><div class="service-bars">${bar('Hull',player.hull,stats.hull)}${droneMax ? bar('Drones',droneHull,droneMax) : ''}</div>${action('repair','REPAIR',repairs)}</article>` : ''}
           ${fuelDepot ? `<article class="service-card"><h3>${t('Fuel and ordnance')}</h3><div class="service-emblem" aria-hidden="true"><svg viewBox="0 0 100 64"><path d="M27 13h30v46H27ZM33 5h18v8M57 21h9l9 11v17q0 8-8 8t-8-8V36M65 15l10 12"/><path class="service-emblem-accent" d="m43 24-7 13h10l-7 13"/></svg></div><div class="service-bars">${bar('FUEL',player.fuel,stats.fuel)}${ammoMax ? bar('Ammunition',ammo,ammoMax) : ''}</div>${action('refuel','REFILL',refill)}</article>` : ''}
-          ${repairBay && paints.length > 1 ? `<article class="service-card service-paint-card"><h3>${t('Hull paint')}</h3><div class="ship-silhouette service-paint-preview" data-variant="${escapeHtml(SHIPS[player.shipId].variant)}" data-paint="${escapeHtml(paint)}" role="img" aria-label="${escapeHtml(t('Hull paint'))}"></div><select data-service-paint aria-label="${t('Hull paint')}">${paints.map(p => `<option value="${p.id}" ${paint===p.id?'selected':''}>${escapeHtml(paintName(p))}</option>`).join('')}</select><button type="button" class="primary" data-ui-command="repaint" ${paint===current||player.credits<cost?'disabled':''}>${t(paint===current?'Current paint':'Apply paint')}${paint===current?'':` · ${formatCredits(cost)}`}</button></article>` : ''}
+          ${repairBay ? `<article class="service-card service-paint-card"><h3>${t('Hull paint')}</h3><div class="ship-silhouette service-paint-preview" data-variant="${escapeHtml(SHIPS[player.shipId].variant)}" data-current-paint role="img" aria-label="${escapeHtml(t('Hull paint'))}"></div><button type="button" class="primary" data-ui-command="paint-open">${t('Customize paint')}</button></article>` : ''}
         </div>`;
+    }
+    renderPaintWorkshop(){
+        const player=this.save.player,design=editablePaint(this.paintDraft,player.shipId);
+        const colorStyle=design.colors.map((c,i)=>`--paint-${i}:${c}`).join(';');
+        const shape={panels:'M4 10h18v24H4Zm23 6h10v22H27Z',stripes:'M10 3h6v34h-6Zm15 0h3v34h-3Z',blocks:'m2 30 18-22 18 22-18-12Z',asymmetric:'M20 3h18v35H20ZM9 3h4v35H9Z'};
+        return `<section class="paint-workshop" style="${colorStyle}">
+          <div class="paint-stage"><h3>${escapeHtml(SHIPS[player.shipId].name)}</h3><div class="ship-silhouette paint-editor-preview" data-variant="${escapeHtml(SHIPS[player.shipId].variant)}" data-repaint-preview role="img" aria-label="${escapeHtml(t('Paint preview'))}"></div><span class="paint-orbit-hint">${t('Drag to rotate')}</span></div>
+          <div class="paint-controls"><div class="paint-control-heading"><h3><span class="paint-heading-title">${t('Hull paint')}</span><span class="paint-current-pattern"></span></h3><button data-ui-command="paint-factory" aria-pressed="${this.paintDraft==='original'}">${t('Factory finish')}</button></div>
+          <div class="paint-patterns" aria-label="${t('Pattern')}">${PAINT_PATTERNS.map(p=>`<button data-ui-command="paint-pattern" data-pattern="${p.id}" aria-label="${t(p.name)}" aria-pressed="${typeof this.paintDraft==='object'&&this.paintDraft.pattern===p.id}"><svg viewBox="0 0 40 40" aria-hidden="true"><path class="paint-main" d="M3 3h34v34H3Z"/><path class="paint-second" d="${shape[p.id]}"/><path class="paint-accent" d="M3 32h34v3H3Z"/></svg><span>${t(p.name)}</span></button>`).join('')}</div>
+          <div class="paint-colors">${['Main color','Secondary color','Accent color'].map((name,i)=>`<label><span>${t(name)}</span><input type="color" data-paint-color="${i}" value="${design.colors[i]}" aria-label="${t(name)}"></label>`).join('')}</div>
+          <div class="paint-palettes" aria-label="${t('Suggested colors')}">${PAINT_PALETTES.map((p,i)=>`<button data-ui-command="paint-palette" data-palette="${i}" aria-label="${t(p.name)}" title="${t(p.name)}">${p.colors.map(c=>`<i style="background:${c}"></i>`).join('')}</button>`).join('')}</div>
+          <div class="paint-commit"><button data-ui-command="paint-reset">${t('Reset')}</button><button class="primary" data-ui-command="repaint">${t('Apply paint')}</button></div></div></section>`;
+    }
+    syncPaintControls(){
+        const workshop=this.root.querySelector('.paint-workshop');if(!workshop)return;
+        const player=this.save.player,design=editablePaint(this.paintDraft,player.shipId),same=samePaint(this.paintDraft,player.shipPaints?.[player.shipId]);
+        design.colors.forEach((c,i)=>{workshop.style.setProperty(`--paint-${i}`,c);workshop.querySelector(`[data-paint-color="${i}"]`).value=c;});
+        for(const b of workshop.querySelectorAll('[data-pattern]'))b.setAttribute('aria-pressed',typeof this.paintDraft==='object'&&this.paintDraft.pattern===b.dataset.pattern);
+        workshop.querySelector('.paint-current-pattern').textContent=t(PAINT_PATTERNS.find(p=>p.id===this.paintDraft?.pattern)?.name??(this.paintDraft==='original'?'Factory finish':'Current paint'));
+        workshop.querySelector('[data-ui-command="paint-factory"]').setAttribute('aria-pressed',this.paintDraft==='original');
+        const apply=workshop.querySelector('[data-ui-command="repaint"]');
+        apply.disabled=same||player.credits<repaintCost(player)||this.paintPreviewPending;
+        apply.textContent=t(same?'Current paint':'Apply paint')+(same?'':` · ${formatCredits(repaintCost(player))}`);
+    }
+    updatePaintDraft(value){
+        this.paintDraft=normalizePaintDesign(value,this.save.player.shipId)??value;
+        const generation=this.paintDraftGeneration=(this.paintDraftGeneration??0)+1;
+        this.paintPreviewPending=true;this.syncPaintControls();
+        Promise.all(this.shipPreviews.map(p=>p.setPaint(this.paintDraft))).then(()=>{
+            if(generation!==this.paintDraftGeneration)return;this.paintPreviewPending=false;this.syncPaintControls();
+        }).catch(error=>{console.warn('Paint preview failed',error);this.paintPreviewPending=true;this.syncPaintControls();});
     }
     resetOutfittingDrafts() {
         this.outfittingItemId = undefined;
@@ -4192,13 +4232,20 @@ export class GameUI {
                 return;
             const variant = container.dataset.variant;
             const player=this.save?.player;const own=fleetHullId(variant)===player?.shipId;
-            this.shipPreviews.push(new ShipPreview(container, variant,own?{paint:container.dataset.paint??player.shipPaints?.[player.shipId]??'original',paintPreview:container.hasAttribute('data-paint'),fit:player.outfitting?.loadouts?.[player.shipId],fleet:player.droneFleet}:{}));
+            const options=own?{paint:container.hasAttribute('data-repaint-preview')?this.paintDraft:container.dataset.paint??player.shipPaints?.[player.shipId]??'original',paintPreview:container.hasAttribute('data-paint')||container.hasAttribute('data-current-paint')||container.hasAttribute('data-repaint-preview'),fit:player.outfitting?.loadouts?.[player.shipId],fleet:player.droneFleet}:{};
+            const retained=this.shipPreviews.find(p=>p.variant===variant&&p.paintPreview&&options.paintPreview);
+            if(retained){retained.attach(container);void retained.setPaint(options.paint);}
+            else{const preview=new ShipPreview(container,variant,options);preview.outfittingKey=JSON.stringify([options.fit,options.fleet]);this.shipPreviews.push(preview);}
         });
+        this.syncPaintControls();
     }
-    disposeShipPreviews() {
+    disposeShipPreviews(keepService=false) {
         this.shipPreviewGeneration += 1;
-        this.shipPreviews.forEach((preview) => preview.dispose());
-        this.shipPreviews.length = 0;
+        const player=this.save?.player,key=keepService?JSON.stringify([player?.outfitting?.loadouts?.[player?.shipId],player?.droneFleet]):null;
+        this.shipPreviews=this.shipPreviews.filter(preview=>{
+            if(keepService&&preview.paintPreview&&preview.variant===SHIPS[player?.shipId]?.variant&&preview.outfittingKey===key)return true;
+            preview.dispose();return false;
+        });
     }
     renderGuilds() {
         const guildIds = this.localGuildIds();

@@ -9,6 +9,7 @@ import {equipCareerItems,equipCapitalLoot,makeCareerWreck,combatWreckNode,recove
 import {equipmentAction,normalizeEquipmentInventory,refreshInventoryProjection,receiveEquipment,rollEquipmentRecord,inventoryMounts} from './equipmentInventory.js';
 import {equipmentBaseId,forgetEquipmentDefinition} from './equipmentCatalog.js';
 import {FLEET_PAINTS} from './fleetPaintCatalog.js';
+import {normalizePaintDesign,samePaint} from './paintDesign.js';
 import {FLEET_EQUIPMENT,droneDock} from './fleetEquipmentData.js';
 import {canonicalFaction,preferredNpcHull,FACTION_NAMES} from './factions.js';
 import {CRUISER_MOUNTS} from './cruiserModelData.js';
@@ -13820,8 +13821,10 @@ export class GameSession {
     setShipPaint(paint) {
         const player = this.save.player;
         if (!player.dockedAt || !this.dockHasService('repair') || this.save.arena) return false;
-        if (!FLEET_PAINTS[player.shipId]?.paints.some(p => p.id === paint)) return false;
-        if ((player.shipPaints?.[player.shipId] ?? 'original') === paint) return false;
+        const custom=normalizePaintDesign(paint,player.shipId);
+        if (!custom&&!FLEET_PAINTS[player.shipId]?.paints.some(p => p.id === paint)) return false;
+        paint=custom??paint;
+        if (samePaint(player.shipPaints?.[player.shipId],paint)) return false;
         const cost = repaintCost(player);
         if (player.credits < cost) return false;
         if (!player.shipPaints || typeof player.shipPaints !== 'object' || Array.isArray(player.shipPaints)) player.shipPaints = {};

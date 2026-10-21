@@ -1,4 +1,6 @@
 import {normalizeCareerLoot} from './careerLoot.js';
+import {normalizePaintDesign} from './paintDesign.js';
+import {FLEET_PAINTS} from './fleetPaintCatalog.js';
 import {normalizeEquipmentInventory,registerInventoryDefinitions,captureEquipmentAmmo} from './equipmentInventory.js';
 import {migrateFactionReputation,migrateFactionTags} from './factions.js';
 import { createInitialMarket, normalizeMarketIntel, refreshAllPrices } from './economy.js';
@@ -600,6 +602,10 @@ export const hydrateSave = (candidate) => {
             inventory: candidate.player?.inventory ? JSON.parse(JSON.stringify(candidate.player.inventory)) : undefined,
             outfitting: candidate.player?.outfitting ? JSON.parse(JSON.stringify(candidate.player.outfitting)) : undefined,
             ownedShips: candidate.player?.ownedShips ?? fallback.player.ownedShips,
+            shipPaints:Object.fromEntries(Object.entries(candidate.player?.shipPaints&&typeof candidate.player.shipPaints==='object'&&!Array.isArray(candidate.player.shipPaints)?candidate.player.shipPaints:{}).flatMap(([hull,paint])=>{
+                const custom=normalizePaintDesign(paint,hull);
+                return custom?[[hull,custom]]:FLEET_PAINTS[hull]?.paints.some(p=>p.id===paint)?[[hull,paint]]:[];
+            })),
             sealedCargo: normalizeSealedCargo(candidate.player?.sealedCargo),
             discovered: candidate.player?.discovered ?? fallback.player.discovered,
             discoveredSystems: [...SYSTEM_IDS],

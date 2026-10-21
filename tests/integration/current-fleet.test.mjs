@@ -22,7 +22,8 @@ test('external docks face their bottoms into the hull and preserve symmetrical r
  for(const[id,h]of Object.entries(FLEET_EQUIPMENT))for(const[type,docks]of Object.entries(h.docks))for(const[i,d]of docks.entries()){
   const normal=new T.Vector3(...d.normal),bottom=new T.Vector3(0,-1,0).applyQuaternion(new T.Quaternion(...d.rotation));assert.ok(bottom.dot(normal)<-.9999,id);
   const delta=new T.Vector3(...d.position).sub(new T.Vector3(...d.point));assert.ok(delta.dot(normal)>0,id);assert.ok(delta.clone().cross(normal).length()<1e-8,id);
-  assert.equal(droneDock(id,type,d.bay-1,type==='mining'?i%2:0),d);
+  // Mining and combat roles share the current single-drone bay mouth.
+  assert.equal(droneDock(id,type,d.bay-1),h.docks.pdc?.find(port=>port.bay===d.bay));
   if(Math.abs(d.position[0])>.01)assert.ok(docks.some(o=>Math.abs(o.position[0]+d.position[0])<1e-8&&Math.abs(o.position[2]-d.position[2])<1e-8),id+' mirrored dock');
  }
 });

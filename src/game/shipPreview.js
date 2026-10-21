@@ -1,6 +1,8 @@
 import {FLEET_EQUIPMENT,equipmentHullId,droneDock} from './fleetEquipmentData.js';
 import {applyFleetPaint} from './fleetPaint.js';
 import {fleetPaintPath,resolveFleetPaint} from './fleetPaintCatalog.js';
+import {warmCustomPaint} from './customShipPaint.js';
+import {normalizePaintDesign} from './paintDesign.js';
 import * as THREE from 'three';
 import { createVoxelShipModel, paletteForFaction } from './voxelModels.js';
 import { loadGlb } from './glbLoader.js';
@@ -25,6 +27,7 @@ export class ShipPreview {
     constructor(container, variant, options={}) {
         this.container = container;
         this.paintPreview = !!options.paintPreview;
+        this.options=options;this.dirty=true;this.paintGeneration=0;
         this.variant = variant;
         this.disposed = false;
         this.visible = true;
@@ -60,7 +63,7 @@ export class ShipPreview {
         // flight scene's voxel-until-GLB path.
         const placeholder = createVoxelShipModel(variant, paletteForFaction('player'));
         this.pivot = new THREE.Group();
-        if (this.paintPreview) this.pivot.rotation.y = .5;
+        if (this.paintPreview) this.pivot.rotation.y = .15;
         this.model = placeholder.group;
         this.pivot.add(this.model);
         this.scene.add(this.pivot);
@@ -81,6 +84,8 @@ export class ShipPreview {
             this.model = glb;
             this.pivot.add(glb);
             this.frameModel();
+            this.dirty=true;
+            if(this.paintPreview)void this.setPaint(this.options.paint??'original');
         });
 
         this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -93,6 +98,12 @@ export class ShipPreview {
             this.visibilityObserver.observe(container);
         }
         this.resize();
+        if(this.paintPreview){
+            const canvas=this.renderer.domElement;canvas.style.touchAction='none';
+            canvas.onpointerdown=e=>{canvas.setPointerCapture(e.pointerId);this.drag=[e.clientX,e.clientY];};
+            canvas.onpointerup=canvas.onpointercancel=()=>{this.drag=null;};
+            canvas.onpointermove=e=>{if(!this.drag)return;this.pivot.rotation.y+=(e.clientX-this.drag[0])*.009;this.pivot.rotation.x=THREE.MathUtils.clamp(this.pivot.rotation.x+(e.clientY-this.drag[1])*.008,-1.5,1.5);this.drag=[e.clientX,e.clientY];this.updateCameraFraming();this.dirty=true;};
+        }
 
         this.clock = new THREE.Clock();
         this.rafId = requestAnimationFrame(this.tick);
@@ -145,26 +156,40 @@ export class ShipPreview {
         const size = box.getSize(new THREE.Vector3());
         this.model.position.sub(center);
         this.modelRadius = size.length() * 0.5;
+        if(this.paintPreview){
+            // Fit real surfaces rather than the empty corners of a fighter's
+            // broad bounding box. Cache points once; dragging reuses storage.
+            this.pivot.updateMatrixWorld(true);const points=[],point=new THREE.Vector3();
+            this.pivot.traverse(n=>{const p=n.geometry?.attributes.position;if(!n.isMesh||!p)return;for(let i=0;i<p.count;i++){point.fromBufferAttribute(p,i).applyMatrix4(n.matrixWorld);points.push(point.x,point.y,point.z);}});
+            this.paintFitPositions=new Float32Array(points);
+        }
         this.pivot.rotation.y = rotation;
         this.updateCameraFraming();
     }
     updateCameraFraming() {
         const aspect = this.container.clientWidth / Math.max(1, this.container.clientHeight);
         let distance = previewCameraDistance(this.modelRadius ?? 1, this.camera.fov, aspect);
-        const azimuth = Math.PI / 3;
-        const elevation = Math.PI / 6;
+        const azimuth = this.paintPreview?Math.PI/4:Math.PI/3;
+        const elevation = this.paintPreview?Math.PI/4:Math.PI/6;
         if (this.paintPreview) {
             // A fixed paint view can fit its projected bounds, rather than the
             // full rotation sphere. Long hulls remain legible in short phone cards.
             const normal = new THREE.Vector3(Math.cos(elevation)*Math.sin(azimuth), Math.sin(elevation), -Math.cos(elevation)*Math.cos(azimuth));
             const right = new THREE.Vector3(0,1,0).cross(normal).normalize();
             const up = normal.clone().cross(right);
-            const box = new THREE.Box3().setFromObject(this.pivot), point = new THREE.Vector3();
+            const point = new THREE.Vector3(),positions=this.paintFitPositions;
             const tanV = Math.tan(THREE.MathUtils.degToRad(this.camera.fov/2)), tanH = tanV*aspect;
             distance = 0;
-            for (let corner=0;corner<8;corner++) {
-                point.set(corner&1?box.max.x:box.min.x,corner&2?box.max.y:box.min.y,corner&4?box.max.z:box.min.z);
+            for (let i=0;i<(positions?.length??0);i+=3) {
+                point.fromArray(positions,i).applyQuaternion(this.pivot.quaternion);
                 distance = Math.max(distance, normal.dot(point) + Math.max(Math.abs(right.dot(point))/tanH, Math.abs(up.dot(point))/tanV)*1.08);
+            }
+            if(!positions){
+                const box=new THREE.Box3().setFromObject(this.pivot);
+                for(let corner=0;corner<8;corner++){
+                    point.set(corner&1?box.max.x:box.min.x,corner&2?box.max.y:box.min.y,corner&4?box.max.z:box.min.z);
+                    distance=Math.max(distance,normal.dot(point)+Math.max(Math.abs(right.dot(point))/tanH,Math.abs(up.dot(point))/tanV)*1.08);
+                }
             }
         }
         this.camera.position.set(
@@ -183,13 +208,31 @@ export class ShipPreview {
         this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
         this.updateCameraFraming();
+        this.dirty=true;
+    }
+    async setPaint(paint){
+        this.options.paint=paint;
+        const own=++this.paintGeneration;
+        if(normalizePaintDesign(paint,equipmentHullId(this.variant)))await warmCustomPaint(equipmentHullId(this.variant));
+        if(this.disposed||own!==this.paintGeneration||!this.model?.paintSources)return;
+        applyFleetPaint(this.model,equipmentHullId(this.variant),{id:'player',faction:'player',livery:paint});
+        this.dirty=true;
+    }
+    attach(container){
+        if(this.container!==container){
+            this.resizeObserver.unobserve(this.container);this.visibilityObserver?.unobserve(this.container);
+            this.container=container;container.append(this.renderer.domElement);
+            this.resizeObserver.observe(container);this.visibilityObserver?.observe(container);this.visible=true;
+        }
+        this.resize();
     }
     tick = (now) => {
         if (this.disposed)
             return;
-        if (this.visible && !document.hidden && this.frameBudget.take(now, 30) !== null) {
-            this.pivot.rotation.y = this.paintPreview ? 0.5 : this.clock.getElapsedTime() * 0.5;
+        if (this.visible && !document.hidden && (!this.paintPreview||this.dirty) && this.frameBudget.take(now, 30) !== null) {
+            if(!this.paintPreview)this.pivot.rotation.y = this.clock.getElapsedTime() * 0.5;
             this.renderer.render(this.scene, this.camera);
+            this.dirty=false;
         }
         this.rafId = requestAnimationFrame(this.tick);
     };
@@ -203,6 +246,9 @@ export class ShipPreview {
         disposeObject(this.pivot);
         this.scene.environment?.dispose?.();
         this.renderer.dispose();
+        // Mobile browsers limit live WebGL contexts. Releasing a discarded
+        // preview immediately protects the long-lived concourse/flight views.
+        this.renderer.forceContextLoss?.();
         this.renderer.domElement.remove();
     }
 }
@@ -215,8 +261,10 @@ export const loadPreviewGlb = async (variant,options={}) => {
  const entity={id:'player',faction:'player',livery:options.paint??'original'};
  const paint=resolveFleetPaint(hullId,entity);
  try {
+  if(paint==='custom'||options.paintPreview)await warmCustomPaint(hullId);
   const model=await loadGlb(fleetPaintPath(hullId,paint)??config.path??`assets/models/ships/${config.file}`);
   model.rotation.y=config.yaw;model.scale.setScalar(config.scale*(config.baseScale??1));
+  model.userData.paintHullRoot=true;
   const assembly=new THREE.Group();assembly.add(model);model.updateMatrixWorld(true);
   let armor;model.traverse(o=>{if(!armor&&o.material?.map&&!/glass|canopy|window/i.test(o.material.name))armor=o.material;});
   for(const [i,t]of (hull?.turrets??[]).entries()) {
@@ -250,6 +298,7 @@ function equipmentRotation(normal) {
 export const disposeObject = (root) => {
     const geometries = new Set(), materials = new Set(), textures = new Set();
     root.traverse((object) => {
+        if(object.paintSources)for(const original of object.paintSources.values())for(const m of Array.isArray(original)?original:[original])if(m&&!m.userData.shared)materials.add(m);
         if (!(object instanceof THREE.Mesh))
             return;
         if (object.geometry && !object.geometry.userData.shared) geometries.add(object.geometry);

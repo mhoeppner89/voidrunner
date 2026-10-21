@@ -1,3 +1,11 @@
+## 0.8.2ko — Custom ship paint workshop
+
+- Give all fifteen player hulls four fitted patterns and independent main, secondary and accent colors. Retain the exact factory finish and existing preset saves.
+- Open a large rotatable preview from the repaint service card. Offer color pickers, suggested palettes and reset; preview/cancel for free and charge the existing hull-based fee once when applying a changed design.
+- Save designs per hull and use the same masks and colors in flight, concourse views and departure/arrival scenes. Preserve glass, emissive areas, machinery, panel detail and existing PBR maps.
+- Preload compact masks with the selected service preview. Color and pattern edits reuse the mesh, canvas and compiled shader; idle previews stop drawing. Original ship GLBs and material batches are unchanged.
+- Add a temporary all-hull workshop under `output/repaint/` that does not read or overwrite the real career. Include muted desktop/Android/iPhone checks for controls, shader reuse, protected glass, transactions, persistence and scene continuity.
+
 ## 0.8.2kn — Compact Rook docks and Concord paint
 
 - Replace Rook's long docking funnels and hanging gangways with short, pod-mounted pressure collars. Bring both frigates close and dock them belly-up against their ventral hulls. Shorten the available central heavy port too.

@@ -6,6 +6,11 @@
   --console-recess: #020a16;
   --console-edge: #516374;
   --console-screw: #201b13;
+  --paint-edge: #3d5b70;
+  --paint-stage-glow: #183347cc;
+  --paint-stage-shade: #05121de8;
+  --paint-control-background: #061523ed;
+  --paint-pattern-background: #0b2637;
 
   --flight-font: "Courier New", monospace;
   color-scheme: dark;
@@ -17496,3 +17501,63 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #hud { --pixel-font:var(--flight-font); font-family:var(--flight-font); }
 #game-shell .comms-channel #comms-bar { line-height:var(--comms-line-height); }
 #game-shell .comms-channel #comms-bar.story::after { content:"›"; margin-left:2px; padding-left:4px; letter-spacing:0; }
+
+/* The repaint bay uses one reusable preview; controls never recreate its canvas. */
+#dock-screen .paint-workshop { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr); gap:18px; padding:18px; max-width:1400px; margin:auto; color:var(--void-cream); }
+#dock-screen .paint-stage { min-width:0; display:flex; flex-direction:column; align-items:stretch; border:1px solid var(--paint-edge); background:radial-gradient(ellipse at 50% 45%,var(--paint-stage-glow),var(--paint-stage-shade) 75%); }
+#dock-screen .paint-stage h3 { margin:16px 18px 0; font:600 18px/1.2 var(--ui-font); color:var(--void-gold); }
+#dock-screen .paint-stage .paint-editor-preview { height:clamp(230px,51vh,620px); min-height:0; max-height:none; max-width:none; width:100%; margin:0; border:0; background:none; }
+#dock-screen .paint-editor-preview::after { display:none; }
+#dock-screen .paint-editor-preview canvas { cursor:grab; }
+#dock-screen .paint-editor-preview canvas:active { cursor:grabbing; }
+#dock-screen .paint-orbit-hint { text-align:center; padding:8px 12px 12px; color:var(--void-muted); font:400 12px/1.3 var(--ui-font); }
+#dock-screen .paint-controls { display:flex; min-width:0; flex-direction:column; gap:18px; padding:18px; background:var(--paint-control-background); border:1px solid var(--paint-edge); border-top:2px solid var(--void-gold); }
+#dock-screen .paint-control-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+#dock-screen .paint-control-heading h3 { margin:0; font:600 20px/1.2 var(--ui-font); }
+#dock-screen .paint-workshop button { min-width:0; min-height:44px; padding:9px 12px; font:500 14px/1.2 var(--ui-font); letter-spacing:0; text-transform:none; }
+#dock-screen .paint-workshop button[aria-pressed=true] { border-color:var(--void-gold); box-shadow:inset 0 0 0 1px var(--void-gold); }
+#dock-screen .paint-patterns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+#dock-screen .paint-patterns button { display:flex; align-items:center; gap:10px; text-align:left; background:var(--paint-pattern-background); }
+#dock-screen .paint-patterns svg { width:44px; height:44px; flex:none; }
+#dock-screen .paint-current-pattern { display:none; }
+#dock-screen .paint-main { fill:var(--paint-0); }
+#dock-screen .paint-second { fill:var(--paint-1); }
+#dock-screen .paint-accent { fill:var(--paint-2); }
+#dock-screen .paint-colors { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+#dock-screen .paint-colors label { display:flex; flex-direction:column; gap:7px; font:400 13px/1.3 var(--ui-font); text-align:center; }
+#dock-screen .paint-colors input { appearance:none; width:100%; min-width:0; height:48px; padding:3px; border:1px solid var(--console-edge); background:var(--console-recess); cursor:pointer; }
+#dock-screen .paint-colors input::-webkit-color-swatch-wrapper { padding:0; }
+#dock-screen .paint-colors input::-webkit-color-swatch { border:0; }
+#dock-screen .paint-palettes { display:flex; flex-wrap:wrap; gap:8px; }
+#dock-screen .paint-palettes button { flex:1; display:flex; min-width:48px; padding:5px; gap:0; }
+#dock-screen .paint-palettes i { flex:1; min-height:30px; }
+#dock-screen .paint-commit { display:grid; grid-template-columns:auto minmax(0,1fr); gap:8px; margin-top:auto; }
+#dock-screen .paint-commit .primary { min-height:50px; }
+@media(max-height:600px) and (min-width:601px) {
+ #dock-screen .paint-workshop { padding:8px; gap:8px; grid-template-columns:minmax(0,1fr) minmax(320px,1fr); }
+ #dock-screen .paint-controls { padding:8px; gap:6px; }
+ #dock-screen .paint-stage .paint-editor-preview { height:calc(100dvh - 160px); min-height:180px; }
+ #dock-screen .paint-stage h3 { margin:10px 12px 0; font-size:15px; }
+ #dock-screen .paint-control-heading h3 { font-size:16px; }
+ #dock-screen .paint-workshop button { padding:7px; font-size:14px; }
+ #dock-screen .paint-patterns { grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; }
+ #dock-screen .paint-patterns button { justify-content:center; }
+ #dock-screen .paint-patterns span { display:none; }
+ #dock-screen .paint-heading-title { display:none; }
+ #dock-screen .paint-current-pattern { display:block; color:var(--void-cream); font:500 14px/1.3 var(--ui-font); }
+ #dock-screen .paint-patterns svg { width:28px; height:28px; }
+ #dock-screen .paint-colors label { font-size:13px; gap:3px; }
+ #dock-screen .paint-colors input { height:44px; }
+ #dock-screen .paint-palettes { gap:5px; }
+ #dock-screen .paint-palettes button { min-height:44px; }
+ #dock-screen .paint-palettes i { min-height:26px; }
+ #dock-screen .paint-commit .primary { min-height:44px; }
+}
+@media(max-width:600px) {
+ #dock-screen .paint-workshop { padding:8px; gap:10px; grid-template-columns:1fr; }
+ #dock-screen .paint-stage .paint-editor-preview { height:30dvh; min-height:180px; }
+ #dock-screen .paint-controls { padding:12px; gap:12px; }
+ #dock-screen .paint-control-heading h3 { font-size:18px; }
+ #dock-screen .paint-patterns svg { width:34px; height:34px; }
+ #dock-screen .paint-patterns button { flex-direction:column; gap:4px; text-align:center; }
+}

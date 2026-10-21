@@ -44,7 +44,9 @@
     "balance:racing": "node --import ./tests/helpers/offline-imports.mjs tools/balance/racing-hulls.mjs",
     "test:browser:station-surfaces": "node tools/playtest/station-review.mjs && node tests/browser/station-surfaces.mjs",
     "test:browser:survey": "node tests/browser/tutorial-survey.mjs",
-    "test:browser:carrier-hiding": "node tests/browser/carrier-hiding.mjs"
+    "test:browser:carrier-hiding": "node tests/browser/carrier-hiding.mjs",
+    "review:paint": "node tools/playtest/repaint-review.mjs",
+    "test:browser:paint": "node tests/browser/custom-paint.mjs"
   },
   "version": "0.8.2-a",
   "devDependencies": {

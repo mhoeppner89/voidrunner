@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v558-0-8-2kn-concord-collars';
+const CACHE = 'voidrunner-v559-0-8-2ko-custom-paint';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -54,6 +54,9 @@ const CORE_ASSETS = [
   './src/game/fleetEquipmentData.js',
   './src/game/fleetTurretClearance.js',
   './src/game/fleetPaint.js',
+  './src/game/paintDesign.js',
+  './src/game/customShipPaint.js',
+  './src/game/shipPaintMaskCatalog.js',
   './src/game/independentPaints.js',
   './src/game/wayfarerLiveries.js',
   './src/game/explosionFx.js',
