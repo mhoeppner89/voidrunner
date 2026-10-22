@@ -1209,3 +1209,17 @@ Task: each hull must have four distinctive fitted patterns plus its original fin
 Publish repaint release 0.8.2kq:
 - User requested integration, commit and push to main. Confirm the normal game service/editor, flight and cinematic paths already use all60 fitted patterns plus the15 original finishes; production runtime includes all15 v3 atlases and the matching kq/cachev561 versions.
 - Reuse the completed21 focused assertions, all15 desktop hull checks, five Android/iPhone hull checks and375 visual captures. No runtime changes since those passed. Review the final diff and whitespace; generated comparison output remains ignored. Fetch GitHub main and confirm no divergence before publishing.
+
+
+Task: repaint rotation should match the shipyard preview, and both should use the game's shared shader/look.
+- Use the develop-web-game workflow with focused muted browser checks. The broker auto-rotated at0.5rad/s; repaint allowed pitch/yaw drag with dynamic camera fit and a separate unpixelated renderer path. Unify their turntable/camera and inspection light, retain drag with a two-second pause, and honor reduced motion.
+- Reuse the spaceflight linear-HDR resolve with an optional transparent-output variant, keeping the opaque flight path unchanged. Use integer nearest-neighbor pixel output, nearest texture magnification and stable normals. Targets/quad live with each preview; the service card remains static.
+- Verify turntable/drag, no camera pumping/clipping, alpha, shared shader, model/program/target reuse, saves and scene continuity on desktop/Android/iPhone. Runtimekr/cachev562.
+
+- Final checks pass:23 focused shader/paint/service/framing assertions (the final framing group has4), with actual-surface bounds tested through complete yaw and pitch inspection. A redundant resize notification caused one extra card redraw; skip unchanged dimensions and wait for the DOM remount to settle before checking idle work.
+- Muted actual-game checks pass Wayfarer/Talon/Lancer/Atlas on desktop, Android and iPhone: four patterns/colors, automatic turn speed, fixed camera, drag pause and smooth resume, reduced-motion stillness, offscreen GPU suspension, transparent pixels, shared resolve, stable model/program/target counts, one repaint fee, save hydration, concourse and departure. Fix the new broker probe to enter through the real market hotspot; the low-level render method alone has no market container. A scoped Talon confirmation also passes.
+- Inspect desktop paint/shipyard and iPhone shipyard screenshots. Production packaging and whitespace pass; the opaque spaceflight shader path retains its output and has no alpha-variant work. Open and visually verify the current in-memory Talon workshop in IAB tab2 and mark it deliverable. No required work remains; no commit/push requested.
+
+Publish preview release 0.8.2kr:
+- User requested commit and push to main. Reviewed the completed preview/shader changes, confirmed packaged runtime matches the tested source, and retained the kr/cachev562 release identifiers.
+- Reused the passing focused assertions and muted desktop/Android/iPhone checks; no runtime changes for publication. Whitespace passes. Fetched GitHub main and confirmed no divergence before committing.

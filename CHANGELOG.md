@@ -1,3 +1,9 @@
+## 0.8.2kr — Unified ship preview rotation and finish
+
+- Give the repaint editor the shipyard's steady automatic turntable and fixed camera distance. Both support drag inspection, a smooth delayed return to turning and reduced-motion preferences.
+- Apply spaceflight's final pixel shader to both previews, preserving transparent edges over the dock artwork. Use one neutral lighting setup and crisp texture filtering without palette changes or added noise.
+- Reuse bounded render targets at an integer pixel scale. Keep the small service card idle and stop hidden or detached previews from drawing.
+
 ## 0.8.2kq — Four fitted patterns plus the original finish
 
 - Give every playable hull four distinctive paint designs plus its exact original finish. Add eighteen new hull-specific designs, including split wings, crossbands, center spears, staggered cargo bays and offset nacelles.

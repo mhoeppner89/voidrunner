@@ -29,8 +29,15 @@ uses two additional mask samples and no extra draw calls. Physical surface
 normals select the plan or appropriate side profile; hull normalization does
 not distort shallow wing normals. Three colors and the pattern index are uniforms, so edits reuse the loaded mesh, canvas and compiled
 program. The service card, editor and apply step retain one renderer when the
-equipment is unchanged; leaving the service releases its WebGL context. Idle
-paint previews stop drawing until they change or rotate. Masks
+equipment is unchanged; leaving the service releases its WebGL context. The small service-card preview stops drawing until changed. The full repaint
+editor and shipyard share a 30fps turntable at 0.5 radians/second. Dragging pauses
+the turntable for inspection, then it resumes smoothly after two seconds; the
+camera keeps a fixed distance. Reduced-motion preferences disable automatic
+turning. Hidden or detached previews do not draw. Both previews share neutral inspection lighting and nearest texture
+magnification. Their linear-HDR final pixel shader is the same as spaceflight,
+with transparent, premultiplied edges over the dock art. Their integer pixel grid follows the viewport; the render target and final
+quad are reused and released with the preview. No dithering, palette conversion
+or close-range blur is added. Masks
 are cached once per hull/material and remain available across preview reuse.
 
 Preview equipment assemblies and flight models use the same original hull frame

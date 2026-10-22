@@ -16,18 +16,31 @@ test('resizing a showroom reframes the hull without recentering its rotated mode
  const preview=Object.create(ShipPreview.prototype);
  preview.camera=new THREE.PerspectiveCamera(38,1,.05,1000);
  preview.container={clientWidth:600,clientHeight:300};preview.modelRadius=20;
- preview.renderer={setSize(){}};preview.model={position:new THREE.Vector3(3,4,5)};
+ preview.renderer={setSize(){},domElement:{style:{},dataset:{}}};preview.pixelTarget={setSize(){}};preview.model={position:new THREE.Vector3(3,4,5)};
+ const oldWindow=globalThis.window;globalThis.window={innerWidth:1440,innerHeight:900};
+ try{
  preview.resize();const wide=preview.camera.position.length();
  preview.container.clientWidth=150;preview.resize();
  assert.ok(preview.camera.position.length()>wide*1.8);
  assert.ok(Math.abs(preview.camera.position.length()-previewCameraDistance(20,38,.5))<1e-9);
  assert.equal(preview.camera.aspect,.5);
  assert.deepEqual(preview.model.position.toArray(),[3,4,5]);
+ }finally{globalThis.window=oldWindow;}
 });
 
-test('fixed paint views fit long and wide hulls at short phone and desktop sizes',()=>{
+test('paint and shipyard use the same fixed framing through a complete turn',()=>{
  for(const dims of [[20,2,4],[4,3,20],[9,8,10]])for(const aspect of [1,3,5]){
-  const p=Object.create(ShipPreview.prototype);p.paintPreview=true;p.camera=new THREE.PerspectiveCamera(38,aspect,.05,1000);p.container={clientWidth:300,clientHeight:300/aspect};p.pivot=new THREE.Group();p.pivot.rotation.y=.5;p.model=new THREE.Mesh(new THREE.BoxGeometry(...dims));p.pivot.add(p.model);p.modelRadius=Math.hypot(...dims)/2;p.updateCameraFraming();p.camera.updateMatrixWorld();
-  const box=new THREE.Box3().setFromObject(p.pivot),point=new THREE.Vector3();for(let c=0;c<8;c++){point.set(c&1?box.max.x:box.min.x,c&2?box.max.y:box.min.y,c&4?box.max.z:box.min.z).project(p.camera);assert.ok(Math.abs(point.x)<1&&Math.abs(point.y)<1,`${dims}/${aspect}: paint preview clips`);}
+  const p=Object.create(ShipPreview.prototype);p.paintPreview=true;p.camera=new THREE.PerspectiveCamera(38,aspect,.05,1000);p.container={clientWidth:300,clientHeight:300/aspect};p.pivot=new THREE.Group();p.model=new THREE.Mesh(new THREE.BoxGeometry(...dims));p.pivot.add(p.model);p.modelRadius=Math.hypot(...dims)/2;p.updateCameraFraming();p.camera.updateMatrixWorld();const camera=p.camera.position.clone();
+  for(let yaw=0;yaw<Math.PI*2;yaw+=Math.PI/8)for(const pitch of [-1.5,0,1.5]){
+   p.pivot.rotation.set(pitch,yaw,0);p.pivot.updateMatrixWorld(true);
+   const point=new THREE.Vector3();for(let c=0;c<8;c++){point.set((c&1?1:-1)*dims[0]/2,(c&2?1:-1)*dims[1]/2,(c&4?1:-1)*dims[2]/2).applyMatrix4(p.model.matrixWorld).project(p.camera);assert.ok(Math.abs(point.x)<1&&Math.abs(point.y)<1,`${dims}/${aspect}: rotating hull clips`);}
+  }
+  p.paintPreview=false;p.updateCameraFraming();assert.deepEqual(p.camera.position.toArray(),camera.toArray());p.model.geometry.dispose();p.model.material.dispose();
  }
+});
+test('inspection framing uses the hull surface instead of empty bounding-box corners',()=>{
+ const p=Object.create(ShipPreview.prototype);p.paintPreview=true;p.container={clientWidth:800,clientHeight:500};p.camera=new THREE.PerspectiveCamera(38,1.6,.05,1000);p.pivot=new THREE.Group();p.pivot.rotation.set(.3,.7,0);const rotation=p.pivot.quaternion.clone();
+ p.model=new THREE.Mesh(new THREE.OctahedronGeometry(4),new THREE.MeshBasicMaterial());p.pivot.add(p.model);p.frameModel();
+ assert.ok(Math.abs(p.modelRadius-4)<1e-6);assert.ok(p.pivot.quaternion.angleTo(rotation)<1e-6);assert.ok(p.paintFitPositions.length>0);
+ p.model.geometry.dispose();p.model.material.dispose();
 });

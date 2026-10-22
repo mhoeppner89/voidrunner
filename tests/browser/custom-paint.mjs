@@ -11,7 +11,7 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
   const page=await browser.newPage({...device,serviceWorkers:'allow'}),errors=[],requests=[];page.setDefaultTimeout(60000);
   page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.on('request',r=>{if(r.url().includes('.glb'))requests.push(r.url());});
   await page.addInitScript(()=>{localStorage.setItem('void-privateer-settings-v1',JSON.stringify({music:0,effects:0}));const C=window.AudioContext??window.webkitAudioContext;if(C)C.prototype.resume=async function(){await this.suspend();};});
-  await page.goto(`${base}/game.html?revision=0.8.2kq&debug-shaders`);await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.newGame);await page.waitForFunction(()=>navigator.serviceWorker.controller);await page.reload();
+  await page.goto(`${base}/game.html?revision=0.8.2kr&debug-shaders`);await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.newGame);await page.waitForFunction(()=>navigator.serviceWorker.controller);await page.reload();
   await page.locator('[data-ui-command="new"]').click();await page.locator('[data-ui-command="skip-new-career"]').click();
   await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime()?.flightPrepared&&document.querySelector('#loading-screen').classList.contains('is-hidden'));
   const hulls=process.env.VR_HULLS?.split(',')??(name==='desktop'?await page.evaluate(async()=>Object.keys((await import('/src/game/data.js')).SHIPS)):['wayfarer','talon','demon','lancer','atlas']);
@@ -41,7 +41,8 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
     await page.screenshot({path:`${out}/${name}-${hull}-${pattern}.png`});
    }
    assert.equal(requests.length,beforeRequests,'pattern changes must not reload GLBs');
-   const idle=await page.evaluate(async()=>{const p=__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0],frame=p.renderer.info.render.frame;await new Promise(r=>setTimeout(r,250));return frame===p.renderer.info.render.frame;});assert.ok(idle,'idle paint preview must not keep drawing');
+   const motion=await page.evaluate(async()=>{const p=__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0],yaw=p.pivot.rotation.y,camera=p.camera.position.toArray(),target=p.pixelTarget;await new Promise(r=>setTimeout(r,300));return{yaw:p.pivot.rotation.y-yaw,camera,after:p.camera.position.toArray(),sameTarget:target===p.pixelTarget};});
+   assert.ok(motion.yaw>.03&&motion.yaw<.25,'paint uses the steady shipyard turntable');assert.deepEqual(motion.after,motion.camera,'rotation does not pump camera distance');assert.ok(motion.sameTarget,'turning reuses the pixel target');
    await page.locator('[data-paint-color="0"]').fill('#267e91');await paintReady();
    await page.locator('[data-paint-color="1"]').fill('#e0c487');await paintReady();
    await page.locator('[data-paint-color="2"]').fill('#a7335c');await paintReady();
@@ -73,8 +74,26 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
    await page.locator('[data-pattern="panels"]').click();await paintReady();
    await page.locator('[data-ui-command="paint-back"]').click();await ready();assert.deepEqual(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().save.player.shipPaints[__VOID_PRIVATEER__.getRuntime().save.player.shipId]),design);
    assert.deepEqual(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0].model.userData.paintDesign),design);
+   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))));
+   const idle=await page.evaluate(async()=>{const p=__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0],frame=p.renderer.info.render.frame;await new Promise(r=>setTimeout(r,250));return{turntable:p.turntable,frame,after:p.renderer.info.render.frame};});assert.equal(idle.turntable,false);assert.equal(idle.after,idle.frame,'the small service card stays idle');
    cases.push({hull,...saved});console.log(name,hull,'patterns, colors, fixed glass, rotation, uniform reuse, billing and save passed');
   }
+  // The actual dealer uses the same pixel finish and turntable, including
+  // drag-to-inspect without camera zoom or a snap when automatic turning resumes.
+  await page.evaluate(()=>{const u=__VOID_PRIVATEER__.getRuntime().ui;u.switchToTerminal('market');u.shipDetailId='talon';});
+  await page.locator('[data-market-point="shipyard"]').click();
+  try{await ready();}catch(error){await page.screenshot({path:`${out}/${name}-shipyard-failure.png`});console.log('shipyard state',await page.evaluate(()=>{const u=__VOID_PRIVATEER__.getRuntime().ui;return{terminal:u.dockTerminal,point:u.marketPoint,selected:u.shipDetailId,canvases:document.querySelectorAll('.ship-preview-canvas').length,previews:u.shipPreviews.map(p=>({variant:p.variant,connected:p.container.isConnected,model:!!p.model,source:!!p.model?.paintSources,dirty:p.dirty,disposed:p.disposed,visible:p.visible,turntable:p.turntable}))};}),errors);throw error;}
+  const broker=await page.evaluate(async()=>{const p=__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0],yaw=p.pivot.rotation.y;await new Promise(r=>setTimeout(r,300));p.render();const c=document.createElement('canvas');c.width=p.renderer.domElement.width;c.height=p.renderer.domElement.height;const ctx=c.getContext('2d');ctx.drawImage(p.renderer.domElement,0,0);const data=ctx.getImageData(0,0,c.width,c.height).data;let solid=0;for(let i=3;i<data.length;i+=4)if(data[i]>0)solid++;return{turn:p.pivot.rotation.y-yaw,alpha:data[3],solid,finish:p.pixelFinish.defines.PRESERVE_SCENE_ALPHA,scale:Number(p.renderer.domElement.dataset.pixelScale),renderWidth:c.width,cssWidth:p.container.clientWidth,filter:p.renderer.domElement.style.imageRendering};});
+  assert.ok(broker.turn>.03&&broker.turn<.25);assert.equal(broker.finish,1);assert.equal(broker.alpha,0,'transparent backdrop survives the shared resolve');assert.ok(broker.solid>100,'ship renders through the final shader');assert.equal(broker.filter,'pixelated');assert.equal(broker.renderWidth,Math.ceil(broker.cssWidth/broker.scale));
+  const dealerCanvas=page.locator('.ship-showroom .ship-preview-canvas'),dealerBox=await dealerCanvas.boundingBox(),dealerBefore=await page.evaluate(()=>{const p=__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0];return{yaw:p.pivot.rotation.y,camera:p.camera.position.toArray()};});
+  await page.mouse.move(dealerBox.x+dealerBox.width*.4,dealerBox.y+dealerBox.height*.5);await page.mouse.down();await page.mouse.move(dealerBox.x+dealerBox.width*.6,dealerBox.y+dealerBox.height*.6,{steps:5});await page.mouse.up();
+  const dealerAfter=await page.evaluate(()=>{const p=__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0];return{yaw:p.pivot.rotation.y,camera:p.camera.position.toArray()};});assert.ok(dealerAfter.yaw>dealerBefore.yaw+.2);assert.deepEqual(dealerAfter.camera,dealerBefore.camera);
+  const resume=await page.evaluate(async()=>{const p=__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0],yaw=p.pivot.rotation.y;await new Promise(r=>setTimeout(r,250));const held=p.pivot.rotation.y;await new Promise(r=>setTimeout(r,2100));return{yaw,held,after:p.pivot.rotation.y};});assert.equal(resume.held,resume.yaw,'inspection pauses automatic turning');assert.ok(resume.after>resume.held&&resume.after-resume.held<.4,'automatic turn resumes without snapping');
+  await page.emulateMedia({reducedMotion:'reduce'});await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+  const still=await page.evaluate(async()=>{const p=__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0],frame=p.renderer.info.render.frame;await new Promise(r=>setTimeout(r,250));return frame===p.renderer.info.render.frame;});assert.ok(still,'reduced motion leaves the preview still');await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.evaluate(()=>{__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0].container.style.transform='translateY(-300vh)';});await page.waitForFunction(()=>!__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0].visible);
+  const hidden=await page.evaluate(async()=>{const p=__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0],frame=p.renderer.info.render.frame;await new Promise(r=>setTimeout(r,250));return frame===p.renderer.info.render.frame;});assert.ok(hidden,'offscreen previews stop GPU draws');await page.evaluate(()=>{__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0].container.style.transform='';});await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime().ui.shipPreviews[0].visible);
+  await page.screenshot({path:`${out}/${name}-shipyard.png`});
   // The same saved design reaches the real docked model and departure shot.
   await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();r.ui.switchToTerminal('concourse');});
   await page.waitForFunction(()=>{const u=__VOID_PRIVATEER__.getRuntime().ui,v=u.concourseShip;return v?.model?.userData.livery==='custom'&&v.host?.classList.contains('has-model')&&!u.concourseArrivalPending&&!document.querySelector('.concourse-hover-ship')?.disabled;});
@@ -93,7 +112,7 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
    // landscape context can retain its old CSS layout viewport and only shrink
    // the visual viewport, which is not a device rotation.
    const portrait=await browser.newPage({...devices['iPhone 13'],serviceWorkers:'block'});
-   portrait.on('pageerror',e=>errors.push(e.message));await portrait.goto(`${base}/output/repaint/index.html?revision=0.8.2kq`);
+   portrait.on('pageerror',e=>errors.push(e.message));await portrait.goto(`${base}/output/repaint/index.html?revision=0.8.2kr`);
    await portrait.waitForFunction(()=>window.paintReview?.shipPreviews[0]?.model?.paintSources);
    const layout=await portrait.evaluate(()=>({width:innerWidth,doc:document.documentElement.scrollWidth,client:document.documentElement.clientWidth}));
    assert.equal(layout.doc>layout.width,false);assert.equal(await portrait.locator('#review-hull option').count(),15);

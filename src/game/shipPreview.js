@@ -10,6 +10,9 @@ import { GLB_SHIP_CONFIG } from './render.js';
 import { FrameBudget } from './frameBudget.js';
 import { TURRET_LAYOUTS } from './turretLayouts.js';
 import { createTurretModel, paintFrigateTurret } from './turretModels.js';
+import {pixelRenderSize} from './retroDisplay.js';
+import {createPixelResolveMaterial,createPixelSceneTarget,pixelTargetSamples,bindPixelResolve} from './pixelResolve.js';
+import {stabilizeMaterialNormals} from './materialNormals.js';
 
 // A bounding sphere fits every turntable angle, including wide hulls on a
 // narrow card. Keep a little margin for turrets and the perspective near side.
@@ -32,27 +35,35 @@ export class ShipPreview {
         this.disposed = false;
         this.visible = true;
         this.frameBudget = new FrameBudget();
-        const touchDevice = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+        const touchDevice = this.touchDevice = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+        this.motionQuery=matchMedia('(prefers-reduced-motion: reduce)');
+        this.turntable=!this.paintPreview||container.hasAttribute('data-repaint-preview');
         this.renderer = new THREE.WebGLRenderer({
-            antialias: true,
+            antialias: false,
             alpha: true,
             powerPreference: touchDevice ? 'low-power' : 'default',
-            depth: true,
+            depth: false,
             stencil: false,
         });
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderer.toneMapping = THREE.NeutralToneMapping;
         this.renderer.toneMappingExposure = 1.18;
-        this.renderer.setPixelRatio(touchDevice ? 1 : Math.min(window.devicePixelRatio || 1, 1.5));
+        this.renderer.setPixelRatio(1);
         this.renderer.setClearColor(0x000000, 0);
         this.renderer.domElement.className = 'ship-preview-canvas';
         this.renderer.domElement.style.width = '100%';
         this.renderer.domElement.style.height = '100%';
-        this.renderer.domElement.style.imageRendering = 'auto';
+        this.renderer.domElement.style.imageRendering = 'pixelated';
         this.renderer.domElement.setAttribute('aria-hidden', 'true');
         container.appendChild(this.renderer.domElement);
 
         this.scene = new THREE.Scene();
+        // The same linear-HDR resolve as spaceflight, preserving alpha over
+        // the dock artwork. One bounded pixel grid, without blur or grading.
+        this.pixelTarget=createPixelSceneTarget(1,1,touchDevice?0:pixelTargetSamples(this.renderer));
+        this.pixelFinish=createPixelResolveMaterial({preserveAlpha:true});
+        this.pixelQuad=new THREE.Mesh(new THREE.PlaneGeometry(2,2),this.pixelFinish);
+        this.pixelQuad.frustumCulled=false;this.pixelCamera=new THREE.Camera();
         this.camera = new THREE.PerspectiveCamera(38, 1, 0.05, 1000);
         this.scene.add(this.camera);
         this.createLighting();
@@ -63,7 +74,6 @@ export class ShipPreview {
         // flight scene's voxel-until-GLB path.
         const placeholder = createVoxelShipModel(variant, paletteForFaction('player'));
         this.pivot = new THREE.Group();
-        if (this.paintPreview) this.pivot.rotation.y = .15;
         this.model = placeholder.group;
         this.pivot.add(this.model);
         this.scene.add(this.pivot);
@@ -82,6 +92,10 @@ export class ShipPreview {
             this.pivot.remove(this.model);
             disposeObject(this.model);
             this.model = glb;
+            this.model.traverse(n=>{if(!n.isMesh)return;for(const m of Array.isArray(n.material)?n.material:[n.material]){
+                stabilizeMaterialNormals(m);
+                for(const v of Object.values(m))if(v?.isTexture){v.magFilter=THREE.NearestFilter;v.minFilter=THREE.LinearMipmapLinearFilter;v.anisotropy=2;}
+            }});
             this.pivot.add(glb);
             this.frameModel();
             this.dirty=true;
@@ -98,21 +112,19 @@ export class ShipPreview {
             this.visibilityObserver.observe(container);
         }
         this.resize();
-        if(this.paintPreview){
-            const canvas=this.renderer.domElement;canvas.style.touchAction='none';
-            canvas.onpointerdown=e=>{canvas.setPointerCapture(e.pointerId);this.drag=[e.clientX,e.clientY];};
-            canvas.onpointerup=canvas.onpointercancel=()=>{this.drag=null;};
-            canvas.onpointermove=e=>{if(!this.drag)return;this.pivot.rotation.y+=(e.clientX-this.drag[0])*.009;this.pivot.rotation.x=THREE.MathUtils.clamp(this.pivot.rotation.x+(e.clientY-this.drag[1])*.008,-1.5,1.5);this.drag=[e.clientX,e.clientY];this.updateCameraFraming();this.dirty=true;};
-        }
-
-        this.clock = new THREE.Clock();
+        const canvas=this.renderer.domElement;canvas.style.touchAction='none';
+        canvas.onpointerdown=e=>{if(!this.turntable||e.button!==0)return;canvas.setPointerCapture(e.pointerId);this.drag=[e.clientX,e.clientY];};
+        const endDrag=()=>{if(this.drag)this.rotateAfter=performance.now()+2000;this.drag=null;};
+        canvas.onpointerup=canvas.onpointercancel=canvas.onlostpointercapture=endDrag;
+        canvas.onpointermove=e=>{if(!this.drag)return;this.pivot.rotation.y+=(e.clientX-this.drag[0])*.009;this.pivot.rotation.x=THREE.MathUtils.clamp(this.pivot.rotation.x+(e.clientY-this.drag[1])*.008,-1.5,1.5);this.drag=[e.clientX,e.clientY];this.dirty=true;};
         this.rafId = requestAnimationFrame(this.tick);
     }
     createLighting() {
-        // Same two-tone dusk as the flight scene: warm sun key, cool cyan rim.
-        this.scene.add(new THREE.HemisphereLight(this.paintPreview ? 0xe8f2ff : 0xffd2a8, this.paintPreview ? 0x465566 : 0x32284c, 2.4));
-        this.scene.add(new THREE.AmbientLight(this.paintPreview ? 0xffffff : 0x7a6caa, 1.0));
-        const sun = new THREE.DirectionalLight(this.paintPreview ? 0xffffff : 0xffa566, this.paintPreview ? 3.0 : 5.0);
+        // Shared inspection light: factory and custom finishes have the same
+        // colour response in the broker and repaint service.
+        this.scene.add(new THREE.HemisphereLight(0xe8f2ff,0x465566,2.4));
+        this.scene.add(new THREE.AmbientLight(0xffffff,1.0));
+        const sun = new THREE.DirectionalLight(0xffffff,3.0);
         sun.position.set(-0.45, 0.18, 1.0).normalize();
         this.scene.add(sun);
         const rim = new THREE.DirectionalLight(0x66b9ff, 1.4);
@@ -127,18 +139,9 @@ export class ShipPreview {
         canvas.height = 128;
         const context = canvas.getContext('2d');
         const gradient = context.createLinearGradient(0, 0, 0, 128);
-        if (this.paintPreview) {
-            gradient.addColorStop(0, '#9fbbd2');
-            gradient.addColorStop(.5, '#556d83');
-            gradient.addColorStop(1, '#172330');
-        } else {
-        gradient.addColorStop(0, '#0a122c');
-        gradient.addColorStop(0.32, '#54264c');
-        gradient.addColorStop(0.48, '#ee9e50');
-        gradient.addColorStop(0.54, '#ffd070');
-        gradient.addColorStop(0.68, '#56284e');
-        gradient.addColorStop(1, '#0a1132');
-        }
+        gradient.addColorStop(0, '#9fbbd2');
+        gradient.addColorStop(.5, '#556d83');
+        gradient.addColorStop(1, '#172330');
         context.fillStyle = gradient;
         context.fillRect(0, 0, 256, 128);
         const texture = new THREE.CanvasTexture(canvas);
@@ -149,49 +152,27 @@ export class ShipPreview {
     frameModel() {
         // Center the model on the pivot origin, then pull the camera back to a
         // 3/4 top-front showroom angle that fits the whole hull in frame.
-        const rotation = this.pivot.rotation.y;
-        this.pivot.rotation.y = 0;
+        const rotation = this.pivot.quaternion.clone();
+        this.pivot.quaternion.identity();
         const box = new THREE.Box3().setFromObject(this.pivot);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
         this.model.position.sub(center);
         this.modelRadius = size.length() * 0.5;
-        if(this.paintPreview){
-            // Fit real surfaces rather than the empty corners of a fighter's
-            // broad bounding box. Cache points once; dragging reuses storage.
-            this.pivot.updateMatrixWorld(true);const points=[],point=new THREE.Vector3();
-            this.pivot.traverse(n=>{const p=n.geometry?.attributes.position;if(!n.isMesh||!p)return;for(let i=0;i<p.count;i++){point.fromBufferAttribute(p,i).applyMatrix4(n.matrixWorld);points.push(point.x,point.y,point.z);}});
-            this.paintFitPositions=new Float32Array(points);
-        }
-        this.pivot.rotation.y = rotation;
+        // Bound actual surfaces, not the empty corners of a fighter's box.
+        // This fixed sphere fits every inspection angle without shrinking a
+        // thin swept hull unnecessarily. Cache points for the review tool too.
+        this.pivot.updateMatrixWorld(true);const points=[],point=new THREE.Vector3();let radiusSq=0;
+        this.pivot.traverse(n=>{const p=n.geometry?.attributes.position;if(!n.isMesh||!p)return;for(let i=0;i<p.count;i++){point.fromBufferAttribute(p,i).applyMatrix4(n.matrixWorld);points.push(point.x,point.y,point.z);radiusSq=Math.max(radiusSq,point.lengthSq());}});
+        if(radiusSq>0)this.modelRadius=Math.sqrt(radiusSq);
+        this.paintFitPositions=new Float32Array(points);
+        this.pivot.quaternion.copy(rotation);
         this.updateCameraFraming();
     }
     updateCameraFraming() {
         const aspect = this.container.clientWidth / Math.max(1, this.container.clientHeight);
-        let distance = previewCameraDistance(this.modelRadius ?? 1, this.camera.fov, aspect);
-        const azimuth = this.paintPreview?Math.PI/4:Math.PI/3;
-        const elevation = this.paintPreview?Math.PI/4:Math.PI/6;
-        if (this.paintPreview) {
-            // A fixed paint view can fit its projected bounds, rather than the
-            // full rotation sphere. Long hulls remain legible in short phone cards.
-            const normal = new THREE.Vector3(Math.cos(elevation)*Math.sin(azimuth), Math.sin(elevation), -Math.cos(elevation)*Math.cos(azimuth));
-            const right = new THREE.Vector3(0,1,0).cross(normal).normalize();
-            const up = normal.clone().cross(right);
-            const point = new THREE.Vector3(),positions=this.paintFitPositions;
-            const tanV = Math.tan(THREE.MathUtils.degToRad(this.camera.fov/2)), tanH = tanV*aspect;
-            distance = 0;
-            for (let i=0;i<(positions?.length??0);i+=3) {
-                point.fromArray(positions,i).applyQuaternion(this.pivot.quaternion);
-                distance = Math.max(distance, normal.dot(point) + Math.max(Math.abs(right.dot(point))/tanH, Math.abs(up.dot(point))/tanV)*1.08);
-            }
-            if(!positions){
-                const box=new THREE.Box3().setFromObject(this.pivot);
-                for(let corner=0;corner<8;corner++){
-                    point.set(corner&1?box.max.x:box.min.x,corner&2?box.max.y:box.min.y,corner&4?box.max.z:box.min.z);
-                    distance=Math.max(distance,normal.dot(point)+Math.max(Math.abs(right.dot(point))/tanH,Math.abs(up.dot(point))/tanV)*1.08);
-                }
-            }
-        }
+        const distance = previewCameraDistance(this.modelRadius ?? 1, this.camera.fov, aspect);
+        const azimuth = Math.PI/3,elevation = Math.PI/6;
         this.camera.position.set(
             distance * Math.cos(elevation) * Math.sin(azimuth),
             distance * Math.sin(elevation),
@@ -204,7 +185,12 @@ export class ShipPreview {
             return;
         const width = Math.max(1, this.container.clientWidth);
         const height = Math.max(1, this.container.clientHeight);
-        this.renderer.setSize(width, height, false);
+        const scale=pixelRenderSize(window.innerWidth,window.innerHeight,this.touchDevice?720:960).scale;
+        if(width===this.cssWidth&&height===this.cssHeight&&scale===this.pixelScale)return;
+        this.cssWidth=width;this.cssHeight=height;this.pixelScale=scale;
+        const w=Math.ceil(width/scale),h=Math.ceil(height/scale);
+        this.renderer.setSize(w,h,false);this.pixelTarget.setSize(w,h);
+        const canvas=this.renderer.domElement;canvas.style.width=`${w*scale}px`;canvas.style.height=`${h*scale}px`;canvas.dataset.pixelScale=String(scale);
         this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
         this.updateCameraFraming();
@@ -216,12 +202,15 @@ export class ShipPreview {
         if(normalizePaintDesign(paint,equipmentHullId(this.variant)))await warmCustomPaint(equipmentHullId(this.variant));
         if(this.disposed||own!==this.paintGeneration||!this.model?.paintSources)return;
         applyFleetPaint(this.model,equipmentHullId(this.variant),{id:'player',faction:'player',livery:paint});
+        this.model.traverse(n=>{if(n.isMesh)for(const m of Array.isArray(n.material)?n.material:[n.material])stabilizeMaterialNormals(m);});
         this.dirty=true;
     }
     attach(container){
         if(this.container!==container){
             this.resizeObserver.unobserve(this.container);this.visibilityObserver?.unobserve(this.container);
             this.container=container;container.append(this.renderer.domElement);
+            this.turntable=!this.paintPreview||container.hasAttribute('data-repaint-preview');
+            this.drag=null;
             this.resizeObserver.observe(container);this.visibilityObserver?.observe(container);this.visible=true;
         }
         this.resize();
@@ -229,13 +218,22 @@ export class ShipPreview {
     tick = (now) => {
         if (this.disposed)
             return;
-        if (this.visible && !document.hidden && (!this.paintPreview||this.dirty) && this.frameBudget.take(now, 30) !== null) {
-            if(!this.paintPreview)this.pivot.rotation.y = this.clock.getElapsedTime() * 0.5;
-            this.renderer.render(this.scene, this.camera);
-            this.dirty=false;
-        }
+        if (this.visible && !document.hidden && this.container.isConnected) {
+            const rotating=this.turntable&&!this.motionQuery.matches&&!this.drag&&now>=(this.rotateAfter??0);
+            if(this.dirty||rotating){const dt=this.frameBudget.take(now,30);if(dt!==null){
+                if(rotating)this.pivot.rotation.y+=dt*.5;
+                this.render();this.dirty=false;
+            }}else this.frameBudget.reset();
+        }else this.frameBudget.reset();
         this.rafId = requestAnimationFrame(this.tick);
     };
+    render(){
+        this.renderer.setRenderTarget(this.pixelTarget);
+        this.renderer.render(this.scene,this.camera);
+        this.sceneDrawCalls=this.renderer.info.render.calls;
+        bindPixelResolve(this.pixelFinish,this.pixelTarget.texture,this.pixelTarget,this.camera,this.renderer.toneMappingExposure);
+        this.renderer.setRenderTarget(null);this.renderer.render(this.pixelQuad,this.pixelCamera);
+    }
     dispose() {
         if (this.disposed)
             return;
@@ -245,6 +243,9 @@ export class ShipPreview {
         this.visibilityObserver?.disconnect();
         disposeObject(this.pivot);
         this.scene.environment?.dispose?.();
+        this.pixelTarget.dispose();this.pixelFinish.dispose();this.pixelQuad.geometry.dispose();
+        const canvas=this.renderer.domElement;
+        canvas.onpointerdown=canvas.onpointerup=canvas.onpointercancel=canvas.onlostpointercapture=canvas.onpointermove=null;
         this.renderer.dispose();
         // Mobile browsers limit live WebGL contexts. Releasing a discarded
         // preview immediately protects the long-lived concourse/flight views.

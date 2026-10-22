@@ -5,8 +5,9 @@ export const FINITE_COLOUR_GLSL=`vec3 finiteColour(vec3 c){return vec3(
  c.r>=0.?min(c.r,65504.):0.,c.g>=0.?min(c.g,65504.):0.,c.b>=0.?min(c.b,65504.):0.);}`;
 // Minify real scene detail before the final pixel output. Depth prevents
 // distant scenery from smearing nearby hulls; the sky keeps its sharp stars.
-export function createPixelResolveMaterial(){
+export function createPixelResolveMaterial({preserveAlpha=false}={}){
  return new THREE.ShaderMaterial({
+  defines:preserveAlpha?{PRESERVE_SCENE_ALPHA:1}:{},
   uniforms:{tScene:{value:null},tDepth:{value:null},tBloom:{value:null},uStrength:{value:0},uExposure:{value:1.18},uResolution:{value:new THREE.Vector2(1,1)},uNearFar:{value:new THREE.Vector2(.5,1e8)}},
   vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}',
   fragmentShader:`
@@ -48,9 +49,17 @@ export function createPixelResolveMaterial(){
   vec3 sRGBTransferOETF(vec3 color){return mix(color*12.92,1.055*pow(max(color,vec3(0.)),vec3(1./2.4))-.055,step(vec3(.0031308),color));}
   void main(){
    vec3 colour=filteredScene();
+   #ifdef PRESERVE_SCENE_ALPHA
+   float alpha=texture2D(tScene,vUv).a;
+   colour/=max(alpha,.001);
+   #endif
    if(uStrength>0.)colour+=finiteColour(texture2D(tBloom,vUv).rgb)*uStrength;
    colour=sRGBTransferOETF(neutralToneMapping(colour));
+   #ifdef PRESERVE_SCENE_ALPHA
+   gl_FragColor=vec4(colour*alpha,alpha);
+   #else
    gl_FragColor=vec4(colour,1.);
+   #endif
   }`,
   depthTest:false,depthWrite:false,toneMapped:false,
  });

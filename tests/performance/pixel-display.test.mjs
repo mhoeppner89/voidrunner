@@ -27,6 +27,12 @@ test('painted pixel textures keep close pixels but blend between distant mip lev
  const r=Object.create(SpaceRenderer.prototype);r.pixelTextures=new Set();r.renderer={capabilities:{getMaxAnisotropy:()=>16}};
  const texture=r.configurePixelTexture(new THREE.Texture());assert.equal(texture.magFilter,THREE.NearestFilter);assert.equal(texture.minFilter,THREE.LinearMipmapLinearFilter);assert.equal(texture.anisotropy,4);assert.ok(texture.generateMipmaps);texture.dispose();
 });
+test('transparent previews reuse the flight resolve without changing opaque flight output',()=>{
+ const flight=createPixelResolveMaterial(),preview=createPixelResolveMaterial({preserveAlpha:true});
+ assert.deepEqual(flight.defines,{});assert.equal(preview.defines.PRESERVE_SCENE_ALPHA,1);
+ assert.equal(preview.fragmentShader,flight.fragmentShader);assert.equal(preview.uniforms.uExposure.value,flight.uniforms.uExposure.value);assert.equal(preview.toneMapped,false);
+ flight.dispose();preview.dispose();
+});
 
 test('display installation keeps source artwork and instruments free from colour conversion',async()=>{
  const {installRetroDisplay}=await import('../../src/game/retroDisplay.js');
