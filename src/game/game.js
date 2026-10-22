@@ -1,3 +1,4 @@
+import {ExplorationMethods} from './exploration.js';
 import { getAsteroidTerrain } from './asteroidTerrain.js';
 import { shardbeltSolidDistance, SHARDBELT_LAYOUT_VERSION } from './asteroidFieldLayout.js';
 import {RACE_HULLS,raceHull,takeRaceHull,returnRaceHull,integrateRaceTurn,integrateRaceVelocity} from './raceHulls.js';
@@ -1379,8 +1380,9 @@ export class GameSession {
         this.asteroids = generateAsteroidField(save.world.seed, save.world.depletedAsteroids, save.world.scannedNodes);
         this.regionalFields = new Map(REGIONAL_ASTEROID_FIELD_IDS.map((id) => [id, generateRegionalAsteroidField(save.world.seed, id)]));
         this.graveyard = generateGraveyardPieces(save.world.seed);
+        this.initializeExploration();
         this.wreckNodes = generateWreckNodes(save.world.seed, save.world.depletedWrecks, save.world.scannedNodes);
-        if(!save.arena)for(const wreck of Object.values(save.world.combatWrecks??{}))if(wreck.contents?.length)this.wreckNodes.push(combatWreckNode(wreck));
+        if(!save.arena)for(const wreck of Object.values(save.world.combatWrecks??{}))if(wreck.contents?.length||wreck.derelict)this.wreckNodes.push(combatWreckNode(wreck));
         this.input = new InputManager(ui.root);
         this.input.configureTilt(save.settings);
         // Permission and the first physical gyro sample are separate events.
@@ -2612,7 +2614,7 @@ export class GameSession {
         const tutorialTarget = this.tutorialFieldTarget();
         if (current?.kind === 'asteroid' && next !== 'shardbelt' && current.id !== tutorialTarget?.id)
             this.clearTarget();
-        if (current?.kind === 'wreck' && next !== 'mourning-line' && current.id !== tutorialTarget?.id)
+        if (current?.kind === 'wreck' && !current.combatLoot && next !== 'mourning-line' && current.id !== tutorialTarget?.id)
             this.clearTarget();
         const lesson = this.tutorialSummary()?.stepId;
         if (!this.arena && ((next === 'shardbelt' && lesson === 'mine-shardbelt')
@@ -3034,6 +3036,7 @@ export class GameSession {
         this.updateActiveInstance();
         this.updateAssetWarmup();
         this.updateBountySpawns();
+        this.updateExploration();
         this.updateDynamicEncounters();
         this.updateRace(dt);
         this.updateShips(dt);
@@ -4815,6 +4818,13 @@ export class GameSession {
     // Keep full notices in the ship log; the cockpit uses compact labels.
     setOwnMonitorStatus(message, duration = 2400) {
         if(message===t('CAPACITOR LOW')) {
+            // Holding an empty trigger keeps the monitor readable without
+            // filling the log or turning the refusal cue into an alarm.
+            const now=this.save.world.time;
+            if(now >= (this.capacitorFeedbackAt ?? -Infinity) + 2) {
+                (this.audio?.playCockpit ?? this.audio?.play)?.call(this.audio,'capacitorEmpty',.65);
+                this.capacitorFeedbackAt=now;
+            }
             this.ownMonitorStatus=message;this.ownMonitorStatusUntil=this.save.world.time+duration/1000;return;
         }
         // Repeated held-trigger failures must not flood the event history.
@@ -4941,7 +4951,7 @@ export class GameSession {
             this.addPlayerEmission(launcher.id === 'torpedo' ? 320 : 250);
             this.renderer.spawnMuzzleFlash(anchorX, anchorY, anchorZ, launcher.id === 'torpedo' ? 0xffa65e : 0xff7a42);
         }
-        if(!actualFired){this.setMonitorStatus(t('CAPACITOR LOW'));return;}
+        if(!actualFired){this.setOwnMonitorStatus(t('CAPACITOR LOW'));return;}
         if (mode === 'alternating') {
             const firedIndex = magazines.findIndex(entry=>entry.mount.id===firing[0].mount.id);
             player.activeLauncherMountId = magazines[(firedIndex+1)%magazines.length].mount.id;
@@ -5035,7 +5045,7 @@ export class GameSession {
         this.recallAllDrones('hyperdrive');
         if (this.dronesSafelyStowed()) return true;
         this.pendingDroneDeparture ??= { kind, locationId,
-            navTargetId: this.save.player.navTargetId, waypointId:this.tutorialLocalWaypoint()?.id, throttle: this.save.player.throttle };
+            navTargetId: this.save.player.navTargetId, waypointId:(this.explorationWaypoint()??this.tutorialLocalWaypoint())?.id, throttle: this.save.player.throttle };
         this.save.player.throttle = 0;
         this.setHyperdriveStatus(t('RECOVERING DRONES · DEPARTURE QUEUED'), 360000);
         return false;
@@ -5606,6 +5616,7 @@ export class GameSession {
             }
         } else if (event.code === 'payload-delivered') {
             // Delivery owns the cargo mutation. Only notify collection here.
+            this.ui.queueSpacePickup?.({kind:'cargo',commodity:event.commodityId,quantity:event.units});
             const nodeId = event.targetNodeKey.slice(event.targetNodeKey.lastIndexOf(':') + 1);
             this.handleTutorialEvent('extracted', { nodeId, commodityId: event.commodityId,
                 amount: event.units, source: 'mining', instanceId: 'shardbelt' });
@@ -5784,11 +5795,13 @@ export class GameSession {
             return;
         }
         this.save.player.cargo.gold = (this.save.player.cargo.gold ?? 0) + grant;
+        this.ui.queueSpacePickup?.({kind:'cargo',commodity:'gold',quantity:grant});
         this.ui.pushEvent(t('Gold pocket struck: +{amount} GOLD.', { amount: grant }), 'success', 5600);
         this.audio.play('success', 1.35);
     }
     collectExtraction(commodity, source, amount) {
         this.save.player.cargo[commodity] = (this.save.player.cargo[commodity] ?? 0) + amount;
+        this.ui.queueSpacePickup?.({kind:'cargo',commodity,quantity:amount});
         this.recordExtractionProgress(source, amount);
     }
     recordExtractionProgress(source, amount) {
@@ -6041,6 +6054,7 @@ export class GameSession {
             return;
         }
         this.save.player.cargo[pickup.commodity] = (this.save.player.cargo[pickup.commodity] ?? 0) + amount;
+        this.ui.queueSpacePickup?.({kind:'cargo',commodity:pickup.commodity,quantity:amount});
         pickup.amount -= amount;
         if(pickup.amount<=0)pickup.life = 0;
         this.handleTutorialEvent('cargo-collected',{tutorialCargo:Boolean(pickup.tutorialCargo)});
@@ -6544,7 +6558,7 @@ export class GameSession {
             return;
         // Known mission coordinates survive beyond the sensor horizon, as race
         // gathering markers do. Scanning and extraction still require range.
-        if (id === this.tutorialFieldTarget()?.id) return;
+        if (id === this.tutorialFieldTarget()?.id || id === this.explorationWaypoint()?.id) return;
         const stats = this.playerStats();
         const player = vec(this.save.player.position);
         const ship = this.ships.find((entry) => entry.id === id && entry.hull > 0);
@@ -6981,7 +6995,7 @@ export class GameSession {
     hyperdriveDestination(){
         // Entering the graveyard must not retarget an existing location jump.
         if(this.autopilot)return this.hyperdriveWaypoint??LOCATIONS[this.save.player.navTargetId];
-        return this.tutorialLocalWaypoint()??LOCATIONS[this.save.player.navTargetId];
+        return this.explorationWaypoint()??this.tutorialLocalWaypoint()??LOCATIONS[this.save.player.navTargetId];
     }
     toggleHyperdrive() {
         if(this.save.player.raceReturn)return;
@@ -7063,7 +7077,7 @@ export class GameSession {
         if (recovery>0) return {message:t('DRIVE RECOVERY · {seconds}s',{seconds:Math.ceil(recovery)}),kind:'info'};
         const nav = this.hyperdriveDestination();
         const arrivalRadius = hyperdriveArrivalRadius(nav);
-        if(nav.kind==='waypoint'&&player.distanceTo(vec(nav.position))<=SURVEY_JUMP_MIN_DISTANCE)return {message:t('Fly within 100 km of the star. Local jumps need over 2,000 km.'),kind:'info'};
+        if(nav.kind==='waypoint'&&player.distanceTo(vec(nav.position))<=SURVEY_JUMP_MIN_DISTANCE)return {message:t(nav.exploration?'Approach the wreck on normal engines.':'Fly within 100 km of the star. Local jumps need over 2,000 km.'),kind:'info'};
         if (nav.kind === 'jump-point' && player.distanceTo(vec(nav.position)) <= arrivalRadius + 0.5)
             return null;
         if (player.distanceTo(vec(nav.position)) < arrivalRadius + 12)
@@ -8377,6 +8391,8 @@ export class GameSession {
         return rings;
     }
     resolveShipTarget(ship) {
+        const authored=this.explorationCombatTarget(ship);
+        if(authored!==undefined)return authored;
         const playerPosition = vec(this.save.player.position);
         const now = this.save.world.time;
         const observerCombat = Boolean(this.arena?.observer && ship.observerTeam);
@@ -9765,6 +9781,7 @@ export class GameSession {
         return false;
     }
     damageShip(ship, amount, attackerId, position, weapon = {}, origin) {
+        this.onExplorationActorHit(ship,attackerId,amount);
         // A captured hull is still a hull: it takes damage like any other
         // ship. It stays inert — no AI, no retaliation, no comms (the pilot is
         // already in cuffs, so the reaction block below is skipped for it) —
@@ -9774,6 +9791,13 @@ export class GameSession {
         const shieldBeforeHit = ship.shield;
         const applied = activationWeaponDamage(ship, attackerId==='environment'?0:ship.maxShield, amount, weapon, this.save.world.time);
         ship.shield -= applied.shield;
+        // Confirm only the player's locked target; background battles should
+        // not fill the instruments with unseen damage reports.
+        if (attackerId==='player' && ship.id===this.save.player.currentTargetId && ship.hull>applied.hull && shieldBeforeHit>0 && ship.shield<=0 && this.save.world.time >= (this.targetShieldFeedbackAt ?? -Infinity)+1.5) {
+            this.targetShieldFeedbackAt=this.save.world.time;
+            this.setMonitorStatus(t('TARGET SHIELDS DOWN'),1800);
+            (this.audio?.playCockpit ?? this.audio?.play)?.call(this.audio,'targetShieldBreak',.7);
+        }
         if (applied.activationRemaining > 0 && ship.shield > 0)
             this.renderer.flashShield?.(ship, this.npcHullExtents(ship), applied.activationRemaining, false, position, origin);
 
@@ -10423,6 +10447,7 @@ export class GameSession {
     destroyShip(ship, attackerId, position = ship.position) {
         this.cancelPendingMug(ship);
         ship.hull = 0;
+        this.onExplorationActorDefeated(ship);
         this.resolveHyperdriveIntercept(ship);
         const explosionScale = (CAPITAL_SHIP_STATS[ship.capitalClass]?.explosionScale ?? (ship.role === 'trader' ? 1.5 : 1)) * npcShipScaleForVariant(npcFlightVariant(ship));
         const explosion = this.renderer.spawnExplosion(ship.position, ship.hostile, explosionScale);
@@ -10511,7 +10536,17 @@ export class GameSession {
         if (!this.autopilot && this.activeRace?.state!=='running') this.snapToCombatSpeed();
         // Beam callers suppress vibration, not the sound of taking damage.
         if (applied.shield + applied.hull > 0) {
-            (this.audio?.playCockpit ?? this.audio?.play)?.call(this.audio, remaining > 0 ? 'hit' : 'shield', clamp(amount / 18, .85, 1.4));
+            const collapsed=shieldBeforeHit>0 && this.save.player.shield<=0;
+            const announceCollapse=collapsed && this.save.world.time >= (this.shieldBreakFeedbackAt ?? -Infinity)+2;
+            if(announceCollapse) {
+                this.shieldBreakFeedbackAt=this.save.world.time;
+                this.setOwnMonitorStatus(t('SHIELDS DOWN'),2000);
+            }
+            (this.audio?.playCockpit ?? this.audio?.play)?.call(this.audio, announceCollapse ? 'shieldBreak' : remaining > 0 ? 'hit' : 'shield', clamp(amount / 18, .85, 1.4));
+            // Overflow damage still has its structural impact beneath the
+            // collapse cue; breaking a shield never disguises a hull strike.
+            if(announceCollapse && remaining>0)
+                (this.audio?.playCockpit ?? this.audio?.play)?.call(this.audio,'hit',clamp(remaining/18,.85,1.4));
         }
         if (feedback && amount > 1.5) {
             if (navigator.vibrate && this.save.settings.vibration && (navigator.userActivation?.hasBeenActive ?? true))
@@ -10683,6 +10718,7 @@ export class GameSession {
         // (house rule — the run stays a test of flying, not of guns).
         if (this.activeRace)
             return;
+        if(this.save.world.exploration?.convoy==='active'||this.save.world.exploration?.finale==='fighting'&&this.ships.some(ship=>ship.explorationGroup==='salvagers'&&ship.hull>0))return;
         // A standoff pauses the beam clock: no second ambush while the player
         // is mid-deal. This runs before the nextEncounterAt gate and the
         // hostile lock (both return early during a mug) so the timer keeps
@@ -11869,7 +11905,7 @@ export class GameSession {
                 });
             }
             for (const node of this.wreckNodes) {
-                if (node.remaining <= 0)
+                if (node.combatLoot || node.remaining <= 0)
                     continue;
                 const collisionMesh = wreckNodeCollisionMesh(node);
                 const q = (this.tmpFieldQuaternion ??= new THREE.Quaternion()).setFromEuler((this.tmpFieldEuler ??= new THREE.Euler()).set(...node.rotation, 'XYZ'));
@@ -14137,7 +14173,7 @@ export class GameSession {
                     : distance > stats.scanRange
                         ? t('OUT OF RANGE · {current}/{max} km', { current: Math.round(distance), max: stats.scanRange })
                         : t('SCANNING…');
-                hudTarget = { kind: 'wreck', combatLoot:Boolean(node.combatLoot), name: node.name, subtitle: node.combatLoot ? t('Loot') : node.scanned ? (claim ? t('SALVAGE CLAIM') : t(commodity)) : t('UNRESOLVED WRECK'), distance, scanned: node.scanned, readout: node.combatLoot ? (cargoFree(this.save.player)<1?t('CARGO FULL'):stats.lootRange>0?t('AUTO COLLECTION · {range} km',{range:stats.lootRange}):t('FLY OVER TO COLLECT')) : this.utilityReadout || scanStatus, ...screen };
+                hudTarget = { kind: 'wreck', combatLoot:Boolean(node.combatLoot), name: node.name, subtitle: node.combatLoot ? t('Loot') : node.scanned ? (claim ? t('SALVAGE CLAIM') : t(commodity)) : t('UNRESOLVED WRECK'), distance, scanned: node.scanned, readout: node.combatLoot ? (node.locked?(distance>2000?t('ACTIVATE HYPERDRIVE'):t('SALVAGE CLAIM')):cargoFree(this.save.player)<1?t('CARGO FULL'):stats.lootRange>0?t('AUTO COLLECTION · {range} km',{range:stats.lootRange}):t('FLY OVER TO COLLECT')) : this.utilityReadout || scanStatus, ...screen };
             }
             else if (target.kind === 'pickup') {
                 const pickup = this.pickups.find((entry) => entry.id === target.id);
@@ -14446,7 +14482,7 @@ export class GameSession {
             const claimNodes = new Set(this.activeSalvageClaims().map((mission) => mission.targetNodeId));
             const wrecks = this.wreckNodes
                 .filter((node) => node.remaining > 0 && !claimNodes.has(node.id) && node.id !== tutorialTarget?.id)
-                .filter(node=>node.combatLoot?node.systemId===this.save.player.systemId:this.activeInstanceId==='mourning-line')
+                .filter(node=>node.combatLoot?node.systemId===this.save.player.systemId&&(!node.sensorRange||node.id===this.save.player.currentTargetId||player.distanceTo(vec(node.position))<node.sensorRange):this.activeInstanceId==='mourning-line')
                 .map((node) => buildContact('wreck', node.id, node.name, node.scanned ? (SCAN_COMMODITY_LABELS[node.salvage] ?? COMMODITIES[node.salvage].name.toUpperCase()) : 'UNSCANNED WRECK', node.position, wreckRange, false, node.scanned))
                 .filter((contact) => Boolean(contact))
                 .sort(prioritize)
@@ -14601,7 +14637,7 @@ export class GameSession {
         const add = (position, type, selected, surfaceOffset = 0, ghost = false, lostAlpha = 0, race = false, faint = false) => {
             const relative = this.tmpRadarRel.set(position[0], position[1], position[2]).sub(player).applyQuaternion(inverse);
             const distance = Math.hypot(relative.x, relative.z) - surfaceOffset;
-            const navigation=type==='location'&&selected;
+            const navigation=(type==='location'||type==='wreck')&&selected;
             if (!ghost && distance > range * 1.45&&!navigation)
                 return;
             // Lost contacts are last-known traces: only draw them within a
@@ -14682,6 +14718,7 @@ export class GameSession {
         for (const node of this.wreckNodes) {
             if (!(node.combatLoot ? node.systemId === this.save.player.systemId : this.save.player.mode === 'salvage' && this.activeInstanceId === 'mourning-line')
                 || node.remaining <= 0 || node.id === tutorialTarget?.id
+                || (node.sensorRange&&node.id!==this.save.player.currentTargetId&&Math.hypot(node.position[0]-this.save.player.position[0],node.position[1]-this.save.player.position[1],node.position[2]-this.save.player.position[2])>node.sensorRange)
                 || !(node.combatLoot || node.scanned || node.id === this.save.player.currentTargetId)) continue;
             const contact=add(node.position,'wreck',node.id===this.save.player.currentTargetId);
             if(contact&&node.combatLoot)contact.lootRarity=node.lootRarity??'common';
@@ -14787,3 +14824,5 @@ const FACTION_LABEL = faction => FACTION_NAMES[faction] ?? faction;
 Object.assign(GameSession.prototype,ArenaRunMethods);
 Object.assign(GameSession.prototype,CampaignWingMethods);
 Object.assign(GameSession.prototype,TutorialRuntimeMethods);
+
+Object.assign(GameSession.prototype,ExplorationMethods);

@@ -272,6 +272,7 @@ export function updateShipAI(session, ship, dt) {
         session.updateTravelAI(ship, dt);
         return;
     }
+    if(ship.explorationGroup){session.updateTravelAI(ship,dt);return;}
     // Task layer: what the ship wants right now, yielding the travel waypoint.
     tickTask(ship, session);
     if (!updateStationDock(session, ship, dt)) session.updateTravelAI(ship, dt);

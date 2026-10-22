@@ -47,7 +47,13 @@
     "test:browser:carrier-hiding": "node tests/browser/carrier-hiding.mjs",
     "review:paint-quality": "node tools/playtest/repaint-review.mjs && node tools/playtest/paint-quality.mjs",
     "review:paint": "node tools/playtest/repaint-review.mjs",
-    "test:browser:paint": "node tests/browser/custom-paint.mjs"
+    "test:browser:paint": "node tests/browser/custom-paint.mjs",
+    "test:browser:exploration": "node tests/browser/exploration.mjs",
+    "test:browser:combat-feedback": "node tests/browser/combat-feedback.mjs",
+    "review:discoveries": "node tools/playtest/exploration-review.mjs",
+    "test:browser:discovery-review": "node tools/playtest/exploration-review.mjs && node tests/browser/exploration-review.mjs",
+    "test:browser:space-pickups": "node tools/playtest/exploration-review.mjs && node tests/browser/space-pickups.mjs",
+    "test:browser:cargo-usage": "node tools/playtest/exploration-review.mjs && node tests/browser/cargo-usage.mjs"
   },
   "version": "0.8.2-a",
   "devDependencies": {

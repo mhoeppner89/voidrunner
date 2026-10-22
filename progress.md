@@ -1223,3 +1223,60 @@ Task: repaint rotation should match the shipyard preview, and both should use th
 Publish preview release 0.8.2kr:
 - User requested commit and push to main. Reviewed the completed preview/shader changes, confirmed packaged runtime matches the tested source, and retained the kr/cachev562 release identifiers.
 - Reused the passing focused assertions and muted desktop/Android/iPhone checks; no runtime changes for publication. Whitespace passes. Fetched GitHub main and confirmed no divergence before committing.
+
+## Exploration discoveries and combat feedback (0.8.2ks)
+
+- User request: three freighter-story packages in the asteroid tunnels, triangulated deep-space wreck with share/fight salvage crew, three hidden graveyard caches, optional convoy distress/rescue; delegate and review combat feedback. Equipment comparisons, free-play threshold and general contract complications deferred.
+- Added explorationData.js (authored sites, bilingual short logs/dialogues, normalization, journal rows) and exploration.js (persistent side-encounter runtime). Integrated normal loot recovery, deep-space waypoint hyperdrive, dialogue choices and journal targeting.
+- Reuse the actual freighter model and existing fractured-hull renderer for the derelict; retain it after loot recovery. Collectible graveyard crates no longer become solid salvage obstacles.
+- Combat worker added shield-collapse and empty-capacitor cues; root reviewed sound routing, damage sites and tests. Worker reports 40 focused checks plus muted desktop/Android/iPhone checks passed.
+- Final verification: 17 exploration integration checks pass, alongside 40 related save/loot/story/audio checks. Muted desktop Chrome, Android Chrome and iPhone WebKit exploration runs pass: six reachable/collectible caches, readable logs, journal navigation, actual hyperdrive arrival, visible share/fight choices, persistent derelict, real convoy attackers and one-time survival reward. Screenshots reviewed under output/exploration/.
+- Fixed issues caught during integration: tuple dialogue text, solid collectible crates, distant/field-transition wreck lock loss, and defeated actors disappearing before the side-quest tick. Voice-only discovery cards now omit fake portraits and fit both salvage choices on phones. Prospectors retreat, and finished encounter actors retire beyond range.
+- Build packaging, source verification and git diff checks pass. No outstanding requested work; broader balance playtesting may tune optional encounter rewards later. No commit/push requested for this task.
+
+## Focused discovery review environment
+
+- User request: build a way to review the exploration and combat-feedback changes specifically.
+- Added `review:discoveries`: reusable authoring sources generate an isolated live-game page under `output/exploration-review/`. Twelve presets cover the three-package trail and individual logs, hyperdrive approach, salvage choice, full salvage, all three graveyard caches, convoy and direct combat-cue controls.
+- Storage writes stay in a per-window in-memory map; career saves are hidden from the review. Presets reset full quest/loot state and scene actors without rebuilding the renderer. Reuse shader warmup per environment; sound is off by default.
+- Muted desktop Chrome and iPhone WebKit checks passed across all twelve presets: normal fly-over of all three logs and caches, next-discovery navigation, share/fight replay, full salvage, convoy actors and all five feedback cues. Verified that native career save and settings remain byte-identical. iPhone also passed sound-toggle and death/retry checks. Screenshots reviewed under output/exploration-review/checks/.
+- Fixed typed interpolation buffers in review snapshots, restored cockpit/flight state on resets and kept native quit/death paths inside the review picker. The practice target is already identified, so target shield-collapse feedback is immediately visible; a final muted live check verified the Testziel readout and screenshot. Source and generated-page checks pass. No runtime release bump: this is an isolated development review tool.
+
+## Sheltered discovery containers (0.8.2kt)
+
+- User request: move exploration containers closer to asteroids, wrecks and debris so they are better hidden.
+- Fitted all six sites against actual tunnel/wreck surfaces, with approximately 8–13 km of surface clearance. Moved the exposed battleship and cruiser caches against fixed capital-hull geometry; tucked the logs against tunnel walls. No terrain, races or flight physics changes.
+- Existing stationary cache records and live nodes receive authored positions without replacing remaining cargo, scan state or recovered progress.
+- Verification: 18 focused exploration integration checks passed, including position migration with partial cargo. Exact triangle/hull checks across seeds 175, 321 and 8675309 found collision-free 90-km approach paths at every site. Muted desktop Chrome and iPhone WebKit review checks passed physical fly-over collection at all six sites, replay, choices and save isolation. Packaging, source verification and whitespace checks passed.
+- Visually inspected the six refreshed approach views in `output/container-placement/`: containers lie against rock faces or hull panels/ribs instead of isolated open space. Updated and regenerated the review page for 0.8.2kt. No commit/push requested.
+
+## Convoy particles and space-pickup receipts (0.8.2ku)
+
+- User reported stationary bright particles in the convoy review and requested icons/quantities after pickup messages, also for other space cargo.
+- Root cause: review scene resets replaced `renderer.effects`, while LaserFx retained the previous array. Later muzzle flashes and impact particles were added to an unprocessed list. Added `clearEffects()` to dispose entries in place, reused by the review and renderer teardown. Added a repeated-reset regression test.
+- Added a transient pickup receipt in the own monitor's decorative hull area. Queue until dialogue/menus close, show one actual item/commodity icon and quantity at a time, aggregate matching pickups and expire on simulation time. Keep all flight telemetry and health bars visible; no extra flight pauses or canopy cards. Hook normal fly-over salvage, loose cargo, direct extraction, gold pockets and mining-drone delivery. Full holds produce no receipt; partial stacks report only the actual transfer.
+- Focused integration checks: exploration and loot collection passed (31); updated lifecycle and pickup receipt checks passed (9). Muted browser coverage in progress for desktop, Android and iPhone, including all cockpit layouts and combat following scene resets.
+- Final checks passed: all 40 focused exploration/loot/receipt/lifecycle assertions and 20 renderer-resource/wreck checks (including the targeted reruns after fixes). The renderer cleanup method also handles uninitialized/partial teardown fixtures.
+- Muted desktop Chrome, Android Chrome and iPhone WebKit checks passed: real fly-over pickup, dialogue-before-receipt ordering, loose cargo receipt, quantities, all fifteen cockpit layouts with bars unobscured, real convoy combat after a warmed-scene reset, and effect expiry. Reviewed desktop/Android/iPhone receipt screenshots under `output/space-pickups/`. Cached icon markup avoids rebuilding SVGs during ordinary HUD ticks; equipment tier/affix marks retain rarity color.
+- Updated 0.8.2ku/v565 and the isolated review. Runtime packaging, model-source verification and whitespace checks passed. No commit/push requested.
+
+## Equipment pickup labels (0.8.2kv)
+
+- User screenshot showed `undefined II` on the final salvage's equipment receipt.
+- Cause: the receipt passed the persisted equipment record to `equipmentName`; records contain identity/roll data, while names are in resolved inventory definitions. Resolve equipment and drone definitions before snapshotting the receipt, retaining tier, rarity and affix icons.
+- Four focused receipt/transfer tests pass. Added coverage for readable names of every equipment type and all drone types in both German and English. Added a targeted browser mode that physically collects the final salvage and checks every displayed receipt against the actual inventory name/quantity.
+- Muted desktop Chrome and iPhone WebKit final-salvage runs passed: all three receipts match actual cargo/equipment labels and quantities (Gold, Reaktorupgrade I, Antriebsbooster II), with no undefined text or browser errors. Inspected both equipment receipt screenshots. Runtime packaging and whitespace checks passed; no commit/push requested.
+
+## Cargo capacity in the cockpit inventory (0.8.2kw)
+
+- User request: show how full the hold is when opening Fracht from the own-ship cockpit menu.
+- Added used/total cargo mass, percentage and a fill bar directly above the Cargo inventory list. The same header remains visible while inspecting an item and uses the canonical mass/capacity calculations, including commodities, carried equipment, spare drones and mission cargo. Full holds are marked red; the bar is bounded for overfilled imports.
+- Two focused integration checks passed for mixed/empty/full holds, mission/equipment mass and detail-view visibility. Muted desktop/iPhone menu/layout checks in progress.
+- Desktop Chrome and iPhone WebKit checks passed: enter through the own-ship monitor, open Cargo, verify actual used/total/percentage and full bar, retain usage while inspecting equipment, and contain the header in the phone/desktop console. Inspected screenshots under `output/cargo-usage/`.
+- The phone check caught review-only test controls intercepting the equipment tab. Hide those review controls while the game’s ship/map/pause menus are open; the phone retest passed. Runtime packaging and whitespace checks passed. No commit/push requested.
+
+## Publish 0.8.2kw
+
+- User requested commit and push to main. Reviewed the pending exploration encounters, combat cues, isolated review tools, closer cache sites, transient-effects fix, pickup receipts/names and cargo-capacity view.
+- Reused the passing focused integration, renderer/resource and muted desktop/Android/iPhone checks recorded above. Runtime packaging and whitespace checks passed. Confirmed UI version 0.8.2kw, service-worker cache v567 and inclusion of the new exploration modules.
+- Fetched GitHub main and confirmed no divergence before committing. Generated output and packaged dist remain ignored.

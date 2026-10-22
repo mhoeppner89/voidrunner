@@ -1,3 +1,28 @@
+## 0.8.2kw — Cargo-view capacity
+
+- Show used/total cargo mass, percentage and a fill bar directly in the Cargo inventory view, including the embedded cockpit menu on phones. Count commodities, carried equipment, spare drones and mission cargo through the normal hold calculation.
+
+## 0.8.2kv — Equipment pickup names
+
+- Resolve saved equipment and drone records through the inventory catalogue before building pickup receipts. Preserve names, tiers, rarity and modifier marks instead of showing “undefined”.
+
+## 0.8.2ku — Pickup receipts and transient combat effects
+
+- Fix stationary weapon flashes and impact particles after switching or replaying review scenes: preserve the shared effects list so later effects still move, fade and expire.
+- Show recovered cargo, equipment and drones as icons with quantities on the own-ship monitor. Wait until story messages close; aggregate repeated pickups and keep flight telemetry visible. Include fly-over salvage, loose cargo, extraction and drone deliveries; report only quantities actually received.
+
+## 0.8.2kt — Sheltered exploration containers
+
+- Place discovery containers close against asteroid tunnel walls and broken capital hulls, away from open passage centres. Keep clear approaches for normal fly-over collection.
+- Move uncollected containers in existing saves without refilling cargo or resetting discoveries.
+
+## 0.8.2ks — Hidden freight, salvage claims and convoy distress
+
+- Hide three Kestrel Nine cargo pods in Shardbelt's tunnels. Each carries a small reward and a saved log; all three triangulate a freighter wreck in deep space, targetable from the ship journal. At the wreck, share the hold with Driftglass or fight its two salvage ships for the full cargo.
+- Place three additional cargo caches in capital-wreck recesses at Mourning Line. A nearby distress area offers a prospecting-convoy rescue with real attackers and a reward based on surviving prospectors.
+- Preserve recovered cargo, partial manifests, encounter choices and damaged actors across saves. Use normal fly-over/collector recovery, short-range cache signals and the existing dialogue/journal interfaces. Keep exploration encounters out of guided lessons and races.
+- Distinguish shield collapse, target shield collapse and depleted weapon energy with brief cockpit notices and separate, throttled sound cues. Preserve combat balance and the existing shield/hull hit effects.
+
 ## 0.8.2kr — Unified ship preview rotation and finish
 
 - Give the repaint editor the shipyard's steady automatic turntable and fixed camera distance. Both support drag inspection, a smooth delayed return to turning and reduced-motion preferences.

@@ -1,3 +1,4 @@
+import {normalizeExploration} from './explorationData.js';
 import {normalizeCareerLoot} from './careerLoot.js';
 import {normalizePaintDesign} from './paintDesign.js';
 import {FLEET_PAINTS} from './fleetPaintCatalog.js';
@@ -773,6 +774,7 @@ export const hydrateSave = (candidate) => {
     }
     normalizeEquipmentInventory(save.player,{disabled:Boolean(save.arena)});
     normalizeCareerLoot(save.world,save.player);
+    normalizeExploration(save.world);
     save.version = SAVE_VERSION;
     const stats = getEffectiveShipStats(save.player);
     if (sourceVersion < 9) {

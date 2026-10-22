@@ -48,7 +48,7 @@ export function equipCapitalLoot(session,ship){
 export function combatWreckNode(wreck){
  for(const entry of wreck.contents)if(entry.item)registerInventoryDefinitions({items:{[entry.item.id]:entry.item}});
  const count=wreck.contents.reduce((n,e)=>n+(e.quantity??1),0);
- return {id:wreck.id,name:wreck.name,position:[...wreck.position],rotation:[0,0,0],radius:wreck.radius,shape:0,salvage:'scrap',remaining:count,scanned:wreck.scanned??false,combatLoot:true,lootRarity:highestLootRarity(wreck.contents),systemId:wreck.systemId,instanceId:wreck.instanceId,velocity:[0,0,0]};
+ return {id:wreck.id,name:wreck.name,position:[...wreck.position],rotation:[0,0,0],radius:wreck.radius,shape:0,salvage:'scrap',remaining:count,scanned:wreck.scanned??false,combatLoot:true,locked:Boolean(wreck.locked),derelict:wreck.derelict,sensorRange:wreck.sensorRange,lootRarity:highestLootRarity(wreck.contents),systemId:wreck.systemId,instanceId:wreck.instanceId,velocity:[0,0,0]};
 }
 export function makeCareerWreck(session,ship,{captured=false}={}){
  if(session.arena||ship.lootResolved)return null;
@@ -111,7 +111,7 @@ export function updateCombatLoot(session){
  let changed=false,beams=0;
  for(const id in session.save.world.combatWrecks){
   const wreck=session.save.world.combatWrecks[id];
-  if(wreck.systemId!==session.save.player.systemId || session.save.world.time<(wreck.collectAfter??0) || session.save.world.time<(retry.get(wreck)??0))continue;
+  if(!wreck.contents.length||wreck.explorationId&&session.explorationLootAllowed?.()===false||wreck.locked||wreck.systemId!==session.save.player.systemId || session.save.world.time<(wreck.collectAfter??0) || session.save.world.time<(retry.get(wreck)??0))continue;
   if(!lootInReach(session,wreck.position,range,true,wreck.id))continue;
   // Bounded work even for imported wrecks with a very large manifest. Cargo
   // stacks transfer in bulk, retaining any remainder when the hold fills.
@@ -139,7 +139,7 @@ export function recoverWreckEntry(session,wreckId,entryId){
 }
 function transferWreckEntry(session,wreck,entryId,bulk){
  const node=session.wreckNodes.find(n=>n.id===wreck.id);
- if(!node)return {ok:false,code:'Loot is unavailable.'};
+ if(!node||wreck.locked||wreck.explorationId&&session.explorationLootAllowed?.()===false)return {ok:false,code:'Loot is unavailable.'};
  const index=wreck.contents.findIndex(e=>e.id===entryId),entry=wreck.contents[index];if(!entry)return {ok:false,code:'Already recovered.'};
  let result;
  if(entry.kind==='equipment'){
@@ -155,11 +155,13 @@ function transferWreckEntry(session,wreck,entryId,bulk){
   const fleet=session.save.player.droneFleet,id=`drone-unit-${fleet.nextUnitId++}`;fleet.unitsById[id]=createDroneUnit(id,entry.type);if(entry.hull!=null)fleet.unitsById[id].hull=entry.hull;if(entry.ammo!=null)fleet.unitsById[id].ammo=entry.ammo;fleet.lockerIds.push(id);refreshInventoryProjection(session.save.player);result={ok:true};
  }
  if(!result.ok)return result;
+ session.ui.queueSpacePickup?.({...entry,quantity:result.amount??1});
  session.recordExtractionProgress?.('salvage',result.amount??1);
  if(entry.kind!=='cargo'||entry.quantity<=0)wreck.contents.splice(index,1);
  node.lootRarity=highestLootRarity(wreck.contents);
  node.remaining=wreck.contents.reduce((n,e)=>n+(e.quantity??1),0);session._statsDirty=true;
- if(!node.remaining){delete session.save.world.combatWrecks[wreck.id];session.wreckNodes.splice(session.wreckNodes.indexOf(node),1);session.renderer?.removeCombatLootNode?.(node.id);if(session.save.player.currentTargetId===node.id)session.save.player.currentTargetId=undefined;}
+ if(!node.remaining&&!wreck.derelict){delete session.save.world.combatWrecks[wreck.id];session.wreckNodes.splice(session.wreckNodes.indexOf(node),1);session.renderer?.removeCombatLootNode?.(node.id);if(session.save.player.currentTargetId===node.id)session.save.player.currentTargetId=undefined;}
+ session.onExplorationLoot?.(wreck);
  return {ok:true,code:'Recovered into cargo.'};
 }
 
@@ -186,7 +188,7 @@ export function normalizeCareerLoot(world, player) {
    } else continue;
    used.add(entry.id);contents.push(entry);
   }
-  if(!contents.length)continue;
+  if(!contents.length&&!(raw.derelict==='atlas-freighter'&&raw.explorationId==='finale'))continue;
   wrecks[id]={...raw,name:String(raw.name??'Ship wreck').slice(0,150),contents,radius:Math.max(1,Math.min(35,Number(raw.radius)||3)),velocity:[0,0,0],scanned:Boolean(raw.scanned)};
  }
  if(world.combatWrecks)world.combatWrecks=wrecks;

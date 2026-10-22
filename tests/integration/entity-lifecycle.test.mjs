@@ -6,6 +6,7 @@ registerHooks({ resolve(s, c, next) {
 } });
 const THREE = await import('three');
 const { SpaceRenderer } = await import(process.env.RENDER_MODULE || '../../src/game/render.js');
+const { LaserFx } = await import('../../src/game/laserFx.js');
 function renderer() {
     const r = Object.create(SpaceRenderer.prototype);
     Object.assign(r, {
@@ -74,4 +75,18 @@ test('new beam, PDC and muzzle effects survive their first slow render, then exp
     assert.equal(r.combatBeams.get('test').visible,false);
     assert.equal(r.pdcTracers[0].visible,false);
     assert.equal(r.effects.length,0);
+});
+test('clearing a reused scene preserves the LaserFx expiry list for later combat',()=>{
+    const r=renderer();Object.assign(r,{scene:new THREE.Scene(),effects:[]});
+    const fx=r.laserFx=new LaserFx(r.scene,r.effects);
+    fx.flashMaterial=()=>new THREE.SpriteMaterial();
+    const list=r.effects;
+    for(let scene=0;scene<3;scene++){
+        fx.muzzleFlash(1,2,3,0xffffff);
+        assert.equal(r.effects.length,1);
+        r.clearEffects();assert.equal(r.effects,list);assert.equal(fx.effects,r.effects);assert.equal(r.scene.children.length,0);
+        fx.muzzleFlash(4,5,6,0xffffff);const flash=r.effects[0].object;
+        r.updateEffects(.1);r.updateEffects(.1);
+        assert.equal(r.effects.length,0);assert.equal(flash.parent,null);
+    }
 });

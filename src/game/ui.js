@@ -1,3 +1,4 @@
+import {explorationDialogue,explorationJournal,explorationText} from './explorationData.js';
 import {installRetroDisplay,monitorRasterRatio} from './retroDisplay.js';
 import {RACE_HULLS} from './raceHulls.js';
 import {EQUIPMENT_RARITIES,equipmentName,modifiedWeapon,equipmentBaseId} from './equipmentCatalog.js';
@@ -451,7 +452,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2kr';
+const GAME_VERSION = '0.8.2kw';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -978,6 +979,7 @@ export class GameUI {
         return node;
     }
     attachSave(save) {
+        if(this.save!==save)this.clearSpacePickups();
         this.save = save;
         this.setCockpitShip(save?.player?.shipId);
     }
@@ -1865,6 +1867,8 @@ export class GameUI {
             case 'close-chat':
                 this.closeChatLog();
                 break;
+            case 'exploration-journal':
+                this.actions?.explorationJournalAction?.(element.dataset.explorationAction);break;
             case 'transponder-toggle':
                 this.actions?.toggleTransponder?.();
                 this.showShipMenu();
@@ -2933,11 +2937,11 @@ export class GameUI {
             return;
         }
         const person = Object.values(LOCATIONS).flatMap(location => location.people ?? []).find(person => person.name === name)
-            ?? { id: name === 'Rin Vek' ? 'rin-vek' : name==='Paul'?'paul':'', name };
+            ?? { id: conversationId?.startsWith('exploration-')||name==='Sera'||name==='Lantern'?'exploration-signal':name === 'Rin Vek' ? 'rin-vek' : name==='Paul'?'paul':'', name };
         this.commsLog.push({callsign:name,line:text,relation,story:true});
         if (this.commsLog.length > 40) this.commsLog.shift();
-        const script = conversationId === 'rin-first-flight' ? ADVENTURE_DIALOGUES.flight
-            : ADVENTURE_DIALOGUES[conversationId?.replace(/^tutorial-/, '')];
+        const script = explorationDialogue(conversationId,this.save) ?? (conversationId === 'rin-first-flight' ? ADVENTURE_DIALOGUES.flight
+            : ADVENTURE_DIALOGUES[conversationId?.replace(/^tutorial-/, '')]);
         this.storyDismissed = false;
         this.startAdventure(person,script,!this.dockLocation,text);
         this.adventure.story = true;
@@ -2987,6 +2991,10 @@ export class GameUI {
         if (node.choices) {
             state.transcript.push({speaker:this.adventureLabel('Du','You'),text:dialogueText(choice.label,getLanguage())});
             if (choice.next) state.asked.add(choice.next);
+        }
+        if(choice.explorationChoice){
+            if(this.actions?.chooseExploration?.(choice.explorationChoice)?.ok)this.closeAdventure();
+            return;
         }
         if (choice.tutorialChoice) {
             this.recordAdventureTopic();
@@ -3055,6 +3063,8 @@ export class GameUI {
         const state = this.adventure, panel = this.root.querySelector('#adventure-panel');
         if (!state || !panel) return;
         const node = this.adventureNode();
+        const signalOnly=state.person.id==='exploration-signal';
+        panel.dataset.signalOnly=String(signalOnly);
         const text = dialogueText(node.text,getLanguage());
         const identity = state.nodeId ?? node;
         if (state.lastRendered !== identity && !state.history) {
@@ -3070,7 +3080,7 @@ export class GameUI {
           <header class="adventure-heading"><span>${state.space ? this.adventureLabel('FUNKVERBINDUNG · FLUG PAUSIERT','COMMS LINK · FLIGHT PAUSED') : escapeHtml(LOCATIONS[this.dockLocation]?.name ?? '')}</span>
             <button data-ui-command="adventure-exit">${this.adventureLabel('Gespräch verlassen','Leave conversation')}</button></header>
           <div class="adventure-stage">
-            <figure class="adventure-portrait">${this.portraitImage(state.person.id,state.person.name)}<figcaption>${escapeHtml(state.person.name)}${state.person.relationship ? `<small>${escapeHtml(t(state.person.relationship))}</small>` : ''}</figcaption></figure>
+            ${signalOnly?'':`<figure class="adventure-portrait">${this.portraitImage(state.person.id,state.person.name)}<figcaption>${escapeHtml(state.person.name)}${state.person.relationship ? `<small>${escapeHtml(t(state.person.relationship))}</small>` : ''}</figcaption></figure>`}
             <section class="adventure-dialogue">
               <h2>${escapeHtml(state.person.name)}</h2>
               ${state.history ? `<div class="adventure-transcript" tabindex="0">${[...(this.adventureHistory ?? []),...state.transcript].map(entry=>`<p><b>${escapeHtml(entry.speaker)}</b><br>${escapeHtml(entry.text)}</p>`).join('')}</div>` : `
@@ -4328,10 +4338,55 @@ export class GameUI {
         const screenLabel = screen === 'bar' ? t('BAR') : screen === 'market' ? t('MARKET') : t('CONCOURSE');
         return `<div class="procedural-location-plate system-${escapeHtml(location.systemId ?? 'helios-verge')}" style="--plate-accent:${escapeHtml(location.accent ?? '#80b7c8')};--plate-secondary:${escapeHtml(location.secondary ?? '#182b36')}" role="img" aria-label="${escapeHtml(location.name)} · ${escapeHtml(screenLabel)}"><span>${escapeHtml(location.shortName)}</span><b>${escapeHtml(screenLabel)}</b><i aria-hidden="true"></i></div>`;
     }
+    clearSpacePickups() {
+        this.spacePickupQueue=[];this.spacePickupReceipt=undefined;
+        this.el('#space-pickup-receipt')?.remove();
+        this.elementCache?.delete('#space-pickup-receipt');
+        this.el('.cockpit-screen-own .screen-ship-layout')?.classList.remove('has-space-pickup');
+    }
+    queueSpacePickup(entry) {
+        const quantity=Math.floor(entry.quantity??1);
+        if(!Number.isFinite(quantity)||quantity<=0)return;
+        // Saved equipment records hold identity/stats, not display names.
+        // Resolve the same catalogue definition used by the inventory first.
+        const definition=entry.kind==='equipment'?(OUTFIT_ITEMS[entry.item?.id]??OUTFIT_ITEMS[entry.item?.baseId]):entry.kind==='drone'?OUTFIT_ITEMS[entry.type+'-drone']:undefined;
+        const item=definition?{...definition,...(entry.kind==='equipment'?entry.item:{}),baseName:definition.baseName??definition.name}:undefined;
+        const commodity=entry.kind==='cargo'?COMMODITIES[entry.commodity]:undefined;
+        if(!item&&!commodity)return;
+        const key=commodity?'cargo:'+commodity.id:entry.kind+':'+(entry.item?.id??entry.type);
+        const queue=this.spacePickupQueue??=[];
+        const current=this.spacePickupReceipt;
+        const existing=current?.key===key&&current.until>(this.save?.world.time??0)?current:queue.find(p=>p.key===key);
+        if(existing){existing.quantity+=quantity;existing.markup=undefined;if(existing===current)existing.until=this.save.world.time+5;return;}
+        // Bound transient presentation only; the actual cargo is already saved.
+        if(queue.length>=32)queue.shift();
+        queue.push({key,quantity,item,commodity:commodity?.id,name:commodity?t(commodity.name):equipmentName(item)});
+    }
+    updateSpacePickup() {
+        const layout=this.el('.cockpit-screen-own .screen-ship-layout');if(!layout)return;
+        const now=this.save?.world.time??0;
+        const blocked=this.isModalOpen||this.save?.player.dockedAt;
+        let receipt=this.spacePickupReceipt;
+        if(!blocked&&(!receipt||now>=receipt.until)){
+            receipt=this.spacePickupReceipt=this.spacePickupQueue?.shift();
+            if(receipt)receipt.until=now+5;
+        }
+        const visible=Boolean(receipt&&!blocked&&receipt.until>now);
+        layout.classList.toggle('has-space-pickup',visible);
+        let panel=this.el('#space-pickup-receipt');
+        if(!panel&&visible){panel=document.createElement('div');panel.id='space-pickup-receipt';panel.className='space-pickup-receipt';panel.setAttribute('role','status');panel.setAttribute('aria-live','polite');layout.appendChild(panel);this.elementCache?.delete('#space-pickup-receipt');}
+        if(!panel)return;
+        panel.hidden=!visible;
+        if(visible){
+            if(!receipt.markup)receipt.markup=`${receipt.item?equipmentIcon(receipt.item):commodityIcon(receipt.commodity)}<b>+${formatNumber(receipt.quantity)}</b><span>${escapeHtml(receipt.name)}</span>`;
+            if(panel.receiptMarkup!==receipt.markup){panel.innerHTML=receipt.markup;panel.receiptMarkup=receipt.markup;panel.title=`+${receipt.quantity} ${receipt.name}`;panel.setAttribute('aria-label',panel.title);panel.style?.setProperty('--item-color',EQUIPMENT_RARITIES[receipt.item?.rarity??'common']?.color??'currentColor');}
+        }
+    }
     updateHud(model) {
         this.lastHud = model;
         this.droneHud = this.droneHudSnapshot(model);
         this.setCockpitShip(model.shipId);
+        this.updateSpacePickup();
         const setText = (selector, value) => {
             const element = this.el(selector);
             if (element && element.textContent !== value)
@@ -5842,7 +5897,9 @@ export class GameUI {
           </section>
           ${wingSection}
         </div>`;
-        const journalPanel=`<div class="ship-console-grid ship-journal">${tutorialSection}<section class="ship-menu-missions"><h3>${t('ACTIVE CONTRACTS · {count}/6',{count:missions.length})}</h3>${missionRows}</section>
+        const explorationRows=explorationJournal(this.save);
+        const explorationSection=explorationRows.length?`<section class="ship-menu-missions"><h3>${escapeHtml(explorationText(['ENTDECKUNGEN','DISCOVERIES']))}</h3>${explorationRows.map(row=>`<details><summary>${escapeHtml(row.title)}</summary><p>${escapeHtml(row.text)}</p>${row.action&&!player.dockedAt?`<button type="button" data-ui-command="exploration-journal" data-exploration-action="${row.action}">${escapeHtml(explorationText(row.action==='navigate'?['Wrack anvisieren','Target wreck']:['Notruf beantworten','Answer distress call']))}</button>`:''}</details>`).join('')}</section>`:'';
+        const journalPanel=`<div class="ship-console-grid ship-journal">${tutorialSection}${explorationSection}<section class="ship-menu-missions"><h3>${t('ACTIVE CONTRACTS · {count}/6',{count:missions.length})}</h3>${missionRows}</section>
           <details class="ship-menu-account"><summary>${t('COMBAT VALUE')} · ${formatCredits(combatValue)}</summary><p>${t('SHIP + EQUIPMENT · HALF CASH · NO CARGO')}</p></details>
           <details class="ship-menu-events"><summary>${t('RECENT EVENTS · {count}',{count:events.length})}</summary>${eventRows}</details></div>`;
         panel.innerHTML=`<div class="ship-console" data-ship-pane="${tab}">

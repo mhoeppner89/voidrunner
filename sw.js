@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v562-0-8-2kr-preview-finish';
+const CACHE = 'voidrunner-v567-0-8-2kw-cargo-capacity';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -144,6 +144,8 @@ const CORE_ASSETS = [
   './src/game/itemIcons.js',
   './src/game/equipmentStatPresentation.js',
   './src/game/careerLoot.js',
+  './src/game/explorationData.js',
+  './src/game/exploration.js',
   './src/game/lootVisuals.js',
   './src/game/pilots.js',
   './src/game/quests.js',

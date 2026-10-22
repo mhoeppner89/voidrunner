@@ -14,6 +14,9 @@ import {EQUIPMENT_NAMING} from './equipmentNaming.js';
 // Player address is informal "du" throughout, matching the frontier voice of
 // the English lines. Values are plain text — never HTML.
 export const DE_CATALOG = {
+    'Approach the wreck on normal engines.': 'Nähere dich dem Wrack mit normalem Antrieb.',
+    'SHIELDS DOWN': 'SCHILDE AUS',
+    'TARGET SHIELDS DOWN': 'ZIELSCHILDE AUS',
     'Mining Drone':'Abbaudrohne',
     'PDC Drone':'PDC-Drohne',
     'Repair Drone':'Reparaturdrohne',

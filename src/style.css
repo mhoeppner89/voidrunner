@@ -14858,6 +14858,20 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 }
 
 /* Conversations take the stage; the station and flight HUD wait underneath. */
+/* Recorded logs and voice-only discovery hails do not need a fake portrait. */
+.adventure-panel[data-signal-only="true"] .adventure-stage {
+  grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
+  flex: 0 1 auto; max-width: 860px; max-height: calc(100% - 72px); margin: auto;
+  padding: clamp(12px, 3vw, 28px); box-sizing: border-box;
+  border: 1px solid var(--void-gold); background: var(--void-navy);
+}
+.adventure-panel[data-signal-only="true"] .adventure-choices { margin-top: 12px; }
+.adventure-panel[data-signal-only="true"] .adventure-speech { white-space: pre-line; }
+.adventure-panel[data-signal-only="true"] .adventure-history { display: none; }
+@media (max-height: 520px) {
+  .adventure-panel[data-signal-only="true"] .adventure-stage { padding: 12px; max-height: calc(100% - 60px); }
+}
+
 .adventure-panel {
   position: fixed; inset: 0; z-index: 12000; box-sizing: border-box;
   padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
@@ -17561,3 +17575,32 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
  #dock-screen .paint-patterns svg { width:34px; height:34px; }
  #dock-screen .paint-patterns button { flex-direction:column; gap:4px; text-align:center; }
 }
+
+/* Pickup receipts occupy the decorative hull area, keeping flight telemetry
+   and the shield/energy/hull bars visible on every cockpit and phone layout. */
+#game-shell .screen-ship-layout.has-space-pickup > .hull-outline { visibility:hidden; }
+#game-shell .screen-ship-layout > .space-pickup-receipt {
+  grid-area:outline; display:grid; grid-template-columns:minmax(0,1fr) auto;
+  grid-template-rows:minmax(0,1fr) auto; align-items:center;
+  min-width:0; min-height:0; width:100%; height:100%; max-height:100%;
+  gap:1px 2px; overflow:hidden; color:var(--void-gold); text-shadow:none;
+  font:inherit; line-height:1.1; pointer-events:none;
+}
+#game-shell .space-pickup-receipt[hidden] { display:none; }
+#game-shell .space-pickup-receipt .item-icon {
+  width:100%; height:100%; min-width:0; min-height:0; max-width:64px; max-height:64px;
+  justify-self:center; grid-column:1; grid-row:1;
+}
+#game-shell .space-pickup-receipt b { font-size:clamp(10px,1vw,16px); align-self:center; }
+#game-shell .space-pickup-receipt span {
+  grid-column:1 / -1; text-align:center; font-size:clamp(8px,.75vw,12px);
+  overflow-wrap:anywhere; max-height:2.2em; overflow:hidden; letter-spacing:0;
+}
+
+.inventory-cargo-usage { flex-shrink:0; margin-bottom:8px; color:var(--void-cyan); }
+.inventory-cargo-usage > div:first-child { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:3px 12px; font:500 13px/1.3 var(--ui-font); }
+.inventory-cargo-usage b { color:var(--void-gold); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.inventory-cargo-meter { height:5px; margin-top:5px; background:rgba(80,150,180,.18); overflow:hidden; }
+.inventory-cargo-meter i { display:block; height:100%; background:var(--void-cyan); }
+.inventory-cargo-usage.is-full .inventory-cargo-meter i { background:var(--retro-red); }
+@media(max-height:520px) { .inventory-cargo-usage { margin-bottom:5px; } .inventory-cargo-usage > div:first-child { font-size:12px; } }

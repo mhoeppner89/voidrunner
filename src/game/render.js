@@ -3007,20 +3007,43 @@ export class SpaceRenderer {
         const mesh=createLootVisual(node,this.combatLootResources);
         this.tagTargetable(mesh,'wreck',node.id);this.scene.add(mesh);this.combatLootMeshes.set(node.id,mesh);
     }
+    updateExplorationDerelict(mesh,node,visible){
+        if(!node.derelict)return;
+        const data=mesh.userData;
+        if(data.derelictEffect){data.derelictEffect.object.visible=visible;return;}
+        if(!visible)return;
+        const variant=node.derelict,model=this.glbShipModels.get(variant);
+        if(!model){this.ensureGlbShipModel(variant);return;}
+        if(!data.derelictSource){
+            const actor={id:node.id,variant,role:'trader',faction:'independents',position:node.position,velocity:[0,0,0]};
+            const source=this.createGlbShipMesh(actor,model,GLB_SHIP_CONFIG[variant],variant);
+            source.position.fromArray(node.position);source.position.z-=65;
+            source.rotation.set(.18,.6,-.28);source.updateWorldMatrix(true,true);
+            data.derelictSource=source;data.derelictActor=actor;
+            // createGlbShipMesh schedules fracture work in idle slices.
+            return;
+        }
+        if(this.wreckFactory.jobs.size)return;
+        const effect=this.wreckFactory.create(data.derelictSource,data.derelictActor);
+        if(!effect)return;
+        effect.update(5);this.scene.add(effect.object);data.derelictEffect=effect;
+        this.disposeObject(data.derelictSource);delete data.derelictSource;
+    }
     removeCombatLootNode(id) {
-        const mesh=this.combatLootMeshes?.get(id);if(mesh){this.scene.remove(mesh);this.combatLootMeshes.delete(id);}
+        const mesh=this.combatLootMeshes?.get(id);if(mesh){const effect=mesh.userData.derelictEffect;if(effect){this.scene.remove(effect.object);effect.dispose();}if(mesh.userData.derelictSource)this.disposeObject(mesh.userData.derelictSource);this.scene.remove(mesh);this.combatLootMeshes.delete(id);}
     }
     updateCombatLootNodes() {
         for(const mesh of this.combatLootMeshes?.values()??[]){const node=mesh.userData.lootNode;
             const dx=node.position[0]-this.camera.position.x,dy=node.position[1]-this.camera.position.y,dz=node.position[2]-this.camera.position.z;
             mesh.visible=node.remaining>0&&node.systemId===this.systemId&&dx*dx+dy*dy+dz*dz<WRECK_RENDER_DISTANCE_SQ;
+            this.updateExplorationDerelict(mesh,node,node.systemId===this.systemId&&dx*dx+dy*dy+dz*dz<WRECK_RENDER_DISTANCE_SQ);
             if(mesh.visible){
                 mesh.position.fromArray(node.position);
                 if(mesh.userData.lootRarity!==(node.lootRarity??'common'))setLootVisualRarity(mesh,this.combatLootResources,node.lootRarity);
                 const beacon=mesh.userData.lootBeacon,distance=Math.sqrt(dx*dx+dy*dy+dz*dz);
                 // World-space, depth-tested beacons: legible nearby, never an
                 // always-on-top HUD card or a marker for distant systems.
-                beacon.visible=distance<2400;
+                beacon.visible=distance<Math.min(2400,node.sensorRange??2400);
                 if(beacon.visible){
                     const size=Math.max(3,Math.min(80,distance*2*Math.tan(this.camera.fov*Math.PI/360)*26/this.viewportHeight));
                     beacon.scale.setScalar(size);beacon.position.y=mesh.userData.lootBodySize*.75+size*.8;
@@ -5657,6 +5680,16 @@ export class SpaceRenderer {
         this.scene.add(streak);
         this.effects.push({ object: streak, streak, velocities: [], life: 0.75, maxLife: 0.75 });
     }
+    clearEffects() {
+        this.effects??=[];
+        for(const effect of this.effects){
+            this.scene.remove(effect.object);
+            if(effect.dispose)effect.dispose();else this.disposeObject(effect.object);
+        }
+        // LaserFx holds this same list. Replacing it strands future muzzle
+        // flashes and impacts outside the renderer's expiry/update pass.
+        this.effects.length=0;
+    }
     updateEffects(dt) {
         for (let index = this.effects.length - 1; index >= 0; index -= 1) {
             const effect = this.effects[index];
@@ -6586,7 +6619,8 @@ export class SpaceRenderer {
         }
     }
     disposeResources() {
-        for(const effect of this.effects??[]){this.scene.remove(effect.object);if(effect.dispose)effect.dispose();else this.disposeObject(effect.object);}this.effects=[];
+        this.clearEffects();
+        for(const mesh of this.combatLootMeshes?.values()??[]){const effect=mesh.userData.derelictEffect;if(effect){this.scene.remove(effect.object);effect.dispose();}if(mesh.userData.derelictSource)this.disposeObject(mesh.userData.derelictSource);}
         this.wreckFactory?.dispose();this.wreckFactory=undefined;
         this.clearDrones();
         this.combatLootMeshes?.clear();disposeLootVisualResources(this.combatLootResources);this.combatLootResources=undefined;

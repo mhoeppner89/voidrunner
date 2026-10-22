@@ -2,6 +2,11 @@ import { playIndustrial, warmIndustrial, INDUSTRIAL_DURATIONS, playWorkSample, u
 import { clamp } from './random.js';
 import {createTransitVoice} from './transitAudio.js';
 
+// Immutable routing tables avoid rebuilding collections for every weapon hit.
+const EFFECT_SPACING = {salvage:1.65,hyperActive:3.6,warning:.65,ui:.035,hit:.065,shield:.065,shieldBreak:2,targetShieldBreak:1.5,capacitorEmpty:2,impact:.035,rock:.035,pdc:.035};
+const EFFECT_WET = {pdc:.06,laser:.12,ripper:.12,ui:0,warning:.04,hit:.08,shield:.12,shieldBreak:.04,targetShieldBreak:0,capacitorEmpty:0,repair:.06,mining:.08};
+const VARIABLE_PITCH_EFFECTS = new Set(['laser','gauss','pdc','ripper','ion','mortar','impact','hit','rock','mining','repair']);
+
 const midiToFrequency = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
 
 // Music scheduler: one bar fires per tick. Every context has its own tempo,
@@ -804,14 +809,14 @@ export class AudioManager {
         if (!this.context || !this.effectsGain || !this.reverbInput || !this.enabled || this.effectsVolume <= 0.001)
             return;
         const now = this.context.currentTime;
-        if (['repair','mining'].includes(effect) && Number.isFinite(intensity) && intensity > 0) {
+        if ((effect==='repair'||effect==='mining') && Number.isFinite(intensity) && intensity > 0) {
             playWorkSample(this,effect,intensity,Number.isFinite(pan)?pan:0,Number.isFinite(distance)?distance:0);return;
         }
         if (!Number.isFinite(intensity) || intensity <= 0) return;
         pan = Number.isFinite(pan) ? pan : 0;
         distance = Number.isFinite(distance) ? Math.max(0,distance) : 0;
         this.effectTimes ??= new Map();
-        const spacing = {salvage:1.65,hyperActive:3.6,warning:.65,ui:.035,hit:.065,shield:.065,impact:.035,rock:.035,pdc:.035}[effect] ?? 0;
+        const spacing = EFFECT_SPACING[effect] ?? 0;
         const channel = cockpit ? `cockpit:${effect}` : effect;
         if (now-(this.effectTimes.get(channel) ?? -Infinity)<spacing) return;
         this.effectTimes.set(channel,now);
@@ -820,10 +825,10 @@ export class AudioManager {
         // sounds do not smear into one position (the old single panner).
         const chain = this.eventChain(pan, distance);
         const out = chain.input;
-        out.pitchRatio = ['laser','gauss','pdc','ripper','ion','mortar','impact','hit','rock','mining','repair'].includes(effect) ? .97+Math.random()*.06 : 1;
+        out.pitchRatio = VARIABLE_PITCH_EFFECTS.has(effect) ? .97+Math.random()*.06 : 1;
         chain.output.connect(this.effectsGain);
         const wet = this.context.createGain();
-        wet.gain.value = {pdc:.06,laser:.12,ripper:.12,ui:0,warning:.04,hit:.08,shield:.12,repair:.06,mining:.08}[effect] ?? .25;
+        wet.gain.value = EFFECT_WET[effect] ?? .25;
         chain.output.connect(wet);wet.connect(this.effectsReverbGain);
         this.effectReleases ??= new Set();
         const release = () => {
@@ -834,6 +839,9 @@ export class AudioManager {
         switch (effect) {
             case 'beam': this.playBeam(now,strength,out); break;
             case 'shield': this.playShieldHit(now,strength,out); break;
+            case 'shieldBreak': this.playShieldBreak(now,strength,out); break;
+            case 'targetShieldBreak': this.playTargetShieldBreak(now,strength,out); break;
+            case 'capacitorEmpty': this.playCapacitorEmpty(now,strength,out); break;
             case 'capitalExplosion': this.playCapitalExplosion(now,strength,out); break;
             case 'laser': this.playLaser(now, strength, out); break;
             case 'gauss': this.playGauss(now, strength, out); break;
@@ -952,6 +960,22 @@ export class AudioManager {
     }
     playShieldHit(at, intensity, out) {
         playIndustrial(this, 'shield', at, intensity, out);
+    }
+    // A falling electrical note marks collapse, distinct from the metallic
+    // hull strike and the short, bright shield-impact sample.
+    playShieldBreak(at, intensity, out) {
+        this.playTone({at,frequency:740,endFrequency:85,duration:.38,type:'triangle',level:.11*intensity,filterFrequency:2100,out});
+        this.playTone({at:at+.035,frequency:135,endFrequency:48,duration:.27,level:.14*intensity,filterFrequency:600,out});
+    }
+    // A quieter rising pair confirms the locked opponent lost its shields.
+    playTargetShieldBreak(at, intensity, out) {
+        this.playTone({at,frequency:640,duration:.075,level:.045*intensity,filterFrequency:1600,out});
+        this.playTone({at:at+.1,frequency:900,duration:.1,level:.045*intensity,filterFrequency:1800,out});
+    }
+    // A dry switch-like refusal, rather than the general warning alarm.
+    playCapacitorEmpty(at, intensity, out) {
+        this.playTone({at,frequency:145,endFrequency:70,duration:.085,type:'triangle',level:.1*intensity,filterFrequency:700,out});
+        this.playTone({at:at+.105,frequency:110,endFrequency:55,duration:.06,type:'triangle',level:.07*intensity,filterFrequency:500,out});
     }
     playCapitalExplosion(at, intensity, out) {
         playIndustrial(this, 'capitalExplosion', at, intensity, out);

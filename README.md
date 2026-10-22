@@ -1,10 +1,18 @@
 # Voidrunner
 
-A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2kr**.
+A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2kw**.
 
 All thirteen stations use architecture based on their concourse, bar and market artwork. Helix retains its tiered refinery silhouette, with 77 closely spaced pressure buildings, fully supported foundations, sealed exterior walls and six detailed glazed park courtyards on the upper deck. Its radar dishes have supported outriggers clear of the tower. Rook has a pitched armored roof, continuous lower keel, eight Cruiser batteries, sixteen capital PDCs and three downward-facing capital docking ports. Rook uses Concord navy, pale armor and brass; two frigates dock belly-up beneath short pressure collars; its small-ship entrance remains clear. Ordinary windows and utility fittings use the same scale as fitted ships and capital-ship windows. Station shells retain ten materials, one atlas and the 40,000-triangle / 2.5 MB limits. Run `npm run review:stations` and open `/output/station-review/gallery.html?revision=0.8.2kn`; each card opens the model and its artwork comparison. Refresh gallery thumbnails with `VR_PROFILES=desktop VR_VIEWS_ONLY=1 node tests/browser/station-models.mjs`.
 
 Service → Hull paint opens a rotatable editor for all fifteen player hulls: four distinctive patterns fitted to each hull, three independent colors, palette suggestions and the original factory finish. Previewing and cancellation are free; applying a changed design uses the hull's repaint fee. Paint persists separately per hull and appears in flight, concourse scenes and cutscenes. Repaint and shipyard previews share the same steady turntable, drag inspection, neutral lighting and final pixel shader used in spaceflight. Run `npm run review:paint` for a temporary workshop that leaves the career untouched, or `npm run test:browser:paint` for muted desktop/Android/iPhone checks. See [SHIP_PAINT.md](docs/SHIP_PAINT.md).
+
+Run `npm run review:discoveries` and open `/output/exploration-review/index.html` to review the Kestrel Nine logs, triangulated wreck, share/fight encounter, hidden graveyard caches, Lantern rescue and combat feedback. Twelve scene presets, replay and next-discovery controls use the live game with an isolated in-memory save. Sound starts muted and can be enabled in the review toolbar. `npm run test:browser:discovery-review` checks scene switching, loot recovery, both salvage choices, combat cues and career-save isolation on desktop and iPhone.
+
+The cockpit menu’s Cargo view shows used/total cargo mass, a fill percentage and a capacity bar, including equipment and mission cargo.
+
+Space pickups show their actual cargo/equipment icons and quantities in the own-ship monitor after any story dialogue closes. Receipts leave flight telemetry visible and do not pause flight.
+
+Exploration containers sit close against tunnel walls and broken hull surfaces, with clear approaches for fly-over collection. Existing saves receive the fitted positions while retaining their remaining cargo and discovery progress.
 
 Fly over dropped cargo or equipment to collect it, with no target selection, scan or salvage controls required. A fitted Beutesammler / Loot Collector automatically beams drops aboard within 150 / 200 / 250 km for tiers I / II / III. Buy and fit it through normal Equipment; only the strongest fitted collector applies. Cargo limits, reserved drone cargo space and solid obstacles still apply. Large wrecks retain their normal salvage mechanic.
 
