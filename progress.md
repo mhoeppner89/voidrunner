@@ -1280,3 +1280,17 @@ Publish preview release 0.8.2kr:
 - User requested commit and push to main. Reviewed the pending exploration encounters, combat cues, isolated review tools, closer cache sites, transient-effects fix, pickup receipts/names and cargo-capacity view.
 - Reused the passing focused integration, renderer/resource and muted desktop/Android/iPhone checks recorded above. Runtime packaging and whitespace checks passed. Confirmed UI version 0.8.2kw, service-worker cache v567 and inclusion of the new exploration modules.
 - Fetched GitHub main and confirmed no divergence before committing. Generated output and packaged dist remain ignored.
+
+## Solid exploration wrecks (0.8.2kx)
+
+- User requested collision, smoke/fire on the asteroid-log quest's final freighter, and a reachable carrier cargo container with corrected wreck collision.
+- Bake collision from the freighter's actual posed fragment triangles once; warm their query structures and invalidate the spatial grid immediately. Keep the solid wreck after cargo recovery, and remove its collision on scene reset. Add three animated vent/fire sites in one instanced GPU draw; effects pause with simulation and dispose with the wreck.
+- The carrier's simplified deck missed visible plating: the old crate was only 0.1 km from actual skin, despite reporting 8 km clearance. Retained exact carrier triangles, welded coincident seam vertices, and prewarmed collision BVHs during loading. Moved the crate to a visible outside deck edge with about 14 km clearance; existing uncollected saves migrate without changing remaining cargo.
+- Passed 30 existing focused exploration/graveyard checks and three new collision/effect/grid tests. Authored fly-through passages and race centerlines remain clear. Muted desktop Chrome and iPhone WebKit checks passed real collision response, blocked shots, stable wreck pose, animated vents, persistent solid wreck after collection, visible carrier approach and physical fly-over collection with zero hull damage. No browser errors.
+- Reviewed desktop/phone captures under output/wreck-collision. Improved smoke/fire visibility and kept a small persistent flame at each vent. Final muted desktop/iPhone reruns passed with no browser errors; inspected both final visual captures. Runtime packaging, model-source verification and whitespace checks passed. No commit/push requested.
+
+## Publish 0.8.2kx
+
+- User requested commit and push of the current state. The recurring-distress expansion remains a conversational plan; no expansion code was added.
+- Publish the solid freighter, animated damage vents, exact carrier collision, relocated cargo and focused regression coverage. Reuse the passing integration, muted desktop/iPhone, packaging and source checks above; whitespace check passes. User also confirmed the lingering-particle issue was absent in 0.8.2kx.
+- Fetched GitHub main and confirmed no divergence before committing.

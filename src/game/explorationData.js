@@ -17,7 +17,7 @@ export const FREIGHTER_LOGS = Object.freeze([
 ]);
 // Recesses near broken capital hulls. Deliberately off the racing line.
 export const GRAVEYARD_CACHES = Object.freeze([
- {id:'carrier',position:at('mourning-line',[-961,857,-2262]),commodity:'electronics',quantity:2},
+ {id:'carrier',position:at('mourning-line',[-840,889,-1586]),commodity:'electronics',quantity:2},
  {id:'battleship',position:at('mourning-line',[516,-408,1997]),commodity:'gold',quantity:1},
  {id:'cruiser',position:at('mourning-line',[2911,893,-1448]),commodity:'machinery',quantity:2},
 ]);

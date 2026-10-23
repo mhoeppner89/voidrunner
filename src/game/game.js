@@ -11852,14 +11852,16 @@ export class GameSession {
         });
     }
     activeFieldObstacles(instanceId = this.activeInstanceId) {
+        const derelicts=[];
+        for(const entry of this.renderer?.derelictCollisionObstacles?.values()??[])if(entry.systemId===this.save.player.systemId)derelicts.push(...entry.obstacles);
         if (instanceId === 'shardbelt') {
             // Geometry is shared; query stamps belong to this session's grid.
             this.asteroidTerrainObstacles ??= getAsteroidTerrain().obstacles.map(obstacle => ({ ...obstacle }));
-            return [...this.asteroidFieldObstacles(this.asteroids), ...this.asteroidTerrainObstacles];
+            return [...this.asteroidFieldObstacles(this.asteroids), ...this.asteroidTerrainObstacles,...derelicts];
         }
         const regionalField = this.regionalFields?.get(instanceId);
         if (regionalField)
-            return this.asteroidFieldObstacles(regionalField);
+            return [...this.asteroidFieldObstacles(regionalField),...derelicts];
         if (instanceId === 'mourning-line') {
             const obstacles = this.graveyard.filter((piece) => piece.collidable !== false).map((piece) => {
                 const [hx, hy, hz] = piece.halfExtents;
@@ -11925,9 +11927,9 @@ export class GameSession {
                     box: { hx, hy, hz, qx: q.x, qy: q.y, qz: q.z, qw: q.w },
                 });
             }
-            return obstacles;
+            return [...obstacles,...derelicts];
         }
-        return [];
+        return derelicts;
     }
     // The player's collision envelope follows the outfitted hull: the same
     // per-hull collisionRadius the NPCs use, so an Atlas bumps at its full
@@ -12270,7 +12272,7 @@ export class GameSession {
     ensureObstacleGrid() {
         // Drifting rocks and wreckage move slowly, so the grid is rebuilt at most
         // twice a second, or immediately after switching instances.
-        if (this.obstacleGrid && this.obstacleGridInstance === this.activeInstanceId && this.save.world.time - this.obstacleGridBuiltAt < 0.5)
+        if (this.obstacleGrid && this.obstacleGridInstance === this.activeInstanceId && this.obstacleGridRevision===(this.renderer?.staticObstacleRevision??0) && this.save.world.time - this.obstacleGridBuiltAt < 0.5)
             return;
         const grid = new Map();
         const segmentGrid = new Map();
@@ -12318,6 +12320,7 @@ export class GameSession {
         this.obstacleBoxIndex = indexObstacleCells(grid, size);
         this.obstacleSegmentGrid = segmentGrid;
         this.obstacleGridInstance = this.activeInstanceId;
+        this.obstacleGridRevision=this.renderer?.staticObstacleRevision??0;
         this.obstacleGridBuiltAt = this.save.world.time;
     }
     cellKey(cx, cy, cz) {

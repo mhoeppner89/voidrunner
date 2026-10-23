@@ -1,6 +1,6 @@
 # Voidrunner
 
-A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2kw**.
+A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2kx**.
 
 All thirteen stations use architecture based on their concourse, bar and market artwork. Helix retains its tiered refinery silhouette, with 77 closely spaced pressure buildings, fully supported foundations, sealed exterior walls and six detailed glazed park courtyards on the upper deck. Its radar dishes have supported outriggers clear of the tower. Rook has a pitched armored roof, continuous lower keel, eight Cruiser batteries, sixteen capital PDCs and three downward-facing capital docking ports. Rook uses Concord navy, pale armor and brass; two frigates dock belly-up beneath short pressure collars; its small-ship entrance remains clear. Ordinary windows and utility fittings use the same scale as fitted ships and capital-ship windows. Station shells retain ten materials, one atlas and the 40,000-triangle / 2.5 MB limits. Run `npm run review:stations` and open `/output/station-review/gallery.html?revision=0.8.2kn`; each card opens the model and its artwork comparison. Refresh gallery thumbnails with `VR_PROFILES=desktop VR_VIEWS_ONLY=1 node tests/browser/station-models.mjs`.
 
@@ -11,6 +11,8 @@ Run `npm run review:discoveries` and open `/output/exploration-review/index.html
 The cockpit menu’s Cargo view shows used/total cargo mass, a fill percentage and a capacity bar, including equipment and mission cargo.
 
 Space pickups show their actual cargo/equipment icons and quantities in the own-ship monitor after any story dialogue closes. Receipts leave flight telemetry visible and do not pause flight.
+
+The Kestrel Nine derelict has collision fitted to its posed fragments and persistent fire/coolant smoke at torn faces. Carrier wreck collision retains its actual deck surfaces, and its hidden cargo sits outside an exposed deck edge.
 
 Exploration containers sit close against tunnel walls and broken hull surfaces, with clear approaches for fly-over collection. Existing saves receive the fitted positions while retaining their remaining cargo and discovery progress.
 

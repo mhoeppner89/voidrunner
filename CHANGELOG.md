@@ -1,3 +1,9 @@
+## 0.8.2kx — Solid exploration wrecks
+
+- Give the stationary Kestrel Nine fragments fitted ship/weapon collision. Invalidate the obstacle grid when their geometry becomes available; retain the wreck and collision after cargo recovery.
+- Add three persistent burning/venting damage sites with moving, cooling smoke in one GPU draw. Keep the fracture pose fixed and pause the effects with the game.
+- Rebuild carrier collision from its actual surfaces instead of decimating thin deck skins. Move the hidden carrier cargo outside an exposed deck edge and migrate existing uncollected containers without changing their contents. Warm carrier collision query structures during loading.
+
 ## 0.8.2kw — Cargo-view capacity
 
 - Show used/total cargo mass, percentage and a fill bar directly in the Cargo inventory view, including the embedded cockpit menu on phones. Count commodities, carried equipment, spare drones and mission cargo through the normal hold calculation.

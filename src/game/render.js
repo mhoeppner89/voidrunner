@@ -17,6 +17,7 @@ import {bindCarrierArmament} from './carrierModels.js';
 import {CRUISER_MOUNTS,CRUISER_ARMAMENT_COUNT} from './cruiserModelData.js';
 import {createCruiserTurret,createCruiserPdc,createCruiserEngineDamage,updateCruiserEngineDamage} from './cruiserModels.js';
 import { createShipExplosion, createHullDebris } from './explosionFx.js';
+import {derelictSurfaceObstacles,createDerelictVents} from './derelictFx.js';
 import {ShipWreckFactory} from './shipWreckFx.js';
 import { createOrdnanceModel } from './ordnanceModels.js';
 import { skipHiddenWorldMatrices, markAttributeSpan, configureShaderDiagnostics, prepareRenderScene, freezeStaticTransforms, waitForRenderWork } from './renderWork.js';
@@ -3027,10 +3028,15 @@ export class SpaceRenderer {
         const effect=this.wreckFactory.create(data.derelictSource,data.derelictActor);
         if(!effect)return;
         effect.update(5);this.scene.add(effect.object);data.derelictEffect=effect;
+        this.derelictCollisionObstacles??=new Map();
+        this.derelictCollisionObstacles.set(node.id,{systemId:node.systemId,obstacles:derelictSurfaceObstacles(effect.object,node.id)});
+        this.staticObstacleRevision=(this.staticObstacleRevision??0)+1;
+        data.derelictVents=createDerelictVents(effect.object,effect.sections);
         this.disposeObject(data.derelictSource);delete data.derelictSource;
     }
     removeCombatLootNode(id) {
-        const mesh=this.combatLootMeshes?.get(id);if(mesh){const effect=mesh.userData.derelictEffect;if(effect){this.scene.remove(effect.object);effect.dispose();}if(mesh.userData.derelictSource)this.disposeObject(mesh.userData.derelictSource);this.scene.remove(mesh);this.combatLootMeshes.delete(id);}
+        const mesh=this.combatLootMeshes?.get(id);if(mesh){mesh.userData.derelictVents?.dispose();const effect=mesh.userData.derelictEffect;if(effect){this.scene.remove(effect.object);effect.dispose();}if(mesh.userData.derelictSource)this.disposeObject(mesh.userData.derelictSource);this.scene.remove(mesh);this.combatLootMeshes.delete(id);}
+        if(this.derelictCollisionObstacles?.delete(id))this.staticObstacleRevision=(this.staticObstacleRevision??0)+1;
     }
     updateCombatLootNodes() {
         for(const mesh of this.combatLootMeshes?.values()??[]){const node=mesh.userData.lootNode;
@@ -5796,6 +5802,7 @@ export class SpaceRenderer {
         const dt = this.pendingWorldVisualDt ?? 0;
         this.pendingWorldVisualDt = 0;
         if (dt <= 0) return;
+        for(const mesh of this.combatLootMeshes?.values()??[])if(mesh.userData.derelictEffect?.object.visible)mesh.userData.derelictVents?.update(dt);
         this.updatePdcTracers(dt);
         this.updateRailPlumes(dt);
         for(const beam of this.combatBeams?.values() ?? []) {
@@ -6620,7 +6627,8 @@ export class SpaceRenderer {
     }
     disposeResources() {
         this.clearEffects();
-        for(const mesh of this.combatLootMeshes?.values()??[]){const effect=mesh.userData.derelictEffect;if(effect){this.scene.remove(effect.object);effect.dispose();}if(mesh.userData.derelictSource)this.disposeObject(mesh.userData.derelictSource);}
+        for(const mesh of this.combatLootMeshes?.values()??[]){mesh.userData.derelictVents?.dispose();const effect=mesh.userData.derelictEffect;if(effect){this.scene.remove(effect.object);effect.dispose();}if(mesh.userData.derelictSource)this.disposeObject(mesh.userData.derelictSource);}
+        this.derelictCollisionObstacles?.clear();
         this.wreckFactory?.dispose();this.wreckFactory=undefined;
         this.clearDrones();
         this.combatLootMeshes?.clear();disposeLootVisualResources(this.combatLootResources);this.combatLootResources=undefined;

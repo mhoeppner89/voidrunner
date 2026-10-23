@@ -6,6 +6,8 @@ import { t } from './i18n.js';
 import {raceBoostLayout} from './raceDynamics.js';
 import { RACE_COURSES } from './racing.js';
 import { GRAVEYARD_COLLISION_PROFILES } from './graveyardCollisionProfiles.js';
+import {prepareSurfaceMeshIndex} from './surfaceMeshCandidates.js';
+import {prepareMeshQueryIndex} from './meshQueries.js';
 import { wreckSectionDelta, GRAVEYARD_MODEL_WRECKS, generateWreckNodes, miningClaimCandidates, miningClaimName } from './missionWorldData.js';
 
 // Keep the historical worldData exports stable for game/render callers while
@@ -248,6 +250,9 @@ const scaledColliderMesh = (profileName, sectionIndex, profile, scale) => {
         radiusSq = Math.max(radiusSq, x * x + y * y + z * z);
     }
     const indices = new Uint16Array(profile.indices);
+    // The carrier retains exact deck skins. Warm their acceleration structures
+    // during world loading, rather than on the first close fly-by or shot.
+    if(profileName==='carrier'){prepareSurfaceMeshIndex(vertices,indices);prepareMeshQueryIndex(vertices,indices);}
     let minReach = Infinity;
     for (let index = 0; index < indices.length; index += 3) {
         const ia = indices[index] * 3;

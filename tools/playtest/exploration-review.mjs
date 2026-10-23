@@ -13,7 +13,7 @@ Storage.prototype.setItem=function(key,value){memory.set(String(key),String(valu
 <link rel="stylesheet" href="/output/exploration-review/review.css">
 <div id="discovery-review" role="dialog" aria-modal="true" aria-labelledby="review-title">
  <section class="review-card">
-  <header><div><p class="review-kicker">ISOLIERTER TESTFLUG · 0.8.2kw</p><h1 id="review-title">Entdeckungen & Kampfgefühl</h1></div><button id="review-resume" disabled>Weiterfliegen</button></header>
+  <header><div><p class="review-kicker">ISOLIERTER TESTFLUG · 0.8.2kx</p><h1 id="review-title">Entdeckungen & Kampfgefühl</h1></div><button id="review-resume" disabled>Weiterfliegen</button></header>
   <p id="review-status" role="status">Flugsysteme werden vorbereitet …</p>
   <div id="review-scenarios"></div>
   <footer><span>Eigener Teststand · dein Karrierespielstand bleibt unverändert.</span><span>WASD drehen · R/F Schub · Shift Nachbrenner · Leertaste feuern · J Hyperdrive</span></footer>
