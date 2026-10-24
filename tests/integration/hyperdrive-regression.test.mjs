@@ -52,6 +52,23 @@ test('HUD reads are pure, spool holds position, and manual input drops to normal
  s.updatePlayer(1/60,{...axes,yaw:.5});assert.equal(s.autopilot,false);assert.ok(Math.hypot(...s.save.player.velocity)<s.playerStats().maxSpeed*1.06);assert.equal(s.save.player.throttle,.37);
 });
 
+test('a hyperdrive leg schedules the distress pickup only when a call is due',()=>{
+ const due=flight();
+ due.save.world.distress={active:null,history:[],nextAt:0,counter:0,lastVariants:[],migrated:true};
+ due.toggleHyperdrive();
+ assert.equal(due.autopilot,true);
+ assert.ok(Number.isFinite(due.distressPickupAt),'the leg listens on the emergency band');
+ assert.ok(due.distressPickupAt>due.save.world.time,'the call arrives in flight, not at the spool');
+ const quiet=flight();
+ quiet.save.world.distress={active:null,history:[],nextAt:9e9,counter:0,lastVariants:[],migrated:true};
+ quiet.toggleHyperdrive();
+ assert.equal(quiet.distressPickupAt??null,null,'a call inside its gap is not scheduled');
+ // Dropping the leg cancels whatever was pending on it.
+ due.autopilot=false;
+ due.updateDistress();
+ assert.equal(due.distressPickupAt,null);
+});
+
 test('guided docking cannot engage hyperdrive or overwrite a safe checkpoint',()=>{const s=flight();s.playerDocking={id:'helix',launch:true};s.toggleHyperdrive();assert.notEqual(s.autopilot,true);assert.equal(s.persistSave(),true);});
 
 test('nearby hostiles no longer block or cancel a local jump',()=>{const s=flight();s.hostilesVisibleNear=()=>true;assert.equal(s.hyperdriveBlockReason(),null);s.toggleHyperdrive();assert.equal(s.autopilot,true);for(let i=0;i<90;i++){s.save.world.time+=1/60;s.updatePlayer(1/60,axes);}assert.equal(s.autopilot,true);});

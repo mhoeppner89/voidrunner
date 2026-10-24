@@ -11,7 +11,8 @@ import {
     DISTRESS_GAP_MIN, DISTRESS_GAP_MAX, DISTRESS_DISCOVER_RANGE,
     DISTRESS_RETALIATION_TIME, DISTRESS_SIGNAL_MIN_DISTANCE, DISTRESS_SIGNAL_MAX_DISTANCE,
     DISTRESS_BEACON_FAIL_RANGE,
-    distressDialogue, distressJournal, distressObjective, distressSetup, distressText, normalizeDistress,
+    distressDialogue, distressIntercept, distressJournal, distressObjective, distressSetup, distressText,
+    normalizeDistress, DISTRESS_INTERCEPT_COUNT,
 } from '../../src/game/distressData.js';
 
 function make() {
@@ -87,19 +88,25 @@ test('eight authored variants, two setups each, and an 85/15 genuine/trap split'
     assert.equal(DISTRESS_VARIANTS.find(variant => variant.id === 'trap').weight, 15);
 });
 
-test('scheduling waits for the first window, avoids the last two variants and never stacks events', () => {
+test('calls are owed only after the first window, avoid the last two variants and never stack', () => {
     const s = make();
-    const data = s.save.world.distress;
-    assert.ok(data.nextAt >= 100 + DISTRESS_FIRST_MIN && data.nextAt <= 100 + DISTRESS_FIRST_MAX);
-    data.nextAt = 100;
-    tick(s);
-    const first = data.active;
+    // Every read goes back to the save: normalizeDistress rebuilds the record.
+    const data = () => s.save.world.distress;
+    assert.ok(data().nextAt >= 100 + DISTRESS_FIRST_MIN && data().nextAt <= 100 + DISTRESS_FIRST_MAX);
+    assert.equal(s.distressPickupDue(), false, 'nothing is due inside the first window');
+    data().nextAt = 100;
+    assert.equal(s.distressPickupDue(), true);
+    s.beginDistressPickup();
+    const first = data().active;
     assert.ok(first);
-    assert.equal(data.lastVariants[0], first.variant);
-    data.nextAt = 0;
-    tick(s);
-    assert.equal(data.active.id, first.id, 'an unresolved event must not be replaced');
-    data.lastVariants = ['trap', 'wreck', 'fuel'];
+    assert.equal(first.progress.pickup, true, 'a pickup waits for the pilot to decide');
+    assert.equal(first.phase, 'signal');
+    assert.equal(data().lastVariants[0], first.variant);
+    assert.equal(s.ships.length, 0, 'nothing spawns before the call is followed');
+    data().nextAt = 0;
+    assert.equal(s.distressPickupDue(), false, 'a live call blocks the next one');
+    assert.equal(s.beginDistressPickup(), false, 'an unresolved event must not be replaced');
+    data().lastVariants = ['trap', 'wreck', 'fuel'];
     let sawOlder = false;
     for (let i = 0; i < 200; i++) {
         const picked = s.pickDistressVariant(() => i / 200);
@@ -109,17 +116,235 @@ test('scheduling waits for the first window, avoids the last two variants and ne
     assert.ok(sawOlder, 'a variant older than the two newest stays eligible');
 });
 
-test('tutorials, races, docks and nearby combat suppress a new signal', () => {
+test('calls never open in flight: only a hyperdrive leg schedules them', () => {
+    const s = make();
+    s.save.world.distress.nextAt = 0;
+    // A pilot parked in a sector is left alone however long they sit there.
+    for (let i = 0; i < 20; i++) {
+        s.save.world.time += 30;
+        tick(s);
+    }
+    assert.equal(s.save.world.distress.active, null, 'no ambient signal while flying normally');
+    // The leg itself is what schedules the pickup, and only once it is due.
+    s.autopilot = true;
+    s.distressPickupAt = s.save.world.time + 5;
+    s.save.world.time += 6;
+    tick(s);
+    assert.ok(s.save.world.distress.active, 'the leg delivers the call');
+    assert.equal(s.save.world.distress.active.progress.pickup, true);
+    // Dropping out of the drive before the timer cancels it.
+    const other = make();
+    other.save.world.distress.nextAt = 0;
+    other.autopilot = true;
+    other.distressPickupAt = other.save.world.time + 30;
+    other.autopilot = false;
+    tick(other);
+    assert.equal(other.distressPickupAt, null, 'a dropped leg clears the timer');
+    assert.equal(other.save.world.distress.active, null);
+});
+
+test('tutorials, races, docks and nearby combat suppress a call', () => {
     for (const blocked of ['race', 'dock', 'combat']) {
         const s = make();
-        s.save.world.distress.nextAt = 100;
+        s.save.world.distress.nextAt = 0;
         if (blocked === 'race') s.activeRace = {};
         if (blocked === 'dock') s.save.player.dockedAt = 'helix';
         if (blocked === 'combat') s.ships.push({id: 'hostile', hull: 10, hostile: true, position: [...s.save.player.position]});
+        assert.equal(s.distressPickupDue(), false, blocked);
+        s.autopilot = true;
+        s.distressPickupAt = s.save.world.time - 1;
         tick(s);
         assert.equal(s.save.world.distress.active, null, blocked);
-        if (blocked === 'combat') assert.ok(s.save.world.distress.nextAt > 100);
     }
+});
+
+test('following a pickup drops the leg and puts the bearing in the journal; passing keeps flying', () => {
+    const s = make();
+    s.autopilot = true;
+    s.save.world.distress.nextAt = 0;
+    s.beginDistressPickup();
+    const active = s.save.world.distress.active;
+    // The pickup card is what the pilot reads: the signal, the caller, and two
+    // choices — follow the bearing or keep flying.
+    const card = distressDialogue(active.id, s.save);
+    assert.match(dialogueText(card.nodes.main.text, 'de'), /Signal verfolgen|Peilung|abseits deiner Flugbahn/);
+    assert.deepEqual(card.nodes.main.choices.map(choice => choice.distressChoice), ['follow', 'pass']);
+    assert.equal(card.nodes.main.mission.kicker, 'FUNK · NOTRUF AUFGEFANGEN');
+    s.chooseDistress('follow');
+    assert.equal(s.autopilot, false, 'accepting leaves the drive');
+    assert.equal(s.save.world.distress.active.id, active.id);
+    assert.equal(active.progress.pickup, false);
+    assert.equal(s.save.player.currentTargetId, active.id, 'the bearing is the selected target');
+    assert.ok(s.distressWaypoint(), 'the journal can plot the signal');
+    assert.match(s.monitor ?? '', /Notruf|Konvoi|Wrack|Treibstoff|Havarie|Container|Streit/i);
+
+    const other = make();
+    other.autopilot = true;
+    other.save.world.distress.nextAt = 0;
+    other.beginDistressPickup();
+    other.chooseDistress('pass');
+    assert.equal(other.autopilot, true, 'declining keeps the drive running');
+    assert.equal(other.save.world.distress.active, null);
+    assert.ok(other.save.world.distress.nextAt >= other.save.world.time + DISTRESS_GAP_MIN);
+});
+
+test('the pickup card carries a generic mayday and nothing that gives the scenario away', () => {
+    for (const variant of DISTRESS_VARIANT_IDS) {
+        const s = make();
+        s.autopilot = true;
+        s.debugStartDistress(variant, 0, {phase: 'signal', distance: 6800, pickup: true});
+        const active = s.save.world.distress.active;
+        const setup = distressSetup(variant, 0);
+        const card = distressDialogue(active.id, s.save).nodes.main;
+        const text = dialogueText(card.text, 'de');
+        assert.ok(text.includes(distressIntercept(active)), `${variant}: the card reads the intercepted mayday`);
+        assert.ok(!text.includes(distressText(setup.signal)), `${variant}: the authored signal is not revealed in hyperdrive`);
+        assert.ok(!text.includes(distressText(setup.context)), `${variant}: the situation row is not on the intercept card`);
+        // Only the bearing: no LAGE row and no scenario name on the mission block.
+        assert.deepEqual(card.mission.rows.map(row => row.label), ['PEILUNG']);
+        assert.ok(!card.mission.title.includes('Täuschung'), `${variant}: the card does not name the variant`);
+    }
+});
+
+test('intercepted maydays are drawn at random and shared across variants', () => {
+    assert.ok(DISTRESS_INTERCEPT_COUNT >= 12, 'the pool is wide enough that a voice does not repeat');
+    const seen = new Set();
+    const variants = new Set();
+    for (let index = 0; index < 40; index++) {
+        const s = make();
+        s.autopilot = true;
+        s.save.world.time = 100 + index * 37;
+        s.save.world.distress.nextAt = 0;
+        s.beginDistressPickup();
+        const active = s.save.world.distress.active;
+        seen.add(active.intercept);
+        variants.add(active.variant);
+        s.chooseDistress('pass');
+    }
+    assert.ok(seen.size > 4, 'the same mayday does not open every call');
+    assert.ok(variants.size > 2, 'the sample covers more than one scenario');
+});
+
+test('a trap can arrive in any voice, including the calmest one', () => {
+    const voices = new Set();
+    for (let index = 0; index < 30; index++) {
+        const s = make();
+        s.autopilot = true;
+        s.save.world.time = 500 + index * 41;
+        s.debugStartDistress('trap', 0, {phase: 'signal', distance: 6800, pickup: true, intercept: index});
+        voices.add(distressIntercept(s.save.world.distress.active));
+        s.chooseDistress('pass');
+    }
+    assert.equal(voices.size, 15, 'every mayday in the pool can bait a trap');
+});
+
+test('the intercept carries no portrait; the face arrives with the scene', () => {
+    const pickup = make();
+    const calls = [];
+    pickup.ui.showStoryLine = (...args) => calls.push(args);
+    pickup.encounterPortraitForSpeaker = () => ({faction: 'independents', portraitIndex: 3});
+    pickup.autopilot = true;
+    pickup.save.world.distress.nextAt = 0;
+    pickup.beginDistressPickup();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0][4], undefined, 'no portrait faction on the intercept card');
+    assert.equal(calls[0][5], undefined, 'no portrait index on the intercept card');
+
+    // On arrival the caller gets their face — the scene is where the identity
+    // lives, so a trap cannot be spotted by its portrait in hyperdrive.
+    const s = make();
+    const arrival = [];
+    s.ui.showStoryLine = (...args) => arrival.push(args);
+    s.encounterPortraitForSpeaker = () => ({faction: 'independents', portraitIndex: 3});
+    s.debugStartDistress('convoy', 0, {phase: 'discovered', distance: 300});
+    atEvent(s);
+    tick(s);
+    assert.ok(arrival.length >= 1, 'the briefing opened');
+    const briefing = arrival.find(args => args[3] === s.save.world.distress.active.id) ?? arrival[0];
+    assert.equal(briefing[4], 'independents', 'the briefing carries the portrait');
+    assert.equal(briefing[5], 3);
+});
+
+test('a trap stays an unnamed distress call until the scan exposes it', () => {
+    const s = make();
+    s.autopilot = true;
+    s.save.world.distress.nextAt = 0;
+    s.debugStartDistress('trap', 0, {phase: 'signal', distance: 6800, pickup: true, intercept: 2});
+    const active = s.save.world.distress.active;
+    s.chooseDistress('follow');
+    // Chasing the bearing: monitor, journal and map must not name the trap.
+    assert.equal(distressText(distressObjective(active, s.save)), 'Notruf · Peilung folgen');
+    assert.equal(distressText(distressJournal(s.save)[0].title), 'Notruf');
+    assert.equal(s.distressWaypoint().name, 'Notruf');
+    // The briefing hints, but still does not label the call.
+    s.save.world.time += 1;
+    atEvent(s);
+    tick(s);
+    assert.ok(active.progress.briefedAt > 0);
+    assert.equal(distressText(distressJournal(s.save)[0].title), 'Notruf');
+    // The scan is the reveal.
+    s.chooseDistress('scan');
+    active.progress.exposed = true;
+    assert.equal(distressText(distressJournal(s.save)[0].title), 'Falscher Notruf');
+    assert.match(distressText(distressObjective(active, s.save)), /Falle offen|Funk prüfen/);
+});
+
+test('a convoy is only named once its briefing has been seen', () => {
+    const s = make();
+    s.autopilot = true;
+    s.save.world.distress.nextAt = 0;
+    s.debugStartDistress('convoy', 0, {phase: 'signal', distance: 6800, pickup: true});
+    const active = s.save.world.distress.active;
+    s.chooseDistress('follow');
+    assert.equal(distressText(distressJournal(s.save)[0].title), 'Notruf');
+    s.save.world.time += 1;
+    atEvent(s);
+    tick(s);
+    assert.ok(active.progress.briefedAt > 0);
+    assert.equal(distressText(distressJournal(s.save)[0].title), 'Konvoi unter Beschuss');
+});
+
+test('the arrival briefing continues the scene instead of replaying the mayday', () => {
+    for (const variant of DISTRESS_VARIANT_IDS) {
+        const s = make();
+        s.autopilot = true;
+        s.debugStartDistress(variant, 0, {phase: 'signal', distance: 6800, pickup: true});
+        const active = s.save.world.distress.active;
+        s.chooseDistress('follow');
+        assert.equal(active.progress.pickupFollowed, true, `${variant}: following is remembered`);
+        s.save.world.time += 1;
+        atEvent(s);
+        tick(s);
+        const arrival = dialogueText(distressDialogue(active.id, s.save).nodes.main.text, 'de');
+        assert.ok(!arrival.includes(distressIntercept(active)), `${variant}: the arrival card does not replay the mayday`);
+        assert.ok(arrival.trim().length > 20, `${variant}: the arrival card still has something to say`);
+        // A reload keeps the scene continuous: the mayday must not come back.
+        const restored = normalizeDistress({distress: JSON.parse(JSON.stringify(s.save.world.distress))});
+        assert.equal(restored.active.progress.pickupFollowed, true, `${variant}: the flag survives a reload`);
+        assert.equal(restored.active.intercept, active.intercept, `${variant}: the voice survives a reload`);
+    }
+});
+
+test('a call answered without a hyperdrive pickup still hails with its transmission', () => {
+    const s = make();
+    s.debugStartDistress('convoy', 0, {phase: 'discovered', distance: 600});
+    const active = s.save.world.distress.active;
+    const signal = distressText(distressSetup('convoy', 0).signal);
+    assert.equal(active.progress.pickupFollowed, false);
+    assert.ok(dialogueText(distressDialogue(active.id, s.save).nodes.main.text, 'de').includes(signal));
+});
+
+test('closing the pickup card passes the call instead of leaving a dead signal', () => {
+    const s = make();
+    s.autopilot = true;
+    s.save.world.distress.nextAt = 0;
+    s.beginDistressPickup();
+    assert.ok(s.save.world.distress.active);
+    // No card open: the pilot dismissed it.
+    s.ui.adventure = undefined;
+    tick(s);
+    assert.equal(s.save.world.distress.active, null);
+    assert.ok(s.save.world.distress.nextAt >= s.save.world.time + DISTRESS_GAP_MIN);
 });
 
 test('a signal is only a saved coordinate until answered, then expires without a penalty', () => {
@@ -211,6 +436,60 @@ test('convoy contact already fights, pays per surviving ship and never pays twic
     assert.equal(s.save.player.credits - before, 4000);
 });
 
+test('a convoy raider taken prisoner clears the fight and still pays', () => {
+    const s = make();
+    s.debugStartDistress('convoy', 0, {phase: 'discovered'});
+    const active = s.save.world.distress.active;
+    const pirates = s.ships.filter(ship => ship.distressRole === 'pirate');
+    assert.deepEqual(s.chooseDistress('help'), {ok: true});
+    const before = s.save.player.credits;
+    pirates[0].hull = 0;
+    // The second raider strikes its colours and is boarded, not destroyed: it
+    // keeps its hit points and is still in the scene.
+    const prisoner = pirates[1];
+    prisoner.surrendered = true;
+    prisoner.poweredDown = true;
+    prisoner.hostile = false;
+    prisoner.authorizedTarget = false;
+    tick(s);
+    assert.equal(s.save.world.distress.active, null, 'the boarding ends the engagement');
+    assert.equal(s.save.player.credits - before, 4000, 'a prisoner is as good as a kill');
+    assert.equal(s.save.world.distress.history[0].outcome, 'rescued');
+    assert.equal(prisoner.hull, 240, 'the hull was taken, not destroyed');
+    // The prize stays a prize: a reload rebuilds the raider from its saved
+    // snapshot, and that must not re-arm the boarded hull.
+    const other = make();
+    other.debugStartDistress('convoy', 0, {phase: 'discovered'});
+    const event = other.save.world.distress.active;
+    const raid = other.ships.find(ship => ship.distressRole === 'pirate');
+    raid.surrendered = true;
+    raid.poweredDown = true;
+    raid.hostile = false;
+    other.snapshotDistressActors(event);
+    other.ships.splice(other.ships.indexOf(raid), 1);
+    other.spawnDistressActors(event, other.save.world.time);
+    const rebuilt = other.ships.find(ship => ship.distressActor === raid.distressActor);
+    assert.ok(rebuilt, 'the raider is rebuilt from the snapshot');
+    assert.equal(rebuilt.hostile, false, 'a prisoner never comes back hostile');
+    assert.equal(rebuilt.poweredDown, true);
+    assert.equal(rebuilt.surrendered, true);
+});
+
+test('a swallowed trap clears with prisoners too', () => {
+    const s = make();
+    s.debugStartDistress('trap', 0, {phase: 'discovered', exposed: true});
+    const raiders = s.ships.filter(ship => ship.distressRole === 'pirate');
+    assert.ok(raiders.length > 0);
+    for (const raider of raiders) {
+        raider.surrendered = true;
+        raider.poweredDown = true;
+        raider.hostile = false;
+    }
+    tick(s);
+    assert.equal(s.save.world.distress.active, null, 'prisoners end the trap encounter');
+    assert.equal(s.save.world.distress.history[0].outcome, 'fought-off');
+});
+
 test('raiders break off their convoy victim to answer fire from the player or another ship', () => {
     const s = make();
     s.debugStartDistress('convoy', 0, {phase: 'discovered'});
@@ -288,9 +567,15 @@ test('fuel transfers deduct the stated reserve once and insufficient tanks are e
     atEvent(short);
     const oldLanguage = getLanguage();
     setLanguage('en');
-    const script = distressDialogue(short.save.world.distress.active.id, short.save);
-    assert.match(script.nodes.main.text, /only have 5 units/);
-    setLanguage(oldLanguage);
+    // The crew names the pilot's own reserve: it has to read as something a
+    // person says, not as a status line on a card.
+    let script;
+    try {
+        script = distressDialogue(short.save.world.distress.active.id, short.save);
+        assert.match(script.nodes.main.text, /running on 5 yourself/);
+    } finally {
+        setLanguage(oldLanguage);
+    }
     assert.deepEqual(script.nodes.main.choices.map(choice => choice.distressChoice), ['decline']);
     assert.deepEqual(short.chooseDistress('transfer'), {ok: false});
     assert.ok(short.save.world.distress.active);
@@ -355,10 +640,14 @@ test('a full hold explains why jettisoned cargo cannot be recovered yet', () => 
     atEvent(s);
     const oldLanguage = getLanguage();
     setLanguage('en');
-    const script = distressDialogue(s.save.world.distress.active.id, s.save);
-    assert.match(script.nodes.main.text, /hold is full/i);
-    assert.deepEqual(script.nodes.main.choices.map(choice => choice.distressChoice), ['close', 'decline']);
-    setLanguage(oldLanguage);
+    let script;
+    try {
+        script = distressDialogue(s.save.world.distress.active.id, s.save);
+        assert.match(script.nodes.main.text, /hold is full/i);
+        assert.deepEqual(script.nodes.main.choices.map(choice => choice.distressChoice), ['close', 'decline']);
+    } finally {
+        setLanguage(oldLanguage);
+    }
     assert.deepEqual(s.chooseDistress('recover'), {ok: true});
     assert.equal(s.save.world.distress.active.phase, 'discovered', 'the event waits instead of trapping the player');
 });
@@ -574,7 +863,7 @@ test('new distress signals stay 3,000–10,000 km away until the player jumps', 
     const event = make();
     event.save.player.position = [0, 0, 0];
     event.save.world.time = 100;
-    event.beginDistressSignal();
+    event.beginDistressPickup();
     const active = event.save.world.distress.active;
     assert.equal(active.phase, 'signal');
     assert.equal(event.ships.length, 0, 'a long-range signal stays quiet until contact');

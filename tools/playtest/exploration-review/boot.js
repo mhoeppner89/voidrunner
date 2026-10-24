@@ -10,7 +10,7 @@ const panel=document.querySelector('#discovery-review'),status=document.querySel
 const statePanel=document.querySelector('#review-state-panel'),statePre=document.querySelector('#review-state'),stateButton=document.querySelector('#review-state-toggle'),commsButton=document.querySelector('#review-comms'),advanceButton=document.querySelector('#review-advance'),journalButton=document.querySelector('#review-journal');
 const mode=window.__VR_REVIEW_MODE__==='distress'||new URLSearchParams(location.search).get('mode')==='distress'?'distress':'exploration';
 const scenes=[
- ['distress-convoy-arrival','Notruf · Konvoi-Ankunft','Sprung bei 500 km: Der Kanal öffnet sich mit Lage und der Wahl „Ich greife ein / Nicht mein Krieg“.'],
+ ['distress-convoy-arrival','Notruf · Konvoi-Ankunft','Sprung bei 500 km: Der Kanal öffnet sich mit Lage und der Wahl „Ich gehe rein / Nicht meine Schlacht“.'],
  ['distress-wreck-offer','Notruf · Wrack-Ankunft','Sprung bei 500 km: Das Wrack meldet sich, dann die Wahl über Fracht und Rettungskapsel.'],
  ['distress-trap-arrival','Notruf · Täuschung-Ankunft','Sprung bei 500 km: Ein sauberer Notruf. Scannen, anfliegen oder weiterfliegen — die Raider warten auf die Antwort.'],
  ['distress-fuel-arrival','Notruf · Treibstoff-Ankunft','Sprung bei 500 km: Transferbetrag und Restreserve stehen vor der Entscheidung, 8 Einheiten gegen 1.200 cr.'],
@@ -28,24 +28,28 @@ const scenes=[
  ['cache-0','Verborgene Fracht · Träger','Ein versteckter Behälter am Trägerwrack.'],
  ['cache-1','Verborgene Fracht · Schlachtschiff','Ein versteckter Behälter zwischen den Bruchstücken.'],
  ['cache-2','Verborgene Fracht · Kreuzer','Ein versteckter Behälter am Kreuzerwrack.'],
- ['distress-convoy-signal','Notruf · Konvoi-Signal','Signal auf 6.800 km. Erst Logbuch-Kurs und Hyperdrive, dann Funk.'],
+ ['distress-voice-a','Funkaufnahme · Konvoi (Stimme 7)','Ein beliebiger Notruf, kein Gesicht, keine Lage — nur Rufzeichen und Peilung. Danach wartet der beschossene Konvoi.'],
+ ['distress-voice-b','Funkaufnahme · Täuschung (gleiches Mayday)','Dieselben Worte wie der Konvoi, dahinter eine Falle. Die Karte darf sich nicht unterscheiden — erst vor Ort zeigt sich das Gesicht.'],
+ ['distress-voice-c','Funkaufnahme · Treibstoff (Stimme 2)','Andere Stimme, gleiche Karte: Rufzeichen, Mayday, Peilung. Die Treibstoffnot steht erst nach dem Sprung im Funk.'],
+ ['distress-voice-d','Funkaufnahme · Streit (Stimme 12)','Vierte Stimme im Pool. Kein „Streit“ im Text: die zwei Crews zeigen sich erst am Wrack.'],
+ ['distress-convoy-signal','Notruf · Konvoi · Funkaufnahme','Im Hyperdrive aufgefangen: Karte hält den Flug an. Signal verfolgen oder weiterfliegen — danach der Konvoi unter Beschuss.'],
  ['distress-convoy','Notruf · Konvoi (Nahaufnahme)','Nach dem Sprung: Zwei Prospektoren werden bereits beschossen. Greife ein oder fliege weiter.'],
  ['distress-convoy-partial','Notruf · Teilrettung (Nahaufnahme)','Ein Schiff ist verloren. Prüfe Zahlung und die verbleibenden Ziele.'],
  ['distress-convoy-rescued','Notruf · Konvoi gerettet','Raider ausgeschaltet. Zahlung, Logbuch und Folgen prüfen.'],
  ['distress-convoy-retaliation','Notruf · Gegenangriff (Nahaufnahme)','Ein Raider wird beschossen und bricht aus dem Konvoi aus. Prüfe Zielwechsel und Rückkehr.'],
- ['distress-wreck-signal','Notruf · Wrack-Signal','Wrack-Signal auf 6.800 km. Erst springen, dann Kontakt aufnehmen.'],
+ ['distress-wreck-signal','Notruf · Wrack · Funkaufnahme','Im Hyperdrive aufgefangen. Signal verfolgen oder weiterfliegen — danach meldet sich das Wrack.'],
  ['distress-wreck','Notruf · Wrack (Nahaufnahme)','Nach dem Sprung: Fracht und Rettungskapsel im zerstörten Frachter bergen.'],
  ['distress-wreck-ambush','Notruf · Rückkehrer (Nahaufnahme)','Die Angreifer sind zurück. Wrack bergen und Kampf bestehen.'],
- ['distress-trap-signal','Notruf · Täuschung-Signal','Ein sauberer Notruf auf 6.800 km. Erst springen, dann anfliegen und scannen.'],
+ ['distress-trap-signal','Notruf · Täuschung · Funkaufnahme','Im Hyperdrive aufgefangen: ein sauberer Notruf. Verfolgen, anfliegen — und die Signatur prüfen.'],
  ['distress-trap','Notruf · Täuschung (Nahaufnahme)','Nach dem Sprung: Scan oder Annäherung deckt die Falle auf.'],
  ['distress-trap-exposed','Notruf · Falle offen','Die Raider sind enttarnt und greifen an.'],
- ['distress-fuel-signal','Notruf · Treibstoff-Signal','Treibstoffnot auf 6.800 km. Erst springen, dann die Reserve prüfen.'],
+ ['distress-fuel-signal','Notruf · Treibstoff · Funkaufnahme','Im Hyperdrive aufgefangen: Treibstoffnot. Verfolgen und die Reserve prüfen.'],
  ['distress-fuel-prepared','Notruf · Treibstoff (Nahaufnahme)','Nach dem Sprung: Genug Reserve für den Transfer. Betrag und Rest werden vorher angezeigt.'],
  ['distress-fuel-unprepared','Notruf · Ohne Reserve (Nahaufnahme)','Zu wenig Treibstoff: die Alternative wird klar erklärt.'],
- ['distress-disabled-signal','Notruf · Havarie-Signal','Havarie-Signal auf 6.800 km. Erst springen, dann reparieren.'],
+ ['distress-disabled-signal','Notruf · Havarie · Funkaufnahme','Im Hyperdrive aufgefangen: Havarie. Verfolgen, dann mit Ersatzteilen helfen.'],
  ['distress-disabled-parts','Notruf · Ersatzteile (Nahaufnahme)','Nach dem Sprung: Zwei Maschinenteile an Bord. Übergabe prüfen.'],
  ['distress-disabled-crew','Notruf · Crew-Hilfe (Nahaufnahme)','Keine Teile und keine Drohne: langsame Crew-Reparatur anbieten.'],
- ['distress-debris-signal','Notruf · Trümmerfeld-Signal','Eingeschlossene Crew auf 6.800 km. Erst springen, dann Kurs markieren.'],
+ ['distress-debris-signal','Notruf · Geleit · Funkaufnahme','Im Hyperdrive aufgefangen: Crew im Trümmerfeld. Verfolgen, dann den Bojenkurs legen.'],
  ['distress-debris','Notruf · Eingeschlossen (Nahaufnahme)','Nach dem Sprung: Der Frachter steckt im Feld, sein Nav ist tot.'],
  ['distress-debris-route','Notruf · Bojenkurs','Angenommen: Die Bojen liegen voraus, der Frachter folgt deiner Spur.'],
  ['distress-debris-closing','Notruf · Aus der Ferne angenommen','Außerhalb der Übergabe angenommen: Der Frachter hält Position, die Sturm-Uhr steht bei 3:30 ab Übergabe.'],
@@ -53,10 +57,10 @@ const scenes=[
  ['distress-debris-hit','Notruf · Frachter getroffen','Der Frachter hat Metall berührt; Hülle und Auszahlung prüfen.'],
  ['distress-debris-jump','Notruf · Sprungkurs','Am Sprungpunkt: acht Sekunden Spulen, der Sturm läuft.'],
  ['distress-debris-lost','Notruf · Verloren','Die Sonnenfront war schneller; Wrack und Logbuch prüfen.'],
- ['distress-jettison-signal','Notruf · Fracht-Signal','Ausgesetzte Fracht auf 6.800 km. Erst springen, dann bergen.'],
+ ['distress-jettison-signal','Notruf · Fracht · Funkaufnahme','Im Hyperdrive aufgefangen: drei ausgesetzte Container. Verfolgen und bergen.'],
  ['distress-jettison','Notruf · Fracht (Nahaufnahme)','Nach dem Sprung: Drei Container bergen: zurückgeben oder behalten.'],
  ['distress-jettison-full','Notruf · Voller Laderaum (Nahaufnahme)','Der Laderaum ist voll; die Bergung muss warten.'],
- ['distress-dispute-signal','Notruf · Streit-Signal','Streit um Bergung auf 6.800 km. Erst springen, dann verhandeln.'],
+ ['distress-dispute-signal','Notruf · Streit · Funkaufnahme','Im Hyperdrive aufgefangen: zwei Crews am selben Wrack. Verfolgen und verhandeln.'],
  ['distress-dispute','Notruf · Streit (Nahaufnahme)','Nach dem Sprung: Zwei Crews, ein Wrack. Verhandeln oder Partei ergreifen.'],
  ['distress-wreck-stripped','Notruf · Wrack geplündert','Frachtraum leer, die Rettungskapsel bleibt bergbar.'],
  ['distress-wreck-survivor','Notruf · Kapsel geborgen','Überlebende als Missionsfracht; Andocken zahlt aus.'],
@@ -139,32 +143,36 @@ const distressScenes={
  'distress-disabled-arrival':['disabled',0,{phase:'discovered',distance:500,parts:2}],
  'distress-jettison-arrival':['jettison',0,{phase:'discovered',distance:500}],
  'distress-dispute-arrival':['dispute',0,{phase:'discovered',distance:500}],
- 'distress-convoy-signal':['convoy',0,{phase:'signal',distance:6800}],
+ 'distress-voice-a':['convoy',0,{phase:'signal',distance:6800,pickup:true,intercept:7}],
+ 'distress-voice-b':['trap',0,{phase:'signal',distance:6800,pickup:true,intercept:7}],
+ 'distress-voice-c':['fuel',0,{phase:'signal',distance:6800,pickup:true,intercept:2}],
+ 'distress-voice-d':['dispute',0,{phase:'signal',distance:6800,pickup:true,intercept:12}],
+ 'distress-convoy-signal':['convoy',0,{phase:'signal',distance:6800,pickup:true,intercept:0}],
  'distress-convoy':['convoy',0,{phase:'discovered',distance:620}],
  'distress-convoy-partial':['convoy',0,{phase:'involved',distance:620}],
  'distress-convoy-rescued':['convoy',0,{phase:'discovered',distance:620}],
  'distress-convoy-retaliation':['convoy',0,{phase:'involved',distance:620}],
- 'distress-wreck-signal':['wreck',0,{phase:'signal',distance:6800}],
+ 'distress-wreck-signal':['wreck',0,{phase:'signal',distance:6800,pickup:true,intercept:3}],
  'distress-wreck':['wreck',0,{phase:'discovered',distance:620}],
  'distress-wreck-offer':['wreck',0,{phase:'discovered',distance:320}],
  'distress-wreck-ambush':['wreck',1,{phase:'involved',distance:620}],
  'distress-wreck-stripped':['wreck',0,{phase:'discovered',distance:620}],
  'distress-wreck-survivor':['wreck',0,{phase:'discovered',distance:620}],
  'distress-wreck-delivered':['wreck',0,{phase:'discovered',distance:620}],
- 'distress-trap-signal':['trap',0,{phase:'signal',distance:6800}],
+ 'distress-trap-signal':['trap',0,{phase:'signal',distance:6800,pickup:true,intercept:7}],
  'distress-trap':['trap',0,{phase:'discovered',distance:420}],
  'distress-trap-scanned':['trap',0,{phase:'discovered',distance:420}],
  'distress-trap-exposed':['trap',0,{phase:'discovered',distance:420,exposed:true}],
  'distress-trap-cleared':['trap',0,{phase:'discovered',distance:420,exposed:true}],
- 'distress-fuel-signal':['fuel',0,{phase:'signal',distance:6800}],
+ 'distress-fuel-signal':['fuel',0,{phase:'signal',distance:6800,pickup:true,intercept:10}],
  'distress-fuel-prepared':['fuel',0,{phase:'discovered',distance:320,fuel:80}],
  'distress-fuel-unprepared':['fuel',0,{phase:'discovered',distance:320,fuel:5}],
  'distress-fuel-supplied':['fuel',0,{phase:'discovered',distance:320,fuel:80}],
- 'distress-disabled-signal':['disabled',0,{phase:'signal',distance:6800}],
+ 'distress-disabled-signal':['disabled',0,{phase:'signal',distance:6800,pickup:true,intercept:12}],
  'distress-disabled-parts':['disabled',0,{phase:'discovered',distance:320,parts:2}],
  'distress-disabled-crew':['disabled',0,{phase:'discovered',distance:320,parts:0}],
  'distress-disabled-repaired':['disabled',0,{phase:'discovered',distance:320,parts:0}],
- 'distress-debris-signal':['debris',0,{phase:'signal',distance:6800}],
+ 'distress-debris-signal':['debris',0,{phase:'signal',distance:6800,pickup:true,intercept:5}],
  'distress-debris':['debris',0,{phase:'discovered',distance:380}],
  'distress-debris-offer':['debris',0,{phase:'discovered',distance:380}],
  'distress-debris-closing':['debris',0,{phase:'discovered',distance:380}],
@@ -175,13 +183,13 @@ const distressScenes={
  'distress-debris-hit':['debris',0,{phase:'discovered',distance:380}],
  'distress-debris-jump':['debris',0,{phase:'discovered',distance:380}],
  'distress-debris-lost':['debris',0,{phase:'discovered',distance:380}],
- 'distress-jettison-signal':['jettison',0,{phase:'signal',distance:6800}],
+ 'distress-jettison-signal':['jettison',0,{phase:'signal',distance:6800,pickup:true,intercept:9}],
  'distress-jettison':['jettison',0,{phase:'discovered',distance:520}],
  'distress-jettison-full':['jettison',0,{phase:'discovered',distance:520,cargo:{water:999}}],
  'distress-jettison-ready':['jettison',0,{phase:'discovered',distance:520}],
  'distress-jettison-returned':['jettison',0,{phase:'discovered',distance:520}],
  'distress-jettison-kept':['jettison',0,{phase:'discovered',distance:520}],
- 'distress-dispute-signal':['dispute',0,{phase:'signal',distance:6800}],
+ 'distress-dispute-signal':['dispute',0,{phase:'signal',distance:6800,pickup:true,intercept:14}],
  'distress-dispute':['dispute',0,{phase:'discovered',distance:520}],
  'distress-dispute-negotiated':['dispute',0,{phase:'discovered',distance:520}],
  'distress-dispute-side-a':['dispute',0,{phase:'discovered',distance:520}],
@@ -189,6 +197,7 @@ const distressScenes={
 };
 const noComms=new Set([
  'distress-convoy-arrival','distress-trap-arrival','distress-fuel-arrival','distress-disabled-arrival','distress-jettison-arrival','distress-dispute-arrival',
+ 'distress-voice-a','distress-voice-b','distress-voice-c','distress-voice-d',
  'distress-convoy-signal','distress-disabled-signal','distress-wreck-signal','distress-trap-signal',
  'distress-debris-offer','distress-wreck-offer',
  'distress-fuel-signal','distress-debris-signal','distress-jettison-signal','distress-dispute-signal',
@@ -243,13 +252,25 @@ function prepareDistressScene(id){
  }
  const [variant,setup,options]=distressScenes[id]??[];
  if(!variant)return undefined;
+ // Pickup scenes are the real entry point now: the call is caught on a
+ // hyperdrive leg in open space, never beside a station. Put the ship far out
+ // along a clear vector and run the drive before the card opens.
+ const pickup=Boolean(options?.pickup);
+ if(pickup){
+  place([0,2400,-360000],[0,2400,-360001]);
+  rt.autopilot=true;rt.hyperdriveFx='active';rt.hyperdriveSpoolStartedAt=rt.save.world.time-3;
+  rt.save.player.throttle=1;rt.save.player.navTargetId='shardbelt';
+ }
  const created=rt.debugStartDistress(variant,setup,options);
  if(!created)throw Error('Notruf konnte nicht gestartet werden.'); const active=rt.save.world.distress.active;
  // The offer panel opens itself when the pilot is in comms range. Every other
  // scene wants the world view, not the card, so stamp the offer as taken.
  // Arrival scenes keep the stamp clear: their whole point is that the briefing
- // opens on its own the moment the drop lands in comms range.
- if(!/-(?:arrival|offer)$/.test(id))active.progress.briefedAt=rt.save.world.time+1e-6;
+ // opens on its own the moment the drop lands in comms range. They also mark
+ // the call as followed, because that is the only way a pilot ever arrives at
+ // one: the pickup card already carried the transmission.
+ if(!/-(?:arrival|offer)$/.test(id)&&!pickup)active.progress.briefedAt=rt.save.world.time+1e-6;
+ if(/-(?:arrival|offer)$/.test(id))active.progress.pickupFollowed=true;
 
  if(id==='distress-disabled-crew'){
   for(const unit of Object.values(rt.save.player.droneFleet?.unitsById??{}))if(unit.type==='repair'){unit.state='destroyed';unit.hull=0;}
@@ -528,11 +549,12 @@ const distressOnly=new Set([
 ]);
 const visibleScenes=mode==='distress'?scenes.filter(([id])=>id.startsWith('distress-')):scenes.filter(([id])=>!distressOnly.has(id));
 const sceneGroups={
+ pickup:'Funkaufnahme im Hyperdrive',
  arrival:'Ankunft & Briefing',
  convoy:'Konvoi unter Beschuss',wreck:'Zerstörter Frachter',trap:'Getarnte Raider',fuel:'Treibstoffnot',
  disabled:'Havarie',debris:'Trümmerfeld',jettison:'Ausgesetzte Fracht',dispute:'Streit um Bergung',history:'Folgen & Journal',
 };
-const sceneGroup=id=>/-(?:arrival|offer)$/.test(id)?sceneGroups.arrival:sceneGroups[id.split('-')[1]]??sceneGroups.history;
+const sceneGroup=id=>/-signal$|-voice-/.test(id)?sceneGroups.pickup:/-(?:arrival|offer)$/.test(id)?sceneGroups.arrival:sceneGroups[id.split('-')[1]]??sceneGroups.history;
 const sceneButton=([id,title,description])=>`<button data-scene="${id}" disabled><b>${title}</b><span>${description}</span></button>`;
 if(mode==='distress'){
  grid.innerHTML=Object.entries(sceneGroups).map(([,group])=>{

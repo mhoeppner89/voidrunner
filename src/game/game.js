@@ -1,6 +1,6 @@
 import {ExplorationMethods} from './exploration.js';
 import {DistressMethods} from './distressEvents.js';
-import {DISTRESS_ANSWER_RANGE, distressSetup, distressText, distressVariant} from './distressData.js';
+import {DISTRESS_ANSWER_RANGE, distressLabel, distressSetup, distressText} from './distressData.js';
 import { getAsteroidTerrain } from './asteroidTerrain.js';
 import { shardbeltSolidDistance, SHARDBELT_LAYOUT_VERSION } from './asteroidFieldLayout.js';
 import {RACE_HULLS,raceHull,takeRaceHull,returnRaceHull,integrateRaceTurn,integrateRaceVelocity} from './raceHulls.js';
@@ -1259,6 +1259,9 @@ export class GameSession {
     jumpCounter = 0;
     interceptCounter = 0;
     hyperdriveEncounterAt = null;
+    // Moment on this leg when the drive's emergency band picks up a distress
+    // call (see updateDistress/beginDistressPickup). Null = nothing scheduled.
+    distressPickupAt = null;
     hyperdriveEncounterCooldownUntil = 0;
     hyperdriveInterceptIds = new Set();
     hyperdriveFx = 'none';
@@ -2466,6 +2469,7 @@ export class GameSession {
         this.afterburning = false;
         this.hyperdriveFx = 'none';
         this.hyperdriveEncounterAt = null;
+        this.distressPickupAt = null;
         this.hyperdriveEncounterCooldownUntil = 0;
         this.hyperdriveInterceptIds.clear();
         this.deathTimer = 0;
@@ -4035,6 +4039,7 @@ export class GameSession {
             this.hyperdriveWaypoint=undefined;this.tutorialSurveyTrack=undefined;
             this.autopilot = false;
             this.hyperdriveEncounterAt = null;
+            this.distressPickupAt = null;
             this.hyperdriveFx = 'drop';
             this.hyperdriveFxUntil = this.save.world.time + HYPERDRIVE_FX_DURATION;
             // A manual break must shed the cruise vector as fast as every other
@@ -4060,6 +4065,8 @@ export class GameSession {
         if (this.autopilot) {
             if (this.hyperdriveEncounterAt !== null && this.save.world.time >= this.hyperdriveEncounterAt) {
                 this.hyperdriveEncounterAt = null;
+                // The ambush ends the leg: a call that was still due is gone.
+                this.distressPickupAt = null;
                 this.spawnHyperdriveIntercept();
                 this.autopilot=false;this.hyperdriveFx='interrupt';
                 this.hyperdriveFxUntil=this.save.world.time+HYPERDRIVE_INTERRUPT_DURATION;
@@ -7016,6 +7023,9 @@ export class GameSession {
     }
     disengageHyperdrive() {
         this.hyperdriveWaypoint=undefined;this.tutorialSurveyTrack=undefined;
+        // Any reason to leave the leg also cancels a call that was still due
+        // on it; the pickup itself calls this, then keeps its own record.
+        this.distressPickupAt = null;
         const cancelledGalaxyJump = Boolean(this.galaxyJump);
         if (cancelledGalaxyJump) {
             this.galaxyJump = null;
@@ -7101,6 +7111,13 @@ export class GameSession {
             const travelSeconds = HYPERDRIVE_SPOOL_SECONDS + player.distanceTo(vec(nav.position)) / HYPERDRIVE_CRUISE_SPEED;
             this.hyperdriveEncounterRegionId = nav.id;
             this.hyperdriveEncounterAt = this.save.world.time + travelSeconds * randomBetween(rng, 0.4, 0.75);
+        }
+        // A distress call arrives on the leg itself: the drive listens on the
+        // emergency band. One call per leg, never together with an ambush (the
+        // ambush breaks the leg anyway), and never while a call is already live.
+        if (!this.hyperdriveEncounterAt && this.distressPickupDue()) {
+            const travelSeconds = HYPERDRIVE_SPOOL_SECONDS + player.distanceTo(vec(nav.position)) / HYPERDRIVE_CRUISE_SPEED;
+            this.distressPickupAt = this.save.world.time + travelSeconds * randomBetween(rng, 0.3, 0.65);
         }
         }
         this.setHyperdriveStatus(t('VECTOR SET · {name}', { name: nav.name }), 3200);
@@ -14627,7 +14644,9 @@ export class GameSession {
         // the player closes to sensor range, so the map can select it.
         const distress = this.save.world.distress?.active;
         if (distress) {
-            const distressContact = buildContact('waypoint', distress.id, distressText(distressVariant(distress.variant)?.title ?? ['Notruf', 'Distress call']), `${distress.caller} · ${distressText(['NOTRUF','DISTRESS SIGNAL'])}`, distress.position, MAP_CLAIM_CONTACT_RANGE, false, false, true);
+            // The map names a call "distress signal" until the pilot is on scene:
+            // a contact labelled "Falscher Notruf" would give the trap away.
+            const distressContact = buildContact('waypoint', distress.id, distressText(distressLabel(distress)), `${distress.caller} · ${distressText(['NOTRUF','DISTRESS SIGNAL'])}`, distress.position, MAP_CLAIM_CONTACT_RANGE, false, false, true);
             if (distressContact) {
                 distressContact.distress = true;
                 distressContact.signal = distress.phase === 'signal';

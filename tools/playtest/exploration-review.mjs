@@ -1,5 +1,7 @@
 import {readFile,writeFile,mkdir,copyFile} from 'node:fs/promises';
 const out=new URL('../../output/exploration-review/',import.meta.url);await mkdir(out,{recursive:true});
+// The stand serves the live sources, so the kicker must name the live runtime.
+const version=(await readFile(new URL('../../src/game/ui.js',import.meta.url),'utf8')).match(/GAME_VERSION\s*=\s*'([^']+)'/)?.[1]??'dev';
 let html=await readFile(new URL('../../game.html',import.meta.url),'utf8');
 html=html.replace('<html lang="de">','<html lang="de" data-test-build="exploration-review">').replace('<head>','<head>\n    <base href="/">').replace('<title>Voidrunner — Frontier Adventure</title>','<title>Voidrunner — Entdeckungen testen</title>');
 html=html.replace('<script type="module" src="./src/main.js"></script>',`<script>
@@ -13,7 +15,7 @@ Storage.prototype.setItem=function(key,value){memory.set(String(key),String(valu
 <link rel="stylesheet" href="/output/exploration-review/review.css">
 <div id="discovery-review" role="dialog" aria-modal="true" aria-labelledby="review-title">
  <section class="review-card">
-  <header><div><p class="review-kicker">ISOLIERTER TESTFLUG · 0.8.2ky</p><h1 id="review-title">Entdeckungen, Notrufe & Kampfgefühl</h1></div><button id="review-resume" disabled>Weiterfliegen</button></header>
+  <header><div><p class="review-kicker">ISOLIERTER TESTFLUG · ${version}</p><h1 id="review-title">Entdeckungen, Notrufe & Kampfgefühl</h1></div><button id="review-resume" disabled>Weiterfliegen</button></header>
   <p id="review-status" role="status">Flugsysteme werden vorbereitet …</p>
   <p class="review-note">Entdeckungen, wiederkehrende Notrufe, Ressourcen und Folgen. Jede Szene startet isoliert; „Speichern/Laden“ prüft den gespeicherten Zustand.</p>
   <div id="review-scenarios"></div>

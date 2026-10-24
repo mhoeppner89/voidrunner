@@ -7,6 +7,7 @@
 import {CONVOY_POSITION} from './explorationData.js';
 import {cargoFree} from './economy.js';
 import {getLanguage} from './i18n.js';
+import {seededRandom} from './random.js';
 
 export const distressText = text => Array.isArray(text) ? text[getLanguage() === 'de' ? 0 : 1] : text;
 
@@ -17,6 +18,44 @@ export const DISTRESS_FIRST_MAX = 420;
 export const DISTRESS_GAP_MIN = 360;
 export const DISTRESS_GAP_MAX = 600;
 export const DISTRESS_SIGNAL_TIMEOUT = 600;
+// What the emergency band actually carries. A call picked up in hyperdrive is a
+// mayday, not a mission brief: the same fifteen voices serve every variant, so
+// nothing in the transmission says whether the source is a wounded freighter, a
+// convoy under fire or a trap. Only the intercept is random — the scenario is
+// already decided, and it stays hidden until the ship drops out at the source.
+export const DISTRESS_INTERCEPTS = Object.freeze([
+    ['Mayday, mayday. Wir treiben antriebslos. Ist da jemand auf dieser Frequenz?',
+        'Mayday, mayday. We are drifting without power. Is anyone on this frequency?'],
+    ['Hier ist ein ziviler Frachter. Unsere Systeme fallen nacheinander aus. Ich wiederhole: Wir brauchen Hilfe.',
+        'This is a civilian freighter. Our systems are failing one after another. I repeat: we need help.'],
+    ['Notruf auf offener Frequenz. Wir haben unsere Position verloren. Bitte meldet euch.',
+        'Distress call on an open frequency. We have lost our position. Please respond.'],
+    ['Ist da wer? Der große Sender ist tot — ich weiß nicht, wie weit das hier trägt.',
+        'Is anyone there? The main transmitter is dead — I do not know how far this carries.'],
+    ['SOS. Zwei von uns sind verletzt, und wir kommen aus eigener Kraft nicht mehr weg.',
+        'SOS. Two of us are hurt, and we cannot get out under our own power.'],
+    ['An alle Schiffe im Sektor: Wir brauchen einen Schlepper oder ein paar geschickte Hände. Zahle, was ich habe.',
+        'To any ship in the sector: we need a tow or a few steady hands. Paying what I have.'],
+    ['Mayday … (Rauschen) … wir halten noch, aber nicht mehr lange.',
+        'Mayday … (static) … we are holding, but not for much longer.'],
+    ['Hier die Restcrew. Antrieb tot, Lebenserhaltung auf Reserve. Bitte, irgendwer.',
+        'This is the surviving crew. Drive dead, life support on reserve. Please, anyone.'],
+    ['Notruf. Wir sind keine Gefahr — wir sind nur kaputt. Bitte kommt näher.',
+        'Distress call. We are no threat — we are just broken. Please come closer.'],
+    ['Wir treiben seit Stunden hier draußen. Hat uns jemand auf dem Schirm?',
+        'We have been drifting out here for hours. Does anyone have us on scope?'],
+    ['Mayday. Die Brücke ist dicht, der Rest ist Schrott. Holt uns hier raus.',
+        'Mayday. The bridge is sealed, the rest is scrap. Get us out of here.'],
+    ['An jeden in Reichweite: Wir zahlen für Treibstoff, Teile oder einen Schlepp. Alles, was ihr habt.',
+        'To anyone in range: we pay for fuel, parts or a tow. Whatever you have.'],
+    ['Notruf, zivile Kennung. Unser Reaktor läuft heiß, und wir wissen nicht, wie lange noch.',
+        'Distress call, civilian ident. Our reactor is running hot and we do not know for how long.'],
+    ['Notruf. Wir haben alles abgeschaltet, was Strom zieht. Bitte, wir brauchen jemanden.',
+        'Distress call. We shut down everything that draws power. Please, we need someone.'],
+    ['Ich habe noch Luft für ein paar Stunden. Danach ist es egal. Bitte beeilt euch.',
+        'I have a few hours of air left. After that it does not matter. Please hurry.'],
+]);
+export const DISTRESS_INTERCEPT_COUNT = DISTRESS_INTERCEPTS.length;
 export const DISTRESS_REWARD_PER_SURVIVOR = 2000;
 export const DISTRESS_ANSWER_RANGE = 1400;
 export const DISTRESS_DISCOVER_RANGE = 2400;
@@ -367,6 +406,10 @@ function normalizeActive(raw) {
         id: /^distress-[a-z0-9-]{1,32}$/.test(String(raw.id ?? '')) ? String(raw.id) : `distress-${Math.floor(finite(raw.createdAt, 0))}`,
         variant, setup,
         seed: finite(raw.seed, 1),
+        // Which mayday the drive picked up. Older records have no field, so the
+        // index is derived from the seed instead of defaulting every legacy call
+        // to the same voice.
+        intercept: normalizeIntercept(raw.intercept, raw.seed, raw.createdAt),
         systemId: shortString(raw.systemId, 32) || 'helios-verge',
         instanceId: shortString(raw.instanceId, 32) || undefined,
         position,
@@ -405,6 +448,10 @@ function normalizeActive(raw) {
             // The arrival briefing is shown once per event; a reload must not
             // pop the same card in the pilot's face again.
             briefedAt: finite(raw.progress?.briefedAt, 0),
+            // The pilot already read the transmission on the hyperdrive leg, so
+            // the card that opens on arrival continues the scene instead of
+            // replaying the same mayday word for word.
+            pickupFollowed: raw.progress?.pickupFollowed === true,
             lastProgressAt: finite(raw.progress?.lastProgressAt, now),
         },
         survivors: {
@@ -512,7 +559,26 @@ export function normalizeDistress(world) {
     return result;
 }
 
-export function createDistressRecord({counter, variant, setup, seed, position, systemId, instanceId, now, caller, vessel}) {
+const clampIntercept = value => Math.max(0, Math.min(DISTRESS_INTERCEPT_COUNT - 1, Number(value) | 0));
+const normalizeIntercept = (value, seed, createdAt) => Number.isFinite(Number(value))
+    ? clampIntercept(value)
+    : clampIntercept(Math.floor(seededRandom(`${Number(seed) || 1}:intercept:${Number(createdAt) || 0}`)() * DISTRESS_INTERCEPT_COUNT));
+export const distressIntercept = active => distressText(DISTRESS_INTERCEPTS[normalizeIntercept(active?.intercept, active?.seed, active?.createdAt)] ?? DISTRESS_INTERCEPTS[0]);
+
+// Only the location reveals what the call really was. A trap stays "a distress
+// call" on the monitor, the map and in the journal until the scan or the
+// approach exposes it; every other variant is revealed by its briefing card.
+export const distressRevealed = active => {
+    if (!active) return false;
+    if (active.phase === 'involved' || active.phase === 'resolved') return true;
+    if (active.variant === 'trap') return active.progress?.exposed === true;
+    return Boolean(active.progress?.briefedAt);
+};
+export const distressLabel = active => distressRevealed(active)
+    ? distressVariant(active?.variant)?.title ?? ['Notruf', 'Distress call']
+    : ['Notruf', 'Distress call'];
+
+export function createDistressRecord({counter, variant, setup, seed, position, systemId, instanceId, now, caller, vessel, intercept}) {
     const data = distressSetup(variant, setup);
     const number = Math.max(1, Number(counter) | 0);
     return {
@@ -523,6 +589,7 @@ export function createDistressRecord({counter, variant, setup, seed, position, s
         instanceId,
         position: [...position],
         phase: 'signal',
+        intercept: normalizeIntercept(intercept, seed, now),
         caller: caller || data.caller,
         vessel: vessel || distressText(data.vessel),
         createdAt: now,
@@ -533,7 +600,7 @@ export function createDistressRecord({counter, variant, setup, seed, position, s
         objectives: {},
         progress: {
             scanRevealed: false, exposed: false, betrayed: false, prefight: false, repaired: 0,
-            escapeAt: 0, briefedAt: 0, lastProgressAt: now,
+            escapeAt: 0, briefedAt: 0, pickupFollowed: false, lastProgressAt: now,
             // Debris escort: the projected route and the storm clock. The trail
             // itself is runtime-only on the ship, never saved.
             route: [], exitYaw: 0, escortAt: 0, joinedAt: 0, burstAt: 0, burstStage: 0,
@@ -556,6 +623,9 @@ const clock = seconds => `${Math.floor(Math.max(0, seconds) / 60)}:${String(Math
 
 export function distressObjective(active, save) {
     if (!active) return ['', ''];
+    // Until the pilot is on scene the call is just a bearing; naming the
+    // variant here would announce a trap from the cockpit glass.
+    if (!distressRevealed(active)) return ['Notruf · Peilung folgen', 'Distress call · follow the bearing'];
     const data = distressSetup(active.variant, active.setup);
     const alive = (active.actors ?? []).filter(actor => !actor.destroyed && actor.hull > 0);
     switch (active.variant) {
@@ -636,7 +706,70 @@ export function distressObjective(active, save) {
 
 export function distressOpenLine(active) {
     const data = distressSetup(active.variant, active.setup);
-    return distressText(data.signal);
+    return distressText(active.progress?.pickupFollowed ? arrivalLine(active) : data.signal);
+}
+
+// The first card a pilot sees is the transmission itself, picked up on a
+// hyperdrive leg. Repeating it verbatim once the ship drops out reads as a bug,
+// so the arrival briefing opens with a word from the scene instead: the caller
+// noticing the ship, the recording running dry, the standoff getting a witness.
+// Nobody announces the state of the fight — a crew under fire shouts, it does
+// not narrate its own battle.
+function arrivalLine(active) {
+    const speaker = `${call(active)}: `;
+    switch (active.variant) {
+        case 'convoy':
+            return [`${speaker}„Beeil dich, sie greifen an!“`,
+                `${speaker}“Hurry, they are attacking!”`];
+        case 'wreck':
+            return ['Kein offener Kanal, nur die Aufzeichnung — und ein Rumpf, der noch warm ist.',
+                'No live channel, only the recording — and a hull that is still warm.'];
+        case 'trap':
+            return [`${speaker}„Oh. Du bist schneller hier, als ich dachte.“`,
+                `${speaker}“Oh. You got here faster than I expected.”`];
+        case 'fuel':
+            return [`${speaker}„Da bist du ja. Ich dachte schon, hier hört uns keiner.“`,
+                `${speaker}“There you are. I was starting to think no one was listening.”`];
+        case 'disabled':
+            return [`${speaker}„Du hast angehalten. Gut. Allein bekommen wir die Maschine nicht mehr an.“`,
+                `${speaker}“You stopped. Good. We are not getting this engine back on our own.”`];
+        case 'debris':
+            return [`${speaker}„Du bist in Sicht. Sag mir, dass du dich in diesem Feld auskennst.“`,
+                `${speaker}“We have you in sight. Tell me you know your way through this field.”`];
+        case 'jettison':
+            return [`${speaker}„Die Container sind deine, wenn du sie kriegst. Keiner von uns kommt noch ran.“`,
+                `${speaker}“The containers are yours if you can reach them. None of us can anymore.”`];
+        case 'dispute':
+            return [`${speaker}„Endlich ein Dritter. Vielleicht hört jetzt einer zu.“`,
+                `${speaker}“Finally a third party. Maybe someone will listen now.”`];
+        default:
+            return ['Der Notruf ist noch auf dem Kanal.', 'The call is still on the channel.'];
+    }
+}
+
+// What the scene says after the opener. A followed call pairs this with the
+// arrival line; a call answered straight from the journal pairs it with the
+// transmission, so the same card reads correctly either way. Variants whose
+// branch writes its own second paragraph (fuel, disabled) return nothing here.
+function sceneTail(active) {
+    switch (active.variant) {
+        case 'wreck':
+            return ['Der Frachtraum ist noch versiegelt.', 'The hold is still sealed.'];
+        case 'trap':
+            return ['Die Stimme ist ruhig. Zu ruhig für einen Havaristen.',
+                'The voice is calm. Too calm for a ship in distress.'];
+        case 'debris':
+            return ['Komm längsseits, dann wirf deine Bojen — wir hängen uns an deine Spur.',
+                'Come alongside, drop your beacons, and we will follow your trail.'];
+        case 'jettison':
+            return ['Wir wissen, was da drin ist. Bring sie trotzdem zurück.',
+                'We know what is inside them. Bring them back anyway.'];
+        case 'dispute':
+            return ['Sie sind bewaffnet, ich auch. Geschossen hat noch keiner.',
+                'They are armed, so am I. No one has fired yet.'];
+        default:
+            return undefined;
+    }
 }
 
 export function distressOutcomeText(entry) {
@@ -668,7 +801,7 @@ export function distressJournal(save) {
         const active = data.active;
         const objective = distressObjective(active, save);
         rows.push({
-            title: distressText(distressVariant(active.variant)?.title ?? ['Notruf', 'Distress call']),
+            title: distressText(distressLabel(active)),
             text: `${active.caller} · ${distressText(objective)}`,
             actions: [
                 {id: 'navigate', label: ['Kurs setzen', 'Set course']},
@@ -710,10 +843,44 @@ export function distressDialogue(conversationId, save) {
     const script = baseScript(active);
     const node = script.nodes.main;
     const blocked = resourceBlocked(save, active);
+
     const player = save.player;
     const fuel = Math.floor(Number(player.fuel) || 0);
     const cargo = player.cargo ?? {};
+    // A pilot who followed the bearing on a hyperdrive leg has already read the
+    // transmission; every "discovered" card below opens with the arrival beat
+    // instead of the same mayday a second time. The comms log uses the same
+    // line, so the channel does not show the transmission twice either.
+    const opener = distressOpenLine(active);
+    const scene = [opener, distressText(sceneTail(active))].filter(Boolean).join('\n\n');
     const distance = Math.hypot(player.position[0] - active.position[0], player.position[1] - active.position[1], player.position[2] - active.position[2]);
+
+    // A call picked up on a hyperdrive leg opens before the ship has dropped
+    // out: the pilot hears the transmission on the emergency band and decides
+    // whether to leave the leg now. The scenario card still comes on arrival.
+    if (active.progress?.pickup) {
+        // A generic mayday, never the authored situation: the caller, the words
+        // and the bearing are all the pilot gets until the ship arrives.
+        const source = distressIntercept(active);
+        const km = Math.round(distance).toLocaleString(getLanguage() === 'de' ? 'de-DE' : 'en-US');
+        node.text = [
+            `${call(active)}: „${source}“\n\nDie Quelle liegt abseits deiner Flugbahn.`,
+            `${call(active)}: “${source}”\n\nThe source sits off your flight path.`,
+        ];
+        node.choices = [
+            choice(['Signal verfolgen.','Follow the signal.'], 'follow'),
+            choice(['Weiterfliegen.','Keep flying.'], 'pass'),
+        ];
+        // No situation row and no portrait on an intercepted call: either one
+        // would tell the pilot what is waiting at the source — and a trap caller
+        // would look exactly like a wounded freighter on the radio.
+        node.mission = {
+            kicker: ['FUNK · NOTRUF AUFGEFANGEN', 'COMMS · DISTRESS CALL INTERCEPTED'],
+            title: active.caller,
+            rows: [{label: ['PEILUNG', 'BEARING'], value: `${km} km`}],
+        };
+        return localize(script);
+    }
 
     if (blocked) {
         node.text = ['Nur noch Rauschen. Komm näher ran, dann können wir reden.', 'Nothing but static. Get closer and we can talk.'];
@@ -728,16 +895,17 @@ export function distressDialogue(conversationId, save) {
             if (active.phase === 'involved') {
                 const total = data.victims ?? 0;
                 const safe = (active.actors ?? []).filter(actor => actor.role !== 'pirate' && !actor.destroyed && actor.hull > 0).length;
-                node.text = [`${call(active)}: „Sie lassen nicht locker. Wir halten die Köpfe unten, aber ewig geht das nicht.“\n\nNoch ${safe} von ${total} Frachtern.`,
-                    `${call(active)}: “They are not letting up. We are keeping our heads down, but we cannot do this forever.”\n\n${safe} of ${total} mules left.`];
+                // A roster that has not been snapshotted yet knows nobody alive;
+                // "0 of 2 left" would be a lie spoken by a survivor.
+                const headcount = safe > 0 && total > 0 ? (safe === total ? ` Wir sind noch ${safe}.` : ` Wir sind nur noch ${safe} von ${total}.`) : '';
+                node.text = [`${call(active)}: „Sie lassen nicht locker. Wir halten die Köpfe unten, aber ewig geht das nicht.${headcount}“`,
+                    `${call(active)}: “They are not letting up. We keep our heads down, but this cannot last.${headcount ? (safe === total ? ` We are still ${safe}.` : ` We are down to ${safe} of ${total}.`) : ''}”`];
                 node.choices = [
                     choice(['Ich bleibe an ihnen.','I am staying on them.'], 'close'),
                     choice(['Ich muss raus.','I have to break off.'], 'withdraw'),
                 ];
             } else {
-                const flock = (data.victims ?? 0) > 1 ? 'Die Frachter feuern nicht zurück.' : 'Der Frachter feuert nicht zurück.';
-                node.text = [`${distressText(data.signal)}\n\nEin Pirat dreht schon wieder ein. ${flock}`,
-                    `${distressText(data.signal)}\n\nOne raider is already coming around again. ${(data.victims ?? 0) > 1 ? 'The mules are not shooting back.' : 'The freighter is not shooting back.'}`];
+                node.text = scene;
                 node.choices = [
                     choice(['Ich gehe rein.','I am going in.'], 'help'),
                     choice(['Nicht meine Schlacht.','Not my fight.'], 'decline'),
@@ -751,13 +919,12 @@ export function distressDialogue(conversationId, save) {
             const pods = Math.max(0, (active.survivors?.total ?? 0) - (active.survivors?.rescued ?? 0));
             if (active.phase === 'involved') {
                 const cargoLine = remaining > 0 ? `Im Frachtraum liegen noch ${remaining} Einheiten.` : 'Der Frachtraum ist leer.';
-                const podLine = pods > 0 ? 'Neben dem Rumpf treibt noch eine Kapsel.' : 'Die Kapsel ist geborgen.';
-                node.text = [`${call(active)} ist längst eine Aufzeichnung. ${cargoLine} ${podLine}`,
-                    `${call(active)} is only a recording now. ${remaining > 0 ? `There are still ${remaining} units in the hold.` : 'The hold is empty.'} ${pods > 0 ? 'One pod is still drifting beside the hull.' : 'The pod is recovered.'}`];
+                const podLine = pods > 0 ? 'Neben dem Rumpf treibt eine Kapsel.' : 'Die Kapsel ist geborgen.';
+                node.text = [`${cargoLine} ${podLine}`,
+                    `${remaining > 0 ? `There are still ${remaining} units in the hold.` : 'The hold is empty.'} ${pods > 0 ? 'One pod is still drifting beside the hull.' : 'The pod is recovered.'}`];
                 node.choices = [choice(['Ich räume das Wrack.','I am stripping the wreck.'], 'close'), choice(['Ich lasse es liegen.','I am leaving it.'], 'withdraw')];
             } else {
-                node.text = [`${distressText(data.signal)}\n\nDie Aufzeichnung läuft auf Schleife. Der Frachtraum ist noch versiegelt.`,
-                    `${distressText(data.signal)}\n\nThe recording is looping. The hold is still sealed.`];
+                node.text = scene;
                 node.choices = [
                     choice(['Ich sehe mir das Wrack an.','I will take a look at the wreck.'], 'accept'),
                     choice(['Nicht mein Wrack.','Not my wreck.'], 'decline'),
@@ -767,15 +934,14 @@ export function distressDialogue(conversationId, save) {
         }
         case 'trap': {
             if (active.progress?.exposed) {
-                node.text = [`${distressText(data.clue)}\n\nDie Piraten fahren die Waffen hoch.`,
-                    `${distressText(data.clue)}\n\nThe raiders are bringing their weapons up.`];
+                node.text = [`${distressText(data.clue)}\n\n${call(active)}: „Überraschung. Hände weg von den Waffen.“`,
+                    `${distressText(data.clue)}\n\n${call(active)}: “Surprise. Hands off your guns.”`];
                 node.choices = [
                     choice(['Dann eben so.','Fine. Let us do this.'], 'fight'),
                     choice(['Ich bin weg.','I am gone.'], 'withdraw'),
                 ];
             } else {
-                node.text = [`${distressText(data.signal)}\n\nDie Stimme ist ruhig. Zu ruhig für einen Havaristen.`,
-                    `${distressText(data.signal)}\n\nThe voice is calm. Too calm for a ship in distress.`];
+                node.text = scene;
                 node.choices = [
                     choice(['Sensorcheck.','Run a sensor check.'], 'scan'),
                     choice(['Ich komme näher.','I am coming closer.'], 'expose'),
@@ -787,12 +953,14 @@ export function distressDialogue(conversationId, save) {
         case 'fuel': {
             const enough = fuel >= data.fuel;
             const payment = data.payment.toLocaleString(getLanguage() === 'de' ? 'de-DE' : 'en-US');
-            const fuelWord = data.fuel === 6 ? 'Sechs' : data.fuel === 8 ? 'Acht' : String(data.fuel);
+            // The crew reads the pilot's tank off the transponder; saying it in
+            // their own voice keeps the card a conversation instead of a status
+            // readout.
             node.text = enough
-                ? [`${distressText(data.signal)}\n\nDu hast ${fuel} Einheiten an Bord. ${fuelWord} davon abzugeben tut nicht weh.`,
-                    `${distressText(data.signal)}\n\nYou have ${fuel} units aboard. Giving up ${data.fuel} of them will not hurt.`]
-                : [`${distressText(data.signal)}\n\nDu hast nur ${fuel} Einheiten. ${fuelWord} abzugeben heißt, dass du selbst liegen bleibst.`,
-                    `${distressText(data.signal)}\n\nYou only have ${fuel} units. Giving up ${data.fuel} would leave you stranded too.`];
+                ? [`${opener}\n\nDu hast ${fuel} im Tank — ${data.fuel} davon tun dir nicht weh. Gib sie mir, und ich bin hier raus.`,
+                    `${opener}\n\nYou are carrying ${fuel} — ${data.fuel} of them will not hurt you. Hand them over and I am out of here.`]
+                : [`${opener}\n\nDu hast selbst nur ${fuel}. Behalte sie — ich will nicht, dass du auch hier festsitzt.`,
+                    `${opener}\n\nYou are running on ${fuel} yourself. Keep them — I do not want you stuck out here too.`];
             node.choices = enough ? [
                 choice([`${data.fuel} Einheiten abgeben · ${payment} cr.`, `Hand over ${data.fuel} units · ${payment} cr.`], 'transfer'),
                 choice(['Ohne Bezahlung — schenken.','No payment — make it a gift.'], 'donate'),
@@ -804,10 +972,10 @@ export function distressDialogue(conversationId, save) {
             const hasParts = (cargo.machinery ?? 0) >= data.parts;
             const partCount = data.parts === 1 ? 'eine' : data.parts === 2 ? 'zwei' : String(data.parts);
             const partLine = hasParts
-                ? (data.parts === 1 ? 'Du hast die eine Einheit an Bord.' : `Du hast die ${partCount} Einheiten an Bord.`)
-                : (data.parts === 1 ? 'Eine Einheit Ersatzteile fehlt dir.' : `${partCount.charAt(0).toUpperCase() + partCount.slice(1)} Einheiten Ersatzteile fehlen dir.`);
-            node.text = [`${distressText(data.signal)}\n\n${partLine} Eine Reparaturdrohne tut es auch — oder du kommst selbst rüber und hältst die Hände still.`,
-                `${distressText(data.signal)}\n\n${hasParts ? `You have the ${data.parts === 1 ? 'one unit' : `${data.parts} units`} aboard.` : `You are ${data.parts === 1 ? 'one unit' : `${data.parts} units`} short.`} A repair drone would do it too — or you come aboard and keep your hands steady.`];
+                ? (data.parts === 1 ? 'Du hast die eine Einheit an Bord, oder?' : `Du hast die ${partCount} Einheiten an Bord, oder?`)
+                : (data.parts === 1 ? 'Ich brauche eine Einheit Ersatzteile, und ich habe keine.' : `Ich brauche ${partCount} Einheiten Ersatzteile, und ich habe keine.`);
+            node.text = [`${opener}\n\n${partLine} Eine Reparaturdrohne tut es auch — oder du kommst selbst rüber und hältst die Hände still.`,
+                `${opener}\n\n${hasParts ? `You have the ${data.parts === 1 ? 'one unit' : `${data.parts} units`} aboard, right?` : `I need ${data.parts === 1 ? 'one unit' : `${data.parts} units`} of parts, and I have none.`} A repair drone would do it too — or you come aboard and keep your hands steady.`];
             node.choices = [
                 ...(hasParts ? [choice([`${data.parts === 1 ? 'Eine Einheit' : `${data.parts} Einheiten`} Ersatzteile abgeben.`, `Hand over ${data.parts === 1 ? 'one unit' : `${data.parts} units`} of parts.`], 'parts')] : []),
                 ...(hasRepairDrone(save) ? [choice(['Reparaturdrohne schicken.','Send a repair drone.'], 'drone')] : []),
@@ -849,8 +1017,7 @@ export function distressDialogue(conversationId, save) {
             } else {
                 const payment = data.payment.toLocaleString(getLanguage() === 'de' ? 'de-DE' : 'en-US');
                 const clean = Math.round(data.payment * DISTRESS_ESCORT_CLEAN_BONUS).toLocaleString(getLanguage() === 'de' ? 'de-DE' : 'en-US');
-                node.text = [`${distressText(data.signal)}\n\nUnser Nav ist tot — der Rechner hat den Treffer nicht überlebt. Wir sehen das Feld, aber wir können keinen Kurs daraus rechnen. Komm längsseits, dann wirf deine Bojen; wir hängen uns an deine Spur.`,
-                    `${distressText(data.signal)}\n\nOur nav is dead — the computer did not survive the hit. We can see the field, but we cannot plot a course through it. Come alongside, then drop your beacons; we will follow your trail.`];
+                node.text = scene;
                 node.mission = {
                     kicker: ['MISSION · GELEITSCHUTZ', 'MISSION · ESCORT'],
                     title: ['Geleit durch das Trümmerfeld', 'Escort through the debris'],
@@ -874,8 +1041,8 @@ export function distressDialogue(conversationId, save) {
             const holds = data.containers.every(entry => (cargo[entry.commodity] ?? 0) >= entry.quantity);
             const free = Math.max(0, Math.floor(cargoFree(save.player)));
             if (active.phase === 'involved') {
-                node.text = [`${remaining > 0 ? 'Die Container treiben noch draußen.' : holds ? 'Du hast die Container an Bord. Rückgabe oder behalten?' : 'Dir fehlt ein Teil der Fracht.'}`,
-                    `${remaining > 0 ? 'The containers are still out there.' : holds ? 'You have the containers aboard. Hand them over or keep them?' : 'You are missing part of the cargo.'}`];
+                node.text = [`${call(active)}: „${remaining > 0 ? 'Die Container treiben noch da draußen.' : holds ? 'Du hast alles beisammen. Bringst du es zurück?' : 'Da fehlt noch ein Teil. Wir warten.'}“`,
+                    `${call(active)}: “${remaining > 0 ? 'The containers are still out there.' : holds ? 'You have all of it. Are you bringing it back?' : 'Some of it is still missing. We are waiting.'}”`];
                 node.choices = [
                     ...(holds ? [choice([`Fracht zurückgeben · ${data.returnPayment.toLocaleString(getLanguage() === 'de' ? 'de-DE' : 'en-US')} cr.`, `Hand over cargo · ${data.returnPayment.toLocaleString(getLanguage() === 'de' ? 'de-DE' : 'en-US')} cr.`], 'handover')] : []),
                     ...(remaining === 0 ? [choice(['Behalten.','Keep it.'], 'keep')] : []),
@@ -883,9 +1050,8 @@ export function distressDialogue(conversationId, save) {
                     choice(['Ich fliege weiter.','I am moving on.'], 'withdraw'),
                 ];
             } else {
-                const room = free >= 1 ? '' : ['\n\nDein Laderaum ist voll. Schaff Platz und komm wieder.', '\n\nYour hold is full. Make room and come back.'];
-                node.text = [`${distressText(data.signal)}\n\nDie Prämie deckt den Wert nicht — und die Crew weiß das.${distressText(room)}`,
-                    `${distressText(data.signal)}\n\nThe reward does not cover the value — and the crew knows it.${distressText(room)}`];
+                const room = free >= 1 ? '' : ['\n\nDein Laderaum ist voll — schaff Platz und komm wieder.', '\n\nYour hold is full — make room and come back.'];
+                node.text = `${scene}${distressText(room)}`;
                 node.choices = [
                     ...(free >= 1 ? [choice(['Ich bringe sie zurück.','I will bring them back.'], 'recover'),
                         choice(['Ich behalte sie.','I am keeping them.'], 'keep')] : [choice(['Ich schaffe erst Platz.','I will make room first.'], 'close')]),
@@ -907,15 +1073,14 @@ export function distressDialogue(conversationId, save) {
             if (active.phase === 'involved') {
                 const backed = active.progress?.side === 'side-b' ? rivalName : active.caller;
                 const enemy = active.progress?.side === 'side-b' ? active.caller : rivalName;
-                node.text = [`${backed} bleibt in Deckung. ${enemy} hat die Waffen oben und kommt auf dich zu.`,
-                    `${backed} stays under cover. ${enemy} has its guns up and is coming for you.`];
+                node.text = [`${backed}: „Wir bleiben unten. ${enemy} kommt auf dich zu — Waffen oben.“`,
+                    `${backed}: “We are staying down. ${enemy} is coming for you — guns up.”`];
                 node.choices = [
                     choice(['Ich nehme sie auseinander.','I will take them apart.'], 'close'),
                     choice(['Ich ziehe mich zurück.','I am pulling out.'], 'withdraw'),
                 ];
             } else {
-                node.text = [`${distressText(data.signal)}\n\nBeide sind bewaffnet. Geschossen hat noch keiner.`,
-                    `${distressText(data.signal)}\n\nBoth are armed. Neither has fired.`];
+                node.text = scene;
                 node.choices = [
                     {label: ['Ich höre mir beide an.','I will hear both sides.'], next: 'accounts'},
                     ...decisions,
@@ -935,7 +1100,10 @@ export function distressDialogue(conversationId, save) {
             node.choices = [choice(['Verstanden.','Understood.'], 'close')];
     }
     if (active.progress?.betrayed) {
-        node.text = ['Die Crew hat den Funk abgeschaltet. Die Zahlung ist entzogen.', 'The crew has cut the channel. The payment is withdrawn.'];
+        // The forfeit has to come out of the crew's mouth; a card that reads
+        // "payment withdrawn" is a receipt, not a transmission.
+        node.text = [`${call(active)}: „Wir haben alles mitgehört. Kein Geld — und ruf nicht wieder an.“`,
+            `${call(active)}: “We heard all of it. No money — and do not call again.”`];
         node.choices = [choice(['Verstanden.','Understood.'], 'close')];
     }
     // Every call opens with the same scenario card: who is transmitting and

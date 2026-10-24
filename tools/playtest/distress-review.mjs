@@ -2,6 +2,8 @@ import {readFile,writeFile,mkdir,copyFile} from 'node:fs/promises';
 const out=new URL('../../output/distress-review/',import.meta.url);
 await mkdir(out,{recursive:true});
 const build=Date.now().toString(36);
+// The stand serves the live sources, so the kicker must name the live runtime.
+const version=(await readFile(new URL('../../src/game/ui.js',import.meta.url),'utf8')).match(/GAME_VERSION\s*=\s*'([^']+)'/)?.[1]??'dev';
 let html=await readFile(new URL('../../game.html',import.meta.url),'utf8');
 html=html.replace('<html lang="de">','<html lang="de" data-test-build="distress-review">').replace('<head>','<head>\n    <base href="/">').replace('<title>Voidrunner — Frontier Adventure</title>','<title>Voidrunner — Notrufe prüfen</title>');
 html=html.replace('<script type="module" src="./src/main.js"></script>',`<script>
@@ -16,9 +18,9 @@ Storage.prototype.setItem=function(key,value){memory.set(String(key),String(valu
 <link rel="stylesheet" href="/output/distress-review/review.css?v=${build}">
 <div id="discovery-review" role="dialog" aria-modal="true" aria-labelledby="review-title">
  <section class="review-card">
-  <header><div><p class="review-kicker">ISOLIERTER TESTFLUG · 0.8.2ld</p><h1 id="review-title">Notrufe & Folgen prüfen</h1></div><button id="review-resume" disabled>Weiterfliegen</button></header>
+  <header><div><p class="review-kicker">ISOLIERTER TESTFLUG · ${version}</p><h1 id="review-title">Notrufe & Folgen prüfen</h1></div><button id="review-resume" disabled>Weiterfliegen</button></header>
   <p id="review-status" role="status">Flugsysteme werden vorbereitet …</p>
-  <p class="review-note">Szenen für alle acht Varianten. Jede Variante beginnt mit einer Signal-Szene auf 6.800 km: Logbuch-Kurs setzen, J springen — beim Drop öffnet sich der Kanal von selbst. Die Gruppe „Ankunft & Briefing“ setzt direkt nach dem Sprung bei 500 km an: Lageschild, Funktext und die Entscheidung, bevor die Welt weiterläuft. Die „Nahaufnahme“-Szenen setzen mitten im Szenario an und prüfen Kampf, Ressourcen, Ausgänge und Folgen. Jede Szene startet isoliert; „Speichern/Laden“ prüft den gespeicherten Zustand. „Funk“, „Logbuch“ und „Status“ liegen in der Werkzeugleiste.</p>
+  <p class="review-note">Szenen für alle acht Varianten. „Funkaufnahme im Hyperdrive“ setzt mitten im Sprung an: Der Notruf hält den Flug an, die Karte zeigt Rufzeichen, Mayday und Peilung — kein Porträt, keine Lage, damit weder Gesicht noch Situation die Art des Notrufs verrät. Die Stimmen kommen aus einem gemeinsamen Pool, den jeder Szenariotyp nutzt: „Stimme 7“ liegt beim Konvoi und bei der Täuschung wortgleich auf dem Kanal. Die Gruppe „Ankunft & Briefing“ setzt direkt nach dem Absprung bei 500 km an: dort erscheinen Porträt, Lageschild, Funktext und die Entscheidung, bevor die Welt weiterläuft. Die „Nahaufnahme“-Szenen setzen mitten im Szenario an und prüfen Kampf, Ressourcen, Ausgänge und Folgen. Jede Szene startet isoliert; „Speichern/Laden“ prüft den gespeicherten Zustand. „Funk“, „Logbuch“ und „Status“ liegen in der Werkzeugleiste.</p>
   <div id="review-scenarios"></div>
   <footer><span>Eigener Teststand · dein Karrierespielstand bleibt unverändert.</span><span>Werkzeugleiste: Szenen · Neustart · Laden · Funk · +10 s · Logbuch · Status · Ton</span></footer>
  </section>

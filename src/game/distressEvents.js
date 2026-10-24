@@ -18,9 +18,9 @@ import {
     DISTRESS_GAP_MAX, DISTRESS_GAP_MIN, DISTRESS_REPAIR_RANGE, DISTRESS_RETALIATION_TIME,
     DISTRESS_REWARD_PER_SURVIVOR, DISTRESS_SIGNAL_MAX_DISTANCE, DISTRESS_SIGNAL_MIN_DISTANCE,
     DISTRESS_SIGNAL_TIMEOUT,
-    DISTRESS_TRANSFER_RANGE, DISTRESS_TRANSFER_SPEED, DISTRESS_VARIANTS, createDistressRecord,
-    distressObjective, distressOpenLine, distressRoster, distressSetup, distressText,
-    distressVariant, normalizeDistress,
+    DISTRESS_INTERCEPT_COUNT, DISTRESS_TRANSFER_RANGE, DISTRESS_TRANSFER_SPEED, DISTRESS_VARIANTS, createDistressRecord,
+    distressIntercept, distressLabel, distressObjective, distressOpenLine, distressRoster,
+    distressSetup, distressText, distressVariant, normalizeDistress,
 } from './distressData.js';
 
 const near = (a, b, radius) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) <= radius;
@@ -62,6 +62,11 @@ const nowOf = session => Number(session.save?.world?.time) || 0;
 const eventWrecks = (session, active) => Object.values(session.save.world.combatWrecks ?? {}).filter(entry => entry.distressEventId === active.id);
 const eventShip = (session, active, key) => session.ships.find(ship => ship.distressEventId === active.id && ship.distressActor === key);
 const liveEventShips = (session, active, filter = () => true) => session.ships.filter(ship => ship.distressEventId === active.id && ship.hull > 0 && filter(ship));
+// A hull that struck its colours or was taken as a prize is out of the fight
+// even though it still has hit points. Boarding a raider must count exactly
+// like killing it, or the event never resolves and the reward is never paid.
+const outOfFight = ship => !ship || ship.hull <= 0 || ship.surrendered === true || ship.captured === true || ship.poweredDown === true;
+const eventRaiders = (session, active) => session.ships.filter(ship => ship.distressEventId === active.id && ship.distressRole === 'pirate' && !outOfFight(ship));
 
 function archive(session, active, outcome, reward) {
     const data = session.save.world.distress;
@@ -160,6 +165,7 @@ export const DistressMethods = {
             data.nextAt = nowOf(this) + DISTRESS_FIRST_MIN + rng() * (DISTRESS_FIRST_MAX - DISTRESS_FIRST_MIN);
         }
         this.distressTickAt = 0;
+        this.distressPickupAt = null;
     },
 
     distressEligible() {
@@ -170,8 +176,10 @@ export const DistressMethods = {
         return true;
     },
 
-    distressBlocked() {
-        if (!this.distressEligible() || this.autopilot) return true;
+    // Is there room for a new call right now? Autopilot is deliberately absent:
+    // calls are picked up mid-hyperdrive, so the drive must not disqualify them.
+    distressSectorBusy() {
+        if (!this.distressEligible()) return true;
         if (this.ui?.adventure || this.ui?.isModalOpen) return true;
         if (this.activeMug?.()) return true;
         if (this.save.world.exploration?.finale === 'fighting' && this.ships.some(ship => ship.explorationGroup === 'salvagers' && ship.hull > 0)) return true;
@@ -280,48 +288,121 @@ export const DistressMethods = {
         return pool[pool.length - 1].id;
     },
 
-    beginDistressSignal() {
+    // Is a call owed to this pilot, and can the sector take one?
+    distressPickupDue() {
+        if (this.distressSectorBusy()) return false;
+        // Read-only check on purpose: normalizing here would replace the save's
+        // distress object on every look, invalidating references held by the
+        // caller (and by the leg that scheduled the pickup).
         const data = this.save.world.distress;
+        if (data?.active) return false;
+        return nowOf(this) >= Math.max(0, Number(data?.nextAt) || 0);
+    },
+
+    // A distress call is picked up on a hyperdrive leg, not while flying a
+    // sector: the drive listens on the emergency band. The leg schedules the
+    // moment (see toggleHyperdrive), this opens the call itself as a card that
+    // pauses the flight: follow the bearing (drop out of the drive) or keep
+    // flying. Nothing spawns in the world until the pilot decides.
+    beginDistressPickup() {
+        if (this.save.world.distress?.active || this.distressSectorBusy()) return false;
+        const data = normalizeDistress(this.save.world);
         const now = nowOf(this);
         const rng = seededRandom(`${this.save.world.seed}:distress:${data.counter + 1}:${Math.floor(now)}`);
         const variant = this.pickDistressVariant(rng);
         const setupIndex = Math.floor(rng() * distressVariant(variant).setups.length);
         const seed = Math.floor(rng() * 0x7fffffff) || 1;
         const position = this.distressSignalPosition(rng);
+        // Which mayday the emergency band carried is independent of what is
+        // waiting out there, so the words never give the scenario away.
+        const intercept = Math.floor(rng() * DISTRESS_INTERCEPT_COUNT);
         const active = createDistressRecord({
-            counter: data.counter + 1, variant, setup: setupIndex, seed, position,
+            counter: data.counter + 1, variant, setup: setupIndex, seed, position, intercept,
             systemId: this.save.player.systemId, instanceId: this.activeInstanceId,
             now, caller: undefined, vessel: undefined,
         });
+        active.progress.pickup = true;
+        active.progress.pickupAt = now;
         data.counter += 1;
         data.active = active;
         data.nextAt = 0;
         data.lastVariants = [variant, ...(data.lastVariants ?? []).filter(entry => entry !== variant)].slice(0, 3);
-        const setup = distressSetup(variant, setupIndex);
         this.distressPreloadHulls(active);
-        this.ui?.pushEvent?.(distressText([`Notruf empfangen · ${active.caller}`, `Distress signal received · ${active.caller}`]), 'warning', 5600, distressText(distressVariant(variant).title));
-        this.ui?.pushSensor?.(distressText(['Ein Notruf wurde aufgezeichnet. Koordinaten im Bordlogbuch.', 'A distress call was logged. Coordinates are in the ship journal.']), 'info', 5600);
-        const portrait = this.encounterPortraitForSpeaker?.(active.caller, undefined, active);
-        this.ui?.showStoryLine?.(active.caller, distressText(setup.signal), 'neutral', undefined, portrait?.faction, portrait?.portraitIndex);
+        // The card is the call: opening it pauses the flight, so the pilot
+        // reads the transmission before the drive carries them past it. No
+        // portrait — a face would identify the caller before the ship arrives.
+        this.ui?.showStoryLine?.(active.caller, distressIntercept(active), 'neutral', active.id);
         this.audio?.play?.('warning');
         this.persistSave?.();
+        return true;
+    },
+
+    // The pickup card is the only way in. Closing it without choosing keeps the
+    // drive running, so the call is passed rather than left hanging in the
+    // journal as an unreachable signal.
+    distressPickupOpen() {
+        const active = this.save.world.distress?.active;
+        return Boolean(active?.progress?.pickup && this.ui?.adventure?.conversationId === active.id);
+    },
+
+    followDistressPickup(active) {
+        if (!active?.progress?.pickup) return false;
+        active.progress.pickup = false;
+        active.progress.pickupAt = 0;
+        // The transmission has been read: the card that opens on arrival must
+        // continue the scene, not replay the same mayday.
+        active.progress.pickupFollowed = true;
+        active.progress.lastProgressAt = nowOf(this);
+        active.nextReminderAt = nowOf(this) + 90;
+        // Leaving the leg is the acceptance: the ship drops out where it is,
+        // the bearing goes on the board and the pilot jumps the rest of the way.
+        this.disengageHyperdrive();
+        this.save.player.currentTargetId = active.id;
+        this.updateAssetWarmup?.(true);
+        this.setDistressMonitor(active);
+        this.setHyperdriveStatus?.(distressText(['PEILUNG ÜBERNOMMEN · LOG SIEHT DEN KURS', 'BEARING TAKEN · JOURNAL HAS THE COURSE']), 4200);
+        this.ui?.pushSensor?.(distressText(['Peilung übernommen. Koordinaten im Logbuch, Sprung mit J.', 'Bearing taken. Coordinates are in the journal, jump with J.']), 'info', 5600);
+        this.ui?.pushEvent?.(distressText([`Notruf aufgenommen · ${active.caller}`, `Distress call logged · ${active.caller}`]), 'warning', 5200, distressText(distressLabel(active)));
+        this.persistSave?.();
+        return true;
+    },
+
+    passDistressPickup(active) {
+        const data = this.save.world.distress;
+        if (!active || data?.active?.id !== active.id) return false;
+        data.active = null;
+        data.nextAt = nowOf(this) + DISTRESS_GAP_MIN + seededRandom(`${active.seed}:gap:${active.id}`)() * (DISTRESS_GAP_MAX - DISTRESS_GAP_MIN);
+        this.setDistressMonitor?.(null);
+        this.persistSave?.();
+        return true;
     },
 
     updateDistress() {
-        if (!this.distressEligible()) return;
         const now = nowOf(this);
+        // The leg's pickup timer only means anything while the drive runs; a
+        // dropped or finished leg must not fire the call later.
+        if (this.distressPickupAt !== null && this.distressPickupAt !== undefined) {
+            if (!this.autopilot || this.galaxyJump) this.distressPickupAt = null;
+            else if (now >= this.distressPickupAt) {
+                this.distressPickupAt = null;
+                this.beginDistressPickup();
+                return;
+            }
+        }
+        if (!this.distressEligible()) return;
         if (now < (this.distressTickAt ?? 0)) return;
         this.distressTickAt = now + 0.5;
         const data = this.save.world.distress ?? normalizeDistress(this.save.world);
         this.sweepDistressLeavers(now);
         const active = data.active;
-        if (!active) {
-            if (now < data.nextAt) return;
-            if (this.distressBlocked()) {
-                data.nextAt = now + 45;
-                return;
-            }
-            this.beginDistressSignal();
+        // Calls are never spawned into the sector any more: they are picked up
+        // on a hyperdrive leg (beginDistressPickup). A pilot who stays put is
+        // left alone.
+        if (!active) return;
+        if (active.progress?.pickup) {
+            // The sim is frozen while the card is open, so reaching this line
+            // means the panel was closed: the call was passed.
+            if (!this.distressPickupOpen()) this.passDistressPickup(active);
             return;
         }
         if (active.systemId !== this.save.player.systemId
@@ -458,9 +539,17 @@ export const DistressMethods = {
                     ship.poweredDown = true;
                 }
             }
-            const hostile = entry.role === 'pirate' && (active.variant !== 'trap' || active.progress?.exposed === true);
+            // A prisoner stays a prisoner across a reload: re-arming the hull
+            // here would undo the boarding the pilot already paid for.
+            const prisoner = snapshot?.surrendered === true;
+            const hostile = !prisoner && entry.role === 'pirate' && (active.variant !== 'trap' || active.progress?.exposed === true);
             ship.hostile = hostile;
             ship.authorizedTarget = hostile;
+            if (prisoner) {
+                ship.surrendered = true;
+                ship.poweredDown = true;
+                ship.standingDown = true;
+            }
             if (entry.neutral) {
                 ship.hostile = false;
                 ship.authorizedTarget = false;
@@ -502,7 +591,7 @@ export const DistressMethods = {
                 ship.authorizedTarget = false;
                 ship.velocity.fill(0);
             }
-            if (active.variant === 'convoy' && entry.role === 'pirate') {
+            if (active.variant === 'convoy' && entry.role === 'pirate' && !prisoner) {
                 ship.hostile = true;
                 ship.authorizedTarget = true;
                 ship.poweredDown = false;
@@ -728,6 +817,10 @@ export const DistressMethods = {
     },
 
     setDistressMonitor(active) {
+        if (!active) {
+            this.setMonitorStatus?.('', 0);
+            return;
+        }
         this.setMonitorStatus?.(distressText(distressObjective(active, this.save)), 600000);
     },
 
@@ -923,7 +1016,9 @@ export const DistressMethods = {
             return;
         }
         if (active.variant === 'convoy') {
-            const raiders = liveEventShips(this, active, ship => ship.distressRole === 'pirate');
+            // Captured or surrendered raiders count as cleared, exactly like
+            // the ones the pilot shot down.
+            const raiders = eventRaiders(this, active);
             const victims = liveEventShips(this, active, ship => ship.distressRole !== 'pirate');
             if (active.phase === 'involved' && raiders.length === 0 && victims.length > 0) {
                 const reward = victims.length * DISTRESS_REWARD_PER_SURVIVOR;
@@ -946,7 +1041,7 @@ export const DistressMethods = {
             return;
         }
         if (active.variant === 'wreck') {
-            const raiders = liveEventShips(this, active, ship => ship.distressRole === 'pirate');
+            const raiders = eventRaiders(this, active);
             const wrecks = eventWrecks(this, active).filter(wreck => wreck.contents?.length);
             // Survivor pods stay collectible after the wreck is stripped; the
             // event itself closes once the manifest and any ambushers are done.
@@ -965,9 +1060,9 @@ export const DistressMethods = {
                 if (now - active.createdAt > 900) this.abandonDistress(active, 'withdrawn');
                 return;
             }
-            const raiders = liveEventShips(this, active, ship => ship.distressRole === 'pirate');
+            const raiders = eventRaiders(this, active);
             if (raiders.length === 0) {
-                this.finishDistress(active, 'fought-off', {reward: 0, message: ['Die Raider sind ausgeschaltet.', 'The raiders are down.']});
+                this.finishDistress(active, 'fought-off', {reward: 0, message: ['Die Raider sind aus dem Gefecht.', 'The raiders are out of the fight.']});
                 return;
             }
             if (now - active.createdAt > 600) this.abandonDistress(active, 'withdrawn');
@@ -1011,7 +1106,7 @@ export const DistressMethods = {
                 this.abandonDistress(active, 'failed', ['Die unterstützte Crew ist ausgefallen.', 'The crew you backed is down.']);
                 return;
             }
-            if (active.progress.sided && (!enemy || enemy.hull <= 0 || distance(enemy.position, active.position) > 9000)) {
+            if (active.progress.sided && (outOfFight(enemy) || distance(enemy.position, active.position) > 9000)) {
                 this.finishDistress(active, 'settled', {reward: 0, message: ['Der Streit ist entschieden.', 'The dispute is decided.']});
                 return;
             }
@@ -1165,6 +1260,18 @@ export const DistressMethods = {
         };
         const keepOpen = () => ({ok: true});
         switch (choice) {
+            // The hyperdrive pickup card: leave the leg for the bearing, or
+            // stay on course and let the call go.
+            case 'follow': {
+                if (!active.progress?.pickup) return {ok: false};
+                this.followDistressPickup(active);
+                return {ok: true};
+            }
+            case 'pass': {
+                if (!active.progress?.pickup) return {ok: false};
+                this.passDistressPickup(active);
+                return {ok: true};
+            }
             case 'help': {
                 if (active.variant !== 'convoy' || active.progress.betrayed) return {ok: false};
                 if (active.phase === 'signal') this.discoverDistress(active, now);
@@ -1772,7 +1879,7 @@ export const DistressMethods = {
         if (!active || !player || player.dockedAt || this.arena || this.activeRace) return undefined;
         if (player.systemId !== active.systemId || player.currentTargetId !== active.id) return undefined;
         if (active.instanceId && this.activeInstanceId && active.instanceId !== this.activeInstanceId) return undefined;
-        const title = distressText(distressVariant(active.variant)?.title ?? ['Notruf', 'Distress call']);
+        const title = distressText(distressLabel(active));
         return {
             id: active.id,
             kind: 'waypoint',
@@ -1827,6 +1934,7 @@ export const DistressMethods = {
         const active = createDistressRecord({
             counter: (data.counter ?? 0) + 1, variant, setup, seed: options.seed ?? 424242,
             position, systemId: this.save.player.systemId, instanceId: this.activeInstanceId, now,
+            intercept: options.intercept,
         });
         data.counter = (data.counter ?? 0) + 1;
         const setupData = distressSetup(variant, setup);
@@ -1838,6 +1946,11 @@ export const DistressMethods = {
         }
         if (options.betrayed) active.progress.betrayed = true;
         if (options.deadline) active.deadline = now + options.deadline;
+        if (options.pickup) {
+            // Review/probe entry point for the hyperdrive pickup card.
+            active.progress.pickup = true;
+            active.progress.pickupAt = now;
+        }
         data.active = active;
         data.nextAt = 0;
         if (targetPhase !== 'signal') {
@@ -1873,8 +1986,14 @@ export const DistressMethods = {
         }
         if (options.rescued) active.survivors.rescued = Math.min(active.survivors.total, options.rescued);
         this.snapshotDistressActors(active);
-        this.setDistressMonitor(active);
+        // A pickup has no objective yet: the card is the whole event until the
+        // pilot decides to follow the bearing.
+        if (!options.pickup) this.setDistressMonitor(active);
         this.persistSave?.();
+        if (options.pickup) {
+            // Same card the game opens: a generic mayday, no portrait.
+            this.ui?.showStoryLine?.(active.caller, distressIntercept(active), 'neutral', active.id);
+        }
         return {id: active.id, variant, setup, phase: active.phase, position: [...position]};
     },
 };
