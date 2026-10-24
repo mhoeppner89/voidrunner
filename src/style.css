@@ -14900,10 +14900,23 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .adventure-dialogue { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; padding: 6px 6px 4px; }
 .adventure-dialogue h2 { flex-shrink: 0; margin: 0 0 12px; font: 600 clamp(20px, 2.5vw, 30px)/1.15 var(--pixel-font); color: #f3d285; letter-spacing: .02em; }
 .adventure-speech { margin: 0 0 18px; font-size: clamp(16px, 1.7vw, 22px); line-height: 1.5; max-width: 64ch; }
-.adventure-choices { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
+/* Sticky so a long brief or speech never pushes the decision below the fold:
+   the reply buttons stay reachable on a phone in landscape. */
+.adventure-choices { display: flex; flex-direction: column; gap: 6px; margin-top: auto; position: sticky; bottom: 0; z-index: 1; padding-top: 8px; background: #030b16f2; }
 .adventure-choices button { text-align: left; font-size: 16px; line-height: 1.35; background: #071725db; }
 .adventure-choices button::before { content: '›'; display: inline-block; width: 18px; color: #f1cf76; }
 .adventure-choices button.is-visited { color: #acc0c8; }
+.adventure-choices button.is-primary { color: #ffe9a8; border-color: #f3d285; background: #12333f; }
+.adventure-choices button.is-primary::before { content: '▸'; color: #ffd24a; }
+/* Mission terms for the distress escort: the offer has to read as a contract
+   with a clock, not as another line of barter. */
+.adventure-mission { flex-shrink: 0; margin: 0 0 14px; padding: 10px 12px; border: 1px solid #657583; border-left: 3px solid #f3d285; background: #071725cc; }
+.adventure-mission-kicker { margin: 0 0 3px; color: #b3d5da; font-size: 11px; letter-spacing: .14em; }
+.adventure-mission h3 { margin: 0 0 8px; font: 600 17px/1.2 var(--pixel-font); color: #f3d285; }
+.adventure-mission dl { margin: 0; display: grid; gap: 5px; }
+.adventure-mission dl div { display: grid; grid-template-columns: minmax(72px, .26fr) minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.adventure-mission dt { color: #8fb0b9; font-size: 11px; letter-spacing: .08em; }
+.adventure-mission dd { margin: 0; color: #f1ece0; font-size: 14px; line-height: 1.35; }
 .adventure-panel .adventure-history { align-self: flex-end; flex-shrink: 0; margin-top: 8px; padding: 6px 9px; min-height: 36px; font-size: 13px; color: #afccd5; background: transparent; border-color: transparent; }
 .adventure-transcript { overflow-y: auto; font-size: 16px; line-height: 1.5; }
 .adventure-transcript p { margin: 0 0 16px; }
@@ -14914,6 +14927,10 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   .adventure-stage { grid-template-columns: minmax(0, 30fr) minmax(0, 70fr); gap: 18px; }
   .adventure-dialogue h2 { margin-bottom: 7px; font-size: 22px; }
   .adventure-speech { font-size: 16px; line-height: 1.35; margin-bottom: 10px; }
+  .adventure-mission { margin-bottom: 8px; padding: 7px 9px; }
+  .adventure-mission h3 { font-size: 15px; margin-bottom: 6px; }
+  .adventure-mission dd { font-size: 13px; }
+  .adventure-mission dl { gap: 3px; }
   .adventure-choices { gap: 4px; }
   .adventure-choices button { padding: 7px 10px; }
 }

@@ -162,6 +162,7 @@ function transferWreckEntry(session,wreck,entryId,bulk){
  node.remaining=wreck.contents.reduce((n,e)=>n+(e.quantity??1),0);session._statsDirty=true;
  if(!node.remaining&&!wreck.derelict){delete session.save.world.combatWrecks[wreck.id];session.wreckNodes.splice(session.wreckNodes.indexOf(node),1);session.renderer?.removeCombatLootNode?.(node.id);if(session.save.player.currentTargetId===node.id)session.save.player.currentTargetId=undefined;}
  session.onExplorationLoot?.(wreck);
+ session.onDistressLoot?.(wreck);
  return {ok:true,code:'Recovered into cargo.'};
 }
 

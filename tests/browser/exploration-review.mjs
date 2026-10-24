@@ -2,9 +2,9 @@ import {chromium,webkit,devices} from 'playwright';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {isolateBrowserProfiles} from '../helpers/browser-profiles.mjs';
-await isolateBrowserProfiles(import.meta.url,['desktop','iphone']);
+await isolateBrowserProfiles(import.meta.url,['desktop','android','iphone']);
 const out='output/exploration-review/checks',base=process.env.VR_BASE_URL??'http://127.0.0.1:4192';await mkdir(out,{recursive:true});
-for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1440,height:900}}],['iphone',webkit,devices['iPhone 13 landscape']]]){
+for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1440,height:900}}],['android',chromium,devices['Pixel 7 landscape']],['iphone',webkit,devices['iPhone 13 landscape']]]){
  if(!process.env.VR_PROFILES?.split(',').includes(name))continue;
  const browser=await engine.launch({headless:true,...(engine===chromium?{executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--no-sandbox','--disable-gpu-sandbox','--mute-audio','--use-gl=angle','--use-angle=swiftshader']}:{})});let page;const errors=[];
  try{
@@ -15,7 +15,7 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heig
   page=await context.newPage();page.setDefaultTimeout(120000);page.on('pageerror',e=>errors.push(e.stack));page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});
   await page.goto(base+'/output/exploration-review/index.html');await page.waitForFunction(()=>window.discoveryReview?.ready);
   const press=async locator=>device.isMobile?locator.tap():locator.click();
-  assert.equal(await page.locator('[data-scene]').count(),12);assert.equal(await page.locator('[data-scene]:disabled').count(),0);
+  assert.equal(await page.locator('[data-scene]').count(),28);assert.equal(await page.locator('[data-scene]:disabled').count(),0);
   assert.ok(await page.locator('#discovery-review').isVisible());
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`${out}/${name}-menu.png`});
   const select=async id=>{console.log(name,'scene',id);if(await page.locator('#discovery-review').getAttribute('hidden')!==null)await press(page.locator('#review-menu'));await press(page.locator(`[data-scene="${id}"]`));await page.waitForFunction(id=>window.discoveryReview?.error||discoveryReview?.ready&&discoveryReview.scene===id,id);assert.equal(await page.evaluate(()=>discoveryReview.error),undefined);};
@@ -34,7 +34,16 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heig
    if(id.startsWith('cache-'))await collect(['carrier','battleship','cruiser'][Number(id.slice(6))]);
    if(id==='salvage'){await collect('finale');assert.equal(await page.evaluate(()=>discoveryReview.snapshot().finale),'won');}
   }
-  await select('convoy');assert.match(await page.locator('.adventure-speech').innerText(),/Lantern/);await press(page.locator('[data-ui-command="adventure-choice"]').first());assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ships.filter(s=>s.explorationGroup==='convoy').length),4);
+  await select('distress-convoy-signal');assert.equal(await page.evaluate(()=>discoveryReview.snapshot().distress.active.phase),'signal');assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ships.filter(s=>s.distressActor).length),0,'an unanswered signal spawns no actors');
+  assert.ok(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().radarContacts().some(c=>c.distress)),'the signal appears on radar');assert.ok(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().buildNavigationMapModel().contacts.some(c=>c.distress)),'the signal appears on the nav map');
+  const signalNav=await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime(),contact=r.buildNavigationMapModel().contacts.find(c=>c.distress);r.selectTarget(contact.kind,contact.id);return{target:r.save.player.currentTargetId,destination:r.hyperdriveDestination()?.id,distance:contact.distance};});assert.equal(signalNav.target,signalNav.destination,'selecting the signal locks it as the hyperdrive destination');
+  await select('distress-convoy');assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ships.filter(s=>s.distressActor).length),4);
+  for(const id of ['distress-wreck','distress-trap','distress-fuel-prepared','distress-disabled-parts','distress-debris','distress-jettison','distress-dispute']){
+   await select(id);const choices=await page.locator('[data-ui-command="adventure-choice"]').count();assert.ok(choices>=2,`${id} opens two or more comms choices`);
+  }
+  await select('distress-trap');await press(page.locator('[data-ui-command="adventure-choice"]').first());assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().save.world.distress.active.progress.exposed),true);assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ships.filter(s=>s.distressRole==='pirate').length),2,'exposing the trap reveals its raiders');
+  await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();r.ships.find(s=>s.distressRole!=='pirate').hull=37;r.distressTickAt=0;r.updateDistress();});await press(page.locator('#review-reload'));await page.waitForFunction(()=>discoveryReview.ready);assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ships.find(s=>s.distressRole!=='pirate').hull),37,'save/reload keeps damaged rescue actors');
+  await select('distress-fuel-prepared');assert.equal(await page.locator('[data-ui-command="adventure-choice"]').count(),3);await press(page.locator('[data-ui-command="adventure-choice"]').first());assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().save.player.fuel),72);assert.equal(await page.evaluate(()=>discoveryReview.snapshot().distress.active),null,'fuel transfer settles once');
   await select('feedback');
   await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime(),play=r.audio.playCockpit.bind(r.audio);window.reviewCues=[];r.audio.playCockpit=(effect,...args)=>{reviewCues.push(effect);return play(effect,...args);};});
   for(const cue of ['shield','hull','collapse','target','empty'])await press(page.locator(`[data-feedback="${cue}"]`));

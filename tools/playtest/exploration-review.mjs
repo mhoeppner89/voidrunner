@@ -13,14 +13,15 @@ Storage.prototype.setItem=function(key,value){memory.set(String(key),String(valu
 <link rel="stylesheet" href="/output/exploration-review/review.css">
 <div id="discovery-review" role="dialog" aria-modal="true" aria-labelledby="review-title">
  <section class="review-card">
-  <header><div><p class="review-kicker">ISOLIERTER TESTFLUG · 0.8.2kx</p><h1 id="review-title">Entdeckungen & Kampfgefühl</h1></div><button id="review-resume" disabled>Weiterfliegen</button></header>
+  <header><div><p class="review-kicker">ISOLIERTER TESTFLUG · 0.8.2ky</p><h1 id="review-title">Entdeckungen, Notrufe & Kampfgefühl</h1></div><button id="review-resume" disabled>Weiterfliegen</button></header>
   <p id="review-status" role="status">Flugsysteme werden vorbereitet …</p>
+  <p class="review-note">Entdeckungen, wiederkehrende Notrufe, Ressourcen und Folgen. Jede Szene startet isoliert; „Speichern/Laden“ prüft den gespeicherten Zustand.</p>
   <div id="review-scenarios"></div>
   <footer><span>Eigener Teststand · dein Karrierespielstand bleibt unverändert.</span><span>WASD drehen · R/F Schub · Shift Nachbrenner · Leertaste feuern · J Hyperdrive</span></footer>
  </section>
 </div>
 <nav id="review-toolbar" aria-label="Teststeuerung" hidden>
- <button id="review-menu">Testauswahl</button><button id="review-restart">↻ Neustart</button><button id="review-next" hidden>Nächster Fund</button><button id="review-sound" aria-pressed="false">Ton: aus</button>
+ <button id="review-menu">Testauswahl</button><button id="review-restart">↻ Neustart</button><button id="review-reload">Speichern/Laden</button><button id="review-next" hidden>Nächster Fund</button><button id="review-sound" aria-pressed="false">Ton: aus</button>
 </nav>
 <div id="feedback-controls" hidden aria-label="Kampf-Rückmeldung testen">
  <button data-feedback="shield">Schildtreffer</button><button data-feedback="hull">Hüllentreffer</button><button data-feedback="collapse">Schildausfall</button><button data-feedback="target">Zielschildausfall</button><button data-feedback="empty">Energie leer</button>

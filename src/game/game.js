@@ -1,4 +1,6 @@
 import {ExplorationMethods} from './exploration.js';
+import {DistressMethods} from './distressEvents.js';
+import {DISTRESS_ANSWER_RANGE, distressSetup, distressText, distressVariant} from './distressData.js';
 import { getAsteroidTerrain } from './asteroidTerrain.js';
 import { shardbeltSolidDistance, SHARDBELT_LAYOUT_VERSION } from './asteroidFieldLayout.js';
 import {RACE_HULLS,raceHull,takeRaceHull,returnRaceHull,integrateRaceTurn,integrateRaceVelocity} from './raceHulls.js';
@@ -1381,6 +1383,7 @@ export class GameSession {
         this.regionalFields = new Map(REGIONAL_ASTEROID_FIELD_IDS.map((id) => [id, generateRegionalAsteroidField(save.world.seed, id)]));
         this.graveyard = generateGraveyardPieces(save.world.seed);
         this.initializeExploration();
+        this.initializeDistress();
         this.wreckNodes = generateWreckNodes(save.world.seed, save.world.depletedWrecks, save.world.scannedNodes);
         if(!save.arena)for(const wreck of Object.values(save.world.combatWrecks??{}))if(wreck.contents?.length||wreck.derelict)this.wreckNodes.push(combatWreckNode(wreck));
         this.input = new InputManager(ui.root);
@@ -2672,6 +2675,7 @@ export class GameSession {
         if (this.save.player.dockedAt) {
             this.renderer?.setCockpitVisible(false);
             completeMissionsAtDock(this.save, this.save.player.dockedAt);
+            this.settleDistressSurvivors();
             markSortieDocked(this.save, this.save.player.dockedAt);
             refreshMissionOffers(this.save);
             recordMarketVisit(this.save.world, this.save.player.dockedAt);
@@ -3037,6 +3041,10 @@ export class GameSession {
         this.updateAssetWarmup();
         this.updateBountySpawns();
         this.updateExploration();
+        this.updateDistress();
+        // The debris escort needs 60 Hz for the trail and the corridor tube;
+        // the 2 Hz distress tick still owns the event lifecycle.
+        this.updateDistressEscort(dt);
         this.updateDynamicEncounters();
         this.updateRace(dt);
         this.updateShips(dt);
@@ -5045,7 +5053,7 @@ export class GameSession {
         this.recallAllDrones('hyperdrive');
         if (this.dronesSafelyStowed()) return true;
         this.pendingDroneDeparture ??= { kind, locationId,
-            navTargetId: this.save.player.navTargetId, waypointId:(this.explorationWaypoint()??this.tutorialLocalWaypoint())?.id, throttle: this.save.player.throttle };
+            navTargetId: this.save.player.navTargetId, waypointId:(this.distressWaypoint()??this.explorationWaypoint()??this.tutorialLocalWaypoint())?.id, throttle: this.save.player.throttle };
         this.save.player.throttle = 0;
         this.setHyperdriveStatus(t('RECOVERING DRONES · DEPARTURE QUEUED'), 360000);
         return false;
@@ -6037,6 +6045,31 @@ export class GameSession {
     collectPickup(pickup) {
         if (pickup.life <= 0)
             return;
+        if (pickup.distressSurvivor) {
+            // A survivor pod is mission cargo: it reserves one unit of hold
+            // space now and is paid out by the normal docking flow.
+            if (cargoFree(this.save.player) < 1) {
+                this.setOwnMonitorStatus(t('CARGO FULL'));
+                return;
+            }
+            this.save.player.sealedCargo ??= [];
+            this.save.player.sealedCargo.push({
+                missionId: `distress-survivor-${pickup.id}`,
+                label: distressText(['Überlebende', 'Survivors']),
+                units: 1, mass: 1,
+            });
+            const active=this.save.world.distress?.active;
+            if(active&&active.id===pickup.distressEventId){
+                active.survivors.rescued=Math.min(active.survivors.total,active.survivors.rescued+1);
+                active.progress.lastProgressAt=this.save.world.time;
+                this.setDistressMonitor(active);
+            }
+            pickup.life = 0;
+            this.setOwnMonitorStatus('+1 ' + distressText(['ÜBERLEBENDER', 'SURVIVOR']));
+            this.audio.play('pickup', 0.7);
+            this.persistSave();
+            return;
+        }
         if (pickup.commodity === 'credits') {
             // A surrendered pilot's transfer: credits, straight to the wallet —
             // no cargo space involved.
@@ -6265,9 +6298,11 @@ export class GameSession {
     // Pickup labels: a commodity name for cargo crates, CREDITS for a
     // surrendered pilot's transfer.
     pickupLabel(pickup) {
+        if (pickup.distressSurvivor) return distressText(['RETTUNGSKAPSEL', 'SURVIVOR POD']);
         return pickup.commodity === 'credits' ? t('CREDITS') : t(COMMODITIES[pickup.commodity].name);
     }
     pickupDetail(pickup) {
+        if (pickup.distressSurvivor) return '1 POD';
         return pickup.commodity === 'credits' ? formatCredits(pickup.amount) : `${pickup.amount} ${t('UNITS')}`;
     }
     targetCandidates() {
@@ -6444,6 +6479,9 @@ export class GameSession {
             this.applyTarget(tutorialTarget);
             return true;
         }
+        if (kind === 'waypoint') {
+            if (this.distressSelect(id)) { if (source === 'map') this.updateAssetWarmup(true); return; }
+        }
         if (kind === 'system') {
             const selected = this.plotSystemRoute(id);
             if (selected && source === 'map') this.handleTutorialEvent('map-selected',{kind,id});
@@ -6558,7 +6596,7 @@ export class GameSession {
             return;
         // Known mission coordinates survive beyond the sensor horizon, as race
         // gathering markers do. Scanning and extraction still require range.
-        if (id === this.tutorialFieldTarget()?.id || id === this.explorationWaypoint()?.id) return;
+        if (id === this.tutorialFieldTarget()?.id || id === this.explorationWaypoint()?.id || id === this.distressWaypoint()?.id) return;
         const stats = this.playerStats();
         const player = vec(this.save.player.position);
         const ship = this.ships.find((entry) => entry.id === id && entry.hull > 0);
@@ -6622,6 +6660,8 @@ export class GameSession {
             return undefined;
         const tutorialTarget = this.tutorialFieldTarget();
         if (tutorialTarget?.id === id) return tutorialTarget;
+        const distressTarget = this.distressWaypoint();
+        if (distressTarget?.id === id) return distressTarget;
         if (Object.prototype.hasOwnProperty.call(LOCATIONS, id) && LOCATIONS[id].systemId === this.save.player.systemId) {
             const locationId = id;
             const location = LOCATIONS[locationId];
@@ -6995,7 +7035,7 @@ export class GameSession {
     hyperdriveDestination(){
         // Entering the graveyard must not retarget an existing location jump.
         if(this.autopilot)return this.hyperdriveWaypoint??LOCATIONS[this.save.player.navTargetId];
-        return this.explorationWaypoint()??this.tutorialLocalWaypoint()??LOCATIONS[this.save.player.navTargetId];
+        return this.distressWaypoint()??this.explorationWaypoint()??this.tutorialLocalWaypoint()??LOCATIONS[this.save.player.navTargetId];
     }
     toggleHyperdrive() {
         if(this.save.player.raceReturn)return;
@@ -7077,7 +7117,7 @@ export class GameSession {
         if (recovery>0) return {message:t('DRIVE RECOVERY · {seconds}s',{seconds:Math.ceil(recovery)}),kind:'info'};
         const nav = this.hyperdriveDestination();
         const arrivalRadius = hyperdriveArrivalRadius(nav);
-        if(nav.kind==='waypoint'&&player.distanceTo(vec(nav.position))<=SURVEY_JUMP_MIN_DISTANCE)return {message:t(nav.exploration?'Approach the wreck on normal engines.':'Fly within 100 km of the star. Local jumps need over 2,000 km.'),kind:'info'};
+        if (nav.kind==='waypoint'&&player.distanceTo(vec(nav.position))<=SURVEY_JUMP_MIN_DISTANCE)return {message:t(nav.distress?'Close the last stretch on normal engines.':'Approach the wreck on normal engines.'),kind:'info'};
         if (nav.kind === 'jump-point' && player.distanceTo(vec(nav.position)) <= arrivalRadius + 0.5)
             return null;
         if (player.distanceTo(vec(nav.position)) < arrivalRadius + 12)
@@ -7284,15 +7324,47 @@ export class GameSession {
         // Lines already localized at their pool definition pass through
         // unchanged (the catalog key is English; a German string simply has
         // no entry and renders as itself).
-        this.ui.showPilotLine?.(ship.name, t(line), relation);
+        this.ui.showPilotLine?.(ship.name, t(line), relation, 6000, false, ship.faction, ship.portraitIndex);
         this.audio?.playComms?.(ship.pilot.temperament);
     }
     // A line from a whole group (a scared-off mug): the comms bar shows every
     // callsign at once so the player sees who folded.
     sayGroupLine(ships, line) {
         this.nextChatterAt = this.save.world.time + CHATTER_GAP;
-        this.ui.showGroupLine?.(ships.map((ship) => ship.name), t(line), this.shipRelation(ships[0]));
+        this.ui.showGroupLine?.(ships.map((ship) => ship.name), t(line), this.shipRelation(ships[0]), 6000, ships[0]?.faction, ships[0]?.portraitIndex);
         this.audio?.playComms?.(ships[0].pilot.temperament);
+    }
+    encounterPortraitForSpeaker(name, conversationId, encounterContext) {
+        const speaker = String(name ?? '').trim();
+        const active = encounterContext?.variant && Number.isFinite(encounterContext?.seed)
+            ? encounterContext
+            : this.save.world.distress?.active;
+        if (active && (encounterContext || conversationId === active.id || speaker === active.caller)) {
+            const setup = distressSetup(active.variant, active.setup);
+            const liveShip = this.ships?.find(ship => ship.distressEventId === active.id
+                && (ship.name === speaker || ship.name.endsWith(` · ${speaker}`)));
+            const snapshot = active.actors?.find(actor => actor.name === speaker);
+            const actor = snapshot ?? setup?.actors?.find(entry => entry.name === speaker)
+                ?? (speaker === active.caller ? setup?.actors?.find(entry => entry.role !== 'pirate') ?? setup?.actors?.[0] : undefined);
+            const faction = liveShip?.faction ?? actor?.faction ?? 'independents';
+            const identity = liveShip?.name ?? actor?.name ?? speaker;
+            const missionId = `distress-${active.id}`;
+            const portraitIndex = liveShip?.portraitIndex ?? Math.floor(seededRandom(
+                `${this.save.world.seed}:encounter-portrait:${faction}:${missionId}:${identity}`,
+            )() * 6);
+            return {faction, portraitIndex};
+        }
+        const salvageShip = this.ships?.find(ship => ship.explorationActor === 'sera');
+        if (salvageShip && (speaker === 'Sera' || conversationId === 'exploration-salvagers'))
+            return {faction: salvageShip.faction, portraitIndex: salvageShip.portraitIndex};
+        if (speaker === 'Sera' || conversationId === 'exploration-salvagers') {
+            const faction = this.save.world.exploration?.finale === 'fighting' ? 'pirates' : 'independents';
+            const portraitIndex = Math.floor(seededRandom(
+                `${this.save.world.seed}:encounter-portrait:${faction}:exploration-salvagers:Driftglass · Sera`,
+            )() * 6);
+            return {faction, portraitIndex};
+        }
+        return undefined;
     }
     playerLosing() {
         const stats = this.playerStats();
@@ -7336,14 +7408,15 @@ export class GameSession {
     // and mute all chatter until the player dismisses it (or the duration
     // elapses). The mock story content proves the seam end-to-end; real
     // story missions call this with their own lines.
-    playStoryLine(name, text, relation = 'neutral', duration = 12000, conversationId) {
+    playStoryLine(name, text, relation = 'neutral', duration = 12000, conversationId, portraitOverride) {
+        const portrait = portraitOverride ?? this.encounterPortraitForSpeaker(name, conversationId);
         const urgent = conversationId === 'urgent' || duration <= 7000;
         const inSpace = !this.save.player.dockedAt;
         if (!urgent && conversationId !== 'tutorial-combat' && conversationId !== 'tutorial-paul-hide' && conversationId !== 'tutorial-paul-clear' && inSpace
             && (this.save.world.time < (this.flightDialogueAfter ?? 0)
                 || this.hostilesVisibleNear(vec(this.save.player.position), HYPERDRIVE_THREAT_RADIUS))) {
             this.pendingStoryConversations ??= [];
-            this.pendingStoryConversations.push({name,text,relation,duration,conversationId:conversationId ?? 'story',
+            this.pendingStoryConversations.push({name,text,relation,duration,conversationId:conversationId ?? 'story',portrait,
                 tutorialStepId: conversationId?.startsWith('tutorial-') ? getTutorialQuest(this.save)?.stepId : undefined});
             return;
         }
@@ -7353,7 +7426,7 @@ export class GameSession {
             const quest=getTutorialQuest(this.save),key='briefingShown-'+conversationId.slice(9);
             if(quest&&!quest.flags[key]){quest.flags[key]=true;this.persistSave();}
         }
-        this.ui.showStoryLine?.(name,text,relation,urgent ? undefined : conversationId ?? 'story');
+        this.ui.showStoryLine?.(name,text,relation,urgent ? undefined : conversationId ?? 'story',portrait?.faction,portrait?.portraitIndex);
     }
     // Called every frame: lift the story mute when the player dismissed the
     // bar or the duration elapsed, and unpin the bar.
@@ -7381,7 +7454,7 @@ export class GameSession {
             if (this.ui.isModalOpen || this.storyLineActive() || this.save.world.time < (this.flightDialogueAfter ?? 0)
                 || this.hostilesVisibleNear(vec(this.save.player.position), HYPERDRIVE_THREAT_RADIUS)) break;
             this.pendingStoryConversations.shift();
-            this.playStoryLine(next.name,next.text,next.relation,next.duration,next.conversationId);
+            this.playStoryLine(next.name,next.text,next.relation,next.duration,next.conversationId,next.portrait);
             break;
         }
     }
@@ -9078,6 +9151,17 @@ export class GameSession {
         }
         if(flightStats)fireCrossfireOpportunity(this,ship);
     }
+    // Neutral distress crews park while the player works. Reusing the travel
+    // AI with destination=own position made damaged ships chase a zero-length
+    // vector and orbit themselves; this bleeds momentum and holds the pose.
+    holdDistressStation(ship, dt) {
+        const position = this.tmpA.set(ship.position[0], ship.position[1], ship.position[2]);
+        const velocity = this.tmpB.set(ship.velocity[0], ship.velocity[1], ship.velocity[2]);
+        velocity.multiplyScalar(Math.max(0, 1 - dt * 1.2));
+        position.addScaledVector(velocity, dt);
+        tupleInto(ship.position, position);
+        tupleInto(ship.velocity, velocity);
+    }
     updateTravelAI(ship, dt) {
         const flightStats=this.npcFlightStats(ship);
         if(flightStats)this.updateTurrets(ship,ship.id,dt);
@@ -9167,6 +9251,9 @@ export class GameSession {
         // and half-throttle getaways feel broken. Everyone else cruises.
         const inChase = ship.task?.kind === 'flee' || (ship.role === 'patrol' && Boolean(ship.arrest)) || (ship.hostile && Boolean(ship.search));
         let travelSpeed = inChase ? ship.speed : ship.speed * (ship.role === 'trader' ? 0.72 : 0.5);
+        // An escorted transport runs near its cruise speed: the pilot sets the
+        // line, and a half-throttle mule would make the storm clock unwinnable.
+        if (ship.distressEscort) travelSpeed = ship.speed * 0.9;
         // A search approach is an investigation, not a cruise: the patrol
         // pushes harder than its patrol speed — but still slower than any lit
         // hull at full throttle, so a running dark pilot bleeds the contact.
@@ -9782,6 +9869,7 @@ export class GameSession {
     }
     damageShip(ship, amount, attackerId, position, weapon = {}, origin) {
         this.onExplorationActorHit(ship,attackerId,amount);
+        this.onDistressActorHit(ship,attackerId,amount);
         // A captured hull is still a hull: it takes damage like any other
         // ship. It stays inert — no AI, no retaliation, no comms (the pilot is
         // already in cuffs, so the reaction block below is skipped for it) —
@@ -10448,6 +10536,7 @@ export class GameSession {
         this.cancelPendingMug(ship);
         ship.hull = 0;
         this.onExplorationActorDefeated(ship);
+        this.onDistressActorDefeated(ship);
         this.resolveHyperdriveIntercept(ship);
         const explosionScale = (CAPITAL_SHIP_STATS[ship.capitalClass]?.explosionScale ?? (ship.role === 'trader' ? 1.5 : 1)) * npcShipScaleForVariant(npcFlightVariant(ship));
         const explosion = this.renderer.spawnExplosion(ship.position, ship.hostile, explosionScale);
@@ -10718,7 +10807,14 @@ export class GameSession {
         // (house rule — the run stays a test of flying, not of guns).
         if (this.activeRace)
             return;
-        if(this.save.world.exploration?.convoy==='active'||this.save.world.exploration?.finale==='fighting'&&this.ships.some(ship=>ship.explorationGroup==='salvagers'&&ship.hull>0))return;
+        if(this.save.world.exploration?.finale==='fighting'&&this.ships.some(ship=>ship.explorationGroup==='salvagers'&&ship.hull>0))return;
+        // A distress event owns its pocket of space: no ambient ambush while a
+        // rescue is being worked or while the player is close to its signal.
+        const distress=this.save.world.distress?.active;
+        if(distress){
+            const p=this.save.player.position,d=distress.position;
+            if(distress.phase==='involved'||Math.hypot(p[0]-d[0],p[1]-d[1],p[2]-d[2])<=8000)return;
+        }
         // A standoff pauses the beam clock: no second ambush while the player
         // is mid-deal. This runs before the nextEncounterAt gate and the
         // hostile lock (both return early during a mug) so the timer keeps
@@ -11230,6 +11326,9 @@ export class GameSession {
             id: `ship-${index}`,
             hullId, variant: SHIPS[hullId]?.variant ?? hullId, livery: fleetOptions.livery,
             name: faction === 'alliance' && !nameOverride ? `ALV ${SHIPS[hullId]?.name ?? hullId} ${index}` : shipName,
+            // An independent seeded draw keeps the portrait random per pilot
+            // without changing the ship, pilot or combat RNG streams.
+            portraitIndex: Math.floor(seededRandom(`${this.save.world.seed}:encounter-portrait:${faction}:${missionId ?? 'ambient'}:${shipName}`)() * 6),
             role,
             faction, guild,
             position: [...position],
@@ -12891,6 +12990,7 @@ export class GameSession {
         if (this.save.player.transponder === false && this.darkDockPolicy(locationId) === 'syndicate')
             this.beginDarkArrival(locationId);
         completeMissionsAtDock(this.save, locationId);
+        this.settleDistressSurvivors();
         markSortieDocked(this.save, locationId);
         refreshMissionOffers(this.save);
         this.renderer.setCockpitVisible(false);
@@ -13998,7 +14098,16 @@ export class GameSession {
         this.renderer.updateCamera(this.save.player.position, this.save.player.prevPosition, this.save.player.rotation, this.save.player.prevRotation, this.save.player.angularVelocity, clamp(speed / Math.max(1, stats.afterburnSpeed), 0, 2), this.afterburning || (this.autopilot && speed > stats.afterburnSpeed), dt, alpha);
         this.renderer.setLandingGuide?.(null);
         this.renderer.setDamageWarning(1 - this.save.player.hull / stats.hull, this.save.settings.reducedDamageEffects);
+        // The sun swells only while an escort is racing its storm clock. The
+        // last 90 s are visible from the cockpit, not just a monitor number.
+        const storm = this.save.world.distress?.active;
+        const stormLeft = storm?.variant === 'debris' && storm.progress?.method === 'escape'
+            ? Number(storm.progress.burstAt) - Number(this.save.world.time)
+            : Infinity;
+        this.renderer.setSolarFront?.(Number.isFinite(stormLeft) ? clamp((90 - stormLeft) / 90, 0, 1) : 0);
         this.renderer.syncShips(this.ships, alpha);
+        this.renderer.syncDistressBeacons?.(this.distressBeaconView());
+        this.renderer.syncDistressPocket?.(this.distressPocketView());
         this.renderer.syncProjectiles(this.projectiles, this.projStore, alpha);
         this.renderer.syncPickups(this.pickups, this.pickupStore, alpha);
         this.renderDroneFleet??={unitsById:{}};this.renderDroneFleet.unitsById=droneUnits(this);
@@ -14191,7 +14300,19 @@ export class GameSession {
                 };
             }
             else if (target.kind === 'waypoint') {
-                hudTarget={kind:'waypoint',name:target.name,subtitle:t('SURVEY WAYPOINT'),distance,objectKind:'waypoint',readout:t(this.tutorialSummary()?.stepId==='hide-patrol'?(distance<100?'HOLD POSITION':'ENTER HANGAR'):distance>SURVEY_JUMP_MIN_DISTANCE?'ACTIVATE HYPERDRIVE':'WITHIN 100 KM'),...screen};
+                if(target.distress){
+                    // A waypoint is the signal until contact resolves; during an
+                    // escort run the useful hint is the corridor, not "approach".
+                    const event=this.save.world.distress?.active;
+                    const escorting=event?.variant==='debris'&&event.progress?.method==='escape';
+                    const readout=escorting
+                        ? (event.progress.joinedAt?distressText(['BOJEN FOLGEN','FOLLOW THE BEACONS']):distressText(['LÄNGSSEITS GEHEN','COME ALONGSIDE']))
+                        : event?.phase==='signal'
+                            ? (distance>DISTRESS_ANSWER_RANGE?distressText(['NÄHER HERAN','CLOSE TO ANSWER']):distressText(['SIGNAL IN REICHWEITE','SIGNAL WITHIN RANGE']))
+                            : distressText(['ANFLIEGEN FÜR KONTAKT','APPROACH TO MAKE CONTACT']);
+                    hudTarget={kind:'waypoint',name:target.name,subtitle:distressText(escorting?['GELEITSCHUTZ','ESCORT']:['NOTRUF','DISTRESS SIGNAL']),distance,objectKind:'waypoint',distress:true,readout,...screen};
+                }
+                else hudTarget={kind:'waypoint',name:target.name,subtitle:t('SURVEY WAYPOINT'),distance,objectKind:'waypoint',readout:t(this.tutorialSummary()?.stepId==='hide-patrol'?(distance<100?'HOLD POSITION':'ENTER HANGAR'):distance>SURVEY_JUMP_MIN_DISTANCE?'ACTIVATE HYPERDRIVE':'WITHIN 100 KM'),...screen};
             }
             else if (target.kind === 'gate') {
                 const found = this.raceGateById(target.id);
@@ -14502,6 +14623,17 @@ export class GameSession {
             .sort(prioritize)
             .slice(0, MAP_PICKUP_CONTACT_LIMIT);
         contacts.push(...pickups);
+        // A logged distress signal is a real navigation contact even before
+        // the player closes to sensor range, so the map can select it.
+        const distress = this.save.world.distress?.active;
+        if (distress) {
+            const distressContact = buildContact('waypoint', distress.id, distressText(distressVariant(distress.variant)?.title ?? ['Notruf', 'Distress call']), `${distress.caller} · ${distressText(['NOTRUF','DISTRESS SIGNAL'])}`, distress.position, MAP_CLAIM_CONTACT_RANGE, false, false, true);
+            if (distressContact) {
+                distressContact.distress = true;
+                distressContact.signal = distress.phase === 'signal';
+                contacts.push(distressContact);
+            }
+        }
         // Staked claims always surface — even far beyond sensor range — so the
         // pilot can see where the rock is and lock a hyperdrive jump to it.
         for (const mission of this.activeMiningClaims()) {
@@ -14658,6 +14790,21 @@ export class GameSession {
             const contact={ x: clamp(relative.x / scale, -1, 1), y: clamp(relative.z / scale, -1, 1), type, selected, altitude: relative.y / Math.max(relative.length(), 1), ghost, lostAlpha, race, racer: race, faint };
             contacts.push(contact);return contact;
         };
+        // A logged distress signal is a navigation contact before anyone is in
+        // sensor range; it sits on the rim until the source is close enough to
+        // resolve, exactly like a ship's distress beacon.
+        const distressSignal = this.save.world.distress?.active;
+        if (distressSignal) {
+            const relative = this.tmpRadarRel.set(distressSignal.position[0], distressSignal.position[1], distressSignal.position[2]).sub(player).applyQuaternion(inverse);
+            const horiz = Math.hypot(relative.x, relative.z);
+            contacts.push({
+                x: (relative.x / Math.max(horiz, 1)) * Math.min(.97, horiz / Math.max(range, 1)),
+                y: (relative.z / Math.max(horiz, 1)) * Math.min(.97, horiz / Math.max(range, 1)),
+                type: 'distress', selected: this.save.player.currentTargetId === distressSignal.id,
+                altitude: relative.y / Math.max(relative.length(), 1), ghost: false, distress: true,
+                distance: Math.round(horiz),
+            });
+        }
         for (const ship of this.ships) {
             if (ship.hull <= 0)
                 continue;
@@ -14828,4 +14975,4 @@ Object.assign(GameSession.prototype,ArenaRunMethods);
 Object.assign(GameSession.prototype,CampaignWingMethods);
 Object.assign(GameSession.prototype,TutorialRuntimeMethods);
 
-Object.assign(GameSession.prototype,ExplorationMethods);
+Object.assign(GameSession.prototype,ExplorationMethods,DistressMethods);

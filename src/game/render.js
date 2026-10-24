@@ -324,6 +324,14 @@ export class SpaceRenderer {
     raceShortcutMeshes = [];
     raceStartRoot = null;
     raceActiveGate;
+    // Nav-projected escort beacons and the local debris pocket around a
+    // stranded transport. Both are event scenery: cosmetic, pooled, never
+    // collidable. The corridor tube, not the visuals, is the hazard.
+    distressBeaconRoot = null;
+    distressBeaconMeshes = [];
+    distressPocketRoot = null;
+    distressPocketKey = undefined;
+    distressPocketPanels = [];
     shipSyncRevision = 0;
     // GLB ship hulls: per-variant cached model (or null when the load failed),
     // plus the in-flight promises so concurrent spawns share one fetch.
@@ -607,6 +615,21 @@ export class SpaceRenderer {
         this.skyRoot.add(farHalo);
         this.sunVisuals.push(farHalo);
         this.starCoronas.push(farHalo);
+        // The inbound solar front is the same star, swollen and reddened. It
+        // stays invisible until an escort's storm clock enters its last 90 s.
+        const solarFront = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: this.starTexture('#fff0c8', '#ff3d12'),
+            transparent: true,
+            opacity: 0,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            fog: false,
+        }));
+        solarFront.position.copy(sunPos);
+        solarFront.scale.setScalar(150000);
+        this.skyRoot.add(solarFront);
+        this.sunVisuals.push(solarFront);
+        this.solarFront = solarFront;
         // Persist the sun direction in render-space so other systems (rim shader,
         // engine flare bias, sub-light point glows) can use it without re-reading
         // the directional light.
@@ -4593,6 +4616,153 @@ export class SpaceRenderer {
             group.visible = false;
         if (this.raceGateRoot)
             this.raceGateRoot.visible = false;
+    }
+    // A smaller, amber sibling of the race gate: the transport's nav is dead,
+    // so these are the pilot's projected route, not official course furniture.
+    setSolarFront(intensity = 0) {
+        if (!this.solarFront)
+            return;
+        const value = clamp(Number(intensity) || 0, 0, 1);
+        this.solarFront.material.opacity = value * 0.34;
+        this.solarFront.scale.setScalar(150000 + value * 80000);
+    }
+    createDistressBeaconMesh() {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.055, 8, 32), new THREE.MeshBasicMaterial({ color: 0xffc35a, transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false }));
+        const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.radialTexture('#fff3d2', '#ffab3d'), transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+        glow.scale.setScalar(1.7);
+        const group = new THREE.Group();
+        group.name = 'distress-beacon';
+        group.raycast = () => { };
+        ring.raycast = () => { };
+        glow.raycast = () => { };
+        group.add(ring);
+        group.add(glow);
+        group.userData.ring = ring;
+        group.userData.glow = glow;
+        return group;
+    }
+    syncDistressBeacons(view) {
+        if (!view || !Array.isArray(view.points) || view.points.length < 2) {
+            this.clearDistressBeacons();
+            return;
+        }
+        if (!this.distressBeaconRoot) {
+            const root = new THREE.Group();
+            root.name = 'distress-beacons';
+            root.raycast = () => { };
+            this.scene.add(root);
+            this.distressBeaconRoot = root;
+        }
+        const root = this.distressBeaconRoot;
+        const points = view.points;
+        while (this.distressBeaconMeshes.length < points.length) {
+            const group = this.createDistressBeaconMesh();
+            root.add(group);
+            this.distressBeaconMeshes.push(group);
+        }
+        const activeIndex = Math.max(0, Math.min(points.length - 1, Number(view.activeIndex) || 0));
+        const range = Number(view.range) || 4000;
+        const player = view.player;
+        const axis = this.tmpDistressBeaconAxis ?? (this.tmpDistressBeaconAxis = new THREE.Vector3());
+        for (let index = 0; index < this.distressBeaconMeshes.length; index++) {
+            const group = this.distressBeaconMeshes[index];
+            const point = points[index];
+            // The next three markers are the readable corridor. A failed nav
+            // drops the far ones first, so the last stretch is flown by eye.
+            if (!point || index < activeIndex || index > activeIndex + 2) {
+                group.visible = false;
+                continue;
+            }
+            if (player && Math.hypot(point[0] - player[0], point[1] - player[1], point[2] - player[2]) > range) {
+                group.visible = false;
+                continue;
+            }
+            group.visible = true;
+            group.position.set(point[0], point[1], point[2]);
+            const previous = points[Math.max(0, index - 1)];
+            const next = points[Math.min(points.length - 1, index + 1)];
+            axis.set(next[0] - previous[0], next[1] - previous[1], next[2] - previous[2]);
+            if (axis.lengthSq() < 1e-6)
+                axis.set(0, 0, 1);
+            else
+                axis.normalize();
+            group.quaternion.setFromUnitVectors(FORWARD_AXIS, axis);
+            const active = index === activeIndex;
+            const pulse = active ? 1 + Math.sin((this.skyTime ?? 0) * 3.1) * 0.06 : 1;
+            group.scale.setScalar((active ? 34 : 26) * pulse);
+            const ring = group.userData.ring, glow = group.userData.glow;
+            ring.material.color.setHex(active ? 0xffc35a : 0x8fb0bd);
+            ring.material.opacity = active ? 0.95 : 0.5;
+            glow.material.color.setHex(active ? 0xffb347 : 0x7e9aa6);
+            glow.material.opacity = active ? 0.4 : 0.16;
+        }
+        for (let index = points.length; index < this.distressBeaconMeshes.length; index += 1)
+            this.distressBeaconMeshes[index].visible = false;
+        root.visible = true;
+    }
+    clearDistressBeacons() {
+        for (const group of this.distressBeaconMeshes ?? [])
+            group.visible = false;
+        if (this.distressBeaconRoot)
+            this.distressBeaconRoot.visible = false;
+    }
+    // One local pocket of torn plating around the stranded transport. It sells
+    // "the field is turning between us and open space" anywhere a signal can
+    // spawn, instead of depending on the graveyard layout. Cosmetic only.
+    syncDistressPocket(view) {
+        if (!view) {
+            if (this.distressPocketRoot)
+                this.distressPocketRoot.visible = false;
+            return;
+        }
+        if (!this.distressPocketRoot) {
+            const root = new THREE.Group();
+            root.name = 'distress-pocket';
+            root.raycast = () => { };
+            this.scene.add(root);
+            this.distressPocketRoot = root;
+            this.distressPocketGeometry = new THREE.BoxGeometry(1, 1, 1);
+            this.distressPocketMaterial = new THREE.MeshStandardMaterial({ color: 0x67747d, metalness: 0.45, roughness: 0.85 });
+            this.distressPocketGirderMaterial = new THREE.MeshStandardMaterial({ color: 0x4d5a63, metalness: 0.55, roughness: 0.7 });
+        }
+        const root = this.distressPocketRoot;
+        if (this.distressPocketKey !== view.key) {
+            this.distressPocketKey = view.key;
+            for (const panel of this.distressPocketPanels)
+                root.remove(panel);
+            this.distressPocketPanels = [];
+            const hash = n => {
+                const value = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
+                return value - Math.floor(value);
+            };
+            for (let index = 0; index < 30; index++) {
+                let angle = hash(index * 4 + 1) * Math.PI * 2;
+                const delta = Math.abs(Math.atan2(Math.sin(angle - view.exitYaw), Math.cos(angle - view.exitYaw)));
+                // Leave the seeded exit heading open: the route must not read
+                // as a tunnel through a wall of plating.
+                if (delta < .58) angle += 1.15;
+                const radial = 170 + hash(index * 4 + 2) * 390;
+                const long = 4 + hash(index * 4 + 3) * 15;
+                const thin = .35 + hash(index * 4 + 4) * 1.2;
+                const girder = index % 5 === 0;
+                const panel = new THREE.Mesh(this.distressPocketGeometry, girder ? this.distressPocketGirderMaterial : this.distressPocketMaterial);
+                panel.position.set(Math.cos(angle) * radial, (hash(index * 4 + 5) - .5) * 260, Math.sin(angle) * radial);
+                panel.scale.set(girder ? thin : long, girder ? thin : thin, girder ? long : 1.6 + hash(index * 4 + 6) * 3.5);
+                panel.rotation.set(hash(index * 7 + 1) * Math.PI, hash(index * 7 + 2) * Math.PI, hash(index * 7 + 3) * Math.PI);
+                panel.userData.spin = [(hash(index * 7 + 4) - .5) * .08, (hash(index * 7 + 5) - .5) * .08, (hash(index * 7 + 6) - .5) * .08];
+                panel.userData.baseRotation = [panel.rotation.x, panel.rotation.y, panel.rotation.z];
+                panel.raycast = () => { };
+                root.add(panel);
+                this.distressPocketPanels.push(panel);
+            }
+        }
+        root.position.set(view.center[0], view.center[1], view.center[2]);
+        root.visible = true;
+        const time = this.skyTime ?? 0;
+        for (const panel of this.distressPocketPanels) {
+            const spin = panel.userData.spin, base = panel.userData.baseRotation;
+            panel.rotation.set(base[0] + time * spin[0], base[1] + time * spin[1], base[2] + time * spin[2]);
+        }
     }
     // A one-shot pulse stored on the pooled gate itself. It is cleared by the
     // normal world update, so callers never own an effect object or cleanup

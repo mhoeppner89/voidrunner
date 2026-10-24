@@ -13,6 +13,27 @@ test('comms use short speaker labels without changing transcript names',()=>{
     assert.equal(callsignHandle('Rin Vek'),'Rin Vek');
 });
 
+test('encounter comms keep a pilot-specific portrait from the sender faction',()=>{
+    const previousDocument=globalThis.document,previousWindow=globalThis.window;
+    globalThis.document={createElement:tag=>({tag,addEventListener(){}})};
+    globalThis.window={clearTimeout(){}};
+    try{
+        const ui=Object.create(GameUI.prototype);ui.encounterPortraitChoices=new Map();ui.scheduleCommsFit=()=>{};
+        const render=(line,story=false,faction='pirates',portraitIndex)=>{
+            const children=[],bar={dataset:{},classList:{toggle(){}},append:node=>children.push(node)};
+            ui.renderCommsMessage(bar,'Red Talon',line,story,faction,portraitIndex,'Red Talon');
+            return children[0]?.src;
+        };
+        const first=render('Break off!');
+        assert.match(first,/^\.\/art\/portraits\/simplified\/encounters\/pirates\/pilot-\d{2}\.webp$/);
+        assert.equal(render('I said break off!'),first);
+        assert.equal(render('Mayday.',true,'alliance',3),'./art/portraits/simplified/encounters/alliance/pilot-04.webp');
+    }finally{
+        if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;
+        if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow;
+    }
+});
+
 function fixture(line,columns=30,rows=4){
     const timers=new Map();let next=0;
     globalThis.window={setTimeout:fn=>{timers.set(++next,fn);return next;},clearTimeout:id=>timers.delete(id)};

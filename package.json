@@ -51,6 +51,7 @@
     "test:browser:exploration": "node tests/browser/exploration.mjs",
     "test:browser:combat-feedback": "node tests/browser/combat-feedback.mjs",
     "review:discoveries": "node tools/playtest/exploration-review.mjs",
+    "review:distress": "node tools/playtest/distress-review.mjs",
     "test:browser:discovery-review": "node tools/playtest/exploration-review.mjs && node tests/browser/exploration-review.mjs",
     "test:browser:space-pickups": "node tools/playtest/exploration-review.mjs && node tests/browser/space-pickups.mjs",
     "test:browser:cargo-usage": "node tools/playtest/exploration-review.mjs && node tests/browser/cargo-usage.mjs",

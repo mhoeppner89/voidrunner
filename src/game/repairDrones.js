@@ -9,7 +9,7 @@ const origin=[0,0,0],identity=[0,0,0,1],up=new THREE.Vector3(0,1,0),generated=ne
 const distanceSq=(a,b)=>(a[0]-b[0])**2+(a[1]-b[1])**2+(a[2]-b[2])**2;
 const hullId=actor=>actor.shipId??(actor.capitalClass?actor.variant:actor.combatFit?.hullId??actor.hullId??actor.variant);
 const maximum=(session,actor)=>actor===session.save.player?session.playerStats().hull:actor.maxHull??actor.combatFit?.stats.hull??0;
-function available(session,actor){return actor&&actor.hull>0&&!actor.poweredDown&&!actor.captured&&!actor.claimed&&!actor.surrendered&&!actor.race&&actor.position&&(actor!==session.save.player||!actor.dockedAt&&!session.arena?.observer);}
+function available(session,actor){return actor&&actor.hull>0&&(!actor.poweredDown||actor.distressRepairEligible===true)&&!actor.captured&&!actor.claimed&&!actor.surrendered&&!actor.race&&actor.position&&(actor!==session.save.player||!actor.dockedAt&&!session.arena?.observer);}
 function friendly(session,owner,target){
  const p=session.save.player;if(owner===target)return true;
  if(owner.observerTeam||target.observerTeam)return Boolean(owner.observerTeam&&owner.observerTeam===target.observerTeam);
@@ -20,7 +20,10 @@ function friendly(session,owner,target){
  return Boolean(owner.faction&&owner.faction===target.faction&&Boolean(owner.hostile)===Boolean(target.hostile));
 }
 export function repairTargetEligible(session,owner,target){
- return available(session,owner)&&available(session,target)&&friendly(session,owner,target)
+ // Distress-event neutrals opt in explicitly; their crews asked for help,
+ // while a hostile raider is still not a valid repair recipient.
+ const distressHelp=owner===session.save.player&&target?.distressRepairEligible===true&&!target.hostile;
+ return available(session,owner)&&available(session,target)&&(friendly(session,owner,target)||distressHelp)
   &&distanceSq(owner.position,target.position)<=REPAIR_DRONE_RANGE**2;
 }
 function targetById(session,owner,id){if(id==='player')return session.save.player;if(id===owner.id)return owner;for(const ship of session.ships)if(ship.id===id)return ship;}

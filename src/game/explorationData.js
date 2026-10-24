@@ -44,20 +44,14 @@ function explorationScript(id,save){
  const log=FREIGHTER_LOGS.find(p=>id==='exploration-log-'+p.id);
  if(log){const triangulated=save?.world.exploration?.finale!=='locked'&&FREIGHTER_LOGS.every(p=>save?.world.exploration?.recovered.includes(p.id));return {start:'log',nodes:{log:{text:triangulated?log.text.map((line,i)=>line+'\n\n'+['Peilung abgeschlossen. Du kannst das Wrack im Bordlogbuch anvisieren.','Triangulation complete. You can target the wreck from the ship journal.'][i]):log.text,next:'@end'}}};}
  if(id==='exploration-salvagers')return {start:'offer',nodes:{offer:{
-  text:['Hier ist Sera, Driftglass-Bergung. Wir sind zuerst am Wrack. Teilen wir: Für deine Peilung bekommst du den Reaktor und zwei Goldbarren. Oder willst du die ganze Fracht mit Gewalt?',
-        'Sera, Driftglass salvage. We reached the wreck first. Split it: for your bearings, you take the reactor and two gold bars. Or will you take the entire hold by force?'],
-  choices:[{label:['Wir teilen.','We split it.'],explorationChoice:'share'},{label:['Die ganze Ladung gehört mir.','The entire cargo is mine.'],explorationChoice:'fight'}]}}};
- if(id==='exploration-convoy')return {start:'offer',nodes:{offer:{
-  text:['Mayday! Hier ist der Prospektorenkonvoi Lantern. Zwei Piraten schneiden uns den Rückweg ab. Kannst du uns helfen? Wir zahlen 2.000 cr für jedes Schiff, das durchkommt.',
-        'Mayday! This is the Lantern prospecting convoy. Two pirates are cutting off our retreat. Can you help us? We can pay 2,000 cr for each ship that makes it.'],
-  choices:[{label:['Ich helfe euch.','I will help you.'],explorationChoice:'help'},{label:['Ich kann nicht eingreifen.','I cannot intervene.'],explorationChoice:'decline'}]}}};
+  text:['Hier Sera, Driftglass. Wir waren zuerst am Wrack — aber ohne deine Peilung hätten wir es nie gefunden. Mein Angebot: Du nimmst den Reaktor und zwei Barren Gold, wir den Rest. Oder willst du wirklich alles?',
+        'Sera, Driftglass. We reached the wreck first — but without your bearings we would never have found it. My offer: you take the reactor and two gold bars, we take the rest. Or do you really want all of it?'],
+  choices:[{label:['Abgemacht, wir teilen.','Done. We split it.'],explorationChoice:'share'},{label:['Ich nehme alles.','I am taking all of it.'],explorationChoice:'fight'}]}}};
 }
 export function explorationJournal(save){
  const state=save.world.exploration;if(!state)return [];
  const rows=FREIGHTER_LOGS.filter(log=>state.recovered.includes(log.id)).map(log=>({title:explorationText(log.title),text:explorationText(log.text)}));
  if(state.finale!=='locked')rows.push({title:'Kestrel Nine',text:explorationText(state.recovered.includes('finale')?['Fracht geborgen.','Cargo recovered.']:state.finale==='shared'?['Fracht mit Driftglass geteilt. Dein Anteil liegt am Wrack.','Cargo shared with Driftglass. Your share is at the wreck.']:state.finale==='won'?['Bergungscrew besiegt. Die Fracht liegt am Wrack.','Salvage crew defeated. The cargo is at the wreck.']:['Drei Peilungen ergeben die letzte Position im freien Raum.','Three bearings reveal the final position in deep space.']),action:state.recovered.includes('finale')?undefined:'navigate'});
- if(state.convoy==='offered'||state.convoy==='active')rows.push({title:'Lantern',text:explorationText(state.convoy==='offered'?['Ein Prospektorenkonvoi bittet um Hilfe.','A prospecting convoy needs help.']:['Schütze die beiden Prospektoren vor den Piraten.','Protect both prospectors from the pirates.']),action:'convoy'});
- if(['rewarded','failed','declined'].includes(state.convoy))rows.push({title:'Lantern',text:explorationText(state.convoy==='rewarded'?[`Konvoi gerettet · ${state.convoyReward.toLocaleString('de-DE')} cr erhalten.`,`Convoy rescued · ${state.convoyReward.toLocaleString('en-US')} cr received.`]:state.convoy==='failed'?['Der Konvoi konnte nicht gerettet werden.','The convoy could not be saved.']:['Der Notruf blieb unbeantwortet.','The distress call went unanswered.'])});
  return rows;
 }
 

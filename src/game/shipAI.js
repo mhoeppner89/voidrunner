@@ -206,6 +206,14 @@ export function updateShipAI(session, ship, dt) {
         session.updateTravelAI(ship, dt);
         return;
     }
+    // A neutral distress crew holds its position while the player repairs,
+    // transfers fuel or recovers cargo. Sending an already-parked ship back
+    // through the travel planner made it chase its own zero-length vector.
+    if (ship.distressActor && !ship.hostile && ship.standingDown
+        && (!ship.destination || dist2(ship.position, ship.destination) < 900)) {
+        session.holdDistressStation(ship, dt);
+        return;
+    }
 
     // Sensors advance before target resolution. A hunter may want the player,
     // but it cannot receive the player's live position until it has built a
@@ -272,7 +280,7 @@ export function updateShipAI(session, ship, dt) {
         session.updateTravelAI(ship, dt);
         return;
     }
-    if(ship.explorationGroup){session.updateTravelAI(ship,dt);return;}
+    if(ship.explorationGroup||ship.distressActor){session.updateTravelAI(ship,dt);return;}
     // Task layer: what the ship wants right now, yielding the travel waypoint.
     tickTask(ship, session);
     if (!updateStationDock(session, ship, dt)) session.updateTravelAI(ship, dt);

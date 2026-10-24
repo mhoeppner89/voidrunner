@@ -129,6 +129,25 @@ test('rendering answers and reviewing history never replays the topic introducti
     assert.equal(ui.adventure.nodeId,'rin');
 });
 
+test('random encounter dialogue shows the assigned faction portrait',()=>{
+    const previousDocument=globalThis.document;
+    globalThis.document={activeElement:null};
+    try{
+        const panel={dataset:{},style:{},classList:{remove(){}},setAttribute(){},querySelector(){return null;},querySelectorAll(){return [];}};
+        const shell={classList:{add(){}}};
+        const ui=Object.create(GameUI.prototype),portraitCalls=[];
+        ui.root={querySelector:selector=>selector==='#adventure-panel'?panel:shell};
+        ui.commsLog=[];ui.dockLocation=undefined;
+        ui.portraitImage=(...args)=>{portraitCalls.push(args);return '<img class="adventure-pilot">';};
+        ui.openStoryAdventure('MV Bright Mercy','Please come closer.','neutral','distress-test','independents',2);
+        assert.deepEqual(portraitCalls[0],['exploration-signal','MV Bright Mercy','independents',2]);
+        assert.match(panel.innerHTML,/adventure-portrait/);
+        assert.equal(panel.dataset.signalOnly,'false');
+    }finally{
+        if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;
+    }
+});
+
 // An aborted prologue leaves the pilot standing in the Helix bar without ever
 // having heard the family introduction. Mara and Rin must then offer that
 // story as an ordinary question, not as a repetition, and Rin must not promise

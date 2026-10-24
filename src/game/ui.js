@@ -1,4 +1,5 @@
 import {explorationDialogue,explorationJournal,explorationText} from './explorationData.js';
+import {distressDialogue,distressJournal,distressText} from './distressData.js';
 import {installRetroDisplay,monitorRasterRatio} from './retroDisplay.js';
 import {RACE_HULLS} from './raceHulls.js';
 import {EQUIPMENT_RARITIES,equipmentName,modifiedWeapon,equipmentBaseId} from './equipmentCatalog.js';
@@ -251,6 +252,13 @@ const ACTIVE_NPC_PORTRAIT_BY_ID = Object.freeze({
     'cinderfall-factor': './art/portraits/simplified/cinderfall-factor-portrait.webp',
 });
 const NPC_PORTRAIT_BY_ID = ACTIVE_NPC_PORTRAIT_BY_ID;
+const ENCOUNTER_PORTRAITS_BY_FACTION = Object.freeze(Object.fromEntries(
+    ['concord', 'alliance', 'independents', 'pirates'].map((faction) => [
+        faction,
+        Object.freeze(Array.from({ length: 6 }, (_, index) =>
+            `./art/portraits/simplified/encounters/${faction}/pilot-${String(index + 1).padStart(2, '0')}.webp`)),
+    ]),
+));
 const FULL_DOCK_SERVICES = Object.freeze({ fuel: true, repair: true, market: true, bar: true, shipyard: true, outfitting: true, missions: true });
 const locationServices = (locationId) => LOCATIONS[locationId]?.services ?? FULL_DOCK_SERVICES;
 const hasLocationService = (locationId, service) => Boolean(locationServices(locationId)?.[service]);
@@ -452,7 +460,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2kx';
+const GAME_VERSION = '0.8.2ld';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -1869,6 +1877,8 @@ export class GameUI {
                 break;
             case 'exploration-journal':
                 this.actions?.explorationJournalAction?.(element.dataset.explorationAction);break;
+            case 'distress-journal':
+                this.actions?.distressJournalAction?.(element.dataset.distressAction);break;
             case 'transponder-toggle':
                 this.actions?.toggleTransponder?.();
                 this.showShipMenu();
@@ -2930,17 +2940,18 @@ export class GameUI {
         this.root.querySelector('#game-shell')?.classList.add('adventure-open');
         this.renderAdventure();
     }
-    openStoryAdventure(name, text, relation, conversationId) {
+    openStoryAdventure(name, text, relation, conversationId, faction, portraitIndex) {
         if (this.adventure) {
             this.adventureQueue ??= [];
-            this.adventureQueue.push({ name,text,relation,conversationId });
+            this.adventureQueue.push({ name,text,relation,conversationId,faction,portraitIndex });
             return;
         }
-        const person = Object.values(LOCATIONS).flatMap(location => location.people ?? []).find(person => person.name === name)
-            ?? { id: conversationId?.startsWith('exploration-')||name==='Sera'||name==='Lantern'?'exploration-signal':name === 'Rin Vek' ? 'rin-vek' : name==='Paul'?'paul':'', name };
+        const knownPerson = Object.values(LOCATIONS).flatMap(location => location.people ?? []).find(person => person.name === name)
+            ?? { id: conversationId?.startsWith('exploration-')||conversationId?.startsWith('distress-')||name==='Sera'||name==='Lantern'?'exploration-signal':name === 'Rin Vek' ? 'rin-vek' : name==='Paul'?'paul':'', name };
+        const person = faction ? { ...knownPerson, portraitFaction: faction, portraitIndex } : knownPerson;
         this.commsLog.push({callsign:name,line:text,relation,story:true});
         if (this.commsLog.length > 40) this.commsLog.shift();
-        const script = explorationDialogue(conversationId,this.save) ?? (conversationId === 'rin-first-flight' ? ADVENTURE_DIALOGUES.flight
+        const script = distressDialogue(conversationId,this.save) ?? explorationDialogue(conversationId,this.save) ?? (conversationId === 'rin-first-flight' ? ADVENTURE_DIALOGUES.flight
             : ADVENTURE_DIALOGUES[conversationId?.replace(/^tutorial-/, '')]);
         this.storyDismissed = false;
         this.startAdventure(person,script,!this.dockLocation,text);
@@ -2994,6 +3005,10 @@ export class GameUI {
         }
         if(choice.explorationChoice){
             if(this.actions?.chooseExploration?.(choice.explorationChoice)?.ok)this.closeAdventure();
+            return;
+        }
+        if(choice.distressChoice){
+            if(this.actions?.chooseDistress?.(choice.distressChoice)?.ok)this.closeAdventure();
             return;
         }
         if (choice.tutorialChoice) {
@@ -3056,15 +3071,15 @@ export class GameUI {
         state.previousFocus?.isConnected && state.previousFocus.focus?.();
         if (refresh && this.adventureQueue?.length) {
             const next = this.adventureQueue.shift();
-            this.openStoryAdventure(next.name,next.text,next.relation,next.conversationId);
+            this.openStoryAdventure(next.name,next.text,next.relation,next.conversationId,next.faction,next.portraitIndex);
         }
     }
     renderAdventure() {
         const state = this.adventure, panel = this.root.querySelector('#adventure-panel');
         if (!state || !panel) return;
         const node = this.adventureNode();
-        const signalOnly=state.person.id==='exploration-signal';
-        panel.dataset.signalOnly=String(signalOnly);
+        const signalOnly=state.person.id==='exploration-signal'&&!state.person.portraitFaction;
+        if (panel.dataset) panel.dataset.signalOnly=String(signalOnly);
         const text = dialogueText(node.text,getLanguage());
         const identity = state.nodeId ?? node;
         if (state.lastRendered !== identity && !state.history) {
@@ -3080,13 +3095,18 @@ export class GameUI {
           <header class="adventure-heading"><span>${state.space ? this.adventureLabel('FUNKVERBINDUNG · FLUG PAUSIERT','COMMS LINK · FLIGHT PAUSED') : escapeHtml(LOCATIONS[this.dockLocation]?.name ?? '')}</span>
             <button data-ui-command="adventure-exit">${this.adventureLabel('Gespräch verlassen','Leave conversation')}</button></header>
           <div class="adventure-stage">
-            ${signalOnly?'':`<figure class="adventure-portrait">${this.portraitImage(state.person.id,state.person.name)}<figcaption>${escapeHtml(state.person.name)}${state.person.relationship ? `<small>${escapeHtml(t(state.person.relationship))}</small>` : ''}</figcaption></figure>`}
+            ${signalOnly?'':`<figure class="adventure-portrait">${this.portraitImage(state.person.id,state.person.name,state.person.portraitFaction,state.person.portraitIndex)}<figcaption>${escapeHtml(state.person.name)}${state.person.relationship ? `<small>${escapeHtml(t(state.person.relationship))}</small>` : ''}</figcaption></figure>`}
             <section class="adventure-dialogue">
               <h2>${escapeHtml(state.person.name)}</h2>
               ${state.history ? `<div class="adventure-transcript" tabindex="0">${[...(this.adventureHistory ?? []),...state.transcript].map(entry=>`<p><b>${escapeHtml(entry.speaker)}</b><br>${escapeHtml(entry.text)}</p>`).join('')}</div>` : `
+                ${node.mission ? `<section class="adventure-mission" aria-label="${this.adventureLabel('Auftrag','Mission')}">
+                  <p class="adventure-mission-kicker">${escapeHtml(node.mission.kicker)}</p>
+                  <h3>${escapeHtml(node.mission.title)}</h3>
+                  <dl>${node.mission.rows.map(row=>`<div><dt>${escapeHtml(row.label)}</dt><dd>${escapeHtml(row.value)}</dd></div>`).join('')}</dl>
+                </section>` : ''}
                 <p class="adventure-speech" aria-live="polite">${escapeHtml(text)}</p>
                 <nav class="adventure-choices" aria-label="${this.adventureLabel('Deine Antwort','Your reply')}">
-                  ${choices.map((choice,index)=>`<button data-ui-command="adventure-choice" data-choice-id="${index}" class="${state.asked.has(choice.topic ?? choice.next) ? 'is-visited' : ''}">${escapeHtml(dialogueText(choice.label,getLanguage()))}</button>`).join('')}
+                  ${choices.map((choice,index)=>`<button data-ui-command="adventure-choice" data-choice-id="${index}" class="${state.asked.has(choice.topic ?? choice.next) ? 'is-visited' : ''}${choice.primary ? ' is-primary' : ''}">${escapeHtml(dialogueText(choice.label,getLanguage()))}</button>`).join('')}
                 </nav>`}
               <button class="adventure-history" data-ui-command="adventure-history">${state.history ? this.adventureLabel('Zurück zum Gespräch','Back to conversation') : this.adventureLabel('Gespräch nachlesen','Read transcript')}</button>
             </section>
@@ -4312,8 +4332,8 @@ export class GameUI {
       </div>
     `;
     }
-    portraitImage(personId, personName) {
-        const source = NPC_PORTRAIT_BY_ID[personId];
+    portraitImage(personId, personName, faction, portraitIndex) {
+        const source = NPC_PORTRAIT_BY_ID[personId] ?? this.encounterPortraitSource(faction, personName, portraitIndex);
         if (!source) {
             const initials = personName.split(/\s+/).slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
             return `<span class="avatar generated-avatar" aria-label="${t('Portrait of {name}', { name: escapeHtml(personName) })}">${escapeHtml(initials)}</span>`;
@@ -5465,14 +5485,35 @@ export class GameUI {
     // the transmission is the whole bar. Last speaker wins; the full
     // transcript lives in the chat log, which opens when the bar is tapped.
     commsLog = [];
+    encounterPortraitChoices = new Map();
     commsBarTimer;
-    renderCommsMessage(bar,callsign,line,story=false) {
+    encounterPortraitSource(faction, identity, portraitIndex) {
+        const portraits = ENCOUNTER_PORTRAITS_BY_FACTION[faction];
+        if (!portraits)
+            return undefined;
+        const key = `${faction}:${String(identity ?? '').trim().normalize('NFKC').toLowerCase()}`;
+        let index = Number.isInteger(portraitIndex) && portraitIndex >= 0 && portraitIndex < portraits.length
+            ? portraitIndex
+            : this.encounterPortraitChoices.get(key);
+        if (index === undefined) {
+            index = Math.floor(Math.random() * portraits.length);
+            this.encounterPortraitChoices.set(key, index);
+            if (this.encounterPortraitChoices.size > 128)
+                this.encounterPortraitChoices.delete(this.encounterPortraitChoices.keys().next().value);
+        }
+        else if (!this.encounterPortraitChoices.has(key)) {
+            this.encounterPortraitChoices.set(key, index);
+        }
+        return portraits[index];
+    }
+    renderCommsMessage(bar,callsign,line,story=false,faction,portraitIndex,portraitIdentity=callsign) {
         this.commsMessage={callsign,line,pinned:false};
         delete bar.dataset.page;
         window.clearTimeout(this.commsPageTimer);
         bar.textContent='';
         const id={'Rin Vek':'rin-vek','Mara Vek':'mara-vek',Paul:'paul'}[callsign];
-        const source=story&&NPC_PORTRAIT_BY_ID[id];
+        const encounterSource=this.encounterPortraitSource(faction,portraitIdentity,portraitIndex);
+        const source=story?(NPC_PORTRAIT_BY_ID[id]??encounterSource):encounterSource;
         bar.classList.toggle('has-portrait',Boolean(source));
         if(source){const img=document.createElement('img');img.className='comms-portrait';img.src=source;img.alt=callsign;img.addEventListener('error',()=>{img.remove();bar.classList.remove('has-portrait');this.scheduleCommsFit();},{once:true});bar.append(img);}
         const text=document.createElement('span');text.className='talker-text';text.textContent=`${commsSenderLabel(callsign)}: ${line}`;bar.append(text);
@@ -5530,7 +5571,7 @@ export class GameUI {
     // story marks story-mission transmissions on the log entries; rendering
     // them distinctly (pinned bar, log tag) is later work — the flag is the
     // seam so the log already knows which lines are story.
-    showPilotLine(callsign, line, relation = 'neutral', duration = 6000, story = false) {
+    showPilotLine(callsign, line, relation = 'neutral', duration = 6000, story = false, faction, portraitIndex, portraitIdentity = callsign) {
         // Append to the comms log (capped) so the chat panel can review the
         // whole conversation — nobody misses a line that faded off the bar.
         this.commsLog.push({ callsign, line, relation, story });
@@ -5545,7 +5586,7 @@ export class GameUI {
         if (!bar)
             return;
         const color = relationColor(relation);
-        this.renderCommsMessage(bar,callsign,line,story);
+        this.renderCommsMessage(bar,callsign,line,story,faction,portraitIndex,portraitIdentity);
         this.commsMessage.duration=duration;
         bar.style.color = color;
         bar.style.borderColor = color;
@@ -5584,17 +5625,17 @@ export class GameUI {
     }
     // A group transmission keeps all callsigns in the log; the flight label
     // shows the first handle and a count of the other senders.
-    showGroupLine(callsigns, line, relation = 'neutral', duration = 6000) {
+    showGroupLine(callsigns, line, relation = 'neutral', duration = 6000, faction, portraitIndex) {
         const names = callsigns.map((callsign) => callsignHandle(callsign)).join(', ');
-        this.showPilotLine(names, line, relation, duration);
+        this.showPilotLine(names, line, relation, duration, false, faction, portraitIndex, callsigns[0] ?? names);
     }
     // Story-mission display: a pinned amber transmission on the comms bar.
     // Unlike normal chatter it doesn't fade — it stays until dismissed (tap
     // the CONTINUE bar, or the game times it out) — and it's flagged story in
     // the log. The game holds the chatter mute (storyLineUntil) while it's up.
-    showStoryLine(name, text, relation = 'neutral', conversationId) {
+    showStoryLine(name, text, relation = 'neutral', conversationId, faction, portraitIndex) {
         if (conversationId || this.adventure) {
-            this.openStoryAdventure(name,text,relation,conversationId);
+            this.openStoryAdventure(name,text,relation,conversationId,faction,portraitIndex);
             return;
         }
         this.commsLog.push({ callsign: name, line: text, relation, story: true });
@@ -5607,7 +5648,7 @@ export class GameUI {
         bar.classList.add('active', 'story');
         bar.setAttribute('data-ui-command', 'dismiss-story');
         bar.setAttribute('aria-label', t('CONTINUE'));
-        this.renderCommsMessage(bar,name,text,true);
+        this.renderCommsMessage(bar,name,text,true,faction,portraitIndex,name);
         this.commsMessage.pinned=true;
         window.clearTimeout(this.commsBarTimer);
         this.storyDismissed = false;
@@ -5899,7 +5940,9 @@ export class GameUI {
         </div>`;
         const explorationRows=explorationJournal(this.save);
         const explorationSection=explorationRows.length?`<section class="ship-menu-missions"><h3>${escapeHtml(explorationText(['ENTDECKUNGEN','DISCOVERIES']))}</h3>${explorationRows.map(row=>`<details><summary>${escapeHtml(row.title)}</summary><p>${escapeHtml(row.text)}</p>${row.action&&!player.dockedAt?`<button type="button" data-ui-command="exploration-journal" data-exploration-action="${row.action}">${escapeHtml(explorationText(row.action==='navigate'?['Wrack anvisieren','Target wreck']:['Notruf beantworten','Answer distress call']))}</button>`:''}</details>`).join('')}</section>`:'';
-        const journalPanel=`<div class="ship-console-grid ship-journal">${tutorialSection}${explorationSection}<section class="ship-menu-missions"><h3>${t('ACTIVE CONTRACTS · {count}/6',{count:missions.length})}</h3>${missionRows}</section>
+        const distressRows=distressJournal(this.save);
+        const distressSection=distressRows.length?`<section class="ship-menu-missions"><h3>${escapeHtml(distressText(['NOTRUFE','DISTRESS CALLS']))}</h3>${distressRows.map(row=>`<details><summary>${escapeHtml(row.title)}</summary><p>${escapeHtml(row.text)}</p>${!player.dockedAt&&row.actions?.length?`<div class="ship-menu-actions">${row.actions.map(action=>`<button type="button" data-ui-command="distress-journal" data-distress-action="${action.id}">${escapeHtml(distressText(action.label))}</button>`).join('')}</div>`:''}</details>`).join('')}</section>`:'';
+        const journalPanel=`<div class="ship-console-grid ship-journal">${tutorialSection}${distressSection}${explorationSection}<section class="ship-menu-missions"><h3>${t('ACTIVE CONTRACTS · {count}/6',{count:missions.length})}</h3>${missionRows}</section>
           <details class="ship-menu-account"><summary>${t('COMBAT VALUE')} · ${formatCredits(combatValue)}</summary><p>${t('SHIP + EQUIPMENT · HALF CASH · NO CARGO')}</p></details>
           <details class="ship-menu-events"><summary>${t('RECENT EVENTS · {count}',{count:events.length})}</summary>${eventRows}</details></div>`;
         panel.innerHTML=`<div class="ship-console" data-ship-pane="${tab}">

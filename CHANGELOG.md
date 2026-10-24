@@ -1,3 +1,68 @@
+## 0.8.2ld — Arrival briefings
+
+- Open the channel for every distress variant on arrival, not just the debris escort. Once the pilot is in comms range the briefing opens itself — convoy attack, wreck, trap, fuel, accident, debris, cargo, dispute — with the variant's own choices (accept, scan, hand over, side with a crew, decline). The world pauses while the card is open, so the scenario starts after the decision instead of running behind the panel; closing without deciding leaves the journal answer live and the briefing never pops up again uninvited.
+- Give each briefing a scenario card: who is transmitting and what the situation looks like, before the signal text and choices. It never names the authored variant, so a false distress call reads exactly like a real one.
+- Wait for the right envelope before opening: fuel and repair briefings hold until transfer and repair range, and the hail is deferred (not spent) while another panel or conversation is open or while the pilot is under hyperdrive.
+- Start the debris storm clock at the handover instead of acceptance. Signing the contract up to 1,400 km out no longer burns the 3:30 window while the transport is still holding position; the terms, the running card and the monitor now say the clock starts when you are alongside. A hyperdrive drop lands inside the handover radius, so accepting there links the transport on the spot and starts the clock at once, without a stale “come alongside” acknowledgement.
+- Persist the briefing latch (`briefedAt`) so a reload does not re-open the same card, and let existing careers get their overdue briefing once.
+- Add a wreck-arrival preset to the focused distress stand (50 presets) so the generic briefing can be checked next to the escort offer.
+- Cover the arrival briefing for all eight variants, the non-spoiling scenario card, the fuel range gate, the deferral and the reload latch with integration tests. Focused distress suite: 42 tests.
+
+- Release identifiers: GAME_VERSION `0.8.2ld`, CACHE `voidrunner-v578-0-8-2ld-arrival-briefing`.
+
+## 0.8.2lc — Escort handover
+
+- Fix the escort start when accepting from comms range (up to 1,400 km): the transport cannot fly without its nav and holds its patch of the pocket, so the run silently never began and the storm clock guaranteed a loss. The objective, journal, comms panel and target hint now ask for the handover (“come alongside”), and the transport’s own line says it is holding position.
+- Arm the debris corridor on the handover and on first contact with the line, not on acceptance. Closing on a stranded hull no longer costs hull or the clean-run bonus, and joining within 700 km no longer counts as straying from a corridor that is 110 km wide.
+- Keep the mission card honest mid-run: the objective row switches from “come alongside” to “follow the beacons” at the handover, and the HUD hint switches from “approach” to “follow the beacons” while an escort is running.
+- Clear a finished event’s id from the player’s current target, so the map, radar and target panel cannot keep a dead contact selected.
+- Teach the focused distress stand the real start sequence: escort presets now perform the handover and arm the corridor before asserting damage, and a new preset shows the accepted-but-not-yet-alongside state. The stand has 49 presets.
+- Cover the handover, the pre-handover objective and the target cleanup with integration tests, and update the stray test to fly the line before leaving it. Focused distress suite: 37 tests.
+
+- Release identifiers: GAME_VERSION `0.8.2lc`, CACHE `voidrunner-v577-0-8-2lc-escort-handover`.
+
+## 0.8.2lb — Escort mission brief
+
+- Open the debris escort as a mission, not a journal entry. Once the pilot is within comms range of the transport, the offer panel opens itself; closing it leaves the journal answer live, and it never pops back up uninvited.
+- Give the offer a terms card: mission title, objective, the 3:30 solar-front window, the straying risk and the payout with its clean-run bonus, plus an explicit “accept mission” and “decline” choice.
+- Keep the terms visible during the run: reopening comms mid-escort shows a running card with the live storm clock, transport hull and objective instead of restating the fiction.
+- Close the panel on acceptance and let the transport acknowledge over the comms bar, so starting the escort puts the pilot back in the seat rather than behind a second continue card.
+- Add the mission-offer preset to the focused distress stand, bring the scene count to 48, and cover the auto-offer range, the once-only hail, the terms and the accepted start with integration tests.
+
+- Release identifiers: GAME_VERSION `0.8.2lb`, CACHE `voidrunner-v576-0-8-2lb-escort-brief`.
+
+## 0.8.2la — Debris escort
+
+- Turn the debris rescue into a timed escort. The transport now starts inside a local pocket of torn plating, its nav computer dead, and cannot plot a course out on its own.
+- Project the route from the pilot's nav as amber beacons. Accepting builds a five-marker corridor from the stranded hull through the pocket to an open jump point; the beacons are advisory, not checkpoint gates.
+- Fly the transport on the pilot's exact breadcrumb trail at a 150 m lag. It copies the line the pilot actually flew rather than chasing a formation slot, so a clean line proves the heavy hull fits and a corner cut swings the transport wide.
+- Sweep a damage tube around the route. Leaving it warns first, then damages the pilot after a short grace; the transport takes its own hits when it reaches the same off-line breadcrumb. Accepting from behind the transport grants a short join window.
+- Add a solar-front clock to the accept step. The sun swells over the final ninety seconds, the far beacons fail at one minute, and the transport is lost if it has not spun up and jumped by zero.
+- End the run at a jump point outside the pocket: eight seconds of spin-up, a payout scaled by remaining hull, and a clean-run bonus. A late or destroyed transport leaves a persistent salvage wreck instead of a dead log entry.
+- Extend the focused distress stand with escort scenes for the beacon route, a straying pilot, a damaged transport, the jump-point spin-up and a lost transport; update the README and review note.
+- Add integration coverage for route generation, breadcrumb following, delayed shared corridor damage, the solar-front loss and the paid jump.
+
+- Release identifiers: GAME_VERSION `0.8.2la`, CACHE `voidrunner-v575-0-8-2la-debris-escort`.
+
+## 0.8.2kz — Procedural encounter portraits
+
+- Add six individually prompted, anonymous cockpit portraits for each active faction: Concord, Alliance, Independents and Pirates. All 24 assets use the existing portrait dimensions and graphic style.
+- Assign each procedural pilot a random portrait from their faction and reuse it across comms and random-encounter dialogue exchanges. Story characters keep their existing portraits.
+- Release identifiers: GAME_VERSION `0.8.2kz`, CACHE `voidrunner-v574-0-8-2kz-encounter-portraits`.
+
+## 0.8.2ky — Recurring distress calls
+
+- Add eight recurring distress variants with two authored setups each: convoy attack, destroyed freighter, pirate trap, fuel shortage, disabled ship, debris escape, jettisoned cargo and disputed salvage. The first call arrives after 4–7 minutes of eligible flight, later calls follow after 6–10 minutes, only one event is active at a time, and the last two variants are not repeated. Genuine calls remain roughly 85% of events.
+- Persist each event as a lifecycle record with actors, objectives, cargo and settlement so reloading never refills salvage, heals damage, revives raiders or pays twice. Existing Lantern convoy progress migrates once: a finished rescue becomes history, an active one keeps its damaged actors and deadline.
+- Make assistance use real resources: fuel transfers show and deduct the reserve, parts come from the normal hold, repair drones accept neutral event ships, and crew repair is a slower fallback. Survivor pods use normal fly-over collection, reserve mission cargo and are paid on docking. A full hold is explained before cargo recovery.
+- Integrate signals into the cockpit: one comms announcement, a journal entry, a selectable map/radar waypoint, hull-appropriate dialogue in German and English, and cockpit-monitor objectives. New signals are logged 3,000–10,000 km from the player, outside discovery range, so responding means setting the journal waypoint and making a local hyperdrive jump; answers still require closing to 1,400 km. Ignoring or declining a call carries no reputation penalty. Attacking a neutral or breaking a dispute agreement forfeits the payment.
+- Hold neutral distress crews at their station while the player repairs, transfers fuel or recovers cargo. A parked ship no longer receives a zero-length travel destination that made damaged vessels orbit themselves; hostile raiders, fleeing convoy victims, escape-vector ships and departing supported claimants retain normal travel.
+- Make raiders answer fire: the raider that is hit breaks off its convoy victim to engage the player or another attacking ship for 45 seconds, then resumes the encounter's target assignment. Other raiders keep pressing the transports.
+- Keep unresolved signals cheap and quiet: no actors spawn until contact is answered, and an unanswered signal expires after ten minutes. Disguised raiders stay hidden until an actual scan exposes them.
+- Extend the discovery review with distress presets, save/reload checks, full-hold and resource states, and integration coverage for pacing, migration, transfers, persistence and exactly-once rewards. The focused distress stand now has 42 scenes: every variant opens with a 6,800 km signal that requires the journal waypoint and hyperdrive, close-range interaction checks are marked as “Nahaufnahme”, and a convoy retaliation scene shows a raider breaking off its transport.
+- Rewrite every distress transmission, follow-up and player reply as natural two-way radio traffic in German and English. Callers now have distinct voices, the quest-log objective stays on the cockpit monitor instead of appearing in spoken lines, and backing a claimant in a dispute gets that crew’s own reply and callsign. Signal-phase hull and container objectives report the authored manifest instead of zero, finishing an event clears its monitor line, and a dispute’s journal entry keeps the advance that was actually paid.
+- Rewrite Sera’s salvage offer for Driftglass so it sounds like a working crew making a deal rather than a menu description. Fix the focused wreck-ambush preset so the returning raiders actually spawn (world time 0 made the scheduled deadline read as unscheduled).
+
 ## 0.8.2kx — Solid exploration wrecks
 
 - Give the stationary Kestrel Nine fragments fitted ship/weapon collision. Invalidate the obstacle grid when their geometry becomes available; retain the wreck and collision after cargo recovery.

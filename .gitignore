@@ -33,6 +33,8 @@ obj_models/
 !art/locations/simplified/*.webp
 !art/portraits/simplified/
 !art/portraits/simplified/*.webp
+!art/portraits/simplified/encounters/
+!art/portraits/simplified/encounters/**/*.webp
 !assets/remaster/landed-flat/
 !assets/remaster/landed-flat/*.webp
 !assets/remaster/cockpit-vanguard.webp

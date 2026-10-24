@@ -497,6 +497,8 @@ const actions = {
     discardMission: (missionId) => session?.discardMission(missionId),
     chooseExploration: choice=>session?.chooseExploration(choice),
     explorationJournalAction: action=>session?.explorationJournalAction(action),
+    chooseDistress: choice=>session?.chooseDistress(choice),
+    distressJournalAction: action=>session?.distressJournalAction(action),
     chooseTutorial: (choiceId) => session?.chooseTutorial(choiceId),
     finishTutorialBriefing: (id, completed) => session?.finishTutorialBriefing(id, completed),
     talkToNpc: (personId, topicId) => session?.talkToNpc(personId, topicId),
@@ -671,6 +673,8 @@ window.__VOID_PRIVATEER__ = {
     launch: () => withSession((ready) => ready.launch()),
     restartArena: () => session?.arena && session.restartArena(),
     jumpToSystem: (systemId) => session?.debugJumpToSystem(systemId),
+    startDistress: (variant, setup = 0, options = {}) => session?.debugStartDistress(variant, setup, options),
+    distressState: () => session?.save?.world?.distress ?? null,
     saveNow: () => session?.saveNow(),
     // Mock story-mission line: pins the comms bar in amber, mutes all chatter
     // until dismissed (tap the CONTINUE bar) or the duration elapses.

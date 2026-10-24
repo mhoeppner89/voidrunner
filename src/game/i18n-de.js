@@ -15,6 +15,7 @@ import {EQUIPMENT_NAMING} from './equipmentNaming.js';
 // the English lines. Values are plain text — never HTML.
 export const DE_CATALOG = {
     'Approach the wreck on normal engines.': 'Nähere dich dem Wrack mit normalem Antrieb.',
+    'Close the last stretch on normal engines.': 'Schließe das letzte Stück mit normalem Antrieb ab.',
     'SHIELDS DOWN': 'SCHILDE AUS',
     'TARGET SHIELDS DOWN': 'ZIELSCHILDE AUS',
     'Mining Drone':'Abbaudrohne',
