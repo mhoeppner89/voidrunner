@@ -1,3 +1,26 @@
+## 0.8.2lf — One German table
+
+- Merge the German catalog into a single ordered table. `DE_CATALOG` was a literal plus ~35 appended `Object.assign` blocks, so a key could sit in the file twice and the last definition silently won; the entries now live in one literal grouped by area (flight and cockpit, stations, missions, game data, then the later feature passes: outfitting, wingmen, capital combat, lore) and end with the two generated blocks that fold in the equipment naming table and the tutorial copy from their own modules. Entry-for-entry identical to the previous build — verified by comparing all 3,495 final entries before and after, with 0 changed and 0 lost.
+- Remove the duplicates the merge exposed: 8 appended entries repeated the literal, and 5 pairs inside the literal repeated each other ("Radar range", "SHIELD", "Courier", one siege-ordinance line). Identical text, so no player-visible change.
+- Add a fallback-coverage test: every literal key handed to `t()`/`translate()` anywhere in `src/` must have a German entry. It caught 16 labels that had been rendering in English — FIRE, PAUSE, PAUSED, RESTART, CONTINUE, SELECT, SWITCH, TORPEDO, LIVE, TEAMS, MISSION CARGO, "Scan this wreck first.", the ore-deposit toast, the race-time tooltip, the wing-order call for Rin Vek and the `{seconds}s` countdown suffix. All translated.
+- Tighten the catalog guard: any duplicate key now fails (identical or not), as does a reassignment appended below the literal, an empty value, or a German value that drops or renames a `{placeholder}` of its key.
+
+- Release identifiers: GAME_VERSION `0.8.2lf`, CACHE `voidrunner-v580-0-8-2lf-catalog-table`.
+
+## 0.8.2le — Dialogue pass
+
+- Read every authored line in both languages — distress variants, arrival briefings, adventure dialogue, tutorial coaching, radio traffic, bar conversations and contract briefs — and fixed the places where the German had drifted from what the game actually does or from how people speak.
+- Stop translating names: a Vanguard pair is a “Vanguard-Paar” again instead of a “Vorhut-Paar”, the Shard Gauntlet and Hard Run keep their names, and “The Shardbelt” no longer carries its English article into a German sentence.
+- Repair German that duplicate catalog keys had silently shadowed: the radar upgrade promised 25 % instead of 50 % target range, and the prologue completion line read “Das Prolog”. A unit test now fails when the catalog redefines a key with different text, so a later `Object.assign` block cannot overwrite a translation unnoticed.
+- Fix meaning errors: the NPC observer reported “ships aiming at you” instead of ships holding fire, “kill the screen or the hunter” became “Erledige den Schirm” (a window screen) instead of the fighter screen, and a 40 % hull refill was phrased in “Prozentpunkte”.
+- Say what the transponder button actually shows. The monitor button displays the current state, so Paul now points at “the button that currently reads TRANSPONDER ON” instead of telling the pilot to press a label that is already active; switching back on points at the OFF label.
+- Replace literal calques with German that reads like speech: “Nicht mein Krieg” → “Nicht meine Schlacht”, “Mulis” → “unbewaffnete Frachter”, “Beacon” → “Bake”, “Metall berührt” → “an Metall geschrammt”, and the trade tip no longer says a station “gives” a commodity at a price.
+- Repair German grammar and register in the coaching and radio lines: “Vergleich” → “Vergleiche”, “Klicke” → “Tippe”, “Erprobe” → “Probier … aus”, “Ziehe den Schub” → “Setze den Schub”, “Rin ist auf Cairn zurück” → “Rin ist zurück in Cairn”, and traffic control speaks instead of filing memos (“Freihaltung der Gasse”).
+- Keep the flavour radio and bar lines in one voice across systems, and align the capital-ship item names (“Großkampfschiff-Gaußkanone” rather than “Kampfschiff-Gausskanone”).
+- Add a German catalog guard test for conflicting keys, translated proper nouns and shifted numbers. Focused dialogue and localization suites: 70 tests.
+
+- Release identifiers: GAME_VERSION `0.8.2le`, CACHE `voidrunner-v579-0-8-2le-dialogue-pass`.
+
 ## 0.8.2ld — Arrival briefings
 
 - Open the channel for every distress variant on arrival, not just the debris escort. Once the pilot is in comms range the briefing opens itself — convoy attack, wreck, trap, fuel, accident, debris, cargo, dispute — with the variant's own choices (accept, scan, hand over, side with a crew, decline). The world pauses while the card is open, so the scenario starts after the decision instead of running behind the panel; closing without deciding leaves the journal answer live and the briefing never pops up again uninvited.

@@ -1602,7 +1602,7 @@ export const DistressMethods = {
                     this.playDistressLine(active, ['Eine Minute. Deine Bojen fallen aus — wir sehen nur noch dich.', 'One minute. Your beacons are dropping — we only see you.']);
                     this.ui?.pushEvent?.(distressText(['Die Sonnenfront erreicht die Bojen. Der Kurs liegt jetzt bei dir.', 'The solar front is taking the beacons. The course is yours now.']), 'danger', 6200);
                 }
-                if (stage === 3) this.playDistressLine(active, ['Dreißig Sekunden! Wo ist der Vektor?', 'Thirty seconds! Where is the vector?']);
+                if (stage === 3) this.playDistressLine(active, ['Dreißig Sekunden! Wo bleibt der Vektor?', 'Thirty seconds! Where is the vector?']);
             }
             if (now >= p.burstAt) {
                 this.loseDistressEscort(active, ship);
@@ -1650,7 +1650,7 @@ export const DistressMethods = {
                     this.renderer?.spawnImpact?.(player.position, 0xffd08a, false);
                     if (!p.strayLine) {
                         p.strayLine = true;
-                        this.playDistressLine(active, ['Du bist zu weit raus! Wir sehen das Metall zu spät.', 'You are too wide! We see the metal too late.']);
+                        this.playDistressLine(active, ['Du fliegst zu weit raus! Wir sehen die Brocken zu spät.', 'You are too wide! We see the metal too late.']);
                     }
                 }
             } else p.straySince = 0;
@@ -1666,7 +1666,7 @@ export const DistressMethods = {
                     p.escortHull = Math.max(0, Math.min(1, ship.hull / Math.max(1, ship.maxHull)));
                     if (!p.transportLine) {
                         p.transportLine = true;
-                        this.playDistressLine(active, ['Wir haben Metall berührt. Halt die Linie!', 'We clipped metal. Hold the line!']);
+                        this.playDistressLine(active, ['Wir sind an Metall geschrammt. Halt die Linie!', 'We clipped metal. Hold the line!']);
                     }
                     if (ship.hull <= 0) {
                         this.loseDistressEscort(active, ship);

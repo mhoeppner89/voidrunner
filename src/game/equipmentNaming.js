@@ -98,15 +98,15 @@ export const EQUIPMENT_NAMING = {
     },
     "frigate-battery": {
       "en": "Capital Anti-Fighter Cannon",
-      "de": "Kampfschiff-Abfangkanone"
+      "de": "Großkampfschiff-Abfangkanone"
     },
     "cruiser-battery": {
       "en": "Capital Rail Cannon",
-      "de": "Kampfschiff-Gausskanone"
+      "de": "Großkampfschiff-Gaußkanone"
     },
     "capital-shield-generator": {
       "en": "Capital Shield Booster",
-      "de": "Kampfschiff-Schildverstärker"
+      "de": "Großkampfschiff-Schildverstärker"
     }
   },
   "terms": {

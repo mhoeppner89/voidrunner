@@ -59,7 +59,7 @@ const VARIANTS = [
         setups: [
             {
                 caller: 'Lantern', vessel: ['Prospektorenkonvoi Lantern', 'Lantern prospecting convoy'],
-                signal: ['Mayday, hier ist der Konvoi Lantern. Zwei Raider hängen an uns und schneiden uns den Rückweg ab. Wir sind zwei Mulis ohne Waffen. Die Kompanie zahlt euch zweitausend für jedes Schiff, das hier rauskommt.',
+                signal: ['Mayday, hier ist der Konvoi Lantern. Zwei Piraten hängen an uns und schneiden uns den Rückweg ab. Wir sind zwei unbewaffnete Frachter. Die Kompanie zahlt euch zweitausend für jedes Schiff, das hier rauskommt.',
                     'Mayday, this is the Lantern convoy. Two raiders are on us and cutting off our way out. We are two unarmed mules. The company pays two thousand for every ship you get out of here.'],
                 context: ['Zwei Prospektoren werden bereits beschossen.', 'Two prospectors are already under fire.'],
                 actors: [
@@ -161,7 +161,7 @@ const VARIANTS = [
         setups: [
             {
                 caller: 'MV Tallow', vessel: ['Frachter Tallow', 'freighter Tallow'],
-                signal: ['Tallow an alle. Wir sind trocken. Acht Einheiten Treibstoff, sonst treiben wir hier ab. Zahle zwölfhundert.',
+                signal: ['Tallow an alle. Uns geht der Sprit aus. Acht Einheiten, sonst treiben wir hier ab. Zahle zwölfhundert.',
                     'Tallow to all. We are dry. Eight units of fuel or we drift. Paying twelve hundred.'],
                 context: ['Ein Frachter hat noch Luft, aber keinen Sprit.', 'A freighter still has air, but no fuel.'],
                 actors: [v('tallow', 'Tallow', 'mule', 'trader', [0, 0, 0])],
@@ -244,7 +244,7 @@ const VARIANTS = [
             },
             {
                 caller: 'Prospektor Ember', vessel: ['Prospektor Ember', 'prospector Ember'],
-                signal: ['Ember hier. Zwei Medizingehäuse treiben neben mir. Bring sie mir, und du bekommst vierzehnhundert.',
+                signal: ['Ember hier. Zwei Kisten Medikamente treiben neben mir. Bring sie mir, und du bekommst vierzehnhundert.',
                     'Ember here. Two medical cases are drifting beside me. Bring them in and you get fourteen hundred.'],
                 context: ['Zwei medizinische Behälter, und ein Prospektor ohne Greifer.', 'Two medical cases, and a prospector with no grabber.'],
                 actors: [v('ember', 'Ember', 'prospector', 'miner', [0, 0, 0])],
@@ -728,19 +728,19 @@ export function distressDialogue(conversationId, save) {
             if (active.phase === 'involved') {
                 const total = data.victims ?? 0;
                 const safe = (active.actors ?? []).filter(actor => actor.role !== 'pirate' && !actor.destroyed && actor.hull > 0).length;
-                node.text = [`${call(active)}: „Sie lassen nicht locker. Wir halten die Köpfe unten, aber ewig geht das nicht.“\n\nNoch ${safe} von ${total} Mulis.`,
+                node.text = [`${call(active)}: „Sie lassen nicht locker. Wir halten die Köpfe unten, aber ewig geht das nicht.“\n\nNoch ${safe} von ${total} Frachtern.`,
                     `${call(active)}: “They are not letting up. We are keeping our heads down, but we cannot do this forever.”\n\n${safe} of ${total} mules left.`];
                 node.choices = [
                     choice(['Ich bleibe an ihnen.','I am staying on them.'], 'close'),
                     choice(['Ich muss raus.','I have to break off.'], 'withdraw'),
                 ];
             } else {
-                const flock = (data.victims ?? 0) > 1 ? 'Die Mulis feuern nicht zurück.' : 'Der Frachter feuert nicht zurück.';
-                node.text = [`${distressText(data.signal)}\n\nEin Raider dreht schon wieder ein. ${flock}`,
+                const flock = (data.victims ?? 0) > 1 ? 'Die Frachter feuern nicht zurück.' : 'Der Frachter feuert nicht zurück.';
+                node.text = [`${distressText(data.signal)}\n\nEin Pirat dreht schon wieder ein. ${flock}`,
                     `${distressText(data.signal)}\n\nOne raider is already coming around again. ${(data.victims ?? 0) > 1 ? 'The mules are not shooting back.' : 'The freighter is not shooting back.'}`];
                 node.choices = [
                     choice(['Ich gehe rein.','I am going in.'], 'help'),
-                    choice(['Nicht mein Krieg.','Not my war.'], 'decline'),
+                    choice(['Nicht meine Schlacht.','Not my fight.'], 'decline'),
                 ];
             }
             break;
@@ -767,7 +767,7 @@ export function distressDialogue(conversationId, save) {
         }
         case 'trap': {
             if (active.progress?.exposed) {
-                node.text = [`${distressText(data.clue)}\n\nDie Raider fahren die Waffen hoch.`,
+                node.text = [`${distressText(data.clue)}\n\nDie Piraten fahren die Waffen hoch.`,
                     `${distressText(data.clue)}\n\nThe raiders are bringing their weapons up.`];
                 node.choices = [
                     choice(['Dann eben so.','Fine. Let us do this.'], 'fight'),
@@ -791,7 +791,7 @@ export function distressDialogue(conversationId, save) {
             node.text = enough
                 ? [`${distressText(data.signal)}\n\nDu hast ${fuel} Einheiten an Bord. ${fuelWord} davon abzugeben tut nicht weh.`,
                     `${distressText(data.signal)}\n\nYou have ${fuel} units aboard. Giving up ${data.fuel} of them will not hurt.`]
-                : [`${distressText(data.signal)}\n\nDu hast nur ${fuel} Einheiten. ${fuelWord} abzugeben heißt, selbst liegen zu bleiben.`,
+                : [`${distressText(data.signal)}\n\nDu hast nur ${fuel} Einheiten. ${fuelWord} abzugeben heißt, dass du selbst liegen bleibst.`,
                     `${distressText(data.signal)}\n\nYou only have ${fuel} units. Giving up ${data.fuel} would leave you stranded too.`];
             node.choices = enough ? [
                 choice([`${data.fuel} Einheiten abgeben · ${payment} cr.`, `Hand over ${data.fuel} units · ${payment} cr.`], 'transfer'),
@@ -826,7 +826,7 @@ export function distressDialogue(conversationId, save) {
             if (active.phase === 'involved') {
                 const hull = Math.round(Math.max(0, Math.min(1, Number(p.escortHull) || 0)) * 100);
                 node.text = [p.joinedAt
-                        ? `${call(active)}: „Wir hängen an deiner Spur. Hülle ${hull}%, Sturm in ${clock(left)}. Wenn du zu weit rausgehst, sehen wir das Metall zu spät.“`
+                        ? `${call(active)}: „Wir hängen an deiner Spur. Hülle ${hull}%, Sturm in ${clock(left)}. Wenn du zu weit rausfliegst, sehen wir die Brocken zu spät.“`
                         : `${call(active)}: „Wir halten Position — unser Nav ist tot. Komm längsseits, dann legen wir die Spur zusammen. Hülle ${hull}%, Sturm in ${clock(left)}.“`,
                     p.joinedAt
                         ? `${call(active)}: “We are on your trail. Hull ${hull}%, storm in ${clock(left)}. If you go wide, we see the metal too late.”`
@@ -899,7 +899,7 @@ export function distressDialogue(conversationId, save) {
             const rivalName = rival?.name ?? 'the other crew';
             const claimant = data.actors.find(actor => actor.key !== data.rival);
             const decisions = [
-                choice(['Ich schlage einen Split vor.','I propose a split.'], 'negotiate'),
+                choice(['Ich schlage eine Teilung vor.','I propose a split.'], 'negotiate'),
                 choice([`Ich stehe zu ${active.caller}.`, `I side with ${active.caller}.`], 'side-a'),
                 choice([`Ich stehe zu ${rivalName}.`, `I side with ${rivalName}.`], 'side-b'),
                 choice(['Klär das selbst.','Settle it yourselves.'], 'decline'),
@@ -923,7 +923,7 @@ export function distressDialogue(conversationId, save) {
                 // Listening to both claims is optional; the decision stays on
                 // the main node so a player can skip straight to it.
                 script.nodes.accounts = {
-                    text: [`${claimant?.name ?? active.caller}: „Unser Beacon steht seit dem Sturm hier. Der Greifer hängt noch im Rumpf — willst du da wirklich ran?“\n${rivalName}: „Ein Beacon ist keine Lizenz. Wir haben die Bergung heute Morgen gemeldet, mit zwei Leuten im Feld.“\n\nBeide haben Papiere. Zusammen ergeben sie keinen Sinn.`,
+                    text: [`${claimant?.name ?? active.caller}: „Unsere Bake steht seit dem Sturm hier. Der Greifer hängt noch im Rumpf — willst du da wirklich ran?“\n${rivalName}: „Eine Bake ist keine Lizenz. Wir haben die Bergung heute Morgen gemeldet, mit zwei Leuten im Feld.“\n\nBeide haben Papiere. Zusammen passen sie nicht.`,
                         `${claimant?.name ?? active.caller}: “Our beacon has been here since the storm. Our grapple is still in the hull — do you really want to touch that?”\n${rivalName}: “A beacon is not a licence. We filed the salvage this morning, with two people in the field.”\n\nBoth have papers. Together they make no sense.`],
                     choices: decisions,
                 };

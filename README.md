@@ -1,6 +1,6 @@
 # Voidrunner
 
-A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2ld**.
+A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2lf**.
 
 Procedural pilot comms and random-encounter dialogue use 24 individually prompted, anonymous cockpit portraits: six each for Concord, Alliance, Independents and Pirates, with three male and three female portraits per faction. Files 01–03 are male; 04–06 are female. Each image is a separate 647×768 WebP. Each pilot gets a random portrait from their faction, reused throughout their exchange.
 

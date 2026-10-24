@@ -7,7 +7,7 @@ export const TUTORIAL_TRANSLATIONS = {
     "The cargo is aboard. Rin will meet you outside.": "Die Fracht ist an Bord. Rin trifft dich draußen.",
     "Select Vesper on the navigation map.": "Wähle Vesper auf der Navigationskarte.",
     "Open the centre radar, select VESPER and close the map.": "Öffne das mittlere Radar, wähle VESPER und schließe die Karte.",
-    "Try the flight controls with Rin.": "Erprobe die Steuerung mit Rin.",
+    "Try the flight controls with Rin.": "Probier die Steuerung mit Rin aus.",
     "Follow Rin’s instructions on the comms display.": "Folge Rins Anweisungen im Funkfeld.",
     "Fly to Vesper and land.": "Fliege nach Vesper und lande.",
     "Select Vesper, engage HYPERDRIVE, then reduce thrust and approach slowly. Landing is automatic.": "Wähle Vesper, aktiviere HYPERDRIVE, reduziere dann den Schub und fliege langsam heran. Die Landung läuft automatisch.",
@@ -28,7 +28,7 @@ export const TUTORIAL_TRANSLATIONS = {
     "Land at Vesper and collect your contract payment.": "Lande auf Vesper und kassiere deinen Vertragslohn.",
     "Select Vesper and approach slowly. Your mining contract settles on landing.": "Wähle Vesper und fliege langsam heran. Der Abbauvertrag wird bei der Landung abgerechnet.",
     "Talk to Rin in Vesper’s bar.": "Sprich mit Rin in Vespers Bar.",
-    "Rin has a survey job for you before she leaves to gather information.": "Rin hat einen Erkundungsauftrag für dich, bevor sie Informationen sammeln geht.",
+    "Rin has a survey job for you before she leaves to gather information.": "Rin hat noch einen Erkundungsauftrag für dich, bevor sie losfliegt und Nachforschungen anstellt.",
     "Switch your drone bay to PDC drones.": "Stelle deine Drohnenbucht auf PDC um.",
     "Open EQUIPMENT, select the PDC drone in cargo and install it in Drone bay 1.": "Öffne AUSRÜSTUNG, wähle die PDC-Drohne in der Fracht und baue sie in Drohnenbucht 1 ein.",
     "Chart the major wrecks in Mourning Line.": "Kartiere die großen Wracks in der Mourning Line.",
@@ -48,7 +48,7 @@ export const TUTORIAL_TRANSLATIONS = {
     "Talk to Mara at Helix.": "Sprich mit Mara auf Helix.",
     "Mara is waiting in the bar.": "Mara wartet in der Bar.",
     "Earn and equip your ship.": "Verdiene Geld und rüste dein Schiff auf.",
-    "Trade, mine and take contracts in the starting system. Mara will call when your ship and equipment are ready. The jump gate is closed for repairs.": "Handle, baue Erz ab und nimm Aufträge im Startsystem an. Mara meldet sich, wenn Schiff und Ausrüstung bereit sind. Das Sprungtor wird repariert.",
+    "Trade, mine and take contracts in the starting system. Mara will call when your ship and equipment are ready. The jump gate is closed for repairs.": "Treib Handel, bau Erz ab und nimm Aufträge im Startsystem an. Mara meldet sich, wenn Schiff und Ausrüstung bereit sind. Das Sprungtor wird repariert.",
     "Meet Rin at Cairn Yard.": "Triff Rin auf Cairn Yard.",
     "Mara has news from Rin. Fly to Cairn and land.": "Mara hat Neuigkeiten von Rin. Fliege nach Cairn und lande.",
     "Talk to Rin at Cairn.": "Sprich mit Rin auf Cairn.",
@@ -75,9 +75,9 @@ export const TUTORIAL_TRANSLATIONS = {
     "Drag the thrust slider on the left upward.": "Ziehe den Schubregler links nach oben.",
     "Turn the ship.": "Wende das Schiff.",
     "Desktop: use your flight controls. Phone: tilt to steer. The edge marker points to your selected target.": "Desktop: Nutze die Flugsteuerung. Handy: Kippe zum Steuern. Der Randmarker zeigt zum gewählten Ziel.",
-    "Try the afterburner.": "Erprobe den Nachbrenner.",
+    "Try the afterburner.": "Probier den Nachbrenner aus.",
     "Set full thrust, then hold the gold afterburner button for two seconds. Afterburner uses fuel.": "Stelle vollen Schub ein und halte die goldene Nachbrennertaste zwei Sekunden gedrückt. Der Nachbrenner verbraucht Treibstoff.",
-    "Try the target monitor.": "Erprobe den Zielmonitor.",
+    "Try the target monitor.": "Probier den Zielmonitor aus.",
     "Tap the right monitor to cycle contacts. It shows your target and its distance.": "Tippe den rechten Monitor an, um Kontakte zu wechseln. Er zeigt Ziel und Entfernung.",
     "Open your ship monitor.": "Öffne den Schiffsmonitor.",
     "Tap the left monitor to see your equipment, cargo and mission. Close it to return to flight.": "Tippe den linken Monitor an, um Ausrüstung, Fracht und Auftrag zu sehen. Schließe ihn für den Weiterflug.",
@@ -87,7 +87,7 @@ export const TUTORIAL_TRANSLATIONS = {
     "Mayday! Two Scrappers on my tail by the cruiser. I could use a hand!": "Mayday! Zwei Scrapper hinter mir beim Kreuzer. Ich könnte Hilfe gebrauchen!",
     "Five contacts. Too many. Transponder off, thrust down. Hide inside the carrier hangar and hold fire.": "Fünf Kontakte. Zu viele. Transponder aus, Schub runter. Versteck dich im Trägerhangar und halte das Feuer zurück.",
     "The lane is clear. Transponder on. Let us head to Helix; Mara will want your survey.": "Die Route ist frei. Transponder an. Fliegen wir nach Helix; Mara wartet auf deine Kartierung.",
-    "Rin is back at Cairn. She has a lead on your parents. Go meet her there.": "Rin ist auf Cairn zurück. Sie hat eine Spur zu deinen Eltern. Triff sie dort.",
+    "Rin is back at Cairn. She has a lead on your parents. Go meet her there.": "Rin ist zurück in Cairn. Sie hat eine Spur zu deinen Eltern. Triff sie dort.",
     "You have the recorder. Take it to Mara. We are even now — safe flying.": "Du hast den Rekorder. Bring ihn zu Mara. Wir sind jetzt quitt — guten Flug.",
     "Good. The hull blocks their sensors. I used to haul supplies through this hangar before the evacuation. Now we wait.": "Gut. Die Hülle blockiert ihre Sensoren. Vor der Evakuierung habe ich Fracht durch diesen Hangar geflogen. Jetzt warten wir.",
     "I see you outside, but I need you at the hangar. Select Helix, reduce thrust and approach the landing marker.": "Ich sehe dich draußen, aber ich brauche dich am Hangar. Wähle Helix, reduziere den Schub und fliege zum Landemarker.",
@@ -119,7 +119,7 @@ export const TUTORIAL_TRANSLATIONS = {
 };
 
 
-Object.assign(TUTORIAL_TRANSLATIONS,{'Finish this training contract with Rin first.':'Beende zuerst diesen Übungsvertrag mit Rin.','I will scout ahead. Keep your eyes open too; we will compare notes when Mara has decoded the recorder.':'Ich erkunde die nächste Spur. Halte auch die Augen offen; wir vergleichen unsere Notizen, wenn Mara den Rekorder entschlüsselt hat.'});
+Object.assign(TUTORIAL_TRANSLATIONS,{'Finish this training contract with Rin first.':'Beende zuerst diesen Übungsvertrag mit Rin.','I will scout ahead. Keep your eyes open too; we will compare notes when Mara has decoded the recorder.':'Ich sehe mir die nächste Spur an. Halte auch die Augen offen; wir vergleichen unsere Notizen, wenn Mara den Rekorder entschlüsselt hat.'});
 
 Object.assign(TUTORIAL_TRANSLATIONS,{'Talk to Rin, then accept the mining contract.':'Sprich mit Rin und nimm dann den Abbauvertrag an.','Talk to Rin first.':'Sprich zuerst mit Rin.','Vesper Mining Cooperative':'Vesper-Bergbaukooperative','APPROACH SLOWLY':'LANGSAM NÄHERN'});
 
@@ -137,9 +137,9 @@ Object.assign(TUTORIAL_TRANSLATIONS, {
     "The patrol has passed. Switch your transponder ON in the left monitor.": "Die Patrouille ist vorbei. Schalte im linken Monitor den Transponder EIN.",
     "Select {destination} as your target.": "Wähle {destination} als Ziel.",
     "Approach to 5,000 km above the surface. Watch the distance on your target monitor.": "Fliege bis auf 5.000 km über die Oberfläche heran. Die Entfernung steht im Zielmonitor.",
-    "Set thrust to zero to slow down for landing.": "Ziehe den Schub auf null, um für die Landung abzubremsen.",
+    "Set thrust to zero to slow down for landing.": "Setze den Schub auf null, um für die Landung abzubremsen.",
     "Hold position. Landing starts automatically below 5,000 km.": "Halte die Position. Unter 5.000 km beginnt die Landung automatisch.",
-    "Approach the highlighted landing beacon.": "Fliege zum hervorgehobenen Landebeacon.",
+    "Approach the highlighted landing beacon.": "Fliege zur hervorgehobenen Landebake.",
     "Fly slowly along the landing guide into the marked hangar.": "Fliege langsam entlang der Landehilfe in den markierten Hangar.",
     "Fly to the highlighted survey marker.": "Fliege zum hervorgehobenen Vermessungsmarker.",
     "Reduce thrust so the survey can finish.": "Senke den Schub, damit die Vermessung abgeschlossen werden kann.",
@@ -152,7 +152,7 @@ Object.assign(TUTORIAL_TRANSLATIONS, {
     "Hold SALVAGE to recover the black box.": "Halte BERGEN gedrückt, um die Blackbox zu bergen.",
     "Five contacts. Switch your transponder OFF in the left monitor.": "Fünf Kontakte. Schalte im linken Monitor den Transponder AUS.",
     "Fly into the marked carrier hangar. Its hull will block their sensors.": "Fliege in den markierten Trägerhangar. Seine Hülle schirmt dich vor ihren Sensoren ab.",
-    "Set thrust to zero inside the hangar.": "Ziehe im Hangar den Schub auf null.",
+    "Set thrust to zero inside the hangar.": "Setze im Hangar den Schub auf null.",
     "Stay hidden while the patrol passes.": "Bleib im Versteck, bis die Patrouille vorbei ist.",
     "Fire when the pirate crosses your sights.": "Feuere, wenn der Pirat vor deinem Fadenkreuz liegt.",
     "Stay near the carrier while Paul checks the flight deck.": "Bleib beim Träger, während Paul das Flugdeck prüft.",
@@ -167,7 +167,7 @@ Object.assign(TUTORIAL_TRANSLATIONS, {
 });
 
 Object.assign(TUTORIAL_TRANSLATIONS, {
-    "Raise thrust to maximum.": "Ziehe den Schub auf Maximum.",
+    "Raise thrust to maximum.": "Stelle den Schub auf Maximum.",
     "Hold the afterburner for two seconds: Shift on desktop, the gold button on phone.": "Halte den Nachbrenner zwei Sekunden lang: Shift am Desktop, die goldene Taste am Smartphone.",
     "Tap the left monitor to open your ship status.": "Tippe auf den linken Monitor, um deinen Schiffsstatus zu öffnen.",
     "Talk to Rin in Vesper’s bar.": "Sprich mit Rin in Vespers Bar.",
@@ -178,18 +178,18 @@ Object.assign(TUTORIAL_TRANSLATIONS,{
     'Buy the maximum Protein at Helix.':'Kaufe mit MAXIMAL KAUFEN Protein auf Helix.',
     'Select Protein in TRADE, then choose BUY MAX.':'Wähle unter HANDEL Protein und tippe auf MAXIMAL KAUFEN.',
     'Sell all Protein at Vesper.':'Verkaufe das gesamte Protein auf Vesper.',
-    'Follow Rin’s approach instructions after hyperdrive ends at Vesper.':'Folge nach dem Hyperdrive bei Vesper Rins Anflughinweisen.',
+    'Follow Rin’s approach instructions after hyperdrive ends at Vesper.':'Folge Rins Anflughinweisen, sobald der Hyperdrive bei Vesper endet.',
     'Hold the afterburner until 5,000 km: Shift on desktop, the gold button on phone.':'Halte den Nachbrenner bis auf 5.000 km: Shift am Desktop, die goldene Taste am Smartphone.',
     'Release the afterburner.':'Lass den Nachbrenner los.'
 });
 
 Object.assign(TUTORIAL_TRANSLATIONS, {
     "Meet Mara and Rin in the bar.": "Triff Mara und Rin in der Bar.",
-    "Select Story to see these hints.": "Klicke auf 'Story', um diese Hinweise zu sehen.",
+    "Select Story to see these hints.": "Tippe auf STORY, um diese Hinweise zu sehen.",
     "Buy Protein on Helix.": "Kaufe Protein auf Helix.",
     "TRADE → Protein → BUY MAX.": "HANDEL → Protein → MAXIMAL KAUFEN.",
     "Launch from Helix.": "Starte von Helix.",
-    "Select your ship in the hangar.": "Klicke auf dein Schiff im Hangar.",
+    "Select your ship in the hangar.": "Wähle dein Schiff im Hangar.",
     "Select Vesper on the map.": "Wähle Vesper auf der Karte.",
     "Open the centre radar.": "Öffne das mittlere Radar.",
     "Follow Rin’s flight instructions.": "Folge Rins Fluganweisungen.",
@@ -234,7 +234,7 @@ Object.assign(TUTORIAL_TRANSLATIONS, {
 });
 
 Object.assign(TUTORIAL_TRANSLATIONS, {
-    "Mara is calling.": "Mara ruft an.",
+    "Mara is calling.": "Mara ruft dich.",
     "Move within {range} km of the deposit to deploy your miners.": "Nähere dich der Lagerstätte auf {range} km, damit die Abbaudrohnen starten können.",
     "Deploy your miners: tap MINE, or press M on desktop.": "Starte die Abbaudrohnen: Tippe auf ABBAU oder drücke am Computer M.",
     "Hold SALVAGE to recover the black box; on desktop, hold M.": "Halte BERGEN gedrückt, um die Blackbox zu holen; am Computer M.",
@@ -245,7 +245,7 @@ Object.assign(TUTORIAL_TRANSLATIONS, {
 Object.assign(TUTORIAL_TRANSLATIONS, {
     'Open the mission board and accept the marked mining contract.':'Öffne das Auftragsbrett und nimm den markierten Abbauauftrag an.',
     'I am ready. Launch when you have prepared your ship.':'Ich bin bereit. Starte, sobald dein Schiff fertig ist.',
-    'I will meet you outside. My repair drones are ready.':'Wir treffen uns draußen. Meine Reparaturdrohnen sind bereit.',
+    'I will meet you outside. My repair drones are ready.':'Ich warte draußen auf dich. Meine Reparaturdrohnen sind bereit.',
 });
 
 Object.assign(TUTORIAL_TRANSLATIONS, {
@@ -264,7 +264,7 @@ Object.assign(TUTORIAL_TRANSLATIONS, {
  'Fly alone to Mourning Line. Fly within 100 km of each survey star to chart it.':'Fliege allein zur Mourning Line. Nähere dich jedem Kartierungsstern auf unter 100 km.',
  'Aim at the survey star and engage HYPERDRIVE.':'Richte dein Schiff auf den Kartierungsstern und aktiviere HYPERDRIVE.',
  'Fly within 100 km of the survey star.':'Nähere dich dem Kartierungsstern auf unter 100 km.',
- 'Fly within 100 km of the star. Local jumps need over 2,000 km.':'Nähere dich dem Stern auf unter 100 km. Kurze Sprünge sind bei über 2000 km möglich.',
+ 'Fly within 100 km of the star. Local jumps need over 2,000 km.':'Nähere dich dem Stern auf unter 100 km. Lokale Sprünge brauchen mehr als 2.000 km Abstand.',
  'WITHIN 100 KM':'AUF UNTER 100 KM NÄHERN',
  'Open the left ship monitor, choose Flight and switch the transponder OFF. Enter the marked carrier hangar, lower thrust and hold fire. Five pirates are passing through.':'Öffne den Schiffsmonitor links, wähle Flug und schalte den Transponder AUS. Fliege in den markierten Trägerhangar, nimm den Schub zurück und halte das Feuer.',
  'I used to bring supplies here. The flight deck was so busy you could barely find a berth.':'Früher habe ich Vorräte hergebracht. Auf dem Flugdeck war so viel los, dass du kaum einen Liegeplatz gefunden hast.',

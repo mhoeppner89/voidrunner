@@ -25,7 +25,7 @@ test('the mission board shows the normal training contract and offers ordinary w
 test('all Story cards have concise translated present-task copy; the opening contains only the requested two lines',()=>{
  const {save,quest}=tutorialFixture();
  for(const id of Object.keys(TUTORIAL_STEPS)){quest.stepId=id;const card=tutorialCardContent(save);assert.equal(card.stepId,id);assert.ok(DE_CATALOG[card.objective],id);if(card.instruction)assert.ok(DE_CATALOG[card.instruction],id);assert.notEqual(card.objective,card.instruction,id);assert.ok((card.objective+' '+card.instruction).split(/\s+/).length<=30,id);}
- quest.stepId='meet-family';const card=tutorialCardContent(save);assert.equal(DE_CATALOG[card.objective],'Triff Mara und Rin in der Bar.');assert.equal(DE_CATALOG[card.instruction],"Klicke auf 'Story', um diese Hinweise zu sehen.");
+ quest.stepId='meet-family';const card=tutorialCardContent(save);assert.equal(DE_CATALOG[card.objective],'Triff Mara und Rin in der Bar.');assert.equal(DE_CATALOG[card.instruction],"Tippe auf STORY, um diese Hinweise zu sehen.");
  const ui=Object.create(GameUI.prototype);ui.save=save;const html=ui.renderShipTutorial();assert.doesNotMatch(html,/CHAPTER|chapter-track|before buying|Spare Key|FAMILY PROLOGUE/);assert.match(html,/Meet Mara and Rin in the bar/);
 });
 test('mining and hiding cards expose the current action without announcing the next task',()=>{
