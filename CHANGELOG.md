@@ -1,3 +1,14 @@
+## 0.8.2lk — Every caller closes their own call
+
+- The decision labels, the payout line and the farewell now belong to the caller. The two setups of a category already opened the scene differently, but shared every word after it: Tallow's rescue and Nettle's ended with the same `Danke. Die Überweisung ist raus.`, so a second fuel call read as a rerun the moment it closed. Each of the sixteen setups now carries its own `labels` and `endings`, read through `distressChoiceLabel` / `distressEnding` in `distressData.js`.
+- Endings are keyed by what actually happened rather than by category: a clean debris run, a scraped one and a transport lost to the front close in three different ways, a donated fuel transfer thanks differently from a paid one, and jettisoned cargo that is handed back ends differently from cargo that is kept.
+- Runtime values are `{tokens}` filled at the call site, so payout, hull percentage, units handed over and the crew that ends up holding the Spindle stay the real numbers. The old convoy farewell also printed `cr` twice after `formatCredits`; that is gone with the rewrite.
+- A trap's farewell plays on a hostile channel: the voice that lured the pilot in no longer gets the friendly send-off.
+- Review stand: five “zweiter Anrufer” ending presets (Ash Gambit, Nettle, Calder, Ember, Blue Hour) put the two closes of a category side by side. The repair preset now calls the same ending closure the game uses instead of keeping its own hardcoded copy.
+- Tests: every setup must carry a full label and ending set, two callers of a category must not share a rendered label, payout line or farewell, a fuel transfer must close in the caller's own words, and a cleared trap must speak on the hostile channel.
+
+- Release identifiers: GAME_VERSION `0.8.2lk`, CACHE `voidrunner-v585-0-8-2lk-caller-endings`.
+
 ## 0.8.2lj — Only the trap hides
 
 - Corrected the intercept rule from the previous build. The shared mayday pool now belongs to the trap alone: a baited call borrows one of the fifteen lines and never says what is actually wrong. Every genuine call speaks with its own authored text again, so a fuel distress names the missing fuel, a convoy names the raiders on its tail and a wreck names its dead drive the moment the drive picks the call up.

@@ -107,6 +107,16 @@ const VARIANTS = [
                     p('cutlass-2', 'Cutlass 2', 'scrapper', [800, -90, -950]),
                 ],
                 victims: 2, raiders: 2, reward: 2000,
+                labels: {
+                    help: ['Ich nehme die beiden Raider auf mich.', 'I will take both raiders on.'],
+                    decline: ['Haltet selbst durch.', 'Hold out on your own.'],
+                },
+                endings: {
+                    rescued: {
+                        message: ['Lantern ist durch · {reward}', 'Lantern is clear · {reward}'],
+                        farewell: ['Beide Frachter sind raus. Die Kompanie überweist noch heute — und du stehst auf ihrer Liste.', 'Both mules made it. The company pays today — and you are on their list.'],
+                    },
+                },
             },
             {
                 caller: 'Ash Gambit', vessel: ['Ash-Kurier', 'Ash courier'],
@@ -118,6 +128,16 @@ const VARIANTS = [
                     p('red-talon', 'Red Talon', 'scrapper', [-720, 90, -640]),
                 ],
                 victims: 1, raiders: 1, reward: 2000,
+                labels: {
+                    help: ['Ich hänge mich an den Raider.', 'I will get on that raider.'],
+                    decline: ['Ohne Begleitschutz ist das kein Job.', 'With no escort left that is no job.'],
+                },
+                endings: {
+                    rescued: {
+                        message: ['Ash Gambit ist durch · {reward}', 'Ash Gambit is clear · {reward}'],
+                        farewell: ['Ich bin raus. Der Escort ist weg, aber die Fracht ist an Bord. Danke, dass du umgedreht hast.', 'I am out. The escort is gone, but the cargo is aboard. Thank you for turning back.'],
+                    },
+                },
             },
         ],
     },
@@ -137,6 +157,16 @@ const VARIANTS = [
                 wreck: {name: 'Cold Harbor', derelict: 'atlas-freighter', cargo: [{commodity: 'electronics', quantity: 2}], survivors: 1, attackers: 0},
                 recorder: ['Cold Harbor, letzte Aufnahme. Fracht gesichert, Antrieb tot. Wir gehen in die Kapseln. Wer das hört: Die Kiste gehört der Crew, nicht den Haien.',
                     'Cold Harbor, final recording. Cargo secured, drive dead. We are taking the pods. Whoever hears this: the crate belongs to the crew, not the sharks.'],
+                labels: {
+                    accept: ['Ich gehe an Bord der Cold Harbor.', 'I will board Cold Harbor.'],
+                    decline: ['Der Kanal bleibt tot.', 'Let the channel stay dead.'],
+                },
+                endings: {
+                    salvaged: {
+                        message: ['Cold Harbor geräumt · Kapsel wird beim Andocken abgerechnet', 'Cold Harbor stripped · pod settled on docking'],
+                        farewell: ['Automatik: Frachtraum leer. Aufzeichnung beendet.', 'Automated voice: hold empty. Recording ends.'],
+                    },
+                },
             },
             {
                 caller: 'MV Pale Ledger', vessel: ['Frachterwrack Pale Ledger', 'freighter wreck Pale Ledger'],
@@ -150,6 +180,16 @@ const VARIANTS = [
                 wreck: {name: 'Pale Ledger', derelict: 'atlas-freighter', cargo: [{commodity: 'medicine', quantity: 2}], survivors: 1, attackers: 2},
                 recorder: ['Pale Ledger, letzte Aufzeichnung. Wir haben die Kennung gelöscht, damit sie nicht auf unser Signal kommen. Der Rest der Crew sitzt in der Kapsel. Falls die Schiffe zurückkommen — sie kommen nicht zum Helfen.',
                     'Pale Ledger, final recording. We wiped the transponder so they would not follow our signal home. The rest of the crew is in the pod. If those ships come back, they are not here to help.'],
+                labels: {
+                    accept: ['Ich sehe nach, wer da zurückkommt.', 'I will see who is coming back.'],
+                    decline: ['Zwei Raider, ein Wrack — nein.', 'Two raiders, one wreck — no.'],
+                },
+                endings: {
+                    salvaged: {
+                        message: ['Pale Ledger geräumt · beide Raider aus dem Feld', 'Pale Ledger stripped · both raiders out of the field'],
+                        farewell: ['Automatik: Frachtraum leer. Zwei Signaturen verschwunden.', 'Automated voice: hold empty. Two signatures gone.'],
+                    },
+                },
             },
         ],
     },
@@ -173,6 +213,17 @@ const VARIANTS = [
                 hidden: ['mercy-1', 'mercy-2'],
                 clue: ['Die Triebwerke sind kalt, und die Signatur passt nicht zur Fracht.',
                     'The engines are cold, and the signature does not match the manifest.'],
+                labels: {
+                    scan: ['Ich scanne die Bright Mercy.', 'I am scanning Bright Mercy.'],
+                    expose: ['Ich gehe längsseits.', 'I will come alongside.'],
+                    decline: ['Nicht mit mir.', 'Not with me on the hook.'],
+                },
+                endings: {
+                    foughtOff: {
+                        message: ['Falle zu · Bright Mercy war nie in Not', 'Trap closed · Bright Mercy was never in trouble'],
+                        farewell: ['Nächstes Mal siehst du nicht mal die Kapsel.', 'Next time you will not even see the pod.'],
+                    },
+                },
             },
             {
                 caller: 'Prospektor Vela', vessel: ['Prospektor Vela', 'prospector Vela'],
@@ -187,6 +238,17 @@ const VARIANTS = [
                 hidden: ['vela-1', 'vela-2'],
                 clue: ['Der Ruf kommt von einer Position ohne Trümmer — und der Antrieb ist heiß.',
                     'The call comes from a spot with no debris — and the drive is running hot.'],
+                labels: {
+                    scan: ['Ich prüfe Velas Antrieb.', 'I will check the Vela drive.'],
+                    expose: ['Ich fliege näher ran.', 'I will move in closer.'],
+                    decline: ['Vela, such dir jemand anderen.', 'Vela, find someone else.'],
+                },
+                endings: {
+                    foughtOff: {
+                        message: ['Shrike und Wire aus dem Gefecht · Velas Falle ist zu', 'Shrike and Wire out of the fight · the Vela trap is closed'],
+                        farewell: ['Ein sauberer Scan. Beim nächsten Mal lade ich dich ein.', 'A clean scan. Next time I will invite you in.'],
+                    },
+                },
             },
         ],
     },
@@ -204,6 +266,21 @@ const VARIANTS = [
                 context: ['Ein Frachter hat noch Luft, aber keinen Sprit.', 'A freighter still has air, but no fuel.'],
                 actors: [v('tallow', 'Tallow', 'mule', 'trader', [0, 0, 0])],
                 fuel: 8, payment: 1200,
+                labels: {
+                    give: ['{fuel} Einheiten rüber · {payment} cr.', '{fuel} units across · {payment} cr.'],
+                    donate: ['Ohne Bezahlung — Hauptsache raus hier.', 'No payment — just get them clear of here.'],
+                    decline: ['Mein Tank ist auch nicht voll, Tallow.', 'My tank is not full either, Tallow.'],
+                },
+                endings: {
+                    supplied: {
+                        message: ['Tallow läuft wieder · {fuel} Einheiten gegen {reward}', 'Tallow is running again · {fuel} units for {reward}'],
+                        farewell: ['Zwölfhundert sind raus. Wenn du je in Rook landest, geht der Kaffee auf mich.', 'Twelve hundred is on its way. If you ever dock in Rook, the coffee is on me.'],
+                    },
+                    suppliedGift: {
+                        message: ['{fuel} Einheiten geschenkt · Tallow läuft wieder', '{fuel} units given away · Tallow is running again'],
+                        farewell: ['Du hast nichts verlangt. Das erzähle ich in jeder Bar von Rook.', 'You asked for nothing. I will tell that in every bar in Rook.'],
+                    },
+                },
             },
             {
                 caller: 'Prospektor Nettle', vessel: ['Prospektor Nettle', 'prospector Nettle'],
@@ -212,6 +289,21 @@ const VARIANTS = [
                 context: ['Ein Prospektor ohne Reserve, weit draußen.', 'A prospector with no reserve, far out.'],
                 actors: [v('nettle', 'Nettle', 'prospector', 'miner', [0, 0, 0])],
                 fuel: 6, payment: 900,
+                labels: {
+                    give: ['{fuel} Einheiten abzweigen · {payment} cr.', '{fuel} units tapped off · {payment} cr.'],
+                    donate: ['Um sonst. Du bist weit genug draußen.', 'Free of charge. You are far enough out as it is.'],
+                    decline: ['Tut mir leid, Nettle.', 'Sorry, Nettle.'],
+                },
+                endings: {
+                    supplied: {
+                        message: ['Nettle läuft wieder · {fuel} Einheiten gegen {reward}', 'Nettle is running again · {fuel} units for {reward}'],
+                        farewell: ['Neunhundert, wie versprochen. Rook ist noch zwei Sprünge weg — das schaffe ich jetzt.', 'Nine hundred, as promised. Rook is two jumps out — I can make that now.'],
+                    },
+                    suppliedGift: {
+                        message: ['{fuel} Einheiten geschenkt · Nettle fliegt nach Rook', '{fuel} units given away · Nettle is heading for Rook'],
+                        farewell: ['Sechs Einheiten und keine Rechnung. Ich schulde dir was, Pilot.', 'Six units and no bill. I owe you one, pilot.'],
+                    },
+                },
             },
         ],
     },
@@ -229,6 +321,17 @@ const VARIANTS = [
                 context: ['Ein Frachter hängt an einer defekten Pumpe.', 'A freighter is stuck on a broken pump.'],
                 actors: [v('orchard', 'Orchard Star', 'mule', 'trader', [0, 0, 0])],
                 parts: 2, payment: 1800, repairTarget: 0.62,
+                labels: {
+                    parts: ['{parts} Einheiten rüber, dann läuft die Pumpe.', '{parts} units across and the pump runs.'],
+                    crew: ['Ich komme rüber und halte die Pumpe.', 'I will come over and hold the pump.'],
+                    decline: ['Für eine Pumpe habe ich keine Zeit.', 'I have no time for a pump.'],
+                },
+                endings: {
+                    repaired: {
+                        message: ['Orchard Star läuft wieder · Pumpe dicht · {reward}', 'Orchard Star is under way · pump sealed · {reward}'],
+                        farewell: ['Die Pumpe hält. Die Reederei hört davon — im Guten.', 'The pump is holding. The company will hear of this — in a good way.'],
+                    },
+                },
             },
             {
                 caller: 'Prospektor Calder', vessel: ['Prospektor Calder', 'prospector Calder'],
@@ -237,6 +340,17 @@ const VARIANTS = [
                 context: ['Ein Prospektor kann sich nicht mehr bewegen.', 'A prospector cannot move any more.'],
                 actors: [v('calder', 'Calder', 'prospector', 'miner', [0, 0, 0])],
                 parts: 1, payment: 1200, repairTarget: 0.58,
+                labels: {
+                    parts: ['Die eine Einheit gehört dir.', 'The one unit is yours.'],
+                    crew: ['Ich halte den Arm, du schweißt.', 'I hold the arm, you weld.'],
+                    decline: ['Der Arm ist dein Problem, Calder.', 'The arm is your problem, Calder.'],
+                },
+                endings: {
+                    repaired: {
+                        message: ['Calder ist wieder beweglich · Förderarm geflickt · {reward}', 'Calder can move again · feed arm patched · {reward}'],
+                        farewell: ['Der Arm hält. Wenn du mal Fracht nach Rook brauchst, Calder fliegt.', 'The arm holds. If you ever need a cargo run to Rook, Calder flies.'],
+                    },
+                },
             },
         ],
     },
@@ -254,6 +368,24 @@ const VARIANTS = [
                 context: ['Ein Frachter ohne Navigation, und ein Sturm im Anflug.', 'A freighter with no navigation, and a storm on the way.'],
                 actors: [v('tide', 'Hollow Tide', 'mule', 'trader', [0, 0, 0])],
                 payment: 1600,
+                labels: {
+                    accept: ['MISSION ANNEHMEN · Bojen für die Tide legen', 'ACCEPT MISSION · lay beacons for the Tide'],
+                    decline: ['Ich fliege nicht in das Feld.', 'I am not flying into that field.'],
+                },
+                endings: {
+                    escapedClean: {
+                        message: ['Hollow Tide sauber draußen · Hülle {hull}% · {reward}', 'Hollow Tide out clean · hull {hull}% · {reward}'],
+                        farewell: ['Kein Kratzer. Ich melde der Reederei, wer uns den Weg gelegt hat.', 'Not a scratch. I will tell the company who laid the path.'],
+                    },
+                    escapedRough: {
+                        message: ['Hollow Tide durchgeschrammt · Hülle {hull}% · {reward}', 'Hollow Tide through, scraped · hull {hull}% · {reward}'],
+                        farewell: ['Wir sind durch — mit Beulen. Danke, dass du auf der Spur geblieben bist.', 'We are through — with dents. Thank you for staying on the line.'],
+                    },
+                    lost: {
+                        message: ['Die Sonnenfront hat Hollow Tide erreicht', 'The solar front reached Hollow Tide'],
+                        farewell: ['Die Front ist über uns. Wenn du das hörst, war es zu weit.', 'The front is over us. If you hear this, we went too wide.'],
+                    },
+                },
             },
             {
                 caller: 'Prospektor Sable', vessel: ['Prospektor Sable', 'prospector Sable'],
@@ -262,6 +394,24 @@ const VARIANTS = [
                 context: ['Ein Prospektor ohne Nav, zwischen ihm und dem Sprung ein Trümmerfeld.', 'A prospector with no nav, a debris field between it and the jump.'],
                 actors: [v('sable', 'Sable', 'prospector', 'miner', [0, 0, 0])],
                 payment: 1300,
+                labels: {
+                    accept: ['MISSION ANNEHMEN · Spur für Sable legen', 'ACCEPT MISSION · lay a trail for Sable'],
+                    decline: ['Such dir einen anderen Lotsen.', 'Find another pilot.'],
+                },
+                endings: {
+                    escapedClean: {
+                        message: ['Sable sauber draußen · Hülle {hull}% · {reward}', 'Sable out clean · hull {hull}% · {reward}'],
+                        farewell: ['Kein Kratzer am Rumpf. Ich schulde dir eine Ladung Erz.', 'Not a scratch on the hull. I owe you a load of ore.'],
+                    },
+                    escapedRough: {
+                        message: ['Sable durchgeschrammt · Hülle {hull}% · {reward}', 'Sable through, scraped · hull {hull}% · {reward}'],
+                        farewell: ['Das war knapp. Danke, dass du nicht abgedreht bist.', 'That was close. Thank you for not turning away.'],
+                    },
+                    lost: {
+                        message: ['Die Sonnenfront hat Sable erreicht', 'The solar front reached Sable'],
+                        farewell: ['Das Feld war schneller als du. Grüß Rook von mir.', 'The field was faster than you. Say hello to Rook for me.'],
+                    },
+                },
             },
         ],
     },
@@ -279,6 +429,21 @@ const VARIANTS = [
                 context: ['Drei Container treiben zwischen den Trümmern.', 'Three containers are drifting among the debris.'],
                 actors: [v('wren', 'Copper Wren', 'mule', 'trader', [0, 0, 0])],
                 containers: [{commodity: 'electronics', quantity: 3}], returnPayment: 1600,
+                labels: {
+                    recover: ['Ich sammle die drei Container ein.', 'I will collect all three containers.'],
+                    keep: ['Drei Container Elektronik — die nehme ich.', 'Three containers of electronics — those are mine.'],
+                    decline: ['Deine Container, dein Problem.', 'Your containers, your problem.'],
+                },
+                endings: {
+                    returned: {
+                        message: ['Drei Container an Bord der Copper Wren · {reward}', 'Three containers aboard Copper Wren · {reward}'],
+                        farewell: ['Alles wieder drin. Wenn du in Rook vorbeikommst, geht ein Bier auf mich.', 'All of it is back in. If you pass through Rook, a beer is on me.'],
+                    },
+                    kept: {
+                        message: ['Container behalten · Copper Wren fliegt leer weiter', 'Containers kept · Copper Wren flies on empty'],
+                        farewell: ['Dann behalte sie. Ich merke mir deine Kennung.', 'Keep them, then. I will remember your transponder.'],
+                    },
+                },
             },
             {
                 caller: 'Prospektor Ember', vessel: ['Prospektor Ember', 'prospector Ember'],
@@ -287,6 +452,21 @@ const VARIANTS = [
                 context: ['Zwei medizinische Behälter, und ein Prospektor ohne Greifer.', 'Two medical cases, and a prospector with no grabber.'],
                 actors: [v('ember', 'Ember', 'prospector', 'miner', [0, 0, 0])],
                 containers: [{commodity: 'medicine', quantity: 2}], returnPayment: 1400,
+                labels: {
+                    recover: ['Ich hole die beiden Kisten.', 'I will fetch both cases.'],
+                    keep: ['Medikamente finden immer einen Käufer.', 'Medicine always finds a buyer.'],
+                    decline: ['Lass die Kisten treiben.', 'Let the cases drift.'],
+                },
+                endings: {
+                    returned: {
+                        message: ['Zwei Kisten bei Ember abgeliefert · {reward}', 'Two cases delivered to Ember · {reward}'],
+                        farewell: ['Die Kisten sind drin. Ohne die hätte ich umdrehen müssen.', 'The cases are stowed. Without them I would have had to turn back.'],
+                    },
+                    kept: {
+                        message: ['Zwei Kisten behalten · Ember fliegt ohne Medikamente weiter', 'Two cases kept · Ember flies on without medicine'],
+                        farewell: ['Behältst du sie? Viel Glück beim Verkauf.', 'Keeping them? Good luck with the sale.'],
+                    },
+                },
             },
         ],
     },
@@ -308,6 +488,20 @@ const VARIANTS = [
                 ],
                 rival: 'gannet', wreckName: 'Meridian Spindle',
                 negotiate: 1400, support: 2200,
+                labels: {
+                    negotiate: ['Teilt die Spindle, dann fliegt jeder heim.', 'Split the Spindle and everyone flies home.'],
+                    decline: ['Zwei Crews, ein Wrack — regelt es selbst.', 'Two crews, one wreck — settle it yourselves.'],
+                },
+                endings: {
+                    settled: {
+                        message: ['Split über die Meridian Spindle · {reward}', 'Split over the Meridian Spindle · {reward}'],
+                        farewell: ['Ein fairer Schnitt. Gannet flucht noch, aber beide fliegen heim.', 'A fair cut. Gannet is still cursing, but both crews fly home.'],
+                    },
+                    settledSupport: {
+                        message: ['Streit entschieden · {winner} hält die Meridian Spindle', 'Dispute decided · {winner} holds the Meridian Spindle'],
+                        farewell: ['Das war deutlich. Die Spindle hat jetzt einen Besitzer.', 'That was clear enough. The Spindle has an owner now.'],
+                    },
+                },
             },
             {
                 caller: 'Blue Hour Collective', vessel: ['Blue Hour Collective', 'Blue Hour Collective'],
@@ -320,6 +514,20 @@ const VARIANTS = [
                 ],
                 rival: 'rook-field', wreckName: 'Meridian Spindle',
                 negotiate: 1500, support: 2300,
+                labels: {
+                    negotiate: ['Halb Blue Hour, halb Rook — dann ist es vorbei.', 'Half to Blue Hour, half to Rook — then it is over.'],
+                    decline: ['Ich bin kein Schiedsrichter.', 'I am not a referee.'],
+                },
+                endings: {
+                    settled: {
+                        message: ['Spindle geteilt · Blue Hour und Rook fliegen beide heim · {reward}', 'Spindle split · Blue Hour and Rook both fly home · {reward}'],
+                        farewell: ['Beide Crews sind zufrieden. Das passiert selten genug.', 'Both crews are satisfied. That happens rarely enough.'],
+                    },
+                    settledSupport: {
+                        message: ['Die Meridian Spindle gehört jetzt {winner} · Streit beigelegt', 'The Meridian Spindle now belongs to {winner} · dispute settled'],
+                        farewell: ['Die Spindle hat einen Besitzer, und beide fliegen heim.', 'The Spindle has an owner, and both crews fly home.'],
+                    },
+                },
             },
         ],
     },
@@ -354,6 +562,30 @@ function normalizeLastSetups(raw) {
 // keeps actor identity stable across reloads and lets a variant be replayed in
 // the review environment without extra schema.
 export const distressRoster = (variant, setup = 0) => (distressSetup(variant, setup)?.actors ?? []).map(entry => ({...entry, offset: [...entry.offset]}));
+
+// ------------------------------------------------------------- caller voice
+// The decision labels and the closing words belong to the caller, not to the
+// category: two fuel rescues must not open and close with the same sentences
+// just because they are the same kind of rescue. Every setup therefore carries
+// its own `labels` and `endings`. Values that only exist at runtime (payout,
+// hull percentage, the crew that ends up holding the wreck) are `{tokens}`
+// filled at the call site.
+const VOICE_TOKEN = /\{(\w+)\}/g;
+const fillTokens = (text, values) => (values ? text.map(line => line.replace(VOICE_TOKEN, (match, key) => values[key] ?? match)) : text);
+
+export function distressChoiceLabel(active, key, fallback, values) {
+    const label = distressSetup(active?.variant, active?.setup)?.labels?.[key];
+    return label ? fillTokens(label, values) : fallback;
+}
+
+export function distressEnding(active, key, values) {
+    const ending = distressSetup(active?.variant, active?.setup)?.endings?.[key];
+    if (!ending) return {};
+    return {
+        message: ending.message ? fillTokens(ending.message, values) : undefined,
+        farewell: ending.farewell ? fillTokens(ending.farewell, values) : undefined,
+    };
+}
 
 const setupFor = active => distressSetup(active?.variant, active?.setup);
 
@@ -959,8 +1191,8 @@ export function distressDialogue(conversationId, save) {
             } else {
                 node.text = scene;
                 node.choices = [
-                    choice(['Ich gehe rein.','I am going in.'], 'help'),
-                    choice(['Nicht meine Schlacht.','Not my fight.'], 'decline'),
+                    choice(distressChoiceLabel(active, 'help', ['Ich gehe rein.','I am going in.']), 'help'),
+                    choice(distressChoiceLabel(active, 'decline', ['Nicht meine Schlacht.','Not my fight.']), 'decline'),
                 ];
             }
             break;
@@ -978,8 +1210,8 @@ export function distressDialogue(conversationId, save) {
             } else {
                 node.text = scene;
                 node.choices = [
-                    choice(['Ich sehe mir das Wrack an.','I will take a look at the wreck.'], 'accept'),
-                    choice(['Nicht mein Wrack.','Not my wreck.'], 'decline'),
+                    choice(distressChoiceLabel(active, 'accept', ['Ich sehe mir das Wrack an.','I will take a look at the wreck.']), 'accept'),
+                    choice(distressChoiceLabel(active, 'decline', ['Nicht mein Wrack.','Not my wreck.']), 'decline'),
                 ];
             }
             break;
@@ -995,16 +1227,16 @@ export function distressDialogue(conversationId, save) {
             } else {
                 node.text = scene;
                 node.choices = [
-                    choice(['Sensorcheck.','Run a sensor check.'], 'scan'),
-                    choice(['Ich komme näher.','I am coming closer.'], 'expose'),
-                    choice(['Nicht heute.','Not today.'], 'decline'),
+                    choice(distressChoiceLabel(active, 'scan', ['Sensorcheck.','Run a sensor check.']), 'scan'),
+                    choice(distressChoiceLabel(active, 'expose', ['Ich komme näher.','I am coming closer.']), 'expose'),
+                    choice(distressChoiceLabel(active, 'decline', ['Nicht heute.','Not today.']), 'decline'),
                 ];
             }
             break;
         }
         case 'fuel': {
             const enough = fuel >= data.fuel;
-            const payment = data.payment.toLocaleString(getLanguage() === 'de' ? 'de-DE' : 'en-US');
+            const tokens = {fuel: data.fuel, payment: data.payment.toLocaleString(getLanguage() === 'de' ? 'de-DE' : 'en-US')};
             // The crew reads the pilot's tank off the transponder; saying it in
             // their own voice keeps the card a conversation instead of a status
             // readout.
@@ -1014,10 +1246,10 @@ export function distressDialogue(conversationId, save) {
                 : [`${opener}\n\nDu hast selbst nur ${fuel}. Behalte sie — ich will nicht, dass du auch hier festsitzt.`,
                     `${opener}\n\nYou are running on ${fuel} yourself. Keep them — I do not want you stuck out here too.`];
             node.choices = enough ? [
-                choice([`${data.fuel} Einheiten abgeben · ${payment} cr.`, `Hand over ${data.fuel} units · ${payment} cr.`], 'transfer'),
-                choice(['Ohne Bezahlung — schenken.','No payment — make it a gift.'], 'donate'),
-                choice(['Ich brauche den Sprit selbst.','I need the fuel myself.'], 'decline'),
-            ] : [choice(['Ich kann nicht helfen.','I cannot help.'], 'decline')];
+                choice(distressChoiceLabel(active, 'give', ['{fuel} Einheiten abgeben · {payment} cr.', 'Hand over {fuel} units · {payment} cr.'], tokens), 'transfer'),
+                choice(distressChoiceLabel(active, 'donate', ['Ohne Bezahlung — schenken.','No payment — make it a gift.']), 'donate'),
+                choice(distressChoiceLabel(active, 'decline', ['Ich brauche den Sprit selbst.','I need the fuel myself.']), 'decline'),
+            ] : [choice(distressChoiceLabel(active, 'decline', ['Ich kann nicht helfen.','I cannot help.']), 'decline')];
             break;
         }
         case 'disabled': {
@@ -1029,10 +1261,10 @@ export function distressDialogue(conversationId, save) {
             node.text = [`${opener}\n\n${partLine} Eine Reparaturdrohne tut es auch — oder du kommst selbst rüber und hältst die Hände still.`,
                 `${opener}\n\n${hasParts ? `You have the ${data.parts === 1 ? 'one unit' : `${data.parts} units`} aboard, right?` : `I need ${data.parts === 1 ? 'one unit' : `${data.parts} units`} of parts, and I have none.`} A repair drone would do it too — or you come aboard and keep your hands steady.`];
             node.choices = [
-                ...(hasParts ? [choice([`${data.parts === 1 ? 'Eine Einheit' : `${data.parts} Einheiten`} Ersatzteile abgeben.`, `Hand over ${data.parts === 1 ? 'one unit' : `${data.parts} units`} of parts.`], 'parts')] : []),
+                ...(hasParts ? [choice(distressChoiceLabel(active, 'parts', [`${data.parts === 1 ? 'Eine Einheit' : `${data.parts} Einheiten`} Ersatzteile abgeben.`, `Hand over ${data.parts === 1 ? 'one unit' : `${data.parts} units`} of parts.`], {parts: data.parts}), 'parts')] : []),
                 ...(hasRepairDrone(save) ? [choice(['Reparaturdrohne schicken.','Send a repair drone.'], 'drone')] : []),
-                choice(['Ich komme selbst rüber.','I will come aboard myself.'], 'crew'),
-                choice(['Ich kann nicht bleiben.','I cannot stay.'], 'decline'),
+                choice(distressChoiceLabel(active, 'crew', ['Ich komme selbst rüber.','I will come aboard myself.']), 'crew'),
+                choice(distressChoiceLabel(active, 'decline', ['Ich kann nicht bleiben.','I cannot stay.']), 'decline'),
             ];
             if (active.phase === 'involved') node.choices = [
                 choice(['Weiterarbeiten.','Keep working.'], 'close'),
@@ -1081,8 +1313,8 @@ export function distressDialogue(conversationId, save) {
                     ],
                 };
                 node.choices = [
-                    choice(['MISSION ANNEHMEN · Bojen legen', 'ACCEPT MISSION · lay the beacons'], 'escape', {primary: true}),
-                    choice(['ABLEHNEN · nicht mein Fall', 'DECLINE · not my problem'], 'decline'),
+                    choice(distressChoiceLabel(active, 'accept', ['MISSION ANNEHMEN · Bojen legen', 'ACCEPT MISSION · lay the beacons']), 'escape', {primary: true}),
+                    choice(distressChoiceLabel(active, 'decline', ['ABLEHNEN · nicht mein Fall', 'DECLINE · not my problem']), 'decline'),
                 ];
             }
             break;
@@ -1097,7 +1329,7 @@ export function distressDialogue(conversationId, save) {
                     `${call(active)}: “${remaining > 0 ? 'The containers are still out there.' : holds ? 'You have all of it. Are you bringing it back?' : 'Some of it is still missing. We are waiting.'}”`];
                 node.choices = [
                     ...(holds ? [choice([`Fracht zurückgeben · ${data.returnPayment.toLocaleString(getLanguage() === 'de' ? 'de-DE' : 'en-US')} cr.`, `Hand over cargo · ${data.returnPayment.toLocaleString(getLanguage() === 'de' ? 'de-DE' : 'en-US')} cr.`], 'handover')] : []),
-                    ...(remaining === 0 ? [choice(['Behalten.','Keep it.'], 'keep')] : []),
+                    ...(remaining === 0 ? [choice(distressChoiceLabel(active, 'keep', ['Behalten.','Keep it.']), 'keep')] : []),
                     choice(['Später.','Later.'], 'close'),
                     choice(['Ich fliege weiter.','I am moving on.'], 'withdraw'),
                 ];
@@ -1105,9 +1337,9 @@ export function distressDialogue(conversationId, save) {
                 const room = free >= 1 ? '' : ['\n\nDein Laderaum ist voll — schaff Platz und komm wieder.', '\n\nYour hold is full — make room and come back.'];
                 node.text = `${scene}${distressText(room)}`;
                 node.choices = [
-                    ...(free >= 1 ? [choice(['Ich bringe sie zurück.','I will bring them back.'], 'recover'),
-                        choice(['Ich behalte sie.','I am keeping them.'], 'keep')] : [choice(['Ich schaffe erst Platz.','I will make room first.'], 'close')]),
-                    choice(['Nicht mein Problem.','Not my problem.'], 'decline'),
+                    ...(free >= 1 ? [choice(distressChoiceLabel(active, 'recover', ['Ich bringe sie zurück.','I will bring them back.']), 'recover'),
+                        choice(distressChoiceLabel(active, 'keep', ['Ich behalte sie.','I am keeping them.']), 'keep')] : [choice(['Ich schaffe erst Platz.','I will make room first.'], 'close')]),
+                    choice(distressChoiceLabel(active, 'decline', ['Nicht mein Problem.','Not my problem.']), 'decline'),
                 ];
             }
             break;
@@ -1117,10 +1349,10 @@ export function distressDialogue(conversationId, save) {
             const rivalName = rival?.name ?? 'the other crew';
             const claimant = data.actors.find(actor => actor.key !== data.rival);
             const decisions = [
-                choice(['Ich schlage eine Teilung vor.','I propose a split.'], 'negotiate'),
+                choice(distressChoiceLabel(active, 'negotiate', ['Ich schlage eine Teilung vor.','I propose a split.']), 'negotiate'),
                 choice([`Ich stehe zu ${active.caller}.`, `I side with ${active.caller}.`], 'side-a'),
                 choice([`Ich stehe zu ${rivalName}.`, `I side with ${rivalName}.`], 'side-b'),
-                choice(['Klär das selbst.','Settle it yourselves.'], 'decline'),
+                choice(distressChoiceLabel(active, 'decline', ['Klär das selbst.','Settle it yourselves.']), 'decline'),
             ];
             if (active.phase === 'involved') {
                 const backed = active.progress?.side === 'side-b' ? rivalName : active.caller;

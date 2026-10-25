@@ -4,7 +4,8 @@ import {combatWreckNode} from '/src/game/careerLoot.js';
 import {forgetEquipmentDefinition} from '/src/game/equipmentCatalog.js';
 import {shipVsObstacle} from '/src/game/shipCollision.js';
 import {FREIGHTER_LOGS,GRAVEYARD_CACHES,FREIGHTER_POSITION,FREIGHTER_WRECK_ID,explorationLootId} from '/src/game/explorationData.js';
-import {distressSetup,distressText,distressObjective} from '/src/game/distressData.js';
+import {distressEnding,distressSetup,distressText,distressObjective} from '/src/game/distressData.js';
+import {formatCredits} from '/src/game/random.js';
 import {cargoFree} from '/src/game/economy.js';
 const panel=document.querySelector('#discovery-review'),status=document.querySelector('#review-status'),grid=document.querySelector('#review-scenarios'),toolbar=document.querySelector('#review-toolbar'),resume=document.querySelector('#review-resume'),nextButton=document.querySelector('#review-next'),feedbackControls=document.querySelector('#feedback-controls'),soundButton=document.querySelector('#review-sound');
 const statePanel=document.querySelector('#review-state-panel'),statePre=document.querySelector('#review-state'),stateButton=document.querySelector('#review-state-toggle'),commsButton=document.querySelector('#review-comms'),advanceButton=document.querySelector('#review-advance'),journalButton=document.querySelector('#review-journal');
@@ -80,6 +81,11 @@ const scenes=[
  ['distress-jettison-returned','Notruf · Fracht zurück','Container übergeben. Zahlung und Laderaum prüfen.'],
  ['distress-jettison-kept','Notruf · Fracht behalten','Behalten gewählt. Bergungsrecht und Folgen prüfen.'],
  ['distress-dispute-negotiated','Notruf · Verhandelt','Split vereinbart. Zahlung und Wrackfreigabe prüfen.'],
+ ['distress-convoy-rescued-alt','Notruf · Konvoi gerettet · zweiter Anrufer','Ash Gambit allein: Rettung, Zahlung und Abspann aus seinem Funk.'],
+ ['distress-fuel-supplied-alt','Notruf · Treibstoff geliefert · zweiter Anrufer','Nettle statt Tallow: eigener Abschluss, eigene Dankesworte.'],
+ ['distress-disabled-repaired-alt','Notruf · Havarie repariert · zweiter Anrufer','Calder statt Orchard Star: der Abschluss gehört dem Anrufer.'],
+ ['distress-jettison-returned-alt','Notruf · Fracht zurück · zweiter Anrufer','Ember bekommt ihre zwei Kisten: andere Fracht, andere Worte.'],
+ ['distress-dispute-negotiated-alt','Notruf · Verhandelt · zweiter Anrufer','Blue Hour und Rook einigen sich: eigener Split, eigener Abgang.'],
  ['distress-dispute-side-a','Notruf · Partei A','Eine Crew unterstützt, die andere ist jetzt feindlich.'],
  ['distress-dispute-resolved','Notruf · Streit geklärt','Gegner ausgeschaltet. Ausgang und Logbuch prüfen.'],
  ['distress-history','Folgen · Gemischtes Logbuch','Vier abgeschlossene Notrufe mit unterschiedlichen Ausgängen.'],
@@ -161,6 +167,7 @@ const distressScenes={
  'distress-convoy':['convoy',0,{phase:'discovered',distance:620}],
  'distress-convoy-partial':['convoy',0,{phase:'involved',distance:620}],
  'distress-convoy-rescued':['convoy',0,{phase:'discovered',distance:620}],
+ 'distress-convoy-rescued-alt':['convoy',1,{phase:'discovered',distance:620}],
  'distress-convoy-retaliation':['convoy',0,{phase:'involved',distance:620}],
  'distress-wreck-signal':['wreck',0,{phase:'signal',distance:6800,pickup:true,intercept:3}],
  'distress-wreck':['wreck',0,{phase:'discovered',distance:620}],
@@ -178,10 +185,12 @@ const distressScenes={
  'distress-fuel-prepared':['fuel',0,{phase:'discovered',distance:320,fuel:80}],
  'distress-fuel-unprepared':['fuel',0,{phase:'discovered',distance:320,fuel:5}],
  'distress-fuel-supplied':['fuel',0,{phase:'discovered',distance:320,fuel:80}],
+ 'distress-fuel-supplied-alt':['fuel',1,{phase:'discovered',distance:320,fuel:80}],
  'distress-disabled-signal':['disabled',0,{phase:'signal',distance:6800,pickup:true,intercept:12}],
  'distress-disabled-parts':['disabled',0,{phase:'discovered',distance:320,parts:2}],
  'distress-disabled-crew':['disabled',0,{phase:'discovered',distance:320,parts:0}],
  'distress-disabled-repaired':['disabled',0,{phase:'discovered',distance:320,parts:0}],
+ 'distress-disabled-repaired-alt':['disabled',1,{phase:'discovered',distance:320,parts:1}],
  'distress-debris-signal':['debris',0,{phase:'signal',distance:6800,pickup:true,intercept:5}],
  'distress-debris':['debris',0,{phase:'discovered',distance:380}],
  'distress-debris-offer':['debris',0,{phase:'discovered',distance:380}],
@@ -198,10 +207,12 @@ const distressScenes={
  'distress-jettison-full':['jettison',0,{phase:'discovered',distance:520,cargo:{water:999}}],
  'distress-jettison-ready':['jettison',0,{phase:'discovered',distance:520}],
  'distress-jettison-returned':['jettison',0,{phase:'discovered',distance:520}],
+ 'distress-jettison-returned-alt':['jettison',1,{phase:'discovered',distance:520}],
  'distress-jettison-kept':['jettison',0,{phase:'discovered',distance:520}],
  'distress-dispute-signal':['dispute',0,{phase:'signal',distance:6800,pickup:true,intercept:14}],
  'distress-dispute':['dispute',0,{phase:'discovered',distance:520}],
  'distress-dispute-negotiated':['dispute',0,{phase:'discovered',distance:520}],
+ 'distress-dispute-negotiated-alt':['dispute',1,{phase:'discovered',distance:520}],
  'distress-dispute-side-a':['dispute',0,{phase:'discovered',distance:520}],
  'distress-dispute-resolved':['dispute',0,{phase:'discovered',distance:520}],
 };
@@ -216,6 +227,8 @@ const noComms=new Set([
  'distress-wreck-ambush','distress-wreck-delivered','distress-trap-exposed','distress-trap-cleared',
  'distress-fuel-supplied','distress-disabled-repaired', 'distress-debris-enroute','distress-debris-escaped','distress-debris-route','distress-debris-closing','distress-debris-stray','distress-debris-hit','distress-debris-jump','distress-debris-lost',
  'distress-jettison-returned','distress-jettison-kept','distress-dispute-negotiated','distress-dispute-side-a',
+ 'distress-convoy-rescued-alt','distress-fuel-supplied-alt','distress-disabled-repaired-alt',
+ 'distress-jettison-returned-alt','distress-dispute-negotiated-alt',
  'distress-dispute-resolved','distress-declined','distress-abandoned','distress-history',
 ]);
 const eventActors=(active,role)=>rt.ships.filter(ship=>ship.distressEventId===active.id&&ship.hull>0&&(!role||ship.distressRole===role));
@@ -297,7 +310,7 @@ function prepareDistressScene(id){
   const victim=rt.ships.find(ship=>ship.distressEventId===active.id&&ship.distressRole!=='pirate');
   if(victim){victim.hull=0;rt.onDistressActorDefeated(victim);rt.distressTickAt=0;rt.updateDistress();}
  }
- if(id==='distress-convoy-rescued'){
+ if(id==='distress-convoy-rescued'||id==='distress-convoy-rescued-alt'){
   rt.chooseDistress('help');killEventRaiders(active);rt.distressTickAt=0;rt.updateDistress();
  }
  if(id==='distress-wreck-ambush'){
@@ -322,14 +335,11 @@ function prepareDistressScene(id){
  if(id==='distress-trap-cleared'){
   killEventRaiders(active);rt.distressTickAt=0;rt.updateDistress();
  }
- if(id==='distress-fuel-supplied')rt.chooseDistress('transfer');
- if(id==='distress-disabled-repaired'){
+ if(id==='distress-fuel-supplied'||id==='distress-fuel-supplied-alt')rt.chooseDistress('transfer');
+ if(id==='distress-disabled-repaired'||id==='distress-disabled-repaired-alt'){
   const setupData=distressSetup(active.variant,active.setup);
-  rt.finishDistress(active,'repaired',{
-   reward:setupData.payment,
-   message:[`${active.caller} ist repariert.`,`${active.caller} is repaired.`],
-   farewell:['Die Crew hat es geschafft. Danke.','The crew got it running. Thank you.'],
-  });
+  // Same closure the game uses, so the stand cannot drift from the caller voice.
+  rt.finishDistress(active,'repaired',{reward:setupData.payment,...distressEnding(active,'repaired',{reward:formatCredits(setupData.payment)})});
  }
  const escortShip=()=>eventActors(active).find(entry=>entry.distressRole!=='pirate');
  const placeBehindRoute=()=>{
@@ -425,13 +435,13 @@ function prepareDistressScene(id){
  if(id==='distress-jettison-ready'){
   rt.chooseDistress('recover');addContainerCargo(active);emptyEventWrecks(active);
  }
- if(id==='distress-jettison-returned'){
+ if(id==='distress-jettison-returned'||id==='distress-jettison-returned-alt'){
   addContainerCargo(active);rt.chooseDistress('handover');
  }
  if(id==='distress-jettison-kept'){
   addContainerCargo(active);rt.chooseDistress('keep');emptyEventWrecks(active);rt.distressTickAt=0;rt.updateDistress();
  }
- if(id==='distress-dispute-negotiated')rt.chooseDistress('negotiate');
+ if(id==='distress-dispute-negotiated'||id==='distress-dispute-negotiated-alt')rt.chooseDistress('negotiate');
  if(id==='distress-dispute-side-a')rt.chooseDistress('side-a');
  if(id==='distress-dispute-resolved'){
   rt.chooseDistress('side-a');killHostileEventActors(active);rt.distressTickAt=0;rt.updateDistress();
@@ -558,6 +568,8 @@ const distressOnly=new Set([
  'distress-debris-escaped','distress-debris-route','distress-debris-stray','distress-debris-hit',
  'distress-debris-jump','distress-debris-lost','distress-jettison-signal','distress-jettison-ready','distress-jettison-returned',
  'distress-jettison-kept','distress-dispute-signal','distress-dispute-negotiated','distress-dispute-side-a',
+ 'distress-convoy-rescued-alt','distress-fuel-supplied-alt','distress-disabled-repaired-alt',
+ 'distress-jettison-returned-alt','distress-dispute-negotiated-alt',
  'distress-dispute-resolved','distress-history',
 ]);
 const visibleScenes=mode==='distress'?scenes.filter(([id])=>id.startsWith('distress-')):scenes.filter(([id])=>!distressOnly.has(id));

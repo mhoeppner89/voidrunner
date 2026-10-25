@@ -19,7 +19,7 @@ import {
     DISTRESS_REWARD_PER_SURVIVOR, DISTRESS_SIGNAL_MAX_DISTANCE, DISTRESS_SIGNAL_MIN_DISTANCE,
     DISTRESS_SIGNAL_TIMEOUT,
     DISTRESS_INTERCEPT_COUNT, DISTRESS_TRANSFER_RANGE, DISTRESS_TRANSFER_SPEED, DISTRESS_VARIANTS, createDistressRecord,
-    distressIntercept, distressLabel, distressObjective, distressOpenLine, distressPickupLine, distressRoster,
+    distressEnding, distressIntercept, distressLabel, distressObjective, distressOpenLine, distressPickupLine, distressRoster,
     distressSetup, distressText, distressVariant, normalizeDistress,
 } from './distressData.js';
 
@@ -151,7 +151,9 @@ function disposeEncounter(session, active, {outcome, reward = 0, message, farewe
     if (message) session.ui?.pushEvent?.(distressText(message), tone, 5600, distressText(distressVariant(active.variant)?.title ?? ['Notruf', 'Distress call']));
     if (farewell && session.playStoryLine) {
         const portrait = session.encounterPortraitForSpeaker?.(active.caller, undefined, active);
-        session.playStoryLine(active.caller, distressText(farewell), 'friendly', 6500, undefined, portrait);
+        // A baited call ends on the same channel it started: the voice that
+        // lured the pilot in does not get a friendly send-off.
+        session.playStoryLine(active.caller, distressText(farewell), active.variant === 'trap' ? 'hostile' : 'friendly', 6500, undefined, portrait);
     }
     session.persistSave?.();
 }
@@ -1011,8 +1013,7 @@ export const DistressMethods = {
                 if (proportion >= setup.repairTarget) {
                     this.finishDistress(active, 'repaired', {
                         reward: setup.payment,
-                        message: [`${active.caller} ist wieder manövrierfähig.`, `${active.caller} is under way again.`],
-                        farewell: ['Danke. Die Überweisung ist raus.', 'Thank you. The transfer is on its way.'],
+                        ...distressEnding(active, 'repaired', {reward: formatCredits(setup.payment)}),
                     });
                     return;
                 }
@@ -1030,8 +1031,7 @@ export const DistressMethods = {
                 const reward = victims.length * DISTRESS_REWARD_PER_SURVIVOR;
                 this.finishDistress(active, 'rescued', {
                     reward,
-                    message: [`Konvoi gerettet · ${victims.length} ${victims.length === 1 ? 'Schiff' : 'Schiffe'} · ${formatCredits(reward)}`, `Convoy rescued · ${victims.length} ${victims.length === 1 ? 'ship' : 'ships'} · ${formatCredits(reward)}`],
-                    farewell: [`Wir sind durch. Danke! ${formatCredits(reward)} cr sind unterwegs.`, `We made it. Thank you! Transferring ${formatCredits(reward)} cr.`],
+                    ...distressEnding(active, 'rescued', {reward: formatCredits(reward)}),
                 });
                 return;
             }
@@ -1052,10 +1052,7 @@ export const DistressMethods = {
             // Survivor pods stay collectible after the wreck is stripped; the
             // event itself closes once the manifest and any ambushers are done.
             if (raiders.length === 0 && wrecks.length === 0) {
-                this.finishDistress(active, 'salvaged', {
-                    reward: 0,
-                    message: ['Wrack geborgen. Die Überlebenden werden bei Andocken abgerechnet.', 'Wreck recovered. Survivors are settled on docking.'],
-                });
+                this.finishDistress(active, 'salvaged', {reward: 0, ...distressEnding(active, 'salvaged')});
                 return;
             }
             if (now - active.createdAt > 1200) this.abandonDistress(active, 'withdrawn');
@@ -1068,7 +1065,7 @@ export const DistressMethods = {
             }
             const raiders = eventRaiders(this, active);
             if (raiders.length === 0) {
-                this.finishDistress(active, 'fought-off', {reward: 0, message: ['Die Raider sind aus dem Gefecht.', 'The raiders are out of the fight.']});
+                this.finishDistress(active, 'fought-off', {reward: 0, ...distressEnding(active, 'foughtOff')});
                 return;
             }
             if (now - active.createdAt > 600) this.abandonDistress(active, 'withdrawn');
@@ -1094,7 +1091,7 @@ export const DistressMethods = {
         if (active.variant === 'jettison') {
             const remaining = eventWrecks(this, active).reduce((sum, wreck) => sum + (wreck.contents?.length ?? 0), 0);
             if (remaining === 0 && active.progress.keep) {
-                this.finishDistress(active, 'salvaged', {reward: 0, message: ['Die Container sind deine.', 'The containers are yours.']});
+                this.finishDistress(active, 'salvaged', {reward: 0, ...distressEnding(active, 'kept')});
                 return;
             }
             if (now - active.createdAt > 1200) this.abandonDistress(active, 'withdrawn');
@@ -1113,7 +1110,7 @@ export const DistressMethods = {
                 return;
             }
             if (active.progress.sided && (outOfFight(enemy) || distance(enemy.position, active.position) > 9000)) {
-                this.finishDistress(active, 'settled', {reward: 0, message: ['Der Streit ist entschieden.', 'The dispute is decided.']});
+                this.finishDistress(active, 'settled', {reward: 0, ...distressEnding(active, 'settledSupport', {winner: supported?.name ?? active.caller})});
                 return;
             }
             if (now - active.createdAt > 900) this.abandonDistress(active, 'withdrawn');
@@ -1129,8 +1126,7 @@ export const DistressMethods = {
             if (target && target.hull / Math.max(1, target.maxHull) >= setup.repairTarget) {
                 this.finishDistress(active, 'repaired', {
                     reward: setup.payment,
-                    message: [`${active.caller} ist repariert.`, `${active.caller} is repaired.`],
-                    farewell: ['Die Drohne hat gute Arbeit geleistet. Danke.', 'The drone did good work. Thank you.'],
+                    ...distressEnding(active, 'repaired', {reward: formatCredits(setup.payment)}),
                 });
             }
         }
@@ -1336,10 +1332,7 @@ export const DistressMethods = {
                 const reward = choice === 'donate' ? 0 : setup.payment;
                 finish('supplied', {
                     reward,
-                    message: choice === 'donate'
-                        ? [`${setup.fuel} Einheiten Treibstoff gespendet.`, `${setup.fuel} units of fuel donated.`]
-                        : [`${setup.fuel} Einheiten Treibstoff geliefert · ${formatCredits(reward)}`, `${setup.fuel} units of fuel delivered · ${formatCredits(reward)}`],
-                    farewell: choice === 'donate' ? ['Das vergessen wir nicht.', 'We will not forget this.'] : ['Danke. Die Überweisung ist raus.', 'Thanks. The transfer is on its way.'],
+                    ...distressEnding(active, choice === 'donate' ? 'suppliedGift' : 'supplied', {fuel: setup.fuel, reward: formatCredits(reward)}),
                 });
                 return {ok: true};
             }
@@ -1356,8 +1349,7 @@ export const DistressMethods = {
                 if (ship) ship.hull = Math.max(ship.hull, ship.maxHull * setup.repairTarget);
                 finish('repaired', {
                     reward: setup.payment,
-                    message: [`Teile geliefert · ${formatCredits(setup.payment)}`, `Parts delivered · ${formatCredits(setup.payment)}`],
-                    farewell: ['Die Pumpe läuft wieder. Danke.', 'The pump is running again. Thank you.'],
+                    ...distressEnding(active, 'repaired', {reward: formatCredits(setup.payment)}),
                 });
                 return {ok: true};
             }
@@ -1483,8 +1475,7 @@ export const DistressMethods = {
                 }
                 finish('returned', {
                     reward: setup.returnPayment,
-                    message: [`Fracht zurückgegeben · ${formatCredits(setup.returnPayment)}`, `Cargo returned · ${formatCredits(setup.returnPayment)}`],
-                    farewell: ['Alles an Bord. Danke.', 'All aboard. Thank you.'],
+                    ...distressEnding(active, 'returned', {reward: formatCredits(setup.returnPayment)}),
                 });
                 return {ok: true};
             }
@@ -1493,8 +1484,7 @@ export const DistressMethods = {
                 this.unlockDistressWreck(active);
                 finish('settled', {
                     reward: setup.negotiate,
-                    message: [`Split vereinbart · ${formatCredits(setup.negotiate)}`, `Split agreed · ${formatCredits(setup.negotiate)}`],
-                    farewell: ['Ein fairer Schnitt. Wir verschwinden.', 'A fair cut. We are leaving.'],
+                    ...distressEnding(active, 'settled', {reward: formatCredits(setup.negotiate)}),
                 });
                 return {ok: true};
             }
@@ -1806,10 +1796,7 @@ export const DistressMethods = {
         this.renderer?.syncShips?.(this.ships);
         this.finishDistress(active, 'escaped', {
             reward,
-            message: [`${active.caller} ist gesprungen · Hülle ${Math.round(hullFraction * 100)}% · ${formatCredits(reward)}`, `${active.caller} jumped out · hull ${Math.round(hullFraction * 100)}% · ${formatCredits(reward)}`],
-            farewell: clean
-                ? ['Sauberer Lauf. Danke für die Augen.', 'Clean run. Thanks for the eyes.']
-                : ['Wir sind raus. Danke — das war knapp.', 'We are out. Thanks — that was close.'],
+            ...distressEnding(active, clean ? 'escapedClean' : 'escapedRough', {reward: formatCredits(reward), hull: Math.round(hullFraction * 100)}),
         });
     },
 
@@ -1842,11 +1829,7 @@ export const DistressMethods = {
         this.renderer?.spawnExplosion?.(ship.position, true, 1.5);
         this.ships = this.ships.filter(entry => entry !== ship);
         this.renderer?.syncShips?.(this.ships);
-        this.finishDistress(active, 'lost', {
-            reward: 0,
-            message: ['Die Sonnenfront hat den Frachter erreicht.', 'The solar front reached the transport.'],
-            farewell: ['Die Front hat uns. Wir schaffen es nicht mehr.', 'The front has us. We are not going to make it.'],
-        });
+        this.finishDistress(active, 'lost', {reward: 0, ...distressEnding(active, 'lost')});
     },
 
     distressBeaconView() {

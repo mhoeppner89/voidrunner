@@ -11,7 +11,8 @@ import {
     DISTRESS_GAP_MIN, DISTRESS_GAP_MAX, DISTRESS_DISCOVER_RANGE,
     DISTRESS_RETALIATION_TIME, DISTRESS_SIGNAL_MIN_DISTANCE, DISTRESS_SIGNAL_MAX_DISTANCE,
     DISTRESS_BEACON_FAIL_RANGE,
-    distressDialogue, distressIntercept, distressPickupLine, distressJournal, distressObjective, distressSetup, distressText,
+    distressChoiceLabel, distressDialogue, distressEnding, distressIntercept, distressPickupLine, distressJournal,
+    distressObjective, distressSetup, distressText,
     normalizeDistress, DISTRESS_INTERCEPT_COUNT, DISTRESS_INTERCEPTS,
 } from '../../src/game/distressData.js';
 
@@ -1309,4 +1310,93 @@ test('an alongside acceptance begins on the trail without a holding phase', () =
     s.chooseDistress('escape');
     assert.ok(active.progress.joinedAt > 0);
     assert.match(distressText(distressObjective(active, s.save)), /Bojen folgen/);
+});
+
+// Every decision and every closing line belongs to the caller, not to the
+// category. These keys are the ones each variant actually hands out.
+const VOICE_LABEL_KEYS = {
+    convoy: ['help', 'decline'],
+    wreck: ['accept', 'decline'],
+    trap: ['scan', 'expose', 'decline'],
+    fuel: ['give', 'donate', 'decline'],
+    disabled: ['parts', 'crew', 'decline'],
+    debris: ['accept', 'decline'],
+    jettison: ['recover', 'keep', 'decline'],
+    dispute: ['negotiate', 'decline'],
+};
+const VOICE_ENDING_KEYS = {
+    convoy: ['rescued'],
+    wreck: ['salvaged'],
+    trap: ['foughtOff'],
+    fuel: ['supplied', 'suppliedGift'],
+    disabled: ['repaired'],
+    debris: ['escapedClean', 'escapedRough', 'lost'],
+    jettison: ['returned', 'kept'],
+    dispute: ['settled', 'settledSupport'],
+};
+
+test('every caller owns a full set of labels and closing lines', () => {
+    for (const variant of DISTRESS_VARIANTS) {
+        assert.equal(variant.setups.length, 2, `${variant.id} carries two callers`);
+        variant.setups.forEach((setup, index) => {
+            for (const key of VOICE_LABEL_KEYS[variant.id])
+                assert.equal(setup.labels?.[key]?.length, 2, `${variant.id}/${index} is missing the ${key} label`);
+            for (const key of VOICE_ENDING_KEYS[variant.id]) {
+                assert.equal(setup.endings?.[key]?.message?.length, 2, `${variant.id}/${index} is missing the ${key} message`);
+                assert.equal(setup.endings?.[key]?.farewell?.length, 2, `${variant.id}/${index} is missing the ${key} farewell`);
+            }
+        });
+    }
+});
+
+test('two callers of one category never share a label, a payout line or a farewell', () => {
+    const values = {fuel: 8, parts: 2, payment: '1.200', reward: '4.000 cr', hull: 88};
+    for (const variant of DISTRESS_VARIANTS) {
+        const seen = new Map();
+        variant.setups.forEach((setup, index) => {
+            const active = {variant: variant.id, setup: index, caller: setup.caller};
+            const tokens = {...values, winner: setup.caller};
+            for (const key of VOICE_LABEL_KEYS[variant.id]) {
+                const label = distressText(distressChoiceLabel(active, key, ['?', '?'], tokens));
+                assert.notEqual(seen.get(key), label, `${variant.id} callers share the ${key} label`);
+                seen.set(key, label);
+            }
+            for (const key of VOICE_ENDING_KEYS[variant.id]) {
+                const {message, farewell} = distressEnding(active, key, tokens);
+                assert.ok(message && farewell, `${variant.id}/${index} ${key} has both halves`);
+                const lines = [[`${key}:message`, distressText(message)], [`${key}:farewell`, distressText(farewell)]];
+                for (const [slot, text] of lines) {
+                    assert.notEqual(seen.get(slot), text, `${variant.id} callers share the ${slot}`);
+                    seen.set(slot, text);
+                }
+            }
+        });
+    }
+});
+
+test('the ending fills in the payout it actually paid', () => {
+    const s = make();
+    const closed = [];
+    s.ui.pushEvent = (message, tone, duration, title) => closed.push({message, tone, title});
+    s.playStoryLine = (speaker, text) => closed.push({speaker, text});
+    s.debugStartDistress('fuel', 1, {phase: 'discovered', fuel: 40});
+    s.chooseDistress('transfer');
+    const text = closed.map(entry => entry.message ?? entry.text).join('\n');
+    // Nettle called, so Nettle closes the call — not Tallow, the other fuel
+    // hauler of the same category.
+    assert.match(text, /Nettle läuft wieder · 6 Einheiten gegen 900 cr/);
+    assert.match(text, /Neunhundert, wie versprochen/);
+    assert.doesNotMatch(text, /Tallow|Zwölfhundert/);
+});
+
+test('a baited call does not get a friendly send-off', () => {
+    const s = make();
+    const tones = [];
+    s.playStoryLine = (speaker, text, tone) => tones.push(tone);
+    s.debugStartDistress('trap', 0, {phase: 'discovered', exposed: true});
+    const active = atEvent(s);
+    for (const ship of s.ships) if (ship.distressEventId === active.id) ship.hull = 0;
+    tick(s);
+    assert.equal(s.save.world.distress.active, null, 'the trap closed');
+    assert.equal(tones.at(-1), 'hostile');
 });
