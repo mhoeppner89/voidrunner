@@ -19,7 +19,7 @@ import {
     DISTRESS_REWARD_PER_SURVIVOR, DISTRESS_SIGNAL_MAX_DISTANCE, DISTRESS_SIGNAL_MIN_DISTANCE,
     DISTRESS_SIGNAL_TIMEOUT,
     DISTRESS_INTERCEPT_COUNT, DISTRESS_TRANSFER_RANGE, DISTRESS_TRANSFER_SPEED, DISTRESS_VARIANTS, createDistressRecord,
-    distressIntercept, distressLabel, distressObjective, distressOpenLine, distressRoster,
+    distressIntercept, distressLabel, distressObjective, distressOpenLine, distressPickupLine, distressRoster,
     distressSetup, distressText, distressVariant, normalizeDistress,
 } from './distressData.js';
 
@@ -310,11 +310,17 @@ export const DistressMethods = {
         const now = nowOf(this);
         const rng = seededRandom(`${this.save.world.seed}:distress:${data.counter + 1}:${Math.floor(now)}`);
         const variant = this.pickDistressVariant(rng);
-        const setupIndex = Math.floor(rng() * distressVariant(variant).setups.length);
+        // Alternate the callers of a category: the same setup twice in a row
+        // reads as one repeated script rather than two different ships.
+        const setups = distressVariant(variant).setups.length;
+        let setupIndex = Math.floor(rng() * setups);
+        if (setups > 1 && setupIndex === data.lastSetups?.[variant])
+            setupIndex = (setupIndex + 1) % setups;
+        data.lastSetups = {...(data.lastSetups ?? {}), [variant]: setupIndex};
         const seed = Math.floor(rng() * 0x7fffffff) || 1;
         const position = this.distressSignalPosition(rng);
-        // Which mayday the emergency band carried is independent of what is
-        // waiting out there, so the words never give the scenario away.
+        // The trap's bait is drawn here. A genuine call ignores it and speaks
+        // its own lines, which is why a real crew always names its trouble.
         const intercept = Math.floor(rng() * DISTRESS_INTERCEPT_COUNT);
         const active = createDistressRecord({
             counter: data.counter + 1, variant, setup: setupIndex, seed, position, intercept,
@@ -331,7 +337,7 @@ export const DistressMethods = {
         // The card is the call: opening it pauses the flight, so the pilot
         // reads the transmission before the drive carries them past it. No
         // portrait — a face would identify the caller before the ship arrives.
-        this.ui?.showStoryLine?.(active.caller, distressIntercept(active), 'neutral', active.id);
+        this.ui?.showStoryLine?.(active.caller, distressPickupLine(active), 'neutral', active.id);
         this.audio?.play?.('warning');
         this.persistSave?.();
         return true;
@@ -1991,8 +1997,8 @@ export const DistressMethods = {
         if (!options.pickup) this.setDistressMonitor(active);
         this.persistSave?.();
         if (options.pickup) {
-            // Same card the game opens: a generic mayday, no portrait.
-            this.ui?.showStoryLine?.(active.caller, distressIntercept(active), 'neutral', active.id);
+            // Same card the game opens: the call itself, no portrait.
+            this.ui?.showStoryLine?.(active.caller, distressPickupLine(active), 'neutral', active.id);
         }
         return {id: active.id, variant, setup, phase: active.phase, position: [...position]};
     },

@@ -1,3 +1,15 @@
+## 0.8.2lj — Only the trap hides
+
+- Corrected the intercept rule from the previous build. The shared mayday pool now belongs to the trap alone: a baited call borrows one of the fifteen lines and never says what is actually wrong. Every genuine call speaks with its own authored text again, so a fuel distress names the missing fuel, a convoy names the raiders on its tail and a wreck names its dead drive the moment the drive picks the call up.
+- New `distressPickupLine` is the single place that decides this, and both the card and the comms entry use it. The trap still never shows its own authored signal, a portrait or a situation row before the ship arrives, so nothing about the card identifies the ambush.
+- The bait pool stays civilian: no line mentions pirates, an attack, weapons or an ongoing fight, because a baited mayday that announces a firefight would give the trap away.
+- Variety per category: the two setups of a variant now differ all the way through, not just in the call. Each caller opens the scene with its own line, so Ash Gambit does not greet the pilot with Lantern's sentence and Nettle does not use Tallow's. The sixteen arrival beats live in `ARRIVAL_LINES`, indexed by setup, with `{caller}` only in the spoken ones — a dead freighter still has no one left to speak.
+- A category alternates its callers: `save.world.distress.lastSetups` remembers which setup ran last per variant, and the next call of that category takes the other one. Before this, a convoy could be Lantern twice in a row while Ash Gambit never appeared.
+- Review stand: the “Funkaufnahme” group now says which rule is which — a genuine convoy, a genuine fuel call and a genuine salvage dispute each carry their own words, and only the trap preset draws from the shared pool. Three “zweiter Anrufer” recordings (Ash Gambit, Nettle, Vela) plus two second-caller arrivals make the alternation inspectable side by side.
+- Tests: a genuine pickup must read its own lines, the trap must never read its authored ones, a fuel call must say fuel and must not mention an attacker, and the arrival card must not replay whichever line opened the call.
+
+- Release identifiers: GAME_VERSION `0.8.2lj`, CACHE `voidrunner-v584-0-8-2lj-trap-bait`.
+
 ## 0.8.2li — A distress call tells you nothing
 
 - The intercept card no longer shows a portrait. A face in the first card identified the caller before the ship ever arrived — a trap could be read off the portrait alone. The card now carries the callsign, the mayday and the bearing; the face appears with the actual scene on arrival.

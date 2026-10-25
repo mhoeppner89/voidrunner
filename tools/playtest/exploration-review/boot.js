@@ -28,11 +28,16 @@ const scenes=[
  ['cache-0','Verborgene Fracht · Träger','Ein versteckter Behälter am Trägerwrack.'],
  ['cache-1','Verborgene Fracht · Schlachtschiff','Ein versteckter Behälter zwischen den Bruchstücken.'],
  ['cache-2','Verborgene Fracht · Kreuzer','Ein versteckter Behälter am Kreuzerwrack.'],
- ['distress-voice-a','Funkaufnahme · Konvoi (Stimme 7)','Ein beliebiger Notruf, kein Gesicht, keine Lage — nur Rufzeichen und Peilung. Danach wartet der beschossene Konvoi.'],
- ['distress-voice-b','Funkaufnahme · Täuschung (gleiches Mayday)','Dieselben Worte wie der Konvoi, dahinter eine Falle. Die Karte darf sich nicht unterscheiden — erst vor Ort zeigt sich das Gesicht.'],
- ['distress-voice-c','Funkaufnahme · Treibstoff (Stimme 2)','Andere Stimme, gleiche Karte: Rufzeichen, Mayday, Peilung. Die Treibstoffnot steht erst nach dem Sprung im Funk.'],
- ['distress-voice-d','Funkaufnahme · Streit (Stimme 12)','Vierte Stimme im Pool. Kein „Streit“ im Text: die zwei Crews zeigen sich erst am Wrack.'],
+ ['distress-voice-a','Funkaufnahme · echter Konvoi','Ein echter Ruf nennt seinen Notfall beim Namen: zwei Piraten hängen an den Frachtern.'],
+ ['distress-voice-b','Funkaufnahme · Täuschung (geliehener Ruf)','Nur die Falle greift in den gemeinsamen Pool — und nennt nie eine Ursache. Jede dieser Zeilen könnte auch ein echter Havarist senden.'],
+ ['distress-voice-c','Funkaufnahme · echte Treibstoffnot','Eigener Text, wie bei jedem echten Ruf: Es fehlt Sprit. Niemand greift an.'],
+ ['distress-voice-d','Funkaufnahme · echter Streit','Eigener Text: zwei Bergungscrews am selben Wrack, jede mit ihrer Version.'],
  ['distress-convoy-signal','Notruf · Konvoi · Funkaufnahme','Im Hyperdrive aufgefangen: Karte hält den Flug an. Signal verfolgen oder weiterfliegen — danach der Konvoi unter Beschuss.'],
+ ['distress-convoy-alt-signal','Notruf · Konvoi · zweiter Anrufer','Ash Gambit statt Lantern: eigener Ruf, eigene Ankunft. Dieselbe Kategorie, ein anderer Sprecher.'],
+ ['distress-fuel-alt-signal','Notruf · Treibstoff · zweiter Anrufer','Nettle statt Tallow. Der Ruf gehört zum Schiff, nicht zur Kategorie.'],
+ ['distress-trap-alt-signal','Notruf · Täuschung · zweiter Anrufer','Vela statt Bright Mercy: ein getarnter Prospektor, wieder mit geliehenen Worten.'],
+ ['distress-convoy-alt-arrival','Notruf · Konvoi-Ankunft · zweiter Anrufer','Ash Gambit empfängt dich mit seinem eigenen Satz — nicht mit Lanterns.'],
+ ['distress-trap-alt-arrival','Notruf · Täuschung-Ankunft · zweiter Anrufer','Vela, der getarnte Prospektor: anderer Anrufer, dieselbe kalte Begrüßung.'],
  ['distress-convoy','Notruf · Konvoi (Nahaufnahme)','Nach dem Sprung: Zwei Prospektoren werden bereits beschossen. Greife ein oder fliege weiter.'],
  ['distress-convoy-partial','Notruf · Teilrettung (Nahaufnahme)','Ein Schiff ist verloren. Prüfe Zahlung und die verbleibenden Ziele.'],
  ['distress-convoy-rescued','Notruf · Konvoi gerettet','Raider ausgeschaltet. Zahlung, Logbuch und Folgen prüfen.'],
@@ -145,9 +150,14 @@ const distressScenes={
  'distress-dispute-arrival':['dispute',0,{phase:'discovered',distance:500}],
  'distress-voice-a':['convoy',0,{phase:'signal',distance:6800,pickup:true,intercept:7}],
  'distress-voice-b':['trap',0,{phase:'signal',distance:6800,pickup:true,intercept:7}],
- 'distress-voice-c':['fuel',0,{phase:'signal',distance:6800,pickup:true,intercept:2}],
+ 'distress-voice-c':['fuel',0,{phase:'signal',distance:6800,pickup:true,intercept:7}],
  'distress-voice-d':['dispute',0,{phase:'signal',distance:6800,pickup:true,intercept:12}],
  'distress-convoy-signal':['convoy',0,{phase:'signal',distance:6800,pickup:true,intercept:0}],
+ 'distress-convoy-alt-signal':['convoy',1,{phase:'signal',distance:6800,pickup:true,intercept:0}],
+ 'distress-fuel-alt-signal':['fuel',1,{phase:'signal',distance:6800,pickup:true,intercept:3}],
+ 'distress-trap-alt-signal':['trap',1,{phase:'signal',distance:6800,pickup:true,intercept:3}],
+ 'distress-convoy-alt-arrival':['convoy',1,{phase:'discovered',distance:500}],
+ 'distress-trap-alt-arrival':['trap',1,{phase:'discovered',distance:500}],
  'distress-convoy':['convoy',0,{phase:'discovered',distance:620}],
  'distress-convoy-partial':['convoy',0,{phase:'involved',distance:620}],
  'distress-convoy-rescued':['convoy',0,{phase:'discovered',distance:620}],
@@ -198,6 +208,7 @@ const distressScenes={
 const noComms=new Set([
  'distress-convoy-arrival','distress-trap-arrival','distress-fuel-arrival','distress-disabled-arrival','distress-jettison-arrival','distress-dispute-arrival',
  'distress-voice-a','distress-voice-b','distress-voice-c','distress-voice-d',
+ 'distress-convoy-alt-signal','distress-fuel-alt-signal','distress-trap-alt-signal',
  'distress-convoy-signal','distress-disabled-signal','distress-wreck-signal','distress-trap-signal',
  'distress-debris-offer','distress-wreck-offer',
  'distress-fuel-signal','distress-debris-signal','distress-jettison-signal','distress-dispute-signal',
@@ -540,6 +551,8 @@ function toggleReviewState(){if(!statePanel)return;statePanel.hidden=!statePanel
 const distressOnly=new Set([
  'distress-convoy-arrival','distress-trap-arrival','distress-fuel-arrival','distress-disabled-arrival','distress-jettison-arrival','distress-dispute-arrival',
  'distress-convoy-rescued','distress-convoy-retaliation','distress-wreck-stripped','distress-wreck-survivor','distress-wreck-delivered',
+ 'distress-convoy-alt-signal','distress-fuel-alt-signal','distress-trap-alt-signal',
+ 'distress-convoy-alt-arrival','distress-trap-alt-arrival',
  'distress-disabled-signal','distress-wreck-signal','distress-wreck-offer','distress-trap-signal','distress-trap-scanned','distress-trap-cleared','distress-fuel-signal',
  'distress-fuel-supplied','distress-disabled-repaired','distress-debris-signal','distress-debris-enroute','distress-debris-offer','distress-debris-closing',
  'distress-debris-escaped','distress-debris-route','distress-debris-stray','distress-debris-hit',
@@ -554,7 +567,7 @@ const sceneGroups={
  convoy:'Konvoi unter Beschuss',wreck:'Zerstörter Frachter',trap:'Getarnte Raider',fuel:'Treibstoffnot',
  disabled:'Havarie',debris:'Trümmerfeld',jettison:'Ausgesetzte Fracht',dispute:'Streit um Bergung',history:'Folgen & Journal',
 };
-const sceneGroup=id=>/-signal$|-voice-/.test(id)?sceneGroups.pickup:/-(?:arrival|offer)$/.test(id)?sceneGroups.arrival:sceneGroups[id.split('-')[1]]??sceneGroups.history;
+const sceneGroup=id=>/-signal$|-voice-/.test(id)?sceneGroups.pickup:/-arrival$|-offer$/.test(id)?sceneGroups.arrival:sceneGroups[id.split('-')[1]]??sceneGroups.history;
 const sceneButton=([id,title,description])=>`<button data-scene="${id}" disabled><b>${title}</b><span>${description}</span></button>`;
 if(mode==='distress'){
  grid.innerHTML=Object.entries(sceneGroups).map(([,group])=>{

@@ -11,8 +11,8 @@ import {
     DISTRESS_GAP_MIN, DISTRESS_GAP_MAX, DISTRESS_DISCOVER_RANGE,
     DISTRESS_RETALIATION_TIME, DISTRESS_SIGNAL_MIN_DISTANCE, DISTRESS_SIGNAL_MAX_DISTANCE,
     DISTRESS_BEACON_FAIL_RANGE,
-    distressDialogue, distressIntercept, distressJournal, distressObjective, distressSetup, distressText,
-    normalizeDistress, DISTRESS_INTERCEPT_COUNT,
+    distressDialogue, distressIntercept, distressPickupLine, distressJournal, distressObjective, distressSetup, distressText,
+    normalizeDistress, DISTRESS_INTERCEPT_COUNT, DISTRESS_INTERCEPTS,
 } from '../../src/game/distressData.js';
 
 function make() {
@@ -188,25 +188,32 @@ test('following a pickup drops the leg and puts the bearing in the journal; pass
     assert.ok(other.save.world.distress.nextAt >= other.save.world.time + DISTRESS_GAP_MIN);
 });
 
-test('the pickup card carries a generic mayday and nothing that gives the scenario away', () => {
+// A real crew says what is wrong the moment the drive picks them up. Only the
+// trap needs borrowed words: it never names a cause, because the cause is a
+// trap.
+test('a genuine pickup names its own trouble, the trap borrows a mayday', () => {
     for (const variant of DISTRESS_VARIANT_IDS) {
         const s = make();
         s.autopilot = true;
-        s.debugStartDistress(variant, 0, {phase: 'signal', distance: 6800, pickup: true});
+        s.debugStartDistress(variant, 0, {phase: 'signal', distance: 6800, pickup: true, intercept: 4});
         const active = s.save.world.distress.active;
         const setup = distressSetup(variant, 0);
         const card = distressDialogue(active.id, s.save).nodes.main;
         const text = dialogueText(card.text, 'de');
-        assert.ok(text.includes(distressIntercept(active)), `${variant}: the card reads the intercepted mayday`);
-        assert.ok(!text.includes(distressText(setup.signal)), `${variant}: the authored signal is not revealed in hyperdrive`);
-        assert.ok(!text.includes(distressText(setup.context)), `${variant}: the situation row is not on the intercept card`);
+        if (variant === 'trap') {
+            assert.ok(text.includes(distressIntercept(active)), 'the trap reads from the shared mayday pool');
+            assert.ok(!text.includes(distressText(setup.signal)), 'the trap never says what is wrong');
+        } else {
+            assert.ok(text.includes(distressText(setup.signal)), `${variant}: a genuine call speaks its own lines`);
+            assert.ok(!text.includes(distressText(setup.context)), `${variant}: the situation row is not on the intercept card`);
+        }
         // Only the bearing: no LAGE row and no scenario name on the mission block.
         assert.deepEqual(card.mission.rows.map(row => row.label), ['PEILUNG']);
         assert.ok(!card.mission.title.includes('Täuschung'), `${variant}: the card does not name the variant`);
     }
 });
 
-test('intercepted maydays are drawn at random and shared across variants', () => {
+test('the bait pool is drawn at random, not from the scenario', () => {
     assert.ok(DISTRESS_INTERCEPT_COUNT >= 12, 'the pool is wide enough that a voice does not repeat');
     const seen = new Set();
     const variants = new Set();
@@ -223,6 +230,72 @@ test('intercepted maydays are drawn at random and shared across variants', () =>
     }
     assert.ok(seen.size > 4, 'the same mayday does not open every call');
     assert.ok(variants.size > 2, 'the sample covers more than one scenario');
+});
+
+// Variety per category: two different callers, two different calls, and two
+// different arrival beats — otherwise the second ship of a category reads as a
+// rerun of the first.
+test('every category has two callers with their own words, on the radio and on arrival', () => {
+    for (const variant of DISTRESS_VARIANT_IDS) {
+        const setups = DISTRESS_VARIANTS.find(entry => entry.id === variant).setups;
+        assert.ok(setups.length >= 2, `${variant}: a category needs more than one setup`);
+        const callers = new Set(setups.map(setup => setup.caller));
+        assert.equal(callers.size, setups.length, `${variant}: every setup has its own caller`);
+        const calls = new Set(setups.map((setup, index) => distressText(distressSetup(variant, index).signal)));
+        assert.equal(calls.size, setups.length, `${variant}: every setup has its own call`);
+
+        const openings = new Set();
+        for (let index = 0; index < setups.length; index++) {
+            const s = make();
+            s.autopilot = true;
+            s.debugStartDistress(variant, index, {phase: 'signal', distance: 6800, pickup: true});
+            s.chooseDistress('follow');
+            s.save.world.time += 1;
+            atEvent(s);
+            tick(s);
+            openings.add(dialogueText(distressDialogue(s.save.world.distress.active.id, s.save).nodes.main.text, 'de'));
+        }
+        assert.equal(openings.size, setups.length, `${variant}: each caller opens the scene differently`);
+    }
+});
+
+test('a category alternates its callers instead of drawing the same setup twice', () => {
+    const last = {};
+    const seen = new Set();
+    for (let index = 0; index < 60; index++) {
+        const s = make();
+        s.autopilot = true;
+        s.save.world.time = 100 + index * 53;
+        // Keep the previous pick so the next call of that category is compared.
+        s.save.world.distress = {...normalizeDistress(s.save.world), lastSetups: {...last}};
+        s.save.world.distress.nextAt = 0;
+        s.beginDistressPickup();
+        const active = s.save.world.distress.active;
+        assert.notEqual(active.setup, last[active.variant], `${active.variant}: the same setup ran twice in a row`);
+        last[active.variant] = active.setup;
+        seen.add(active.variant);
+        s.chooseDistress('pass');
+    }
+    assert.ok(seen.size > 2, 'the sample covers more than two categories');
+});
+
+// A fuel call is a fuel call: it may be dull, but it must never read as a ship
+// already in a fight, and it must not borrow the trap's vagueness either.
+test('a fuel pickup says fuel, and the bait pool never claims an attacker', () => {
+    const s = make();
+    s.autopilot = true;
+    s.debugStartDistress('fuel', 0, {phase: 'signal', distance: 6800, pickup: true});
+    const active = s.save.world.distress.active;
+    const text = dialogueText(distressDialogue(active.id, s.save).nodes.main.text, 'de');
+    assert.match(text, /Sprit|Treibstoff/, 'the call names what is missing');
+    assert.doesNotMatch(text, /Pirat|Angriff|greifen an|beschossen/i, 'and no one is shooting at them');
+
+    // The trap's pool is civilian trouble only: a baited mayday cannot announce
+    // a firefight, or the bait would tell the pilot what is waiting.
+    const hostile = /pirat|überfall|angriff|greifen an|beschuss|beschossen|waffe|raider|attack|hostile|weapon|under fire/i;
+    for (const pair of DISTRESS_INTERCEPTS) {
+        for (const line of pair) assert.doesNotMatch(line, hostile, `hostile wording in: ${line}`);
+    }
 });
 
 test('a trap can arrive in any voice, including the calmest one', () => {
@@ -316,7 +389,7 @@ test('the arrival briefing continues the scene instead of replaying the mayday',
         atEvent(s);
         tick(s);
         const arrival = dialogueText(distressDialogue(active.id, s.save).nodes.main.text, 'de');
-        assert.ok(!arrival.includes(distressIntercept(active)), `${variant}: the arrival card does not replay the mayday`);
+        assert.ok(!arrival.includes(distressPickupLine(active)), `${variant}: the arrival card does not replay the call`);
         assert.ok(arrival.trim().length > 20, `${variant}: the arrival card still has something to say`);
         // A reload keeps the scene continuous: the mayday must not come back.
         const restored = normalizeDistress({distress: JSON.parse(JSON.stringify(s.save.world.distress))});

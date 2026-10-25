@@ -18,11 +18,10 @@ export const DISTRESS_FIRST_MAX = 420;
 export const DISTRESS_GAP_MIN = 360;
 export const DISTRESS_GAP_MAX = 600;
 export const DISTRESS_SIGNAL_TIMEOUT = 600;
-// What the emergency band actually carries. A call picked up in hyperdrive is a
-// mayday, not a mission brief: the same fifteen voices serve every variant, so
-// nothing in the transmission says whether the source is a wounded freighter, a
-// convoy under fire or a trap. Only the intercept is random — the scenario is
-// already decided, and it stays hidden until the ship drops out at the source.
+// What a baited call carries. A genuine crew names its own trouble, so only the
+// trap needs borrowed words: it picks one of these maydays and never says what
+// is actually wrong. Every line has to be plausible enough that a real casualty
+// could have sent it, or the bait would read as bait.
 export const DISTRESS_INTERCEPTS = Object.freeze([
     ['Mayday, mayday. Wir treiben antriebslos. Ist da jemand auf dieser Frequenz?',
         'Mayday, mayday. We are drifting without power. Is anyone on this frequency?'],
@@ -338,6 +337,19 @@ export const distressSetup = (variant, setup = 0) => {
 };
 export const isDistressVariant = id => BY_ID.has(id);
 
+// Variant -> index of the setup that ran last. Kept beside lastVariants so a
+// category alternates its callers instead of drawing the same one twice in a row.
+function normalizeLastSetups(raw) {
+    const result = {};
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return result;
+    for (const [variant, setup] of Object.entries(raw)) {
+        const def = BY_ID.get(variant);
+        if (!def || !Number.isFinite(Number(setup))) continue;
+        result[variant] = Math.max(0, Math.min(def.setups.length - 1, Number(setup) | 0));
+    }
+    return result;
+}
+
 // A roster is derived from the authored setup, never trusted from a save. It
 // keeps actor identity stable across reloads and lets a variant be replayed in
 // the review environment without extra schema.
@@ -549,6 +561,9 @@ export function normalizeDistress(world) {
         lastVariants: Array.isArray(raw.lastVariants)
             ? [...new Set(raw.lastVariants.filter(isDistressVariant))].slice(0, 3)
             : [],
+        // Which setup of a variant ran last, so the second caller of the same
+        // category is not followed by the first one again.
+        lastSetups: normalizeLastSetups(raw.lastSetups),
         migrated: raw.migrated === true,
     };
     if (!result.migrated) {
@@ -564,6 +579,12 @@ const normalizeIntercept = (value, seed, createdAt) => Number.isFinite(Number(va
     ? clampIntercept(value)
     : clampIntercept(Math.floor(seededRandom(`${Number(seed) || 1}:intercept:${Number(createdAt) || 0}`)() * DISTRESS_INTERCEPT_COUNT));
 export const distressIntercept = active => distressText(DISTRESS_INTERCEPTS[normalizeIntercept(active?.intercept, active?.seed, active?.createdAt)] ?? DISTRESS_INTERCEPTS[0]);
+// Only a trap hides behind the shared mayday pool, because a baited call never
+// says what is actually wrong. Every genuine call speaks with its own words: a
+// crew that is out of fuel says they are out of fuel.
+export const distressPickupLine = active => active?.variant === 'trap'
+    ? distressIntercept(active)
+    : distressText(distressSetup(active?.variant, active?.setup)?.signal ?? '');
 
 // Only the location reveals what the call really was. A trap stays "a distress
 // call" on the monitor, the map and in the journal until the scan or the
@@ -715,36 +736,66 @@ export function distressOpenLine(active) {
 // noticing the ship, the recording running dry, the standoff getting a witness.
 // Nobody announces the state of the fight — a crew under fire shouts, it does
 // not narrate its own battle.
+//
+// Two lines per variant, picked by the setup, so the second caller of a category
+// does not open with the first one's sentence. `{caller}` is only in the spoken
+// versions; narrator lines (a dead freighter) have no one left to speak them.
+const ARRIVAL_LINES = Object.freeze({
+    convoy: [
+        ['{caller}: „Beeil dich, sie greifen an!“',
+            '{caller}: “Hurry, they are attacking!”'],
+        ['{caller}: „Sie kommen zurück — und ich bin allein hier draußen.“',
+            '{caller}: “They are coming back — and I am out here alone.”'],
+    ],
+    wreck: [
+        ['Kein offener Kanal, nur die Aufzeichnung — und ein Rumpf, der noch warm ist.',
+            'No live channel, only the recording — and a hull that is still warm.'],
+        ['Ein offener Kanal, ein leeres Cockpit — und draußen kreuzen zwei Signaturen.',
+            'An open channel, an empty cockpit — and two signatures crossing outside.'],
+    ],
+    trap: [
+        ['{caller}: „Oh. Du bist schneller hier, als ich dachte.“',
+            '{caller}: “Oh. You got here faster than I expected.”'],
+        ['{caller}: „Na endlich. Ich dachte schon, ich muss das allein hinbekommen.“',
+            '{caller}: “There you are. I was starting to think I would have to manage this alone.”'],
+    ],
+    fuel: [
+        ['{caller}: „Da bist du ja. Ich dachte schon, hier hört uns keiner.“',
+            '{caller}: “There you are. I was starting to think no one was listening.”'],
+        ['{caller}: „Du hast mich gefunden. Ich zeig dir den Tank, dann kannst du selbst nachzählen.“',
+            '{caller}: “You found me. I will show you the tank, then you can count for yourself.”'],
+    ],
+    disabled: [
+        ['{caller}: „Du hast angehalten. Gut. Allein bekommen wir die Maschine nicht mehr an.“',
+            '{caller}: “You stopped. Good. We are not getting this engine back on our own.”'],
+        ['{caller}: „Vorsicht, der Arm hängt lose. Einer von uns muss raus, wenn das was werden soll.“',
+            '{caller}: “Careful, the arm is hanging loose. One of us has to go outside if this is going to work.”'],
+    ],
+    debris: [
+        ['{caller}: „Du bist in Sicht. Sag mir, dass du dich in diesem Feld auskennst.“',
+            '{caller}: “We have you in sight. Tell me you know your way through this field.”'],
+        ['{caller}: „Ich sehe dich. Mein Nav ist blind — ich brauche deine Spur, nicht deine Meinung.“',
+            '{caller}: “I can see you. My nav is blind — I need your trail, not your opinion.”'],
+    ],
+    jettison: [
+        ['{caller}: „Die Container sind deine, wenn du sie kriegst. Keiner von uns kommt noch ran.“',
+            '{caller}: “The containers are yours if you can reach them. None of us can anymore.”'],
+        ['{caller}: „Die Kisten treiben noch. Ich komm nicht ran — der Arm ist im Eimer.“',
+            '{caller}: “The crates are still drifting. I cannot reach them — the arm is gone.”'],
+    ],
+    dispute: [
+        ['{caller}: „Endlich ein Dritter. Vielleicht hört jetzt einer zu.“',
+            '{caller}: “Finally a third party. Maybe someone will listen now.”'],
+        ['{caller}: „Da kommt jemand. Sag diesen Leuten, dass eine Bake keine Lizenz ist.“',
+            '{caller}: “Someone is coming. Tell these people a beacon is not a licence.”'],
+    ],
+});
 function arrivalLine(active) {
-    const speaker = `${call(active)}: `;
-    switch (active.variant) {
-        case 'convoy':
-            return [`${speaker}„Beeil dich, sie greifen an!“`,
-                `${speaker}“Hurry, they are attacking!”`];
-        case 'wreck':
-            return ['Kein offener Kanal, nur die Aufzeichnung — und ein Rumpf, der noch warm ist.',
-                'No live channel, only the recording — and a hull that is still warm.'];
-        case 'trap':
-            return [`${speaker}„Oh. Du bist schneller hier, als ich dachte.“`,
-                `${speaker}“Oh. You got here faster than I expected.”`];
-        case 'fuel':
-            return [`${speaker}„Da bist du ja. Ich dachte schon, hier hört uns keiner.“`,
-                `${speaker}“There you are. I was starting to think no one was listening.”`];
-        case 'disabled':
-            return [`${speaker}„Du hast angehalten. Gut. Allein bekommen wir die Maschine nicht mehr an.“`,
-                `${speaker}“You stopped. Good. We are not getting this engine back on our own.”`];
-        case 'debris':
-            return [`${speaker}„Du bist in Sicht. Sag mir, dass du dich in diesem Feld auskennst.“`,
-                `${speaker}“We have you in sight. Tell me you know your way through this field.”`];
-        case 'jettison':
-            return [`${speaker}„Die Container sind deine, wenn du sie kriegst. Keiner von uns kommt noch ran.“`,
-                `${speaker}“The containers are yours if you can reach them. None of us can anymore.”`];
-        case 'dispute':
-            return [`${speaker}„Endlich ein Dritter. Vielleicht hört jetzt einer zu.“`,
-                `${speaker}“Finally a third party. Maybe someone will listen now.”`];
-        default:
-            return ['Der Notruf ist noch auf dem Kanal.', 'The call is still on the channel.'];
-    }
+    const lines = ARRIVAL_LINES[active.variant];
+    if (!lines) return ['Der Notruf ist noch auf dem Kanal.', 'The call is still on the channel.'];
+    const index = Math.max(0, Math.min(lines.length - 1, Number(active.setup) | 0));
+    const speaker = call(active);
+    return lines[index].map(line => line.replace('{caller}', speaker));
 }
 
 // What the scene says after the opener. A followed call pairs this with the
@@ -859,9 +910,10 @@ export function distressDialogue(conversationId, save) {
     // out: the pilot hears the transmission on the emergency band and decides
     // whether to leave the leg now. The scenario card still comes on arrival.
     if (active.progress?.pickup) {
-        // A generic mayday, never the authored situation: the caller, the words
-        // and the bearing are all the pilot gets until the ship arrives.
-        const source = distressIntercept(active);
+        // The call itself: a genuine crew names its trouble, a trap borrows one
+        // of the shared maydays. Either way the caller and the bearing are all
+        // the pilot has until the ship drops out.
+        const source = distressPickupLine(active);
         const km = Math.round(distance).toLocaleString(getLanguage() === 'de' ? 'de-DE' : 'en-US');
         node.text = [
             `${call(active)}: „${source}“\n\nDie Quelle liegt abseits deiner Flugbahn.`,
