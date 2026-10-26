@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import {LOCATIONS} from './data.js';
+import {applySpaceLighting} from './spaceLighting.js';
 
 // An exterior camera shot, not a second flight simulation. It borrows the
 // already-loaded painted hull and dock renderer; all scenery is procedural.
@@ -94,7 +96,8 @@ export class PlanetTransit {
   const p=this.palette;
   this.hemi=new THREE.HemisphereLight(p.sky,p.land,2.1);this.scene.add(this.hemi);
   this.key=new THREE.DirectionalLight(0xffe4c1,3.8);this.key.position.set(-6,7,-3);this.scene.add(this.key);
-  this.fill=new THREE.DirectionalLight(p.haze,1.1);this.fill.position.set(5,-1,5);this.scene.add(this.fill);
+  this.atmosphereFill=new THREE.DirectionalLight(p.haze,1.1);this.atmosphereFill.position.set(5,-1,5);this.scene.add(this.atmosphereFill);
+  this.fill=new THREE.AmbientLight();this.rim=new THREE.DirectionalLight();this.scene.add(this.fill,this.rim);
   this.engineLight=new THREE.PointLight(0x61bfff,2.5,10,2);this.engineLight.position.set(0,.3,2.4);this.scene.add(this.engineLight);
   this.update(0);
  }
@@ -103,7 +106,11 @@ export class PlanetTransit {
   const p=this.palette=planetTransitPalette(id),u=this.uniforms;
   u.uSurface.value=surface??null;u.uHasSurface.value=surface?.image?1:0;u.uWater.value=p.water;u.uSeed.value=p.seed;
   for(const [name,key]of [['uSky','sky'],['uHaze','haze'],['uLand','land'],['uSea','sea'],['uCloud','cloud']])u[name].value.setHex(p[key]);
-  this.hemi.color.setHex(p.sky);this.hemi.groundColor.setHex(p.land);this.fill.color.setHex(p.haze);this.update(0);
+  applySpaceLighting(this,LOCATIONS[id]?.systemId);this.scene.environmentIntensity=1;
+  this.spaceSky??=new THREE.Color();this.spaceGround??=new THREE.Color();this.spaceKey??=new THREE.Color();
+  this.spaceSky.copy(this.hemi.color);this.spaceGround.copy(this.hemi.groundColor);this.spaceKey.copy(this.key.color);
+  this.spaceHemiIntensity=this.hemi.intensity;this.spaceKeyIntensity=this.key.intensity;this.spaceRimIntensity=this.rim.intensity;this.spaceFillIntensity=this.fill.intensity;
+  this.atmosphereFill.color.setHex(p.haze);this.update(0);
  }
  resize(aspect){this.camera.aspect=aspect;this.camera.zoom=Math.min(1,aspect/1.35);this.camera.updateProjectionMatrix();this.uniforms.uAspect.value=aspect;}
  update(t){
@@ -127,7 +134,14 @@ export class PlanetTransit {
    const depth=-this.planetPoint.z,r=this.departureRadius;
    u.uPlanetRadius.value=r*this.camera.zoom/(2*Math.tan(THREE.MathUtils.degToRad(this.camera.fov*.5))*Math.sqrt(Math.max(1,depth*depth-r*r)));
   }
-  this.key.intensity=3.1+.7*(1-pose.altitude);this.fill.intensity=1.1+.6*(1-pose.altitude);
+  const atmosphere=1-pose.altitude;
+  if(this.spaceKey){
+   this.hemi.color.setHex(this.palette.sky).lerp(this.spaceSky,pose.altitude);this.hemi.groundColor.setHex(this.palette.land).lerp(this.spaceGround,pose.altitude);
+   this.hemi.intensity=THREE.MathUtils.lerp(this.spaceHemiIntensity,2.1,atmosphere);
+   this.key.color.setHex(0xffe4c1).lerp(this.spaceKey,pose.altitude);this.key.intensity=THREE.MathUtils.lerp(this.spaceKeyIntensity,3.8,atmosphere);
+   this.fill.intensity=this.spaceFillIntensity;this.rim.intensity=this.spaceRimIntensity;
+  }
+  this.atmosphereFill.intensity=1.7*atmosphere;
   this.engineLight.position.set(pose.x,pose.y+.3,pose.z+2.4);
   return pose;
  }

@@ -1,4 +1,5 @@
 import {stabilizeMaterialNormals as stabilizeConcourseNormals} from './materialNormals.js';
+import {SPACE_EXPOSURE,createSpaceEnvironment} from './spaceLighting.js';
 import * as THREE from 'three';
 import {loadPreviewGlb,disposeObject} from './shipPreview.js';
 import {GLB_SHIP_CONFIG,stationOccupantScale} from './render.js';
@@ -313,14 +314,15 @@ export class ConcourseShip {
   this.stop();this.finishAnimation(false);this.endAtmosphere();
   const origin={host:this.host,button:this.button},generation=this.transitGeneration=(this.transitGeneration??0)+1;
   let shot;
+  this.exteriorEnvironment??=createSpaceEnvironment();
   if(station){
    if(!await this.prepareStation(location)||this.disposed||this.contextLost||this.transitGeneration!==generation)return false;
    shot=this.stationView;
    const size=this.modelBounds.getSize(this.point);
-   shot.configure(this.pivot,this.scene.environment,location,direction,{...data,hullLength:Math.max(size.x,size.y,size.z),hullHeight:size.y},this.profile);
+   shot.configure(this.pivot,this.exteriorEnvironment,location,direction,{...data,hullLength:Math.max(size.x,size.y,size.z),hullHeight:size.y});
   }else{
-   shot=this.atmosphereView??=new PlanetTransit(this.pivot,this.scene.environment,location,direction,data);
-   shot.configure(this.pivot,this.scene.environment,location,direction,data);
+   shot=this.atmosphereView??=new PlanetTransit(this.pivot,this.exteriorEnvironment,location,direction,data);
+   shot.configure(this.pivot,this.exteriorEnvironment,location,direction,data);
   }
   shot.origin=origin;this.transit=shot;
   const preparing=this.transitPreparing={skipped:false};
@@ -331,7 +333,7 @@ export class ConcourseShip {
    await waitForRenderWork(this.renderer,{shouldCancel:()=>this.disposed||this.contextLost||this.transitGeneration!==generation||preparing.skipped});
    if(this.disposed||this.contextLost||this.transitGeneration!==generation)return false;
    if(preparing.skipped){completed=true;return true;}
-   this.renderer.shadowMap.enabled=false;this.finish.uniforms.uExposure.value=1.1;this.attach(host,null);
+   this.renderer.shadowMap.enabled=false;this.finish.uniforms.uExposure.value=SPACE_EXPOSURE;this.attach(host,null);
    await prepareRenderScene(this.renderer,shot.scene,shot.camera,this.target,{shouldCancel:()=>this.disposed||this.contextLost||this.transitGeneration!==generation||preparing.skipped});
    if(this.disposed||this.contextLost||this.transitGeneration!==generation)return false;
    if(preparing.skipped){completed=true;return true;}
@@ -396,6 +398,6 @@ export class ConcourseShip {
   }this.raf=requestAnimationFrame(this.tick);
  };
  dispose(){if(this.disposed)return;this.disposed=true;this.pause();this.outputHost?.classList.remove('has-concourse-composite');this.generation++;this.resizeObserver.disconnect();if(this.resizeFrame)cancelAnimationFrame(this.resizeFrame);window.removeEventListener('resize',this.onViewportResize);window.visualViewport?.removeEventListener('resize',this.onViewportResize);document.removeEventListener('visibilitychange',this.onVisibility);this.motionQuery.removeEventListener('change',this.onMotion);this.canvas.removeEventListener('webglcontextlost',this.onLost);this.canvas.removeEventListener('webglcontextrestored',this.onRestored);
-  this.atmosphereView?.dispose();this.stationView?.dispose();this.transitWarmupTarget?.dispose();this.reflection.dispose();for(const glow of this.glows)glow.material.dispose();if(this.model)disposeObject(this.model);this.ground.geometry.dispose();this.ground.material.dispose();this.sun.shadow.map?.dispose();this.scene.environment?.dispose();this.exhaustTexture?.dispose();this.backdropTexture?.dispose();this.target.dispose();this.finish.dispose();this.quad.geometry.dispose();this.renderer.dispose();this.canvas.remove();
+  this.atmosphereView?.dispose();this.stationView?.dispose();this.exteriorEnvironment?.dispose();this.transitWarmupTarget?.dispose();this.reflection.dispose();for(const glow of this.glows)glow.material.dispose();if(this.model)disposeObject(this.model);this.ground.geometry.dispose();this.ground.material.dispose();this.sun.shadow.map?.dispose();this.scene.environment?.dispose();this.exhaustTexture?.dispose();this.backdropTexture?.dispose();this.target.dispose();this.finish.dispose();this.quad.geometry.dispose();this.renderer.dispose();this.canvas.remove();
  }
 }

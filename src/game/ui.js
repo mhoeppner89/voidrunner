@@ -398,8 +398,9 @@ const mapLocationLabel = (location) => location?.kind === 'jump-point' && locati
 // relation to the player — hostiles red, allies blue, neutral white — so the
 // strip reads at a glance. Flight uses a short label; the transcript keeps
 // the complete identity, including quoted combat handles.
-const RELATION_COLORS = { hostile: '#ff6b5e', ally: '#6fb5ff', neutral: '#e9e6dc' };
+const RELATION_COLORS = { 'story-friend':'#7fe5f5', hostile: '#ff6b5e', ally: '#6fb5ff', friendly:'#6fb5ff', neutral: '#e9e6dc' };
 export const relationColor = (relation) => RELATION_COLORS[relation] ?? RELATION_COLORS.neutral;
+const commsRelation=(name,relation)=>/^(Rin Vek|Mara Vek|Paul)( · |$)/.test(name)?'story-friend':relation;
 export const callsignHandle = (callsign) => {
     const quoted = callsign.match(/“[^”]+”/);
     return quoted ? quoted[0].slice(1, -1) : callsign;
@@ -460,7 +461,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2ll';
+const GAME_VERSION = '0.8.2lo';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -1254,6 +1255,7 @@ export class GameUI {
           <div class="hud-wing-tactics" id="hud-wing-tactics"></div>
           <div id="race-flight-vector" class="race-flight-vector is-hidden" aria-hidden="true"><svg viewBox="0 0 32 32"><g class="flight-vector-ring"><circle cx="16" cy="16" r="6"/><path d="M2 16h8M22 16h8M16 2v8"/></g><path class="flight-vector-arrow" d="M8 20l8-10 8 10"/></svg></div>
           <div id="target-bracket" class="target-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div id="speaker-bracket" class="target-bracket speaker-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
           <div id="target-edge-pointer" class="target-edge-pointer is-hidden" aria-hidden="true"><i></i><span></span></div>
           <div class="reticle" aria-hidden="true"><span></span><span></span><span></span><span></span><b></b></div>
           <div class="comms-channel"><button type="button" id="comms-bar" class="comms-bar" data-ui-command="open-chat" role="button" tabindex="0" aria-label="${t('Open comms log')}"></button>
@@ -4404,6 +4406,7 @@ export class GameUI {
     }
     updateHud(model) {
         this.lastHud = model;
+        this.updateSpeakerBracket(model.speaker);
         this.droneHud = this.droneHudSnapshot(model);
         this.setCockpitShip(model.shipId);
         this.updateSpacePickup();
@@ -4671,6 +4674,7 @@ export class GameUI {
             return;
         }
         const hostile = target.kind === 'ship' && target.hostile;
+        if(bracket){if(target.kind==='ship')bracket.style.setProperty('--target-relation-color',relationColor(target.relation));else bracket.style.removeProperty('--target-relation-color');}
         const surrendered = target.kind === 'ship' && target.surrendered;
         bracket?.classList.toggle('is-hostile', hostile);
         bracket?.classList.toggle('is-surrendered', surrendered && !hostile);
@@ -5511,9 +5515,9 @@ export class GameUI {
         delete bar.dataset.page;
         window.clearTimeout(this.commsPageTimer);
         bar.textContent='';
-        const id={'Rin Vek':'rin-vek','Mara Vek':'mara-vek',Paul:'paul'}[callsign];
+        const id={'Rin Vek':'rin-vek','Mara Vek':'mara-vek',Paul:'paul'}[String(portraitIdentity).split(' · ')[0]];
         const encounterSource=this.encounterPortraitSource(faction,portraitIdentity,portraitIndex);
-        const source=story?(NPC_PORTRAIT_BY_ID[id]??encounterSource):encounterSource;
+        const source=NPC_PORTRAIT_BY_ID[id]??encounterSource;
         bar.classList.toggle('has-portrait',Boolean(source));
         if(source){const img=document.createElement('img');img.className='comms-portrait';img.src=source;img.alt=callsign;img.addEventListener('error',()=>{img.remove();bar.classList.remove('has-portrait');this.scheduleCommsFit();},{once:true});bar.append(img);}
         const text=document.createElement('span');text.className='talker-text';text.textContent=`${commsSenderLabel(callsign)}: ${line}`;bar.append(text);
@@ -5571,7 +5575,14 @@ export class GameUI {
     // story marks story-mission transmissions on the log entries; rendering
     // them distinctly (pinned bar, log tag) is later work — the flag is the
     // seam so the log already knows which lines are story.
-    showPilotLine(callsign, line, relation = 'neutral', duration = 6000, story = false, faction, portraitIndex, portraitIdentity = callsign) {
+    updateSpeakerBracket(speaker) {
+        const bracket=this.el('#speaker-bracket');if(!bracket)return;
+        bracket.classList.toggle('is-hidden',!speaker);
+        bracket.classList.toggle('is-targeted',Boolean(speaker?.targeted));
+        if(speaker)bracket.style.transform=`translate(${speaker.x}px, ${speaker.y}px)`;
+    }
+    showPilotLine(callsign, line, relation = 'neutral', duration = 6000, story = false, faction, portraitIndex, portraitIdentity = callsign, speakerId) {
+        relation=commsRelation(portraitIdentity,relation);
         // Append to the comms log (capped) so the chat panel can review the
         // whole conversation — nobody misses a line that faded off the bar.
         this.commsLog.push({ callsign, line, relation, story });
@@ -5587,6 +5598,7 @@ export class GameUI {
             return;
         const color = relationColor(relation);
         this.renderCommsMessage(bar,callsign,line,story,faction,portraitIndex,portraitIdentity);
+        this.commsMessage.portraitIdentity=portraitIdentity;this.commsMessage.speakerId=speakerId;
         this.commsMessage.duration=duration;
         bar.style.color = color;
         bar.style.borderColor = color;
@@ -5604,6 +5616,7 @@ export class GameUI {
         this.showPilotLine(speaker,text,'ally',12000,true);
     }
     clearPilotLine() {
+        this.updateSpeakerBracket();
         this.commsMessage=undefined; window.clearTimeout(this.commsPageTimer);
         const bar = this.el('#comms-bar');
         if (bar) {
@@ -5619,21 +5632,22 @@ export class GameUI {
             bar.classList.add('active');
             this.renderCommsMessage(bar,this.tutorialHint.speaker,this.tutorialHint.text,true);
             this.commsMessage.pinned=true;
-            bar.style.color=relationColor('ally');bar.style.borderColor=relationColor('ally');
+            bar.style.color=relationColor(commsRelation(this.tutorialHint.speaker,'ally'));bar.style.borderColor=bar.style.color;
         }
         this.scheduleCommsFit();
     }
     // A group transmission keeps all callsigns in the log; the flight label
     // shows the first handle and a count of the other senders.
-    showGroupLine(callsigns, line, relation = 'neutral', duration = 6000, faction, portraitIndex) {
+    showGroupLine(callsigns, line, relation = 'neutral', duration = 6000, faction, portraitIndex, speakerId) {
         const names = callsigns.map((callsign) => callsignHandle(callsign)).join(', ');
-        this.showPilotLine(names, line, relation, duration, false, faction, portraitIndex, callsigns[0] ?? names);
+        this.showPilotLine(names, line, relation, duration, false, faction, portraitIndex, callsigns[0] ?? names,speakerId);
     }
-    // Story-mission display: a pinned amber transmission on the comms bar.
+    // Story-mission display: a pinned transmission in the speaker relation color.
     // Unlike normal chatter it doesn't fade — it stays until dismissed (tap
     // the CONTINUE bar, or the game times it out) — and it's flagged story in
     // the log. The game holds the chatter mute (storyLineUntil) while it's up.
     showStoryLine(name, text, relation = 'neutral', conversationId, faction, portraitIndex) {
+        relation=commsRelation(name,relation);
         if (conversationId || this.adventure) {
             this.openStoryAdventure(name,text,relation,conversationId,faction,portraitIndex);
             return;
@@ -5643,8 +5657,8 @@ export class GameUI {
         if (!bar)
             return;
         bar.textContent = '';
-        bar.style.color = '#e8c87a';
-        bar.style.borderColor = 'rgba(232, 200, 122, 0.6)';
+        bar.style.color = relationColor(relation);
+        bar.style.borderColor = relationColor(relation);
         bar.classList.add('active', 'story');
         bar.setAttribute('data-ui-command', 'dismiss-story');
         bar.setAttribute('aria-label', t('CONTINUE'));
@@ -5654,6 +5668,7 @@ export class GameUI {
         this.storyDismissed = false;
     }
     dismissStory() {
+        this.updateSpeakerBracket();
         this.commsMessage=undefined; window.clearTimeout(this.commsPageTimer);
         const bar = this.el('#comms-bar');
         if (bar) {

@@ -74,7 +74,7 @@ import { commitShipTrade, quoteShipTrade } from './shipTrade.js';
 import { TURRET_LAYOUTS } from './turretLayouts.js';
 import { SHIP_MOUNT_ANCHORS } from './shipMounts.js';
 import { canMineWithHull, createDroneUnit, DRONE_BAY_CAPACITY, DRONE_RULES, DRONE_TYPES, droneBayLayoutFor, normalizeDroneFleet, validateDroneBays,droneUnitAccessible } from './droneData.js';
-import { destroyMiningUnit, finishMiningRecall, miningReservedMass, miningStartEligibility, recallMining, startMining } from './droneMining.js';
+import { deliverMiningPayload, destroyMiningUnit, finishMiningRecall, miningReservedMass, miningStartEligibility, recallMining, startMining } from './droneMining.js';
 import { createMiningDroneSystem } from './droneSystem.js';
 import { createPdcDroneController, destroyPdcDrone } from './dronePdc.js';
 import { quoteDroneService, commitDroneService } from './droneService.js';
@@ -2972,6 +2972,7 @@ export class GameSession {
         this.snapshotInterpolationState();
         this.renderer.updateWorld(dt);
         this.save.world.time += dt;
+        this.updateHyperdriveDroneRecovery(dt);
         tickEconomy(this.save.world, dt);
         refreshMissionOffers(this.save);
         this.gunCooldown -= dt;
@@ -5058,12 +5059,27 @@ export class GameSession {
     }
     requestDroneDeparture(kind, locationId = null) {
         this.recallAllDrones('hyperdrive');
-        if (this.dronesSafelyStowed()) return true;
-        this.pendingDroneDeparture ??= { kind, locationId,
-            navTargetId: this.save.player.navTargetId, waypointId:(this.distressWaypoint()??this.explorationWaypoint()??this.tutorialLocalWaypoint())?.id, throttle: this.save.player.throttle };
-        this.save.player.throttle = 0;
-        this.setHyperdriveStatus(t('RECOVERING DRONES · DEPARTURE QUEUED'), 360000);
-        return false;
+        if(!this.dronesSafelyStowed())this.hyperdriveDroneRecoveryUntil??=this.save.world.time+HYPERDRIVE_SPOOL_SECONDS*.8;
+        return true;
+    }
+    updateHyperdriveDroneRecovery(dt,force=false) {
+        if(this.hyperdriveDroneRecoveryUntil===undefined&&!force)return;
+        const p=this.save.player,fleet=p.droneFleet;if(!fleet?.unitsById){this.hyperdriveDroneRecoveryUntil=undefined;return;}
+        const remaining=Math.max(0,(this.hyperdriveDroneRecoveryUntil??this.save.world.time)-this.save.world.time);
+        const fraction=force||remaining<=dt?1:Math.min(1,dt/remaining);
+        const mining=this.prepareMiningDroneContext(0),support=this.preparePdcDroneContext(0);
+        for(const id in fleet.unitsById){const unit=fleet.unitsById[id];if(unit.hull<=0||unit.state==='destroyed'||unit.state==='stowed'&&!unit.payload)continue;
+            const dock=(unit.type==='mining'?mining:support)?.bayAnchors?.[id]?.dock;
+            const target=dock?.position??p.position;
+            unit.position??=[...p.position];unit.velocity??=[0,0,0];
+            for(let axis=0;axis<3;axis++){const delta=(target[axis]-unit.position[axis])*fraction;unit.position[axis]+=delta;unit.velocity[axis]=fraction===1?p.velocity[axis]:delta/Math.max(dt,SIM_STEP);}
+            unit.state='returning';unit.thrust=1;
+            if(fraction<1)continue;
+            unit.job=null;
+            if(unit.type==='mining'&&unit.payload&&mining){unit.state='docking';const event=deliverMiningPayload(fleet,id,mining);if(event.ok){mining.cargoMass+=event.units*event.unitMass;this.processMiningDroneEvent(event);}}
+            unit.state='stowed';unit.phaseTime=0;unit.recallTime=0;unit.portStage=null;unit.recallRequested=false;unit.thrust=0;unit.repairAttached=false;unit.repairing=false;unit.repairReturnStage=null;
+        }
+        if(fraction===1){this.hyperdriveDroneRecoveryUntil=undefined;finishMiningRecall(fleet);}
     }
     cancelDroneDeparture() {
         const pending = this.pendingDroneDeparture;
@@ -5316,6 +5332,7 @@ export class GameSession {
         return context;
     }
     updatePdcDrones(dt = SIM_STEP) {
+        if(this.hyperdriveDroneRecoveryUntil!==undefined)return [];
         if (!this.save?.player?.droneFleet?.unitsById) return;
         if (dt === 0) return [];
         if (!Number.isFinite(dt) || Math.abs(dt - SIM_STEP) > 1e-10)
@@ -5359,12 +5376,8 @@ export class GameSession {
         const fleet = this.save?.player?.droneFleet;
         if (!fleet?.controller || !fleet.unitsById) return { ok: false, code: 'unavailable' };
         const result = recallMining(fleet, reason);
-        for (const id in fleet.unitsById) {
-            const unit = fleet.unitsById[id];
-            // An imported payload with no flight state is not a dock arrival.
-            if (unit.type === 'mining' && unit.state === 'stowed' && unit.payload)
-                this.loseMiningDrone(id, 'invalid-stowed-payload');
-        }
+        // A recovered drone may hold its packet in the bay until cargo space
+        // is available. Recalling again must not destroy that unit or packet.
         // No airborne units: settle immediately so docking is never blocked by
         // a start/stop edge that occurred before the first launch step.
         finishMiningRecall(fleet);
@@ -5383,7 +5396,7 @@ export class GameSession {
         this.recallMiningDrones(reason);
         for (const id in fleet.unitsById) {
             const unit = fleet.unitsById[id];
-            if (unit.type === 'mining' && unit.state !== 'destroyed'
+            if (unit.type === 'mining' && unit.state !== 'destroyed' && !(unit.state==='stowed'&&['system-jump','docked-on-load','docked'].includes(reason))
                 && (unit.state !== 'stowed' || unit.job || unit.payload)) this.loseMiningDrone(id, reason);
         }
         finishMiningRecall(fleet);
@@ -5574,6 +5587,7 @@ export class GameSession {
         return result;
     }
     updateMiningDrones(dt) {
+        if(this.hyperdriveDroneRecoveryUntil!==undefined)return;
         if (!this.miningDroneSystem || !this.save?.player?.droneFleet?.controller) return; // Old direct simulation harnesses.
         const player = this.save.player;
         if (player.dockedAt || this.deathTimer > 0 || this.galaxyJump) {
@@ -5582,6 +5596,9 @@ export class GameSession {
         }
         const context = this.prepareMiningDroneContext(dt);
         const fleet = player.droneFleet;
+        // A full imported hold can retain a packet safely inside its bay.
+        // Retry the normal cargo transaction once room becomes available.
+        for(const id in fleet.unitsById){const unit=fleet.unitsById[id];if(unit.type==='mining'&&unit.state==='stowed'&&unit.payload){unit.state='docking';const event=deliverMiningPayload(fleet,id,context);unit.state='stowed';if(event.ok){context.cargoMass+=event.units*event.unitMass;this.processMiningDroneEvent(event);}}}
         const reservedMass = miningReservedMass(fleet);
         if (fleet.controller.phase === 'running' && (!context.unitIds.length
             || (reservedMass === 0 && context.cargoMass + context.unitMass > context.cargoCapacity)))
@@ -6774,7 +6791,7 @@ export class GameSession {
         this.armedJumpPointId = null;
         this.armedJumpPointSide = 0;
         this.renderer.setArmedJumpPoint?.();
-        this.abandonMiningDrones('system-jump');
+        this.recallMiningDrones('system-jump');
         this.galaxyJump = jump;
         this.save.world.pendingJump = { ...jump };
         this.save.world.plannedSystemId ??= jump.toSystemId;
@@ -6926,13 +6943,9 @@ export class GameSession {
             this.disarmGalaxyJump();
             return false;
         }
-        this.recallPdcDrones('system-jump');
-        if (this.hasDeployedPdcDrones()) {
-            // Also handles an imported pending jump: keep simulating returns in
-            // the departure frame before changing the coordinate system.
-            this.galaxyJump = jump;
-            return false;
-        }
+        this.recallAllDrones('system-jump');
+        // Also recover imported pending jumps before changing coordinates.
+        this.updateHyperdriveDroneRecovery(0,true);
         const tutorialArrival = isTutorialGuided(this.save);
         this.clearTransientSpace();
         const player = this.save.player;
@@ -7155,6 +7168,7 @@ export class GameSession {
         if (this.hyperdriveFx === 'spooling') {
             if (!this.autopilot) this.hyperdriveFx = 'none';
             else if (now - this.hyperdriveSpoolStartedAt >= HYPERDRIVE_SPOOL_SECONDS) {
+                this.updateHyperdriveDroneRecovery(0,true);
                 this.hyperdriveFx = 'active';
                 this.audio.play('hyperActive');
             }
@@ -7314,11 +7328,28 @@ export class GameSession {
         }
     }
     // The comms surfaces color each line by the speaker's relation to the
-    // player: hostiles red, allies blue, neutral white. Hostile is the flag
-    // itself; an unhostile patrol with a non-player target is actively
-    // fighting on our side (wingman, friendly patrol) and reads as an ally.
+    // player: story friends light blue, reputation friends blue, enemies red
+    // and neutrals white. A neutral patrol fighting pirates is not by itself
+    // evidence of friendship with the player.
     shipRelation(ship) {
-        return ship.hostile ? 'hostile' : ship.tutorialCompanion || ship.arenaRunWingman || (ship.role === 'patrol' && ship.targetId && ship.targetId !== 'player') ? 'ally' : 'neutral';
+        if(ship.tutorialCompanion||ship.storyPersonId)return 'story-friend';
+        if(ship.hostile)return 'hostile';
+        const reputation=this.save.player.reputation?.[ship.faction]??0;
+        return reputation<=-30?'hostile':ship.arenaRunWingman||reputation>=30||this.deferentialPilot(ship)?'ally':'neutral';
+    }
+    commsSpeakerShip(message=this.ui.commsMessage) {
+        if(!message)return;
+        const identity=message.portraitIdentity??message.callsign;
+        const person=({'Rin Vek':'rin',Paul:'paul','Mara Vek':'mara'})[identity];
+        return this.ships.find(ship=>ship.hull>0&&(message.speakerId?ship.id===message.speakerId
+            :person?ship.storyPersonId===person
+            :ship.name===identity||ship.name?.startsWith(identity+' · ')||ship.name?.endsWith(' · '+identity)));
+    }
+    commsSpeakerHud() {
+        const ship=this.commsSpeakerShip();if(!ship)return;
+        const screen=this.renderer.projectTargetToScreen('ship',ship.id,ship.position);
+        if(!screen.visible||screen.behind||this.targetEdge(screen))return;
+        return {id:ship.id,x:screen.x,y:screen.y,targeted:this.save.player.currentTargetId===ship.id};
     }
     // A pilot who recognizes the player and was captured (not escaped) defers:
     // non-hostile, never re-engages, offers favors. Escaped pilots come back
@@ -7341,14 +7372,14 @@ export class GameSession {
         // Lines already localized at their pool definition pass through
         // unchanged (the catalog key is English; a German string simply has
         // no entry and renders as itself).
-        this.ui.showPilotLine?.(ship.name, t(line), relation, 6000, false, ship.faction, ship.portraitIndex);
+        this.ui.showPilotLine?.(ship.name, t(line), this.shipRelation(ship), 6000, false, ship.faction, ship.portraitIndex,ship.name,ship.id);
         this.audio?.playComms?.(ship.pilot.temperament);
     }
     // A line from a whole group (a scared-off mug): the comms bar shows every
     // callsign at once so the player sees who folded.
     sayGroupLine(ships, line) {
         this.nextChatterAt = this.save.world.time + CHATTER_GAP;
-        this.ui.showGroupLine?.(ships.map((ship) => ship.name), t(line), this.shipRelation(ships[0]), 6000, ships[0]?.faction, ships[0]?.portraitIndex);
+        this.ui.showGroupLine?.(ships.map((ship) => ship.name), t(line), this.shipRelation(ships[0]), 6000, ships[0]?.faction, ships[0]?.portraitIndex,ships[0]?.id);
         this.audio?.playComms?.(ships[0].pilot.temperament);
     }
     encounterPortraitForSpeaker(name, conversationId, encounterContext) {
@@ -7427,6 +7458,9 @@ export class GameSession {
     // story missions call this with their own lines.
     playStoryLine(name, text, relation = 'neutral', duration = 12000, conversationId, portraitOverride) {
         const portrait = portraitOverride ?? this.encounterPortraitForSpeaker(name, conversationId);
+        const speaker=this.commsSpeakerShip({callsign:name});
+        if(speaker)relation=this.shipRelation(speaker);
+        else if(portrait?.faction)relation=this.shipRelation({faction:portrait.faction});
         const urgent = conversationId === 'urgent' || duration <= 7000;
         const inSpace = !this.save.player.dockedAt;
         if (!urgent && conversationId !== 'tutorial-combat' && conversationId !== 'tutorial-paul-hide' && conversationId !== 'tutorial-paul-clear' && inSpace
@@ -9930,7 +9964,7 @@ export class GameSession {
             ship.targetId = undefined;
             if (attackerId === 'player' && this.save.world.time >= (ship.tutorialFireWarningAt ?? 0)) {
                 ship.tutorialFireWarningAt = this.save.world.time + 8;
-                this.playStoryLine('Rin Vek', t('Watch your line. I am on your wing, remember?'), 'ally', 7000);
+                this.playStoryLine(ship.storyPersonId==='paul'?'Paul':'Rin Vek', t('Watch your line. I am on your wing, remember?'), 'story-friend', 7000);
             }
             // One point of hull is the limit of what the story ship can take.
             // She does not fight on as a wreck: the hull hit that would have
@@ -14239,6 +14273,7 @@ export class GameSession {
                     capitalShielded: ship.shield>0,
                     capitalSelected: Number.isInteger(target.mount)?ship.capitalMountHull[target.mount]:undefined,
                     hostile: ship.hostile,
+                    relation: this.shipRelation(ship),
                     surrendered: ship.surrendered,
                     captured: ship.captured,
                     captureClaimable: Boolean(claimable),
@@ -14482,6 +14517,7 @@ export class GameSession {
             handlingPercent: Math.round(this.flightLoadScale() * 100),
             zone: this.zoneLabel(this.getWorldZone(player)),
             target: hudTarget,
+            speaker: this.commsSpeakerHud(),
             dockPrompt,
             monitorStatus: this.save.world.time < this.monitorStatusUntil ? this.monitorStatus : undefined,
             ownMonitorStatus: this.save.world.time < this.ownMonitorStatusUntil ? this.ownMonitorStatus : undefined,

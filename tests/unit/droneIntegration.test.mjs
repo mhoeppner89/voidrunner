@@ -66,20 +66,18 @@ rt.applyTarget({ id: 'another-contact', kind: 'asteroid' });
 assert.equal(save.player.droneFleet.controller.phase, 'running');
 rt.clearTarget();
 assert.equal(save.player.droneFleet.controller.phase, 'running');
-// Departure is queued once and resumes once, only after the fleet is stowed.
+// Drone return starts with the charge, without stopping throttle or queuing departure.
 rt.recallAllDrones = () => {};
 save.player.dockedAt = null; save.player.throttle = 0.4;
-let departed = 0; rt.toggleHyperdrive = () => departed++;
-assert.equal(rt.requestDroneDeparture('hyperdrive'), false);
-assert.equal(save.player.throttle, 0);
-rt.updateDroneDeparture(); assert.equal(departed, 0);
+assert.equal(rt.requestDroneDeparture('hyperdrive'), true);
+assert.equal(save.player.throttle, .4);
+assert.equal(rt.pendingDroneDeparture, undefined);
+assert.equal(rt.hyperdriveDroneRecoveryUntil,save.world.time+1.6);
 const defender = createDroneUnit('test-defender', 'pdc'); defender.state = 'returning';
 save.player.droneFleet.unitsById[defender.id] = defender;
 unit.state = 'stowed'; unit.payload = null;
-rt.updateDroneDeparture(); assert.equal(departed, 0, 'PDC return also gates departure');
+assert.equal(rt.requestDroneDeparture('hyperdrive'),true,'PDC return does not gate departure');
 defender.state = 'stowed';
-rt.updateDroneDeparture(); rt.updateDroneDeparture();
-assert.equal(departed, 1); assert.equal(save.player.throttle, 0.4);
 
 // Seeded, actual sell quotes: ordinary ore approaches 6k; gold adds a substantial premium.
 let oreTotal = 0, goldTotal = 0;

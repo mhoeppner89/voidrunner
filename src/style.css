@@ -1,5 +1,6 @@
 @font-face { font-family:"Void VGA"; src:url("../assets/fonts/void-vga.ttf") format("truetype"); font-display:swap; font-style:normal; font-weight:400 900; }
 :root {
+  --speaker-yellow: #ffd24a;
   --console-brass: #a58b58;
   --console-brass-light: #cfb67a;
   --console-face: #17334c;
@@ -3109,6 +3110,7 @@ html[lang="de"] .comms-bar::before {
 }
 
 .comms-bar.active {
+  transition:background-color .28s ease,box-shadow .28s ease;
   color: var(--void-cyan);
   background: rgba(2, 8, 10, 0.9);
   border: 1px solid rgba(48, 161, 195, 0.5);
@@ -3130,11 +3132,10 @@ html[lang="de"] .comms-bar.active::before {
   filter: none;
 }
 
-/* Story-mission transmissions: pinned amber (no fade until dismissed), a
-   pulsing glow, and a CONTINUE affordance so it reads as dismissible. The
-   color is set inline from showStoryLine; this class adds the motion. */
+/* Story transmissions retain the speaker relation color until dismissed.
+   The CONTINUE affordance marks them as dismissible without an amber tint. */
 .comms-bar.story {
-  animation: story-glow 2.2s ease-in-out infinite;
+  animation: none;
 }
 
 .comms-bar.story::after {
@@ -4351,6 +4352,16 @@ button.primary,
 .target-bracket i {
   border-color: #eec751;
   border-width: 3px;
+}
+
+#target-bracket i { border-color:var(--target-relation-color,#eec751); }
+.speaker-bracket { pointer-events:none; }
+#speaker-bracket i { border-color:var(--speaker-yellow); }
+.speaker-bracket.is-targeted {
+  width:calc(clamp(58px,7vw,90px) + 28px);
+  height:calc(clamp(58px,7vw,90px) + 28px);
+  margin-left:calc(clamp(-45px,-3.5vw,-29px) - 14px);
+  margin-top:calc(clamp(-45px,-3.5vw,-29px) - 14px);
 }
 
 #radar {

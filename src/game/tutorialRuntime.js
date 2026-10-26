@@ -289,7 +289,7 @@ export const TutorialRuntimeMethods={
         const s=q.stepId;
         if(['survey-graveyard','survey-carrier','carrier-wait'].includes(s)){
             const index=s==='carrier-wait'?surveyIds.length-1:Math.min(q.flags.surveyIndex??0,surveyIds.length-1),id=surveyIds[index];
-            return {kind:'waypoint',id:`tutorial-survey-${index}`,position:q.flags['survey-position-'+index]??=(tutorialWreckPoint(id)),name:t(['Battleship survey','Frigate survey','Cruiser distress signal','Second cruiser survey','Carrier survey'][index]),destinationId:'mourning-line'};
+            return {kind:'waypoint',id:`tutorial-survey-${index}`,position:q.flags['survey-position-'+index]??=(tutorialWreckPoint(id)),name:t('Wreck survey')+' '+(index+1)+'/5',destinationId:'mourning-line'};
         }
         if(s==='hide-patrol')return {kind:'waypoint',id:'tutorial-hide',position:q.flags.hidingPosition??tutorialWreckPoint('concord-carrier-wreck',true),name:t('CARRIER HANGAR · HIDE'),destinationId:'mourning-line'};
         const mining=s==='mine-shardbelt';if(!mining&&s!=='salvage-black-box')return;
@@ -458,12 +458,14 @@ export const TutorialRuntimeMethods={
             const encounter=s==='rescue-paul'?'rescue':'black-box',count=encounter==='rescue'?2:4;
             this.ensureTutorialEnemy();if(Array.from({length:count},(_,i)=>q.flags[`defeated-${encounter}-${i}`]).every(Boolean))this.handleTutorialEvent('encounter-cleared',{encounter});
         }
+        if(s==='survey-carrier'&&(q.flags.surveyIndex??0)===4&&!q.flags.carrierRemark&&!this.autopilot){
+            const marker=this.tutorialFieldTarget();
+            if(marker&&distance(p.position,marker.position)<=500){q.flags.carrierRemark=true;this.ui.showPilotLine?.('Paul',t('I used to bring supplies here. The flight deck was so busy you could barely find a berth.'),'story-friend',10000,true);}
+        }
         if(this.updateTutorialSurveyProgress())return;
         if(s==='return-helix'&&!q.flags['briefingShown-paul-clear'])this.playTutorialBriefing('paul-clear');
         if(s==='carrier-wait'){
-            if(now-(q.flags.carrierWaitStartedAt??now)>=3&&!q.flags.carrierRemark){q.flags.carrierRemark=true;this.ui.showPilotLine?.('Paul',t('I used to bring supplies here. The flight deck was so busy you could barely find a berth.'),'ally',10000,true);}
-            const marker=this.tutorialFieldTarget();if(distance(p.position,marker.position)>250)q.flags.carrierWaitStartedAt=now;
-            else if(now-(q.flags.carrierWaitStartedAt??now)>=10)this.handleTutorialEvent('patrol-arrived');
+            this.handleTutorialEvent('patrol-arrived');
         }
         if(s==='hide-patrol'){
             if(!q.flags['briefingShown-paul-hide'])this.playTutorialBriefing('paul-hide');

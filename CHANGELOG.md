@@ -1,3 +1,23 @@
+## 0.8.2lo — Exterior cutscene lighting matches flight
+
+- Share star-system light colors, intensities, world directions, reflection environment and exposure between flight and exterior station shots. Remove the hangar reflection/lighting leak and match station material reflection strength to flight.
+- Use the same neutral tone-mapping shader for exterior films as flight; preserve the existing concourse artwork finish and interior staging.
+- Planet shots match flight lighting in orbit and blend toward atmospheric scattering near the surface, in both arrival and departure. Keep the dedicated exterior environment cached and dispose it with the dock renderer.
+
+## 0.8.2ln — Carrier arrival and rapid drone recovery
+
+- Paul recalls the carrier at 500 km on the final charting approach. Reaching the waypoint immediately starts the five-pirate/transponder briefing; remove the ten-second carrier wait.
+- Start hyperdrive charging immediately while all live drones boost back to their bays. Recover within the normal two-second spool and safely latch remaining units before cruise or a system transition, without queued departure or throttle waiting.
+- Preserve mining packets and identities, including a full hold: retain ore safely in the docked drone and retry the normal cargo transfer when space opens. Cancellation still completes recall; no recovery-timeout loss or transition destruction.
+- Extend the isolated tutorial review with carrier-approach and mining-drone jump presets.
+
+## 0.8.2lm — Speaker identity and charting labels
+
+- Label charting waypoints by mission and sequence only, without revealing Paul's encounter.
+- Companions identify their own collision warnings. Story friends use light blue comms; ordinary friends blue, hostile relationships red and neutrals white. Remove the amber story-strip override and match ship target corners to the same relationship colors.
+- Mark the currently speaking ship with yellow corners. When also targeted, place the speaking corners 14 pixels outside the relationship bracket; track the rendered ship and clear the cue with the transmission or when offscreen.
+- Add an isolated tutorial comms review with charting, Paul's first fight and four relationship examples; career saves are quarantined and sound starts muted.
+
 ## 0.8.2ll — Refuelling lesson and local survey beacons
 
 - Rin’s post-mining Vesper dialogue explains the normal SERVICE → Treibstoff und Munition → AUFFÜLLEN controls before the next flight, in German and English.

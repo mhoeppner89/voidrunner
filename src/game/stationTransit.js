@@ -7,6 +7,7 @@ import {stationModelOffsetZ,stationVisualSurfaceRadius} from './stationTraffic.j
 import {STATION_DOCKS} from './stationDocks.js';
 import {addStationOccupants} from './stationOccupants.js';
 import {freezeStaticTransforms} from './renderWork.js';
+import {applySpaceLighting} from './spaceLighting.js';
 
 export const STATION_TRANSIT_DURATION={entry:4200,exit:3600};
 const ease=t=>t*t*(3-2*t),forward=new THREE.Vector3(0,0,-1);
@@ -18,6 +19,7 @@ export class StationTransit {
   this.scene.matrixAutoUpdate=false;
   this.point=new THREE.Vector3();this.look=new THREE.Vector3();this.out=new THREE.Vector3();this.right=new THREE.Vector3();this.pad=new THREE.Vector3();this.gate=new THREE.Vector3();this.rotation=new THREE.Quaternion();this.euler=new THREE.Euler();
   this.hemi=new THREE.HemisphereLight(0x809cbd,0x182636,1.5);this.key=new THREE.DirectionalLight(0xffebcf,2.6);this.key.position.set(-18,30,24);this.rim=new THREE.DirectionalLight(0x79baf5,1.8);this.rim.position.set(20,6,-20);this.scene.add(this.hemi,this.key,this.rim);
+  this.fill=new THREE.AmbientLight();this.scene.add(this.fill);
   this.engineLight=new THREE.PointLight(0x70ceff,.32,2,2);this.scene.add(this.engineLight);
   this.geometry=new THREE.PlaneGeometry(2,2);
   this.background=new THREE.ShaderMaterial({depthTest:false,depthWrite:false,toneMapped:false,vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,1.,1.);}',fragmentShader:`varying vec2 vUv;float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}void main(){vec2 cell=floor(vUv*vec2(700.,430.));float star=step(.997,hash(cell))*pow(hash(cell+19.),3.);vec3 colour=mix(vec3(.002,.004,.012),vec3(.012,.025,.045),exp(-length((vUv-vec2(.6,.4))*vec2(1.5,1.))*3.));gl_FragColor=vec4(colour+vec3(star*.7),1.);}`});
@@ -35,7 +37,7 @@ export class StationTransit {
    if(this.model){this.scene.remove(this.model);disposeObject(this.model);}
    this.model=model;model.scale.setScalar(.18);model.name=`cinematic-station-${id}`;
    freezeStaticTransforms(model);
-   model.traverse(o=>{if(!o.isMesh)return;for(const m of Array.isArray(o.material)?o.material:[o.material]){m.fog=false;if(m.roughness!==undefined)m.roughness=Math.max(.55,m.roughness);this.patchMaterial?.(m);for(const t of Object.values(m))if(t?.isTexture){t.anisotropy=2;t.minFilter=THREE.LinearMipmapLinearFilter;t.magFilter=THREE.NearestFilter;}}});
+   model.traverse(o=>{if(!o.isMesh)return;for(const m of Array.isArray(o.material)?o.material:[o.material]){m.fog=false;m.envMapIntensity=.3;this.patchMaterial?.(m);for(const t of Object.values(m))if(t?.isTexture){t.anisotropy=2;t.minFilter=THREE.LinearMipmapLinearFilter;t.magFilter=THREE.NearestFilter;}}});
    this.scene.add(model);return true;
   }).catch(error=>{if(generation===this.generation){this.id=undefined;this.ready=undefined;}throw error;});return this.ready;
  }
@@ -53,7 +55,7 @@ export class StationTransit {
   const length=Math.max(.5,Math.min(1.5,2*Math.max(...(data.extents??[8,6,12]))*scale));this.shipLength=length;this.shipScale=length/(data.hullLength??4);this.shipHeight=(data.hullHeight??1)*this.shipScale;this.engineLight.distance=length*2;
   this.rotation.setFromUnitVectors(forward,this.point.copy(this.out).multiplyScalar(direction==='entry'?-1:1));this.euler.setFromQuaternion(this.rotation);
   this.moon.visible=id==='blackglass';
-  if(profile){this.hemi.color.setHex(profile.sky);this.hemi.groundColor.setHex(profile.ground);this.key.color.setHex(profile.key);this.rim.color.setHex(profile.rim);}
+  applySpaceLighting(this,location.systemId);this.scene.environmentIntensity=1;
   this.update(0);
  }
  resize(aspect){this.camera.aspect=aspect;this.camera.zoom=Math.min(1,aspect/1.35);this.camera.updateProjectionMatrix();}

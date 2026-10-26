@@ -1,3 +1,4 @@
+import {SYSTEM_STAR_PROFILE,SPACE_EXPOSURE,applySpaceLighting,createSpaceEnvironment} from './spaceLighting.js';
 import {stabilizeMaterialNormals} from './materialNormals.js';
 import {createPixelResolveMaterial,createPixelSceneTarget,pixelTargetSamples,bindPixelResolve,FINITE_COLOUR_GLSL} from './pixelResolve.js';
 import {pixelRenderSize} from './retroDisplay.js';
@@ -106,65 +107,6 @@ const SYSTEM_RENDER_STYLE = Object.freeze({
     meridian: { clear: 0x0d2032, fog: 0x284358, density: 0.000105, stars: 0xe4f4ff, band: 0xffffff, bandOpacity: 0.68, nebula: 0x91b5c3, nebulaOpacity: 0.68 },
     redwake: { clear: 0x1f0d18, fog: 0x4b2029, density: 0.00013, stars: 0xffd2ca, band: 0xffffff, bandOpacity: 0.66, nebula: 0xa86268, nebulaOpacity: 0.6 },
     'pale-ring': { clear: 0x0d1825, fog: 0x273b49, density: 0.000095, stars: 0xd9f2ff, band: 0xffffff, bandOpacity: 0.7, nebula: 0x759fbd, nebulaOpacity: 0.64 },
-});
-const SYSTEM_STAR_PROFILE = Object.freeze({
-    'helios-verge': Object.freeze({
-        radius: 22000,
-        core: 0xffe1a0,
-        corona: [
-            ['#fff5cf', '#ffaf3d', 48000, 0.55],
-            ['#ffd57a', '#ff6b2a', 110000, 0.32],
-            ['#ffe9a8', '#e07a3a', 220000, 0.14],
-        ],
-        hemisphere: [0xffd2a8, 0x32284c, 2.4],
-        fill: [0x7a6caa, 1.0],
-        key: [0xffa566, 5.0],
-        rim: [0x66b9ff, 1.4],
-    }),
-    meridian: Object.freeze({
-        radius: 19000,
-        core: 0xfff2c7,
-        corona: [
-            ['#fffbea', '#efc86f', 44000, 0.52],
-            ['#fff0b0', '#d89038', 98000, 0.28],
-            ['#fff7d5', '#d6a652', 190000, 0.12],
-        ],
-        hemisphere: [0xffe7bd, 0x263b55, 2.3],
-        fill: [0x7195bc, 1.0],
-        key: [0xffc978, 4.8],
-        rim: [0x77c9ff, 1.35],
-    }),
-    redwake: Object.freeze({
-        // A compact red dwarf: physically smaller on the far shell and much
-        // redder than Helios, with a restrained corona rather than a recolored
-        // copy of the same yellow star.
-        radius: 11000,
-        core: 0xff6046,
-        corona: [
-            ['#ffb08a', '#e33b25', 30000, 0.48],
-            ['#ff6a48', '#971c24', 66000, 0.29],
-            ['#ee4937', '#5d1021', 135000, 0.13],
-        ],
-        hemisphere: [0xff8c69, 0x321421, 2.15],
-        fill: [0x6a405d, 0.9],
-        key: [0xff5538, 4.4],
-        rim: [0xb65f8f, 1.15],
-    }),
-    'pale-ring': Object.freeze({
-        // Pale Ring is lit by a blue giant: a larger blue-white disc with a
-        // broad cold corona and correspondingly cool key light.
-        radius: 38000,
-        core: 0xe9fbff,
-        corona: [
-            ['#ffffff', '#8fdcff', 78000, 0.62],
-            ['#c8efff', '#418dff', 165000, 0.38],
-            ['#9edcff', '#245bb8', 310000, 0.17],
-        ],
-        hemisphere: [0xc8efff, 0x192b4f, 2.65],
-        fill: [0x638bc7, 1.15],
-        key: [0x9bdcff, 5.6],
-        rim: [0xd7f6ff, 1.65],
-    }),
 });
 // Half the previous pull-back (was 0.97): the frame relaxes to 0.994 under
 // burn, and the grime follows at half that rate via the 0.5 factor below.
@@ -458,7 +400,7 @@ export class SpaceRenderer {
         configureShaderDiagnostics(this.renderer);
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderer.toneMapping = THREE.NeutralToneMapping;
-        this.renderer.toneMappingExposure = 1.18;
+        this.renderer.toneMappingExposure = SPACE_EXPOSURE;
         this.renderer.setPixelRatio(1);
         this.renderer.shadowMap.enabled = false;
         this.renderer.setClearColor(0x0d1a3c, 1);
@@ -657,66 +599,10 @@ export class SpaceRenderer {
             sprite.material.needsUpdate = true;
             sprite.scale.setScalar(scale);
         });
-        const [skyColor, groundColor, hemisphereIntensity] = profile.hemisphere;
-        this.hemisphereLight?.color.setHex(skyColor);
-        this.hemisphereLight?.groundColor.setHex(groundColor);
-        if (this.hemisphereLight)
-            this.hemisphereLight.intensity = hemisphereIntensity;
-        const [fillColor, fillIntensity] = profile.fill;
-        this.fillLight?.color.setHex(fillColor);
-        if (this.fillLight)
-            this.fillLight.intensity = fillIntensity;
-        const [keyColor, keyIntensity] = profile.key;
-        this.sunLight?.color.setHex(keyColor);
-        if (this.sunLight)
-            this.sunLight.intensity = keyIntensity;
-        const [rimColor, rimIntensity] = profile.rim;
-        this.rimLight?.color.setHex(rimColor);
-        if (this.rimLight)
-            this.rimLight.intensity = rimIntensity;
+        applySpaceLighting({hemi:this.hemisphereLight,fill:this.fillLight,key:this.sunLight,rim:this.rimLight},systemId);
     }
     createEnvironmentMap() {
-        // Painterly galactic sky used as an IBL environment so glossy, clearcoated
-        // hulls and stations reflect a colorful deep-space gradient instead of
-        // black. The horizon band stays hot orange/peach so any high-altitude
-        // glossy part catches the warm sun reflection. Polar caps fade to deep
-        // cobalt (still cool blue, but darker than before).
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 256;
-        const context = canvas.getContext('2d');
-        const gradient = context.createLinearGradient(0, 0, 0, 256);
-        gradient.addColorStop(0, '#0a122c');
-        gradient.addColorStop(0.18, '#54264c');
-        gradient.addColorStop(0.34, '#a35a3c');
-        gradient.addColorStop(0.46, '#ee9e50');
-        gradient.addColorStop(0.52, '#ffd070');
-        gradient.addColorStop(0.58, '#e07250');
-        gradient.addColorStop(0.72, '#56284e');
-        gradient.addColorStop(1, '#0a1132');
-        context.fillStyle = gradient;
-        context.fillRect(0, 0, 512, 256);
-        for (const [cx, cy, radius, fill] of [
-            [120, 132, 170, 'rgba(255,170,80,0.85)'],
-            [396, 132, 160, 'rgba(255,140,90,0.7)'],
-            [250, 50, 110, 'rgba(196,108,238,0.42)'],
-            [70, 210, 100, 'rgba(140,158,196,0.36)'],
-            [430, 220, 80, 'rgba(120,236,196,0.28)'],
-        ]) {
-            const blob = context.createRadialGradient(cx, cy, 0, cx, cy, radius);
-            blob.addColorStop(0, fill);
-            blob.addColorStop(1, 'rgba(0,0,0,0)');
-            context.fillStyle = blob;
-            context.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
-        }
-        // No star dots in the IBL canvas: scene.environment feeds every
-        // standard material's specular, and 1px stars at 512x256 alias into
-        // speckled dots on any glossy surface seen from orbit (Azure's seas).
-        // The visible starfield is the Points shell from createStarfield.
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.mapping = THREE.EquirectangularReflectionMapping;
-        texture.colorSpace = THREE.SRGBColorSpace;
-        this.scene.environment = texture;
+        this.scene.environment = createSpaceEnvironment();
     }
     // Transparent canvases store empty pixels as transparent BLACK (0,0,0,0).
     // GPU mipmap generation averages RGB uniformly — not alpha-weighted — so
@@ -5263,7 +5149,6 @@ export class SpaceRenderer {
         this.blackHole.visible=blackHoleSystem;
         this.blackHole.position.set(...sunPositionForSystem('acheron'));
         for(const visual of this.sunVisuals)visual.visible=!blackHoleSystem;
-        if(blackHoleSystem){this.sunLight.color.setHex(0xffd5a0);this.sunLight.intensity=3.5;}
         const sunPosition = sunPositionForSystem(this.systemId);
         for (const visual of this.sunVisuals)
             visual.position.set(...sunPosition);

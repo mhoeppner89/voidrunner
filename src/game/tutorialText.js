@@ -1,4 +1,5 @@
 export const TUTORIAL_TRANSLATIONS = {
+    "Wreck survey": "Wracks kartieren",
     "Meet Mara and Rin in the Helix bar.": "Triff Mara und Rin in der Helix-Bar.",
     "Talk to both of them before buying your first cargo.": "Sprich mit beiden, bevor du deine erste Fracht kaufst.",
     "Buy 16 Protein at Helix.": "Kaufe 16 Einheiten Protein auf Helix.",

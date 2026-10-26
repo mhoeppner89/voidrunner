@@ -1,6 +1,6 @@
 # Voidrunner
 
-A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2ll**.
+A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2lo**.
 
 Procedural pilot comms and random-encounter dialogue use 24 individually prompted, anonymous cockpit portraits: six each for Concord, Alliance, Independents and Pirates, with three male and three female portraits per faction. Files 01–03 are male; 04–06 are female. Each image is a separate 647×768 WebP. Each pilot gets a random portrait from their faction, reused throughout their exchange.
 
@@ -164,3 +164,5 @@ Choosing the tutorial opens its first Story card automatically. Story and journa
 The cockpit ship menu’s Weapons section assigns fitted guns to A/B and controls each group’s alternating/together firing. Fire All combines both groups with their own modes; launcher firing stays separate. Gun group settings persist per hull.
 
 Rebuild the graveyard and race review pages with `node tools/playtest/graveyard-review.mjs`, then open `output/graveyard-review/races.html` on the local server. The three Cairn race courses now follow the current wreck geometry.
+
+Run `npm run review:tutorial-comms` and open `/output/tutorial-comms-review/index.html` for an isolated, muted review of spoiler-free charting waypoints, Paul’s collision response, relationship colors and speaking-ship brackets. Career storage remains untouched.

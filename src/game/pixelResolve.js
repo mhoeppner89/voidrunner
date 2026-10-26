@@ -3,6 +3,21 @@ import * as THREE from 'three';
 // HDR texel can otherwise poison a whole rectangular glow footprint.
 export const FINITE_COLOUR_GLSL=`vec3 finiteColour(vec3 c){return vec3(
  c.r>=0.?min(c.r,65504.):0.,c.g>=0.?min(c.g,65504.):0.,c.b>=0.?min(c.b,65504.):0.);}`;
+export const NEUTRAL_TONE_GLSL=`
+  vec3 neutralToneMapping(vec3 color){
+   float startCompression=.76,desaturation=.15;
+   color*=uExposure;
+   float x=min(color.r,min(color.g,color.b));
+   float offset=x<.08?x-6.25*x*x:.01125;
+   color+=offset;
+   float peak=max(color.r,max(color.g,color.b));
+   if(peak<startCompression)return color;
+   float d=1.-startCompression,newPeak=1.-d*d/(peak+d-startCompression);
+   color*=newPeak/peak;
+   float g=1.-1./(desaturation*(peak-newPeak)+1.);
+   return mix(color,vec3(newPeak),g);
+  }
+`;
 // Minify real scene detail before the final pixel output. Depth prevents
 // distant scenery from smearing nearby hulls; the sky keeps its sharp stars.
 export function createPixelResolveMaterial({preserveAlpha=false}={}){
@@ -33,19 +48,7 @@ export function createPixelResolveMaterial({preserveAlpha=false}={}){
     +sceneSample(vUv+vec2(0.,offset.y),centre,distance)+sceneSample(vUv-vec2(0.,offset.y),centre,distance);
    return mix(centre,centre*.5+neighbours*.125,softness);
   }
-  vec3 neutralToneMapping(vec3 color){
-   float startCompression=.76,desaturation=.15;
-   color*=uExposure;
-   float x=min(color.r,min(color.g,color.b));
-   float offset=x<.08?x-6.25*x*x:.01125;
-   color+=offset;
-   float peak=max(color.r,max(color.g,color.b));
-   if(peak<startCompression)return color;
-   float d=1.-startCompression,newPeak=1.-d*d/(peak+d-startCompression);
-   color*=newPeak/peak;
-   float g=1.-1./(desaturation*(peak-newPeak)+1.);
-   return mix(color,vec3(newPeak),g);
-  }
+  ${NEUTRAL_TONE_GLSL}
   vec3 sRGBTransferOETF(vec3 color){return mix(color*12.92,1.055*pow(max(color,vec3(0.)),vec3(1./2.4))-.055,step(vec3(.0031308),color));}
   void main(){
    vec3 colour=filteredScene();
