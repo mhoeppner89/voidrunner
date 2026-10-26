@@ -165,7 +165,7 @@ const helixPeople = [
         lines: [
             'You made it to Helix. What are you looking for: a drink, a lead, or a quiet berth?',
             'Keep your transponder on near Rookhaven unless you have a reason to invite an inspection.',
-            'Three crews are claiming the same Shardbelt rock, and pirates are already watching the approach.',
+            'Three crews are claiming the same Shattered Crown rock, and pirates are already watching the approach.',
         ],
     },
     {
@@ -200,9 +200,9 @@ const HELIOS_LOCATIONS = {
         name: 'Helix Freeport',
         shortName: 'HELIX',
         kind: 'station',
-        // Helix services the Shardbelt directly: close enough for the rock
+        // Helix services the Shattered Crown directly: close enough for the rock
         // crown to hang on the horizon, but well outside the active field.
-        position: [18000, -8000, -176000],
+        position: [18000, -8000, -212000],
         radius: 880,
         dockRadius: 1420,
         faction: 'independents',
@@ -275,8 +275,8 @@ const HELIOS_LOCATIONS = {
     },
     shardbelt: {
         id: 'shardbelt',
-        name: 'The Shardbelt',
-        shortName: 'SHARDBELT',
+        name: 'The Shattered Crown',
+        shortName: 'CROWN',
         kind: 'field',
         position: [18000, -8000, -196000],
         radius: 2340,
@@ -337,7 +337,7 @@ const JUMP_POINT_POSITIONS = Object.freeze({
     'verge-redwake-point': [245000, 16000, 205000],
     'redwake-verge-point': [-70000, -12000, 245000],
     'verge-pale-point': [255000, 50000, 200000],
-    'pale-verge-point': [-80000, 10000, 220000],
+    'pale-verge-point': [-80000, 10000, 195000],
 });
 const jumpPointLocations = {};
 for (const route of JUMP_ROUTES) {

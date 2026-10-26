@@ -1,3 +1,35 @@
+## 0.8.2lu — Mission instructions match the interface
+
+- Direct the Cairn meeting and optional Paul invitation to the Race Desk / Rennbüro, including Mara’s call, the Story hints and Rin’s explanation.
+- Use shared localized control-label tokens in tutorial paths and dialogue for trading, fitting/storage/cargo, mission acceptance, services/refuelling, drone bays, salvage and transponder controls.
+- Match market headers to Trade / Equipment / Shipyard and social-scene headers/accessibility labels to each location’s actual Bar, Race Desk or Contracts entrance; use the real mission/race board name.
+- Correct the stale mining-dialogue claim that hyperdrive waits for returning drones; describe their return during the normal warmup.
+
+## 0.8.2lt — Restore direct hyperdrive travel
+
+- Remove automatic intermediate POI detours and their via/resume hints. Hyperdrive again travels directly to the selected destination. Preserve Helix’s 16,000 km separation, the Shattered Crown name, distant visibility and station orientations.
+
+## 0.8.2ls — Shattered Crown visible from Helix
+
+- Place Helix 16,000 km north of the Shattered Crown so its fragmented silhouette is within the existing distant-field rendering range. Keep its hangar facing toward the field and the main routes.
+- Cap distant asteroid-surface haze so fragments retain their shape instead of merging into a purple fog blob; preserve close-range fog.
+
+## 0.8.2lr — Shattered Crown and intermediate nav stops
+
+- Move Helix 40,000 km north of the asteroid-field centre. Rename the field The Shattered Crown across maps, dialogue, contracts and readouts, preserving the shardbelt save ID and translating older saved briefing strings.
+- Local hyperdrive routes stop at the first third POI whose nearby region the route crosses. Retain the original destination, show the intermediate stop and require manual reengagement to continue. Ignore the departure region to prevent repeated stops; keep authored local mission hops unchanged.
+- An intermediate jump point does not arm an unwanted system jump; selecting it explicitly still works normally.
+
+## 0.8.2lq — Stations face their main approach routes
+
+- Orient all 13 stations toward their systems’ populated routes. Keep models, physical surfaces, parked hulls, player/NPC berths and exterior cutscenes in one shared frame, including Blackglass’s moon attachment.
+- Adjust Helix, Gatehouse Twelve, Foundry Lanes, Torchwell, Shepherd and the Pale–Verge jump point by at most 25,000 km each. All normal POI routes approach the hangar side; only three surrounding jump-point routes remain behind centrally placed stations.
+- Preserve level decks, collision-safe docking lanes and outward departure headings.
+
+## 0.8.2lp — Story investment progress
+
+- The Story hint during Your Own Course shows the current ship-readiness value, the 50,000-credit goal, percentage and amount remaining until Mara calls. Explain that ship and owned equipment count fully, cash counts half and cargo does not count. Read the same live value used by mission progression.
+
 ## 0.8.2lo — Exterior cutscene lighting matches flight
 
 - Share star-system light colors, intensities, world directions, reflection environment and exposure between flight and exterior station shots. Remove the hangar reflection/lighting leak and match station material reflection strength to flight.

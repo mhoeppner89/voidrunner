@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v589-0-8-2lo-exterior-lighting';
+const CACHE = 'voidrunner-v595-0-8-2lu-interface-names';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -30,6 +30,8 @@ const CORE_ASSETS = [
   './src/game/planetTransit.js',
   './src/game/stationTransit.js',
   './src/game/spaceLighting.js',
+  './src/game/stationOrientation.js',
+  './src/game/interfaceTerms.js',
   './src/game/transitAudio.js',
   './assets/fonts/void-vga.ttf',
   './vendor/three.module.min.js',

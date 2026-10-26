@@ -7,14 +7,7 @@ const {GameSession}=await import('../../src/game/game.js');
 const {createNewSave}=await import('../../src/game/save.js');
 const {getEffectiveShipStats}=await import('../../src/game/shipStats.js');
 const {LOCATIONS,hyperdriveArrivalRadius}=await import('../../src/game/data.js');
-function flight(distance=20000,angle=0){
- const s=Object.create(GameSession.prototype);s.save=createNewSave(175,{tutorial:false});
- const p=s.save.player,n=LOCATIONS.helix;p.dockedAt=undefined;p.navTargetId=n.id;p.position=[n.position[0],n.position[1],n.position[2]+distance];p.rotation=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),angle).toArray();p.velocity=[0,0,0];p.angularVelocity=[0,0,0];p.throttle=.37;
- for(const k of ['A','B','C','D','E','F','G','Avoidance'])s['tmp'+k]=new THREE.Vector3();s.tmpPlayerOrientation=new THREE.Quaternion();s.tmpQ2=new THREE.Quaternion();s.tmpM4=new THREE.Matrix4();
- s.playerStats=()=>getEffectiveShipStats(p);s.flightLoadScale=()=>1;s.ships=[];s.ui={pushSensor(){}};s.audio={play(){}};s.renderer={};s.hyperdriveEncounterAt=null;s.hyperdriveReturnThrottle=.37;s.hyperdriveFx='none';s.playerEmissionHeat=0;
- s.hostilesVisibleNear=()=>false;s.readyJumpPoint=()=>undefined;s.resolvePlayerCollisions=()=>{};s.ensurePlayerEntryClearance=()=>{};s.resetPlayerInterpolation=()=>{};s.updateAssetWarmup=()=>{};s.getAvoidanceVector=()=>s.tmpAvoidance.set(0,0,0);s.setHyperdriveStatus=(message)=>s.hyperdriveStatus=message;s.requestDroneDeparture=()=>true;s.recallMiningDrones=()=>{};s.playerExposureRange=()=>0;s.combatEncounterScale=()=>0;s.hyperdriveCooldownRemaining=()=>0;s.jumpCounter=0;s.lineBlocked=()=>false;
- return s;
-}
+import {flight} from '../helpers/hyperdrive-flight.mjs';
 const axes={pitch:0,yaw:0,roll:0,throttleDelta:0};
 test('changing navigation immediately drops cruise speed and restores throttle',()=>{
  const s=flight();s.autopilot=true;s.hyperdriveFx='active';s.save.player.velocity=[0,0,-50000];s.save.player.throttle=1;s.hyperdriveEncounterAt=20;
@@ -33,10 +26,10 @@ test('charge completes and arrives without the renderer advancing drive state',(
 });
 test('all accepted initial headings reach small arrival zones without orbiting',()=>{
  for(const distance of [5000,20000,200000])for(const angle of [0,.45,-.45]){
-  const s=flight(distance,angle);s.toggleHyperdrive();assert.equal(s.autopilot,true);
+  const s=flight(distance,angle);s.toggleHyperdrive();assert.equal(s.autopilot,true);const leg=s.hyperdriveDestination();
   for(let i=0;i<1800&&s.autopilot;i++){s.save.world.time+=1/60;s.hyperdriveFxState();s.updatePlayer(1/60,axes);}
   assert.equal(s.autopilot,false,JSON.stringify({distance,angle,position:s.save.player.position}));
-  assert.ok(Math.abs(new THREE.Vector3(...s.save.player.position).distanceTo(new THREE.Vector3(...LOCATIONS.helix.position))-hyperdriveArrivalRadius(LOCATIONS.helix))<20);
+  assert.ok(Math.abs(new THREE.Vector3(...s.save.player.position).distanceTo(new THREE.Vector3(...leg.position))-hyperdriveArrivalRadius(leg))<20);
  }
 });
 test('reselecting the current nav point preserves the jump; actual changes cancel drone recovery',()=>{
@@ -72,3 +65,5 @@ test('a hyperdrive leg schedules the distress pickup only when a call is due',()
 test('guided docking cannot engage hyperdrive or overwrite a safe checkpoint',()=>{const s=flight();s.playerDocking={id:'helix',launch:true};s.toggleHyperdrive();assert.notEqual(s.autopilot,true);assert.equal(s.persistSave(),true);});
 
 test('nearby hostiles no longer block or cancel a local jump',()=>{const s=flight();s.hostilesVisibleNear=()=>true;assert.equal(s.hyperdriveBlockReason(),null);s.toggleHyperdrive();assert.equal(s.autopilot,true);for(let i=0;i<90;i++){s.save.world.time+=1/60;s.updatePlayer(1/60,axes);}assert.equal(s.autopilot,true);});
+
+test('Rook to Helix remains one direct leg even though it passes near the Crown',()=>{const s=flight(),p=s.save.player;p.position=[...LOCATIONS.rook.position];p.navTargetId=p.currentTargetId='helix';p.rotation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),new THREE.Vector3(...LOCATIONS.helix.position).sub(new THREE.Vector3(...p.position)).normalize()).toArray();s.toggleHyperdrive();assert.equal(s.hyperdriveDestination().id,'helix');for(let i=0;i<1800&&s.autopilot;i++){s.save.world.time+=1/60;s.updatePlayer(1/60,axes);}assert.equal(s.autopilot,false);assert.equal(p.navTargetId,'helix');assert.ok(Math.abs(new THREE.Vector3(...p.position).distanceTo(new THREE.Vector3(...LOCATIONS.helix.position))-hyperdriveArrivalRadius(LOCATIONS.helix))<20);assert.match(s.hyperdriveStatus,/Helix/);});

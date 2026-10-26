@@ -136,7 +136,7 @@ export const missionBriefing = (mission) => {
     if (mission.kind === 'smuggle')
         return t('{quantity} units of {commodity} that the manifest cannot show. Collect the sealed crate, run dark, and deliver to {station}. A patrol that resolves you seizes the crate and fines you — stay off the cordon.', { quantity: mission.quantity, commodity: t(COMMODITIES[mission.commodity]?.name ?? mission.commodity), station: LOCATIONS[mission.destination]?.name ?? mission.destination });
     if (mission.kind === 'mining')
-        return t('{station} holds the papers on the {claim} in the Shardbelt. Cut the whole seam — {quantity} units — and deliver it back. No deadline: the claim is yours until it runs dry. Bought ore won\'t clear the manifest.', { station: LOCATIONS[mission.origin]?.name ?? mission.origin, claim: t(mission.claimName), quantity: mission.quantity });
+        return t('{station} holds the papers on the {claim} in the Shattered Crown. Cut the whole seam — {quantity} units — and deliver it back. No deadline: the claim is yours until it runs dry. Bought ore won\'t clear the manifest.', { station: LOCATIONS[mission.origin]?.name ?? mission.origin, claim: t(mission.claimName), quantity: mission.quantity });
     if (mission.kind === 'salvage')
         return t('Recover {quantity} units of {commodity} from {wreck} in the Mourning Line and bring them back to {station}. Only components cut from that deposit count; market cargo cannot clear the claim.', { quantity: mission.quantity, commodity: t(COMMODITIES[mission.commodity]?.name ?? mission.commodity), wreck: mission.targetName, station: LOCATIONS[mission.origin]?.name ?? mission.origin });
     if (mission.kind === 'delivery')
@@ -302,7 +302,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
         }
         // Ore-hungry stations (they import ore at a premium, so buying it
         // locally is the expensive route) post mining contracts: the board
-        // stakes a specific Shardbelt claim, the pilot cuts it out, and the ore
+        // stakes a specific Shattered Crown claim, the pilot cuts it out, and the ore
         // is delivered back. No clock — and only rock actually cut from the
         // claim counts, so bought ore can't pad the manifest.
         // The smuggler's den opens once the berth ledger crosses the favor
@@ -368,7 +368,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
                     guild: 'mining',
                     guildRep: 6 + Math.floor(quantity / 3) + (save.player.guildRank.mining >= 1 ? 1 : 0),
                     faction: 'independents',
-                    briefing: t('{station} holds the papers on the {claim} in the Shardbelt. Cut the whole seam — {quantity} units — and deliver it back. No deadline: the claim is yours until it runs dry. Bought ore won\'t clear the manifest.', { station: LOCATIONS[locationId].name, claim: t(claimName), quantity }),
+                    briefing: t('{station} holds the papers on the {claim} in the Shattered Crown. Cut the whole seam — {quantity} units — and deliver it back. No deadline: the claim is yours until it runs dry. Bought ore won\'t clear the manifest.', { station: LOCATIONS[locationId].name, claim: t(claimName), quantity }),
                 });
                 continue;
             }

@@ -260,7 +260,7 @@ const CLAIM_DISPUTE_LINES = [
     t('You have cut enough of my rock. Take what you have and go.'),
 ];
 // Selling gold marks the player (see economy.js GOLD_HEAT_SECONDS). While the
-// heat is fresh, the Shardbelt's ambient encounter windows shift so pirate
+// heat is fresh, the Shattered Crown's ambient encounter windows shift so pirate
 // intercepts roughly double — but from a low base, because mining is meant to
 // be mostly safe: base windows are miner 0.42, trader 0.68, patrol 0.90
 // (pirate 10%), and gold heat moves them to miner 0.36, trader 0.58, patrol
@@ -6364,7 +6364,7 @@ export class GameSession {
             }
             else if (mission.kind === 'mining') {
                 // A claim contract points at the rock until it's dry, then at the
-                // return dock. Before the pilot reaches the Shardbelt the goal is
+                // return dock. Before the pilot reaches the Shattered Crown the goal is
                 // the field itself, so target cycling still gives a fly-to point.
                 const doneMining = (mission.mined ?? 0) >= mission.quantity;
                 if (doneMining || !mission.claimNodeId) {
@@ -6553,12 +6553,12 @@ export class GameSession {
             }
             else {
                 // Out of sensor range or not in the field yet: the claim lives in
-                // the Shardbelt, so lock a jump vector to the field. Once there,
+                // the Shattered Crown, so lock a jump vector to the field. Once there,
                 // the claim marker re-resolves to the actual rock.
                 const claim = this.activeMiningClaim(id);
                 if (claim) {
                     this.changeNavTarget('shardbelt');
-                    this.ui.pushSensor(t('NAV set: The Shardbelt — {claim} vector locked.', { claim: claim.claimName ?? t('claim') }), 'info');
+                    this.ui.pushSensor(t('NAV set: The Shattered Crown — {claim} vector locked.', { claim: claim.claimName ?? t('claim') }), 'info');
                     target = { kind: 'location', id: 'shardbelt', position: LOCATIONS.shardbelt.position, name: LOCATIONS.shardbelt.name };
                 }
             }
@@ -8351,7 +8351,7 @@ export class GameSession {
             case 'patrol':
                 return t('ON PATROL LANE');
             case 'mine':
-                return t('WORKING THE SHARDBELT');
+                return t('WORKING THE SHATTERED CROWN');
             case 'salvage':
                 return t('STRIPPING A WRECK');
             case 'hunt':
@@ -11029,7 +11029,7 @@ export class GameSession {
         const bucket = rng();
         // Selling gold is loud: while the sale is fresh (world.goldHeatUntil),
         // the syndicate has the miner's scent and pirates converge on the
-        // Shardbelt lanes — the intercept window roughly doubles and the miner,
+        // Shattered Crown lanes — the intercept window roughly doubles and the miner,
         // trader, and patrol windows shrink to make room.
         const goldHeat = zone === 'asteroid-field' && this.save.world.goldHeatUntil > this.save.world.time;
         const minerCutoff = zone === 'asteroid-field' ? (goldHeat ? GOLD_HEAT_MINER_CUTOFF : 0.42) : zone === 'graveyard' ? 0.28 : 0.22;
@@ -13246,7 +13246,7 @@ export class GameSession {
             });
             this.ensureTutorialDelivery();
         }
-        const goldHeatNote = result.ok && commodityId === 'gold' ? t(' The board marks the sale — expect company on the Shardbelt lanes.') : '';
+        const goldHeatNote = result.ok && commodityId === 'gold' ? t(' The board marks the sale — expect company on the Shattered Crown lanes.') : '';
         const denNote = result.ok && den ? t(' The den pays untraceable — no manifest entry.') : '';
         const holdNote = result.ok ? t(' Hold: {used}/{capacity} mass.', { used: result.postCargoMass.toFixed(1), capacity: cargoCapacity(this.save.player) }) : '';
         if(result.ok){
@@ -15016,7 +15016,7 @@ export class GameSession {
     }
     zoneLabel(zone) {
         if (zone === 'asteroid-field')
-            return t('SHARDBELT / COLLISION HAZARD');
+            return t('SHATTERED CROWN / COLLISION HAZARD');
         if (zone === 'graveyard')
             return t('MOURNING LINE / {zone}', { zone: graveyardZoneLabel(graveyardZoneAt(this.save.player.position)) });
         if (zone === 'near-location')

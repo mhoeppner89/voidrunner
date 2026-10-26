@@ -110,7 +110,7 @@ const LOCATION_DEFINITIONS = {
     rook: { id: 'rook', name: 'Rookhaven Bastion', kind: 'station', systemId: 'helios-verge', major: true, services: ['market', 'missions', 'repairs', 'fuel', 'ships', 'bounties'] },
     vesper: { id: 'vesper', name: 'Vesper Colony', kind: 'planet', systemId: 'helios-verge', major: true, services: ['market', 'missions', 'repairs', 'fuel'] },
     azure: { id: 'azure', name: 'Azure Reach', kind: 'planet', systemId: 'helios-verge', major: true, services: ['market', 'missions', 'repairs', 'fuel'] },
-    shardbelt: { id: 'shardbelt', name: 'The Shardbelt', kind: 'field', systemId: 'helios-verge', major: false, services: ['mining', 'missions'] },
+    shardbelt: { id: 'shardbelt', name: 'The Shattered Crown', kind: 'field', systemId: 'helios-verge', major: false, services: ['mining', 'missions'] },
     'mourning-line': { id: 'mourning-line', name: 'Mourning Line', kind: 'graveyard', systemId: 'helios-verge', major: false, services: ['salvage', 'missions', 'racing'] },
     cairn: { id: 'cairn', name: 'Cairn Yard', kind: 'station', systemId: 'helios-verge', major: false, services: ['fuel', 'repairs', 'racing'] },
 

@@ -32,6 +32,8 @@ export function applyAsteroidLightResponse(shader){
         /directLight\.color \*= ([^;]*directionalShadowMap[^;]+);/,
         'float rockShadow=$1; rockSunVisibility=min(rockSunVisibility,rockShadow); directLight.color*=rockShadow;');
     shader.fragmentShader=shader.fragmentShader
+        // Cap only long-range haze: nearby walls and tunnels retain their fog.
+        .replace('#include <fog_fragment>',THREE.ShaderChunk.fog_fragment.replace(/vFogDepth/g,'min(vFogDepth,6000.0)'))
         .replace('#include <lights_fragment_begin>','float rockSunVisibility=1.0;\n'+lighting)
         .replace('#include <lights_fragment_end>',`#include <lights_fragment_end>
 float rockFill=0.60*mix(0.35,1.0,rockSunVisibility);
@@ -68,7 +70,7 @@ export function createAsteroidFragmentMaterials(){
         const material=new THREE.MeshStandardMaterial({map,color:0xffffff,roughness:1,metalness:kind==='iron'?.035:.01,flatShading:true});
         material.name=`asteroid-fragment-${kind}`;
         material.onBeforeCompile=applyAsteroidLightResponse;
-        material.customProgramCacheKey=()=>'asteroid-fragment-light-v2-shadow-fill';
+        material.customProgramCacheKey=()=>'asteroid-fragment-light-v3-distant-haze';
         return [kind,material];
     }));
 }

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {stationModelOffsetZ,stationVisualSurfaceRadius} from '../../src/game/stationTraffic.js';
+import {stationYaw,stationRotatePoint} from '../../src/game/stationOrientation.js';
 
 // Geometry-only GLB reader: test the shipping vertices and node transforms,
 // without a browser/image decoder or an invented collision proxy.
@@ -32,6 +33,6 @@ export function stationModel(id) {
     });
     gltf.nodes.forEach((n,i)=>{for(const c of n.children??[])nodes[i].add(nodes[c]);});
     const root=new THREE.Group();for(const i of gltf.scenes[gltf.scene??0].nodes)root.add(nodes[i]);
-    root.scale.setScalar(stationVisualSurfaceRadius(id)/100);root.position.z=stationModelOffsetZ(id);
+    root.scale.setScalar(stationVisualSurfaceRadius(id)/100);root.position.fromArray(stationRotatePoint(id,[0,0,stationModelOffsetZ(id)]));root.rotation.y=stationYaw(id);
     return root;
 }

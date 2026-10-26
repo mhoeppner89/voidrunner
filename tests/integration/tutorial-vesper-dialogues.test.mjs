@@ -4,7 +4,7 @@ import {tutorialFixture} from '../helpers/tutorial.mjs';
 import {GameSession} from '../../src/game/game.js';
 import {hydrateSave} from '../../src/game/save.js';
 import {normalizeEquipmentInventory} from '../../src/game/equipmentInventory.js';
-import {ADVENTURE_DIALOGUES} from '../../src/game/adventureDialogues.js';
+import {ADVENTURE_DIALOGUES,dialogueText} from '../../src/game/adventureDialogues.js';
 
 function dockFixture(step,save){
  const f=tutorialFixture(step,save),{session}=f,calls=[];
@@ -44,6 +44,6 @@ test('pending Vesper lessons resume once, wait behind other modals and never app
 });
 test('the arrival and gift dialogues explain normal controls without transaction or navigation actions',()=>{
  for(const id of ['vesper-arrival','reactor-gift'])for(const node of Object.values(ADVENTURE_DIALOGUES[id].nodes))for(const c of node.choices??[]){assert.equal(c.action,undefined);assert.equal(c.tutorialChoice,undefined);}
- assert.match(ADVENTURE_DIALOGUES['vesper-arrival'].nodes.market.text.en,/COMMODITY MARKET.*Protein.*SELL ALL/);
- assert.match(ADVENTURE_DIALOGUES['reactor-gift'].nodes.fitting.text.en,/SHIP PARTS.*STORAGE.*Reactor Upgrade.*INSTALL/);
+ assert.match(dialogueText(ADVENTURE_DIALOGUES['vesper-arrival'].nodes.market.text,'en'),/Trade.*Protein.*SELL ALL/);
+ assert.match(dialogueText(ADVENTURE_DIALOGUES['reactor-gift'].nodes.fitting.text,'en'),/Equipment.*STORAGE.*Reactor Upgrade.*INSTALL/);
 });

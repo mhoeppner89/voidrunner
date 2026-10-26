@@ -1,0 +1,20 @@
+import {chromium,webkit,devices} from 'playwright';
+import assert from 'node:assert/strict';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {isolateBrowserProfiles} from '../helpers/browser-profiles.mjs';
+await isolateBrowserProfiles(import.meta.url,['desktop','iphone']);
+const base=process.env.VR_BASE_URL??'http://127.0.0.1:4193',out='output/story-investment';await mkdir(out,{recursive:true});
+for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1440,height:900}}],['iphone',webkit,devices['iPhone 13 landscape']]]){
+ if(!process.env.VR_PROFILES?.split(',').includes(name))continue;
+ const browser=await engine.launch({headless:true,...(engine===chromium?{executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--no-sandbox','--disable-gpu-sandbox','--mute-audio','--use-gl=angle','--use-angle=swiftshader']}:{})});const errors=[];
+ try{const p=await browser.newPage({...device,serviceWorkers:'block'});p.setDefaultTimeout(180000);p.on('pageerror',e=>errors.push(e.message));
+ await p.addInitScript(()=>{localStorage.setItem('void-privateer-settings-v1',JSON.stringify({music:0,effects:0}));const A=window.AudioContext??window.webkitAudioContext;if(A)A.prototype.resume=async function(){await this.suspend();};});
+ await p.goto(base+'/game.html?startup-probe=1');await p.waitForFunction(()=>window.__VOID_PRIVATEER__);await p.evaluate(()=>void __VOID_PRIVATEER__.newGame());await p.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime()?.flightPrepared&&document.querySelector('#loading-screen').classList.contains('is-hidden'));
+ const expected=await p.evaluate(async()=>{const r=__VOID_PRIVATEER__.getRuntime();cancelAnimationFrame(r.frameId);r.audio.setVolumes(0,0);r.ui.hideStory();r.ui.closeAdventure(false);r.ui.concourseArrivalPending=false;r.save.quests.find(q=>q.id==='the-spare-key').stepId='earn-standing';r.save.player.credits=10000;r.save.player.dockedAt='helix';r.ui.showDock(r.save,'helix');const {playerStrengthValue}=await import('/src/game/playerStrength.js'),{formatCredits}=await import('/src/game/random.js');return{current:formatCredits(playerStrengthValue(r.save.player)),goal:formatCredits(50000),remaining:formatCredits(Math.max(0,50000-playerStrengthValue(r.save.player)))};});
+ const press=async selector=>device.isMobile?p.locator(selector).tap():p.locator(selector).click();await press('[data-ui-command="story"]');await p.locator('#story-panel').waitFor({state:'visible'});const text=await p.locator('#story-panel').innerText();for(const value of Object.values(expected))assert.ok(text.includes(value),text);assert.match(text,/Bargeld zur Hälfte.*Fracht zählt nicht/s);
+ const fit=await p.locator('.story-card').evaluate(e=>{const b=e.getBoundingClientRect();return{fits:b.left>=0&&b.right<=innerWidth+1&&b.top>=0&&b.bottom<=innerHeight+1,overflow:e.scrollWidth>e.clientWidth+1};});assert.ok(fit.fits&&!fit.overflow,JSON.stringify(fit));await p.screenshot({path:`${out}/${name}.png`});
+ await press('[data-ui-command="close-story"]');const changed=await p.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();r.save.player.credits+=2000;return r.ui.renderTutorialNotice();});assert.notEqual(changed,'');await press('[data-ui-command="story"]');const updated=await p.locator('.story-investment-progress').innerText();assert.ok(!updated.includes(expected.current),updated);
+ await p.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();r.save.player.credits=200000;r.ui.renderStory();});assert.match(await p.locator('.story-investment-progress').innerText(),/100 %/);assert.ok(!(await p.locator('#story-panel').innerText()).includes('-'));
+ await p.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();r.save.quests.find(q=>q.id==='the-spare-key').stepId='meet-cairn';r.ui.renderStory();});assert.equal(await p.locator('.story-investment-progress').count(),0);assert.deepEqual(errors,[]);await writeFile(`${out}/${name}.json`,JSON.stringify({expected,text,updated,fit,errors},null,2));console.log(name,'Story click, live progress, bounded percentage and layout passed');
+ }finally{await browser.close();}
+}

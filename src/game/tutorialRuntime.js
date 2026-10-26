@@ -240,7 +240,7 @@ export const TutorialRuntimeMethods={
             this.save.world.depletedAsteroids[node.id]=node.remaining;
         }
         const offers=this.save.world.offers.vesper??=[];
-        const terms={quantity:TUTORIAL_MINING_QUANTITY,reward:TUTORIAL_MINING_REWARD,claimNodeId:node.id,claimPosition:[...node.position],commodity:'ore',briefing:t('Mine six units from the marked Shardbelt deposit and bring them back to Vesper. Bought ore does not count.')};
+        const terms={quantity:TUTORIAL_MINING_QUANTITY,reward:TUTORIAL_MINING_REWARD,claimNodeId:node.id,claimPosition:[...node.position],commodity:'ore',briefing:t('Mine six units from the marked Shattered Crown deposit and bring them back to Vesper. Bought ore does not count.')};
         const offer=offers.find(m=>m.id===TUTORIAL_MINING_CONTRACT_ID);
         if(offer)Object.assign(offer,terms);
         else offers.unshift({id:TUTORIAL_MINING_CONTRACT_ID,tutorial:true,kind:'mining',title:t('Vesper starter mining claim'),issuer:'Vesper Mining Cooperative',origin:'vesper',destination:'vesper',claimName:t('Rin’s training deposit'),mined:0,deposit:0,deadline:null,status:'offered',guild:'mining',guildRep:6,faction:'independents',...terms});

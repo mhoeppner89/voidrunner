@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {LOCATIONS} from '../../src/game/data.js';import {getLanguage,setLanguage,t} from '../../src/game/i18n.js';
+test('Helix is north of the renamed crown, and older saved briefing strings still translate',()=>{assert.equal(LOCATIONS.shardbelt.name,'The Shattered Crown');assert.equal(LOCATIONS.shardbelt.shortName,'CROWN');assert.equal(LOCATIONS.shardbelt.position[2]-LOCATIONS.helix.position[2],16000);const lang=getLanguage();setLanguage('de');assert.match(t('Fly to the Shardbelt. Select the marked deposit, wait for its scan, then deploy your miners.'),/Fliege zur Shattered Crown/);setLanguage(lang);});

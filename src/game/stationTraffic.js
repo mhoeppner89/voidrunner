@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { LOCATIONS } from './data.js';
 import { STATION_DOCKS } from './stationDocks.js';
+import {stationYaw,stationRotatePoint} from './stationOrientation.js';
 
 // Station GLBs are normalized to a 100-unit source radius before the root is
 // scaled. Keep guidance thresholds on the same visible hull edge as the model.
@@ -17,8 +18,9 @@ export function stationModelOffsetZ(id) {
 // Blackglass's station is attached to the moon's near surface, not its center.
 export function stationSurfaceDistance(id, position) {
     const location = LOCATIONS[id];
-    return Math.max(0, Math.hypot((position[0]??position.x)-location.position[0], (position[1]??position.y)-location.position[1],
-        (position[2]??position.z)-location.position[2]-stationModelOffsetZ(id)) - stationVisualSurfaceRadius(id));
+    const offset=stationModelOffsetZ(id),yaw=stationYaw(id);
+    return Math.max(0, Math.hypot((position[0]??position.x)-location.position[0]-Math.sin(yaw)*offset, (position[1]??position.y)-location.position[1],
+        (position[2]??position.z)-location.position[2]-Math.cos(yaw)*offset) - stationVisualSurfaceRadius(id));
 }
 
 // The same model transform as render.ensureStationModels, including Blackglass's moon offset.
@@ -75,9 +77,13 @@ function berthFromSpec(id, laneSpec, height = 2, radialGate = false) {
         const throat=[location.position[0]+spec.sharedEntry.x*scale,pad[1],
             location.position[2]-spec.sharedEntry.innerY*scale+stationModelOffsetZ(id)];
         gate[0]=throat[0];
-        return {pad,gate,throat};
+        return worldBerth(id,{pad,gate,throat});
     }
-    return {pad,gate};
+    return worldBerth(id,{pad,gate});
+}
+function worldBerth(id,berth) {
+    for(const key of ['pad','gate','throat'])if(berth[key])berth[key]=stationRotatePoint(id,berth[key],LOCATIONS[id].position);
+    return {id,...berth};
 }
 export function stationBerth(id, lane = 0, height = 2) {
     const spec = STATION_DOCKS[id];
@@ -129,13 +135,21 @@ export function reserveStationDock(session,ship,id,departing=false) {
     ship.stationDock={id,lane,...berth,phase:departing?'docked':'align',elapsed:0};
     if(departing) {
         for(let i=0;i<3;i++){ship.position[i]=berth.pad[i];ship.velocity[i]=0;}
-        ship.rotation.splice(0,4,0,0,0,1);
+        ship.rotation.splice(0,4,0,Math.sin(stationYaw(id)/2),0,Math.cos(stationYaw(id)/2));
         ship.stationDock.until=session.save.world.time+6;
     }
     return true;
 }
 
 export function clearParkedBerth(berth,hull,obstacles=[]) {
+    // Work in the authored frame; parked bounds are stored in that frame.
+    if(berth.id){
+        const id=berth.id,origin=LOCATIONS[id].position,local={};
+        for(const key of ['pad','gate','throat'])if(berth[key])local[key]=stationRotatePoint(id,berth[key],origin,true);
+        const before=local.pad[2],fits=clearParkedBerth(local,hull,obstacles);
+        if(local.pad[2]!==before)berth.pad=stationRotatePoint(id,local.pad,origin);
+        return fits;
+    }
     // Authored traffic doors face +Z. Keep the same deck and centreline, but
     // stop ahead of parked hulls instead of occupying their maintenance cradle.
     for(const {min,max} of obstacles) {

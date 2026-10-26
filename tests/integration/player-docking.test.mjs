@@ -14,6 +14,7 @@ import {
 } from '../../src/game/playerDocking.js';
 import { LOCATIONS, hyperdriveArrivalRadius } from '../../src/game/data.js';
 import { STATION_DOCKS } from '../../src/game/stationDocks.js';
+import {stationRotatePoint} from '../../src/game/stationOrientation.js';
 import { stationVisualSurfaceRadius } from '../../src/game/stationTraffic.js';
 import { GameSession } from '../../src/game/game.js';
 
@@ -141,11 +142,11 @@ test('Helix landing gates enter through the authored hangar mouth', () => {
 
     assert.equal(stationVisualSurfaceRadius('helix'), location.radius * 0.95);
     for (const berth of playerBerths('helix', 6)) {
-        const toModel = (point) => [
+        const toModel = (world) => {const point=stationRotatePoint('helix',world,location.position,true);return [
             (point[0] - location.position[0]) / scale,
             -(point[2] - location.position[2]) / scale,
             (point[1] - location.position[1]) / scale,
-        ];
+        ];};
         const pad = toModel(berth.pad);
         const gate = toModel(berth.gate);
         const mouthY = hangar.front;

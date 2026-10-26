@@ -43,6 +43,7 @@ import { addStationActivity, updateStationActivity } from './stationActivity.js'
 import { playerBerth } from './playerDocking.js';
 import { buildStationColliderAsync } from './stationCollision.js';
 import { stationModelOffsetZ, stationVisualSurfaceRadius } from './stationTraffic.js';
+import {stationYaw,stationRotatePoint} from './stationOrientation.js';
 import { LaserFx } from './laserFx.js';
 const tupleToVector = (tuple, out = new THREE.Vector3()) => out.set(tuple[0], tuple[1], tuple[2]);
 const NEG_Z = new THREE.Vector3(0, 0, -1);
@@ -1483,7 +1484,8 @@ export class SpaceRenderer {
                 // Use the exact rendered transform for physical surfaces.
                 // Build before adding parked ships and decorative activity.
                 model.scale.setScalar(LOCATIONS[id].radius * (id === 'blackglass' ? .2 : .95) / 100);
-                model.position.z = stationModelOffsetZ(id);
+                model.position.fromArray(stationRotatePoint(id,[0,0,stationModelOffsetZ(id)]));
+                model.rotation.y = stationYaw(id);
                 const collider = await buildStationColliderAsync(model, LOCATIONS[id].position, {shouldCancel: () => this.disposed});
                 if (!collider) { this.disposeObject(model); return; }
                 try { await addStationOccupants(model, id, undefined, hull => stationOccupantScale(id,hull)); }
@@ -1492,6 +1494,8 @@ export class SpaceRenderer {
                 // Traffic shares bays with authored parked ships. Save their
                 // actual bounds so incoming hulls stop in front of them.
                 const dockObstacles=[];
+                // Parked clearance uses authored coordinates, independent of yaw.
+                model.rotation.y=0;model.position.set(0,0,stationModelOffsetZ(id));
                 model.updateMatrixWorld(true);
                 model.traverse(node => {
                     if (!node.userData.stationOccupant) return;
@@ -1500,6 +1504,8 @@ export class SpaceRenderer {
                     dockObstacles.push({min:box.min.toArray().map((v,i)=>v+origin[i]),max:box.max.toArray().map((v,i)=>v+origin[i])});
                 });
                 this.stationDockObstacles.set(id,dockObstacles);
+                model.rotation.y=stationYaw(id);
+                model.position.fromArray(stationRotatePoint(id,[0,0,stationModelOffsetZ(id)]));
                 const activity=addStationActivity(model, id);
                 freezeStaticTransforms(model,new Set(activity.lifts.map(entry=>entry.lift)));
                 model.name = `station-${id}`;
@@ -1531,7 +1537,7 @@ export class SpaceRenderer {
                 }
                 // Helix/Rook's primitive fallbacks use a tenfold root scale
                 // and visual-only rotation. The authored GLBs and dock specs
-                // share their own unrotated local frame.
+                // share their own authored frame and explicit system-facing yaw.
                 root.scale.setScalar(1);
                 root.rotation.set(0, 0, 0);
                 root.updateMatrix();
@@ -3481,7 +3487,7 @@ export class SpaceRenderer {
                 if (entity.race && !isCanopy) {
                     // A low self-lit wash keeps the custom race paint readable
                     // while the ships idle at the gathering point and under
-                    // the Shardbelt's uneven lighting.
+                    // the Shattered Crown's uneven lighting.
                     material.emissive.copy(tint);
                     material.emissiveIntensity = 0.24;
                 }
@@ -6163,7 +6169,7 @@ export class SpaceRenderer {
         }
         this.droneWarmupReady=Promise.all(droneReady);
         // Shadow depth programs are separate from colour programs. Keep the
-        // ordinary and instanced variants resident before entering Shardbelt.
+        // ordinary and instanced variants resident before entering Shattered Crown.
         const depth=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking,side:THREE.BackSide});
         const depthGeometry=new THREE.BoxGeometry(1,1,1);
         root.add(new THREE.Mesh(depthGeometry,depth));

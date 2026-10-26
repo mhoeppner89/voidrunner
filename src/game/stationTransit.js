@@ -8,6 +8,7 @@ import {STATION_DOCKS} from './stationDocks.js';
 import {addStationOccupants} from './stationOccupants.js';
 import {freezeStaticTransforms} from './renderWork.js';
 import {applySpaceLighting} from './spaceLighting.js';
+import {stationYaw,stationRotatePoint} from './stationOrientation.js';
 
 export const STATION_TRANSIT_DURATION={entry:4200,exit:3600};
 const ease=t=>t*t*(3-2*t),forward=new THREE.Vector3(0,0,-1);
@@ -48,13 +49,15 @@ export class StationTransit {
   this.cameraElevation=id==='blackglass'?.25:(this.cameraLayout?.elevation??.3);
   this.cliffPort=id==='blackglass';
   const height=data.height??6,berth=data.berth??playerBerth(id,height),location=LOCATIONS[id],scale=18/stationVisualSurfaceRadius(id);
-  const origin=new THREE.Vector3(...location.position);origin.z+=stationModelOffsetZ(id);
+  const origin=new THREE.Vector3(...stationRotatePoint(id,[location.position[0],location.position[1],location.position[2]+stationModelOffsetZ(id)],location.position));
+  if(this.model){this.model.rotation.y=stationYaw(id);this.model.updateMatrix();this.model.updateMatrixWorld(true);}
   this.pad.fromArray(berth.pad).sub(origin).multiplyScalar(scale);this.pad.y-=height*scale;
   this.gate.fromArray(berth.gate).sub(origin).multiplyScalar(scale);this.gate.y-=height*scale;
   this.out.subVectors(this.gate,this.pad).normalize();this.right.crossVectors(new THREE.Vector3(0,1,0),this.out).normalize();
   const length=Math.max(.5,Math.min(1.5,2*Math.max(...(data.extents??[8,6,12]))*scale));this.shipLength=length;this.shipScale=length/(data.hullLength??4);this.shipHeight=(data.hullHeight??1)*this.shipScale;this.engineLight.distance=length*2;
   this.rotation.setFromUnitVectors(forward,this.point.copy(this.out).multiplyScalar(direction==='entry'?-1:1));this.euler.setFromQuaternion(this.rotation);
   this.moon.visible=id==='blackglass';
+  this.moon.position.fromArray(stationRotatePoint(id,[0,0,-75.15]));
   applySpaceLighting(this,location.systemId);this.scene.environmentIntensity=1;
   this.update(0);
  }

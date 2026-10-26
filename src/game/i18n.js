@@ -10,7 +10,7 @@
 //
 // Proper nouns are deliberately NOT translated: station names (Helix, Rook,
 // Vesper, Azure), ship models (Wayfarer, Talon …), person names and
-// callsigns, zone names (Shardbelt, Mourning Line) and company names
+// callsigns, zone names (Shattered Crown, Mourning Line) and company names
 // (Kestrel Freight …) stay English. Descriptive names (factions, guilds,
 // commodity and equipment names) DO translate.
 //
@@ -20,6 +20,7 @@
 // and title shell are built once, so a reload guarantees every surface
 // renders in the same language.
 import { DE_CATALOG } from './i18n-de.js';
+import {UI_TERMS} from './interfaceTerms.js';
 
 export const SUPPORTED_LANGUAGES = ['de', 'en'];
 export const DEFAULT_LANGUAGE = 'de';
@@ -63,7 +64,13 @@ export const setLanguage = (language) => {
     return next;
 };
 
+export const interfaceText = (text, language=currentLanguage) => typeof text==='string'&&text.includes('{ui.')
+    ? text.replace(/\{ui\.([a-zA-Z]+)\}/g,(token,key)=>UI_TERMS[key]?(language==='de'?DE_CATALOG[UI_TERMS[key]]??UI_TERMS[key]:UI_TERMS[key]):token)
+    : text;
+
 export const translate = (text, params) => {
+    // Older saves can carry authored briefing strings with the former name.
+    if(typeof text==='string'&&(text.includes('Shardbelt')||text.includes('SHARDBELT')))text=text.replace(/\bShardbelt\b/g,'Shattered Crown').replace(/\bSHARDBELT\b/g,'SHATTERED CROWN');
     let out = text;
     if (currentLanguage === 'de' && typeof text === 'string') {
         const translation = DE_CATALOG[text];
@@ -74,6 +81,6 @@ export const translate = (text, params) => {
         for (const key of Object.keys(params))
             out = out.split(`{${key}}`).join(String(params[key]));
     }
-    return out;
+    return interfaceText(out);
 };
 export const t = translate;

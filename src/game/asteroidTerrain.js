@@ -184,7 +184,7 @@ float fleck=step(.90,rockHash(floor(vRockPosition/4.0)))*(1.0-smoothstep(1.0,4.0
 diffuseColor.rgb*=.68+stoneTone*.62+fleck*.055;
 diffuseColor.rgb+=mineral*vec3(.026,.019,.009);`);
     };
-    material.customProgramCacheKey=()=> 'shardbelt-rock-v8-distant-detail';
+    material.customProgramCacheKey=()=> 'shardbelt-rock-v9-distant-haze';
     for(const f of getAsteroidTerrain().fragments){const mesh=new THREE.Mesh(f.geometry,material);mesh.name=f.id;mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);}
     return group;
 }

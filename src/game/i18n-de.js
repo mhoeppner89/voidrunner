@@ -18,13 +18,15 @@ import {EQUIPMENT_NAMING} from './equipmentNaming.js';
 //
 // Proper nouns are intentionally absent: stations (Helix, Rook, Vesper,
 // Azure), ship models (Wayfarer, Talon …), people/callsigns, zones
-// (Shardbelt, Mourning Line) and companies (Kestrel Freight …) stay English.
+// (Shattered Crown, Mourning Line) and companies (Kestrel Freight …) stay English.
 // Descriptive names (factions, guilds, commodities, equipment, roles) DO get
 // entries here.
 //
 // Player address is informal "du" throughout, matching the frontier voice of
 // the English lines. Values are plain text — never HTML.
 export const DE_CATALOG = {
+    'Open {place}': '{place} öffnen',
+    'Return to {place}': 'Zurück: {place}',
     'Approach the wreck on normal engines.': 'Nähere dich dem Wrack mit normalem Antrieb.',
     'Close the last stretch on normal engines.': 'Schließe das letzte Stück mit normalem Antrieb ab.',
     'SHIELDS DOWN': 'SCHILDE AUS',
@@ -574,7 +576,7 @@ export const DE_CATALOG = {
 
     "Vesper is selected for you. Engage hyperdrive, then keep Vesper selected and approach slowly for automatic landing. Keep your transponder on. The centre monitor opens the navigation map.": "Vesper ist bereits angewählt. Aktiviere den Hyperdrive, lass Vesper danach angewählt und nähere dich langsam für die automatische Landung. Lass den Transponder eingeschaltet. Über den mittleren Monitor öffnest du die NAV-KARTE.",
 
-    "Use hyperdrive to reach the Shardbelt. A deposit is selected on arrival. Approach slowly, wait for its automatic scan, and hold MINE within range. Leave room for one unit of ore.": "Flieg mit dem Hyperdrive zum Shardbelt. Bei der Ankunft wird eine Lagerstätte angewählt. Nähere dich langsam, warte auf den automatischen Scan und halte ABBAU in Reichweite gedrückt. Lass Platz für eine Einheit Erz.",
+    "Use hyperdrive to reach the Shattered Crown. A deposit is selected on arrival. Approach slowly, wait for its automatic scan, and hold MINE within range. Leave room for one unit of ore.": "Flieg mit dem Hyperdrive zur Shattered Crown. Bei der Ankunft wird eine Lagerstätte angewählt. Nähere dich langsam, warte auf den automatischen Scan und halte ABBAU in Reichweite gedrückt. Lass Platz für eine Einheit Erz.",
     "Defeat Ash Moth.": "Besiege Ash Moth.",
 
     "Recover the marked salvage in Mourning Line.": "Berge das markierte Fundstück in der Mourning Line.",
@@ -612,7 +614,7 @@ export const DE_CATALOG = {
     'Fly to Vesper Colony and land.': "Flieg nach Vesper Colony und lande dort.",
     'Use the navigation map or target monitor, engage the local hyperdrive, then approach slowly for automatic landing.': "Nutze die NAV-KARTE oder den Zielmonitor, aktiviere den lokalen Hyperdrive und nähere dich dann langsam für die automatische Landung.",
     'Sell the 2 Einheiten Protein Packs at Vesper.': "Verkaufe die zwei Einheiten Protein auf Vesper.",
-    'Recover 1 unit of ore from the Shardbelt.': 'Bau 1 Einheit Erz im Shardbelt ab.',
+    'Recover 1 unit of ore from the Shattered Crown.': 'Bau 1 Einheit Erz in der Shattered Crown ab.',
     'Fly to the field, lock the marked deposit, wait for the automatic scan, then hold MINE in range.': 'Flieg zum Feld, erfasse die markierte Lagerstätte, warte auf den automatischen Scan und halte dann ABBAU gedrückt, solange du in Reichweite bist.',
     'Drive off the raider.': 'Vertreib den Plünderer.',
     'The hostile is already locked. Use your guns, and try the selected missile launcher when you have a clear line.': 'Der Feind ist bereits erfasst. Nutze deine Kanonen und probier den ausgewählten Raketenwerfer, sobald du freie Schusslinie hast.',
@@ -740,7 +742,7 @@ export const DE_CATALOG = {
     'SMUGGLING — {to}': 'SCHMUGGEL — {to}',
     'SMUGGLING': 'SCHMUGGEL',
     'ON PATROL LANE': 'AUF PATROUILLENROUTE',
-    'WORKING THE SHARDBELT': 'IM SHARDBELT BEI DER ARBEIT',
+    'WORKING THE SHATTERED CROWN': 'IM SHATTERED CROWN BEI DER ARBEIT',
     'STRIPPING A WRECK': 'WRACK WIRD AUSGESCHLACHTET',
     'HUNTING': 'AUF DER JAGD',
     'FLEEING': 'AUF DER FLUCHT',
@@ -750,7 +752,7 @@ export const DE_CATALOG = {
     'SALVAGE UNION': 'BERGUNGSUNION',
     'RED TALONS': 'ROTE KLAUEN',
     'UNKNOWN': 'UNBEKANNT',
-    'SHARDBELT / COLLISION HAZARD': 'SHARDBELT / KOLLISIONSGEFAHR',
+    'SHATTERED CROWN / COLLISION HAZARD': 'SHATTERED CROWN / KOLLISIONSGEFAHR',
     'MOURNING LINE / {zone}': 'MOURNING LINE / {zone}',
     'CONTROLLED APPROACH': 'KONTROLLIERTER ANFLUG',
     'ENTRY POCKET / QUIET APPROACH': "EINFLUGZONE / RUHIGER ANFLUG",
@@ -927,7 +929,7 @@ export const DE_CATALOG = {
     '{time} AGO': 'VOR {time}',
     'The den does not trade legal goods.': "Auf dem Schwarzmarkt werden nur genehmigungspflichtige Waren gehandelt.",
     'Untraceable cargo. The den pays off-manifest and never writes the transaction to a licensed manifest.': "Fracht ohne Herkunftsnachweis. Der Schwarzmarkt zahlt unter der Hand und meldet den Verkauf keiner Behörde.",
-    ' The board marks the sale — expect company on the Shardbelt lanes.': " Der Verkauf ist öffentlich bekannt. Rechne auf den Shardbelt-Routen mit unerwünschten Besuchern.",
+    ' The board marks the sale — expect company on the Shattered Crown lanes.': " Der Verkauf ist öffentlich bekannt. Rechne auf die Shattered Crown-Routen mit unerwünschten Besuchern.",
     ' The den pays untraceable — no manifest entry.': " Der Schwarzmarkt zahlt unter der Hand. Der Verkauf wird nicht registriert.",
     'Market stock exhausted.': 'Marktbestand erschöpft.',
     'Insufficient credits.': 'Nicht genug Credits.',
@@ -988,7 +990,7 @@ export const DE_CATALOG = {
     'Dark run: {quantity} {commodity}': "Schmuggel: {quantity} {commodity}",
     '{quantity} units of {commodity} that the manifest cannot show. Collect the sealed crate, run dark, and deliver to {station}. A patrol that resolves you seizes the crate and fines you — stay off the cordon.': "{quantity} Einheiten {commodity}, die in keinen Frachtpapieren auftauchen dürfen. Hol die versiegelte Kiste ab und bring sie mit ausgeschaltetem Transponder nach {station}. Wenn eine Patrouille dich identifiziert, beschlagnahmt sie die Fracht und verhängt ein Bußgeld. Halte Abstand zu den Kontrollen.",
     'Mine the {claim} claim': 'Schürfe im Abbaugebiet „{claim}“',
-    '{station} holds the papers on the {claim} in the Shardbelt. Cut the whole seam — {quantity} units — and deliver it back. No deadline: the claim is yours until it runs dry. Bought ore won\'t clear the manifest.': '{station} verwahrt die Unterlagen zum Abbaugebiet „{claim}“ im Shardbelt. Baue die ganze Ader ab – {quantity} Einheiten – und liefere das Erz zurück. Keine Frist: Das Abbaurecht gehört dir, bis die Ader erschöpft ist. Gekauftes Erz wird nicht anerkannt.',
+    '{station} holds the papers on the {claim} in the Shattered Crown. Cut the whole seam — {quantity} units — and deliver it back. No deadline: the claim is yours until it runs dry. Bought ore won\'t clear the manifest.': '{station} verwahrt die Unterlagen zum Abbaugebiet „{claim}“ in der Shattered Crown. Baue die ganze Ader ab – {quantity} Einheiten – und liefere das Erz zurück. Keine Frist: Das Abbaurecht gehört dir, bis die Ader erschöpft ist. Gekauftes Erz wird nicht anerkannt.',
     'Recover {quantity} {commodity}': 'Bergungsauftrag · {quantity} Einheiten: {commodity}',
     'Recover {quantity} units of {commodity} from {wreck} in the Mourning Line and bring them back to {station}. Only components cut from that deposit count; market cargo cannot clear the claim.': 'Berge {quantity} Einheiten {commodity} aus {wreck} in der Mourning Line und bring sie zu {station}. Nur Teile aus diesem Wrack zählen; gekaufte Ware erfüllt den Auftrag nicht.',
     'That salvage claim is no longer available.': 'Dieses Bergungsrecht ist nicht mehr verfügbar.',
@@ -1148,7 +1150,7 @@ export const DE_CATALOG = {
     'Register at this desk to begin earning formal standing and rank access.': 'Melde dich hier an, um offizielles Ansehen aufzubauen und Zugang zu höheren Rängen zu erhalten.',
     'STAR': 'STERN',
     'DOCK': 'DOCK',
-    'SHARDBELT CLAIM': "SHARDBELT-ABBAUGEBIET",
+    'SHATTERED CROWN CLAIM': "SHATTERED CROWN-ABBAUGEBIET",
     'MOURNING LINE CLAIM': 'MOURNING-LINE-ANSPRUCH',
 
     // ── Services / equipment / shipyard ───────────────────────────────────
@@ -1496,7 +1498,7 @@ export const DE_CATALOG = {
     'Gold-hunters inbound — they are hailing you.': 'Goldjäger im Anflug — sie rufen dich.',
     'NAV DISCOVERY: {name}': "NEUES NAVIGATIONSZIEL: {name}",
     'NAV set: {name}.': "Reiseziel gewählt: {name}.",
-    'NAV set: The Shardbelt — {claim} vector locked.': "Reiseziel gewählt: Shardbelt. {claim} ist markiert.",
+    'NAV set: The Shattered Crown — {claim} vector locked.': "Reiseziel gewählt: Shattered Crown. {claim} ist markiert.",
     'claim': 'Anspruch',
     'Cleared for departure from {name}.': 'Abflug von {name} freigegeben.',
     'The syndicate wants {credits} — not enough credits.': 'Das Syndikat verlangt {credits} — dafür hast du nicht genug.',
@@ -1924,7 +1926,7 @@ export const DE_CATALOG = {
     // ── Data: current NPC dialogue ───────────────────────────────────────
     'You made it to Helix. What are you looking for: a drink, a lead, or a quiet berth?': 'Du bist in Helix angekommen. Suchst du einen Drink, einen Hinweis oder einen ruhigen Liegeplatz?',
     'Keep your transponder on near Rookhaven unless you have a reason to invite an inspection.': 'Lass den Transponder nahe Rookhaven eingeschaltet, es sei denn, du willst eine Kontrolle provozieren.',
-    'Three crews are claiming the same Shardbelt rock, and pirates are already watching the approach.': 'Drei Crews beanspruchen denselben Felsen im Shardbelt, und Piraten beobachten bereits den Anflug.',
+    'Three crews are claiming the same Shattered Crown rock, and pirates are already watching the approach.': 'Drei Crews beanspruchen denselben Felsen in der Shattered Crown, und Piraten beobachten bereits den Anflug.',
     'Two keys, two ships: you have the Wayfarer, I have the Second Light. That is how our mother wanted it.': 'Zwei Schlüssel, zwei Schiffe: Du hast die Wayfarer, ich die Second Light. So wollte es unsere Mutter.',
     'Use the target monitor for the next contact and the navigation map for the route. I will keep off your firing line.': 'Nimm für den nächsten Kontakt den Zielmonitor und für die Route die Navigationskarte. Ich bleibe aus deiner Schusslinie.',
     'Mara calls this a delivery run. She is not wrong, but she is not telling you why I chose the route.': 'Mara nennt das einen Lieferflug. Sie hat nicht unrecht, aber sie sagt dir nicht, warum ich diese Route gewählt habe.',
@@ -1942,7 +1944,7 @@ export const DE_CATALOG = {
     'Red Talon traffic has moved toward Mourning Line, where the wrecks make identification difficult.': 'Der Verkehr der Roten Klauen hat sich zur Mourning Line verlagert, wo die Wracks die Identifizierung erschweren.',
     'If you’re shopping for a hull, tell me the job first; the cheapest ship is rarely the cheapest run.': "Du suchst ein Schiff? Sag mir zuerst, wofür du es brauchst. Ein günstiger Kauf kann im Betrieb teuer werden.",
     'Compare cargo capacity with the modules you want to fit before you sign the trade.': 'Vergleiche Frachtkapazität und gewünschte Module, bevor du den Tausch bestätigst.',
-    'Vanguard demand is up because more pilots are taking contracts through the Shardbelt.': 'Die Nachfrage nach der Vanguard steigt, weil mehr Piloten Aufträge durch den Shardbelt fliegen.',
+    'Vanguard demand is up because more pilots are taking contracts through the Shattered Crown.': 'Die Nachfrage nach der Vanguard steigt, weil mehr Piloten Aufträge durch die Shattered Crown fliegen.',
     'Tovik Raal, Registry pilot. I can help you read a warrant before you chase it.': 'Tovik Raal, Pilot des Registers. Ich helfe dir, einen Steckbrief zu lesen, bevor du die Jagd aufnimmst.',
     'In debris, make the target turn around the rocks; a straight chase gives pirates the easy line.': 'Im Trümmerfeld zwingst du das Ziel um die Felsen; bei einer geraden Verfolgung haben die Piraten leichtes Spiel.',
     'The Registry has posted more named targets near Mourning Line, and several have escorts.': "Das Kopfgeldjäger-Register hat neue Steckbriefe für die Mourning Line veröffentlicht. Einige der Gesuchten fliegen mit Eskorte.",
@@ -1951,10 +1953,10 @@ export const DE_CATALOG = {
     'Ore prices are soft here, but machinery shipments from Meridian are late again.': 'Die Erzpreise sind hier schwach, aber Maschinenlieferungen aus Meridian verspäten sich wieder.',
     'Ren Iverson, Prospector survey. I can mark a claim if your scan has enough detail.': 'Ren Iverson, Vermessung der Prospektoren. Ich markiere dir ein Abbaugebiet, wenn dein Scan detailliert genug ist.',
     'Run a full scan over the rock; a partial pass will not reveal deep signatures.': 'Führe einen vollständigen Scan über den Felsen; ein kurzer Durchlauf zeigt tiefe Signaturen nicht.',
-    'A harmonic marker from the old Shardbelt tunnel is active again, near the rock crown.': 'Eine Harmoniebake des alten Shardbelt-Tunnels ist wieder aktiv – nahe der Felsenkrone.',
+    'A harmonic marker from the old Shattered Crown tunnel is active again, near the rock crown.': 'Eine Harmoniebake des alten Shattered Crown-Tunnels ist wieder aktiv – nahe der Felsenkrone.',
     'Sit down. I’m Kes Ali, and I keep the Cooperative’s people from being treated as easy salvage.': 'Setz dich. Ich bin Kes Ali und sorge dafür, dass die Leute der Genossenschaft nicht als leichte Beute enden.',
     'If pirates are near a claim, call for help before you start cutting; an escort is cheaper than a lost hold.': 'Wenn Piraten nahe an einem Abbaugebiet sind, ruf Hilfe, bevor du schneidest; eine Eskorte ist billiger als verlorene Ladung.',
-    'The Cooperative has logged more gold in the Shardbelt, which is why the pirate patrols are thicker.': 'Die Genossenschaft hat mehr Gold im Shardbelt registriert. Deshalb sind dort mehr Piratenpatrouillen unterwegs.',
+    'The Cooperative has logged more gold in the Shattered Crown, which is why the pirate patrols are thicker.': 'Die Genossenschaft hat mehr Gold in der Shattered Crown registriert. Deshalb sind dort mehr Piratenpatrouillen unterwegs.',
     'Welcome to Azure Reach. We have food to move and too few pilots willing to take the long route.': "Willkommen in Azure Reach. Wir haben Lebensmittel zu verschicken, aber kaum jemand will die lange Strecke fliegen.",
     'Leave room for the return cargo; food is light, but a full hold still limits your options.': 'Lass Platz für die Rückfracht; Nahrung ist leicht, aber ein voller Frachtraum schränkt dich trotzdem ein.',
     'The latest harvest came in early, and Vesper’s clinics are already asking for more medicine.': 'Die letzte Ernte kam früh, und die Kliniken von Vesper verlangen bereits nach mehr Medizin.',
@@ -2254,7 +2256,7 @@ export const DE_CATALOG = {
     'Podium target: 215–240 seconds': 'Podiumsziel: 215–240 Sekunden',
     'A marked rock crown with a tight zig-zag through the centre. Take the short cut only if you can thread its narrow rings without losing your line.': 'Markierte Felsenkrone, enge Zickzacklinie durchs Zentrum. Nimm die Abkürzung nur, wenn du die schmalen Ringe triffst, ohne die Linie zu verlieren.',
     'The Pit Boss sends the field runners deep, then doubles them back through alternating rock lanes. A very tight inner cut saves time but punishes a late turn.': 'Der Rennleiter schickt das Feld tief hinein und dann durch abwechselnde Felsengassen zurück. Die enge Innenlinie spart Zeit, verzeiht aber kein spätes Einlenken.',
-    'The hard Shardbelt line dives around the miner monoliths and closes back on itself. It is feasible in a Wayfarer, but only with disciplined heavy-afterburner bursts and a clean exit from the knife cut.': 'Die schwierige Shardbelt-Strecke führt um die Bergbaumonolithen und schließt sich wieder. Mit einer Wayfarer machbar – aber nur mit disziplinierten Nachbrennerstößen und sauberem Ausgang aus der Klingenabkürzung.',
+    'The hard Shattered Crown line dives around the miner monoliths and closes back on itself. It is feasible in a Wayfarer, but only with disciplined heavy-afterburner bursts and a clean exit from the knife cut.': 'Die schwierige Shattered Crown-Strecke führt um die Bergbaumonolithen und schließt sich wieder. Mit einer Wayfarer machbar – aber nur mit disziplinierten Nachbrennerstößen und sauberem Ausgang aus der Klingenabkürzung.',
     "Descend into the carrier hangar, pass the torn bow and skim the nearby frigate. Follow the carrier flank and drive before turning through its break debris.": "Sinke in den Trägerhangar, flieg durch den Bugbruch und dicht an der benachbarten Fregatte vorbei. Folge der Trägerflanke und dem Antrieb, bevor du durch die Bruchtrümmer zurückkehrst.",
     "Cross the battleship’s forward fracture, descend into its spine and leave through the aft break. Stay close around the drive and keel, then finish through the bow debris cloud.": "Flieg durch den vorderen Schlachtschiffbruch, sinke in den Rumpf und verlasse ihn durch den hinteren Bruch. Bleib eng an Antrieb und Kiel und erreiche das Ziel durch die Trümmerwolke am Bug.",
     "Follow the carrier fracture, escort wrecks and the broadside cruiser’s interior. Cross the port debris cloud, skim the battleship’s broken hull and weave past two more frigates before the final cruiser break.": "Folge dem Trägerbruch, den Begleitwracks und dem offenen Kreuzerrumpf. Durchquere die backbordseitige Trümmerwolke, flieg eng am zerbrochenen Schlachtschiff entlang und an zwei weiteren Fregatten vorbei zum letzten Kreuzerbruch.",
@@ -3241,7 +3243,7 @@ export const DE_CATALOG = {
     'Practise thrust, steering, a short afterburner burst and both cockpit monitors before engaging hyperdrive.': 'Übe Schub, Steuerung, einen kurzen Nachbrennerstoß und beide Cockpitmonitore, bevor du den Hyperdrive zündest.',
     'Vesper is plotted. Engage HYPERDRIVE, then approach slowly with Vesper selected for automatic landing.': 'Vesper ist gesetzt. Zünde den HYPERDRIVE und flieg Vesper danach langsam an – die Landung erfolgt automatisch.',
     'Sell two Protein Packs at the Vesper commodity market.': 'Verkaufe zwei Einheiten Protein an der Warenbörse von Vesper.',
-    'Hyperdrive to the Shardbelt. Approach the marked deposit until the automatic scan completes, then tap MINE to deploy your drones. Tap RECALL before leaving; hyperdrive waits for their return.': 'Fliege per Hyperdrive zum Shardbelt. Nähere dich dem markierten Vorkommen bis zum automatischen Scan und tippe auf ABBAU, um die Drohnen zu starten. Tippe vor dem Abflug auf RÜCKRUF; der Hyperdrive wartet auf ihre Rückkehr.',
+    'Hyperdrive to the Shattered Crown. Approach the marked deposit until the automatic scan completes, then tap MINE to deploy your drones. Tap RECALL before leaving; hyperdrive waits for their return.': 'Fliege per Hyperdrive zur Shattered Crown. Nähere dich dem markierten Vorkommen bis zum automatischen Scan und tippe auf ABBAU, um die Drohnen zu starten. Tippe vor dem Abflug auf RÜCKRUF; der Hyperdrive wartet auf ihre Rückkehr.',
     'Open SERVICES and refill fuel and ordnance; repair the hull if needed. Shields recharge in flight, hull does not.': 'Öffne SERVICE und fülle Treibstoff und Raketen auf; repariere bei Bedarf die Hülle. Schilde laden im Flug nach, die Hülle nicht.',
     'Your beam lasers draw on regenerating energy. Release fire briefly if the capacitor runs low. Only missiles need ammunition.': 'Deine Strahllaser nutzen sich regenerierende Energie. Lass bei leerem Speicher kurz vom Feuerknopf ab. Nur Raketen brauchen Munition.',
     'Approach the marked crate slowly; it is collected automatically at close range. The left monitor opens your hold.': 'Flieg langsam an die markierte Kiste heran; sie wird auf kurze Distanz automatisch aufgenommen. Der linke Monitor zeigt deinen Laderaum.',

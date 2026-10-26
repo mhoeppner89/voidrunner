@@ -83,6 +83,7 @@ test('urgent radio stays compact; longer stories wait for danger to pass',async(
     const calls=[];
     const session=Object.create(GameSession.prototype);
     session.save={world:{time:20},player:{position:[0,0,0]}};
+    session.ships=[];
     session.ui={showStoryLine:(...args)=>calls.push(args),showPilotLine:()=>{}};
     session.hostilesVisibleNear=()=>true;
     session.playStoryLine('Rin','Incoming fire','ally',7000);

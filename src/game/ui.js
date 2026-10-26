@@ -1,3 +1,4 @@
+import {UI_TERMS,socialVenueKey,missionBoardKey} from './interfaceTerms.js';
 import {explorationDialogue,explorationJournal,explorationText} from './explorationData.js';
 import {distressDialogue,distressJournal,distressText} from './distressData.js';
 import {installRetroDisplay,monitorRasterRatio} from './retroDisplay.js';
@@ -31,7 +32,7 @@ import { HULL_TRADE_IN_RATE, quoteShipTrade } from './shipTrade.js';
 import { LOADOUT_KEYS, HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RATE, itemAvailable, itemFitsMount, loadoutFor, quoteOutfitting } from './outfitting.js';
 import { playerStrengthValue } from './playerStrength.js';
 import { guildJoinCost, missionBriefing, missionTitle } from './missions.js';
-import { getTutorialQuest, tutorialCampaignSummary, tutorialCardContent, tutorialDialogue, tutorialPeople, tutorialConversation, tutorialContentUnlocked, tutorialTradePrice, tutorialLaunchBlock, TUTORIAL_MINING_CONTRACT_ID } from './tutorialCampaign.js';
+import { getTutorialQuest, tutorialCampaignSummary, tutorialCardContent, tutorialDialogue, tutorialPeople, tutorialConversation, tutorialContentUnlocked, tutorialTradePrice, tutorialLaunchBlock, TUTORIAL_MINING_CONTRACT_ID, TUTORIAL_MARA_CALL_MIN_COMBAT_VALUE } from './tutorialCampaign.js';
 import { canMineWithHull, DRONE_BAY_CAPACITY, DRONE_TYPES, droneBayLayoutFor } from './droneData.js';
 const WARM_IMAGE_TIMEOUT_MS = 5000;
 const cockpitPolygonContains=(points,x,y)=>{
@@ -301,7 +302,7 @@ const SYSTEM_STAR_TYPES = Object.freeze({
     'pale-ring': 'BLUE GIANT',
 });
 // Local charts use the real X/Z coordinates again. Tiny label nudges separate
-// genuinely close neighbours (Helix/Shardbelt, Cairn/Mourning Line, and the
+// genuinely close neighbours (Helix/Shattered Crown, Cairn/Mourning Line, and the
 // Meridian yard cluster) without turning the whole system into a matrix.
 const SYSTEM_MAP_NUDGES = Object.freeze({
     'helios-verge': Object.freeze({
@@ -461,7 +462,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2lo';
+const GAME_VERSION = '0.8.2lu';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -2274,9 +2275,9 @@ export class GameUI {
         if (this.dockTerminal === 'market' && this.marketPoint) {
             const tab = (point, label) => `<button type="button" class="${this.marketPoint === point ? 'is-active' : ''}" data-market-point="${point}" aria-pressed="${this.marketPoint === point}">${t(label)}</button>`;
             const tabs = [
-                hasLocationService(this.dockLocation, 'market') ? tab('commodities', 'Trade') : '',
-                hasLocationService(this.dockLocation, 'outfitting') ? tab('equipment', 'Equipment') : '',
-                hasLocationService(this.dockLocation, 'shipyard') ? tab('shipyard', 'Shipyard') : '',
+                hasLocationService(this.dockLocation, 'market') ? tab('commodities', UI_TERMS.trade) : '',
+                hasLocationService(this.dockLocation, 'outfitting') ? tab('equipment', UI_TERMS.equipment) : '',
+                hasLocationService(this.dockLocation, 'shipyard') ? tab('shipyard', UI_TERMS.shipyard) : '',
                 this.denUnlockedAt(this.dockLocation) ? tab('den', "SMUGGLER'S DEN") : '',
             ].filter(Boolean);
             // A lone tab would just repeat the label beside it.
@@ -2293,19 +2294,19 @@ export class GameUI {
     // repeat it as their own title band, so this is the single "where am I".
     dockScreenLabel() {
         if (this.dockTerminal === 'market')
-            return { commodities: t('COMMODITY MARKET'), equipment: t('SHIP PARTS'), shipyard: t('NEW SHIP'), den: t("SMUGGLER'S DEN") }[this.marketPoint] ?? t('MARKET');
+            return { commodities: t(UI_TERMS.trade), equipment: t(UI_TERMS.equipment), shipyard: t(UI_TERMS.shipyard), den: t("SMUGGLER'S DEN") }[this.marketPoint] ?? t('MARKET');
         if (this.dockTerminal === 'bar' && this.barPanel === 'missions')
-            return t('CONTRACT TERMINAL');
+            return t(missionBoardKey(LOCATIONS[this.dockLocation]));
         if (this.dockTerminal === 'bar' && this.barPanel === 'guilds')
             return t('GUILDS');
         return {
             concourse: t('CONCOURSE'),
             services: t('SERVICES'),
-            bar: t('BAR'),
-            missions: t('CONTRACT TERMINAL'),
+            bar: t(socialVenueKey(LOCATIONS[this.dockLocation])),
+            missions: t(missionBoardKey(LOCATIONS[this.dockLocation])),
             guilds: t('GUILDS'),
-            equipment: t('SHIP PARTS'),
-            shipyard: t('NEW SHIP'),
+            equipment: t(UI_TERMS.equipment),
+            shipyard: t(UI_TERMS.shipyard),
         }[this.dockTerminal] ?? t('CONCOURSE');
     }
     renderDock() {
@@ -2350,7 +2351,7 @@ export class GameUI {
             : barPanelOpen ? 'bar-scene'
                 : this.dockTerminal !== 'concourse' ? 'dock-concourse' : '';
         const backLabel = marketPointOpen ? t('Return to the market floor')
-            : barPanelOpen ? t('Return to the bar')
+            : barPanelOpen ? t('Return to {place}',{place:t(socialVenueKey(LOCATIONS[this.dockLocation]))})
                 : t('Return to the concourse');
         dock.innerHTML = `
       <div class="dock-backdrop">${this.locationIllustration(this.dockLocation, illustrationScreen)}</div>
@@ -2414,11 +2415,15 @@ export class GameUI {
         const liveHint = !this.save.player.dockedAt && this.tutorialHint?.key?.startsWith(card.stepId + ':') && this.tutorialHint.text;
         const objective = liveHint || t(card.objective);
         const instruction = liveHint ? '' : t(card.instruction);
+        const investment = card.stepId === 'earn-standing' ? playerStrengthValue(this.save.player) : undefined;
+        const goal = TUTORIAL_MARA_CALL_MIN_COMBAT_VALUE;
+        const investmentProgress = investment === undefined ? '' : `<p class="story-investment-progress">${t('Ship readiness: {current} / {goal} ({percent}%).', {current:formatCredits(investment),goal:formatCredits(goal),percent:Math.min(100,Math.floor(investment/goal*100))})}</p><p>${t('Ship and owned equipment count at full value, cash at half value. Cargo does not count.')}</p><p>${t('{remaining} remaining until Mara calls.', {remaining:formatCredits(Math.max(0,goal-investment))})}</p>`;
         return `<aside class="tutorial-dock-notice" aria-label="${t('Family prologue objective')}">
           ${this.portraitImage('rin-vek', 'Rin Vek')}
           <div class="tutorial-notice-copy">
             <p class="story-current-objective">${escapeHtml(objective)}${card.progress ? ` <em>${escapeHtml(card.progress)}</em>` : ''}</p>
             ${instruction ? `<p class="${fitting ? 'tutorial-equipment-explainer' : 'story-objective-detail'}">${escapeHtml(instruction)}</p>` : ''}
+            ${investmentProgress}
           </div>
         </aside>`;
     }
@@ -2673,7 +2678,7 @@ export class GameUI {
         const rinAtBerth = false;
         const raceOnly = hasLocationService(this.dockLocation, 'race') && !hasLocationService(this.dockLocation, 'missions');
         const contractsOnly = hasLocationService(this.dockLocation, 'missions') && !hasLocationService(this.dockLocation, 'bar');
-        const deskLabel = raceOnly ? t('RACE DESK') : contractsOnly ? t('CONTRACTS') : t('BAR');
+        const deskLabel = t(socialVenueKey(LOCATIONS[this.dockLocation]));
         const deskDetail = raceOnly ? t('Pilots and race entries') : contractsOnly ? t('Local contract terminal') : t('Guilds and missions');
         const previewToolbar = livePreview ? `
         <div class="vesper-preview-toolbar" aria-label="${t('Live concourse ship preview')}">
@@ -2753,9 +2758,9 @@ export class GameUI {
         if (this.barPersonId)
             return this.renderBarDialogue(this.barPersonId);
         return `
-      <div class="bar-scene station-scene" aria-label="${t('Bar points of interest')}">
-        <div class="scene-pointers" aria-label="${t('Bar actions')}">
-          ${missionDesk ? `<div class="scene-pointer bar-pointer-missions" data-bar-panel="missions" role="button" tabindex="0" aria-label="${t('Open the mission board')}"><i>✦</i><b>${hasLocationService(this.dockLocation, 'race') && !hasLocationService(this.dockLocation, 'missions') ? t('RACE BOARD') : t('MISSION BOARD')}</b><small>${hasLocationService(this.dockLocation, 'race') ? t('Enter a course') : t('Find work')}</small></div>` : ''}
+      <div class="bar-scene station-scene" aria-label="${t(socialVenueKey(LOCATIONS[this.dockLocation]))}">
+        <div class="scene-pointers" aria-label="${t(socialVenueKey(LOCATIONS[this.dockLocation]))}">
+          ${missionDesk ? `<div class="scene-pointer bar-pointer-missions" data-bar-panel="missions" role="button" tabindex="0" aria-label="${t('Open the mission board')}"><i>✦</i><b>${t(missionBoardKey(LOCATIONS[this.dockLocation]))}</b><small>${hasLocationService(this.dockLocation, 'race') ? t('Enter a course') : t('Find work')}</small></div>` : ''}
           ${guildDesk ? `<div class="scene-pointer bar-pointer-guilds" data-bar-panel="guilds" role="button" tabindex="0" aria-label="${t('Open guilds')}"><i>◇</i><b>${t('LOCAL GUILDS')}</b><small>${t('{count} represented here', { count: this.localGuildIds().length })}</small></div>` : ''}
           ${people.map((person, index) => `
             <div class="scene-pointer bar-person-pointer ${(this.save.world.npcMemory?.[person.id]?.met) ? 'is-known' : 'is-new'}" style="--person-column:${index%3};--person-row:${Math.floor(index/3)}" data-person-id="${person.id}" role="button" tabindex="0" aria-label="${t('Talk to {name}', { name: person.name })}"><i>●</i><b>${escapeHtml(person.name)}</b><small>${escapeHtml(t(person.role))}</small>${this.save.world.npcMemory?.[person.id]?.met ? '' : `<em>${t('NEW CONTACT')}</em>`}</div>
@@ -3133,7 +3138,7 @@ export class GameUI {
         const memory = this.save.world.npcMemory?.[person.id] ?? { talks: 1 };
         return `
       <div class="bar-dialogue-screen station-scene" aria-label="${t('Conversation with {name}', { name: person.name })}">
-        <div class="scene-pointer scene-return-pointer" data-ui-command="bar-scene" role="button" tabindex="0" aria-label="${t('Return to the bar')}"><i>◀</i><b>${t('BAR FLOOR')}</b><small>${t('Back to the room')}</small></div>
+        <div class="scene-pointer scene-return-pointer" data-ui-command="bar-scene" role="button" tabindex="0" aria-label="${t('Return to {place}',{place:t(socialVenueKey(LOCATIONS[this.dockLocation]))})}"><i>◀</i><b>${t(socialVenueKey(LOCATIONS[this.dockLocation]))}</b><small>${t('Back to the room')}</small></div>
         <section class="bar-dialogue-card" aria-live="polite">
           ${this.portraitImage(person.id, person.name)}
           <div class="bar-dialogue-copy">
@@ -3158,9 +3163,9 @@ export class GameUI {
             return `
         <div class="market-scene station-scene" aria-label="${t('Market points of interest')}">
           <div class="scene-pointers" aria-label="${t('Market actions')}">
-            ${commodityMarket ? `<div class="scene-pointer market-pointer-commodities" data-market-point="commodities" role="button" tabindex="0" aria-label="${t('Open commodity market')}"><i>▦</i><b>${t('Trade')}</b><small>${t('Buy and sell cargo')}</small></div>` : ''}
-            ${outfitting ? `<div class="scene-pointer market-pointer-equipment" data-market-point="equipment" role="button" tabindex="0" aria-label="${t('Open ship parts')}"><i>⚙</i><b>${t('Equipment')}</b><small>${t('Fit out your ship')}</small></div>` : ''}
-            ${shipyard ? `<div class="scene-pointer market-pointer-shipyard" data-market-point="shipyard" role="button" tabindex="0" aria-label="${t('Open the ship dealer')}"><i>↗</i><b>${t('NEW SHIP')}</b><small>${t('Hulls for sale')}</small></div>` : ''}
+            ${commodityMarket ? `<div class="scene-pointer market-pointer-commodities" data-market-point="commodities" role="button" tabindex="0" aria-label="${t('Open {place}',{place:t(UI_TERMS.trade)})}"><i>▦</i><b>${t(UI_TERMS.trade)}</b><small>${t('Buy and sell cargo')}</small></div>` : ''}
+            ${outfitting ? `<div class="scene-pointer market-pointer-equipment" data-market-point="equipment" role="button" tabindex="0" aria-label="${t('Open {place}',{place:t(UI_TERMS.equipment)})}"><i>⚙</i><b>${t(UI_TERMS.equipment)}</b><small>${t('Fit out your ship')}</small></div>` : ''}
+            ${shipyard ? `<div class="scene-pointer market-pointer-shipyard" data-market-point="shipyard" role="button" tabindex="0" aria-label="${t('Open {place}',{place:t(UI_TERMS.shipyard)})}"><i>↗</i><b>${t(UI_TERMS.shipyard)}</b><small>${t('Hulls for sale')}</small></div>` : ''}
             ${this.denUnlockedAt(this.dockLocation) ? `<div class="scene-pointer market-pointer-den" data-market-point="den" role="button" tabindex="0" aria-label="${t('Enter the smuggler\'s den')}"><i>☣</i><b>${t('SMUGGLER\'S DEN')}</b><small>${t('Black-market prices')}</small></div>` : ''}
           </div>
         </div>
@@ -4346,7 +4351,7 @@ export class GameUI {
     locationIllustration(locationId, screen = 'concourse') {
         const location = LOCATIONS[locationId];
         const label = screen === 'bar'
-            ? t('{name} bar', { name: location.name })
+            ? `${location.name} · ${t(socialVenueKey(location))}`
             : screen === 'market'
                 ? t('{name} market', { name: location.name })
                 : location.name;
@@ -4355,9 +4360,9 @@ export class GameUI {
             const source = VESPER_HOVER_PREVIEW && locationId === 'vesper' && screen === 'concourse'
                 ? './art/locations/simplified/vesper-preview.webp'
                 : art[screen] ?? art.concourse;
-            return `<img ${screen==='concourse'?'data-concourse-plate':''} src="${source}" alt="${t('HD view')} of ${escapeHtml(label)}" draggable="false">`;
+            return `<img ${screen==='concourse'?'data-concourse-plate':''} src="${source}" alt="${t('HD view')} · ${escapeHtml(label)}" draggable="false">`;
         }
-        const screenLabel = screen === 'bar' ? t('BAR') : screen === 'market' ? t('MARKET') : t('CONCOURSE');
+        const screenLabel = screen === 'bar' ? t(socialVenueKey(location)) : screen === 'market' ? t('MARKET') : t('CONCOURSE');
         return `<div class="procedural-location-plate system-${escapeHtml(location.systemId ?? 'helios-verge')}" style="--plate-accent:${escapeHtml(location.accent ?? '#80b7c8')};--plate-secondary:${escapeHtml(location.secondary ?? '#182b36')}" role="img" aria-label="${escapeHtml(location.name)} · ${escapeHtml(screenLabel)}"><span>${escapeHtml(location.shortName)}</span><b>${escapeHtml(screenLabel)}</b><i aria-hidden="true"></i></div>`;
     }
     clearSpacePickups() {
@@ -4615,6 +4620,7 @@ export class GameUI {
             targetReadout.classList.toggle('is-dock-prompt', Boolean(model.dockPrompt && !model.monitorStatus));
             if (model.monitorStatus)
                 targetReadout.textContent = model.monitorStatus;
+
             else if (model.dockPrompt)
                 targetReadout.textContent = model.dockPrompt;
             if(model.race?.phase==='running'&&!model.monitorStatus){
@@ -5877,7 +5883,7 @@ export class GameUI {
                     : mission.kind === 'mining'
                         ? ((mission.mined ?? 0) >= mission.quantity
                             ? t('RETURN TO {name}', { name: (LOCATIONS[mission.destination]?.name ?? 'DOCK').toUpperCase() })
-                            : t('MINE {name}', { name: (mission.claimName ?? 'SHARDBELT CLAIM').toUpperCase() }))
+                            : t('MINE {name}', { name: (mission.claimName ?? 'SHATTERED CROWN CLAIM').toUpperCase() }))
                         : mission.kind === 'salvage'
                             ? ((mission.salvaged ?? 0) >= mission.quantity
                                 ? t('RETURN TO {name}', { name: (LOCATIONS[mission.destination]?.name ?? 'DOCK').toUpperCase() })

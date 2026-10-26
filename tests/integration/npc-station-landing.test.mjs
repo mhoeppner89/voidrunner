@@ -5,6 +5,7 @@ import {stationModel} from '../helpers/station-model.mjs';
 import {GameSession} from '../../src/game/game.js';
 import {SHIPS,LOCATIONS} from '../../src/game/data.js';
 import {STATION_DOCKS} from '../../src/game/stationDocks.js';
+import {stationYaw} from '../../src/game/stationOrientation.js';
 import {reserveStationDock,updateStationDock,stationBerth,clearParkedBerth} from '../../src/game/stationTraffic.js';
 import {buildStationCollider,hullVsStation} from '../../src/game/stationCollision.js';
 import {shipVsStation} from '../../src/game/shipCollision.js';
@@ -25,10 +26,10 @@ for(const id of Object.keys(STATION_DOCKS))test(`${id}: every traffic lane clear
    pos.fromArray(ship.position);inv.fromArray(ship.rotation);
    assert.equal(shipVsStation(pos,inv,variant,npcShipScaleForVariant(variant),collider,contact),false,`${hullId}/lane ${lane}/${ship.stationDock?.phase}: fitted hull clips station`);
    if(ship.stationDock?.phase==='docked'){docked=true;assert.deepEqual(ship.velocity,[0,0,0]);}
-   if(['landing','docked','launch','outbound'].includes(ship.stationDock?.phase))assert.ok(Math.abs(ship.rotation[1])<1e-5,'no turn inside the station');
+   if(['landing','docked','launch','outbound'].includes(ship.stationDock?.phase))assert.ok(new THREE.Quaternion(...ship.rotation).angleTo(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),stationYaw(id)))<1e-5,'no turn inside the station');
   }
   assert.ok(docked);assert.equal(ship.stationDockCompleted,id);for(const phase of ['orient','landing','docked','launch','outbound','turnout'])assert.ok(phases.has(phase));
-  assert.ok(new THREE.Vector3(0,0,-1).applyQuaternion(new THREE.Quaternion().fromArray(ship.rotation)).z>.999,'normal flight receives an outward heading');
+  assert.ok(new THREE.Vector3(0,0,-1).applyQuaternion(new THREE.Quaternion().fromArray(ship.rotation)).dot(new THREE.Vector3(Math.sin(stationYaw(id)),0,Math.cos(stationYaw(id))))>.999,'normal flight receives an outward heading');
  }
 });
 
