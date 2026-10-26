@@ -4797,12 +4797,15 @@ export class SpaceRenderer {
     updateMissionMarker(){
         const marker=this.missionMarker;if(!marker)return;
         const distance=this.camera.position.distanceTo(marker.position);
-        marker.visible=marker.userData.active&&distance>2;
+        // A six-kilometre beacon is roughly half a Talon's span. Never
+        // enlarge it to preserve screen pixels: distant navigation uses the
+        // independent radar contact and HUD target brackets instead.
+        marker.visible=marker.userData.active&&distance>2&&distance<2500;
         if(!marker.visible)return;
         const pulse=this.reducedHyperdriveMotion?0:Math.sin((this.skyTime??0)*3.4);
         marker.quaternion.copy(this.camera.quaternion);
-        marker.scale.setScalar(distance*Math.tan(this.camera.fov*Math.PI/360)*28/Math.max(1,this.viewportHeight??800)*(1+pulse*.12));
-        marker.children[0].material.opacity=.8+pulse*.18;
+        marker.scale.setScalar(3);
+        marker.children[0].material.opacity=(.8+pulse*.18)*(1-THREE.MathUtils.smoothstep(distance,1500,2500));
     }
     setTarget(targetId, asteroidId, wreckId, locationId, pickupId) {
         this.targetId = targetId;

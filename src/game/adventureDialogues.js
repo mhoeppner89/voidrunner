@@ -22,7 +22,7 @@ export const ADVENTURE_DIALOGUES={
         bar:{text:pair('Der Reaktor läuft. Komm zu mir in die Bar; ich habe einen Abbauauftrag für uns.','The reactor is running. Meet me in the bar; I have a mining job for us.'),choices:[end('Bis gleich.','See you there.')]},
     }},
     'mining-return':{start:'bar',nodes:{
-        bar:{text:pair('Gut geflogen. Der Abbauauftrag ist bezahlt. Triff mich in der Bar, bevor du wieder startest. Ich habe etwas für die Arbeit an Wracks.','Good flying. The mining contract is paid. Meet me in the bar before you launch again. I have something for working around wrecks.'),choices:[end('Ich komme.','On my way.')]},
+        bar:{text:pair('Gut geflogen. Der Abbauauftrag ist bezahlt. Füll vor dem nächsten Start deinen Tank: Öffne SERVICE und wähle bei „Treibstoff und Munition“ AUFFÜLLEN. Danach komm zu mir in die Bar; ich habe etwas für die Arbeit an Wracks.','Good flying. The mining contract is paid. Fill your tank before the next flight: open SERVICES and choose REFILL under Fuel and ordnance. Then meet me in the bar; I have something for working around wrecks.'),choices:[end('Ich komme.','On my way.')]},
     }},
     'mara-cairn':{start:'call',nodes:{
         call:{text:pair('Rin ist zurück und hat eine Spur zu euren Eltern. Sie wartet in der Bar auf Cairn. Flieg hin und sprich mit ihr.','Rin is back with a lead on your parents. She is waiting in the bar at Cairn. Fly there and speak with her.'),choices:[end('Ich fliege nach Cairn.','I will head to Cairn.')]},

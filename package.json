@@ -44,6 +44,7 @@
     "balance:racing": "node --import ./tests/helpers/offline-imports.mjs tools/balance/racing-hulls.mjs",
     "test:browser:station-surfaces": "node tools/playtest/station-review.mjs && node tests/browser/station-surfaces.mjs",
     "test:browser:survey": "node tests/browser/tutorial-survey.mjs",
+    "test:browser:tutorial-refuel-marker": "node tests/browser/tutorial-refuel-marker.mjs",
     "test:browser:carrier-hiding": "node tests/browser/carrier-hiding.mjs",
     "review:paint-quality": "node tools/playtest/repaint-review.mjs && node tools/playtest/paint-quality.mjs",
     "review:paint": "node tools/playtest/repaint-review.mjs",

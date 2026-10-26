@@ -1,3 +1,8 @@
+## 0.8.2ll — Refuelling lesson and local survey beacons
+
+- Rin’s post-mining Vesper dialogue explains the normal SERVICE → Treibstoff und Munition → AUFFÜLLEN controls before the next flight, in German and English.
+- Survey stars keep a fixed six-kilometre height, roughly half a Talon’s span, and pulse only in brightness. Fade out from 1,500 to 2,500 km; distant radar contacts and HUD target corners remain independent and visible.
+
 ## 0.8.2lk — Every caller closes their own call
 
 - The decision labels, the payout line and the farewell now belong to the caller. The two setups of a category already opened the scene differently, but shared every word after it: Tallow's rescue and Nettle's ended with the same `Danke. Die Überweisung ist raus.`, so a second fuel call read as a rerun the moment it closed. Each of the sixteen setups now carries its own `labels` and `endings`, read through `distressChoiceLabel` / `distressEnding` in `distressData.js`.

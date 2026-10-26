@@ -109,9 +109,15 @@ test('both languages explain genuine transponder controls and station access mat
  }
  const {session:s}=tutorialFixture();for(const location of Object.values(LOCATIONS).filter(l=>l.kind==='station'))assert.notEqual(s.darkDockPolicy(location.id),'deny',location.id);assert.equal(s.darkDockPolicy('helix'),'syndicate');
 });
-test('survey star faces the camera, pulses without allocating again and respects reduced motion',()=>{
- const r=Object.create(SpaceRenderer.prototype);r.scene=new THREE.Scene();r.camera=new THREE.PerspectiveCamera(70,1.6,.1,20000);r.viewportHeight=800;r.skyTime=0;r.setMissionMarker({position:[0,0,-1000]});const mesh=r.missionMarker.children[0],geometry=mesh.geometry,scale=r.missionMarker.scale.x,opacity=mesh.material.opacity;
- assert.equal(mesh.geometry.type,'ShapeGeometry');r.skyTime=.35;r.camera.rotation.set(.2,.3,0);r.updateMissionMarker();assert.notEqual(r.missionMarker.scale.x,scale);assert.notEqual(mesh.material.opacity,opacity);assert.ok(r.missionMarker.quaternion.equals(r.camera.quaternion));
- r.reducedHyperdriveMotion=true;r.updateMissionMarker();const still=r.missionMarker.scale.x;r.skyTime=9;r.updateMissionMarker();assert.equal(r.missionMarker.scale.x,still);r.setMissionMarker({position:[0,0,-2000]});assert.equal(mesh.geometry,geometry);assert.equal(r.missionMarker.scale.x,still*2);r.setMissionMarker();assert.equal(r.missionMarker.visible,false);
+test('survey star keeps fighter-sized world dimensions and leaves distant navigation to the HUD',()=>{
+ const r=Object.create(SpaceRenderer.prototype);r.scene=new THREE.Scene();r.camera=new THREE.PerspectiveCamera(70,1.6,.1,200000);r.viewportHeight=800;r.skyTime=0;r.setMissionMarker({position:[0,0,-1000]});
+ const mesh=r.missionMarker.children[0],geometry=mesh.geometry,scale=r.missionMarker.scale.x,opacity=mesh.material.opacity;
+ geometry.computeBoundingBox();assert.equal(geometry.boundingBox.getSize(new THREE.Vector3()).y*scale,6);
+ const projectedHeight=()=>{r.camera.updateMatrixWorld();return new THREE.Vector3(0,scale,r.missionMarker.position.z).project(r.camera).y-new THREE.Vector3(0,-scale,r.missionMarker.position.z).project(r.camera).y;};
+ const nearHeight=projectedHeight();r.setMissionMarker({position:[0,0,-2000]});assert.equal(r.missionMarker.scale.x,scale);assert.ok(Math.abs(projectedHeight()/nearHeight-.5)<1e-6);assert.ok(mesh.material.opacity<opacity);
+ r.setMissionMarker({position:[0,0,-1000]});r.skyTime=.35;r.camera.rotation.set(.2,.3,0);r.updateMissionMarker();assert.equal(r.missionMarker.scale.x,scale);assert.notEqual(mesh.material.opacity,opacity);assert.ok(r.missionMarker.quaternion.equals(r.camera.quaternion));
+ r.reducedHyperdriveMotion=true;r.updateMissionMarker();const still=mesh.material.opacity;r.skyTime=9;r.updateMissionMarker();assert.equal(mesh.material.opacity,still);
+ const {session:s}=tutorialFixture('survey-graveyard');s.save.player.dockedAt=undefined;const target=s.ensureTutorialFieldTarget();r.camera.position.fromArray(LOCATIONS.vesper.position);r.setMissionMarker(target);assert.equal(r.missionMarker.visible,false,'no star visible from Vesper');assert.equal(s.save.player.currentTargetId,target.id,'distant target remains selected');
+ r.camera.position.fromArray(target.position).add(new THREE.Vector3(0,0,500));r.updateMissionMarker();assert.equal(r.missionMarker.visible,true);assert.equal(mesh.geometry,geometry);r.setMissionMarker();assert.equal(r.missionMarker.visible,false);
  geometry.dispose();mesh.material.dispose();
 });
