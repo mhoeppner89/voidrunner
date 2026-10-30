@@ -29,6 +29,13 @@ test('capital recovery radius does not produce a ship-sized loot crate',()=>{
  assert.equal(root.children[0].scale.x,2.2);assert.equal(root.userData.lootBodySize,2.2);assert.equal(node.radius,35);
  disposeLootVisualResources(res);
 });
+test('recovered wreckage has a solid irregular shared model and keeps its rarity beacon',()=>{
+ const contents=[{id:'part',kind:'cargo',commodity:'scrap',quantity:1,sourceNodeId:'wreck-piece'}];
+ const node=combatWreckNode({id:'wreck-salvage-1',name:'Part',contents,position:[0,0,0],radius:3,systemId:'helios-verge'});
+ assert.equal(node.salvageFragment,true);node.lootRarity='uncommon';const res=createLootVisualResources(),a=createLootVisual(node,res),b=createLootVisual(node,res);
+ assert.equal(a.children[0].geometry,res.fragment);assert.equal(a.children[0].geometry,b.children[0].geometry);res.fragment.computeBoundingBox();assert.ok(res.fragment.boundingBox.getSize(new THREE.Vector3()).z>.5);
+ assert.equal(a.userData.lootFace.material.color.getHexString(),EQUIPMENT_RARITIES.uncommon.color.slice(1));disposeLootVisualResources(res);
+});
 test('collecting the best item changes the actual wreck marker before it disappears when empty',()=>{
  const {session,save}=tutorialFixture('land-mining');save.player.dockedAt=undefined;
  const rare=createEquipmentRecord('pulse-cannon',{rarity:'rare'}),green=createEquipmentRecord('pulse-cannon',{rarity:'uncommon'});

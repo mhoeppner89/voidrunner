@@ -47,7 +47,7 @@ export const RUN_ACTS=[
   id:'merchants',name:'Free Merchants',faction:'independents',
   waves:[
    {name:'Freight lane',hint:'Armed convoy.',environment:'open',enemies:[enemy('wayfarer',{faction:'independents',role:'escort',tier:'veteran',missiles:1}),enemy('mule',{faction:'independents',role:'trader',tier:'novice'})]},
-   {name:'Claim jumpers',hint:'Prospector under escort.',environment:'asteroid-field',enemies:[enemy('prospector',{faction:'independents',role:'miner',tier:'veteran'}),enemy('wayfarer',{faction:'independents',role:'escort',tier:'novice',delay:8})]},
+   {name:'Claim jumpers',hint:'Gaia under escort.',environment:'asteroid-field',enemies:[enemy('prospector',{faction:'independents',role:'miner',tier:'veteran'}),enemy('wayfarer',{faction:'independents',role:'escort',tier:'novice',delay:8})]},
    {name:'Haul trouble',hint:'Heavy haulers and escort.',environment:'debris-field',enemies:[enemy('torsas',{faction:'independents',role:'trader',tier:'veteran',missiles:2}),enemy('atlas',{faction:'independents',role:'trader',tier:'veteran',delay:6}),enemy('speedster',{faction:'independents',role:'escort',tier:'novice',delay:12})]},
    {name:'Crossfire',hint:'Mixed skirmish.',environment:'open',enemies:[enemy('speedster',{faction:'independents',role:'escort',tier:'veteran'}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'veteran',delay:8,missiles:1})]},
    {name:'Rookie wing',hint:'Choose your first wingman (Tier 1).',environment:'debris-field',enemies:[enemy('mule',{faction:'independents',role:'trader',tier:'veteran'}),enemy('wayfarer',{faction:'independents',role:'escort',tier:'novice',delay:8})]},
@@ -67,9 +67,9 @@ export const RUN_ACTS=[
   id:'concord',name:'Concord Frontier Fleet',faction:'concord',
   waves:[
    {name:'Show of force',hint:'Concord courier.',environment:'open',enemies:[enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',missiles:1})]},
-   {name:'Blade dance',hint:'Heavy fighter and courier.',environment:'debris-field',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'novice',delay:10})]},
-   {name:'Battery test',hint:'Vanguard with support.',environment:'open',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'veteran',missiles:2})]},
-   {name:'Screened',hint:'Hunter screened by blade.',environment:'asteroid-field',enemies:[enemy('lancer',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'novice',delay:8})]},
+   {name:'Victoria dance',hint:'Heavy fighter and courier.',environment:'debris-field',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'novice',delay:10})]},
+   {name:'Battery test',hint:'Bellona with support.',environment:'open',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'veteran',missiles:2})]},
+   {name:'Screened',hint:'Hunter screened by Victoria.',environment:'asteroid-field',enemies:[enemy('lancer',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'novice',delay:8})]},
    {name:'Heavy metal',hint:'Choose a tier-3 hull.',environment:'open',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('vanguard',{faction:'concord',role:'patrol',tier:'novice',delay:10,missiles:1})]},
   ],
  },
@@ -80,7 +80,7 @@ export const RUN_ACTS=[
    {name:'Reserves',hint:'Mixed heavy pack.',environment:'asteroid-field',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('lancer',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'novice',delay:12,missiles:1})]},
    {name:'Ace screen',hint:'Ace pair.',environment:'open',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:8,missiles:2})]},
    {name:'Elite guard',hint:'Upgrade your first wingman to Tier 3.',environment:'debris-field',enemies:[enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',delay:8,missiles:2})]},
-   {name:'The line',hint:'Choose your second wingman (Tier 3). Frigate with two blade escorts, all aces.',environment:'asteroid-field',enemies:[enemy('concord-frigate',{faction:'concord',role:'frigate',tier:'ace'}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:4,missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:8,missiles:2})]},
+   {name:'The line',hint:'Choose your second wingman (Tier 3). Frigate with two Victoria escorts, all aces.',environment:'asteroid-field',enemies:[enemy('concord-frigate',{faction:'concord',role:'frigate',tier:'ace'}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:4,missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:8,missiles:2})]},
   ],
  },
 ];

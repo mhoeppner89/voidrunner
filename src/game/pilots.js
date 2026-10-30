@@ -184,19 +184,19 @@ export const PILOT_LINES = {
             'You\'re a {rank}? I\'ll pay you anything — just go!',
         ],
         case: [
-            'The diplomatic case is yours — take it, please!',
+            'Your case is safe from me — please let me go!',
             'That case isn\'t worth my life!',
-            'It\'s just a sealed case — take it and go!',
+            'Keep your sealed case — just leave me alone!',
         ],
         cargo: [
-            'Take the cargo — just let me go!',
-            'The sealed goods are yours, all of it!',
-            'I\'ll drop the hold — don\'t shoot!',
+            'Keep your cargo — just let me go!',
+            'Your cargo is safe from me — I swear!',
+            'I won\'t touch your cargo — don\'t shoot!',
         ],
         pressed: [
             'I\'m begging you — break off!',
             'This isn\'t worth dying for!',
-            'Take the ship — just let me go!',
+            'Please — I just want to get out alive!',
         ],
         surrender: {
             // Every line pleads for life and names the action being taken, so
@@ -205,8 +205,8 @@ export const PILOT_LINES = {
             eject: ['I\'m dumping the hold — take it, just let me go!', 'The cargo\'s yours, I\'m ejecting it — please don\'t shoot!'],
             pay: ['Take my credits — I\'m paying you, just spare me!', 'Here, all my credits — please don\'t come after me!'],
             down: ['I\'m powering down — please don\'t shoot!', 'I surrender, everything\'s going dark — let me live!'],
-            downEject: ['I\'m dumping everything and powering down — please!', 'The cargo\'s yours and I\'m going dark — spare me!'],
-            downPay: ['My credits and my ship, I\'m powered down — just let me live!', 'Here\'s everything I have, I\'m shutting down — please!'],
+            downEject: ["I'm dropping cargo and powering down — please!", 'The cargo\'s yours and I\'m going dark — spare me!'],
+            downPay: ["Take my credits. I'm powered down — just let me live!", "Here are my credits. I'm shutting down — please!"],
         },
         // One last plea when the player closes in on a surrendered ship (see
         // maybeProximityLine) — then the pilot falls silent.
@@ -276,7 +276,7 @@ export const PILOT_LINES = {
         threat: [
             'You\'re mine. All of you.',
             'No quarter. No mercy.',
-            'Your bounty is going up by the second.',
+            'You will not get away from me.',
             'Burn for me.',
             'I\'ve scraped better pilots off my hull.',
             'Every breath you take is borrowed now.',
@@ -292,13 +292,13 @@ export const PILOT_LINES = {
             flee: ['I\'m running — don\'t waste the fuel chasing me!', 'You win this round. I\'m out!'],
             eject: ['I\'m jettisoning the hold — take it and leave me be!', 'The cargo\'s yours, I\'m dumping it — don\'t push your luck!'],
             pay: ['Take the credits — I\'m paying you off, fight\'s over!', 'Here\'s my payment. This is where I walk!'],
-            down: ['Fine — I\'m powering down. Don\'t make this a grave.', 'The ship\'s yours, I\'m going dark — just spare me!'],
-            downEject: ['Dumping the hold and powering down. Satisfied?', 'Take the cargo, take the ship — I\'m going dark, leave me be!'],
-            downPay: ['My credits, my ship, powered down — now walk away.', 'Here\'s my tribute — I\'m shutting down, don\'t finish me!'],
+            down: ['Fine — I\'m powering down. Don\'t make this a grave.', "I'm shutting everything down — just spare me!"],
+            downEject: ['Dumping the hold and powering down. Satisfied?', "Take the cargo — I'm going dark, leave me be!"],
+            downPay: ["Take my credits. I'm powered down — now walk away.", 'Here\'s my tribute — I\'m shutting down, don\'t finish me!'],
         },
         plead: [
             'I\'m done fighting — don\'t pull that trigger.',
-            'The ship\'s yours. Mercy is all I\'m asking.',
+            "I'm not fighting. Mercy is all I'm asking.",
             'You won. That\'s enough — let me live.',
         ],
         deference: [
@@ -374,7 +374,7 @@ export const PILOT_LINES = {
             pay: ['My credits are yours — a little ransom for my charm!', 'Take my payment — and please remember my generosity!'],
             down: ['I\'m powering down — do let me live to shine another day!', 'Dark and quiet, darling — spare the paint, and me!'],
             downEject: ['Everything\'s yours — cargo, glory, my life, if you please!', 'I\'m shedding my hold and going dark — do be kind!'],
-            downPay: ['My credits and my ship, powered down — surely that\'s enough!', 'Here\'s my tribute — I\'m shutting down, spare your humble admirer!'],
+            downPay: ["My credits are yours and I'm powered down — surely that's enough!", 'Here\'s my tribute — I\'m shutting down, spare your humble admirer!'],
         },
         plead: [
             'Oh, you wouldn\'t finish a surrendered ship... would you?',
@@ -434,7 +434,7 @@ export const PILOT_LINES = {
         ],
         gloat: [
             'You were dead the moment you crossed me.',
-            'I\'ve counted your shots. You have two left.',
+            'Your hull cannot take much more.',
             'Every vector you fly is one I\'ve already flown.',
         ],
     },

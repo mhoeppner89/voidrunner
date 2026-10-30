@@ -17,7 +17,7 @@ test('additional Protein purchases update the entire tutorial delivery without a
  session.trade('sell','food',1);assert.equal(quest.stepId,'fit-upgrade');
 });
 test('launch, fitted-reactor and mining-return introductions wait for their real screen and only appear once',()=>{
- for(const [step,port,id]of [['launch-helix','helix','cargo-ready'],['mining-contract','vesper','reactor-ready'],['salvage-briefing','vesper','mining-return']]){
+ for(const [step,port,id]of [['launch-helix','helix','cargo-ready'],['mining-contract','vesper','reactor-ready'],['salvage-briefing','vesper','mining-return'],['survey-graveyard','vesper','survey-ready']]){
   const {session,save,quest}=tutorialFixture(step),calls=[];save.player.dockedAt=port;session.ui.dockLocation=port;session.playTutorialBriefing=id=>calls.push(id);
   session.ui.isModalOpen=true;session.showTutorialDockBriefing();assert.equal(calls.length,0);
   session.ui.isModalOpen=false;save.world.missionSettlements=[{id:'pending'}];session.showTutorialDockBriefing();assert.equal(calls.length,0);
@@ -75,7 +75,7 @@ test('Rin’s combat lesson opens immediately beside the pirate and is remembere
  assert.equal(calls.length,1);assert.equal(calls[0][3],'tutorial-combat');assert.equal(session.storyLineUntil,Infinity);
  assert.equal(session.pendingStoryConversations,undefined,'the nearby pirate cannot delay his own combat lesson');
  assert.match(dialogueText(ADVENTURE_DIALOGUES.combat.nodes.weapons.text,'en'),/Space.*fire pad.*energy/);
- for(const phrase of [/Y.*wing card/,/defensive.*covering fire/i,/aggressive.*more help/i,/break off/])assert.match(dialogueText(ADVENTURE_DIALOGUES.combat.nodes.wing.text,'en'),phrase);
+ for(const phrase of [/Y.*wing card/,/cover you and stay close/i])assert.match(dialogueText(ADVENTURE_DIALOGUES.combat.nodes.wing.text,'en'),phrase);
  session.finishTutorialBriefing('tutorial-combat',true);assert.equal(quest.flags['briefingRead-combat'],true);
  session.playTutorialBriefing('combat');assert.equal(calls.length,1);assert.equal(quest.stepId,'defeat-raider');
  const resumed=tutorialFixture('defeat-raider',hydrateSave(JSON.parse(JSON.stringify(save))));resumed.session.playTutorialBriefing=GameSession.prototype.playTutorialBriefing;resumed.session.ui.showStoryLine=()=>assert.fail('completed combat lesson repeated');resumed.session.playTutorialBriefing('combat');

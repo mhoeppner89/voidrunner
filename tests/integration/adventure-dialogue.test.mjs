@@ -70,6 +70,26 @@ test('space dialogue holds the modal pause until the final reply',()=>{
     ui.advanceAdventure(0);
     assert.equal(ui.isModalOpen,false);assert.equal(ui.storyDismissed,true);assert.equal(calls.length,0);
 });
+test('repair and loot details are optional without completing their conversations early',()=>{
+    for(const [script,intro,detail,continuation] of [
+        ['paul-rescue','repairs','support','route'],['loot','find','rarity','recover']
+    ])for(const readDetails of [false,true]){
+        const {ui,calls}=fixture(ADVENTURE_DIALOGUES[script],true);
+        if(script==='paul-rescue')ui.advanceAdventure(0);
+        assert.equal(ui.adventure.nodeId,intro);
+        ui.advanceAdventure(readDetails?0:1);
+        if(readDetails){
+            assert.equal(ui.adventure.nodeId,detail);
+            assert.equal(ui.isModalOpen,true);
+            assert.equal(ui.adventureNode().choices.length,1);
+            ui.advanceAdventure(0);
+        }
+        assert.equal(ui.adventure.nodeId,continuation);
+        assert.equal(ui.isModalOpen,true);assert.equal(calls.length,0);
+        ui.advanceAdventure(0);assert.equal(ui.isModalOpen,false);
+    }
+});
+
 test('replaying an introduction cannot advance tutorial state',()=>{
     const {ui,calls}=fixture(ADVENTURE_DIALOGUES.mara);
     ui.adventure.script=undefined;ui.adventure.node={text:'Replay',choices:[{label:'Replay',replay:'mara'}]};
@@ -100,18 +120,18 @@ test('remaining questions retain the latest answer and completion stays availabl
 test('generic answers expose remaining questions directly and acknowledge each once',()=>{
     const {ui,calls}=fixture(ADVENTURE_DIALOGUES.mara);
     ui.adventure.script=undefined;
-    ui.dialogueTopics=()=>[{id:'local'},{id:'advice'}];
+    ui.dialogueTopics=()=>[{id:'work'},{id:'market'}];
     ui.dialogueResponse=(_,topic)=>({text:'Answer: '+topic});
     ui.adventure.node={text:'Welcome',next:'@topics'};
     ui.advanceAdventure(0);
     assert.equal(ui.adventureNode().text,'Welcome');
     ui.advanceAdventure(0);
-    assert.equal(ui.adventureNode().text,'Answer: local');
-    assert.deepEqual(ui.adventureNode().choices.map(c=>c.topic??'finish'),['advice','finish']);
+    assert.equal(ui.adventureNode().text,'Answer: work');
+    assert.deepEqual(ui.adventureNode().choices.map(c=>c.topic??'finish'),['market','finish']);
     ui.advanceAdventure(0);
-    assert.equal(ui.adventureNode().text,'Answer: advice');
+    assert.equal(ui.adventureNode().text,'Answer: market');
     ui.advanceAdventure(0);
-    assert.deepEqual(calls,[['mara-vek','greeting'],['mara-vek','local'],['mara-vek','advice']]);
+    assert.deepEqual(calls,[['mara-vek','greeting'],['mara-vek','work'],['mara-vek','market']]);
 });
 
 test('rendering answers and reviewing history never replays the topic introduction',()=>{
@@ -158,7 +178,22 @@ test('random encounter dialogue shows the assigned faction portrait',()=>{
 // whose loss the whole prologue mourns. "And afterwards?" must be askable.
 test('the Cairn lead concerns the parents and leaves the recorder encrypted for Mara',()=>{const text=JSON.stringify(ADVENTURE_DIALOGUES.cairn);assert.match(text,/parents/);assert.match(text,/encrypted/);assert.match(text,/Mara/);assert.doesNotMatch(text,/recording is readable|mother’s voice|forged/);});
 
-test('Rin accompanies the black-box mission and Mara handles decoding before open-world exploration',()=>{assert.match(ADVENTURE_DIALOGUES.cairn.nodes.company.text.en,/coming with you/);assert.match(ADVENTURE_DIALOGUES.delivery.nodes.box.text.en,/decoding/);assert.match(ADVENTURE_DIALOGUES.delivery.nodes.rin.text.en,/gate is open/);});
+test('the family introduction and recorder lead match the fleet disaster without revealing its cause',()=>{
+    for(const lang of ['de','en']){
+        const opening=ADVENTURE_DIALOGUES.mara.nodes.welcome.text[lang];
+        const survey=ADVENTURE_DIALOGUES['survey-ready'].nodes.farewell.text[lang];
+        const lead=ADVENTURE_DIALOGUES.cairn.nodes.box.text[lang];
+        assert.match(opening,/Wanderer/);
+        assert.doesNotMatch(opening,/zwei Schlüssel|two keys/i);
+        assert.match(survey,/Concord/);
+        assert.match(survey,lang==='de'?/Eltern.*verschwanden/:/parents disappeared/);
+        assert.match(lead,lang==='de'?/Flottenbericht.*vielleicht/i:/fleet report.*might/i);
+        assert.doesNotMatch(lead,/Evakuierungskonvoi|evacuation convoy/i);
+        assert.doesNotMatch([opening,survey,lead].join(' '),/Orison|Lattice|Iona|safeguard|wormhole|Wurmloch/i);
+    }
+});
+
+test('Rin accompanies the black-box mission and Mara handles decoding before open-world exploration',()=>{assert.match(ADVENTURE_DIALOGUES.cairn.nodes.company.text.en,/come with you/);assert.match(ADVENTURE_DIALOGUES.delivery.nodes.box.text.en,/decoding/);assert.match(ADVENTURE_DIALOGUES.delivery.nodes.rin.text.en,/gate is open/);});
 
 test('Rin leaves the Helix bar once the prologue has her jump ahead',async()=>{
     globalThis.document??={activeElement:null};
@@ -251,20 +286,20 @@ test('a skipped prologue is retold without the escort or the delivery run',async
     for(const script of [ADVENTURE_DIALOGUES.mara,ADVENTURE_DIALOGUES.rin]){
         const retold=collect(skipped,script);
         for(const line of prologueOnly) assert.ok(!retold.includes(line),line);
-        assert.match(retold,/Wayfarer/,'the retelling is still the family story');
+        assert.match(retold,/Wanderer/,'the retelling is still the family story');
     }
     assert.match(collect(skipped,ADVENTURE_DIALOGUES.mara),/contracts/,'and says what to do instead');
-    const lived=createNewSave(3111,{tutorial:true});assert.match(collect(lived,ADVENTURE_DIALOGUES.rin),/BUY MAX for Protein/);
+    const lived=createNewSave(3111,{tutorial:true});assert.match(collect(lived,ADVENTURE_DIALOGUES.rin),/Protein and BUY MAX/);
 });
 
-// A contact can offer a different set of barks in a career that never played
-// the prologue, but the slots must stay aligned: greeting, advice, local news.
-test('bar line variants keep one line per topic slot',async()=>{
+test('remaining bar contacts keep only their reachable greeting',async()=>{
     const {LOCATIONS}=await import('../../src/game/data.js');
     for(const [locationId,location] of Object.entries(LOCATIONS))
         for(const person of location.people??[])
-            if(person.linesNoPrologue)
-                assert.equal(person.linesNoPrologue.length,person.lines.length,`${locationId}/${person.id}`);
+            if(person.lines) {
+                assert.equal(person.lines.length,1,`${locationId}/${person.id}`);
+                assert.equal(person.linesNoPrologue,undefined);
+            }
 });
 
 // A second, contradictory telling of the prologue survived in the German
@@ -306,12 +341,9 @@ test('an aborted prologue offers the family story instead of repeating it',async
     const offered=ui.adventure.node.choices.map(choice=>choice.label);
     assert.equal(offered.length,2);
     assert.doesNotMatch(offered[1],/again/i,'a pilot who skipped the prologue never heard this');
-    assert.match(offered[1],/Wayfarer/);
+    assert.match(offered[1],/Wanderer/);
     assert.doesNotMatch(ui.dialogueResponse(rin,'greeting').text,/stay close|on your wing/i);
-    // The barks on the same screen must not offer the shared flight either.
-    assert.doesNotMatch(ui.dialogueResponse(rin,'advice').text,/firing line/i);
-    assert.doesNotMatch(ui.dialogueResponse(rin,'local').text,/delivery run/i);
-    assert.match(ui.dialogueResponse(rin,'local').text,/key/i);
+    assert.ok(!ui.dialogueTopics(rin).some(topic=>['advice','local'].includes(topic.id)));
     // A pilot who did live the prologue keeps the replay wording.
     save.quests.find(quest=>quest.id==='the-spare-key').flags.metMara=true;
     ui.adventure=undefined;

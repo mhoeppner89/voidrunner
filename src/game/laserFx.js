@@ -293,6 +293,35 @@ export class LaserFx {
         this.rockBurst(position, rockCenter, tuning.chipColor, tuning.chipCount, tuning.chipSpeedMin, tuning.chipSpeedMax, tuning.chipLife, tuning.chipSize, 0.95, tuning.chipDamping);
         this.rockBurst(position, rockCenter, tuning.dustColor, tuning.dustCount, tuning.dustSpeedMin, tuning.dustSpeedMax, tuning.dustLife, tuning.dustSize, 0.4, tuning.dustDamping);
     }
+    // A released cargo pod leaves a few solid, thick pieces of plating behind.
+    // One instanced draw call per release; the actual collectible stays still.
+    salvageRelease(position, direction, released = 1) {
+        if(!this.salvageGeometry){
+            this.salvageGeometry=new THREE.BoxGeometry(1,.16,.65);
+            this.salvageGeometry.userData.shared=true;
+        }
+        const material=this.materialFor('salvage-shards',()=>new THREE.MeshStandardMaterial({color:0x9ca8a9,metalness:.58,roughness:.76}));
+        const count=Math.min(9,5+released*2),mesh=new THREE.InstancedMesh(this.salvageGeometry,material,count);
+        mesh.name='salvage-release-fragments';mesh.position.set(...position);mesh.frustumCulled=false;
+        const length=Math.hypot(direction.x,direction.y,direction.z)||1;
+        const nx=-direction.x/length,ny=-direction.y/length,nz=-direction.z/length;
+        const pieces=Array.from({length:count},()=>{
+            let x=Math.random()*2-1,y=Math.random()*2-1,z=Math.random()*2-1;
+            if(x*nx+y*ny+z*nz<0){x=-x;y=-y;z=-z;}
+            const magnitude=Math.hypot(x,y,z)||1,speed=5+Math.random()*9;
+            return {x:0,y:0,z:0,vx:x/magnitude*speed+nx*2,vy:y/magnitude*speed+ny*2,vz:z/magnitude*speed+nz*2,
+                rx:Math.random()*6,ry:Math.random()*6,rz:Math.random()*6,
+                ax:(Math.random()-.5)*4,ay:(Math.random()-.5)*4,az:(Math.random()-.5)*4,
+                size:.7+Math.random()*1.2};
+        });
+        const transform=new THREE.Object3D();let age=0;const life=1.2;
+        const update=dt=>{age+=dt;const fade=Math.min(1,Math.max(0,(life-age)/.3));
+            for(let i=0;i<count;i++){const p=pieces[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;p.rx+=p.ax*dt;p.ry+=p.ay*dt;p.rz+=p.az*dt;
+                transform.position.set(p.x,p.y,p.z);transform.rotation.set(p.rx,p.ry,p.rz);transform.scale.setScalar(p.size*fade);transform.updateMatrix();mesh.setMatrixAt(i,transform.matrix);}
+            mesh.instanceMatrix.needsUpdate=true;
+        };
+        update(0);this.scene.add(mesh);this.effects.push({object:mesh,life,maxLife:life,update});
+    }
     rockBurst(position, rockCenter, colorHex, count, speedMin, speedMax, life, size, opacity, damping) {
         const geometry = new THREE.BufferGeometry();
         const positions = new Float32Array(count * 3);
@@ -384,6 +413,7 @@ export class LaserFx {
         this.effects.push({ object: points, points, velocities, life, maxLife: life });
     }
     dispose() {
+        this.salvageGeometry?.dispose();this.salvageGeometry=undefined;
         if (this.shared) {
             this.shared.coreGeometry.dispose();
             this.shared.glowGeometry.dispose();

@@ -35,7 +35,7 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1440,hei
    const drones={phase:'idle',bays:[],action:{ok:true,label:'Mine'}};
    u.updateWeaponButtons({kind:'asteroid'},'mining',drones);check(missile.dataset.touchAction==='miningDrones'&&!missile.disabled,'mine action');
    drones.phase='recalling';drones.action={ok:false,label:'Returning'};u.updateWeaponButtons({kind:'asteroid'},'mining',drones);check(missile.disabled&&missile.classList.contains('is-recalling'),'recall updates immediately');
-   u.updateWeaponButtons({kind:'wreck'},'salvage',drones);check(missile.dataset.touchAction==='utility'&&missile.classList.contains('is-salvage')&&!missile.disabled,'salvage action');
+   u.updateWeaponButtons({kind:'wreck'},'salvage',drones);check(missile.classList.contains('is-hidden')&&fire.dataset.touchAction==='fire'&&!fire.disabled,'wreck salvage uses fire');
    u.updateWeaponButtons({kind:'ship',surrendered:true,captureAvailable:false,captureClaimable:true},'combat',drones);check(missile.disabled,'distant capture disabled');
    u.updateWeaponButtons({kind:'ship',surrendered:true,captureAvailable:true,captureClaimable:true},'combat',drones);check(!missile.disabled&&missile.dataset.touchAction==='capture','capture ready');
    model.launcher={name:'Test launcher',shortCode:'M',displayCode:'M2',current:2,capacity:4,index:0,count:2};u.lastHud=model;

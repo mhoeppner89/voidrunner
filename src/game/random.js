@@ -39,6 +39,34 @@ const CALLSIGNS = [
 ];
 export const proceduralPersonName = (rng) => `${pick(rng, GIVEN_NAMES)} ${pick(rng, SURNAMES)}`;
 export const proceduralCallsign = (rng) => `${proceduralPersonName(rng)} “${pick(rng, CALLSIGNS)}”`;
+// A vessel's name belongs to its crew and is independent of its model and
+// pilot callsign. Each name is short enough for the flight monitors.
+const VESSEL_NAMES = Object.freeze({
+    independents: Object.freeze([
+        'Long Wake', 'Quiet Harbor', 'Open Ledger', 'Near Promise', 'Dustward', 'Rising Tide',
+        'Second Wind', 'Far Lantern', 'Borrowed Dawn', 'Last Passage', 'Patient Star', 'Homeward',
+        'Lone Pilgrim', 'Sable Wake', 'Blue Horizon', 'Even Keel', 'Winter’s Due', 'Wide Mercy',
+        'Old Fortune', 'Gentle Risk', 'Silent Orbit', 'Long Crossing', 'Copper Rose', 'Northbound',
+        'Distant Shore', 'Silver Thread', 'Last Anchor', 'Faint Signal', 'Hollow Crown', 'Small Fortune',
+    ]),
+    concord: Object.freeze([
+        'North Star', 'Sure Horizon', 'Iron Measure', 'Clear Vow', 'Last Bastion', 'Resolute',
+        'First Light', 'Patient Shield', 'Far Accord', 'Open Vigil', 'Steadfast', 'Distant Bell',
+        'Constant Star', 'True Bearing', 'Dawn Guard', 'High Oath', 'North Watch', 'Long Vigil',
+        'Bright Helm', 'Stone and Sky', 'Stalwart', 'Patient Watch', 'First Watch', 'Last Witness',
+    ]),
+    alliance: Object.freeze([
+        'Free Meridian', 'Far Horizon', 'Sable Vow', 'Quiet Resolve', 'Open Sky', 'Boundless',
+        'Honest Reach', 'Way North', 'Distant Sun', 'First Horizon', 'Wild Promise', 'Winter Tide',
+        'True Bearing', 'Bright Passage', 'Dawnward', 'Free Harbor', 'Narrow Sea', 'Still North',
+        'Far Beacon', 'Open Hand', 'Evening Star', 'North Passage', 'Iron Dawn', 'Silver Tide',
+    ]),
+});
+export function proceduralVesselName(rng, faction, role) {
+    const bank = VESSEL_NAMES[faction] ?? VESSEL_NAMES.independents;
+    const prefix = faction === 'concord' ? 'CPV' : faction === 'alliance' ? 'ALV' : role === 'bounty' ? 'BH' : 'MV';
+    return `${prefix} ${pick(rng, bank)}`;
+}
 // Locale-aware grouping: the German UI reads "3.200 cr", English "3,200 cr".
 // Non-finite values (corrupted save, upstream NaN) render as 0 instead of
 // "NaN cr"; negatives clamp to 0 so a bookkeeping bug can't show phantom debt.

@@ -84,7 +84,7 @@ test('hidden Paul chatter is spaced, one-off, and the post-patrol briefing opens
  const shown=[];s.ui.showStoryLine=(...args)=>shown.push(args);s.hostilesVisibleNear=()=>true;s.playTutorialBriefing=GameSession.prototype.playTutorialBriefing;const start=save.world.time;
  assert.equal(s.tutorialMusicContext(),'stealth');
  for(const elapsed of [0,1,6,7,8,13,14,15,19]){save.world.time=start+elapsed;s.updateTutorialCampaignRuntime();}
- const chatter=lines.filter(l=>l[0]==='Paul');assert.equal(chatter.length,3);assert.match(chatter[1][1],/every berth was full/);assert.match(chatter[2][1],/Thanks/);
+ const chatter=lines.filter(l=>l[0]==='Paul');assert.equal(chatter.length,3);assert.match(chatter[1][1],/hangar/);assert.match(chatter[2][1],/Thanks/);
  save.world.time=start+21;s.updateTutorialCampaignRuntime();assert.equal(quest.stepId,'return-helix');assert.equal(s.tutorialMusicContext(),undefined);assert.equal(shown.at(-1)[3],'tutorial-paul-clear');assert.ok(quest.flags['briefingShown-paul-clear']);
  const count=shown.length;s.updateTutorialCampaignRuntime();assert.equal(shown.length,count);
 });

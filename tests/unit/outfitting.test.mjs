@@ -1,3 +1,4 @@
+import {SHIPS} from '../../src/game/data.js';
 import assert from 'node:assert/strict';
 import {
     HULL_HARDPOINTS,
@@ -306,7 +307,7 @@ assert.ok(
 );
 assert.deepEqual(hydrated.player.ownedShips, ['wayfarer'], 'fleet-era careers retain only their active hull');
 assert.equal(hydrated.player.outfitting.loadouts.talon, undefined, 'discarded hull loadout is removed');
-assert.equal(hydrated.player.credits, 70000, 'discarded Talon is compensated at half base value');
+assert.equal(hydrated.player.credits, 50000 + SHIPS.talon.price * .5, 'discarded Talon is compensated at half base value');
 assert.ok(hydrated.player.equipment.includes('pdc-cluster'), 'legacy PDC spelling remains in the compatibility projection');
 assert.ok(hydrated.player.equipment.includes('engine-mk2'), 'legacy utility gear remains in the compatibility projection');
 
@@ -544,7 +545,7 @@ const malformedV9Fleet = hydrateSave({
     world: { seed: 90 },
 });
 assert.deepEqual(malformedV9Fleet.player.ownedShips, ['wayfarer']);
-assert.equal(malformedV9Fleet.player.credits, 70000, 'malformed v9 fleet receives the same half-value buyback');
+assert.equal(malformedV9Fleet.player.credits, 50000 + SHIPS.talon.price * .5, 'malformed v9 fleet receives the same half-value buyback');
 
 const nullDurability = hydrateSave({
     version: 8,
@@ -559,7 +560,7 @@ const badVersion = hydrateSave({
     world: { seed: 92 },
 });
 assert.equal(badVersion.player.hull, 185);
-assert.equal(badVersion.player.credits, 70000);
+assert.equal(badVersion.player.credits, 50000 + SHIPS.talon.price * .5);
 assert.deepEqual(badVersion.player.ownedShips, ['wayfarer']);
 
 const freshFromNull = hydrateSave(null);

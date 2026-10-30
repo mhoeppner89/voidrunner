@@ -2,10 +2,10 @@ import {PDC_TURRET} from './turrets.js';
 import {TRACKING_LASER,weaponForOutfit,launcherForOutfit} from './weapons.js';
 import {modifiedWeapon,equipmentName,EQUIPMENT_RARITIES,resolveEquipmentDefinition,registerEquipmentDefinition} from './equipmentCatalog.js';
 import {OUTFIT_ITEMS,BASE_OUTFIT_ITEMS,itemAvailable} from './outfitting.js';
-import {inventoryMounts,mountItemId,normalizeEquipmentInventory,shopEquipmentTiers,equipmentFitsMount,equipmentInstallMount,equipmentSaleEligibility,equipmentSaleValue} from './equipmentInventory.js';
+import {inventoryMounts,mountItemId,normalizeEquipmentInventory,shopEquipmentTiers,specialEquipmentOffers,equipmentFitsMount,equipmentInstallMount,equipmentSaleEligibility,equipmentSaleValue} from './equipmentInventory.js';
 import {getEffectiveShipStats} from './shipStats.js';
 import {cargoMass} from './economy.js';
-import {COMMODITIES,LOCATIONS} from './data.js';
+import {COMMODITIES,LOCATIONS,SHIPS} from './data.js';
 import {t} from './i18n.js';
 import {DRONE_TYPES} from './droneData.js';
 import {equipmentIcon,commodityIcon} from './itemIcons.js';
@@ -38,6 +38,10 @@ export function renderEquipmentInventory(ui,{embedded=false}={}){
   const id=`shop-${base.id}-${tier}`,definition=resolveEquipmentDefinition(base,{id,baseId:base.id,tier,rarity:'common',affixes:[]});
   registerEquipmentDefinition(id,definition);shop.push({id,baseId:base.id,tier,shop:true});
  }
+ if(docked)for(const offer of specialEquipmentOffers(player,player.dockedAt,ui.save.world)){
+  const id=`shop-special-${offer.offerId}`,base=BASE_OUTFIT_ITEMS[offer.baseId];
+  registerEquipmentDefinition(id,resolveEquipmentDefinition(base,{id,...offer}));shop.push({id,...offer,shop:true});
+ }
  if(view==='remote')selectedMount=undefined;
  const compatible=item=>!selectedMount||equipmentFitsMount(item,selectedMount);
  const candidates=view==='shop'?shop:owned.filter(i=>view==='cargo'?i.location.kind==='cargo':view==='storage'?i.location.kind==='station'&&i.location.stationId===player.dockedAt:view==='remote'?i.location.kind==='station'&&i.location.stationId!==player.dockedAt:false);
@@ -54,7 +58,7 @@ export function renderEquipmentInventory(ui,{embedded=false}={}){
  const cargoSummary=view==='cargo'?Object.entries(player.cargo??{}).filter(([id,n])=>COMMODITIES[id]&&n>0).map(([id,n])=>`<div class="inventory-commodity ${COMMODITIES[id].legal?'':'is-illegal'}">${commodityIcon(id)}<b>${number(n)}× ${html(t(COMMODITIES[id].name))}</b><small>${number(n*COMMODITIES[id].mass)} ${t('MASS')}</small>${docked?'':`<button type="button" data-jettison="${html(id)}">${t('JETTISON')}</button>`}</div>`).join('')+(player.sealedCargo??[]).map(c=>`<div class="inventory-commodity"><b>${html(c.label)} · ${number(c.units)}</b><small>${t('MISSION CARGO')}</small></div>`).join(''):'';
  let demand=0,salvo=0;
  for(const id of [...fit.guns,...fit.launchers,...fit.turrets].filter(Boolean)){const w=flight(OUTFIT_ITEMS[id]);if(w){const interval=w.burstSize?((w.shotInterval??w.cooldown)*w.burstSize+(w.burstPause??0))/w.burstSize:w.cooldown;if(interval>0)demand+=(w.energyCost??0)/interval;salvo+=w.energyCost??0;}}
- const budgetMarkup=`<dl class="inventory-readouts"><div><dt>${t('Energy capacity')}</dt><dd>${number(stats.energyCapacity)}</dd></div><div><dt>${t('Energy regeneration')}</dt><dd>${number(stats.reactorOutput)}/s</dd></div><div class="${demand>stats.reactorOutput?'power-demand-high':''}"><dt>${t('Weapon draw')}</dt><dd>${number(demand)}/s</dd></div><div><dt>${t('Cargo')}</dt><dd>${number(cargoMass(player))}/${number(stats.cargo)}</dd></div></dl>`;
+ const budgetMarkup=`<dl class="inventory-readouts"><div><dt>${t('Energy capacity')}</dt><dd>${number(stats.energyCapacity)}</dd></div><div><dt>${t('Energy regeneration')}</dt><dd>${number(stats.reactorOutput)}/s</dd></div>${stats.overTierLoad>0?`<div class="power-demand-high"><dt>${t('Higher-tier load')}</dt><dd>−${number(stats.overTierLoad)}/s</dd></div>`:''}<div class="${demand>stats.reactorOutput?'power-demand-high':''}"><dt>${t('Weapon draw')}</dt><dd>${number(demand)}/s</dd></div><div><dt>${t('Cargo')}</dt><dd>${number(cargoMass(player))}/${number(stats.cargo)}</dd></div></dl>`;
  let panel='';
  if(item){
   const w=flight(item),before=flight(old),rare=EQUIPMENT_RARITIES[quality(item)];
@@ -74,9 +78,11 @@ export function renderEquipmentInventory(ui,{embedded=false}={}){
     values+=`<div class="inventory-stat" data-stat="${row.key}"><span>${html(t(row.label))}</span><b>${item.id===old?.id?'':`<small>${number(row.before)} → </small>`}${number(row.after)}${row.unit?`<small class="stat-unit">${row.unit}</small>`:''}</b></div>`;
    }
   }else values=equipmentEffectStats(item).map(row=>`<div class="inventory-stat" data-stat="${row.key}"><span>${html(t(row.label))}</span><b>${row.value>0?'+':''}${number(row.value)}${row.unit}</b></div>`).join('')||`<p class="inventory-hint">${html(t('Select a mount.'))}</p>`;
+  const levels=Math.max(0,(item.tier??1)-(SHIPS[player.shipId]?.tier??1));
+  if(levels)values+=`<p class="inventory-hint">${html(t('Higher-tier equipment can reduce regeneration by up to {amount}/s on this hull.',{amount:number((SHIPS[player.shipId]?.reactorOutput??0)*.06*levels)}))}</p>`;
   let actions='';
   if(record.loot)actions=`<p class="inventory-hint">${t('Fly over dropped loot to collect it.')}</p>`;
-  else if(record.shop)actions=button('buy','BUY',`data-base-id="${html(record.baseId)}" data-tier="${record.tier}"`,player.credits<item.price);
+  else if(record.shop)actions=button('buy','BUY',`data-base-id="${html(record.baseId)}" data-tier="${record.tier}" ${record.offerId?`data-offer-id="${html(record.offerId)}"`: ''}`,player.credits<item.price);
   else if(docked||item.category==='drone'){
    const pendingDrone=item.category==='drone'&&selectedMount&&fit.droneBays[selectedMount.index]?.pendingInventoryDrone;
    if(record.location.kind==='installed')actions=button('remove','Remove',`data-item-id="${html(record.id)}"`,Boolean(pendingDrone));
@@ -126,7 +132,7 @@ export function bindEquipmentInventory(ui){
   if(action==='tab'){ui.inventoryTab=b.dataset.tab;ui.inventoryItemId=undefined;redraw();return;}
   if(action==='close-detail'){ui.inventoryItemId=undefined;redraw();return;}
   if(action==='clear-mount'){ui.inventoryMountId=undefined;ui.inventoryItemId=undefined;redraw();return;}
-  const result=ui.actions.inventoryCommand(action,{id:b.dataset.itemId,baseId:b.dataset.baseId,tier:b.dataset.tier,mountId:b.dataset.mountId,wreckId:b.dataset.wreckId,group:b.dataset.group});
+  const result=ui.actions.inventoryCommand(action,{id:b.dataset.itemId,baseId:b.dataset.baseId,tier:b.dataset.tier,offerId:b.dataset.offerId,mountId:b.dataset.mountId,wreckId:b.dataset.wreckId,group:b.dataset.group});
   // Success is already visible in the updated cards. Keep only failures as text.
   ui.inventoryNotice=result?.ok?undefined:result?.code==='cargo-full'?'Cargo hold is full.':result?.code;
   if(result?.ok&&result.id)ui.inventoryItemId=result.id;

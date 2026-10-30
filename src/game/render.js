@@ -32,6 +32,7 @@ import * as THREE from 'three';
 import { createRingVolume } from './ringVolume.js';
 import { createRingParticles } from './ringParticles.js';
 import {createBlackHole} from './blackHole.js';
+import {createJumpGateStructure} from './jumpGate.js';
 import { LOCATIONS, SUN_POSITION, sunPositionForSystem } from './data.js';
 import { createVoxelShipModel, createVoxelStationModel, paletteForFaction, shipVariantForRole } from './voxelModels.js';
 import { clamp, seededRandom } from './random.js';
@@ -1563,14 +1564,6 @@ export class SpaceRenderer {
         landmark.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), gateNormal.normalize());
         landmark.userData.activationRadius = 1000;
         const radius = location.radius;
-        const frameMaterial = new THREE.MeshStandardMaterial({
-            color: secondary.clone().lerp(new THREE.Color(0x66717a), 0.18),
-            roughness: 0.62,
-            metalness: 0.78,
-            emissive: secondary,
-            emissiveIntensity: 0.16,
-            fog: false,
-        });
         const energizedMaterial = new THREE.MeshBasicMaterial({
             color: accent,
             transparent: true,
@@ -1579,33 +1572,16 @@ export class SpaceRenderer {
             depthWrite: false,
             fog: false,
         });
-        const outerRing = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.72, radius * 0.065, 10, 72), frameMaterial);
-        landmark.add(outerRing);
+        landmark.add(createJumpGateStructure(radius, accent));
         const innerRing = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.535, radius * 0.018, 8, 72), energizedMaterial);
         landmark.add(innerRing);
-
-        // A heavy segmented frame and radial braces make the point read as a
-        // built piece of infrastructure, even before the bright aperture does.
-        const pylonGeometry = new THREE.BoxGeometry(radius * 0.18, radius * 0.31, radius * 0.095);
-        const braceGeometry = new THREE.BoxGeometry(radius * 0.19, radius * 0.026, radius * 0.038);
-        for (let index = 0; index < 12; index += 1) {
-            const angle = index / 12 * Math.PI * 2;
-            const pylon = new THREE.Mesh(pylonGeometry, index % 3 === 0 ? energizedMaterial : frameMaterial);
-            pylon.position.set(Math.cos(angle) * radius * 0.72, Math.sin(angle) * radius * 0.72, 0);
-            pylon.rotation.z = angle;
-            landmark.add(pylon);
-            const brace = new THREE.Mesh(braceGeometry, frameMaterial);
-            brace.position.set(Math.cos(angle) * radius * 0.625, Math.sin(angle) * radius * 0.625, 0);
-            brace.rotation.z = angle;
-            landmark.add(brace);
-        }
 
         const portal = new THREE.Mesh(
             new THREE.CircleGeometry(radius * 0.515, 64),
             new THREE.MeshBasicMaterial({
                 color: accent,
                 transparent: true,
-                opacity: 0.13,
+                opacity: 0.027,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
                 side: THREE.DoubleSide,
@@ -1618,7 +1594,7 @@ export class SpaceRenderer {
             map: this.radialTexture('#ffffff', cssHex(accent.getHex())),
             color: accent,
             transparent: true,
-            opacity: 0.44,
+            opacity: 0.12,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             fog: false,
@@ -1633,8 +1609,8 @@ export class SpaceRenderer {
         for (let index = 0; index < 6; index += 1) {
             const angle = index / 6 * Math.PI * 2;
             const charge = new THREE.Mesh(chargeGeometry, energizedMaterial);
-            charge.position.set(Math.cos(angle) * radius * 0.46, Math.sin(angle) * radius * 0.46, radius * 0.035);
-            charge.rotation.z = angle;
+            charge.position.set(Math.cos(angle) * radius * 0.54, Math.sin(angle) * radius * 0.54, radius * 0.035);
+            charge.rotation.z = angle + Math.PI / 2;
             spinner.add(charge);
         }
         landmark.add(spinner);
@@ -5527,6 +5503,10 @@ export class SpaceRenderer {
         this.laserFx ??= new LaserFx(this.scene, this.effects);
         this.laserFx.rockImpact(position, rockCenter);
     }
+    spawnSalvageRelease(position, direction, released) {
+        this.laserFx ??= new LaserFx(this.scene, this.effects);
+        this.laserFx.salvageRelease(position,direction,released);
+    }
     showDisabledCapitalMount(id,position,rotation,actor,index) {
         this.showTurret(id,position,(this.tmpDisabledDirection??=new THREE.Vector3()).set(0,1,0).applyQuaternion(rotation),index<4?'M':'S',index<4?'laser':'pdc',rotation,index===0||index===1||index>5?-1:1,0,index<4?112.9/18:112.9/22,index<4?0:1,actor);
         // Keep the wrecked armored pedestal and yaw housing attached; damage
@@ -5898,8 +5878,7 @@ export class SpaceRenderer {
             const armed = visual.id === this.armedJumpPointId;
             const radius = LOCATIONS[visual.id]?.radius ?? 460;
             visual.spinner.rotation.z += dt * (armed ? 1.75 : 0.24);
-            visual.spinner.rotation.x = Math.sin(this.skyTime * 0.38 + visual.phase) * 0.08;
-            visual.innerRing.rotation.y = Math.sin(this.skyTime * 0.31 + visual.phase) * 0.12;
+            // Rotation stays in the gate plane, keeping the crossing clear.
             // Keep the throat visibly open. Arming energizes its edge and
             // charge blocks, but never turns the fly-through hole into a blue wall.
             visual.portal.material.opacity = (armed ? 0.055 : 0.018) + pulse * (armed ? 0.045 : 0.018);

@@ -9,7 +9,8 @@ import {planRaceTactics} from './raceTactics.js';
 import {createRaceDrive,stepRaceDrive,collectRaceStabilizer,sweptBoostHit,raceDistance,raceDraft,RACE_BOOST_SECONDS} from './raceDynamics.js';
 import {createRepairDroneState,prepareRepairDrone,applyDroneRepair} from './repairDrones.js';
 import {equipCareerItems,equipCapitalLoot,makeCareerWreck,combatWreckNode,recoverWreckEntry,lootInReach,lootCollectionEnabled,updateCombatLoot} from './careerLoot.js';
-import {equipmentAction,normalizeEquipmentInventory,refreshInventoryProjection,receiveEquipment,rollEquipmentRecord,inventoryMounts} from './equipmentInventory.js';
+import {equipmentAction,normalizeEquipmentInventory,refreshInventoryProjection,rollEquipmentRecord,inventoryMounts} from './equipmentInventory.js';
+import {highestLootRarity} from './lootVisuals.js';
 import {equipmentBaseId,forgetEquipmentDefinition} from './equipmentCatalog.js';
 import {FLEET_PAINTS} from './fleetPaintCatalog.js';
 import {normalizePaintDesign,samePaint} from './paintDesign.js';
@@ -49,14 +50,14 @@ import { combatProfile, interceptTime } from './combatTactics.js';
 import * as THREE from 'three';
 import { AudioManager } from './audio.js';
 import { FrameBudget, flightFrameRate } from './frameBudget.js';
-import { COMMODITIES, DEFAULT_NAV_LOCATION_BY_SYSTEM, DOCK_LOCATION_IDS, EQUIPMENT, GUILD_RANK_NAMES, LOCATIONS, MARKET_LOCATION_IDS, SHIPS, activityLocationIdsForSystem, displaySpeed, dockLocationIdsForSystem, hyperdriveArrivalRadius, locationInstanceRadius, navLocationIdsForSystem, sectorEncounterChance, spawnClearance } from './data.js';
+import { COMMODITIES, CONCORD_CAPITAL_CLASSES, DEFAULT_NAV_LOCATION_BY_SYSTEM, DOCK_LOCATION_IDS, EQUIPMENT, GUILD_RANK_NAMES, LOCATIONS, MARKET_LOCATION_IDS, SHIPS, activityLocationIdsForSystem, displaySpeed, dockLocationIdsForSystem, hyperdriveArrivalRadius, locationInstanceRadius, navLocationIdsForSystem, sectorEncounterChance, spawnClearance } from './data.js';
 import { SYSTEMS, getRoute, hasSystem, jumpPiracyRisk, planRoute } from './galaxy.js';
 import {careerRegion,encounterDelay,careerGroupSize,careerPilotTier,careerCombatHull,portPoliceStrength} from './careerDanger.js';
 import { buyCommodity, cargoCapacity, cargoFree, cargoMass, denPrice, recordMarketVisit, refreshAllPrices, sellCommodity, SYNDICATE_DEN_FAVOR, tickEconomy } from './economy.js';
 import { InputManager } from './input.js';
 import { acceptMission, awardCareerProgress, completeBountyMission, completeMissionsAtDock, discardMission as discardActiveMission, failExpiredMissions, failMission, joinGuild, missionTitle, refreshMissionOffers, VALUABLE_CARGO_LABELS, } from './missions.js';
 import { RACE_QUEST_ID, createRaceRacers, crossedRaceGate, generateRaceCourse, normalizeRaceRecord, raceCourseUnlocked, racePayout, raceRankLabel, raceRacerTarget, recordRaceResult, stageRaceRacers, updateRaceRacer, advanceRaceRacerGates } from './racing.js';
-import { clamp, damp, formatCredits, pick, proceduralCallsign, randomBetween, randomInt, seededRandom } from './random.js';
+import { clamp, damp, formatCredits, pick, proceduralCallsign, proceduralVesselName, randomBetween, randomInt, seededRandom } from './random.js';
 import { EntityStore } from './entityStore.js';
 import { NPC_FIGHTER_SCALE, SpaceRenderer, npcShipScaleForVariant } from './render.js';
 import { saveGame } from './save.js';
@@ -152,7 +153,7 @@ const OBSERVER_MAPS = Object.freeze([
 // Use shipping hull identities and stock fittings, including every capital model.
 const OBSERVER_SHIP_TYPES = Object.freeze([
     ...PLAYER_FLYABLE_HULLS.map(id => Object.freeze({ id, label: SHIPS[id].name.toUpperCase(), role: observerRoleFor(id), hullId: id, defaultFit: 'varied' })),
-    ...['frigate', 'cruiser', 'battleship', 'carrier'].map(id => Object.freeze({ id, label: `CONCORD ${id.toUpperCase()}`, role: 'patrol', capitalVariant: `concord-${id}` })),
+    ...Object.entries(CONCORD_CAPITAL_CLASSES).map(([id, name]) => Object.freeze({ id, label: `${name.toUpperCase()} · ${id.toUpperCase()}`, role: 'patrol', capitalVariant: `concord-${id}` })),
 ]);
 const OBSERVER_FITS = Object.freeze(['varied', 'balanced', 'assault', 'support', 'beam']);
 const OBSERVER_AIM_ERROR_MIN = 1;
@@ -436,25 +437,16 @@ const PATROL_REFUSAL_REP = -3;
 // sweep.
 const PATROL_SEARCH_SPEED_MUL = 0.85;
 const PATROL_SEARCH_LINES = {
-    catch: [
-        t('Dark transponder logged. Hold position — Concord has you on file.'),
-        t('Unlicensed squawk detected. You have been flagged, pilot.'),
-        t('Running dark is logged, not ignored. Concord sees you.'),
-    ],
-    giveup: [
-        t('Contact lost. Logging the sector and resuming patrol.'),
-        t('Nothing here but noise. Resuming patrol route.'),
-    ],
     firm: [
-        t('Contact confirmed. Carry on — and mind the cordon.'),
-        t('Identity logged. Fly clean and we are done here.'),
+        t('Contact reacquired. Staying with you.'),
+        t('Contact reacquired. Continuing the check.'),
     ],
     // Spoken the moment the patrol loses a contact it had resolved and opens
     // the sweep — the player hears that they were just shaken, not silently
     // flagged and forgotten.
     lost: [
         t('Signal dropped. Sweeping the last-known position.'),
-        t('Contact lost. Fanning out — there is no cover out here.'),
+        t('Contact lost. Fan out and keep searching.'),
         t('Lost the signature. Sweeping the sector.'),
     ],
 };
@@ -515,11 +507,11 @@ const PATROL_ARREST_LINES = {
         t('{smuggler}, this is Concord patrol. Cut your engines and hold for inspection.'),
         t('{smuggler}, you are running dark. Stop and stand by for a scan.'),
         t('Dark transponder, {smuggler}. Hold course or I will light you up.'),
-        t('Concord patrol to {smuggler}: shut down and prepare to be boarded.'),
+        t('Concord patrol to {smuggler}: shut down and prepare for inspection.'),
     ],
     giveup: [
         t('Lost the signal. Back on the lane.'),
-        t('Nothing flagged aboard. Moving on.'),
+        t('No sign of them. Resuming patrol.'),
         t('Slipped away in the dark. Resuming patrol.'),
     ],
 };
@@ -540,7 +532,7 @@ const SMUGGLE_BUST_PER_UNIT = 60;
 const SMUGGLE_BUST_REP = -8;
 const PATROL_BUST_LINES = [
     t('Sealed cargo logged. You are flagged, pilot — the cordon will not forget this.'),
-    t('Cut engines. That hold is the syndicate\'s, and the fine is yours.'),
+    t('Cut engines. The syndicate cargo is seized, and the fine is yours.'),
     t('Running dark with a sealed manifest. Consider this your one warning — logged and fined.'),
 ];
 // How long "seen working" sticks after the player runs the beam: long enough
@@ -3131,7 +3123,7 @@ export class GameSession {
             const asteroid = target?.kind === 'asteroid'
                 || this.asteroids?.some(node => node.id === this.save.player.currentTargetId);
             const ship = target?.kind === 'ship' ? this.ships.find((entry) => entry.id === target.id) : undefined;
-            if (asteroid || this.save.player.mode === 'mining') {
+            if (target?.kind !== 'ship' && (asteroid || this.save.player.mode === 'mining')) {
                 if (missileEdge) this.toggleMiningDrones();
             }
             else if (ship?.surrendered && !ship.claimed && !ship.captured && (ship.bountyValue > 0 || ship.missionId))
@@ -4351,7 +4343,7 @@ export class GameSession {
             this.renderer.setUtilityBeam(false, 'combat', this.save.player.position);
             return;
         }
-        this.updateUtilityTool(dt, actions.utility);
+        this.updateUtilityTool();
     }
     ensureRuntimeFireGroups() {
         const player = this.save.player;
@@ -4617,7 +4609,8 @@ export class GameSession {
     }
     fireBeam(ownerId, weapon, start, direction, beamId) {
         const end=start.clone().addScaledVector(direction,weapon.range);
-        let nearest=this.firstObstacleHit(start,end,ownerId) ?? 1;
+        const obstacleHit=this.firstObstacleHitInfo(start,end,ownerId);
+        let nearest=obstacleHit?.t ?? 1;
         let victim,droneVictim;
         if(ownerId!=='player') {
             const player=this.save.player;
@@ -4647,6 +4640,8 @@ export class GameSession {
             const impact = this.renderer.weaponImpact(impactActor, victim === 'player' ? this.playerHullExtents() : this.npcHullExtents(victim), end, start, weapon, color);
             if (impact?.isVector3) end.copy(impact);
         } else if (victim || droneVictim || nearest < 1) this.renderer.spawnImpact(hullHit, color, false);
+        if(ownerId==='player'&&!victim&&!droneVictim&&obstacleHit?.obstacle?.shape==='wreck-node-mesh')
+            this.hitSalvageWreck(obstacleHit.obstacle.id,weapon.damageFlat,hullHit,direction);
         if(droneVictim){if(droneVictim.ownerId)damageNpcDrone(this,droneVictim,weapon.damageFlat);else this.damagePdcDrone(droneVictim.id,weapon.damageFlat,'beam fire');}
         else if(victim==='player')this.damagePlayer(weapon.damageFlat,weapon.kind==='pdc'?'weapons fire':'beam fire',false,weapon,hullHit,start);
         else if(victim)this.damageShip(victim,weapon.damageFlat,ownerId,hullHit,weapon,start);
@@ -4869,6 +4864,11 @@ export class GameSession {
     }
     fireMountedMissiles() {
         const player = this.save.player;
+        const target = this.getTargetRef();
+        const ship = target?.kind === 'ship' ? this.ships.find((entry) => entry.id === target.id && entry.hull > 0) : undefined;
+        // A restored or automatically acquired ship lock can predate the mode
+        // change. Honour the actual lock instead of blocking its launcher.
+        if (ship) player.mode = 'combat';
         if (player.mode !== 'combat') {
             this.setMonitorStatus(t('MISSILES: COMBAT MODE ONLY'));
             return;
@@ -4878,13 +4878,11 @@ export class GameSession {
             this.setMonitorStatus(t('NO MISSILE RACK INSTALLED'));
             return;
         }
-        const target = this.getTargetRef();
         if (!target || target.kind !== 'ship') {
             this.setMonitorStatus(t('NO SHIP TARGET LOCKED'));
             return;
         }
-        const ship = this.ships.find((entry) => entry.id === target.id);
-        if (!ship || ship.hull <= 0)
+        if (!ship)
             return;
         const selectedIndex = Math.max(0, magazines.findIndex(entry => entry.selected));
         const mode = player.launcherFireMode;
@@ -5723,96 +5721,60 @@ export class GameSession {
     setDronePdcPolicy(policy) {
         return this.dronePdcPolicy(policy);
     }
-    updateUtilityTool(dt, active) {
+    updateUtilityTool() {
         if (this.save.player.mode === 'mining') {
             this.renderer.setUtilityBeam(false, 'mining', this.save.player.position);
             if (!this.miningDroneSystem || (this.save.player.droneFleet?.controller?.phase ?? 'idle') === 'idle')
                 this.utilityReadout = this.miningDroneActionState().label;
             return;
         }
-        const target = this.getTargetRef();
-        const stats = this.playerStats();
-        const playerPosition = vec(this.save.player.position, this.tmpShipPlayer);
-        const mode = this.save.player.mode;
-        const range = mode === 'mining' ? stats.miningRange : stats.salvageRange;
-        if (!active || !target || (mode === 'mining' && target.kind !== 'asteroid') || (mode === 'salvage' && target.kind !== 'wreck')) {
-            this.renderer.setUtilityBeam(false, mode, this.save.player.position);
-            return;
-        }
-        if(target.kind==='wreck' && this.wreckNodes.find(node=>node.id===target.id)?.combatLoot){
-            this.renderer.setUtilityBeam(false,mode,this.save.player.position);
-            this.utilityReadout=t('FLY OVER TO COLLECT');
-            return;
-        }
-        const distance = this.surfaceDistance(playerPosition, target);
-        if (distance > range) {
-            this.renderer.setUtilityBeam(false, mode, this.save.player.position);
-            this.utilityReadout = t('OUT OF RANGE · {current}/{max} km', { current: Math.round(distance), max: Math.round(range) });
-            return;
-        }
-        if (this.lineBlocked(playerPosition, this.tmpShipPos.set(target.position[0], target.position[1], target.position[2]), target.id)) {
-            this.renderer.setUtilityBeam(false, mode, this.save.player.position);
-            this.utilityReadout = t('BEAM OBSTRUCTED');
-            return;
-        }
-        {
-            const node = this.wreckNodes.find((entry) => entry.id === target.id);
-            if (!node || node.remaining <= 0)
-                return;
-            if (!node.scanned) {
-                this.requireScanHint();
-                return;
-            }
-            this.utilityActive = true;
-            this.playerEmissionHeat = Math.max(this.playerEmissionHeat, 180);
-            this.renderer.setUtilityBeam(true, mode, this.save.player.position, node.position);
-            this.extractWreck(node, dt, stats.salvageRate);
-            if (this.utilitySoundCooldown <= 0) {
-                this.utilitySoundCooldown = 0.18;
-                this.audio.play('salvage', 0.32);
-            }
-            this.triggerSalvageAmbush(node);
-        }
-    }
-    requireScanHint() {
-        // An unscanned deposit already reads SCANNING… / OUT OF RANGE on
-        // the target monitor, so there is nothing extra to pop up here.
+        // Salvage is released by weapon impacts, not a beaming tool.
         this.renderer.setUtilityBeam(false, this.save.player.mode, this.save.player.position);
     }
     // Mining is owned exclusively by the drone transaction system.
     extractAsteroid() { return false; }
-    extractWreck(node, dt, rate) {
-        if(node.combatLoot)return; // Dropped loot uses contact or a fitted collector.
-        this.lastExtractionAt = this.save.world.time;
-        this.seenWorkingUntil = this.save.world.time + SEEN_WORKING_SECONDS;
-        if (cargoFree(this.save.player) < COMMODITIES[node.salvage].mass + 0.001) {
-            this.utilityReadout = t('CARGO FULL');
+    hitSalvageWreck(nodeId, damage, hit, direction) {
+        const node=this.wreckNodes.find(entry=>entry.id===nodeId && !entry.combatLoot && entry.remaining>0);
+        if(!node || this.activeInstanceId!=='mourning-line' || !(damage>0))return;
+        if(!node.scanned){
+            if(this.save.player.currentTargetId===node.id)this.setMonitorStatus(t('Scan this wreck first.'));
             return;
         }
-        const current = this.extractionCarry.get(node.id) ?? 0;
-        let next = current + dt * 0.48 * rate;
-        while (next >= 1 && node.remaining > 0) {
-            next -= 1;
-            node.remaining = Math.max(0, node.remaining - 1);
-            this.save.world.depletedWrecks[node.id] = node.remaining;
-            // Recovered components go straight to the hold — no pickup to chase.
-            // The monitor's remaining-recoveries count ticks down, so no per-unit toast.
-            this.collectExtraction(node.salvage, 'salvage', 1);
-            this.recordClaimSalvage(node.id, 1);
-            this.handleTutorialEvent('extracted', { nodeId: node.id, commodityId: node.salvage, amount: 1, source: 'salvage', instanceId: this.activeInstanceId });
-            if (node.remaining <= 0) {
-                if (node.salvage === 'electronics' || node.salvage === 'arms')
-                    this.recoverWreckEquipment(node);
-                if (this.save.player.currentTargetId === node.id) {
-                    this.setMonitorStatus(t('WRECK STRIPPED'));
-                    this.clearTarget();
-                }
-                this.obstacleGridBuiltAt = -Infinity;
-                break;
-            }
-            if (this.ui.isModalOpen || this.save.player.currentTargetId !== node.id) break;
+        const quest=getTutorialQuest(this.save);
+        const recorder=quest?.stepId==='salvage-black-box' && quest.flags.blackBoxTargetId===node.id && !quest.flags.blackBoxDropId;
+        let accumulated=(this.extractionCarry.get(node.id)??0)+damage*(this.playerStats().salvageRate??1);
+        const threshold=30;
+        if(accumulated<threshold){this.extractionCarry.set(node.id,accumulated);return;}
+        this.lastExtractionAt=this.save.world.time;
+        this.seenWorkingUntil=this.save.world.time+SEEN_WORKING_SECONDS;
+        const shotLength=Math.hypot(direction.x,direction.y,direction.z)||1;
+        let released=0,lastDrop;
+        while(accumulated>=threshold && node.remaining>0 && released<4){
+            accumulated-=threshold;released++;
+            const claim=this.activeSalvageClaim(node.id);
+            if(claim)claim.salvagePickupAccounting=true;
+            const rng=seededRandom(`${this.save.world.seed}:salvage-drop:${node.id}:${node.remaining}`);
+            const commodity=recorder||claim||rng()>=.25?node.salvage:'scrap';
+            const serial=this.save.world.lootShipCounter=(this.save.world.lootShipCounter??0)+1;
+            const id=`wreck-salvage-${serial}`,entry={id:`${id}-cargo`,kind:'cargo',commodity,quantity:1,sourceNodeId:node.id,...(claim?{sourceClaimId:claim.id}:{}),...(recorder&&released===1?{tutorialRecorder:true}:{})};
+            const offset=10+released*3;
+            const position=[hit[0]-direction.x/shotLength*offset,hit[1]-direction.y/shotLength*offset,hit[2]-direction.z/shotLength*offset];
+            const drop={id,name:`${node.name} — ${t('Loot')}`,position,velocity:[0,0,0],radius:3,systemId:this.save.player.systemId,instanceId:this.activeInstanceId,contents:[entry],scanned:true};
+            lastDrop=drop;
+            this.save.world.combatWrecks??={};this.save.world.combatWrecks[id]=drop;
+            const live=combatWreckNode(drop);this.wreckNodes.push(live);this.renderer.addCombatLootNode?.(live);
+            node.remaining=Math.max(0,node.remaining-1);this.save.world.depletedWrecks[node.id]=node.remaining;
+            if(entry.tutorialRecorder){quest.flags.blackBoxDropId=id;this.applyTarget({kind:'wreck',id,position,name:t('BLACK BOX SIGNAL')});break;}
         }
-        this.extractionCarry.set(node.id, next);
+        this.extractionCarry.set(node.id,Math.min(accumulated,threshold-.001));
+        if(released)this.renderer.spawnSalvageRelease?.(hit,direction,released);
+        this.triggerSalvageAmbush(node);
+        if(node.remaining<=0){
+            if(node.salvage==='electronics'||node.salvage==='arms')this.recoverWreckEquipment(node,lastDrop);
+            if(this.save.player.currentTargetId===node.id){this.setMonitorStatus(t('WRECK STRIPPED'));this.clearTarget();}
+            this.obstacleGridBuiltAt=-Infinity;
+        }
+        this.persistSave();
     }
     strikeGoldPocket(node) {
         const rng = seededRandom(`${this.save.world.seed}:gold-pocket:${node.id}`);
@@ -5830,11 +5792,6 @@ export class GameSession {
         this.ui.queueSpacePickup?.({kind:'cargo',commodity:'gold',quantity:grant});
         this.ui.pushEvent(t('Gold pocket struck: +{amount} GOLD.', { amount: grant }), 'success', 5600);
         this.audio.play('success', 1.35);
-    }
-    collectExtraction(commodity, source, amount) {
-        this.save.player.cargo[commodity] = (this.save.player.cargo[commodity] ?? 0) + amount;
-        this.ui.queueSpacePickup?.({kind:'cargo',commodity,quantity:amount});
-        this.recordExtractionProgress(source, amount);
     }
     recordExtractionProgress(source, amount) {
         if (source === 'mining') {
@@ -5890,10 +5847,10 @@ export class GameSession {
         if (this.activeMiningClaim(nodeId))
             this.triggerClaimDispute(nodeId);
     }
-    recordClaimSalvage(nodeId, amount) {
+    recordClaimSalvage(nodeId, amount, claimId) {
         let fulfilled;
         for (const mission of this.save.activeMissions) {
-            if (mission.kind !== 'salvage' || mission.targetNodeId !== nodeId)
+            if (mission.kind !== 'salvage' || mission.targetNodeId !== nodeId || claimId && mission.id !== claimId)
                 continue;
             const before = mission.salvaged ?? 0;
             mission.salvaged = Math.min(mission.quantity, before + amount);
@@ -5942,23 +5899,21 @@ export class GameSession {
         const direction = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.4, rng() - 0.5).normalize();
         return tuple(vec(node.position).addScaledVector(direction, asteroidCollisionRadius(node) + 90));
     }
-    recoverWreckEquipment(node) {
+    recoverWreckEquipment(node, drop) {
         const rng = seededRandom(`${this.save.world.seed}:wreck-equipment:${node.id}`);
         // Tech wrecks can surface an intact module, but the roll stays low so
         // the event is genuinely rare (only ~half of wrecks are tech).
         if (rng() > 0.08)
             return;
-        const state = normalizeOutfitting(this.save.player);
         const candidates = OUTFIT_ITEM_IDS.filter((id) => !['pulse-cannon', 'gauss-cannon', 'seeker-launcher'].includes(id));
-        if (!candidates.length)
+        if (!candidates.length || !drop || this.arena)
             return;
         const equipmentId = pick(rng, candidates);
-        if(!this.arena){const item=rollEquipmentRecord(equipmentId,rng,1);const result=receiveEquipment(this.save.player,item);if(!result.ok){this.setOwnMonitorStatus(t('CARGO FULL'));return;}this._statsDirty=true;this.persistSave();this.ui.pushEvent(t('Equipment recovered into cargo.'),'success',4200);return;}
-        state.locker[equipmentId] = (state.locker[equipmentId] ?? 0) + 1;
-        this.save.player.equipment = projectLegacyEquipment(this.save.player, state);
-        this.ui.pushEvent(t('Intact module recovered: {name} moved to locker.', { name: t(OUTFIT_ITEMS[equipmentId].name) }), 'success', 6200);
-        this.audio.play('success', 1.35);
-        this.persistSave();
+        const item=rollEquipmentRecord(equipmentId,rng,1);
+        if(!item)return;
+        drop.contents.push({id:item.id,kind:'equipment',item:{...item,location:{kind:'wreck'}}});
+        const live=this.wreckNodes.find(entry=>entry.id===drop.id);
+        if(live){live.remaining+=1;live.lootRarity=highestLootRarity(drop.contents);}
     }
     triggerSalvageAmbush(node) {
         if (isTutorialGuided(this.save) || this.arena || this.activeRace
@@ -6200,6 +6155,7 @@ export class GameSession {
         else if (target.kind === 'wreck') {
             const node = this.wreckNodes.find((entry) => entry.id === target.id);
             node.scanned = true;
+            if(this.monitorStatus===t('Scan this wreck first.')){this.monitorStatus='';this.monitorStatusUntil=0;}
             if(node.combatLoot && this.save.world.combatWrecks?.[node.id])this.save.world.combatWrecks[node.id].scanned=true;
             if (!this.save.world.scannedNodes.includes(node.id))
                 this.save.world.scannedNodes.push(node.id);
@@ -6591,8 +6547,10 @@ export class GameSession {
         this.save.player.currentTargetId = target.id;
         if (target.kind === 'ship') {
             const ship = this.ships.find((entry) => entry.id === target.id);
-            if (ship)
+            if (ship) {
+                this.save.player.mode = 'combat';
                 ship.playerLockOccludedUntil = undefined;
+            }
         }
         // A fresh lock supersedes the previous target's transient readout
         // (DEPOSIT EXHAUSTED / WRECK STRIPPED) instead of letting it linger
@@ -7463,7 +7421,7 @@ export class GameSession {
         else if(portrait?.faction)relation=this.shipRelation({faction:portrait.faction});
         const urgent = conversationId === 'urgent' || duration <= 7000;
         const inSpace = !this.save.player.dockedAt;
-        if (!urgent && conversationId !== 'tutorial-combat' && conversationId !== 'tutorial-paul-hide' && conversationId !== 'tutorial-paul-clear' && inSpace
+        if (!urgent && conversationId !== 'tutorial-combat' && conversationId !== 'tutorial-surrender' && conversationId !== 'tutorial-loot-surrender-killed' && conversationId !== 'tutorial-paul-hide' && conversationId !== 'tutorial-paul-clear' && inSpace
             && (this.save.world.time < (this.flightDialogueAfter ?? 0)
                 || this.hostilesVisibleNear(vec(this.save.player.position), HYPERDRIVE_THREAT_RADIUS))) {
             this.pendingStoryConversations ??= [];
@@ -9869,6 +9827,8 @@ export class GameSession {
                     }
                     else
                         this.audio.playAtDirection('impact', projectile.kind === 'gauss' ? 0.6 : projectile.kind === 'ripper' || projectile.kind === 'pdc' ? 0.3 : 0.45, playerPosition.distanceTo(hitPosition), localHit.x);
+                    if(projectile.ownerId==='player' && hitKind==='obstacle' && hitObstacle?.shape==='wreck-node-mesh')
+                        this.hitSalvageWreck(hitObstacle.id,projectile.damage,tuple(hitPosition),{x:velocity.x,y:velocity.y,z:velocity.z});
                     // Over-penetration: punch through the ship and keep the
                     // remaining step. Rocks, the player, and a spent pierce
                     // budget all end the slug here instead.
@@ -9919,6 +9879,7 @@ export class GameSession {
         return false;
     }
     damageShip(ship, amount, attackerId, position, weapon = {}, origin) {
+        if (ship.tutorialSurrenderProtectedUntil > this.save.world.time) return;
         this.onExplorationActorHit(ship,attackerId,amount);
         this.onDistressActorHit(ship,attackerId,amount);
         // A captured hull is still a hull: it takes damage like any other
@@ -9942,6 +9903,22 @@ export class GameSession {
 
         const remaining = applied.hull*(ship.capitalClass==='frigate'?frigateHullDamageScale(weapon):1);
         ship.hull -= remaining;
+        const tutorialQuest = ship.tutorialEncounter === 'mining' ? getTutorialQuest(this.save) : undefined;
+        const firstSurrender = tutorialQuest && ['raider-standoff','defeat-raider'].includes(tutorialQuest.stepId)
+            && !tutorialQuest.flags.firstRaiderSurrendered && !ship.surrendered && ship.maxHull > 0
+            && remaining > 0 && ship.hull <= ship.maxHull * .4;
+        if (firstSurrender) {
+            // Stop the threshold-crossing shot at 40%, even for a lethal hit.
+            // Brief grace prevents other shots in the same volley from killing
+            // the pirate before the player can hear and act on the lesson.
+            ship.hull = ship.maxHull * .4;
+            ship.tutorialSurrenderProtectedUntil = this.save.world.time + 1.5;
+            tutorialQuest.flags.firstRaiderSurrendered = true;
+            tutorialQuest.flags.firstRaiderSurrenderPosition = [...ship.position];
+            this.surrenderShip(ship, {action:'down'});
+            this.playTutorialBriefing('surrender');
+            this.persistSave();
+        }
         const disabledMount=(ship.capitalClass==='cruiser'?damageCruiserMount:damageFrigateMount)(ship,position,applied.hull);
         if(disabledMount>=0&&ship.capitalMountHull[disabledMount]===0){
             this.renderer.spawnExplosion?.(position,true,(ship.capitalClass==='cruiser'?cruiserSubsystemExplosionScale:frigateSubsystemExplosionScale)(disabledMount));
@@ -10123,7 +10100,7 @@ export class GameSession {
     // fight: the ship stops counting as hostile (hyperdrive/landing unlock)
     // and turns orange on the HUD, with a fitting line per action. The action
     // follows the temperament weights, and cargo/credit dumps spawn pickups.
-    surrenderShip(ship) {
+    surrenderShip(ship, options = {}) {
         ship.surrendered = true;
         ship.hostile = false;
         ship.fleeing = false;
@@ -10133,12 +10110,14 @@ export class GameSession {
         const entries = Object.entries(weights);
         const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
         let roll = ship.aiRng() * total;
-        let action = entries[0][0];
-        for (const [candidate, weight] of entries) {
-            roll -= weight;
-            if (roll < 0) {
-                action = candidate;
-                break;
+        let action = options.action ?? entries[0][0];
+        if (!options.action) {
+            for (const [candidate, weight] of entries) {
+                roll -= weight;
+                if (roll < 0) {
+                    action = candidate;
+                    break;
+                }
             }
         }
         if (action === 'eject' || action === 'downEject')
@@ -10154,7 +10133,7 @@ export class GameSession {
         // later spawn of the same name defers or comes back wary (see spawnShip
         // recognition).
         const surrenderedTo = this.save.world.surrenderedTo ?? (this.save.world.surrenderedTo = {});
-        surrenderedTo[ship.name] = action.startsWith('down') ? 'captured' : 'fled';
+        surrenderedTo[ship.recognitionName ?? ship.name] = action.startsWith('down') ? 'captured' : 'fled';
         const pool = PILOT_LINES[ship.pilot?.temperament]?.surrender?.[action];
         if (pool?.length && this.chatterOpen()) {
             const line = pool[Math.floor(ship.aiRng() * pool.length)];
@@ -10525,7 +10504,7 @@ export class GameSession {
     claimSurrendered(ship) {
         if (!ship.surrendered || ship.claimed || ship.hull <= 0 || !(ship.bountyValue > 0 || ship.missionId))
             return false;
-        this.addCareerWreck(ship,true);
+        const lootWreck=this.addCareerWreck(ship,true);
         ship.cargo={};
         ship.claimed = true;
         ship.captured = true;
@@ -10555,9 +10534,11 @@ export class GameSession {
                 this.ui.pushEvent(result.message, 'success', 6500, t('Contract complete'));
         }
         const surrenderedTo = this.save.world.surrenderedTo ?? (this.save.world.surrenderedTo = {});
-        surrenderedTo[ship.name] = 'captured';
+        surrenderedTo[ship.recognitionName ?? ship.name] = 'captured';
         if (this.save.player.currentTargetId === ship.id)
             this.clearTarget();
+        if (ship.tutorialEncounter === 'mining')
+            this.handleTutorialEvent('ship-defeated', {shipId:ship.id,tutorialEnemy:true,tutorialEncounter:'mining',tutorialIndex:ship.tutorialIndex,attackerId:'player',wreckId:lootWreck?.id});
         return true;
     }
     // A civilian the player just saved thanks the pilot: a comms line and a
@@ -10584,6 +10565,10 @@ export class GameSession {
     // to hand `undefined` to spawnPickup's vec() — a TypeError inside the frame
     // guard that silently ate the combat drop and aborted the sim step.
     destroyShip(ship, attackerId, position = ship.position) {
+        if (ship.tutorialEncounter === 'mining' && ship.surrendered && !ship.captured && attackerId === 'player') {
+            const quest=getTutorialQuest(this.save);
+            if (quest && ['raider-standoff','defeat-raider'].includes(quest.stepId)) quest.flags.firstRaiderKilledAfterSurrender=true;
+        }
         this.cancelPendingMug(ship);
         ship.hull = 0;
         this.onExplorationActorDefeated(ship);
@@ -10753,7 +10738,7 @@ export class GameSession {
             refreshMissionOffers(this.save);
             this.restoreTutorialRuntime();
             this.ui.showDock(this.save, location.id);
-            this.ui.showToast(t('Rin pulled the Wayfarer home. The tutorial objective is ready to retry.'), 'warning', 6500);
+            this.ui.showToast(t('Rin pulled the Wanderer home. The tutorial objective is ready to retry.'), 'warning', 6500);
             finishSortie(this.save, location.id, 'tutorial-recovery');
             this.persistSave();
             return;
@@ -11186,20 +11171,20 @@ export class GameSession {
             const home = LOCATIONS['meridian-prime'];
             const clearance = home.dockRadius ?? home.radius;
             if (player.distanceTo(vec(home.position)) <= clearance + CAPITAL_HOMEWORLD_RANGE) {
-                ensure('concord-battleship', 'battleship', home.id, 'CNS Vigilance', 1);
-                ensure('concord-carrier', 'carrier', home.id, 'CNS Aegis', -1);
-                ensure('concord-frigate', 'frigate', home.id, 'CPV Resolute', -1);
+                ensure('concord-battleship', 'battleship', home.id, 'CNS Iron Covenant', 1);
+                ensure('concord-carrier', 'carrier', home.id, 'CNS Quiet Promise', -1);
+                ensure('concord-frigate', 'frigate', home.id, 'CPV Morning Watch', -1);
             }
             const gatehouse = LOCATIONS['gatehouse-twelve'];
             const gatehouseClearance = gatehouse.dockRadius ?? gatehouse.radius;
             if (player.distanceTo(vec(gatehouse.position)) <= gatehouseClearance + CAPITAL_GATEHOUSE_RANGE)
-                ensure('concord-cruiser', 'cruiser', gatehouse.id, 'CNS Arbiter', 1);
+                ensure('concord-cruiser', 'cruiser', gatehouse.id, 'CNS Still Horizon', 1);
         }
         else if (this.save.player.systemId === 'helios-verge') {
             const home = LOCATIONS.rook;
             const clearance = home.dockRadius ?? home.radius;
             if (player.distanceTo(vec(home.position)) <= clearance + CAPITAL_ROOK_RANGE)
-                ensure('concord-frigate', 'frigate', home.id, 'CPV Wayguard', 1);
+                ensure('concord-frigate', 'frigate', home.id, 'CPV Last Beacon', 1);
         }
     }
     // Approach-lane traffic: when the player is near a dock or planet, top up a
@@ -11356,14 +11341,27 @@ export class GameSession {
         const maxHull = structuralArmor + pressureHull;
         const direction = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.4, rng() - 0.5).normalize();
         const rotation = new THREE.Quaternion().setFromUnitVectors(FORWARD, direction);
-        const shipName = nameOverride ?? (hostile ? proceduralCallsign(rng) : `${role === 'trader' ? 'MV' : role === 'patrol' ? 'CPV' : role === 'miner' ? 'Prospector' : role === 'bounty' ? 'BH' : 'Escort'} ${randomInt(rng, 12, 997)}`);
+        // Preserve the original draw for pilot/flight determinism and existing
+        // surrender records; a separate stream names ordinary vessels.
+        const legacyName = nameOverride ?? (hostile ? proceduralCallsign(rng) : `${role === 'trader' ? 'MV' : role === 'patrol' ? 'CPV' : role === 'miner' ? 'Prospector' : role === 'bounty' ? 'BH' : 'Escort'} ${randomInt(rng, 12, 997)}`);
+        let shipName = legacyName;
+        if (nameOverride == null && (!hostile || faction === 'alliance')) {
+            const nameRng = seededRandom(`${this.save.world.seed}:vessel:${faction}:${role}:${index}:${Math.floor(this.save.world.time)}`);
+            for (let attempt = 0; attempt < 12; attempt++) {
+                const candidate = proceduralVesselName(nameRng, faction, role);
+                if (!this.ships.some(ship => ship.name === candidate)) {shipName = candidate; break;}
+            }
+            // A very busy sector can exhaust its name pool; keep every contact
+            // distinguishable without changing any existing ship's identity.
+            if (shipName === legacyName) shipName = `${proceduralVesselName(nameRng, faction, role)} ${index}`;
+        }
         // A pilot who surrendered to the player before remembers: when the same
         // callsign spawns again (outside an active warrant), it defers instead
         // of re-engaging — non-hostile, no combat target, and a one-shot line
         // when the player gets close (see maybeRecognitionLine). The memory
         // lives in the save (world.surrenderedTo) so it survives instance
         // resets and reloads.
-        const prior = (this.save.world.surrenderedTo ?? {})[shipName];
+        const prior = (this.save.world.surrenderedTo ?? {})[legacyName];
         const recognizesPlayer = hostile && !missionId && prior !== undefined;
         // A pilot who fled after surrendering came back wary, not deferential:
         // hostile again, but they cut and run earlier than usual (see damageShip).
@@ -11376,10 +11374,11 @@ export class GameSession {
         const ship = {
             id: `ship-${index}`,
             hullId, variant: SHIPS[hullId]?.variant ?? hullId, livery: fleetOptions.livery,
-            name: faction === 'alliance' && !nameOverride ? `ALV ${SHIPS[hullId]?.name ?? hullId} ${index}` : shipName,
+            name: shipName,
+            recognitionName: legacyName,
             // An independent seeded draw keeps the portrait random per pilot
             // without changing the ship, pilot or combat RNG streams.
-            portraitIndex: Math.floor(seededRandom(`${this.save.world.seed}:encounter-portrait:${faction}:${missionId ?? 'ambient'}:${shipName}`)() * 6),
+            portraitIndex: Math.floor(seededRandom(`${this.save.world.seed}:encounter-portrait:${faction}:${missionId ?? 'ambient'}:${legacyName}`)() * 6),
             role,
             faction, guild,
             position: [...position],
@@ -13741,7 +13740,7 @@ export class GameSession {
         }
         if(action==='group')return this.setWeaponGroup(args.mountId,args.group)?{ok:true,code:'Fire group updated.'}:{ok:false,code:'Invalid fire group.'};
         if(action==='select-loot'){this.selectedLootEntry=args.id;return {ok:true,code:'Salvage selection updated.'};}
-        const result=action==='recover'?recoverWreckEntry(this,args.wreckId,args.id):equipmentAction(this.save.player,action,args);
+        const result=action==='recover'?recoverWreckEntry(this,args.wreckId,args.id):equipmentAction(this.save.player,action,{...args,world:{seed:this.save.world.seed,time:this.save.world.time}});
         if(result.ok){if(this.save.player.inventory?.items?.[args.id]?.droneUnitId){const fit=this.save.player.outfitting.loadouts[this.save.player.shipId];for(const bay of fit.droneBays)this.handleTutorialEvent('drone-configured',{mode:bay.mode,locationId:this.save.player.dockedAt,loaded:bay.unitIds.some(Boolean)});}this._statsDirty=true;this.save.player.turretRuntime=[];const stats=this.playerStats();this.save.player.energy=Math.min(this.save.player.energy,stats.energyCapacity);this.save.player.shield=Math.min(this.save.player.shield,stats.shield);this.save.player.hull=Math.min(this.save.player.hull,stats.hull);this.handleTutorialEvent('outfitted',{locationId:this.save.player.dockedAt,reactorInstalled:this.save.player.outfitting.loadouts[this.save.player.shipId].utility.some(id=>equipmentBaseId(id)==='sustained-reactor')});if(result.credit)recordSortieCredit(this.save,result.credit,'outfitting');this.syncWeaponProjection();this.persistSave();}
         return result;
     }
@@ -14337,7 +14336,7 @@ export class GameSession {
                     : distance > stats.scanRange
                         ? t('OUT OF RANGE · {current}/{max} km', { current: Math.round(distance), max: stats.scanRange })
                         : t('SCANNING…');
-                hudTarget = { kind: 'wreck', combatLoot:Boolean(node.combatLoot), name: node.name, subtitle: node.combatLoot ? t('Loot') : node.scanned ? (claim ? t('SALVAGE CLAIM') : t(commodity)) : t('UNRESOLVED WRECK'), distance, scanned: node.scanned, readout: node.combatLoot ? (node.locked?(distance>2000?t('ACTIVATE HYPERDRIVE'):t('SALVAGE CLAIM')):cargoFree(this.save.player)<1?t('CARGO FULL'):stats.lootRange>0?t('AUTO COLLECTION · {range} km',{range:stats.lootRange}):t('FLY OVER TO COLLECT')) : this.utilityReadout || scanStatus, ...screen };
+                hudTarget = { kind: 'wreck', combatLoot:Boolean(node.combatLoot), name: node.name, subtitle: node.combatLoot ? t('Loot') : node.scanned ? (claim ? t('SALVAGE CLAIM') : t(commodity)) : t('UNRESOLVED WRECK'), distance, scanned: node.scanned, readout: node.combatLoot ? (node.locked?(distance>2000?t('ACTIVATE HYPERDRIVE'):t('SALVAGE CLAIM')):cargoFree(this.save.player)<1?t('CARGO FULL'):stats.lootRange>0?t('AUTO COLLECTION · {range} km',{range:stats.lootRange}):t('FLY OVER TO COLLECT')) : scanStatus, ...screen };
             }
             else if (target.kind === 'pickup') {
                 const pickup = this.pickups.find((entry) => entry.id === target.id);

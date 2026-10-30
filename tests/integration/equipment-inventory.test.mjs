@@ -35,7 +35,7 @@ test('gun and launcher replacements share a seat; ammo persists with stable moun
 test('rare stats used in flight match the recovered item; common migration preserves baseline',()=>{
  const p=make().player,item=createEquipmentRecord('gauss-cannon',{tier:3,rarity:'rare',affixes:['efficient','rapid'],location:{kind:'station',stationId:'helix'}});p.inventory.items[item.id]=item;refreshInventoryProjection(p);
  assert.ok(equipmentAction(p,'install',{id:item.id,mountId:'wayfarer-weapon-0'}).ok);const w=weaponForOutfit(item.id);assert.ok(w.damageFlat>weaponForOutfit('gauss-cannon').damageFlat);assert.ok(w.cooldown<1.1);assert.equal(weaponForOutfit(item.id),w,'resolved flight object is cached');assert.ok(w.energyCost>0);
- const stats=getEffectiveShipStats(p);assert.equal(stats.energyCapacity,60);assert.equal(stats.reactorOutput,10);
+ const stats=getEffectiveShipStats(p);assert.equal(stats.energyCapacity,60);assert.equal(stats.reactorOutput,8.8);assert.ok(Math.abs(stats.overTierLoad-1.2)<1e-9);
 });
 test('station storage is local, cargo is mass-limited, sales are atomic and bundled parts cannot be sold',()=>{
  const p=make().player,b=equipmentAction(p,'buy',{baseId:'gauss-cannon'});assert.ok(b.ok);assert.ok(equipmentAction(p,'carry',{id:b.id}).ok);assert.equal(cargoMass(p),6);assert.ok(equipmentAction(p,'store',{id:b.id}).ok);
@@ -44,7 +44,7 @@ test('station storage is local, cargo is mass-limited, sales are atomic and bund
  const credit=p.credits;assert.ok(equipmentAction(p,'sell',{id:b.id}).ok);assert.ok(p.credits>credit);assert.equal(equipmentAction(p,'sell',{id:b.id}).ok,false);
  p.cargo.ore=1000;const next=equipmentAction(p,'buy',{baseId:'pulse-cannon'});assert.ok(next.ok,'station purchases do not need cargo space');const wallet=p.credits;assert.equal(equipmentAction(p,'carry',{id:next.id}).ok,false);assert.equal(p.credits,wallet);assert.equal(p.inventory.items[next.id].location.kind,'station');
 });
-function session(seed=714){const save=createNewSave(seed,{tutorial:false});save.player.dockedAt=undefined;save.player.position=[20,0,0];return {save,ships:[],activeInstanceId:'shardbelt',npcHullExtents:()=>[4,3,12],careerRegionAt:()=>({danger:1.4}),playerStats:()=>getEffectiveShipStats(save.player),wreckNodes:[]};}
+function session(seed=714){const save=createNewSave(seed,{tutorial:false});save.player.dockedAt=undefined;save.player.position=[20,0,0];return {save,ships:[],ui:{queueSpacePickup(){}},activeInstanceId:'shardbelt',npcHullExtents:()=>[4,3,12],careerRegionAt:()=>({danger:1.4}),playerStats:()=>getEffectiveShipStats(save.player),wreckNodes:[]};}
 function ship(s){const a={id:'ship-1',name:'Test NPC',role:'pirate',hullId:'talon',pilot:{tier:'veteran'},position:[20,0,0],velocity:[0,0,0],cargo:{ore:12,food:3}};a.combatFit=createEnemyLoadout(a,1);equipCareerItems(s,a);return a;}
 test('career destruction rolls actual cargo/equipment once and keeps the result through reload',()=>{
  const s=session(),a=ship(s),w=makeCareerWreck(s,a);assert.ok(w);assert.equal(makeCareerWreck(s,a),null);for(const e of w.contents)if(e.item)assert.ok(a.equipmentRecords.some(r=>r.item.id===e.item.id));

@@ -1415,3 +1415,96 @@ Flow audit (signal → hyperdrive → briefing → scenario) across all eight va
 - Findings: Cairn directions incorrectly said Bar; UI entrance itself correctly used Rennbüro but interior/alt labels called it Bar. German instructions used Warenbörse/Schiffsausrüstung/Auftragsbrett versus visible Handel/Ausrüstung/Auftragstafel. Market headers also alternated Commodity Market/Ship Parts vs Trade/Equipment.
 - Added interfaceTerms.js canonical label keys and {ui.term} expansion for both ordinary localized text and bilingual authored dialogue. Correct Cairn Mara call, Rin/Paul meeting hints and conversation; share social/board label policy across station UI headers, entrances and accessibility names. Update current tutorial paths/control references including storage/cargo, buying/selling, service/refill, drone bay and transponder/salvage labels. Also correct social-room return buttons and their accessibility labels; non-bar rooms no longer tell the player to return to a Bar. Keep legitimate short proper names in natural dialogue.
 - Also fixed a stale authored line claiming the drive waits for drones (normal spool recall already implemented). Static all-step/all-dialogue EN/DE label resolution and every-port header consistency checks passed; normal fitting/trading/story regressions passed after asserting rendered text instead of template literals. Muted desktop Chrome/iPhone WebKit checks passed in both German and English: actual Story button → Cairn Race Desk → Rin conversation → Paul invitation, correct mission step advancement, market buttons/tabs and rendered reactor-fitting instructions with fitting dialogue layout. Inspected phone Cairn hint and desktop German fitting screenshots. All 24 adventure/naming/catalog checks passed, along with 15 story/Vesper regressions and 4 guidance checks. Repaired the older urgent-radio test fixture to supply its missing ships array; production comms behavior was untouched. Packaging and whitespace checks passed.
+
+## Rin’s Cairn remark (0.8.2lv)
+
+- User requested a casual opening mention of talkative Paul instead of Rin announcing his willingness to help. Updated both languages: opening names Paul and his actual ingame hull (Torsas), later mission instructions no longer offer his help. Paul’s own optional conversation and quest mechanics remain unchanged. Shifted naming assertion to the opening node where the Race Desk reference now lives.
+- Verification: 23 existing dialogue/naming checks passed; runtime packaging and whitespace checks passed.
+
+## 0.8.2lw — Tutorial dialogue pacing
+- Implemented the four agreed improvements in German/English: remove Paul recruitment spoilers from all Story hints, make his repair details and Rin's full rarity/tier guide optional, and give Mara a personal send-off.
+- Preserved normal pickup/fitting instructions, optional Paul recruitment and quest completion. Removed duplicate aiming/warmup wording and clarified English cease-fire wording.
+- Reviewed the remaining authored tutorial, hints, sparse route radio and contextual flight guidance. Further candidates: mining route radio repeats the briefing; salvage briefing combines fitting and survey preparation. Left those sequences intact for a separate focused pass.
+- 29 focused integration/unit checks passed. Muted desktop Chrome and iPhone WebKit checked German/English direct and optional paths, modal pause and layout; screenshots reviewed under output/dialogue-pacing. Build and diff checks passed.
+
+## 0.8.2lx — Separate fitting and survey conversations
+- Replace repeated mining-route controls with Rin's short remark about the Crown once being one rock, localized in German/English; keep the existing once-per-career radio ID.
+- End the Vesper preparation conversation after normal PDC fitting directions. Add the separate survey-ready dock briefing after an actual loaded PDC bay advances the quest; preserve existing task/event mechanics, defer around modals/settlements and remember the briefing across reloads.
+- Explain survey stars, local jumps, solo flight and returning to Mara in the second conversation. Make optional salvage instructions explicitly distinguish salvaging from charting.
+- 40 focused dialogue, naming, tutorial progression and runtime checks plus 5 localization/radio regressions passed. Muted desktop Chrome/iPhone WebKit checks used actual Cargo → PDC drone → Drone bay 1 → Install controls; verified no early briefing, optional salvage, layout and no repeat. Screenshots reviewed under output/survey-briefing.
+- Corrected the old story-menus browser fixture's retired Drones tab to use current equipment installation. Runtime packaging and whitespace checks passed.
+
+## 0.8.2ly — Mara’s opening copy
+- User found the farewell unnatural and the Protein suggestion abrupt. Changed farewell to “Passt auf euch auf!” and explicitly introduced trading as an idea for the player's first earnings before naming Protein. Updated English too; tutorial mechanics and skipped-prologue variants unchanged.
+- All 20 dialogue regression checks, runtime packaging and whitespace checks passed. Copy-only adjustment; no further browser run needed.
+
+## 0.8.2lz — Seven dialogue continuity fixes
+- Paul now offers a simple reunion before Rin explains the recorder job, then the escort offer at launch-black-box. The choice handler also rejects premature recruitment, while preserving existing invited saves.
+- Vesper's first-flight question has two real replies with brief distinct responses before ordinary selling instructions. Motivated Rin's reactor gift, connected the contraband warning specifically to traded weapons cargo, and introduced the survey assignment before PDC protection.
+- Rin's Cairn greeting moves from talkative Paul to the parents' lead; jump-gate news is an optional later question. Removed Sera's contradictory claim about receiving the player's bearings without inventing a new information leak.
+- German/English authored text and release metadata updated. 58 focused dialogue, tutorial progression/order, Vesper, naming and exploration checks passed; normal share/fight loot behavior remains covered.
+- Muted desktop Chrome and iPhone WebKit checked both flight replies, Paul-before-Rin greeting without quest advancement, Rin's optional gate question and subsequent Paul recruitment in both languages. Layout assertions and console checks passed; inspected desktop first-flight choices and phone Paul greeting in output/dialogue-continuity. Build and diff checks passed.
+
+## 2026-10-28 — Myth-inspired ship model names
+
+- Updated model display names by design family, race frames, capital class labels, paint patterns and bilingual tutorial references. Existing hull IDs, saved fleets and individual vessel names remain stable; the family vessel Wayfarer is a Hestia model.
+- Updated the shipyard's compact drone-bay summary after visual review found its count clipped on an iPhone landscape viewport.
+- Focused ship naming, progression, observer, faction, tutorial, paint, racing and localization checks passed. Existing guild coverage now reads the model catalog rather than obsolete literal names.
+- Muted desktop Chrome and iPhone WebKit checks passed for the real shipyard, family dialogue in both languages and label bounds; reviewed the screenshots. Runtime packaging and diff checks passed.
+- Runtime 0.8.2ma. No outstanding implementation work for this naming pass.
+
+## 2026-10-28 — Alliance models and individual vessel names
+
+- Changed Alliance model labels to Loki, Tyr, Thor, Freya and Odin; updated bilingual story text, race frames and paint patterns without changing hull IDs.
+- Added faction-sensitive personal vessel names to civilian and patrol traffic, using a separate seeded stream so flight and pilot rolls remain deterministic. Kept authored story ships and pirate pilot callsigns, and retained pilot recognition independently of reusable vessel names.
+- Gave the Lantern convoy and Concord capital ships individual names. In-progress distress actors retain their saved names across reloads; older convoy records preserve their named actors during migration.
+- Focused naming, faction, observer, tutorial, race, paint, save and distress checks passed. Runtime packaging and whitespace checks passed.
+- Muted desktop Chrome and iPhone WebKit checks passed for Alliance shipyard labels, the bilingual family dialogue and a selected generated vessel on the cockpit monitor; screenshots reviewed.
+- Runtime 0.8.2mb. No outstanding work for this naming pass.
+
+Follow-up: renamed the three story vessels Hearth, Lumen and Memento; hull IDs remain unchanged. Review tutorial continuity against private lore.
+
+Follow-up: renamed the family ship Wanderer; replaced the two-key story and evacuation-convoy claim, introduced the lost Concord fleet without revealing the mystery, and updated the private lore.
+
+Follow-up: renamed Rin’s ship Valkyrie and rebuilt the jump gates as batched, detailed industrial structures with their existing aperture and crossing rules. Gate review: node tools/playtest/jump-gate-review.mjs.
+- Verified 47 focused story/render tests; clear gate aperture and crossings from both sides, gate closed during tutorial, muted in-game jump to Meridian, and desktop/phone-sized gate review. Browser review uses normal in-game ship scale.
+
+- 0.8.2mf: Applied the reviewed German story dialogue and matching English translations; audited remaining dialogue for reachability and atmosphere in output/dialogue-review.
+
+- 0.8.2mg: Renamed the loot collector to Tractor Beam / Traktorstrahl without changing its ID; moved the tutorial recorder fragment closer to its frigate; removed unreachable contact chatter and exported the remaining dialogue for review.
+
+- 0.8.2mh: Reviewed the remaining German dialogue against the live encounter triggers and translated the necessary corrections into English. The user-authored main story dialogue is preserved.
+
+Follow-up: integrate the verified Gemini and DeepSeek dialogue review.
+- Clarified distress, piracy, patrol, salvage and exploration lines; corrected singular wreck cargo in both languages.
+- Verified 106 other focused dialogue, tutorial and exploration checks; corrected the new bilingual cargo test and reran all 64 distress checks successfully. The 87 authored story slots still match their approved text.
+- Muted desktop and Android browser checks passed and showed the singular wreck dialogue without clipping; no outstanding work for this request.
+
+Follow-up: improve equipment progression, rare loot and hull pricing.
+- Matched-tier upgrades provide positive performance, higher-tier fits load regeneration on smaller hulls, colored drops are rarer, rotating dealers offer limited expensive colored items, and purchasable hull prices are doubled.
+- Compared sustained firing for matching upgraded and base fits on all 15 hulls, checked tier and rarity scaling for every non-drone item, tested 10,000 loot rolls and verified limited dealer purchases across reload and stock rotations.
+- 96 affected regression checks passed, plus 3 focused inventory recovery checks. Muted desktop and Android browser checks verified colored purchases and the over-tier regeneration warning. Approved story dialogue still matches all 87 authored entries.
+- The broader suite reproduced five unrelated station-model/docking-geometry failures; it was interrupted after the station-streaming performance test remained running for over eight minutes. The affected station models and collider fixtures were not changed in this task.
+
+Follow-up: fix missiles blocked by a stale tool mode in career flight.
+- Automatically acquired ship locks now enter combat mode; missile input also recovers existing stale mining/salvage modes while preserving asteroid drone controls.
+- The ordnance integration tests passed, including both stale modes and the asteroid control. An isolated, muted desktop career browser check bought and installed a launcher and fired at a locked enemy with the M key.
+
+Follow-up: first tutorial pirate surrender.
+- The mining pirate powers down at 40% hull, with a short volley grace and a paused, bilingual capture lesson. The surrender persists across reloads.
+- Capture resolves the mission and preserves its single guaranteed green launcher; destruction after surrender opens Rin's reproach before the loot lesson. Updated the later nudge and objective.
+- Muted desktop browser checks passed for the real M-key capture and the destruction/reproach path, with both dialogue screenshots reviewed. Focused loot, tutorial, dialogue, ordnance and wing-order tests passed.
+- The broader desktop campaign browser test reached and passed the new capture and Vesper handoff, but later stopped at an unrelated Mara debrief transition (expected earn-standing, remained mara-debrief).
+
+Follow-up: replace salvage beams with shooting and physical collection.
+- Player beam/projectile impacts on real wreck geometry release persistent, stationary cargo or scrap crates. Fly over them to collect; previously requested fitted tractor beams still collect within range.
+- Contracts count only collected drops from their own claim; unfinished legacy claims retain prior progress. The recorder stays pending until its marked crate is collected and survives reload.
+- Reworked the former salvage tractor as a useful impact-targeting upgrade, and updated tutorial dialogue, contract instructions, phone controls and monitor text.
+- Focused salvage, mission, loot, equipment naming, tutorial, surrender and encounter checks passed. Muted desktop and Android playtests fired on the recorder and collected it; phone control regression and screenshots passed.
+- A broad equipment-inventory test was interrupted after 90 seconds; focused equipment naming, stats, outfits, loot recovery and UI checks passed.
+- The focused inventory recovery, full-hold and deployed-drone cases also passed independently; the slow 1,000-roll survival-frequency case was outside this change.
+
+Follow-up: restore wreck scanning and improve salvage visuals.
+- Wreckage must again be scanned automatically in range before hits release cargo, and the target monitor shows the identified material and remaining units. Updated the recorder and salvage-contract instructions.
+- Salvage releases shed short-lived instanced solid metal fragments; ordinary recovered wreckage has a shared irregular thick model and unchanged rarity beacon. Pickup positions stay stationary. Shortened the recorder receipt to fit cockpit monitors.
+- Focused scanning, salvage, loot visuals, resource-lifecycle, tutorial and mission tests passed. Muted desktop and Android browser checks verified the scan, firing, breakup, pickup, recorder progress and readable HUD; screenshots reviewed.

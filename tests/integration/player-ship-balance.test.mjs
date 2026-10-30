@@ -21,7 +21,7 @@ test('module stacking is bounded, order independent and gives progressively smal
 test('starter reactor stacks cannot sustain a full heavy battery or equal elite power systems',()=>{
  for(const tier of [1,3]){
   const fit=balanceFit('wayfarer',Array(3).fill(itemAtTier('mortar',tier)),Array(3).fill(itemAtTier('sustained-reactor',tier))),trace=firingTrace(fit);
-  assert.ok(fit.stats.reactorOutput<20);assert.ok(fit.stats.reactorOutput<SHIPS.blade.reactorOutput*.6);assert.ok(trace.blocked>0);assert.ok(fit.stats.maxSpeed<SHIPS.wayfarer.maxSpeed);
+  assert.ok(fit.stats.reactorOutput<20);assert.ok(fit.stats.reactorOutput<SHIPS.blade.reactorOutput*.6);assert.ok(trace.blocked>0);assert.equal(fit.stats.maxSpeed,SHIPS.wayfarer.maxSpeed);
  }
  assert.ok(HULL_HARDPOINTS.wayfarer.utility.length<HULL_HARDPOINTS.astra.utility.length);
 });

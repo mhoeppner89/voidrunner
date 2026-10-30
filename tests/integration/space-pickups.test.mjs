@@ -30,6 +30,11 @@ test('equipment and drone receipts retain their actual icons and equipment rarit
  ui.queueSpacePickup({kind:'equipment',item,quantity:1});ui.updateSpacePickup();assert.match(panel.innerHTML,/data-icon="seeker-launcher"/);assert.match(panel.innerHTML,/data-tier="1"/);assert.equal(panel.style['--item-color'],'#72df95');
  ui.queueSpacePickup({kind:'drone',type:'mining'});ui.save.world.time+=6;ui.updateSpacePickup();assert.match(panel.innerHTML,/data-icon="mining-drone"/);
 });
+test('recorder pickup is identified as mission cargo rather than scrap',()=>{
+ setLanguage('de');const {ui,panel}=uiFixture();
+ ui.queueSpacePickup({kind:'cargo',commodity:'scrap',tutorialRecorder:true,quantity:1});ui.updateSpacePickup();
+ assert.match(panel.innerHTML,/>Rekorder</);assert.match(panel.innerHTML,/data-commodity-icon="electronics"/);assert.doesNotMatch(panel.innerHTML,/>Schrott</);
+});
 test('raw salvage records resolve readable catalogue names for every equipment type and drone in both languages',()=>{
  for(const language of ['de','en']){
   setLanguage(language);

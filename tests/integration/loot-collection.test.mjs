@@ -8,6 +8,8 @@ import {getEffectiveShipStats} from '../../src/game/shipStats.js';
 import {cargoFree} from '../../src/game/economy.js';
 import {hydrateSave} from '../../src/game/save.js';
 import {equipmentEffectStats} from '../../src/game/equipmentStatPresentation.js';
+import {equipmentName} from '../../src/game/equipmentCatalog.js';
+import {setLanguage} from '../../src/game/i18n.js';
 
 const fixture=()=>{const f=tutorialFixture('earn-standing');f.save.player.dockedAt=undefined;f.save.player.position.splice(0,3,0,0,0);f.save.player.prevPosition=new Float64Array(3);f.session.activeInstanceId=undefined;f.session.wreckNodes=[];f.save.world.combatWrecks={};return f;};
 function drop(f,position,contents){
@@ -22,6 +24,15 @@ function install(f,tier=1,slot='wayfarer-utility-0'){
  assert.ok(equipmentAction(p,'install',{id:result.id,mountId:slot}).ok);p.dockedAt=undefined;f.session._statsDirty=true;return result.id;
 }
 function tick(f){f.save.world.time+=1/60;f.session.updatePickups(1/60);}
+test('existing and newly purchased collectors use the tractor-beam name in both languages',()=>{
+ const f=fixture(),id=install(f,2),saved=hydrateSave(JSON.parse(JSON.stringify(f.save)));
+ refreshInventoryProjection(saved.player);
+ for(const [lang,name] of [['de','Traktorstrahl'],['en','Tractor Beam']]){
+  setLanguage(lang);assert.match(equipmentName(OUTFIT_ITEMS[id]),new RegExp(`^${name}\\s+II`));
+  assert.equal(saved.player.inventory.items[id].baseId,'loot-collector');
+ }
+ setLanguage('en');
+});
 test('fast fly-over collects an unselected, unscanned crate with exact item identity once',()=>{
  const f=fixture(),w=drop(f,[0,0,0]),entry=w.contents[0];f.save.player.prevPosition.set([-20,0,0]);f.save.player.position.splice(0,3,20,0,0);f.save.player.mode='combat';
  tick(f);const item=f.save.player.inventory.items[entry.id];assert.equal(item.rarity,'uncommon');assert.equal(item.baseId,'seeker-launcher');assert.deepEqual(item.affixes,['efficient']);assert.equal(item.location.kind,'cargo');assert.equal(f.save.world.combatWrecks[w.id],undefined);
@@ -46,12 +57,12 @@ for(const tier of [1,2,3])test(`collector tier ${tier} uses its exact range for 
 test('tiers, rarity, storage, removal and sale respect the real fitted module',()=>{
  const f=fixture(),id=install(f,1);const p=f.save.player;
  const bonus=createEquipmentRecord('loot-collector',{tier:3,rarity:'rare',affixes:['tuned','compact'],location:{kind:'station',stationId:'rook'}});p.inventory.items[bonus.id]=bonus;refreshInventoryProjection(p);
- assert.equal(OUTFIT_ITEMS[bonus.id].effects.lootRange,250);assert.equal(getEffectiveShipStats(p).lootRange,150,'stored equipment has no effect');
- p.dockedAt='rook';assert.ok(equipmentAction(p,'install',{id:bonus.id,mountId:'wayfarer-utility-1'}).ok);assert.equal(getEffectiveShipStats(p).lootRange,250,'ranges never add');
+ assert.equal(OUTFIT_ITEMS[bonus.id].effects.lootRange,275);assert.equal(getEffectiveShipStats(p).lootRange,150,'stored equipment has no effect');
+ p.dockedAt='rook';assert.ok(equipmentAction(p,'install',{id:bonus.id,mountId:'wayfarer-utility-1'}).ok);assert.equal(getEffectiveShipStats(p).lootRange,275,'ranges never add');
  assert.ok(equipmentAction(p,'remove',{id:bonus.id}).ok);assert.equal(getEffectiveShipStats(p).lootRange,150);
  assert.ok(equipmentAction(p,'remove',{id}).ok);assert.equal(getEffectiveShipStats(p).lootRange,0);
  assert.ok(equipmentAction(p,'sell',{id}).ok);assert.equal(p.inventory.items[id],undefined);
- const row=equipmentEffectStats(OUTFIT_ITEMS[bonus.id]).find(r=>r.key==='lootRange');assert.equal(row.value,250);assert.equal(row.unit,' km');
+ const row=equipmentEffectStats(OUTFIT_ITEMS[bonus.id]).find(r=>r.key==='lootRange');assert.equal(row.value,275);assert.equal(row.unit,' km');
 });
 test('a blocked beam collects neither equipment nor loose cargo; clear sight enables both',()=>{
  const f=fixture();install(f);const w=drop(f,[100,0,0]),p=f.session.spawnPickup('ore',[100,0,0],'combat');f.session.lineBlocked=()=>true;tick(f);assert.ok(f.save.world.combatWrecks[w.id]);assert.ok(p.life>0);

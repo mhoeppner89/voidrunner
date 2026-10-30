@@ -17,7 +17,7 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1440,hei
   await press(page.locator('[data-inventory-mount="wayfarer-utility-0"]'));
   const tabs=page.locator('[data-inventory-tab]');if(await tabs.isVisible())await tabs.selectOption('shop');else await press(page.locator('[data-inventory-action="tab"][data-tab="shop"]'));
   await press(page.locator('[data-inventory-id="shop-loot-collector-1"]'));
-  assert.match(await page.locator('[data-stat="lootRange"]').innerText(),/150.*km/s);assert.match(await page.locator('.inventory-identity h3').innerText(),/Beutesammler.*I/);
+  assert.match(await page.locator('[data-stat="lootRange"]').innerText(),/150.*km/s);assert.match(await page.locator('.inventory-identity h3').innerText(),/Traktorstrahl.*I/);
   const art=page.locator('.inventory-detail-art');assert.equal(await art.getAttribute('data-icon'),'loot-collector');
   const layout=await page.locator('.equipment-inventory').evaluate(e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,w:innerWidth,h:innerHeight,overflow:e.scrollWidth>e.clientWidth+1};});assert.ok(layout.x>=-1&&layout.y>=-1&&layout.right<=layout.w+1&&layout.bottom<=layout.h+1&&!layout.overflow,JSON.stringify(layout));
   const readouts=await page.locator('.inventory-readouts > div').evaluateAll(rows=>rows.map(row=>({width:row.clientWidth,scroll:row.scrollWidth})));assert.ok(readouts.every(r=>r.scroll<=r.width+1),JSON.stringify(readouts));

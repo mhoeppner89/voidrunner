@@ -160,8 +160,7 @@ const fresh = createNewSave(1234);
 const freshLoadout = loadoutFor(fresh.player);
 check('fresh save starts with two factory beam emitters',
     freshLoadout.guns.filter(id => equipmentBaseId(id) === 'beam-emitter').length, 2);
-checkTrue('fresh save starts with its factory seeker rack',
-    freshLoadout.launchers.some(id => equipmentBaseId(id) === 'seeker-launcher'));
+check('fresh save starts without a launcher', freshLoadout.launchers.filter(Boolean).length, 0);
 check('fresh save starts on wayfarer', fresh.player.shipId, 'wayfarer');
 check('fresh save docks at helix', fresh.player.dockedAt, 'helix');
 check('fresh save starting credits', fresh.player.credits, STARTING_CREDITS);
@@ -169,9 +168,7 @@ check('fresh save resolves wayfarer stats', getEffectiveShipStats(fresh.player).
 check('fresh save resolves wayfarer shield', getEffectiveShipStats(fresh.player).shield, 200);
 check('fresh save starts at full energy', fresh.player.energy, 60);
 const freshMagazines = launcherMagazineEntries(fresh.player);
-check('fresh save has one explicit launcher magazine', freshMagazines.length, 1);
-check('fresh launcher starts full', freshMagazines[0].rounds, 4);
-check('fresh launcher is selected', freshMagazines[0].selected, true);
+check('fresh save has no launcher magazine', freshMagazines.length, 0);
 
 // Legacy saves carry their flat equipment array through hydration, and the
 // fitted gear applies once stats are resolved.
@@ -197,7 +194,7 @@ for (const id of ['shield-mk2','pulse-cannon','cargo-pods','engine-mk2'])
 check('migrated shield resolves', getEffectiveShipStats(migrated.player).shield, 260);
 check('migrated pulse-mk2 does not globally buff hull damage', getEffectiveShipStats(migrated.player).gunDamage, 10);
 check('migrated cargo resolves', getEffectiveShipStats(migrated.player).cargo, 50);
-checkTrue('heavier migrated equipment reduces speed while preserving the booster', getEffectiveShipStats(migrated.player).maxSpeed < 50 * 1.18 && getEffectiveShipStats(migrated.player).maxSpeed > 50);
+check('migrated equipment preserves the full speed booster', getEffectiveShipStats(migrated.player).maxSpeed, 50 * 1.18);
 check('legacy armor and hull combine', migrated.player.hull, 185);
 check('legacy armor field is removed', Object.hasOwn(migrated.player, 'armor'), false);
 check('legacy save receives the current full capacitor', migrated.player.energy, 60);

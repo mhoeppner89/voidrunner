@@ -87,7 +87,7 @@ export function profileForWeapons(weapons,tier='veteran') {
     // Tactical pass spacing is distinct from maximum weapon reach. Scatter/ion
     // fits still close to exploit pellet density; longer reach must not make
     // every fighter hang back like artillery. Firing uses weaponRange directly.
-    const preferred={pulse:235,beam:240,gauss:tier==='ace'?510:tier==='novice'?300:410,mortar:300,ion:85,ripper:85};
+    const preferred={pulse:235,beam:240,gauss:tier==='ace'?560:tier==='novice'?300:410,mortar:300,ion:85,ripper:85};
     const range=Math.min(weaponRange(main),preferred[main.id]??240);
     const role=range>=300?'gunship':range<100?'interceptor':'fighter';
     return {role,range,projectileSpeed:main.speed,life:main.life,interval:main.cooldown,

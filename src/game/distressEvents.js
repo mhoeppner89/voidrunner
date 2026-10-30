@@ -504,7 +504,7 @@ export const DistressMethods = {
             const snapshot = active.actors.find(actor => actor.key === entry.key || actor.key === legacyAlias);
             if (snapshot?.destroyed) continue;
             const point = snapshot?.position ?? offset(active.position, entry.offset, yaw);
-            const ship = this.spawnShip(entry.role, [...point], `distress-${active.id}`, entry.name, {tier: 'regular', temperament: 'steady'}, {hullId: entry.hullId, faction: entry.faction});
+            const ship = this.spawnShip(entry.role, [...point], `distress-${active.id}`, snapshot?.name ?? entry.name, {tier: 'regular', temperament: 'steady'}, {hullId: entry.hullId, faction: entry.faction});
             ship.distressActor = entry.key;
             ship.distressEventId = active.id;
             ship.distressVariant = active.variant;

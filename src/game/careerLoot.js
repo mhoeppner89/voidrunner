@@ -48,7 +48,7 @@ export function equipCapitalLoot(session,ship){
 export function combatWreckNode(wreck){
  for(const entry of wreck.contents)if(entry.item)registerInventoryDefinitions({items:{[entry.item.id]:entry.item}});
  const count=wreck.contents.reduce((n,e)=>n+(e.quantity??1),0);
- return {id:wreck.id,name:wreck.name,position:[...wreck.position],rotation:[0,0,0],radius:wreck.radius,shape:0,salvage:'scrap',remaining:count,scanned:wreck.scanned??false,combatLoot:true,locked:Boolean(wreck.locked),derelict:wreck.derelict,sensorRange:wreck.sensorRange,lootRarity:highestLootRarity(wreck.contents),systemId:wreck.systemId,instanceId:wreck.instanceId,velocity:[0,0,0]};
+ return {id:wreck.id,name:wreck.name,position:[...wreck.position],rotation:[0,0,0],radius:wreck.radius,shape:0,salvage:'scrap',remaining:count,scanned:wreck.scanned??false,combatLoot:true,salvageFragment:wreck.contents.some(entry=>entry.sourceNodeId&&!entry.tutorialRecorder),locked:Boolean(wreck.locked),derelict:wreck.derelict,sensorRange:wreck.sensorRange,lootRarity:highestLootRarity(wreck.contents),systemId:wreck.systemId,instanceId:wreck.instanceId,velocity:[0,0,0]};
 }
 export function makeCareerWreck(session,ship,{captured=false}={}){
  if(session.arena||ship.lootResolved)return null;
@@ -157,10 +157,13 @@ function transferWreckEntry(session,wreck,entryId,bulk){
  if(!result.ok)return result;
  session.ui.queueSpacePickup?.({...entry,quantity:result.amount??1});
  session.recordExtractionProgress?.('salvage',result.amount??1);
+ if(entry.kind==='cargo' && entry.sourceNodeId && entry.sourceClaimId && entry.commodity===session.wreckNodes.find(n=>n.id===entry.sourceNodeId)?.salvage)
+  session.recordClaimSalvage?.(entry.sourceNodeId,result.amount??1,entry.sourceClaimId);
  if(entry.kind!=='cargo'||entry.quantity<=0)wreck.contents.splice(index,1);
  node.lootRarity=highestLootRarity(wreck.contents);
  node.remaining=wreck.contents.reduce((n,e)=>n+(e.quantity??1),0);session._statsDirty=true;
  if(!node.remaining&&!wreck.derelict){delete session.save.world.combatWrecks[wreck.id];session.wreckNodes.splice(session.wreckNodes.indexOf(node),1);session.renderer?.removeCombatLootNode?.(node.id);if(session.save.player.currentTargetId===node.id)session.save.player.currentTargetId=undefined;}
+ if(entry.tutorialRecorder)session.handleTutorialEvent?.('extracted',{nodeId:entry.sourceNodeId,commodityId:entry.commodity,amount:result.amount??1,source:'salvage',instanceId:wreck.instanceId});
  session.onExplorationLoot?.(wreck);
  session.onDistressLoot?.(wreck);
  return {ok:true,code:'Recovered into cargo.'};

@@ -1,4 +1,4 @@
-// The campaign half of the wing system. Rin Vek flies the Second Light on the
+// The campaign half of the wing system. Rin Vek flies the Valkyrie on the
 // player's wing through the family prologue, and from the combat lesson on she
 // takes standing orders exactly like a hired arena veteran. The vocabulary, the
 // range gates and the target doctrine are shared (see wingOrders.js); this

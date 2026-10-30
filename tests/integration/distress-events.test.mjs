@@ -708,6 +708,29 @@ test('a destroyed freighter exposes real cargo and a fly-over survivor pod that 
     assert.equal(s.settleDistressSurvivors(), 0);
 });
 
+test('wreck cargo briefing agrees with the actual remaining amount in both languages', () => {
+    const s = make();
+    s.debugStartDistress('wreck', 0, {phase: 'discovered'});
+    atEvent(s);
+    const active = s.save.world.distress.active;
+    const wreck = s.save.world.combatWrecks[`wreck-distress-${active.id}`];
+    s.chooseDistress('accept');
+    const language = getLanguage();
+    try {
+        for (const [quantity, de, en] of [
+            [2, 'Im Frachtraum liegen noch 2 Einheiten.', 'There are still 2 units in the hold.'],
+            [1, 'Im Frachtraum liegt noch eine Einheit.', 'There is still one unit in the hold.'],
+            [0, 'Der Frachtraum ist leer.', 'The hold is empty.'],
+        ]) {
+            wreck.contents = quantity ? [{commodity: 'water', quantity}] : [];
+            for (const [lang, expected] of [['de', de], ['en', en]]) {
+                setLanguage(lang);
+                assert.ok(distressDialogue(active.id, s.save).nodes.main.text.includes(expected), `${lang}, quantity ${quantity}`);
+            }
+        }
+    } finally { setLanguage(language); }
+});
+
 test('a full hold explains why jettisoned cargo cannot be recovered yet', () => {
     const s = make();
     s.debugStartDistress('jettison', 0, {phase: 'discovered', cargo: {water: 999}});
@@ -822,6 +845,7 @@ test('reload restores damaged actors and never returns destroyed ones', () => {
     s.debugStartDistress('convoy', 0, {phase: 'involved'});
     atEvent(s);
     s.ships[0].hull = 55;
+    s.ships[0].name = 'Lantern 1'; // An in-progress save from before the roster rename.
     s.ships[2].hull = 0;
     tick(s);
     const loaded = hydrateSave(JSON.parse(JSON.stringify(s.save)));
@@ -830,6 +854,7 @@ test('reload restores damaged actors and never returns destroyed ones', () => {
     s.distressTickAt = 0;
     s.updateDistress();
     assert.deepEqual(s.ships.map(ship => [ship.distressActor, ship.hull]), [['lantern-1', 55], ['lantern-2', 186], ['cutlass-2', 240]]);
+    assert.equal(s.ships.find(ship => ship.distressActor === 'lantern-1').name, 'Lantern 1');
     assert.equal(s.ships.some(ship => ship.distressActor === 'cutlass-1'), false);
 });
 

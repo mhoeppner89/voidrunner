@@ -21,8 +21,8 @@ export const getEffectiveShipStats = (player) => {
     const count = (id) => installed.reduce((total, installedId) => total + (equipmentBaseId(installedId) === id ? 1 : 0), 0);
     const has = (id) => count(id) > 0;
     const effect = (id, key, fallback = 0) => {
-        const item = installed.map(i=>OUTFIT_ITEMS[i]).find(i=>equipmentBaseId(i?.id)===id);
-        return item?.effects?.[key] ?? OUTFIT_ITEMS[id]?.effects?.[key] ?? fallback;
+        const values=installed.map(i=>OUTFIT_ITEMS[i]).filter(item=>equipmentBaseId(item?.id)===id).map(item=>item.effects?.[key]).filter(Number.isFinite);
+        return values.length ? Math.max(...values) : OUTFIT_ITEMS[id]?.effects?.[key] ?? fallback;
     };
     const radarMultiplier = effect('radar-mk2', 'radarMultiplier', 1.5);
     const scanMultiplier = effect('radar-mk2', 'scanMultiplier', 1.5);
@@ -39,8 +39,13 @@ export const getEffectiveShipStats = (player) => {
     const product=key=>stackedMultiplier(selectedEffects.flatMap(e=>e[key]==null?[]:[e[key]]));
     const capacity=key=>stackedBonus(selectedEffects.map(e=>e[key]??0));
     const equipmentMass=installed.reduce((n,id)=>n+(OUTFIT_ITEMS[id]?.mass??0),0);
-    const spec=HULL_HARDPOINTS[player.shipId],allowance=spec?spec.stockGunCount*2+spec.stockLauncherCount*3+spec.turrets.length+spec.utility.length:8;
-    const handling=Math.max(.65,1/(1+Math.max(0,equipmentMass-allowance)*.012));
+    // Normal equipment is an upgrade; fitting technology above the hull's tier
+    // instead places a visible, cumulative load on its power distribution.
+    const overTierLevels=installed.reduce((sum,id)=>sum+Math.max(0,(OUTFIT_ITEMS[id]?.tier??1)-(base.tier??1)),0);
+    const grossOutput=base.reactorOutput*product('outputMultiplier');
+    const reactorOutput=Math.max(base.reactorOutput*.35, grossOutput-base.reactorOutput*.06*overTierLevels);
+    const overTierLoad=grossOutput-reactorOutput;
+    const handling=1;
     return {
         ...base,
         maxSpeed: base.maxSpeed * product('speedMultiplier') * handling,
@@ -49,7 +54,8 @@ export const getEffectiveShipStats = (player) => {
         angularAcceleration: base.angularAcceleration * product('turnMultiplier') * handling,
         shield: (base.shield + capacity('shieldCapacity'))*product('shieldMultiplier'),
         hull: base.hull + capacity('hullCapacity'),
-        reactorOutput: base.reactorOutput * product('outputMultiplier'),
+        reactorOutput,
+        overTierLoad, overTierLevels,
         energyCapacity: base.energyCapacity * product('capacityMultiplier'),
         burnFuelMultiplier:product('burnFuelMultiplier'),lateralMultiplier:(base.lateralMultiplier??1)*product('lateralMultiplier'),shieldRechargeMultiplier:product('rechargeMultiplier'),
         shieldRegeneration:(base.shieldRegen??5)*product('rechargeMultiplier'),
@@ -58,7 +64,7 @@ export const getEffectiveShipStats = (player) => {
         // the hull's base gunDamage untouched prevents an installed gun from
         // silently buffing every other active mount.
         gunDamage: base.gunDamage,
-        equipmentMass:installed.reduce((n,id)=>n+(OUTFIT_ITEMS[id]?.mass??0),0),
+        equipmentMass,
         missileCapacity,
         // Radar (sensor) range decides what appears as a selectable target. A
         // locked ship, asteroid, or wreck resolves automatically within the

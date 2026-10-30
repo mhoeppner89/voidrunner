@@ -14,8 +14,8 @@ export const EQUIPMENT_STAT_FIELDS=[
  {key:'radarRange',label:'Radar range',unit:'km',effects:['radarMultiplier']},
  {key:'scanRange',label:'Scan range',unit:'km',effects:['scanMultiplier']},
  {key:'lootRange',label:'Loot collection range',unit:'km',effects:['lootRange']},
- {key:'salvageRange',label:'Salvage range',unit:'km',effects:['salvageRange']},
- {key:'salvageRate',label:'Salvage rate',unit:'×',effects:['salvageRate']},
+ {key:'salvageRange',label:'Drone recovery range',unit:'km',effects:['salvageRange']},
+ {key:'salvageRate',label:'Salvage impact',unit:'×',effects:['salvageRate']},
  {key:'burnFuelMultiplier',label:'Boost fuel use',unit:'%',scale:100,lowerBetter:true,effects:['burnFuelMultiplier']},
  {key:'lateralMultiplier',label:'Drift correction',unit:'%',scale:100,effects:['lateralMultiplier']},
 ];

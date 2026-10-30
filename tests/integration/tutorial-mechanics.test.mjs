@@ -3,6 +3,7 @@ import {test} from 'node:test';
 import {tutorialFixture} from '../helpers/tutorial.mjs';
 import {loadoutFor} from '../../src/game/outfitting.js';
 import {equipmentBaseId} from '../../src/game/equipmentCatalog.js';
+import {weaponForOutfit} from '../../src/game/weapons.js';
 import {hydrateSave} from '../../src/game/save.js';
 import {completeMissionsAtDock} from '../../src/game/missions.js';
 import {TUTORIAL_MINING_CONTRACT_ID} from '../../src/game/tutorialCampaign.js';
@@ -41,7 +42,7 @@ test('PDC switching moves the real mining drones to cargo without deleting them 
 test('one coordinated mining intercept happens during the return drive, followed by a real standoff',()=>{
  const {save,quest,session}=tutorialFixture('return-mining');const briefings=[];session.playTutorialBriefing=id=>briefings.push(id);save.player.dockedAt=undefined;save.player.navTargetId='vesper';session.autopilot=true;session.hyperdriveFx='active';session.disengageHyperdrive=()=>{session.autopilot=false;};
  session.updateTutorialCampaignRuntime();assert.equal(quest.stepId,'raider-standoff');assert.equal(session.autopilot,false);const enemy=session.ships.find(s=>s.tutorialEnemy);assert.ok(enemy.holdFire);assert.equal(enemy.hullId,'scrapper');
- save.world.time=7;session.updateTutorialCampaignRuntime();assert.equal(quest.stepId,'raider-standoff');save.world.time=9;session.updateTutorialCampaignRuntime();assert.equal(quest.stepId,'defeat-raider');assert.equal(enemy.holdFire,false);assert.equal(enemy.pursuitHoldFire,false);assert.deepEqual(briefings,['combat']);
+ save.world.time=3;session.updateTutorialCampaignRuntime();assert.equal(quest.stepId,'raider-standoff');save.world.time=5;session.updateTutorialCampaignRuntime();assert.equal(quest.stepId,'defeat-raider');assert.equal(enemy.holdFire,false);assert.equal(enemy.pursuitHoldFire,false);assert.deepEqual(briefings,['combat']);
 });
 test('shooting the standoff pirate early does not strand the story',()=>{const {session,quest}=tutorialFixture('raider-standoff');session.handleTutorialEvent('ship-defeated',{tutorialEncounter:'mining',tutorialIndex:0});assert.equal(quest.stepId,'land-mining');});
 test('encounter casualties persist and only surviving enemies return after reload',()=>{
@@ -69,5 +70,5 @@ test('new story fighters use the shared hull flight and actual fitted weapons, r
  const {save,session,quest}=tutorialFixture('black-box-fight');save.player.dockedAt=undefined;quest.flags.paulInvited=true;session.ensureTutorialEnemy();
  for(const actor of session.ships){assert.equal(actor.campaignCombat,true);assert.equal(session.npcFlightStats(actor),actor.combatFit.stats);}
  const rin=session.ships.find(s=>s.storyPersonId==='rin');rin.position=[0,0,0];rin.velocity=[0,0,0];rin.rotation=[0,0,0,1];rin.combatWeaponIndex=0;rin.targetId='test-enemy';session.ships=[rin,{id:'test-enemy',position:[0,0,-200],velocity:[0,0,0],rotation:[0,0,0,1],hull:200,hostile:true,hullId:'scrapper',variant:'scrapper'}];
- session.fireNpcGun(rin,new T.Vector3(0,0,-1));assert.ok(session.projectiles.length>0);assert.equal(session.projectiles[0].damage,10.8);
+ session.fireNpcGun(rin,new T.Vector3(0,0,-1));assert.ok(session.projectiles.length>0);assert.equal(session.projectiles[0].damage,weaponForOutfit(rin.combatFit.guns[0]).damageFlat);
 });

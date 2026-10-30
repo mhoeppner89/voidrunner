@@ -1,3 +1,97 @@
+## 0.8.2mn — Salvage scanning and breakup
+
+- Restore scanning of wreckage before recovery and show the identified contents and remaining material on the target monitor.
+- Add brief, solid flying fragments when shots release salvage; cargo drops remain stationary.
+
+## 0.8.2mm — Shootable salvage
+
+- Shoot wreckage to release cargo or scrap as persistent fly-over pickups; fitted tractor beams can collect them at range.
+- Update salvage claims, the recorder mission, controls and equipment to use the new recovery mechanic.
+
+## 0.8.2ml — First pirate surrender
+
+- The first pirate surrenders at 40% hull; Rin explains capture and reacts if the player destroys the surrendered ship.
+- Preserve the first-pirate loot and tutorial progress when the pirate is captured.
+
+## 0.8.2mk — Ship target missile controls
+
+- Switch to combat mode when a ship is automatically targeted, and allow missiles to fire at a locked ship even if an older save retained a tool mode.
+
+## 0.8.2mj — Equipment progression
+
+- Increase the primary performance of higher-tier and rarer equipment, remove ordinary equipment drawbacks, and show the reactor load for parts above a hull’s tier.
+- Make colored equipment less common in ordinary drops and add rotating, limited, expensive colored dealer stock.
+- Double purchasable hull prices while retaining the free starter ship.
+
+## 0.8.2mi — Dialogue review
+
+- Clarify distress calls, patrol and pirate radio, salvage instructions and the Driftglass greeting.
+- Show singular and plural wreck cargo correctly in German and English.
+
+## 0.8.2mh — Dialogue consistency
+
+- Align ambient family and carrier dialogue with the established story, and remove an obsolete drone-wait hint.
+- Clarify patrol and pilot chatter so it reflects the actual cargo, surrender and inspection states.
+- Fix distress dialogue that contradicted the available actions, rewards or event outcomes.
+
+## 0.8.2mg — Tractor beam and recorder
+
+- Rename the loot collector Tractor Beam / Traktorstrahl while preserving existing equipment IDs and collection ranges.
+- Move the tutorial recorder fragment closer to the frigate without changing salvage identities, and remove unreachable contact chatter.
+
+## 0.8.2mf — Revised story dialogue
+
+- Use the revised German tutorial and story dialogue and matching English translations, preserving existing conversation branches.
+
+## 0.8.2me — Jump gates and Valkyrie
+
+- Rebuilt jump gates with a detailed industrial frame, power modules and an open, unchanged flight aperture.
+- Renamed Rin’s ship Valkyrie.
+
+## 0.8.2md — Family story continuity
+
+- Renamed the family ship Wanderer and clarified how Mara kept its key.
+- Connect the survey to the lost Concord fleet and describe the frigate recorder as a possible lead.
+
+## 0.8.2mc — Story vessel names
+
+- Renamed the family ship Hearth, Rin’s ship Lumen and Paul’s freighter Memento.
+
+## 0.8.2mb — Alliance and vessel names
+
+- Renamed Alliance hull models using familiar Norse names and updated race, paint and tutorial text in English and German.
+- Gave civilian and patrol traffic personal vessel names, with distinct names for the Lantern convoy and Concord capital ships. Existing named ships, pirate pilot callsigns and saved ship identities are preserved.
+
+## 0.8.2ma — Ship model names
+
+- Gave Concord, Alliance, independent and pirate-built hulls distinct myth-inspired model names, including the race variants and Concord capital classes.
+- Updated shipyard, paint patterns, Arena and tutorial references in English and German. The family ship keeps its personal name, Wayfarer; its model is Hestia. Saved hull IDs and individual ship names stay intact.
+
+## 0.8.2lz — Dialogue continuity
+
+- Give Paul a reunion greeting before Rin explains the recorder mission; offer his support afterwards.
+- Let players answer Rin’s first-flight question, motivate her reactor gift, introduce the survey before PDC preparation, and connect the contraband warning to the Protein purchase.
+- Keep Rin’s Cairn lead focused on the parents; move jump-gate news to an optional question. Remove Sera’s contradictory claim about obtaining the player’s bearings.
+
+## 0.8.2ly — Mara’s opening conversation
+
+- Give Mara a natural transition from the ship handover to the first trading opportunity, and a simple “Passt auf euch auf!” farewell. Update German and English.
+
+## 0.8.2lx — Separate fitting and survey briefings
+
+- Rin’s mining-route remark reflects on the shattered asteroid instead of repeating the controls.
+- Introduce PDC fitting first, then explain the survey after the player installs the drone through normal equipment controls. Keep salvage instructions behind an optional question; surveying itself requires no salvage action.
+
+## 0.8.2lw — Natural tutorial conversations
+
+- Remove Paul recruitment spoilers from Story hints; retain his optional invitation conversation.
+- Keep Paul’s repair introduction and Rin’s first loot explanation short, with optional questions for the technical details.
+- Give Mara a personal send-off, remove repeated aiming/warmup wording, and make the stealth cease-fire instruction unambiguous in English.
+
+## 0.8.2lv — Rin’s Cairn introduction
+
+- Rin opens with a remark that Paul, the Torsas pilot, talked nonstop while she waited. Remove her explicit suggestion that he could accompany the player. Update both German and English; Paul’s own conversation remains available.
+
 ## 0.8.2lu — Mission instructions match the interface
 
 - Direct the Cairn meeting and optional Paul invitation to the Race Desk / Rennbüro, including Mara’s call, the Story hints and Rin’s explanation.

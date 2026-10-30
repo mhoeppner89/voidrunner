@@ -11,9 +11,9 @@ export const TUTORIAL_MINING_REWARD = 3000;
 export const tutorialMiningQuantity = save => save?.activeMissions?.find(m=>m.id===TUTORIAL_MINING_CONTRACT_ID)?.quantity ?? getTutorialQuest(save)?.flags?.miningQuantity ?? TUTORIAL_MINING_QUANTITY;
 // Story progress is separate from the restrictions used during guided lessons.
 const definitions = [
-    ['meet-family',1,'The Spare Key','Meet Mara and Rin in the Helix bar.','Talk to both of them before buying your first cargo.','helix'],
-    ['buy-supplies',1,'The Spare Key','Buy the maximum Protein at Helix.','Select Protein in {ui.trade}, then choose {ui.buyMax}.','helix'],
-    ['launch-helix',1,'The Spare Key','Launch from Helix.','The cargo is aboard. Rin will meet you outside.','vesper'],
+    ['meet-family',1,'The Family Ship','Meet Mara and Rin in the Helix bar.','Talk to both of them before buying your first cargo.','helix'],
+    ['buy-supplies',1,'The Family Ship','Buy the maximum Protein at Helix.','Select Protein in {ui.trade}, then choose {ui.buyMax}.','helix'],
+    ['launch-helix',1,'The Family Ship','Launch from Helix.','The cargo is aboard. Rin will meet you outside.','vesper'],
     ['plot-vesper',2,'First Flight','Select Vesper on the navigation map.','Open the centre radar, select VESPER and close the map.','vesper'],
     ['flight-checks',2,'First Flight','Try the flight controls with Rin.','Follow Rin’s instructions on the comms display.','vesper'],
     ['fly-vesper',2,'First Flight','Fly to Vesper and land.','Follow Rin’s approach instructions after hyperdrive ends at Vesper.','vesper'],
@@ -28,19 +28,19 @@ const definitions = [
     ['salvage-briefing',4,'The Wrecks Remember','Talk to Rin in Vesper’s bar.','Rin has a survey job for you before she leaves to gather information.','vesper'],
     ['fit-pdc',4,'The Wrecks Remember','Switch your drone bay to PDC drones.','Open {ui.equipment}, select the PDC drone in cargo and install it in {ui.droneBay} 1.','vesper'],
     ['survey-graveyard',4,'The Wrecks Remember','Chart the major wrecks in Mourning Line.','Fly alone to Mourning Line. Fly within 100 km of each survey star to chart it.','mourning-line'],
-    ['rescue-paul',4,'The Wrecks Remember','Help Paul defeat the two Scrappers.','Paul’s Torsas is under attack beside the cruiser. Destroy both pirate ships.','mourning-line'],
+    ['rescue-paul',4,'The Wrecks Remember','Help Paul defeat the two Balors.','Paul’s Freya is under attack beside the cruiser. Destroy both pirate ships.','mourning-line'],
     ['talk-paul',4,'The Wrecks Remember','Answer Paul’s transmission.','Paul wants to thank you. Open his comms message.','mourning-line'],
     ['survey-carrier',4,'The Wrecks Remember','Chart the remaining wrecks with Paul.','Follow the survey markers to the carrier. Paul is on your wing.','mourning-line'],
     ['carrier-wait',4,'The Wrecks Remember','Stay near the carrier with Paul.','Keep close to the carrier while Paul checks the old flight deck.','mourning-line'],
-    ['hide-patrol',4,'The Wrecks Remember','Switch off your transponder and hide inside the carrier.','Open the left ship monitor, choose Flight and switch the transponder OFF. Enter the marked carrier hangar, lower thrust and hold fire. Five pirates are passing through.','mourning-line'],
+    ['hide-patrol',4,'The Wrecks Remember','Switch off your transponder and hide inside the carrier.','Open the left ship monitor, choose Flight and switch the transponder OFF. Enter the marked carrier hangar, lower thrust and do not fire. Five pirates are passing through.','mourning-line'],
     ['return-helix',4,'The Wrecks Remember','Return to Helix and dock.','Switch your transponder ON, select Helix and slow down near the station.','helix'],
     ['mara-debrief',4,'The Wrecks Remember','Talk to Mara at Helix.','Mara is waiting in the bar.','helix'],
     ['earn-standing',5,'Your Own Course','Earn and equip your ship.','Trade, mine and take contracts in the starting system. Mara will call when your ship and equipment are ready. The jump gate is closed for repairs.','helix'],
     ['meet-cairn',5,'Your Own Course','Meet Rin at Cairn Yard.','Mara has news from Rin. Fly to Cairn and land.','cairn'],
-    ['rin-cairn',5,'Your Own Course','Talk to Rin at the {ui.raceDesk} on Cairn Yard.','Rin has a lead on your parents. Paul is also here; you can ask him to join you.','cairn'],
-    ['launch-black-box',6,'The Black Box','Launch from Cairn.','Rin will join you. Talk to Paul before launching if you want his help.','mourning-line'],
-    ['salvage-black-box',6,'The Black Box','Salvage the black box beside the frigate wreck.','Fly to Mourning Line and follow BLACK BOX SIGNAL. Within range, hold SALVAGE.','mourning-line'],
-    ['black-box-fight',6,'The Black Box','Defeat the four pirate ships.','Three Scrappers and a Demon are closing in. Protect the black box. Rin will help; Paul joins if you asked him.','mourning-line'],
+    ['rin-cairn',5,'Your Own Course','Talk to Rin at the {ui.raceDesk} on Cairn Yard.','Rin has a lead on your parents. She is waiting at the {ui.raceDesk}.','cairn'],
+    ['launch-black-box',6,'The Black Box','Launch from Cairn.','Rin will join you. Prepare your ship before launching.','mourning-line'],
+    ['salvage-black-box',6,'The Black Box','Salvage the black box beside the frigate wreck.','Fly to Mourning Line, scan and shoot the marked wreckage, then collect the recorder.','mourning-line'],
+    ['black-box-fight',6,'The Black Box','Defeat the four pirate ships.','Three Balors and a Morrigan are closing in. Protect the black box and stay with your wing.','mourning-line'],
     ['deliver-black-box',6,'The Black Box','Bring the black box to Mara at Helix.','Fly to Helix, dock and take the black box to the bar.','helix'],
     ['decode-black-box',6,'The Black Box','Give Mara the black box.','Talk to Mara in the Helix bar. She will decode the recorder.','helix'],
     ['complete',6,'The Black Box','Explore on your own terms.','Mara is decoding the black box. Rin is following the next lead. Trade, explore and take contracts across the open jump gate.','helix'],
@@ -72,7 +72,10 @@ export const tutorialConversation = (save,personId,locationId) => {
     if(locationId==='helix'&&q.stepId==='meet-family')return {'mara-vek':'mara','rin-vek':'rin'}[personId];
     if(locationId==='vesper'&&personId==='rin-vek')return { 'mining-contract':q.flags.miningExplained?undefined:'mining','salvage-briefing':'salvage' }[q.stepId];
     if(locationId==='helix'&&personId==='mara-vek')return {'mara-debrief':'debrief','decode-black-box':'delivery'}[q.stepId];
-    if(locationId==='cairn')return personId==='rin-vek'&&q.stepId==='rin-cairn'?'cairn':personId==='paul'&&!q.flags.paulInvited&&['rin-cairn','launch-black-box'].includes(q.stepId)?'paul-offer':undefined;
+    if(locationId==='cairn'){
+        if(personId==='rin-vek'&&q.stepId==='rin-cairn')return 'cairn';
+        if(personId==='paul'&&!q.flags.paulInvited)return q.stepId==='rin-cairn'?'paul-reunion':q.stepId==='launch-black-box'?'paul-offer':undefined;
+    }
 };
 export const tutorialLaunchBlock = save => {
     if(!isTutorialActive(save))return;
@@ -145,7 +148,7 @@ export const advanceTutorialCampaign=(save,event={})=>{
     if(s==='earn-standing'&&type==='mara-call'){f.maraCallMade=true;return next('meet-cairn');}
     if(s==='meet-cairn'&&dock('cairn'))return next('rin-cairn');
     if(s==='rin-cairn'&&talked('rin-vek','cairn')){f.gateOpen=true;return next('launch-black-box');}
-    if(['rin-cairn','launch-black-box'].includes(s)&&type==='choice'&&event.choiceId==='invite-paul'){recordChoice(save,q.id,'paul','joined');f.paulInvited=true;return {changed:true,quest:q,fromStepId:s,stepId:s};}
+    if(s==='launch-black-box'&&type==='choice'&&event.choiceId==='invite-paul'){recordChoice(save,q.id,'paul','joined');f.paulInvited=true;return {changed:true,quest:q,fromStepId:s,stepId:s};}
     if(s==='launch-black-box'&&type==='launched'&&event.fromLocationId==='cairn')return next('salvage-black-box');
     if(s==='salvage-black-box'&&type==='extracted'&&event.source==='salvage'&&event.instanceId==='mourning-line'&&event.nodeId===f.blackBoxTargetId&&integer(event.amount)>0){f.blackBoxRecovered=true;return next('black-box-fight');}
     if(s==='black-box-fight'&&type==='encounter-cleared'&&event.encounter==='black-box')return next('deliver-black-box');
@@ -157,7 +160,7 @@ export const tutorialCampaignSummary=save=>{
     const q=getTutorialQuest(save);if(!q)return;const step=TUTORIAL_STEPS[q.stepId]??TUTORIAL_STEPS['meet-family'];
     const lesson=q.stepId==='flight-checks'?TUTORIAL_FLIGHT_LESSONS.find(l=>!q.flags['learned-'+l.id]):undefined;
     let progress;if(q.stepId==='sell-supplies')progress=`${Math.min(q.flags.suppliesSold??0,q.flags.deliveryRequired??16)}/${q.flags.deliveryRequired??16}`;if(q.stepId==='mine-shardbelt')progress=`${q.flags.oreRecovered??0}/${tutorialMiningQuantity(save)}`;
-    return {...step,id:q.id,title:'The Spare Key',label:'FAMILY PROLOGUE',active:isTutorialActive(save),guided:isTutorialGuided(save),completed:q.completedAt!==undefined,skipped:Boolean(q.flags.skipped),stepId:q.stepId,chapterCount:TUTORIAL_CHAPTER_COUNT,objective:lesson?.objective??(q.stepId==='mine-shardbelt'?`Mine ${tutorialMiningQuantity(save)} units of ore from the marked deposit.`:step.objective),detail:lesson?.detail??step.detail,lessonId:lesson?.id,progress};
+    return {...step,id:q.id,title:'The Family Ship',label:'FAMILY PROLOGUE',active:isTutorialActive(save),guided:isTutorialGuided(save),completed:q.completedAt!==undefined,skipped:Boolean(q.flags.skipped),stepId:q.stepId,chapterCount:TUTORIAL_CHAPTER_COUNT,objective:lesson?.objective??(q.stepId==='mine-shardbelt'?`Mine ${tutorialMiningQuantity(save)} units of ore from the marked deposit.`:step.objective),detail:lesson?.detail??step.detail,lessonId:lesson?.id,progress};
 };
 export const tutorialDialogue=(save,personId)=>{
     const q=getTutorialQuest(save);if(!q||q.flags?.skipped)return;
@@ -190,7 +193,7 @@ const CARD_COPY = Object.freeze({
     "salvage-briefing": ["Talk to Rin in the bar.", ""],
     "fit-pdc": ["Switch your drone bay to PDC.", "{ui.equipment} → {ui.cargo} → PDC Drone."],
     "survey-graveyard": ["Chart the marked wrecks in Mourning Line.", "Fly within 100 km of each survey star."],
-    "rescue-paul": ["Help Paul defeat the two Scrappers.", ""],
+    "rescue-paul": ["Help Paul defeat the two Balors.", ""],
     "talk-paul": ["Open Paul’s comms message.", ""],
     "survey-carrier": ["Chart the remaining wrecks with Paul.", "Fly within 100 km of each survey star."],
     "carrier-wait": ["Stay with Paul near the carrier.", ""],
@@ -200,8 +203,8 @@ const CARD_COPY = Object.freeze({
     "earn-standing": ["Earn money and upgrade your ship.", ""],
     "meet-cairn": ["Meet Rin at Cairn.", ""],
     "rin-cairn": ["Talk to Rin at the {ui.raceDesk} on Cairn Yard.", ""],
-    "launch-black-box": ["Launch from Cairn.", "Ask Paul at the {ui.raceDesk} if you want his company."],
-    "salvage-black-box": ["Salvage the black box beside the frigate wreck.", "Hold SALVAGE within range."],
+    "launch-black-box": ["Launch from Cairn.", "Check your equipment and supplies before launching."],
+    "salvage-black-box": ["Salvage the black box beside the frigate wreck.", "Approach to scan, shoot, then collect the recorder."],
     "black-box-fight": ["Defeat the four pirate ships.", ""],
     "deliver-black-box": ["Return to Helix.", ""],
     "decode-black-box": ["Give Mara the black box.", "She is in the bar."],
@@ -214,6 +217,10 @@ export const tutorialCardContent = save => {
     const quest = getTutorialQuest(save);
     if (campaign.stepId === 'mine-shardbelt') objective = `Mine ${tutorialMiningQuantity(save)} units of ore at the marked deposit.`;
     if (campaign.stepId === 'mining-contract' && quest.flags.miningExplained) objective = 'Accept the marked mining contract on the mission board.';
+    if (campaign.stepId === 'defeat-raider' && quest.flags.firstRaiderSurrendered) {
+        objective = 'Capture the surrendered pirate.';
+        instruction = 'Keep the pirate targeted, approach and press M or tap capture.';
+    }
     if (campaign.stepId === 'hide-patrol' && save.player.transponder === false) {
         objective = 'Hide inside the marked carrier hangar.';
         instruction = 'Lower thrust and hold fire.';

@@ -30,7 +30,7 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1440,hei
    assert.ok(bounds.x>=0&&bounds.y>=0&&bounds.right<=bounds.width+1&&bounds.bottom<=bounds.height+1,`${name} ${label}: reply outside viewport`);
    await page.screenshot({path:`${out}/${name}-${label}.png`});await page.locator('#adventure-panel [data-ui-command="adventure-choice"]').first().click();
   };
-  await read('arrival',/Wie war dein erster Flug/);await read('sell-instructions',/ALLES VERKAUFEN/);
+  await read('arrival',/Wie war dein erster Flug/);await read('flight-reply',/Hat auch so ausgesehen/);await read('sell-instructions',/ALLES VERKAUFEN/);
   assert.ok(await page.locator('#adventure-panel').isHidden());assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().save.player.cargo.food),purchased);
   await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();for(let i=0;i<3;i++)r.refreshStoryLine();r.restoreTutorialRuntime();r.refreshStoryLine();});assert.ok(await page.locator('#adventure-panel').isHidden());
   await page.locator('[data-dock-hotspot="market"]').click();await page.locator('[data-market-point="commodities"]').click();await page.locator('[data-commodity-id="food"]').click();

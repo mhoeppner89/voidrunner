@@ -26,6 +26,9 @@ function beaconGeometry(level){
 }
 export function createLootVisualResources(){
     const box=new THREE.BoxGeometry(1,.65,.8),edges=new THREE.EdgesGeometry(box);
+    const shape=new THREE.Shape();shape.moveTo(-.52,-.24);shape.lineTo(-.35,-.38);shape.lineTo(.02,-.31);shape.lineTo(.17,-.43);shape.lineTo(.54,-.2);shape.lineTo(.46,.28);shape.lineTo(.2,.39);shape.lineTo(-.03,.28);shape.lineTo(-.29,.4);shape.lineTo(-.55,.16);shape.closePath();
+    const fragment=new THREE.ExtrudeGeometry(shape,{depth:.52,bevelEnabled:false});fragment.translate(0,0,-.26);
+    const fragmentEdges=new THREE.EdgesGeometry(fragment);
     const hull=new THREE.MeshStandardMaterial({color:0x283846,roughness:.7,metalness:.65});
     const outline=new THREE.MeshBasicMaterial({color:0x020910,side:THREE.DoubleSide,toneMapped:false});
     const qualities=new Map(QUALITIES.map((rarity,index)=>[rarity,{
@@ -33,8 +36,8 @@ export function createLootVisualResources(){
         beacon:new THREE.MeshBasicMaterial({color:EQUIPMENT_RARITIES[rarity].color,side:THREE.DoubleSide,toneMapped:false}),
         frame:new THREE.LineBasicMaterial({color:EQUIPMENT_RARITIES[rarity].color,toneMapped:false}),
     }]));
-    for(const resource of [box,edges,hull,outline,...[...qualities.values()].flatMap(q=>[q.geometry,q.beacon,q.frame])])resource.userData.shared=true;
-    return {box,edges,hull,outline,qualities};
+    for(const resource of [box,edges,fragment,fragmentEdges,hull,outline,...[...qualities.values()].flatMap(q=>[q.geometry,q.beacon,q.frame])])resource.userData.shared=true;
+    return {box,edges,fragment,fragmentEdges,hull,outline,qualities};
 }
 export function setLootVisualRarity(root,resources,rarity){
     const quality=resources.qualities.get(rarity)??resources.qualities.get('common');
@@ -44,8 +47,8 @@ export function setLootVisualRarity(root,resources,rarity){
     root.userData.lootRarity=resources.qualities.has(rarity)?rarity:'common';
 }
 export function createLootVisual(node,resources){
-    const root=new THREE.Group(),body=new THREE.Mesh(resources.box,resources.hull);
-    const frame=new THREE.LineSegments(resources.edges,resources.qualities.get('common').frame);
+    const root=new THREE.Group(),body=new THREE.Mesh(node.salvageFragment?resources.fragment:resources.box,resources.hull);
+    const frame=new THREE.LineSegments(node.salvageFragment?resources.fragmentEdges:resources.edges,resources.qualities.get('common').frame);
     const common=resources.qualities.get('common');
     const beacon=new THREE.Group(),face=new THREE.Mesh(common.geometry,common.beacon),outline=new THREE.Mesh(common.geometry,resources.outline);
     // Build both meshes from cached resources; no per-drop material/geometry.
@@ -63,6 +66,6 @@ export function createLootVisual(node,resources){
 }
 export function disposeLootVisualResources(resources){
     if(!resources)return;
-    for(const resource of [resources.box,resources.edges,resources.hull,resources.outline,...[...resources.qualities.values()].flatMap(q=>[q.geometry,q.beacon,q.frame])])resource.dispose();
+    for(const resource of [resources.box,resources.edges,resources.fragment,resources.fragmentEdges,resources.hull,resources.outline,...[...resources.qualities.values()].flatMap(q=>[q.geometry,q.beacon,q.frame])])resource.dispose();
     resources.qualities.clear();
 }

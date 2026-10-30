@@ -49,6 +49,27 @@ test('anti-shield racks fire their typed volleys and persist separate one-canist
   assert.ok(s.projectiles.every(m=>m.launcherId===id&&m.damage===LAUNCHERS[id].damage));
  }
 });
+test('automatic ship locks enter combat mode and stale tool modes still fire at a locked ship',()=>{
+ for(const mode of ['mining','salvage']){
+  const s=session(),p=s.save.player;p.shipId='wayfarer';p.ownedShips=['wayfarer'];
+  const fit=loadoutFor(p);fit.launchers[2]='seeker-launcher';p.outfitting.loadouts.wayfarer=fit;
+  fillLauncherMagazines(p);const before=launcherMagazineEntries(p)[0].rounds;
+  const enemy=s.spawnShip('pirate',[0,0,-100]);s.renderer.setTarget=()=>{};
+  s.getTargetRef=()=>({kind:'ship',id:enemy.id,position:enemy.position});
+  p.mode=mode;s.applyTarget({kind:'ship',id:enemy.id,position:enemy.position});
+  assert.equal(p.mode,'combat',`automatic lock from ${mode}`);
+  p.mode=mode;let dronesToggled=false;s.toggleMiningDrones=()=>{dronesToggled=true;};
+  s.handleActions({missile:true});
+  assert.equal(dronesToggled,false);assert.equal(p.mode,'combat');
+  assert.equal(s.projectiles.length,1);assert.equal(s.projectiles[0].targetId,enemy.id);
+  assert.equal(launcherMagazineEntries(p)[0].rounds,before-1);
+ }
+});
+test('missile control still operates mining drones when an asteroid is selected',()=>{
+ const s=session();s.save.player.mode='mining';s.save.player.currentTargetId='ore';
+ s.getTargetRef=()=>({kind:'asteroid',id:'ore'});let calls=0;s.toggleMiningDrones=()=>calls++;
+ s.handleActions({missile:true});assert.equal(calls,1);assert.equal(s.projectiles.length,0);
+});
 test('swept missile impacts preserve anti-shield and anti-hull profiles',()=>{
  for(const [id,[hullDamage,shieldDamage]] of Object.entries(profiles))for(const shield of [0,500]){
   const s=session();s.save.player.position=[1000,1000,0];const ship=s.spawnShip('pirate',[0,0,0]);

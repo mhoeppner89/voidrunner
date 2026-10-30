@@ -90,3 +90,13 @@ test('clearing a reused scene preserves the LaserFx expiry list for later combat
         assert.equal(r.effects.length,0);assert.equal(flash.parent,null);
     }
 });
+test('salvage breakup uses temporary instanced solid fragments and shared resources',()=>{
+    const r=renderer();Object.assign(r,{scene:new THREE.Scene(),effects:[]});const fx=r.laserFx=new LaserFx(r.scene,r.effects);
+    fx.salvageRelease([2,3,4],{x:0,y:0,z:-1},2);assert.equal(r.effects.length,1);
+    const fragment=r.effects[0].object;assert.ok(fragment.isInstancedMesh);assert.equal(fragment.count,9);
+    fragment.geometry.computeBoundingBox();assert.ok(fragment.geometry.boundingBox.getSize(new THREE.Vector3()).y>0,'metal pieces have thickness');
+    const matrix=new THREE.Matrix4();fragment.getMatrixAt(0,matrix);const before=new THREE.Vector3().setFromMatrixPosition(matrix);
+    r.updateEffects(.01);r.updateEffects(.25);fragment.getMatrixAt(0,matrix);const after=new THREE.Vector3().setFromMatrixPosition(matrix);assert.ok(after.distanceTo(before)>0);assert.ok(after.z>0,'fragments leave the impact face');
+    let disposed=0;fragment.geometry.addEventListener('dispose',()=>disposed++);r.updateEffects(1.3);assert.equal(r.effects.length,0);assert.equal(fragment.parent,null);assert.equal(disposed,0,'shared mesh remains usable');
+    fx.dispose();assert.equal(disposed,1);
+});

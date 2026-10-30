@@ -6,22 +6,22 @@ export const equipmentRecord = id => resolved.get(id);
 export const registerEquipmentDefinition = (id, definition) => resolved.set(id, definition);
 export const forgetEquipmentDefinition = id => resolved.delete(id);
 export const equipmentBaseId = id => resolved.get(id)?.baseId ?? id;
-export const EQUIPMENT_RARITIES = Object.freeze({common:{name:'Common',color:'#f1f4f7',affixes:0,value:1},uncommon:{name:'Uncommon',color:'#72df95',affixes:1,value:1.25},rare:{name:'Rare',color:'#79b8ff',affixes:2,value:1.65},named:{name:'Named',color:'#e5bc61',affixes:0,value:2}});
+export const EQUIPMENT_RARITIES = Object.freeze({common:{name:'Common',color:'#f1f4f7',affixes:0,value:1},uncommon:{name:'Uncommon',color:'#72df95',affixes:1,value:4},rare:{name:'Rare',color:'#79b8ff',affixes:2,value:10},named:{name:'Named',color:'#e5bc61',affixes:0,value:18}});
 export const EQUIPMENT_AFFIXES = Object.freeze({
  efficient:{name:'Efficient',categories:['gun','launcher','turret'],energy:.86},
  precise:{name:'Precise',categories:['gun','launcher','turret'],accuracy:1.12},
- rapid:{name:'Rapid',categories:['gun','launcher','turret'],cooldown:.92,energy:1.06},
+ rapid:{name:'Rapid',categories:['gun','launcher','turret'],cooldown:.92},
  longRange:{name:'Long-range',categories:['gun','launcher','turret'],range:1.1},
  light:{name:'Lightweight',categories:['gun','launcher','turret','power','drive','defense','utility'],mass:.75},
  tuned:{name:'Tuned',categories:['power','drive','defense','utility'],effect:1.08},
  compact:{name:'Compact',categories:['power','drive','defense','utility'],mass:.85,effect:1.04},
 });
 export const NAMED_EQUIPMENT = Object.freeze({
- 'gauss-cannon':{name:'Dead Reckoning',damage:1.12,cooldown:1.12,energy:1.12,range:1.15},
- 'pulse-cannon':{name:'Needle Array',damage:.94,cooldown:.88,energy:.88,accuracy:1.15},
- 'beam-emitter':{name:'Quiet Sun',damage:1.08,energy:.85,range:.9},
- 'torpedo-launcher':{name:'Siegebreaker',damage:1.12,cooldown:1.2,energy:1.15},
- 'shield-mk2':{name:'Bastion',effect:1.18,mass:1.3},
+ 'gauss-cannon':{name:'Dead Reckoning',damage:1.12,range:1.15},
+ 'pulse-cannon':{name:'Needle Array',cooldown:.88,energy:.88,accuracy:1.15},
+ 'beam-emitter':{name:'Quiet Sun',damage:1.08,energy:.85},
+ 'torpedo-launcher':{name:'Siegebreaker',damage:1.12},
+ 'shield-mk2':{name:'Bastion',effect:1.18},
 });
 // Technology tier is independent of rarity and of the hardware model name.
 // Named loot still shows its hardware type; affixes stay out of compact lists.
@@ -49,14 +49,16 @@ export function resolveEquipmentDefinition(base, record) {
  const extra=Math.max(0,tier-(base.tier??1));
  // Tier II exactly replaces the former reinforced pulse's base performance.
  const pulse=base.id==='pulse-cannon';
- const modifiers={damage:1+extra*(pulse?4/23:.1),energy:1+extra*(pulse ? .125 : .14),cooldown:1,range:1,accuracy:1,mass:1,effect:1+extra*.1};
+ const quality={common:0,uncommon:1,rare:2,named:3}[record.rarity]??0;
+ const qualityGain=[1,1.1,1.3,1.6][quality];
+ const modifiers={damage:(1+extra*(pulse?4/23:.1))*qualityGain,energy:(1+extra*(pulse ? .125 : .06))*(1-quality*.02),cooldown:1,range:1,accuracy:1,mass:1,effect:(1+extra*.1)*qualityGain};
  const affixes=(record.affixes??[]).map(id=>EQUIPMENT_AFFIXES[id]).filter(a=>a?.categories.includes(base.category));
  for(const a of affixes)for(const key of Object.keys(modifiers))modifiers[key]*=a[key]??1;
  const named=record.rarity==='named'?NAMED_EQUIPMENT[record.baseId]:undefined;
  if(named)for(const key of Object.keys(modifiers))modifiers[key]*=named[key]??1;
  const effects={...base.effects};
  // Collection distance is a fixed technology specification, never an affix roll.
- if(base.id==='loot-collector')effects.lootRange=[150,200,250][tier-1];
+ if(base.id==='loot-collector')effects.lootRange=[150,200,250][tier-1]*(1+quality*.05);
  for(const [key,value] of Object.entries(effects))if(typeof value==='number'){
   if(key.endsWith('Multiplier'))effects[key]=1+(value-1)*modifiers.effect;
   else if(['cargoCapacity','shieldCapacity','hullCapacity','salvageRange','salvageRate','radarMultiplier','scanMultiplier'].includes(key))effects[key]=value*modifiers.effect;

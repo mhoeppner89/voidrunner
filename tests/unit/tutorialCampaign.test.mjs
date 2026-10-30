@@ -34,3 +34,14 @@ test('legacy prologues migrate once without repeating trade purchases or changin
  const {save:done,q:completed}=fixture();completed.flags={};completed.completedAt=20;completed.stepId='complete';migrateTutorialCampaign(done);assert.equal(completed.completedAt,20);assert.ok(tutorialGateOpen(done));
  for(const step of Object.values(TUTORIAL_STEPS))assert.ok(step.chapter<=6);
 });
+
+test('Paul cannot offer or accept a recorder escort before Rin has explained the mission',async()=>{
+ const {tutorialConversation}=await import('../../src/game/tutorialCampaign.js');
+ const {save,q,go}=fixture();q.stepId='rin-cairn';save.player.dockedAt='cairn';
+ assert.equal(tutorialConversation(save,'paul','cairn'),'paul-reunion');
+ go({type:'talked',personId:'paul',locationId:'cairn'});assert.equal(q.stepId,'rin-cairn');
+ assert.equal(go({type:'choice',choiceId:'invite-paul'}).changed,false);assert.ok(!q.flags.paulInvited);
+ go({type:'talked',personId:'rin-vek',locationId:'cairn'});assert.equal(q.stepId,'launch-black-box');
+ assert.equal(tutorialConversation(save,'paul','cairn'),'paul-offer');
+ go({type:'choice',choiceId:'invite-paul'});assert.equal(q.flags.paulInvited,true);
+});

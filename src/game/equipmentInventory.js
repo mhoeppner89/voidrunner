@@ -5,6 +5,7 @@ import {normalizeLauncherMagazines,launcherMagazineEntries,mountedLauncherEntrie
 import {DRONE_ITEM_IDS,DRONE_TYPES,createDroneUnit,droneInventoryId,droneUnitAccessible} from './droneData.js';
 import {LOCATIONS,COMMODITIES} from './data.js';
 import {cargoMass} from './economy.js';
+import {seededRandom} from './random.js';
 const clone=value=>JSON.parse(JSON.stringify(value));
 export const ITEM_SURVIVAL_CHANCE=.18;
 export const CARGO_SURVIVAL_CHANCE=.55;
@@ -25,7 +26,7 @@ export function createEquipmentRecord(baseId,{id,tier=1,rarity='common',affixes=
  registerInventoryDefinitions({items:{[item.id]:item}});return item;
 }
 export function rollEquipmentRecord(baseId,rng,tier=1,id){
- const chance=rng(),rarity=chance<.015&&NAMED_EQUIPMENT[baseId]?'named':chance<.12?'rare':chance<.4?'uncommon':'common';
+ const chance=rng(),rarity=BASE_OUTFIT_ITEMS[baseId]?.category==='drone'?'common':chance<.003&&NAMED_EQUIPMENT[baseId]?'named':chance<.025?'rare':chance<.12?'uncommon':'common';
  const candidates=Object.keys(EQUIPMENT_AFFIXES).filter(a=>EQUIPMENT_AFFIXES[a].categories.includes(BASE_OUTFIT_ITEMS[baseId]?.category));
  const affixes=[];while(affixes.length<EQUIPMENT_RARITIES[rarity].affixes&&candidates.length)affixes.push(candidates.splice(Math.floor(rng()*candidates.length),1)[0]);
  return createEquipmentRecord(baseId,{id,tier,rarity,affixes});
@@ -95,6 +96,26 @@ export function equipmentInstallMount(player,item,requestedId){
  return slots.find(slot=>slot.mount.id===requestedId)??slots.find(slot=>!mountItemId(fit,slot));
 }
 export function shopEquipmentTiers(stationId){return ['rook','argent','league-yard','haven','cinderfall'].includes(stationId)?[1,2,3]:['helix','azure','vesper','blackglass'].includes(stationId)?[1,2]:[1];}
+// Small, rotating station stock. The generated offers depend only on the
+// saved world seed and time; a purchase ledger prevents duplicates after reload.
+export function specialEquipmentOffers(player, stationId, world = {}) {
+ if(!LOCATIONS[stationId]?.services?.outfitting)return [];
+ const period=Math.floor(Math.max(0,Number(world.time)||0)/1800);
+ const rng=seededRandom(`${world.seed??0}:special-equipment:${stationId}:${period}`);
+ if(rng()>=.7)return [];
+ const candidates=Object.values(BASE_OUTFIT_ITEMS).filter(base=>!base.lootOnly&&base.category!=='drone'&&itemAvailable(player,base,stationId));
+ const result=[];
+ for(let i=0;i<2&&candidates.length;i++){
+  const base=candidates.splice(Math.floor(rng()*candidates.length),1)[0];
+  const tiers=shopEquipmentTiers(stationId).filter(t=>t>=(base.tier??1));if(!tiers.length)continue;
+  const tier=tiers[Math.floor(rng()*tiers.length)],rarity=rng()<.22?'rare':'uncommon';
+  const pool=Object.keys(EQUIPMENT_AFFIXES).filter(id=>EQUIPMENT_AFFIXES[id].categories.includes(base.category));
+  const affixes=[];while(affixes.length<EQUIPMENT_RARITIES[rarity].affixes&&pool.length)affixes.push(pool.splice(Math.floor(rng()*pool.length),1)[0]);
+  const offerId=`${stationId}:${period}:${i}`;
+  if(!player.inventory?.shopPurchases?.[offerId])result.push({offerId,baseId:base.id,tier,rarity,affixes});
+ }
+ return result;
+}
 export function captureEquipmentAmmo(player){
  if(!player.inventory)return;
  for(const entry of launcherMagazineEntries(player)){const item=player.inventory.items[entry.itemId];if(item)item.rounds=entry.rounds;}
@@ -108,7 +129,7 @@ export function equipmentSaleEligibility(player,item){
  return {ok:true};
 }
 export const equipmentSaleValue=(player,item)=>Math.floor((OUTFIT_ITEMS[item.id]?.price??0)*.7*(item.droneUnitId?Math.max(0,player.droneFleet?.unitsById[item.droneUnitId]?.hull??0)/DRONE_TYPES[OUTFIT_ITEMS[item.id].droneType].maxHull:1));
-export function equipmentAction(player,action,{id,baseId,tier=1,mountId,stationId=player.dockedAt}={}){
+export function equipmentAction(player,action,{id,baseId,tier=1,mountId,stationId=player.dockedAt,offerId,world}={}){
  if(!['buy','install','remove','store','carry','sell'].includes(action))return {ok:false,code:'Invalid equipment action.'};
  const droneRefit=['install','remove'].includes(action)&&Boolean(player.inventory?.items?.[id]?.droneUnitId);
  if((!player.dockedAt&&!droneRefit)||stationId!==player.dockedAt)return {ok:false,code:'Dock at a station to change equipment.'};
@@ -118,11 +139,14 @@ export function equipmentAction(player,action,{id,baseId,tier=1,mountId,stationI
  if(action==='buy'){
   if(!LOCATIONS[stationId]?.services?.outfitting)return {ok:false,code:'Equipment unavailable.'};
   if(!Object.hasOwn(BASE_OUTFIT_ITEMS,baseId)||BASE_OUTFIT_ITEMS[baseId].lootOnly||!itemAvailable(player,baseId,stationId)||Number(tier)<(BASE_OUTFIT_ITEMS[baseId].tier??1)||!shopEquipmentTiers(stationId).includes(Number(tier)))return {ok:false,code:'Equipment unavailable.'};
+  const offer=offerId?specialEquipmentOffers(player,stationId,world).find(entry=>entry.offerId===offerId):undefined;
+  if(offerId&&(!offer||offer.baseId!==baseId||offer.tier!==Number(tier)))return {ok:false,code:'Equipment unavailable.'};
   const type=BASE_OUTFIT_ITEMS[baseId].droneType,fleet=draft.droneFleet;
   if(type&&(Number(tier)!==1||!Number.isSafeInteger(fleet?.nextUnitId)||fleet.nextUnitId>=Number.MAX_SAFE_INTEGER))return {ok:false,code:'Equipment unavailable.'};
   const unitId=type?`drone-unit-${fleet.nextUnitId}`:undefined;
-  const record=createEquipmentRecord(baseId,{id:unitId?droneInventoryId(unitId):undefined,tier:Number(tier),location:{kind:'station',stationId}}),price=OUTFIT_ITEMS[record.id].price;
+  const record=createEquipmentRecord(baseId,{id:unitId?droneInventoryId(unitId):undefined,tier:Number(tier),rarity:offer?.rarity??'common',affixes:offer?.affixes??[],location:{kind:'station',stationId}}),price=OUTFIT_ITEMS[record.id].price;
   if(draft.credits<price){forgetEquipmentDefinition(record.id);return {ok:false,code:'Not enough credits.'};}inventory.items[record.id]=record;draft.credits-=price;item=record;id=record.id;credit=-price;
+  if(offer){inventory.shopPurchases??={};inventory.shopPurchases[offer.offerId]=true;}
   if(type){record.droneUnitId=unitId;fleet.nextUnitId++;fleet.unitsById[unitId]=createDroneUnit(unitId,type);fleet.lockerIds.push(unitId);}
  }else if(!item)return {ok:false,code:'Item is no longer available.'};
  const fit=draft.outfitting.loadouts[draft.shipId];

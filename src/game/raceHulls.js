@@ -2,10 +2,10 @@ import {integrateFlightTurn,integrateFlightVelocity} from './flightDynamics.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 // Purpose-built race frames. These never enter the career equipment catalog.
 export const RACE_HULLS=Object.freeze(Object.fromEntries([
- ['speedster','Speedster R','Agil',115,185,5,0.72,0x70e8ee,500],
- ['demon','Demon R','Sprint',115,185,5,1.1,0xffa16b,500],
- ['talon','Talon R','Präzision',115,185,5,0.9,0xb9b2ff,500],
- ['lancer','Lancer R','Durchsetzung',115,185,5,1.45,0xf1cc77,500],
+ ['speedster','Loki R','Agil',115,185,5,0.72,0x70e8ee,500],
+ ['demon','Morrigan R','Sprint',115,185,5,1.1,0xffa16b,500],
+ ['talon','Mercury R','Präzision',115,185,5,0.9,0xb9b2ff,500],
+ ['lancer','Artemis R','Durchsetzung',115,185,5,1.45,0xf1cc77,500],
 ].map(([id,name,style,acceleration,braking,angularAcceleration,mass,color,afterburnSpeed])=>[id,Object.freeze({
  id,name,style,acceleration,braking,angularAcceleration,mass,color,
  maxSpeed:145,afterburnSpeed,angularDamping:5.5,lateralMultiplier:1,hull:400,shield:400,

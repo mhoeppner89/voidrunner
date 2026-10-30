@@ -1,6 +1,10 @@
 # Voidrunner
 
-A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2lu**.
+A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2mn**.
+
+Equipment improves its primary performance with technology tier and rarity. Gear above the hull tier draws up to 6% of the bare reactor output per excess tier and installed item; the equipment screen shows the regeneration load. Exceptional equipment is less common in wrecks, while stations may stock one-off colored items that rotate after 30 minutes of simulation time and cost substantially more than common gear. Shipyard hull prices are doubled.
+
+Jump gates have a segmented, deep industrial frame with power modules, maintenance details and an unobstructed flight aperture. Run `node tools/playtest/jump-gate-review.mjs` and open `/output/jump-gate-review/index.html` to inspect the gate from both sides and compare it with a ship at in-game scale.
 
 Procedural pilot comms and random-encounter dialogue use 24 individually prompted, anonymous cockpit portraits: six each for Concord, Alliance, Independents and Pirates, with three male and three female portraits per faction. Files 01–03 are male; 04–06 are female. Each image is a separate 647×768 WebP. Each pilot gets a random portrait from their faction, reused throughout their exchange.
 

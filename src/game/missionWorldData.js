@@ -308,6 +308,24 @@ export const generateWreckNodes = (seed, depleted, scanned = []) => {
             accepted += 1;
         }
     }
+    // The tutorial selects the first external fragment by the port frigate.
+    // Move just that fragment closer after generation, so the RNG stream and
+    // other salvage IDs in existing saves never change.
+    const recorder = nodes.find(node => node.zone === 'frigate-alpha' && !node.insideWreckId);
+    const frigate = GRAVEYARD_MODEL_WRECKS.find(wreck => wreck.id === 'concord-frigate-alpha-wreck');
+    if (recorder && frigate) {
+        const local = recorder.position.map((value, i) => value - center[i]);
+        const direction = local.map((value, i) => value - frigate.local[i]);
+        const length = Math.hypot(...direction), reach = wreckNodeCollisionRadius(recorder);
+        for (const shift of [50, 40, 30, 20, 10]) {
+            const candidate = local.map((value, i) => value - direction[i] / length * shift);
+            if (overlapsGraveyardModelWreck(candidate, reach) || intersectsRaceCorridor('mourning-line', candidate, reach)) continue;
+            const world = add(center, candidate);
+            if (nodes.some(other => other !== recorder && Math.hypot(...other.position.map((v,i) => v - world[i])) < reach + wreckNodeCollisionRadius(other) + 4)) continue;
+            recorder.position = world;
+            break;
+        }
+    }
     return nodes;
 };
 

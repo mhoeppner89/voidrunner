@@ -4,7 +4,7 @@ import {equipmentStatChanges,equipmentEffectStats} from '../../src/game/equipmen
 import {BASE_OUTFIT_ITEMS} from '../../src/game/outfitting.js';import {COMMODITIES,displaySpeed} from '../../src/game/data.js';
 import {createNewSave} from '../../src/game/save.js';import {getEffectiveShipStats} from '../../src/game/shipStats.js';import {resolveEquipmentDefinition} from '../../src/game/equipmentCatalog.js';import {SHIELD_RECHARGE_RATE} from '../../src/game/combatResources.js';
 test('all equipment and commodities have distinct transparent vector symbols',()=>{
- const equipment=new Set(),cargo=new Set();for(const item of Object.values(BASE_OUTFIT_ITEMS)){const icon=equipmentIcon(item);assert.match(icon,/<svg /);assert.match(icon,new RegExp(`data-icon="${item.id}"`));assert.doesNotMatch(icon,/<img|<image|<rect|background|undefined/);const shape=icon.match(/<path d="([^"]+)"/)[1];assert(!equipment.has(shape),item.id);equipment.add(shape);}
+ const equipment=new Set(),cargo=new Set();for(const item of Object.values(BASE_OUTFIT_ITEMS)){const icon=equipmentIcon(item);assert.match(icon,/<svg /);assert.match(icon,new RegExp(`data-icon="${item.id}"`));assert.doesNotMatch(icon,/<img|<image|<rect|background|undefined/);const shape=[...icon.matchAll(/<path d="([^"]+)"/g)].map(m=>m[1]).join('|');assert(!equipment.has(shape),item.id);equipment.add(shape);}
  for(const item of Object.values(COMMODITIES)){const icon=commodityIcon(item);assert.match(icon,new RegExp(`data-commodity-icon="${item.id}"`));assert.doesNotMatch(icon,/<img|<image|background|undefined/);assert(!cargo.has(icon));cargo.add(icon);}
 });
 test('inventory tiers and different affixes remain visible without using rarity as a tier',()=>{
@@ -13,11 +13,11 @@ test('inventory tiers and different affixes remain visible without using rarity 
 });
 test('capacitor comparisons name actual stored energy and output and retain replacement trade-offs',()=>{
  const s=createNewSave(81,{tutorial:false}),p=s.player,fit=p.outfitting.loadouts[p.shipId];fit.utility.fill(null);fit.utility[0]='engine-mk2';const before=getEffectiveShipStats(p);fit.utility[0]='capacitor-bank';const after=getEffectiveShipStats(p),rows=equipmentStatChanges(before,after,BASE_OUTFIT_ITEMS['capacitor-bank']);
- assert.equal(rows[0].key,'energyCapacity');assert.equal(rows[0].label,'Energy capacity');assert.equal(rows[0].after,after.energyCapacity);assert.equal(rows[1].key,'reactorOutput');assert.equal(rows[1].label,'Energy regeneration');assert.equal(rows[1].unit,'/s');assert(rows.some(r=>r.key==='maxSpeed'));assert(rows.some(r=>r.key==='angularAcceleration'));assert(rows.length>3,'no three-stat cutoff');assert.equal(rows.find(r=>r.key==='maxSpeed').after,displaySpeed(after.maxSpeed));
+ assert.equal(rows[0].key,'energyCapacity');assert.equal(rows[0].label,'Energy capacity');assert.equal(rows[0].after,after.energyCapacity);assert(!rows.some(r=>r.key==='reactorOutput'),'the capacitor no longer reduces regeneration');assert(rows.some(r=>r.key==='maxSpeed'));assert(rows.some(r=>r.key==='acceleration'));assert(rows.length>=3,'replacement losses remain visible');assert.equal(rows.find(r=>r.key==='maxSpeed').after,displaySpeed(after.maxSpeed));
 });
 test('shield recharge is a real per-second rate; sensor and cargo upgrades expose their own stats',()=>{
  const s=createNewSave(83,{tutorial:false}),p=s.player,fit=p.outfitting.loadouts[p.shipId];fit.utility.fill(null);const before=getEffectiveShipStats(p);
- for(const[id,keys]of [['recovery-shield',['shield','shieldRegeneration']],['radar-mk2',['radarRange','scanRange']],['cargo-pods',['cargo']]]){fit.utility.fill(null);fit.utility[0]=id;const after=getEffectiveShipStats(p),rows=equipmentStatChanges(before,after,BASE_OUTFIT_ITEMS[id]);for(const key of keys)assert(rows.some(r=>r.key===key));if(id==='recovery-shield'){const r=rows.find(r=>r.key==='shieldRegeneration');assert.equal(r.after,after.shieldRegeneration);assert.equal(r.unit,'/s');}}
+ for(const[id,keys]of [['recovery-shield',['shieldRegeneration']],['radar-mk2',['radarRange','scanRange']],['cargo-pods',['cargo']]]){fit.utility.fill(null);fit.utility[0]=id;const after=getEffectiveShipStats(p),rows=equipmentStatChanges(before,after,BASE_OUTFIT_ITEMS[id]);for(const key of keys)assert(rows.some(r=>r.key===key));if(id==='recovery-shield'){const r=rows.find(r=>r.key==='shieldRegeneration');assert.equal(r.after,after.shieldRegeneration);assert.equal(r.unit,'/s');}}
 });
 test('new shell modules are included in the offline cache',async()=>{const sw=await readFile('sw.js','utf8');assert.match(sw,/\.\/src\/game\/itemIcons\.js/);assert.match(sw,/\.\/src\/game\/equipmentStatPresentation\.js/);});
 
@@ -26,8 +26,8 @@ test('Arena rewards show capacity/output, every replacement trade-off and distin
  setLanguage('en');const s=newArenaRun(false,91);s.player.shipId='legionary';s.player.ownedShips=['legionary'];const f=loadoutFor(s.player);f.guns[0]='pulse-cannon';f.utility=['engine-mk2','radar-mk2','shield-mk2','cargo-pods'];s.player.outfitting.loadouts.legionary=f;
  Object.assign(s.arenaRun,{wave:13,phase:'prepare',hullChosen:true,decisions:{13:true},rewardChosen:false,offers:['shield-swarm-launcher','capacitor-bank','swarm-launcher']});
  const node={innerHTML:'',classList:{remove(){}}},ui=Object.create(GameUI.prototype);ui.root={querySelector:()=>node};ui.updateOrientationNotice=()=>{};ui.showArenaRun(s);
- const markup=node.innerHTML;for(const key of ['energyCapacity','reactorOutput','maxSpeed','acceleration','angularAcceleration','burnFuelMultiplier'])assert.match(markup,new RegExp(`data-stat="${key}"`));
- assert.match(markup,/>Energy capacity</);assert.match(markup,/>Energy regeneration</);assert.doesNotMatch(markup,/>Capacitor<|<img/);assert.match(markup,/>4×20</);assert.match(markup,/>4×10</);assert.match(markup,/Shield damage/);assert.match(markup,/Hull damage/);
+ const markup=node.innerHTML;for(const key of ['energyCapacity','maxSpeed','acceleration'])assert.match(markup,new RegExp(`data-stat="${key}"`));
+ assert.match(markup,/>Energy capacity</);assert.doesNotMatch(markup,/>Capacitor<|<img/);assert.match(markup,/>4×20</);assert.match(markup,/>4×10</);assert.match(markup,/Shield damage/);assert.match(markup,/Hull damage/);
 });
 test('station warmup no longer fetches retired equipment/commodity bitmaps',async()=>{
  const {GameUI}=await import('../../src/game/ui.js'),ui=Object.create(GameUI.prototype);ui.save=createNewSave(98,{tutorial:false});const urls=ui.locationAssetUrls('helix');assert(urls.length>0);assert(!urls.some(url=>url.includes('/commodities/')||url.includes('/outfitting/simplified/')));
@@ -68,8 +68,8 @@ test('German Arena reward names use complete weapon types and tiers',async()=>{
 
 test('unmounted utility bonuses use concrete stat labels and actual rolled effects',()=>{
  const base=BASE_OUTFIT_ITEMS['capacitor-bank'];const item=resolveEquipmentDefinition(base,{id:'tier2',baseId:base.id,tier:2,rarity:'common',affixes:[]});
- const rows=equipmentEffectStats(item);assert.deepEqual(rows.map(r=>r.label),['Energy capacity','Energy regeneration']);assert.equal(rows[0].unit,'%');assert(Math.abs(rows[0].value-44)<.001);assert(Math.abs(rows[1].value+11)<.001);
- for(const base of Object.values(BASE_OUTFIT_ITEMS).filter(d=>!['gun','launcher','turret'].includes(d.category)))assert(equipmentEffectStats(base).length,base.id);
+ const rows=equipmentEffectStats(item);assert.deepEqual(rows.map(r=>r.label),['Energy capacity']);assert.equal(rows[0].unit,'%');assert(Math.abs(rows[0].value-44)<.001);
+ for(const base of Object.values(BASE_OUTFIT_ITEMS).filter(d=>!['gun','launcher','turret','drone'].includes(d.category)))assert(equipmentEffectStats(base).length,base.id);
 });
 
 test('approved review names win over historical aliases in both languages',async()=>{
@@ -88,5 +88,5 @@ test('commodity labels stay short in both languages, with legality separate from
  const expected={food:'Protein',water:'Wasser',medicine:'Medigel',electronics:'Elektronik',machinery:'Maschinen',ore:'Erz',gold:'Gold',scrap:'Schrott',luxuries:'Luxusgüter',arms:'Waffen'};
  for(const [id,label]of Object.entries(expected))assert.equal(DE_CATALOG[COMMODITIES[id].name],label,id);
  assert.equal(COMMODITIES.arms.legal,false);assert.equal(COMMODITIES.arms.name,'Weapons');
- const {ADVENTURE_DIALOGUES}=await import('../../src/game/adventureDialogues.js');assert.match(ADVENTURE_DIALOGUES.rin.nodes.legal.text.de,/Waffen sind rot markiert. Ihr Transport ist illegal/);
+ const {ADVENTURE_DIALOGUES}=await import('../../src/game/adventureDialogues.js');assert.match(ADVENTURE_DIALOGUES.rin.nodes.legal.text.de,/rot markierte Waffenfracht.*Schmuggelware/);
 });

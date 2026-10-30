@@ -7,10 +7,10 @@ const THREE=await import('three');
 const {GameSession}=await import('../../src/game/game.js');
 const {createNewSave,hydrateSave}=await import('../../src/game/save.js');
 const {getTutorialQuest,skipTutorialCampaign}=await import('../../src/game/tutorialCampaign.js');
-const {generateWreckNodes,generateGraveyardPieces}=await import('../../src/game/worldData.js');
+const {generateWreckNodes,generateGraveyardPieces,GRAVEYARD_MODEL_WRECKS}=await import('../../src/game/worldData.js');
 const {DE_CATALOG}=await import('../../src/game/i18n-de.js');
-const {ADVENTURE_DIALOGUES}=await import('../../src/game/adventureDialogues.js');
-const {TUTORIAL_RADIO,TRAVEL_RADIO}=await import('../../src/game/tutorialRadio.js');
+const {ADVENTURE_DIALOGUES,dialogueText}=await import('../../src/game/adventureDialogues.js');
+const {TRAVEL_RADIO}=await import('../../src/game/tutorialRadio.js');
 const {SYSTEMS}=await import('../../src/game/galaxy.js');
 const {LOCATIONS}=await import('../../src/game/data.js');
 const {t,setLanguage}=await import('../../src/game/i18n.js');
@@ -18,12 +18,12 @@ const {t,setLanguage}=await import('../../src/game/i18n.js');
 test('German variables, radio entries and the labels used in lessons remain consistent',()=>{
     const fields=text=>[...text.matchAll(/\{(\w+)\}/g)].map(m=>m[1]).sort();
     for(const [en,de] of Object.entries(DE_CATALOG)) assert.deepEqual(fields(en),fields(de),en);
-    for(const line of [...TUTORIAL_RADIO,...TRAVEL_RADIO]) {
+    for(const line of TRAVEL_RADIO) {
         assert.ok(DE_CATALOG[line.text],line.id);
         if(line.system) {assert.ok(SYSTEMS[line.system]);assert.ok(DE_CATALOG[line.speaker]);}
         else assert.ok(LOCATIONS[line.destination]);
     }
-    assert.equal(new Set([...TUTORIAL_RADIO,...TRAVEL_RADIO].map(l=>l.id)).size,TUTORIAL_RADIO.length+TRAVEL_RADIO.length);
+    assert.equal(new Set(TRAVEL_RADIO.map(l=>l.id)).size,TRAVEL_RADIO.length);
     setLanguage('de');
     assert.equal(t('Dogfight Arena').toUpperCase(),t('COMBAT SIM'));
     assert.equal(t('Gauss Cannon').toUpperCase(),t('MAGRAIL'));
@@ -32,7 +32,7 @@ test('German variables, radio entries and the labels used in lessons remain cons
     assert.equal(GameUI.prototype.missionBadge({kind:'mining'}),'ABBAU');
     assert.ok(ADVENTURE_DIALOGUES.salvage.nodes.risk.text.de.includes('PDC'));
     assert.ok(t('Deploy your miners: tap MINE, or press M on desktop.').includes(t('MINE')));
-    assert.ok(ADVENTURE_DIALOGUES.salvage.nodes.payment.text.de.includes(t('SALVAGE')));
+    assert.ok(dialogueText(ADVENTURE_DIALOGUES['survey-ready'].nodes.salvage.text,'de').includes(t('SALVAGE')));
     assert.doesNotMatch(JSON.stringify(ADVENTURE_DIALOGUES),/Hundekampfarena|Langbasis-Radar|BERGUNG gedrückt|Impulswaffe/);
 });
 
@@ -45,7 +45,7 @@ test('every bar contact has German prose for roles and spoken lines',()=>{
         for(const person of location.people??[]){
             for(const field of ['role','relationship','affiliation','title'])
                 if(person[field] && !DE_CATALOG[person[field]]) missing.push(`${locationId}/${person.id}.${field}: ${person[field]}`);
-            for(const field of ['lines','linesNoPrologue'])
+            for(const field of ['lines'])
                 for(const [index,line] of (person[field]??[]).entries())
                     if(!DE_CATALOG[line]) missing.push(`${locationId}/${person.id}.${field}[${index}]: ${line}`);
         }
@@ -72,6 +72,9 @@ test('real generated wrecks provide a short and collision-clear tutorial arrival
             assert.equal(s.setFieldEntryPosition(arrival,'mourning-line',new THREE.Vector3(...direction)),true);
             const node=s.wreckNodes.find(n=>n.id===quest.flags.blackBoxTargetId);
             const target=new THREE.Vector3().fromArray(node.position),distance=arrival.distanceTo(target);
+            const frigate=GRAVEYARD_MODEL_WRECKS.find(w=>w.id==='concord-frigate-alpha-wreck');
+            const frigateCentre=new THREE.Vector3().fromArray(LOCATIONS['mourning-line'].position).add(new THREE.Vector3().fromArray(frigate.local));
+            assert.ok(target.distanceTo(frigateCentre)<410,`${seed}: recorder too far from frigate`);
             assert.ok(distance>=180 && distance<=301,`${seed}: ${distance}`);
             assert.equal(save.player.currentTargetId,node.id);
             const obstacles=s.activeFieldObstacles('mourning-line');

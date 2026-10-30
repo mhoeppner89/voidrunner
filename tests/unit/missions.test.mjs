@@ -601,16 +601,17 @@ const projection = (offers) => offers.map((offer) => ({
     assert.equal(salvage.activeMissions.length, 1);
     assert.equal(salvage.player.cargo[activeSalvage.commodity], activeSalvage.quantity);
 
-    // These are the same persisted writes made by Game.extractWreck: the
-    // target node's remaining units fall, while the recovered commodity enters
-    // the hold. A partial cut advances progress but still cannot pay out.
+    // Breaking the wreck alone cannot satisfy a claim: its actual drops must
+    // be collected from this contract's target before the cargo can be paid.
     const partial = Math.max(0, activeSalvage.quantity - 1);
-    salvage.world.depletedWrecks[activeSalvage.targetNodeId] = Math.max(0, activeSalvage.targetRemaining - partial);
+    salvage.world.depletedWrecks[activeSalvage.targetNodeId] = Math.max(0, activeSalvage.targetRemaining - activeSalvage.quantity);
+    assert.deepEqual(completeMissionsAtDock(salvage, 'rook'), []);
+    activeSalvage.salvaged=partial;
     assert.deepEqual(completeMissionsAtDock(salvage, 'rook'), []);
     assert.equal(activeSalvage.salvaged, partial);
     assert.equal(salvage.activeMissions.length, 1);
 
-    salvage.world.depletedWrecks[activeSalvage.targetNodeId] = Math.max(0, activeSalvage.targetRemaining - activeSalvage.quantity);
+    activeSalvage.salvaged=activeSalvage.quantity;
     const messages = completeMissionsAtDock(salvage, 'rook');
     assert.equal(messages.length, 1, 'a fully cut target deposit completes at the issuing dock');
     assert.equal(salvage.player.credits, startingCredits + activeSalvage.reward, 'completion returns the bond and pays the reward');
@@ -641,6 +642,7 @@ const projection = (offers) => offers.map((offer) => ({
     assert.equal(acceptMission(fractional, 'rook', fractionalOffer.id).ok, true, 'a fractional final deposit still represents one recovery cycle');
     fractional.player.cargo[fractionalOffer.commodity] = 1;
     fractional.world.depletedWrecks[fractionalOffer.targetNodeId] = 0;
+    fractional.activeMissions[0].salvaged=1;
     assert.equal(completeMissionsAtDock(fractional, 'rook').length, 1, 'cutting the fractional final unit completes its recovery contract');
 }
 

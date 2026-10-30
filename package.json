@@ -13,6 +13,7 @@
     "test:browser:wrecks": "node tests/browser/ship-wrecks.mjs",
     "test:browser:weapons": "node tests/browser/weapon-groups.mjs",
     "test:browser:loot-collection": "node tests/browser/loot-collection.mjs",
+    "test:browser:salvage": "node tests/browser/salvage-shooting.mjs",
     "test:browser:loot": "node tests/browser/loot-visuals.mjs",
     "test:browser:ship": "node tests/browser/ship-console.mjs",
     "build": "node tools/maintenance/package-runtime.mjs",

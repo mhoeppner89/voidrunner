@@ -22,6 +22,7 @@ const dockBriefings=Object.freeze({
     'fit-upgrade':['vesper','reactor-gift'],
     'mining-contract':['vesper','reactor-ready'],
     'salvage-briefing':['vesper','mining-return'],
+    'survey-graveyard':['vesper','survey-ready'],
     'meet-cairn':[undefined,'mara-cairn'],
 });
 export const tutorialWreckPoint=(id,inside=false)=>{
@@ -36,7 +37,7 @@ export const SURVEY_JUMP_MIN_DISTANCE=2000;
 const surveySteps=new Set(['survey-graveyard','survey-carrier']);
 const hidingConversation=[
     ['hideRemark',0,'Good. Their sensors cannot see us through this hull.'],
-    ['hideMemory',7,'The last time I came through this hangar, every berth was full. Hard to believe it is the same place.'],
+    ['hideMemory',7,'This hangar must have been busy once.'],
     ['hideDebt',14,'Thanks for coming back for me. Most pilots would have kept flying.'],
 ];
 export const TutorialRuntimeMethods={
@@ -79,7 +80,7 @@ export const TutorialRuntimeMethods={
             const goal=this.tutorialFormationGoal();if(person==='paul')goal.addScaledVector(this.tmpTutorialRight,-96);
             if(!ship){
                 const hull=person==='paul'?'torsas':'lancer';
-                ship=this.spawnShip('patrol',goal.toArray(),undefined,person==='paul'?'Paul · Long Memory':'Rin Vek · Second Light',{tier:'veteran',temperament:'steady'},{hullId:hull,faction:'independents'});
+                ship=this.spawnShip('patrol',goal.toArray(),undefined,person==='paul'?'Paul · Memento':'Rin Vek · Valkyrie',{tier:'veteran',temperament:'steady'},{hullId:hull,faction:'independents'});
                 Object.assign(ship,{tutorialCompanion:true,campaignCombat:true,storyPersonId:person,task:{kind:'tutorial-wing'},destination:[...ship.position],faction:'independents',hostile:false,authorizedTarget:false,dark:false,mugCapable:false,routineInspectionDue:false,noSurrender:true,identifiedByPlayer:true,playerIdentified:true,playerSensorAwareness:1,playerAwareness:1});
                 const state=q.flags['actor-'+person];if(state){ship.hull=Math.max(1,state[0]);ship.shield=Math.max(0,state[1]);if(state[2]){ship.poweredDown=true;ship.holdFire=true;ship.pursuitHoldFire=true;}}
                 this.renderer.ensureGlbShipModel?.(hull);
@@ -149,6 +150,11 @@ export const TutorialRuntimeMethods={
                 let position=offset.toArray();
                 ship=this.spawnShip('pirate',position,undefined,encounter==='mining'?'Ash Moth':`${patrol?'Redwake patrol':'Graveyard raider'} ${index+1}`,{tier:patrol?'veteran':'novice',temperament:'steady'},{hullId:hulls[index],faction:'pirates',tutorialEncounter:encounter});
                 Object.assign(ship,{tutorialEnemy:true,campaignCombat:true,tutorialEncounter:encounter,tutorialIndex:index,noSurrender:true,dark:false,mugCapable:false,targetId:patrol?undefined:encounter==='rescue'?this.ships.find(s=>s.storyPersonId==='paul')?.id:'player',playerAwareness:1,playerSensorAwareness:1,playerIdentified:true,identifiedByPlayer:true});
+                if(encounter==='mining'&&q.flags.firstRaiderSurrendered){
+                    ship.hull=ship.maxHull*.4;ship.shield=0;ship.surrendered=true;ship.hostile=false;ship.poweredDown=true;ship.fleeing=false;ship.targetId=undefined;
+                    if(Array.isArray(q.flags.firstRaiderSurrenderPosition))ship.position.splice(0,3,...q.flags.firstRaiderSurrenderPosition);
+                    ship.velocity.splice(0,3,0,0,0);
+                }
                 if(!this.entryPositionClear(point(ship.position),this.activeFieldObstacles(),30))ship.position.splice(0,3,...this.findClearSpace(ship));
                 if(encounter==='mining'&&q.stepId==='raider-standoff'){ship.holdFire=true;ship.pursuitHoldFire=true;ship.demandUntil=Number.MAX_SAFE_INTEGER;ship.destination=[...ship.position];}
                 if(patrol){ship.tutorialPatrol=true;ship.hostile=true;ship.destination=ship.position.map((v,a)=>v+(a===0?-3200:a===2?1800:0));ship.task={kind:'travel'};}
@@ -251,6 +257,9 @@ export const TutorialRuntimeMethods={
             const node=this.asteroids.find(n=>n.id===q.flags.oreTargetId);if(node){if(node.remaining<tutorialMiningQuantity(this.save)-(q.flags.oreRecovered??0)){node.remaining=tutorialMiningQuantity(this.save)-(q.flags.oreRecovered??0);this.save.world.depletedAsteroids[node.id]=node.remaining;}this.selectTarget('asteroid',node.id);}return node;
         }
         if(q.stepId==='salvage-black-box'){
+            const drop=q.flags.blackBoxDropId&&this.wreckNodes.find(n=>n.id===q.flags.blackBoxDropId&&n.remaining>0);
+            if(drop){this.selectTarget('wreck',drop.id);return drop;}
+            if(q.flags.blackBoxDropId&&!this.save.world.combatWrecks?.[q.flags.blackBoxDropId])delete q.flags.blackBoxDropId;
             let node=this.wreckNodes.find(n=>n.id===q.flags.blackBoxTargetId);
             node??=this.wreckNodes.find(n=>n.zone==='frigate-alpha'&&!n.insideWreckId&&n.remaining>0)??this.wreckNodes.find(n=>n.zone==='frigate-alpha');
             if(node){q.flags.blackBoxTargetId=node.id;if(node.remaining<=0){node.remaining=1;this.save.world.depletedWrecks[node.id]=1;}this.selectTarget('wreck',node.id);}return node;
@@ -293,7 +302,8 @@ export const TutorialRuntimeMethods={
         }
         if(s==='hide-patrol')return {kind:'waypoint',id:'tutorial-hide',position:q.flags.hidingPosition??tutorialWreckPoint('concord-carrier-wreck',true),name:t('CARRIER HANGAR · HIDE'),destinationId:'mourning-line'};
         const mining=s==='mine-shardbelt';if(!mining&&s!=='salvage-black-box')return;
-        const node=(mining?this.asteroids:this.wreckNodes)?.find(n=>n.id===q.flags[mining?'oreTargetId':'blackBoxTargetId']&&n.remaining>0);
+        const targetId=mining?q.flags.oreTargetId:q.flags.blackBoxDropId??q.flags.blackBoxTargetId;
+        const node=(mining?this.asteroids:this.wreckNodes)?.find(n=>n.id===targetId&&n.remaining>0);
         return node?{kind:mining?'asteroid':'wreck',id:node.id,position:node.position,name:t(mining?'RIN’S MINING MARKER':'BLACK BOX SIGNAL'),destinationId:mining?'shardbelt':'mourning-line'}:undefined;
     },
     applyTutorialTransition(result){
@@ -312,14 +322,14 @@ export const TutorialRuntimeMethods={
         if(s==='return-mining')this.ui.showPilotLine?.('Rin Vek',t('That covers the contract. We can return to Vesper whenever you are ready.'),'ally',12000,true);
         if(s==='raider-standoff'){this.save.player.mode='combat';this.utilityActive=false;q.flags.standoffStartedAt=this.save.world.time;this.ensureTutorialEnemy();this.ui.showPilotLine?.('Ash Moth',t('Cut your drive. That ore belongs to us. Drop it and you can leave.'),'hostile',12000,true);}
         if(s==='defeat-raider'){
-            const enemy=this.ensureTutorialEnemy();if(enemy){enemy.holdFire=false;enemy.pursuitHoldFire=false;enemy.demandUntil=0;enemy.targetId='player';}
+            const enemy=this.ensureTutorialEnemy();if(enemy&&!enemy.surrendered){enemy.holdFire=false;enemy.pursuitHoldFire=false;enemy.demandUntil=0;enemy.targetId='player';}
             this.save.player.mode='combat';this.utilityActive=false;this.introduceCampaignWingOrders();
-            this.playTutorialBriefing('combat');
+            this.playTutorialBriefing(q.flags.firstRaiderSurrendered?'surrender':'combat');
         }
         if(['rescue-paul','black-box-fight','hide-patrol'].includes(s)){q.flags.encounterStartedAt=this.save.world.time;this.ensureTutorialCompanion();this.ensureTutorialEnemy();}
-        if(s==='rescue-paul')this.ui.showPilotLine?.('Paul',t('Mayday! Two Scrappers on my tail by the cruiser. I could use a hand!'),'ally',12000,true);
+        if(s==='rescue-paul')this.ui.showPilotLine?.('Paul',t('Mayday! Two Balors on my tail by the cruiser. I could use a hand!'),'ally',12000,true);
         if(s==='talk-paul')this.playTutorialBriefing('paul-rescue');
-        if(s==='land-mining'&&q.flags.tutorialLootWreckId)this.playTutorialBriefing('loot');
+        if(s==='land-mining'&&q.flags.tutorialLootWreckId)this.playTutorialBriefing(q.flags.firstRaiderKilledAfterSurrender?'loot-surrender-killed':'loot');
         if(s==='carrier-wait')q.flags.carrierWaitStartedAt=this.save.world.time;
         if(s==='return-helix')this.playTutorialBriefing('paul-clear');
         if(s==='hide-patrol'){this.ensureTutorialHidePosition();this.playTutorialBriefing('paul-hide');}
@@ -337,7 +347,7 @@ export const TutorialRuntimeMethods={
         this.save.world.campaignUnlocked=tutorialContentUnlocked(this.save);
         if(isTutorialGuided(this.save)){this.hyperdriveEncounterAt=null;this.beamAmbushNextAt=0;}
         this.ensureTutorialEquipment();this.ensureTutorialDelivery();this.ensureTutorialMiningContract();
-        if(!this.save.player.dockedAt){if(!['earn-standing','raider-standoff','defeat-raider','hide-patrol','talk-paul','return-mining'].includes(q.stepId))this.setTutorialDestination(this.tutorialSummary().destinationId);this.ensureTutorialCompanion();this.ensureTutorialEnemy();if(q.stepId==='hide-patrol')this.ensureTutorialHidePosition();this.ensureTutorialFieldTarget();if(q.stepId==='talk-paul')this.playTutorialBriefing('paul-rescue');if(q.stepId==='defeat-raider')this.playTutorialBriefing('combat');if(q.stepId==='land-mining'&&this.save.world.combatWrecks?.[q.flags.tutorialLootWreckId])this.playTutorialBriefing('loot');}
+        if(!this.save.player.dockedAt){if(!['earn-standing','raider-standoff','defeat-raider','hide-patrol','talk-paul','return-mining'].includes(q.stepId))this.setTutorialDestination(this.tutorialSummary().destinationId);this.ensureTutorialCompanion();this.ensureTutorialEnemy();if(q.stepId==='hide-patrol')this.ensureTutorialHidePosition();this.ensureTutorialFieldTarget();if(q.stepId==='talk-paul')this.playTutorialBriefing('paul-rescue');if(q.stepId==='defeat-raider')this.playTutorialBriefing(q.flags.firstRaiderSurrendered?'surrender':'combat');if(q.stepId==='land-mining'&&this.save.world.combatWrecks?.[q.flags.tutorialLootWreckId])this.playTutorialBriefing(q.flags.firstRaiderKilledAfterSurrender?'loot-surrender-killed':'loot');}
         if(!this.save.player.dockedAt&&['hide-patrol','return-helix'].includes(q.stepId))this.playTutorialBriefing(q.stepId==='hide-patrol'?'paul-hide':'paul-clear');
         this.queueTutorialMaraCall();return this.tutorialSummary();
     },
@@ -355,11 +365,10 @@ export const TutorialRuntimeMethods={
     tutorialFlightGuidance(){
         const q=getTutorialQuest(this.save),summary=this.tutorialSummary();if(!summary?.active)return;
         const s=q.stepId,p=this.save.player,stats=this.playerStats();
-        const speaker=['survey-carrier','carrier-wait','hide-patrol','return-helix'].includes(s)?'Paul':s==='survey-graveyard'?'Wayfarer':'Rin Vek';
+        const speaker=['survey-carrier','carrier-wait','hide-patrol','return-helix'].includes(s)?'Paul':s==='survey-graveyard'?'Wanderer':'Rin Vek';
         const say=(stage,text,vars)=>({key:`${s}:${stage}`,speaker,text:t(text,vars)});
         const transit=id=>{
             const location=LOCATIONS[id],name=t(location.shortName),range=distance(p.position,location.position);
-            if(this.pendingDroneDeparture)return say('recover-drones','Your drones are returning automatically. Hyperdrive will start when they are aboard.');
             if(this.autopilot)return say('cruise','Stay on course until hyperdrive drops at {destination}.',{destination:name});
             if(range<=hyperdriveArrivalRadius(location)+160||this.activeInstanceId===id)return;
             if(p.navTargetId!==id)return say('route','Select {destination} on the navigation map.',{destination:name});
@@ -409,8 +418,8 @@ export const TutorialRuntimeMethods={
                 if(action.code==='out-of-range')return say('mining-range','Move within {range} km of the deposit to deploy your miners.',{range:action.range});
                 return say('deploy','Deploy your miners: tap MINE, or press M on desktop.');
             }
-            if(range>stats.salvageRange)return say('salvage-range','Move closer to the black box signal.');
-            return say('salvage','Hold SALVAGE to recover the black box; on desktop, hold M.');
+            if(node?.combatLoot)return say('salvage-pickup','Fly over the released flight recorder to collect it.');
+            return say('salvage','Shoot the marked wreckage, then fly over the released flight recorder.');
         }
         if(s==='hide-patrol'){
             if(p.transponder!==false)return say('dark','Switch your transponder OFF in the left monitor.');
@@ -419,7 +428,8 @@ export const TutorialRuntimeMethods={
             if(p.throttle>.01||Math.hypot(...p.velocity)>=12)return say('stop','Set thrust to zero inside the hangar.');
             return say('hidden','Stay hidden while the patrol passes.');
         }
-        const oneTask={'rescue-paul':'Help Paul defeat the two Scrappers.','defeat-raider':'Fire as the pirate crosses your sights: hold Space on desktop or FIRE on phone.','black-box-fight':'Defeat the four pirate ships.','carrier-wait':'Stay near the carrier while Paul checks the flight deck.','talk-paul':'Open Paul’s transmission.'};
+        if(s==='defeat-raider'&&q.flags.firstRaiderSurrendered)return say('capture','Keep the surrendered pirate targeted, move closer and press M or tap the capture button.');
+        const oneTask={'rescue-paul':'Help Paul defeat the two Balors.','defeat-raider':'Fire as the pirate crosses your sights: hold Space on desktop or FIRE on phone.','black-box-fight':'Defeat the four pirate ships.','carrier-wait':'Stay near the carrier while Paul checks the flight deck.','talk-paul':'Open Paul’s transmission.'};
         if(oneTask[s])return say(s,oneTask[s]);
     },
     updateTutorialGuidance(guidance){
@@ -453,14 +463,14 @@ export const TutorialRuntimeMethods={
             this.disengageHyperdrive();this.handleTutorialEvent('hyperdrive-intercept');return;
         }
         if(s==='raider-standoff'&&now-(q.flags.standoffStartedAt??now)>=FIRST_STANDOFF_SECONDS)this.handleTutorialEvent('standoff-ended');
-        if(s==='defeat-raider'&&!q.flags['briefingShown-combat'])this.playTutorialBriefing('combat');
+        if(s==='defeat-raider'&&!q.flags['briefingShown-'+(q.flags.firstRaiderSurrendered?'surrender':'combat')])this.playTutorialBriefing(q.flags.firstRaiderSurrendered?'surrender':'combat');
         if(['rescue-paul','black-box-fight'].includes(s)){
             const encounter=s==='rescue-paul'?'rescue':'black-box',count=encounter==='rescue'?2:4;
             this.ensureTutorialEnemy();if(Array.from({length:count},(_,i)=>q.flags[`defeated-${encounter}-${i}`]).every(Boolean))this.handleTutorialEvent('encounter-cleared',{encounter});
         }
         if(s==='survey-carrier'&&(q.flags.surveyIndex??0)===4&&!q.flags.carrierRemark&&!this.autopilot){
             const marker=this.tutorialFieldTarget();
-            if(marker&&distance(p.position,marker.position)<=500){q.flags.carrierRemark=true;this.ui.showPilotLine?.('Paul',t('I used to bring supplies here. The flight deck was so busy you could barely find a berth.'),'story-friend',10000,true);}
+            if(marker&&distance(p.position,marker.position)<=500){q.flags.carrierRemark=true;this.ui.showPilotLine?.('Paul',t('A Concord carrier. Still huge, even as a wreck.'),'story-friend',10000,true);}
         }
         if(this.updateTutorialSurveyProgress())return;
         if(s==='return-helix'&&!q.flags['briefingShown-paul-clear'])this.playTutorialBriefing('paul-clear');

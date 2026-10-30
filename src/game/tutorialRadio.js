@@ -1,12 +1,3 @@
-// Route-specific transmissions use the ordinary radio bar and never pause flight.
-// IDs are saved with the quest so returning to a route does not repeat a line.
-// Kept deliberately sparse: a wingman on comms drops short remarks, not
-// lectures — the objective panel carries the step-by-step instructions.
-export const TUTORIAL_RADIO = [
-    {id:'vesper-food',step:'fly-vesper',destination:'vesper',text:'Vesper needs food. Your own cargo, your own profit.'},
-    {id:'belt-route',step:'mine-shardbelt',destination:'shardbelt',text:'Select the deposit and let it scan. Your miners return automatically before hyperdrive.'},
-];
-
 // Public regional traffic continues world-building after the prologue.
 // Every transmission is heard once per career and remains in the transcript.
 // Kept short and idiomatic — traffic control talks in clipped routines, not

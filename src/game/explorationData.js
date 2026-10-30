@@ -44,8 +44,8 @@ function explorationScript(id,save){
  const log=FREIGHTER_LOGS.find(p=>id==='exploration-log-'+p.id);
  if(log){const triangulated=save?.world.exploration?.finale!=='locked'&&FREIGHTER_LOGS.every(p=>save?.world.exploration?.recovered.includes(p.id));return {start:'log',nodes:{log:{text:triangulated?log.text.map((line,i)=>line+'\n\n'+['Peilung abgeschlossen. Du kannst das Wrack im Bordlogbuch anvisieren.','Triangulation complete. You can target the wreck from the ship journal.'][i]):log.text,next:'@end'}}};}
  if(id==='exploration-salvagers')return {start:'offer',nodes:{offer:{
-  text:['Hier Sera, Driftglass. Wir waren zuerst am Wrack — aber ohne deine Peilung hätten wir es nie gefunden. Mein Angebot: Du nimmst den Reaktor und zwei Barren Gold, wir den Rest. Oder willst du wirklich alles?',
-        'Sera, Driftglass. We reached the wreck first — but without your bearings we would never have found it. My offer: you take the reactor and two gold bars, we take the rest. Or do you really want all of it?'],
+  text:['Hier Sera, Driftglass. Wir haben schon mit der Bergung begonnen. Du suchst offenbar dieselbe Fracht. Mein Angebot: Du nimmst den Reaktor und zwei Barren Gold, wir den Rest. Oder willst du wirklich alles?',
+        'Sera, Driftglass. We have already started salvaging here. You seem to be after the same cargo. My offer: you take the reactor and two gold bars, we take the rest. Or do you really want all of it?'],
   choices:[{label:['Abgemacht, wir teilen.','Done. We split it.'],explorationChoice:'share'},{label:['Ich nehme alles.','I am taking all of it.'],explorationChoice:'fight'}]}}};
 }
 export function explorationJournal(save){

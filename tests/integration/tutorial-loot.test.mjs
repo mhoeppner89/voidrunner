@@ -46,3 +46,37 @@ test('Rin’s loot lesson restores while its wreck exists and does not repeat on
  session.finishTutorialBriefing('tutorial-loot',true);session.restoreTutorialRuntime();assert.equal(calls.length,1);assert.equal(quest.flags['briefingRead-loot'],true);
  assert.ok(save.world.combatWrecks[wreck.id]);
 });
+test('first pirate surrenders at 40%, survives a lethal volley and can be captured for its unique loot',()=>{
+ const {session:s,enemy,save,quest,lines}=pirate(42),briefings=[];
+ s.playTutorialBriefing=id=>briefings.push(id);enemy.shield=0;
+ s.damageShip(enemy,enemy.maxHull*.59,'player',enemy.position);
+ assert.ok(!enemy.surrendered);assert.ok(enemy.hull>enemy.maxHull*.4);
+ s.damageShip(enemy,10000,'player',enemy.position);
+ assert.equal(enemy.hull,enemy.maxHull*.4);assert.equal(enemy.surrendered,true);assert.equal(enemy.poweredDown,true);assert.equal(enemy.fleeing,false);
+ assert.equal(quest.flags.firstRaiderSurrendered,true);assert.deepEqual(briefings,['surrender']);
+ s.damageShip(enemy,10000,'player',enemy.position);assert.equal(enemy.hull,enemy.maxHull*.4,'same volley cannot destroy the surrendering ship');
+ save.player.position.splice(0,3,enemy.position[0]+2000,enemy.position[1],enemy.position[2]);save.player.currentTargetId=enemy.id;
+ s.captureTarget();assert.equal(enemy.captured,false,'capture still requires approaching');assert.equal(quest.stepId,'defeat-raider');
+ save.player.position.splice(0,3,...enemy.position);
+ s.captureTarget();assert.equal(enemy.captured,true);assert.equal(quest.stepId,'land-mining');
+ const wreck=save.world.combatWrecks[quest.flags.tutorialLootWreckId];assert.ok(wreck);assert.equal(wreck.contents.length,1);assert.equal(wreck.contents[0].item.id,enemy.guaranteedLootId);assert.deepEqual(briefings,['surrender','loot']);
+});
+test('executing the surrendered first pirate triggers Rin’s reproach before the loot lesson',()=>{
+ const {session:s,enemy,save,quest}=pirate(43),briefings=[];s.playTutorialBriefing=id=>briefings.push(id);enemy.shield=0;
+ s.damageShip(enemy,10000,'player',enemy.position);save.world.time+=2;s.damageShip(enemy,10000,'player',enemy.position);
+ assert.equal(enemy.hull,0);assert.equal(quest.flags.firstRaiderKilledAfterSurrender,true);assert.equal(quest.stepId,'land-mining');
+ assert.ok(save.world.combatWrecks[quest.flags.tutorialLootWreckId]);assert.deepEqual(briefings,['surrender','loot-surrender-killed']);
+});
+test('surrendered tutorial pirate remains surrendered and captureable after save reload',()=>{
+ const {session:s,enemy,save}=pirate(44);enemy.shield=0;s.damageShip(enemy,10000,'player',enemy.position);
+ const restored=tutorialFixture('defeat-raider',hydrateSave(JSON.parse(JSON.stringify(save))));restored.session.ensureTutorialEnemy();
+ const ship=restored.session.ships.find(x=>x.tutorialEncounter==='mining');
+ assert.ok(ship);assert.equal(ship.surrendered,true);assert.equal(ship.poweredDown,true);assert.equal(ship.hostile,false);assert.equal(ship.hull,ship.maxHull*.4);assert.ok(ship.bountyValue>0);
+});
+test('Rin’s surrender lesson and reproach open immediately even near other hostiles',()=>{
+ const {session:s,enemy,save}=pirate(45),shown=[];s.playTutorialBriefing=GameSession.prototype.playTutorialBriefing;
+ s.hostilesVisibleNear=()=>true;s.flightDialogueAfter=999;s.ui.showStoryLine=(...args)=>shown.push(args);
+ enemy.shield=0;s.damageShip(enemy,10000,'player',enemy.position);assert.equal(shown.at(-1)[3],'tutorial-surrender');
+ s.finishTutorialBriefing('tutorial-surrender',true);save.world.time+=2;s.damageShip(enemy,10000,'player',enemy.position);
+ assert.equal(shown.at(-1)[3],'tutorial-loot-surrender-killed');
+});

@@ -91,10 +91,10 @@ export const EQUIPMENT_NAMING = {
       "en": "Cargo Expansion",
       "de": "Frachterweiterung"
     },
-    "loot-collector": {"en": "Loot Collector", "de": "Beutesammler"},
+    "loot-collector": {"en": "Tractor Beam", "de": "Traktorstrahl"},
     "salvage-mk2": {
-      "en": "Salvage Tractor",
-      "de": "Bergungstraktor"
+      "en": "Salvage Targeting",
+      "de": "Bergungszielsystem"
     },
     "frigate-battery": {
       "en": "Capital Anti-Fighter Cannon",
@@ -162,6 +162,8 @@ export const EQUIPMENT_NAMING = {
       "en": "Salvage rate",
       "de": "Bergungsrate"
     },
+    "Drone recovery range": {"en":"Drone recovery range","de":"Drohnen-Bergungsreichweite"},
+    "Salvage impact": {"en":"Salvage impact","de":"Bergungswirkung"},
     "Boost fuel use": {
       "en": "Boost fuel use",
       "de": "Boost-Verbrauch"

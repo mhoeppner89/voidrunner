@@ -33,7 +33,7 @@ export const DISTRESS_INTERCEPTS = Object.freeze([
         'Is anyone there? The main transmitter is dead — I do not know how far this carries.'],
     ['SOS. Zwei von uns sind verletzt, und wir kommen aus eigener Kraft nicht mehr weg.',
         'SOS. Two of us are hurt, and we cannot get out under our own power.'],
-    ['An alle Schiffe im Sektor: Wir brauchen einen Schlepper oder ein paar geschickte Hände. Zahle, was ich habe.',
+    ['An alle Schiffe im Sektor: Wir brauchen einen Schlepper oder ein paar geschickte Hände. Wir zahlen, was wir haben.',
         'To any ship in the sector: we need a tow or a few steady hands. Paying what I have.'],
     ['Mayday … (Rauschen) … wir halten noch, aber nicht mehr lange.',
         'Mayday … (static) … we are holding, but not for much longer.'],
@@ -98,13 +98,13 @@ const VARIANTS = [
             {
                 caller: 'Lantern', vessel: ['Prospektorenkonvoi Lantern', 'Lantern prospecting convoy'],
                 signal: ['Mayday, hier ist der Konvoi Lantern. Zwei Piraten hängen an uns und schneiden uns den Rückweg ab. Wir sind zwei unbewaffnete Frachter. Die Kompanie zahlt euch zweitausend für jedes Schiff, das hier rauskommt.',
-                    'Mayday, this is the Lantern convoy. Two raiders are on us and cutting off our way out. We are two unarmed mules. The company pays two thousand for every ship you get out of here.'],
+                    'Mayday, this is the Lantern convoy. Two raiders are on us and cutting off our way out. We are two unarmed freighters. The company pays two thousand for every ship you get out of here.'],
                 context: ['Zwei Prospektoren werden bereits beschossen.', 'Two prospectors are already under fire.'],
                 actors: [
-                    v('lantern-1', 'Lantern 1', 'mule', 'miner', [-230, 40, 0]),
-                    v('lantern-2', 'Lantern 2', 'mule', 'miner', [180, -40, 130]),
-                    p('cutlass-1', 'Cutlass 1', 'scrapper', [-850, 120, -850]),
-                    p('cutlass-2', 'Cutlass 2', 'scrapper', [800, -90, -950]),
+                    v('lantern-1', 'Hearthward', 'mule', 'miner', [-230, 40, 0]),
+                    v('lantern-2', 'Last Lantern', 'mule', 'miner', [180, -40, 130]),
+                    p('cutlass-1', 'Dust Knife', 'scrapper', [-850, 120, -850]),
+                    p('cutlass-2', 'Hollow Wager', 'scrapper', [800, -90, -950]),
                 ],
                 victims: 2, raiders: 2, reward: 2000,
                 labels: {
@@ -114,7 +114,7 @@ const VARIANTS = [
                 endings: {
                     rescued: {
                         message: ['Lantern ist durch · {reward}', 'Lantern is clear · {reward}'],
-                        farewell: ['Beide Frachter sind raus. Die Kompanie überweist noch heute — und du stehst auf ihrer Liste.', 'Both mules made it. The company pays today — and you are on their list.'],
+                        farewell: ['Beide Frachter sind raus. Die Kompanie überweist noch heute — und du stehst auf ihrer Liste.', 'Both freighters made it. The company pays today — and you are on their list.'],
                     },
                 },
             },
@@ -158,7 +158,7 @@ const VARIANTS = [
                 recorder: ['Cold Harbor, letzte Aufnahme. Fracht gesichert, Antrieb tot. Wir gehen in die Kapseln. Wer das hört: Die Kiste gehört der Crew, nicht den Haien.',
                     'Cold Harbor, final recording. Cargo secured, drive dead. We are taking the pods. Whoever hears this: the crate belongs to the crew, not the sharks.'],
                 labels: {
-                    accept: ['Ich gehe an Bord der Cold Harbor.', 'I will board Cold Harbor.'],
+                    accept: ['Ich sehe mir die Cold Harbor an.', 'I will take a look at Cold Harbor.'],
                     decline: ['Der Kanal bleibt tot.', 'Let the channel stay dead.'],
                 },
                 endings: {
@@ -261,7 +261,7 @@ const VARIANTS = [
         setups: [
             {
                 caller: 'MV Tallow', vessel: ['Frachter Tallow', 'freighter Tallow'],
-                signal: ['Tallow an alle. Uns geht der Sprit aus. Acht Einheiten, sonst treiben wir hier ab. Zahle zwölfhundert.',
+                signal: ['Tallow an alle. Uns geht der Sprit aus. Acht Einheiten, sonst treiben wir hier ab. Ich zahle zwölfhundert.',
                     'Tallow to all. We are dry. Eight units of fuel or we drift. Paying twelve hundred.'],
                 context: ['Ein Frachter hat noch Luft, aber keinen Sprit.', 'A freighter still has air, but no fuel.'],
                 actors: [v('tallow', 'Tallow', 'mule', 'trader', [0, 0, 0])],
@@ -284,20 +284,20 @@ const VARIANTS = [
             },
             {
                 caller: 'Prospektor Nettle', vessel: ['Prospektor Nettle', 'prospector Nettle'],
-                signal: ['Nettle hier. Sechs Einheiten Sprit, und ich schaffe es zurück nach Rook. Zahle, was ich habe.',
+                signal: ['Nettle hier. Sechs Einheiten Sprit, und ich schaffe es zurück nach Rook. Ich zahle, was ich habe.',
                     'Nettle here. Six units of fuel and I can make it back to Rook. Paying what I have.'],
                 context: ['Ein Prospektor ohne Reserve, weit draußen.', 'A prospector with no reserve, far out.'],
                 actors: [v('nettle', 'Nettle', 'prospector', 'miner', [0, 0, 0])],
                 fuel: 6, payment: 900,
                 labels: {
                     give: ['{fuel} Einheiten abzweigen · {payment} cr.', '{fuel} units tapped off · {payment} cr.'],
-                    donate: ['Um sonst. Du bist weit genug draußen.', 'Free of charge. You are far enough out as it is.'],
+                    donate: ['Umsonst. Du bist weit genug draußen.', 'Free of charge. You are far enough out as it is.'],
                     decline: ['Tut mir leid, Nettle.', 'Sorry, Nettle.'],
                 },
                 endings: {
                     supplied: {
                         message: ['Nettle läuft wieder · {fuel} Einheiten gegen {reward}', 'Nettle is running again · {fuel} units for {reward}'],
-                        farewell: ['Neunhundert, wie versprochen. Rook ist noch zwei Sprünge weg — das schaffe ich jetzt.', 'Nine hundred, as promised. Rook is two jumps out — I can make that now.'],
+                        farewell: ['Neunhundert, wie versprochen. Jetzt schaffe ich es zurück nach Rook.', 'Nine hundred, as promised. I can make it back to Rook now.'],
                     },
                     suppliedGift: {
                         message: ['{fuel} Einheiten geschenkt · Nettle fliegt nach Rook', '{fuel} units given away · Nettle is heading for Rook'],
@@ -335,7 +335,7 @@ const VARIANTS = [
             },
             {
                 caller: 'Prospektor Calder', vessel: ['Prospektor Calder', 'prospector Calder'],
-                signal: ['Calder hier. Riss im Förderarm, mir fehlt eine Einheit Ersatzteile. Zahle zwölfhundert — für die Teile oder für ein Paar geschickte Hände.',
+                signal: ['Calder hier. Riss im Förderarm, mir fehlt eine Einheit Ersatzteile. Ich zahle zwölfhundert — für die Teile oder für ein Paar geschickte Hände.',
                     'Calder here. Crack in the feed arm, one unit of spare parts short. Paying twelve hundred — for the parts or for a pair of skilled hands.'],
                 context: ['Ein Prospektor kann sich nicht mehr bewegen.', 'A prospector cannot move any more.'],
                 actors: [v('calder', 'Calder', 'prospector', 'miner', [0, 0, 0])],
@@ -375,15 +375,15 @@ const VARIANTS = [
                 endings: {
                     escapedClean: {
                         message: ['Hollow Tide sauber draußen · Hülle {hull}% · {reward}', 'Hollow Tide out clean · hull {hull}% · {reward}'],
-                        farewell: ['Kein Kratzer. Ich melde der Reederei, wer uns den Weg gelegt hat.', 'Not a scratch. I will tell the company who laid the path.'],
+                        farewell: ['Wir sind durch. Ich melde der Reederei, wer uns den Weg gelegt hat.', 'We are through. I will tell the company who laid the path.'],
                     },
                     escapedRough: {
                         message: ['Hollow Tide durchgeschrammt · Hülle {hull}% · {reward}', 'Hollow Tide through, scraped · hull {hull}% · {reward}'],
                         farewell: ['Wir sind durch — mit Beulen. Danke, dass du auf der Spur geblieben bist.', 'We are through — with dents. Thank you for staying on the line.'],
                     },
                     lost: {
-                        message: ['Die Sonnenfront hat Hollow Tide erreicht', 'The solar front reached Hollow Tide'],
-                        farewell: ['Die Front ist über uns. Wenn du das hörst, war es zu weit.', 'The front is over us. If you hear this, we went too wide.'],
+                        message: ['Hollow Tide im Trümmerfeld verloren', 'Hollow Tide lost in the debris field'],
+                        farewell: ['Wir schaffen es nicht mehr raus. Pass auf dich auf.', 'We are not going to make it out. Take care of yourself.'],
                     },
                 },
             },
@@ -401,15 +401,15 @@ const VARIANTS = [
                 endings: {
                     escapedClean: {
                         message: ['Sable sauber draußen · Hülle {hull}% · {reward}', 'Sable out clean · hull {hull}% · {reward}'],
-                        farewell: ['Kein Kratzer am Rumpf. Ich schulde dir eine Ladung Erz.', 'Not a scratch on the hull. I owe you a load of ore.'],
+                        farewell: ['Wir sind durch. Danke, Pilot — du hast mir den Rückflug gerettet.', 'We are through. Thank you, pilot — you saved my trip home.'],
                     },
                     escapedRough: {
                         message: ['Sable durchgeschrammt · Hülle {hull}% · {reward}', 'Sable through, scraped · hull {hull}% · {reward}'],
                         farewell: ['Das war knapp. Danke, dass du nicht abgedreht bist.', 'That was close. Thank you for not turning away.'],
                     },
                     lost: {
-                        message: ['Die Sonnenfront hat Sable erreicht', 'The solar front reached Sable'],
-                        farewell: ['Das Feld war schneller als du. Grüß Rook von mir.', 'The field was faster than you. Say hello to Rook for me.'],
+                        message: ['Sable im Trümmerfeld verloren', 'Sable lost in the debris field'],
+                        farewell: ['Wir schaffen es nicht mehr raus. Grüß Rook von mir.', 'We are not going to make it out. Say hello to Rook for me.'],
                     },
                 },
             },
@@ -773,7 +773,8 @@ function migrateLantern(result, world) {
             const pirate = actor.key.startsWith('raider');
             const match = pirate ? roster.find(entry => entry.key === `cutlass-${actor.key.split('-').at(-1)}`) : roster.find(entry => entry.key === actor.key);
             const key = pirate && match ? `cutlass-${actor.key.split('-').at(-1)}` : actor.key;
-            return {...actor, key, role: match?.role ?? actor.role, hullId: match?.hullId ?? actor.hullId, name: match?.name ?? actor.name, faction: match?.faction ?? actor.faction};
+            const name = actor.name && actor.name !== actor.key ? actor.name : match?.name ?? actor.name;
+            return {...actor, key, role: match?.role ?? actor.role, hullId: match?.hullId ?? actor.hullId, name, faction: match?.faction ?? actor.faction};
         }),
         objectives: {}, progress: {lastProgressAt: now},
         survivors: {total: 0, rescued: 0, delivered: 0}, cargo: {}, choices: {help: convoy === 'active' ? 'accepted' : 'offered'},
@@ -1010,8 +1011,8 @@ const ARRIVAL_LINES = Object.freeze({
             '{caller}: “I can see you. My nav is blind — I need your trail, not your opinion.”'],
     ],
     jettison: [
-        ['{caller}: „Die Container sind deine, wenn du sie kriegst. Keiner von uns kommt noch ran.“',
-            '{caller}: “The containers are yours if you can reach them. None of us can anymore.”'],
+        ['{caller}: „Die Container treiben noch. Keiner von uns kommt an sie ran.“',
+            '{caller}: “The containers are still drifting. None of us can reach them.”'],
         ['{caller}: „Die Kisten treiben noch. Ich komm nicht ran — der Arm ist im Eimer.“',
             '{caller}: “The crates are still drifting. I cannot reach them — the arm is gone.”'],
     ],
@@ -1202,10 +1203,10 @@ export function distressDialogue(conversationId, save) {
             const remaining = wreck ? wreck.contents.reduce((sum, entry) => sum + (entry.quantity ?? 1), 0) : 0;
             const pods = Math.max(0, (active.survivors?.total ?? 0) - (active.survivors?.rescued ?? 0));
             if (active.phase === 'involved') {
-                const cargoLine = remaining > 0 ? `Im Frachtraum liegen noch ${remaining} Einheiten.` : 'Der Frachtraum ist leer.';
+                const cargoLine = remaining === 1 ? 'Im Frachtraum liegt noch eine Einheit.' : remaining > 1 ? `Im Frachtraum liegen noch ${remaining} Einheiten.` : 'Der Frachtraum ist leer.';
                 const podLine = pods > 0 ? 'Neben dem Rumpf treibt eine Kapsel.' : 'Die Kapsel ist geborgen.';
                 node.text = [`${cargoLine} ${podLine}`,
-                    `${remaining > 0 ? `There are still ${remaining} units in the hold.` : 'The hold is empty.'} ${pods > 0 ? 'One pod is still drifting beside the hull.' : 'The pod is recovered.'}`];
+                    `${remaining === 1 ? 'There is still one unit in the hold.' : remaining > 1 ? `There are still ${remaining} units in the hold.` : 'The hold is empty.'} ${pods > 0 ? 'One pod is still drifting beside the hull.' : 'The pod is recovered.'}`];
                 node.choices = [choice(['Ich räume das Wrack.','I am stripping the wreck.'], 'close'), choice(['Ich lasse es liegen.','I am leaving it.'], 'withdraw')];
             } else {
                 node.text = scene;
@@ -1258,8 +1259,8 @@ export function distressDialogue(conversationId, save) {
             const partLine = hasParts
                 ? (data.parts === 1 ? 'Du hast die eine Einheit an Bord, oder?' : `Du hast die ${partCount} Einheiten an Bord, oder?`)
                 : (data.parts === 1 ? 'Ich brauche eine Einheit Ersatzteile, und ich habe keine.' : `Ich brauche ${partCount} Einheiten Ersatzteile, und ich habe keine.`);
-            node.text = [`${opener}\n\n${partLine} Eine Reparaturdrohne tut es auch — oder du kommst selbst rüber und hältst die Hände still.`,
-                `${opener}\n\n${hasParts ? `You have the ${data.parts === 1 ? 'one unit' : `${data.parts} units`} aboard, right?` : `I need ${data.parts === 1 ? 'one unit' : `${data.parts} units`} of parts, and I have none.`} A repair drone would do it too — or you come aboard and keep your hands steady.`];
+            node.text = [`${opener}\n\n${partLine} Eine Reparaturdrohne tut es auch — oder du kommst selbst rüber und hilfst bei der Reparatur.`,
+                `${opener}\n\n${hasParts ? `You have the ${data.parts === 1 ? 'one unit' : `${data.parts} units`} aboard, right?` : `I need ${data.parts === 1 ? 'one unit' : `${data.parts} units`} of parts, and I have none.`} A repair drone would do it too — or you come aboard and help with the repairs.`];
             node.choices = [
                 ...(hasParts ? [choice(distressChoiceLabel(active, 'parts', [`${data.parts === 1 ? 'Eine Einheit' : `${data.parts} Einheiten`} Ersatzteile abgeben.`, `Hand over ${data.parts === 1 ? 'one unit' : `${data.parts} units`} of parts.`], {parts: data.parts}), 'parts')] : []),
                 ...(hasRepairDrone(save) ? [choice(['Reparaturdrohne schicken.','Send a repair drone.'], 'drone')] : []),
@@ -1288,7 +1289,7 @@ export function distressDialogue(conversationId, save) {
                     title: ['Geleit durch das Trümmerfeld', 'Escort through the debris'],
                     rows: [
                         {label: ['AUFGABE', 'OBJECTIVE'], value: p.joinedAt
-                            ? ['Bojen folgen bis der Frachter draußen springen kann', 'Follow the beacons until the transport can jump clear']
+                            ? ['Bojen folgen, bis der Frachter draußen springen kann', 'Follow the beacons until the transport can jump clear']
                             : ['Längsseits gehen, dann die Bojen für die Spur legen', 'Come alongside, then lay the beacons for the trail']},
                         {label: ['STURM', 'STORM'], value: p.joinedAt ? [clock(left), clock(left)] : [`${clock(left)} ab Übergabe`, `${clock(left)} after handover`]},
                         {label: ['HÜLLE', 'HULL'], value: [`${hull}%`, `${hull}%`]},
@@ -1357,7 +1358,7 @@ export function distressDialogue(conversationId, save) {
             if (active.phase === 'involved') {
                 const backed = active.progress?.side === 'side-b' ? rivalName : active.caller;
                 const enemy = active.progress?.side === 'side-b' ? active.caller : rivalName;
-                node.text = [`${backed}: „Wir bleiben unten. ${enemy} kommt auf dich zu — Waffen oben.“`,
+                node.text = [`${backed}: „Wir bleiben unten. ${enemy} kommt auf dich zu — Waffen bereit.“`,
                     `${backed}: “We are staying down. ${enemy} is coming for you — guns up.”`];
                 node.choices = [
                     choice(['Ich nehme sie auseinander.','I will take them apart.'], 'close'),

@@ -426,10 +426,8 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
     }
     // Keep the existing ordinary board intact and add one concrete Salvage
     // Union recovery slot on Helios boards. The target is a real Mourning Line
-    // deposit, not an abstract cargo request: completion reads the same
-    // depleted-wreck ledger that the flight extractor updates. This keeps
-    // bought components from satisfying a contract without a second progress
-    // system, while leaving all pre-existing offer rolls unchanged.
+    // deposit, not an abstract cargo request: only drops released and picked up
+    // under that claim count, so purchased cargo cannot fulfill it.
     if (count > 0 && LOCATIONS[locationId].systemId === LOCATIONS['mourning-line'].systemId) {
         const candidates = generateWreckNodes(save.world.seed, save.world.depletedWrecks, save.world.scannedNodes)
             .filter((node) => node.remaining > 0 && !postedSalvageNodeIds.has(node.id) && !activeSalvageNodeIds.has(node.id));
@@ -463,7 +461,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
                 guild: 'salvage',
                 guildRep: 7 + Math.floor(quantity / 2) + rank,
                 faction: 'independents',
-                briefing: t('Recover {quantity} units of {commodity} from {wreck} in the Mourning Line and bring them back to {station}. Only components cut from that deposit count; market cargo cannot clear the claim.', { quantity, commodity: t(COMMODITIES[target.salvage].name), wreck: target.name, station: LOCATIONS[locationId].name }),
+                briefing: t('Scan and shoot {wreck} in the Mourning Line, collect {quantity} units of {commodity}, then bring them to {station}. Only cargo recovered from this wreck counts; market cargo cannot clear the claim.', { quantity, commodity: t(COMMODITIES[target.salvage].name), wreck: target.name, station: LOCATIONS[locationId].name }),
             });
         }
     }
@@ -499,6 +497,7 @@ export const acceptMission = (save, locationId, missionId) => {
         // deposit at acceptance so progress is measured only after the bond is
         // posted, even if a stale board entry has a different snapshot.
         offered.targetRemaining = target.remaining;
+        offered.salvagePickupAccounting = true;
     }
     if (offered.kind === 'delivery' || offered.kind === 'transport' || offered.kind === 'smuggle') {
         const units = offered.quantity ?? 0;
@@ -641,11 +640,8 @@ export const completeMissionsAtDock = (save, locationId) => {
             messages.push(awardMission(save, mission));
         }
         else if (mission.kind === 'salvage' && mission.targetNodeId && mission.commodity && mission.quantity) {
-            // A salvage contract points at one generated wreck deposit. The
-            // flight extractor writes that node's remaining units to
-            // `depletedWrecks`; comparing the accepted baseline with the live
-            // node makes progress real and target-specific. Carrying bought
-            // components alone therefore cannot clear the contract.
+            // New claims count collected drops; legacy active claims retain
+            // their old depletion-based accounting until the next shot.
             const target = wreckNodeForSave(save, mission.targetNodeId);
             if (!target || target.salvage !== mission.commodity)
                 continue;
@@ -653,7 +649,8 @@ export const completeMissionsAtDock = (save, locationId) => {
             const remaining = Number(target.remaining);
             if (!Number.isFinite(baseline) || !Number.isFinite(remaining))
                 continue;
-            const recovered = Math.max(0, salvageUnitsRemaining(baseline) - salvageUnitsRemaining(remaining));
+            const recovered = mission.salvagePickupAccounting ? Math.max(0,Number(mission.salvaged)||0)
+                : Math.max(0, salvageUnitsRemaining(baseline) - salvageUnitsRemaining(remaining));
             mission.salvaged = Math.min(mission.quantity, recovered);
             if (recovered + 0.001 < mission.quantity)
                 continue;

@@ -15,7 +15,7 @@ import { CanvasSizeCache } from './canvasSizeCache.js';
 import {cockpitDamageMarkup,CANOPY_APERTURES} from './cockpitDamage.js';
 import {RUN_EQUIPMENT_RARITY,RUN_WAVES,HULL_STAGES,DECISION_STAGES,isPendingDecision,waveAct,readArenaRun,arenaRecord,runScore,runRewardPlan,runHullOffers,runWingmanOffers,WING_ORDERS,WING_ORDER_LABEL,WING_ORDER_HINT,WING_ORDER_SHORT,normalizeWingOrder,wingmanOrder} from './arenaRun.js';
 import {MAX_RUN_WINGMEN} from './shipPool.js';
-import { COMMODITIES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, LOCATIONS, SHIPS, SYSTEM_MAP_EXTENT, commodityIds, displaySpeed, routeDistanceBetween } from './data.js';
+import { COMMODITIES, CONCORD_CAPITAL_CLASSES, DOCK_LOCATION_IDS, EQUIPMENT, FACTION_NAMES, GUILD_NAMES, GUILD_RANK_NAMES, LOCATIONS, SHIPS, SYSTEM_MAP_EXTENT, commodityIds, displaySpeed, routeDistanceBetween } from './data.js';
 import { JUMP_ROUTES, SYSTEMS, planRoute } from './galaxy.js';
 import { bestKnownTradeRoute, cargoCapacity, cargoMass, currentProfitableRoutes, denPrice, knownMarketQuotes, quoteCommodityTrade, SYNDICATE_DEN_FAVOR } from './economy.js';
 import { formatCredits, formatDuration, formatNumber } from './random.js';
@@ -98,7 +98,7 @@ const sortieImpactMarkup = (item, before = {}, after = {}) => {
         'thrusters-mk2': t('Tighter evasion: turning {before} → {after}; speed {speed} km/s.', { before: previous('angularAcceleration', 2), after: value('angularAcceleration', 2), speed: value('maxSpeed') }),
         'radar-mk2': t('Earlier contact and safer scans: radar {before} → {after} km; scan {scanBefore} → {scanAfter} km.', { before: previous('radarRange'), after: value('radarRange'), scanBefore: previous('scanRange'), scanAfter: value('scanRange') }),
         'cargo-pods': t('More earning capacity per run: cargo {before} → {after} mass.', { before: previous('cargo'), after: value('cargo') }),
-        'salvage-mk2': t('More salvage per approach: pull range {beforeRange} → {range} km; recovery rate {beforeRate} → {rate}×.', { beforeRange: previous('salvageRange'), range: value('salvageRange'), beforeRate: (before.salvageRate ?? 1).toFixed(2), rate: (after.salvageRate ?? 1).toFixed(2) }),
+        'salvage-mk2': t('Break wreckage faster: salvage impact {beforeRate} → {rate}×; drone recovery range {beforeRange} → {range} km.', { beforeRange: previous('salvageRange'), range: value('salvageRange'), beforeRate: (before.salvageRate ?? 1).toFixed(2), rate: (after.salvageRate ?? 1).toFixed(2) }),
     }[item.id];
     return lines ? `<aside class="fit-impact"><b>${t('SORTIE IMPACT')}</b><span>${escapeHtml(lines)}</span></aside>` : '';
 };
@@ -462,7 +462,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2lu';
+const GAME_VERSION = '0.8.2mn';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -2791,29 +2791,21 @@ export class GameUI {
         const personId = this.guildRepresentativeId(guildId, locationId);
         return this.barPeople(locationId).find((person) => person.id === personId);
     }
-    personGuildId(personId) {
-        return Object.entries(GUILD_REPRESENTATIVE_BY_LOCATION[this.dockLocation] ?? {})
-            .find(([, representativeId]) => representativeId === personId)?.[0];
-    }
     dialogueTopics(person) {
         const topics = [];
         if (tutorialContentUnlocked(this.save) && hasAnyLocationService(this.dockLocation, ['missions', 'race']))
             topics.push({ id: 'work', label: t('WORK') });
         if (person.marketTipster)
             topics.push({ id: 'market', label: t('TRADE TIP') });
-        if (this.personGuildId(person.id))
-            topics.push({ id: 'guild', label: t('GUILD') });
         return topics.slice(0, 4);
     }
     dialogueMission(person) {
-        const guildId = this.personGuildId(person.id);
-        return this.save.activeMissions.find((mission) => guildId && mission.guild === guildId)
-            ?? this.save.activeMissions.find((mission) => mission.origin === this.dockLocation || mission.destination === this.dockLocation);
+        return this.save.activeMissions.find((mission) => mission.origin === this.dockLocation || mission.destination === this.dockLocation);
     }
     dialogueResponse(person, topicId) {
         const memory = this.save.world.npcMemory?.[person.id] ?? { topics: {}, talks: 0 };
         const count = Math.max(0, (memory.topics?.[topicId] ?? 1) - 1);
-        const lines = ((this.prologueUnplayed() && person.linesNoPrologue) || person.lines || []).map((line) => t(line));
+        const lines = (person.lines || []).map((line) => t(line));
         const activeMission = this.dialogueMission(person);
         if (topicId === 'work') {
             if (activeMission) {
@@ -2850,17 +2842,6 @@ export class GameUI {
                 destinationId: route.destinationId,
             };
         }
-        if (topicId === 'guild') {
-            const guildId = this.personGuildId(person.id);
-            const joined = guildId && (this.save.player.guildRep[guildId] ?? 0) > 0;
-            return {
-                text: joined
-                    ? t('Your {guild} standing is {rep} reputation. The local desk can show what the next rank actually unlocks.', { guild: t(GUILD_NAMES[guildId]), rep: this.save.player.guildRep[guildId] })
-                    : t('I can register you with the {guild} here. The entry fee is {credits}; read the terms before you sign.', { guild: t(GUILD_NAMES[guildId]), credits: formatCredits(guildJoinCost(guildId)) }),
-                action: 'guilds',
-                actionLabel: t('VIEW GUILD DESK'),
-            };
-        }
         if (topicId === 'greeting') {
             const npcMemory = this.save.world.npcMemory ?? {};
             const current = npcMemory[person.id] ?? {};
@@ -2868,20 +2849,11 @@ export class GameUI {
                 [person.id]:{...current,topics:{...current.topics,greeting:(current.topics?.greeting ?? 0)+1}}}}}, person.id);
             if (campaignLine)
                 return { text: t(campaignLine) };
-            const damaged = this.save.player.hull < getEffectiveShipStats(this.save.player).hull * 0.55;
-            if (damaged && /mechanic|shipwright|engineer/i.test(person.role))
-                return { text: t('That hull has had a hard run. I would inspect the pressure structure before taking another contract.') };
-            if (this.save.player.transponder === false && /customs|fixer|broker|marshal/i.test(person.role))
-                return { text: t('You came in without broadcasting a name. Around here, people notice that even when the official log does not.') };
             if ((memory.topics?.greeting ?? 0) > 1 && activeMission)
                 return { text: t('Back already? Your contract is still active. If the situation changed, the board has the current details.') };
             return { text: lines[0] ?? t('What do you need?') };
         }
-        // Each authored contact line has a fixed purpose: greeting, advice,
-        // then local news. Repeatedly opening one topic should never rotate
-        // into a greeting or a different topic just because its counter rose.
-        const lineIndex = topicId === 'advice' ? 1 : 2;
-        return { text: lines[lineIndex] ?? lines[0] ?? t('Nothing useful comes to mind.') };
+        return { text: lines[0] ?? t('What do you need?') };
     }
     selectDialogueTopic(topicId) {
         const person = this.barPeople().find((entry) => entry.id === this.barPersonId);
@@ -2912,7 +2884,7 @@ export class GameUI {
     }
     // A career that skipped (or never started) the prologue never flew the
     // escort, the delivery or the practice flights those conversations describe.
-    // Its copies of them must not promise a Second Light that never takes off.
+    // Its copies of them must not promise a Valkyrie that never takes off.
     prologueUnplayed() {
         const quest = getTutorialQuest(this.save);
         return !quest || quest.flags?.skipped === true;
@@ -2939,8 +2911,8 @@ export class GameUI {
                 this.adventure.node.choices = [
                     ...(this.dialogueTopics(person).length ? [{label:this.adventureLabel('Ich habe ein paar Fragen.','I have a few questions.'),next:'@topics'}] : []),
                     heard
-                        ? {label:this.adventureLabel('Noch einmal: Wie fing das mit der Wayfarer an?','Tell me again: how did this start with the Wayfarer?'),replay}
-                        : {label:this.adventureLabel('Wie fing das mit der Wayfarer an?','How did this start with the Wayfarer?'),replay},
+                        ? {label:this.adventureLabel('Noch einmal: Wie fing das mit der Wanderer an?','Tell me again: how did this start with the Wanderer?'),replay}
+                        : {label:this.adventureLabel('Wie fing das mit der Wanderer an?','How did this start with the Wanderer?'),replay},
                 ];
             }
         }
@@ -2981,9 +2953,6 @@ export class GameUI {
         const labels = {
             work: ['Hast du Arbeit für mich?', 'Know of any work?'],
             market: ['Womit lässt sich hier Geld verdienen?', 'What trades well around here?'],
-            guild: ['Erzähl mir von deiner Gilde.', 'Tell me about your guild.'],
-            local: ['Was gibt es Neues?', 'What is happening around here?'],
-            advice: ['Was sollte ich wissen, bevor ich starte?', 'What should I know before I launch?'],
         };
         state.node = { text: state.node.text,
             choices: this.dialogueTopics(state.person).filter(topic => !state.asked.has(topic.id)).map(topic => ({topic:topic.id,label:this.adventureLabel(...labels[topic.id])}))
@@ -4231,7 +4200,7 @@ export class GameUI {
           <section class="ship-showroom-sheet">
             <div class="ship-sheet-scroll"><div class="ship-spec-grid">${stats.filter(([label])=>!['AFTERBURNER','FUEL'].includes(label)).map(([label, value, delta, digits = 0]) => `<div><span title="${t(label)}">${specLabel(label)}</span><b>${value}</b>${this.statDelta(delta, digits)}</div>`).join('')}</div>
             <div class="ship-hardpoints" aria-label="${t('INSTALLED EQUIPMENT')}">
-              ${[['Weapon','Weapon',hardpoints.weapons?.length??hardpoints.guns.length],['Utility','Utility',hardpoints.utility.length],['Drone bays','Drone bays',hardpoints.droneBays?.length??0],['Turret','Turret',hardpoints.turrets?.length??0]].map(([label,icon,n])=>`<div title="${t(label)}" aria-label="${t(label)}"><span>${t(icon)}</span><b>${n}</b></div>`).join('')}
+              ${[['Weapon','Weapon',hardpoints.weapons?.length??hardpoints.guns.length],['Utility','Utility',hardpoints.utility.length],['Drone bays','Drones',hardpoints.droneBays?.length??0],['Turret','Turret',hardpoints.turrets?.length??0]].map(([label,icon,n])=>`<div title="${t(label)}" aria-label="${t(label)}"><span>${t(icon)}</span><b>${n}</b></div>`).join('')}
             </div>
             <details class="ui-details ship-details"><summary>${t('Details')}</summary><div class="ship-spec-grid">${stats.filter(([label])=>['AFTERBURNER','FUEL'].includes(label)).map(([label,value,delta,digits=0])=>`<div><span>${t(label)}</span><b>${value}</b>${this.statDelta(delta,digits)}</div>`).join('')}</div><p class="ship-description">${escapeHtml(t(ship.description))}</p><p class="ship-career-note">${(ship.progressesTo ?? []).length ? `Suggested next ships: ${ship.progressesTo.map(id=>SHIPS[id].name).join(" · ")}` : "Top tier in this role"}</p>${ship.price ? `<p class="ship-career-note">Outfitting budget: ${formatCredits(Math.round(ship.price*.2))}–${formatCredits(Math.round(ship.price*.35))} extra.</p>` : ""}<p class="ship-handling-note">${t('Handling falls up to 24% as the cargo hold fills.')}</p></details></div>
             ${active ? '' : `<div class="ship-trade-panel">
@@ -4378,16 +4347,16 @@ export class GameUI {
         // Resolve the same catalogue definition used by the inventory first.
         const definition=entry.kind==='equipment'?(OUTFIT_ITEMS[entry.item?.id]??OUTFIT_ITEMS[entry.item?.baseId]):entry.kind==='drone'?OUTFIT_ITEMS[entry.type+'-drone']:undefined;
         const item=definition?{...definition,...(entry.kind==='equipment'?entry.item:{}),baseName:definition.baseName??definition.name}:undefined;
-        const commodity=entry.kind==='cargo'?COMMODITIES[entry.commodity]:undefined;
+        const commodity=entry.kind==='cargo'?COMMODITIES[entry.tutorialRecorder?'electronics':entry.commodity]:undefined;
         if(!item&&!commodity)return;
-        const key=commodity?'cargo:'+commodity.id:entry.kind+':'+(entry.item?.id??entry.type);
+        const key=entry.tutorialRecorder?'mission:flight-recorder':commodity?'cargo:'+commodity.id:entry.kind+':'+(entry.item?.id??entry.type);
         const queue=this.spacePickupQueue??=[];
         const current=this.spacePickupReceipt;
         const existing=current?.key===key&&current.until>(this.save?.world.time??0)?current:queue.find(p=>p.key===key);
         if(existing){existing.quantity+=quantity;existing.markup=undefined;if(existing===current)existing.until=this.save.world.time+5;return;}
         // Bound transient presentation only; the actual cargo is already saved.
         if(queue.length>=32)queue.shift();
-        queue.push({key,quantity,item,commodity:commodity?.id,name:commodity?t(commodity.name):equipmentName(item)});
+        queue.push({key,quantity,item,commodity:commodity?.id,name:entry.tutorialRecorder?t('Recorder'):commodity?t(commodity.name):equipmentName(item)});
     }
     updateSpacePickup() {
         const layout=this.el('.cockpit-screen-own .screen-ship-layout');if(!layout)return;
@@ -4790,14 +4759,15 @@ export class GameUI {
         if (this.weaponButtonState?.length === state.length && state.every((value, index) => value === this.weaponButtonState[index])) return;
         this.weaponButtonState = state;
         fire.classList.remove('is-mining', 'is-salvage', 'is-surrendered', 'is-recalling');
-        missile.classList.remove('is-hidden', 'is-scan');
+        missile.classList.remove('is-scan');
+        missile.classList.toggle('is-hidden', salvage);
         missile.classList.toggle('is-mining', mining);
         missile.classList.toggle('is-salvage', salvage);
         missile.classList.toggle('is-recalling', droneMining && drones.phase === 'recalling');
         missile.classList.toggle('is-capture', surrendered);
         missile.classList.toggle('is-empty', missileAction && missileCurrent <= 0);
         fire.dataset.touchAction = 'fire';
-        missile.dataset.touchAction = droneMining ? 'miningDrones' : salvage ? 'utility' : surrendered ? 'capture' : 'missile';
+        missile.dataset.touchAction = droneMining ? 'miningDrones' : surrendered ? 'capture' : 'missile';
         fire.disabled = false;
         fire.title = '';
         missile.disabled = droneMining ? droneAction?.ok !== true : surrendered && !capture;
@@ -4806,7 +4776,7 @@ export class GameUI {
                 icon.classList.toggle('is-hidden', icon.dataset.icon !== name);
         };
         showIcon(fire, 'fire');
-        showIcon(missile, droneMining ? 'none' : salvage ? 'salvage' : surrendered ? 'capture' : 'missile');
+        showIcon(missile, droneMining ? 'none' : surrendered ? 'capture' : 'missile');
         const fireText = this.el('#touch-drone-label');
         if (fireText) { fireText.classList.remove('is-hidden'); fireText.textContent = t('FIRE'); }
         let utilityText = missile.querySelector('.touch-utility-label');
@@ -4817,7 +4787,7 @@ export class GameUI {
         }
         utilityText.textContent = droneMining ? droneLabel : '';
         utilityText.classList.toggle('is-hidden', !droneMining);
-        missile.title = droneMining ? droneAction?.label ?? droneLabel : salvage ? t('Salvage — hold') : '';
+        missile.title = droneMining ? droneAction?.label ?? droneLabel : '';
         const launcherCycle = this.el('#touch-launcher-cycle');
         const missileCount = this.el('#touch-missile-count');
         const launcherCode = this.el('#touch-launcher-code');
@@ -4842,9 +4812,7 @@ export class GameUI {
             showIcon(fire,'brake');if(fireText)fireText.textContent=t('BRAKE');fire.setAttribute('aria-label',t('Brake — hold'));return;
         }
         fire.setAttribute('aria-label', t('Fire — hold'));
-        missile.setAttribute('aria-label', droneMining ? droneAction?.label ?? droneLabel : salvage
-            ? t('Salvage — hold')
-                : capture
+        missile.setAttribute('aria-label', droneMining ? droneAction?.label ?? droneLabel : capture
                     ? t('Capture surrendered pilot')
                     : surrendered
                     ? target.captureClaimable === false ? t('Capture unavailable — no claim') : t('Capture unavailable — approach target')
@@ -6230,7 +6198,7 @@ export class GameUI {
             ? config.catalog.map((entry) => [entry.id, entry.label, entry.capital ? 'CAPITAL HULL' : paletteFitLabels[entry.defaultFit] ?? paletteFitLabels.varied])
             : [
                 ...Object.entries(SHIPS).map(([id, ship]) => [id, ship.name.toUpperCase(), 'STOCK LOADOUT']),
-                ...['frigate', 'cruiser', 'battleship', 'carrier'].map(id => [id, `CONCORD ${id.toUpperCase()}`, 'CAPITAL HULL']),
+                ...Object.entries(CONCORD_CAPITAL_CLASSES).map(([id, name]) => [id, `${name.toUpperCase()} · ${id.toUpperCase()}`, 'CAPITAL HULL']),
             ];
         this.observerNodes.clear();
         panel.innerHTML = `
